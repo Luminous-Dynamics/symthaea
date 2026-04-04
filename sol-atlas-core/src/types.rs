@@ -23,6 +23,10 @@ pub enum Layer {
     Robotics,
     FossilDeposits,
     Nuclear,
+    Earthquakes,
+    Fires,
+    Storms,
+    Volcanoes,
 }
 
 impl Layer {
@@ -31,6 +35,7 @@ impl Layer {
             Self::Energy, Self::Geothermal, Self::Maglev, Self::ResontiaVaults,
             Self::TerraLumina, Self::Regions, Self::SupplyChain, Self::Climate,
             Self::Emergency, Self::Health, Self::Robotics, Self::FossilDeposits, Self::Nuclear,
+            Self::Earthquakes, Self::Fires, Self::Storms, Self::Volcanoes,
         ]
         .into_iter()
         .collect()
@@ -51,6 +56,10 @@ impl Layer {
             Self::Robotics => "Robotics Dispatch",
             Self::FossilDeposits => "Fossil Deposits",
             Self::Nuclear => "Nuclear Sites",
+            Self::Earthquakes => "Earthquakes",
+            Self::Fires => "Active Fires",
+            Self::Storms => "Storms",
+            Self::Volcanoes => "Volcanoes",
         }
     }
 
@@ -69,6 +78,10 @@ impl Layer {
             Self::Robotics => "#8b5cf6",
             Self::FossilDeposits => "#b8860b",
             Self::Nuclear => "#a855f7",
+            Self::Earthquakes => "#e53e3e",
+            Self::Fires => "#ed8936",
+            Self::Storms => "#4299e1",
+            Self::Volcanoes => "#e53e3e",
         }
     }
 
@@ -88,6 +101,10 @@ impl Layer {
             Self::Robotics => [0.545, 0.361, 0.965],
             Self::FossilDeposits => [0.72, 0.53, 0.04],
             Self::Nuclear => [0.659, 0.333, 0.969],
+            Self::Earthquakes => [0.9, 0.15, 0.1],
+            Self::Fires => [0.95, 0.5, 0.1],
+            Self::Storms => [0.1, 0.7, 0.9],
+            Self::Volcanoes => [0.9, 0.3, 0.05],
         }
     }
 }
@@ -450,6 +467,25 @@ pub struct LoadedData {
     pub robotics_dispatch: Vec<RoboticsDispatch>,
     pub fossil_deposits: Vec<FossilDeposit>,
     pub nuclear_sites: Vec<NuclearSite>,
+    pub natural_events: Vec<NaturalEvent>,
+}
+
+/// Natural event from USGS, NASA EONET, FIRMS, or volcanoes.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NaturalEvent {
+    pub lat: f64,
+    pub lon: f64,
+    pub event_type: NaturalEventType,
+    pub magnitude: f64,
+    pub name: String,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
+pub enum NaturalEventType {
+    Earthquake,
+    Fire,
+    Storm,
+    Volcano,
 }
 
 // ─── Hover/Selection ────────────────────────────────────────────

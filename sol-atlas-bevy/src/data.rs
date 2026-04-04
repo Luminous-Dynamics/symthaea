@@ -22,6 +22,14 @@ const FOSSIL_DEPOSITS_JSON: &str =
     include_str!("../../sol-atlas-leptos/assets/data/fossil-deposits.json");
 const NUCLEAR_SITES_JSON: &str =
     include_str!("../../sol-atlas-leptos/assets/data/nuclear-sites.json");
+const EARTHQUAKES_JSON: &str =
+    include_str!("../../sol-atlas-leptos/assets/data/usgs-earthquakes.json");
+const FIRES_JSON: &str =
+    include_str!("../../sol-atlas-leptos/assets/data/nasa-firms.json");
+const STORMS_JSON: &str =
+    include_str!("../../sol-atlas-leptos/assets/data/nasa-eonet.json");
+const VOLCANOES_JSON: &str =
+    include_str!("../../sol-atlas-leptos/assets/data/volcanoes.json");
 
 /// Load all static datasets at compile time.
 pub fn load_all() -> LoadedData {
@@ -36,5 +44,9 @@ pub fn load_all() -> LoadedData {
         INFRA_JSON,
         FOSSIL_DEPOSITS_JSON,
         NUCLEAR_SITES_JSON,
+        EARTHQUAKES_JSON,
+        FIRES_JSON,
+        STORMS_JSON,
+        VOLCANOES_JSON,
     )
 }

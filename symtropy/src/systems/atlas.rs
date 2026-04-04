@@ -622,6 +622,50 @@ pub fn setup_globe_view(
         ));
     }
 
+    // ─── Natural Events (ALWAYS VISIBLE) ──────────────────────────
+    // Earthquakes, fires, storms, volcanoes from USGS/NASA/NOAA.
+    let event_mesh = meshes.add(Sphere::new(1.0).mesh().uv(6, 6));
+    for event in &data.natural_events {
+        let pos = geo::lat_lon_to_xyz(event.lat, event.lon, 1.015);
+        let (c, size, layer) = match event.event_type {
+            sol_atlas_core::types::NaturalEventType::Earthquake => {
+                let s = 0.006 + (event.magnitude as f32 / 8.0).min(1.0) * 0.012;
+                ([0.9, 0.15, 0.1], s, Layer::Earthquakes)
+            }
+            sol_atlas_core::types::NaturalEventType::Fire => {
+                ([0.95, 0.5, 0.1], 0.005, Layer::Fires)
+            }
+            sol_atlas_core::types::NaturalEventType::Storm => {
+                ([0.1, 0.7, 0.9], 0.008, Layer::Storms)
+            }
+            sol_atlas_core::types::NaturalEventType::Volcano => {
+                ([0.9, 0.3, 0.05], 0.007, Layer::Volcanoes)
+            }
+        };
+        let mat = materials.add(StandardMaterial {
+            base_color: Color::linear_rgba(c[0], c[1], c[2], 0.7),
+            emissive: LinearRgba::new(c[0] * 0.4, c[1] * 0.4, c[2] * 0.4, 1.0),
+            alpha_mode: AlphaMode::Blend,
+            unlit: true,
+            ..default()
+        });
+        commands.spawn((
+            Mesh3d(event_mesh.clone()),
+            MeshMaterial3d(mat),
+            Transform::from_xyz(pos[0], pos[1], pos[2]).with_scale(Vec3::splat(size)),
+            MarkerPulse {
+                speed: 2.0,
+                amplitude: 0.2,
+                phase: event.lat as f32 * 0.3,
+                base_scale: size,
+            },
+            DataMarker { layer, name: event.name.clone() },
+            // NO LOD tag — always visible
+            AtlasEntity,
+        ));
+    }
+    info!("[atlas] {} natural events loaded (earthquakes + fires + storms + volcanoes)", data.natural_events.len());
+
     // ─── Solar System Bodies ────────────────────────────────────
     let bodies = sol_atlas_core::solar_system::solar_system_bodies();
     let body_mesh = meshes.add(Sphere::new(1.0).mesh().uv(32, 32)); // higher detail for textured planets

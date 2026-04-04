@@ -1,0 +1,136 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "volcano",
+        "source": "Smithsonian GVP",
+        "name": "Kilauea",
+        "status": "erupting",
+        "country": "USA",
+        "hazard_level": "high",
+        "quality_score": 0.9,
+        "data_lineage": [
+          "Smithsonian",
+          "Global Volcanism Program",
+          "Expert Review"
+        ],
+        "verification_status": "expert_verified"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -155.287,
+          19.421
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "volcano",
+        "source": "Smithsonian GVP",
+        "name": "Etna",
+        "status": "active",
+        "country": "Italy",
+        "hazard_level": "moderate",
+        "quality_score": 0.9,
+        "data_lineage": [
+          "Smithsonian",
+          "Global Volcanism Program",
+          "Expert Review"
+        ],
+        "verification_status": "expert_verified"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          15.004,
+          37.734
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "volcano",
+        "source": "Smithsonian GVP",
+        "name": "Fuji",
+        "status": "dormant",
+        "country": "Japan",
+        "hazard_level": "moderate",
+        "quality_score": 0.9,
+        "data_lineage": [
+          "Smithsonian",
+          "Global Volcanism Program",
+          "Expert Review"
+        ],
+        "verification_status": "expert_verified"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          138.728,
+          35.361
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "volcano",
+        "source": "Smithsonian GVP",
+        "name": "Vesuvius",
+        "status": "dormant",
+        "country": "Italy",
+        "hazard_level": "moderate",
+        "quality_score": 0.9,
+        "data_lineage": [
+          "Smithsonian",
+          "Global Volcanism Program",
+          "Expert Review"
+        ],
+        "verification_status": "expert_verified"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          14.426,
+          40.821
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "volcano",
+        "source": "Smithsonian GVP",
+        "name": "Mauna Loa",
+        "status": "active",
+        "country": "USA",
+        "hazard_level": "moderate",
+        "quality_score": 0.9,
+        "data_lineage": [
+          "Smithsonian",
+          "Global Volcanism Program",
+          "Expert Review"
+        ],
+        "verification_status": "expert_verified"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -155.608,
+          19.475
+        ]
+      }
+    }
+  ],
+  "metadata": {
+    "source": "Smithsonian Global Volcanism Program",
+    "timestamp": "2025-09-16T02:57:10.249754",
+    "count": 5,
+    "trust_level": "scientific_institution"
+  }
+}

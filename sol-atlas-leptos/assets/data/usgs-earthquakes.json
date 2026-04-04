@@ -1,0 +1,7300 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 5,
+        "depth": 35,
+        "place": "152 km SSE of Vilyuchinsk, Russia",
+        "time": "2025-09-16T01:05:59.070000",
+        "quality_score": 0.5,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          159.2908,
+          51.6713,
+          35
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 4.7,
+        "depth": 10,
+        "place": "59 km NNW of Salinas, Ecuador",
+        "time": "2025-09-15T22:54:48.942000",
+        "quality_score": 0.47000000000000003,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -81.0659,
+          -1.6864,
+          10
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 5.1,
+        "depth": 10,
+        "place": "49 km WSW of Sechura, Peru",
+        "time": "2025-09-15T22:41:53.147000",
+        "quality_score": 0.51,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -81.2473,
+          -5.6973,
+          10
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 4.4,
+        "depth": 585.524,
+        "place": "Fiji region",
+        "time": "2025-09-15T22:22:42.848000",
+        "quality_score": 0.44000000000000006,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -177.8149,
+          -18.1522,
+          585.524
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 4.4,
+        "depth": 10,
+        "place": "118 km E of Yamada, Japan",
+        "time": "2025-09-15T22:18:27.232000",
+        "quality_score": 0.44000000000000006,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          143.3224,
+          39.5181,
+          10
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 2.94,
+        "depth": 54.26,
+        "place": "7 km ENE of Marrowstone, Washington",
+        "time": "2025-09-15T20:29:30.200000",
+        "quality_score": 0.294,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -122.59666666666666,
+          48.072,
+          54.26
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 3.1,
+        "depth": 0,
+        "place": "50 km N of Kobuk, Alaska",
+        "time": "2025-09-15T20:12:31.442000",
+        "quality_score": 0.31,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -156.661,
+          67.353,
+          0
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 4.5,
+        "depth": 124.752,
+        "place": "52 km SSW of Ollag\u00fce, Chile",
+        "time": "2025-09-15T18:21:44.834000",
+        "quality_score": 0.45,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -68.4731,
+          -21.6528,
+          124.752
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 3.27,
+        "depth": 7.5,
+        "place": "8 km E of Clayton, CA",
+        "time": "2025-09-15T17:00:08.600000",
+        "quality_score": 0.327,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -121.850166666667,
+          37.9411666666667,
+          7.5
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 3.3,
+        "depth": 17.5,
+        "place": "107 km SE of Akhiok, Alaska",
+        "time": "2025-09-15T16:37:19.210000",
+        "quality_score": 0.32999999999999996,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -153.1216,
+          56.1724,
+          17.5
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 4.2,
+        "depth": 10,
+        "place": "43 km WSW of Mohr, Iran",
+        "time": "2025-09-15T16:03:22.980000",
+        "quality_score": 0.42000000000000004,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          52.4709,
+          27.4283,
+          10
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 4.9,
+        "depth": 106.51,
+        "place": "63 km ENE of La Tirana, Chile",
+        "time": "2025-09-15T15:56:13.172000",
+        "quality_score": 0.49000000000000005,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -69.1368,
+          -20.0415,
+          106.51
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 4.9,
+        "depth": 639.511,
+        "place": "Fiji region",
+        "time": "2025-09-15T15:29:22.163000",
+        "quality_score": 0.49000000000000005,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -177.8029,
+          -17.8408,
+          639.511
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 4.5,
+        "depth": 95.543,
+        "place": "21 km NNW of Locumba, Peru",
+        "time": "2025-09-15T15:07:17.051000",
+        "quality_score": 0.45,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -70.8583,
+          -17.4431,
+          95.543
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 2.88,
+        "depth": 4.09,
+        "place": "4 km SW of Kahaluu-Keauhou, Hawaii",
+        "time": "2025-09-15T14:49:55.680000",
+        "quality_score": 0.288,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -155.994666666667,
+          19.547,
+          4.09
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 4.4,
+        "depth": 183.43,
+        "place": "4 km S of Kamo, Japan",
+        "time": "2025-09-15T14:00:06.794000",
+        "quality_score": 0.44000000000000006,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          139.0321,
+          37.62,
+          183.43
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 4.5,
+        "depth": 10,
+        "place": "127 km NW of Davila, Philippines",
+        "time": "2025-09-15T13:01:01.845000",
+        "quality_score": 0.45,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          119.7149,
+          19.2859,
+          10
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 5,
+        "depth": 10,
+        "place": "247 km SE of Severo-Kuril\u2019sk, Russia",
+        "time": "2025-09-15T12:15:42.675000",
+        "quality_score": 0.5,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          159.0221,
+          49.4638,
+          10
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 6,
+        "depth": 24.472,
+        "place": "145 km ESE of Petropavlovsk-Kamchatsky, Russia",
+        "time": "2025-09-15T11:34:36.629000",
+        "quality_score": 0.6,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": "green",
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          160.7026,
+          52.6922,
+          24.472
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 4.4,
+        "depth": 56.944,
+        "place": "126 km ENE of Petropavlovsk-Kamchatsky, Russia",
+        "time": "2025-09-15T11:09:53.147000",
+        "quality_score": 0.44000000000000006,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          160.4397,
+          53.4091,
+          56.944
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 4.4,
+        "depth": 19.228,
+        "place": "145 km ESE of Petropavlovsk-Kamchatsky, Russia",
+        "time": "2025-09-15T11:06:50.429000",
+        "quality_score": 0.44000000000000006,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          160.703,
+          52.7093,
+          19.228
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 4.4,
+        "depth": 10,
+        "place": "Mariana Islands region",
+        "time": "2025-09-15T10:32:33.859000",
+        "quality_score": 0.44000000000000006,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          146.6779,
+          20.2901,
+          10
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 4.7,
+        "depth": 10,
+        "place": "284 km WNW of Longyearbyen, Svalbard and Jan Mayen",
+        "time": "2025-09-15T09:21:59.239000",
+        "quality_score": 0.47000000000000003,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          4.4279,
+          79.5808,
+          10
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 4.5,
+        "depth": 60.941,
+        "place": "5 km S of L\u00e1zaro C\u00e1rdenas, Mexico",
+        "time": "2025-09-15T07:36:33.999000",
+        "quality_score": 0.45,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -94.8532,
+          16.6815,
+          60.941
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 2.61,
+        "depth": 10.09,
+        "place": "23 km ESE of Little Lake, CA",
+        "time": "2025-09-15T07:09:35.960000",
+        "quality_score": 0.261,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -117.6775,
+          35.8403333,
+          10.09
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 4.4,
+        "depth": 31.048,
+        "place": "32 km WNW of Cartagena, Chile",
+        "time": "2025-09-15T05:34:43.743000",
+        "quality_score": 0.44000000000000006,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -71.9265,
+          -33.4425,
+          31.048
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 5.1,
+        "depth": 10,
+        "place": "228 km SE of Bir\u017cebbu\u0121a, Malta",
+        "time": "2025-09-15T04:55:12.470000",
+        "quality_score": 0.51,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          16.3452,
+          34.4083,
+          10
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 5,
+        "depth": 60.74,
+        "place": "28 km NNE of Anse-Bertrand, Guadeloupe",
+        "time": "2025-09-15T04:16:21.775000",
+        "quality_score": 0.5,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -61.4232,
+          16.7191,
+          60.74
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 4.7,
+        "depth": 10,
+        "place": "4 km NE of Luocheng, China",
+        "time": "2025-09-15T03:42:10.524000",
+        "quality_score": 0.47000000000000003,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          104.0599,
+          29.4109,
+          10
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 4.1,
+        "depth": 10,
+        "place": "13 km WSW of Sincik, Turkey",
+        "time": "2025-09-15T02:39:58.666000",
+        "quality_score": 0.41,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          38.472,
+          37.9846,
+          10
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 4.4,
+        "depth": 66.346,
+        "place": "81 km ENE of Petropavlovsk-Kamchatsky, Russia",
+        "time": "2025-09-15T02:18:26.961000",
+        "quality_score": 0.44000000000000006,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          159.8065,
+          53.2653,
+          66.346
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 2.83,
+        "depth": 13.74,
+        "place": "11 km NNW of Anza, CA",
+        "time": "2025-09-15T02:08:52.750000",
+        "quality_score": 0.28300000000000003,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -116.7293333,
+          33.639,
+          13.74
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 3.6,
+        "depth": 97,
+        "place": "51 km SE of Punta Cana, Dominican Republic",
+        "time": "2025-09-14T23:52:15.450000",
+        "quality_score": 0.36,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -68.059,
+          18.2528,
+          97
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 4.4,
+        "depth": 62.107,
+        "place": "46 km ENE of Onagawa Ch\u014d, Japan",
+        "time": "2025-09-14T23:34:46.769000",
+        "quality_score": 0.44000000000000006,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          141.9747,
+          38.5338,
+          62.107
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 4.4,
+        "depth": 15.464,
+        "place": "27 km SW of Amorg\u00f3s, Greece",
+        "time": "2025-09-14T22:53:25.869000",
+        "quality_score": 0.44000000000000006,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          25.6615,
+          36.6748,
+          15.464
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 5,
+        "depth": 94.514,
+        "place": "31 km WSW of Vilcanchos, Peru",
+        "time": "2025-09-14T20:52:44.774000",
+        "quality_score": 0.5,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -74.7966,
+          -13.7217,
+          94.514
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 4.2,
+        "depth": 19.505,
+        "place": "154 km WNW of Vallenar, Chile",
+        "time": "2025-09-14T20:42:37.447000",
+        "quality_score": 0.42000000000000004,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -72.1488,
+          -27.9223,
+          19.505
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 5.1,
+        "depth": 59.455,
+        "place": "91 km E of Petropavlovsk-Kamchatsky, Russia",
+        "time": "2025-09-14T20:39:54.032000",
+        "quality_score": 0.51,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          159.9787,
+          53.1957,
+          59.455
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 4.6,
+        "depth": 56.812,
+        "place": "92 km ENE of Petropavlovsk-Kamchatsky, Russia",
+        "time": "2025-09-14T20:12:20.547000",
+        "quality_score": 0.45999999999999996,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          159.9725,
+          53.2665,
+          56.812
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 5.2,
+        "depth": 35,
+        "place": "102 km E of Petropavlovsk-Kamchatsky, Russia",
+        "time": "2025-09-14T19:06:34.400000",
+        "quality_score": 0.52,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          160.1619,
+          53.0329,
+          35
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 4.3,
+        "depth": 109.848,
+        "place": "26 km W of Malamig, Philippines",
+        "time": "2025-09-14T17:24:48.027000",
+        "quality_score": 0.43,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          121.1242,
+          12.9167,
+          109.848
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 2.9,
+        "depth": 13.4,
+        "place": "34 km WNW of Elfin Cove, Alaska",
+        "time": "2025-09-14T17:20:37.749000",
+        "quality_score": 0.29,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -136.8904,
+          58.3062,
+          13.4
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 2.68,
+        "depth": 4.03000020980835,
+        "place": "4 km WNW of Cold Springs, NV",
+        "time": "2025-09-14T14:33:33.460000",
+        "quality_score": 0.268,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -120.02466583252,
+          39.6898345947266,
+          4.03000020980835
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 4.7,
+        "depth": 10,
+        "place": "12 km WSW of Leuteboro, Philippines",
+        "time": "2025-09-14T13:57:29.195000",
+        "quality_score": 0.47000000000000003,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          121.2643,
+          13.0391,
+          10
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 4.1,
+        "depth": 152.535,
+        "place": "69 km NNW of Yonakuni, Japan",
+        "time": "2025-09-14T13:41:52.446000",
+        "quality_score": 0.41,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          122.8162,
+          25.0699,
+          152.535
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 3.8,
+        "depth": 18.846,
+        "place": "54 km SE of Atka, Alaska",
+        "time": "2025-09-14T12:38:05.631000",
+        "quality_score": 0.38,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -173.6462,
+          51.8502,
+          18.846
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 4.3,
+        "depth": 55,
+        "place": "116 km ENE of Petropavlovsk-Kamchatsky, Russia",
+        "time": "2025-09-14T12:28:28.351000",
+        "quality_score": 0.43,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          160.195,
+          53.5259,
+          55
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 3.16,
+        "depth": 25.13,
+        "place": "91 km NNW of San Antonio, Puerto Rico",
+        "time": "2025-09-14T12:16:06.880000",
+        "quality_score": 0.316,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -67.2828333333333,
+          19.2955,
+          25.13
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 4.5,
+        "depth": 10,
+        "place": "83 km NE of Barishal, Pakistan",
+        "time": "2025-09-14T10:18:40.041000",
+        "quality_score": 0.45,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          75.429,
+          36.7806,
+          10
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 4.3,
+        "depth": 74.084,
+        "place": "53 km E of Petropavlovsk-Kamchatsky, Russia",
+        "time": "2025-09-14T10:10:10.237000",
+        "quality_score": 0.43,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          159.4222,
+          53.0948,
+          74.084
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 4.6,
+        "depth": 57.003,
+        "place": "112 km W of Chauk, Burma (Myanmar)",
+        "time": "2025-09-14T09:56:44.759000",
+        "quality_score": 0.45999999999999996,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          93.7363,
+          20.8843,
+          57.003
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 5.3,
+        "depth": 66.624,
+        "place": "93 km SSW of Sungai Penuh, Indonesia",
+        "time": "2025-09-14T09:49:44.566000",
+        "quality_score": 0.53,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          101.02,
+          -2.8175,
+          66.624
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 2.56,
+        "depth": 8.60000038146973,
+        "place": "18 km W of Big Pine, CA",
+        "time": "2025-09-14T09:05:34.310000",
+        "quality_score": 0.256,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -118.477836608887,
+          37.1139984130859,
+          8.60000038146973
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 2.9,
+        "depth": 10,
+        "place": "174 km W of Port Orford, Oregon",
+        "time": "2025-09-14T08:25:13.579000",
+        "quality_score": 0.29,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -126.5959,
+          42.5093,
+          10
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 2.97,
+        "depth": 16.5200004577637,
+        "place": "18 km W of Ferndale, CA",
+        "time": "2025-09-14T07:24:53.080000",
+        "quality_score": 0.29700000000000004,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -124.463668823242,
+          40.5183334350586,
+          16.5200004577637
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 2.6,
+        "depth": 127.3,
+        "place": "50 km ENE of Pedro Bay, Alaska",
+        "time": "2025-09-14T07:10:06.158000",
+        "quality_score": 0.26,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -153.3242,
+          60.007,
+          127.3
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 4.7,
+        "depth": 35,
+        "place": "161 km SSE of Vilyuchinsk, Russia",
+        "time": "2025-09-14T06:42:07.098000",
+        "quality_score": 0.47000000000000003,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          159.5006,
+          51.6432,
+          35
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 2.6,
+        "depth": 103.1,
+        "place": "43 km W of Cantwell, Alaska",
+        "time": "2025-09-14T06:17:48.621000",
+        "quality_score": 0.26,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -149.8128,
+          63.3722,
+          103.1
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 5.5,
+        "depth": 29,
+        "place": "10 km NNE of Kh\u0101rupatia, India",
+        "time": "2025-09-14T06:11:51.105000",
+        "quality_score": 0.55,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": "orange",
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          92.1963,
+          26.6066,
+          29
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 2.81,
+        "depth": 16.5900001525879,
+        "place": "18 km W of Ferndale, CA",
+        "time": "2025-09-14T04:42:27.210000",
+        "quality_score": 0.281,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -124.460830688477,
+          40.5185012817383,
+          16.5900001525879
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 2.8,
+        "depth": 35.2,
+        "place": "5 km SSW of Kasilof, Alaska",
+        "time": "2025-09-14T04:30:53.053000",
+        "quality_score": 0.27999999999999997,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -151.3158,
+          60.2886,
+          35.2
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 4,
+        "depth": 127.028,
+        "place": "22 km NE of Adak, Alaska",
+        "time": "2025-09-14T04:00:53.400000",
+        "quality_score": 0.4,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -176.4035,
+          52.0237,
+          127.028
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 3.1,
+        "depth": 50,
+        "place": "20 km SSW of Anchor Point, Alaska",
+        "time": "2025-09-14T03:33:29.113000",
+        "quality_score": 0.31,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -151.9244,
+          59.6033,
+          50
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 5.4,
+        "depth": 50.192,
+        "place": "5 km N of Uramita, Colombia",
+        "time": "2025-09-14T02:12:17.489000",
+        "quality_score": 0.54,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": "green",
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -76.1732,
+          6.9494,
+          50.192
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 4.7,
+        "depth": 39.19,
+        "place": "81 km SSE of Panguna, Papua New Guinea",
+        "time": "2025-09-14T00:17:58.916000",
+        "quality_score": 0.47000000000000003,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          155.7577,
+          -6.9975,
+          39.19
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 4.6,
+        "depth": 10,
+        "place": "213 km SSE of Vilyuchinsk, Russia",
+        "time": "2025-09-14T00:15:14.866000",
+        "quality_score": 0.45999999999999996,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          159.6753,
+          51.1772,
+          10
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 4.7,
+        "depth": 25.09,
+        "place": "182 km SSE of Vilyuchinsk, Russia",
+        "time": "2025-09-14T00:01:23.838000",
+        "quality_score": 0.47000000000000003,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          159.6091,
+          51.4676,
+          25.09
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 4.6,
+        "depth": 10,
+        "place": "15 km WSW of K\u0101zer\u016bn, Iran",
+        "time": "2025-09-13T23:43:46.310000",
+        "quality_score": 0.45999999999999996,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          51.5171,
+          29.5508,
+          10
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 4.5,
+        "depth": 135.559,
+        "place": "270 km WSW of Tual, Indonesia",
+        "time": "2025-09-13T23:36:20.424000",
+        "quality_score": 0.45,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          130.3865,
+          -6.2332,
+          135.559
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 3.2,
+        "depth": 38.731,
+        "place": "28 km SSE of La Tirana, Chile",
+        "time": "2025-09-13T23:00:13.542000",
+        "quality_score": 0.32,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -70.0621,
+          -20.5372,
+          38.731
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 3.28,
+        "depth": 13.25,
+        "place": "16 km WSW of Esperanza, Puerto Rico",
+        "time": "2025-09-13T22:10:50.590000",
+        "quality_score": 0.32799999999999996,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -65.607,
+          18.0251666666667,
+          13.25
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 4.7,
+        "depth": 220.479,
+        "place": "59 km WSW of Abra Pampa, Argentina",
+        "time": "2025-09-13T21:58:45.851000",
+        "quality_score": 0.47000000000000003,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -66.2392,
+          -22.9178,
+          220.479
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 3.48,
+        "depth": 7.15,
+        "place": "7 km SW of Atascadero, CA",
+        "time": "2025-09-13T21:50:00.380000",
+        "quality_score": 0.348,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -120.7225,
+          35.4375,
+          7.15
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 3.58,
+        "depth": 7.62,
+        "place": "15 km NNE of Pine Valley, CA",
+        "time": "2025-09-13T21:02:41.750000",
+        "quality_score": 0.358,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -116.4726667,
+          32.9476667,
+          7.62
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 4.4,
+        "depth": 35,
+        "place": "124 km SW of La Esperanza (El Zapotal), Mexico",
+        "time": "2025-09-13T20:05:51.645000",
+        "quality_score": 0.44000000000000006,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -93.9196,
+          14.5908,
+          35
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 4.8,
+        "depth": 10,
+        "place": "51 km NW of Salinas, Ecuador",
+        "time": "2025-09-13T18:59:54.189000",
+        "quality_score": 0.48,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -81.2188,
+          -1.8371,
+          10
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 3.76,
+        "depth": 71,
+        "place": "99 km NNE of Cruz Bay, U.S. Virgin Islands",
+        "time": "2025-09-13T17:56:05.320000",
+        "quality_score": 0.376,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -64.4746,
+          19.1813,
+          71
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 4.5,
+        "depth": 36.454,
+        "place": "176 km SW of Nikolski, Alaska",
+        "time": "2025-09-13T17:29:57.797000",
+        "quality_score": 0.45,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -170.7586,
+          51.8529,
+          36.454
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 2.84,
+        "depth": 17.13,
+        "place": "3 km NE of Mineral, Washington",
+        "time": "2025-09-13T16:17:58.550000",
+        "quality_score": 0.284,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -122.15,
+          46.7325,
+          17.13
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 3.05,
+        "depth": 4.76,
+        "place": "11 km ENE of P\u0101hala, Hawaii",
+        "time": "2025-09-13T15:53:45.120000",
+        "quality_score": 0.305,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -155.379166666667,
+          19.2488333333333,
+          4.76
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 4.5,
+        "depth": 64.463,
+        "place": "113 km ENE of Petropavlovsk-Kamchatsky, Russia",
+        "time": "2025-09-13T12:17:16.608000",
+        "quality_score": 0.45,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          160.1103,
+          53.5627,
+          64.463
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 4.8,
+        "depth": 563.514,
+        "place": "162 km SW of Palimbang, Philippines",
+        "time": "2025-09-13T11:08:26.981000",
+        "quality_score": 0.48,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          123.1585,
+          5.1596,
+          563.514
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 2.9,
+        "depth": 10,
+        "place": "102 km W of Petrolia, CA",
+        "time": "2025-09-13T10:40:13.640000",
+        "quality_score": 0.29,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -125.471166666667,
+          40.4621666666667,
+          10
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 4.9,
+        "depth": 108.626,
+        "place": "89 km W of Ambunti, Papua New Guinea",
+        "time": "2025-09-13T10:05:42.551000",
+        "quality_score": 0.49000000000000005,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          142.0223,
+          -4.1163,
+          108.626
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 4.5,
+        "depth": 10,
+        "place": "48 km N of Savannah Bight, Honduras",
+        "time": "2025-09-13T10:01:07.308000",
+        "quality_score": 0.45,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -85.8227,
+          16.8833,
+          10
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 4.1,
+        "depth": 64.689,
+        "place": "110 km ENE of Petropavlovsk-Kamchatsky, Russia",
+        "time": "2025-09-13T09:42:01.375000",
+        "quality_score": 0.41,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          160.0476,
+          53.5842,
+          64.689
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 3.1,
+        "depth": 9.11,
+        "place": "14 km SE of Fern Forest, Hawaii",
+        "time": "2025-09-13T08:01:28.730000",
+        "quality_score": 0.31,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -155.040166666667,
+          19.3671666666667,
+          9.11
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 4.5,
+        "depth": 174.236,
+        "place": "55 km W of San Antonio de los Cobres, Argentina",
+        "time": "2025-09-13T07:52:26.803000",
+        "quality_score": 0.45,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -66.8587,
+          -24.1558,
+          174.236
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 4.3,
+        "depth": 74.413,
+        "place": "36 km W of Pante Makasar, Timor Leste",
+        "time": "2025-09-13T07:49:52.354000",
+        "quality_score": 0.43,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          124.0556,
+          -9.1932,
+          74.413
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 2.7,
+        "depth": 8.7,
+        "place": "104 km S of Yakutat, Alaska",
+        "time": "2025-09-13T07:47:57.432000",
+        "quality_score": 0.27,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -140.0329,
+          58.622,
+          8.7
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 4.6,
+        "depth": 10,
+        "place": "32 km W of K\u0101zer\u016bn, Iran",
+        "time": "2025-09-13T07:37:27.715000",
+        "quality_score": 0.45999999999999996,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          51.3174,
+          29.6049,
+          10
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 4.6,
+        "depth": 10,
+        "place": "11 km SSE of Cliza, Bolivia",
+        "time": "2025-09-13T06:49:36.358000",
+        "quality_score": 0.45999999999999996,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -65.8984,
+          -17.6904,
+          10
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 4,
+        "depth": 179.787,
+        "place": "76 km W of San Antonio de los Cobres, Argentina",
+        "time": "2025-09-13T06:16:57.749000",
+        "quality_score": 0.4,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -67.07,
+          -24.1806,
+          179.787
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 4.9,
+        "depth": 35,
+        "place": "South Sandwich Islands region",
+        "time": "2025-09-13T06:08:25.584000",
+        "quality_score": 0.49000000000000005,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -26.0441,
+          -59.5757,
+          35
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 3.4,
+        "depth": 35.24,
+        "place": "97 km N of Charlotte Amalie, U.S. Virgin Islands",
+        "time": "2025-09-13T06:06:12.180000",
+        "quality_score": 0.33999999999999997,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -64.8091666666667,
+          19.2193333333333,
+          35.24
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 2.56,
+        "depth": 3.21,
+        "place": "12 km S of Olancha, CA",
+        "time": "2025-09-13T05:03:33.600000",
+        "quality_score": 0.256,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -118.0265,
+          36.1765,
+          3.21
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 2.85,
+        "depth": 2.54,
+        "place": "12 km S of Olancha, CA",
+        "time": "2025-09-13T04:37:03.660000",
+        "quality_score": 0.28500000000000003,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -118.0238333,
+          36.1746667,
+          2.54
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 2.83,
+        "depth": 1.75,
+        "place": "12 km S of Olancha, CA",
+        "time": "2025-09-13T04:36:57.180000",
+        "quality_score": 0.28300000000000003,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -118.0228333,
+          36.1773333,
+          1.75
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 2.91,
+        "depth": 6.74,
+        "place": "16 km WNW of Progreso, B.C., MX",
+        "time": "2025-09-13T04:13:45.830000",
+        "quality_score": 0.29100000000000004,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -115.7368333,
+          32.6453333,
+          6.74
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 4.5,
+        "depth": 10,
+        "place": "55 km SSW of Kastr\u00ed, Greece",
+        "time": "2025-09-13T03:44:39.086000",
+        "quality_score": 0.45,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          23.8293,
+          34.382,
+          10
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 3.02,
+        "depth": 7.26,
+        "place": "16 km WNW of Progreso, B.C., MX",
+        "time": "2025-09-13T03:02:11.600000",
+        "quality_score": 0.302,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -115.732,
+          32.6431667,
+          7.26
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 2.9,
+        "depth": 17.3,
+        "place": "28 km NNE of Paxson, Alaska",
+        "time": "2025-09-13T02:50:21.272000",
+        "quality_score": 0.29,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -145.4692,
+          63.337,
+          17.3
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 5.2,
+        "depth": 35,
+        "place": "160 km ESE of Ozernovskiy, Russia",
+        "time": "2025-09-13T02:03:50.097000",
+        "quality_score": 0.52,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          158.7606,
+          51.2224,
+          35
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 5.1,
+        "depth": 59.366,
+        "place": "123 km E of Petropavlovsk-Kamchatsky, Russia",
+        "time": "2025-09-13T01:22:28.762000",
+        "quality_score": 0.51,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          160.4633,
+          53.197,
+          59.366
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 3.12,
+        "depth": 8.07,
+        "place": "56 km N of San Juan, Puerto Rico",
+        "time": "2025-09-13T01:00:19.820000",
+        "quality_score": 0.312,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -66.0796666666667,
+          18.98,
+          8.07
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 4.3,
+        "depth": 29.993,
+        "place": "102 km SSE of Sand Point, Alaska",
+        "time": "2025-09-13T00:23:29.205000",
+        "quality_score": 0.43,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -159.85,
+          54.4995,
+          29.993
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 4.6,
+        "depth": 39.867,
+        "place": "73 km SW of Yonakuni, Japan",
+        "time": "2025-09-12T23:46:16.789000",
+        "quality_score": 0.45999999999999996,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          122.5318,
+          23.9627,
+          39.867
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 5.4,
+        "depth": 54.849,
+        "place": "South Sandwich Islands region",
+        "time": "2025-09-12T23:32:09.092000",
+        "quality_score": 0.54,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": "green",
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -28.0637,
+          -55.624,
+          54.849
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 4.9,
+        "depth": 10,
+        "place": "82 km E of Tocache, Peru",
+        "time": "2025-09-12T22:57:55.812000",
+        "quality_score": 0.49000000000000005,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -75.7796,
+          -8.0686,
+          10
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 4,
+        "depth": 224.558,
+        "place": "72 km WNW of Atka, Alaska",
+        "time": "2025-09-12T22:30:42.272000",
+        "quality_score": 0.4,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -175.2273,
+          52.3506,
+          224.558
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 7.4,
+        "depth": 39.465,
+        "place": "111 km E of Petropavlovsk-Kamchatsky, Russia",
+        "time": "2025-09-12T21:37:54.754000",
+        "quality_score": 0.74,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": "red",
+        "tsunami": 1
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          160.2938,
+          53.1043,
+          39.465
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 4.5,
+        "depth": 72.681,
+        "place": "260 km W of Adak, Alaska",
+        "time": "2025-09-12T20:58:56.099000",
+        "quality_score": 0.45,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          179.651,
+          51.5071,
+          72.681
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 2.73,
+        "depth": 13.86,
+        "place": "5 km SSE of La Parguera, Puerto Rico",
+        "time": "2025-09-12T20:33:29.580000",
+        "quality_score": 0.273,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -67.0196666666667,
+          17.9281666666667,
+          13.86
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 4.9,
+        "depth": 31.654,
+        "place": "132 km SE of Vilyuchinsk, Russia",
+        "time": "2025-09-12T20:31:28.478000",
+        "quality_score": 0.49000000000000005,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          159.7233,
+          52.0503,
+          31.654
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 3,
+        "depth": 34.3,
+        "place": "20 km NW of Akhiok, Alaska",
+        "time": "2025-09-12T20:17:31.085000",
+        "quality_score": 0.3,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -154.4452,
+          57.0515,
+          34.3
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 4.5,
+        "depth": 58.93,
+        "place": "128 km SW of Bandar Lampung, Indonesia",
+        "time": "2025-09-12T20:01:11.221000",
+        "quality_score": 0.45,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          104.5431,
+          -6.3434,
+          58.93
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 4.3,
+        "depth": 73.932,
+        "place": "110 km S of Vilyuchinsk, Russia",
+        "time": "2025-09-12T19:30:48.958000",
+        "quality_score": 0.43,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          158.4153,
+          51.9401,
+          73.932
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 4.9,
+        "depth": 10,
+        "place": "285 km SSE of Katsuura, Japan",
+        "time": "2025-09-12T19:17:54.975000",
+        "quality_score": 0.49000000000000005,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          141.7432,
+          32.867,
+          10
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 4.5,
+        "depth": 186.192,
+        "place": "71 km W of San Antonio de los Cobres, Argentina",
+        "time": "2025-09-12T18:49:37.989000",
+        "quality_score": 0.45,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -67.0219,
+          -24.2635,
+          186.192
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 4.6,
+        "depth": 10,
+        "place": "140 km SSW of Manuel \u00c1vila Camacho (Ponte Duro), Mexico",
+        "time": "2025-09-12T18:35:53.858000",
+        "quality_score": 0.45999999999999996,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -94.245,
+          14.7067,
+          10
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 5.3,
+        "depth": 10,
+        "place": "Pacific-Antarctic Ridge",
+        "time": "2025-09-12T18:12:54.808000",
+        "quality_score": 0.53,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -142.9512,
+          -56.2637,
+          10
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 4.5,
+        "depth": 41.241,
+        "place": "111 km E of Severo-Kuril\u2019sk, Russia",
+        "time": "2025-09-12T18:11:47.772000",
+        "quality_score": 0.45,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          157.6793,
+          50.5073,
+          41.241
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 3.08,
+        "depth": 48.35,
+        "place": "71 km N of Charlotte Amalie, U.S. Virgin Islands",
+        "time": "2025-09-12T17:45:24.800000",
+        "quality_score": 0.308,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -65.013,
+          18.9845,
+          48.35
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 4.9,
+        "depth": 35,
+        "place": "120 km SE of Vilyuchinsk, Russia",
+        "time": "2025-09-12T17:29:25.598000",
+        "quality_score": 0.49000000000000005,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          159.7401,
+          52.2202,
+          35
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 4.7,
+        "depth": 35,
+        "place": "123 km SE of Vilyuchinsk, Russia",
+        "time": "2025-09-12T16:50:27.089000",
+        "quality_score": 0.47000000000000003,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          159.7144,
+          52.1555,
+          35
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 5,
+        "depth": 10,
+        "place": "122 km N of Lobuche, Nepal",
+        "time": "2025-09-12T16:42:10.307000",
+        "quality_score": 0.5,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          86.9103,
+          29.0474,
+          10
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 2.7,
+        "depth": 16.8,
+        "place": "28 km NNE of Paxson, Alaska",
+        "time": "2025-09-12T16:24:30.897000",
+        "quality_score": 0.27,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -145.4652,
+          63.3362,
+          16.8
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 4.3,
+        "depth": 10,
+        "place": "76 km W of Tual, Indonesia",
+        "time": "2025-09-12T16:22:00.726000",
+        "quality_score": 0.43,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          132.0647,
+          -5.5391,
+          10
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 4.5,
+        "depth": 10,
+        "place": "206 km SE of Vilyuchinsk, Russia",
+        "time": "2025-09-12T16:20:09.549000",
+        "quality_score": 0.45,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          160.5505,
+          51.6279,
+          10
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 3.8,
+        "depth": 8.6,
+        "place": "34 km NNE of Paxson, Alaska",
+        "time": "2025-09-12T16:08:56.456000",
+        "quality_score": 0.38,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -145.4335,
+          63.3893,
+          8.6
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 5.1,
+        "depth": 10.177,
+        "place": "139 km SE of Vilyuchinsk, Russia",
+        "time": "2025-09-12T15:53:05.047000",
+        "quality_score": 0.51,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          159.8522,
+          52.0445,
+          10.177
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 2.9,
+        "depth": 3.1,
+        "place": "63 km E of Yakutat, Alaska",
+        "time": "2025-09-12T15:31:48.077000",
+        "quality_score": 0.29,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -138.6187,
+          59.4519,
+          3.1
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 3.4,
+        "depth": 57.2,
+        "place": "215 km SE of Chignik, Alaska",
+        "time": "2025-09-12T15:20:50.605000",
+        "quality_score": 0.33999999999999997,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -156.1369,
+          54.8519,
+          57.2
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 2.9,
+        "depth": 129.278,
+        "place": "57 km SE of Denali National Park, Alaska",
+        "time": "2025-09-12T14:36:14.684000",
+        "quality_score": 0.29,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -150.985,
+          63.1472,
+          129.278
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 4.2,
+        "depth": 198.006,
+        "place": "39 km WSW of Ashk\u0101sham, Afghanistan",
+        "time": "2025-09-12T14:02:02.945000",
+        "quality_score": 0.42000000000000004,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          71.126,
+          36.546,
+          198.006
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 4.6,
+        "depth": 44.512,
+        "place": "80 km SSE of Waingapu, Indonesia",
+        "time": "2025-09-12T13:38:26.234000",
+        "quality_score": 0.45999999999999996,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          120.4812,
+          -10.3564,
+          44.512
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 5.6,
+        "depth": 10,
+        "place": "Tristan da Cunha region",
+        "time": "2025-09-12T12:46:45.942000",
+        "quality_score": 0.5599999999999999,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": "green",
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -15.6077,
+          -39.3896,
+          10
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 4.7,
+        "depth": 10,
+        "place": "102 km NE of Barishal, Pakistan",
+        "time": "2025-09-12T12:36:02.854000",
+        "quality_score": 0.47000000000000003,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          75.3716,
+          37.0714,
+          10
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 5.1,
+        "depth": 61.98,
+        "place": "73 km W of Lata, Solomon Islands",
+        "time": "2025-09-12T12:29:44.049000",
+        "quality_score": 0.51,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          165.1214,
+          -10.721,
+          61.98
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 4.8,
+        "depth": 39.01,
+        "place": "78 km S of Shikotan, Russia",
+        "time": "2025-09-12T10:57:45.098000",
+        "quality_score": 0.48,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          146.6663,
+          43.0896,
+          39.01
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 4.6,
+        "depth": 10,
+        "place": "south of Africa",
+        "time": "2025-09-12T09:13:22.418000",
+        "quality_score": 0.45999999999999996,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          21.7826,
+          -52.8897,
+          10
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 2.86,
+        "depth": 29.92,
+        "place": "1 km SW of P\u0101hala, Hawaii",
+        "time": "2025-09-12T09:07:34.470000",
+        "quality_score": 0.286,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -155.489666666667,
+          19.1938333333333,
+          29.92
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 4.4,
+        "depth": 564.825,
+        "place": "224 km E of Levuka, Fiji",
+        "time": "2025-09-12T04:47:47.721000",
+        "quality_score": 0.44000000000000006,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -178.587,
+          -17.8026,
+          564.825
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 4.7,
+        "depth": 174.862,
+        "place": "295 km SSE of Isangel, Vanuatu",
+        "time": "2025-09-12T03:58:00.887000",
+        "quality_score": 0.47000000000000003,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          170.8323,
+          -21.7798,
+          174.862
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 4.7,
+        "depth": 10,
+        "place": "137 km N of Manatutu, Timor Leste",
+        "time": "2025-09-12T02:21:57.648000",
+        "quality_score": 0.47000000000000003,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          125.9437,
+          -7.2674,
+          10
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 2.8,
+        "depth": 10,
+        "place": "173 km W of Port Orford, Oregon",
+        "time": "2025-09-12T01:47:38.446000",
+        "quality_score": 0.27999999999999997,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -126.5898,
+          42.546,
+          10
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 2.6,
+        "depth": 30.5,
+        "place": "22 km WSW of Glacier View, Alaska",
+        "time": "2025-09-12T01:35:08.344000",
+        "quality_score": 0.26,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -148.0281,
+          61.7092,
+          30.5
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 4.9,
+        "depth": 37.379,
+        "place": "30 km SW of Lakatoro, Vanuatu",
+        "time": "2025-09-12T01:05:25.100000",
+        "quality_score": 0.49000000000000005,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          167.1934,
+          -16.2776,
+          37.379
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 4.3,
+        "depth": 102.166,
+        "place": "44 km E of Vallenar, Chile",
+        "time": "2025-09-12T00:58:37.001000",
+        "quality_score": 0.43,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -70.3065,
+          -28.6032,
+          102.166
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 5,
+        "depth": 10,
+        "place": "31 km SSW of Lakatoro, Vanuatu",
+        "time": "2025-09-11T23:50:35.974000",
+        "quality_score": 0.5,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          167.2667,
+          -16.3434,
+          10
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 4.2,
+        "depth": 374.646,
+        "place": "242 km WNW of Hihifo, Tonga",
+        "time": "2025-09-11T23:30:28.665000",
+        "quality_score": 0.42000000000000004,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -176.0103,
+          -15.4976,
+          374.646
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 4.6,
+        "depth": 188.646,
+        "place": "88 km WNW of San Antonio de los Cobres, Argentina",
+        "time": "2025-09-11T23:30:06.197000",
+        "quality_score": 0.45999999999999996,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -67.1512,
+          -23.9994,
+          188.646
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 3.6,
+        "depth": 10,
+        "place": "128 km W of Adak, Alaska",
+        "time": "2025-09-11T22:45:20.740000",
+        "quality_score": 0.36,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -178.4966,
+          51.822,
+          10
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 5.3,
+        "depth": 10,
+        "place": "South Sandwich Islands region",
+        "time": "2025-09-11T22:31:04.243000",
+        "quality_score": 0.53,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -27.81,
+          -56.3186,
+          10
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 3.19,
+        "depth": 0.0199999995529652,
+        "place": "71 km WNW of Petrolia, CA",
+        "time": "2025-09-11T22:25:24.970000",
+        "quality_score": 0.319,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -125.107666015625,
+          40.431999206543,
+          0.0199999995529652
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 2.7,
+        "depth": 35,
+        "place": "54 km SW of Karluk, Alaska",
+        "time": "2025-09-11T21:35:11.604000",
+        "quality_score": 0.27,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -154.9991,
+          57.1728,
+          35
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 3,
+        "depth": 118.7,
+        "place": "49 km E of Pedro Bay, Alaska",
+        "time": "2025-09-11T21:10:58.482000",
+        "quality_score": 0.3,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -153.228,
+          59.8065,
+          118.7
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 2.56,
+        "depth": 11.1,
+        "place": "5 km SSE of Gorman, CA",
+        "time": "2025-09-11T20:52:47.920000",
+        "quality_score": 0.256,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -118.8218333,
+          34.7575,
+          11.1
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 3.05,
+        "depth": 39.69,
+        "place": "66 km N of Tierras Nuevas Poniente, Puerto Rico",
+        "time": "2025-09-11T20:51:07.230000",
+        "quality_score": 0.305,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -66.4835,
+          19.0603333333333,
+          39.69
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 3.34,
+        "depth": 22.74,
+        "place": "51 km N of Charlotte Amalie, U.S. Virgin Islands",
+        "time": "2025-09-11T20:47:25.940000",
+        "quality_score": 0.33399999999999996,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -64.9236666666667,
+          18.8113333333333,
+          22.74
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 4.5,
+        "depth": 222.2,
+        "place": "101 km WSW of Abra Pampa, Argentina",
+        "time": "2025-09-11T20:38:39.282000",
+        "quality_score": 0.45,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -66.6606,
+          -22.94,
+          222.2
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 4.5,
+        "depth": 9.361,
+        "place": "1 km S of Rudna, Poland",
+        "time": "2025-09-11T19:42:10.130000",
+        "quality_score": 0.45,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          16.266,
+          51.5005,
+          9.361
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 4.4,
+        "depth": 158.015,
+        "place": "64 km E of Palca, Peru",
+        "time": "2025-09-11T19:16:21.380000",
+        "quality_score": 0.44000000000000006,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -69.3557,
+          -17.8718,
+          158.015
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 2.6,
+        "depth": 6.5918,
+        "place": "13 km NNW of Midland, Texas",
+        "time": "2025-09-11T17:45:37.452000",
+        "quality_score": 0.26,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -102.144,
+          32.108,
+          6.5918
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 2.83,
+        "depth": 9.38000011444092,
+        "place": "40 km SSW of Qualeys Camp, NV",
+        "time": "2025-09-11T17:26:15.680000",
+        "quality_score": 0.28300000000000003,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -118.550834655762,
+          37.9461669921875,
+          9.38000011444092
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 2.57,
+        "depth": 1.94,
+        "place": "9 km E of Coso Junction, CA",
+        "time": "2025-09-11T17:11:05.850000",
+        "quality_score": 0.257,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -117.8516667,
+          36.0495,
+          1.94
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 2.73,
+        "depth": 4.63000011444092,
+        "place": "3 km E of Cholame, CA",
+        "time": "2025-09-11T15:53:47.550000",
+        "quality_score": 0.273,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -120.262168884277,
+          35.7314987182617,
+          4.63000011444092
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 2.7,
+        "depth": 6.9794,
+        "place": "14 km NNW of Midland, Texas",
+        "time": "2025-09-11T14:00:26.010000",
+        "quality_score": 0.27,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -102.154,
+          32.106,
+          6.9794
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 4.7,
+        "depth": 10,
+        "place": "173 km SSE of Vilyuchinsk, Russia",
+        "time": "2025-09-11T13:27:13.412000",
+        "quality_score": 0.47000000000000003,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          159.4531,
+          51.5107,
+          10
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 4,
+        "depth": 136.006,
+        "place": "49 km SW of Ollag\u00fce, Chile",
+        "time": "2025-09-11T13:23:17.555000",
+        "quality_score": 0.4,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -68.5493,
+          -21.5741,
+          136.006
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 4.6,
+        "depth": 37.957,
+        "place": "152 km SSE of Vilyuchinsk, Russia",
+        "time": "2025-09-11T12:45:09.238000",
+        "quality_score": 0.45999999999999996,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          159.1928,
+          51.6456,
+          37.957
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 2.96,
+        "depth": 8.94,
+        "place": "47 km NNW of San Antonio, Puerto Rico",
+        "time": "2025-09-11T12:15:50.110000",
+        "quality_score": 0.296,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -67.3211666666667,
+          18.862,
+          8.94
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 3.07,
+        "depth": 9.52,
+        "place": "64 km N of Isabela, Puerto Rico",
+        "time": "2025-09-11T11:30:38.540000",
+        "quality_score": 0.307,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -66.9998333333333,
+          19.0836666666667,
+          9.52
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 4.4,
+        "depth": 54.174,
+        "place": "173 km SSE of Vilyuchinsk, Russia",
+        "time": "2025-09-11T11:05:52.808000",
+        "quality_score": 0.44000000000000006,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          159.4702,
+          51.519,
+          54.174
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 4.8,
+        "depth": 12.928,
+        "place": "40 km S of Lakatoro, Vanuatu",
+        "time": "2025-09-11T10:43:54.162000",
+        "quality_score": 0.48,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          167.3468,
+          -16.4588,
+          12.928
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 2.7,
+        "depth": 33.6,
+        "place": "8 km NNE of Point MacKenzie, Alaska",
+        "time": "2025-09-11T07:52:59.090000",
+        "quality_score": 0.27,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -149.9069,
+          61.4254,
+          33.6
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 2.8,
+        "depth": 11.5,
+        "place": "60 km SSW of Shungnak, Alaska",
+        "time": "2025-09-11T06:56:23.204000",
+        "quality_score": 0.27999999999999997,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -157.5142,
+          66.3707,
+          11.5
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 2.93,
+        "depth": 14.9899997711182,
+        "place": "45 km WNW of Petrolia, CA",
+        "time": "2025-09-11T06:00:25.330000",
+        "quality_score": 0.29300000000000004,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -124.810668945312,
+          40.3370018005371,
+          14.9899997711182
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 4.9,
+        "depth": 36.118,
+        "place": "190 km SSE of Vilyuchinsk, Russia",
+        "time": "2025-09-11T05:40:40.533000",
+        "quality_score": 0.49000000000000005,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          159.5975,
+          51.3877,
+          36.118
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 4.9,
+        "depth": 10,
+        "place": "central East Pacific Rise",
+        "time": "2025-09-11T05:08:11.849000",
+        "quality_score": 0.49000000000000005,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -103.0068,
+          -3.7084,
+          10
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 4.5,
+        "depth": 61.18,
+        "place": "101 km SSW of Severo-Kuril\u2019sk, Russia",
+        "time": "2025-09-11T04:43:35.559000",
+        "quality_score": 0.45,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          155.8372,
+          49.7853,
+          61.18
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 4.7,
+        "depth": 35,
+        "place": "165 km SSE of Vilyuchinsk, Russia",
+        "time": "2025-09-11T04:26:53.136000",
+        "quality_score": 0.47000000000000003,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          159.4926,
+          51.6024,
+          35
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 4.9,
+        "depth": 35,
+        "place": "117 km W of Tual, Indonesia",
+        "time": "2025-09-11T04:06:26.568000",
+        "quality_score": 0.49000000000000005,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          131.6935,
+          -5.542,
+          35
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 2.56,
+        "depth": 15.75,
+        "place": "14 km NE of Delta, B.C., MX",
+        "time": "2025-09-11T03:29:37.040000",
+        "quality_score": 0.256,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -115.1103333,
+          32.4585,
+          15.75
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 4.6,
+        "depth": 67.378,
+        "place": "2 km SSE of Panan, Philippines",
+        "time": "2025-09-11T01:09:41.636000",
+        "quality_score": 0.45999999999999996,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          120.0337,
+          15.1903,
+          67.378
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 2.9,
+        "depth": 9.177,
+        "place": "37 km NNE of Jeffrey City, Wyoming",
+        "time": "2025-09-11T00:59:08.945000",
+        "quality_score": 0.29,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -107.6885,
+          42.816,
+          9.177
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 4.8,
+        "depth": 35,
+        "place": "178 km SSE of Vilyuchinsk, Russia",
+        "time": "2025-09-11T00:52:44.236000",
+        "quality_score": 0.48,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          159.3778,
+          51.4423,
+          35
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 2.99,
+        "depth": 5.96,
+        "place": "14 km S of Fern Forest, Hawaii",
+        "time": "2025-09-11T00:28:30.290000",
+        "quality_score": 0.29900000000000004,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -155.132666666667,
+          19.3311666666667,
+          5.96
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 4.8,
+        "depth": 35.508,
+        "place": "187 km SSE of Vilyuchinsk, Russia",
+        "time": "2025-09-11T00:05:54.396000",
+        "quality_score": 0.48,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          159.6228,
+          51.4168,
+          35.508
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 5.3,
+        "depth": 10,
+        "place": "185 km SSE of Vilyuchinsk, Russia",
+        "time": "2025-09-10T23:54:21.990000",
+        "quality_score": 0.53,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          159.8403,
+          51.5117,
+          10
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 5,
+        "depth": 10,
+        "place": "182 km SSE of Vilyuchinsk, Russia",
+        "time": "2025-09-10T23:53:55.986000",
+        "quality_score": 0.5,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          159.6916,
+          51.4916,
+          10
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 3.69,
+        "depth": 18.05,
+        "place": "20 km NE of Maricopa, CA",
+        "time": "2025-09-10T22:53:50.880000",
+        "quality_score": 0.369,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -119.2336667,
+          35.1761667,
+          18.05
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 5.2,
+        "depth": 10,
+        "place": "180 km SSE of Vilyuchinsk, Russia",
+        "time": "2025-09-10T22:35:12.298000",
+        "quality_score": 0.52,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          159.8937,
+          51.5895,
+          10
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 4.5,
+        "depth": 10,
+        "place": "237 km SE of Bir\u017cebbu\u0121a, Malta",
+        "time": "2025-09-10T22:16:46.499000",
+        "quality_score": 0.45,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          16.4279,
+          34.365,
+          10
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 4.9,
+        "depth": 35,
+        "place": "160 km S of Dampit, Indonesia",
+        "time": "2025-09-10T22:14:58.065000",
+        "quality_score": 0.49000000000000005,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          112.8505,
+          -9.6564,
+          35
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 2.59,
+        "depth": -0.16,
+        "place": "59 km E of Maneadero, B.C., MX",
+        "time": "2025-09-10T20:56:38.610000",
+        "quality_score": 0.259,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -115.9406667,
+          31.7326667,
+          -0.16
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 4.13,
+        "depth": 68.34,
+        "place": "10 km W of Maeser, Utah",
+        "time": "2025-09-10T18:57:47.450000",
+        "quality_score": 0.413,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": "green",
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -109.704833333333,
+          40.4801666666667,
+          68.34
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 4.5,
+        "depth": 227.353,
+        "place": "41 km NNW of Bedugul, Indonesia",
+        "time": "2025-09-10T16:50:42.061000",
+        "quality_score": 0.45,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          115.5079,
+          -8.0866,
+          227.353
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 4.8,
+        "depth": 85.163,
+        "place": "58 km SSE of Vilyuchinsk, Russia",
+        "time": "2025-09-10T16:46:15.159000",
+        "quality_score": 0.48,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          158.7287,
+          52.4452,
+          85.163
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 2.79,
+        "depth": 7.36999988555908,
+        "place": "1 km WNW of Pinnacles, CA",
+        "time": "2025-09-10T15:27:45.440000",
+        "quality_score": 0.279,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -121.158164978027,
+          36.5320014953613,
+          7.36999988555908
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 5,
+        "depth": 69.704,
+        "place": "67 km E of Petropavlovsk-Kamchatsky, Russia",
+        "time": "2025-09-10T14:30:25.691000",
+        "quality_score": 0.5,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          159.6205,
+          52.9737,
+          69.704
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 4.9,
+        "depth": 10,
+        "place": "72 km E of Tocache, Peru",
+        "time": "2025-09-10T13:52:45.078000",
+        "quality_score": 0.49000000000000005,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -75.8666,
+          -8.163,
+          10
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 2.8,
+        "depth": 5,
+        "place": "22 km W of Fairview, Wyoming",
+        "time": "2025-09-10T13:39:38.871000",
+        "quality_score": 0.27999999999999997,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -111.2522,
+          42.6682,
+          5
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 4.6,
+        "depth": 10,
+        "place": "32 km SSW of Tr\u00e0 My, Vietnam",
+        "time": "2025-09-10T13:36:29.961000",
+        "quality_score": 0.45999999999999996,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          108.1503,
+          15.0535,
+          10
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 3.2,
+        "depth": 5,
+        "place": "22 km NNE of Georgetown, Idaho",
+        "time": "2025-09-10T13:24:24.244000",
+        "quality_score": 0.32,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -111.2847,
+          42.67,
+          5
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 5.1,
+        "depth": 50.615,
+        "place": "158 km SSE of Vilyuchinsk, Russia",
+        "time": "2025-09-10T13:03:57.987000",
+        "quality_score": 0.51,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          159.3734,
+          51.6411,
+          50.615
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 4.6,
+        "depth": 170.522,
+        "place": "Volcano Islands, Japan region",
+        "time": "2025-09-10T11:16:01.718000",
+        "quality_score": 0.45999999999999996,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          143.1007,
+          22.4562,
+          170.522
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 2.7,
+        "depth": 25.8,
+        "place": "122 km SW of Akhiok, Alaska",
+        "time": "2025-09-10T10:45:08.245000",
+        "quality_score": 0.27,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -155.7457,
+          56.2689,
+          25.8
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 3.8,
+        "depth": 64,
+        "place": "84 km NNE of Cruz Bay, U.S. Virgin Islands",
+        "time": "2025-09-10T07:17:44.440000",
+        "quality_score": 0.38,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -64.5118,
+          19.0445,
+          64
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 4.2,
+        "depth": 47.483,
+        "place": "30 km ESE of Aitape, Papua New Guinea",
+        "time": "2025-09-10T06:14:50.068000",
+        "quality_score": 0.42000000000000004,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          142.5914,
+          -3.2753,
+          47.483
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 3.19,
+        "depth": 8.11,
+        "place": "40 km N of Isabela, Puerto Rico",
+        "time": "2025-09-10T05:34:03.240000",
+        "quality_score": 0.319,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -67.0348333333333,
+          18.8625,
+          8.11
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 4.5,
+        "depth": 76.702,
+        "place": "98 km ESE of Petropavlovsk-Kamchatsky, Russia",
+        "time": "2025-09-10T05:32:04.757000",
+        "quality_score": 0.45,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          160.0532,
+          52.8646,
+          76.702
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 2.8,
+        "depth": 8.0566,
+        "place": "11 km NNE of Midland, Texas",
+        "time": "2025-09-10T04:30:55.935000",
+        "quality_score": 0.27999999999999997,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -102.024,
+          32.086,
+          8.0566
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 2.8,
+        "depth": 0,
+        "place": "126 km SSE of Prudhoe Bay, Alaska",
+        "time": "2025-09-10T03:22:52.968000",
+        "quality_score": 0.27999999999999997,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -146.9565,
+          69.2314,
+          0
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 2.9,
+        "depth": 0.46000000834465,
+        "place": "77 km WNW of Petrolia, CA",
+        "time": "2025-09-10T02:19:19.330000",
+        "quality_score": 0.29,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -125.183502197266,
+          40.406665802002,
+          0.46000000834465
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 4.8,
+        "depth": 53.104,
+        "place": "69 km E of Severo-Kuril\u2019sk, Russia",
+        "time": "2025-09-10T01:51:25.132000",
+        "quality_score": 0.48,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          157.1086,
+          50.7386,
+          53.104
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 2.75,
+        "depth": 15.63,
+        "place": "64 km WSW of Rosarito, B.C., MX",
+        "time": "2025-09-10T01:14:52.460000",
+        "quality_score": 0.275,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -117.6953333,
+          32.1851667,
+          15.63
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 2.68,
+        "depth": 11.0500001907349,
+        "place": "9 km NNW of Avenal, CA",
+        "time": "2025-09-10T01:14:16.110000",
+        "quality_score": 0.268,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -120.187835693359,
+          36.0745010375977,
+          11.0500001907349
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 2.61,
+        "depth": 3.47000002861023,
+        "place": "2 km NNW of The Geysers, CA",
+        "time": "2025-09-10T00:54:59.350000",
+        "quality_score": 0.261,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -122.769332885742,
+          38.7898330688477,
+          3.47000002861023
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 3.06,
+        "depth": 1.6,
+        "place": "26 km WNW of Ludlow, CA",
+        "time": "2025-09-10T00:23:58.640000",
+        "quality_score": 0.306,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -116.4101667,
+          34.8416667,
+          1.6
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 4.4,
+        "depth": 10,
+        "place": "Revilla Gigedo Islands region",
+        "time": "2025-09-10T00:14:21.141000",
+        "quality_score": 0.44000000000000006,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -108.496,
+          19.2136,
+          10
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 3.12,
+        "depth": 32.62,
+        "place": "95 km NNE of Cruz Bay, U.S. Virgin Islands",
+        "time": "2025-09-09T22:07:52.350000",
+        "quality_score": 0.312,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -64.5555,
+          19.1623333333333,
+          32.62
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 2.52,
+        "depth": 1.7,
+        "place": "4 km NW of Waterville, Washington",
+        "time": "2025-09-09T21:41:32.230000",
+        "quality_score": 0.252,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -120.10883333333334,
+          47.67516666666667,
+          1.7
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 3.81,
+        "depth": 40,
+        "place": "101 km NNE of Cruz Bay, U.S. Virgin Islands",
+        "time": "2025-09-09T20:28:30.270000",
+        "quality_score": 0.381,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -64.4696,
+          19.1995,
+          40
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 2.6,
+        "depth": 10,
+        "place": "221 km WSW of Port Orford, Oregon",
+        "time": "2025-09-09T19:57:48.329000",
+        "quality_score": 0.26,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -127.1426,
+          42.3584,
+          10
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 3.86,
+        "depth": 64,
+        "place": "82 km NNE of Cruz Bay, U.S. Virgin Islands",
+        "time": "2025-09-09T19:57:42.760000",
+        "quality_score": 0.386,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -64.473,
+          19.0106,
+          64
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 4.3,
+        "depth": 259.049,
+        "place": "61 km S of Challapata, Bolivia",
+        "time": "2025-09-09T19:14:26.614000",
+        "quality_score": 0.43,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -66.7833,
+          -19.459,
+          259.049
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 2.79,
+        "depth": 3.74,
+        "place": "6 km E of Calumet, Oklahoma",
+        "time": "2025-09-09T19:12:32.630000",
+        "quality_score": 0.279,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -98.049,
+          35.61133333,
+          3.74
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 4.4,
+        "depth": 10,
+        "place": "156 km ENE of Tok\u0101r, Sudan",
+        "time": "2025-09-09T18:47:38.007000",
+        "quality_score": 0.44000000000000006,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          39.136,
+          18.8646,
+          10
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 3.7,
+        "depth": 6.087,
+        "place": "40 km WSW of Mentone, Texas",
+        "time": "2025-09-09T18:21:24.957000",
+        "quality_score": 0.37,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -104.015,
+          31.635,
+          6.087
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 4.3,
+        "depth": 154.785,
+        "place": "110 km NNW of Pante Makasar, Timor Leste",
+        "time": "2025-09-09T17:58:27.814000",
+        "quality_score": 0.43,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          123.9132,
+          -8.3211,
+          154.785
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 2.7,
+        "depth": 10,
+        "place": "164 km WSW of Port Orford, Oregon",
+        "time": "2025-09-09T17:34:21.630000",
+        "quality_score": 0.27,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -126.4597,
+          42.4278,
+          10
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 4.01,
+        "depth": 15,
+        "place": "102 km NNE of Cruz Bay, U.S. Virgin Islands",
+        "time": "2025-09-09T16:57:12.750000",
+        "quality_score": 0.40099999999999997,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -64.5288,
+          19.2206,
+          15
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 5.2,
+        "depth": 10,
+        "place": "187 km SSE of Vilyuchinsk, Russia",
+        "time": "2025-09-09T16:25:51.424000",
+        "quality_score": 0.52,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          159.8179,
+          51.4876,
+          10
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 4.7,
+        "depth": 35,
+        "place": "86 km S of Koshima, Japan",
+        "time": "2025-09-09T15:56:17.263000",
+        "quality_score": 0.47000000000000003,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          130.6555,
+          29.4648,
+          35
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 4.5,
+        "depth": 10,
+        "place": "175 km ENE of Tok\u0101r, Sudan",
+        "time": "2025-09-09T15:36:58.850000",
+        "quality_score": 0.45,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          39.2086,
+          19.1435,
+          10
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 4.6,
+        "depth": 14.385,
+        "place": "193 km E of Petropavlovsk-Kamchatsky, Russia",
+        "time": "2025-09-09T15:01:33.984000",
+        "quality_score": 0.45999999999999996,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          161.5104,
+          53.0001,
+          14.385
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 3.88,
+        "depth": 6.55,
+        "place": "54 km W of Petrolia, CA",
+        "time": "2025-09-09T14:40:59.180000",
+        "quality_score": 0.388,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -124.926833333333,
+          40.3318333333333,
+          6.55
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 5.1,
+        "depth": 10,
+        "place": "181 km WSW of Port Orford, Oregon",
+        "time": "2025-09-09T14:31:43.854000",
+        "quality_score": 0.51,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -126.6691,
+          42.4397,
+          10
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 4.4,
+        "depth": 10,
+        "place": "162 km W of Port Orford, Oregon",
+        "time": "2025-09-09T14:31:03.620000",
+        "quality_score": 0.44000000000000006,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -126.4478,
+          42.4765,
+          10
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 4.1,
+        "depth": 145.448,
+        "place": "85 km W of Tobelo, Indonesia",
+        "time": "2025-09-09T14:03:50.968000",
+        "quality_score": 0.41,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          127.2494,
+          1.6315,
+          145.448
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 4.9,
+        "depth": 10,
+        "place": "181 km WSW of Port Orford, Oregon",
+        "time": "2025-09-09T14:02:04.025000",
+        "quality_score": 0.49000000000000005,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -126.6499,
+          42.3804,
+          10
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 4.5,
+        "depth": 169.452,
+        "place": "86 km W of San Antonio de los Cobres, Argentina",
+        "time": "2025-09-09T12:35:20.701000",
+        "quality_score": 0.45,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -67.1608,
+          -24.3117,
+          169.452
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 4.3,
+        "depth": 20.132,
+        "place": "70 km NW of Coquimbo, Chile",
+        "time": "2025-09-09T12:35:15.219000",
+        "quality_score": 0.43,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -71.9219,
+          -29.5743,
+          20.132
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 2.79,
+        "depth": 2.15000009536743,
+        "place": "7 km NW of Pinnacles, CA",
+        "time": "2025-09-09T12:28:07.380000",
+        "quality_score": 0.279,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -121.208831787109,
+          36.5716667175293,
+          2.15000009536743
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 4.4,
+        "depth": 9.03,
+        "place": "12 km S of Khadyzhensk, Russia",
+        "time": "2025-09-09T11:55:45.339000",
+        "quality_score": 0.44000000000000006,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          39.5629,
+          44.3185,
+          9.03
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 3.43,
+        "depth": 30.49,
+        "place": "9 km ESE of Willow Creek, CA",
+        "time": "2025-09-09T11:45:10.860000",
+        "quality_score": 0.343,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -123.5225,
+          40.9195,
+          30.49
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 2.8,
+        "depth": 10.5,
+        "place": "56 km NE of Valmy, Nevada",
+        "time": "2025-09-09T11:31:51.011000",
+        "quality_score": 0.27999999999999997,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -116.6894,
+          41.1815,
+          10.5
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 3.6,
+        "depth": 13.367,
+        "place": "218 km WSW of Port Orford, Oregon",
+        "time": "2025-09-09T11:31:29.733000",
+        "quality_score": 0.36,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -127.1084,
+          42.3833,
+          13.367
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 3.63,
+        "depth": 37.96,
+        "place": "6 km SSE of Leilani Estates, Hawaii",
+        "time": "2025-09-09T11:04:05.220000",
+        "quality_score": 0.363,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -154.894833333333,
+          19.4156666666667,
+          37.96
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 3,
+        "depth": 110.1,
+        "place": "58 km WNW of Happy Valley, Alaska",
+        "time": "2025-09-09T10:54:38.395000",
+        "quality_score": 0.3,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -152.7153,
+          60.1181,
+          110.1
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 2.7,
+        "depth": 10,
+        "place": "160 km W of Port Orford, Oregon",
+        "time": "2025-09-09T10:50:01.408000",
+        "quality_score": 0.27,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -126.4272,
+          42.5239,
+          10
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 4.6,
+        "depth": 17.698,
+        "place": "63 km NE of Masohi, Indonesia",
+        "time": "2025-09-09T10:46:03.971000",
+        "quality_score": 0.45999999999999996,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          129.3512,
+          -2.8767,
+          17.698
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 2.6,
+        "depth": 12.098,
+        "place": "61 km NE of Valmy, Nevada",
+        "time": "2025-09-09T10:21:34.306000",
+        "quality_score": 0.26,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -116.669,
+          41.2198,
+          12.098
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 5.3,
+        "depth": 10,
+        "place": "Mid-Indian Ridge",
+        "time": "2025-09-09T10:21:16.465000",
+        "quality_score": 0.53,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": "green",
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          78.1376,
+          -37.4921,
+          10
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 2.55,
+        "depth": 2.54999995231628,
+        "place": "12 km SSW of Tres Pinos, CA",
+        "time": "2025-09-09T10:19:15.110000",
+        "quality_score": 0.255,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -121.349166870117,
+          36.6863327026367,
+          2.54999995231628
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 2.64,
+        "depth": 2.84,
+        "place": "17 km W of Ludlow, CA",
+        "time": "2025-09-09T10:06:35.240000",
+        "quality_score": 0.264,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -116.344,
+          34.6911667,
+          2.84
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 2.7,
+        "depth": 18.936,
+        "place": "135 km WSW of Port Orford, Oregon",
+        "time": "2025-09-09T09:58:09.230000",
+        "quality_score": 0.27,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -126.1097,
+          42.4804,
+          18.936
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 4.5,
+        "depth": 14.806,
+        "place": "13 km ENE of K\u012bsh, Iran",
+        "time": "2025-09-09T08:12:10.699000",
+        "quality_score": 0.45,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          54.1507,
+          26.5826,
+          14.806
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 4.9,
+        "depth": 221.643,
+        "place": "61 km SW of Atocha, Bolivia",
+        "time": "2025-09-09T08:03:28.630000",
+        "quality_score": 0.49000000000000005,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -66.6289,
+          -21.3372,
+          221.643
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 2.67,
+        "depth": 5.17999982833862,
+        "place": "4 km SE of Aromas, CA",
+        "time": "2025-09-09T07:31:47.140000",
+        "quality_score": 0.267,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -121.609664916992,
+          36.8675003051758,
+          5.17999982833862
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 4.3,
+        "depth": 10,
+        "place": "184 km WSW of Port Orford, Oregon",
+        "time": "2025-09-09T06:47:09.266000",
+        "quality_score": 0.43,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -126.7031,
+          42.4299,
+          10
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 3.05,
+        "depth": 55.93,
+        "place": "3 km SW of Vega Alta, Puerto Rico",
+        "time": "2025-09-09T06:46:43.450000",
+        "quality_score": 0.305,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -66.3536666666667,
+          18.3931666666667,
+          55.93
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 3.4,
+        "depth": 10,
+        "place": "196 km W of Port Orford, Oregon",
+        "time": "2025-09-09T06:46:32.365000",
+        "quality_score": 0.33999999999999997,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -126.8778,
+          42.5235,
+          10
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 4.7,
+        "depth": 35,
+        "place": "111 km S of Ende, Indonesia",
+        "time": "2025-09-09T05:53:28.119000",
+        "quality_score": 0.47000000000000003,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          121.7697,
+          -9.8497,
+          35
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 4.7,
+        "depth": 10,
+        "place": "255 km ESE of Ust\u2019-Kamchatsk Staryy, Russia",
+        "time": "2025-09-09T05:35:22.352000",
+        "quality_score": 0.47000000000000003,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          166.3169,
+          55.4528,
+          10
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 2.9,
+        "depth": 10,
+        "place": "174 km W of Port Orford, Oregon",
+        "time": "2025-09-09T04:31:44.421000",
+        "quality_score": 0.29,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -126.5947,
+          42.4988,
+          10
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 4.4,
+        "depth": 200.226,
+        "place": "Pagan region, Northern Mariana Islands",
+        "time": "2025-09-09T03:08:47.188000",
+        "quality_score": 0.44000000000000006,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          145.6729,
+          18.4716,
+          200.226
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 3.1,
+        "depth": 10,
+        "place": "173 km WSW of Port Orford, Oregon",
+        "time": "2025-09-09T03:05:20.522000",
+        "quality_score": 0.31,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -126.5555,
+          42.3988,
+          10
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "earthquake",
+        "source": "USGS",
+        "magnitude": 2.6,
+        "depth": 35.5,
+        "place": "18 km ESE of Naalehu, Hawaii",
+        "time": "2025-09-09T02:48:56.450000",
+        "quality_score": 0.26,
+        "data_lineage": [
+          "USGS",
+          "Seismic Network",
+          "Real-time"
+        ],
+        "alert": null,
+        "tsunami": 0
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -155.405833333333,
+          19.0343333333333,
+          35.5
+        ]
+      }
+    }
+  ],
+  "metadata": {
+    "source": "USGS",
+    "timestamp": "2025-09-16T07:39:42.838090",
+    "count": 270
+  }
+}
