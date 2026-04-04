@@ -60,14 +60,7 @@ fn run_dim<const D: usize>(with_drift: bool, seed: u64) -> DimResult {
     let gravity = SVector::<f64, D>::zeros(); // no gravity
     let mut world = PhysicsWorld::<D>::new(gravity);
     let mut consciousness = ConsciousnessField::<D>::new();
-    consciousness.constants = ThermodynamicConstants {
-        initial_energy: 400.0, max_energy: 400.0,
-        consciousness_maintenance_per_tick: 0.10, movement_cost_per_unit: 0.006,
-        sprint_cost_multiplier: 2.5, collision_energy_drain: 0.05,
-        harmony_resonance_regen_rate: 0.12, energy_well_regen_rate: 0.25,
-        ambient_regen_rate: 0.03, collapse_recovery_harmony_threshold: 0.5,
-        harmony_range: 40.0,
-    };
+    consciousness.constants = ThermodynamicConstants::research();
 
     let mut rng = seed;
     let mut agent_handles = Vec::new();
@@ -83,14 +76,14 @@ fn run_dim<const D: usize>(with_drift: bool, seed: u64) -> DimResult {
 
         let h = world.add_sphere(Point::new(coords), 1.0, 1.0);
         if let Some(b) = world.body_mut(h) {
-            b.linear_damping = 0.3;
+            b.linear_damping = 0.05; // LTC: tau=20s, gentle air resistance
             let mut vel = SVector::<f64, D>::zeros();
             vel[0] = (nr(&mut rng) - 0.5) * 8.0;
             if D > 1 { vel[1] = (nr(&mut rng) - 0.5) * 8.0; }
             b.linear_velocity = vel;
         }
 
-        consciousness.register(h, 400.0, 20.0);
+        consciousness.register(h, consciousness.constants.initial_energy, consciousness.constants.harmony_range);
         if let Some(e) = consciousness.entities.get_mut(&h) {
             match i % 4 {
                 0 => e.harmony_activations = [0.9,0.1,0.1,0.1,0.1,0.1,0.1,0.8],
