@@ -160,10 +160,17 @@ impl MuseVoiceBridge {
         let result = self.broca.generate(&channels);
         let text = result.text.trim().to_string();
 
-        if text.is_empty() || text.len() < 3 {
-            None // fall back to hardcoded
+        // Filter: reject if empty, too short, or contains code tokens (untrained weights)
+        if text.is_empty() || text.len() < 5
+            || text.contains("pub ") || text.contains("fn ") || text.contains("struct")
+            || text.contains("&mut") || text.contains("<T") || text.contains("[]")
+            || text.contains("unknown unknown")
+        {
+            None // fall back to curated phrases
         } else {
-            Some(text)
+            // Clean up: take first sentence only, cap length
+            let clean = text.split('.').next().unwrap_or(&text).trim().to_string();
+            if clean.len() >= 5 { Some(format!("{}.", clean)) } else { None }
         }
     }
 
