@@ -158,34 +158,47 @@ fn main() {
         homeostasis_pull_cruise: 1.498,
     }));
 
+    // Run 4: CLS-evolved "vigilant learner" (from evolve_cls)
+    println!("\n  [4/4] Running CLS-EVOLVED ({} cycles)...", CYCLES);
+    let cls_evolved = run_with_label("CLS-Evolved", Some(Overrides {
+        fep_surprise_scale: 9.360,
+        fep_lr_decay: 0.922,
+        neuromod_d2_baseline: 0.244,
+        neuromod_ne_phasic_threshold: 0.197,
+        neuromod_arousal_ema_decay: 0.936,
+        homeostasis_recalibrate_high: 1.273,
+        homeostasis_recalibrate_low: 0.725,
+        frustration_dampen_threshold: 0.490,
+        self_model_weight_high: 0.423,
+        homeostasis_pull_cruise: 1.440,
+    }));
+
     // Results table
     println!("\n═══════════════════════════════════════════════════════════════");
-    println!("  Results");
+    println!("  Results (4-way comparison)");
     println!("═══════════════════════════════════════════════════════════════\n");
 
-    println!("  {:>20}  {:>10}  {:>10}  {:>10}", "Metric", "Defaults", "Consist.", "Spectral");
-    println!("  {}", "-".repeat(55));
+    println!("  {:>16}  {:>8}  {:>8}  {:>8}  {:>8}", "Metric", "Default", "Consist", "Spectr", "CLS-Evo");
+    println!("  {}", "-".repeat(56));
 
-    fn row(name: &str, a: f64, b: f64, c: f64) {
+    fn row(name: &str, a: f64, b: f64, c: f64, d: f64) {
         let db = if a.abs() > 1e-6 { (b - a) / a * 100.0 } else { 0.0 };
         let dc = if a.abs() > 1e-6 { (c - a) / a * 100.0 } else { 0.0 };
-        println!("  {:>20}  {:>10.4}  {:>7.4}{:>+4.0}%  {:>7.4}{:>+4.0}%",
-            name, a, b, db, c, dc);
+        let dd = if a.abs() > 1e-6 { (d - a) / a * 100.0 } else { 0.0 };
+        println!("  {:>16}  {:>8.4}  {:>+7.1}%  {:>+7.1}%  {:>+7.1}%",
+            name, a, db, dc, dd);
     }
 
-    row("Mean Φ", defaults.mean_phi, consistency.mean_phi, spectral.mean_phi);
-    row("Final Φ", defaults.final_phi, consistency.final_phi, spectral.final_phi);
-    row("First 100 Φ", defaults.first_100_phi, consistency.first_100_phi, spectral.first_100_phi);
-    row("Last 100 Φ", defaults.last_100_phi, consistency.last_100_phi, spectral.last_100_phi);
-    row("Mean PE", defaults.mean_pe, consistency.mean_pe, spectral.mean_pe);
-    row("Mean Coherence", defaults.mean_coherence, consistency.mean_coherence, spectral.mean_coherence);
-    row("Learning %", defaults.learning_cycles as f64 / CYCLES as f64,
-        consistency.learning_cycles as f64 / CYCLES as f64,
-        spectral.learning_cycles as f64 / CYCLES as f64);
+    row("Mean Φ", defaults.mean_phi, consistency.mean_phi, spectral.mean_phi, cls_evolved.mean_phi);
+    row("Final Φ", defaults.final_phi, consistency.final_phi, spectral.final_phi, cls_evolved.final_phi);
+    row("First 100 Φ", defaults.first_100_phi, consistency.first_100_phi, spectral.first_100_phi, cls_evolved.first_100_phi);
+    row("Last 100 Φ", defaults.last_100_phi, consistency.last_100_phi, spectral.last_100_phi, cls_evolved.last_100_phi);
+    row("Mean PE", defaults.mean_pe, consistency.mean_pe, spectral.mean_pe, cls_evolved.mean_pe);
+    row("Mean Coherence", defaults.mean_coherence, consistency.mean_coherence, spectral.mean_coherence, cls_evolved.mean_coherence);
 
     // Winner determination
     println!("\n  Winner (by last 100 Φ):");
-    let results = [&defaults, &consistency, &spectral];
+    let results = [&defaults, &consistency, &spectral, &cls_evolved];
     let best = results.iter().max_by(|a, b|
         a.last_100_phi.partial_cmp(&b.last_100_phi).unwrap()).unwrap();
     println!("    {} — Φ={:.4}", best.name, best.last_100_phi);
