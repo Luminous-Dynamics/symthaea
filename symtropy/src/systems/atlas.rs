@@ -1209,6 +1209,7 @@ pub fn consciousness_shader_system(
 pub fn celestial_orbit_system(
     mut gizmos: Gizmos,
     time: Res<Time>,
+    timeline: Res<TimelineState>,
 ) {
     let t = time.elapsed_secs();
     let bodies = sol_atlas_core::solar_system::solar_system_bodies();
@@ -1257,6 +1258,38 @@ pub fn celestial_orbit_system(
                 Vec3::new(pos[0] + ring_r * a1.cos(), pos[1], pos[2] + ring_r * a1.sin()),
                 ring_color,
             );
+        }
+    }
+
+    // ═══ COLONY INDICATORS ═════════════════════════════════════════
+    // Show civilization presence on planets based on timeline year.
+    let colonies = sol_atlas_core::simulation::colonies_at_year(timeline.year);
+    for colony in &colonies {
+        // Find the planet's current position
+        if let Some(body) = bodies.iter().find(|b| b.name == colony.body) {
+            let pos = sol_atlas_core::solar_system::body_position(body, t);
+            let flicker = (t * 3.0 + colony.light_delay_s * 0.01).sin().abs() * 0.3 + 0.7;
+
+            // Colony indicator: small bright sphere near the planet
+            let colony_color = Color::linear_rgba(0.2, 0.9, 0.4, 0.6 * flicker);
+            gizmos.sphere(
+                Isometry3d::from_translation(Vec3::new(
+                    pos[0] + body.visual_radius * 1.2,
+                    pos[1] + body.visual_radius * 0.5,
+                    pos[2],
+                )),
+                0.03 + (colony.population as f32 / 5000.0).min(1.0) * 0.03,
+                colony_color,
+            );
+
+            // Light-delay connection arc back to Earth (pulsing)
+            let earth_pos = Vec3::ZERO;
+            let colony_pos = Vec3::new(pos[0], pos[1], pos[2]);
+            let mid = (earth_pos + colony_pos) / 2.0 + Vec3::Y * 0.5;
+            let sync_alpha = 0.05 * flicker;
+            let sync_color = Color::linear_rgba(0.3, 0.7, 1.0, sync_alpha);
+            gizmos.line(earth_pos, mid, sync_color);
+            gizmos.line(mid, colony_pos, sync_color);
         }
     }
 }
