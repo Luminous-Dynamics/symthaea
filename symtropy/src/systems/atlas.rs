@@ -51,6 +51,72 @@ pub struct CityIndicator {
 #[derive(Component)]
 pub struct TimelineHud;
 
+/// Active data view preset — filters which layers are visible.
+#[derive(Resource, Debug, Clone, Copy, PartialEq)]
+pub enum DataView {
+    All,
+    Energy,
+    Climate,
+    Civilization,
+    Infrastructure,
+    Interplanetary,
+}
+
+impl Default for DataView {
+    fn default() -> Self { Self::All }
+}
+
+impl DataView {
+    pub fn label(&self) -> &'static str {
+        match self {
+            Self::All => "ALL DATA",
+            Self::Energy => "ENERGY",
+            Self::Climate => "CLIMATE",
+            Self::Civilization => "CIVILIZATION",
+            Self::Infrastructure => "INFRASTRUCTURE",
+            Self::Interplanetary => "INTERPLANETARY",
+        }
+    }
+
+    pub fn next(&self) -> Self {
+        match self {
+            Self::All => Self::Energy,
+            Self::Energy => Self::Climate,
+            Self::Climate => Self::Civilization,
+            Self::Civilization => Self::Infrastructure,
+            Self::Infrastructure => Self::Interplanetary,
+            Self::Interplanetary => Self::All,
+        }
+    }
+
+    /// Which layers are visible in this view.
+    pub fn visible_layers(&self) -> Vec<Layer> {
+        match self {
+            Self::All => Layer::all().into_iter().collect(),
+            Self::Energy => vec![
+                Layer::Energy, Layer::FossilDeposits, Layer::Nuclear,
+                Layer::Geothermal, Layer::TerraLumina,
+            ],
+            Self::Climate => vec![
+                Layer::Earthquakes, Layer::Fires, Layer::Storms, Layer::Volcanoes,
+                Layer::Climate,
+            ],
+            Self::Civilization => vec![
+                Layer::Regions, Layer::Health, Layer::Emergency,
+            ],
+            Self::Infrastructure => vec![
+                Layer::Maglev, Layer::SupplyChain, Layer::ResontiaVaults,
+                Layer::Robotics,
+            ],
+            Self::Interplanetary => vec![], // planets + colonies only (no Earth markers)
+        }
+    }
+}
+
+/// HUD element showing current data view.
+#[derive(Component)]
+pub struct ViewHud;
+
 /// Marker pulse — makes data markers breathe with sinusoidal scale modulation.
 #[derive(Component)]
 pub struct MarkerPulse {
@@ -112,8 +178,8 @@ pub fn setup_globe_view(
     }
 
     // Pure black space background
-    // Deep space — not pure black, faint starlight glow
-    commands.insert_resource(ClearColor(Color::linear_rgb(0.005, 0.003, 0.012)));
+    // Deep space — subtle blue-purple glow (scattered starlight)
+    commands.insert_resource(ClearColor(Color::linear_rgb(0.012, 0.008, 0.025)));
 
     // Ambient light so the dark side of the globe isn't pitch black
     commands.spawn((
@@ -296,13 +362,28 @@ pub fn setup_globe_view(
     commands.spawn((
         Text::new("SOL ATLAS"),
         TextFont { font_size: 16.0, ..default() },
-        TextColor(Color::srgba(0.3, 0.6, 0.7, 0.4)),
+        TextColor(Color::srgba(0.4, 0.7, 0.8, 0.65)),
         Node {
             position_type: PositionType::Absolute,
             top: Val::Px(24.0),
             left: Val::Px(28.0),
             ..default()
         },
+        AtlasEntity,
+    ));
+
+    // Data view indicator HUD (top-right)
+    commands.spawn((
+        Text::new("ALL DATA"),
+        TextFont { font_size: 13.0, ..default() },
+        TextColor(Color::srgba(0.5, 0.7, 0.8, 0.55)),
+        Node {
+            position_type: PositionType::Absolute,
+            top: Val::Px(24.0),
+            right: Val::Px(28.0),
+            ..default()
+        },
+        ViewHud,
         AtlasEntity,
     ));
 
@@ -865,7 +946,7 @@ pub fn draw_arcs_system(
     // ═══ SHIPPING LANES ═════════════════════════════════════════════
     // Global maritime trade routes — blue, very faint background layer
     let lanes = sol_atlas_bevy::data::load_shipping_lanes();
-    let lane_color = Color::linear_rgba(0.15, 0.3, 0.6, 0.08);
+    let lane_color = Color::linear_rgba(0.2, 0.35, 0.65, 0.15); // brighter — maritime arteries
     for route in &lanes {
         for w in route.windows(2) {
             let a = geo::lat_lon_to_xyz(w[0][1], w[0][0], 1.002);
@@ -890,7 +971,7 @@ pub fn draw_arcs_system(
     for ring in 1..=8 {
         let r = ring as f32 * 0.5;
         let segments = 48;
-        let ring_alpha = 0.04 * flicker * (1.0 - ring as f32 / 10.0); // fade with distance
+        let ring_alpha = 0.07 * flicker * (1.0 - ring as f32 / 10.0); // brighter gravity well
         let ring_color = Color::linear_rgba(0.0, 0.5, 0.7, ring_alpha);
         for i in 0..segments {
             let a0 = i as f32 / segments as f32 * std::f32::consts::TAU;
@@ -908,7 +989,7 @@ pub fn draw_arcs_system(
     // Radial spokes (12 lines from center outward)
     for spoke in 0..12 {
         let angle = spoke as f32 / 12.0 * std::f32::consts::TAU;
-        let spoke_alpha = 0.03 * flicker;
+        let spoke_alpha = 0.05 * flicker;
         let spoke_color = Color::linear_rgba(0.0, 0.4, 0.6, spoke_alpha);
         let segments = 16;
         for i in 0..segments {
@@ -979,6 +1060,50 @@ pub fn temporal_4d_system(
         let alpha = projector.alpha(&point);
 
         *vis = if alpha > 0.05 {
+            Visibility::Visible
+        } else {
+            Visibility::Hidden
+        };
+    }
+}
+
+/// Data view switcher — Tab key cycles through categorical presets.
+pub fn data_view_switch_system(
+    kb: Res<ButtonInput<KeyCode>>,
+    mut view: ResMut<DataView>,
+    mut view_hud: Query<(&mut Text, &mut TextColor), With<ViewHud>>,
+) {
+    if kb.just_pressed(KeyCode::Tab) {
+        *view = view.next();
+        info!("[view] Switched to: {}", view.label());
+        for (mut text, mut color) in view_hud.iter_mut() {
+            *text = Text::new(view.label());
+            // Color by view type
+            let c = match *view {
+                DataView::All => [0.5, 0.7, 0.8],
+                DataView::Energy => [1.0, 0.8, 0.2],
+                DataView::Climate => [0.9, 0.3, 0.2],
+                DataView::Civilization => [0.3, 0.8, 0.5],
+                DataView::Infrastructure => [0.8, 0.6, 0.3],
+                DataView::Interplanetary => [0.4, 0.5, 0.9],
+            };
+            *color = TextColor(Color::srgba(c[0], c[1], c[2], 0.65));
+        }
+    }
+}
+
+/// Data view filter — hides markers not in the active view's layer set.
+pub fn data_view_filter_system(
+    view: Res<DataView>,
+    mut markers: Query<(&DataMarker, &mut Visibility), Without<CityIndicator>>,
+) {
+    if !view.is_changed() { return; }
+
+    let visible_layers = view.visible_layers();
+    let show_all = *view == DataView::All;
+
+    for (marker, mut vis) in markers.iter_mut() {
+        *vis = if show_all || visible_layers.contains(&marker.layer) {
             Visibility::Visible
         } else {
             Visibility::Hidden

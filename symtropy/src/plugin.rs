@@ -108,6 +108,7 @@ impl Plugin for SymtropyPlugin {
                 .init_resource::<sol_atlas_bevy::timeline::TimelineState>()
                 .init_resource::<sol_atlas_bevy::selection::SelectedMarker>()
                 .init_resource::<systems::atlas::CurrentAesthetic>()
+                .init_resource::<systems::atlas::DataView>()
                 .init_resource::<sol_atlas_bevy::frame_capture::FrameCaptureConfig>()
                 .init_resource::<systems::demo_director::DemoDirector>()
                 .add_systems(Update,
@@ -123,7 +124,7 @@ impl Plugin for SymtropyPlugin {
                     systems::atlas::temporal_4d_system,
                     systems::atlas::lod_visibility_system,
                 ).chain().run_if(in_state(GamePhase::GlobeView)))
-                // Everything else runs in parallel
+                // Globe systems — split into two groups (Bevy tuple size limit)
                 .add_systems(Update, (
                     systems::atlas::globe_input_system,
                     systems::atlas::draw_arcs_system,
@@ -136,8 +137,12 @@ impl Plugin for SymtropyPlugin {
                     systems::atlas::cloud_rotation_system,
                     systems::atlas::marker_pulse_system,
                     systems::atlas::consciousness_shader_system,
+                ).run_if(in_state(GamePhase::GlobeView)))
+                .add_systems(Update, (
                     systems::atlas::city_stress_evolution_system,
                     systems::atlas::timeline_hud_system,
+                    systems::atlas::data_view_switch_system,
+                    systems::atlas::data_view_filter_system,
                     systems::atlas::aesthetic_switch_system,
                     systems::atlas::aesthetic_apply_system,
                     sol_atlas_bevy::selection::click_select_system,
