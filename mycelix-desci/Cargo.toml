@@ -4,6 +4,7 @@ members = [
     "src/api",
     "src/cli",
 ]
+exclude = ["apps/leptos"]
 resolver = "2"
 
 [workspace.package]

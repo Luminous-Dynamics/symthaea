@@ -1,0 +1,15 @@
+[build]
+target = "index.html"
+dist = "dist"
+
+[watch]
+watch = ["src", "index.html"]
+
+[serve]
+port = 8106
+open = false
+
+# Proxy API calls to the DeSci REST backend
+[[proxy]]
+rewrite = "/api/"
+backend = "http://localhost:8080/api/"

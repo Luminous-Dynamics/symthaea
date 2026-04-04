@@ -1,0 +1,27 @@
+# Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
+
+[package]
+name = "mycelix-desci-ui"
+version = "0.1.0"
+edition = "2021"
+license = "AGPL-3.0-or-later"
+description = "Leptos CSR frontend for Mycelix DeSci — epistemic claim management + physics discovery"
+
+[dependencies]
+leptos = { version = "0.8", features = ["csr"] }
+leptos_router = "0.8"
+leptos_meta = "0.8"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+wasm-bindgen = "0.2"
+wasm-bindgen-futures = "0.4"
+js-sys = "0.3"
+web-sys = { version = "0.3", features = [
+    "console", "HtmlInputElement", "HtmlSelectElement", "HtmlTextAreaElement",
+    "Window", "Document", "Location", "Storage",
+    "Request", "RequestInit", "RequestMode", "Response", "Headers",
+] }
+console_error_panic_hook = "0.1"
+gloo-net = { version = "0.6", features = ["http"] }
