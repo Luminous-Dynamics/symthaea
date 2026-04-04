@@ -4,6 +4,18 @@
 
 **Cooperation is a thermodynamic inevitability under energy scarcity — not a strategic choice, not a moral virtue, not a product of intelligence — but only when agents have social range and mutual benefit.**
 
+## The Honest Complication
+
+The falsification experiment (F38) revealed that cooperation persists even under "IMPOSSIBLE" parameters (maintenance 7.5×, range 1/4, zero ambient). This challenges the thesis: if cooperation can't be killed, is it a genuine emergent property or an artifact of the FEP gradient forcing spatial co-location near wells?
+
+**The answer is both, and they're separable:**
+
+- **Proximate cause**: The FEP gradient drives agents toward energy wells. Once co-located at wells, even tiny harmony range produces resonance. This is the *mechanism*.
+- **Ultimate cause**: Energy scarcity creates the pressure that makes well-seeking urgent. Without scarcity, agents don't cluster (F24: ABUNDANT worst survival). This is the *condition*.
+- **Null model evidence**: Random-walk agents (no FEP gradient) survive at 100% but cooperate 55% less and cluster 2.5× looser (F32). So the gradient is the clustering mechanism, but resonance is the survival mechanism. They're distinct.
+
+**Revised thesis**: Cooperation emerges from two separable mechanisms operating together: (1) scarcity-driven spatial aggregation near shared resources, and (2) mutual energy regeneration through proximity. The FEP gradient optimizes the first; harmony resonance provides the second. Neither alone is sufficient (F32). The system is robust because BOTH mechanisms have wide parameter tolerance.
+
 ## The Logic Chain
 
 1. **Agents with finite energy die without regeneration.** (Trivially true — F1, F32 NO_REGEN: 3.9/20 survive)
@@ -12,22 +24,36 @@
 
 3. **Harmony resonance regeneration is the only sustainable energy source.** (F32: without it, nearly everyone dies. Wells deplete, ambient regen is too slow.)
 
-4. **Resonance requires proximity.** (Physics: harmony range limits who you can cooperate with)
+4. **The FEP gradient drives agents toward wells AND toward resonant partners.** These are two components of the same gradient, but they serve different functions: wells provide energy, resonance provides sustainability.
 
-5. **Therefore agents MUST cluster near resonant partners to survive.** (F1-4: clustering emerges, p<0.001, d=-1.94)
+5. **Spatial co-location at wells creates cooperation as a side effect.** (F38: even range=10 produces cooperation when agents are forced near each other. The gradient is the proximate cause.)
 
-6. **The specific consciousness metric doesn't matter.** (F3: IIT Φ, Shannon entropy, constant scalar all produce identical clustering. Only Φ=0 differs.)
+6. **But cooperation is not just co-location — resonance actively regenerates energy.** (F32: NO_REGEN kills most agents even when they're near wells. Cooperation is more than being in the same place.)
 
-7. **But HAVING some nonzero integration metric does matter.** (F4: Φ=0 clusters 35% less tightly)
+7. **Therefore: scarcity → gradient → co-location → resonance → survival.** This is a causal chain with two necessary links. Removing the gradient (random walk) preserves individual survival but degrades social structure. Removing resonance (NO_REGEN) kills the population.
 
-8. **This is a phase transition, not a gradual effect.** (F20: sharp threshold at 0.20 J/tick maintenance, bistable above)
+8. **The specific consciousness metric doesn't matter.** (F3: IIT Φ, Shannon entropy, constant scalar all produce identical clustering. Only Φ=0 differs.)
 
-9. **The critical parameters are social range and mutual benefit.** (F33: harmony_range and resonance_regen are CRITICAL; F35: they interact synergistically, +3.32 agents)
+9. **This is a phase transition.** (F20: sharp threshold at 0.20 J/tick, bistable above)
 
-10. **Everything else is noise.** Specifically:
+10. **The critical infrastructure is social range + mutual benefit rate.** (F33, F35: range×regen synergy +3.32 agents)
+
+11. **Most individual-level factors are noise:**
     - Information asymmetry: zero effect (F29, d=0.0)
     - Agent memory: unnecessary in simple arenas (F34, all n.s.)
     - Curvature geometry: irrelevant to cooperation (F36, d=0.006)
+    - Individual charity: futile without structural support (F25, 100% recidivism)
+    - Hereditary position: doesn't persist (F28, 25% = random)
+    - Learning: weights already near-optimal (F31, <0.5% drift)
+
+12. **But structural and environmental factors dominate:**
+    - Physical bonds: +70% survival (F19, p=0.001)
+    - Abundance: breeds complacency (F24)
+    - Equal starts: produce maximum inequality (F26, Gini 0→0.66)
+    - Evolution: selects for solidarity (F18, resonance 0.86→1.0)
+    - Scale: cooperation STRENGTHENS at N=1000 (F37, 96%)
+
+13. **The FEP gradient's dominance is itself a finding.** The gradient is so effective at solving the cooperation problem that additional mechanisms (memory, learning, communication, curvature) add no measurable value. This suggests cooperation is a *robust* emergent property — not fragile to the specific implementation, but deeply coupled to the thermodynamic cost structure.
     - Individual charity: futile without structural support (F25, 100% recidivism)
     - Hereditary position: doesn't persist (F28, 25% = random)
 
