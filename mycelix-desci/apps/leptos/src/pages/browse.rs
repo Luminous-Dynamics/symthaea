@@ -71,13 +71,25 @@ pub fn BrowsePage() -> impl IntoView {
     let (search_text, set_search_text) = signal(String::new());
     let (tier_filter, set_tier_filter) = signal(String::new());
 
-    let claims = demo_claims();
+    // Try API, fall back to demo data
+    let api_claims = leptos::prelude::LocalResource::new(|| async {
+        crate::api::query_claims(&crate::types::QueryRequest::default()).await.ok()
+    });
+
+    let claims = move || {
+        api_claims
+            .get()
+            .flatten()
+            .map(|r| r.results)
+            .unwrap_or_else(demo_claims)
+    };
 
     let filtered_claims = move || {
         let search = search_text.get().to_lowercase();
         let tier = tier_filter.get();
+        let all_claims = claims();
 
-        claims.iter()
+        all_claims.into_iter()
             .filter(|c| {
                 if !search.is_empty() {
                     let matches = c.content.description.to_lowercase().contains(&search)
@@ -91,7 +103,6 @@ pub fn BrowsePage() -> impl IntoView {
                 }
                 true
             })
-            .cloned()
             .collect::<Vec<_>>()
     };
 

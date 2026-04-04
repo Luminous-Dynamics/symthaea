@@ -14,9 +14,28 @@ pub fn SubmitPage() -> impl IntoView {
     let (submitted, set_submitted) = signal(false);
 
     let on_submit = move |_| {
-        if !description.get().is_empty() {
-            set_submitted.set(true);
+        if description.get().is_empty() {
+            return;
         }
+        let desc = description.get();
+        let cat = category.get();
+        leptos::task::spawn_local(async move {
+            let req = crate::types::CreateClaimRequest {
+                tier: crate::types::EpistemicTier::E0,
+                content: crate::types::ClaimContent {
+                    dataset_hash: String::new(),
+                    description: desc,
+                    category: cat,
+                    keywords: vec![],
+                    storage_ref: None,
+                    reproducibility_score: None,
+                    license: None,
+                },
+                creator: "anonymous".to_string(),
+            };
+            let _ = crate::api::create_claim(&req).await;
+        });
+        set_submitted.set(true);
     };
 
     view! {

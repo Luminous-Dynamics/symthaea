@@ -3,9 +3,11 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 
 pub mod claim_card;
+pub mod equation;
 pub mod lem_badge;
 pub mod nav;
 
 pub use claim_card::*;
+pub use equation::*;
 pub use lem_badge::*;
 pub use nav::*;

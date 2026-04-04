@@ -6,12 +6,22 @@
 use leptos::prelude::*;
 
 /// Dashboard page with system overview.
+///
+/// Attempts to fetch real stats from the DeSci REST API.
+/// Falls back to static demo data if the API is unavailable.
 #[component]
 pub fn HomePage() -> impl IntoView {
-    // Static demo data — will connect to API when backend is running
-    let total_claims = 93; // Matches our equation catalog size
-    let total_categories = 16;
-    let total_equations = 93;
+    let stats = leptos::prelude::LocalResource::new(|| async {
+        crate::api::fetch_stats().await.ok()
+    });
+
+    let total_claims = move || {
+        stats.get().flatten().map(|s| s.total_claims).unwrap_or(148)
+    };
+    let total_categories = move || {
+        stats.get().flatten().map(|s| s.total_categories).unwrap_or(19)
+    };
+    let total_equations = 148; // From physics catalog
 
     view! {
         <div class="page-container">
@@ -23,11 +33,11 @@ pub fn HomePage() -> impl IntoView {
                     <div class="stat-label">"Physics Equations"</div>
                 </div>
                 <div class="glass-panel stat-card">
-                    <div class="stat-value">{total_claims}</div>
+                    <div class="stat-value">{move || total_claims()}</div>
                     <div class="stat-label">"Epistemic Claims"</div>
                 </div>
                 <div class="glass-panel stat-card">
-                    <div class="stat-value">{total_categories}</div>
+                    <div class="stat-value">{move || total_categories()}</div>
                     <div class="stat-label">"Physics Domains"</div>
                 </div>
                 <div class="glass-panel stat-card">
