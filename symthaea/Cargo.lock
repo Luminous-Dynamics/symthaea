@@ -15759,6 +15759,8 @@ dependencies = [
  "sha2 0.10.9",
  "sha3",
  "strsim",
+ "symthaea-aesthetic",
+ "symthaea-atelier",
  "symthaea-auv",
  "symthaea-broca",
  "symthaea-canvas",

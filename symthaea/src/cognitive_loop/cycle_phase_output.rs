@@ -2053,6 +2053,8 @@ impl CognitiveLoopService {
             wisdom_hv: perception.encoding.hv16_cached,
             #[cfg(feature = "ssm_language")]
             language_output: self.language_comm.last_broca_text.take(),
+            #[cfg(feature = "canvas")]
+            canvas_svg: self.sensorimotor.motor_rendering.last_canvas_svg.take(),
             #[cfg(feature = "identity")]
             signed_output,
             #[cfg(feature = "identity")]

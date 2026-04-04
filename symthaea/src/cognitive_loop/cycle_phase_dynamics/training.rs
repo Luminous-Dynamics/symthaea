@@ -636,6 +636,19 @@ impl CognitiveLoopService {
             }
         };
 
+        // Pre-extract knowledge signals before mutable borrow of broca_manager.
+        let km_grounding = self
+            .knowledge_manager()
+            .map(|km| {
+                let s = km.signals();
+                ((s.relevance * 0.6 + (1.0 - s.uncertainty) * 0.4) as f32).clamp(0.0, 1.0)
+            })
+            .unwrap_or(0.5);
+        let km_context = self
+            .knowledge_manager()
+            .map(|km| km.top_grounded_facts(5))
+            .unwrap_or_default();
+
         // Generate in a scoped borrow, then apply feedback outside
         let broca_feedback = if let Some(ref mut broca) = self.language_comm.broca_manager {
             let math_epistemic_penalty = if math_result.epistemic_caveat.is_some() {
@@ -657,19 +670,8 @@ impl CognitiveLoopService {
                 consciousness_level: broca_psi,
                 meta_awareness: self.carryover.learning.self_model_accuracy as f32,
                 coherence,
-                knowledge_grounding: self
-                    .knowledge_manager
-                    .as_ref()
-                    .map(|km| {
-                        let s = km.signals();
-                        ((s.relevance * 0.6 + (1.0 - s.uncertainty) * 0.4) as f32).clamp(0.0, 1.0)
-                    })
-                    .unwrap_or(0.5),
-                knowledge_context: self
-                    .knowledge_manager
-                    .as_ref()
-                    .map(|km| km.top_grounded_facts(5))
-                    .unwrap_or_default(),
+                knowledge_grounding: km_grounding,
+                knowledge_context: km_context,
                 #[cfg(feature = "therapeutic")]
                 therapeutic_intent: if self.therapeutic_manager.crisis_active {
                     7.0
@@ -726,46 +728,6 @@ impl CognitiveLoopService {
                 cube_h_value: self.carryover.quality.last_cube_h_value,
                 cube_quality: self.carryover.quality.last_cube_quality,
                 code_channels: self.language_comm.broca_code_channels.take(),
-
-                // Compute HDC encoding of the epistemic cube via cached NSM grounding.
-                // Semantically encodes the cube position so the thought HV
-                // carries *what kind of knowledge this is*, not just scalar metadata.
-                epistemic_cube_hv: {
-                    if let (Some(e), Some(n), Some(m), Some(ref grounding)) = (
-                        self.carryover.quality.last_cube_e_tier,
-                        self.carryover.quality.last_cube_n_tier,
-                        self.carryover.quality.last_cube_m_tier,
-                        &self.primitive_tier.epistemic_nsm_grounding,
-                    ) {
-                        use crate::consciousness::epistemic_tiers::{
-                            EmpiricalTier, EpistemicCoordinate, MaterialityTier, NormativeTier,
-                        };
-                        let coord = EpistemicCoordinate {
-                            empirical: match e {
-                                0 => EmpiricalTier::E0Null,
-                                1 => EmpiricalTier::E1Testimonial,
-                                2 => EmpiricalTier::E2PrivatelyVerifiable,
-                                3 => EmpiricalTier::E3CryptographicallyProven,
-                                _ => EmpiricalTier::E4PubliclyReproducible,
-                            },
-                            normative: match n {
-                                0 => NormativeTier::N0Personal,
-                                1 => NormativeTier::N1Communal,
-                                2 => NormativeTier::N2Network,
-                                _ => NormativeTier::N3Axiomatic,
-                            },
-                            materiality: match m {
-                                0 => MaterialityTier::M0Ephemeral,
-                                1 => MaterialityTier::M1Temporal,
-                                2 => MaterialityTier::M2Persistent,
-                                _ => MaterialityTier::M3Foundational,
-                            },
-                        };
-                        Some(grounding.encode_coordinate(&coord).to_continuous())
-                    } else {
-                        None
-                    }
-                },
             };
 
             // ── Epistemic: Sacred Stillness modulates confidence ──

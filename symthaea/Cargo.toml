@@ -282,6 +282,12 @@ symthaea-geodesic = { path = "crates/symthaea-geodesic", optional = true }
 # Symthaea Canvas - Living topology UI: cognitive geometry → SVG
 symthaea-canvas = { path = "crates/symthaea-canvas", optional = true }
 
+# Symthaea Aesthetic - Aesthetic evaluation and feedback
+symthaea-aesthetic = { path = "crates/symthaea-aesthetic", optional = true }
+
+# Symthaea Atelier - Generative art studio
+symthaea-atelier = { path = "crates/symthaea-atelier", optional = true }
+
 # Symthaea Clinical - Clinical assessment and therapeutic reasoning
 symthaea-clinical = { path = "crates/symthaea-clinical", optional = true }
 symthaea-therapeutic = { path = "crates/symthaea-therapeutic", optional = true }
@@ -534,7 +540,7 @@ neural-bridge-cuda = ["neural-bridge", "candle-core/cuda", "candle-nn/cuda", "ca
 
 # ── Motor / Embodiment ─────────────────────────────────────────────
 cpg = []                                    # Central Pattern Generator (Kuramoto coupled oscillators)
-creative = []                               # Creative agency: motor rendering bridge, artistic expression
+creative = ["dep:symthaea-muse", "dep:symthaea-canvas", "dep:symthaea-aesthetic", "dep:symthaea-atelier"]  # Creative agency: motor rendering bridge, artistic expression
 complex_cfc = ["symthaea-core/complex_cfc"] # Complex-valued CfC neuron with native oscillation
 spectral_state = []                         # Spectral twin: frequency-domain CfC state analysis
 
