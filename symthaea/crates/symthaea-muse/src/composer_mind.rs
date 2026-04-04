@@ -136,7 +136,7 @@ impl ComposerMind {
     }
 
     /// Advance the form by one bar. Returns any new goals triggered.
-    pub fn advance_bar(&mut self, state: &MusicalState) -> Vec<CompositionGoal> {
+    pub fn advance_bar(&mut self, _state: &MusicalState) -> Vec<CompositionGoal> {
         self.memory.bars_elapsed += 1.0;
         let mut new_goals = Vec::new();
 

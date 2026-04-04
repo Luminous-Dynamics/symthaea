@@ -70,7 +70,7 @@ pub fn export_midi(
     let usec_per_beat = (60_000_000.0 / tempo_bpm) as u32;
 
     // Track 0: tempo/time signature
-    let mut tempo_track = Track {
+    let tempo_track = Track {
         name: "Tempo".into(),
         channel: 0,
         events: vec![

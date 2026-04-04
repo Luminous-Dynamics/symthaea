@@ -310,7 +310,7 @@ pub fn print_report(score: &TasteScore) {
         score.composite, rating(score.composite));
     println!("╚══════════════════════════════════════════════════════════════╝");
     println!("\nDetails:");
-    for (name, value, desc) in &score.details {
+    for (name, _value, desc) in &score.details {
         println!("  {name:20}: {desc}");
     }
 }

@@ -13,7 +13,6 @@
 //! - Stay in a 14-semitone range
 //! - Follow the chord progression naturally
 
-use crate::Note;
 
 /// Evolvable melody parameters — the evolutionary tuner optimizes these.
 #[derive(Debug, Clone)]
@@ -98,7 +97,7 @@ impl TasteMelody {
         &mut self,
         scale_tones: &[f32],
         chord_tones: &[f32],
-        arousal: f32,
+        _arousal: f32,
         consciousness: f32,
     ) -> f32 {
         if scale_tones.is_empty() {

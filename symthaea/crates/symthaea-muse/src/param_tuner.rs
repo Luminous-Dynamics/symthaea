@@ -301,7 +301,7 @@ fn tournament_select(population: &[(Genome, f64)], size: usize, seed: u64) -> &G
 
 /// Evaluate using TASTE BENCHMARK — scores generated notes directly.
 /// Much faster than full audio evaluation. Uses StreamingSynth for 10 seconds.
-pub fn evaluate_taste(genome: &Genome, params: &[ParamDef], seed: u64) -> f64 {
+pub fn evaluate_taste(genome: &Genome, _params: &[ParamDef], _seed: u64) -> f64 {
     use crate::streaming::StreamingSynth;
     use crate::substrate_timbre::SubstrateTimbreType;
     use crate::taste_bench;

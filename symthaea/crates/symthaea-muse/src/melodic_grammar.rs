@@ -13,7 +13,6 @@
 //! - Huron (2006), Sweet Anticipation
 //! - Narmour (1990), Implication-Realization Model
 
-use crate::Note;
 
 /// Melodic context for making the next note decision.
 pub struct MelodicContext {
@@ -195,7 +194,7 @@ fn skip_from(freq: f32, direction: i32, scale: &[f32]) -> Option<f32> {
     }
 }
 
-fn nearest_step(from: f32, targets: &[f32], scale: &[f32]) -> Option<f32> {
+fn nearest_step(from: f32, targets: &[f32], _scale: &[f32]) -> Option<f32> {
     // Among targets, find one that's a step (1-2 scale degrees) from 'from'
     targets.iter()
         .filter(|&&t| {

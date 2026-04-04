@@ -10,7 +10,6 @@
 //! tempo meta-events. Skips SysEx, text, and other meta-events.
 
 use crate::Note;
-use std::io::Read;
 use std::path::Path;
 
 /// Parse a Standard MIDI File and extract the melody as a Vec<Note>.
@@ -177,7 +176,7 @@ fn parse_track(data: &[u8], _ticks_per_beat: u16, _default_tempo: u32) -> (Vec<M
             pos += 1;
         }
 
-        let channel = status & 0x0F;
+        let _channel = status & 0x0F;
         let msg_type = status & 0xF0;
 
         match msg_type {

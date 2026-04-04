@@ -20,7 +20,6 @@ use crate::density_regulator::DensityRegulator;
 use crate::dramatic::DramaticState;
 use crate::emotional_gestures;
 use crate::learned_melody::MelodyPredictor;
-use crate::melodic_grammar::{self, MelodicContext};
 use crate::motif_memory::MotifMemory;
 use crate::performance;
 use crate::production;
@@ -28,7 +27,7 @@ use crate::taste_melody::TasteMelody;
 use crate::rhythm_engine::{self, TimeSignature, GroovePocket, ExtendedChordType};
 use crate::sample_player::SampleLibrary;
 use crate::similarity_monitor::{SimilarityAction, SimilarityMonitor};
-use crate::voice_leader::{self, VoiceRole, VoiceState};
+use crate::voice_leader::{VoiceRole, VoiceState};
 use crate::state_smoother::StateSmoother;
 use crate::binaural::BinauralConsciousnessRenderer;
 use crate::consciousness_reverb::ConsciousnessReverb;
@@ -419,10 +418,10 @@ impl StreamingSynth {
 
         let sr = self.sample_rate as f32;
         let nyquist = sr * 0.5;
-        let num_p = self.config.num_partials.clamp(1, 16);
-        let fm_depth = self.state.dopamine * self.config.max_fm_depth;
-        let fm_ratio = 2.0 + self.state.noradrenaline;
-        let rolloff = 1.0 + self.state.serotonin * 0.8;
+        let _num_p = self.config.num_partials.clamp(1, 16);
+        let _fm_depth = self.state.dopamine * self.config.max_fm_depth;
+        let _fm_ratio = 2.0 + self.state.noradrenaline;
+        let _rolloff = 1.0 + self.state.serotonin * 0.8;
         let brightness = BRIGHTNESS_FLOOR + self.state.dopamine * BRIGHTNESS_DA_SCALE;
 
         // NE → vibrato rate scaling: high stress = faster, more agitated vibrato
@@ -434,7 +433,7 @@ impl StreamingSynth {
 
         // Prediction error → onset jitter (±samples): surprise makes timing unpredictable
         // Max jitter: ±5ms at PE=1.0 (Vuust & Witek 2014: rhythmic surprise)
-        let pe_jitter_samples = (self.state.prediction_error * 0.005 * sr) as i32;
+        let _pe_jitter_samples = (self.state.prediction_error * 0.005 * sr) as i32;
 
         // ADSR per instrument type (not just arousal)
         // Piano: fast attack, moderate decay, low sustain (strings ring then die)
@@ -461,7 +460,7 @@ impl StreamingSynth {
         ];
 
         // Select instrument from consciousness state (updated per chunk)
-        let current_instrument = instruments::select_instrument(&self.state);
+        let _current_instrument = instruments::select_instrument(&self.state);
 
         for active in &mut self.active_notes {
             let voice = active.voice_idx.min(num_voices - 1);
@@ -587,7 +586,7 @@ impl StreamingSynth {
                 } else {
                     // No sample: pure additive synthesis
                     let inst_partials = active.instrument.partials();
-                    let mp = &self.manifold_partials;
+                    let _mp = &self.manifold_partials;
                     let num_p_fallback = inst_partials.len().min(16);
                     let mut s = 0.0f32;
                     for h in 0..num_p_fallback {
@@ -618,7 +617,7 @@ impl StreamingSynth {
                     Instrument::Bell => "bell",
                     _ => "pad",
                 };
-                let body_freq = production::body_resonance(inst_name);
+                let _body_freq = production::body_resonance(inst_name);
                 let noise_amt = production::noise_amount(inst_name);
                 // Use sample_pos as seed for deterministic noise per note
                 let noise_seed = (active.sample_pos as u32).wrapping_mul(2654435761);
@@ -1013,7 +1012,7 @@ impl StreamingSynth {
                 } else {
                     &[0, 2, 3, 5, 7, 8, 10, 12] // natural minor
                 };
-                let scale_tones: Vec<f32> = scale_intervals.iter()
+                let _scale_tones: Vec<f32> = scale_intervals.iter()
                     .flat_map(|&s| {
                         let f = root_freq * 2.0f32.powf(s as f32 / 12.0);
                         vec![f, f * 2.0] // two octaves
@@ -1022,7 +1021,7 @@ impl StreamingSynth {
 
                 self.note_counter = self.note_counter.wrapping_add(1);
                 let phrase_pos = self.motif.replay_queue_len() as f32 / 8.0;
-                let ctx = self.lead_voice.melodic_context(phrase_pos, self.chord_beat_counter);
+                let _ctx = self.lead_voice.melodic_context(phrase_pos, self.chord_beat_counter);
 
                 // Phrasing: rests are handled via duration (longer notes = space)
                 // NOT via skipping — skipping breaks the melody state machine

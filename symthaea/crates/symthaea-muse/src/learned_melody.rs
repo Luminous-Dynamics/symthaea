@@ -10,7 +10,6 @@
 //! This replaces hand-coded rules with patterns learned from Bach, Beethoven,
 //! Chopin, and 3,000 folk songs.
 
-use crate::Note;
 
 /// Trained weights from the melody predictor.
 /// Layout: [8 intervals | 8 durations | beat_pos | phrase_pos | valence | arousal] → interval
@@ -115,7 +114,7 @@ impl MelodyPredictor {
         let mut features = [0.0f32; 20];
 
         // Pad interval history to 8 (oldest first)
-        let iv_offset = 8 - self.interval_history.len().min(8);
+        let _iv_offset = 8 - self.interval_history.len().min(8);
         for (i, &iv) in self.interval_history.iter().rev().take(8).enumerate() {
             features[7 - i] = (iv / 12.0).clamp(-1.0, 1.0);
         }
