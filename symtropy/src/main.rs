@@ -58,7 +58,7 @@ fn main() {
                 .set(WindowPlugin {
                     primary_window: Some(Window {
                         title: "Symtropy: The Room That Remembers You".into(),
-                        resolution: bevy::window::WindowResolution::new(1920, 1080),
+                        resolution: bevy::window::WindowResolution::new(1280, 720),
                         present_mode: bevy::window::PresentMode::AutoVsync,
                         ..default()
                     }),

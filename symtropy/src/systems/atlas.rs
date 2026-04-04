@@ -40,6 +40,13 @@ pub struct AtlasEntity;
 #[derive(Component)]
 pub struct CloudLayer;
 
+/// City indicator — always visible at orbit, shows grid stress.
+#[derive(Component)]
+pub struct CityIndicator {
+    pub name: String,
+    pub load: f32,
+}
+
 /// Marker pulse — makes data markers breathe with sinusoidal scale modulation.
 #[derive(Component)]
 pub struct MarkerPulse {
@@ -283,7 +290,7 @@ pub fn setup_globe_view(
 
     // ─── Globe Label HUD ─────────────────────────────────────────
     commands.spawn((
-        Text::new("TERRA ATLAS"),
+        Text::new("SOL ATLAS"),
         TextFont { font_size: 16.0, ..default() },
         TextColor(Color::srgba(0.3, 0.6, 0.7, 0.4)),
         Node {
@@ -551,46 +558,68 @@ pub fn setup_globe_view(
     }
 
     // Grid stress markers (FEP allostatic load visualization)
-    let stress_mesh = meshes.add(Sphere::new(1.0).mesh().uv(10, 10));
+    // ─── City Grid Stress Indicators (ALWAYS VISIBLE) ─────────────
+    // 16 major cities showing civilization's energy heartbeat at orbit zoom.
+    let city_mesh = meshes.add(Sphere::new(1.0).mesh().uv(12, 12));
     let stress_data = sol_atlas_core::energy_trading::simulate_grid_stress(0);
     for stress in &stress_data {
-        let pos = geo::lat_lon_to_xyz(stress.lat, stress.lon, 1.02);
+        let pos = geo::lat_lon_to_xyz(stress.lat, stress.lon, 1.025);
         let c = sol_atlas_core::energy_trading::stress_color(stress.allostatic_load);
-        let size = 0.015 + stress.allostatic_load * 0.020;
-        // Solid marker for the stress point
+        let size = 0.018 + stress.allostatic_load * 0.015;
+
+        // Emissive city indicator — visible at ALL zoom levels (no LOD tag)
         let mat = materials.add(StandardMaterial {
-            base_color: Color::linear_rgb(c[0], c[1], c[2]),
+            base_color: Color::linear_rgba(c[0], c[1], c[2], 0.8),
+            emissive: LinearRgba::new(c[0] * 0.5, c[1] * 0.5, c[2] * 0.5, 1.0),
+            unlit: true,
+            alpha_mode: AlphaMode::Blend,
+            ..default()
+        });
+        commands.spawn((
+            Mesh3d(city_mesh.clone()),
+            MeshMaterial3d(mat),
+            Transform::from_xyz(pos[0], pos[1], pos[2]).with_scale(Vec3::splat(size)),
+            CityIndicator { name: stress.name.clone(), load: stress.allostatic_load },
+            MarkerPulse {
+                speed: 1.5 + stress.allostatic_load * 2.0, // stressed cities pulse faster
+                amplitude: 0.1 + stress.allostatic_load * 0.15,
+                phase: stress.lat as f32 * 0.2,
+                base_scale: size,
+            },
+            DataMarker { layer: Layer::Energy, name: format!("{} (load={:.0}%)", stress.name, stress.allostatic_load * 100.0) },
+            // NO SurfaceLod — always visible at orbit!
+            AtlasEntity,
+        ));
+    }
+
+    // ─── Earth Region Indicators (ALWAYS VISIBLE) ────────────────
+    // 12 UN-calibrated regions showing vulnerability at a glance.
+    let region_mesh = meshes.add(Sphere::new(1.0).mesh().uv(8, 8));
+    for region in &data.earth_regions {
+        let pos = geo::lat_lon_to_xyz(region.lat, region.lon, 1.04);
+        // Color by vulnerability: green (resilient) → red (vulnerable)
+        let v = region.climate_vulnerability as f32;
+        let c = [
+            0.1 + v * 0.8,       // R: increases with vulnerability
+            0.7 * (1.0 - v),     // G: decreases
+            0.2 * (1.0 - v),     // B: decreases
+        ];
+        let size = 0.012 + (region.population_m as f32 / 2000.0).min(1.0) * 0.012;
+        let mat = materials.add(StandardMaterial {
+            base_color: Color::linear_rgba(c[0], c[1], c[2], 0.5),
+            emissive: LinearRgba::new(c[0] * 0.3, c[1] * 0.3, c[2] * 0.3, 1.0),
+            alpha_mode: AlphaMode::Blend,
             unlit: true,
             ..default()
         });
         commands.spawn((
-            Mesh3d(stress_mesh.clone()),
+            Mesh3d(region_mesh.clone()),
             MeshMaterial3d(mat),
             Transform::from_xyz(pos[0], pos[1], pos[2]).with_scale(Vec3::splat(size)),
-            DataMarker { layer: Layer::Energy, name: format!("{} (Φ={:.2})", stress.name, stress.phi) },
-            SurfaceLod,
+            DataMarker { layer: Layer::Regions, name: format!("{} (pop={}M, vuln={:.0}%)", region.name, region.population_m as u32, v * 100.0) },
+            // NO LOD tag — always visible at orbit
             AtlasEntity,
         ));
-        // Translucent stress halo — larger when under more stress
-        if stress.allostatic_load > 0.3 {
-            let halo_size = 0.03 + stress.allostatic_load * 0.05;
-            let alpha = stress.allostatic_load * 0.12;
-            let halo_mat = materials.add(StandardMaterial {
-                base_color: Color::linear_rgba(c[0], c[1] * 0.3, c[2] * 0.2, alpha),
-                alpha_mode: AlphaMode::Blend,
-                unlit: true,
-                double_sided: true,
-                cull_mode: None,
-                ..default()
-            });
-            commands.spawn((
-                Mesh3d(stress_mesh.clone()),
-                MeshMaterial3d(halo_mat),
-                Transform::from_xyz(pos[0], pos[1], pos[2]).with_scale(Vec3::splat(halo_size)),
-                SurfaceLod,
-                AtlasEntity,
-            ));
-        }
     }
 
     // ─── Solar System Bodies ────────────────────────────────────
