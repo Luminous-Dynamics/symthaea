@@ -155,5 +155,4 @@ pub fn globe_audio_system(
     state.consciousness_level = 0.7 + breath * 0.1;
 
     audio.current = Some(state);
-    info_once!("Audio: planetary ambient mode (Sacred Stillness + Interconnectedness)");
 }

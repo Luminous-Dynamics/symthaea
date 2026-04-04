@@ -120,7 +120,7 @@ pub fn setup_globe_view(
     let earth_texture: Handle<Image> = asset_server.load(terra_atlas_bevy::globe::EARTH_TEXTURE_PATH);
     let holo_globe = holo_materials.add(terra_atlas_bevy::holographic_material::HolographicMaterial {
         base: StandardMaterial {
-            base_color: Color::linear_rgba(0.20, 0.28, 0.35, 0.7), // slightly brighter — coastlines visible
+            base_color: Color::linear_rgba(0.10, 0.15, 0.20, 0.5), // dark ghost — holographic, coastlines as contours
             base_color_texture: Some(earth_texture),
             alpha_mode: AlphaMode::Blend,
             double_sided: true,
@@ -148,7 +148,7 @@ pub fn setup_globe_view(
     let clouds_mesh = meshes.add(Sphere::new(1.0).mesh().uv(64, 64));
     let clouds_texture: Handle<Image> = asset_server.load("textures/earth-clouds.jpg");
     let clouds_material = materials.add(StandardMaterial {
-        base_color: Color::linear_rgba(1.0, 1.0, 1.0, 0.3),
+        base_color: Color::linear_rgba(0.6, 0.7, 0.8, 0.15), // ghost clouds — barely visible in holographic mode
         base_color_texture: Some(clouds_texture),
         alpha_mode: AlphaMode::Blend,
         unlit: true,
