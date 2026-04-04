@@ -819,51 +819,51 @@ impl Default for CognitiveLoopConfig {
             enable_online_learning: false,
             causal_enhancement: false,
             causal_discovery_interval: 100,
-            episodic_replay_training: false,
+            episodic_replay_training: true,
             memory_graduation: true,
             memory_db_path: None,
             epistemic_auditor_db_path: None,
             episodic_replay_config: crate::memory::episodic_replay::EpisodicReplayConfig::default(),
-            enable_surprise_exploration: false,
-            enable_prefrontal: false,
-            enable_meta_cognition: false,
-            enable_narrative_self: false,
+            enable_surprise_exploration: true,
+            enable_prefrontal: true,
+            enable_meta_cognition: true,
+            enable_narrative_self: true,
             enable_virtual_body: true,
-            enable_predictive_self: false,
-            enable_attention_schema: false,
+            enable_predictive_self: true,
+            enable_attention_schema: true,
             enable_gwt: true,
-            enable_resonance: false,
-            enable_quantum_coherence: false,
-            enable_temporal_consciousness: false,
-            enable_embodied_cognition: false,
-            enable_narrative_gwt: false,
-            enable_dream_replay: false,
-            enable_predictive_processing: false,
-            enable_cross_modal_binding: false,
-            enable_affective_bridge: false,
-            enable_user_state_inference: false,
+            enable_resonance: true,
+            enable_quantum_coherence: true,
+            enable_temporal_consciousness: true,
+            enable_embodied_cognition: true,
+            enable_narrative_gwt: true,
+            enable_dream_replay: true,
+            enable_predictive_processing: true,
+            enable_cross_modal_binding: true,
+            enable_affective_bridge: true,
+            enable_user_state_inference: true,
             enable_coherence_field: false,
-            enable_consciousness_thermodynamics: false,
-            enable_phenomenal_binding: false,
-            enable_hierarchical_free_energy: false,
-            enable_trajectory_planning: false,
+            enable_consciousness_thermodynamics: true,
+            enable_phenomenal_binding: true,
+            enable_hierarchical_free_energy: true,
+            enable_trajectory_planning: true,
             trajectory_horizon_seconds: default_trajectory_horizon(),
             trajectory_planning_interval: default_trajectory_interval(),
-            enable_hierarchical_bundling: false,
-            enable_contextual_weights: false,
-            enable_phi_attention: false,
-            enable_negation_detection: false,
-            enable_visualization: false,
-            enable_soul_alignment: false,
-            enable_primitive_consciousness: false,
+            enable_hierarchical_bundling: true,
+            enable_contextual_weights: true,
+            enable_phi_attention: true,
+            enable_negation_detection: true,
+            enable_visualization: true,
+            enable_soul_alignment: true,
+            enable_primitive_consciousness: true,
             enable_safety_gateway: true,
-            enable_metacognitive_monitoring: false,
-            enable_resonator_recall: false,
+            enable_metacognitive_monitoring: true,
+            enable_resonator_recall: true,
             resonator_growth_interval: 50,
             resonator_novelty_threshold: 0.7,
             resonator_max_symbols: 100,
-            enable_psi_attestation: false,
-            agent_did: None,
+            enable_psi_attestation: true,
+            agent_did: Some("did:symthaea:default-agent".into()),
             attestation_buffer_capacity: 64,
             trace_feedback: false,
             #[cfg(feature = "nurture")]
@@ -876,7 +876,7 @@ impl Default for CognitiveLoopConfig {
             validation_skepticism_floor: 0.5,
             enable_substrate_speed_modulation: false,
             enable_substrate_encoding_noise: false,
-            enable_phi_tau_feedback: false,
+            enable_phi_tau_feedback: true,
             substrate_type: SubstrateType::SiliconDigital,
             substrate_composition: None,
             per_region_substrates: None,
@@ -893,29 +893,29 @@ impl Default for CognitiveLoopConfig {
             #[cfg(feature = "therapeutic")]
             therapeutic_text_crisis_detection: true, // Safety-critical: on by default
             #[cfg(feature = "ssm_language")]
-            enable_broca_language: false,
+            enable_broca_language: true,
             #[cfg(feature = "ssm_language")]
             broca_checkpoint_path: None,
             #[cfg(feature = "ssm_language")]
-            enable_broca_nsm_semantic: false,
+            enable_broca_nsm_semantic: true,
             #[cfg(feature = "ssm_language")]
-            enable_broca_nsm_gate: false,
-            enable_hodge_decomposition: false,
-            enable_energy_budget: false,
+            enable_broca_nsm_gate: true,
+            enable_hodge_decomposition: true,
+            enable_energy_budget: true,
             energy_budget_joules_per_sec: None,
             substrate_transition_alpha: super::thresholds::SUBSTRATE_TRANSITION_ALPHA_DEFAULT
                 as f32,
-            enable_thermal_adaptation: false,
+            enable_thermal_adaptation: true,
             federation_enabled: false,
             federation_round_interval_ms: 30_000,
             #[cfg(feature = "vision-manifold")]
-            enable_vision_manifold: false,
+            enable_vision_manifold: true,
             #[cfg(feature = "vision-manifold")]
             vision_frame_width: 64,
             #[cfg(feature = "vision-manifold")]
             vision_frame_height: 64,
             #[cfg(feature = "vision-manifold")]
-            enable_vision_predictive_hierarchy: false,
+            enable_vision_predictive_hierarchy: true,
             #[cfg(feature = "vision-manifold")]
             scene_memory_coherence_threshold: 0.7,
             #[cfg(feature = "vision-manifold")]
@@ -925,14 +925,14 @@ impl Default for CognitiveLoopConfig {
             #[cfg(feature = "vision-manifold")]
             enable_cross_manifold_predictor: false,
             #[cfg(feature = "foveation")]
-            enable_foveation: false,
+            enable_foveation: true,
             #[cfg(feature = "foveation")]
             foveation_max_dispatches: 3,
             timezone_offset_hours: 0.0,
-            enable_mesh_time: false,
+            enable_mesh_time: true,
             enable_name_resolution: false,
             name_cache_size: 256,
-            enable_knowledge_engine: false,
+            enable_knowledge_engine: true,
             knowledge_graph_capacity: 10_000,
             knowledge_causal_capacity: 5_000,
             knowledge_search_top_k: 5,
@@ -1205,6 +1205,9 @@ impl ConsciousnessProfile {
                 config.causal_enhancement = true;
                 config.episodic_replay_training = true;
                 config.enable_psi_attestation = true;
+                // Research profile intentionally clears agent_did so operators
+                // must supply their own DID for attestation integrity.
+                config.agent_did = None;
                 config.enable_user_state_inference = true;
                 config.enable_coherence_field = true;
                 config.enable_visualization = true;
@@ -1887,6 +1890,7 @@ mod tests {
     fn dependency_temporal_without_narrative() {
         let mut c = CognitiveLoopConfig::default();
         c.enable_temporal_consciousness = true;
+        c.enable_narrative_self = false;
         let warnings = c.validate_dependencies();
         assert!(
             warnings.iter().any(|w| w.contains("narrative_self")),
@@ -1899,6 +1903,7 @@ mod tests {
     fn dependency_temporal_without_predictive() {
         let mut c = CognitiveLoopConfig::default();
         c.enable_temporal_consciousness = true;
+        c.enable_predictive_self = false;
         let warnings = c.validate_dependencies();
         assert!(warnings.iter().any(|w| w.contains("predictive_self")));
     }
