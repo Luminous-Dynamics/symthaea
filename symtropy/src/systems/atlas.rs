@@ -36,6 +36,19 @@ use crate::resources::GamePhase;
 #[derive(Component)]
 pub struct AtlasEntity;
 
+/// Cloud layer marker — rotates independently for parallax depth.
+#[derive(Component)]
+pub struct CloudLayer;
+
+/// Marker pulse — makes data markers breathe with sinusoidal scale modulation.
+#[derive(Component)]
+pub struct MarkerPulse {
+    pub speed: f32,
+    pub amplitude: f32,
+    pub phase: f32,
+    pub base_scale: f32,
+}
+
 /// Current aesthetic preset — cycle with number keys 1-5.
 #[derive(Resource)]
 pub struct CurrentAesthetic {
@@ -128,6 +141,26 @@ pub fn setup_globe_view(
         MeshMaterial3d(holo_globe),
         Transform::IDENTITY,
         Globe,
+        AtlasEntity,
+    ));
+
+    // [1.5] Cloud layer — translucent atmosphere, rotates independently for parallax
+    let clouds_mesh = meshes.add(Sphere::new(1.0).mesh().uv(64, 64));
+    let clouds_texture: Handle<Image> = asset_server.load("textures/earth-clouds.jpg");
+    let clouds_material = materials.add(StandardMaterial {
+        base_color: Color::linear_rgba(1.0, 1.0, 1.0, 0.3),
+        base_color_texture: Some(clouds_texture),
+        alpha_mode: AlphaMode::Blend,
+        unlit: true,
+        double_sided: true,
+        cull_mode: None,
+        ..default()
+    });
+    commands.spawn((
+        Mesh3d(clouds_mesh),
+        MeshMaterial3d(clouds_material),
+        Transform::from_scale(Vec3::splat(1.012)), // 1.2% larger — sits above surface
+        CloudLayer,
         AtlasEntity,
     ));
 
@@ -290,7 +323,8 @@ pub fn setup_globe_view(
             MeshMaterial3d(mat),
             Transform::from_xyz(pos[0], pos[1], pos[2]).with_scale(Vec3::splat(size)),
             DataMarker { layer: Layer::Energy, name: site.name.clone() },
-            TemporalW { year: 2010.0 }, // renewables: modern era
+            TemporalW { year: 2010.0 },
+            MarkerPulse { speed: 1.0, amplitude: 0.15, phase: site.lat as f32 * 0.1, base_scale: size },
             SurfaceLod,
             TimelineLayer::Renewable,
             AtlasEntity,
@@ -858,6 +892,48 @@ pub fn holographic_pulse_system(
         let base = tf.scale.x.max(0.5); // avoid zero scale
         // Apply breathing to atmosphere shells (they started at ~1.03-1.05 scale)
         tf.scale = Vec3::splat(base.signum() * breath * 1.04);
+    }
+}
+
+/// Cloud layer independent rotation — creates parallax depth against the globe surface.
+pub fn cloud_rotation_system(
+    time: Res<Time>,
+    mut clouds: Query<&mut Transform, With<CloudLayer>>,
+) {
+    let dt = time.delta_secs();
+    for mut tf in clouds.iter_mut() {
+        tf.rotate_y(0.002 * dt); // slow independent rotation
+        tf.rotate_x(0.0003 * dt); // slight axial tilt drift
+    }
+}
+
+/// Marker pulse — data markers breathe with sinusoidal scale modulation.
+pub fn marker_pulse_system(
+    time: Res<Time>,
+    mut markers: Query<(&MarkerPulse, &mut Transform)>,
+) {
+    let t = time.elapsed_secs();
+    for (pulse, mut tf) in markers.iter_mut() {
+        let scale = pulse.base_scale * (1.0 + pulse.amplitude * (t * pulse.speed + pulse.phase).sin());
+        tf.scale = Vec3::splat(scale);
+    }
+}
+
+/// Consciousness-coupled holographic shader — Phi modulates visual quality.
+pub fn consciousness_shader_system(
+    player_c: Option<Res<crate::systems::consciousness::PlayerConsciousness>>,
+    mut materials: ResMut<Assets<terra_atlas_bevy::holographic_material::HolographicMaterial>>,
+) {
+    // Get consciousness level (fallback to 0.5 if not in dungeon)
+    let phi = player_c.map(|c| c.level as f32).unwrap_or(0.5);
+
+    for (_, mat) in materials.iter_mut() {
+        // Higher phi = tighter fresnel (more integrated, coherent light)
+        mat.extension.fresnel_power = 2.0 + phi * 3.0; // 2.0 → 5.0
+        // Higher phi = slower scanlines (serene vs anxious)
+        mat.extension.scanline_speed = 1.3 - phi * 1.0; // 1.3 → 0.3
+        // Higher phi = more opaque (clearer perception)
+        mat.extension.hologram_alpha = 0.40 + phi * 0.40; // 0.40 → 0.80
     }
 }
 

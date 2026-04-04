@@ -132,6 +132,9 @@ impl Plugin for SymtropyPlugin {
                     terra_atlas_bevy::timeline::timeline_autoplay_system,
                     systems::atlas::celestial_orbit_system,
                     systems::atlas::holographic_pulse_system,
+                    systems::atlas::cloud_rotation_system,
+                    systems::atlas::marker_pulse_system,
+                    systems::atlas::consciousness_shader_system,
                     systems::atlas::aesthetic_switch_system,
                     systems::atlas::aesthetic_apply_system,
                     terra_atlas_bevy::selection::click_select_system,
@@ -140,7 +143,16 @@ impl Plugin for SymtropyPlugin {
                     terra_atlas_bevy::frame_capture::frame_capture_system,
                     systems::demo_director::demo_director_system,
                 ).run_if(in_state(GamePhase::GlobeView)))
-                .add_systems(OnExit(GamePhase::GlobeView), systems::atlas::cleanup_globe_view);
+                .add_systems(OnExit(GamePhase::GlobeView), systems::atlas::cleanup_globe_view)
+                // Cinematic director (global — runs across ALL game phases)
+                .add_systems(Startup, systems::cinematic_director::setup_cinematic_overlay
+                    .run_if(resource_exists::<systems::cinematic_director::CinematicDirector>))
+                .add_systems(Update, (
+                    systems::cinematic_director::cinematic_director_system,
+                    systems::cinematic_director::screen_fade_system,
+                    systems::cinematic_director::narration_system,
+                    systems::cinematic_director::orbital_tracks_system,
+                ).run_if(resource_exists::<systems::cinematic_director::CinematicDirector>));
         }
 
         #[cfg(feature = "mycelix")]
