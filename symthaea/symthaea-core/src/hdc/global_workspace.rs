@@ -157,7 +157,10 @@ impl Default for WorkspaceConfig {
     fn default() -> Self {
         Self {
             max_capacity: 3,      // Typical: 3-4 items
-            entry_threshold: 0.5, // Moderate threshold
+            entry_threshold: 0.3, // Dehaene (2011): ignition should fire for
+                                  // most salient content, not just peaks.
+                                  // 0.5 was too high — Phi-weighted activations
+                                  // from the cognitive loop are typically 0.2-0.5.
             decay_rate: 0.1,      // 10% per timestep
             enable_broadcasting: true,
             winner_takes_all: false, // Allow multiple contents
