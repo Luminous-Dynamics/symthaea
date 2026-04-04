@@ -28,6 +28,7 @@ pub enum Domain {
     Acoustics,
     PlasmaPhysics,
     Mathematics,
+    Astrophysics,
 }
 
 impl Domain {
@@ -52,6 +53,7 @@ impl Domain {
             Self::Acoustics => "Acoustics",
             Self::PlasmaPhysics => "Plasma Physics",
             Self::Mathematics => "Mathematics",
+            Self::Astrophysics => "Astrophysics",
         }
     }
 }
@@ -281,6 +283,76 @@ fn equations_raw() -> Vec<(&'static str, Domain, &'static str)> {
         ("Fourier Transform", Mathematics, r"F(\omega) = \int f(t)e^{-i\omega t}dt"),
         ("Laplace Transform", Mathematics, r"F(s) = \int_0^\infty f(t)e^{-st}dt"),
         ("Cauchy-Schwarz Inequality", Mathematics, r"|\langle u,v\rangle|^2 \leq \langle u,u\rangle\langle v,v\rangle"),
+        // ── Fusion / Plasma ──
+        ("Lawson Criterion", PlasmaPhysics, r"nT\tau > 1.5\times10^{20}\,\text{m}^{-3}\cdot\text{keV}\cdot\text{s}"),
+        ("Grad-Shafranov Equation", PlasmaPhysics, r"R\frac{\partial}{\partial R}\left(\frac{1}{R}\frac{\partial\psi}{\partial R}\right)+\frac{\partial^2\psi}{\partial Z^2}=-\mu_0 R^2\frac{dp}{d\psi}-F\frac{dF}{d\psi}"),
+        ("Bremsstrahlung Radiation", PlasmaPhysics, r"P_{br}\propto n^2 Z^2 T^{1/2}"),
+        ("Alfven Wave Speed", PlasmaPhysics, r"v_A = \frac{B}{\sqrt{\mu_0\rho}}"),
+        ("Magnetic Mirror Ratio", PlasmaPhysics, r"R = B_{max}/B_{min}"),
+        ("Spitzer Resistivity", PlasmaPhysics, r"\eta\propto\frac{Z\ln\Lambda}{T^{3/2}}"),
+        ("Cyclotron Frequency", PlasmaPhysics, r"\omega_c = \frac{qB}{m}"),
+        ("Larmor Radius", PlasmaPhysics, r"r_L = \frac{mv_\perp}{qB}"),
+        // ── Superconductors / Condensed Matter ──
+        ("Ginzburg-Landau Equation", CondensedMatter, r"F=\alpha|\psi|^2+\beta|\psi|^4+\frac{|(-i\hbar\nabla-2e\mathbf{A})\psi|^2}{2m^*}"),
+        ("London Penetration Depth", CondensedMatter, r"\lambda_L=\sqrt{\frac{m}{\mu_0 ne^2}}"),
+        ("Eliashberg Equation", CondensedMatter, r"\Delta(i\omega_n)=\pi T\sum_m\frac{\lambda(\omega_n-\omega_m)\Delta(i\omega_m)}{\sqrt{\omega_m^2+\Delta^2}}"),
+        ("Josephson Effect", CondensedMatter, r"I = I_c\sin(\Delta\varphi)"),
+        ("Curie-Weiss Law", CondensedMatter, r"\chi = \frac{C}{T-T_c}"),
+        ("Meissner Effect", CondensedMatter, r"\mathbf{B}_{internal}=0"),
+        ("Anderson Localization", CondensedMatter, r"\psi(r)\sim e^{-|r-r_0|/\xi}"),
+        ("Wiedemann-Franz Law", CondensedMatter, r"\frac{\kappa}{\sigma T}=L_0=\frac{\pi^2 k_B^2}{3e^2}"),
+        // ── Materials / Chemistry ──
+        ("Kohn-Sham DFT", CondensedMatter, r"\left[-\frac{\hbar^2\nabla^2}{2m}+V_{eff}(\mathbf{r})\right]\varphi_i=\varepsilon_i\varphi_i"),
+        ("Lennard-Jones Potential", Thermodynamics, r"V(r)=4\varepsilon\left[\left(\frac{\sigma}{r}\right)^{12}-\left(\frac{\sigma}{r}\right)^6\right]"),
+        ("Born-Oppenheimer Approximation", QuantumMechanics, r"\Psi(\mathbf{r},\mathbf{R})=\psi_e(\mathbf{r};\mathbf{R})\chi_n(\mathbf{R})"),
+        ("Fick First Law", Thermodynamics, r"J=-D\nabla c"),
+        ("Fick Second Law", Thermodynamics, r"\frac{\partial c}{\partial t}=D\nabla^2 c"),
+        ("Beer-Lambert Law", Optics, r"A=\varepsilon l c"),
+        ("Vegard Law", CondensedMatter, r"a(x)=(1-x)a_A+xa_B"),
+        ("Hess Law", Thermodynamics, r"\Delta H_{rxn}=\sum\Delta H_f(\text{products})-\sum\Delta H_f(\text{reactants})"),
+        // ── Quantum Information ──
+        ("Von Neumann Entropy", InformationTheory, r"S=-\text{Tr}(\rho\ln\rho)"),
+        ("Quantum Fidelity", InformationTheory, r"F(\rho,\sigma)=\left(\text{Tr}\sqrt{\sqrt{\rho}\sigma\sqrt{\rho}}\right)^2"),
+        ("Lindblad Master Equation", QuantumMechanics, r"\frac{d\rho}{dt}=-\frac{i}{\hbar}[H,\rho]+\sum\left(L\rho L^\dagger-\frac{1}{2}\{L^\dagger L,\rho\}\right)"),
+        ("Bell CHSH Inequality", InformationTheory, r"|S|\leq 2\text{ (classical)},\leq 2\sqrt{2}\text{ (quantum)}"),
+        ("No-Cloning Theorem", InformationTheory, r"\nexists U:|\psi\rangle|0\rangle\to|\psi\rangle|\psi\rangle\;\forall|\psi\rangle"),
+        ("Rabi Oscillation", QuantumMechanics, r"P(t)=\sin^2(\Omega t/2)"),
+        ("Jaynes-Cummings Model", QuantumMechanics, r"H=\hbar\omega_a a^\dagger a+\frac{\hbar\omega_b}{2}\sigma_z+\hbar g(a^\dagger\sigma_-+a\sigma_+)"),
+        ("Bloch Sphere", QuantumMechanics, r"|\psi\rangle=\cos(\theta/2)|0\rangle+e^{i\varphi}\sin(\theta/2)|1\rangle"),
+        // ── Climate / Atmosphere ──
+        ("Radiative Transfer Equation", Thermodynamics, r"\frac{dI}{ds}=-\kappa I+j"),
+        ("Greenhouse Radiative Forcing", Thermodynamics, r"\Delta F=5.35\ln(C/C_0)\;\text{W/m}^2"),
+        ("Clausius-Mossotti Relation", Electromagnetism, r"\frac{\varepsilon-1}{\varepsilon+2}=\frac{n\alpha}{3\varepsilon_0}"),
+        // ── Longevity / Biology ──
+        ("Gompertz Mortality Law", Biophysics, r"\mu(x)=ae^{bx}"),
+        ("Goldman-Hodgkin-Katz Voltage", Biophysics, r"V=\frac{RT}{F}\ln\frac{P_K[K^+]_o+P_{Na}[Na^+]_o}{P_K[K^+]_i+P_{Na}[Na^+]_i}"),
+        ("Monod Equation", Biophysics, r"\mu=\frac{\mu_{max}S}{K_s+S}"),
+        // ── Astrophysics ──
+        ("Chandrasekhar Mass Limit", Astrophysics, r"M_{Ch}\approx 1.4\,M_\odot"),
+        ("Eddington Luminosity", Astrophysics, r"L_{Edd}=\frac{4\pi GMc}{\kappa}"),
+        ("Tolman-Oppenheimer-Volkoff Equation", Astrophysics, r"\frac{dP}{dr}=-\frac{(\rho+P/c^2)(m+4\pi r^3 P/c^2)G}{r(r-2Gm/c^2)}"),
+        ("Jeans Instability", Astrophysics, r"\lambda_J=c_s\sqrt{\frac{\pi}{G\rho}}"),
+        ("Tsiolkovsky Rocket Equation", Astrophysics, r"\Delta v=v_e\ln\frac{m_0}{m_f}"),
+        ("Drake Equation", Astrophysics, r"N=R_*\times f_p\times n_e\times f_l\times f_i\times f_c\times L"),
+        // ── Nonequilibrium / Statistical ──
+        ("Langevin Equation", StatisticalMechanics, r"m\frac{dv}{dt}=-\gamma v+F(t)+\eta(t)"),
+        ("Fokker-Planck Equation", StatisticalMechanics, r"\frac{\partial P}{\partial t}=-\frac{\partial(\mu P)}{\partial x}+\frac{\partial^2(DP)}{\partial x^2}"),
+        ("Boltzmann Transport Equation", StatisticalMechanics, r"\frac{\partial f}{\partial t}+\mathbf{v}\cdot\nabla f+\mathbf{F}\cdot\nabla_p f=\left(\frac{\partial f}{\partial t}\right)_{coll}"),
+        ("Fluctuation-Dissipation Theorem", StatisticalMechanics, r"S(\omega)=\frac{2k_BT\text{Re}[\chi(\omega)]}{\omega}"),
+        ("Jarzynski Equality", StatisticalMechanics, r"\langle e^{-W/kT}\rangle=e^{-\Delta F/kT}"),
+        ("Crooks Fluctuation Theorem", StatisticalMechanics, r"\frac{P_F(W)}{P_R(-W)}=e^{(W-\Delta F)/kT}"),
+        // ── Mathematical Physics ──
+        ("Noether Theorem", Mathematics, r"\text{continuous symmetry}\leftrightarrow\text{conservation law}"),
+        ("Green Function", Mathematics, r"LG(x,x')=\delta(x-x')"),
+        ("Legendre Transform", Mathematics, r"f^*(p)=\sup_x(px-f(x))"),
+        ("Virial Theorem", ClassicalMechanics, r"2\langle KE\rangle=-\langle\mathbf{r}\cdot\nabla V\rangle"),
+        ("Pendulum Period", ClassicalMechanics, r"T=2\pi\sqrt{L/g}"),
+        ("Gravitational Potential Energy", ClassicalMechanics, r"U=-\frac{GMm}{r}"),
+        // ── QFT / Symmetry ──
+        ("Goldstone Theorem", QuantumFieldTheory, r"\text{spontaneous symmetry breaking}\to\text{massless boson}"),
+        ("Anomalous Magnetic Moment", ParticlePhysics, r"a=\frac{g-2}{2}\approx\frac{\alpha}{2\pi}+\cdots"),
+        ("Lamb Shift", ParticlePhysics, r"\Delta E(2S_{1/2}-2P_{1/2})\approx 1057\,\text{MHz}"),
+        ("Weinberg Angle", ParticlePhysics, r"\sin^2\theta_W\approx 0.231"),
     ]
 }
 
@@ -292,8 +364,8 @@ mod tests {
     fn catalog_has_148_equations() {
         let catalog = PhysicsCatalog::new();
         assert!(
-            catalog.len() >= 140,
-            "Expected >= 140, got {}",
+            catalog.len() >= 200,
+            "Expected >= 200, got {}",
             catalog.len()
         );
     }
@@ -318,5 +390,6 @@ mod tests {
         assert!(!catalog.entries_in_domain(Domain::Acoustics).is_empty());
         assert!(!catalog.entries_in_domain(Domain::PlasmaPhysics).is_empty());
         assert!(!catalog.entries_in_domain(Domain::Mathematics).is_empty());
+        assert!(!catalog.entries_in_domain(Domain::Astrophysics).is_empty());
     }
 }

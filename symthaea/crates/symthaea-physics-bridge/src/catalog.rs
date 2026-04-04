@@ -328,6 +328,88 @@ fn build_all_equations() -> Vec<PhysicsEquation> {
     eqs.push(simple_eq("Bose-Einstein Distribution", PhysicsDomain::StatisticalMechanics, "n(E) = 1/(exp((E-μ)/kT) - 1)", DimensionalSignature::DIMENSIONLESS));
     eqs.push(simple_eq("Saha Ionization Equation", PhysicsDomain::StatisticalMechanics, "nᵢnₑ/n₀ = (2πmₑkT/h²)^(3/2) exp(-χ/kT)", DimensionalSignature::DIMENSIONLESS));
 
+    // ── Phase: Exhaustive Expansion to 210+ ──
+
+    // Fusion / Plasma
+    eqs.push(simple_eq("Lawson Criterion", PhysicsDomain::PlasmaPhysics, "nTτ > 1.5×10²⁰ m⁻³·keV·s", DimensionalSignature::DIMENSIONLESS));
+    eqs.push(simple_eq("Grad-Shafranov Equation", PhysicsDomain::PlasmaPhysics, "R∂/∂R(1/R·∂ψ/∂R) + ∂²ψ/∂Z² = -μ₀R²dp/dψ - F dF/dψ", DimensionalSignature { mass: 1, length: 0, time: -2, current: 0, temperature: 0, amount: 0, luminous: 0 }));
+    eqs.push(simple_eq("Bremsstrahlung Radiation", PhysicsDomain::PlasmaPhysics, "P_br ∝ n²Z²T^(1/2)", DimensionalSignature { mass: 1, length: -1, time: -3, current: 0, temperature: 0, amount: 0, luminous: 0 }));
+    eqs.push(simple_eq("Alfven Wave Speed", PhysicsDomain::PlasmaPhysics, "v_A = B/√(μ₀ρ)", DimensionalSignature::VELOCITY));
+    eqs.push(simple_eq("Magnetic Mirror Ratio", PhysicsDomain::PlasmaPhysics, "R = B_max/B_min", DimensionalSignature::DIMENSIONLESS));
+    eqs.push(simple_eq("Spitzer Resistivity", PhysicsDomain::PlasmaPhysics, "η ∝ Z·ln(Λ)/T^(3/2)", DimensionalSignature { mass: 1, length: 3, time: -3, current: -2, temperature: 0, amount: 0, luminous: 0 }));
+    eqs.push(simple_eq("Cyclotron Frequency", PhysicsDomain::PlasmaPhysics, "ω_c = qB/m", DimensionalSignature { mass: 0, length: 0, time: -1, current: 0, temperature: 0, amount: 0, luminous: 0 }));
+    eqs.push(simple_eq("Larmor Radius", PhysicsDomain::PlasmaPhysics, "r_L = mv⊥/(qB)", DimensionalSignature::LENGTH));
+
+    // Superconductors / Condensed Matter
+    eqs.push(simple_eq("Ginzburg-Landau Equation", PhysicsDomain::CondensedMatter, "F = α|ψ|² + β|ψ|⁴ + |(-iℏ∇ - 2eA)ψ|²/(2m*)", DimensionalSignature::ENERGY_DENSITY));
+    eqs.push(simple_eq("London Penetration Depth", PhysicsDomain::CondensedMatter, "λ_L = √(m/(μ₀ne²))", DimensionalSignature::LENGTH));
+    eqs.push(simple_eq("Eliashberg Equation", PhysicsDomain::CondensedMatter, "Δ(iω_n) = πT Σ_m λ(ω_n-ω_m)Δ(iω_m)/√(ω_m² + Δ²(iω_m))", DimensionalSignature::ENERGY));
+    eqs.push(simple_eq("Josephson Effect", PhysicsDomain::CondensedMatter, "I = I_c sin(Δφ)", DimensionalSignature { mass: 0, length: 0, time: 0, current: 1, temperature: 0, amount: 0, luminous: 0 }));
+    eqs.push(simple_eq("Curie-Weiss Law", PhysicsDomain::CondensedMatter, "χ = C/(T - T_c)", DimensionalSignature::DIMENSIONLESS));
+    eqs.push(simple_eq("Meissner Effect", PhysicsDomain::CondensedMatter, "B_internal = 0 (perfect diamagnetism)", DimensionalSignature::MAGNETIC_FIELD));
+    eqs.push(simple_eq("Anderson Localization", PhysicsDomain::CondensedMatter, "ψ(r) ~ exp(-|r-r₀|/ξ)", DimensionalSignature::DIMENSIONLESS));
+    eqs.push(simple_eq("Wiedemann-Franz Law", PhysicsDomain::CondensedMatter, "κ/(σT) = L₀ = π²k_B²/(3e²)", DimensionalSignature::DIMENSIONLESS));
+
+    // Materials / Chemistry
+    eqs.push(simple_eq("Kohn-Sham DFT", PhysicsDomain::CondensedMatter, "[-ℏ²∇²/(2m) + V_eff(r)]φ_i(r) = ε_iφ_i(r)", DimensionalSignature::ENERGY));
+    eqs.push(simple_eq("Lennard-Jones Potential", PhysicsDomain::Thermodynamics, "V(r) = 4ε[(σ/r)¹² - (σ/r)⁶]", DimensionalSignature::ENERGY));
+    eqs.push(simple_eq("Born-Oppenheimer Approximation", PhysicsDomain::QuantumMechanics, "Ψ(r,R) = ψ_e(r;R)·χ_n(R)", DimensionalSignature::DIMENSIONLESS));
+    eqs.push(simple_eq("Fick First Law", PhysicsDomain::Thermodynamics, "J = -D∇c", DimensionalSignature { mass: 0, length: -2, time: -1, current: 0, temperature: 0, amount: 1, luminous: 0 }));
+    eqs.push(simple_eq("Fick Second Law", PhysicsDomain::Thermodynamics, "∂c/∂t = D∇²c", DimensionalSignature { mass: 0, length: -3, time: -1, current: 0, temperature: 0, amount: 1, luminous: 0 }));
+    eqs.push(simple_eq("Beer-Lambert Law", PhysicsDomain::Optics, "A = εlc", DimensionalSignature::DIMENSIONLESS));
+    eqs.push(simple_eq("Vegard Law", PhysicsDomain::CondensedMatter, "a(x) = (1-x)a_A + x·a_B", DimensionalSignature::LENGTH));
+    eqs.push(simple_eq("Hess Law", PhysicsDomain::Thermodynamics, "ΔH_rxn = Σ ΔH_f(products) - Σ ΔH_f(reactants)", DimensionalSignature::ENERGY));
+
+    // Quantum Information
+    eqs.push(simple_eq("Von Neumann Entropy", PhysicsDomain::InformationTheory, "S = -Tr(ρ ln ρ)", DimensionalSignature::DIMENSIONLESS));
+    eqs.push(simple_eq("Quantum Fidelity", PhysicsDomain::InformationTheory, "F(ρ,σ) = (Tr√(√ρ σ √ρ))²", DimensionalSignature::DIMENSIONLESS));
+    eqs.push(simple_eq("Lindblad Master Equation", PhysicsDomain::QuantumMechanics, "dρ/dt = -i[H,ρ]/ℏ + Σ(LρL† - {L†L,ρ}/2)", DimensionalSignature { mass: 0, length: 0, time: -1, current: 0, temperature: 0, amount: 0, luminous: 0 }));
+    eqs.push(simple_eq("Bell CHSH Inequality", PhysicsDomain::InformationTheory, "|S| ≤ 2 (classical), ≤ 2√2 (quantum)", DimensionalSignature::DIMENSIONLESS));
+    eqs.push(simple_eq("No-Cloning Theorem", PhysicsDomain::InformationTheory, "∄ U: |ψ⟩|0⟩ → |ψ⟩|ψ⟩ ∀|ψ⟩", DimensionalSignature::DIMENSIONLESS));
+    eqs.push(simple_eq("Rabi Oscillation", PhysicsDomain::QuantumMechanics, "P(t) = sin²(Ωt/2)", DimensionalSignature::DIMENSIONLESS));
+    eqs.push(simple_eq("Jaynes-Cummings Model", PhysicsDomain::QuantumMechanics, "H = ℏω_a a†a + ℏω_b σ_z/2 + ℏg(a†σ₋ + aσ₊)", DimensionalSignature::ENERGY));
+    eqs.push(simple_eq("Bloch Sphere", PhysicsDomain::QuantumMechanics, "|ψ⟩ = cos(θ/2)|0⟩ + e^(iφ)sin(θ/2)|1⟩", DimensionalSignature::DIMENSIONLESS));
+
+    // Climate / Atmosphere
+    eqs.push(simple_eq("Radiative Transfer Equation", PhysicsDomain::Thermodynamics, "dI/ds = -κI + j", DimensionalSignature { mass: 1, length: 0, time: -3, current: 0, temperature: 0, amount: 0, luminous: 0 }));
+    eqs.push(simple_eq("Greenhouse Radiative Forcing", PhysicsDomain::Thermodynamics, "ΔF = 5.35 ln(C/C₀) W/m²", DimensionalSignature { mass: 1, length: 0, time: -3, current: 0, temperature: 0, amount: 0, luminous: 0 }));
+    eqs.push(simple_eq("Clausius-Mossotti Relation", PhysicsDomain::Electromagnetism, "(ε-1)/(ε+2) = nα/(3ε₀)", DimensionalSignature::DIMENSIONLESS));
+
+    // Longevity / Biology
+    eqs.push(simple_eq("Gompertz Mortality Law", PhysicsDomain::Biophysics, "μ(x) = a·e^(bx)", DimensionalSignature { mass: 0, length: 0, time: -1, current: 0, temperature: 0, amount: 0, luminous: 0 }));
+    eqs.push(simple_eq("Goldman-Hodgkin-Katz Voltage", PhysicsDomain::Biophysics, "V = (RT/F)ln((P_K[K⁺]_o + P_Na[Na⁺]_o)/(P_K[K⁺]_i + P_Na[Na⁺]_i))", DimensionalSignature { mass: 1, length: 2, time: -3, current: -1, temperature: 0, amount: 0, luminous: 0 }));
+    eqs.push(simple_eq("Monod Equation", PhysicsDomain::Biophysics, "μ = μ_max·S/(K_s + S)", DimensionalSignature { mass: 0, length: 0, time: -1, current: 0, temperature: 0, amount: 0, luminous: 0 }));
+
+    // Astrophysics
+    eqs.push(simple_eq("Chandrasekhar Mass Limit", PhysicsDomain::Astrophysics, "M_Ch ≈ 1.4 M_☉", DimensionalSignature::MASS));
+    eqs.push(simple_eq("Eddington Luminosity", PhysicsDomain::Astrophysics, "L_Edd = 4πGMc/κ", DimensionalSignature { mass: 1, length: 2, time: -3, current: 0, temperature: 0, amount: 0, luminous: 0 }));
+    eqs.push(simple_eq("Tolman-Oppenheimer-Volkoff Equation", PhysicsDomain::Astrophysics, "dP/dr = -(ρ+P/c²)(m+4πr³P/c²)G/(r(r-2Gm/c²))", DimensionalSignature { mass: 1, length: -1, time: -2, current: 0, temperature: 0, amount: 0, luminous: 0 }));
+    eqs.push(simple_eq("Jeans Instability", PhysicsDomain::Astrophysics, "λ_J = c_s√(π/(Gρ))", DimensionalSignature::LENGTH));
+    eqs.push(simple_eq("Tsiolkovsky Rocket Equation", PhysicsDomain::Astrophysics, "Δv = v_e ln(m₀/m_f)", DimensionalSignature::VELOCITY));
+    eqs.push(simple_eq("Drake Equation", PhysicsDomain::Astrophysics, "N = R* × f_p × n_e × f_l × f_i × f_c × L", DimensionalSignature::DIMENSIONLESS));
+
+    // Nonequilibrium / Statistical
+    eqs.push(simple_eq("Langevin Equation", PhysicsDomain::StatisticalMechanics, "m dv/dt = -γv + F(t) + η(t)", DimensionalSignature::FORCE));
+    eqs.push(simple_eq("Fokker-Planck Equation", PhysicsDomain::StatisticalMechanics, "∂P/∂t = -∂(μP)/∂x + ∂²(DP)/∂x²", DimensionalSignature { mass: 0, length: 0, time: -1, current: 0, temperature: 0, amount: 0, luminous: 0 }));
+    eqs.push(simple_eq("Boltzmann Transport Equation", PhysicsDomain::StatisticalMechanics, "∂f/∂t + v·∇f + F·∇_p f = (∂f/∂t)_coll", DimensionalSignature { mass: 0, length: 0, time: -1, current: 0, temperature: 0, amount: 0, luminous: 0 }));
+    eqs.push(simple_eq("Fluctuation-Dissipation Theorem", PhysicsDomain::StatisticalMechanics, "S(ω) = 2k_BT·Re[χ(ω)]/ω", DimensionalSignature::DIMENSIONLESS));
+    eqs.push(simple_eq("Jarzynski Equality", PhysicsDomain::StatisticalMechanics, "⟨e^(-W/kT)⟩ = e^(-ΔF/kT)", DimensionalSignature::DIMENSIONLESS));
+    eqs.push(simple_eq("Crooks Fluctuation Theorem", PhysicsDomain::StatisticalMechanics, "P_F(W)/P_R(-W) = e^((W-ΔF)/kT)", DimensionalSignature::DIMENSIONLESS));
+
+    // Mathematical Physics
+    eqs.push(simple_eq("Noether Theorem", PhysicsDomain::Mathematics, "continuous symmetry ↔ conservation law", DimensionalSignature::DIMENSIONLESS));
+    eqs.push(simple_eq("Green Function", PhysicsDomain::Mathematics, "LG(x,x') = δ(x-x')", DimensionalSignature::DIMENSIONLESS));
+    eqs.push(simple_eq("Legendre Transform", PhysicsDomain::Mathematics, "f*(p) = sup_x(px - f(x))", DimensionalSignature::DIMENSIONLESS));
+    eqs.push(simple_eq("Virial Theorem", PhysicsDomain::ClassicalMechanics, "2⟨KE⟩ = -⟨r·∇V⟩", DimensionalSignature::ENERGY));
+    eqs.push(simple_eq("Pendulum Period", PhysicsDomain::ClassicalMechanics, "T = 2π√(L/g)", DimensionalSignature::TIME));
+    eqs.push(simple_eq("Gravitational Potential Energy", PhysicsDomain::ClassicalMechanics, "U = -GMm/r", DimensionalSignature::ENERGY));
+
+    // QFT / Symmetry
+    eqs.push(simple_eq("Goldstone Theorem", PhysicsDomain::QuantumFieldTheory, "spontaneous symmetry breaking → massless boson", DimensionalSignature::DIMENSIONLESS));
+    eqs.push(simple_eq("Anomalous Magnetic Moment", PhysicsDomain::ParticlePhysics, "a = (g-2)/2 ≈ α/(2π) + ...", DimensionalSignature::DIMENSIONLESS));
+    eqs.push(simple_eq("Lamb Shift", PhysicsDomain::ParticlePhysics, "ΔE(2S₁/₂ - 2P₁/₂) ≈ 1057 MHz", DimensionalSignature::ENERGY));
+    eqs.push(simple_eq("Weinberg Angle", PhysicsDomain::ParticlePhysics, "sin²θ_W ≈ 0.231", DimensionalSignature::DIMENSIONLESS));
+
     eqs
 }
 
@@ -2800,8 +2882,8 @@ mod tests {
     fn catalog_builds_successfully() {
         let catalog = PhysicsCatalog::new();
         assert!(
-            catalog.len() >= 148,
-            "Expected >= 148 entries, got {}",
+            catalog.len() >= 205,
+            "Expected >= 205 entries, got {}",
             catalog.len()
         );
     }

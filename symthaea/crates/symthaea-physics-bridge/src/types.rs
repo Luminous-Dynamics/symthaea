@@ -635,6 +635,7 @@ pub enum PhysicsDomain {
     Acoustics,
     PlasmaPhysics,
     Mathematics,
+    Astrophysics,
 }
 
 /// A fully described physics equation with all metadata.
