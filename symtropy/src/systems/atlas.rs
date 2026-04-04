@@ -1194,41 +1194,45 @@ pub fn aesthetic_apply_system(
         // Override holographic shader params per aesthetic
         match current.aesthetic {
             sol_atlas_core::aesthetics::Aesthetic::Satellite => {
-                // Bypass holographic effects — photorealistic
+                // PBR mode — disable holographic, enable real lighting
+                mat.extension.enable_holographic = 0.0; // shader skips scanlines/noise
                 mat.extension.hologram_alpha = 1.0;
-                mat.extension.scanline_density = 0.0;
-                mat.extension.scanline_speed = 0.0;
-                mat.extension.fresnel_power = 1.0;
+                mat.extension.fresnel_power = 2.0;
                 mat.extension.fresnel_color = LinearRgba::new(0.3, 0.5, 0.8, 1.0);
+                mat.base.unlit = false; // enable PBR lighting
             }
             sol_atlas_core::aesthetics::Aesthetic::Night => {
-                // Dim holographic, emphasis on emissive city lights
+                mat.extension.enable_holographic = 1.0;
                 mat.extension.hologram_alpha = 0.7;
                 mat.extension.scanline_density = 10.0;
                 mat.extension.fresnel_power = 2.0;
                 mat.extension.fresnel_color = LinearRgba::new(0.1, 0.15, 0.3, 1.0);
+                mat.base.unlit = true;
             }
             sol_atlas_core::aesthetics::Aesthetic::Minimal => {
-                // Maximum data clarity
+                mat.extension.enable_holographic = 0.0; // clean PBR
                 mat.extension.hologram_alpha = 0.3;
-                mat.extension.scanline_density = 0.0;
                 mat.extension.fresnel_power = 4.0;
                 mat.extension.fresnel_color = LinearRgba::new(0.2, 0.3, 0.4, 1.0);
+                mat.base.unlit = true;
             }
             sol_atlas_core::aesthetics::Aesthetic::Procedural => {
-                // Mycelix brand — warm
+                mat.extension.enable_holographic = 1.0;
                 mat.extension.hologram_alpha = 0.65;
                 mat.extension.scanline_density = 12.0;
                 mat.extension.fresnel_power = 3.0;
                 mat.extension.fresnel_color = LinearRgba::new(0.0, 0.87, 1.0, 1.0);
+                mat.base.unlit = true;
             }
             sol_atlas_core::aesthetics::Aesthetic::Holographic => {
-                // Default holographic — reset to standard
+                // Full holographic effects
+                mat.extension.enable_holographic = 1.0;
                 mat.extension.hologram_alpha = 0.55;
                 mat.extension.scanline_density = 20.0;
                 mat.extension.scanline_speed = 0.5;
                 mat.extension.fresnel_power = 3.0;
                 mat.extension.fresnel_color = LinearRgba::new(0.0, 0.87, 1.0, 1.0);
+                mat.base.unlit = true;
             }
         }
     }

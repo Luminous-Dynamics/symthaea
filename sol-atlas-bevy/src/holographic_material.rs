@@ -32,11 +32,12 @@ pub struct HolographicExtension {
     /// Current time (updated each frame by the time system).
     #[uniform(100)]
     pub time: f32,
+    /// Enable holographic effects (1.0 = full, 0.0 = PBR only for Satellite mode).
+    #[uniform(100)]
+    pub enable_holographic: f32,
     // Padding for 16-byte alignment
     #[uniform(100)]
-    pub _padding1: f32,
-    #[uniform(100)]
-    pub _padding2: f32,
+    pub _padding: f32,
 }
 
 impl Default for HolographicExtension {
@@ -48,8 +49,8 @@ impl Default for HolographicExtension {
             scanline_density: 15.0,
             hologram_alpha: 0.6,
             time: 0.0,
-            _padding1: 0.0,
-            _padding2: 0.0,
+            enable_holographic: 1.0,
+            _padding: 0.0,
         }
     }
 }
