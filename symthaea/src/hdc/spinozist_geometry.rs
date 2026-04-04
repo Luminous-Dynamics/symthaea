@@ -1901,9 +1901,8 @@ impl SpinozistClassifier {
 
     /// Classify a text string into a moral verdict with confidence.
     pub fn classify(&self, text: &str) -> (MoralVerdict, f32) {
-        if self.learned_prototypes.is_some() {
-            return self.classify_learned(text);
-        }
+        if self.hybrid_trained { return self.classify_hybrid(text); }
+        if self.learned_prototypes.is_some() { return self.classify_learned(text); }
         let fp = self.fingerprint(text);
         geometric_verdict(&fp)
     }
@@ -2298,6 +2297,10 @@ impl SpinozistClassifier {
         let normed: Vec<(Vec<f32>, usize)> = labeled.iter().map(|(f, c)| (self.norm_features(f), *c)).collect();
         self.train_multi_proto(&normed);
         self.hybrid_trained = true;
+        eprintln!("[SpinozistClassifier] Hybrid trained: {} anchors, {} multi-protos, {} features",
+            self.anchor_hvs.len(),
+            self.multi_prototypes.as_ref().map(|p| p.len()).unwrap_or(0),
+            NUM_HYBRID_FEATURES);
     }
 
     fn extract_hybrid_features_inner(&self, text: &str, surface_hv: &ContinuousHV) -> Vec<f32> {
@@ -2356,11 +2359,39 @@ impl SpinozistClassifier {
         if !self.hybrid_trained { return (MoralVerdict::Neutral, 0.0); }
         let f = self.extract_hybrid_features(text);
         let nf = self.norm_features(&f);
+
+        // Simple centroid classification: dot product with each class centroid
+        // More stable than multi-prototype K-means on small training sets
         let protos = match &self.multi_prototypes { Some(p) => p, None => return (MoralVerdict::Neutral, 0.0) };
-        let mut bi = 0; let mut bs = f32::NEG_INFINITY; let mut ss = f32::NEG_INFINITY;
-        for (i, (p, _)) in protos.iter().enumerate() { let s: f32 = nf.iter().zip(p.iter()).map(|(a, b)| a * b).sum(); if s > bs { ss = bs; bs = s; bi = i; } else if s > ss { ss = s; } }
-        let margin = (bs - ss).max(0.0);
-        let verdict = match protos[bi].1 { 0 => MoralVerdict::Good, 1 => MoralVerdict::Bad, _ => MoralVerdict::Neutral };
+
+        // Aggregate multi-prototypes into class centroids for stability
+        let mut class_sims = [0.0f32; 3];
+        let mut class_counts = [0usize; 3];
+        for (proto, cls) in protos {
+            let sim: f32 = nf.iter().zip(proto.iter()).map(|(a, b)| a * b).sum();
+            class_sims[*cls] += sim;
+            class_counts[*cls] += 1;
+        }
+        // Average similarity per class
+        for i in 0..3 {
+            if class_counts[i] > 0 {
+                class_sims[i] /= class_counts[i] as f32;
+            }
+        }
+
+        let mut best = 0;
+        let mut second = f32::NEG_INFINITY;
+        for i in 1..3 {
+            if class_sims[i] > class_sims[best] {
+                second = class_sims[best];
+                best = i;
+            } else if class_sims[i] > second {
+                second = class_sims[i];
+            }
+        }
+        if best == 0 { second = class_sims[1].max(class_sims[2]); }
+        let margin = (class_sims[best] - second).max(0.0);
+        let verdict = match best { 0 => MoralVerdict::Good, 1 => MoralVerdict::Bad, _ => MoralVerdict::Neutral };
         (verdict, margin.min(1.0))
     }
 }

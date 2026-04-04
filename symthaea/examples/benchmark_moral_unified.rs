@@ -393,8 +393,9 @@ fn main() {
                         .collect();
                     s.calibrate(&cal_samples);
                     s.train_prototypes(&cal_samples);
+                    s.train_hybrid(&cal_samples);
                     println!(
-                        "  Spinozist classifier calibrated + trained on {} samples in {:.1}s\n",
+                        "  Spinozist classifier calibrated + hybrid trained on {} samples in {:.1}s\n",
                         cal_samples.len(), cal_start.elapsed().as_secs_f64()
                     );
                 }
@@ -1404,8 +1405,8 @@ fn benchmark_spinozist_social_chemistry(
         total += 1;
 
         let expected: i32 = ex.rot_judgment.parse().unwrap_or(0);
-        // Use learned prototypes if trained, otherwise geometric verdict
-        let (verdict, _conf) = classifier.classify_learned(&ex.rot);
+        // Use best available: hybrid > learned prototypes > geometric
+        let (verdict, _conf) = classifier.classify(&ex.rot);
         let predicted = match verdict {
             MoralVerdict::Good => 1,
             MoralVerdict::Bad | MoralVerdict::ConsentViolation => -1,
@@ -1489,6 +1490,7 @@ fn benchmark_spinozist_ethics(
             })
             .collect();
         classifier.train_prototypes(&train_samples);
+        classifier.train_hybrid(&train_samples);
 
         let start = Instant::now();
         let mut correct = 0;
@@ -1508,7 +1510,7 @@ fn benchmark_spinozist_ethics(
                 total += 1;
                 // Use domain-trained prototypes (trained on this ETHICS category's train split)
                 let cleaned = clean_ethics_text(&ex.text);
-                let (verdict, _conf) = classifier.classify_learned(&cleaned);
+                let (verdict, _conf) = classifier.classify(&cleaned);
                 let predicted = match (category, verdict) {
                     (&"commonsense", MoralVerdict::Bad | MoralVerdict::ConsentViolation) => 1,
                     (&"commonsense", _) => 0,

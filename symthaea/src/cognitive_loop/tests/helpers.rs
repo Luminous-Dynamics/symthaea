@@ -347,7 +347,8 @@ fn test_step_fep_active_inference_high_error_response() {
 
 #[test]
 fn test_update_cross_modal_binding_without_binder() {
-    let service_config = CognitiveLoopConfig::default();
+    let mut service_config = CognitiveLoopConfig::default();
+    service_config.enable_cross_modal_binding = false;
     let mut service = CognitiveLoopService::new(service_config).unwrap();
     // Default config has no cross-modal binder
     let hv = symthaea_core::hdc::binary_hv::BinaryHV::random(42);
@@ -470,7 +471,9 @@ fn test_compute_temporal_primitives_confidence_stable_without_analyzer() {
 
 #[test]
 fn test_compute_dissipative_no_dc() {
-    let mut service = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
+    let mut config = CognitiveLoopConfig::default();
+    config.enable_primitive_consciousness = false;
+    let mut service = CognitiveLoopService::new(config).unwrap();
     let mut timings = super::super::ModuleTimings::default();
     let (health, regime, entropy) = service.compute_dissipative_phase(0.3, 0.6, 0.5, &mut timings);
     // Without dissipative_consciousness, all zeros
@@ -517,7 +520,9 @@ fn test_compute_equation_v2_exploration_unaffected_at_zero() {
 
 #[test]
 fn test_compute_lattice_no_lattice() {
-    let mut service = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
+    let mut config = CognitiveLoopConfig::default();
+    config.enable_primitive_consciousness = false;
+    let mut service = CognitiveLoopService::new(config).unwrap();
     let mut timings = super::super::ModuleTimings::default();
     let names = vec!["awareness".to_string(), "binding".to_string()];
     let (height, width, join) = service.compute_lattice_phase(&names, &mut timings);
@@ -529,7 +534,9 @@ fn test_compute_lattice_no_lattice() {
 
 #[test]
 fn test_compute_lattice_lr_unaffected_without_lattice() {
-    let mut service = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
+    let mut config = CognitiveLoopConfig::default();
+    config.enable_primitive_consciousness = false;
+    let mut service = CognitiveLoopService::new(config).unwrap();
     let mut timings = super::super::ModuleTimings::default();
     let initial_lr = service.carryover.learning.subsystem_lr_factor;
     let _ = service.compute_lattice_phase(&[], &mut timings);
@@ -564,7 +571,9 @@ fn test_compute_value_evaluator_lr_stable_without_evaluator() {
 
 #[test]
 fn test_compute_fiduciary_harmonics_no_field() {
-    let mut service = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
+    let mut config = CognitiveLoopConfig::default();
+    config.enable_primitive_consciousness = false;
+    let mut service = CognitiveLoopService::new(config).unwrap();
     let mut timings = super::super::ModuleTimings::default();
     let (coherence, love, interferences) =
         service.compute_fiduciary_harmonics_phase(0.7, 0.3, 0.5, &mut timings);
