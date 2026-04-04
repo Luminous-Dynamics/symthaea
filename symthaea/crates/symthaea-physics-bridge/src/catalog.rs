@@ -191,6 +191,53 @@ fn build_all_equations() -> Vec<PhysicsEquation> {
     eqs.push(ideal_gas_law());
     eqs.push(stefan_boltzmann_law());
 
+    // ── Phase A1: Foundational Equations ──
+    eqs.push(newton_second_law());
+    eqs.push(newton_gravitation());
+    eqs.push(kepler_third_law());
+    eqs.push(hooke_law());
+    eqs.push(centripetal_acceleration());
+    eqs.push(coulomb_law());
+    eqs.push(lorentz_force());
+    eqs.push(ohm_law());
+    eqs.push(planck_einstein_relation());
+    eqs.push(de_broglie_wavelength());
+    eqs.push(heisenberg_uncertainty());
+    eqs.push(photoelectric_equation());
+    eqs.push(mass_energy_equivalence());
+    eqs.push(lorentz_factor());
+    eqs.push(planck_radiation_law());
+    eqs.push(wien_displacement());
+    eqs.push(rayleigh_scattering());
+
+    // ── Phase A2: Information Theory ──
+    eqs.push(shannon_entropy());
+    eqs.push(kl_divergence());
+    eqs.push(mutual_information());
+    eqs.push(cross_entropy());
+    eqs.push(fisher_information());
+    eqs.push(variational_free_energy());
+    eqs.push(integrated_information_phi());
+    eqs.push(boltzmann_entropy());
+    eqs.push(bekenstein_hawking_entropy());
+
+    // ── Phase A3: Named Equations + Biophysics ──
+    eqs.push(bernoulli_equation());
+    eqs.push(clausius_clapeyron());
+    eqs.push(gibbs_free_energy());
+    eqs.push(van_der_waals());
+    eqs.push(continuity_equation());
+    eqs.push(fourier_heat_law());
+    eqs.push(fermi_golden_rule());
+    eqs.push(compton_scattering());
+    eqs.push(poisson_equation());
+    eqs.push(rydberg_formula());
+    eqs.push(hodgkin_huxley());
+    eqs.push(lotka_volterra());
+    eqs.push(bayes_theorem());
+    eqs.push(arrhenius_equation());
+    eqs.push(hubble_law());
+
     eqs
 }
 
@@ -1925,6 +1972,678 @@ fn stefan_boltzmann_law() -> PhysicsEquation {
     }
 }
 
+// ══════════════════════════════════════════════════════════════════════════════
+// PHASE A1: FOUNDATIONAL EQUATIONS
+// ══════════════════════════════════════════════════════════════════════════════
+
+/// F = ma — Newton's second law of motion
+fn newton_second_law() -> PhysicsEquation {
+    let euc3 = MetricSignature::Euclidean(3);
+    PhysicsEquation {
+        name: "Newton Second Law".to_string(),
+        domain: PhysicsDomain::ClassicalMechanics,
+        ast: make_equals(
+            make_field("F", TensorDescriptor::vector(euc3)),
+            make_product(vec![make_const("m"), make_field("a", TensorDescriptor::vector(euc3))]),
+        ),
+        symmetries: SymmetryDescriptor::new(vec![LieGroup::SO(3)], vec![DiscreteSymmetry::T], false),
+        dimensions: DimensionalSignature::FORCE,
+        tensor: Some(TensorDescriptor::vector(euc3)),
+    }
+}
+
+/// F = GMm/r² — Newton's law of universal gravitation
+fn newton_gravitation() -> PhysicsEquation {
+    let euc3 = MetricSignature::Euclidean(3);
+    PhysicsEquation {
+        name: "Newton Gravitation".to_string(),
+        domain: PhysicsDomain::ClassicalMechanics,
+        ast: make_equals(
+            make_const("F"),
+            make_product(vec![
+                make_const("G"), make_const("M"), make_const("m"),
+                EquationNode::Power { base: Box::new(make_const("r")), exponent: Box::new(EquationNode::Scalar(-2.0)) },
+            ]),
+        ),
+        symmetries: SymmetryDescriptor::from_lie_groups(vec![LieGroup::SO(3)], false),
+        dimensions: DimensionalSignature::FORCE,
+        tensor: None,
+    }
+}
+
+/// T² = (4π²/GM)a³ — Kepler's third law
+fn kepler_third_law() -> PhysicsEquation {
+    PhysicsEquation {
+        name: "Kepler Third Law".to_string(),
+        domain: PhysicsDomain::ClassicalMechanics,
+        ast: make_equals(
+            EquationNode::Power { base: Box::new(make_const("T")), exponent: Box::new(EquationNode::Scalar(2.0)) },
+            make_product(vec![
+                make_const("4π²/GM"),
+                EquationNode::Power { base: Box::new(make_const("a")), exponent: Box::new(EquationNode::Scalar(3.0)) },
+            ]),
+        ),
+        symmetries: SymmetryDescriptor::from_lie_groups(vec![LieGroup::SO(3)], false),
+        dimensions: DimensionalSignature { mass: 0, length: 0, time: 2, current: 0, temperature: 0, amount: 0, luminous: 0 },
+        tensor: None,
+    }
+}
+
+/// F = -kx — Hooke's law
+fn hooke_law() -> PhysicsEquation {
+    PhysicsEquation {
+        name: "Hooke Law".to_string(),
+        domain: PhysicsDomain::ClassicalMechanics,
+        ast: make_equals(make_const("F"), EquationNode::Negate(Box::new(make_product(vec![make_const("k"), make_const("x")])))),
+        symmetries: SymmetryDescriptor::none(),
+        dimensions: DimensionalSignature::FORCE,
+        tensor: None,
+    }
+}
+
+/// a = v²/r — Centripetal acceleration
+fn centripetal_acceleration() -> PhysicsEquation {
+    PhysicsEquation {
+        name: "Centripetal Acceleration".to_string(),
+        domain: PhysicsDomain::ClassicalMechanics,
+        ast: make_equals(
+            make_const("a"),
+            make_product(vec![
+                EquationNode::Power { base: Box::new(make_const("v")), exponent: Box::new(EquationNode::Scalar(2.0)) },
+                EquationNode::Power { base: Box::new(make_const("r")), exponent: Box::new(EquationNode::Scalar(-1.0)) },
+            ]),
+        ),
+        symmetries: SymmetryDescriptor::from_lie_groups(vec![LieGroup::SO(2)], false),
+        dimensions: DimensionalSignature::ACCELERATION,
+        tensor: None,
+    }
+}
+
+/// F = kq₁q₂/r² — Coulomb's law
+fn coulomb_law() -> PhysicsEquation {
+    PhysicsEquation {
+        name: "Coulomb Law".to_string(),
+        domain: PhysicsDomain::Electromagnetism,
+        ast: make_equals(
+            make_const("F"),
+            make_product(vec![
+                make_const("k_e"), make_const("q₁"), make_const("q₂"),
+                EquationNode::Power { base: Box::new(make_const("r")), exponent: Box::new(EquationNode::Scalar(-2.0)) },
+            ]),
+        ),
+        symmetries: SymmetryDescriptor::new(vec![LieGroup::U(1), LieGroup::SO(3)], vec![DiscreteSymmetry::C, DiscreteSymmetry::P, DiscreteSymmetry::T], true),
+        dimensions: DimensionalSignature::FORCE,
+        tensor: None,
+    }
+}
+
+/// F = q(E + v × B) — Lorentz force law
+fn lorentz_force() -> PhysicsEquation {
+    let euc3 = MetricSignature::Euclidean(3);
+    PhysicsEquation {
+        name: "Lorentz Force".to_string(),
+        domain: PhysicsDomain::Electromagnetism,
+        ast: make_equals(
+            make_field("F", TensorDescriptor::vector(euc3)),
+            make_product(vec![
+                make_const("q"),
+                make_sum(vec![
+                    make_field("E", TensorDescriptor::vector(euc3)),
+                    make_product(vec![make_const("v×B")]),
+                ]),
+            ]),
+        ),
+        symmetries: SymmetryDescriptor::new(vec![LieGroup::U(1)], vec![DiscreteSymmetry::C, DiscreteSymmetry::P, DiscreteSymmetry::T], true),
+        dimensions: DimensionalSignature::FORCE,
+        tensor: Some(TensorDescriptor::vector(euc3)),
+    }
+}
+
+/// V = IR — Ohm's law
+fn ohm_law() -> PhysicsEquation {
+    PhysicsEquation {
+        name: "Ohm Law".to_string(),
+        domain: PhysicsDomain::Electromagnetism,
+        ast: make_equals(make_const("V"), make_product(vec![make_const("I"), make_const("R")])),
+        symmetries: SymmetryDescriptor::none(),
+        dimensions: DimensionalSignature { mass: 1, length: 2, time: -3, current: -1, temperature: 0, amount: 0, luminous: 0 },
+        tensor: None,
+    }
+}
+
+/// E = hf — Planck-Einstein relation
+fn planck_einstein_relation() -> PhysicsEquation {
+    PhysicsEquation {
+        name: "Planck-Einstein Relation".to_string(),
+        domain: PhysicsDomain::QuantumMechanics,
+        ast: make_equals(make_const("E"), make_product(vec![make_const("h"), make_const("f")])),
+        symmetries: SymmetryDescriptor::from_lie_groups(vec![LieGroup::U(1)], false),
+        dimensions: DimensionalSignature::ENERGY,
+        tensor: None,
+    }
+}
+
+/// λ = h/p — de Broglie wavelength
+fn de_broglie_wavelength() -> PhysicsEquation {
+    PhysicsEquation {
+        name: "De Broglie Wavelength".to_string(),
+        domain: PhysicsDomain::QuantumMechanics,
+        ast: make_equals(
+            make_const("λ"),
+            make_product(vec![make_const("h"), EquationNode::Power { base: Box::new(make_const("p")), exponent: Box::new(EquationNode::Scalar(-1.0)) }]),
+        ),
+        symmetries: SymmetryDescriptor::from_lie_groups(vec![LieGroup::U(1)], false),
+        dimensions: DimensionalSignature::LENGTH,
+        tensor: None,
+    }
+}
+
+/// ΔxΔp ≥ ℏ/2 — Heisenberg uncertainty principle
+fn heisenberg_uncertainty() -> PhysicsEquation {
+    PhysicsEquation {
+        name: "Heisenberg Uncertainty Principle".to_string(),
+        domain: PhysicsDomain::QuantumMechanics,
+        ast: make_equals(
+            make_product(vec![make_const("Δx"), make_const("Δp")]),
+            make_const("ℏ/2"),
+        ),
+        symmetries: SymmetryDescriptor::none(),
+        dimensions: DimensionalSignature::ACTION,
+        tensor: None,
+    }
+}
+
+/// KE = hf - φ — Photoelectric equation
+fn photoelectric_equation() -> PhysicsEquation {
+    PhysicsEquation {
+        name: "Photoelectric Equation".to_string(),
+        domain: PhysicsDomain::QuantumMechanics,
+        ast: make_equals(
+            make_const("KE_max"),
+            make_sum(vec![
+                make_product(vec![make_const("h"), make_const("f")]),
+                EquationNode::Negate(Box::new(make_const("φ"))),
+            ]),
+        ),
+        symmetries: SymmetryDescriptor::none(),
+        dimensions: DimensionalSignature::ENERGY,
+        tensor: None,
+    }
+}
+
+/// E = mc² — Mass-energy equivalence
+fn mass_energy_equivalence() -> PhysicsEquation {
+    PhysicsEquation {
+        name: "Mass-Energy Equivalence".to_string(),
+        domain: PhysicsDomain::GeneralRelativity,
+        ast: make_equals(
+            make_const("E"),
+            make_product(vec![
+                make_const("m"),
+                EquationNode::Power { base: Box::new(make_const("c")), exponent: Box::new(EquationNode::Scalar(2.0)) },
+            ]),
+        ),
+        symmetries: SymmetryDescriptor::from_lie_groups(vec![LieGroup::Lorentz], false),
+        dimensions: DimensionalSignature::ENERGY,
+        tensor: None,
+    }
+}
+
+/// γ = 1/√(1 - v²/c²) — Lorentz factor
+fn lorentz_factor() -> PhysicsEquation {
+    PhysicsEquation {
+        name: "Lorentz Factor".to_string(),
+        domain: PhysicsDomain::GeneralRelativity,
+        ast: make_equals(
+            make_const("γ"),
+            EquationNode::Power {
+                base: Box::new(make_sum(vec![
+                    EquationNode::Scalar(1.0),
+                    EquationNode::Negate(Box::new(make_product(vec![
+                        EquationNode::Power { base: Box::new(make_const("v")), exponent: Box::new(EquationNode::Scalar(2.0)) },
+                        EquationNode::Power { base: Box::new(make_const("c")), exponent: Box::new(EquationNode::Scalar(-2.0)) },
+                    ]))),
+                ])),
+                exponent: Box::new(EquationNode::Scalar(-0.5)),
+            },
+        ),
+        symmetries: SymmetryDescriptor::from_lie_groups(vec![LieGroup::Lorentz], false),
+        dimensions: DimensionalSignature::DIMENSIONLESS,
+        tensor: None,
+    }
+}
+
+/// B(ν,T) = (2hν³/c²)/(exp(hν/kT) - 1) — Planck radiation law
+fn planck_radiation_law() -> PhysicsEquation {
+    PhysicsEquation {
+        name: "Planck Radiation Law".to_string(),
+        domain: PhysicsDomain::QuantumMechanics,
+        ast: make_equals(
+            make_const("B(ν,T)"),
+            make_product(vec![
+                make_const("2hν³/c²"),
+                EquationNode::Power {
+                    base: Box::new(make_sum(vec![
+                        EquationNode::Exponential(Box::new(make_const("hν/kT"))),
+                        EquationNode::Scalar(-1.0),
+                    ])),
+                    exponent: Box::new(EquationNode::Scalar(-1.0)),
+                },
+            ]),
+        ),
+        symmetries: SymmetryDescriptor::none(),
+        dimensions: DimensionalSignature { mass: 1, length: 0, time: -2, current: 0, temperature: 0, amount: 0, luminous: 0 },
+        tensor: None,
+    }
+}
+
+/// λ_max = b/T — Wien's displacement law
+fn wien_displacement() -> PhysicsEquation {
+    PhysicsEquation {
+        name: "Wien Displacement Law".to_string(),
+        domain: PhysicsDomain::Thermodynamics,
+        ast: make_equals(make_const("λ_max"), make_product(vec![make_const("b"), EquationNode::Power { base: Box::new(make_const("T")), exponent: Box::new(EquationNode::Scalar(-1.0)) }])),
+        symmetries: SymmetryDescriptor::none(),
+        dimensions: DimensionalSignature::LENGTH,
+        tensor: None,
+    }
+}
+
+/// I ∝ 1/λ⁴ — Rayleigh scattering
+fn rayleigh_scattering() -> PhysicsEquation {
+    PhysicsEquation {
+        name: "Rayleigh Scattering".to_string(),
+        domain: PhysicsDomain::Optics,
+        ast: make_equals(make_const("I"), make_product(vec![make_const("I₀"), EquationNode::Power { base: Box::new(make_const("λ")), exponent: Box::new(EquationNode::Scalar(-4.0)) }])),
+        symmetries: SymmetryDescriptor::none(),
+        dimensions: DimensionalSignature::DIMENSIONLESS,
+        tensor: None,
+    }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// PHASE A2: INFORMATION THEORY
+// ══════════════════════════════════════════════════════════════════════════════
+
+/// H(X) = -Σ p(x) log p(x) — Shannon entropy
+fn shannon_entropy() -> PhysicsEquation {
+    PhysicsEquation {
+        name: "Shannon Entropy".to_string(),
+        domain: PhysicsDomain::InformationTheory,
+        ast: make_equals(
+            make_const("H(X)"),
+            EquationNode::Negate(Box::new(make_const("Σ p(x) log p(x)"))),
+        ),
+        symmetries: SymmetryDescriptor::new(vec![], vec![DiscreteSymmetry::Permutation(0)], false),
+        dimensions: DimensionalSignature::DIMENSIONLESS,
+        tensor: None,
+    }
+}
+
+/// D_KL(P||Q) = Σ P ln(P/Q) — Kullback-Leibler divergence
+fn kl_divergence() -> PhysicsEquation {
+    PhysicsEquation {
+        name: "KL Divergence".to_string(),
+        domain: PhysicsDomain::InformationTheory,
+        ast: make_equals(make_const("D_KL(P||Q)"), make_const("Σ P ln(P/Q)")),
+        symmetries: SymmetryDescriptor::none(),
+        dimensions: DimensionalSignature::DIMENSIONLESS,
+        tensor: None,
+    }
+}
+
+/// I(X;Y) = H(X) - H(X|Y) — Mutual information
+fn mutual_information() -> PhysicsEquation {
+    PhysicsEquation {
+        name: "Mutual Information".to_string(),
+        domain: PhysicsDomain::InformationTheory,
+        ast: make_equals(
+            make_const("I(X;Y)"),
+            make_sum(vec![make_const("H(X)"), EquationNode::Negate(Box::new(make_const("H(X|Y)")))]),
+        ),
+        symmetries: SymmetryDescriptor::new(vec![], vec![DiscreteSymmetry::Permutation(2)], false),
+        dimensions: DimensionalSignature::DIMENSIONLESS,
+        tensor: None,
+    }
+}
+
+/// H(P,Q) = -Σ P ln Q — Cross-entropy
+fn cross_entropy() -> PhysicsEquation {
+    PhysicsEquation {
+        name: "Cross-Entropy".to_string(),
+        domain: PhysicsDomain::InformationTheory,
+        ast: make_equals(make_const("H(P,Q)"), EquationNode::Negate(Box::new(make_const("Σ P ln Q")))),
+        symmetries: SymmetryDescriptor::none(),
+        dimensions: DimensionalSignature::DIMENSIONLESS,
+        tensor: None,
+    }
+}
+
+/// I(θ) = E[(∂/∂θ ln f)²] — Fisher information
+fn fisher_information() -> PhysicsEquation {
+    PhysicsEquation {
+        name: "Fisher Information".to_string(),
+        domain: PhysicsDomain::InformationTheory,
+        ast: make_equals(
+            make_const("I(θ)"),
+            make_const("E[(∂ ln f/∂θ)²]"),
+        ),
+        symmetries: SymmetryDescriptor::none(),
+        dimensions: DimensionalSignature::DIMENSIONLESS,
+        tensor: None,
+    }
+}
+
+/// F = E_q[ln q(z) - ln p(o,z)] — Friston's variational free energy
+fn variational_free_energy() -> PhysicsEquation {
+    PhysicsEquation {
+        name: "Variational Free Energy (Friston)".to_string(),
+        domain: PhysicsDomain::InformationTheory,
+        ast: make_equals(
+            make_const("F"),
+            make_const("E_q[ln q(z) - ln p(o,z)]"),
+        ),
+        symmetries: SymmetryDescriptor::none(),
+        dimensions: DimensionalSignature::DIMENSIONLESS,
+        tensor: None,
+    }
+}
+
+/// Φ = min_partition D_KL(p(X) || Π p(X_i)) — Integrated Information
+fn integrated_information_phi() -> PhysicsEquation {
+    PhysicsEquation {
+        name: "Integrated Information (Phi)".to_string(),
+        domain: PhysicsDomain::InformationTheory,
+        ast: make_equals(make_const("Φ"), make_const("min_partition D_KL(p || Π p_i)")),
+        symmetries: SymmetryDescriptor::none(),
+        dimensions: DimensionalSignature::DIMENSIONLESS,
+        tensor: None,
+    }
+}
+
+/// S = k_B ln W — Boltzmann entropy
+fn boltzmann_entropy() -> PhysicsEquation {
+    PhysicsEquation {
+        name: "Boltzmann Entropy".to_string(),
+        domain: PhysicsDomain::StatisticalMechanics,
+        ast: make_equals(make_const("S"), make_product(vec![make_const("k_B"), make_const("ln(W)")])),
+        symmetries: SymmetryDescriptor::none(),
+        dimensions: DimensionalSignature { mass: 1, length: 2, time: -2, current: 0, temperature: -1, amount: 0, luminous: 0 },
+        tensor: None,
+    }
+}
+
+/// S = kA/(4ℓ_P²) — Bekenstein-Hawking entropy
+fn bekenstein_hawking_entropy() -> PhysicsEquation {
+    PhysicsEquation {
+        name: "Bekenstein-Hawking Entropy".to_string(),
+        domain: PhysicsDomain::GeneralRelativity,
+        ast: make_equals(
+            make_const("S_BH"),
+            make_product(vec![
+                make_const("k_B·c³/(4Gℏ)"),
+                make_const("A"),
+            ]),
+        ),
+        symmetries: SymmetryDescriptor::none(),
+        dimensions: DimensionalSignature { mass: 1, length: 2, time: -2, current: 0, temperature: -1, amount: 0, luminous: 0 },
+        tensor: None,
+    }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// PHASE A3: NAMED EQUATIONS + BIOPHYSICS
+// ══════════════════════════════════════════════════════════════════════════════
+
+/// P + ½ρv² + ρgh = const — Bernoulli's equation
+fn bernoulli_equation() -> PhysicsEquation {
+    PhysicsEquation {
+        name: "Bernoulli Equation".to_string(),
+        domain: PhysicsDomain::FluidDynamics,
+        ast: make_equals(
+            make_sum(vec![make_const("P"), make_product(vec![EquationNode::Scalar(0.5), make_const("ρ"), EquationNode::Power { base: Box::new(make_const("v")), exponent: Box::new(EquationNode::Scalar(2.0)) }]), make_product(vec![make_const("ρ"), make_const("g"), make_const("h")])]),
+            make_const("constant"),
+        ),
+        symmetries: SymmetryDescriptor::none(),
+        dimensions: DimensionalSignature::PRESSURE,
+        tensor: None,
+    }
+}
+
+/// dP/dT = ΔH/(TΔV) — Clausius-Clapeyron
+fn clausius_clapeyron() -> PhysicsEquation {
+    PhysicsEquation {
+        name: "Clausius-Clapeyron Equation".to_string(),
+        domain: PhysicsDomain::Thermodynamics,
+        ast: make_equals(make_const("dP/dT"), make_product(vec![make_const("ΔH"), EquationNode::Power { base: Box::new(make_product(vec![make_const("T"), make_const("ΔV")])), exponent: Box::new(EquationNode::Scalar(-1.0)) }])),
+        symmetries: SymmetryDescriptor::none(),
+        dimensions: DimensionalSignature { mass: 1, length: -1, time: -2, current: 0, temperature: -1, amount: 0, luminous: 0 },
+        tensor: None,
+    }
+}
+
+/// G = H - TS — Gibbs free energy
+fn gibbs_free_energy() -> PhysicsEquation {
+    PhysicsEquation {
+        name: "Gibbs Free Energy".to_string(),
+        domain: PhysicsDomain::Thermodynamics,
+        ast: make_equals(make_const("G"), make_sum(vec![make_const("H"), EquationNode::Negate(Box::new(make_product(vec![make_const("T"), make_const("S")])))])),
+        symmetries: SymmetryDescriptor::none(),
+        dimensions: DimensionalSignature::ENERGY,
+        tensor: None,
+    }
+}
+
+/// (P + a/V²)(V - b) = RT — Van der Waals equation
+fn van_der_waals() -> PhysicsEquation {
+    PhysicsEquation {
+        name: "Van der Waals Equation".to_string(),
+        domain: PhysicsDomain::Thermodynamics,
+        ast: make_equals(
+            make_product(vec![
+                make_sum(vec![make_const("P"), make_product(vec![make_const("a"), EquationNode::Power { base: Box::new(make_const("V")), exponent: Box::new(EquationNode::Scalar(-2.0)) }])]),
+                make_sum(vec![make_const("V"), EquationNode::Negate(Box::new(make_const("b")))]),
+            ]),
+            make_product(vec![make_const("R"), make_const("T")]),
+        ),
+        symmetries: SymmetryDescriptor::none(),
+        dimensions: DimensionalSignature::ENERGY,
+        tensor: None,
+    }
+}
+
+/// ∂ρ/∂t + ∇·(ρv) = 0 — Continuity equation
+fn continuity_equation() -> PhysicsEquation {
+    let euc3 = MetricSignature::Euclidean(3);
+    PhysicsEquation {
+        name: "Continuity Equation".to_string(),
+        domain: PhysicsDomain::FluidDynamics,
+        ast: make_equals(
+            make_sum(vec![
+                make_diffop(DiffOperator::TimeDerivative, make_field("ρ", TensorDescriptor::scalar(euc3))),
+                make_diffop(DiffOperator::Divergence, make_product(vec![make_field("ρ", TensorDescriptor::scalar(euc3)), make_field("v", TensorDescriptor::vector(euc3))])),
+            ]),
+            EquationNode::Scalar(0.0),
+        ),
+        symmetries: SymmetryDescriptor::from_lie_groups(vec![LieGroup::SO(3)], false),
+        dimensions: DimensionalSignature { mass: 1, length: -3, time: -1, current: 0, temperature: 0, amount: 0, luminous: 0 },
+        tensor: None,
+    }
+}
+
+/// q = -k∇T — Fourier's law of heat conduction
+fn fourier_heat_law() -> PhysicsEquation {
+    let euc3 = MetricSignature::Euclidean(3);
+    PhysicsEquation {
+        name: "Fourier Heat Law".to_string(),
+        domain: PhysicsDomain::Thermodynamics,
+        ast: make_equals(
+            make_field("q", TensorDescriptor::vector(euc3)),
+            EquationNode::Negate(Box::new(make_product(vec![make_const("k"), make_diffop(DiffOperator::Gradient, make_field("T", TensorDescriptor::scalar(euc3)))]))),
+        ),
+        symmetries: SymmetryDescriptor::none(),
+        dimensions: DimensionalSignature { mass: 1, length: 0, time: -3, current: 0, temperature: 0, amount: 0, luminous: 0 },
+        tensor: Some(TensorDescriptor::vector(euc3)),
+    }
+}
+
+/// Γ = (2π/ℏ)|⟨f|V|i⟩|²ρ(E) — Fermi's golden rule
+fn fermi_golden_rule() -> PhysicsEquation {
+    PhysicsEquation {
+        name: "Fermi Golden Rule".to_string(),
+        domain: PhysicsDomain::QuantumMechanics,
+        ast: make_equals(
+            make_const("Γ"),
+            make_product(vec![
+                make_const("2π/ℏ"),
+                EquationNode::Power { base: Box::new(make_const("|⟨f|V|i⟩|")), exponent: Box::new(EquationNode::Scalar(2.0)) },
+                make_const("ρ(E)"),
+            ]),
+        ),
+        symmetries: SymmetryDescriptor::none(),
+        dimensions: DimensionalSignature { mass: 0, length: 0, time: -1, current: 0, temperature: 0, amount: 0, luminous: 0 },
+        tensor: None,
+    }
+}
+
+/// Δλ = (h/mc)(1 - cosθ) — Compton scattering
+fn compton_scattering() -> PhysicsEquation {
+    PhysicsEquation {
+        name: "Compton Scattering".to_string(),
+        domain: PhysicsDomain::QuantumMechanics,
+        ast: make_equals(
+            make_const("Δλ"),
+            make_product(vec![make_const("h/(m_e·c)"), make_sum(vec![EquationNode::Scalar(1.0), EquationNode::Negate(Box::new(make_const("cos(θ)")))])]),
+        ),
+        symmetries: SymmetryDescriptor::from_lie_groups(vec![LieGroup::Lorentz], false),
+        dimensions: DimensionalSignature::LENGTH,
+        tensor: None,
+    }
+}
+
+/// ∇²φ = -ρ/ε₀ — Poisson's equation
+fn poisson_equation() -> PhysicsEquation {
+    let euc3 = MetricSignature::Euclidean(3);
+    PhysicsEquation {
+        name: "Poisson Equation".to_string(),
+        domain: PhysicsDomain::Electromagnetism,
+        ast: make_equals(
+            make_diffop(DiffOperator::Laplacian, make_field("φ", TensorDescriptor::scalar(euc3))),
+            EquationNode::Negate(Box::new(make_product(vec![make_field("ρ", TensorDescriptor::scalar(euc3)), EquationNode::Power { base: Box::new(make_const("ε₀")), exponent: Box::new(EquationNode::Scalar(-1.0)) }]))),
+        ),
+        symmetries: SymmetryDescriptor::new(vec![LieGroup::U(1), LieGroup::SO(3)], vec![], true),
+        dimensions: DimensionalSignature { mass: 1, length: 1, time: -3, current: -1, temperature: 0, amount: 0, luminous: 0 },
+        tensor: None,
+    }
+}
+
+/// 1/λ = R(1/n₁² - 1/n₂²) — Rydberg formula
+fn rydberg_formula() -> PhysicsEquation {
+    PhysicsEquation {
+        name: "Rydberg Formula".to_string(),
+        domain: PhysicsDomain::QuantumMechanics,
+        ast: make_equals(
+            EquationNode::Power { base: Box::new(make_const("λ")), exponent: Box::new(EquationNode::Scalar(-1.0)) },
+            make_product(vec![
+                make_const("R_∞"),
+                make_sum(vec![
+                    EquationNode::Power { base: Box::new(make_const("n₁")), exponent: Box::new(EquationNode::Scalar(-2.0)) },
+                    EquationNode::Negate(Box::new(EquationNode::Power { base: Box::new(make_const("n₂")), exponent: Box::new(EquationNode::Scalar(-2.0)) })),
+                ]),
+            ]),
+        ),
+        symmetries: SymmetryDescriptor::from_lie_groups(vec![LieGroup::SO(3)], false),
+        dimensions: DimensionalSignature::INVERSE_LENGTH,
+        tensor: None,
+    }
+}
+
+/// C dV/dt = -g_Na·m³h(V-E_Na) - g_K·n⁴(V-E_K) - g_L(V-E_L) + I — Hodgkin-Huxley
+fn hodgkin_huxley() -> PhysicsEquation {
+    PhysicsEquation {
+        name: "Hodgkin-Huxley Equation".to_string(),
+        domain: PhysicsDomain::Biophysics,
+        ast: make_equals(
+            make_product(vec![make_const("C"), make_const("dV/dt")]),
+            make_sum(vec![
+                EquationNode::Negate(Box::new(make_product(vec![make_const("g_Na"), make_const("m³h"), make_sum(vec![make_const("V"), EquationNode::Negate(Box::new(make_const("E_Na")))])]))),
+                EquationNode::Negate(Box::new(make_product(vec![make_const("g_K"), make_const("n⁴"), make_sum(vec![make_const("V"), EquationNode::Negate(Box::new(make_const("E_K")))])]))),
+                EquationNode::Negate(Box::new(make_product(vec![make_const("g_L"), make_sum(vec![make_const("V"), EquationNode::Negate(Box::new(make_const("E_L")))])]))),
+                make_const("I_ext"),
+            ]),
+        ),
+        symmetries: SymmetryDescriptor::none(),
+        dimensions: DimensionalSignature { mass: 0, length: -2, time: -3, current: 1, temperature: 0, amount: 0, luminous: 0 },
+        tensor: None,
+    }
+}
+
+/// dx/dt = αx - βxy, dy/dt = δxy - γy — Lotka-Volterra
+fn lotka_volterra() -> PhysicsEquation {
+    PhysicsEquation {
+        name: "Lotka-Volterra Equations".to_string(),
+        domain: PhysicsDomain::Biophysics,
+        ast: make_equals(
+            make_const("dx/dt"),
+            make_sum(vec![make_product(vec![make_const("α"), make_const("x")]), EquationNode::Negate(Box::new(make_product(vec![make_const("β"), make_const("x"), make_const("y")])))]),
+        ),
+        symmetries: SymmetryDescriptor::none(),
+        dimensions: DimensionalSignature { mass: 0, length: 0, time: -1, current: 0, temperature: 0, amount: 0, luminous: 0 },
+        tensor: None,
+    }
+}
+
+/// P(A|B) = P(B|A)P(A)/P(B) — Bayes' theorem
+fn bayes_theorem() -> PhysicsEquation {
+    PhysicsEquation {
+        name: "Bayes Theorem".to_string(),
+        domain: PhysicsDomain::InformationTheory,
+        ast: make_equals(
+            make_const("P(A|B)"),
+            make_product(vec![
+                make_const("P(B|A)"), make_const("P(A)"),
+                EquationNode::Power { base: Box::new(make_const("P(B)")), exponent: Box::new(EquationNode::Scalar(-1.0)) },
+            ]),
+        ),
+        symmetries: SymmetryDescriptor::none(),
+        dimensions: DimensionalSignature::DIMENSIONLESS,
+        tensor: None,
+    }
+}
+
+/// k = A·exp(-E_a/RT) — Arrhenius equation
+fn arrhenius_equation() -> PhysicsEquation {
+    PhysicsEquation {
+        name: "Arrhenius Equation".to_string(),
+        domain: PhysicsDomain::Thermodynamics,
+        ast: make_equals(
+            make_const("k"),
+            make_product(vec![
+                make_const("A"),
+                EquationNode::Exponential(Box::new(EquationNode::Negate(Box::new(make_product(vec![
+                    make_const("E_a"),
+                    EquationNode::Power { base: Box::new(make_product(vec![make_const("R"), make_const("T")])), exponent: Box::new(EquationNode::Scalar(-1.0)) },
+                ]))))),
+            ]),
+        ),
+        symmetries: SymmetryDescriptor::none(),
+        dimensions: DimensionalSignature { mass: 0, length: 0, time: -1, current: 0, temperature: 0, amount: 0, luminous: 0 },
+        tensor: None,
+    }
+}
+
+/// v = H₀d — Hubble's law
+fn hubble_law() -> PhysicsEquation {
+    PhysicsEquation {
+        name: "Hubble Law".to_string(),
+        domain: PhysicsDomain::Cosmology,
+        ast: make_equals(make_const("v"), make_product(vec![make_const("H₀"), make_const("d")])),
+        symmetries: SymmetryDescriptor::from_lie_groups(vec![LieGroup::SO(3)], false),
+        dimensions: DimensionalSignature::VELOCITY,
+        tensor: None,
+    }
+}
+
 /// "Art's Parts" terahertz waveguide claim: alternating Bi/Mg layers
 /// act as a metamaterial waveguide at THz frequencies, enabling
 /// anti-gravity propulsion.
@@ -1991,8 +2710,8 @@ mod tests {
     fn catalog_builds_successfully() {
         let catalog = PhysicsCatalog::new();
         assert!(
-            catalog.len() >= 52,
-            "Expected >= 52 entries, got {}",
+            catalog.len() >= 90,
+            "Expected >= 90 entries, got {}",
             catalog.len()
         );
     }
@@ -2033,7 +2752,7 @@ mod tests {
     fn entries_in_domain() {
         let catalog = PhysicsCatalog::new();
         let em = catalog.entries_in_domain(PhysicsDomain::Electromagnetism);
-        assert_eq!(em.len(), 4, "Expected 4 Maxwell equations");
+        assert!(em.len() >= 4, "Expected >= 4 EM equations, got {}", em.len());
     }
 
     #[test]
@@ -2220,6 +2939,37 @@ mod tests {
             "Landauer Principle",
             "Ideal Gas Law",
             "Stefan-Boltzmann Law",
+            // Phase A1
+            "Newton Second Law",
+            "Newton Gravitation",
+            "Kepler Third Law",
+            "Hooke Law",
+            "Coulomb Law",
+            "Lorentz Force",
+            "Ohm Law",
+            "Planck-Einstein Relation",
+            "De Broglie Wavelength",
+            "Heisenberg Uncertainty Principle",
+            "Mass-Energy Equivalence",
+            "Lorentz Factor",
+            "Planck Radiation Law",
+            "Wien Displacement Law",
+            // Phase A2
+            "Shannon Entropy",
+            "KL Divergence",
+            "Mutual Information",
+            "Variational Free Energy (Friston)",
+            "Integrated Information (Phi)",
+            "Boltzmann Entropy",
+            "Bekenstein-Hawking Entropy",
+            "Bayes Theorem",
+            // Phase A3
+            "Bernoulli Equation",
+            "Gibbs Free Energy",
+            "Hodgkin-Huxley Equation",
+            "Lotka-Volterra Equations",
+            "Hubble Law",
+            "Arrhenius Equation",
         ];
 
         for name in &new_names {
