@@ -1,0 +1,61 @@
+# Chapter 15: Cooperation Without Communication
+
+*In which blind agents survive by following their friends, and information turns out to be the most overrated resource in the simulation.*
+
+---
+
+## The Information Hypothesis
+
+A reasonable person, looking at our engine's cooperation dynamics, might assume that better-informed agents would cooperate more effectively. More information about well locations, partner energy states, and environmental conditions should translate into better decisions, tighter clustering, and higher survival.
+
+This reasonable hypothesis is wrong. Four separate experiments tested it, and four produced the same answer: information has zero measurable effect on cooperation.
+
+## The Four Null Results
+
+**Finding 29: Information Asymmetry.** We gave four out of twenty agents doubled perception range ("scouts" who could see wells at 400 units instead of 200). Result: survival identical for scouts and non-scouts (78% vs 76%). Total group survival identical across conditions (15.2/20 for equal, scout, and blind conditions). Cohen's d = 0.000.
+
+Even more striking: we made four agents completely blind — unable to see wells at all, with zero perception range. These blind agents survived at 81%. They navigated to wells by following the FEP gradient's social component, which pulled them toward nearby agents, who were themselves moving toward wells. The blind followed the sighted, and the sighted didn't even know they were being followed.
+
+**Finding 34: Agent Memory.** We gave agents persistent memory — the ability to remember well locations they had discovered and the resonance history of partners they had cooperated with. Agents with memory could navigate to remembered wells even when they were out of perception range, and could preferentially seek partners with high historical resonance. Result: no significant difference in survival, cooperation, or clustering. Cohen's d = 0.270 (small, not significant after Holm-Bonferroni correction).
+
+Memory agents discovered an average of 0.8 wells and remembered 19 partners — but this information didn't change their behavior meaningfully, because the FEP gradient already pointed them in the right direction without memory.
+
+**Finding 40: Communication.** We tested two forms of signaling. Energy broadcasting: agents shared their energy fraction with neighbors, and the FEP gradient included a component pulling agents toward low-energy neighbors (altruistic seeking). Well broadcasting: agents shared discovered well locations with all nearby agents. Result: well broadcasting produced outcomes identical to silence (d = 0.000 — literally the same numbers). Energy broadcasting tightened clustering slightly (7.36 vs 12.11) but did not improve survival.
+
+**Finding 36: Curvature.** We tested whether the conformal geometry — which deflects agent trajectories based on harmony field energy — improved cooperation. Three curvature levels: flat (κ=0), low (κ=0.01), and high (κ=0.05). Result: d = 0.006 for high curvature vs flat. The mathematically sophisticated curvature system, which produces statistically significant trajectory deflection (p=0.009, Finding 8), has zero effect on cooperation.
+
+## Why Information Doesn't Matter
+
+The FEP gradient already encodes all the information agents need. Its four components — seek resonant partners, seek energy wells, flee danger, explore when comfortable — integrate the relevant environmental information into a single directional vector. An agent following this gradient moves toward good outcomes by construction.
+
+Additional information channels (memory, communication, extended perception) provide redundant signals. The gradient already points toward wells. Remembering where wells are doesn't help when you're already walking toward them. Communicating well locations doesn't help when your neighbor's gradient already points the same direction yours does.
+
+This is a deep result about the relationship between information and action in gradient-based systems. In a landscape with strong gradients, local information is sufficient — you don't need a map when you can feel the slope under your feet. The FEP gradient is a slope. Agents feel it and follow it. Giving them a map on top of the slope doesn't change where they end up.
+
+## The Sociological Implication
+
+This finding is at odds with the dominant narrative of the information age: that more information leads to better outcomes. In our engine, the opposite is closer to true — or rather, information is simply irrelevant.
+
+The relevant parallel is Dunbar's (1998) observation that human social groups function primarily through physical proximity and repeated interaction, not through information exchange. You don't form a community by sharing data — you form one by being near each other and benefiting from that nearness. Our engine, knowing nothing about Dunbar, reproduces this finding from thermodynamics: proximity + mutual benefit = cooperation. Information is orthogonal.
+
+The provocative implication: if cooperation depends on social infrastructure (range + resonance) and not on information, then the information revolution — the internet, social media, algorithmic feeds — would not be expected to improve cooperation. Our internet effect experiment (Finding 12-13) confirmed this: the algorithm era, which maximizes information flow but reduces effective social range, produces the worst cooperation outcomes of any technology era.
+
+Information is not social infrastructure. A fiber optic cable is not a community center.
+
+## Blind Navigation as Design Principle
+
+The blind agent result (Finding 29) has a practical interpretation for multi-agent system design.
+
+If you are building a swarm robotics system or a multi-agent coordination framework, you do not need to give every agent full environmental awareness. Agents that can sense their nearest neighbors — and follow a gradient that attracts them to those neighbors — will collectively navigate to resources that individual agents cannot see.
+
+This is social navigation: using the group as a distributed sensor. Each agent senses a small part of the environment. By following neighbors who themselves follow neighbors, information about distant resources propagates through the social graph without any explicit communication protocol.
+
+The only requirement is that the gradient has a social component — that agents are attracted to each other, not just to resources. Remove the social gradient (willingness = 0), and blind agents would wander randomly. But with even a weak social pull, the group becomes a navigation system that exceeds any individual's perception.
+
+## The Chapter's Thesis
+
+*Information is the most overrated resource in cooperative systems. What matters is not how much you know, but how close you are to others who are moving in the right direction. Social navigation — following your neighbors rather than consulting your map — is both sufficient for cooperation and robust to individual ignorance. You don't need to see the well. You just need to follow someone who can.*
+
+---
+
+*Next: Chapter 16 — Toward Living Systems*
