@@ -24,6 +24,9 @@ pub struct MuseVoiceBridge {
     phrase_index: usize,
     /// Sample rate.
     sample_rate: u32,
+    /// Broca language generator (consciousness → text).
+    #[cfg(feature = "broca")]
+    broca: symthaea_broca::BrocaGenerator,
 }
 
 #[cfg(feature = "voice")]
@@ -35,6 +38,11 @@ impl MuseVoiceBridge {
             generation_interval: 160, // ~5 seconds at 32ms/chunk
             phrase_index: 0,
             sample_rate,
+            #[cfg(feature = "broca")]
+            broca: {
+                let genesis = symthaea_core::genesis::GenesisSeed::from_phrase("symthaea-muse-voice");
+                symthaea_broca::BrocaGenerator::new(&genesis, symthaea_broca::BrocaConfig::default())
+            },
         }
     }
 
@@ -49,8 +57,17 @@ impl MuseVoiceBridge {
 
         self.chunks_since_speech = 0;
 
-        // Select phrase based on consciousness state
-        let phrase = self.select_phrase(state);
+        // Generate phrase: Broca (consciousness-driven) or hardcoded fallback
+        #[cfg(feature = "broca")]
+        let phrase_owned = self.broca_generate(state);
+        #[cfg(not(feature = "broca"))]
+        let phrase_owned = None::<String>;
+
+        let phrase = if let Some(ref text) = phrase_owned {
+            text.as_str()
+        } else {
+            self.select_phrase(state)
+        };
 
         // Always use Kokoro when available (feature-gated).
         // The consciousness level drives speed, not engine selection.
@@ -116,6 +133,38 @@ impl MuseVoiceBridge {
         let phrase = phrases[self.phrase_index % phrases.len()];
         self.phrase_index += 1;
         phrase
+    }
+
+    /// Generate text from consciousness using Broca language center.
+    #[cfg(feature = "broca")]
+    fn broca_generate(&mut self, state: &MusicalState) -> Option<String> {
+        let mut channels = symthaea_broca::ThoughtChannels::default();
+
+        // Map MusicalState → ThoughtChannels
+        // Intent: reflect (channel 5)
+        channels.channels[5] = 1.0; // reflect intent
+
+        // Emotions
+        channels.channels[9] = state.valence;           // valence
+        channels.channels[10] = state.arousal;           // arousal
+        channels.channels[11] = state.serotonin;         // warmth
+
+        // Consciousness
+        channels.channels[12] = state.consciousness_level; // Ψ
+        channels.channels[13] = state.consciousness_level * 0.8; // meta_awareness
+        channels.channels[14] = state.harmony_activations[0]; // coherence
+
+        // Epistemic status: confident when high Ψ
+        channels.channels[8] = if state.consciousness_level > 0.7 { 0.0 } else { 2.0 }; // Certain vs Uncertain
+
+        let result = self.broca.generate(&channels);
+        let text = result.text.trim().to_string();
+
+        if text.is_empty() || text.len() < 3 {
+            None // fall back to hardcoded
+        } else {
+            Some(text)
+        }
     }
 
     pub fn reset(&mut self) {

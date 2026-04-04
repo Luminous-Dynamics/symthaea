@@ -16,6 +16,7 @@ flacenc = { workspace = true }
 rustfft = { workspace = true }
 midly = "0.5"
 symthaea-voice = { path = "../symthaea-voice", optional = true }
+symthaea-broca = { path = "../symthaea-broca", optional = true }
 
 # Real-time audio output (optional)
 cpal = { version = "0.17", optional = true }
@@ -29,6 +30,8 @@ default = []
 muse-live = ["cpal", "ringbuf"]
 voice = ["symthaea-voice"]
 voice-kokoro = ["voice", "symthaea-voice/kokoro"]
+broca = ["symthaea-broca"]
+voice-broca = ["voice-kokoro", "broca"]
 
 [[example]]
 name = "live_demo"
