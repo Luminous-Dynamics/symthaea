@@ -27,6 +27,7 @@ pub mod harmony_field;
 pub mod hdc_context;
 pub mod safety;
 pub mod sanctuary;
+pub mod spatial_hash;
 pub mod thermodynamics;
 
 pub use coupling::{ConsciousnessField, EntityConsciousness};
