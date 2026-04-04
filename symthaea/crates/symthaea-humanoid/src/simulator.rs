@@ -594,6 +594,8 @@ pub struct SimpleHumanoidSimulator {
     morphology: crate::morphology::HumanoidMorphology,
     /// Per-joint limits from morphology (replaces const JOINT_LIMITS for extended morphologies).
     joint_limits: Vec<[f64; 2]>,
+    /// Gravity scaling factor (1.0 = Earth, 0.16 = Moon, 0.38 = Mars).
+    gravity_scale: f64,
 }
 
 impl SimpleHumanoidSimulator {
@@ -626,6 +628,7 @@ impl SimpleHumanoidSimulator {
             terrain: TerrainModel::new(),
             morphology,
             joint_limits,
+            gravity_scale: 1.0,
         }
     }
 
@@ -671,6 +674,12 @@ impl SimpleHumanoidSimulator {
         self.domain_rand.length_range *= scale;
         self.domain_rand.damping_range *= scale;
         self.observation_noise.noise_std *= scale;
+        self
+    }
+
+    /// Set gravity scaling factor (1.0 = Earth, 0.16 = Moon, 0.38 = Mars).
+    pub fn with_gravity(mut self, scale: f64) -> Self {
+        self.gravity_scale = scale;
         self
     }
 
@@ -750,7 +759,7 @@ impl HumanoidPhysicsSimulator for SimpleHumanoidSimulator {
         } else {
             cmd.clone()
         };
-        let g = 9.81;
+        let g = 9.81 * self.gravity_scale;
 
         // 1. Joint dynamics: per-joint inertia, damping, torque scaling
         for i in 0..cmd.torques.len().min(self.body.joint_torque_scale.len()) {
