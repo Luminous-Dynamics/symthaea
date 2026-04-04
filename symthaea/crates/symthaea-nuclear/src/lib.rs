@@ -22,12 +22,14 @@
 //! - Ring & Schuck (2004). *The Nuclear Many-Body Problem*. Springer.
 
 pub mod constants;
+pub mod discovery;
 pub mod encoder;
 pub mod island_stability;
 pub mod mass_formula;
 pub mod shell_model;
 
 pub use constants::*;
+pub use discovery::*;
 pub use encoder::*;
 pub use island_stability::*;
 pub use mass_formula::*;

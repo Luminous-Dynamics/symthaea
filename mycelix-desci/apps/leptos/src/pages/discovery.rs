@@ -5,26 +5,30 @@
 
 use leptos::prelude::*;
 use crate::types::DiscoveryResult;
+use crate::components::nuclear_chart::NuclearChart;
 
-/// Physics equation domains and counts (from the 93-equation catalog).
+/// Physics equation domains and counts (from the 148-equation catalog).
 fn catalog_domains() -> Vec<(&'static str, usize)> {
     vec![
-        ("Classical Mechanics", 11),
-        ("Electromagnetism", 8),
-        ("General Relativity", 14),
-        ("Quantum Mechanics", 10),
+        ("Classical Mechanics", 12),
+        ("Electromagnetism", 12),
+        ("General Relativity", 12),
+        ("Quantum Mechanics", 13),
         ("Quantum Field Theory", 3),
-        ("Statistical Mechanics", 4),
-        ("Fluid Dynamics", 4),
-        ("Cosmology", 5),
+        ("Statistical Mechanics", 7),
+        ("Fluid Dynamics", 7),
+        ("Cosmology", 6),
         ("Nuclear Physics", 9),
-        ("Thermodynamics", 10),
-        ("Optics", 5),
-        ("Condensed Matter", 2),
+        ("Thermodynamics", 15),
+        ("Optics", 7),
+        ("Condensed Matter", 5),
         ("Particle Physics", 4),
-        ("Modified Gravity", 4),
-        ("Information Theory", 10),
-        ("Biophysics", 2),
+        ("Modified Gravity", 3),
+        ("Information Theory", 11),
+        ("Biophysics", 6),
+        ("Acoustics", 3),
+        ("Plasma Physics", 3),
+        ("Mathematics", 4),
     ]
 }
 
@@ -68,7 +72,7 @@ pub fn DiscoveryPage() -> impl IntoView {
 
             // Catalog overview
             <div class="glass-panel" style="margin-bottom: 1.5rem;">
-                <h2 style="font-size: 1.25rem; margin-bottom: 1rem;">"Equation Catalog — 93 Equations across 16 Domains"</h2>
+                <h2 style="font-size: 1.25rem; margin-bottom: 1rem;">"Equation Catalog — 148 Equations across 19 Domains"</h2>
                 <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 0.5rem;">
                     {catalog_domains().into_iter().map(|(name, count)| {
                         view! {
@@ -174,6 +178,9 @@ pub fn DiscoveryPage() -> impl IntoView {
                     }).collect::<Vec<_>>()}
                 </div>
             </div>
+
+            // Interactive Nuclear Chart
+            <NuclearChart z_min=100 z_max=120 n_min=140 n_max=190 />
         </div>
     }
 }
