@@ -136,8 +136,22 @@ impl ConsciousnessSnapshot {
         }
     }
 
-    /// Check if consciousness is adequate for action type
+    /// Maximum age (seconds) before a consciousness snapshot is considered stale.
+    /// Prevents governance actions based on outdated consciousness state.
+    const MAX_AGE_SECS: u64 = 30;
+
+    /// Check if consciousness is adequate for action type.
+    /// Returns false if the snapshot is stale (older than MAX_AGE_SECS).
     pub fn is_adequate_for(&self, action_type: ActionType) -> bool {
+        // Reject stale snapshots — consciousness can decay significantly in 30s
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
+        if now > 0 && self.timestamp_secs > 0 && now.saturating_sub(self.timestamp_secs) > Self::MAX_AGE_SECS {
+            return false;
+        }
+
         let required = match action_type {
             ActionType::Basic => GOV_BASIC,
             ActionType::Governance => GOV_PROPOSAL,
