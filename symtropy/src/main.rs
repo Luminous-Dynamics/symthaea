@@ -49,6 +49,8 @@ fn main() {
     let record_mode = std::env::args().any(|a| a == "--record");
     #[cfg(feature = "atlas")]
     let demo_mode = std::env::args().any(|a| a == "--demo");
+    #[cfg(feature = "atlas")]
+    let cinematic_mode = std::env::args().any(|a| a == "--cinematic");
 
     let mut app = App::new();
     app.add_plugins(
@@ -56,7 +58,7 @@ fn main() {
                 .set(WindowPlugin {
                     primary_window: Some(Window {
                         title: "Symtropy: The Room That Remembers You".into(),
-                        resolution: bevy::window::WindowResolution::new(960, 720),
+                        resolution: bevy::window::WindowResolution::new(1920, 1080),
                         present_mode: bevy::window::PresentMode::AutoVsync,
                         ..default()
                     }),
@@ -109,6 +111,33 @@ fn main() {
                 let _ = std::fs::create_dir_all(&config.output_dir);
             }
         }).run_if(bevy::prelude::in_state(crate::resources::GamePhase::GlobeView)));
+    }
+
+    // --cinematic: full-spectrum 90s cinematic demo
+    #[cfg(feature = "atlas")]
+    if cinematic_mode {
+        eprintln!("[symtropy] --cinematic: full-spectrum cinematic (90s, 18 phases)");
+        // Insert cinematic resources
+        app.insert_resource(crate::systems::cinematic_director::CinematicDirector {
+            enabled: true,
+            ..Default::default()
+        });
+        app.insert_resource(crate::systems::cinematic_director::ScreenFade::default());
+        app.insert_resource(crate::systems::cinematic_director::NarrationState::default());
+        // Frame capture with cinematic output dir
+        app.insert_resource(terra_atlas_bevy::frame_capture::FrameCaptureConfig {
+            output_dir: "/tmp/symtropy-cinematic-frames".into(),
+            max_frames: 720,
+            active: true,
+            ..Default::default()
+        });
+        // AI player (starts disabled, cinematic enables it during dungeon phases)
+        let ai = crate::systems::ai_player::AiPlayer::new();
+        app.insert_resource(ai);
+        // Auto-start Loading phase
+        app.add_systems(Update, (|mut next: ResMut<bevy::prelude::NextState<crate::resources::GamePhase>>| {
+            next.set(crate::resources::GamePhase::Loading);
+        }).run_if(bevy::prelude::in_state(crate::resources::GamePhase::MainMenu)));
     }
 
     if ai_player {

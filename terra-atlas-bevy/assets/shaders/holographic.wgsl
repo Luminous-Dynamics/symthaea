@@ -57,7 +57,7 @@ fn fragment(
     let noise = fract(sin(dot(world_pos.xz, vec2<f32>(12.9898, 78.233))) * 43758.5453);
 
     // Modulate base color with holographic effects
-    let scan_mod = mix(1.0, 0.7, scanline * 0.3);
+    let scan_mod = mix(1.0, 0.85, scanline * 0.2); // gentler — 15% dim not 30%
     let noise_mod = mix(0.85, 1.0, noise);
     pbr_input.material.base_color = vec4<f32>(
         pbr_input.material.base_color.rgb * scan_mod * noise_mod,

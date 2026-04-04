@@ -221,15 +221,15 @@ pub fn setup_globe_view(
     // 3D orbital camera — holographic post-processing
     commands.spawn((
         Camera3d::default(),
-        bevy::core_pipeline::tonemapping::Tonemapping::Reinhard,
+        bevy::core_pipeline::tonemapping::Tonemapping::AcesFitted,
         // [6] Bloom — makes emissive markers glow through the hologram
         bevy::post_process::bloom::Bloom {
-            intensity: 0.12, // subtle — markers glow without washing out
+            intensity: 0.04, // low — crisp text, subtle marker glow
             ..default()
         },
         // [3] Chromatic aberration — holographic projection artifact
         bevy::post_process::effect_stack::ChromaticAberration {
-            intensity: 0.008,  // subtle — just enough to read as "projected"
+            intensity: 0.002,  // minimal — preserves text clarity
             max_samples: 8,
             ..default()
         },
