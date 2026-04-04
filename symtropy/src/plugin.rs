@@ -136,6 +136,7 @@ impl Plugin for SymtropyPlugin {
                     systems::atlas::cloud_rotation_system,
                     systems::atlas::marker_pulse_system,
                     systems::atlas::consciousness_shader_system,
+                    systems::atlas::city_stress_evolution_system,
                     systems::atlas::aesthetic_switch_system,
                     systems::atlas::aesthetic_apply_system,
                     sol_atlas_bevy::selection::click_select_system,

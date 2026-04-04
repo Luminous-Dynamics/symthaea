@@ -945,6 +945,28 @@ pub fn temporal_4d_system(
     }
 }
 
+/// Evolve city grid stress based on timeline year.
+/// As the timeline scrubs, city indicators change color to reflect
+/// the civilization simulator's predictions of grid stress evolution.
+pub fn city_stress_evolution_system(
+    timeline: Res<TimelineState>,
+    mut city_markers: Query<(&CityIndicator, &MeshMaterial3d<StandardMaterial>)>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+) {
+    let stress_data = sol_atlas_core::simulation::evolve_grid_stress(timeline.year);
+
+    for (city, mat_handle) in city_markers.iter_mut() {
+        // Find matching stress data by city name
+        if let Some(stress) = stress_data.iter().find(|s| s.name == city.name) {
+            if let Some(mat) = materials.get_mut(&mat_handle.0) {
+                let c = sol_atlas_core::energy_trading::stress_color(stress.allostatic_load);
+                mat.base_color = Color::linear_rgba(c[0], c[1], c[2], 0.8);
+                mat.emissive = LinearRgba::new(c[0] * 0.5, c[1] * 0.5, c[2] * 0.5, 1.0);
+            }
+        }
+    }
+}
+
 /// Aesthetic switcher — number keys 1-5 cycle visual presets.
 pub fn aesthetic_switch_system(
     kb: Res<ButtonInput<KeyCode>>,
@@ -980,13 +1002,54 @@ pub fn aesthetic_apply_system(
 
     let config = sol_atlas_core::aesthetics::config_for(current.aesthetic);
 
-    // Update holographic globe material
+    // Update holographic globe material + shader params per aesthetic
     for (_, mat) in holo_materials.iter_mut() {
         let c = config.globe.base_color;
         mat.base.base_color = Color::linear_rgba(c[0], c[1], c[2], c[3]);
         let e = config.globe.emissive;
         mat.base.emissive = LinearRgba::new(e[0], e[1], e[2], e[3]);
         mat.base.unlit = config.globe.unlit;
+
+        // Override holographic shader params per aesthetic
+        match current.aesthetic {
+            sol_atlas_core::aesthetics::Aesthetic::Satellite => {
+                // Bypass holographic effects — photorealistic
+                mat.extension.hologram_alpha = 1.0;
+                mat.extension.scanline_density = 0.0;
+                mat.extension.scanline_speed = 0.0;
+                mat.extension.fresnel_power = 1.0;
+                mat.extension.fresnel_color = LinearRgba::new(0.3, 0.5, 0.8, 1.0);
+            }
+            sol_atlas_core::aesthetics::Aesthetic::Night => {
+                // Dim holographic, emphasis on emissive city lights
+                mat.extension.hologram_alpha = 0.7;
+                mat.extension.scanline_density = 10.0;
+                mat.extension.fresnel_power = 2.0;
+                mat.extension.fresnel_color = LinearRgba::new(0.1, 0.15, 0.3, 1.0);
+            }
+            sol_atlas_core::aesthetics::Aesthetic::Minimal => {
+                // Maximum data clarity
+                mat.extension.hologram_alpha = 0.3;
+                mat.extension.scanline_density = 0.0;
+                mat.extension.fresnel_power = 4.0;
+                mat.extension.fresnel_color = LinearRgba::new(0.2, 0.3, 0.4, 1.0);
+            }
+            sol_atlas_core::aesthetics::Aesthetic::Procedural => {
+                // Mycelix brand — warm
+                mat.extension.hologram_alpha = 0.65;
+                mat.extension.scanline_density = 12.0;
+                mat.extension.fresnel_power = 3.0;
+                mat.extension.fresnel_color = LinearRgba::new(0.0, 0.87, 1.0, 1.0);
+            }
+            sol_atlas_core::aesthetics::Aesthetic::Holographic => {
+                // Default holographic — reset to standard
+                mat.extension.hologram_alpha = 0.55;
+                mat.extension.scanline_density = 20.0;
+                mat.extension.scanline_speed = 0.5;
+                mat.extension.fresnel_power = 3.0;
+                mat.extension.fresnel_color = LinearRgba::new(0.0, 0.87, 1.0, 1.0);
+            }
+        }
     }
 
     // Update atmosphere/fresnel materials

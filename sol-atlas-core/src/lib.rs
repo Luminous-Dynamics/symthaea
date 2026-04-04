@@ -20,6 +20,7 @@ pub mod solar_system;
 pub mod geometry;
 pub mod math;
 pub mod picking;
+pub mod simulation;
 pub mod timeline;
 pub mod types;
 
