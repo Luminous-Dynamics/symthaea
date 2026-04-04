@@ -2357,41 +2357,41 @@ impl SpinozistClassifier {
 
     pub fn classify_hybrid(&self, text: &str) -> (MoralVerdict, f32) {
         if !self.hybrid_trained { return (MoralVerdict::Neutral, 0.0); }
-        let f = self.extract_hybrid_features(text);
-        let nf = self.norm_features(&f);
 
-        // Simple centroid classification: dot product with each class centroid
-        // More stable than multi-prototype K-means on small training sets
-        let protos = match &self.multi_prototypes { Some(p) => p, None => return (MoralVerdict::Neutral, 0.0) };
+        // Classify via surface encoder centroids in full 16,384D space.
+        // This preserves the full discriminative signal that dimensionality
+        // reduction destroys. The surface_protos are class-mean HVs computed
+        // from TextHdcEncoder (the same encoder that drives the 77% k-NN).
+        let protos = match &self.surface_protos {
+            Some(p) => p,
+            None => return (MoralVerdict::Neutral, 0.0),
+        };
 
-        // Aggregate multi-prototypes into class centroids for stability
-        let mut class_sims = [0.0f32; 3];
-        let mut class_counts = [0usize; 3];
-        for (proto, cls) in protos {
-            let sim: f32 = nf.iter().zip(proto.iter()).map(|(a, b)| a * b).sum();
-            class_sims[*cls] += sim;
-            class_counts[*cls] += 1;
-        }
-        // Average similarity per class
-        for i in 0..3 {
-            if class_counts[i] > 0 {
-                class_sims[i] /= class_counts[i] as f32;
-            }
-        }
+        let surface_hv = self.surface_encoder.encode(text);
+        let sims = [
+            surface_hv.similarity(&protos[0]), // Good
+            surface_hv.similarity(&protos[1]), // Bad
+            surface_hv.similarity(&protos[2]), // Neutral
+        ];
 
         let mut best = 0;
-        let mut second = f32::NEG_INFINITY;
+        let mut second_best = f32::NEG_INFINITY;
         for i in 1..3 {
-            if class_sims[i] > class_sims[best] {
-                second = class_sims[best];
+            if sims[i] > sims[best] {
+                second_best = sims[best];
                 best = i;
-            } else if class_sims[i] > second {
-                second = class_sims[i];
+            } else if sims[i] > second_best {
+                second_best = sims[i];
             }
         }
-        if best == 0 { second = class_sims[1].max(class_sims[2]); }
-        let margin = (class_sims[best] - second).max(0.0);
-        let verdict = match best { 0 => MoralVerdict::Good, 1 => MoralVerdict::Bad, _ => MoralVerdict::Neutral };
+        if best == 0 { second_best = sims[1].max(sims[2]); }
+
+        let margin = (sims[best] - second_best).max(0.0);
+        let verdict = match best {
+            0 => MoralVerdict::Good,
+            1 => MoralVerdict::Bad,
+            _ => MoralVerdict::Neutral,
+        };
         (verdict, margin.min(1.0))
     }
 }
