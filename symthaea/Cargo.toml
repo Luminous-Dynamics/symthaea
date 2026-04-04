@@ -198,8 +198,8 @@ symthaea-phi-search = { path = "crates/symthaea-phi-search" }
 # Symthaea Narrative Self - Narrative self-model (always enabled)
 symthaea-narrative-self = { path = "crates/symthaea-narrative-self" }
 
-# Symthaea Field Dynamics - Consciousness field wave equations (always enabled)
-symthaea-field-dynamics = { path = "crates/symthaea-field-dynamics" }
+# Symthaea Field Dynamics - Consciousness field wave equations (optional)
+symthaea-field-dynamics = { path = "crates/symthaea-field-dynamics", optional = true }
 
 # Symthaea Hodge - Hodge Laplacian for simplicial complexes (always enabled)
 symthaea-hodge = { path = "crates/symthaea-hodge" }
@@ -210,8 +210,8 @@ symthaea-factor-graph = { path = "crates/symthaea-factor-graph" }
 # Symthaea Enactive - Enactive cognition paradigm (always enabled)
 symthaea-enactive = { path = "crates/symthaea-enactive" }
 
-# Symthaea Sensorimotor - Sensorimotor contingency theory (always enabled)
-symthaea-sensorimotor = { path = "crates/symthaea-sensorimotor" }
+# Symthaea Sensorimotor - Sensorimotor contingency theory (optional)
+symthaea-sensorimotor = { path = "crates/symthaea-sensorimotor", optional = true }
 symthaea-consciousness-topology = { path = "crates/symthaea-consciousness-topology" }
 symthaea-exploration = { path = "crates/symthaea-exploration" }
 symthaea-wisdom = { path = "crates/symthaea-wisdom" }
@@ -304,6 +304,7 @@ symthaea-population = { path = "crates/symthaea-population", optional = true }
 symthaea-neuroevolution = { path = "crates/symthaea-neuroevolution", optional = true }
 symthaea-jepa = { path = "crates/symthaea-jepa", optional = true }
 symthaea-materials = { path = "crates/symthaea-materials", optional = true }
+symthaea-nuclear = { path = "crates/symthaea-nuclear", optional = true }
 symthaea-nuclear-forensics = { path = "crates/symthaea-nuclear-forensics", optional = true }
 symthaea-fabrication-kernel = { path = "crates/symthaea-fabrication-kernel", optional = true }
 
@@ -546,6 +547,7 @@ spectral_state = []                         # Spectral twin: frequency-domain Cf
 
 # ── Defense / Immune System ────────────────────────────────────────
 sentinel = []                                # Distributed immune system: governance anomaly detection, threat memory, collective immunity
+audio-sentinel = ["dep:symthaea-sentinel"]   # Zero-shot temporal audio pattern recognition (HDC+LTC+CfC)
 hypervisor = []                              # Hierarchical consciousness supervision
 
 # ── Consciousness Deepening ───────────────────────────────────────
@@ -603,6 +605,8 @@ hdc-store = ["dep:symthaea-hdc-store"]  # Zero-copy mmap'd BinaryHV storage with
 fhe-wisdom = []                        # FHE collective wisdom pool for privacy-preserving peer learning
 space-alerts = []                      # Space situational awareness alerts from mycelix-space
 circular = []                          # Waste/circular economy tracking (SwarmEvent + telemetry)
+field-dynamics = ["dep:symthaea-field-dynamics"]   # Consciousness field wave equations
+sensorimotor = ["dep:symthaea-sensorimotor"]       # Sensorimotor contingency theory
 
 # ── Database backends ───────────────────────────────────────────────
 # DuckDB is an unconditional dep. Others deferred:
@@ -658,6 +662,7 @@ genesis = ["genomics", "cell-foundry", "ectogenesis", "nurture", "population"]  
 fusion-twin = ["physics"]
 safety-agents = []
 materials = ["dep:symthaea-materials"]
+nuclear = ["dep:symthaea-nuclear"]                      # Computational nuclear structure: mass formula, shell model, island of stability
 nuclear-forensics = ["dep:symthaea-nuclear-forensics"]
 water-prediction = ["cell-foundry"]
 physics-bridge = ["physics", "dep:symthaea-physics-bridge"]  # HDC semantic physics bridge + guided design exploration
@@ -761,6 +766,7 @@ default-mind = [
     "unified_precision",      # Dynamic HFE precision (Parr 2019). Fixed: 46 Hz (was 1.1 Hz)
     "england_dissipation",    # England exploration + Prigogine-England tension resolution
     "interoceptive_inference", # Body-state prediction modulates precision + blanket (Seth 2021)
+    "observability_module",   # Prometheus metrics + GWT integration telemetry
 ]
 
 
