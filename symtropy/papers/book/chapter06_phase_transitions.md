@@ -1,0 +1,103 @@
+# Chapter 6: The Temperature of Society
+
+*In which we discover that cooperation does not decline gradually — it shatters.*
+
+---
+
+## The Ising Analogy
+
+In 1925, Ernst Ising solved a one-dimensional model of ferromagnetism. Below a critical temperature, atomic spins align spontaneously — the material becomes magnetic. Above it, thermal noise overwhelms the alignment force and the material becomes paramagnetic. The transition is sharp. There is no gradual demagnetization. One degree below the critical temperature, the magnet works. One degree above, it does not.
+
+We found the same pattern in cooperation.
+
+## The Pressure Sweep
+
+We swept maintenance pressure — the energy cost of existing — from 0.05 to 1.00 joules per tick across twelve levels, with eight seeds at each level (Finding 20). Maintenance pressure is our analogue of temperature: higher pressure means more thermal noise in the system, more entropy production, more urgency.
+
+The result was not a gradual decline.
+
+| Pressure | Survival | Cooperation Events | Temperature | Entropy |
+|----------|----------|-------------------|-------------|---------|
+| 0.05 | 100% | 378K | 311.5K | 66.6 J/K |
+| 0.10 | 60% | 507K | 316.6K | 201.7 J/K |
+| **0.20** | **40%** | **1.07M** | **330.1K** | **523.5 J/K** |
+| 0.30 | 27% | 1.19M | 331.4K | 558.4 J/K |
+| 0.75 | 13% | 1.30M | 330.7K | 571.2 J/K |
+| 1.00 | 38% | 1.31M | 330.6K | 571.6 J/K |
+
+At 0.05 J/tick, every agent survives. At 0.20 J/tick, only 40% survive. The transition happens in a narrow band — a four-fold increase in pressure causes a 60% drop in survival. This is not linear degradation. It is a phase transition.
+
+## The Bistability
+
+The most telling feature of the data above 0.20 J/tick was not the average survival but the variance. At pressures above the critical threshold, individual seeds did not produce moderate survival (10 out of 20). They produced either perfect survival (20 out of 20) or total collapse (0 out of 20). The distribution was bimodal.
+
+This is the hallmark of a first-order phase transition. The system has two stable states — cooperative (all survive) and collapsed (all die) — and the initial condition determines which state the system falls into. Small differences in initial spatial configuration — who happened to start near a well, who happened to start near a compatible partner — determined whether the entire population lived or died.
+
+In the Ising model, this corresponds to the coexistence region where both phases are thermodynamically stable. A small perturbation — a nucleation event — tips the system one way or the other. In our engine, the "nucleation event" is whether the first few agents form a viable cooperative cluster before their energy depletes. If they do, the cluster grows and absorbs nearby agents. If they don't, everyone dies alone.
+
+## Desperation Cooperation
+
+The counterintuitive finding was in the cooperation column. At low pressure (0.05 J/tick), agents cooperated 378,000 times across the simulation. At high pressure (1.00 J/tick), they cooperated 1.31 million times — a 3.5-fold increase.
+
+Agents cooperate *more* when they are dying.
+
+This is not paradoxical once you understand the FEP gradient. The cooperation component of the gradient is weighted by `(1.0 - energy_fraction)` — urgency increases as energy drops. Low-energy agents seek partners more desperately than comfortable ones. Under high pressure, every agent is low-energy, so every agent is urgently seeking cooperation. The result is frantic mutual aid — cooperation born not from abundance but from desperation.
+
+This maps to a documented sociological phenomenon. Fritz (1996) studied community response to disasters and found that social cohesion *increases* immediately after catastrophe. Neighbors who never spoke before share food, shelter, and labor. The "therapeutic community" that forms in the aftermath of disaster is a real-world example of desperation cooperation — and it eventually dissipates as conditions normalize, just as our high-pressure cooperation events decrease per capita as agents collapse.
+
+## The Thermodynamic Response
+
+The engine tracks physical thermodynamic quantities for each agent: temperature, entropy, and Helmholtz free energy (F = U - TS).
+
+Across the pressure sweep, system temperature rose monotonically from 311.5K to 330.6K — a 19K increase driven entirely by energy dissipation from maintenance costs and collision heat. Entropy production increased 8.6-fold from 66.6 to 571.6 J/K. And Helmholtz free energy — the maximum extractable work — dropped to zero above the critical pressure.
+
+Zero available work means the system has no thermodynamic capacity for ordered behavior. Every joule of internal energy is locked up as entropy. The agents are alive (some of them) but thermodynamically exhausted — their energy goes entirely to maintenance with nothing left for directed action.
+
+This is the thermodynamic definition of the collapsed phase: a system at maximum entropy production with zero free energy. It exists, but it cannot organize.
+
+## The Parameter Sensitivity
+
+The phase transition raised an obvious question: is the critical pressure at 0.20 J/tick a universal feature of the engine or an artifact of the specific parameter values in `ThermodynamicConstants::research()`?
+
+The parameter sensitivity analysis (Finding 33) addressed this directly. We swept each of four parameters independently by ±50%:
+
+| Parameter | Max Effect Size | Verdict |
+|-----------|----------------|---------|
+| Maintenance per tick | d = 1.13 | **CRITICAL** |
+| Harmony range | d = 1.29 | **CRITICAL** |
+| Resonance regen rate | d = 0.63 | Moderate |
+| Ambient regen rate | d = 0.26 | Robust |
+
+Maintenance pressure and harmony range are the critical parameters — unsurprisingly, since they directly control the two mechanisms identified in Chapter 5 (gradient urgency and cooperation range). Ambient regeneration has almost no effect (d = 0.26), confirming that slow background recovery is irrelevant compared to cooperation.
+
+The 2³ factorial design (Finding 35) went further, testing all eight combinations of high/low for the three most important parameters. The interaction between harmony range and resonance regeneration rate was synergistic (+3.32 agents), meaning their combined effect was greater than the sum of their individual effects. Wide social range × high mutual benefit = a multiplicative cooperation advantage.
+
+The best parameter combination (low maintenance, high range, high regen) produced 19.9 out of 20 survival. The worst (high maintenance, low range, low regen) produced 9.2 out of 20. That is a 2.2-fold difference in survival from parameter choice alone — confirming that the phase transition is real and parameter-dependent, not an artifact of a single tuning.
+
+## The Critical Infrastructure
+
+The factorial result has a direct policy interpretation, though we offer it cautiously given the engine's limitations.
+
+If you want to maximize cooperation in a thermodynamic agent system, you should invest in social range (the distance over which agents can interact with each other) and mutual benefit rate (how much agents gain from being near compatible partners). Reducing maintenance pressure (the cost of existing) helps, but less than expanding social infrastructure.
+
+In human terms: reducing the cost of living matters, but building community centers matters more. The synergistic interaction means that neither alone is sufficient — you need both proximity and benefit. A community center in a neighborhood where people can't afford to leave their homes (high maintenance) produces less cooperation than the same center in a neighborhood with moderate costs.
+
+This is Klinenberg's thesis in *Palaces for the People* (2018): social infrastructure — the physical spaces and institutions that enable social contact — is the critical variable for community resilience. Our engine, knowing nothing about Klinenberg, arrives at the same conclusion from thermodynamics.
+
+## The Phase Diagram
+
+Combining the pressure sweep, the parameter sensitivity, and the factorial design, we can sketch a phase diagram for cooperation:
+
+**Cooperative phase** (below critical pressure): All agents survive. Cooperation is thermodynamically favorable — the energy gained from resonance exceeds the energy spent on maintenance. The system reaches a stable equilibrium with organized social structure.
+
+**Transition zone** (near critical pressure): Bistable. The outcome depends on initial conditions. Early cooperative clusters nucleate and grow; isolated agents collapse. Small perturbations determine the fate of the entire population.
+
+**Collapsed phase** (above critical pressure): Most agents die. Those that survive do so near wells, not through cooperation. Entropy production is maximal, free energy is zero. The system exists but cannot organize.
+
+The critical pressure is not a fixed value — it shifts with harmony range (wider range lowers the critical pressure, making cooperation viable under harsher conditions) and resonance regeneration rate (higher regen provides more energy per cooperative interaction, buffering against pressure).
+
+This is the thermodynamics of togetherness in a single diagram: a phase space where the axes are *pressure* (cost of existing) and *infrastructure* (range × benefit), and the boundary between cooperation and collapse is a curve, not a point.
+
+---
+
+*Next: Chapter 7 — Social Bonds and the Physics of Friendship*
