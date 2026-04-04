@@ -57,6 +57,7 @@ fn game_type(node_id: &str) -> Option<&'static str> {
         // Intermediate Phase (Gr6-9)
         id if (id.contains("Gr6") || id.contains("Grade6")) && (id.contains("integer") || id.contains("Integer") || id.contains("negative") || id.contains("NS")) => Some("integer_line"),
         id if (id.contains("Gr7") || id.contains("Gr8") || id.contains("Grade7") || id.contains("Grade8")) && (id.contains("ALG") || id.contains("algebra") || id.contains("equation") || id.contains("EE")) => Some("equation_balance"),
+        id if id.contains("Pythag") || id.contains("pythag") || id.contains("hypotenuse") || (id.contains("Gr8") && id.contains("GEOM")) => Some("pythagoras"),
         _ => None,
     }
 }
@@ -84,6 +85,7 @@ pub fn GameContainer(node_id: String) -> impl IntoView {
         Some("times_tables") => view! { <foundation::times_tables::TimesTablesGame node_id=id /> }.into_any(),
         Some("integer_line") => view! { <intermediate::integer_number_line::IntegerNumberLine node_id=id /> }.into_any(),
         Some("equation_balance") => view! { <intermediate::equation_balance::EquationBalance node_id=id /> }.into_any(),
+        Some("pythagoras") => view! { <intermediate::pythagoras::PythagorasExplorer node_id=id /> }.into_any(),
         _ => view! { <p style="color: var(--text-secondary)">"No interactive game available yet."</p> }.into_any(),
     }
 }

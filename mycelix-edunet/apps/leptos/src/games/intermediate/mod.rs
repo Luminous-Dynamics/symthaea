@@ -4,3 +4,4 @@
 
 pub mod integer_number_line;
 pub mod equation_balance;
+pub mod pythagoras;
