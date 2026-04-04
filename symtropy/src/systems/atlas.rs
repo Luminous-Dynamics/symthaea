@@ -103,7 +103,7 @@ pub fn setup_globe_view(
     // ═══ HOLOGRAPHIC GLOBE ═══════════════════════════════════════
 
     // [1] Globe with custom holographic shader — Fresnel + scanlines
-    let earth_mesh = meshes.add(Sphere::new(1.0).mesh().uv(128, 128));
+    let earth_mesh = meshes.add(Sphere::new(1.0).mesh().uv(64, 64)); // 64 = smooth at distance, 4x fewer verts
     let earth_texture: Handle<Image> = asset_server.load(terra_atlas_bevy::globe::EARTH_TEXTURE_PATH);
     let holo_globe = holo_materials.add(terra_atlas_bevy::holographic_material::HolographicMaterial {
         base: StandardMaterial {
@@ -537,32 +537,25 @@ pub fn setup_globe_view(
 
     // ─── Solar System Bodies ────────────────────────────────────
     let bodies = terra_atlas_core::solar_system::solar_system_bodies();
-    let body_mesh = meshes.add(Sphere::new(1.0).mesh().uv(12, 12)); // low-poly = holographic look
+    let body_mesh = meshes.add(Sphere::new(1.0).mesh().uv(32, 32)); // higher detail for textured planets
     for body in &bodies {
         let pos = terra_atlas_core::solar_system::body_position(body, 0.0);
         let texture: Handle<Image> = asset_server.load(format!("textures/{}", body.texture));
-        // Holographic Data Orb aesthetic — wireframe-style, not photorealistic
         let mat = if body.is_sun {
             materials.add(StandardMaterial {
-                base_color: Color::linear_rgba(1.0, 0.7, 0.2, 0.3), // translucent amber
-                emissive: LinearRgba::new(1.0, 0.6, 0.1, 1.0),
+                base_color: Color::linear_rgba(1.0, 0.85, 0.4, 0.5),
+                base_color_texture: Some(texture),
+                emissive: LinearRgba::new(1.0, 0.7, 0.2, 1.0),
                 alpha_mode: AlphaMode::Blend,
                 unlit: true,
                 ..default()
             })
         } else {
-            // Data orbs — translucent with edge glow, matching holographic globe
-            let hue = match body.name.as_str() {
-                "Moon" => [0.6, 0.7, 0.8],     // cool silver
-                "Venus" => [0.8, 0.7, 0.4],     // warm gold
-                "Mars" => [0.8, 0.3, 0.2],      // deep red
-                "Jupiter" => [0.6, 0.5, 0.3],   // brown-gold
-                "Saturn" => [0.7, 0.6, 0.4],    // pale gold
-                _ => [0.5, 0.6, 0.7],
-            };
+            // Real planet textures with subtle emissive for visibility in space
             materials.add(StandardMaterial {
-                base_color: Color::linear_rgba(hue[0], hue[1], hue[2], 0.25),
-                emissive: LinearRgba::new(hue[0] * 0.3, hue[1] * 0.3, hue[2] * 0.3, 1.0),
+                base_color: Color::linear_rgba(0.9, 0.9, 0.9, 0.85),
+                base_color_texture: Some(texture),
+                emissive: LinearRgba::new(0.08, 0.08, 0.08, 1.0),
                 alpha_mode: AlphaMode::Blend,
                 unlit: true,
                 double_sided: true,

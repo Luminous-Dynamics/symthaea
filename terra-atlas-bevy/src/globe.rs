@@ -15,7 +15,7 @@ pub struct Globe;
 pub struct Atmosphere;
 
 /// Path to the earth texture (relative to the binary's `assets/` directory).
-pub const EARTH_TEXTURE_PATH: &str = "textures/earth-blue-marble.jpg";
+pub const EARTH_TEXTURE_PATH: &str = "textures/earth-8k.jpg";
 
 /// Spawn the globe sphere, atmosphere shell, and sun light.
 pub fn spawn_globe(
