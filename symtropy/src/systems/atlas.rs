@@ -101,7 +101,8 @@ pub fn setup_globe_view(
     }
 
     // Pure black space background
-    commands.insert_resource(ClearColor(Color::BLACK));
+    // Deep space — not pure black, faint starlight glow
+    commands.insert_resource(ClearColor(Color::linear_rgb(0.005, 0.003, 0.012)));
 
     // Ambient light so the dark side of the globe isn't pitch black
     commands.spawn((
@@ -277,6 +278,20 @@ pub fn setup_globe_view(
         },
         Transform::from_xyz(0.0, 0.0, 4.2).looking_at(Vec3::ZERO, Vec3::Y),
         OrbitalCamera,
+        AtlasEntity,
+    ));
+
+    // ─── Globe Label HUD ─────────────────────────────────────────
+    commands.spawn((
+        Text::new("TERRA ATLAS"),
+        TextFont { font_size: 16.0, ..default() },
+        TextColor(Color::srgba(0.3, 0.6, 0.7, 0.4)),
+        Node {
+            position_type: PositionType::Absolute,
+            top: Val::Px(24.0),
+            left: Val::Px(28.0),
+            ..default()
+        },
         AtlasEntity,
     ));
 
@@ -711,10 +726,21 @@ pub fn draw_arcs_system(
         for i in 0..segments as usize {
             let a = Vec3::new(arc[i * 3], arc[i * 3 + 1], arc[i * 3 + 2]);
             let b = Vec3::new(arc[(i + 1) * 3], arc[(i + 1) * 3 + 1], arc[(i + 1) * 3 + 2]);
-            // Bright pulse at packet position, dim elsewhere
             let dist_to_packet = (i as f32 - packet_seg as f32).abs() / segments as f32;
             let brightness = 0.4 + 0.6 * (-dist_to_packet * 8.0).exp();
-            gizmos.line(a, b, Color::linear_rgba(1.0 * brightness, 0.8 * brightness, 0.1 * brightness, brightness));
+            let color = Color::linear_rgba(1.0 * brightness, 0.8 * brightness, 0.1 * brightness, brightness);
+            let glow = Color::linear_rgba(1.0 * brightness * 0.3, 0.8 * brightness * 0.3, 0.1 * brightness * 0.3, brightness * 0.3);
+            // Center line + 2 glow flanks
+            gizmos.line(a, b, color);
+            let normal = (b - a).cross(Vec3::Y).normalize_or_zero() * 0.004;
+            gizmos.line(a + normal, b + normal, glow);
+            gizmos.line(a - normal, b - normal, glow);
+
+            // Data pulse sphere at packet position
+            if dist_to_packet < 0.05 {
+                let pulse_pos = a.lerp(b, 0.5);
+                gizmos.sphere(Isometry3d::from_translation(pulse_pos), 0.008, Color::linear_rgba(1.0, 0.95, 0.7, 0.9));
+            }
         }
     }
 
@@ -735,6 +761,52 @@ pub fn draw_arcs_system(
             let a = Vec3::new(arc[i * 3], arc[i * 3 + 1], arc[i * 3 + 2]);
             let b = Vec3::new(arc[(i + 1) * 3], arc[(i + 1) * 3 + 1], arc[(i + 1) * 3 + 2]);
             gizmos.line(a, b, supply_color);
+        }
+    }
+
+    // ═══ SPACE-TIME GRAVITY WELL GRID ══════════════════════════════
+    // Radial + concentric grid that dips into a funnel beneath the globe.
+    // y = base - k / (r² + ε) — space-time curvature visualization.
+    let base_y = -0.7;
+    let gravity_k = 0.15;
+    let epsilon = 0.3;
+    let flicker = (t * 5.0).sin().abs() * 0.4 + 0.6; // holographic flicker
+
+    // Concentric circles (8 rings)
+    for ring in 1..=8 {
+        let r = ring as f32 * 0.5;
+        let segments = 48;
+        let ring_alpha = 0.04 * flicker * (1.0 - ring as f32 / 10.0); // fade with distance
+        let ring_color = Color::linear_rgba(0.0, 0.5, 0.7, ring_alpha);
+        for i in 0..segments {
+            let a0 = i as f32 / segments as f32 * std::f32::consts::TAU;
+            let a1 = (i + 1) as f32 / segments as f32 * std::f32::consts::TAU;
+            let x0 = r * a0.cos();
+            let z0 = r * a0.sin();
+            let x1 = r * a1.cos();
+            let z1 = r * a1.sin();
+            let y0 = base_y - gravity_k / (x0 * x0 + z0 * z0 + epsilon);
+            let y1 = base_y - gravity_k / (x1 * x1 + z1 * z1 + epsilon);
+            gizmos.line(Vec3::new(x0, y0, z0), Vec3::new(x1, y1, z1), ring_color);
+        }
+    }
+
+    // Radial spokes (12 lines from center outward)
+    for spoke in 0..12 {
+        let angle = spoke as f32 / 12.0 * std::f32::consts::TAU;
+        let spoke_alpha = 0.03 * flicker;
+        let spoke_color = Color::linear_rgba(0.0, 0.4, 0.6, spoke_alpha);
+        let segments = 16;
+        for i in 0..segments {
+            let r0 = i as f32 / segments as f32 * 4.0 + 0.3;
+            let r1 = (i + 1) as f32 / segments as f32 * 4.0 + 0.3;
+            let x0 = r0 * angle.cos();
+            let z0 = r0 * angle.sin();
+            let x1 = r1 * angle.cos();
+            let z1 = r1 * angle.sin();
+            let y0 = base_y - gravity_k / (x0 * x0 + z0 * z0 + epsilon);
+            let y1 = base_y - gravity_k / (x1 * x1 + z1 * z1 + epsilon);
+            gizmos.line(Vec3::new(x0, y0, z0), Vec3::new(x1, y1, z1), spoke_color);
         }
     }
 }
@@ -978,6 +1050,27 @@ pub fn celestial_orbit_system(
                 body.orbit_radius * a1.sin(),
             );
             gizmos.line(p0, p1, orbit_color);
+        }
+
+        // Glow ring around body at current position — holographic aura
+        let pos = terra_atlas_core::solar_system::body_position(body, t);
+        let flicker = (t * 4.0 + body.orbit_offset).sin().abs() * 0.4 + 0.6;
+        let ring_r = body.visual_radius * 1.8;
+        let ring_alpha = if body.is_sun { 0.08 } else { 0.12 } * flicker;
+        let ring_color = if body.is_sun {
+            Color::linear_rgba(1.0, 0.7, 0.2, ring_alpha)
+        } else {
+            Color::linear_rgba(0.3, 0.5, 0.8, ring_alpha)
+        };
+        let ring_segs = 24;
+        for i in 0..ring_segs {
+            let a0 = i as f32 / ring_segs as f32 * std::f32::consts::TAU;
+            let a1 = (i + 1) as f32 / ring_segs as f32 * std::f32::consts::TAU;
+            gizmos.line(
+                Vec3::new(pos[0] + ring_r * a0.cos(), pos[1], pos[2] + ring_r * a0.sin()),
+                Vec3::new(pos[0] + ring_r * a1.cos(), pos[1], pos[2] + ring_r * a1.sin()),
+                ring_color,
+            );
         }
     }
 }
