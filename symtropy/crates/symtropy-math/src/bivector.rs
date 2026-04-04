@@ -97,6 +97,18 @@ impl<const D: usize> Bivector<D> {
         bv
     }
 
+    /// Returns true if all components are finite (not NaN or infinite).
+    #[inline]
+    pub fn is_finite(&self) -> bool {
+        let n = Self::num_components();
+        for i in 0..n {
+            if !self.components[i].is_finite() {
+                return false;
+            }
+        }
+        true
+    }
+
     /// Squared norm.
     #[inline]
     pub fn norm_squared(&self) -> f64 {

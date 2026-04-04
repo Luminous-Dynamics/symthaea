@@ -21,6 +21,16 @@ pub fn integrate<const D: usize>(body: &mut RigidBody<D>, gravity: &SVector<f64,
         return;
     }
 
+    // --- NaN/Inf guards on inputs ---
+    // Sanitize force/torque accumulators: replace non-finite values with zero
+    // to prevent NaN propagation from bad external forces.
+    if !body.force_accumulator.iter().all(|v| v.is_finite()) {
+        body.force_accumulator = SVector::zeros();
+    }
+    if !body.torque_accumulator.is_finite() {
+        body.torque_accumulator = Bivector::zero();
+    }
+
     // --- Linear dynamics ---
 
     // Acceleration = F/m + gravity
@@ -75,6 +85,23 @@ pub fn integrate<const D: usize>(body: &mut RigidBody<D>, gravity: &SVector<f64,
         let delta_angle = ang_speed * dt;
         let delta_rotation = Rotor::from_plane_angle(&body.angular_velocity, delta_angle);
         body.transform.rotation = delta_rotation.compose(&body.transform.rotation);
+    }
+
+    // --- Post-integration NaN/Inf assertions ---
+    // If any state became non-finite despite clamping, zero the offending values
+    // rather than propagating corruption through the simulation.
+    if !body.linear_velocity.iter().all(|v| v.is_finite()) {
+        debug_assert!(false, "NaN/Inf detected in linear_velocity after integration");
+        body.linear_velocity = SVector::zeros();
+    }
+    if !body.angular_velocity.is_finite() {
+        debug_assert!(false, "NaN/Inf detected in angular_velocity after integration");
+        body.angular_velocity = Bivector::zero();
+    }
+    if !body.transform.translation.0.iter().all(|v| v.is_finite()) {
+        debug_assert!(false, "NaN/Inf detected in position after integration");
+        // Don't zero position — that would teleport. Just freeze velocity.
+        body.linear_velocity = SVector::zeros();
     }
 
     // Clear accumulators for next frame
@@ -256,5 +283,41 @@ mod tests {
         let gravity = SVector::from([0.0, -100.0, 0.0]);
         integrate(&mut body, &gravity, 1.0);
         assert!((body.transform.translation.coord(0) - 5.0).abs() < 1e-12);
+    }
+
+    #[test]
+    fn nan_force_is_sanitized() {
+        let mut body = RigidBody::<3>::dynamic_sphere(
+            BodyHandle(0),
+            Point::new([1.0, 2.0, 3.0]),
+            1.0,
+            1.0,
+        );
+        // Apply a NaN force — should be zeroed, not propagated
+        body.apply_force(SVector::from([f64::NAN, 0.0, 0.0]));
+        let gravity = SVector::zeros();
+        integrate(&mut body, &gravity, 0.01);
+
+        // Position and velocity must remain finite
+        assert!(body.linear_velocity.iter().all(|v| v.is_finite()),
+            "NaN force propagated to velocity");
+        assert!(body.transform.translation.0.iter().all(|v| v.is_finite()),
+            "NaN force propagated to position");
+    }
+
+    #[test]
+    fn inf_force_is_sanitized() {
+        let mut body = RigidBody::<3>::dynamic_sphere(
+            BodyHandle(0),
+            Point::origin(),
+            1.0,
+            1.0,
+        );
+        body.apply_force(SVector::from([f64::INFINITY, 0.0, 0.0]));
+        let gravity = SVector::zeros();
+        integrate(&mut body, &gravity, 0.01);
+
+        assert!(body.linear_velocity.iter().all(|v| v.is_finite()),
+            "Inf force propagated to velocity");
     }
 }
