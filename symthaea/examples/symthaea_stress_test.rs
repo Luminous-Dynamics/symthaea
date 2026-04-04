@@ -367,7 +367,9 @@ fn train_controller(
     println!("  Training {} episodes (Stand, seed={})...", episodes, seed);
     let start = std::time::Instant::now();
     let mut trainer = HumanoidTrainer::new(config.clone());
-    let metrics = trainer.train();
+
+    // Use train_and_extract() to get the ACTUALLY TRAINED controller + encoder
+    let (metrics, controller, encoder) = trainer.train_and_extract();
     let elapsed = start.elapsed();
 
     if let Some(last) = metrics.last() {
@@ -375,13 +377,7 @@ fn train_controller(
             elapsed.as_secs_f64(), last.avg_standing_reward, last.avg_uprightness);
     }
 
-    // Reconstruct controller and encoder from same genesis
     let genesis = GenesisSeed::from_phrase(seed);
-    let encoder = symthaea_humanoid::encoder::HumanoidHdcEncoder::new_predictive(
-        &genesis, config.num_levels, config.morphology,
-    );
-    let controller = symthaea_humanoid::controller::HumanoidController::new(&genesis, &config);
-
     (controller, encoder, genesis)
 }
 

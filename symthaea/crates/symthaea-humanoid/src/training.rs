@@ -737,6 +737,73 @@ impl HumanoidTrainer {
         all_metrics
     }
 
+    /// Train and return the trained controller + encoder (for evaluation).
+    ///
+    /// Unlike `train()`, this returns the actual trained weights — not a fresh genesis.
+    /// Uses the same training loop as `train()` but preserves the controller/encoder.
+    pub fn train_and_extract(
+        &mut self,
+    ) -> (Vec<EpisodeMetrics>, HumanoidController, HumanoidHdcEncoder) {
+        self.curriculum_state = CurriculumState::new();
+
+        let genesis = self.genesis.clone();
+        let num_levels = self.config.num_levels;
+        let mut encoder = HumanoidHdcEncoder::new_predictive(
+            &genesis, num_levels, self.config.morphology,
+        );
+        let mut controller = self
+            .initial_controller
+            .take()
+            .unwrap_or_else(|| HumanoidController::new(&genesis, &self.config));
+        let fep_config = HumanoidFepConfig {
+            exploration_decay_rate: self.config.exploration_decay_rate,
+            ..HumanoidFepConfig::default()
+        };
+        let mut fep_agent = ActiveInferenceHumanoidAgent::new(fep_config, self.config.task);
+
+        // Warmup
+        let warmup_samples: Vec<(ContinuousHV, HumanoidCommand)> = (0..20)
+            .map(|i| {
+                let mut state = HumanoidState::standing();
+                let offset = (i as f64 - 10.0) * 0.005;
+                state.joint_angles[0] += offset;
+                let hv = encoder.encode(&state);
+                let target = pd_standing_baseline(&state, &self.pd_gains);
+                (hv, target)
+            })
+            .collect();
+        controller.warmup(&warmup_samples, 100, self.config.learning_rate * 10.0);
+        encoder.reset();
+
+        let mut all_metrics = Vec::with_capacity(self.config.num_episodes);
+        let mut best_reward = f64::NEG_INFINITY;
+        let mut best_weights: Option<(Vec<f32>, Vec<f32>)> = None;
+        let mut consecutive_low = 0u32;
+
+        for ep in 0..self.config.num_episodes {
+            let metrics = self.run_episode(&mut encoder, &mut controller, &mut fep_agent, ep);
+
+            if metrics.avg_episode_reward > best_reward {
+                best_reward = metrics.avg_episode_reward;
+                best_weights = Some(controller.output_projection());
+                consecutive_low = 0;
+            } else {
+                consecutive_low += 1;
+                if consecutive_low >= 3 && best_reward > 0.5 {
+                    if let Some((ref w, ref b)) = best_weights {
+                        controller.set_output_projection(w, b);
+                    }
+                    consecutive_low = 0;
+                }
+            }
+
+            all_metrics.push(metrics);
+        }
+
+        self.metrics = all_metrics.clone();
+        (all_metrics, controller, encoder)
+    }
+
     /// Run training with CSV telemetry output.
     pub fn train_with_telemetry(&mut self, output_dir: &str) -> Vec<EpisodeMetrics> {
         self.config.collect_telemetry = true;
