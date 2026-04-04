@@ -143,6 +143,168 @@ pub fn free_energy_gradient_phi<const D: usize>(
     }
 }
 
+/// Learnable FEP gradient weights per agent.
+///
+/// Replaces hardcoded constants with per-agent adaptive weights, updated by
+/// a reward-modulated plasticity rule (NOT Hebbian — this uses global reward,
+/// not local pre/post correlations).
+///
+/// Initialize with `default()` for backward-compatible values matching the
+/// current hardcoded constants.
+#[derive(Debug, Clone)]
+pub struct LearnedFepWeights {
+    /// Weight for cooperation/social drive (default: 2.0).
+    pub cooperation: f64,
+    /// Weight for energy well attraction (default: 4.0).
+    pub energy_well: f64,
+    /// Weight for danger avoidance (default: 3.0).
+    pub danger: f64,
+    /// Weight for exploration when energy high (default: 0.3).
+    pub exploration: f64,
+    /// Learning rate for reward-modulated updates.
+    pub learning_rate: f64,
+    /// Momentum accumulator per weight.
+    pub momentum: [f64; 4],
+    /// Previous energy fraction (for reward computation).
+    pub prev_energy: f64,
+}
+
+impl Default for LearnedFepWeights {
+    fn default() -> Self {
+        Self {
+            cooperation: 2.0,
+            energy_well: 4.0,
+            danger: 3.0,
+            exploration: 0.3,
+            learning_rate: 0.01,
+            momentum: [0.0; 4],
+            prev_energy: 1.0,
+        }
+    }
+}
+
+impl LearnedFepWeights {
+    /// Update weights via reward-modulated plasticity.
+    ///
+    /// Reward = current_energy - prev_energy (positive = gained energy).
+    /// Each weight is nudged toward values that produced positive outcomes.
+    /// Uses momentum (0.9) for stability.
+    ///
+    /// `contributions`: [cooperation_contrib, well_contrib, danger_contrib, explore_contrib]
+    /// — the raw magnitude each component contributed to the last gradient.
+    pub fn update(&mut self, current_energy: f64, contributions: [f64; 4]) {
+        let reward = current_energy - self.prev_energy;
+        self.prev_energy = current_energy;
+
+        if reward.abs() < 1e-6 { return; } // no signal
+
+        let lr = self.learning_rate;
+        let beta = 0.9; // momentum coefficient
+        // Update each weight with reward-modulated plasticity
+        let grads: [f64; 4] = std::array::from_fn(|i| {
+            let grad = reward * contributions[i];
+            self.momentum[i] = beta * self.momentum[i] + (1.0 - beta) * grad;
+            lr * self.momentum[i]
+        });
+        self.cooperation = (self.cooperation + grads[0]).clamp(0.01, 20.0);
+        self.energy_well = (self.energy_well + grads[1]).clamp(0.01, 20.0);
+        self.danger = (self.danger + grads[2]).clamp(0.01, 20.0);
+        self.exploration = (self.exploration + grads[3]).clamp(0.01, 20.0);
+    }
+
+    /// Summary of learned weight drift from defaults.
+    pub fn drift_from_default(&self) -> f64 {
+        let d = Self::default();
+        (self.cooperation - d.cooperation).abs()
+            + (self.energy_well - d.energy_well).abs()
+            + (self.danger - d.danger).abs()
+            + (self.exploration - d.exploration).abs()
+    }
+}
+
+/// Extended FEP gradient with learnable weights.
+///
+/// Same as `free_energy_gradient_phi` but uses per-agent `LearnedFepWeights`
+/// instead of hardcoded constants. Returns both the gradient direction and
+/// the per-component contribution magnitudes (for weight update).
+pub fn free_energy_gradient_learned<const D: usize>(
+    position: &SVector<f64, D>,
+    energy_fraction: f64,
+    phi: Option<f64>,
+    harmony: &[f64; 8],
+    nearby_agents: &[(SVector<f64, D>, [f64; 8])],
+    energy_wells: &[(SVector<f64, D>, f64)],
+    danger_source: Option<&SVector<f64, D>>,
+    danger_level: f64,
+    weights: &LearnedFepWeights,
+) -> (SVector<f64, D>, [f64; 4]) {
+    let mut gradient: SVector<f64, D> = SVector::zeros();
+    let phi_val = phi.unwrap_or(0.5);
+    let mut contributions = [0.0f64; 4];
+
+    // === 1. Seek resonant partners (cooperation) ===
+    let cooperation_urgency = (1.0 - energy_fraction) * (0.5 + phi_val);
+    let mut coop_grad: SVector<f64, D> = SVector::zeros();
+    for (agent_pos, agent_harmony) in nearby_agents {
+        let delta = agent_pos - position;
+        let dist = delta.norm();
+        if dist < 1.0 || dist > 100.0 { continue; }
+        let resonance = HarmonyField::<D>::resonance(harmony, agent_harmony);
+        let effective_resonance = resonance * (0.3 + phi_val * 0.7);
+        if effective_resonance > 0.15 {
+            let attraction = effective_resonance * cooperation_urgency;
+            coop_grad += delta / dist * attraction;
+        }
+    }
+    contributions[0] = coop_grad.norm();
+    gradient += coop_grad * weights.cooperation;
+
+    // === 2. Seek energy wells ===
+    let energy_urgency = if energy_fraction < 0.5 {
+        (0.5 - energy_fraction) * 4.0
+    } else { 0.0 };
+    let mut well_grad: SVector<f64, D> = SVector::zeros();
+    for (well_pos, well_remaining) in energy_wells {
+        if *well_remaining < 0.01 { continue; }
+        let delta = well_pos - position;
+        let dist = delta.norm();
+        if dist < 1.0 || dist > 200.0 { continue; }
+        well_grad += delta / dist * (energy_urgency * *well_remaining);
+    }
+    contributions[1] = well_grad.norm();
+    gradient += well_grad * weights.energy_well;
+
+    // === 3. Flee danger ===
+    let danger_threshold = 0.5 - phi_val * 0.4;
+    let mut danger_grad: SVector<f64, D> = SVector::zeros();
+    if let Some(danger_pos) = danger_source {
+        if danger_level > danger_threshold {
+            let delta = position - danger_pos;
+            let dist = delta.norm();
+            if dist > 1.0 && dist < 300.0 {
+                danger_grad += delta / dist * danger_level;
+            }
+        }
+    }
+    contributions[2] = danger_grad.norm();
+    gradient += danger_grad * weights.danger;
+
+    // === 4. Exploration ===
+    let mut explore_grad: SVector<f64, D> = SVector::zeros();
+    if energy_fraction > 0.7 && gradient.norm() < 0.5 {
+        let phase = position[0] * 0.1 + position[1 % D] * 0.07;
+        explore_grad[0] = phase.sin();
+        if D > 1 { explore_grad[1] = phase.cos(); }
+    }
+    contributions[3] = explore_grad.norm();
+    gradient += explore_grad * weights.exploration;
+
+    // Normalize
+    let norm = gradient.norm();
+    let dir = if norm > 1e-6 { gradient / norm } else { SVector::zeros() };
+    (dir, contributions)
+}
+
 /// Compute a scalar "free energy" estimate at a position.
 ///
 /// Lower is better. Agents should move to minimize this.

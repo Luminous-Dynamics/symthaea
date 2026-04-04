@@ -126,6 +126,43 @@ pub fn cohens_d(a: &[f64], b: &[f64]) -> f64 {
     (mean_a - mean_b) / pooled_std
 }
 
+/// Holm-Bonferroni correction for multiple comparisons.
+///
+/// Less conservative than Bonferroni but still controls family-wise error rate.
+/// Takes a slice of (label, p-value) pairs and returns adjusted p-values with
+/// significance flags.
+///
+/// Algorithm: sort p-values ascending, reject p_i if p_i × (m - i) < alpha,
+/// where m = number of tests and i = rank (0-indexed).
+///
+/// Ref: Holm, S. (1979). Scandinavian Journal of Statistics, 6(2), 65-70.
+pub fn holm_bonferroni<'a>(tests: &[(&'a str, f64)], alpha: f64) -> Vec<(&'a str, f64, bool)> {
+    let m = tests.len();
+    if m == 0 { return vec![]; }
+
+    // Sort by p-value (ascending), preserving original labels
+    let mut indexed: Vec<(usize, &str, f64)> = tests.iter().enumerate()
+        .map(|(i, (label, p))| (i, *label, *p)).collect();
+    indexed.sort_by(|a, b| a.2.partial_cmp(&b.2).unwrap_or(std::cmp::Ordering::Equal));
+
+    // Step-down: adjust p-values and determine significance
+    let mut results = vec![("", 0.0, false); m];
+    let mut still_rejecting = true;
+
+    for (rank, &(orig_idx, label, p)) in indexed.iter().enumerate() {
+        let correction_factor = (m - rank) as f64;
+        let adjusted_p = (p * correction_factor).min(1.0);
+
+        // Once we fail to reject, all subsequent tests also fail
+        let significant = still_rejecting && adjusted_p < alpha;
+        if !significant { still_rejecting = false; }
+
+        results[orig_idx] = (label, adjusted_p, significant);
+    }
+
+    results
+}
+
 /// Standard normal CDF approximation (Abramowitz & Stegun 26.2.17).
 fn normal_cdf(x: f64) -> f64 {
     let t = 1.0 / (1.0 + 0.2316419 * x.abs());
@@ -223,6 +260,53 @@ mod tests {
         let b = vec![5.0, 5.0, 5.0, 5.0];
         let d = cohens_d(&a, &b);
         assert!((d - 0.0).abs() < 1e-10, "Identical means should give d=0: {d}");
+    }
+
+    #[test]
+    fn holm_bonferroni_basic() {
+        let tests = vec![
+            ("A", 0.01),
+            ("B", 0.04),
+            ("C", 0.03),
+        ];
+        let results = holm_bonferroni(&tests, 0.05);
+        // Sorted: A(0.01), C(0.03), B(0.04)
+        // A: 0.01 × 3 = 0.03 < 0.05 → sig
+        // C: 0.03 × 2 = 0.06 ≥ 0.05 → not sig
+        // B: 0.04 × 1 = 0.04 < 0.05 → but C failed, so B also fails (step-down)
+        assert!(results[0].2, "A should be significant");
+        assert!(!results[1].2, "B should NOT be significant (step-down)");
+        assert!(!results[2].2, "C should NOT be significant");
+    }
+
+    #[test]
+    fn holm_bonferroni_all_significant() {
+        let tests = vec![("A", 0.001), ("B", 0.002), ("C", 0.003)];
+        let results = holm_bonferroni(&tests, 0.05);
+        // A: 0.001×3=0.003, B: 0.002×2=0.004, C: 0.003×1=0.003
+        assert!(results.iter().all(|r| r.2), "All should be significant");
+    }
+
+    #[test]
+    fn holm_bonferroni_none_significant() {
+        let tests = vec![("A", 0.5), ("B", 0.6)];
+        let results = holm_bonferroni(&tests, 0.05);
+        assert!(results.iter().all(|r| !r.2), "None should be significant");
+    }
+
+    #[test]
+    fn holm_bonferroni_preserves_order() {
+        let tests = vec![("X", 0.04), ("Y", 0.01), ("Z", 0.03)];
+        let results = holm_bonferroni(&tests, 0.05);
+        assert_eq!(results[0].0, "X");
+        assert_eq!(results[1].0, "Y");
+        assert_eq!(results[2].0, "Z");
+    }
+
+    #[test]
+    fn holm_bonferroni_empty() {
+        let results = holm_bonferroni(&[], 0.05);
+        assert!(results.is_empty());
     }
 
     #[test]
