@@ -584,12 +584,12 @@ pub fn setup_globe_view(
     for stress in &stress_data {
         let pos = geo::lat_lon_to_xyz(stress.lat, stress.lon, 1.025);
         let c = sol_atlas_core::energy_trading::stress_color(stress.allostatic_load);
-        let size = 0.018 + stress.allostatic_load * 0.015;
+        let size = 0.022 + stress.allostatic_load * 0.018; // larger than event dots
 
         // Emissive city indicator — visible at ALL zoom levels (no LOD tag)
         let mat = materials.add(StandardMaterial {
             base_color: Color::linear_rgba(c[0], c[1], c[2], 0.8),
-            emissive: LinearRgba::new(c[0] * 0.5, c[1] * 0.5, c[2] * 0.5, 1.0),
+            emissive: LinearRgba::new(c[0] * 0.8, c[1] * 0.8, c[2] * 0.8, 1.0), // brighter glow
             unlit: true,
             alpha_mode: AlphaMode::Blend,
             ..default()
@@ -645,20 +645,26 @@ pub fn setup_globe_view(
     // Earthquakes, fires, storms, volcanoes from USGS/NASA/NOAA.
     let event_mesh = meshes.add(Sphere::new(1.0).mesh().uv(6, 6));
     for event in &data.natural_events {
+        // Filter: only show significant events (M4+ quakes, high-confidence fires)
+        match event.event_type {
+            sol_atlas_core::types::NaturalEventType::Earthquake if event.magnitude < 4.0 => continue,
+            _ => {}
+        }
         let pos = geo::lat_lon_to_xyz(event.lat, event.lon, 1.015);
         let (c, size, layer) = match event.event_type {
             sol_atlas_core::types::NaturalEventType::Earthquake => {
-                let s = 0.006 + (event.magnitude as f32 / 8.0).min(1.0) * 0.012;
-                ([0.9, 0.15, 0.1], s, Layer::Earthquakes)
+                // M4=tiny, M7=large
+                let s = 0.004 + ((event.magnitude as f32 - 4.0) / 4.0).clamp(0.0, 1.0) * 0.008;
+                ([0.85, 0.12, 0.08], s, Layer::Earthquakes)
             }
             sol_atlas_core::types::NaturalEventType::Fire => {
-                ([0.95, 0.5, 0.1], 0.005, Layer::Fires)
+                ([0.9, 0.45, 0.1], 0.003, Layer::Fires) // smaller
             }
             sol_atlas_core::types::NaturalEventType::Storm => {
-                ([0.1, 0.7, 0.9], 0.008, Layer::Storms)
+                ([0.1, 0.65, 0.85], 0.006, Layer::Storms)
             }
             sol_atlas_core::types::NaturalEventType::Volcano => {
-                ([0.9, 0.3, 0.05], 0.007, Layer::Volcanoes)
+                ([0.85, 0.25, 0.05], 0.005, Layer::Volcanoes)
             }
         };
         let mat = materials.add(StandardMaterial {

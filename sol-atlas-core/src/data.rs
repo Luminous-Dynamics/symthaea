@@ -228,3 +228,72 @@ fn parse_natural_events(
     events.extend(parse_geojson(volcanoes, NaturalEventType::Volcano));
     events
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_geojson_earthquakes() {
+        let json = r#"{
+            "type": "FeatureCollection",
+            "features": [
+                {
+                    "type": "Feature",
+                    "properties": {"magnitude": 5.1, "place": "Peru", "type": "earthquake"},
+                    "geometry": {"type": "Point", "coordinates": [-80.5, -5.2, 10]}
+                },
+                {
+                    "type": "Feature",
+                    "properties": {"magnitude": 3.2, "place": "Japan"},
+                    "geometry": {"type": "Point", "coordinates": [139.7, 35.7, 5]}
+                }
+            ]
+        }"#;
+        let events = parse_natural_events(json, "[]", "[]", "[]");
+        assert_eq!(events.len(), 2);
+        assert_eq!(events[0].event_type, NaturalEventType::Earthquake);
+        assert!((events[0].lat - (-5.2)).abs() < 0.01);
+        assert!((events[0].magnitude - 5.1).abs() < 0.01);
+        assert_eq!(events[0].name, "Peru");
+    }
+
+    #[test]
+    fn parse_geojson_fires() {
+        let json = r#"{
+            "type": "FeatureCollection",
+            "features": [
+                {
+                    "type": "Feature",
+                    "properties": {"brightness": 387.0, "confidence": 94, "type": "fire"},
+                    "geometry": {"type": "Point", "coordinates": [25.0, -30.0]}
+                }
+            ]
+        }"#;
+        let events = parse_natural_events("[]", json, "[]", "[]");
+        assert_eq!(events.len(), 1);
+        assert_eq!(events[0].event_type, NaturalEventType::Fire);
+        assert!((events[0].magnitude - 3.87).abs() < 0.01); // brightness/100
+    }
+
+    #[test]
+    fn parse_geojson_empty() {
+        let events = parse_natural_events("[]", "[]", "[]", "[]");
+        assert!(events.is_empty());
+    }
+
+    #[test]
+    fn parse_geojson_invalid() {
+        let events = parse_natural_events("not json", "{}", "null", "");
+        assert!(events.is_empty());
+    }
+
+    #[test]
+    fn parse_shipping_lanes_roundtrip() {
+        let json = "[[[-80.0, 25.0], [-10.0, 50.0]], [[100.0, -5.0], [120.0, 10.0]]]";
+        let lanes = parse_shipping_lanes(json);
+        assert_eq!(lanes.len(), 2);
+        assert_eq!(lanes[0].len(), 2);
+        assert!((lanes[0][0][0] - (-80.0)).abs() < 0.01);
+    }
+}
