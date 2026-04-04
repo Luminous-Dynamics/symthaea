@@ -124,3 +124,99 @@ pub struct LEMClassification {
     pub normative: u8,
     pub materiality: u8,
 }
+
+// ── Verification ──
+
+/// Verification record.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Verification {
+    pub verifier: String,
+    pub timestamp: String,
+    pub evidence: String,
+    pub methodology_match: String,
+    pub outcome: String,
+}
+
+// ── Trust ──
+
+/// Trust score for a participant.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TrustScore {
+    pub participant: String,
+    pub score: f64,
+    pub confidence: f64,
+    pub interaction_count: usize,
+    pub expertise_domains: Vec<String>,
+}
+
+// ── Reproducibility ──
+
+/// Replication attempt.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ReplicationAttempt {
+    pub claim_id: String,
+    pub replicator: String,
+    pub status: String,
+    pub outcome: String,
+    pub methodology_match: String,
+    pub sample_size: Option<usize>,
+    pub timestamp: String,
+}
+
+/// Reproducibility stats.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ReproducibilityStats {
+    pub claim_id: String,
+    pub score: f64,
+    pub confidence: f64,
+    pub total_attempts: usize,
+    pub successful: usize,
+    pub failed: usize,
+}
+
+// ── Prediction Markets ──
+
+/// Prediction market for a claim.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PredictionMarket {
+    pub claim_id: String,
+    pub question: String,
+    pub current_probability: f64,
+    pub total_staked: f64,
+    pub positions: usize,
+    pub status: String,
+    pub resolution_method: String,
+}
+
+// ── Citations ──
+
+/// Citation link between claims.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Citation {
+    pub from_claim: String,
+    pub to_claim: String,
+    pub citation_type: String,
+    pub strength: f64,
+}
+
+/// Citation metrics for a claim.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CitationMetrics {
+    pub claim_id: String,
+    pub pagerank: f64,
+    pub h_index: usize,
+    pub citation_count: usize,
+    pub is_foundational: bool,
+}
+
+// ── Consensus ──
+
+/// Consensus state for a claim over time.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ConsensusSnapshot {
+    pub timestamp: String,
+    pub support_ratio: f64,
+    pub verification_count: usize,
+    pub state: String,
+    pub trend: String,
+}

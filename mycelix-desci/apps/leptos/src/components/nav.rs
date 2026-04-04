@@ -12,11 +12,13 @@ pub fn NavBar() -> impl IntoView {
             <a href="/" class="logo">"DeSci"</a>
             <div class="nav-links">
                 <a href="/">"Dashboard"</a>
-                <a href="/browse">"Browse"</a>
-                <a href="/submit">"Submit"</a>
+                <a href="/browse">"Claims"</a>
                 <a href="/discovery">"Discovery"</a>
-                <a href="/trust">"Trust"</a>
-                <a href="/about">"About"</a>
+                <a href="/markets">"Markets"</a>
+                <a href="/reproducibility">"Reproducibility"</a>
+                <a href="/citations">"Citations"</a>
+                <a href="/consensus">"Consensus"</a>
+                <a href="/submit">"Submit"</a>
             </div>
         </nav>
     }

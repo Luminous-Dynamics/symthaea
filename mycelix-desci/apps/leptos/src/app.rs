@@ -22,6 +22,13 @@ pub fn App() -> impl IntoView {
                 <Route path=path!("/submit") view=SubmitPage />
                 <Route path=path!("/discovery") view=DiscoveryPage />
                 <Route path=path!("/about") view=AboutPage />
+                <Route path=path!("/claims/:id") view=ClaimDetailPage />
+                <Route path=path!("/claims/:id/verify") view=VerifyPage />
+                <Route path=path!("/trust/:id") view=TrustProfilePage />
+                <Route path=path!("/reproducibility") view=ReproducibilityPage />
+                <Route path=path!("/markets") view=MarketsPage />
+                <Route path=path!("/citations") view=CitationsPage />
+                <Route path=path!("/consensus") view=ConsensusPage />
             </Routes>
         </Router>
     }
