@@ -359,9 +359,9 @@ impl<const D: usize> Default for ConsciousnessField<D> {
 
 /// Implementation of PhysicsCallback for ConsciousnessField.
 ///
-/// This is the critical bridge that makes consciousness a REAL physics force.
+/// This is the critical bridge: Φ gates force authority and energy budgets.
 /// The physics world calls these methods during collision resolution,
-/// and consciousness modulates the physical outcome.
+/// and the integration metric modulates the physical outcome.
 impl<const D: usize> PhysicsCallback<D> for ConsciousnessField<D> {
     fn modulate_force(&self, body: BodyHandle, force: &SVector<f64, D>) -> SVector<f64, D> {
         let gain = self

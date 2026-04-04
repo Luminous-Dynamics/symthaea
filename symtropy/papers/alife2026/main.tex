@@ -272,6 +272,8 @@ The LTC network's $\Phi$ output crosses an activation threshold around tick 1000
 
 $\Phi$ is a softmin bottleneck approximation, not full IIT partition analysis. The FEP gradient uses handcrafted heuristics, not learned policies. Agents do not learn or adapt strategies. The J/$\Phi$ metric has high variance across seeds (95\% CI spans $\pm 130$\% of mean at 10 seeds). The 16,384D HDC state vector substrate (Section~2.5 of supplementary) produces dynamic $\Phi$ but requires $\sim$100 minutes per 10-seed experiment.
 
+We use ``consciousness'' strictly as a formal integration metric ($\Phi$), following IIT convention~\citep{tononi2004}. We make no claims about subjective experience, qualia, or phenomenal consciousness in our agents. Where findings reference ``conscious'' vs ``unconscious'' conditions, this denotes $\Phi > 0$ vs $\Phi = 0$---a numerical distinction, not an ontological one.
+
 \subsection{Implications}
 
 Our metric independence result is a universality finding analogous to Prigogine's dissipative structures \citep{prigogine1977} and Reynolds' flocking \citep{reynolds1987}: the macro-pattern depends on the thermodynamic cost structure, not the internal state metric. The conscious/unconscious finding adds nuance: having \emph{some} nonzero integration variable amplifies social behavior, but which theory generates it is irrelevant.
@@ -299,7 +301,7 @@ The Symtropy engine and all experiments are open-source. Results are reproducibl
 \centering
 \begin{minipage}{0.45\textwidth}
 \includegraphics[width=\textwidth]{fig2_curvature.pdf}
-\caption{Consciousness bends space. Trajectory deflection scales linearly with curvature $\kappa$ ($p=0.009$, $d=-35.5$).}
+\caption{Integration-parameterized curvature deflects trajectories. Trajectory deflection scales linearly with curvature $\kappa$ ($p=0.009$, $d=-35.5$).}
 \label{fig:curvature_full}
 \end{minipage}\hfill
 \begin{minipage}{0.45\textwidth}

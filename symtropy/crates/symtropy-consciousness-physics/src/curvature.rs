@@ -54,7 +54,7 @@ use nalgebra::SVector;
 pub const MAX_GEODESIC_ACCEL: f64 = 50.0;
 
 /// Default curvature coupling constant.
-/// Controls how strongly consciousness curves gamespace.
+/// Controls how strongly harmony field energy parameterizes conformal curvature.
 /// At 0.01, a harmony field energy of 10.0 produces σ ≈ 0.1 (subtle bending).
 pub const DEFAULT_CURVATURE_SCALE: f64 = 0.01;
 

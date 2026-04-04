@@ -49,7 +49,7 @@ const HDC_DIM: usize = 16_384;
 /// The state vector's norm serves as an integration metric (Φ) — higher
 /// norm indicates more active information integration across network layers.
 pub struct HdcConsciousnessContext {
-    /// Current thought hypervector (output of encoder network).
+    /// Current state hypervector (output of encoder network; not a thought in the phenomenal sense).
     pub thought_hv: ContinuousHV,
     /// Multi-layer encoder network (7 → 8 → 4 neurons).
     encoder: HdcLtcUnifiedNetwork,
@@ -62,8 +62,8 @@ pub struct HdcConsciousnessContext {
 impl HdcConsciousnessContext {
     /// Create a new context with deterministic random basis vectors.
     ///
-    /// Different seeds produce different "cognitive personalities" — each NPC
-    /// develops unique thought patterns from the same inputs.
+    /// Different seeds produce different integration profiles — each agent
+    /// develops unique state-vector trajectories from the same inputs.
     pub fn new(seed: u64) -> Self {
         // Generate basis HVs for consciousness components.
         let consciousness_basis: Vec<ContinuousHV> = (0..NUM_COMPONENTS)
@@ -71,7 +71,7 @@ impl HdcConsciousnessContext {
             .collect();
 
         // Generate harmony basis as CORRELATED perturbations of consciousness basis.
-        // This ensures thought vectors (in consciousness_basis span) have nonzero
+        // This ensures HDC state vectors (in consciousness_basis span) have nonzero
         // projection onto harmony space — fixing the Phi=0 readout problem.
         //
         // Each harmony basis[i] = blend(consciousness_basis[i % 7], noise, 0.7/0.3).
@@ -131,7 +131,7 @@ impl HdcConsciousnessContext {
         self.thought_hv = self.encoder.output();
     }
 
-    /// Extract integration metric (Φ) from the HDC state vector.
+    /// Extract integration metric (Φ) from HDC state vector norm.
     ///
     /// Phi measures how much the LTC network has INTEGRATED its inputs into
     /// a coherent internal representation. This is computed as:
@@ -142,25 +142,25 @@ impl HdcConsciousnessContext {
     ///    Low similarity = inputs are fragmented/not integrated.
     ///
     /// 2. **Complexity** = thought_hv.norm() / 2.0 (bounded to [0, 1])
-    ///    How rich/active the cognitive state is. Zero norm = no thought.
+    ///    How rich/active the state vector is. Zero norm = no activity.
     ///
     /// Phi = integration × complexity, clamped to [0, 1].
-    /// The norm scale at which thought_hv is "maximally conscious".
+    /// The norm scale at which thought_hv reaches maximum integration.
     /// Empirically determined: after 50 ticks of strong input, norm ≈ 0.02-0.05.
     /// Scale factor maps this range to [0, 1].
     const PHI_NORM_SCALE: f32 = 30.0;
 
     pub fn phi_from_thought(&self, _harmony: &[f64; NUM_HARMONIES]) -> f64 {
-        // Emergent Phi = normalized thought vector activity.
+        // Emergent Phi = normalized HDC state vector activity.
         //
-        // The LTC network's output norm reflects how actively the cognitive
-        // system is processing: high norm = strong integration of inputs,
-        // low norm = quiescent/collapsed state. This is a direct measure
-        // of IIT's "integrated information" — the network must bind inputs
+        // The LTC network's output norm reflects how actively the
+        // system is integrating: high norm = strong integration of inputs,
+        // low norm = quiescent/collapsed state. This is a proxy for
+        // IIT's "integrated information" — the network must bind inputs
         // through its weights to produce a high-norm output.
         //
         // Norm naturally varies with input strength, nearby agent count,
-        // energy level, and danger — creating genuine consciousness dynamics.
+        // energy level, and danger — creating LTC-driven state dynamics.
         let norm = self.thought_hv.norm();
         let phi = (norm * Self::PHI_NORM_SCALE).min(1.0) as f64;
         phi.clamp(0.0, 1.0)
@@ -172,10 +172,10 @@ impl HdcConsciousnessContext {
     }
 }
 
-/// Derive consciousness inputs dynamically from physics/game state (HDC-D).
+/// Derive integration-metric inputs dynamically from physics/game state (HDC-D).
 ///
-/// Closes the consciousness-physics loop: physics state drives consciousness
-/// inputs, consciousness (via HDC thought vectors) drives motor authority,
+/// Closes the integration-physics loop: physics state drives integration
+/// inputs, integration metrics (via HDC state vectors) drive motor authority,
 /// motor authority drives physics state.
 ///
 /// Replaces the hardcoded `ConsciousnessInputs { phi: 0.5, ... }` with
@@ -200,7 +200,7 @@ pub fn inputs_from_state(
     ]
 }
 
-/// Compute inter-agent HDC vector similarity.
+/// Compute HDC vector similarity between agents.
 ///
 /// Returns cosine similarity between two state vectors.
 /// Complements scalar harmony resonance with high-dimensional state alignment.
@@ -251,7 +251,7 @@ mod tests {
             ctx_b.step(&inputs, &harmony, 0.016);
         }
 
-        // Different seeds should produce different thought vectors.
+        // Different seeds should produce different HDC state vectors.
         let sim = ctx_a.thought_hv.similarity(&ctx_b.thought_hv);
         assert!(
             sim < 0.9,

@@ -1,6 +1,6 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-//! Consciousness Sandbox: demonstrates the full consciousness-physics loop.
+//! Integration Sandbox: demonstrates the full Φ-coupled physics loop.
 //!
 //! 10 agents with consciousness in a 3D world:
 //! - Agents move, consume energy, collide

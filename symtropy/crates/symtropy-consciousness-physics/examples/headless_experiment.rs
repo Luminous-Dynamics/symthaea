@@ -1,6 +1,6 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-//! Headless experiment: full consciousness-physics simulation without rendering.
+//! Headless experiment: full integration-metric-coupled physics simulation without rendering.
 //!
 //! Tests the core hypothesis: does strict energy conservation produce
 //! emergent cooperation? Outputs CSV data for analysis.
