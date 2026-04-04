@@ -346,7 +346,7 @@ impl HumanoidTrainer {
         controller.reset();
 
         let initial_cmd = HumanoidCommand::zero();
-        let mut fep_result = fep_agent.step(physics.state(), &initial_cmd);
+        let mut fep_result = fep_agent.step_with_encoder_pe(physics.state(), &initial_cmd, None);
 
         // Accumulators
         let mut total_standing_reward = 0.0;
@@ -398,7 +398,7 @@ impl HumanoidTrainer {
         let gait_freq = match task {
             HumanoidTask::Walk => 1.2 + 0.6 * target_speed.min(1.0),
             HumanoidTask::Run => 2.0 + 0.3 * (target_speed - 1.0).clamp(0.0, 2.0),
-            HumanoidTask::Stand => 0.0,
+            HumanoidTask::Stand | HumanoidTask::Reach | HumanoidTask::Grasp => 0.0,
         };
 
         for step in 0..self.config.steps_per_episode {
@@ -419,6 +419,13 @@ impl HumanoidTrainer {
                     }
                     HumanoidTask::Run => {
                         pd_running_baseline(&state, &self.pd_gains, gait_phase, target_speed)
+                    }
+                    HumanoidTask::Reach => {
+                        pd_reaching_baseline(&state, &self.pd_gains, self.config.object_position, self.config.reach_hand)
+                    }
+                    HumanoidTask::Grasp => {
+                        let grasp_phase = (step as f64 / self.config.steps_per_episode as f64).min(1.0);
+                        pd_grasping_baseline(&state, &self.pd_gains, self.config.object_position, self.config.reach_hand, grasp_phase)
                     }
                 };
                 for i in 0..NUM_ACTUATORS {
@@ -509,6 +516,13 @@ impl HumanoidTrainer {
                     HumanoidTask::Run => {
                         pd_running_baseline(&state, &self.pd_gains, gait_phase, target_speed)
                     }
+                    HumanoidTask::Reach => {
+                        pd_reaching_baseline(&state, &self.pd_gains, self.config.object_position, self.config.reach_hand)
+                    }
+                    HumanoidTask::Grasp => {
+                        let gp = (step as f64 / self.config.steps_per_episode as f64).min(1.0);
+                        pd_grasping_baseline(&state, &self.pd_gains, self.config.object_position, self.config.reach_hand, gp)
+                    }
                 };
                 // Reward-modulated BPTT: scale gradient by standing_reward so the
                 // network learns more when upright (clear signal) and less when
@@ -550,7 +564,13 @@ impl HumanoidTrainer {
 
             // -- COGNITIVE TICK (every cognitive_interval steps, 10Hz) --
             if step % cognitive_interval == 0 {
-                fep_result = fep_agent.step(physics.state(), &command);
+                // Feed encoder PE if predictive layer is active
+                let enc_pe = if encoder.has_predictive_layer() {
+                    Some(encoder.prediction_error())
+                } else {
+                    None
+                };
+                fep_result = fep_agent.step_with_encoder_pe(physics.state(), &command, enc_pe);
 
                 if (fep_result.tau_factor - 1.0).abs() > 0.01 {
                     controller.modulate_tau(fep_result.tau_factor);

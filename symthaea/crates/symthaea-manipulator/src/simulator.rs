@@ -24,6 +24,10 @@ pub struct SimpleManipulatorSimulator {
     damping: [f64; NUM_JOINTS],
     /// Max torque per joint (Nm).
     max_torques: [f64; NUM_JOINTS],
+    /// External forces applied to the end-effector [Fx, Fy, Fz] in Newtons.
+    /// Set by external systems (e.g., human proximity force field) and added
+    /// to `end_effector_force` each step. Reset to zero after each step.
+    pub external_forces: [f64; 3],
 }
 
 impl SimpleManipulatorSimulator {
@@ -34,6 +38,7 @@ impl SimpleManipulatorSimulator {
             inertias: [2.0, 2.0, 1.5, 1.0, 0.5, 0.3, 0.2],
             damping: [5.0, 5.0, 4.0, 3.0, 2.0, 1.5, 1.0],
             max_torques: [87.0, 87.0, 87.0, 87.0, 12.0, 12.0, 12.0], // Panda-like
+            external_forces: [0.0; 3],
         }
     }
 }
@@ -65,6 +70,11 @@ impl ManipulatorPhysicsSimulator for SimpleManipulatorSimulator {
         }
         // Update end-effector position via FK
         self.state.end_effector_position = self.kinematics.end_effector_position(&self.state.joint_angles);
+        // Apply external forces to end-effector force feedback
+        for i in 0..3 {
+            self.state.end_effector_force[i] = self.external_forces[i];
+        }
+        self.external_forces = [0.0; 3]; // Reset after application
         // Update gripper
         self.state.gripper_opening = cmd.gripper as f64;
     }

@@ -146,6 +146,18 @@ pub fn episode_reward(
     task: &HumanoidTask,
     target_speed: f64,
 ) -> f64 {
+    episode_reward_ext(state, cmd, task, target_speed, None, None)
+}
+
+/// Extended episode reward with optional object position for Reach/Grasp tasks.
+pub fn episode_reward_ext(
+    state: &HumanoidState,
+    cmd: &HumanoidCommand,
+    task: &HumanoidTask,
+    target_speed: f64,
+    object_pos: Option<[f64; 3]>,
+    hand: Option<crate::morphology::HandSide>,
+) -> f64 {
     let stand = standing_reward(state) * small_control(cmd);
     match task {
         HumanoidTask::Stand => stand,
@@ -161,6 +173,87 @@ pub fn episode_reward(
                 + 0.12 * metabolic
                 + 0.10 * clearance
                 + 0.10 * cot_eff
+        }
+        HumanoidTask::Reach => {
+            let obj = object_pos.unwrap_or([0.3, -0.2, 1.0]);
+            let h = hand.unwrap_or(crate::morphology::HandSide::Right);
+            let reach = reach_reward(state, obj, h);
+            // Must still stand while reaching
+            0.40 * stand + 0.60 * reach
+        }
+        HumanoidTask::Grasp => {
+            let obj = object_pos.unwrap_or([0.3, -0.2, 1.0]);
+            let h = hand.unwrap_or(crate::morphology::HandSide::Right);
+            let reach = reach_reward(state, obj, h);
+            let grip = grip_closure_reward(state, h);
+            // Stand + reach + grip
+            0.25 * stand + 0.35 * reach + 0.40 * grip
+        }
+    }
+}
+
+/// Reach reward: 1.0 when hand centroid is at object, decaying with distance.
+pub fn reach_reward(
+    state: &HumanoidState,
+    object_pos: [f64; 3],
+    hand: crate::morphology::HandSide,
+) -> f64 {
+    let centroid = hand_centroid(state, hand);
+    let dist = ((centroid[0] - object_pos[0]).powi(2)
+        + (centroid[1] - object_pos[1]).powi(2)
+        + (centroid[2] - object_pos[2]).powi(2))
+    .sqrt();
+    tolerance(dist, 0.0, 0.05, 0.15) // Full reward within 5cm, margin 15cm
+}
+
+/// Grip closure reward: mean finger flexion normalized to [0, 1].
+///
+/// Measures how closed the fingers are. Higher flexion = higher reward.
+/// Only meaningful for Dexterous53+ morphologies.
+pub fn grip_closure_reward(
+    state: &HumanoidState,
+    hand: crate::morphology::HandSide,
+) -> f64 {
+    let hand_start = match hand {
+        crate::morphology::HandSide::Right => 21,
+        crate::morphology::HandSide::Left => 37,
+    };
+    let hand_end = hand_start + 16;
+
+    if state.joint_angles.len() < hand_end {
+        return 0.0; // Not a dexterous morphology
+    }
+
+    let flexion_sum: f64 = state.joint_angles[hand_start..hand_end]
+        .iter()
+        .map(|a| a.max(0.0))
+        .sum();
+    let mean_flexion = flexion_sum / 16.0;
+    // Normalize: ~1.0 rad mean flexion = fully closed
+    (mean_flexion / 1.0).clamp(0.0, 1.0)
+}
+
+/// Extract hand centroid position from state extremities.
+fn hand_centroid(
+    state: &HumanoidState,
+    hand: crate::morphology::HandSide,
+) -> [f64; 3] {
+    match hand {
+        crate::morphology::HandSide::Right => {
+            if state.extremities.len() >= 15 {
+                // Prefer hand centroid (computed from finger FK)
+                [state.extremities[12], state.extremities[13], state.extremities[14]]
+            } else {
+                // Fallback to hand base position
+                [state.extremities[0], state.extremities[1], state.extremities[2]]
+            }
+        }
+        crate::morphology::HandSide::Left => {
+            if state.extremities.len() >= 18 {
+                [state.extremities[15], state.extremities[16], state.extremities[17]]
+            } else {
+                [state.extremities[3], state.extremities[4], state.extremities[5]]
+            }
         }
     }
 }
@@ -251,7 +344,7 @@ mod tests {
 
     #[test]
     fn test_small_control_max_torque() {
-        let cmd = HumanoidCommand { torques: [1.0; 21] };
+        let cmd = HumanoidCommand { torques: vec![1.0; 21] };
         let reward = small_control(&cmd);
         assert!(
             reward < 1.0,
@@ -356,7 +449,7 @@ mod tests {
 
     #[test]
     fn test_metabolic_efficiency_high_torque() {
-        let cmd = HumanoidCommand { torques: [0.8; 21] };
+        let cmd = HumanoidCommand { torques: vec![0.8; 21] };
         let reward = metabolic_efficiency_reward(&cmd);
         assert!(
             reward < 0.5,
@@ -377,7 +470,7 @@ mod tests {
         let burst_reward = phasic_metabolic_reward(&cmd);
 
         // Uniform moderate torque → co-contraction
-        let uniform_cmd = HumanoidCommand { torques: [0.4; 21] };
+        let uniform_cmd = HumanoidCommand { torques: vec![0.4; 21] };
         let uniform_reward = phasic_metabolic_reward(&uniform_cmd);
 
         assert!(
@@ -389,7 +482,7 @@ mod tests {
     #[test]
     fn test_phasic_metabolic_cocontraction() {
         // All actuators at moderate torque → co-contraction (low reward)
-        let cmd = HumanoidCommand { torques: [0.5; 21] };
+        let cmd = HumanoidCommand { torques: vec![0.5; 21] };
         let reward = phasic_metabolic_reward(&cmd);
 
         // Burst pattern: few active, rest zero
@@ -469,8 +562,8 @@ mod tests {
         // Low speed (horizontal speed ≈ 0 → clamped to 0.1)
         state.com_velocity = [0.05, 0.0, 0.0];
         // High joint velocities + high torques = high power
-        state.joint_velocities = [2.0; 21];
-        let cmd = HumanoidCommand { torques: [0.8; 21] };
+        state.joint_velocities = vec![2.0; 21];
+        let cmd = HumanoidCommand { torques: vec![0.8; 21] };
         let reward = cot_efficiency_reward(&state, &cmd);
         assert!(
             reward < 0.5,
@@ -499,5 +592,68 @@ mod tests {
             near > far,
             "Closer should give higher reward: near={near}, far={far}"
         );
+    }
+
+    // ── Reach/Grasp reward tests ──
+
+    #[test]
+    fn test_reach_reward_at_target() {
+        use crate::morphology::HumanoidMorphology;
+        let mut state = HumanoidState::standing_for(HumanoidMorphology::Dexterous53);
+        // Place hand centroid at object position
+        state.extremities[12] = 0.3;
+        state.extremities[13] = -0.2;
+        state.extremities[14] = 1.0;
+        let reward = reach_reward(&state, [0.3, -0.2, 1.0], crate::morphology::HandSide::Right);
+        assert!(reward > 0.9, "Hand at object should give high reward: {reward}");
+    }
+
+    #[test]
+    fn test_reach_reward_far_away() {
+        use crate::morphology::HumanoidMorphology;
+        let state = HumanoidState::standing_for(HumanoidMorphology::Dexterous53);
+        // Default standing: hand centroid is far from object
+        let reward = reach_reward(&state, [0.3, -0.2, 1.0], crate::morphology::HandSide::Right);
+        assert!(reward < 0.5, "Hand far from object should give low reward: {reward}");
+    }
+
+    #[test]
+    fn test_grip_closure_zero_flexion() {
+        use crate::morphology::HumanoidMorphology;
+        let state = HumanoidState::standing_for(HumanoidMorphology::Dexterous53);
+        // All joints at zero = open hand
+        let reward = grip_closure_reward(&state, crate::morphology::HandSide::Right);
+        assert!(reward < 0.01, "Open hand should give near-zero grip: {reward}");
+    }
+
+    #[test]
+    fn test_grip_closure_flexed() {
+        use crate::morphology::HumanoidMorphology;
+        let mut state = HumanoidState::standing_for(HumanoidMorphology::Dexterous53);
+        // Set all right hand joints to ~1.0 rad flexion
+        for i in 21..37 {
+            state.joint_angles[i] = 1.0;
+        }
+        let reward = grip_closure_reward(&state, crate::morphology::HandSide::Right);
+        assert!(reward > 0.8, "Closed fist should give high grip reward: {reward}");
+    }
+
+    #[test]
+    fn test_episode_reward_reach() {
+        use crate::morphology::HumanoidMorphology;
+        let mut state = HumanoidState::standing_for(HumanoidMorphology::Dexterous53);
+        state.head_height = 1.4;
+        state.torso_vertical = [0.0, 0.0, 1.0];
+        // Hand at object
+        state.extremities[12] = 0.3;
+        state.extremities[13] = -0.2;
+        state.extremities[14] = 1.0;
+        let cmd = HumanoidCommand::zero_for(53);
+        let reward = episode_reward_ext(
+            &state, &cmd, &HumanoidTask::Reach, 0.0,
+            Some([0.3, -0.2, 1.0]),
+            Some(crate::morphology::HandSide::Right),
+        );
+        assert!(reward > 0.5, "Good reach should give positive reward: {reward}");
     }
 }

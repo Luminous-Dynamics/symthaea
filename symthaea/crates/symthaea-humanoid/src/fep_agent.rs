@@ -278,13 +278,30 @@ impl ActiveInferenceHumanoidAgent {
     ///
     /// Called at 10Hz (every 4th physics step).
     pub fn step(&mut self, state: &HumanoidState, cmd: &HumanoidCommand) -> HumanoidFepResult {
+        self.step_with_encoder_pe(state, cmd, None)
+    }
+
+    /// Called at 10Hz with optional encoder-derived prediction error.
+    ///
+    /// When `encoder_pe` is Some, it's used as the prediction error signal
+    /// (from the predictive HDC-LTC encoder layer). This replaces the FEP
+    /// agent's internal PE computation with emergent HDC-derived surprise.
+    pub fn step_with_encoder_pe(
+        &mut self,
+        state: &HumanoidState,
+        cmd: &HumanoidCommand,
+        encoder_pe: Option<f32>,
+    ) -> HumanoidFepResult {
         let obs_values = self.build_observation(state, cmd);
 
         let obs = Observation::new(obs_values.clone(), 1.0, "humanoid");
 
         let perception = self.agent.perceive(&obs);
         let free_energy = perception.free_energy.total;
-        let prediction_error = perception.free_energy.prediction_error;
+        // Use encoder PE if provided, otherwise use FEP agent's internal PE
+        let prediction_error = encoder_pe
+            .map(|pe| pe as f64)
+            .unwrap_or(perception.free_energy.prediction_error);
 
         let action = if self.config.use_rule_based_policy {
             self.rule_based_action(&obs_values)

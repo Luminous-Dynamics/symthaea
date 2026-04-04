@@ -2,9 +2,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Bevy resources wrapping manipulator state for both arms.
 
-#![allow(unused_imports)] // Phi arm imports used in Phase 2
-
 use bevy::prelude::*;
+use symthaea_core::hdc::ContinuousHV;
 use symthaea_manipulator::{
     ManipulatorConfig,
     kinematics::ManipulatorKinematics,
@@ -20,6 +19,7 @@ use symtropy_consciousness_physics::safety::SafetyTier;
 use symtropy_physics::body::BodyHandle;
 
 use crate::assembly_task::AssemblyTask;
+use crate::grasp_object::GraspObject;
 use crate::human_obstacle::HumanObstacle;
 use crate::iso_comparison::IsoSsmController;
 
@@ -37,6 +37,8 @@ pub struct PhiArmState {
     pub current_safety: SafetyTier,
     pub stiffness: f64,
     pub last_prediction_error: f32,
+    /// Previous HDC perception for cosine dissimilarity PE computation.
+    pub last_perception: Option<ContinuousHV>,
     pub cycles_completed: u32,
     pub total_cycle_time: f64,
     pub current_cycle_start: f64,
@@ -64,6 +66,7 @@ impl PhiArmState {
             current_safety: SafetyTier::Green,
             stiffness: 1.0,
             last_prediction_error: 0.0,
+            last_perception: None,
             cycles_completed: 0,
             total_cycle_time: 0.0,
             current_cycle_start: 0.0,
@@ -121,6 +124,18 @@ impl IsoArmState {
 #[derive(Resource)]
 pub struct SharedHuman {
     pub obstacle: HumanObstacle,
+}
+
+/// Shared grasp object for the adaptive arm.
+#[derive(Resource)]
+pub struct AdaptiveGraspObject {
+    pub object: GraspObject,
+}
+
+/// Shared grasp object for the ISO arm.
+#[derive(Resource)]
+pub struct IsoGraspObject {
+    pub object: GraspObject,
 }
 
 /// Elapsed simulation time.

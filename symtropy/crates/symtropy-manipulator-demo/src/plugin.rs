@@ -9,6 +9,7 @@ use symthaea_manipulator::types::NUM_JOINTS;
 use crate::admittance_control::AdmittanceController;
 use crate::camera;
 use crate::consciousness_bridge;
+use crate::grasp_object::GraspObject;
 use crate::hud;
 use crate::human_obstacle::HumanObstacle;
 use crate::prediction_bridge;
@@ -27,6 +28,8 @@ impl Plugin for ManipulatorDemoPlugin {
             .insert_resource(SharedHuman {
                 obstacle: HumanObstacle::new(12345),
             })
+            .insert_resource(AdaptiveGraspObject { object: GraspObject::at_pick() })
+            .insert_resource(IsoGraspObject { object: GraspObject::at_pick() })
             .insert_resource(SimTime::default())
             .insert_resource(ThroughputMetrics::default())
             // Startup systems
@@ -76,6 +79,7 @@ fn step_phi_arm(
     human: Res<SharedHuman>,
     sim_time: Res<SimTime>,
     mut phi_arm: ResMut<PhiArmState>,
+    mut grasp_obj: ResMut<AdaptiveGraspObject>,
 ) {
     let dt = time.delta_secs_f64();
     if dt <= 0.0 || dt > 0.1 {
@@ -85,17 +89,35 @@ fn step_phi_arm(
     let state = phi_arm.simulator.state().clone();
     let ee_pos = state.end_effector_position;
 
-    // === Step 1: Compute external forces from human proximity ===
-    let external_forces = prediction_bridge::compute_human_interaction_forces(
+    // Update grasp object (track gripper state)
+    grasp_obj.object.update(&ee_pos, state.gripper_opening);
+
+    // === Step 1: Compute external forces ===
+    // Human proximity repulsive force
+    let human_forces = prediction_bridge::compute_human_interaction_forces(
         &human.obstacle,
         &state,
     );
+    // Object gravity load (changes arm dynamics when holding object)
+    let gravity_load = grasp_obj.object.gravity_load();
 
-    // Apply external forces to simulator (will be picked up in next step)
+    // Combined external forces
+    let external_forces = [
+        human_forces[0] + gravity_load[0],
+        human_forces[1] + gravity_load[1],
+        human_forces[2] + gravity_load[2],
+    ];
+
+    // Apply external forces to simulator
     phi_arm.simulator.external_forces = external_forces;
 
     // === Step 2: Compute danger level for consciousness input ===
-    let danger = prediction_bridge::danger_level_from_human(&human.obstacle, &ee_pos);
+    // Combine human proximity danger with encoder confidence.
+    // When the encoder is surprised (low confidence), danger increases even
+    // without direct human proximity — e.g., holding an object changes dynamics.
+    let human_danger = prediction_bridge::danger_level_from_human(&human.obstacle, &ee_pos);
+    let encoder_surprise = phi_arm.last_prediction_error as f64; // PE from HDC encoder
+    let danger = (human_danger + encoder_surprise * 0.5).min(1.0);
 
     // === Step 3: Run full consciousness pipeline ===
     let last_pe = phi_arm.last_prediction_error;
@@ -152,16 +174,23 @@ fn step_phi_arm(
     cmd.gripper = phi_arm.task.desired_gripper() as f32;
     phi_arm.simulator.step(&cmd, dt);
 
-    // === Step 9: Compute prediction error for next tick ===
-    // Use change in EE force as a proxy (force channel weight = 2.5, highest)
+    // === Step 9: Compute prediction error via HDC cosine dissimilarity ===
+    // Encode current state into 16,384D hypervector
     let new_state = phi_arm.simulator.state().clone();
-    let force_change = (
-        (new_state.end_effector_force[0] - state.end_effector_force[0]).powi(2)
-        + (new_state.end_effector_force[1] - state.end_effector_force[1]).powi(2)
-        + (new_state.end_effector_force[2] - state.end_effector_force[2]).powi(2)
-    ).sqrt();
-    // Normalize: 40N max force → PE in [0, 1]
-    phi_arm.last_prediction_error = (force_change / 40.0).min(1.0) as f32;
+    let current_hv = phi_arm.encoder.encode(&new_state);
+
+    // PE = 1 - cosine_similarity(current, previous)
+    // This is the REAL prediction error from HDC space, not a proxy.
+    // Force channels have weight 2.5 (highest), so human proximity forces
+    // naturally dominate the dissimilarity.
+    let pe = if let Some(ref prev_hv) = phi_arm.last_perception {
+        let sim = current_hv.similarity(prev_hv);
+        (1.0 - sim.max(0.0)).min(1.0) as f32
+    } else {
+        0.0 // First tick: no previous perception
+    };
+    phi_arm.last_prediction_error = pe;
+    phi_arm.last_perception = Some(current_hv);
 
     // === Step 10: Update task state machine ===
     let ee_pos = new_state.end_effector_position;
@@ -172,6 +201,7 @@ fn step_phi_arm(
         phi_arm.total_cycle_time += cycle_time;
         phi_arm.cycles_completed += 1;
         phi_arm.current_cycle_start = sim_time.elapsed;
+        grasp_obj.object.reset_to_home();
     }
 }
 
@@ -181,6 +211,7 @@ fn step_iso_arm(
     human: Res<SharedHuman>,
     sim_time: Res<SimTime>,
     mut iso: ResMut<IsoArmState>,
+    mut grasp_obj: ResMut<IsoGraspObject>,
 ) {
     let dt = time.delta_secs_f64();
     if dt <= 0.0 || dt > 0.1 {
@@ -189,6 +220,9 @@ fn step_iso_arm(
 
     let state = iso.simulator.state().clone();
     let ee_pos = state.end_effector_position;
+
+    // Update grasp object
+    grasp_obj.object.update(&ee_pos, state.gripper_opening);
 
     // Compute human distance to EE
     let human_dist = human.obstacle.distance_to(&ee_pos);
@@ -222,6 +256,8 @@ fn step_iso_arm(
                 cmd.joint_torques[i] = ((kp * error - kd * vel) as f32).clamp(-1.0, 1.0);
             }
             cmd.gripper = iso.task.desired_gripper() as f32;
+            // Apply object gravity load to ISO arm too (fair comparison)
+            iso.simulator.external_forces = grasp_obj.object.gravity_load();
             iso.simulator.step(&cmd, dt);
         }
     }
@@ -234,6 +270,7 @@ fn step_iso_arm(
         iso.total_cycle_time += cycle_time;
         iso.cycles_completed += 1;
         iso.current_cycle_start = sim_time.elapsed;
+        grasp_obj.object.reset_to_home();
     }
 }
 
@@ -269,7 +306,7 @@ fn print_status(
     let human_dist = human.obstacle.distance_to(&iso_ee);
 
     println!(
-        "[{:.1}s] Φ-arm: Φ={:.3} {:?} stiff={:.0}% | {} cycles ({:.2}s) | \
+        "[{:.1}s] Adaptive: cert={:.3} {:?} stiff={:.0}% | {} cycles ({:.2}s) | \
          ISO: {} cycles ({:.2}s) | Advantage: {:.1}% | Human: {} ({:.2}m)",
         sim_time.elapsed,
         phi_arm.current_phi,

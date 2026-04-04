@@ -388,7 +388,7 @@ mod tests {
                 at_step: 10,
             });
 
-        let mut cmd = HumanoidCommand { torques: [0.5; 21] };
+        let mut cmd = HumanoidCommand { torques: vec![0.5; 21] };
         let mut sim = crate::simulator::SimpleHumanoidSimulator::new();
 
         // Before failure step: no masking

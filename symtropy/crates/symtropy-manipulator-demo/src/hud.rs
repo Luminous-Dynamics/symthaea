@@ -43,7 +43,7 @@ pub fn setup_hud(mut commands: Commands) {
                 padding: UiRect::all(Val::Px(8.0)),
                 ..default()
             }).with_child((
-                Text::new("Φ-GRADIENT ARM\nΦ: ---\nSafety: ---\nStiffness: ---\nPE: ---\nCycles: 0"),
+                Text::new("ADAPTIVE SAFETY\nCertainty: ---\nTier: ---\nStiffness: ---\nPE: ---\nCycles: 0"),
                 TextFont {
                     font_size: 16.0,
                     ..default()
@@ -106,9 +106,9 @@ pub fn update_phi_hud(
         };
 
         **text = format!(
-            "Φ-GRADIENT ARM\n\
-             Φ: {:.3} {tier_color}\n\
-             Safety: {tier_name}\n\
+            "ADAPTIVE SAFETY\n\
+             Certainty: {:.3} {tier_color}\n\
+             Tier: {tier_name}\n\
              Stiffness: {:.0}%\n\
              PE: {:.3}\n\
              Cycles: {} ({:.2}s avg)",
@@ -155,14 +155,14 @@ pub fn update_throughput_hud(
         if both_have_cycles {
             let sign = if metrics.advantage_percent >= 0.0 { "+" } else { "" };
             **text = format!(
-                "THROUGHPUT ADVANTAGE: {sign}{:.1}%  (Φ: {} cycles | ISO: {} cycles)",
+                "THROUGHPUT ADVANTAGE: {sign}{:.1}%  (Adaptive: {} cycles | ISO: {} cycles)",
                 metrics.advantage_percent,
                 phi_arm.cycles_completed,
                 iso.cycles_completed,
             );
         } else {
             **text = format!(
-                "THROUGHPUT ADVANTAGE: measuring... (Φ: {} | ISO: {} cycles)",
+                "THROUGHPUT ADVANTAGE: measuring... (Adaptive: {} | ISO: {} cycles)",
                 phi_arm.cycles_completed,
                 iso.cycles_completed,
             );
