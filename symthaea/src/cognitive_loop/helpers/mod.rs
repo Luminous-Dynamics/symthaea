@@ -242,7 +242,6 @@ impl CognitiveLoopService {
             metadata: super::CycleMetadata::default(),
             thought_vector: vec![0.0; 32],
             wisdom_hv: symthaea_core::hdc::phi_topology_validation::real_hv_to_hv16(&hdv),
-            #[cfg(feature = "ssm_language")]
             language_output: None,
             #[cfg(feature = "canvas")]
             canvas_svg: None,
@@ -413,7 +412,10 @@ impl CognitiveLoopService {
         // For the HV path, unified_psi is derived from temporal coherence since
         // we don't run the full consciousness subsystems.
         let urgency = self.carryover.urgency.urgency;
-        if self.config.enable_psi_attestation && self.config.agent_did.is_some() {
+        if self.config.enable_psi_attestation
+            && self.config.agent_did.is_some()
+            && (self.stats.total_cycles % 10 == 0)
+        {
             let now = std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap_or_default()
@@ -451,7 +453,6 @@ impl CognitiveLoopService {
             },
             thought_vector: vec![0.0; 32],
             wisdom_hv: symthaea_core::hdc::phi_topology_validation::real_hv_to_hv16(hdv),
-            #[cfg(feature = "ssm_language")]
             language_output: None,
             #[cfg(feature = "canvas")]
             canvas_svg: None,
@@ -554,6 +555,26 @@ impl CognitiveLoopService {
         // Store current state for next cycle
         self.last_state = Some(state.to_vec());
         self.last_prediction = Some(prediction.to_vec());
+    }
+
+    /// Copy `last_state` into the reusable `training_state_buf` without
+    /// allocating a new Vec.  On the first cycle the buffer is allocated once;
+    /// subsequent cycles reuse it via `copy_from_slice`.  This must be called
+    /// *before* `create_experience`, which moves `last_state` into the replay
+    /// buffer.
+    pub(super) fn copy_last_state_to_training_buf(&mut self) {
+        match (&self.last_state, &mut self.training_state_buf) {
+            (Some(src), Some(buf)) if buf.len() == src.len() => {
+                buf.copy_from_slice(src);
+            }
+            (Some(src), _) => {
+                // First cycle or dimension changed — allocate once
+                self.training_state_buf = Some(src.clone());
+            }
+            (None, _) => {
+                self.training_state_buf = None;
+            }
+        }
     }
 
     pub(super) fn update_stats(&mut self, error: f32, cycle_time: Duration) {
@@ -847,6 +868,7 @@ impl CognitiveLoopService {
         self.buffer.clear();
         self.error_history.clear();
         self.last_state = None;
+        self.training_state_buf = None;
         self.last_prediction = None;
         self.stats = LoopStats::default();
         self.start_time = Instant::now();

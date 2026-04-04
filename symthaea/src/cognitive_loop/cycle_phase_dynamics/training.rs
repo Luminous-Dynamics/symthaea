@@ -29,7 +29,7 @@ impl CognitiveLoopService {
         prediction_error: f32,
         effective_lr: f32,
         delta_t: f32,
-        previous_state: Option<Vec<f32>>,
+        previous_state: Option<&[f32]>,
         output: &[f32],
         coherence: f32,
         semantic_hdc: Vec<f32>,
@@ -58,7 +58,7 @@ impl CognitiveLoopService {
 
             let (train_input, train_target, lr) = if let Some(prev) = previous_state {
                 (
-                    Array1::from_vec(prev),
+                    prev.iter().copied().collect::<Array1<f32>>(),
                     perception
                         .encoding
                         .compressed_state
@@ -283,6 +283,29 @@ impl CognitiveLoopService {
             math_result,
             &perception.encoding.encoding_result.detected_primitives,
         );
+
+        // ── BrocaLite fallback: lightweight always-on language generation ────
+        // When ssm_language is not enabled (or didn't fire), BrocaLite provides
+        // basic consciousness-coupled text generation from the current cycle state.
+        #[cfg(not(feature = "ssm_language"))]
+        if self.language_comm.last_broca_text.is_none() {
+            let emo = self.unification_engine.emotional.state();
+            let signals = super::super::broca_bridge::BrocaConsciousnessSignals {
+                epistemic_confidence: coherence.clamp(0.0, 1.0),
+                emotional_valence: emo.valence as f32,
+                emotional_arousal: emo.arousal as f32,
+                emotional_warmth: 0.5, // neutral warmth default
+                consciousness_level: self.carryover.history.consciousness_level as f32,
+                meta_awareness: coherence, // approximate from coherence
+                coherence,
+                knowledge_grounding: 0.5,
+                detected_primitives: perception.encoding.encoding_result.detected_primitives.clone(),
+                ..Default::default()
+            };
+            if let Some(result) = self.language_comm.broca_lite.generate_from_signals(&signals) {
+                self.language_comm.last_broca_text = Some(result.text);
+            }
+        }
 
         // ═══════════════════════════════════════════════════════════════════════
         // PARALLEL POST-PROCESSING
@@ -658,9 +681,13 @@ impl CognitiveLoopService {
             } else {
                 0.0
             };
+            // Modulate epistemic confidence by language quality EMA:
+            // poor generation quality → lower confidence → more hedging.
+            let lang_quality_factor = 0.7 + 0.3 * self.language_manager.quality_ema();
             let signals = super::super::broca_bridge::BrocaConsciousnessSignals {
-                epistemic_confidence: (self.carryover.quality.last_epistemic_confidence
+                epistemic_confidence: ((self.carryover.quality.last_epistemic_confidence
                     - math_epistemic_penalty)
+                    * lang_quality_factor)
                     .clamp(0.0, 1.0),
                 emotional_valence: self.unification_engine.emotional.state().valence as f32
                     + mode_valence_nudge,

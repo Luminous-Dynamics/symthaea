@@ -248,7 +248,9 @@ impl CognitiveLoopService {
         // Additionally: fragile critical_scale → boost exploration
         //               robust critical_scale → allow exploitation
         // Science: Beggs & Plenz (2003) — criticality; Friston (2010) — precision.
-        if self.config.enable_hodge_decomposition {
+        if self.config.enable_hodge_decomposition
+            && (self.stats.total_cycles % self.config.hodge_interval == 0)
+        {
             const TEMP_MIN: f64 = 0.5;
             const TEMP_MAX: f64 = 2.0;
             let summary = self.ethics_engine.moral_topology().last_summary();

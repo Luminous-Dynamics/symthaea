@@ -187,8 +187,8 @@ pub(crate) mod epistemic_auditor;
 pub(crate) mod virtual_body;
 pub(crate) mod voice_coherence_bridge;
 
-#[cfg(feature = "ssm_language")]
 pub mod broca_bridge;
+pub mod broca_lite;
 
 #[cfg(feature = "canvas")]
 pub(crate) mod canvas_bridge;
@@ -365,6 +365,12 @@ pub struct CognitiveLoopService {
 
     /// Last compressed state (for creating experience)
     last_state: Option<Vec<f32>>,
+
+    /// Pre-allocated buffer holding a copy of `last_state` for the training
+    /// phase.  Populated each cycle by `copy_last_state_to_training_buf()`
+    /// before `create_experience` moves `last_state` into the replay buffer.
+    /// Eliminates a per-cycle `Vec<f32>` allocation on the CfC hot path.
+    training_state_buf: Option<Vec<f32>>,
 
     /// Last prediction (for experience)
     last_prediction: Option<Vec<f32>>,

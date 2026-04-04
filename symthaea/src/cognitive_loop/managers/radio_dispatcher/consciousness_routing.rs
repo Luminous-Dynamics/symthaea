@@ -575,24 +575,41 @@ impl StoreAndForward {
     /// - Threats → consolidated threat signatures
     ///
     /// Returns consolidated wisdom ready for mesh transmission.
+    ///
+    /// `max_items` caps how many buffered experiences are processed in this
+    /// call.  Pass `usize::MAX` for unbounded (legacy behaviour).  When the
+    /// buffer still has items after the batch, `consolidation_pending` stays
+    /// `true` so the caller can continue draining on subsequent cycles.
     pub fn consolidate(&mut self, current_cycle: u64) -> ConsolidatedWisdom {
+        self.consolidate_batch(current_cycle, usize::MAX)
+    }
+
+    /// Batch-limited variant of [`Self::consolidate`].
+    pub fn consolidate_batch(
+        &mut self,
+        current_cycle: u64,
+        max_items: usize,
+    ) -> ConsolidatedWisdom {
         let offline_duration = self
             .offline_since
             .map(|since| current_cycle.saturating_sub(since))
             .unwrap_or(0);
 
-        let mean_salience = if self.offline_buffer.is_empty() {
+        // Drain at most `max_items` from the front of the buffer.
+        let drain_count = self.offline_buffer.len().min(max_items);
+        let batch: Vec<OfflineExperience> =
+            self.offline_buffer.drain(..drain_count).collect();
+
+        let mean_salience = if batch.is_empty() {
             0.0
         } else {
-            self.offline_buffer.iter().map(|e| e.salience).sum::<f32>()
-                / self.offline_buffer.len() as f32
+            batch.iter().map(|e| e.salience).sum::<f32>() / batch.len() as f32
         };
 
         let mut patterns = Vec::new();
 
         // Consolidate sensor anomalies into trend summaries
-        let sensor_events: Vec<_> = self
-            .offline_buffer
+        let sensor_events: Vec<_> = batch
             .iter()
             .filter(|e| matches!(e.kind, OfflineExperienceKind::SensorAnomaly { .. }))
             .collect();
@@ -605,8 +622,7 @@ impl StoreAndForward {
         }
 
         // Consolidate consciousness shifts
-        let consciousness_events: Vec<_> = self
-            .offline_buffer
+        let consciousness_events: Vec<_> = batch
             .iter()
             .filter(|e| matches!(e.kind, OfflineExperienceKind::ConsciousnessShift { .. }))
             .collect();
@@ -619,8 +635,7 @@ impl StoreAndForward {
         }
 
         // Consolidate threats into aggregate signature
-        let threat_events: Vec<_> = self
-            .offline_buffer
+        let threat_events: Vec<_> = batch
             .iter()
             .filter(|e| matches!(e.kind, OfflineExperienceKind::ThreatDetected { .. }))
             .collect();
@@ -647,8 +662,7 @@ impl StoreAndForward {
         // Consolidate space events into alert summary
         #[cfg(feature = "space-alerts")]
         {
-            let space_events: Vec<_> = self
-                .offline_buffer
+            let space_events: Vec<_> = batch
                 .iter()
                 .filter(|e| matches!(e.kind, OfflineExperienceKind::SpaceEvent { .. }))
                 .collect();
@@ -673,9 +687,11 @@ impl StoreAndForward {
             }
         }
 
-        let experiences_consolidated = self.offline_buffer.len();
-        self.offline_buffer.clear();
-        self.consolidation_pending = false;
+        let experiences_consolidated = batch.len();
+        // Only mark consolidation complete when the buffer is fully drained.
+        if self.offline_buffer.is_empty() {
+            self.consolidation_pending = false;
+        }
 
         ConsolidatedWisdom {
             experiences_consolidated,

@@ -466,7 +466,7 @@ impl CognitiveLoopService {
                 if let Ok(rx_guard) = self.swarm_event_rx.lock() {
                     if let Some(ref rx) = *rx_guard {
                         use super::managers::swarm_manager::SwarmEvent;
-                        for _ in 0..256 {
+                        for _ in 0..20 {
                             match rx.try_recv() {
                                 Ok(event) => {
                                     // Sovereign Clock: forward TimeBeacons to TimeManager.
@@ -621,8 +621,13 @@ impl CognitiveLoopService {
                     // Drain mpsc channel from HTTP handlers (HolonHttpState) into HolonReceiver.
                     if let Ok(guard) = self.holon_inbound_rx.lock() {
                         if let Some(ref rx) = *guard {
-                            while let Ok((device_id, msg)) = rx.try_recv() {
-                                self.holon_receiver.enqueue_message(device_id, msg);
+                            for _ in 0..20 {
+                                match rx.try_recv() {
+                                    Ok((device_id, msg)) => {
+                                        self.holon_receiver.enqueue_message(device_id, msg);
+                                    }
+                                    Err(_) => break,
+                                }
                             }
                         }
                     }
@@ -688,16 +693,23 @@ impl CognitiveLoopService {
                     if net_health == super::managers::radio_dispatcher::NetworkHealth::Blackout {
                         self.store_and_forward.go_offline(cycle_num);
                     } else if self.store_and_forward.is_offline() {
-                        let needs_consolidation = self.store_and_forward.go_online(cycle_num);
-                        if needs_consolidation {
-                            let wisdom = self.store_and_forward.consolidate(cycle_num);
+                        // Transition to online — may set consolidation_pending.
+                        self.store_and_forward.go_online(cycle_num);
+                    }
+
+                    // Drain up to 5 buffered experiences per cycle to spread
+                    // consolidation cost and avoid multi-second latency spikes.
+                    if self.store_and_forward.needs_consolidation() {
+                        let wisdom =
+                            self.store_and_forward.consolidate_batch(cycle_num, 5);
+                        if wisdom.experiences_consolidated > 0 {
                             tracing::info!(
                                 experiences = wisdom.experiences_consolidated,
                                 duration = wisdom.offline_duration,
                                 patterns = wisdom.patterns.len(),
-                                "Dream consolidation complete — sharing {} patterns after {}cy offline",
+                                "Dream consolidation batch — {} experiences, {} patterns",
+                                wisdom.experiences_consolidated,
                                 wisdom.patterns.len(),
-                                wisdom.offline_duration
                             );
                             // TODO(blocked:mesh-wisdom): Transmit consolidated wisdom via mesh bridge.
                             // Blocker: NetworkServiceBridge bidirectional message passing.
@@ -1449,10 +1461,14 @@ impl CognitiveLoopService {
         let arousal_recovery_active = cfc_plan.arousal_recovery_active;
         let arousal_recovery_tau_factor = cfc_plan.arousal_recovery_tau_factor;
 
-        // 8. Capture previous state BEFORE create_experience updates it
-        let previous_state = self.last_state.clone();
+        // 8. Snapshot previous state into the reusable training buffer before
+        //    create_experience moves last_state into the replay buffer.
+        //    This replaces a per-cycle Vec<f32> clone (~1 KB alloc) with a
+        //    memcpy into a pre-allocated buffer — zero allocator overhead.
+        self.copy_last_state_to_training_buf();
 
-        // 9. Create experience
+        // 9. Create experience (moves last_state into Experience, then stores
+        //    the new compressed_state for next cycle).
         self.create_experience(
             &perception.encoding.compressed_state,
             &prediction,
@@ -2704,9 +2720,12 @@ impl CognitiveLoopService {
         }
 
         // ═══════════════════════════════════════════════════════════════════════
-        // 10h.0 PsiAttestation record
+        // 10h.0 PsiAttestation record (every 10 cycles to reduce overhead)
         // ═══════════════════════════════════════════════════════════════════════
-        if self.config.enable_psi_attestation && self.config.agent_did.is_some() {
+        if self.config.enable_psi_attestation
+            && self.config.agent_did.is_some()
+            && (self.stats.total_cycles % 10 == 0)
+        {
             let now = std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap_or_default()
@@ -3072,6 +3091,12 @@ impl CognitiveLoopService {
         // ═══════════════════════════════════════════════════════════════════════
         // 11–12 + Broca + Parallel: Training, stats, Broca, post-processing
         // ═══════════════════════════════════════════════════════════════════════
+        // Take the training buffer to break the borrow — phase_dynamics_training
+        // only reads the slice to build an Array1 for the CfC update step.
+        // After training we put the buffer back so it can be reused next cycle
+        // (no allocation, just two Option pointer swaps).
+        let training_buf = self.training_state_buf.take();
+        let previous_state = training_buf.as_deref();
         let train_result = self.phase_dynamics_training(
             input,
             perception,
@@ -3091,6 +3116,8 @@ impl CognitiveLoopService {
             semantic_lr_factor,
             module_timings,
         );
+        // Return the training buffer for reuse next cycle (no allocation).
+        self.training_state_buf = training_buf;
         let learning_occurred = train_result.learning_occurred;
         let training_loss = train_result.training_loss;
         let effective_lr = train_result.effective_lr;

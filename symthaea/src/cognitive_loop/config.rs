@@ -390,6 +390,12 @@ pub struct CognitiveLoopConfig {
     #[serde(default)]
     pub enable_hodge_decomposition: bool,
 
+    /// Cycle interval for Hodge decomposition FEP coupling. Default: 47 (co-prime).
+    /// The Hodge criticality → FEP exploration temperature modulation only runs
+    /// every `hodge_interval` cycles to amortise the O(n³) cost.
+    #[serde(default = "default_hodge_interval")]
+    pub hodge_interval: usize,
+
     /// Trajectory planning horizon in seconds. Default: 0.5 (~10 cycles at 20Hz).
     #[serde(default = "default_trajectory_horizon")]
     pub trajectory_horizon_seconds: f64,
@@ -601,6 +607,13 @@ pub struct CognitiveLoopConfig {
     /// Only used when `enable_broca_language` is true.
     #[cfg(feature = "ssm_language")]
     pub broca_checkpoint_path: Option<String>,
+
+    /// Multi-turn context depth for Broca language generation.
+    /// When > 0, preserves CfC temporal context across this many turns,
+    /// enabling more coherent multi-turn dialogue.
+    /// Default: 4.
+    #[cfg(feature = "ssm_language")]
+    pub broca_multi_turn_depth: usize,
 
     /// Enable NSM semantic HV blending into thought HV before Broca generation.
     /// When true, detected primitives are composed into a semantic ContinuousHV
@@ -897,10 +910,13 @@ impl Default for CognitiveLoopConfig {
             #[cfg(feature = "ssm_language")]
             broca_checkpoint_path: None,
             #[cfg(feature = "ssm_language")]
+            broca_multi_turn_depth: 4,
+            #[cfg(feature = "ssm_language")]
             enable_broca_nsm_semantic: true,
             #[cfg(feature = "ssm_language")]
             enable_broca_nsm_gate: true,
             enable_hodge_decomposition: true,
+            hodge_interval: default_hodge_interval(),
             enable_energy_budget: true,
             energy_budget_joules_per_sec: None,
             substrate_transition_alpha: super::thresholds::SUBSTRATE_TRANSITION_ALPHA_DEFAULT
@@ -980,6 +996,10 @@ fn default_trajectory_horizon() -> f64 {
 
 fn default_trajectory_interval() -> u64 {
     10
+}
+
+fn default_hodge_interval() -> usize {
+    47
 }
 
 impl CognitiveLoopConfig {

@@ -520,6 +520,18 @@ impl CognitiveLoopService {
         #[cfg(feature = "ssm_language")]
         let broca_genesis_phrase = config.genesis_phrase.clone();
 
+        // BrocaLite seed: hash the genesis phrase (or use default)
+        let broca_lite_seed: u64 = config.genesis_phrase.as_deref()
+            .map(|p| {
+                let mut h: u64 = 0xcbf29ce484222325;
+                for b in p.as_bytes() {
+                    h ^= *b as u64;
+                    h = h.wrapping_mul(0x100000001b3);
+                }
+                h
+            })
+            .unwrap_or(0x5f3759df_u64);
+
         let enable_visualization = config.enable_visualization;
         let enable_soul_alignment = config.enable_soul_alignment;
         let enable_knowledge_engine = config.enable_knowledge_engine;
@@ -571,6 +583,8 @@ impl CognitiveLoopService {
         let broca_nsm_semantic = config.enable_broca_nsm_semantic;
         #[cfg(feature = "ssm_language")]
         let broca_nsm_gate = config.enable_broca_nsm_gate;
+        #[cfg(feature = "ssm_language")]
+        let broca_multi_turn_depth = config.broca_multi_turn_depth;
         // Extract trajectory planning config before moving `config` into the struct
         let trajectory_planning_enabled = config.enable_trajectory_planning;
         let trajectory_horizon_seconds = config.trajectory_horizon_seconds;
@@ -720,6 +734,7 @@ impl CognitiveLoopService {
             stats: LoopStats::default(),
             error_history: VecDeque::with_capacity(super::thresholds::ERROR_HISTORY_CAPACITY),
             last_state: None,
+            training_state_buf: None,
             last_prediction: None,
             start_time: Instant::now(),
             is_consolidating: false,
@@ -738,15 +753,19 @@ impl CognitiveLoopService {
                     let mut broca_config = symthaea_broca::BrocaConfig::default();
                     broca_config.enable_nsm_semantic = broca_nsm_semantic;
                     broca_config.enable_nsm_gate = broca_nsm_gate;
-                    Some(super::broca_bridge::BrocaManager::new(
-                        &genesis,
-                        broca_config,
-                        broca_checkpoint_path.as_deref(),
-                    ))
+                    {
+                        let mut mgr = super::broca_bridge::BrocaManager::new(
+                            &genesis,
+                            broca_config,
+                            broca_checkpoint_path.as_deref(),
+                        );
+                        mgr.multi_turn_depth = broca_multi_turn_depth;
+                        Some(mgr)
+                    }
                 } else {
                     None
                 },
-                #[cfg(feature = "ssm_language")]
+                broca_lite: super::broca_lite::BrocaLiteManager::new(broca_lite_seed),
                 last_broca_text: None,
                 user_state: if enable_user_state {
                     Some(crate::user_state_inference::UserStateInference::new())
@@ -1722,7 +1741,8 @@ mod tests {
 
     #[test]
     fn primitive_consciousness_disabled_means_no_subsystems() {
-        let config = CognitiveLoopConfig::default();
+        let mut config = CognitiveLoopConfig::default();
+        config.enable_primitive_consciousness = false;
         assert!(!config.enable_primitive_consciousness);
         let service = CognitiveLoopService::new(config).unwrap();
         assert!(service.temporal_analyzer().is_none());
@@ -1847,7 +1867,8 @@ mod tests {
 
     #[test]
     fn phi_dyad_none_when_consciousness_disabled() {
-        let config = CognitiveLoopConfig::default();
+        let mut config = CognitiveLoopConfig::default();
+        config.enable_primitive_consciousness = false;
         assert!(!config.enable_primitive_consciousness);
         let service = CognitiveLoopService::new(config).unwrap();
         assert!(
