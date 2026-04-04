@@ -1,0 +1,95 @@
+# Chapter 11: Learning and the Paradox of Optimal Defaults
+
+*In which agents that learn discover they already knew everything, and the couch potato strategy turns out to be immortal.*
+
+---
+
+## The Learning Hypothesis
+
+If cooperation is thermodynamically inevitable (Chapter 5), a natural question follows: can agents learn to cooperate *better*? Can reward-modulated plasticity — agents adjusting their behavioral weights based on energy outcomes — improve on the hardcoded defaults?
+
+We built the infrastructure to test this. Each agent received four learnable weights controlling how strongly the FEP gradient weighted cooperation, well-seeking, danger avoidance, and exploration. A reward signal (the average energy trend over the last 100 ticks) drove weight updates via momentum-stabilized gradient ascent. This is not Hebbian learning (which uses local pre/post-synaptic correlations) but reward-modulated plasticity — a form of reinforcement learning where a global scalar reward shapes behavioral parameters.
+
+The answer to the learning hypothesis is: no. And the reason is more interesting than the answer.
+
+## Finding 31: Weights Are Already Optimal
+
+Twenty seeds, 10,000 ticks, two conditions: fixed weights (baseline) and learning weights (reward-modulated plasticity). Result:
+
+| Metric | Fixed | Learning | Effect |
+|--------|-------|----------|--------|
+| Survival | 11.4/20 | 7.5/20 | d=0.43 (n.s.) |
+| Cooperation | 1.59M | 1.54M | d=0.15 (n.s.) |
+| **Weight drift** | **0.000** | **0.018** | — |
+| Learned cooperation weight | 2.000 | 1.989 | -0.5% drift |
+| Learned well weight | 4.000 | 3.994 | -0.2% drift |
+| Learned danger weight | 3.000 | 3.000 | 0% drift |
+
+The weights barely moved. In 10,000 ticks of reward-modulated plasticity with momentum, the cooperation weight drifted from 2.000 to 1.989 — a 0.5% change. The danger weight didn't move at all.
+
+The per-tick reward signal (energy fraction delta) was too noisy to drive meaningful learning. Each tick's energy change is dominated by the constant maintenance cost, with cooperation and well regeneration adding small perturbations. The signal-to-noise ratio was insufficient for gradient-based learning.
+
+## Finding 34: Memory Doesn't Help Either
+
+We gave agents persistent memory — discovered well locations and partner resonance history — plus a windowed reward signal (100-tick energy trend average, 5× stronger learning rate). Agents could navigate to remembered wells and preferentially seek high-resonance partners.
+
+Three conditions, twenty seeds each:
+
+| Condition | Survival | Weight Drift |
+|-----------|----------|-------------|
+| Stateless | 15.9/20 | 0.00 |
+| Memory only | 13.9/20 | 0.00 |
+| Memory + learning | 13.2/20 | **1.38** |
+
+The windowed reward produced meaningful weight drift (1.38 vs 0.018) — the stronger signal worked as intended. But the result was *worse*, not better. Stateless agents survived at 15.9. Memory+learning agents survived at 13.2.
+
+Memory agents discovered fewer than 1 well on average. Partner history filled up (19 of 20 max entries) but didn't improve partner selection. The FEP gradient already pointed agents toward compatible partners — remembering which partners were good didn't change which direction the gradient pointed.
+
+The paradox: agents with more information and more learning capacity performed worse than agents with neither. The additional complexity introduced behavioral instability (weight drift disrupts a system already at local optimum) without providing usable information (the gradient already encodes the relevant environmental state).
+
+## Finding 44: The U-Curve Mechanism
+
+The volitional cooperation experiment (Chapter 14) revealed a U-shaped survival curve. We diagnosed its mechanism through per-tick energy flow tracking:
+
+| Willingness | Well Regen | Resonance Regen | Efficiency | At Well% |
+|-------------|-----------|-----------------|------------|----------|
+| 1.0 (full coop) | 4,979J | 83,942J | 2.75 | 44.7% |
+| 0.6 (partial) | 5,000J | 69,717J | 2.31 | 44.1% |
+| 0.0 (selfish) | 1,567J | 22,007J | 0.72 | 8.2% |
+
+Partial cooperators (w=0.6) get the same well energy as full cooperators (5,000J vs 4,979J) but 17% less resonance (70K vs 84K). They're distracted by the social gradient 60% of the time — sometimes moving toward partners, sometimes ignoring them — but their inconsistency means they cluster less tightly and receive less resonance per tick.
+
+Full defectors (w=0.0) have the worst energy efficiency (0.72 vs 2.75) but the highest survival (20/20). How? They barely move. Displacement is 0.14 per tick (vs 0.17 for cooperators). They spend only 8.2% of ticks at wells (vs 44.7%). They sit still, spend almost nothing on movement, and survive by consuming minimal energy. When another agent happens to wander nearby, they passively benefit from resonance (22K events) without having sought it.
+
+This is the couch potato strategy: do nothing, spend nothing, survive by inaction. It works because the engine's maintenance cost is per-tick, not per-action. An agent that stands still pays the same maintenance as one that traverses the arena — but the still agent conserves the kinetic energy that movement would have cost.
+
+## Finding 45: Harmony Dimensionality Is Irrelevant
+
+We used eight harmony channels throughout the book. Was this necessary?
+
+We swept active channels from 1 to 8 by zeroing out higher channels:
+
+| Active Channels | Survival | Mean Resonance | Resonance Variance |
+|----------------|----------|----------------|-------------------|
+| 1 | 11.4 | 1.000 | 0.000 |
+| 2 | 11.9 | 0.893 | 0.013 |
+| 4 | 8.3 | 0.798 | 0.016 |
+| 8 | 11.8 | 0.824 | 0.013 |
+
+With one channel, everyone resonates with everyone (mean = 1.0, variance = 0.0). There is no social differentiation — every agent is equally compatible with every other. Survival (11.4) is essentially identical to eight channels (11.8), Cohen's d = -0.055.
+
+More channels add social nuance (variance increases from 0.0 to 0.013) but don't change outcomes. The eight harmonies create a richer social landscape — agents have graded compatibility rather than binary match/mismatch — but this grading doesn't improve cooperation. It just makes it more selective.
+
+The engine's cooperation doesn't need eight dimensions of social compatibility. It needs one: are you nearby and alive?
+
+## The Paradox of Optimal Defaults
+
+Across four findings, a single pattern: the engine's default configuration is already near-optimal for cooperation, and additional complexity (learning, memory, communication, more harmony dimensions) either has no effect or makes things worse.
+
+This is not a failure of the additions. It is a consequence of the FEP gradient's effectiveness. The gradient solves the cooperation problem so completely that there is nothing left for learning, memory, or communication to improve. Every relevant piece of information (where are the wells? where are compatible partners? how depleted am I?) is already encoded in the gradient's four components. Adding redundant information sources adds noise without signal.
+
+The implication for the book's thesis: cooperation in this engine is not just thermodynamically inevitable — it is *informationally simple*. It requires exactly one behavioral rule (follow the free energy gradient) and exactly one physical mechanism (harmony resonance regeneration). Everything else we tried to add was, in the strict thermodynamic sense, waste heat.
+
+---
+
+*Next: Chapter 12 — Higher Dimensions and the Geometry of Cooperation*
