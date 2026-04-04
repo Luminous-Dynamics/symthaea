@@ -126,3 +126,34 @@ pub fn audio_system(
 
     audio.current = Some(state);
 }
+
+/// Planetary ambient audio for Terra Atlas globe view.
+/// Uses DeepSpace biome preset — sparse, reverberant, Sacred Stillness.
+/// Does not depend on BiometricsCtx or LeviathanState.
+pub fn globe_audio_system(
+    time: Res<Time>,
+    mut audio: ResMut<AudioState>,
+    mut config: ResMut<AudioConfig>,
+) {
+    // Switch to planetary biome if not already
+    if config.biome != BiomeAudioType::DeepSpace {
+        *config = AudioConfig::for_biome(BiomeAudioType::DeepSpace);
+    }
+
+    // Generate a calm, contemplative musical state
+    let t = time.elapsed_secs();
+    let breath = (t * 0.1).sin() * 0.5 + 0.5; // slow breathing modulation
+
+    let mut state = MusicalState::default();
+    state.harmony_activations[7] = 0.8; // Sacred Stillness dominant
+    state.harmony_activations[4] = 0.4 * breath; // Universal Interconnectedness
+    state.harmony_activations[2] = 0.3; // Integral Wisdom
+    state.dopamine = 0.2 + breath * 0.1;
+    state.serotonin = 0.8; // warm, contemplative
+    state.noradrenaline = 0.1; // calm
+    state.prediction_error = 0.05; // minimal surprise
+    state.consciousness_level = 0.7 + breath * 0.1;
+
+    audio.current = Some(state);
+    info_once!("Audio: planetary ambient mode (Sacred Stillness + Interconnectedness)");
+}

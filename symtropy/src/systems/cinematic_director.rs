@@ -187,6 +187,13 @@ pub struct FadeOverlay;
 #[derive(Component)]
 pub struct NarrationText;
 
+/// Voice narration state — tracks which lines have been spoken.
+#[derive(Resource, Default)]
+pub struct VoiceNarration {
+    /// Index of the last narration line that was triggered for audio playback.
+    pub last_spoken: Option<usize>,
+}
+
 // ═══════════════════════════════════════════════════════════════════
 // Setup — spawn the fade overlay and narration text
 // ═══════════════════════════════════════════════════════════════════
@@ -298,6 +305,30 @@ pub fn narration_system(
 // ═══════════════════════════════════════════════════════════════════
 // Cinematic director — the main orchestrator
 // ═══════════════════════════════════════════════════════════════════
+
+/// Voice narration trigger — logs when each narration line starts.
+/// When audio is enabled (live-audio feature), this will trigger playback.
+/// Pre-render narration WAVs with: symthaea-voice --formant --text "..."
+pub fn voice_narration_system(
+    director: Res<CinematicDirector>,
+    mut voice: ResMut<VoiceNarration>,
+) {
+    if !director.enabled { return; }
+
+    let t = director.total_time;
+
+    for (idx, &(start, _end, text)) in NARRATION.iter().enumerate() {
+        if t >= start && t < start + 0.2 {
+            if voice.last_spoken != Some(idx) {
+                voice.last_spoken = Some(idx);
+                info!("[voice] t={:.1}s: \"{}\"", t, text);
+                // TODO: when live-audio enabled, play pre-rendered audio:
+                // let audio = asset_server.load(format!("narration/narration_{:02}.ogg", idx));
+                // commands.spawn(AudioPlayer(audio));
+            }
+        }
+    }
+}
 
 /// Cubic ease-in-out.
 fn ease(t: f32) -> f32 {

@@ -132,6 +132,7 @@ impl Plugin for SymtropyPlugin {
                     terra_atlas_bevy::timeline::timeline_autoplay_system,
                     systems::atlas::celestial_orbit_system,
                     systems::atlas::holographic_pulse_system,
+                    systems::audio::globe_audio_system,
                     systems::atlas::cloud_rotation_system,
                     systems::atlas::marker_pulse_system,
                     systems::atlas::consciousness_shader_system,
@@ -151,6 +152,7 @@ impl Plugin for SymtropyPlugin {
                     systems::cinematic_director::cinematic_director_system,
                     systems::cinematic_director::screen_fade_system,
                     systems::cinematic_director::narration_system,
+                    systems::cinematic_director::voice_narration_system,
                     systems::cinematic_director::orbital_tracks_system,
                 ).run_if(resource_exists::<systems::cinematic_director::CinematicDirector>));
         }

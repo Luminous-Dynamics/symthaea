@@ -124,6 +124,7 @@ fn main() {
         });
         app.insert_resource(crate::systems::cinematic_director::ScreenFade::default());
         app.insert_resource(crate::systems::cinematic_director::NarrationState::default());
+        app.insert_resource(crate::systems::cinematic_director::VoiceNarration::default());
         // Frame capture with cinematic output dir
         app.insert_resource(terra_atlas_bevy::frame_capture::FrameCaptureConfig {
             output_dir: "/tmp/symtropy-cinematic-frames".into(),
