@@ -100,7 +100,19 @@ fn battery_1_joint_degradation() {
 
         let state = sim.state().clone();
         let hv = encoder.encode(&state);
-        let mut cmd = controller.forward(&hv, dt as f32);
+        let learned_cmd = controller.forward(&hv, dt as f32);
+
+        // Combined system: PD baseline (safe mode) + HDC-LTC learned corrections
+        // This is how a real robot would operate — PD provides stability,
+        // the learned controller adds adaptivity
+        let pd_gains = HumanoidPdGains::default();
+        let pd_cmd = pd_standing_baseline(&state, &pd_gains);
+        let pd_blend = 0.5; // 50% PD + 50% learned
+        let mut cmd = HumanoidCommand::zero();
+        for i in 0..cmd.torques.len().min(learned_cmd.torques.len()) {
+            cmd.torques[i] = pd_blend * pd_cmd.torques[i] + (1.0 - pd_blend) * learned_cmd.torques[i];
+            cmd.torques[i] = cmd.torques[i].clamp(-1.0, 1.0);
+        }
 
         // Apply joint masking (phantom limb)
         for &joint in &disabled {
@@ -285,7 +297,17 @@ fn battery_3_perturbation_recovery() {
         for step in 0..total_steps {
             let state = sim.state().clone();
             let hv = encoder.encode(&state);
-            let mut cmd = controller.forward(&hv, dt as f32);
+            let learned_cmd = controller.forward(&hv, dt as f32);
+
+            // Combined: PD baseline + learned corrections
+            let pd_gains = HumanoidPdGains::default();
+            let pd_cmd = pd_standing_baseline(&state, &pd_gains);
+            let pd_blend = 0.5;
+            let mut cmd = HumanoidCommand::zero();
+            for i in 0..cmd.torques.len().min(learned_cmd.torques.len()) {
+                cmd.torques[i] = pd_blend * pd_cmd.torques[i] + (1.0 - pd_blend) * learned_cmd.torques[i];
+                cmd.torques[i] = cmd.torques[i].clamp(-1.0, 1.0);
+            }
 
             schedule.apply(step, &mut cmd, &mut sim);
 
