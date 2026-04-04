@@ -168,6 +168,46 @@ pub fn estimate_free_energy(
         + threat_cost * 2.5
 }
 
+/// Φ-gravity: gravitational attraction proportional to integration metrics.
+///
+/// F = G × Φ_self × Φ_other / r² (Plummer-softened)
+///
+/// High-Φ agents attract each other. Low-Φ agents are gravitationally
+/// invisible. Creates natural hierarchy — "integration wells" that
+/// pull others into orbit.
+///
+/// Returns the gravitational acceleration vector (add to velocity).
+pub fn phi_gravity<const D: usize>(
+    position: &SVector<f64, D>,
+    self_phi: f64,
+    nearby_agents: &[(SVector<f64, D>, f64)], // (position, phi)
+    gravitational_constant: f64,               // coupling strength (default ~0.5)
+) -> SVector<f64, D> {
+    let mut accel = SVector::zeros();
+    let softening = 1.0; // Plummer softening to prevent singularity
+
+    for (other_pos, other_phi) in nearby_agents {
+        let delta = other_pos - position;
+        let dist_sq = delta.norm_squared() + softening * softening;
+        let dist = dist_sq.sqrt();
+
+        if dist < 1e-6 { continue; }
+
+        // F = G × Φ₁ × Φ₂ / r² (Plummer-softened)
+        let force_mag = gravitational_constant * self_phi * other_phi / dist_sq;
+
+        // Direction: toward the other agent
+        accel += delta / dist * force_mag;
+    }
+
+    // Clamp to prevent extreme accelerations
+    let mag = accel.norm();
+    if mag > 20.0 {
+        accel *= 20.0 / mag;
+    }
+    accel
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
