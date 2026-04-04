@@ -817,32 +817,22 @@ pub fn aesthetic_switch_system(
 pub fn aesthetic_apply_system(
     mut current: ResMut<CurrentAesthetic>,
     mut materials: ResMut<Assets<StandardMaterial>>,
-    globe_q: Query<&MeshMaterial3d<StandardMaterial>, With<Globe>>,
+    mut holo_materials: ResMut<Assets<terra_atlas_bevy::holographic_material::HolographicMaterial>>,
     atmo_q: Query<&MeshMaterial3d<StandardMaterial>, With<Atmosphere>>,
+    mut cloud_vis: Query<&mut Visibility, With<CloudLayer>>,
 ) {
     if !current.changed { return; }
     current.changed = false;
 
     let config = terra_atlas_core::aesthetics::config_for(current.aesthetic);
 
-    // Update globe material
-    for mat_handle in globe_q.iter() {
-        if let Some(mat) = materials.get_mut(&mat_handle.0) {
-            let c = config.globe.base_color;
-            mat.base_color = Color::linear_rgba(c[0], c[1], c[2], c[3]);
-            let e = config.globe.emissive;
-            mat.emissive = LinearRgba::new(e[0], e[1], e[2], e[3]);
-            mat.unlit = config.globe.unlit;
-            if !config.globe.unlit {
-                mat.perceptual_roughness = config.globe.roughness;
-                mat.metallic = config.globe.metalness;
-            }
-            if config.globe.alpha_blend {
-                mat.alpha_mode = AlphaMode::Blend;
-            } else {
-                mat.alpha_mode = AlphaMode::Opaque;
-            }
-        }
+    // Update holographic globe material
+    for (_, mat) in holo_materials.iter_mut() {
+        let c = config.globe.base_color;
+        mat.base.base_color = Color::linear_rgba(c[0], c[1], c[2], c[3]);
+        let e = config.globe.emissive;
+        mat.base.emissive = LinearRgba::new(e[0], e[1], e[2], e[3]);
+        mat.base.unlit = config.globe.unlit;
     }
 
     // Update atmosphere/fresnel materials
@@ -853,6 +843,17 @@ pub fn aesthetic_apply_system(
             mat.emissive = LinearRgba::new(f.emissive[0], f.emissive[1], f.emissive[2], f.emissive[3]);
         }
     }
+
+    // Toggle cloud layer visibility per aesthetic
+    let show_clouds = matches!(current.aesthetic,
+        terra_atlas_core::aesthetics::Aesthetic::Satellite |
+        terra_atlas_core::aesthetics::Aesthetic::Procedural
+    );
+    for mut vis in cloud_vis.iter_mut() {
+        *vis = if show_clouds { Visibility::Visible } else { Visibility::Hidden };
+    }
+
+    info!("[aesthetic] Switched to {:?}", current.aesthetic);
 }
 
 /// LOD visibility — toggle markers based on camera zoom distance.
