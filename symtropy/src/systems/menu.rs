@@ -43,6 +43,9 @@ pub fn setup_menu(
     // Dark background
     commands.insert_resource(ClearColor(Color::srgb(0.02, 0.02, 0.04)));
 
+    // Camera for UI rendering (Bevy UI requires a camera entity)
+    commands.spawn((Camera2d, MenuUi));
+
     // Root container — full screen, centered column with dark panel
     commands.spawn((
         Node {
