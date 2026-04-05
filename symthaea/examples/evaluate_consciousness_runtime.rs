@@ -217,6 +217,9 @@ fn run_evaluation() -> RunMetrics {
         *metrics.module_timing_sums.entry("CORE_spectral_mip").or_insert(0) += mt.spectral_mip;
         *metrics.module_timing_sums.entry("CORE_consciousness_engine").or_insert(0) += mt.consciousness_engine;
         *metrics.module_timing_sums.entry("CORE_ethics_engine").or_insert(0) += mt.ethics_engine;
+        *metrics.module_timing_sums.entry("CORE_ethics_moral").or_insert(0) += mt.ethics_engine_moral;
+        *metrics.module_timing_sums.entry("CORE_ethics_value").or_insert(0) += mt.ethics_engine_value;
+        *metrics.module_timing_sums.entry("CORE_ethics_harmonies").or_insert(0) += mt.ethics_engine_harmonies;
         *metrics.module_timing_sums.entry("CORE_metadata_assembly").or_insert(0) += mt.metadata_assembly;
         *metrics.module_timing_sums.entry("cross_modal_binding").or_insert(0) += mt.cross_modal_binding;
         *metrics.module_timing_sums.entry("resonator_recall").or_insert(0) += mt.resonator_recall;
