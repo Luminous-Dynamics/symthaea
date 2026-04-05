@@ -5,6 +5,10 @@ set -euo pipefail
 
 cd "$(dirname "$0")"
 
+# Ensure assets are accessible from the binary's directory
+ln -sfn ../../assets target/release/assets 2>/dev/null || true
+ln -sfn ../../assets target/debug/assets 2>/dev/null || true
+
 EXTRA_ARGS="${*}"
 
 echo "[symtropy] Starting Sol Atlas... (args: --globe $EXTRA_ARGS)"
