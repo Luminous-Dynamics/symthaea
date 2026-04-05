@@ -1,0 +1,111 @@
+\contentsline {part}{I\hspace {1em}The Engine}{1}{part.1}%
+\contentsline {chapter}{\numberline {1}Chapter 1: Why Physics, Not Utility Functions}{3}{chapter.1}%
+\contentsline {section}{\numberline {1.1}The Standard Story}{3}{section.1.1}%
+\contentsline {section}{\numberline {1.2}What We Did Instead}{3}{section.1.2}%
+\contentsline {section}{\numberline {1.3}The Question}{4}{section.1.3}%
+\contentsline {section}{\numberline {1.4}What We Found}{4}{section.1.4}%
+\contentsline {section}{\numberline {1.5}The Structure of This Book}{5}{section.1.5}%
+\contentsline {section}{\numberline {1.6}A Note on Honesty}{5}{section.1.6}%
+\contentsline {chapter}{\numberline {2}Chapter 2: Five Channels}{7}{chapter.2}%
+\contentsline {section}{\numberline {2.1}The Architecture}{7}{section.2.1}%
+\contentsline {section}{\numberline {2.2}Channel 1: Motor Gain}{7}{section.2.2}%
+\contentsline {section}{\numberline {2.3}Channel 2: Energy Budget}{8}{section.2.3}%
+\contentsline {section}{\numberline {2.4}Channel 3: Harmony Field Friction}{8}{section.2.4}%
+\contentsline {section}{\numberline {2.5}Channel 4: Sanctuary Zones}{8}{section.2.5}%
+\contentsline {section}{\numberline {2.6}Channel 5: Conformal Curvature}{9}{section.2.6}%
+\contentsline {section}{\numberline {2.7}The Coupling That Matters}{9}{section.2.7}%
+\contentsline {chapter}{\numberline {3}Chapter 3: What's Real and What Isn't}{11}{chapter.3}%
+\contentsline {section}{\numberline {3.1}The Classification}{11}{section.3.1}%
+\contentsline {section}{\numberline {3.2}The Audit}{11}{section.3.2}%
+\contentsline {section}{\numberline {3.3}What This Means for the Findings}{12}{section.3.3}%
+\contentsline {section}{\numberline {3.4}Why We're Telling You This}{12}{section.3.4}%
+\contentsline {section}{\numberline {3.5}The Proposed Standard}{13}{section.3.5}%
+\contentsline {section}{\numberline {3.6}The Cost of Honesty}{13}{section.3.6}%
+\contentsline {chapter}{\numberline {4}Chapter 4: From Twenty to One Thousand}{15}{chapter.4}%
+\contentsline {section}{\numberline {4.1}The Scaling Problem}{15}{section.4.1}%
+\contentsline {section}{\numberline {4.2}The Spatial Hash}{15}{section.4.2}%
+\contentsline {section}{\numberline {4.3}The Benchmark}{15}{section.4.3}%
+\contentsline {section}{\numberline {4.4}Finding 37: Cooperation at Scale}{16}{section.4.4}%
+\contentsline {section}{\numberline {4.5}Determinism}{17}{section.4.5}%
+\contentsline {part}{II\hspace {1em}The Illusion}{19}{part.2}%
+\contentsline {chapter}{\numberline {5}A Note Before Part II}{21}{chapter.5}%
+\contentsline {chapter}{\numberline {6}Chapter 5: Cooperation as Thermodynamic Necessity}{23}{chapter.6}%
+\contentsline {section}{\numberline {6.1}The Simplest Possible World}{23}{section.6.1}%
+\contentsline {section}{\numberline {6.2}What Happens}{23}{section.6.2}%
+\contentsline {section}{\numberline {6.3}The Six-Condition Ablation}{24}{section.6.3}%
+\contentsline {section}{\numberline {6.4}The Metric Independence Result}{24}{section.6.4}%
+\contentsline {section}{\numberline {6.5}What We Could Not Kill}{25}{section.6.5}%
+\contentsline {section}{\numberline {6.6}The Implication}{25}{section.6.6}%
+\contentsline {chapter}{\numberline {7}Chapter 6: The Temperature of Society}{27}{chapter.7}%
+\contentsline {section}{\numberline {7.1}The Ising Analogy}{27}{section.7.1}%
+\contentsline {section}{\numberline {7.2}The Pressure Sweep}{27}{section.7.2}%
+\contentsline {section}{\numberline {7.3}The Bistability}{28}{section.7.3}%
+\contentsline {section}{\numberline {7.4}Desperation Cooperation}{28}{section.7.4}%
+\contentsline {section}{\numberline {7.5}The Thermodynamic Response}{28}{section.7.5}%
+\contentsline {section}{\numberline {7.6}The Parameter Sensitivity}{29}{section.7.6}%
+\contentsline {section}{\numberline {7.7}The Critical Infrastructure}{29}{section.7.7}%
+\contentsline {section}{\numberline {7.8}The Phase Diagram}{30}{section.7.8}%
+\contentsline {chapter}{\numberline {8}Chapter 7: Social Bonds and the Physics of Friendship}{31}{chapter.8}%
+\contentsline {section}{\numberline {8.1}The Constraint Hypothesis}{31}{section.8.1}%
+\contentsline {section}{\numberline {8.2}Finding 19: Bonds Transform Survival}{31}{section.8.2}%
+\contentsline {section}{\numberline {8.3}The Dunbar Limit}{32}{section.8.3}%
+\contentsline {section}{\numberline {8.4}Migration}{32}{section.8.4}%
+\contentsline {section}{\numberline {8.5}Generational Wealth}{33}{section.8.5}%
+\contentsline {chapter}{\numberline {9}Chapter 8: Raiders, Evolvers, and the Solidarity Response}{35}{chapter.9}%
+\contentsline {section}{\numberline {9.1}The Adversarial Threshold}{35}{section.9.1}%
+\contentsline {section}{\numberline {9.2}The Solidarity Response}{35}{section.9.2}%
+\contentsline {section}{\numberline {9.3}The Arms Race}{36}{section.9.3}%
+\contentsline {section}{\numberline {9.4}The Evolutionary Lesson}{37}{section.9.4}%
+\contentsline {chapter}{\numberline {10}Chapter 9: The Economics of Scarcity}{39}{chapter.10}%
+\contentsline {section}{\numberline {10.1}Three Parables}{39}{section.10.1}%
+\contentsline {subsection}{\numberline {10.1.1}Parable One: The Curse of Abundance}{39}{subsection.10.1.1}%
+\contentsline {subsection}{\numberline {10.1.2}Parable Two: The Futility of Charity}{40}{subsection.10.1.2}%
+\contentsline {subsection}{\numberline {10.1.3}Parable Three: The Equal Opportunity Paradox}{40}{subsection.10.1.3}%
+\contentsline {section}{\numberline {10.2}The Unified Theory}{41}{section.10.2}%
+\contentsline {chapter}{\numberline {11}Chapter 10: Technology and the Shrinking of Range}{43}{chapter.11}%
+\contentsline {section}{\numberline {11.1}Five Eras}{43}{section.11.1}%
+\contentsline {section}{\numberline {11.2}The Results}{43}{section.11.2}%
+\contentsline {section}{\numberline {11.3}Connection Is Not Proximity}{44}{section.11.3}%
+\contentsline {chapter}{\numberline {12}Chapter 11: Learning and the Paradox of Optimal Defaults}{45}{chapter.12}%
+\contentsline {section}{\numberline {12.1}The Learning Hypothesis}{45}{section.12.1}%
+\contentsline {section}{\numberline {12.2}Finding 31: Weights Are Already Optimal}{45}{section.12.2}%
+\contentsline {section}{\numberline {12.3}Finding 34: Memory Doesn't Help Either}{46}{section.12.3}%
+\contentsline {section}{\numberline {12.4}Finding 44: The U-Curve Mechanism}{46}{section.12.4}%
+\contentsline {section}{\numberline {12.5}Finding 45: Harmony Dimensionality Is Irrelevant}{47}{section.12.5}%
+\contentsline {section}{\numberline {12.6}The Paradox of Optimal Defaults}{47}{section.12.6}%
+\contentsline {chapter}{\numberline {13}Chapter 12: Higher Dimensions and the Geometry of Cooperation}{49}{chapter.13}%
+\contentsline {section}{\numberline {13.1}The 3D Test}{49}{section.13.1}%
+\contentsline {section}{\numberline {13.2}Curvature: Beautiful Mathematics, Zero Social Effect}{50}{section.13.2}%
+\contentsline {section}{\numberline {13.3}What Dimension Teaches}{50}{section.13.3}%
+\contentsline {part}{III\hspace {1em}The Unraveling}{53}{part.3}%
+\contentsline {chapter}{\numberline {14}Chapter 13: The Thread That Unraveled Everything}{55}{chapter.14}%
+\contentsline {section}{\numberline {14.1}The Question}{55}{section.14.1}%
+\contentsline {section}{\numberline {14.2}The Result}{56}{section.14.2}%
+\contentsline {section}{\numberline {14.3}The FEP Gradient Was the Problem}{56}{section.14.3}%
+\contentsline {section}{\numberline {14.4}What By-Product Mutualism Means}{56}{section.14.4}%
+\contentsline {chapter}{\numberline {15}Chapter 14: Seven Failed Rescues}{59}{chapter.15}%
+\contentsline {section}{\numberline {15.1}The Rescue Attempts}{59}{section.15.1}%
+\contentsline {section}{\numberline {15.2}Rescue 1: Make Wells Scarce (F48)}{59}{section.15.2}%
+\contentsline {section}{\numberline {15.3}Rescue 2: Make Wells Volatile (F50)}{59}{section.15.3}%
+\contentsline {section}{\numberline {15.4}Rescue 3: Make Wells Hidden (F49)}{60}{section.15.4}%
+\contentsline {section}{\numberline {15.5}Rescue 4: Require Threshold Co-Location (F51)}{60}{section.15.5}%
+\contentsline {section}{\numberline {15.6}Rescue 5: Require Compatible Partners (F52)}{60}{section.15.6}%
+\contentsline {section}{\numberline {15.7}Rescue 6: Remove Wells Entirely (F53)}{61}{section.15.7}%
+\contentsline {section}{\numberline {15.8}Rescue 7: The FEP Gradient as Informational Drive}{61}{section.15.8}%
+\contentsline {section}{\numberline {15.9}What the Rescues Taught Us}{61}{section.15.9}%
+\contentsline {chapter}{\numberline {16}Chapter 15: Resource Geometry}{63}{chapter.16}%
+\contentsline {section}{\numberline {16.1}The Thesis, Revised}{63}{section.16.1}%
+\contentsline {section}{\numberline {16.2}What This Explains}{63}{section.16.2}%
+\contentsline {section}{\numberline {16.3}What This Does Not Explain}{64}{section.16.3}%
+\contentsline {section}{\numberline {16.4}The Constructive Proof, Revised}{64}{section.16.4}%
+\contentsline {section}{\numberline {16.5}The Lesson for Simulation Science}{64}{section.16.5}%
+\contentsline {section}{\numberline {16.6}The Closing}{65}{section.16.6}%
+\contentsline {chapter}{\numberline {17}Chapter 16: The Freedom to Walk Away}{67}{chapter.17}%
+\contentsline {section}{\numberline {17.1}What Survived}{67}{section.17.1}%
+\contentsline {section}{\numberline {17.2}By-Product Mutualism Requires Co-Location}{67}{section.17.2}%
+\contentsline {section}{\numberline {17.3}The U-Curve Is About Resource Access, Not Commitment}{68}{section.17.3}%
+\contentsline {section}{\numberline {17.4}The Bowling Alone Reinterpretation}{68}{section.17.4}%
+\contentsline {section}{\numberline {17.5}What This Means}{68}{section.17.5}%
+\contentsline {section}{\numberline {17.6}The Last Word}{69}{section.17.6}%
+\contentsline {section}{\numberline {17.7}Appendix Note}{69}{section.17.7}%
+\contentsline {chapter}{Reproduction}{71}{chapter*.3}%
