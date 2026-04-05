@@ -23,19 +23,19 @@ html {
 .game-sliders { gap: calc(0.75rem * var(--consciousness-density)); }
 
 :root, [data-theme="dark"] {
-    --bg: #0a0a0a;
-    --bg-raised: #141420;
-    --surface: #1a1a2e;
-    --surface-hover: #222240;
-    --primary: #7c3aed;
-    --primary-hover: #6d28d9;
-    --primary-subtle: rgba(124, 58, 237, 0.15);
-    --text: #e2e8f0;
-    --text-secondary: #94a3b8;
-    --text-tertiary: #64748b;
-    --text-on-primary: #ffffff;
-    --border: #334155;
-    --border-focus: #7c3aed;
+    --bg: #060d12;
+    --bg-raised: #0c1a22;
+    --surface: #0f2130;
+    --surface-hover: #152d3e;
+    --primary: #0ed4a8;
+    --primary-hover: #0bbf98;
+    --primary-subtle: rgba(14, 212, 168, 0.12);
+    --text: #d4e8f0;
+    --text-secondary: #8ba8b8;
+    --text-tertiary: #5a7a8b;
+    --text-on-primary: #060d12;
+    --border: #1a3545;
+    --border-focus: #0ed4a8;
     --radius: 8px;
     --shadow-sm: 0 1px 2px rgba(0,0,0,0.3);
     --shadow-md: 0 4px 12px rgba(0,0,0,0.4);
@@ -66,15 +66,15 @@ html {
     --bg-raised: #ffffff;
     --surface: #ffffff;
     --surface-hover: #f1f5f9;
-    --primary: #7c3aed;
-    --primary-hover: #6d28d9;
-    --primary-subtle: rgba(124, 58, 237, 0.08);
+    --primary: #0ba88a;
+    --primary-hover: #09967b;
+    --primary-subtle: rgba(11, 168, 138, 0.08);
     --text: #1e293b;
     --text-secondary: #475569;
     --text-tertiary: #94a3b8;
     --text-on-primary: #ffffff;
-    --border: #e2e8f0;
-    --border-focus: #7c3aed;
+    --border: #d0e4e8;
+    --border-focus: #0ba88a;
     --radius: 8px;
     --shadow-sm: 0 1px 2px rgba(0,0,0,0.06);
     --shadow-md: 0 4px 12px rgba(0,0,0,0.08);
@@ -101,15 +101,15 @@ html {
     --bg-raised: #111111;
     --surface: #1a1a1a;
     --surface-hover: #2a2a2a;
-    --primary: #a78bfa;
-    --primary-hover: #8b5cf6;
+    --primary: #38f5cc;
+    --primary-hover: #12e8b8;
     --primary-subtle: rgba(167, 139, 250, 0.2);
     --text: #ffffff;
     --text-secondary: #d1d5db;
     --text-tertiary: #9ca3af;
     --text-on-primary: #000000;
     --border: #ffffff;
-    --border-focus: #a78bfa;
+    --border-focus: #38f5cc;
     --radius: 8px;
     --shadow-sm: 0 0 0 1px #ffffff;
     --shadow-md: 0 0 0 2px #ffffff;
@@ -430,7 +430,7 @@ h2 { font-size: 1.75rem; margin-bottom: 0.5rem; }
 
 .progress-bar {
     height: 100%;
-    background: linear-gradient(90deg, var(--primary), #a78bfa);
+    background: linear-gradient(90deg, var(--primary), #38f5cc);
     border-radius: 4px;
     transition: width 0.6s ease;
 }
@@ -543,7 +543,7 @@ h2 { font-size: 1.75rem; margin-bottom: 0.5rem; }
 
 .skill-bar {
     height: 100%;
-    background: linear-gradient(90deg, var(--primary), #a78bfa);
+    background: linear-gradient(90deg, var(--primary), #38f5cc);
     border-radius: 3px;
     transition: width 0.6s ease;
 }
@@ -763,7 +763,7 @@ h2 { font-size: 1.75rem; margin-bottom: 0.5rem; }
 
 .review-progress .progress-fill {
     height: 100%;
-    background: linear-gradient(90deg, var(--primary), #a78bfa);
+    background: linear-gradient(90deg, var(--primary), #38f5cc);
     border-radius: 3px;
     transition: width 0.4s ease;
 }
@@ -1192,12 +1192,12 @@ h2 { font-size: 1.75rem; margin-bottom: 0.5rem; }
     letter-spacing: 0.03em;
 }
 
-.cat-curriculum { background: rgba(124, 58, 237, 0.15); color: #a78bfa; }
+.cat-curriculum { background: rgba(124, 58, 237, 0.15); color: #38f5cc; }
 .cat-policy { background: rgba(59, 130, 246, 0.15); color: #60a5fa; }
 .cat-community { background: rgba(34, 197, 94, 0.15); color: #4ade80; }
 .cat-finance { background: rgba(234, 179, 8, 0.15); color: #facc15; }
 .cat-technical { background: rgba(249, 115, 22, 0.15); color: #fb923c; }
-.cat-protocol { background: rgba(168, 85, 247, 0.15); color: #c084fc; }
+.cat-protocol { background: rgba(168, 85, 247, 0.15); color: #38f5cc; }
 .cat-credentials { background: rgba(14, 165, 233, 0.15); color: #38bdf8; }
 .cat-treasury { background: rgba(234, 179, 8, 0.15); color: #facc15; }
 .cat-governance { background: rgba(236, 72, 153, 0.15); color: #f472b6; }
@@ -1231,7 +1231,7 @@ h2 { font-size: 1.75rem; margin-bottom: 0.5rem; }
 }
 
 .mode-simple { background: rgba(148, 163, 184, 0.15); color: #94a3b8; }
-.mode-quadratic { background: rgba(124, 58, 237, 0.2); color: #a78bfa; }
+.mode-quadratic { background: rgba(124, 58, 237, 0.2); color: #38f5cc; }
 .mode-conviction { background: rgba(234, 179, 8, 0.2); color: #facc15; }
 
 /* --- Vote bar --- */
@@ -1920,7 +1920,7 @@ h2 { font-size: 1.75rem; margin-bottom: 0.5rem; }
 }
 
 .consciousness-bar {
-    background: linear-gradient(90deg, #7c3aed, #a78bfa, #c4b5fd);
+    background: linear-gradient(90deg, #0ed4a8, #38f5cc, #5ef7d8);
 }
 
 /* --- Metric rows (Phi, Coherence, Free Energy) --- */
@@ -1960,7 +1960,7 @@ h2 { font-size: 1.75rem; margin-bottom: 0.5rem; }
 }
 
 .phi-bar {
-    background: linear-gradient(90deg, #8b5cf6, #c084fc);
+    background: linear-gradient(90deg, #12e8b8, #38f5cc);
 }
 
 .coherence-bar {
@@ -2247,7 +2247,7 @@ h2 { font-size: 1.75rem; margin-bottom: 0.5rem; }
     height: 100%;
     border-radius: 3px;
     transition: width 0.6s ease;
-    background: linear-gradient(90deg, var(--primary), #a78bfa);
+    background: linear-gradient(90deg, var(--primary), #38f5cc);
 }
 
 /* Color the bar by mastery class */
@@ -2731,7 +2731,7 @@ h2 { font-size: 1.75rem; margin-bottom: 0.5rem; }
 .landing-title {
     font-size: 3rem;
     font-weight: 800;
-    background: linear-gradient(135deg, #7c3aed, #3b82f6, #22c55e);
+    background: linear-gradient(135deg, #0ed4a8, #3b82f6, #22c55e);
     -webkit-background-clip: text;
     background-clip: text;
     -webkit-text-fill-color: transparent;
@@ -2782,7 +2782,7 @@ h2 { font-size: 1.75rem; margin-bottom: 0.5rem; }
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
 }
 
-.role-teacher:hover { border-color: #7c3aed; box-shadow: 0 8px 24px rgba(124, 58, 237, 0.2); }
+.role-teacher:hover { border-color: #0ed4a8; box-shadow: 0 8px 24px rgba(124, 58, 237, 0.2); }
 .role-student:hover { border-color: #3b82f6; box-shadow: 0 8px 24px rgba(59, 130, 246, 0.2); }
 .role-parent:hover  { border-color: #22c55e; box-shadow: 0 8px 24px rgba(34, 197, 94, 0.2); }
 
@@ -2979,7 +2979,7 @@ h2 { font-size: 1.75rem; margin-bottom: 0.5rem; }
     max-width: 700px;
     margin: 0 auto 1.5rem;
     padding: 1.25rem 2rem;
-    background: linear-gradient(135deg, var(--primary), #6d28d9);
+    background: linear-gradient(135deg, var(--primary), #0bbf98);
     color: var(--text-on-primary);
     border: none;
     border-radius: 16px;
@@ -3655,12 +3655,12 @@ h2 { font-size: 1.75rem; margin-bottom: 0.5rem; }
     }
 
     .certificate-border {
-        border: 3px double #7c3aed !important;
+        border: 3px double #0ed4a8 !important;
         padding: 3rem 2.5rem;
     }
 
     .certificate-heading {
-        color: #7c3aed !important;
+        color: #0ed4a8 !important;
     }
 
     .certificate-certifies {
@@ -3957,7 +3957,7 @@ h2 { font-size: 1.75rem; margin-bottom: 0.5rem; }
 }
 
 .caps-badge-grade { background: var(--primary-subtle); color: var(--primary); }
-.caps-badge-exam { background: rgba(192, 132, 252, 0.15); color: #c084fc; }
+.caps-badge-exam { background: rgba(192, 132, 252, 0.15); color: #38f5cc; }
 .caps-badge-bloom { background: rgba(59, 130, 246, 0.15); color: var(--info); }
 .caps-badge-hours { background: rgba(34, 197, 94, 0.15); color: var(--success); }
 
@@ -4143,7 +4143,7 @@ h2 { font-size: 1.75rem; margin-bottom: 0.5rem; }
 /* Time-of-day color modulation */
 [data-time="morning"] { --primary: #6366f1; } /* cooler violet */
 [data-time="evening"] {
-    --primary: #a78bfa; /* warmer lavender */
+    --primary: #38f5cc; /* warmer lavender */
     --bg: #0c0a0a; /* slightly warm black */
     --surface: #1e1a1a; /* warm surface */
 }
