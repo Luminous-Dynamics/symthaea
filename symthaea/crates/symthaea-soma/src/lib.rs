@@ -35,7 +35,7 @@
 //! println!("Consciousness: {}", result.consciousness_level);
 //! ```
 
-#![cfg_attr(not(feature = "native-ffi"), deny(unsafe_code))]
+#![cfg_attr(not(any(feature = "native-ffi", feature = "litert")), deny(unsafe_code))]
 
 // Re-export Spore kernel types for downstream consumers
 pub use symthaea_spore::broca;
@@ -68,6 +68,10 @@ pub mod positioning_bridge;
 // Full Broca language center (replaces BrocaLite)
 #[cfg(feature = "broca-full")]
 pub mod broca_soma;
+
+// On-device LLM via LiteRT-LM (Gemma 4 E2B)
+#[cfg(feature = "litert")]
+pub mod litert_bridge;
 
 // Native FFI for Android/iOS
 #[cfg(feature = "native-ffi")]

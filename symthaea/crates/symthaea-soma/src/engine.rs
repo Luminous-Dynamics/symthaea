@@ -18,6 +18,8 @@ use symthaea_spore::engine::{CycleResult, SporeEngine};
 
 #[cfg(feature = "broca-full")]
 use crate::broca_soma::BrocaSoma;
+#[cfg(feature = "litert")]
+use crate::litert_bridge::{LiteRTBackend, LiteRTBridge};
 #[cfg(feature = "screen-vision")]
 use crate::screen_vision::{ScreenPerception, ScreenVisionBridge, ScreenVisionConfig};
 #[cfg(feature = "screen-vision")]
@@ -86,6 +88,10 @@ pub struct SomaEngine {
     #[cfg(feature = "broca-full")]
     broca_soma: BrocaSoma,
 
+    /// On-device Gemma 4 E2B via LiteRT-LM.
+    #[cfg(feature = "litert")]
+    pub(crate) litert: Option<LiteRTBridge>,
+
     // Platform state (set via native FFI or programmatically)
     /// Current thermal level (0=Nominal, 1=Fair, 2=Serious, 3=Critical, 4=Emergency).
     pub thermal_level: u8,
@@ -124,6 +130,8 @@ impl SomaEngine {
             touch_body: TouchBody::new(),
             #[cfg(feature = "broca-full")]
             broca_soma: BrocaSoma::new(),
+            #[cfg(feature = "litert")]
+            litert: None,
             thermal_level: 0,
             battery_percent: 100,
             battery_charging: false,
@@ -676,6 +684,37 @@ impl SomaEngine {
             self.sensor_bridge.motion_state(),
             self.sensor_bridge.privacy_mode(),
         )
+    }
+
+    // ======================================================================
+    // On-device LLM (LiteRT-LM / Gemma 4 E2B)
+    // ======================================================================
+
+    /// Initialize the on-device LLM engine with a model path.
+    /// Call after the Kotlin LiteRTManager confirms the model is downloaded.
+    #[cfg(feature = "litert")]
+    pub fn litert_init(&mut self, model_path: &str) -> bool {
+        let mut bridge = LiteRTBridge::new(model_path.to_string(), LiteRTBackend::Gpu);
+        let ready = bridge.init();
+        self.litert = Some(bridge);
+        ready
+    }
+
+    /// Whether the on-device LLM is available for inference.
+    #[cfg(feature = "litert")]
+    pub fn litert_available(&self) -> bool {
+        self.litert.as_ref().map_or(false, |b| b.is_available())
+    }
+
+    /// Generate text using the on-device LLM, gated by current consciousness level.
+    #[cfg(feature = "litert")]
+    pub fn litert_generate(&self, prompt: &str, max_tokens: u32) -> Option<String> {
+        let consciousness = self.spore.consciousness_level();
+        self.litert.as_ref()?.generate_consciousness_gated(
+            prompt,
+            max_tokens,
+            consciousness,
+        ).map(|r| r.text)
     }
 
     /// Set persistence storage backend.
