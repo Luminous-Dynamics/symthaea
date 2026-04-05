@@ -206,6 +206,20 @@ fn run_evaluation() -> RunMetrics {
         *metrics.module_timing_sums.entry("prefrontal").or_insert(0) += mt.prefrontal;
         *metrics.module_timing_sums.entry("cross_modal_binding").or_insert(0) += mt.cross_modal_binding;
         *metrics.module_timing_sums.entry("resonator_recall").or_insert(0) += mt.resonator_recall;
+        // Core pipeline phases (the missing 78%)
+        *metrics.module_timing_sums.entry("CORE_hdc_encode").or_insert(0) += mt.core_hdc_encode;
+        *metrics.module_timing_sums.entry("CORE_compress").or_insert(0) += mt.core_compress;
+        *metrics.module_timing_sums.entry("CORE_semantic_lookup").or_insert(0) += mt.core_semantic_lookup;
+        *metrics.module_timing_sums.entry("CORE_cfc_step").or_insert(0) += mt.core_cfc_step;
+        *metrics.module_timing_sums.entry("CORE_predict").or_insert(0) += mt.core_predict;
+        *metrics.module_timing_sums.entry("CORE_training").or_insert(0) += mt.core_training;
+        *metrics.module_timing_sums.entry("CORE_parallel_post").or_insert(0) += mt.core_parallel_postprocess;
+        *metrics.module_timing_sums.entry("CORE_spectral_mip").or_insert(0) += mt.spectral_mip;
+        *metrics.module_timing_sums.entry("CORE_consciousness_engine").or_insert(0) += mt.consciousness_engine;
+        *metrics.module_timing_sums.entry("CORE_ethics_engine").or_insert(0) += mt.ethics_engine;
+        *metrics.module_timing_sums.entry("CORE_metadata_assembly").or_insert(0) += mt.metadata_assembly;
+        *metrics.module_timing_sums.entry("cross_modal_binding").or_insert(0) += mt.cross_modal_binding;
+        *metrics.module_timing_sums.entry("resonator_recall").or_insert(0) += mt.resonator_recall;
     }
 
     metrics

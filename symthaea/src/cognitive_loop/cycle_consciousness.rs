@@ -1163,7 +1163,7 @@ impl CognitiveLoopService {
     ) -> f64 {
         let _t = Instant::now();
         let correlation = if let Some(ref mut validator) = self.primitive_tier.phi_validation {
-            if self.stats.total_cycles % 499 == 0 && self.stats.total_cycles >= 499 {
+            if self.stats.total_cycles % 997 == 0 && self.stats.total_cycles >= 997 {
                 let results = validator.run_validation_study(10);
                 let r = results.pearson_r;
                 self.carryover.quality.phi_validation_correlation = r;

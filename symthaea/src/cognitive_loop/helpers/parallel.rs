@@ -346,7 +346,7 @@ pub(in crate::cognitive_loop) fn parallel_consciousness_branch_a(
     let t = Instant::now();
     let (phi_validation_correlation, new_phi_validation, new_spectral) =
         if let Some(ref mut validator) = phi_validation {
-            if total_cycles % 499 == 0 && total_cycles >= 499 {
+            if total_cycles % 997 == 0 && total_cycles >= 997 {
                 let results = validator.run_validation_study(10);
                 let r = results.pearson_r;
                 let mut new_spectral = None;
