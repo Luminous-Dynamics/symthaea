@@ -23,6 +23,18 @@ pub struct LoadingUi;
 #[derive(Component)]
 pub struct SelectionIndicator(pub usize);
 
+/// Nexus transition state — smooth launch animation.
+#[derive(Resource, Default)]
+pub struct NexusTransition {
+    pub active: bool,
+    pub target_phase: Option<GamePhase>,
+    pub progress: f32, // 0.0 → 1.0 over ~1.5 seconds
+}
+
+/// Fade overlay for Nexus transitions.
+#[derive(Component)]
+pub struct NexusFade;
+
 /// Spawn the Symtropy Nexus launcher.
 pub fn setup_menu(
     mut commands: Commands,
@@ -105,6 +117,22 @@ pub fn setup_menu(
         ));
     });
 
+    // Transition fade overlay (initially transparent)
+    commands.spawn((
+        Node {
+            width: Val::Vw(100.0),
+            height: Val::Vh(100.0),
+            position_type: PositionType::Absolute,
+            ..default()
+        },
+        BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.0)),
+        ZIndex(i32::MAX),
+        NexusFade,
+        MenuUi,
+    ));
+
+    commands.insert_resource(NexusTransition::default());
+
     eprintln!("[symtropy] Nexus displayed — {} experiences available", registry.experiences.len());
 }
 
@@ -141,7 +169,7 @@ pub fn menu_input_system(
         ));
     }
 
-    // Launch: Enter or N
+    // Launch: Enter or N — starts transition animation
     if keyboard.just_pressed(KeyCode::Enter) || keyboard.just_pressed(KeyCode::KeyN) {
         let exp = &registry.experiences[registry.selected];
         eprintln!("[nexus] Launching: {}", exp.name);
@@ -152,6 +180,8 @@ pub fn menu_input_system(
                 .map(|d| d.as_millis() as u64)
                 .unwrap_or(42);
         }
+
+        // Start transition (immediate for now — cinematic coalescence in future)
         next_state.set(exp.phase);
     }
 

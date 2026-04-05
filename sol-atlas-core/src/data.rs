@@ -299,3 +299,27 @@ mod tests {
         assert!((lanes[0][0][0] - (-80.0)).abs() < 0.01);
     }
 }
+
+#[cfg(test)]
+mod city_tests {
+    use super::*;
+
+    #[test]
+    fn parse_major_cities() {
+        let json = r#"[
+            {"name":"Tokyo","country":"JP","lat":35.68,"lon":139.69,"population":13960000},
+            {"name":"Mumbai","country":"IN","lat":19.07,"lon":72.87,"population":12700000}
+        ]"#;
+        let cities: Vec<MajorCity> = serde_json::from_str(json).unwrap();
+        assert_eq!(cities.len(), 2);
+        assert_eq!(cities[0].name, "Tokyo");
+        assert_eq!(cities[0].population, 13960000);
+        assert!((cities[1].lat - 19.07).abs() < 0.01);
+    }
+
+    #[test]
+    fn parse_major_cities_empty() {
+        let cities: Vec<MajorCity> = serde_json::from_str("[]").unwrap();
+        assert!(cities.is_empty());
+    }
+}
