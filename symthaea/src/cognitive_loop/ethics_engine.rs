@@ -621,6 +621,9 @@ struct EthicsEngineCache {
     last_compliance_flags: Vec<String>,
     /// Cached ahimsa violation flag from last Stage 1.
     last_ahimsa_violated: bool,
+    /// Hash of last morally-parsed input for memoization.
+    /// Skip re-parsing when the same input appears within the 7-cycle window.
+    last_moral_input_hash: u64,
 }
 
 impl Default for EthicsEngineCache {
@@ -643,6 +646,7 @@ impl Default for EthicsEngineCache {
             last_compliance_risk: 0.0,
             last_compliance_flags: Vec::new(),
             last_ahimsa_violated: false,
+            last_moral_input_hash: 0,
         }
     }
 }
@@ -1009,29 +1013,26 @@ impl EthicsEngine {
                 (harmony_coordinates[7] + input.stillness_boost as f64).clamp(-1.0, 1.0);
         }
 
-        // Harmony interaction matrix: observe co-activations and apply synergies
-        self.interaction_matrix.observe(&harmony_coordinates, 0.05);
-        harmony_coordinates = self.interaction_matrix.apply(&harmony_coordinates, 0.15);
+        // Harmony interaction matrix: observe co-activations and apply synergies.
+        // Gated to harmonies interval (19 cycles) — these operations involve
+        // matrix multiplication and entropy computation that cost 15-20ms/cycle
+        // when run unconditionally.
+        if harmonies_us > 0 {
+            self.interaction_matrix.observe(&harmony_coordinates, 0.05);
+            harmony_coordinates = self.interaction_matrix.apply(&harmony_coordinates, 0.15);
 
-        // ── Love Coherence: emergent macro-state of harmony resonance ────
-        // Not a 9th harmony but the *topology* of the 8D manifold when all
-        // harmonies vibrate in synergy. Gates confidence, not capability.
-        let love_coherence = self.interaction_matrix.love_coherence(&harmony_coordinates);
-        self.cache.last_love_coherence = love_coherence.value;
+            // ── Love Coherence: emergent macro-state of harmony resonance ────
+            let love_coherence = self.interaction_matrix.love_coherence(&harmony_coordinates);
+            self.cache.last_love_coherence = love_coherence.value;
 
-        // Love coherence → confidence modulation (gate confidence, not capability)
-        // High coherence = act with confidence; low = act more cautiously
-        if love_coherence.value > 0.6 {
-            confidence_delta += 0.01 * (love_coherence.value - 0.6) as f32;
-        } else if love_coherence.value < 0.3 {
-            confidence_delta -= 0.01 * (0.3 - love_coherence.value) as f32;
-        }
+            // Love coherence → confidence modulation
+            if love_coherence.value > 0.6 {
+                confidence_delta += 0.01 * (love_coherence.value - 0.6) as f32;
+            } else if love_coherence.value < 0.3 {
+                confidence_delta -= 0.01 * (0.3 - love_coherence.value) as f32;
+            }
 
-        // ── Play weight monitoring (Change 4) ────────────────────────────
-        // Infinite Play is index 3 in Harmony::all() canonical order.
-        // When the Hebbian matrix consistently develops synergy for Play,
-        // the base weight of 0.09 may need upward revision.
-        {
+            // ── Play weight monitoring ────────────────────────────────────
             let play_idx = 3;
             let play_avg: f64 = (0..N_HARMONIES)
                 .filter(|&j| j != play_idx)
@@ -1049,6 +1050,14 @@ impl EthicsEngine {
                         play_avg
                     );
                 }
+            }
+        } else {
+            // Non-harmonies cycle: use cached love coherence for confidence modulation
+            let cached_lc = self.cache.last_love_coherence;
+            if cached_lc > 0.6 {
+                confidence_delta += 0.01 * (cached_lc - 0.6) as f32;
+            } else if cached_lc < 0.3 {
+                confidence_delta -= 0.01 * (0.3 - cached_lc) as f32;
             }
         }
 
@@ -1214,7 +1223,7 @@ impl EthicsEngine {
             anomaly_report,
             harmony_coordinates,
             moral_free_energy,
-            love_coherence: love_coherence.value,
+            love_coherence: self.cache.last_love_coherence,
             compliance_risk,
             compliance_flags,
             compliance_fresh,

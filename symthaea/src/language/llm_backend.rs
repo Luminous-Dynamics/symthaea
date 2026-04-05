@@ -233,7 +233,7 @@ pub struct OllamaBackend {
     client: reqwest::Client,
 }
 
-/// Ollama API request body.
+/// Ollama /api/generate request body (legacy, used for streaming).
 #[derive(Serialize)]
 struct OllamaRequest<'a> {
     model: &'a str,
@@ -244,6 +244,21 @@ struct OllamaRequest<'a> {
     options: OllamaOptions,
 }
 
+/// Ollama /api/chat request body (preferred — works with Gemma 4).
+#[derive(Serialize)]
+struct OllamaChatRequest<'a> {
+    model: &'a str,
+    messages: Vec<OllamaChatMessage<'a>>,
+    stream: bool,
+    options: OllamaOptions,
+}
+
+#[derive(Serialize)]
+struct OllamaChatMessage<'a> {
+    role: &'a str,
+    content: &'a str,
+}
+
 /// Ollama generation options.
 #[derive(Serialize)]
 struct OllamaOptions {
@@ -251,12 +266,23 @@ struct OllamaOptions {
     num_predict: usize,
 }
 
-/// Ollama API response body.
+/// Ollama /api/generate response body.
 #[derive(Deserialize)]
 struct OllamaResponse {
     response: String,
-    #[allow(dead_code)] // Used by serde deserialization
+    #[allow(dead_code)]
     done: bool,
+}
+
+/// Ollama /api/chat response body.
+#[derive(Deserialize)]
+struct OllamaChatResponse {
+    message: OllamaChatResponseMessage,
+}
+
+#[derive(Deserialize)]
+struct OllamaChatResponseMessage {
+    content: String,
 }
 
 impl OllamaBackend {
@@ -322,7 +348,8 @@ impl OllamaBackend {
 #[async_trait::async_trait]
 impl LLMBackend for OllamaBackend {
     async fn generate(&self, prompt: &str, params: &GenerationParams) -> Result<String> {
-        let url = format!("{}/api/generate", self.base_url);
+        // Use /api/chat (not /api/generate) — Gemma 4 returns empty with generate API.
+        let url = format!("{}/api/chat", self.base_url);
 
         // Merge consciousness context into system prompt if present
         let effective_system: Option<String> =
@@ -347,10 +374,24 @@ impl LLMBackend for OllamaBackend {
             params.temperature
         };
 
-        let request_body = OllamaRequest {
+        // Build messages array (system + user)
+        let mut messages = Vec::with_capacity(2);
+        let system_text;
+        if let Some(ref sys) = effective_system {
+            system_text = sys.clone();
+            messages.push(OllamaChatMessage {
+                role: "system",
+                content: &system_text,
+            });
+        }
+        messages.push(OllamaChatMessage {
+            role: "user",
+            content: prompt,
+        });
+
+        let request_body = OllamaChatRequest {
             model: &self.model,
-            prompt,
-            system: effective_system.as_deref(),
+            messages,
             stream: false,
             options: OllamaOptions {
                 temperature: effective_temp,
@@ -364,7 +405,7 @@ impl LLMBackend for OllamaBackend {
             .json(&request_body)
             .send()
             .await
-            .map_err(|e| anyhow::anyhow!("Ollama request failed: {e}"))?;
+            .map_err(|e| anyhow::anyhow!("Ollama chat request failed: {e}"))?;
 
         if !response.status().is_success() {
             let status = response.status();
@@ -375,12 +416,12 @@ impl LLMBackend for OllamaBackend {
             anyhow::bail!("Ollama returned {status}: {body}");
         }
 
-        let ollama_response: OllamaResponse = response
+        let chat_response: OllamaChatResponse = response
             .json()
             .await
-            .map_err(|e| anyhow::anyhow!("Failed to parse Ollama response: {e}"))?;
+            .map_err(|e| anyhow::anyhow!("Failed to parse Ollama chat response: {e}"))?;
 
-        Ok(ollama_response.response)
+        Ok(chat_response.message.content)
     }
 
     async fn generate_streaming(
