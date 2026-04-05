@@ -88,10 +88,15 @@ pub struct SupplementaryResource {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CapsEdge {
+    #[serde(alias = "source")]
     pub from: String,
+    #[serde(alias = "target")]
     pub to: String,
+    #[serde(alias = "relationship")]
     pub edge_type: String,
+    #[serde(default)]
     pub strength_permille: u16,
+    #[serde(default)]
     pub rationale: String,
 }
 
