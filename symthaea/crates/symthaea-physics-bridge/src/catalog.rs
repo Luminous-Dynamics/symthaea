@@ -267,7 +267,18 @@ fn build_all_equations() -> Vec<PhysicsEquation> {
     eqs.push(simple_eq("Poynting Vector", PhysicsDomain::Electromagnetism, "S = (1/μ₀)(E × B)", DimensionalSignature { mass: 1, length: 0, time: -3, current: 0, temperature: 0, amount: 0, luminous: 0 }));
     eqs.push(simple_eq("Magnetic Dipole Moment", PhysicsDomain::Electromagnetism, "m = NIA", DimensionalSignature { mass: 0, length: 2, time: 0, current: 1, temperature: 0, amount: 0, luminous: 0 }));
     // Thermodynamics
-    eqs.push(simple_eq("Helmholtz Free Energy", PhysicsDomain::Thermodynamics, "F = U - TS", DimensionalSignature::ENERGY));
+    // Helmholtz: F = U - TS (same structure as Gibbs G = H - TS)
+    eqs.push(PhysicsEquation {
+        name: "Helmholtz Free Energy".to_string(),
+        domain: PhysicsDomain::Thermodynamics,
+        ast: make_equals(
+            make_const("F"),
+            make_sum(vec![make_const("U"), EquationNode::Negate(Box::new(make_product(vec![make_const("T"), make_const("S")])))]),
+        ),
+        symmetries: SymmetryDescriptor::none(),
+        dimensions: DimensionalSignature::ENERGY,
+        tensor: None,
+    });
     eqs.push(simple_eq("Entropy of Mixing", PhysicsDomain::Thermodynamics, "ΔS_mix = -nR Σ xᵢ ln xᵢ", DimensionalSignature { mass: 1, length: 2, time: -2, current: 0, temperature: -1, amount: 0, luminous: 0 }));
     eqs.push(simple_eq("Equipartition Theorem", PhysicsDomain::Thermodynamics, "⟨E⟩ = (f/2)kT", DimensionalSignature::ENERGY));
     eqs.push(simple_eq("Carnot Efficiency", PhysicsDomain::Thermodynamics, "η = 1 - T_cold/T_hot", DimensionalSignature::DIMENSIONLESS));
@@ -278,7 +289,20 @@ fn build_all_equations() -> Vec<PhysicsEquation> {
     eqs.push(simple_eq("Time-Independent Perturbation", PhysicsDomain::QuantumMechanics, "E_n^(1) = ⟨n⁰|V|n⁰⟩", DimensionalSignature::ENERGY));
     // Nuclear/Particle
     eqs.push(simple_eq("Bethe-Bloch Energy Loss", PhysicsDomain::NuclearPhysics, "-dE/dx = Kz²Z/A·(1/β²)[ln(2meβ²γ²/I) - β²]", DimensionalSignature { mass: 1, length: -1, time: -2, current: 0, temperature: 0, amount: 0, luminous: 0 }));
-    eqs.push(simple_eq("Gamow Tunneling Factor", PhysicsDomain::NuclearPhysics, "T = exp(-2π η)", DimensionalSignature::DIMENSIONLESS));
+    // Gamow tunneling: T = exp(-2πη) — exponential barrier penetration
+    eqs.push(PhysicsEquation {
+        name: "Gamow Tunneling Factor".to_string(),
+        domain: PhysicsDomain::NuclearPhysics,
+        ast: make_equals(
+            make_const("T"),
+            EquationNode::Exponential(Box::new(EquationNode::Negate(Box::new(make_product(vec![
+                make_const("2π"), make_const("η"),
+            ]))))),
+        ),
+        symmetries: SymmetryDescriptor::none(),
+        dimensions: DimensionalSignature::DIMENSIONLESS,
+        tensor: None,
+    });
     eqs.push(simple_eq("Nuclear Magnetic Resonance", PhysicsDomain::NuclearPhysics, "ω₀ = γB₀", DimensionalSignature { mass: 0, length: 0, time: -1, current: 0, temperature: 0, amount: 0, luminous: 0 }));
     // Fluid Dynamics
     eqs.push(simple_eq("Reynolds Number", PhysicsDomain::FluidDynamics, "Re = ρvL/μ", DimensionalSignature::DIMENSIONLESS));
@@ -296,8 +320,42 @@ fn build_all_equations() -> Vec<PhysicsEquation> {
     eqs.push(simple_eq("Doppler Effect", PhysicsDomain::Acoustics, "f' = f(v ± v_obs)/(v ∓ v_src)", DimensionalSignature { mass: 0, length: 0, time: -1, current: 0, temperature: 0, amount: 0, luminous: 0 }));
     eqs.push(simple_eq("Sound Intensity Level", PhysicsDomain::Acoustics, "β = 10 log₁₀(I/I₀) dB", DimensionalSignature::DIMENSIONLESS));
     // Plasma Physics (new domain)
-    eqs.push(simple_eq("Debye Length", PhysicsDomain::PlasmaPhysics, "λ_D = √(ε₀kT/(ne²))", DimensionalSignature::LENGTH));
-    eqs.push(simple_eq("Plasma Frequency", PhysicsDomain::PlasmaPhysics, "ω_p = √(ne²/(mε₀))", DimensionalSignature { mass: 0, length: 0, time: -1, current: 0, temperature: 0, amount: 0, luminous: 0 }));
+    // Debye length: λ_D = √(ε₀kT/(ne²)) — square root structure
+    eqs.push(PhysicsEquation {
+        name: "Debye Length".to_string(),
+        domain: PhysicsDomain::PlasmaPhysics,
+        ast: make_equals(
+            make_const("λ_D"),
+            EquationNode::Power {
+                base: Box::new(make_product(vec![
+                    make_const("ε₀kT"),
+                    EquationNode::Power { base: Box::new(make_product(vec![make_const("n"), make_const("e²")])), exponent: Box::new(EquationNode::Scalar(-1.0)) },
+                ])),
+                exponent: Box::new(EquationNode::Scalar(0.5)),
+            },
+        ),
+        symmetries: SymmetryDescriptor::none(),
+        dimensions: DimensionalSignature::LENGTH,
+        tensor: None,
+    });
+    // Plasma frequency: ω_p = √(ne²/(mε₀)) — dual of Debye length
+    eqs.push(PhysicsEquation {
+        name: "Plasma Frequency".to_string(),
+        domain: PhysicsDomain::PlasmaPhysics,
+        ast: make_equals(
+            make_const("ω_p"),
+            EquationNode::Power {
+                base: Box::new(make_product(vec![
+                    make_const("ne²"),
+                    EquationNode::Power { base: Box::new(make_product(vec![make_const("m"), make_const("ε₀")])), exponent: Box::new(EquationNode::Scalar(-1.0)) },
+                ])),
+                exponent: Box::new(EquationNode::Scalar(0.5)),
+            },
+        ),
+        symmetries: SymmetryDescriptor::none(),
+        dimensions: DimensionalSignature { mass: 0, length: 0, time: -1, current: 0, temperature: 0, amount: 0, luminous: 0 },
+        tensor: None,
+    });
     eqs.push(simple_eq("MHD Force Balance", PhysicsDomain::PlasmaPhysics, "J × B = ∇P", DimensionalSignature { mass: 1, length: -2, time: -2, current: 0, temperature: 0, amount: 0, luminous: 0 }));
     // Information Theory (additional)
     eqs.push(simple_eq("Shannon-Hartley Channel Capacity", PhysicsDomain::InformationTheory, "C = B log₂(1 + S/N)", DimensionalSignature { mass: 0, length: 0, time: -1, current: 0, temperature: 0, amount: 0, luminous: 0 }));
@@ -324,9 +382,66 @@ fn build_all_equations() -> Vec<PhysicsEquation> {
     eqs.push(simple_eq("Henderson-Hasselbalch", PhysicsDomain::Thermodynamics, "pH = pK_a + log₁₀([A⁻]/[HA])", DimensionalSignature::DIMENSIONLESS));
     eqs.push(simple_eq("Logistic Growth", PhysicsDomain::Biophysics, "dN/dt = rN(1 - N/K)", DimensionalSignature { mass: 0, length: 0, time: -1, current: 0, temperature: 0, amount: 0, luminous: 0 }));
     // Statistical Mechanics (additional)
-    eqs.push(simple_eq("Fermi-Dirac Distribution", PhysicsDomain::StatisticalMechanics, "f(E) = 1/(exp((E-μ)/kT) + 1)", DimensionalSignature::DIMENSIONLESS));
-    eqs.push(simple_eq("Bose-Einstein Distribution", PhysicsDomain::StatisticalMechanics, "n(E) = 1/(exp((E-μ)/kT) - 1)", DimensionalSignature::DIMENSIONLESS));
-    eqs.push(simple_eq("Saha Ionization Equation", PhysicsDomain::StatisticalMechanics, "nᵢnₑ/n₀ = (2πmₑkT/h²)^(3/2) exp(-χ/kT)", DimensionalSignature::DIMENSIONLESS));
+    // Fermi-Dirac: f(E) = 1/(exp((E-μ)/kT) + 1) — full AST for exponential clustering
+    eqs.push(PhysicsEquation {
+        name: "Fermi-Dirac Distribution".to_string(),
+        domain: PhysicsDomain::StatisticalMechanics,
+        ast: make_equals(
+            make_const("f(E)"),
+            EquationNode::Power {
+                base: Box::new(make_sum(vec![
+                    EquationNode::Exponential(Box::new(make_product(vec![
+                        make_sum(vec![make_const("E"), EquationNode::Negate(Box::new(make_const("μ")))]),
+                        EquationNode::Power { base: Box::new(make_const("kT")), exponent: Box::new(EquationNode::Scalar(-1.0)) },
+                    ]))),
+                    EquationNode::Scalar(1.0),
+                ])),
+                exponent: Box::new(EquationNode::Scalar(-1.0)),
+            },
+        ),
+        symmetries: SymmetryDescriptor::none(),
+        dimensions: DimensionalSignature::DIMENSIONLESS,
+        tensor: None,
+    });
+    // Bose-Einstein: n(E) = 1/(exp((E-μ)/kT) - 1) — same skeleton as Fermi-Dirac
+    eqs.push(PhysicsEquation {
+        name: "Bose-Einstein Distribution".to_string(),
+        domain: PhysicsDomain::StatisticalMechanics,
+        ast: make_equals(
+            make_const("n(E)"),
+            EquationNode::Power {
+                base: Box::new(make_sum(vec![
+                    EquationNode::Exponential(Box::new(make_product(vec![
+                        make_sum(vec![make_const("E"), EquationNode::Negate(Box::new(make_const("μ")))]),
+                        EquationNode::Power { base: Box::new(make_const("kT")), exponent: Box::new(EquationNode::Scalar(-1.0)) },
+                    ]))),
+                    EquationNode::Scalar(-1.0),
+                ])),
+                exponent: Box::new(EquationNode::Scalar(-1.0)),
+            },
+        ),
+        symmetries: SymmetryDescriptor::none(),
+        dimensions: DimensionalSignature::DIMENSIONLESS,
+        tensor: None,
+    });
+    // Saha: exponential + power law (should cluster with Boltzmann)
+    eqs.push(PhysicsEquation {
+        name: "Saha Ionization Equation".to_string(),
+        domain: PhysicsDomain::StatisticalMechanics,
+        ast: make_equals(
+            make_product(vec![make_const("n_i"), make_const("n_e"), EquationNode::Power { base: Box::new(make_const("n_0")), exponent: Box::new(EquationNode::Scalar(-1.0)) }]),
+            make_product(vec![
+                EquationNode::Power {
+                    base: Box::new(make_product(vec![make_const("2πm_ekT"), EquationNode::Power { base: Box::new(make_const("h²")), exponent: Box::new(EquationNode::Scalar(-1.0)) }])),
+                    exponent: Box::new(EquationNode::Scalar(1.5)),
+                },
+                EquationNode::Exponential(Box::new(EquationNode::Negate(Box::new(make_product(vec![make_const("χ"), EquationNode::Power { base: Box::new(make_const("kT")), exponent: Box::new(EquationNode::Scalar(-1.0)) }]))))),
+            ]),
+        ),
+        symmetries: SymmetryDescriptor::none(),
+        dimensions: DimensionalSignature::DIMENSIONLESS,
+        tensor: None,
+    });
 
     // ── Phase: Exhaustive Expansion to 210+ ──
 
@@ -352,10 +467,64 @@ fn build_all_equations() -> Vec<PhysicsEquation> {
 
     // Materials / Chemistry
     eqs.push(simple_eq("Kohn-Sham DFT", PhysicsDomain::CondensedMatter, "[-ℏ²∇²/(2m) + V_eff(r)]φ_i(r) = ε_iφ_i(r)", DimensionalSignature::ENERGY));
-    eqs.push(simple_eq("Lennard-Jones Potential", PhysicsDomain::Thermodynamics, "V(r) = 4ε[(σ/r)¹² - (σ/r)⁶]", DimensionalSignature::ENERGY));
+    // Lennard-Jones: V(r) = 4ε[(σ/r)^12 - (σ/r)^6] — full AST for 1/r clustering with Yukawa
+    eqs.push(PhysicsEquation {
+        name: "Lennard-Jones Potential".to_string(),
+        domain: PhysicsDomain::Thermodynamics,
+        ast: make_equals(
+            make_const("V(r)"),
+            make_product(vec![
+                make_const("4ε"),
+                make_sum(vec![
+                    EquationNode::Power {
+                        base: Box::new(make_product(vec![make_const("σ"), EquationNode::Power { base: Box::new(make_const("r")), exponent: Box::new(EquationNode::Scalar(-1.0)) }])),
+                        exponent: Box::new(EquationNode::Scalar(12.0)),
+                    },
+                    EquationNode::Negate(Box::new(EquationNode::Power {
+                        base: Box::new(make_product(vec![make_const("σ"), EquationNode::Power { base: Box::new(make_const("r")), exponent: Box::new(EquationNode::Scalar(-1.0)) }])),
+                        exponent: Box::new(EquationNode::Scalar(6.0)),
+                    })),
+                ]),
+            ]),
+        ),
+        symmetries: SymmetryDescriptor::from_lie_groups(vec![LieGroup::SO(3)], false),
+        dimensions: DimensionalSignature::ENERGY,
+        tensor: None,
+    });
     eqs.push(simple_eq("Born-Oppenheimer Approximation", PhysicsDomain::QuantumMechanics, "Ψ(r,R) = ψ_e(r;R)·χ_n(R)", DimensionalSignature::DIMENSIONLESS));
-    eqs.push(simple_eq("Fick First Law", PhysicsDomain::Thermodynamics, "J = -D∇c", DimensionalSignature { mass: 0, length: -2, time: -1, current: 0, temperature: 0, amount: 1, luminous: 0 }));
-    eqs.push(simple_eq("Fick Second Law", PhysicsDomain::Thermodynamics, "∂c/∂t = D∇²c", DimensionalSignature { mass: 0, length: -3, time: -1, current: 0, temperature: 0, amount: 1, luminous: 0 }));
+    // Fick I: J = -D∇c — gradient-driven flux (clusters with Fourier heat, Ohm)
+    {
+        let euc3 = MetricSignature::Euclidean(3);
+        eqs.push(PhysicsEquation {
+            name: "Fick First Law".to_string(),
+            domain: PhysicsDomain::Thermodynamics,
+            ast: make_equals(
+                make_field("J", TensorDescriptor::vector(euc3)),
+                EquationNode::Negate(Box::new(make_product(vec![
+                    make_const("D"),
+                    make_diffop(DiffOperator::Gradient, make_field("c", TensorDescriptor::scalar(euc3))),
+                ]))),
+            ),
+            symmetries: SymmetryDescriptor::none(),
+            dimensions: DimensionalSignature { mass: 0, length: -2, time: -1, current: 0, temperature: 0, amount: 1, luminous: 0 },
+            tensor: Some(TensorDescriptor::vector(euc3)),
+        });
+    }
+    // Fick II: ∂c/∂t = D∇²c — diffusion equation (clusters with Heat Equation)
+    {
+        let euc3 = MetricSignature::Euclidean(3);
+        eqs.push(PhysicsEquation {
+            name: "Fick Second Law".to_string(),
+            domain: PhysicsDomain::Thermodynamics,
+            ast: make_equals(
+                make_diffop(DiffOperator::TimeDerivative, make_field("c", TensorDescriptor::scalar(euc3))),
+                make_product(vec![make_const("D"), make_diffop(DiffOperator::Laplacian, make_field("c", TensorDescriptor::scalar(euc3)))]),
+            ),
+            symmetries: SymmetryDescriptor::none(),
+            dimensions: DimensionalSignature { mass: 0, length: -3, time: -1, current: 0, temperature: 0, amount: 1, luminous: 0 },
+            tensor: None,
+        });
+    }
     eqs.push(simple_eq("Beer-Lambert Law", PhysicsDomain::Optics, "A = εlc", DimensionalSignature::DIMENSIONLESS));
     eqs.push(simple_eq("Vegard Law", PhysicsDomain::CondensedMatter, "a(x) = (1-x)a_A + x·a_B", DimensionalSignature::LENGTH));
     eqs.push(simple_eq("Hess Law", PhysicsDomain::Thermodynamics, "ΔH_rxn = Σ ΔH_f(products) - Σ ΔH_f(reactants)", DimensionalSignature::ENERGY));
@@ -376,7 +545,21 @@ fn build_all_equations() -> Vec<PhysicsEquation> {
     eqs.push(simple_eq("Clausius-Mossotti Relation", PhysicsDomain::Electromagnetism, "(ε-1)/(ε+2) = nα/(3ε₀)", DimensionalSignature::DIMENSIONLESS));
 
     // Longevity / Biology
-    eqs.push(simple_eq("Gompertz Mortality Law", PhysicsDomain::Biophysics, "μ(x) = a·e^(bx)", DimensionalSignature { mass: 0, length: 0, time: -1, current: 0, temperature: 0, amount: 0, luminous: 0 }));
+    // Gompertz: μ(x) = a·exp(bx) — exponential growth (clusters with Arrhenius, Boltzmann)
+    eqs.push(PhysicsEquation {
+        name: "Gompertz Mortality Law".to_string(),
+        domain: PhysicsDomain::Biophysics,
+        ast: make_equals(
+            make_const("μ(x)"),
+            make_product(vec![
+                make_const("a"),
+                EquationNode::Exponential(Box::new(make_product(vec![make_const("b"), make_const("x")]))),
+            ]),
+        ),
+        symmetries: SymmetryDescriptor::none(),
+        dimensions: DimensionalSignature { mass: 0, length: 0, time: -1, current: 0, temperature: 0, amount: 0, luminous: 0 },
+        tensor: None,
+    });
     eqs.push(simple_eq("Goldman-Hodgkin-Katz Voltage", PhysicsDomain::Biophysics, "V = (RT/F)ln((P_K[K⁺]_o + P_Na[Na⁺]_o)/(P_K[K⁺]_i + P_Na[Na⁺]_i))", DimensionalSignature { mass: 1, length: 2, time: -3, current: -1, temperature: 0, amount: 0, luminous: 0 }));
     eqs.push(simple_eq("Monod Equation", PhysicsDomain::Biophysics, "μ = μ_max·S/(K_s + S)", DimensionalSignature { mass: 0, length: 0, time: -1, current: 0, temperature: 0, amount: 0, luminous: 0 }));
 
@@ -1257,13 +1440,16 @@ fn gamow_peak_integral() -> PhysicsEquation {
         ast: make_equals(
             make_const("⟨σv⟩"),
             make_product(vec![
-                EquationNode::Sqrt(Box::new(make_product(vec![
-                    EquationNode::Scalar(8.0),
-                    EquationNode::Power {
-                        base: Box::new(make_product(vec![make_const("π"), make_const("μ")])),
-                        exponent: Box::new(EquationNode::Scalar(-1.0)),
-                    },
-                ]))),
+                EquationNode::Power {
+                    base: Box::new(make_product(vec![
+                        EquationNode::Scalar(8.0),
+                        EquationNode::Power {
+                            base: Box::new(make_product(vec![make_const("π"), make_const("μ")])),
+                            exponent: Box::new(EquationNode::Scalar(-1.0)),
+                        },
+                    ])),
+                    exponent: Box::new(EquationNode::Scalar(0.5)),
+                },
                 EquationNode::Power {
                     base: Box::new(make_const("kT")),
                     exponent: Box::new(EquationNode::Scalar(-1.5)),
