@@ -115,6 +115,7 @@ pub struct DiscoveryResult {
     pub name: String,
     pub domain: String,
     pub score: f32,
+    pub latex: String,
 }
 
 /// LEM classification.

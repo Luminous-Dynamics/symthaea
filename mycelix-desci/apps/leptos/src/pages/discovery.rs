@@ -51,22 +51,21 @@ fn catalog_domains() -> Vec<(&'static str, usize)> {
 /// Pre-computed Lazar analysis results.
 fn lazar_results() -> Vec<DiscoveryResult> {
     vec![
-        DiscoveryResult { name: "Heat Equation".into(), domain: "Thermodynamics".into(), score: 0.629 },
-        DiscoveryResult { name: "Yukawa Potential".into(), domain: "Nuclear Physics".into(), score: 0.603 },
-        DiscoveryResult { name: "Schwarzschild Metric".into(), domain: "General Relativity".into(), score: 0.583 },
-        DiscoveryResult { name: "de Sitter Metric".into(), domain: "Cosmology".into(), score: 0.581 },
-        DiscoveryResult { name: "FLRW Metric".into(), domain: "Cosmology".into(), score: 0.579 },
+        DiscoveryResult { name: "Heat Equation".into(), domain: "Thermodynamics".into(), score: 0.629, latex: r"\frac{\partial T}{\partial t} = \alpha\nabla^2 T".into() },
+        DiscoveryResult { name: "Yukawa Potential".into(), domain: "Nuclear Physics".into(), score: 0.603, latex: r"V(r) = -\frac{g^2}{4\pi}\frac{e^{-\mu r}}{r}".into() },
+        DiscoveryResult { name: "Schwarzschild Metric".into(), domain: "General Relativity".into(), score: 0.583, latex: r"ds^2 = -(1-\frac{r_s}{r})c^2dt^2 + \cdots".into() },
+        DiscoveryResult { name: "de Sitter Metric".into(), domain: "Cosmology".into(), score: 0.581, latex: r"ds^2 = -(1-\frac{\Lambda r^2}{3})dt^2 + \cdots".into() },
+        DiscoveryResult { name: "FLRW Metric".into(), domain: "Cosmology".into(), score: 0.579, latex: r"ds^2 = -c^2dt^2 + a^2(t)d\Sigma^2".into() },
     ]
 }
 
-/// Pre-computed Art's Parts analysis results.
 fn arts_parts_results() -> Vec<DiscoveryResult> {
     vec![
-        DiscoveryResult { name: "Waveguide Dispersion Relation".into(), domain: "Optics".into(), score: 0.915 },
-        DiscoveryResult { name: "Friedmann First Equation".into(), domain: "Cosmology".into(), score: 0.469 },
-        DiscoveryResult { name: "One-Pion Exchange Potential".into(), domain: "Nuclear Physics".into(), score: 0.393 },
-        DiscoveryResult { name: "Yukawa Potential".into(), domain: "Nuclear Physics".into(), score: 0.352 },
-        DiscoveryResult { name: "Casimir Force".into(), domain: "Particle Physics".into(), score: 0.334 },
+        DiscoveryResult { name: "Waveguide Dispersion Relation".into(), domain: "Optics".into(), score: 0.915, latex: r"\omega^2 = \frac{c^2}{n^2}k^2 + \omega_c^2".into() },
+        DiscoveryResult { name: "Friedmann First Equation".into(), domain: "Cosmology".into(), score: 0.469, latex: r"H^2 = \frac{8\pi G\rho}{3}".into() },
+        DiscoveryResult { name: "One-Pion Exchange Potential".into(), domain: "Nuclear Physics".into(), score: 0.393, latex: r"V \propto \frac{e^{-m_\pi r}}{m_\pi r}".into() },
+        DiscoveryResult { name: "Yukawa Potential".into(), domain: "Nuclear Physics".into(), score: 0.352, latex: r"V(r) = -\frac{g^2 e^{-\mu r}}{4\pi r}".into() },
+        DiscoveryResult { name: "Casimir Force".into(), domain: "Particle Physics".into(), score: 0.334, latex: r"\frac{F}{A} = -\frac{\pi^2\hbar c}{240 d^4}".into() },
     ]
 }
 
@@ -90,6 +89,7 @@ pub fn DiscoveryPage() -> impl IntoView {
                 name: r.name,
                 domain: format!("{:?}", r.domain),
                 score: r.score,
+                latex: r.latex,
             })
             .collect::<Vec<_>>()
     };
@@ -142,11 +142,16 @@ pub fn DiscoveryPage() -> impl IntoView {
                                     let bar_width = format!("{}%", (r.score * 100.0) as u32);
                                     view! {
                                         <div class="discovery-result">
-                                            <div style="display: flex; align-items: center; gap: 0.5rem;">
-                                                <span style="font-weight: 600; font-size: 0.8rem; color: var(--text-secondary);">{format!("{}.", i + 1)}</span>
-                                                <div>
-                                                    <span style="font-weight: 600;">{r.name.clone()}</span>
-                                                    <span class="domain">{format!(" ({})", r.domain)}</span>
+                                            <div style="display: flex; align-items: center; gap: 0.5rem; flex: 1; min-width: 0;">
+                                                <span style="font-weight: 600; font-size: 0.8rem; color: var(--text-secondary); flex-shrink: 0;">{format!("{}.", i + 1)}</span>
+                                                <div style="min-width: 0;">
+                                                    <div>
+                                                        <span style="font-weight: 600;">{r.name.clone()}</span>
+                                                        <span class="domain">{format!(" ({})", r.domain)}</span>
+                                                    </div>
+                                                    <div style="font-size: 0.75rem; margin-top: 0.125rem;">
+                                                        <Equation latex=r.latex.clone() />
+                                                    </div>
                                                 </div>
                                             </div>
                                             <div style="display: flex; align-items: center; gap: 0.5rem;">

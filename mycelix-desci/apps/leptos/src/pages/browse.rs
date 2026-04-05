@@ -125,7 +125,7 @@ pub fn BrowsePage() -> impl IntoView {
         let tier = tier_filter.get();
         let all_claims = claims();
 
-        all_claims.into_iter()
+        let mut results: Vec<_> = all_claims.into_iter()
             .filter(|c| {
                 if !search.is_empty() {
                     let matches = c.content.description.to_lowercase().contains(&search)
@@ -139,7 +139,19 @@ pub fn BrowsePage() -> impl IntoView {
                 }
                 true
             })
-            .collect::<Vec<_>>()
+            .collect();
+        // Sort by tier (E4 first, then E3, E2, E1, E0) so verified science is prominent
+        results.sort_by(|a, b| {
+            let tier_val = |t: &crate::types::EpistemicTier| match t {
+                crate::types::EpistemicTier::E4 => 4,
+                crate::types::EpistemicTier::E3 => 3,
+                crate::types::EpistemicTier::E2 => 2,
+                crate::types::EpistemicTier::E1 => 1,
+                crate::types::EpistemicTier::E0 => 0,
+            };
+            tier_val(&b.tier).cmp(&tier_val(&a.tier))
+        });
+        results
     };
 
     view! {

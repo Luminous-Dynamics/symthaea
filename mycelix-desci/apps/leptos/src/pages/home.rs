@@ -71,34 +71,61 @@ pub fn HomePage() -> impl IntoView {
                 }}
             </div>
 
+            // ── Featured Story: Same Physics, Opposite Outcomes ──
+            <div style="margin-bottom: 1.5rem;">
+                <h2 style="font-size: 1.25rem; text-align: center; margin-bottom: 0.5rem; color: var(--text-secondary);">"Same Physics. Different Outcomes."</h2>
+                <p style="font-size: 0.875rem; text-align: center; color: var(--text-secondary); margin-bottom: 1rem;">"We track the difference."</p>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                    // Cold Fusion — debunked
+                    <div class="glass-panel" style="border-left: 3px solid var(--tier-e0);">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                            <h3 style="font-size: 1rem;">"Cold Fusion (1989)"</h3>
+                            <span class="lem-badge e0">"E0: Unverified"</span>
+                        </div>
+                        <p style="font-size: 0.8rem; color: var(--text-secondary); line-height: 1.5; margin-bottom: 0.5rem;">
+                            "Claimed deuterium fusion at room temperature. Gamow tunneling factor gives probability ~10"<sup>"-2700"</sup>". Never replicated by any lab worldwide."
+                        </p>
+                        <div style="font-size: 0.7rem; color: var(--tier-e0);">"Verdict: Physically impossible. Calorimetry errors."</div>
+                    </div>
+                    // NIF Ignition — verified
+                    <div class="glass-panel" style="border-left: 3px solid var(--tier-e4);">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                            <h3 style="font-size: 1rem;">"NIF Fusion Ignition (2022-2025)"</h3>
+                            <span class="lem-badge e4">"E4: Reproducible"</span>
+                        </div>
+                        <p style="font-size: 0.8rem; color: var(--text-secondary); line-height: 1.5; margin-bottom: 0.5rem;">
+                            "Same Gamow physics at correct temperatures. Q ratio: 1.54 → 1.89 → 2.36 → 4.13. Eight successful ignition shots."
+                        </p>
+                        <div style="font-size: 0.7rem; color: var(--tier-e4);">"Verdict: Independently verified. Progressive improvement."</div>
+                    </div>
+                </div>
+                <div style="text-align: center; margin-top: 0.75rem;">
+                    <a href="/case-studies" style="font-size: 0.8rem; color: var(--accent-indigo); text-decoration: none;">"See all 10 case studies in 5 paired comparisons →"</a>
+                </div>
+            </div>
+
+            // ── More Highlights ──
             <div class="glass-panel" style="margin-bottom: 1.5rem;">
-                <h2 style="font-size: 1.25rem; margin-bottom: 1rem;">"Discovery Highlights"</h2>
-
-                <div style="margin-bottom: 1rem;">
-                    <h3 style="font-size: 1rem; color: var(--accent-indigo);">"Lazar Gravity-A Structural Analysis"</h3>
-                    <p style="font-size: 0.875rem; color: var(--text-secondary); line-height: 1.6;">
-                        "Nearest neighbors: Yukawa Potential (0.603), Schwarzschild Metric (0.583), "
-                        "cosmological metrics (0.58). Classification: E0/N2/M0 — zero empirical confidence, "
-                        "moderate structural analog in known physics, ephemeral domain."
-                    </p>
-                </div>
-
-                <div style="margin-bottom: 1rem;">
-                    <h3 style="font-size: 1rem; color: var(--accent-emerald);">"Art's Parts THz Waveguide"</h3>
-                    <p style="font-size: 0.875rem; color: var(--text-secondary); line-height: 1.6;">
-                        "Nearest neighbor: Waveguide Dispersion (0.915). Classification: E0/N3/M1 — "
-                        "the physics is axiomatic (textbook optics), but the physical sample fails "
-                        "(ORNL 2022: terrestrial isotopes, impure Bi layers)."
-                    </p>
-                </div>
-
-                <div>
-                    <h3 style="font-size: 1rem; color: var(--tier-e3);">"Superheavy Island of Stability"</h3>
-                    <p style="font-size: 0.875rem; color: var(--text-secondary); line-height: 1.6;">
-                        "SEMF + shell model sweep (Z=110-120, N=170-190): stability island centered "
-                        "at Z=115/N=180. Element 120 (A=294) shows deepest shell correction (-22.81 MeV). "
-                        "Consistent with Moller/Oganessian predictions."
-                    </p>
+                <h2 style="font-size: 1.25rem; margin-bottom: 1rem;">"More Discoveries"</h2>
+                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem;">
+                    <div>
+                        <h3 style="font-size: 0.875rem; color: var(--accent-indigo); margin-bottom: 0.25rem;">"Art's Parts Waveguide"</h3>
+                        <p style="font-size: 0.75rem; color: var(--text-secondary); line-height: 1.4;">
+                            "0.915 match to textbook waveguide dispersion. Physics is real; ORNL sample fails."
+                        </p>
+                    </div>
+                    <div>
+                        <h3 style="font-size: 0.875rem; color: var(--accent-emerald); margin-bottom: 0.25rem;">"Superheavy Island"</h3>
+                        <p style="font-size: 0.75rem; color: var(--text-secondary); line-height: 1.4;">
+                            "Z=115-120, N=180. Element 120 deepest shell correction (-22.81 MeV)."
+                        </p>
+                    </div>
+                    <div>
+                        <h3 style="font-size: 0.875rem; color: var(--tier-e1); margin-bottom: 0.25rem;">"Lazar Gravity-A"</h3>
+                        <p style="font-size: 0.75rem; color: var(--text-secondary); line-height: 1.4;">
+                            "Nearest: Yukawa (0.60), Schwarzschild (0.58). E0/N2/M0."
+                        </p>
+                    </div>
                 </div>
             </div>
 

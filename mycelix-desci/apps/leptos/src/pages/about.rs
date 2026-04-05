@@ -63,11 +63,50 @@ pub fn AboutPage() -> impl IntoView {
                 </p>
             </div>
 
+            // ── Comparison Table ──
+            <div class="glass-panel" style="margin-bottom: 1.5rem;">
+                <h2 style="font-size: 1.25rem; margin-bottom: 1rem;">"How We Compare"</h2>
+                <div style="overflow-x: auto;">
+                    <table style="width: 100%; border-collapse: collapse; font-size: 0.8rem;">
+                        <thead>
+                            <tr style="border-bottom: 1px solid var(--border-glass);">
+                                <th style="text-align: left; padding: 0.5rem; color: var(--text-secondary);">"Feature"</th>
+                                <th style="text-align: center; padding: 0.5rem; color: var(--accent-indigo);">"Mycelix DeSci"</th>
+                                <th style="text-align: center; padding: 0.5rem; color: var(--text-secondary);">"DeSci Labs"</th>
+                                <th style="text-align: center; padding: 0.5rem; color: var(--text-secondary);">"ResearchHub"</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {vec![
+                                ("Epistemic Verification", "Multi-dimensional (HDC + Bayesian + citation)", "None", "AI math check only"),
+                                ("Physics Equation Search", "208 equations, 20 domains, HDC structural", "None", "None"),
+                                ("Blockchain UX", "Invisible (Holochain DHT)", "IPFS/wallet visible", "Token-visible"),
+                                ("Reproducibility Tracking", "Full registry + scoring", "None", "None"),
+                                ("Prediction Markets", "Reputation-staked (Brier scoring)", "None", "Token voting"),
+                                ("Education Pipeline", "EduNet integration (9 games)", "None", "None"),
+                                ("Case Studies", "10 paired comparisons", "None", "None"),
+                                ("Nuclear Discovery", "AME2020 calibrated + stability sweep", "None", "None"),
+                                ("Open Source", "AGPL-3.0 (full stack)", "Partial", "Partial"),
+                            ].into_iter().map(|(feature, us, desci_labs, researchhub)| {
+                                view! {
+                                    <tr style="border-bottom: 1px solid rgba(99,102,241,0.1);">
+                                        <td style="padding: 0.5rem; color: var(--text-primary);">{feature}</td>
+                                        <td style="padding: 0.5rem; text-align: center; color: var(--accent-emerald);">{us}</td>
+                                        <td style="padding: 0.5rem; text-align: center; color: var(--text-secondary);">{desci_labs}</td>
+                                        <td style="padding: 0.5rem; text-align: center; color: var(--text-secondary);">{researchhub}</td>
+                                    </tr>
+                                }
+                            }).collect::<Vec<_>>()}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
             <div class="glass-panel">
                 <h2 style="font-size: 1.25rem; margin-bottom: 0.5rem;">"Protocol"</h2>
                 <p style="font-size: 0.875rem; color: var(--text-secondary);">
                     "Mycelix DeSci Protocol v0.4.0 | Symthaea Physics Bridge v0.1.0 | "
-                    "93 equations | 16 physics domains | HDC 16,384D"
+                    "208 equations | 20 physics domains | HDC 16,384D | 10 case studies"
                 </p>
             </div>
         </div>

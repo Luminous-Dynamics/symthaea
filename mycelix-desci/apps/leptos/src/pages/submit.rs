@@ -17,24 +17,39 @@ pub fn SubmitPage() -> impl IntoView {
     let (creator, set_creator) = signal(String::new());
     let (submitted, set_submitted) = signal(false);
 
-    // Auto-LEM classification preview based on description
+    // Auto-LEM classification preview using WASM catalog search
     let lem_preview = move || {
         let desc = description.get();
-        if desc.len() < 10 { return ("—".to_string(), "—".to_string(), "—".to_string()); }
+        if desc.len() < 10 { return ("—".to_string(), "—".to_string(), "—".to_string(), None); }
+
+        // Run WASM structural search
+        let catalog = symthaea_physics_catalog::catalog::PhysicsCatalog::new();
+        let results = symthaea_physics_catalog::search::search_by_text(&catalog, &desc, 1);
+        let (nearest, similarity) = results
+            .first()
+            .map(|r| (Some(r.name.clone()), r.score as f64))
+            .unwrap_or((None, 0.0));
+
+        // E-axis from keywords (simulation confidence proxy)
         let desc_lower = desc.to_lowercase();
-        // Simple heuristic LEM classification
         let e = if desc_lower.contains("replicated") || desc_lower.contains("reproduced") { "E3" }
                 else if desc_lower.contains("verified") || desc_lower.contains("confirmed") { "E2" }
                 else if desc_lower.contains("observed") || desc_lower.contains("measured") { "E1" }
                 else { "E0" };
-        let n = if desc_lower.contains("consensus") || desc_lower.contains("axiomatic") { "N3" }
-                else if desc_lower.contains("peer-reviewed") || desc_lower.contains("published") { "N2" }
-                else if desc_lower.contains("team") || desc_lower.contains("group") { "N1" }
+
+        // N-axis from catalog similarity
+        let n = if similarity > 0.9 { "N3" }
+                else if similarity > 0.6 { "N2" }
+                else if similarity > 0.3 { "N1" }
                 else { "N0" };
-        let m = if desc_lower.contains("fundamental") || desc_lower.contains("universal") { "M3" }
-                else if desc_lower.contains("established") || desc_lower.contains("documented") { "M2" }
+
+        // M-axis from domain keywords
+        let m = if desc_lower.contains("relativity") || desc_lower.contains("quantum") { "M3" }
+                else if desc_lower.contains("nuclear") || desc_lower.contains("electromagnetic") { "M2" }
+                else if desc_lower.contains("fluid") || desc_lower.contains("thermal") { "M1" }
                 else { "M0" };
-        (e.to_string(), n.to_string(), m.to_string())
+
+        (e.to_string(), n.to_string(), m.to_string(), nearest)
     };
 
     let on_submit = move |_| {
@@ -158,12 +173,15 @@ pub fn SubmitPage() -> impl IntoView {
                         <div style="margin-bottom: 1rem; padding: 0.75rem; background: var(--bg-secondary); border-radius: 0.5rem; border: 1px dashed var(--border-glass);">
                             <div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.375rem;">"Auto-Classification Preview:"</div>
                             {move || {
-                                let (e, n, m) = lem_preview();
+                                let (e, n, m, nearest) = lem_preview();
                                 view! {
-                                    <div style="display: flex; gap: 1rem; font-size: 0.875rem;">
+                                    <div style="display: flex; gap: 1rem; font-size: 0.875rem; flex-wrap: wrap;">
                                         <span>"E: " <strong style="color: var(--accent-indigo);">{e}</strong></span>
                                         <span>"N: " <strong style="color: var(--accent-indigo);">{n}</strong></span>
                                         <span>"M: " <strong style="color: var(--accent-indigo);">{m}</strong></span>
+                                        {nearest.map(|n| view! {
+                                            <span style="font-size: 0.75rem; color: var(--accent-emerald);">"Nearest: " {n}</span>
+                                        })}
                                     </div>
                                 }
                             }}
