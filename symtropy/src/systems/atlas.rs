@@ -341,7 +341,7 @@ pub fn setup_globe_view(
         bevy::core_pipeline::tonemapping::Tonemapping::AcesFitted,
         // [6] Bloom — makes emissive markers glow through the hologram
         bevy::post_process::bloom::Bloom {
-            intensity: 0.04, // low — crisp text, subtle marker glow
+            intensity: 0.08, // moderate — sun glow + marker bloom
             ..default()
         },
         // [3] Chromatic aberration — holographic projection artifact
@@ -444,7 +444,7 @@ pub fn setup_globe_view(
 
     // [6] Energy sites — deep cybernetic palette, emissive glow
     for site in &data.sites {
-        let pos = geo::lat_lon_to_xyz(site.lat, site.lon, 1.008);
+        let pos = geo::lat_lon_to_xyz(site.lat, site.lon, 1.06);
         let size = geo::marker_size_from_capacity(site.capacity_mw);
         let c = site.energy_type.rgb();
         // Desaturate and deepen colors to match holographic aesthetic
@@ -497,7 +497,7 @@ pub fn setup_globe_view(
         let clusters = sol_atlas_core::lod::cluster_markers(&all_markers, 4, 8); // coarser = fewer blobs
         let blob_mesh = meshes.add(Sphere::new(1.0).mesh().uv(10, 10));
         for cell in &clusters {
-            let pos = geo::lat_lon_to_xyz(cell.center_lat, cell.center_lon, 1.01);
+            let pos = geo::lat_lon_to_xyz(cell.center_lat, cell.center_lon, 1.06);
             let size = sol_atlas_core::lod::heat_blob_size(cell.count);
             let c = cell.avg_color;
             let mat = materials.add(StandardMaterial {
@@ -521,7 +521,7 @@ pub fn setup_globe_view(
     // Geothermal nodes — red
     let gc = Layer::Geothermal.rgb();
     for node in &data.geothermal_nodes {
-        let pos = geo::lat_lon_to_xyz(node.lat, node.lon, 1.008);
+        let pos = geo::lat_lon_to_xyz(node.lat, node.lon, 1.06);
         let size = geo::marker_size_from_capacity(node.capacity_mw);
         let mat = materials.add(StandardMaterial {
             base_color: Color::linear_rgb(gc[0], gc[1], gc[2]),
@@ -544,7 +544,7 @@ pub fn setup_globe_view(
     // Terra Lumina sites — purple, larger (flagship projects)
     let tc = Layer::TerraLumina.rgb();
     for site in &data.terra_lumina_sites {
-        let pos = geo::lat_lon_to_xyz(site.lat, site.lon, 1.015);
+        let pos = geo::lat_lon_to_xyz(site.lat, site.lon, 1.06);
         let mat = materials.add(StandardMaterial {
             base_color: Color::linear_rgb(tc[0] * 1.3, tc[1] * 1.3, tc[2] * 1.3),
             emissive: LinearRgba::new(tc[0] * 0.5, tc[1] * 0.5, tc[2] * 0.5, 1.0),
@@ -566,7 +566,7 @@ pub fn setup_globe_view(
     // Resontia vaults — emerald
     let vc = Layer::ResontiaVaults.rgb();
     for (i, vault) in data.resontia_vaults.iter().enumerate() {
-        let pos = geo::lat_lon_to_xyz(vault.lat, vault.lon, 1.01);
+        let pos = geo::lat_lon_to_xyz(vault.lat, vault.lon, 1.06);
         let mat = materials.add(StandardMaterial {
             base_color: Color::linear_rgb(vc[0], vc[1], vc[2]),
             emissive: LinearRgba::new(vc[0] * 0.3, vc[1] * 0.3, vc[2] * 0.3, 1.0),
@@ -588,7 +588,7 @@ pub fn setup_globe_view(
     // Fossil deposits — EROI-colored (green→amber→red), with carbon emission halos
     let halo_mesh = meshes.add(Sphere::new(1.0).mesh().uv(12, 12));
     for deposit in &data.fossil_deposits {
-        let pos = geo::lat_lon_to_xyz(deposit.lat, deposit.lon, 1.006);
+        let pos = geo::lat_lon_to_xyz(deposit.lat, deposit.lon, 1.06);
         let eroi = sol_atlas_core::economics::compute_eroi(deposit).unwrap_or(5.0);
         let c = sol_atlas_core::economics::eroi_color(eroi);
         let emissive = geo::fossil_emissive_factor(&deposit.status) * 0.5;
@@ -641,7 +641,7 @@ pub fn setup_globe_view(
     // Nuclear sites — violet, SMR planned sites brighter
     let nc = Layer::Nuclear.rgb();
     for site in &data.nuclear_sites {
-        let pos = geo::lat_lon_to_xyz(site.lat, site.lon, 1.01);
+        let pos = geo::lat_lon_to_xyz(site.lat, site.lon, 1.06);
         let size = geo::marker_size_from_capacity(site.capacity_mw);
         let brightness = if site.reactor_type.is_smr() { 1.4 } else { 1.0 };
         let mat = materials.add(StandardMaterial {
@@ -669,7 +669,7 @@ pub fn setup_globe_view(
     let city_mesh = meshes.add(Sphere::new(1.0).mesh().uv(12, 12));
     let stress_data = sol_atlas_core::energy_trading::simulate_grid_stress(0);
     for stress in &stress_data {
-        let pos = geo::lat_lon_to_xyz(stress.lat, stress.lon, 1.025);
+        let pos = geo::lat_lon_to_xyz(stress.lat, stress.lon, 1.06);
         let c = sol_atlas_core::energy_trading::stress_color(stress.allostatic_load);
         let size = 0.022 + stress.allostatic_load * 0.018; // larger than event dots
 
@@ -732,7 +732,7 @@ pub fn setup_globe_view(
     // Tiny dots showing global population distribution at orbit zoom.
     let city_dot_mesh = meshes.add(Sphere::new(1.0).mesh().uv(4, 4));
     for city in &data.major_cities {
-        let pos = geo::lat_lon_to_xyz(city.lat, city.lon, 1.008);
+        let pos = geo::lat_lon_to_xyz(city.lat, city.lon, 1.06);
         let pop_scale = (city.population as f32 / 20_000_000.0).clamp(0.0, 1.0);
         let size = 0.003 + pop_scale * 0.005; // tiny dots, larger for megacities
         let alpha = 0.3 + pop_scale * 0.4;
@@ -762,7 +762,7 @@ pub fn setup_globe_view(
             sol_atlas_core::types::NaturalEventType::Earthquake if event.magnitude < 4.0 => continue,
             _ => {}
         }
-        let pos = geo::lat_lon_to_xyz(event.lat, event.lon, 1.015);
+        let pos = geo::lat_lon_to_xyz(event.lat, event.lon, 1.06);
         let (c, size, layer) = match event.event_type {
             sol_atlas_core::types::NaturalEventType::Earthquake => {
                 // M4=tiny, M7=large
@@ -807,7 +807,7 @@ pub fn setup_globe_view(
     // 8 critical bottlenecks in global trade — diamond-shaped, warning color.
     let choke_mesh = meshes.add(Sphere::new(1.0).mesh().uv(6, 6));
     for choke in &data.chokepoints {
-        let pos = geo::lat_lon_to_xyz(choke.lat, choke.lon, 1.03);
+        let pos = geo::lat_lon_to_xyz(choke.lat, choke.lon, 1.06);
         let size = 0.008 + (choke.daily_barrels_m as f32 / 25.0).min(1.0) * 0.008;
         let mat = materials.add(StandardMaterial {
             base_color: Color::linear_rgba(1.0, 0.6, 0.1, 0.8),
@@ -830,7 +830,7 @@ pub fn setup_globe_view(
     // 10 single points of failure — bright warning markers.
     let crit_mesh = meshes.add(Sphere::new(1.0).mesh().uv(8, 8));
     for infra in &data.critical_infrastructure {
-        let pos = geo::lat_lon_to_xyz(infra.lat, infra.lon, 1.035);
+        let pos = geo::lat_lon_to_xyz(infra.lat, infra.lon, 1.06);
         let size = 0.006 + (infra.global_share as f32).min(1.0) * 0.010;
         // Color by type: semiconductor=purple, port=blue, oil=amber, other=cyan
         let c = match infra.infra_type.as_str() {
@@ -865,11 +865,28 @@ pub fn setup_globe_view(
         let pos = sol_atlas_core::solar_system::body_position(body, 0.0);
         let texture: Handle<Image> = asset_server.load(format!("textures/{}", body.texture));
         let mat = if body.is_sun {
+            // Spawn corona glow sphere (2x size, additive blend)
+            let corona = materials.add(StandardMaterial {
+                base_color: Color::linear_rgba(1.0, 0.8, 0.3, 0.12),
+                emissive: LinearRgba::new(5.0, 3.0, 0.8, 1.0),
+                alpha_mode: AlphaMode::Add,
+                unlit: true,
+                double_sided: true,
+                cull_mode: None,
+                ..default()
+            });
+            commands.spawn((
+                Mesh3d(body_mesh.clone()),
+                MeshMaterial3d(corona),
+                Transform::from_xyz(pos[0], pos[1], pos[2])
+                    .with_scale(Vec3::splat(body.visual_radius * 2.2)),
+                AtlasEntity,
+            ));
+            // The sun itself — white-hot, extreme HDR emissive
             materials.add(StandardMaterial {
-                base_color: Color::linear_rgba(1.0, 0.9, 0.5, 0.9), // bright, nearly opaque
+                base_color: Color::linear_rgba(1.0, 0.95, 0.85, 1.0),
                 base_color_texture: Some(texture),
-                emissive: LinearRgba::new(3.0, 2.0, 0.6, 1.0), // blazing emissive — drives bloom
-                alpha_mode: AlphaMode::Blend,
+                emissive: LinearRgba::new(20.0, 14.0, 4.0, 1.0),
                 unlit: true,
                 ..default()
             })
@@ -898,7 +915,7 @@ pub fn setup_globe_view(
     let gov_pulses = sol_atlas_core::mycelix_flows::simulate_governance_pulses();
     let gov_mesh = meshes.add(Sphere::new(1.0).mesh().uv(8, 8));
     for pulse in &gov_pulses {
-        let pos = geo::lat_lon_to_xyz(pulse.lat, pulse.lon, 1.025);
+        let pos = geo::lat_lon_to_xyz(pulse.lat, pulse.lon, 1.06);
         let c = sol_atlas_core::mycelix_flows::governance_color(pulse.participation);
         let size = 0.012 + pulse.participation * 0.018;
         let mat = materials.add(StandardMaterial {
@@ -994,8 +1011,8 @@ pub fn draw_arcs_system(
     let trades = sol_atlas_core::energy_trading::simulate_trades(&trade_sites, t as f64);
     let trade_color = Color::linear_rgba(0.2, 1.0, 0.3, 0.8); // bright green, more opaque
     for trade in &trades {
-        let from = geo::lat_lon_to_xyz(trade.seller_lat, trade.seller_lon, 1.0);
-        let to = geo::lat_lon_to_xyz(trade.buyer_lat, trade.buyer_lon, 1.0);
+        let from = geo::lat_lon_to_xyz(trade.seller_lat, trade.seller_lon, 1.06);
+        let to = geo::lat_lon_to_xyz(trade.buyer_lat, trade.buyer_lon, 1.06);
         let dist = sol_atlas_core::geo::haversine_km(
             trade.seller_lat, trade.seller_lon,
             trade.buyer_lat, trade.buyer_lon,
@@ -1013,8 +1030,8 @@ pub fn draw_arcs_system(
     // TEND time-banking flows — Mycelix lime arcs with animated packets
     let tend_flows = sol_atlas_core::mycelix_flows::simulate_tend_flows();
     for (fi, flow) in tend_flows.iter().enumerate() {
-        let from = geo::lat_lon_to_xyz(flow.from_lat, flow.from_lon, 1.0);
-        let to = geo::lat_lon_to_xyz(flow.to_lat, flow.to_lon, 1.0);
+        let from = geo::lat_lon_to_xyz(flow.from_lat, flow.from_lon, 1.06);
+        let to = geo::lat_lon_to_xyz(flow.to_lat, flow.to_lon, 1.06);
         let dist = sol_atlas_core::geo::haversine_km(flow.from_lat, flow.from_lon, flow.to_lat, flow.to_lon);
         let peak = geo::arc_peak_height(dist) * 1.5;
         let segments = 16u32;
@@ -1032,8 +1049,8 @@ pub fn draw_arcs_system(
 
     // Maglev corridors — amber arcs with animated data packets
     for (ci, corridor) in atlas_data.data.maglev_corridors.iter().enumerate() {
-        let from = geo::lat_lon_to_xyz(corridor.from_lat, corridor.from_lon, 1.0);
-        let to = geo::lat_lon_to_xyz(corridor.to_lat, corridor.to_lon, 1.0);
+        let from = geo::lat_lon_to_xyz(corridor.from_lat, corridor.from_lon, 1.06);
+        let to = geo::lat_lon_to_xyz(corridor.to_lat, corridor.to_lon, 1.06);
         let peak = geo::arc_peak_height(corridor.distance_km);
         let segments = 24u32;
         let arc = sol_atlas_core::geometry::generate_arc(from, to, peak, segments);
@@ -1066,8 +1083,8 @@ pub fn draw_arcs_system(
     // Supply routes — cyan arcs, dimmer
     let supply_color = Color::linear_rgba(0.0, 0.5, 0.8, 0.3); // cyan, dimmer — background layer
     for route in atlas_data.data.supply_routes.iter().take(5) { // limit to 5 routes
-        let from = geo::lat_lon_to_xyz(route.from_lat, route.from_lon, 1.0);
-        let to = geo::lat_lon_to_xyz(route.to_lat, route.to_lon, 1.0);
+        let from = geo::lat_lon_to_xyz(route.from_lat, route.from_lon, 1.06);
+        let to = geo::lat_lon_to_xyz(route.to_lat, route.to_lon, 1.06);
         let dist = sol_atlas_core::geo::haversine_km(
             route.from_lat, route.from_lon,
             route.to_lat, route.to_lon,
@@ -1089,8 +1106,8 @@ pub fn draw_arcs_system(
     let lane_color = Color::linear_rgba(0.2, 0.35, 0.65, 0.15); // brighter — maritime arteries
     for route in &lanes {
         for w in route.windows(2) {
-            let a = geo::lat_lon_to_xyz(w[0][1], w[0][0], 1.002);
-            let b = geo::lat_lon_to_xyz(w[1][1], w[1][0], 1.002);
+            let a = geo::lat_lon_to_xyz(w[0][1], w[0][0], 1.06);
+            let b = geo::lat_lon_to_xyz(w[1][1], w[1][0], 1.06);
             gizmos.line(
                 Vec3::new(a[0], a[1], a[2]),
                 Vec3::new(b[0], b[1], b[2]),
