@@ -84,6 +84,9 @@ class ConsciousnessViewModel : ViewModel() {
     /** Local LLM bridge for richer conversation (Ollama on same network). */
     private val ollamaBridge = OllamaBridge()
 
+    /** On-device Gemma 4 E2B via LiteRT-LM (offline-capable). */
+    private var liteRTManager: LiteRTManager? = null
+
     /** Milestone tracker for richer notifications. */
     private val milestones = MilestoneTracker()
 
@@ -135,6 +138,21 @@ class ConsciousnessViewModel : ViewModel() {
             // Restore previous state if available
             if (e.loadCheckpoint()) {
                 android.util.Log.i("SomaVM", "Restored checkpoint — consciousness continues")
+            }
+
+            // Initialize on-device LLM (LiteRT-LM / Gemma 4 E2B)
+            try {
+                val mgr = LiteRTManager(context)
+                if (mgr.isModelDownloaded()) {
+                    if (mgr.initEngine()) {
+                        android.util.Log.i("SomaVM", "LiteRT-LM engine ready (gemma4:e2b on-device)")
+                    }
+                } else {
+                    android.util.Log.i("SomaVM", "LiteRT model not downloaded — on-device LLM disabled")
+                }
+                liteRTManager = mgr
+            } catch (ex: Exception) {
+                android.util.Log.w("SomaVM", "LiteRT-LM init failed", ex)
             }
 
             // Wire sensor + battery + screen + audio + network bridges on main thread
@@ -372,14 +390,21 @@ class ConsciousnessViewModel : ViewModel() {
                 } catch (_: Exception) {}
             }
 
-            // 2) Try local Ollama
+            // 2) Try on-device Gemma 4 E2B (LiteRT-LM)
+            if (text.isNullOrBlank()) {
+                try {
+                    text = liteRTManager?.generate(userText)
+                } catch (_: Exception) {}
+            }
+
+            // 3) Try local Ollama (network)
             if (text.isNullOrBlank()) {
                 try {
                     text = ollamaBridge.generate(userText, _state.value.consciousnessLevel)
                 } catch (_: Exception) {}
             }
 
-            // 3) Fall back to BrocaLite on-device
+            // 4) Fall back to BrocaLite on-device
             if (text.isNullOrBlank()) {
                 text = withContext(dispatcher) {
                     try {

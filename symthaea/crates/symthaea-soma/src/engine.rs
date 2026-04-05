@@ -725,6 +725,128 @@ impl SomaEngine {
         ).map(|r| r.text)
     }
 
+    /// Generate with tool-use loop: LLM may invoke tools, results fed back.
+    ///
+    /// Tools: web_search (→ Prism/Holon), calculate, get_time, memory_recall.
+    /// Max 3 rounds to prevent infinite loops.
+    #[cfg(feature = "litert")]
+    pub fn litert_generate_with_tools(
+        &mut self,
+        prompt: &str,
+        max_tokens: u32,
+    ) -> Option<String> {
+        use crate::tool_use::{
+            execute_calculate, execute_get_time, format_tool_results, parse_tool_calls,
+            ToolRegistry, ToolResult,
+        };
+
+        let litert = self.litert.as_ref()?;
+        if !litert.is_available() {
+            return None;
+        }
+
+        let consciousness = self.spore.consciousness_level();
+        if consciousness < 0.15 {
+            return None;
+        }
+
+        let registry = ToolRegistry::default_tools();
+        let tool_block = registry.system_prompt_block();
+        let mut current_prompt = format!("{tool_block}\nUser: {prompt}\nAssistant:");
+
+        for _round in 0..3 {
+            let response = litert.generate(&current_prompt, max_tokens)?;
+            let (text, calls) = parse_tool_calls(&response);
+
+            if calls.is_empty() {
+                return Some(text);
+            }
+
+            // Execute tools
+            let mut results = Vec::new();
+            for call in &calls {
+                let result = match call.name.as_str() {
+                    "calculate" => {
+                        let expr = call.arguments["expression"]
+                            .as_str()
+                            .unwrap_or_default();
+                        execute_calculate(expr)
+                    }
+                    "get_time" => execute_get_time(),
+                    "web_search" => {
+                        let query = call.arguments["query"].as_str().unwrap_or_default();
+                        // Try Prism local search first
+                        #[cfg(feature = "prism-search")]
+                        {
+                            let prism_results = self.prism_search(query, 3);
+                            if !prism_results.is_empty() {
+                                let claims: Vec<String> =
+                                    prism_results.iter().map(|r| r.content.clone()).collect();
+                                ToolResult {
+                                    name: "web_search".into(),
+                                    success: true,
+                                    output: claims.join("\n"),
+                                }
+                            } else {
+                                // Enqueue for Holon web search (async)
+                                self.holon_bridge.enqueue_outbound(
+                                    crate::holon_bridge::HolonOutbound::SearchRequest {
+                                        query: query.to_string(),
+                                        max_results: 3,
+                                    },
+                                );
+                                ToolResult {
+                                    name: "web_search".into(),
+                                    success: true,
+                                    output: "Search request sent to desktop. No local results found."
+                                        .into(),
+                                }
+                            }
+                        }
+                        #[cfg(not(feature = "prism-search"))]
+                        {
+                            self.holon_bridge.enqueue_outbound(
+                                crate::holon_bridge::HolonOutbound::SearchRequest {
+                                    query: query.to_string(),
+                                    max_results: 3,
+                                },
+                            );
+                            ToolResult {
+                                name: "web_search".into(),
+                                success: true,
+                                output: "Search request sent to desktop.".into(),
+                            }
+                        }
+                    }
+                    "memory_recall" => {
+                        let _topic = call.arguments["topic"].as_str().unwrap_or_default();
+                        // TODO: query spore semantic memory
+                        ToolResult {
+                            name: "memory_recall".into(),
+                            success: true,
+                            output: "No memories found for this topic.".into(),
+                        }
+                    }
+                    _ => ToolResult {
+                        name: call.name.clone(),
+                        success: false,
+                        output: "Unknown tool".into(),
+                    },
+                };
+                results.push(result);
+            }
+
+            // Re-prompt with tool results
+            let results_block = format_tool_results(&results);
+            current_prompt = format!("{current_prompt}\n{response}\n{results_block}");
+        }
+
+        // Max rounds reached — return last generated text
+        let response = litert.generate(&current_prompt, max_tokens)?;
+        let (text, _) = parse_tool_calls(&response);
+        Some(text)
+    }
+
     // ======================================================================
     // Prism epistemic search (offline-capable, sub-ms)
     // ======================================================================
