@@ -342,7 +342,7 @@ pub fn setup_globe_view(
         bevy::core_pipeline::tonemapping::Tonemapping::AcesFitted,
         // [6] Bloom — makes emissive markers glow through the hologram
         bevy::post_process::bloom::Bloom {
-            intensity: 0.10, // balanced — sun glow without amplifying heat blobs
+            intensity: 0.05, // minimal — only extreme HDR (Sun) blooms
             ..default()
         },
         // [3] Chromatic aberration — holographic projection artifact
@@ -633,6 +633,7 @@ pub fn setup_globe_view(
                 MeshMaterial3d(halo_mat),
                 Transform::from_xyz(pos[0], pos[1], pos[2])
                     .with_scale(Vec3::splat(halo_radius)),
+                DataMarker { layer: Layer::FossilDeposits, name: format!("{} CO2 halo", deposit.name) },
                 SurfaceLod,
                 TimelineLayer::Fossil,
                 AtlasEntity,
@@ -674,21 +675,21 @@ pub fn setup_globe_view(
     let stress_data = sol_atlas_core::energy_trading::simulate_grid_stress(0);
     for stress in &stress_data {
         let pos = geo::lat_lon_to_xyz(stress.lat, stress.lon, 1.04);
-        // City stress uses cyan→amber (NOT red — red is for earthquakes/disasters)
+        // City stress: cyan→yellow (cool palette, never red/orange)
         let load = stress.allostatic_load;
         let c = if load < 0.3 {
-            [0.1, 0.7, 0.8] // cyan — stable
+            [0.1, 0.6, 0.7] // teal — stable
         } else if load < 0.6 {
-            [0.9, 0.7, 0.2] // amber — transitioning
+            [0.5, 0.7, 0.2] // yellow-green — transitioning
         } else {
-            [0.9, 0.4, 0.1] // orange — stressed (not red)
+            [0.8, 0.8, 0.1] // yellow — stressed (NOT red/orange)
         };
-        let size = 0.008 + load * 0.006;
+        let size = 0.005 + load * 0.004; // small — 0.005 to 0.009
 
         // Emissive city indicator — visible at ALL zoom levels (no LOD tag)
         let mat = materials.add(StandardMaterial {
             base_color: Color::linear_rgba(c[0], c[1], c[2], 0.8),
-            emissive: LinearRgba::new(c[0] * 0.8, c[1] * 0.8, c[2] * 0.8, 1.0), // brighter glow
+            emissive: LinearRgba::new(c[0] * 0.2, c[1] * 0.2, c[2] * 0.2, 1.0), // subtle glow
             unlit: true,
             alpha_mode: AlphaMode::Blend,
             ..default()
@@ -749,11 +750,11 @@ pub fn setup_globe_view(
     for city in sorted_cities.iter().take(30) {
         let pos = geo::lat_lon_to_xyz(city.lat, city.lon, 1.04);
         let pop_scale = (city.population as f32 / 20_000_000.0).clamp(0.0, 1.0);
-        let size = 0.003 + pop_scale * 0.005; // tiny dots, larger for megacities
+        let size = 0.002 + pop_scale * 0.003; // pinpoint dots
         let alpha = 0.3 + pop_scale * 0.4;
         let mat = materials.add(StandardMaterial {
-            base_color: Color::linear_rgba(0.9, 0.8, 0.5, alpha), // warm amber
-            emissive: LinearRgba::new(0.3, 0.25, 0.1, 1.0),
+            base_color: Color::linear_rgb(0.8, 0.85, 0.6), // opaque warm-white dot
+            emissive: LinearRgba::new(0.15, 0.15, 0.08, 1.0),
             unlit: true,
             alpha_mode: AlphaMode::Blend,
             ..default()
@@ -827,8 +828,8 @@ pub fn setup_globe_view(
         let pos = geo::lat_lon_to_xyz(choke.lat, choke.lon, 1.04);
         let size = 0.008 + (choke.daily_barrels_m as f32 / 25.0).min(1.0) * 0.008;
         let mat = materials.add(StandardMaterial {
-            base_color: Color::linear_rgba(1.0, 0.6, 0.1, 0.8),
-            emissive: LinearRgba::new(0.8, 0.4, 0.05, 1.0),
+            base_color: Color::linear_rgba(0.8, 0.6, 0.2, 0.5),
+            emissive: LinearRgba::new(0.15, 0.1, 0.03, 1.0), // low emissive
             unlit: true,
             alpha_mode: AlphaMode::Blend,
             ..default()
