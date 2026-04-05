@@ -174,3 +174,56 @@ mod tests {
         assert!(long > short);
     }
 }
+
+#[cfg(test)]
+mod arc_tests {
+    use super::*;
+
+    #[test]
+    fn arc_peak_clears_atmosphere() {
+        // Short arc (1000km) should still clear 1.05 atmosphere
+        let peak = arc_peak_height(1000.0);
+        assert!(peak > 0.06, "Short arc peak {} should be > 0.06", peak);
+    }
+
+    #[test]
+    fn arc_peak_scales_with_distance() {
+        let short = arc_peak_height(1000.0);
+        let long = arc_peak_height(20000.0);
+        assert!(long > short, "Long arcs should peak higher than short arcs");
+    }
+
+    #[test]
+    fn arc_peak_bounded() {
+        // Even max distance shouldn't go crazy
+        let max = arc_peak_height(40000.0);
+        assert!(max < 0.5, "Arc peak {} shouldn't exceed 50% of globe radius", max);
+    }
+
+    #[test]
+    fn lat_lon_to_xyz_radius() {
+        // Equator at radius 1.0
+        let pos = lat_lon_to_xyz(0.0, 0.0, 1.0);
+        let r = (pos[0]*pos[0] + pos[1]*pos[1] + pos[2]*pos[2]).sqrt();
+        assert!((r - 1.0).abs() < 0.01, "Radius should be ~1.0, got {}", r);
+    }
+
+    #[test]
+    fn lat_lon_to_xyz_poles() {
+        // North pole
+        let north = lat_lon_to_xyz(90.0, 0.0, 1.0);
+        assert!(north[1] > 0.99, "North pole Y should be ~1.0, got {}", north[1]);
+        // South pole
+        let south = lat_lon_to_xyz(-90.0, 0.0, 1.0);
+        assert!(south[1] < -0.99, "South pole Y should be ~-1.0, got {}", south[1]);
+    }
+
+    #[test]
+    fn marker_sizes_bounded() {
+        let small = marker_size_from_capacity(0.0);
+        let large = marker_size_from_capacity(1e6);
+        assert!(small > 0.0, "Min marker size should be positive");
+        assert!(large <= 0.020, "Max marker size should be <= 0.020");
+        assert!(large > small, "Larger capacity should make larger markers");
+    }
+}
