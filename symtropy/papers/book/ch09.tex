@@ -1,0 +1,105 @@
+\chapter{Chapter 9: The Economics of Scarcity}\label{chapter-9-the-economics-of-scarcity}
+
+\emph{In which abundance kills, charity fails, and identical starting conditions produce maximum inequality.}
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\section{Three Parables}\label{three-parables}
+
+This chapter presents three economic experiments that each contradict a common intuition. Together, they form a thermodynamic theory of resource distribution that is more pessimistic than Marx and more optimistic than Malthus.
+
+\subsection{Parable One: The Curse of Abundance}\label{parable-one-the-curse-of-abundance}
+
+We placed twenty-four agents in an arena with three energy wells under three conditions: abundant wells (10,000 joules each), scarce wells (1,000 joules each), and depleting wells (2,000 joules with a crowding penalty --- wells drain faster when more agents stand on them).
+
+Common sense predicts that abundant resources produce the best outcomes. Common sense is wrong.
+
+\begin{longtable}[]{@{}lll@{}}
+\toprule\noalign{}
+Condition & Survival & First Well Depleted \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+ABUNDANT (10K each) & \textbf{7.8/24} & tick 8,699 \\
+SCARCE (1K each) & 10.0/24 & tick 1,611 \\
+DEPLETING (2K, crowd penalty) & \textbf{13.9/24} & tick 1,387 \\
+\end{longtable}
+
+Abundant agents survived worst. Depleting agents --- facing the harshest resource dynamics --- survived best.
+
+The mechanism is cooperation timing. Abundant agents have no urgency. Their energy stays high, so the FEP gradient's cooperation component (which scales with \texttt{1.0\ -\ energy\_fraction}) remains weak. They wander. They don't cluster. They don't cooperate. Then, around tick 8,000, the abundant wells finally deplete, and agents who never learned to cooperate find themselves alone, energy-depleted, with no partners nearby.
+
+Scarce agents face immediate pressure. Their wells deplete by tick 1,600, forcing early migration and cooperation. They cluster quickly, establish resonance partnerships, and sustain each other through mutual energy regeneration. The scarcity is the catalyst.
+
+Depleting agents face the most interesting dynamics. The crowding penalty means standing at a well with too many neighbors drains the well faster --- but each agent only receives the base regeneration rate. The well's energy is wasted on crowd overhead. This forces agents to \emph{disperse} across multiple wells rather than crowding a single one --- an emergent resource distribution strategy that no agent planned.
+
+Economists recognize this pattern. The ``resource curse'' (Sachs \& Warner 1995) documents how nations with abundant natural resources often experience worse economic outcomes than resource-poor nations --- a phenomenon attributed to institutional decay under conditions of easy wealth. Our engine reproduces the resource curse from thermodynamics: abundance removes the pressure that drives cooperation, and cooperation is the only sustainable energy source.
+
+\subsection{Parable Two: The Futility of Charity}\label{parable-two-the-futility-of-charity}
+
+We tested whether agents could rescue their collapsed neighbors (Finding 25). Three conditions: no rescue, free rescue (collapsed agents automatically revived when a living agent is nearby), and costly rescue (the rescuer donates 20\% of their energy to revive the collapsed agent with 30 joules).
+
+\begin{longtable}[]{@{}llll@{}}
+\toprule\noalign{}
+Condition & Survival & Rescues & Re-collapses \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+NO RESCUE & 10.2/20 & 0 & 0 \\
+FREE RESCUE & 10.4/20 & 40 & \textbf{40 (100\%)} \\
+COSTLY RESCUE & 10.2/20 & 3 & \textbf{3 (100\%)} \\
+\end{longtable}
+
+Every rescued agent re-collapsed. One hundred percent recidivism.
+
+The gift of 30 joules is consumed by maintenance faster than the rescued agent can reach a well or find a resonant partner. The agent revives, burns through its gift in approximately 120 ticks, and collapses again. The donor, meanwhile, has lost 20\% of its energy --- weakening itself without producing any lasting benefit.
+
+This is not a failure of generosity. It is a structural impossibility. Individual energy transfer cannot substitute for \emph{access to sustainable energy sources} (wells and resonant partners). A collapsed agent needs to be near a well AND near a compatible partner to sustain itself. Receiving a one-time energy gift addresses neither requirement.
+
+The parallel to development economics is direct. Easterly (2006) and Moyo (2009) documented how foreign aid without institutional support --- schools without teachers, hospitals without supply chains, wells without maintenance --- fails to produce lasting improvement. Our engine reproduces this finding: energy transfer without structural change is futile. The rescued agent needs infrastructure (proximity to wells and partners), not charity (one-time energy).
+
+\subsection{Parable Three: The Equal Opportunity Paradox}\label{parable-three-the-equal-opportunity-paradox}
+
+This is the most unsettling result.
+
+We started all twenty-four agents at the center of the arena with identical energy (200 joules each) under three conditions: equal start (everyone at center), random start (random positions, same energy), and unequal start (random positions, energy proportional to well proximity).
+
+\begin{longtable}[]{@{}llll@{}}
+\toprule\noalign{}
+Condition & Starting Gini & Final Gini & Interpretation \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\textbf{EQUAL} & \textbf{0.000} & \textbf{0.657} & Maximum inequality from equality \\
+RANDOM & 0.000 & 0.348 & Moderate inequality \\
+UNEQUAL & 0.081 & 0.365 & Less inequality than equal start \\
+\end{longtable}
+
+Equal starting conditions produced the highest Gini coefficient --- 0.657, comparable to South Africa (0.63), the most unequal major economy on Earth.
+
+The mechanism is symmetry breaking. When all agents start at the same position with the same energy, the FEP gradient points them all in the same direction --- toward the nearest well. They race. The winners (agents whose stochastic position perturbation placed them slightly closer to the well) arrive first and begin regenerating. The losers arrive later, find the well crowded, and begin depleting. Small initial advantages --- fractions of a unit of distance --- compound through positive feedback: energy $\to$ reduced urgency $\to$ sustained well access $\to$ more energy.
+
+This is the Matthew Effect (Merton 1968): ``For unto every one that hath shall be given, and he shall have abundance: but from him that hath not shall be taken away even that which he hath.'' Our engine derives the Matthew Effect from thermodynamics, without any social mechanism, institutional bias, or wealth inheritance. Pure physics produces maximum inequality from perfect equality.
+
+Random starting positions produce \emph{less} inequality (Gini 0.348) because the randomness distributes agents across the arena. Some start near wells, others near partners --- but the spatial diversity means no single well faces a competitive crush. The inequality of starting position paradoxically produces equality of outcome.
+
+Mobility was highest in the equal condition (95.8\% of agents changed quartile) --- not because the society was fair, but because everyone's fate was determined by the race to the well, not by their starting position. High mobility + high inequality is the signature of a winner-take-all system.
+
+\section{The Unified Theory}\label{the-unified-theory}
+
+These three parables converge on a single principle:
+
+\textbf{Cooperation is the only sustainable energy source, and anything that substitutes for cooperation --- abundant resources, individual charity, equal opportunity --- ultimately undermines it.}
+
+Abundance removes the pressure to cooperate. Charity transfers energy without creating cooperative structure. Equal starting conditions create competition rather than complementarity.
+
+What works is scarcity (which creates cooperation pressure), infrastructure (which enables cooperation), and diversity (which ensures agents find complementary partners rather than identical competitors).
+
+This is not an argument for imposed scarcity or against aid. It is a thermodynamic observation: systems that rely on cooperation for survival are resilient. Systems that rely on individual resource access are fragile. The design of the energy landscape determines which regime the system enters --- and well-meaning interventions that make individual survival easier can inadvertently undermine the cooperative structures that make collective survival possible.
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\emph{Next: Chapter 10 --- Technology and the Shrinking of Range}

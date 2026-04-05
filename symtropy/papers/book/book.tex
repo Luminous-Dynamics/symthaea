@@ -1,0 +1,84 @@
+\documentclass[12pt,a4paper]{book}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage[margin=1in]{geometry}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{amsmath}
+\usepackage{longtable}
+\usepackage{xcolor}
+\hypersetup{
+    colorlinks=true,
+    linkcolor=black,
+    urlcolor=blue!60!black
+}
+
+\title{\textbf{\Huge The Thermodynamics of Togetherness}\\[1em]
+\Large Cooperation, Scarcity, and the Physics of Social Life\\[2em]
+\large A Computational Investigation in 45 Findings}
+\author{Tristan Stoltz\\[0.5em]\textit{Luminous Dynamics}}
+\date{2026}
+
+\begin{document}
+
+\frontmatter
+\maketitle
+
+\chapter*{Epigraph}
+\begin{quote}
+\textit{``Energy scarcity + social range + mutual benefit $\to$ cooperation.''}\\[1em]
+--- The formula on a napkin, Chapter 16
+\end{quote}
+
+\tableofcontents
+
+\mainmatter
+
+% ============================================================
+\part{The Engine}
+% ============================================================
+
+\input{ch01}
+\input{ch02}
+\input{ch03}
+\input{ch04}
+
+% ============================================================
+\part{The Experiments}
+% ============================================================
+
+\input{ch05}
+\input{ch06}
+\input{ch07}
+\input{ch08}
+\input{ch09}
+\input{ch10}
+\input{ch11}
+\input{ch12}
+
+% ============================================================
+\part{Implications}
+% ============================================================
+
+\input{ch13}
+\input{ch14}
+\input{ch15}
+\input{ch16}
+
+\backmatter
+
+\chapter*{Reproduction}
+\addcontentsline{toc}{chapter}{Reproduction}
+
+All experiments reported in this book can be reproduced from the open-source repository:
+
+\begin{verbatim}
+cargo run --example [experiment_name] --release
+\end{verbatim}
+
+Seeds are deterministic. Results are bitwise reproducible on the same platform. Statistical methods, effect sizes, and Holm--Bonferroni corrections are computed inline and reported in stderr output.
+
+55 experiment files. 45 findings. 95 library tests + 2 integration tests. AGPL-3.0.
+
+\end{document}

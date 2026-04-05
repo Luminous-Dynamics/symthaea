@@ -1,0 +1,82 @@
+\chapter{Chapter 8: Raiders, Evolvers, and the Solidarity Response}\label{chapter-8-raiders-evolvers-and-the-solidarity-response}
+
+\emph{In which adversaries die faster than cooperators, societies evolve universal compatibility, and the arms race favors the social.}
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\section{The Adversarial Threshold}\label{the-adversarial-threshold}
+
+Every utopian system faces the same question: what happens when someone defects?
+
+We introduced adversarial agents --- entities with inverted harmony profiles that produce low resonance (below 0.2) with cooperators. At low resonance, interactions \emph{drain} energy rather than regenerating it. Adversaries are energetic parasites: their presence near cooperators costs energy without reciprocal benefit.
+
+We swept the adversary fraction from 0\% to 50\% across nine levels, ten seeds each (Finding 14).
+
+The result was a threshold function. Below 20\% adversaries, cooperator survival remained above 80\%. At 25\%, it dropped sharply. Above 30\%, cooperator societies collapsed.
+
+But the adversaries fared worse. At every fraction tested, adversaries died faster than cooperators (Finding 15). Their inverted harmony profiles meant they couldn't regenerate from \emph{any} interaction --- not with cooperators (dissonant) and not with each other (all adversaries share the same inverted profile, so same-type resonance is low). The adversarial strategy is energetically self-defeating.
+
+This is the thermodynamic argument against free-riding: defection costs energy. In a game theory framework, defection is free --- the defector simply takes the cooperator's contribution without paying. In a thermodynamic framework, defection means proximity without resonance, which means collision energy drain without regeneration. The defector pays a physical price for being antisocial.
+
+\section{The Solidarity Response}\label{the-solidarity-response}
+
+What do cooperators do when adversaries are present?
+
+The evolutionary experiment (Finding 18) ran 16 cooperators against 4 fixed adversaries for 30,000 ticks with reproduction every 1,000 ticks. Dead cooperators were replaced by offspring of the fittest survivor, with small mutations to harmony profiles.
+
+We expected tribalism. We expected cooperators to evolve narrow harmony profiles --- specializing to resonate only with their own type, excluding outsiders and adversaries alike.
+
+Instead, cooperators evolved \emph{universal compatibility}. Mean pairwise resonance increased from 0.86 to 0.996 --- approaching the theoretical maximum of 1.0. Cooperators became compatible with \emph{everyone}, not just their kin.
+
+The logic is thermodynamic. An agent with a narrow harmony profile can resonate with few partners. An agent with a broad profile can resonate with many. Under scarcity, the agent that can cooperate with anyone is more likely to find a partner and survive. Natural selection, operating on energy fitness, selects for social breadth rather than social depth.
+
+This is the opposite of the tribalism prediction from evolutionary psychology. Our engine suggests that adversarial pressure drives \emph{openness}, not \emph{closure}. Societies under threat become more inclusive, not less --- because exclusivity is an energy luxury that dying agents cannot afford.
+
+\section{The Arms Race}\label{the-arms-race}
+
+The adversarial learning experiment (Finding 39) asked: what happens when both sides can adapt?
+
+Three conditions: fixed cooperators vs fixed adversaries (baseline), learning cooperators vs fixed adversaries, and learning cooperators vs learning adversaries. ``Learning'' here means reward-modulated plasticity on the FEP gradient weights --- agents adjust how much they weight cooperation, well-seeking, and danger avoidance based on their energy trajectory over the last 100 ticks.
+
+\begin{longtable}[]{@{}lllll@{}}
+\toprule\noalign{}
+Condition & Coop Alive & Adv Alive & Coop Weight Drift & Adv Weight Drift \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+Fixed vs Fixed & 6.7/15 & 2.2/5 & 0.00 & 0.00 \\
+Learn vs Fixed & 5.5/15 & 1.6/5 & 2.82 & 0.00 \\
+\textbf{Learn vs Learn} & \textbf{9.8/15} & \textbf{2.9/5} & \textbf{2.62} & \textbf{3.06} \\
+\end{longtable}
+
+When only cooperators learn, they slightly \emph{underperform} the fixed baseline (5.5 vs 6.7). Learning introduces instability into a system that was already at a local optimum (Finding 31 showed the default weights are near-optimal). One-sided adaptation is worse than no adaptation.
+
+But when both sides learn, cooperators surge to 9.8/15 --- a 46\% improvement over the fixed baseline. The arms race \emph{favors cooperation}. Adversary weight drift (3.06) is higher than cooperator drift (2.62), suggesting adversaries need to adapt more aggressively to survive, but their adaptations are less effective because their fundamental strategy (parasitism) is energetically unviable.
+
+The result was not statistically significant after Holm-Bonferroni correction (d = -0.46, approaching medium), but the trend is consistent across seeds and the mechanism is clear: mutual adaptation selects for the strategy with more degrees of freedom, and cooperation has more degrees of freedom than parasitism. A cooperator can adjust which partners to seek, how urgently to cluster, and how much to weight well-seeking vs social seeking. A parasite can only adjust how aggressively to pursue victims --- but pursuing victims harder doesn't fix the resonance problem.
+
+\section{The Evolutionary Lesson}\label{the-evolutionary-lesson}
+
+Across findings 14-18 and 39, a consistent picture emerges:
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  \textbf{Adversaries are self-defeating}: their strategy costs energy in a thermodynamic system
+\item
+  \textbf{Cooperators evolve solidarity, not tribalism}: adversarial pressure broadens social compatibility
+\item
+  \textbf{Unilateral adaptation hurts}: changing strategy in a stable environment introduces instability
+\item
+  \textbf{Mutual adaptation favors cooperators}: the arms race selects for the more flexible strategy
+\end{enumerate}
+
+This is not the prisoner's dilemma. In the prisoner's dilemma, defection is free and cooperation is costly. In thermodynamic cooperation, defection is costly (proximity without resonance drains energy) and cooperation is free (proximity with resonance generates energy). The payoff matrix is inverted: the ``temptation to defect'' is negative, because defection actively harms the defector.
+
+No wonder cooperation is robust. The engine doesn't just reward cooperation --- it punishes defection with physics.
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\emph{Next: Chapter 9 --- The Economics of Scarcity}

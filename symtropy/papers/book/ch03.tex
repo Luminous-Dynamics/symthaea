@@ -1,0 +1,100 @@
+\chapter{Chapter 3: What's Real and What Isn't}\label{chapter-3-whats-real-and-what-isnt}
+
+\emph{In which we audit our own engine for scientific honesty and find that half of it is invention.}
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\section{The Classification}\label{the-classification}
+
+Every mechanic in a simulation engine has a relationship to reality. Some implement well-established physics. Some draw loose analogy from real systems. Some have no precedent whatsoever and exist because a programmer thought they would be interesting.
+
+Most simulation papers do not distinguish between these categories. We do.
+
+We classify every mechanic in Symtropy as one of three types:
+
+\textbf{GROUNDED}: Implements established physical or mathematical laws. Can be validated against nature. Uses published constants. If the mechanic is wrong, a physicist can demonstrate how.
+
+\textbf{INSPIRED}: Draws loose analogy from a real system but does not faithfully implement its equations. Captures the spirit of a scientific idea without the rigor. If the mechanic is wrong, the error is in the analogy, not the math.
+
+\textbf{SPECULATIVE}: Has no published precedent. Invented for this simulation. If the mechanic is wrong, there is nothing to compare it against --- it was never claimed to be right.
+
+\section{The Audit}\label{the-audit}
+
+\begin{longtable}[]{@{}llll@{}}
+\toprule\noalign{}
+Mechanic & Math & Physics & Classification \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+Thermodynamics (U, T, S, F) & Correct & Correct & \textbf{GROUNDED} \\
+Landauer bound (2.87e-21 J/bit) & Exact & Published & \textbf{GROUNDED} \\
+Conformal geometry (g\_ij = e\^{}\{2$\sigma$\}$\delta$\_ij) & Correct Riemannian & No physics law couples $\Phi$ to spacetime & \textbf{GROUNDED} math, \textbf{SPECULATIVE} physics \\
+FEP gradient descent & Approximation & Loose Friston analogy & \textbf{INSPIRED} \\
+Harmony field (1/r\^{}\{D-1\} falloff) & Correct field theory form & No physical field exists & \textbf{INSPIRED} \\
+Motor gain (4-tier safety) & --- & No neuroscience precedent & \textbf{INSPIRED} \\
+Sanctuary zones (impulse dampening) & --- & No ``harmony force field'' exists & \textbf{SPECULATIVE} \\
+$\Phi$-gravity (F = G$\Phi$$_1$$\Phi$$_2$/r²) & Correct Newtonian form & Tononi never proposed this & \textbf{SPECULATIVE} \\
+Dimensional leakage & --- & Randall-Sundrum misapplied & \textbf{SPECULATIVE} \\
+Joules-per-Phi metric & Novel & Novel & \textbf{SPECULATIVE} (but useful) \\
+\end{longtable}
+
+Five of nine mechanics are either INSPIRED or SPECULATIVE. Only the core thermodynamics and the conformal geometry mathematics are fully GROUNDED. The engine is, by this accounting, approximately half invention.
+
+\section{What This Means for the Findings}\label{what-this-means-for-the-findings}
+
+Not all findings depend on all mechanics.
+
+The cooperation emergence findings (Chapters 5-6) depend only on the GROUNDED thermodynamic layer (energy budgets, maintenance costs, Helmholtz free energy) and the INSPIRED FEP gradient. They do not use sanctuary zones, $\Phi$-gravity, dimensional leakage, or conformal curvature. The core thesis --- cooperation as thermodynamic necessity --- rests on the most grounded components of the engine.
+
+The curvature lensing finding (Finding 8: p=0.009) depends on the conformal geometry, which is mathematically GROUNDED but physically SPECULATIVE. The trajectory deflection is real Riemannian geometry. The claim that harmony field energy curves space is pure invention. Finding 36 confirmed that this curvature has zero effect on cooperation --- it deflects trajectories but doesn't change social outcomes. The conformal curvature is a mathematical demonstration, not a social mechanism.
+
+The $\Phi$-gravity and sanctuary mechanics are used in a few early experiments but are not invoked in any finding reported in this book. They remain as engine features for potential game design use, but we make no scientific claims about them.
+
+\section{Why We're Telling You This}\label{why-were-telling-you-this}
+
+The standard practice in simulation papers is to present the engine as a unified whole and let the reader assume that all components are equally grounded. This is misleading. A reader who sees ``conformal Riemannian curvature'' next to ``thermodynamic energy budgets'' might reasonably assume both are physics. Only one is.
+
+We classify our own mechanics because:
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\item
+  \textbf{Reviewers will find what you don't disclose.} An unreported SPECULATIVE mechanic discovered by a reviewer becomes a credibility problem. A disclosed SPECULATIVE mechanic becomes an honest design choice.
+\item
+  \textbf{Other builders need to know.} If someone extends this engine, they should know which parts are load-bearing science and which are decorative metaphor. Building on a SPECULATIVE foundation without knowing it is how bad science propagates.
+\item
+  \textbf{The findings are stronger with the distinction.} When we say ``cooperation emerges from thermodynamics,'' we can now demonstrate that this claim rests only on GROUNDED mechanics. The SPECULATIVE components are separable and inert. The thesis does not depend on them.
+\end{enumerate}
+
+\section{The Proposed Standard}\label{the-proposed-standard}
+
+We propose that every simulation engine paper include a realism classification table. The format is simple:
+
+\begin{longtable}[]{@{}lll@{}}
+\toprule\noalign{}
+Mechanic & Classification & Evidence \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+{[}name{]} & GROUNDED / INSPIRED / SPECULATIVE & {[}citation or ``none''{]} \\
+\end{longtable}
+
+This table should appear in the methods section, before any results. It sets expectations and demonstrates scientific maturity.
+
+The classification requires judgment. Reasonable people may disagree about whether a particular mechanic is INSPIRED or SPECULATIVE --- the FEP gradient is a borderline case. The point is not to achieve perfect classification but to \emph{force the exercise of classification}. A builder who must categorize each mechanic will think more carefully about what they're building.
+
+\section{The Cost of Honesty}\label{the-cost-of-honesty}
+
+Disclosing that half your engine is speculative is uncomfortable. It invites the question: ``If half of it is made up, why should I trust any of it?''
+
+The answer is in the separation. The findings reported in this book depend on the GROUNDED half. The SPECULATIVE half is present but inert --- it exists in the codebase but does not contribute to the cooperation, phase transition, or social dynamics results. It is engine feature, not scientific claim.
+
+This separation is itself a finding. We \emph{tested} whether the speculative mechanics matter (Finding 36: curvature irrelevant, Finding 29: information irrelevant, Finding 34: memory irrelevant). The negative results are as important as the positive ones --- they demonstrate that the engine's core behavior comes from its grounded components, not from the speculative additions that make it look impressive.
+
+If we had not disclosed and tested the classification, we would not know this. The honesty audit strengthened the science.
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\emph{Next: Chapter 4 --- Scaling and Performance: From Twenty Agents to One Thousand}
