@@ -775,6 +775,7 @@ impl CognitiveLoopService {
                 broca_code_channels: None,
             },
             voice_synthesis: None, // Spawned on demand via enable_voice_synthesis()
+            llm_language: None,   // Spawned on demand via enable_llm_language()
             behavior: super::behavioral_synthesis::BehavioralSynthesis::new(
                 FlowState::default(),
                 EmotionContagion::default(),

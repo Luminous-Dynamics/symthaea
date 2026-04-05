@@ -303,7 +303,28 @@ impl CognitiveLoopService {
                 ..Default::default()
             };
             if let Some(result) = self.language_comm.broca_lite.generate_from_signals_with_input(&signals, Some(input)) {
-                self.language_comm.last_broca_text = Some(result.text);
+                self.language_comm.last_broca_text = Some(result.text.clone());
+
+                // Also send to LLM channel for higher-quality async translation.
+                // LLM response will be available in a future cycle via drain.
+                if let Some(ref llm) = self.llm_language {
+                    let _ = llm.send(super::super::llm_language_channel::LlmLanguageRequest {
+                        input_text: input.to_string(),
+                        signals: signals.clone(),
+                        broca_lite_text: Some(result.text),
+                        cycle_num: self.stats.total_cycles as u64,
+                    });
+                }
+            }
+        }
+
+        // ── Drain LLM language responses: upgrade BrocaLite output with LLM text ──
+        if let Some(ref llm) = self.llm_language {
+            for response in llm.drain_responses() {
+                if response.from_llm && !response.text.is_empty() {
+                    // LLM response ready — use it as the language output for this cycle
+                    self.language_comm.last_broca_text = Some(response.text);
+                }
             }
         }
 

@@ -189,6 +189,7 @@ pub(crate) mod voice_coherence_bridge;
 
 pub mod broca_bridge;
 pub mod broca_lite;
+pub mod llm_language_channel;
 pub mod voice_channel;
 
 #[cfg(feature = "canvas")]
@@ -388,6 +389,11 @@ pub struct CognitiveLoopService {
     /// Async voice synthesis: sends text to background thread, retrieves audio.
     /// None when voice synthesis is not configured.
     pub(crate) voice_synthesis: Option<voice_channel::VoiceSynthesisChannel>,
+
+    /// Async LLM language: sends consciousness state to Gemma 4 for translation.
+    /// None when LLM language is not configured. BrocaLite fills in immediately;
+    /// LLM response upgrades the output for subsequent cycles.
+    pub(crate) llm_language: Option<llm_language_channel::LlmLanguageChannel>,
 
     /// Behavioral synthesis group: flow, emotion, curiosity, adaptive behavior,
     /// thalamic routing, and social cognition.

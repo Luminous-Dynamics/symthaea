@@ -1421,4 +1421,32 @@ impl CognitiveLoopService {
             .map(|vs| vs.drain_responses())
             .unwrap_or_default()
     }
+
+    /// Enable async LLM language: spawns a background thread that sends
+    /// consciousness state to Gemma 4 (via Ollama) for high-quality translation.
+    ///
+    /// When enabled, BrocaLite still fires instantly each cycle (structured grammar),
+    /// but the LLM produces a higher-quality translation that replaces the output
+    /// in subsequent cycles. Architecture:
+    ///
+    /// ```text
+    /// Cycle N:   BrocaLite → immediate text + LLM request sent (async)
+    /// Cycle N+K: LLM response → upgrades language_output
+    /// ```
+    ///
+    /// Model defaults to `gemma4:e2b` via Ollama at localhost:11434.
+    /// Override with `SYMTHAEA_LLM_MODEL` env var.
+    pub fn enable_llm_language(&mut self) {
+        if self.llm_language.is_none() {
+            self.llm_language = Some(super::super::llm_language_channel::LlmLanguageChannel::spawn());
+        }
+    }
+
+    /// Drain completed LLM language responses (non-blocking).
+    pub fn drain_llm_language(&self) -> Vec<super::super::llm_language_channel::LlmLanguageResponse> {
+        self.llm_language
+            .as_ref()
+            .map(|ch| ch.drain_responses())
+            .unwrap_or_default()
+    }
 }
