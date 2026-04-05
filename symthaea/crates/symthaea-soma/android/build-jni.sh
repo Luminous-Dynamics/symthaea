@@ -38,7 +38,7 @@ export AR_aarch64_linux_android="$AR"
 export CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER="$CC"
 # 16KB page alignment required for Android 15+ (Pixel 8 Pro)
 export RUSTFLAGS="-C link-arg=-z -C link-arg=max-page-size=16384"
-cargo build --target "$TARGET" --release -p symthaea-soma --features native-ffi,screen-vision,broca-full
+cargo build --target "$TARGET" --release -p symthaea-soma --features native-ffi,screen-vision,broca-full,litert,prism-search
 
 # Copy Rust .so (soma_jni.c links against -lsymthaea_soma)
 cp "$RUST_SO" "$JNILIBS/libsymthaea_soma.so"
@@ -55,6 +55,27 @@ echo "=== Building JNI glue (soma_jni.c) ==="
     -Wl,-z,max-page-size=16384
 
 echo "  Built:  libsoma_jni.so ($(du -h "$JNILIBS/libsoma_jni.so" | cut -f1))"
+
+# Step 3: Build LiteRT-LM shim (stub mode — full SDK not yet linked)
+echo "=== Building LiteRT shim (litert_shim.cpp) ==="
+LITERT_SRC="$SOMA_CRATE/native"
+LITERT_FLAGS=""
+
+# If LiteRT-LM SDK is available, enable full inference
+if [[ -d "${LITERT_LM_SDK:-}" ]]; then
+    LITERT_FLAGS="-DLITERT_LM_AVAILABLE -I$LITERT_LM_SDK/include -L$LITERT_LM_SDK/lib -llitert_lm"
+    echo "  LiteRT-LM SDK found at $LITERT_LM_SDK — building with full inference"
+else
+    echo "  LiteRT-LM SDK not found — building stub (set LITERT_LM_SDK to enable)"
+fi
+
+"${NDK_TOOLCHAIN}/bin/aarch64-linux-android${API}-clang++" -shared -o "$JNILIBS/liblitert_shim.so" \
+    "$LITERT_SRC/litert_shim.cpp" \
+    -std=c++17 -fPIC -O2 -Wall \
+    -Wl,-z,max-page-size=16384 \
+    $LITERT_FLAGS
+
+echo "  Built:  liblitert_shim.so ($(du -h "$JNILIBS/liblitert_shim.so" | cut -f1))"
 
 echo ""
 echo "=== JNI build complete ==="
