@@ -217,7 +217,7 @@ fn MentorGreeting(
                 let navigate_session = navigate.clone();
                 let set_role_session = set_role;
                 let (session_dest, set_session_dest) = signal("/skill-map".to_string());
-                let (session_hint, set_session_hint) = signal("Explore the constellation and start growing".to_string());
+                let (session_hint, set_session_hint) = signal("Explore the Knowledge Garden and start growing".to_string());
 
                 // Compute session recommendation reactively
                 Effect::new(move |_| {
@@ -238,7 +238,7 @@ fn MentorGreeting(
                         set_session_hint.set(format!("{} needs attention ({}% mastery)", title, (pct * 100.0) as u32));
                     } else {
                         set_session_dest.set("/skill-map".to_string());
-                        set_session_hint.set("Explore the constellation and start growing".to_string());
+                        set_session_hint.set("Explore the Knowledge Garden and start growing".to_string());
                     }
                 });
 
@@ -264,7 +264,7 @@ fn MentorGreeting(
                 <button class="intention-card intention-explore" on:click=on_explore>
                     <span class="intention-icon">"\u{1f4d0}"</span>
                     <span class="intention-label">"Study a topic"</span>
-                    <span class="intention-hint">"Browse the constellation"</span>
+                    <span class="intention-hint">"Browse the Knowledge Garden"</span>
                 </button>
 
                 <button class="intention-card intention-create" on:click=on_create>

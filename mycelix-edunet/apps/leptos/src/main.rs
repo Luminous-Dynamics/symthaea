@@ -15,6 +15,7 @@ mod curriculum;
 mod games;
 mod holochain;
 mod i18n;
+mod katex;
 mod learning_engine;
 mod pages;
 mod persistence;

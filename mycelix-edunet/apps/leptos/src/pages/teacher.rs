@@ -6,6 +6,9 @@
 //! at-risk student alerts, aggregate stats, and action buttons.
 
 use leptos::prelude::*;
+use wasm_bindgen::JsCast;
+
+use crate::student_profile::use_profile;
 
 // ---------------------------------------------------------------------------
 // Data types
@@ -161,15 +164,45 @@ fn mastery_color(permille: u16) -> &'static str {
 
 #[component]
 fn ClassHeader() -> impl IntoView {
+    let profile = use_profile();
+    let name = move || {
+        let p = profile.get();
+        if p.name.is_empty() { "Teacher".to_string() } else { p.name.clone() }
+    };
+    let grade_label = move || {
+        let p = profile.get();
+        let g = p.grade;
+        if g == 0 || g > 15 {
+            "All Grades".to_string()
+        } else if g <= 12 {
+            format!("Grade {}", g)
+        } else {
+            "Post-Secondary".to_string()
+        }
+    };
+
+    // Check Holochain status to determine solo vs connected mode
+    let is_solo = move || {
+        let status = js_sys::Reflect::get(
+            &js_sys::global().unchecked_into::<js_sys::Object>(),
+            &wasm_bindgen::JsValue::from_str("__HC_STATUS"),
+        ).ok().and_then(|v| v.as_string()).unwrap_or_default();
+        status != "connected"
+    };
+
     view! {
         <div class="teacher-class-header">
-            <h2>"Grade 3 Mathematics"</h2>
+            <h2>{grade_label}" Mathematics"</h2>
             <div class="class-header-meta">
-                <span>"24 students"</span>
+                <span>{move || if is_solo() { "Solo Mode".to_string() } else { "Connected".to_string() }}</span>
                 <span class="meta-sep">"|"</span>
-                <span>"Fall 2025"</span>
+                <span>{move || if is_solo() {
+                    "Connect to the mesh to see your class".to_string()
+                } else {
+                    "0 students".to_string()
+                }}</span>
                 <span class="meta-sep">"|"</span>
-                <span>"Mrs. Rodriguez"</span>
+                <span>{name}</span>
             </div>
         </div>
     }

@@ -12,6 +12,7 @@ use wasm_bindgen::JsCast;
 use wasm_bindgen_futures::JsFuture;
 
 use crate::curriculum::{caps_graph, use_progress, use_set_progress};
+use crate::katex::render_math_html;
 
 // ============================================================
 // Types
@@ -97,14 +98,14 @@ pub fn MockExamPage() -> impl IntoView {
         let pool: Vec<ExamProblem> = match p {
             ExamPaper::Paper1 => vec![
                 // ALGEBRA (25m)
-                ExamProblem { question: "Solve for x: x\u{00b2} \u{2212} 5x + 6 = 0".into(), answer: "x = 2 or x = 3 (factorise: (x\u{2212}2)(x\u{2212}3) = 0)".into(), difficulty_permille: 200, topic_title: "Algebra".into(), topic_id: "CAPS.Mathematics.Gr12.P1.ALG".into(), marks: 3 },
-                ExamProblem { question: "Solve for x: 2x\u{00b2} + 3x \u{2212} 5 = 0".into(), answer: "x = 1 or x = \u{2212}5/2 (formula: x = (\u{2212}3 \u{00b1} \u{221a}49)/4)".into(), difficulty_permille: 300, topic_title: "Algebra".into(), topic_id: "CAPS.Mathematics.Gr12.P1.ALG".into(), marks: 4 },
-                ExamProblem { question: "Solve simultaneously: y = 2x \u{2212} 1 and x\u{00b2} + y = 7".into(), answer: "x = 2, y = 3 or x = \u{2212}4, y = \u{2212}9. Substitute: x\u{00b2} + 2x \u{2212} 1 = 7, x\u{00b2} + 2x \u{2212} 8 = 0".into(), difficulty_permille: 500, topic_title: "Algebra".into(), topic_id: "CAPS.Mathematics.Gr12.P1.ALG".into(), marks: 6 },
-                ExamProblem { question: "For which values of p will 2x\u{00b2} + px + 8 = 0 have real roots?".into(), answer: "p \u{2264} \u{2212}8 or p \u{2265} 8. Discriminant: p\u{00b2} \u{2212} 64 \u{2265} 0".into(), difficulty_permille: 600, topic_title: "Algebra".into(), topic_id: "CAPS.Mathematics.Gr12.P1.ALG".into(), marks: 5 },
+                ExamProblem { question: "Solve for $x$: $x^2 - 5x + 6 = 0$".into(), answer: "$x = 2$ or $x = 3$ (factorise: $(x-2)(x-3) = 0$)".into(), difficulty_permille: 200, topic_title: "Algebra".into(), topic_id: "CAPS.Mathematics.Gr12.P1.ALG".into(), marks: 3 },
+                ExamProblem { question: "Solve for $x$: $2x^2 + 3x - 5 = 0$".into(), answer: "$x = 1$ or $x = -\\frac{5}{2}$ (formula: $x = \\frac{-3 \\pm \\sqrt{49}}{4}$)".into(), difficulty_permille: 300, topic_title: "Algebra".into(), topic_id: "CAPS.Mathematics.Gr12.P1.ALG".into(), marks: 4 },
+                ExamProblem { question: "Solve simultaneously: $y = 2x - 1$ and $x^2 + y = 7$".into(), answer: "$x = 2, y = 3$ or $x = -4, y = -9$. Substitute: $x^2 + 2x - 1 = 7$, $x^2 + 2x - 8 = 0$".into(), difficulty_permille: 500, topic_title: "Algebra".into(), topic_id: "CAPS.Mathematics.Gr12.P1.ALG".into(), marks: 6 },
+                ExamProblem { question: "For which values of $p$ will $2x^2 + px + 8 = 0$ have real roots?".into(), answer: "$p \\leq -8$ or $p \\geq 8$. Discriminant: $p^2 - 64 \\geq 0$".into(), difficulty_permille: 600, topic_title: "Algebra".into(), topic_id: "CAPS.Mathematics.Gr12.P1.ALG".into(), marks: 5 },
                 // SEQUENCES (25m)
                 ExamProblem { question: "The first three terms of an arithmetic sequence are 2; 5; 8; ... Find T\u{2082}\u{2080}.".into(), answer: "T\u{2082}\u{2080} = 2 + (20\u{2212}1)(3) = 59".into(), difficulty_permille: 200, topic_title: "Sequences".into(), topic_id: "CAPS.Mathematics.Gr12.P1.SEQ".into(), marks: 3 },
                 ExamProblem { question: "Calculate: \u{03a3}(k=1 to 20) of (3k + 1)".into(), answer: "= 3\u{00b7}(20)(21)/2 + 20 = 630 + 20 = 650".into(), difficulty_permille: 500, topic_title: "Sequences".into(), topic_id: "CAPS.Mathematics.Gr12.P1.SEQ".into(), marks: 5 },
-                ExamProblem { question: "A geometric series has a = 8 and r = \u{00bd}. Calculate S\u{221e}.".into(), answer: "S\u{221e} = a/(1\u{2212}r) = 8/(1\u{2212}0.5) = 16".into(), difficulty_permille: 400, topic_title: "Sequences".into(), topic_id: "CAPS.Mathematics.Gr12.P1.SEQ".into(), marks: 4 },
+                ExamProblem { question: "A geometric series has $a = 8$ and $r = \\frac{1}{2}$. Calculate $S_\\infty$.".into(), answer: "$S_\\infty = \\frac{a}{1-r} = \\frac{8}{1-0.5} = 16$".into(), difficulty_permille: 400, topic_title: "Sequences".into(), topic_id: "CAPS.Mathematics.Gr12.P1.SEQ".into(), marks: 4 },
                 // FINANCE (25m)
                 ExamProblem { question: "Naledi invests R45 000 at 9.5% p.a. compounded monthly. How much after 6 years?".into(), answer: "A = 45000(1 + 0.095/12)\u{2077}\u{00b2} = R79 167.34".into(), difficulty_permille: 300, topic_title: "Finance".into(), topic_id: "CAPS.Mathematics.Gr12.P1.FIN".into(), marks: 4 },
                 ExamProblem { question: "Calculate the monthly repayment on a R600 000 home loan at 11% p.a. compounded monthly over 20 years.".into(), answer: "R6 191.77. Use PV annuity: x = 600000 \u{00d7} 0.11/12 / (1 \u{2212} (1+0.11/12)\u{207b}\u{00b2}\u{2074}\u{2070})".into(), difficulty_permille: 600, topic_title: "Finance".into(), topic_id: "CAPS.Mathematics.Gr12.P1.FIN".into(), marks: 6 },
@@ -112,7 +113,7 @@ pub fn MockExamPage() -> impl IntoView {
                 // FUNCTIONS (25m)
                 ExamProblem { question: "Sketch f(x) = \u{2212}(x\u{2212}2)\u{00b2} + 9. State the turning point, axis of symmetry, and range.".into(), answer: "TP: (2, 9). Axis: x = 2. Range: y \u{2264} 9. Opens downward.".into(), difficulty_permille: 400, topic_title: "Functions".into(), topic_id: "CAPS.Mathematics.Gr12.P1.FN".into(), marks: 5 },
                 // CALCULUS (35m)
-                ExamProblem { question: "Differentiate: f(x) = 4x\u{00b3} \u{2212} 6x\u{00b2} + 2x \u{2212} 7".into(), answer: "f'(x) = 12x\u{00b2} \u{2212} 12x + 2".into(), difficulty_permille: 200, topic_title: "Calculus".into(), topic_id: "CAPS.Mathematics.Gr12.P1.CALC".into(), marks: 3 },
+                ExamProblem { question: "Differentiate: $f(x) = 4x^3 - 6x^2 + 2x - 7$".into(), answer: "$f'(x) = 12x^2 - 12x + 2$".into(), difficulty_permille: 200, topic_title: "Calculus".into(), topic_id: "CAPS.Mathematics.Gr12.P1.CALC".into(), marks: 3 },
                 ExamProblem { question: "Find the equation of the tangent to y = x\u{00b2} \u{2212} 3x + 1 at x = 4.".into(), answer: "At x=4: y=5, m=2(4)\u{2212}3=5. Tangent: y\u{2212}5=5(x\u{2212}4), y = 5x \u{2212} 15".into(), difficulty_permille: 400, topic_title: "Calculus".into(), topic_id: "CAPS.Mathematics.Gr12.P1.CALC".into(), marks: 5 },
                 ExamProblem { question: "Given f(x) = x\u{00b3} \u{2212} 3x\u{00b2} \u{2212} 9x + 27, find the turning points and point of inflection.".into(), answer: "f'(x) = 3x\u{00b2}\u{2212}6x\u{2212}9 = 3(x\u{2212}3)(x+1). TPs: (\u{2212}1, 32) max, (3, 0) min. POI: f''=6x\u{2212}6=0, x=1, (1, 16)".into(), difficulty_permille: 600, topic_title: "Calculus".into(), topic_id: "CAPS.Mathematics.Gr12.P1.CALC".into(), marks: 8 },
                 ExamProblem { question: "A rectangular tank (open top) must hold 32 m\u{00b3}. The base is square with side x. Find x for minimum surface area.".into(), answer: "V=x\u{00b2}h=32, h=32/x\u{00b2}. SA=x\u{00b2}+4xh=x\u{00b2}+128/x. SA'=2x\u{2212}128/x\u{00b2}=0, x\u{00b3}=64, x=4m".into(), difficulty_permille: 800, topic_title: "Calculus".into(), topic_id: "CAPS.Mathematics.Gr12.P1.CALC".into(), marks: 10 },
@@ -136,7 +137,7 @@ pub fn MockExamPage() -> impl IntoView {
                 ExamProblem { question: "PT is a tangent to circle O at T. PAB passes through centre O. PA = 4, AB = 12. Find PT.".into(), answer: "PT\u{00b2} = PA \u{00d7} PB = 4 \u{00d7} 16 = 64. PT = 8".into(), difficulty_permille: 500, topic_title: "Geometry".into(), topic_id: "CAPS.Mathematics.Gr12.P2.GEOM".into(), marks: 5 },
                 ExamProblem { question: "In \u{0394}ABC, D is on AB and E is on AC such that DE \u{2225} BC. AD = 3, DB = 5, AE = 4.5. Find EC.".into(), answer: "AD/DB = AE/EC (proportionality). 3/5 = 4.5/EC. EC = 7.5".into(), difficulty_permille: 400, topic_title: "Geometry".into(), topic_id: "CAPS.Mathematics.Gr12.P2.GEOM".into(), marks: 4 },
                 // ANALYTICAL GEOMETRY (40m)
-                ExamProblem { question: "Find the equation of the circle with centre (3, \u{2212}2) and radius 5.".into(), answer: "(x\u{2212}3)\u{00b2} + (y+2)\u{00b2} = 25".into(), difficulty_permille: 200, topic_title: "Analytical Geometry".into(), topic_id: "CAPS.Mathematics.Gr12.P2.ANAG".into(), marks: 3 },
+                ExamProblem { question: "Find the equation of the circle with centre $(3, -2)$ and radius $5$.".into(), answer: "$(x-3)^2 + (y+2)^2 = 25$".into(), difficulty_permille: 200, topic_title: "Analytical Geometry".into(), topic_id: "CAPS.Mathematics.Gr12.P2.ANAG".into(), marks: 3 },
                 ExamProblem { question: "Determine if (1, 7) lies inside, on, or outside the circle (x\u{2212}3)\u{00b2} + (y\u{2212}4)\u{00b2} = 25.".into(), answer: "(1\u{2212}3)\u{00b2}+(7\u{2212}4)\u{00b2} = 4+9 = 13 < 25. Inside the circle.".into(), difficulty_permille: 400, topic_title: "Analytical Geometry".into(), topic_id: "CAPS.Mathematics.Gr12.P2.ANAG".into(), marks: 4 },
                 ExamProblem { question: "Find the equation of the tangent to x\u{00b2}+y\u{00b2}=25 at the point (3, 4).".into(), answer: "Gradient of radius = 4/3. Tangent \u{22a5} radius: m = \u{2212}3/4. y\u{2212}4 = \u{2212}3/4(x\u{2212}3). 3x+4y = 25".into(), difficulty_permille: 600, topic_title: "Analytical Geometry".into(), topic_id: "CAPS.Mathematics.Gr12.P2.ANAG".into(), marks: 6 },
                 // TRIGONOMETRY (40m)
@@ -302,18 +303,19 @@ pub fn MockExamPage() -> impl IntoView {
                             <div style="font-size: 0.75rem; color: var(--text-tertiary); margin-bottom: 0.5rem">
                                 {topic}" \u{2014} "{marks}"m"
                             </div>
-                            <div style="font-size: 0.95rem; line-height: 1.7; white-space: pre-line">
-                                {question}
-                            </div>
+                            <div style="font-size: 0.95rem; line-height: 1.7; white-space: pre-line"
+                                inner_html=render_math_html(&question)
+                            ></div>
 
                             // Reveal answer
                             {move || if revealed.get() {
                                 let ans = answer.clone();
+                                let ans_html = render_math_html(&ans);
                                 let tid = topic_id.clone();
                                 view! {
-                                    <div class="caps-problem-a" style="margin-top: 1rem">
-                                        {ans}
-                                    </div>
+                                    <div class="caps-problem-a" style="margin-top: 1rem"
+                                        inner_html=ans_html
+                                    ></div>
                                     <div style="display: flex; gap: 0.5rem; margin-top: 0.75rem">
                                         <button
                                             class="caps-filter-btn"

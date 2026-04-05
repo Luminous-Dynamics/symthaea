@@ -105,7 +105,7 @@ fn real_credentials() -> Vec<CredentialView> {
             verification_method: "".into(),
             proof_purpose: "".into(),
             proof_value: "".into(),
-            status_purpose: Some("Master a topic on the constellation to earn your first credential".into()),
+            status_purpose: Some("Complete your first topic in the Knowledge Garden to earn a verifiable credential. Each mastered topic generates a W3C Verifiable Credential stored on your device.".into()),
             epistemic_empirical: None,
             epistemic_normative: None,
             epistemic_materiality: None,
@@ -255,18 +255,33 @@ fn AchievementCard(
     credential: CredentialView,
     on_select: impl Fn() + 'static,
 ) -> impl IntoView {
+    let is_placeholder = credential.credential_id == "vc:edunet:placeholder";
     let trophy = trophy_for_band(&credential.score_band);
     let grade = grade_display(credential.score, &credential.score_band);
     let date = friendly_date(&credential.issuance_date);
+    let status_msg = credential.status_purpose.clone().unwrap_or_default();
 
     view! {
-        <div class="achievement-card" on:click=move |_| on_select()>
+        <div class="achievement-card" on:click=move |_| { if !is_placeholder { on_select(); } }>
             <div class="achievement-card-header">
-                <span class="achievement-trophy">{trophy}</span>
+                <span class="achievement-trophy">{if is_placeholder { "\u{1f331}" } else { trophy }}</span>
                 <div class="achievement-info">
                     <h4>{credential.course_name}</h4>
-                    <p class="achievement-grade">"Grade: " {grade}</p>
-                    <p class="achievement-date">"Earned: " {date}</p>
+                    {if is_placeholder {
+                        view! {
+                            <p style="font-size: 0.8rem; color: var(--text-secondary); line-height: 1.5; margin: 0.5rem 0">
+                                {status_msg}
+                            </p>
+                            <a href="/skill-map" style="display: inline-block; margin-top: 0.5rem; padding: 0.4rem 1rem; background: var(--primary); color: var(--text-on-primary); border-radius: 8px; font-size: 0.85rem; font-weight: 600; text-decoration: none">
+                                "Start growing \u{2192}"
+                            </a>
+                        }.into_any()
+                    } else {
+                        view! {
+                            <p class="achievement-grade">"Grade: " {grade}</p>
+                            <p class="achievement-date">"Earned: " {date}</p>
+                        }.into_any()
+                    }}
                 </div>
             </div>
         </div>
