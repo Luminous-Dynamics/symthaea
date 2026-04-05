@@ -122,11 +122,11 @@ impl Plugin for SymtropyPlugin {
                     systems::atlas::setup_globe_view,
                     sol_atlas_bevy::selection::setup_selection_ui,
                 ))
-                // Visibility pipeline: timeline → temporal → LOD (chained so LOD wins)
+                // Visibility pipeline: timeline → temporal → filter (includes LOD)
                 .add_systems(Update, (
                     systems::atlas::timeline_visibility_system,
                     systems::atlas::temporal_4d_system,
-                    systems::atlas::lod_visibility_system,
+                    systems::atlas::data_view_filter_system, // combined LOD + view filter
                 ).chain().run_if(in_state(GamePhase::GlobeView)))
                 // Globe systems — split into two groups (Bevy tuple size limit)
                 .add_systems(Update, (
@@ -146,7 +146,6 @@ impl Plugin for SymtropyPlugin {
                     systems::atlas::city_stress_evolution_system,
                     systems::atlas::timeline_hud_system,
                     systems::atlas::data_view_switch_system,
-                    systems::atlas::data_view_filter_system,
                     systems::atlas::panel_metrics_system,
                     systems::atlas::timeline_scrubber_system,
                     systems::atlas::aesthetic_switch_system,

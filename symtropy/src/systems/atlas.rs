@@ -1320,17 +1320,47 @@ pub fn data_view_switch_system(
 }
 
 /// Data view filter — hides markers not in the active view's layer set.
+/// Data view filter — hides markers not in the active view's layer set.
+/// Runs every frame (not just on change) because LOD also sets Visibility.
 pub fn data_view_filter_system(
     view: Res<DataView>,
-    mut markers: Query<(&DataMarker, &mut Visibility), Without<CityIndicator>>,
+    mut markers: Query<(&DataMarker, &mut Visibility), (Without<CityIndicator>, Without<SurfaceLod>, Without<OrbitLod>)>,
+    mut surface_markers: Query<(&DataMarker, &mut Visibility), (With<SurfaceLod>, Without<OrbitLod>, Without<CityIndicator>)>,
+    mut orbit_markers: Query<(&DataMarker, &mut Visibility), (With<OrbitLod>, Without<SurfaceLod>, Without<CityIndicator>)>,
+    camera: Query<&Transform, With<OrbitalCamera>>,
 ) {
-    if !view.is_changed() { return; }
-
     let visible_layers = view.visible_layers();
     let show_all = *view == DataView::All;
 
+    // Get LOD state
+    let distance = camera.single().map(|t| t.translation.length()).unwrap_or(4.2);
+    let lod = LodLevel::from_camera_distance(distance);
+    let show_surface = matches!(lod, LodLevel::Surface);
+    let show_orbit = matches!(lod, LodLevel::Orbit);
+
+    // Always-visible markers (no LOD tag): filter by view only
     for (marker, mut vis) in markers.iter_mut() {
         *vis = if show_all || visible_layers.contains(&marker.layer) {
+            Visibility::Visible
+        } else {
+            Visibility::Hidden
+        };
+    }
+
+    // SurfaceLod markers: filter by view AND distance
+    for (marker, mut vis) in surface_markers.iter_mut() {
+        let view_ok = show_all || visible_layers.contains(&marker.layer);
+        *vis = if view_ok && show_surface {
+            Visibility::Visible
+        } else {
+            Visibility::Hidden
+        };
+    }
+
+    // OrbitLod markers: filter by view AND distance
+    for (marker, mut vis) in orbit_markers.iter_mut() {
+        let view_ok = show_all || visible_layers.contains(&marker.layer);
+        *vis = if view_ok && show_orbit {
             Visibility::Visible
         } else {
             Visibility::Hidden
