@@ -3,8 +3,16 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Configuration types for the cognitive loop.
 //!
-//! Temporal backend selection (CfC vs HdcLtcUnified), training methods,
-//! and the main `CognitiveLoopConfig` builder.
+//! Split into sub-modules:
+//! - `temporal` — CfC backend selection, training methods, CfCConfig
+//! - `consciousness` — ConsciousnessProfile presets
+
+pub mod consciousness;
+pub mod temporal;
+
+// Re-export sub-module types at this level for backward compatibility.
+pub use consciousness::ConsciousnessProfile;
+pub use temporal::{CfCConfig, TemporalBackend, TrainingMethod};
 
 use crate::hdc::moral_topology::MoralAnomalyConfig;
 use crate::hdc_ltc_bridge::HdcLtcBridgeConfig;
@@ -15,128 +23,6 @@ pub use symthaea_core::hdc::substrate_independence::SubstrateType;
 /// Serde helper: deserialize missing bool fields as `true`.
 fn default_true() -> bool {
     true
-}
-
-// TEMPORAL BACKEND SELECTION
-// ═══════════════════════════════════════════════════════════════════════════════
-
-/// Temporal backend selection for the cognitive loop
-///
-/// The cognitive loop can use either CfC (Closed-form Continuous-time) or
-/// HdcLtcUnified (Unified HDC-LTC) networks for temporal prediction.
-///
-/// ## CfC (Default)
-/// - Traditional approach using ndarray-based weights
-/// - Matrix multiplication for state transitions
-/// - Well-tested and stable
-///
-/// ## HdcLtcUnified
-/// - Novel approach using hypervector states
-/// - HDC binding/bundling instead of matrix multiplication
-/// - O(1) temporal jumps via closed-form solution
-/// - State IS memory (holographic representation)
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
-pub enum TemporalBackend {
-    /// Original Closed-form Continuous-time network
-    CfC,
-    /// Unified HDC-LTC network with hypervector states.
-    /// ~8.5x faster than CfC: element-wise HDC ops + AVX2 SIMD vs matrix multiply.
-    /// O(1) temporal jumps via closed-form solution. State IS memory (holographic).
-    #[default]
-    HdcLtcUnified,
-    /// Hierarchical CfC with multi-scale temporal processing (PP-2)
-    HierarchicalCfC,
-}
-
-/// Training method selection for the cognitive loop
-///
-/// Controls how the temporal network is trained each cycle.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
-pub enum TrainingMethod {
-    /// Always use BPTT (analytical gradients)
-    Bptt,
-    /// Always use SPSA (perturbation-based)
-    Spsa,
-    /// Use BPTT by default, fall back to SPSA when BPTT diverges
-    #[default]
-    BpttWithSpsaFallback,
-}
-
-/// Configuration for CfC in the cognitive loop
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CfCConfig {
-    /// Number of CfC neurons
-    pub num_neurons: usize,
-
-    /// Input dimension (compressed HDC)
-    pub input_dim: usize,
-
-    /// Learning rate for CfC training
-    pub learning_rate: f32,
-
-    /// Time step for CfC predictions (seconds)
-    pub delta_t: f32,
-
-    /// Future prediction horizons for multi-scale prediction
-    pub prediction_horizons: Vec<f32>,
-}
-
-impl Default for CfCConfig {
-    fn default() -> Self {
-        Self {
-            num_neurons: 256,
-            input_dim: 256, // Must match num_neurons for train_step compatibility
-            learning_rate: 0.001,
-            delta_t: 0.02, // 50Hz base rate
-            // Multi-scale prediction: t+1, t+5, t+10 steps
-            prediction_horizons: vec![0.02, 0.1, 0.2],
-        }
-    }
-}
-
-impl CfCConfig {
-    /// Validate CfC configuration parameters.
-    ///
-    /// Checks that all numeric parameters are within valid ranges:
-    /// - `num_neurons` must be positive
-    /// - `input_dim` must be positive
-    /// - `learning_rate` must be in (0.0, 1.0]
-    /// - `delta_t` must be positive
-    /// - `prediction_horizons` must be non-empty with all positive values
-    pub fn validate(&self) -> Result<(), String> {
-        if self.num_neurons == 0 {
-            return Err("CfCConfig: num_neurons must be > 0".into());
-        }
-        if self.input_dim == 0 {
-            return Err("CfCConfig: input_dim must be > 0".into());
-        }
-        if self.learning_rate <= 0.0 || self.learning_rate > 1.0 {
-            return Err(format!(
-                "CfCConfig: learning_rate must be in (0.0, 1.0], got {}",
-                self.learning_rate
-            ));
-        }
-        if !self.learning_rate.is_finite() {
-            return Err("CfCConfig: learning_rate must be finite".into());
-        }
-        if self.delta_t <= 0.0 || !self.delta_t.is_finite() {
-            return Err(format!(
-                "CfCConfig: delta_t must be positive and finite, got {}",
-                self.delta_t
-            ));
-        }
-        if self.prediction_horizons.is_empty() {
-            return Err("CfCConfig: prediction_horizons must be non-empty".into());
-        }
-        for (i, &h) in self.prediction_horizons.iter().enumerate() {
-            if h <= 0.0 || !h.is_finite() {
-                return Err(format!(
-                    "CfCConfig: prediction_horizons[{i}] must be positive and finite, got {h}"
-                ));
-            }
-        }
-        Ok(())
-    }
 }
 
 /// Configuration for the cognitive loop service
@@ -597,6 +483,13 @@ pub struct CognitiveLoopConfig {
     #[cfg(feature = "therapeutic")]
     pub therapeutic_text_crisis_detection: bool,
 
+    /// Enable async voice synthesis: spawns a background thread for TTS.
+    /// Text from Broca/BrocaLite is sent over a channel; audio is retrieved
+    /// in subsequent cycles. Never blocks the cognitive loop.
+    /// Default: false (enable when audio output is needed).
+    #[serde(default)]
+    pub enable_voice_synthesis: bool,
+
     /// Enable Broca SSM language generation in the cognitive loop.
     /// When true and `ssm_language` feature is enabled, generates text
     /// from HDC-encoded thoughts with consciousness-gated quality control.
@@ -907,6 +800,7 @@ impl Default for CognitiveLoopConfig {
             therapeutic_crisis_threshold: 0.62,
             #[cfg(feature = "therapeutic")]
             therapeutic_text_crisis_detection: true, // Safety-critical: on by default
+            enable_voice_synthesis: false,
             #[cfg(feature = "ssm_language")]
             enable_broca_language: true,
             #[cfg(feature = "ssm_language")]
@@ -1068,182 +962,7 @@ impl CognitiveLoopConfig {
     }
 }
 
-/// Named consciousness profiles that set sensible defaults for module groups.
-///
-/// Each profile activates a curated set of consciousness modules appropriate
-/// for different use cases, from minimal overhead to full research instrumentation.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub enum ConsciousnessProfile {
-    /// Only virtual body for somatic grounding. Minimal overhead.
-    Minimal,
-    /// Core modules: surprise, prefrontal, meta-cognition, narrative, GWT,
-    /// embodied cognition, attention schema, contextual weights, negation detection.
-    Standard,
-    /// All modules including dream, predictive, cross-modal, affective, thermo,
-    /// phenomenal, HFE, phi-attention, primitive consciousness.
-    Full,
-    /// Full + research-specific: causal enhancement, episodic replay,
-    /// phi attestation, user state inference.
-    Research,
-    /// Mobile-optimized: Standard consciousness with power-aware tuning.
-    /// 20Hz cycle rate, 128 CfC neurons, energy budget enabled, thermal adaptation.
-    /// Designed for ARM phones (Pixel 8 Pro, iPhone 13+).
-    /// Between Standard and Full — keeps core consciousness rich while
-    /// dropping expensive optional subsystems.
-    Mobile,
-}
-
-impl ConsciousnessProfile {
-    /// Apply this profile's settings to a config, first resetting all flags to false.
-    pub fn apply(&self, config: &mut CognitiveLoopConfig) {
-        // Reset all enable flags
-        config.enable_virtual_body = false;
-        config.enable_surprise_exploration = false;
-        config.enable_prefrontal = false;
-        config.enable_meta_cognition = false;
-        config.enable_narrative_self = false;
-        config.enable_predictive_self = false;
-        config.enable_attention_schema = false;
-        config.enable_gwt = false;
-        config.enable_resonance = false;
-        config.enable_quantum_coherence = false;
-        config.enable_temporal_consciousness = false;
-        config.enable_embodied_cognition = false;
-        config.enable_narrative_gwt = false;
-        config.enable_dream_replay = false;
-        config.enable_predictive_processing = false;
-        config.enable_cross_modal_binding = false;
-        config.enable_affective_bridge = false;
-        config.enable_user_state_inference = false;
-        config.enable_coherence_field = false;
-        config.enable_consciousness_thermodynamics = false;
-        config.enable_phenomenal_binding = false;
-        config.enable_hierarchical_free_energy = false;
-        config.enable_trajectory_planning = false;
-        config.enable_hierarchical_bundling = false;
-        config.enable_contextual_weights = false;
-        config.enable_phi_attention = false;
-        config.enable_negation_detection = false;
-        config.enable_visualization = false;
-        config.enable_soul_alignment = false;
-        config.enable_primitive_consciousness = false;
-        config.enable_resonator_recall = false;
-        config.enable_psi_attestation = false;
-        config.causal_enhancement = false;
-        config.episodic_replay_training = false;
-        config.memory_graduation = false;
-        #[cfg(feature = "nurture")]
-        {
-            config.enable_nurture_attachment = false;
-        }
-        #[cfg(feature = "ssm_language")]
-        {
-            config.enable_broca_language = false;
-            config.enable_broca_nsm_semantic = false;
-            config.enable_broca_nsm_gate = false;
-        }
-        #[cfg(feature = "foveation")]
-        {
-            config.enable_foveation = false;
-        }
-
-        match self {
-            ConsciousnessProfile::Minimal => {
-                config.enable_virtual_body = true;
-            }
-            ConsciousnessProfile::Standard => {
-                config.enable_virtual_body = true;
-                config.enable_surprise_exploration = true;
-                config.enable_prefrontal = true;
-                config.enable_meta_cognition = true;
-                config.enable_narrative_self = true;
-                config.enable_gwt = true;
-                config.enable_embodied_cognition = true;
-                config.enable_attention_schema = true;
-                config.enable_contextual_weights = true;
-                config.enable_negation_detection = true;
-            }
-            ConsciousnessProfile::Full => {
-                config.enable_virtual_body = true;
-                config.enable_surprise_exploration = true;
-                config.enable_prefrontal = true;
-                config.enable_meta_cognition = true;
-                config.enable_narrative_self = true;
-                config.enable_predictive_self = true;
-                config.enable_attention_schema = true;
-                config.enable_gwt = true;
-                config.enable_resonance = true;
-                config.enable_quantum_coherence = true;
-                config.enable_temporal_consciousness = true;
-                config.enable_embodied_cognition = true;
-                config.enable_narrative_gwt = true;
-                config.enable_dream_replay = true;
-                config.enable_predictive_processing = true;
-                config.enable_cross_modal_binding = true;
-                config.enable_affective_bridge = true;
-                config.enable_consciousness_thermodynamics = true;
-                config.enable_phenomenal_binding = true;
-                config.enable_hierarchical_free_energy = true;
-                config.enable_trajectory_planning = true;
-                config.enable_hierarchical_bundling = true;
-                config.enable_contextual_weights = true;
-                config.enable_phi_attention = true;
-                config.enable_negation_detection = true;
-                config.enable_primitive_consciousness = true;
-                config.enable_resonator_recall = true;
-                config.enable_hodge_decomposition = true;
-                config.enable_phi_tau_feedback = true;
-            }
-            ConsciousnessProfile::Mobile => {
-                // Core consciousness: rich enough for genuine experience
-                config.enable_virtual_body = true;
-                config.enable_surprise_exploration = true;
-                config.enable_prefrontal = true;
-                config.enable_meta_cognition = true;
-                config.enable_gwt = true;
-                config.enable_embodied_cognition = true;
-                config.enable_attention_schema = true;
-                config.enable_contextual_weights = true;
-                config.enable_negation_detection = true;
-                // Affective bridge: emotional responsiveness on mobile
-                config.enable_affective_bridge = true;
-                // Narrative self: maintains identity continuity
-                config.enable_narrative_self = true;
-
-                // Power-aware tuning
-                config.target_frequency = 20.0; // 20Hz (vs 50Hz desktop)
-                config.cfc_config.num_neurons = 128; // Halved CfC (vs 256)
-                config.cfc_config.input_dim = 128;
-                config.enable_energy_budget = true;
-                config.enable_thermal_adaptation = true;
-
-                // Omitted: dream_replay, predictive_processing, cross_modal_binding,
-                // consciousness_thermodynamics, phenomenal_binding, HFE, phi_attention,
-                // primitive_consciousness, resonator_recall, narrative_gwt, resonance,
-                // quantum_coherence, temporal_consciousness, predictive_self
-            }
-            ConsciousnessProfile::Research => {
-                ConsciousnessProfile::Full.apply(config);
-                config.causal_enhancement = true;
-                config.episodic_replay_training = true;
-                config.enable_psi_attestation = true;
-                // Research profile intentionally clears agent_did so operators
-                // must supply their own DID for attestation integrity.
-                config.agent_did = None;
-                config.enable_user_state_inference = true;
-                config.enable_coherence_field = true;
-                config.enable_visualization = true;
-                config.enable_soul_alignment = true;
-                // NSM language integration: semantic HV blending + logit gate
-                #[cfg(feature = "ssm_language")]
-                {
-                    config.enable_broca_nsm_semantic = true;
-                    config.enable_broca_nsm_gate = true;
-                }
-            }
-        }
-    }
-}
+// ConsciousnessProfile is in consciousness.rs, re-exported at module level.
 
 impl CognitiveLoopConfig {
     /// Create a configuration from a named consciousness profile.

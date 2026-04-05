@@ -792,6 +792,49 @@ pub fn veto_timelock(input: VetoTimelockInput) -> ExternResult<Record> {
         }
     }
 
+    // ── YEARLY VETO LIMIT (Art. III, Sec. 5.4) ──
+    // Max 3 vetoes per Guardian per rolling 12-month window.
+    // Exceeding triggers probation signal.
+    if let Ok(eh) = anchor_hash(&guardian_anchor) {
+        if let Ok(links) = get_links(
+            LinkQuery::try_new(eh, LinkTypes::GuardianToVeto)?,
+            GetStrategy::default(),
+        ) {
+            let now_us = sys_time()?.as_micros() as i64;
+            let mut vetoes_in_window: u32 = 0;
+            for link in links {
+                if let Ok(ah) = ActionHash::try_from(link.target) {
+                    if let Some(record) = get(ah, GetOptions::default())? {
+                        if let Some(prior_veto) = record
+                            .entry()
+                            .to_app_option::<GuardianVeto>()
+                            .ok()
+                            .flatten()
+                        {
+                            let elapsed = now_us - prior_veto.vetoed_at.as_micros() as i64;
+                            if elapsed < execution_integrity::ROLLING_YEAR_US {
+                                vetoes_in_window += 1;
+                            }
+                        }
+                    }
+                }
+            }
+            if vetoes_in_window >= execution_integrity::VETO_YEARLY_LIMIT {
+                let _ = emit_signal(serde_json::json!({
+                    "type": "VetoYearlyLimitExceeded",
+                    "guardian_did": input.guardian_did,
+                    "vetoes_in_window": vetoes_in_window,
+                    "limit": execution_integrity::VETO_YEARLY_LIMIT,
+                }));
+                return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                    "Yearly veto limit exceeded: {} vetoes in the past 12 months \
+                     (max {}). Guardian enters probation (Art. III, Sec. 5.4).",
+                    vetoes_in_window, execution_integrity::VETO_YEARLY_LIMIT
+                ))));
+            }
+        }
+    }
+
     // Verify guardian role: caller must be a member of at least one council
     let guardian_io = governance_utils::call_local(
         "councils",
@@ -854,6 +897,9 @@ pub fn veto_timelock(input: VetoTimelockInput) -> ExternResult<Record> {
         guardian: input.guardian_did.clone(),
         reason: input.reason.clone(),
         vetoed_at: now,
+        affected_proposal_id: input.affected_proposal_id.clone(),
+        justification_hash: input.justification_hash.clone(),
+        threat_category: input.threat_category.clone(),
     };
 
     let action_hash = create_entry(&EntryTypes::GuardianVeto(veto))?;
@@ -922,12 +968,21 @@ pub struct VetoTimelockInput {
     pub timelock_id: String,
     pub guardian_did: String,
     pub reason: String,
+    /// Proposal ID affected by this veto (constitutional registry, Art. III Sec. 5.5).
+    #[serde(default)]
+    pub affected_proposal_id: Option<String>,
+    /// SHA-256 hash of the full justification document.
+    #[serde(default)]
+    pub justification_hash: Option<String>,
+    /// Threat category for the veto (required post-sunset for Charter Guardian Authority).
+    #[serde(default)]
+    pub threat_category: Option<String>,
 }
 
 // ============================================================================
 // VETO OVERRIDE MECHANISM
-// Thermodynamic counterbalance: No Maxwell's Demon — collective energy (80%
-// supermajority) can overcome any individual barrier.
+// Thermodynamic counterbalance: No Maxwell's Demon — collective energy (67%
+// supermajority, Art. III Sec. 5.3) can overcome any individual barrier.
 // ============================================================================
 
 /// Challenge a guardian veto — initiates the 48-hour override window.

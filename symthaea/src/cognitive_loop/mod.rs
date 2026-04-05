@@ -189,6 +189,7 @@ pub(crate) mod voice_coherence_bridge;
 
 pub mod broca_bridge;
 pub mod broca_lite;
+pub mod voice_channel;
 
 #[cfg(feature = "canvas")]
 pub(crate) mod canvas_bridge;
@@ -383,6 +384,10 @@ pub struct CognitiveLoopService {
 
     /// Language & communication: voice coherence, Broca, user state.
     pub(crate) language_comm: language_comm_manager::LanguageAndCommunicationManager,
+
+    /// Async voice synthesis: sends text to background thread, retrieves audio.
+    /// None when voice synthesis is not configured.
+    pub(crate) voice_synthesis: Option<voice_channel::VoiceSynthesisChannel>,
 
     /// Behavioral synthesis group: flow, emotion, curiosity, adaptive behavior,
     /// thalamic routing, and social cognition.

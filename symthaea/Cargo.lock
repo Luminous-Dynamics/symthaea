@@ -15813,6 +15813,7 @@ dependencies = [
  "symthaea-psych-bench",
  "symthaea-sensorimotor",
  "symthaea-sentinel",
+ "symthaea-spore",
  "symthaea-ssm",
  "symthaea-stt",
  "symthaea-support",
@@ -15849,6 +15850,13 @@ version = "0.1.0"
 dependencies = [
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "symthaea-app-db"
+version = "0.1.0"
+dependencies = [
+ "serde",
 ]
 
 [[package]]
@@ -16525,6 +16533,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "symthaea-physics-catalog"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "wasm-bindgen",
+]
+
+[[package]]
 name = "symthaea-population"
 version = "0.1.0"
 dependencies = [
@@ -16788,7 +16805,9 @@ dependencies = [
  "leptos_router",
  "log",
  "serde",
+ "serde-wasm-bindgen",
  "serde_json",
+ "symthaea-app-db",
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "web-sys",

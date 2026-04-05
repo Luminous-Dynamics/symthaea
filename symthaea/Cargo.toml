@@ -758,6 +758,7 @@ profile-genesis = [
 
 # ── Mind bundles (graduated consciousness stacks) ─────────────────
 default-mind = [
+    "broca_lite",
     "reasoning_engine",
     "integrity",
     "glyph_codex",

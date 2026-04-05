@@ -41,7 +41,9 @@ pub struct VoiceSynthesisChannel {
     /// Send voice requests to the background thread.
     tx: mpsc::Sender<VoiceRequest>,
     /// Receive completed audio from the background thread.
-    rx: mpsc::Receiver<VoiceResponse>,
+    /// Wrapped in Mutex because mpsc::Receiver is !Sync, and
+    /// CognitiveLoopService may need to be Sync in some contexts.
+    rx: std::sync::Mutex<mpsc::Receiver<VoiceResponse>>,
     /// Handle to the background thread (kept for cleanup).
     _thread: thread::JoinHandle<()>,
 }
@@ -64,7 +66,7 @@ impl VoiceSynthesisChannel {
 
         Self {
             tx: request_tx,
-            rx: response_rx,
+            rx: std::sync::Mutex::new(response_rx),
             _thread: handle,
         }
     }
@@ -81,8 +83,10 @@ impl VoiceSynthesisChannel {
     /// Returns all responses that have been completed since the last drain.
     pub fn drain_responses(&self) -> Vec<VoiceResponse> {
         let mut responses = Vec::new();
-        while let Ok(response) = self.rx.try_recv() {
-            responses.push(response);
+        if let Ok(rx) = self.rx.lock() {
+            while let Ok(response) = rx.try_recv() {
+                responses.push(response);
+            }
         }
         responses
     }

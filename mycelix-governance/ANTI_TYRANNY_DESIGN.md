@@ -37,9 +37,12 @@ requires deploying new WASM (a new DNA), which requires community migration.
 
 | Invariant | Value | Constant Name | File |
 |-----------|-------|---------------|------|
-| Veto override threshold | 80% | `VETO_OVERRIDE_THRESHOLD` | execution/integrity |
+| Veto override threshold | 67% (2/3) | `VETO_OVERRIDE_THRESHOLD` | execution/integrity |
 | Veto override window | 48 hours | `VETO_OVERRIDE_WINDOW_US` | execution/integrity |
+| Override threshold floor | 60% | `OVERRIDE_THRESHOLD_FLOOR` | execution/integrity |
 | Veto cooldown per Guardian | 7 days | `VETO_COOLDOWN_US` | execution/coordinator |
+| Veto yearly limit | 3 per 12 months | `VETO_YEARLY_LIMIT` | execution/integrity |
+| Strategic Override sunset | 36 months | `STRATEGIC_OVERRIDE_SUNSET_US` | execution/integrity |
 | Guardian veto phi | 0.8 | `GUARDIAN_PHI_THRESHOLD` | execution/coordinator |
 | Emergency sessions max | 3 | `MAX_CONSECUTIVE_EMERGENCY_SESSIONS` | councils/integrity |
 | Emergency session duration | 14 days | `MAX_EMERGENCY_SESSION_DURATION_US` | councils/integrity |
@@ -69,7 +72,7 @@ Vetoed,
 pub enum VetoStatus { Active, Challenged, Overridden, Sustained }
 
 pub const VETO_OVERRIDE_WINDOW_US: i64 = 48 * 3600 * 1_000_000;
-pub const VETO_OVERRIDE_THRESHOLD: f64 = 0.80;
+pub const VETO_OVERRIDE_THRESHOLD: f64 = 0.67;  // Constitutional: 2/3 (Art. III, Sec. 5.3)
 
 pub struct VetoOverrideVote {
     pub id: String,

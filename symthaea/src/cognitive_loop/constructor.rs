@@ -1396,6 +1396,7 @@ impl CognitiveLoopService {
             } else {
                 None
             },
+            voice_synthesis: None,
         };
 
         // Initialize Epistemic Auditor if configured

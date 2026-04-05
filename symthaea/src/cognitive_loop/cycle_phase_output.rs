@@ -2051,8 +2051,12 @@ impl CognitiveLoopService {
             metadata,
             thought_vector,
             wisdom_hv: perception.encoding.hv16_cached,
-            #[cfg(feature = "ssm_language")]
-            language_output: self.language_comm.last_broca_text.take(),
+            language_output: {
+                #[cfg(feature = "ssm_language")]
+                { self.language_comm.last_broca_text.take() }
+                #[cfg(not(feature = "ssm_language"))]
+                { None }
+            },
             #[cfg(feature = "canvas")]
             canvas_svg: self.sensorimotor.motor_rendering.last_canvas_svg.take(),
             #[cfg(feature = "identity")]

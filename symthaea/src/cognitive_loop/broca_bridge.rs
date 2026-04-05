@@ -86,8 +86,6 @@ pub struct BrocaConsciousnessSignals {
 // Re-export telemetry type from the types module.
 pub use super::types::BrocaGenerationTelemetry;
 
-/// Manager wrapping BrocaGenerator with consciousness gating and multi-turn context.
-#[cfg(feature = "ssm_language")]
 /// Record of NSM primes expressed in a single generation, for cross-cycle discourse memory.
 #[derive(Debug, Clone)]
 pub struct NsmDiscourseRecord {
@@ -99,6 +97,8 @@ pub struct NsmDiscourseRecord {
     pub cycle: u64,
 }
 
+/// Manager wrapping BrocaGenerator with consciousness gating and multi-turn context.
+#[cfg(feature = "ssm_language")]
 pub struct BrocaManager {
     generator: BrocaGenerator,
     pub(crate) last_telemetry: BrocaGenerationTelemetry,
@@ -138,7 +138,7 @@ impl BrocaManager {
             generator,
             last_telemetry: BrocaGenerationTelemetry::default(),
             consciousness_threshold: 0.1,
-            multi_turn_depth: 0,
+            multi_turn_depth: 4, // Default: preserve CfC context across 4 turns
             turn_count: 0,
             context_window: std::collections::VecDeque::new(),
             discourse_memory: std::collections::VecDeque::new(),

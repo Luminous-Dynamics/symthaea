@@ -87,6 +87,29 @@ pub const OVERRIDE_THRESHOLD_FLOOR: f64 = 0.60;
 /// Aligned with Constitution Art. III, Sec. 5.4.
 pub const VETO_YEARLY_LIMIT: u32 = 3;
 
+/// Rolling year window for veto limit enforcement (microseconds).
+/// 12 months ≈ 365.25 days.
+pub const ROLLING_YEAR_US: i64 = 365 * 24 * 3600 * 1_000_000 + 6 * 3600 * 1_000_000;
+
+/// Strategic Override sunset: 36 months from Genesis Epoch (microseconds).
+/// After this period, veto authority transitions to Charter Guardian Authority,
+/// which requires constitutional justification (Art. III, Sec. 3).
+pub const STRATEGIC_OVERRIDE_SUNSET_US: i64 = 36 * 30 * 24 * 3600 * 1_000_000_i64;
+
+/// Threat categories that constitute valid constitutional justification
+/// for Charter Guardian Authority vetoes (post-sunset period).
+/// Non-charter vetoes are rejected after the sunset.
+pub const CHARTER_THREAT_CATEGORIES: &[&str] = &[
+    "constitutional_violation",
+    "core_principle_violation",
+    "member_rights_violation",
+];
+
+/// Check whether the Strategic Override period has expired.
+pub fn is_post_sunset(genesis_epoch_us: i64, now_us: i64) -> bool {
+    (now_us - genesis_epoch_us) > STRATEGIC_OVERRIDE_SUNSET_US
+}
+
 /// Compute the adaptive override threshold based on failed attempts.
 ///
 /// Thermodynamic metaphor: each failed attempt lowers the energy barrier,
@@ -128,6 +151,10 @@ pub enum ExecutionStatus {
 }
 
 /// Guardian veto (for emergency cancellation)
+///
+/// Constitutional registry fields (Art. III, Sec. 5.5):
+/// All veto exercises are recorded in an immutable public ledger with
+/// justification hash, threat category, and affected proposal reference.
 #[hdk_entry_helper]
 #[derive(Clone, PartialEq)]
 pub struct GuardianVeto {
@@ -141,6 +168,20 @@ pub struct GuardianVeto {
     pub reason: String,
     /// Veto timestamp
     pub vetoed_at: Timestamp,
+    // ── Constitutional registry fields (Art. III, Sec. 5.5) ──────────
+    /// Proposal ID affected by this veto (if known from timelock context).
+    /// Option for backward compatibility with pre-existing DHT entries.
+    #[serde(default)]
+    pub affected_proposal_id: Option<String>,
+    /// SHA-256 hash of the full justification document.
+    /// Enables verifiable justification without storing full text on-chain.
+    #[serde(default)]
+    pub justification_hash: Option<String>,
+    /// Threat category classifying the reason for veto.
+    /// e.g., "safety", "constitutional", "fiscal", "governance", "security"
+    /// Required for Charter Guardian Authority vetoes (post-sunset).
+    #[serde(default)]
+    pub threat_category: Option<String>,
 }
 
 /// A vote to override a guardian veto
@@ -307,14 +348,26 @@ pub fn check_create_execution(execution: &Execution) -> Result<(), String> {
     Ok(())
 }
 
-/// Check that a new guardian veto is valid: guardian starts with "did:" and
-/// reason is not empty.
+/// Check that a new guardian veto is valid: guardian starts with "did:",
+/// reason is not empty, and constitutional registry fields are well-formed.
 pub fn check_create_veto(veto: &GuardianVeto) -> Result<(), String> {
     if !veto.guardian.starts_with("did:") {
         return Err("Guardian must be a valid DID".into());
     }
     if veto.reason.is_empty() {
         return Err("Veto reason is required".into());
+    }
+    // Validate justification_hash format when present (SHA-256 = 64 hex chars)
+    if let Some(ref hash) = veto.justification_hash {
+        if hash.len() != 64 || !hash.chars().all(|c| c.is_ascii_hexdigit()) {
+            return Err("justification_hash must be a 64-character hex string (SHA-256)".into());
+        }
+    }
+    // Validate threat_category is non-empty when present
+    if let Some(ref cat) = veto.threat_category {
+        if cat.is_empty() {
+            return Err("threat_category must not be empty when provided".into());
+        }
     }
     Ok(())
 }
@@ -630,6 +683,11 @@ mod tests {
             guardian: "did:key:z6Guardian".into(),
             reason: "Emergency safety concern".into(),
             vetoed_at: ts(1_500_000),
+            affected_proposal_id: Some("prop-1".into()),
+            justification_hash: Some(
+                "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2".into(),
+            ),
+            threat_category: Some("safety".into()),
         }
     }
 
@@ -851,7 +909,6 @@ mod tests {
 
     #[test]
     fn test_veto_override_threshold_constant() {
-        // Verify the threshold is exactly 0.80 — this is a governance invariant
         // Constitutional threshold: 2/3 (Art. III, Sec. 5.3)
         assert!((VETO_OVERRIDE_THRESHOLD - 0.67).abs() < f64::EPSILON);
     }
@@ -859,6 +916,42 @@ mod tests {
     #[test]
     fn test_veto_override_window_is_48_hours() {
         assert_eq!(VETO_OVERRIDE_WINDOW_US, 48 * 3600 * 1_000_000);
+    }
+
+    #[test]
+    fn test_veto_yearly_limit_constant() {
+        // Constitutional: Art. III, Sec. 5.4 — 3 vetoes per 12 months
+        assert_eq!(VETO_YEARLY_LIMIT, 3);
+    }
+
+    #[test]
+    fn test_strategic_override_sunset_is_36_months() {
+        // Constitutional: Art. III, Sec. 3 — 36 months from Genesis Epoch
+        let thirty_six_months_us: i64 = 36 * 30 * 24 * 3600 * 1_000_000;
+        assert_eq!(STRATEGIC_OVERRIDE_SUNSET_US, thirty_six_months_us);
+    }
+
+    #[test]
+    fn test_is_post_sunset() {
+        let genesis = 0_i64;
+        // Before sunset: 35 months
+        let before = 35 * 30 * 24 * 3600 * 1_000_000_i64;
+        assert!(!is_post_sunset(genesis, before));
+
+        // After sunset: 37 months
+        let after = 37 * 30 * 24 * 3600 * 1_000_000_i64;
+        assert!(is_post_sunset(genesis, after));
+
+        // Exactly at sunset boundary
+        assert!(!is_post_sunset(genesis, STRATEGIC_OVERRIDE_SUNSET_US));
+    }
+
+    #[test]
+    fn test_charter_threat_categories() {
+        assert!(CHARTER_THREAT_CATEGORIES.contains(&"constitutional_violation"));
+        assert!(CHARTER_THREAT_CATEGORIES.contains(&"core_principle_violation"));
+        assert!(CHARTER_THREAT_CATEGORIES.contains(&"member_rights_violation"));
+        assert!(!CHARTER_THREAT_CATEGORIES.contains(&"fiscal"));
     }
 
     // ---- Participation insurance (adaptive threshold) tests ----
@@ -929,6 +1022,41 @@ mod tests {
             check_create_veto(&v).unwrap_err(),
             "Veto reason is required"
         );
+    }
+
+    #[test]
+    fn test_veto_justification_hash_format() {
+        let mut v = make_veto();
+        // Valid 64-char hex passes
+        assert!(check_create_veto(&v).is_ok());
+
+        // Too short
+        v.justification_hash = Some("abc123".into());
+        assert!(check_create_veto(&v).unwrap_err().contains("64-character hex"));
+
+        // Non-hex chars
+        v.justification_hash = Some(
+            "g1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2".into(),
+        );
+        assert!(check_create_veto(&v).unwrap_err().contains("64-character hex"));
+
+        // None is valid (backward compat)
+        v.justification_hash = None;
+        assert!(check_create_veto(&v).is_ok());
+    }
+
+    #[test]
+    fn test_veto_threat_category_not_empty() {
+        let mut v = make_veto();
+        v.threat_category = Some(String::new());
+        assert!(check_create_veto(&v).unwrap_err().contains("threat_category"));
+
+        v.threat_category = Some("fiscal".into());
+        assert!(check_create_veto(&v).is_ok());
+
+        // None is valid (backward compat)
+        v.threat_category = None;
+        assert!(check_create_veto(&v).is_ok());
     }
 
     // ---- Fund allocation tests ----

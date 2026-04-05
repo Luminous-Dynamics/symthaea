@@ -529,6 +529,12 @@ pub struct VetoTimelockInput {
     pub timelock_id: String,
     pub guardian_did: String,
     pub reason: String,
+    #[serde(default)]
+    pub affected_proposal_id: Option<String>,
+    #[serde(default)]
+    pub justification_hash: Option<String>,
+    #[serde(default)]
+    pub threat_category: Option<String>,
 }
 
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -538,6 +544,12 @@ pub struct GuardianVeto {
     pub guardian: String,
     pub reason: String,
     pub vetoed_at: Timestamp,
+    #[serde(default)]
+    pub affected_proposal_id: Option<String>,
+    #[serde(default)]
+    pub justification_hash: Option<String>,
+    #[serde(default)]
+    pub threat_category: Option<String>,
 }
 
 /// Input mirror for lock_proposal_funds
