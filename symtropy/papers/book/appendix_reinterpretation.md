@@ -1,0 +1,20 @@
+# Appendix B: Old Interpretation vs Revised Interpretation
+
+| Finding | Original Interpretation (Part II) | Falsifying Evidence | Revised Interpretation (Part III) |
+|---------|----------------------------------|--------------------|---------------------------------|
+| F1-4: Clustering | FEP gradient drives social clustering | F46: all controllers cluster | Resource co-location at shared wells |
+| F19: Social bonds +70% | Friendship springs sustain cooperation | F46: WELL_ONLY survives better | Bonds prevent drift from resource points |
+| F20: Phase transition | Cooperation/collapse boundary | F47: wells alone sustain | Well-access/depletion boundary |
+| F24: Abundance curse | Cooperation pressure removed | Unchanged | Resource competition delayed |
+| F25: Altruism fails | Charity without structure fails | Unchanged (strengthened) | Energy transfer without resource access fails |
+| F26: Equal starts → inequality | Cooperation failure | F46: resource competition | Race for well access; small advantages compound |
+| F14-18: Adversaries | Social conflict; solidarity response | F47: resonance is incidental | Incidental resonance deficit from incompatibility |
+| F29: Info irrelevant | FEP already optimal | F46: all controllers work | Resource attractors dominate all information |
+| F30: 3D cooperation | Cooperation generalizes to 3D | Unchanged | Co-location generalizes to 3D |
+| F31: Weights optimal | Cooperation already tuned | F46: weights don't matter | Movement rule irrelevant |
+| F34: Memory useless | FEP encodes all info | F46: gradient unnecessary | Well locations are spatial, not cognitive |
+| F36: Curvature irrelevant | Math correct, socially inert | Unchanged | Geometry affects trajectories, not resource access |
+| F38: Can't kill cooperation | Thermodynamic inevitability | F46-48: any controller survives | By-product mutualism at shared attractors |
+| F40: Communication zero effect | FEP already optimal | F46: no gradient needed | Resource co-location is non-informational |
+| F43: Bowling Alone | Voluntary cooperation refusal | Reinterpreted | Voluntary departure from resource co-location |
+| F44: U-curve mechanism | Partial commitment worst | Reinterpreted | Inconsistent resource access worst |

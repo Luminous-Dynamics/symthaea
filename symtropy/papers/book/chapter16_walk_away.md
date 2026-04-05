@@ -6,11 +6,11 @@
 
 ## What Survived
 
-Fifty-three findings. Seven that falsified the original thesis. Sixteen chapters rewritten. One finding stands unchanged.
+Fifty-three findings. Seven that falsified the original thesis. Sixteen chapters rewritten. One finding survives — not unchanged in interpretation, but unchanged as a pattern.
 
-Finding 43: when agents gain the freedom to sometimes ignore resource co-location — to walk away from wells where others are gathered — the by-product mutualism collapses. Cooperation events drop 53%. Isolation increases. Inequality rises. And the worst outcome belongs to the half-committed: agents who sometimes co-locate and sometimes don't, paying the movement cost of both strategies while reliably accessing neither.
+Finding 43: when agents gain the freedom to sometimes ignore resource co-location — to walk away from wells where others are gathered — the incidental benefits of by-product mutualism collapse. Cooperation events drop 53%. Isolation increases. Inequality rises. And the worst outcome belongs to the half-committed: agents who sometimes co-locate and sometimes don't, paying the movement cost of both strategies while reliably accessing neither.
 
-Under the original thesis, this was about cooperation and commitment. Under the revised thesis, it is about something simpler and more fundamental: **the freedom to leave a resource point**.
+Under the original thesis, this was about cooperation and commitment. Under the revised thesis, it is about something different: **the freedom to leave a resource point**. The pattern is the same four Putnam trends. The mechanism has changed entirely — from "refusing to cooperate" to "refusing to stay at the well."
 
 ## By-Product Mutualism Requires Co-Location
 

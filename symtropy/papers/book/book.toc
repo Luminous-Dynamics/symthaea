@@ -98,7 +98,7 @@
 \contentsline {section}{\numberline {16.2}What This Explains}{63}{section.16.2}%
 \contentsline {section}{\numberline {16.3}What This Does Not Explain}{64}{section.16.3}%
 \contentsline {section}{\numberline {16.4}The Constructive Proof, Revised}{64}{section.16.4}%
-\contentsline {section}{\numberline {16.5}The Lesson for Simulation Science}{64}{section.16.5}%
+\contentsline {section}{\numberline {16.5}The Lesson for Simulation Science}{65}{section.16.5}%
 \contentsline {section}{\numberline {16.6}The Closing}{65}{section.16.6}%
 \contentsline {chapter}{\numberline {17}Chapter 16: The Freedom to Walk Away}{67}{chapter.17}%
 \contentsline {section}{\numberline {17.1}What Survived}{67}{section.17.1}%
@@ -108,4 +108,5 @@
 \contentsline {section}{\numberline {17.5}What This Means}{68}{section.17.5}%
 \contentsline {section}{\numberline {17.6}The Last Word}{69}{section.17.6}%
 \contentsline {section}{\numberline {17.7}Appendix Note}{69}{section.17.7}%
-\contentsline {chapter}{Reproduction}{71}{chapter*.3}%
+\contentsline {chapter}{Appendix B: Old Interpretation vs Revised Interpretation}{71}{chapter*.3}%
+\contentsline {chapter}{Reproduction}{73}{chapter*.4}%

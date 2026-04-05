@@ -1,10 +1,10 @@
 # The Thermodynamics of Togetherness — Revised Thesis
 
-## The Argument After 52 Findings
+## The Argument After 53 Findings
 
-**In environments with locatable spatial resource attractors, social structure emerges as by-product mutualism — a free consequence of individual resource-seeking that requires no social drive, no cooperation mechanism, and no integration metric.**
+**In the class of environments tested — small arenas with locatable, non-monopolizable spatial resource attractors and passive proximity-based mutual benefit — the appearance of cooperative social structure emerges as by-product mutualism from individual resource-seeking, without requiring any social drive, cooperation mechanism, or integration metric.**
 
-The macroscopic structure of a society — its clustering, survival patterns, and apparent coordination — is overwhelmingly dictated by the geometry and thermodynamic distribution of resources, not the internal cognitive algorithms of the agents.
+Within this tested regime, the spatial distribution and accessibility of resources, rather than the internal algorithms of agents, is the dominant determinant of clustering, survival patterns, and incidental cooperation. This claim is bounded by the tested controller family (6 controllers), environment types (8 variants), and scale (20-1000 agents in 80-400 unit arenas). Untested regimes — large arenas, monopolizable resources, non-spatial resources, genuine extraction coordination — may produce different dynamics.
 
 ## What We Originally Claimed (Findings 1-45)
 
