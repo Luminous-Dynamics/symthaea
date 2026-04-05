@@ -167,7 +167,10 @@ impl HumanoidController {
         lr_override: Option<f32>,
     ) {
         let lr = lr_override.unwrap_or(self.learning_rate);
-        let output_lr = lr * (HDC_DIMENSION as f32).sqrt();
+        // Scale LR by sqrt(D) but cap to prevent instability
+        // sqrt(16384) = 128, which makes output_lr = lr * 128 — too aggressive
+        // Cap at 10x base LR for stability
+        let output_lr = (lr * (HDC_DIMENSION as f32).sqrt()).min(lr * 10.0);
 
         let output_hv = self.network.output().normalize();
         let hv_values = output_hv.as_slice();
@@ -193,14 +196,15 @@ impl HumanoidController {
             d_raw[i] = error * tanh_deriv;
         }
 
-        // Gradient clipping
-        const GRAD_CLIP: f32 = 1.0;
+        // Gradient clipping — tighter to prevent output projection instability
+        const GRAD_CLIP: f32 = 0.5;
         for g in &mut d_raw {
             *g = g.clamp(-GRAD_CLIP, GRAD_CLIP);
         }
 
-        // Weight decay
-        const WEIGHT_DECAY: f32 = 1e-4;
+        // Weight decay — reduced to prevent weights decaying to zero over long training
+        // At 1e-5 per step × 200K steps: (1-1e-5)^200000 ≈ 0.135 (preserves ~14% of initial magnitude)
+        const WEIGHT_DECAY: f32 = 1e-5;
         let decay = 1.0 - WEIGHT_DECAY;
         for w in self.output_weights.iter_mut() {
             *w *= decay;
