@@ -119,6 +119,7 @@ pub fn holon_router(state: SharedHolonState) -> Router {
         .route("/holon/broca", post(holon_broca))
         .route("/holon/converse", post(holon_converse))
         .route("/holon/tts", post(holon_tts))
+        .route("/holon/search", post(holon_search))
         .route("/holon/dashboard", get(holon_dashboard))
         .route("/holon/telemetry", get(holon_telemetry))
         .route("/holon/ws", get(holon_ws_upgrade))
@@ -696,4 +697,112 @@ async fn holon_tts(
     Json(_req): Json<TtsRequest>,
 ) -> StatusCode {
     StatusCode::SERVICE_UNAVAILABLE
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Web Search (Soma → desktop WebResearcher → verified claims)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+#[derive(Deserialize)]
+struct SearchRequest {
+    query: String,
+    #[serde(default = "default_max_results")]
+    max_results: usize,
+}
+
+fn default_max_results() -> usize {
+    3
+}
+
+#[derive(Serialize)]
+struct SearchClaimSummary {
+    text: String,
+    confidence: f32,
+    source_url: String,
+    epistemic_status: String,
+}
+
+#[derive(Serialize)]
+struct SearchResponse {
+    claims: Vec<SearchClaimSummary>,
+    sources: Vec<String>,
+    status: String,
+}
+
+async fn holon_search(
+    State(state): State<SharedHolonState>,
+    Json(req): Json<SearchRequest>,
+) -> Json<SearchResponse> {
+    let c = state.get_consciousness();
+
+    // Gate on consciousness — no research below threshold
+    if c < 0.1 {
+        return Json(SearchResponse {
+            claims: vec![],
+            sources: vec![],
+            status: "consciousness_below_threshold".to_string(),
+        });
+    }
+
+    // Run web research via the epistemic researcher
+    #[cfg(feature = "web_research_module")]
+    {
+        use crate::web_research::researcher::WebResearcher;
+
+        let researcher = match WebResearcher::new() {
+            Ok(r) => r,
+            Err(_) => {
+                return Json(SearchResponse {
+                    claims: vec![],
+                    sources: vec![],
+                    status: "researcher_init_failed".to_string(),
+                });
+            }
+        };
+
+        match researcher.research_and_verify(&req.query).await {
+            Ok(result) => {
+                let claims: Vec<SearchClaimSummary> = result
+                    .claims
+                    .iter()
+                    .take(req.max_results)
+                    .map(|c| SearchClaimSummary {
+                        text: c.claim.clone(),
+                        confidence: c.confidence,
+                        source_url: c.sources.first().map_or(String::new(), |s| s.url.clone()),
+                        epistemic_status: format!("{:?}", c.epistemic_status),
+                    })
+                    .collect();
+
+                let sources: Vec<String> = result
+                    .claims
+                    .iter()
+                    .flat_map(|c| c.sources.iter().map(|s| s.url.clone()))
+                    .collect::<std::collections::HashSet<_>>()
+                    .into_iter()
+                    .collect();
+
+                Json(SearchResponse {
+                    claims,
+                    sources,
+                    status: format!("{:?}", result.status),
+                })
+            }
+            Err(e) => Json(SearchResponse {
+                claims: vec![],
+                sources: vec![],
+                status: format!("error: {e}"),
+            }),
+        }
+    }
+
+    #[cfg(not(feature = "web_research_module"))]
+    {
+        let _ = req;
+        Json(SearchResponse {
+            claims: vec![],
+            sources: vec![],
+            status: "web_research_module_not_enabled".to_string(),
+        })
+    }
 }

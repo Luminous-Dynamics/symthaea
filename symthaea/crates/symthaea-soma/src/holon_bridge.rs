@@ -49,6 +49,11 @@ pub enum HolonOutbound {
         peer_id: u64,
         pubkey_hex: String,
     },
+    /// Request web search via desktop WebResearcher.
+    SearchRequest {
+        query: String,
+        max_results: u8,
+    },
 }
 
 /// Inbound message types from the Holon.
@@ -63,6 +68,11 @@ pub enum HolonInbound {
     TaskResult {
         task_id: String,
         result: String,
+    },
+    /// Verified claims from desktop web search.
+    SearchResult {
+        claims: Vec<String>,
+        sources: Vec<String>,
     },
 }
 
@@ -224,6 +234,15 @@ impl HolonBridge {
             }
             HolonInbound::TaskResult { .. } => {
                 // Task results stored for platform retrieval via language buffer
+            }
+            HolonInbound::SearchResult { claims, .. } => {
+                // Store search claims in language buffer for LiteRT context injection
+                for claim in claims {
+                    if self.language_buffer.len() >= 16 {
+                        self.language_buffer.pop_front();
+                    }
+                    self.language_buffer.push_back(claim);
+                }
             }
         }
     }

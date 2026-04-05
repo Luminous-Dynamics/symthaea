@@ -263,10 +263,10 @@ impl OllamaBackend {
     /// Create a new Ollama backend with default settings.
     ///
     /// Connects to `http://localhost:11434` with a model determined by the
-    /// `SYMTHAEA_LLM_MODEL` environment variable, falling back to `qwen2.5-coder:7b`.
+    /// `SYMTHAEA_LLM_MODEL` environment variable, falling back to `gemma4:e2b`.
     pub fn new() -> Self {
         let model =
-            std::env::var("SYMTHAEA_LLM_MODEL").unwrap_or_else(|_| "qwen2.5-coder:7b".to_string());
+            std::env::var("SYMTHAEA_LLM_MODEL").unwrap_or_else(|_| "gemma4:e2b".to_string());
         Self::with_config("http://localhost:11434", &model)
     }
 
@@ -643,7 +643,7 @@ pub fn create_backend_from_env() -> Arc<dyn LLMBackend> {
         return Arc::new(backend);
     }
 
-    let model = std::env::var("SYMTHAEA_LLM_MODEL").unwrap_or_else(|_| "llama3".to_string());
+    let model = std::env::var("SYMTHAEA_LLM_MODEL").unwrap_or_else(|_| "gemma4:e2b".to_string());
     Arc::new(OllamaBackend::with_model(&model))
 }
 

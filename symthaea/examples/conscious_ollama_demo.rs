@@ -66,7 +66,7 @@ async fn main() -> Result<()> {
     // Configure LLM organ for Ollama
     let config = LlmConfig {
         provider: LlmProvider::Ollama,
-        model: "llama3.2:3b".to_string(), // Small, fast model
+        model: "gemma4:e2b".to_string(), // Gemma 4 with thinking/reasoning
         endpoint: "http://localhost:11434".to_string(),
         api_key: None,
         max_tokens: 256,

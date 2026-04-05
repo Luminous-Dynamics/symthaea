@@ -49,7 +49,7 @@ async fn main() -> Result<()> {
     // Configure LLM organ for translator-only usage
     let config = LlmConfig {
         provider: LlmProvider::Ollama,
-        model: "llama3.2:3b".to_string(),
+        model: "gemma4:e2b".to_string(),
         endpoint: "http://localhost:11434".to_string(),
         api_key: None,
         max_tokens: 256,

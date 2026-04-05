@@ -213,6 +213,50 @@ impl LiteRTBridge {
             })
     }
 
+    /// Generate text with verified claims as context (on-device RAG).
+    ///
+    /// Prepends verified claims to the prompt so the on-device LLM can
+    /// answer grounded in web research results from the desktop WebResearcher.
+    pub fn generate_with_context(
+        &self,
+        prompt: &str,
+        context_claims: &[String],
+        max_tokens: u32,
+        consciousness_level: f32,
+    ) -> Option<LiteRTResponse> {
+        if consciousness_level < CONSCIOUSNESS_GATE_THRESHOLD {
+            return None;
+        }
+
+        if context_claims.is_empty() {
+            return self
+                .generate(prompt, max_tokens)
+                .map(|text| LiteRTResponse {
+                    text,
+                    from_device: true,
+                });
+        }
+
+        // Build context-augmented prompt
+        let context_block: String = context_claims
+            .iter()
+            .enumerate()
+            .map(|(i, c)| format!("{}. {}", i + 1, c))
+            .collect::<Vec<_>>()
+            .join("\n");
+
+        let augmented_prompt = format!(
+            "Based on these verified facts:\n{}\n\nAnswer: {}",
+            context_block, prompt
+        );
+
+        self.generate(&augmented_prompt, max_tokens)
+            .map(|text| LiteRTResponse {
+                text,
+                from_device: true,
+            })
+    }
+
     /// Update the model path (e.g., after download completes).
     pub fn set_model_path(&mut self, path: String) {
         // If engine is already loaded with a different path, free it first

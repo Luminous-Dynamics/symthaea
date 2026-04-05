@@ -331,6 +331,61 @@ class HolonWebSocket(private val engine: SomaEngine) {
         }
     }
 
+    /**
+     * Request web search via desktop WebResearcher.
+     * Returns verified claims with epistemic status and source URLs.
+     */
+    fun requestWebSearch(query: String, maxResults: Int = 3): SearchResult? {
+        val body = JSONObject().apply {
+            put("query", query)
+            put("max_results", maxResults)
+        }.toString()
+
+        val response = httpPost("/holon/search", body) ?: return null
+        return try {
+            val json = JSONObject(response)
+            val claimsArray = json.getJSONArray("claims")
+            val claims = mutableListOf<SearchClaim>()
+            for (i in 0 until claimsArray.length()) {
+                val c = claimsArray.getJSONObject(i)
+                claims.add(SearchClaim(
+                    text = c.getString("text"),
+                    confidence = c.getDouble("confidence").toFloat(),
+                    sourceUrl = c.optString("source_url", ""),
+                    epistemicStatus = c.optString("epistemic_status", "Unknown")
+                ))
+            }
+
+            val sourcesArray = json.getJSONArray("sources")
+            val sources = mutableListOf<String>()
+            for (i in 0 until sourcesArray.length()) {
+                sources.add(sourcesArray.getString(i))
+            }
+
+            SearchResult(
+                claims = claims,
+                sources = sources,
+                status = json.optString("status", "unknown")
+            )
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to parse search response: ${e.message}")
+            null
+        }
+    }
+
+    data class SearchClaim(
+        val text: String,
+        val confidence: Float,
+        val sourceUrl: String,
+        val epistemicStatus: String
+    )
+
+    data class SearchResult(
+        val claims: List<SearchClaim>,
+        val sources: List<String>,
+        val status: String
+    )
+
     private fun httpPost(path: String, body: String): String? {
         val url = URL("http://$host:$port$path")
         val conn = url.openConnection() as HttpURLConnection
