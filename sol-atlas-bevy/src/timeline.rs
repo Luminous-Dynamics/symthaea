@@ -45,10 +45,10 @@ pub fn timeline_input_system(
     let shift = kb.pressed(KeyCode::ShiftLeft) || kb.pressed(KeyCode::ShiftRight);
     let step = if shift { 10 } else { 1 };
 
-    if kb.just_pressed(KeyCode::ArrowRight) {
+    if kb.pressed(KeyCode::ArrowRight) {
         state.year = state.year.saturating_add(step).min(500);
     }
-    if kb.just_pressed(KeyCode::ArrowLeft) {
+    if kb.pressed(KeyCode::ArrowLeft) {
         state.year = state.year.saturating_sub(step);
     }
     if kb.just_pressed(KeyCode::Space) {
