@@ -42,7 +42,7 @@ pub fn marker_size_from_capacity(capacity_mw: f64) -> f32 {
 /// Peak height for great-circle arc elevation above the globe surface.
 /// Short arcs hug the surface; long arcs arc higher.
 pub fn arc_peak_height(distance_km: f64) -> f32 {
-    (0.015 + distance_km / 200_000.0) as f32
+    (0.06 + distance_km / 150_000.0) as f32 // clears atmosphere at 1.05 radius
 }
 
 /// Haversine distance in km between two lat/lon points.

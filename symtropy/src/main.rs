@@ -75,6 +75,7 @@ fn main() {
                 })
                 .set(ImagePlugin::default_nearest()),
         )
+        // MSAA: Bevy 0.18 defaults to Sample4 via Msaa enum (set per-camera if needed)
         .add_plugins(SymtropyPlugin)
         .add_systems(Startup, log_renderer_info);
 

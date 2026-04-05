@@ -271,7 +271,7 @@ pub fn setup_globe_view(
     let fresnel_mesh = meshes.add(Sphere::new(1.03).mesh().uv(48, 48));
     let fresnel_material = materials.add(StandardMaterial {
         base_color: Color::linear_rgba(0.0, 0.6, 0.8, 0.04),
-        emissive: LinearRgba::new(0.0, 0.25, 0.35, 1.0),
+        emissive: LinearRgba::new(0.0, 0.5, 0.7, 1.0), // 2x brighter — visible glow ring
         alpha_mode: AlphaMode::Blend,
         unlit: true,
         double_sided: true,
@@ -289,7 +289,7 @@ pub fn setup_globe_view(
     // Second Fresnel layer — wider, softer
     let fresnel2_material = materials.add(StandardMaterial {
         base_color: Color::linear_rgba(0.0, 0.87, 1.0, 0.03),
-        emissive: LinearRgba::new(0.0, 0.4, 0.55, 1.0),
+        emissive: LinearRgba::new(0.0, 0.8, 1.1, 1.0), // 2x brighter
         alpha_mode: AlphaMode::Blend,
         unlit: true,
         double_sided: true,
@@ -342,7 +342,7 @@ pub fn setup_globe_view(
         bevy::core_pipeline::tonemapping::Tonemapping::AcesFitted,
         // [6] Bloom — makes emissive markers glow through the hologram
         bevy::post_process::bloom::Bloom {
-            intensity: 0.08, // moderate — sun glow + marker bloom
+            intensity: 0.18, // aggressive — sun halo, atmosphere glow, marker bloom
             ..default()
         },
         // [3] Chromatic aberration — holographic projection artifact
@@ -988,6 +988,30 @@ pub fn setup_globe_view(
         ));
     });
 
+    // ─── Timeline Scrubber Bar (bottom of screen) ─────────────
+    commands.spawn((
+        Node {
+            width: Val::Percent(100.0),
+            height: Val::Px(6.0),
+            position_type: PositionType::Absolute,
+            bottom: Val::Px(0.0),
+            ..default()
+        },
+        BackgroundColor(Color::srgba(0.05, 0.08, 0.1, 0.6)),
+        TimelineScrubber,
+        AtlasEntity,
+    )).with_children(|bar| {
+        bar.spawn((
+            Node {
+                width: Val::Percent(0.0), // updated each frame
+                height: Val::Percent(100.0),
+                ..default()
+            },
+            BackgroundColor(Color::srgb(0.0, 0.7, 0.6)), // teal fill
+            TimelineFill,
+        ));
+    });
+
     // Store data for arc rendering (gizmos are immediate-mode)
     commands.insert_resource(AtlasData { data });
 
@@ -1249,6 +1273,24 @@ pub fn panel_metrics_system(
 
     for mut text in texts.iter_mut() {
         *text = Text::new(metrics.clone());
+    }
+}
+
+/// Timeline scrubber bar — visual progress indicator at bottom of screen.
+#[derive(Component)]
+pub struct TimelineScrubber;
+
+#[derive(Component)]
+pub struct TimelineFill;
+
+/// Update timeline scrubber fill width based on current year.
+pub fn timeline_scrubber_system(
+    timeline: Res<TimelineState>,
+    mut fills: Query<&mut Node, With<TimelineFill>>,
+) {
+    let progress = (timeline.year as f32 / 500.0).clamp(0.0, 1.0) * 100.0;
+    for mut node in fills.iter_mut() {
+        node.width = Val::Percent(progress);
     }
 }
 
