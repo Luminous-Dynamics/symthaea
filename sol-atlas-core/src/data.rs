@@ -377,3 +377,47 @@ mod infra_tests {
         }
     }
 }
+
+#[cfg(test)]
+mod e2e_tests {
+    use super::*;
+
+    #[test]
+    fn loaded_data_has_all_fields() {
+        // Test with minimal valid data for each type
+        let data = load_all(
+            "[]", // sites
+            r#"{"geothermal_nodes":[],"maglev_corridors":[]}"#, // maglev
+            "[]", // vaults
+            "[]", // terra lumina
+            "[]", // regions
+            "[]", // supply routes
+            "[]", // climate
+            r#"{"emergency_shelters":[],"health_facilities":[],"robotics_dispatch":[]}"#, // infra
+            "[]", // fossil
+            "[]", // nuclear
+            "[]", // earthquakes
+            "[]", // fires
+            "[]", // storms
+            "[]", // volcanoes
+            "[]", // cities
+            "[]", // chokepoints
+            "[]", // critical infra
+        );
+        assert!(data.sites.is_empty());
+        assert!(data.natural_events.is_empty());
+        assert!(data.major_cities.is_empty());
+        assert!(data.chokepoints.is_empty());
+        assert!(data.critical_infrastructure.is_empty());
+    }
+
+    #[test]
+    fn loaded_data_handles_invalid_json() {
+        let data = load_all(
+            "not json", "bad", "{}", "null", "[]", "", "[]", "[]",
+            "[]", "[]", "[]", "[]", "[]", "[]", "[]", "[]", "[]",
+        );
+        // Should not panic, just return empty vecs
+        assert!(data.sites.is_empty());
+    }
+}
