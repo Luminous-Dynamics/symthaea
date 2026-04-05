@@ -12,6 +12,8 @@ package io.symthaea.soma
  */
 internal object NativeBindings {
     init {
+        // Load LiteRT shim first — libsymthaea_soma.so depends on litert_* symbols
+        try { System.loadLibrary("litert_shim") } catch (_: UnsatisfiedLinkError) {}
         System.loadLibrary("soma_jni")
     }
 
