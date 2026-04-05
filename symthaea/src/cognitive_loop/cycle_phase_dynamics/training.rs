@@ -285,9 +285,9 @@ impl CognitiveLoopService {
         );
 
         // ── BrocaLite fallback: lightweight always-on language generation ────
-        // When ssm_language is not enabled (or didn't fire), BrocaLite provides
-        // basic consciousness-coupled text generation from the current cycle state.
-        #[cfg(not(feature = "ssm_language"))]
+        // When full Broca didn't fire this cycle (wrong cadence, low consciousness,
+        // or ssm_language not enabled), BrocaLite provides basic consciousness-coupled
+        // text generation from the current cycle state.
         if self.language_comm.last_broca_text.is_none() {
             let emo = self.unification_engine.emotional.state();
             let signals = super::super::broca_bridge::BrocaConsciousnessSignals {
