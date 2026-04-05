@@ -29,6 +29,7 @@ pub fn App() -> impl IntoView {
                 <Route path=path!("/markets") view=MarketsPage />
                 <Route path=path!("/citations") view=CitationsPage />
                 <Route path=path!("/consensus") view=ConsensusPage />
+                <Route path=path!("/case-studies") view=CaseStudiesPage />
             </Routes>
         </Router>
     }

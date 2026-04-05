@@ -13,6 +13,7 @@ pub mod trust_profile;
 pub mod reproducibility;
 pub mod markets;
 pub mod citations;
+pub mod case_studies;
 pub mod consensus;
 
 pub use home::*;
@@ -26,4 +27,5 @@ pub use trust_profile::*;
 pub use reproducibility::*;
 pub use markets::*;
 pub use citations::*;
+pub use case_studies::*;
 pub use consensus::*;

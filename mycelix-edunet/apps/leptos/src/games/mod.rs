@@ -44,6 +44,9 @@ fn game_type(node_id: &str) -> Option<&'static str> {
         "CAPS.PhysicalSciences.Gr12.P2.EQUIL" | "CAPS.PhysicalSciences.Gr11.CHM.3" => Some("equilibrium"),
         // Acid-Base Explorer
         "CAPS.PhysicalSciences.Gr12.P2.ACID" | "CAPS.PhysicalSciences.Gr11.CHM.4" => Some("acids"),
+        // Equation Explorer (Physics Discovery)
+        "CAPS.PhysicalSciences.Gr12.P1.EQUATIONS" | "CAPS.PhysicalSciences.Gr11.P1.EQUATIONS" |
+        "UNIVERSAL.PhysicsEquations" | "UNIVERSAL.EquationExplorer" => Some("equation_explorer"),
         // Financial Literacy (Budget Simulator)
         id if id.contains("FinancialLiteracy") || id.contains("FINLIT") => Some("budget"),
         // Cybersecurity (Password Strength)
@@ -86,6 +89,7 @@ pub fn GameContainer(node_id: String) -> impl IntoView {
         Some("integer_line") => view! { <intermediate::integer_number_line::IntegerNumberLine node_id=id /> }.into_any(),
         Some("equation_balance") => view! { <intermediate::equation_balance::EquationBalance node_id=id /> }.into_any(),
         Some("pythagoras") => view! { <intermediate::pythagoras::PythagorasExplorer node_id=id /> }.into_any(),
+        Some("equation_explorer") => view! { <physics::equation_explorer::EquationExplorer node_id=id /> }.into_any(),
         _ => view! { <p style="color: var(--text-secondary)">"No interactive game available yet."</p> }.into_any(),
     }
 }

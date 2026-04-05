@@ -18,6 +18,7 @@ pub fn NavBar() -> impl IntoView {
                 <a href="/reproducibility">"Reproducibility"</a>
                 <a href="/citations">"Citations"</a>
                 <a href="/consensus">"Consensus"</a>
+                <a href="/case-studies">"Case Studies"</a>
                 <a href="/submit">"Submit"</a>
             </div>
         </nav>

@@ -21,6 +21,7 @@
 //! - Oganessian & Utyonkov (2015). Superheavy element synthesis. *Nuclear Physics A*.
 //! - Ring & Schuck (2004). *The Nuclear Many-Body Problem*. Springer.
 
+pub mod ame2020;
 pub mod constants;
 pub mod discovery;
 pub mod encoder;
@@ -28,6 +29,7 @@ pub mod island_stability;
 pub mod mass_formula;
 pub mod shell_model;
 
+pub use ame2020::*;
 pub use constants::*;
 pub use discovery::*;
 pub use encoder::*;

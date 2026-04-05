@@ -12,6 +12,7 @@
 #![warn(missing_docs)]
 
 pub mod aging;
+pub mod compound_stability;
 pub mod database;
 pub mod encoder;
 pub mod mining;
