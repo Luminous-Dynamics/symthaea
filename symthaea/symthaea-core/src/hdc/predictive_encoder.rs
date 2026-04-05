@@ -601,13 +601,25 @@ impl PredictiveHdcEncoder {
         if output_dim == 0 {
             return Vec::new();
         }
-        // Downsample by taking evenly spaced values
-        let step = (hdv.values.len() / output_dim).max(1);
-        hdv.values
-            .iter()
-            .step_by(step)
-            .take(output_dim)
-            .cloned()
+        let input_len = hdv.values.len();
+        if input_len <= output_dim {
+            return hdv.values[..output_dim.min(input_len)].to_vec();
+        }
+        // Average pooling over blocks: each output element is the mean of a
+        // block of (input_len / output_dim) consecutive input elements.
+        // This preserves far more information than stride-based subsampling
+        // (which discards 63/64 elements at 16384→256).
+        // Science: average pooling is a low-pass filter that retains the
+        // energy distribution across the HDC vector, preserving the semantic
+        // structure that stride sampling destroys.
+        let block_size = input_len / output_dim;
+        (0..output_dim)
+            .map(|i| {
+                let start = i * block_size;
+                let end = (start + block_size).min(input_len);
+                let sum: f32 = hdv.values[start..end].iter().sum();
+                sum / (end - start) as f32
+            })
             .collect()
     }
 }
