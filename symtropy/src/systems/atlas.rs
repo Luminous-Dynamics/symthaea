@@ -204,7 +204,7 @@ pub fn setup_globe_view(
     let earth_texture: Handle<Image> = asset_server.load(sol_atlas_bevy::globe::EARTH_TEXTURE_PATH);
     let holo_globe = holo_materials.add(sol_atlas_bevy::holographic_material::HolographicMaterial {
         base: StandardMaterial {
-            base_color: Color::linear_rgba(0.10, 0.15, 0.20, 0.5), // dark ghost — holographic, coastlines as contours
+            base_color: Color::linear_rgba(0.04, 0.08, 0.10, 0.25), // abyssal ghost — see through to far side
             base_color_texture: Some(earth_texture),
             alpha_mode: AlphaMode::Blend,
             double_sided: true,
@@ -866,9 +866,9 @@ pub fn setup_globe_view(
         let texture: Handle<Image> = asset_server.load(format!("textures/{}", body.texture));
         let mat = if body.is_sun {
             materials.add(StandardMaterial {
-                base_color: Color::linear_rgba(1.0, 0.85, 0.4, 0.5),
+                base_color: Color::linear_rgba(1.0, 0.9, 0.5, 0.9), // bright, nearly opaque
                 base_color_texture: Some(texture),
-                emissive: LinearRgba::new(1.0, 0.7, 0.2, 1.0),
+                emissive: LinearRgba::new(3.0, 2.0, 0.6, 1.0), // blazing emissive — drives bloom
                 alpha_mode: AlphaMode::Blend,
                 unlit: true,
                 ..default()
@@ -934,7 +934,7 @@ pub fn setup_globe_view(
     )).with_children(|parent| {
         // Section: Controls
         parent.spawn((
-            Text::new("─ Controls ─"),
+            Text::new("-- Controls --"),
             TextFont { font_size: 11.0, ..default() },
             TextColor(Color::srgba(0.5, 0.7, 0.8, 0.7)),
             Node { margin: UiRect::bottom(Val::Px(6.0)), ..default() },
@@ -957,7 +957,7 @@ pub fn setup_globe_view(
 
         // Section: Metrics
         parent.spawn((
-            Text::new("─ Metrics ─"),
+            Text::new("-- Metrics --"),
             TextFont { font_size: 11.0, ..default() },
             TextColor(Color::srgba(0.5, 0.7, 0.8, 0.7)),
             Node { margin: UiRect::top(Val::Px(10.0)).with_bottom(Val::Px(6.0)), ..default() },
@@ -1392,9 +1392,9 @@ pub fn aesthetic_apply_system(
                 mat.base.unlit = true;
             }
             sol_atlas_core::aesthetics::Aesthetic::Holographic => {
-                // Full holographic effects
+                // Full holographic effects — see-through globe
                 mat.extension.enable_holographic = 1.0;
-                mat.extension.hologram_alpha = 0.55;
+                mat.extension.hologram_alpha = 0.35; // more transparent — see far side
                 mat.extension.scanline_density = 20.0;
                 mat.extension.scanline_speed = 0.5;
                 mat.extension.fresnel_power = 3.0;
@@ -1545,9 +1545,9 @@ pub fn celestial_orbit_system(
         let pos = sol_atlas_core::solar_system::body_position(body, t);
         let flicker = (t * 4.0 + body.orbit_offset).sin().abs() * 0.4 + 0.6;
         let ring_r = body.visual_radius * 1.8;
-        let ring_alpha = if body.is_sun { 0.08 } else { 0.12 } * flicker;
+        let ring_alpha = if body.is_sun { 0.25 } else { 0.12 } * flicker;
         let ring_color = if body.is_sun {
-            Color::linear_rgba(1.0, 0.7, 0.2, ring_alpha)
+            Color::linear_rgba(1.0, 0.8, 0.3, ring_alpha) // bright solar corona
         } else {
             Color::linear_rgba(0.3, 0.5, 0.8, ring_alpha)
         };
