@@ -44,6 +44,7 @@ fi
 "${NDK_TOOLCHAIN}/bin/aarch64-linux-android${API}-clang++" -shared -o "$JNILIBS/liblitert_shim.so" \
     "$LITERT_SRC/litert_shim.cpp" \
     -std=c++17 -fPIC -O2 -Wall \
+    -static-libstdc++ \
     -Wl,-soname,liblitert_shim.so \
     -Wl,-z,max-page-size=16384 \
     $LITERT_FLAGS
