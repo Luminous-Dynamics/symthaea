@@ -55,6 +55,14 @@ fn game_type(node_id: &str) -> Option<&'static str> {
         "UNIVERSAL.IdealGas" => Some("ideal_gas"),
         // Schwarzschild Radius / Black Holes
         "UNIVERSAL.BlackHoles" | "UNIVERSAL.Schwarzschild" => Some("schwarzschild"),
+        // Coulomb's Law
+        "CAPS.PhysicalSciences.Gr11.P1.ELEC2" | "UNIVERSAL.Coulomb" => Some("coulomb"),
+        // Lorentz Factor / Special Relativity
+        "CAPS.PhysicalSciences.Gr12.P1.REL" | "UNIVERSAL.Relativity" | "UNIVERSAL.Lorentz" => Some("lorentz"),
+        // Hubble's Law / Cosmology
+        "UNIVERSAL.Cosmology" | "UNIVERSAL.Hubble" => Some("hubble"),
+        // Boltzmann Distribution
+        "CAPS.PhysicalSciences.Gr12.P1.THERMO" | "UNIVERSAL.Boltzmann" | "UNIVERSAL.StatMech" => Some("boltzmann"),
         // Financial Literacy (Budget Simulator)
         id if id.contains("FinancialLiteracy") || id.contains("FINLIT") => Some("budget"),
         // Cybersecurity (Password Strength)
@@ -101,6 +109,10 @@ pub fn GameContainer(node_id: String) -> impl IntoView {
         Some("gravity") => view! { <physics::gravity_explorer::GravityExplorer node_id=id /> }.into_any(),
         Some("ideal_gas") => view! { <physics::ideal_gas_explorer::IdealGasExplorer node_id=id /> }.into_any(),
         Some("schwarzschild") => view! { <physics::schwarzschild_explorer::SchwarzschildExplorer node_id=id /> }.into_any(),
+        Some("coulomb") => view! { <physics::coulomb_explorer::CoulombExplorer node_id=id /> }.into_any(),
+        Some("lorentz") => view! { <physics::lorentz_explorer::LorentzExplorer node_id=id /> }.into_any(),
+        Some("hubble") => view! { <physics::hubble_explorer::HubbleExplorer node_id=id /> }.into_any(),
+        Some("boltzmann") => view! { <physics::boltzmann_explorer::BoltzmannExplorer node_id=id /> }.into_any(),
         _ => view! { <p style="color: var(--text-secondary)">"No interactive game available yet."</p> }.into_any(),
     }
 }
