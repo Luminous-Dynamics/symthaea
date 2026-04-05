@@ -16,12 +16,13 @@ pub fn HomePage() -> impl IntoView {
     });
 
     let total_claims = move || {
-        stats.get().flatten().map(|s| s.total_claims).unwrap_or(148)
+        stats.get().flatten().map(|s| s.total_claims).unwrap_or(50)
     };
     let total_categories = move || {
-        stats.get().flatten().map(|s| s.total_categories).unwrap_or(19)
+        stats.get().flatten().map(|s| s.total_categories).unwrap_or(20)
     };
-    let total_equations = 208; // From physics catalog
+    let api_connected = move || stats.get().flatten().is_some();
+    let total_equations = 208;
 
     view! {
         <div class="page-container">
@@ -59,6 +60,15 @@ pub fn HomePage() -> impl IntoView {
                     <div class="stat-value">"E0-E4"</div>
                     <div class="stat-label">"LEM Cube Axes"</div>
                 </div>
+            </div>
+
+            // Connection status
+            <div style="text-align: center; margin-bottom: 1.5rem; font-size: 0.75rem;">
+                {move || if api_connected() {
+                    view! { <span style="color: var(--accent-emerald);">"● API Connected (live data)"</span> }.into_any()
+                } else {
+                    view! { <span style="color: var(--tier-e1);">"○ Demo Mode (API offline)"</span> }.into_any()
+                }}
             </div>
 
             <div class="glass-panel" style="margin-bottom: 1.5rem;">

@@ -211,10 +211,31 @@
             color: var(--text-secondary);
         }
 
+        /* Smooth transitions */
+        a, button, .glass-panel { transition: all 0.2s ease; }
+
+        /* Better focus states for accessibility */
+        input:focus, select:focus, textarea:focus {
+            outline: 2px solid var(--accent-indigo);
+            outline-offset: 2px;
+        }
+
+        /* Navbar active link */
+        .navbar .nav-links a {
+            transition: color 0.2s, background 0.2s;
+        }
+
         @media (max-width: 768px) {
             .navbar .nav-links { display: none; }
             .claim-grid { grid-template-columns: 1fr; }
             .stat-grid { grid-template-columns: repeat(2, 1fr); }
+            .page-container { padding: 1rem; }
+            .page-title { font-size: 1.25rem; }
+        }
+
+        @media (max-width: 480px) {
+            .stat-grid { grid-template-columns: 1fr; }
+            .navbar .logo { font-size: 1rem; }
         }
     </style>
 </head>

@@ -6,12 +6,36 @@
 use leptos::prelude::*;
 use wasm_bindgen::JsCast;
 
-/// Claim submission form.
+/// Claim submission form with auto-LEM classification preview.
 #[component]
 pub fn SubmitPage() -> impl IntoView {
     let (description, set_description) = signal(String::new());
     let (category, set_category) = signal("Nuclear Physics".to_string());
+    let (keywords, set_keywords) = signal(String::new());
+    let (dataset_hash, set_dataset_hash) = signal(String::new());
+    let (license, set_license) = signal("CC-BY-4.0".to_string());
+    let (creator, set_creator) = signal(String::new());
     let (submitted, set_submitted) = signal(false);
+
+    // Auto-LEM classification preview based on description
+    let lem_preview = move || {
+        let desc = description.get();
+        if desc.len() < 10 { return ("—".to_string(), "—".to_string(), "—".to_string()); }
+        let desc_lower = desc.to_lowercase();
+        // Simple heuristic LEM classification
+        let e = if desc_lower.contains("replicated") || desc_lower.contains("reproduced") { "E3" }
+                else if desc_lower.contains("verified") || desc_lower.contains("confirmed") { "E2" }
+                else if desc_lower.contains("observed") || desc_lower.contains("measured") { "E1" }
+                else { "E0" };
+        let n = if desc_lower.contains("consensus") || desc_lower.contains("axiomatic") { "N3" }
+                else if desc_lower.contains("peer-reviewed") || desc_lower.contains("published") { "N2" }
+                else if desc_lower.contains("team") || desc_lower.contains("group") { "N1" }
+                else { "N0" };
+        let m = if desc_lower.contains("fundamental") || desc_lower.contains("universal") { "M3" }
+                else if desc_lower.contains("established") || desc_lower.contains("documented") { "M2" }
+                else { "M0" };
+        (e.to_string(), n.to_string(), m.to_string())
+    };
 
     let on_submit = move |_| {
         if description.get().is_empty() {
@@ -86,6 +110,63 @@ pub fn SubmitPage() -> impl IntoView {
                                 <option>"Thermodynamics"</option>
                                 <option>"Other"</option>
                             </select>
+                        </div>
+
+                        // Additional fields
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+                            <div>
+                                <label style="font-size: 0.875rem; color: var(--text-secondary); display: block; margin-bottom: 0.375rem;">"Keywords (comma-separated)"</label>
+                                <input type="text" placeholder="e.g., fusion, plasma, ignition"
+                                    style="width: 100%; padding: 0.5rem; background: var(--bg-secondary); border: 1px solid var(--border-glass); border-radius: 0.375rem; color: var(--text-primary); font-size: 0.875rem;"
+                                    on:input=move |ev| { use wasm_bindgen::JsCast; let t: web_sys::HtmlInputElement = ev.target().unwrap().unchecked_into(); set_keywords.set(t.value()); }
+                                />
+                            </div>
+                            <div>
+                                <label style="font-size: 0.875rem; color: var(--text-secondary); display: block; margin-bottom: 0.375rem;">"Creator / Author"</label>
+                                <input type="text" placeholder="Your name or institution"
+                                    style="width: 100%; padding: 0.5rem; background: var(--bg-secondary); border: 1px solid var(--border-glass); border-radius: 0.375rem; color: var(--text-primary); font-size: 0.875rem;"
+                                    on:input=move |ev| { use wasm_bindgen::JsCast; let t: web_sys::HtmlInputElement = ev.target().unwrap().unchecked_into(); set_creator.set(t.value()); }
+                                />
+                            </div>
+                        </div>
+
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+                            <div>
+                                <label style="font-size: 0.875rem; color: var(--text-secondary); display: block; margin-bottom: 0.375rem;">"Dataset Hash (optional)"</label>
+                                <input type="text" placeholder="blake3:... or IPFS CID"
+                                    style="width: 100%; padding: 0.5rem; background: var(--bg-secondary); border: 1px solid var(--border-glass); border-radius: 0.375rem; color: var(--text-primary); font-size: 0.875rem; font-family: monospace;"
+                                    on:input=move |ev| { use wasm_bindgen::JsCast; let t: web_sys::HtmlInputElement = ev.target().unwrap().unchecked_into(); set_dataset_hash.set(t.value()); }
+                                />
+                            </div>
+                            <div>
+                                <label style="font-size: 0.875rem; color: var(--text-secondary); display: block; margin-bottom: 0.375rem;">"License"</label>
+                                <select
+                                    style="width: 100%; padding: 0.5rem; background: var(--bg-secondary); border: 1px solid var(--border-glass); border-radius: 0.375rem; color: var(--text-primary);"
+                                    on:change=move |ev| { use wasm_bindgen::JsCast; let t: web_sys::HtmlSelectElement = ev.target().unwrap().unchecked_into(); set_license.set(t.value()); }
+                                >
+                                    <option>"CC-BY-4.0"</option>
+                                    <option>"CC-BY-SA-4.0"</option>
+                                    <option>"CC-BY-NC-4.0"</option>
+                                    <option>"MIT"</option>
+                                    <option>"AGPL-3.0"</option>
+                                    <option>"All Rights Reserved"</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        // Auto-LEM classification preview
+                        <div style="margin-bottom: 1rem; padding: 0.75rem; background: var(--bg-secondary); border-radius: 0.5rem; border: 1px dashed var(--border-glass);">
+                            <div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.375rem;">"Auto-Classification Preview:"</div>
+                            {move || {
+                                let (e, n, m) = lem_preview();
+                                view! {
+                                    <div style="display: flex; gap: 1rem; font-size: 0.875rem;">
+                                        <span>"E: " <strong style="color: var(--accent-indigo);">{e}</strong></span>
+                                        <span>"N: " <strong style="color: var(--accent-indigo);">{n}</strong></span>
+                                        <span>"M: " <strong style="color: var(--accent-indigo);">{m}</strong></span>
+                                    </div>
+                                }
+                            }}
                         </div>
 
                         <div style="display: flex; gap: 1rem; align-items: center;">

@@ -62,7 +62,43 @@ fn demo_claims() -> Vec<ClaimResponse> {
             verifications_count: 0,
             provenance_count: 1,
         },
+        // ── Verification Successes ──
+        claim("nif-ignition", EpistemicTier::E4, "NIF fusion ignition: Q ratio 1.54→4.13, eight successful shots independently verified", "Nuclear Physics", &["nif","fusion","ignition"], "LLNL/NIF", "2025-04-01", 12),
+        claim("higgs-boson", EpistemicTier::E4, "Higgs boson at ~125 GeV: ATLAS + CMS independent discovery, 5.9σ significance. Nobel 2013", "Particle Physics", &["higgs","lhc","nobel"], "ATLAS+CMS (2012)", "2012-07-04", 50),
+        claim("ligo-gw150914", EpistemicTier::E4, "Gravitational wave detection: binary black hole merger, SNR=24, false alarm < 1/203,000 years", "General Relativity", &["ligo","gravitational-waves","nobel"], "LIGO/Virgo (2015)", "2016-02-11", 30),
+        claim("alphafold", EpistemicTier::E4, "AlphaFold2 protein structure prediction: median GDT-TS 92.4 across CASP14 targets. Nobel 2024", "Biophysics", &["alphafold","protein","deep-learning"], "DeepMind (2021)", "2021-07-15", 25),
+        // ── Replication Failures ──
+        claim("cold-fusion", EpistemicTier::E0, "Cold fusion: deuterium fusion at room temperature. Gamow factor ~10^-2700. Never replicated", "Nuclear Physics", &["cold-fusion","debunked"], "Pons & Fleischmann (1989)", "1989-03-23", 0),
+        claim("lk99", EpistemicTier::E0, "LK-99 room-temperature superconductor: Cu₂S impurity, debunked in 3 weeks", "Condensed Matter", &["lk-99","superconductor","debunked"], "Lee & Kim (2023)", "2023-07-22", 0),
+        claim("emdrive", EpistemicTier::E0, "EMDrive: all thrust was magnetic cable artifact. Conservation law violation", "Classical Mechanics", &["emdrive","debunked"], "TU Dresden (2021)", "2021-03-15", 0),
+        // ── Active Science ──
+        claim("nickelates", EpistemicTier::E3, "Nickelate La₃Ni₂O₇ superconductivity at ~80K, reproduced by multiple groups, SLAC ambient pressure", "Condensed Matter", &["nickelate","superconductor"], "Multiple (2023-25)", "2025-02-01", 8),
+        claim("hubble-tension", EpistemicTier::E4, "Hubble tension: local H₀≈73 vs CMB H₀≈67 km/s/Mpc at 5σ. Both sides E4-verified. Unresolved", "Cosmology", &["hubble-tension","dark-energy"], "Riess+Planck", "2024-01-01", 15),
+        claim("gnome", EpistemicTier::E3, "GNoME predicted 2.2M new crystal structures, 380K stable candidates. 736 independently synthesized", "Condensed Matter", &["gnome","materials-discovery"], "DeepMind (2023)", "2023-11-29", 5),
+        claim("quantum-ec", EpistemicTier::E3, "Quantum error correction: <10^-6 error rate with 12 logical qubits via topological code", "Quantum Mechanics", &["quantum","error-correction"], "Microsoft+IBM (2026)", "2026-01-15", 4),
+        claim("jwst-deep", EpistemicTier::E4, "JWST deep field reveals galaxies at z>13, challenging ΛCDM timeline predictions", "Cosmology", &["jwst","deep-field","high-redshift"], "NASA/ESA/CSA", "2022-07-12", 20),
     ]
+}
+
+/// Shorthand claim constructor.
+fn claim(id: &str, tier: EpistemicTier, desc: &str, cat: &str, kw: &[&str], creator: &str, date: &str, verifications: usize) -> ClaimResponse {
+    ClaimResponse {
+        id: id.to_string(),
+        tier,
+        content: ClaimContent {
+            dataset_hash: id.to_string(),
+            description: desc.to_string(),
+            category: cat.to_string(),
+            keywords: kw.iter().map(|s| s.to_string()).collect(),
+            storage_ref: None,
+            reproducibility_score: None,
+            license: None,
+        },
+        creator: creator.to_string(),
+        created_at: format!("{}T00:00:00Z", date),
+        verifications_count: verifications,
+        provenance_count: 1,
+    }
 }
 
 /// Browse claims page with search and filters.
