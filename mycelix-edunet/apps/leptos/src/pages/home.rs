@@ -459,11 +459,13 @@ fn OnboardingFlow(
     let set_profile = use_set_profile();
     let (step, set_step) = signal(0_u8);
     let (name, set_name) = signal(String::new());
+    let (framework, set_framework) = signal("caps".to_string());
     let (grade, set_grade) = signal(12_u8);
 
     let finish_onboarding = move || {
         set_profile.update(|p| {
             p.name = name.get_untracked();
+            p.framework = framework.get_untracked();
             p.grade = grade.get_untracked();
             p.onboarding_complete = true;
             if grade.get_untracked() == 12 {
@@ -503,16 +505,59 @@ fn OnboardingFlow(
                         >"Continue"</button>
                     </div>
                 }.into_any()
+            // Step 1: Framework selection
             } else if step.get() == 1 {
                 let name_val = name.get();
+                let fw_btn_style = "padding: 0.75rem 1.25rem; background: var(--surface); border: 2px solid var(--border); border-radius: 12px; color: var(--text); font-size: 0.9rem; font-weight: 600; cursor: pointer; font-family: inherit; transition: border-color 0.15s";
                 view! {
                     <div class="onboarding-step" style="animation: card-in 0.4s ease-out">
                         <h1 style="font-size: 1.5rem; margin-bottom: 0.5rem; color: var(--primary)">
                             "Nice to meet you, "{name_val}"."
                         </h1>
-                        <p style="color: var(--text-secondary); margin-bottom: 1.5rem">"What best describes you?"</p>
+                        <p style="color: var(--text-secondary); margin-bottom: 1.5rem">"What curriculum are you following?"</p>
 
-                        // Quick paths — most common first
+                        <div style="display: flex; gap: 0.75rem; justify-content: center; flex-wrap: wrap; margin-bottom: 1rem">
+                            <button
+                                style=fw_btn_style
+                                on:click=move |_| { set_framework.set("caps".to_string()); set_step.set(2); }
+                            >"South African (CAPS)"</button>
+                            <button
+                                style=fw_btn_style
+                                on:click=move |_| { set_framework.set("common_core".to_string()); set_step.set(2); }
+                            >"US Common Core"</button>
+                            <button
+                                style=fw_btn_style
+                                on:click=move |_| { set_framework.set("ib".to_string()); set_step.set(2); }
+                            >"International Baccalaureate"</button>
+                            <button
+                                style=fw_btn_style
+                                on:click=move |_| { set_framework.set("self_directed".to_string()); set_step.set(2); }
+                            >"Self-directed"</button>
+                        </div>
+                    </div>
+                }.into_any()
+
+            // Step 2: Grade / level selection
+            } else if step.get() == 2 {
+                let fw = framework.get();
+                let coming_soon = fw != "caps";
+                view! {
+                    <div class="onboarding-step" style="animation: card-in 0.4s ease-out">
+                        <h1 style="font-size: 1.5rem; margin-bottom: 0.5rem; color: var(--primary)">
+                            "What level are you at?"
+                        </h1>
+
+                        {if coming_soon {
+                            view! {
+                                <p style="color: var(--accent, var(--primary)); background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 0.75rem 1rem; margin-bottom: 1rem; font-size: 0.85rem">
+                                    "Coming soon \u{2014} curriculum data loading. You can still explore all content."
+                                </p>
+                            }.into_any()
+                        } else {
+                            view! { <span></span> }.into_any()
+                        }}
+
+                        // Quick path
                         <div style="display: flex; gap: 0.75rem; justify-content: center; flex-wrap: wrap; margin-bottom: 1rem">
                             <button
                                 style="padding: 0.75rem 1.25rem; background: var(--surface); border: 2px solid var(--primary); border-radius: 12px; color: var(--primary); font-size: 0.9rem; font-weight: 600; cursor: pointer; font-family: inherit"
@@ -520,28 +565,32 @@ fn OnboardingFlow(
                             >"Learn a trade"</button>
                         </div>
 
-                        // School grades
-                        <p style="font-size: 0.8rem; color: var(--text-tertiary); margin-bottom: 0.5rem">"School student?"</p>
+                        // School level bands
                         <div style="display: flex; gap: 0.75rem; justify-content: center; flex-wrap: wrap; margin-bottom: 1rem">
-                            {[9_u8, 10, 11, 12].into_iter().map(|g| {
+                            {[
+                                ("Elementary (Gr 1-6)", 6_u8),
+                                ("Middle (Gr 7-9)", 9_u8),
+                                ("High School (Gr 10-12)", 12_u8),
+                            ].into_iter().map(|(label, g)| {
                                 view! {
                                     <button
-                                        style="padding: 1.25rem 1.5rem; background: var(--surface); border: 2px solid var(--border); border-radius: 16px; color: var(--text); font-size: 1.1rem; font-weight: 600; cursor: pointer; min-width: 80px; font-family: inherit; transition: border-color 0.15s"
+                                        style="padding: 1.25rem 1.5rem; background: var(--surface); border: 2px solid var(--border); border-radius: 16px; color: var(--text); font-size: 1rem; font-weight: 600; cursor: pointer; min-width: 140px; font-family: inherit; transition: border-color 0.15s"
                                         on:click=move |_| {
                                             set_grade.set(g);
                                             finish_onboarding();
                                         }
                                     >
-                                        "Grade "{g}
+                                        {label}
                                     </button>
                                 }
                             }).collect::<Vec<_>>()}
                         </div>
-                        // Earlier grades + foundations
+
+                        // Specific grade picker
                         <details style="margin-top: 0.5rem; text-align: center">
-                            <summary style="font-size: 0.85rem; color: var(--text-tertiary); cursor: pointer; padding: 0.5rem">"Earlier grades or need to review basics?"</summary>
+                            <summary style="font-size: 0.85rem; color: var(--text-tertiary); cursor: pointer; padding: 0.5rem">"Pick a specific grade"</summary>
                             <div style="display: flex; gap: 0.5rem; justify-content: center; flex-wrap: wrap; margin-top: 0.75rem">
-                                {(1_u8..=8).map(|g| {
+                                {(1_u8..=12).map(|g| {
                                     view! {
                                         <button
                                             style="padding: 0.75rem 1rem; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; color: var(--text-secondary); font-size: 0.9rem; font-weight: 500; cursor: pointer; min-width: 60px; font-family: inherit"
@@ -559,6 +608,7 @@ fn OnboardingFlow(
                                 "No shame in going back to strengthen foundations. The strongest trees have the deepest roots."
                             </p>
                         </details>
+
                         // Beyond school
                         <details style="margin-top: 0.5rem; text-align: center">
                             <summary style="font-size: 0.85rem; color: var(--text-tertiary); cursor: pointer; padding: 0.5rem">"Beyond school?"</summary>

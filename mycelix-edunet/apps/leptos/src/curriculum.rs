@@ -202,6 +202,47 @@ impl CapsGraph {
             .unwrap_or_default()
     }
 
+    /// Find the highest-priority unmastered node whose prerequisites are all met.
+    ///
+    /// Sorts by `exam_weight.percentage` descending when available, then falls
+    /// back to node order.  Returns the first node that is (a) not in
+    /// `mastered_ids` and (b) has every prerequisite satisfied (i.e. all prereqs
+    /// are in `mastered_ids`).  If no such node exists, returns the first
+    /// unmastered node with no prerequisites at all.
+    pub fn recommended_next(&self, mastered_ids: &std::collections::HashSet<String>) -> Option<&str> {
+        // Build a list of (index, exam_weight_pct) sorted by weight desc
+        let mut candidates: Vec<(usize, f32)> = self
+            .nodes
+            .iter()
+            .enumerate()
+            .filter(|(_, n)| !mastered_ids.contains(&n.id))
+            .map(|(i, n)| {
+                let weight = n.exam_weight.as_ref().map(|w| w.percentage).unwrap_or(0.0);
+                (i, weight)
+            })
+            .collect();
+        candidates.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+
+        // First pass: highest-weight node with all prereqs mastered
+        for &(idx, _) in &candidates {
+            let node = &self.nodes[idx];
+            let prereqs = self.prereqs_for(&node.id);
+            if prereqs.iter().all(|p| mastered_ids.contains(*p)) {
+                return Some(&node.id);
+            }
+        }
+
+        // Fallback: first unmastered node with no prerequisites
+        for &(idx, _) in &candidates {
+            let node = &self.nodes[idx];
+            if self.prereqs_for(&node.id).is_empty() {
+                return Some(&node.id);
+            }
+        }
+
+        None
+    }
+
     /// All unique subjects.
     pub fn subjects(&self) -> Vec<&str> {
         let mut subjects: Vec<&str> = self.nodes.iter().map(|n| n.subject_area.as_str()).collect();

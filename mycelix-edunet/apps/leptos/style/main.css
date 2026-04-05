@@ -2971,6 +2971,11 @@ h2 { font-size: 1.75rem; margin-bottom: 0.5rem; }
 }
 
 /* Session orchestrator — smart start button */
+@keyframes energy-well-glow {
+    0%, 100% { box-shadow: 0 0 20px rgba(14,212,168,0.2), 0 0 40px rgba(14,212,168,0.08); }
+    50% { box-shadow: 0 0 30px rgba(14,212,168,0.4), 0 0 60px rgba(14,212,168,0.15); }
+}
+
 .session-start-btn {
     display: flex;
     flex-direction: column;
@@ -2984,14 +2989,16 @@ h2 { font-size: 1.75rem; margin-bottom: 0.5rem; }
     border: none;
     border-radius: 16px;
     cursor: pointer;
-    transition: transform 0.2s, box-shadow 0.3s;
+    transition: transform 0.2s, box-shadow 0.3s, text-shadow 0.3s;
     font-family: inherit;
     box-shadow: 0 4px 16px rgba(14, 212, 168, 0.3);
+    animation: energy-well-glow 3s ease-in-out infinite;
 }
 
 .session-start-btn:hover {
     transform: translateY(-2px);
     box-shadow: 0 6px 24px rgba(14, 212, 168, 0.4);
+    text-shadow: 0 0 12px rgba(14,212,168,0.4);
 }
 
 .session-start-btn:active {
@@ -4755,6 +4762,19 @@ h2 { font-size: 1.75rem; margin-bottom: 0.5rem; }
 @keyframes dew-pulse {
     0%, 100% { opacity: inherit; }
     50% { opacity: 0.1; }
+}
+
+/* FEP pulse — recommended next node */
+@keyframes fep-pulse {
+    0%, 100% { opacity: 0.3; }
+    50% { opacity: 0.8; }
+}
+
+.fep-pulse-ring {
+    animation: fep-pulse 2s ease-in-out infinite;
+    stroke: var(--primary);
+    fill: none;
+    stroke-width: 2;
 }
 
 /* ===========================================================================

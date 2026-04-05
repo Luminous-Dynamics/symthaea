@@ -71,6 +71,19 @@ pub fn SkillMapPage() -> impl IntoView {
         graph.nodes_for(&s, &g).into_iter().cloned().collect::<Vec<_>>()
     });
 
+    // Recommended next node (FEP pulse target)
+    let recommended_id = Memo::new(move |_| {
+        let graph = caps_graph();
+        let p = progress.get();
+        let mastered: std::collections::HashSet<String> = p
+            .nodes
+            .iter()
+            .filter(|(_, np)| np.status == ProgressStatus::Mastered)
+            .map(|(id, _)| id.clone())
+            .collect();
+        graph.recommended_next(&mastered).map(|s| s.to_string())
+    });
+
     // Progress summary
     let progress_summary = Memo::new(move |_| {
         let graph = caps_graph();
@@ -203,8 +216,9 @@ pub fn SkillMapPage() -> impl IntoView {
                 let margin = 80.0;
 
                 let has_game_fn = crate::games::has_game;
+                let rec_id = recommended_id.get();
 
-                let positions: Vec<(f64, f64, String, String, ProgressStatus, Option<u16>, bool, f64, f64)> = nodes.iter().enumerate().map(|(i, n)| {
+                let positions: Vec<(f64, f64, String, String, ProgressStatus, Option<u16>, bool, f64, f64, bool)> = nodes.iter().enumerate().map(|(i, n)| {
                     let row = i / cols;
                     let col = i % cols;
                     let x_offset = if row % 2 == 1 { spacing_x * 0.5 } else { 0.0 };
@@ -216,7 +230,8 @@ pub fn SkillMapPage() -> impl IntoView {
                     let has_game = has_game_fn(&n.id);
                     let soil = community_soil(&n.id);
                     let decay = knowledge_decay(np.last_reviewed);
-                    (x, y, n.id.clone(), n.title.clone(), status, marks, has_game, soil, decay)
+                    let is_recommended = rec_id.as_deref() == Some(n.id.as_str());
+                    (x, y, n.id.clone(), n.title.clone(), status, marks, has_game, soil, decay, is_recommended)
                 }).collect();
 
                 let rows = (node_count + cols - 1) / cols;
@@ -256,10 +271,11 @@ pub fn SkillMapPage() -> impl IntoView {
                             }).collect::<Vec<_>>()}
 
                             // Nodes — organic growth stages (seed → sprout → tree)
-                            {positions.iter().map(|(x, y, id, title, status, marks, has_game, soil, decay)| {
+                            {positions.iter().map(|(x, y, id, title, status, marks, has_game, soil, decay, is_recommended)| {
                                 let x = *x; let y = *y;
                                 let soil = *soil;
                                 let decay = *decay;
+                                let is_recommended = *is_recommended;
                                 let id_click = id.clone();
                                 let title_short: String = if title.chars().count() > 18 {
                                     title.chars().take(16).collect::<String>() + "..."
@@ -308,6 +324,14 @@ pub fn SkillMapPage() -> impl IntoView {
                                             view! { <g></g> }.into_any()
                                         }}
 
+                                        // FEP pulse ring — recommended next node
+                                        {if is_recommended {
+                                            view! {
+                                                <circle cx=x cy=y r={r + 6.0} class="fep-pulse-ring" />
+                                            }.into_any()
+                                        } else {
+                                            view! { <g></g> }.into_any()
+                                        }}
                                         // Outer ring
                                         <circle cx=x cy=y r={r + 3.0} fill="none" stroke="transparent" stroke-width="2" class="constellation-ring" />
                                         // Main node

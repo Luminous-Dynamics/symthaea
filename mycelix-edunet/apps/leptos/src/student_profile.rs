@@ -10,12 +10,19 @@ use serde::{Deserialize, Serialize};
 
 use crate::persistence;
 
+fn default_framework() -> String {
+    "caps".to_string()
+}
+
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct StudentProfile {
     pub name: String,
     pub grade: u8,           // 9, 10, 11, 12
     pub exam_date: String,   // ISO date e.g. "2026-10-26"
     pub onboarding_complete: bool,
+    /// Curriculum framework: "caps", "common_core", "ib", "self_directed"
+    #[serde(default = "default_framework")]
+    pub framework: String,
 }
 
 const PROFILE_KEY: &str = "edunet_student_profile";
