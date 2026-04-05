@@ -40,10 +40,10 @@ pub fn setup_menu(
     mut commands: Commands,
     registry: Res<ExperienceRegistry>,
 ) {
-    // Deep space background
-    commands.insert_resource(ClearColor(Color::linear_rgb(0.01, 0.008, 0.02)));
+    // Dark background
+    commands.insert_resource(ClearColor(Color::srgb(0.02, 0.02, 0.04)));
 
-    // Root container — full screen, centered column
+    // Root container — full screen, centered column with dark panel
     commands.spawn((
         Node {
             width: Val::Percent(100.0),
@@ -53,26 +53,27 @@ pub fn setup_menu(
             justify_content: JustifyContent::Center,
             ..default()
         },
+        BackgroundColor(Color::srgba(0.02, 0.02, 0.04, 1.0)),
         MenuUi,
     )).with_children(|parent| {
         // ═══ TITLE ═══════════════════════════════════════
         parent.spawn((
             Text::new("SYMTROPY"),
             TextFont { font_size: 56.0, ..default() },
-            TextColor(Color::srgb(0.3, 0.9, 0.8)),
+            TextColor(Color::srgb(0.3, 0.95, 0.85)),
         ));
 
         parent.spawn((
             Text::new("consciousness-first technology"),
             TextFont { font_size: 16.0, ..default() },
-            TextColor(Color::srgba(0.5, 0.7, 0.65, 0.6)),
+            TextColor(Color::srgba(0.5, 0.75, 0.7, 0.7)),
             Node { margin: UiRect::bottom(Val::Px(40.0)), ..default() },
         ));
 
         // ═══ EXPERIENCE ENTRIES ══════════════════════════
         for (i, exp) in registry.experiences.iter().enumerate() {
             let is_selected = i == registry.selected;
-            let alpha = if is_selected { 1.0 } else { 0.5 };
+            let alpha = if is_selected { 1.0 } else { 0.6 };
             let prefix = if is_selected { "▸ " } else { "  " };
 
             // Experience name
@@ -98,14 +99,14 @@ pub fn setup_menu(
         parent.spawn((
             Text::new("  [S]  Settings"),
             TextFont { font_size: 18.0, ..default() },
-            TextColor(Color::srgba(0.4, 0.5, 0.45, 0.4)),
+            TextColor(Color::srgba(0.4, 0.55, 0.5, 0.5)),
             Node { margin: UiRect::bottom(Val::Px(8.0)), ..default() },
         ));
 
         parent.spawn((
             Text::new("  [Esc]  Quit"),
             TextFont { font_size: 18.0, ..default() },
-            TextColor(Color::srgba(0.4, 0.45, 0.4, 0.4)),
+            TextColor(Color::srgba(0.4, 0.5, 0.45, 0.5)),
             Node { margin: UiRect::bottom(Val::Px(40.0)), ..default() },
         ));
 
@@ -113,7 +114,15 @@ pub fn setup_menu(
         parent.spawn((
             Text::new("Powered by Symthaea · Mycelix · Eight Harmonies"),
             TextFont { font_size: 11.0, ..default() },
+            TextColor(Color::srgba(0.35, 0.5, 0.45, 0.5)),
+        ));
+
+        // Version
+        parent.spawn((
+            Text::new("v0.1.0"),
+            TextFont { font_size: 10.0, ..default() },
             TextColor(Color::srgba(0.3, 0.4, 0.35, 0.4)),
+            Node { margin: UiRect::top(Val::Px(4.0)), ..default() },
         ));
     });
 

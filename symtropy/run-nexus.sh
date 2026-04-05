@@ -5,7 +5,13 @@ set -euo pipefail
 
 cd "$(dirname "$0")"
 
-echo "[symtropy] Starting Nexus..."
+# Ensure assets are accessible from the binary's directory
+ln -sfn ../../assets target/release/assets 2>/dev/null || true
+ln -sfn ../../assets target/debug/assets 2>/dev/null || true
+
+EXTRA_ARGS="${*}"
+
+echo "[symtropy] Starting Nexus... $EXTRA_ARGS"
 
 exec nix-shell -p \
   libx11 \
@@ -15,8 +21,10 @@ exec nix-shell -p \
   vulkan-loader \
   libxkbcommon \
   --run "
-    export LD_LIBRARY_PATH=/run/opengl-driver/lib:\$LD_LIBRARY_PATH
+    # Extract library paths from NIX_LDFLAGS
+    NIXLIBS=\$(echo \$NIX_LDFLAGS | grep -oP '(?<=-L)[^ ]+' | tr '\n' ':')
+    export LD_LIBRARY_PATH=\"/run/opengl-driver/lib:\${NIXLIBS}\${LD_LIBRARY_PATH:-}\"
     unset WAYLAND_DISPLAY
     export WINIT_UNIX_BACKEND=x11
-    exec ./target/release/symtropy \"\$@\"
-  " -- "$@"
+    exec ./target/release/symtropy $EXTRA_ARGS
+  "
