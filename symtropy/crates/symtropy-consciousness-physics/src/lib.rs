@@ -15,6 +15,7 @@
 //! 4. **Collective Φ → Global**: Civilization consciousness affects world parameters
 //! 5. **Bottleneck → Environment**: Agent's limiting factor triggers environmental response
 
+pub mod active_inference;
 pub mod convergence;
 pub mod coupling;
 #[cfg(feature = "consciousness-curvature")]
@@ -25,6 +26,7 @@ pub mod fep_gradient;
 pub mod harmony_field;
 #[cfg(feature = "consciousness-hdc")]
 pub mod hdc_context;
+pub mod prey;
 pub mod safety;
 pub mod sanctuary;
 pub mod spatial_hash;
