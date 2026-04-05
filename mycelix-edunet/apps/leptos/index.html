@@ -55,7 +55,7 @@
     <script id="holochain-bridge">
     (function() {
         window.__HC_STATUS = 'connecting';
-        var WS_URL = 'ws://localhost:8307';
+        var WS_URL = window.__HC_CONDUCTOR_URL || 'ws://localhost:8888';
         var TIMEOUT_MS = 3000;
         try {
             var ws = new WebSocket(WS_URL);
