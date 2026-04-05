@@ -1842,6 +1842,8 @@ pub struct SpinozistClassifier {
     feature_normalizer: Option<(Vec<f32>, Vec<f32>)>,
     hybrid_ensemble_weights: [f32; 2],
     hybrid_trained: bool,
+    // Per-class sub-centroids in full 16,384D for similarity-weighted voting
+    surface_subclusters: Option<Vec<(ContinuousHV, usize)>>,
 }
 
 impl SpinozistClassifier {
@@ -1896,6 +1898,7 @@ impl SpinozistClassifier {
             feature_normalizer: None,
             hybrid_ensemble_weights: [0.5, 0.5],
             hybrid_trained: false,
+            surface_subclusters: None,
         }
     }
 
@@ -2296,11 +2299,19 @@ impl SpinozistClassifier {
         self.fit_normalizer(&labeled);
         let normed: Vec<(Vec<f32>, usize)> = labeled.iter().map(|(f, c)| (self.norm_features(f), *c)).collect();
         self.train_multi_proto(&normed);
-        self.hybrid_trained = true;
-        eprintln!("[SpinozistClassifier] Hybrid trained: {} anchors, {} multi-protos, {} features",
-            self.anchor_hvs.len(),
-            self.multi_prototypes.as_ref().map(|p| p.len()).unwrap_or(0),
-            NUM_HYBRID_FEATURES);
+        // Train surface sub-centroids in full 16,384D for similarity-weighted voting.
+        // 5 sub-centroids per class via K-means captures within-class variance
+        // that a single centroid misses — closing the gap to k-NN.
+        self.train_surface_subclusters(&surface_hvs);
+
+        // Only use hybrid when training set is large enough for stable centroids.
+        // Small per-category ETHICS sets (250 samples) → fall through to classify_learned().
+        self.hybrid_trained = samples.len() >= 500;
+        if self.hybrid_trained {
+            eprintln!("[SpinozistClassifier] Hybrid trained: {} sub-centroids, {} samples",
+                self.surface_subclusters.as_ref().map(|s| s.len()).unwrap_or(0),
+                samples.len());
+        }
     }
 
     fn extract_hybrid_features_inner(&self, text: &str, surface_hv: &ContinuousHV) -> Vec<f32> {
@@ -2355,44 +2366,101 @@ impl SpinozistClassifier {
         self.multi_prototypes = Some(protos);
     }
 
+    /// Train per-class sub-centroids via K-means in full 16,384D.
+    fn train_surface_subclusters(&mut self, surface_hvs: &[(ContinuousHV, usize)]) {
+        let k_per_class = MULTI_PROTO_K; // 5 sub-centroids per class
+        let dim = HDC_DIMENSION;
+        let mut subclusters: Vec<(ContinuousHV, usize)> = Vec::new();
+
+        for cls in 0..3 {
+            let class_hvs: Vec<&ContinuousHV> = surface_hvs.iter()
+                .filter(|(_, c)| *c == cls).map(|(hv, _)| hv).collect();
+            let n = class_hvs.len();
+            if n == 0 {
+                for _ in 0..k_per_class {
+                    subclusters.push((ContinuousHV::zero(dim), cls));
+                }
+                continue;
+            }
+            // K-means in 16,384D: evenly-spaced init, 10 iterations
+            let mut cents: Vec<Vec<f32>> = (0..k_per_class)
+                .map(|i| class_hvs[(i * n) / k_per_class].values.clone()).collect();
+            for _ in 0..10 {
+                let mut acc = vec![vec![0.0f32; dim]; k_per_class];
+                let mut cnt = vec![0usize; k_per_class];
+                for hv in &class_hvs {
+                    let mut bi = 0;
+                    let mut bs = f32::NEG_INFINITY;
+                    for (c, cen) in cents.iter().enumerate() {
+                        let s: f32 = hv.values.iter().zip(cen.iter()).map(|(a, b)| a * b).sum();
+                        if s > bs { bs = s; bi = c; }
+                    }
+                    for (a, v) in acc[bi].iter_mut().zip(hv.values.iter()) { *a += v; }
+                    cnt[bi] += 1;
+                }
+                for c in 0..k_per_class {
+                    if cnt[c] > 0 {
+                        let nf = cnt[c] as f32;
+                        for v in &mut acc[c] { *v /= nf; }
+                        let norm: f32 = acc[c].iter().map(|v| v * v).sum::<f32>().sqrt();
+                        if norm > 1e-10 { for v in &mut acc[c] { *v /= norm; } }
+                        cents[c] = acc[c].clone();
+                    }
+                }
+            }
+            for cen in cents {
+                subclusters.push((ContinuousHV::from_vec(cen), cls));
+            }
+        }
+        self.surface_subclusters = Some(subclusters);
+    }
+
     pub fn classify_hybrid(&self, text: &str) -> (MoralVerdict, f32) {
         if !self.hybrid_trained { return (MoralVerdict::Neutral, 0.0); }
 
-        // Classify via surface encoder centroids in full 16,384D space.
-        // This preserves the full discriminative signal that dimensionality
-        // reduction destroys. The surface_protos are class-mean HVs computed
-        // from TextHdcEncoder (the same encoder that drives the 77% k-NN).
-        let protos = match &self.surface_protos {
-            Some(p) => p,
-            None => return (MoralVerdict::Neutral, 0.0),
+        let surface_hv = self.surface_encoder.encode(text);
+
+        // Similarity-weighted voting across per-class sub-centroids.
+        // Each sub-centroid votes for its class, weighted by similarity².
+        // This captures within-class variance that a single centroid misses.
+        let subclusters = match &self.surface_subclusters {
+            Some(s) => s,
+            None => {
+                // Fallback to single-centroid if subclusters not trained
+                let protos = match &self.surface_protos {
+                    Some(p) => p,
+                    None => return (MoralVerdict::Neutral, 0.0),
+                };
+                let sims = [
+                    surface_hv.similarity(&protos[0]),
+                    surface_hv.similarity(&protos[1]),
+                    surface_hv.similarity(&protos[2]),
+                ];
+                let best = if sims[1] > sims[0] && sims[1] > sims[2] { 1 }
+                    else if sims[2] > sims[0] { 2 } else { 0 };
+                let verdict = match best { 0 => MoralVerdict::Good, 1 => MoralVerdict::Bad, _ => MoralVerdict::Neutral };
+                return (verdict, 0.5);
+            }
         };
 
-        let surface_hv = self.surface_encoder.encode(text);
-        let sims = [
-            surface_hv.similarity(&protos[0]), // Good
-            surface_hv.similarity(&protos[1]), // Bad
-            surface_hv.similarity(&protos[2]), // Neutral
-        ];
-
-        let mut best = 0;
-        let mut second_best = f32::NEG_INFINITY;
-        for i in 1..3 {
-            if sims[i] > sims[best] {
-                second_best = sims[best];
-                best = i;
-            } else if sims[i] > second_best {
-                second_best = sims[i];
-            }
+        let mut class_votes = [0.0f32; 3];
+        for (subcentroid, cls) in subclusters {
+            let sim = surface_hv.similarity(subcentroid);
+            // similarity²-weighted voting (same as k-NN)
+            class_votes[*cls] += sim * sim;
         }
-        if best == 0 { second_best = sims[1].max(sims[2]); }
 
-        let margin = (sims[best] - second_best).max(0.0);
+        let total: f32 = class_votes.iter().sum();
+        let best = if class_votes[1] > class_votes[0] && class_votes[1] > class_votes[2] { 1 }
+            else if class_votes[2] > class_votes[0] { 2 } else { 0 };
+        let confidence = if total > 0.0 { class_votes[best] / total } else { 0.0 };
+
         let verdict = match best {
             0 => MoralVerdict::Good,
             1 => MoralVerdict::Bad,
             _ => MoralVerdict::Neutral,
         };
-        (verdict, margin.min(1.0))
+        (verdict, confidence.min(1.0))
     }
 }
 
