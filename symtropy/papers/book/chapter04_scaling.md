@@ -1,0 +1,73 @@
+# Chapter 4: From Twenty to One Thousand
+
+*In which we discover that the engine is not a toy, that the bottleneck is collision detection, and that cooperation gets stronger at scale.*
+
+---
+
+## The Scaling Problem
+
+Every experiment in Chapters 5 through 11 uses 20-24 agents. This is typical of agent-based modeling — NetLogo tutorials use 50, Mesa examples use 100, and published ABM papers rarely exceed a few hundred. But a claim about cooperation as "thermodynamic inevitability" carries an implicit assumption: that the result holds at scale. Twenty agents in a 100×100 arena is a sparse, simple system. Does cooperation survive density?
+
+## The Spatial Hash
+
+The engine's main computational bottleneck is the O(n²) harmony resonance loop: every pair of agents must be checked for proximity and resonance. At N=20, this is 190 pairs — trivial. At N=1,000, it is 499,500 pairs per tick at 64 Hz — 32 million checks per second.
+
+We implemented a grid-based spatial hash (Chapter 1 of the code, `spatial_hash.rs`) with cell size equal to the harmony range. This guarantees that all potential cooperation partners are in the same cell or an adjacent cell — a 3×3 neighborhood in 2D, 3×3×3 in 3D. The check reduces from O(n²) to O(n×k), where k is the average number of agents per cell neighborhood.
+
+Seven unit tests verify correctness, including 3D operation, negative coordinates, and a 1,000-agent population test confirming that queries return a proper subset of the total population.
+
+## The Benchmark
+
+We benchmarked both brute-force and spatial-hash versions at population sizes from 10 to 1,000:
+
+| N | Brute Force (ms/tick) | Spatial Hash (ms/tick) | Speedup |
+|---|----------------------|----------------------|---------|
+| 10 | 0.02 | 0.04 | 0.5× (overhead) |
+| 50 | 0.64 | 0.62 | 1.0× |
+| 100 | 2.67 | 2.40 | 1.1× |
+| 200 | 14.17 | 7.88 | 1.8× |
+| 500 | 165.58 | 59.69 | 2.8× |
+| 1,000 | (skipped) | 444.20 | — |
+
+The spatial hash provides meaningful speedup above N=200 (1.8×) and becomes essential at N=500 (2.8×). At N=1,000, brute force would take approximately 2,500 ms/tick (estimated from the O(n²) trend) — the spatial hash achieves 444 ms/tick.
+
+However, 444 ms/tick is far from real-time (which would require <16 ms at 64 Hz). The bottleneck is not the harmony loop — it's the physics world step. GJK collision detection on 1,000 spheres dominates the tick time. The spatial hash fixed the harmony bottleneck; the physics broadphase (LBVH) handles collision pairs, but EPA penetration resolution on all overlapping spheres remains expensive.
+
+For the book's purposes, 444 ms/tick at N=1,000 means a full 8,000-tick experiment takes approximately 60 minutes in release mode. This is feasible for research (we ran it) but not for real-time gameplay.
+
+## Finding 37: Cooperation at Scale
+
+The defining experiment ran 100, 250, 500, and 1,000 agents with spatial hashing, 4,000 ticks, five seeds each:
+
+| N | Survival | Clusters | Mean Cluster Size | Wall Time |
+|---|----------|----------|-------------------|-----------|
+| 100 | 64% | 13.6 | 4.8 | 17s |
+| 250 | 49% | 13.2 | 9.5 | 103s |
+| 500 | 74% | 17.2 | 22.2 | 262s |
+| **1,000** | **96%** | **13.8** | **72.4** | **738s** |
+
+Three observations:
+
+**Cooperation strengthens at scale.** Survival increases from 64% at N=100 to 96% at N=1,000. More agents means more potential cooperation partners within harmony range, which means more resonance regeneration per agent. The cooperation benefit scales super-linearly with density.
+
+**Cluster count is stable.** The number of clusters stays at approximately 14 regardless of population. This is a structural property of the arena: with 4+ energy wells distributed across a 400×400 space, the well geometry creates 3-4 natural basins of attraction, and agents within each basin form 3-4 sub-clusters within harmony range. The cluster count reflects arena geometry, not population.
+
+**Cluster size scales linearly.** Mean cluster size is approximately N/14 — each cluster absorbs a proportional share of the population. There is no hard "Dunbar number" (a maximum group size beyond which clusters split). The limit is spatial, not cognitive: how many agents fit within harmony range of each other near a well.
+
+The N=250 dip (49% survival) is the "scaling valley": enough agents to create well competition, not enough density for universal cooperation. At N=100, agents are sparse enough that each finds a well without much competition. At N=1,000, agents are dense enough that cooperation partners are always nearby. At N=250, agents compete for wells but can't always find partners — the worst of both regimes.
+
+## Determinism
+
+All results in this book are deterministically reproducible. A lock-in test (`tests/determinism_lockin.rs`) runs a 500-tick simulation with 8 agents twice using the same seed and asserts bitwise identical final positions, energies, and cooperation counts. Both the lock-in test and a different-seeds-different-results test pass.
+
+This means every experiment can be reproduced exactly:
+
+```bash
+cargo run --example cooperation_1000 --release
+```
+
+The same seed produces the same output, every time, on the same platform. (Cross-platform determinism is not guaranteed due to floating-point implementation differences, but single-platform reproducibility is verified.)
+
+---
+
+*Next: Chapter 5 — Cooperation as Thermodynamic Necessity*
