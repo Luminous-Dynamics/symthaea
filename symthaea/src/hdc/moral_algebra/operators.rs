@@ -41,6 +41,10 @@ pub struct MoralAlgebra {
     /// Optional learned moral prototype classifier (trained on Social Chemistry etc.)
     learned_classifier: Option<super::super::moral_prototypes::MoralPrototypeClassifier>,
 
+    /// Optional Spinozist classifier (72-77% on Social Chemistry with affect interpretability).
+    /// Arc-wrapped: SpinozistClassifier contains ExemplarStore (5000 HVs), too expensive to clone.
+    spinozist: Option<std::sync::Arc<super::super::spinozist_geometry::SpinozistClassifier>>,
+
     /// Cached standard obligations (built once, reused for every deontological evaluation)
     standard_rules_cache: ObligationRuleSet,
 }
@@ -81,6 +85,7 @@ impl MoralAlgebra {
             consent_hvs,
             dim,
             learned_classifier: None,
+            spinozist: None,
             standard_rules_cache: ObligationRuleSet { rules: Vec::new() },
         };
         // Build and cache standard obligations once (avoids 112 string allocations per eval)
@@ -91,6 +96,11 @@ impl MoralAlgebra {
     /// Create with default dimension
     pub fn default_dim() -> Self {
         Self::new(MORAL_DIM)
+    }
+
+    /// Set the Spinozist classifier (5th ensemble signal).
+    pub fn set_spinozist(&mut self, s: super::super::spinozist_geometry::SpinozistClassifier) {
+        self.spinozist = Some(std::sync::Arc::new(s));
     }
 
     /// Get dimension
@@ -1172,26 +1182,40 @@ impl MoralAlgebra {
 
         let has_learned = learned_verdict.is_some();
 
-        // Voting: per-category weight tuning
+        // 5. Spinozist signal (if classifier available)
+        let (spinozist_verdict, spinozist_confidence) = if let Some(ref spin) = self.spinozist {
+            let (v, c) = spin.classify(text);
+            (Some(v), Some(c))
+        } else {
+            (None, None)
+        };
+        let has_spinozist = spinozist_verdict.is_some();
+
+        // Voting: per-category weight tuning (5 signals)
         // Different ETHICS categories benefit from different signal balance.
-        let (w_hdc, w_intent, w_deonto, w_learned) = if has_learned {
+        let (w_hdc, w_intent, w_deonto, w_learned, w_spinozist) = if has_spinozist && has_learned {
             match category_hint {
-                // Commonsense: intent is strongest, learned adds social norms context
-                Some("commonsense") => (0.15, 0.35, 0.15, 0.35),
-                // Justice: deontological rules + learned norms are key signals
-                Some("justice") => (0.15, 0.20, 0.30, 0.35),
-                // Deontology: rule-based + learned, intent less reliable
-                Some("deontology") => (0.15, 0.20, 0.30, 0.35),
-                // Virtue: never reaches here (skip_learned), but just in case
-                Some("virtue") => (0.3, 0.4, 0.3, 0.0),
-                // Default (Social Chemistry, Moral Stories, SCRUPLES, etc.):
-                // Learned classifier gets low weight without a category hint
-                // because the Social Chemistry-trained classifier is domain-mismatched
-                // for long narrative text (e.g. SCRUPLES).
-                _ => (0.25, 0.35, 0.30, 0.10),
+                Some("commonsense") => (0.10, 0.30, 0.15, 0.25, 0.20),
+                Some("justice") => (0.10, 0.15, 0.25, 0.25, 0.25),
+                Some("deontology") => (0.10, 0.15, 0.25, 0.25, 0.25),
+                Some("virtue") => (0.20, 0.30, 0.20, 0.00, 0.30),
+                _ => (0.15, 0.25, 0.20, 0.10, 0.30),
+            }
+        } else if has_spinozist {
+            match category_hint {
+                Some("virtue") => (0.20, 0.30, 0.20, 0.00, 0.30),
+                _ => (0.20, 0.30, 0.20, 0.00, 0.30),
+            }
+        } else if has_learned {
+            match category_hint {
+                Some("commonsense") => (0.15, 0.35, 0.15, 0.35, 0.0),
+                Some("justice") => (0.15, 0.20, 0.30, 0.35, 0.0),
+                Some("deontology") => (0.15, 0.20, 0.30, 0.35, 0.0),
+                Some("virtue") => (0.3, 0.4, 0.3, 0.0, 0.0),
+                _ => (0.25, 0.35, 0.30, 0.10, 0.0),
             }
         } else {
-            (0.3, 0.4, 0.3, 0.0)
+            (0.3, 0.4, 0.3, 0.0, 0.0)
         };
 
         let mut votes: std::collections::HashMap<&str, f32> = std::collections::HashMap::new();
@@ -1237,6 +1261,17 @@ impl MoralAlgebra {
             *votes.entry(learned_key).or_insert(0.0) += w_learned;
         }
 
+        // Spinozist vote (confidence-weighted)
+        if let (Some(sv), Some(sc)) = (&spinozist_verdict, &spinozist_confidence) {
+            let spin_key = match sv {
+                MoralVerdict::Good => "good",
+                MoralVerdict::Bad => "bad",
+                MoralVerdict::Neutral => "neutral",
+                MoralVerdict::ConsentViolation => "consent_violation",
+            };
+            *votes.entry(spin_key).or_insert(0.0) += w_spinozist * (1.0 + sc.min(0.5));
+        }
+
         // Determine winner
         let (winner, max_vote) = votes
             .iter()
@@ -1280,6 +1315,8 @@ impl MoralAlgebra {
             satisfactions: deonto.satisfactions,
             learned_verdict,
             learned_confidence,
+            spinozist_verdict,
+            spinozist_confidence,
             final_verdict,
             confidence,
         }

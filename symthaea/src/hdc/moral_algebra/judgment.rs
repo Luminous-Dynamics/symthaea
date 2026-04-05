@@ -102,6 +102,10 @@ pub struct EnsembleJudgment {
     pub learned_verdict: Option<MoralVerdict>,
     /// Learned prototype confidence (best - second-best similarity)
     pub learned_confidence: Option<f32>,
+    /// Spinozist classifier verdict (if available)
+    pub spinozist_verdict: Option<MoralVerdict>,
+    /// Spinozist confidence
+    pub spinozist_confidence: Option<f32>,
     /// Final ensemble verdict (weighted vote)
     pub final_verdict: MoralVerdict,
     /// Confidence in final verdict (0.0 to 1.0)
@@ -121,7 +125,11 @@ impl EnsembleJudgment {
             .learned_verdict
             .map(|v| v == self.final_verdict)
             .unwrap_or(true);
-        intent_matches && deonto_matches && hdc_matches && learned_matches
+        let spinozist_matches = self
+            .spinozist_verdict
+            .map(|v| v == self.final_verdict)
+            .unwrap_or(true);
+        intent_matches && deonto_matches && hdc_matches && learned_matches && spinozist_matches
     }
 
     /// Get a human-readable explanation of the verdict
