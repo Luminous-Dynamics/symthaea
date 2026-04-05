@@ -1,0 +1,87 @@
+# Chapter 14: Seven Failed Rescues
+
+*In which we try every environmental modification we can imagine to save our thesis, and each one confirms the same uncomfortable truth.*
+
+---
+
+## The Rescue Attempts
+
+Finding 46 did not kill our thesis cleanly. It raised a possibility — that cooperation was by-product mutualism — but left room for the counterargument that the *environment* was too easy. Maybe cooperation becomes necessary under harsher conditions. Maybe the FEP gradient becomes indispensable when resources are scarce, volatile, or hidden.
+
+We spent seven experiments testing this. Each was designed to find the environmental regime where the FEP gradient's social component transitions from liability to necessity. Each failed.
+
+## Rescue 1: Make Wells Scarce (F48)
+
+If cooperation is unnecessary because wells are too generous, reduce the generosity. We swept well capacity from 2,500 joules to 250 joules — a ten-fold reduction.
+
+WELL_ONLY agents survived at 20 out of 20 at every capacity. Even at 250 joules — one-tenth of the original — purely selfish well-seeking was sufficient. The FEP gradient remained the worst controller at every scarcity level.
+
+The wells were not too generous. A single agent standing at a well, even a tiny one, regenerates enough energy to survive indefinitely. The well regeneration rate (0.12 joules per tick) exceeds the per-agent share of maintenance costs. Scarcity doesn't help because individual well access is always sufficient.
+
+## Rescue 2: Make Wells Volatile (F50)
+
+If static wells are too predictable, make them cycle on and off. We tested four volatility regimes: stable (always on), seasonal (alternating 1,500-tick on/off cycles), random (50% chance of flipping every 500 ticks), and migrating (wells physically relocate every 1,500 ticks).
+
+Under stable, seasonal, and random volatility, WELL_ONLY agents survived at 20 out of 20. Agents simply waited at well locations during off-periods, surviving on initial energy reserves and occasional resonance from nearby waiting agents.
+
+Migrating resources produced the only marginal result in the entire rescue series. When wells physically moved, WELL_ONLY survival dropped to 9.3 and FEP survival matched at 9.9 — a small, non-significant convergence (d = 0.35). For the first time, the social gradient was not a clear liability. But it was not a clear asset either. Both controllers suffered equally under migration because both had to search for relocated wells.
+
+## Rescue 3: Make Wells Hidden (F49)
+
+If agents can find wells too easily, make the wells invisible. We tested four visibility levels: full perception (200 units), short-range (30 units), completely hidden (0 units — agents must stumble onto wells), and a social information condition (wells invisible but high-energy agents attract the FEP gradient).
+
+WELL_ONLY agents survived at 20 out of 20 even when wells were completely hidden. The arena was 100 by 100 units. The well interaction radius was 35 units. A random walker in a 100-unit arena encounters a 35-unit-radius target frequently enough to survive. The arena was simply too small for hidden resources to matter.
+
+The FEP gradient performed worse than WELL_ONLY under every visibility condition, including hidden (16.8 vs 20.0, d = 1.39). Even when wells were invisible, the social component hurt more than it helped.
+
+## Rescue 4: Require Threshold Co-Location (F51)
+
+If cooperation fails because individual well access is too easy, make wells require multiple agents. We implemented a threshold mechanism: wells only dispense energy when two, three, or four agents are simultaneously present within the well radius.
+
+WELL_ONLY agents survived at 20 out of 20 at every threshold, including the strictest (four agents required). The mechanism: twenty agents seeking three wells naturally produces six to seven agents per well. The threshold was always satisfied as a side effect of shared attraction to the same spatial points.
+
+The FEP gradient performed worst again, because its social component scattered agents across the arena rather than concentrating them at wells. At threshold four, FEP managed 10.8 out of 20 while WELL_ONLY achieved a perfect 20.
+
+## Rescue 5: Require Compatible Partners (F52)
+
+If the threshold test failed because any agents co-locating is sufficient, require *compatible* partners. We implemented resonance-gated wells: a well only provides energy to an agent if that agent has a partner at the same well whose harmony resonance exceeds 0.5 or 0.7.
+
+The GREEDY controller dominated at 16.5 to 16.9 across all resonance gates. Its eight-direction lookahead naturally optimized for positions with both well access and resonant partners. FEP achieved 10.9 at the strictest gate (0.7), marginally better than WELL_ONLY's 9.3, but the difference was not significant (d = -0.20, p = 0.57).
+
+The problem: with twenty agents drawn from six harmony profiles, the probability of at least one compatible pair among six to seven agents at a well is high. Dense well-clustering produces compatible pairs by chance, without any agent seeking compatibility.
+
+## Rescue 6: Remove Wells Entirely (F53)
+
+The nuclear option. If wells make individual survival too easy, remove them. Make resonance — social energy from compatible proximity — the only energy source. Surely, in this regime, social seeking would become indispensable.
+
+It did not. STATIONARY agents — who never move — survived at 19.5 out of 20. FEP agents survived at 11.4. The FEP gradient was *significantly worse* than doing nothing (d = 1.80, p < 0.0001).
+
+The mechanism: in an 80-by-80 arena with 20 agents, initial random placement produces enough proximity for passive resonance encounters. Agents that sit still conserve the energy that moving agents waste on locomotion. The initial energy budget (200 joules at 0.15 per tick = 1,333 ticks of buffer) provides ample time for passive resonance to accumulate.
+
+The GREEDY controller survived at 19.9 by optimizing direction for resonance proximity — but STATIONARY was nearly as good, confirming that in this arena, optimal behavior is *inaction*.
+
+## Rescue 7: The FEP Gradient as Informational Drive
+
+Across all seven rescues, a pattern emerged. The FEP gradient's social component is not a cooperation mechanism. It is an *informational drive* — a compulsion to seek social contact that competes with basic metabolic efficiency. In environments where metabolic efficiency determines survival, the informational drive is a liability.
+
+The drive becomes approximately neutral (not beneficial — just not harmful) only under one condition: migrating resources (F50, d = 0.35). When resource locations change, the social gradient provides weak information about where other agents are moving, which correlates weakly with where resources have appeared. This is the producer-scrounger dynamic from behavioral ecology: the social gradient enables information scrounging from agents who have found resources.
+
+But even in this best case, the social gradient does not *outperform* well-seeking. It merely converges with it. The FEP gradient's social component is, at its very best, neutral.
+
+## What the Rescues Taught Us
+
+Seven experiments. Seven failures. Each confirmed the same mechanism from a different angle:
+
+1. Individual resource access is always sufficient (F48)
+2. Temporal gaps don't require cooperation; they require waiting (F50)
+3. Spatial uncertainty doesn't require social information; it requires random exploration (F49)
+4. Synchronized access is free when everyone wants the same thing (F51)
+5. Compatible pairing is free when populations are dense (F52)
+6. Even without resources, passive proximity suffices (F53)
+7. The social drive hurts more than it helps in every regime
+
+The thesis cannot be rescued because the thesis was wrong. Cooperation in this engine is not a mechanism; it is a geometry.
+
+---
+
+*Next: Chapter 15 — Resource Geometry: The True Determinant of Social Structure*
