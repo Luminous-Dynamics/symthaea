@@ -46,7 +46,7 @@ pub fn setup_menu(
     // Camera for UI rendering (Bevy UI requires a camera entity)
     commands.spawn((Camera2d, MenuUi));
 
-    // Root container — full screen, centered column with dark panel
+    // Root container — full screen, centered
     commands.spawn((
         Node {
             width: Val::Percent(100.0),
@@ -59,54 +59,68 @@ pub fn setup_menu(
         BackgroundColor(Color::srgba(0.02, 0.02, 0.04, 1.0)),
         MenuUi,
     )).with_children(|parent| {
-        // ═══ TITLE ═══════════════════════════════════════
-        parent.spawn((
+        // Inner block — left-aligned text within centered container
+        parent.spawn(Node {
+            flex_direction: FlexDirection::Column,
+            align_items: AlignItems::FlexStart, // left-align the text
+            width: Val::Px(420.0),
+            ..default()
+        }).with_children(|inner| {
+        // ═══ TITLE (centered within block) ═══════════════
+        inner.spawn((
             Text::new("SYMTROPY"),
             TextFont { font_size: 56.0, ..default() },
             TextColor(Color::srgb(0.3, 0.95, 0.85)),
+            Node { align_self: AlignSelf::Center, ..default() },
         ));
 
-        parent.spawn((
+        inner.spawn((
             Text::new("consciousness-first technology"),
             TextFont { font_size: 16.0, ..default() },
             TextColor(Color::srgba(0.5, 0.75, 0.7, 0.7)),
-            Node { margin: UiRect::bottom(Val::Px(40.0)), ..default() },
+            Node { margin: UiRect::bottom(Val::Px(40.0)), align_self: AlignSelf::Center, ..default() },
         ));
 
         // ═══ EXPERIENCE ENTRIES ══════════════════════════
         for (i, exp) in registry.experiences.iter().enumerate() {
             let is_selected = i == registry.selected;
-            let alpha = if is_selected { 1.0 } else { 0.6 };
-            let prefix = if is_selected { "▸ " } else { "  " };
+            let prefix = if is_selected { "> " } else { "  " };
 
-            // Experience name
-            parent.spawn((
+            // Experience name — selected: full color, unselected: muted slate
+            let (r, g, b, a) = if is_selected {
+                (exp.icon_color[0], exp.icon_color[1], exp.icon_color[2], 1.0)
+            } else {
+                (0.35, 0.45, 0.45, 0.7) // muted slate — legible without straining
+            };
+
+            inner.spawn((
                 Text::new(format!("{}[{}]  {}", prefix, i + 1, exp.name)),
                 TextFont { font_size: 22.0, ..default() },
-                TextColor(Color::srgba(exp.icon_color[0], exp.icon_color[1], exp.icon_color[2], alpha)),
+                TextColor(Color::srgba(r, g, b, a)),
                 Node { margin: UiRect::bottom(Val::Px(4.0)), ..default() },
                 SelectionIndicator(i),
             ));
 
             // Subtitle
-            parent.spawn((
+            let sub_a = if is_selected { 0.6 } else { 0.4 };
+            inner.spawn((
                 Text::new(format!("      {}", exp.subtitle)),
                 TextFont { font_size: 13.0, ..default() },
-                TextColor(Color::srgba(0.5, 0.6, 0.55, alpha * 0.6)),
+                TextColor(Color::srgba(0.45, 0.55, 0.5, sub_a)),
                 Node { margin: UiRect::bottom(Val::Px(16.0)), ..default() },
                 SelectionIndicator(i),
             ));
         }
 
         // Settings option
-        parent.spawn((
+        inner.spawn((
             Text::new("  [S]  Settings"),
             TextFont { font_size: 18.0, ..default() },
             TextColor(Color::srgba(0.4, 0.55, 0.5, 0.5)),
             Node { margin: UiRect::bottom(Val::Px(8.0)), ..default() },
         ));
 
-        parent.spawn((
+        inner.spawn((
             Text::new("  [Esc]  Quit"),
             TextFont { font_size: 18.0, ..default() },
             TextColor(Color::srgba(0.4, 0.5, 0.45, 0.5)),
@@ -114,20 +128,21 @@ pub fn setup_menu(
         ));
 
         // ═══ FOOTER ═════════════════════════════════════
-        parent.spawn((
-            Text::new("Powered by Symthaea · Mycelix · Eight Harmonies"),
+        inner.spawn((
+            Text::new("Powered by Symthaea | Mycelix | Eight Harmonies"),
             TextFont { font_size: 11.0, ..default() },
             TextColor(Color::srgba(0.35, 0.5, 0.45, 0.5)),
         ));
 
         // Version
-        parent.spawn((
+        inner.spawn((
             Text::new("v0.1.0"),
             TextFont { font_size: 10.0, ..default() },
             TextColor(Color::srgba(0.3, 0.4, 0.35, 0.4)),
-            Node { margin: UiRect::top(Val::Px(4.0)), ..default() },
+            Node { margin: UiRect::top(Val::Px(4.0)), align_self: AlignSelf::Center, ..default() },
         ));
-    });
+        }); // close inner block
+    }); // close root
 
     // Transition fade overlay (initially transparent)
     commands.spawn((
@@ -171,14 +186,16 @@ pub fn menu_input_system(
     if keyboard.just_pressed(KeyCode::Digit2) && count > 1 { registry.selected = 1; }
     if keyboard.just_pressed(KeyCode::Digit3) && count > 2 { registry.selected = 2; }
 
-    // Update visual selection
+    // Update visual selection — selected: experience color, unselected: muted slate
     for (indicator, mut color) in indicators.iter_mut() {
         let exp = &registry.experiences[indicator.0];
         let is_selected = indicator.0 == registry.selected;
-        let alpha = if is_selected { 1.0 } else { 0.4 };
-        *color = TextColor(Color::srgba(
-            exp.icon_color[0], exp.icon_color[1], exp.icon_color[2], alpha
-        ));
+        let (r, g, b, a) = if is_selected {
+            (exp.icon_color[0], exp.icon_color[1], exp.icon_color[2], 1.0)
+        } else {
+            (0.35, 0.45, 0.45, 0.7)
+        };
+        *color = TextColor(Color::srgba(r, g, b, a));
     }
 
     // Launch: Enter or N — starts transition animation
