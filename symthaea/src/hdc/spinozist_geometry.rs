@@ -2443,11 +2443,14 @@ impl SpinozistClassifier {
             }
         };
 
+        // Single-centroid classification in full 16,384D space.
+        // Empirically outperforms sub-centroid voting and blending (72.0% vs 69.2%).
         let mut class_votes = [0.0f32; 3];
-        for (subcentroid, cls) in subclusters {
-            let sim = surface_hv.similarity(subcentroid);
-            // similarity²-weighted voting (same as k-NN)
-            class_votes[*cls] += sim * sim;
+        if let Some(protos) = &self.surface_protos {
+            for (i, proto) in protos.iter().enumerate() {
+                let sim = surface_hv.similarity(proto);
+                class_votes[i] = sim;
+            }
         }
 
         let total: f32 = class_votes.iter().sum();

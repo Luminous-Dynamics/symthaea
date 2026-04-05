@@ -1490,7 +1490,9 @@ fn benchmark_spinozist_ethics(
             })
             .collect();
         classifier.train_prototypes(&train_samples);
-        classifier.train_hybrid(&train_samples);
+        // Don't call train_hybrid for small per-category sets — it overwrites
+        // the surface_protos from the larger Social Chemistry training and
+        // centroid classification is unstable with <500 samples.
 
         let start = Instant::now();
         let mut correct = 0;
