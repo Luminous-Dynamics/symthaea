@@ -1,0 +1,252 @@
+% Epistemic Verification of Physics Claims via Hyperdimensional Structural Search
+% Target: Frontiers in Blockchain (DeSci section)
+% Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+% SPDX-License-Identifier: CC-BY-4.0
+
+\documentclass[letterpaper,11pt]{article}
+\usepackage[utf8]{inputenc}
+\usepackage{times}
+\usepackage{hyperref}
+\usepackage{natbib}
+\usepackage{booktabs}
+\usepackage{amsmath,amssymb}
+\usepackage{graphicx}
+\usepackage[margin=1in]{geometry}
+\usepackage{multicol}
+
+\title{Epistemic Verification of Physics Claims via Hyperdimensional Structural Search}
+
+\author{
+Tristan Stoltz \\
+Luminous Dynamics \\
+\texttt{tristan.stoltz@evolvingresonantcocreationism.com}
+}
+
+\date{April 2026}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+We present an epistemic verification engine for scientific claims that combines
+Hyperdimensional Computing (HDC) structural search with a three-dimensional
+epistemic classification framework (LEM Cube). Our system encodes 208 physics
+equations across 20 domains as 16,384-dimensional hypervectors, enabling
+structural analog discovery via skeleton encoding---a technique that strips
+variable names to reveal pure mathematical structure. We demonstrate the system
+on 10 high-profile case studies organized in 5 paired comparisons, including
+the cold fusion/NIF ignition contrast, the LK-99/nickelate superconductor
+divergence, and the Sch\"on/Dias fraud pattern. The system correctly classifies
+verified discoveries (LIGO, Higgs) as E4/N3/M3, debunked claims (cold fusion,
+EMDrive) as E0/N0/M0, and active controversies (Hubble tension) as E4/N2/M3.
+We additionally report a nuclear discovery engine calibrated against 70 AME2020
+reference nuclei that predicts a superheavy stability island centered at
+Z=115-120, N=180, consistent with published theoretical predictions. The
+complete system---including physics catalog, discovery bridge, nuclear engine,
+and decentralized science portal---is open source under AGPL-3.0.
+\end{abstract}
+
+\section{Introduction}
+
+The reproducibility crisis in science is well-documented: up to 70\% of
+biomedical studies fail replication \citep{ioannidis2005}, fraudulent
+publications are outpacing legitimate growth \citep{nature2025fraud}, and 2.6\%
+of 2025 papers contain AI-hallucinated citations \citep{nature2026citations}.
+Existing Decentralized Science (DeSci) platforms address publishing and funding
+but lack computational verification of claims against established physics
+\citep{desci2025frontier}.
+
+We present three contributions:
+
+\begin{enumerate}
+\item A \textbf{physics equation catalog} of 208 landmark equations encoded as
+      16,384-dimensional continuous hypervectors (ContinuousHV) using
+      Hyperdimensional Computing (HDC), enabling structural analog discovery
+      across 20 physics domains.
+
+\item A \textbf{discovery bridge} that classifies physics predictions via the
+      LEM Cube---a three-dimensional epistemic framework with Empirical (E0--E4),
+      Normative (N0--N3), and Materiality (M0--M3) axes.
+
+\item A \textbf{nuclear discovery engine} calibrated against 70 AME2020
+      reference nuclei, predicting superheavy element stability via
+      Bethe-Weizs\"acker SEMF + Woods-Saxon shell model.
+\end{enumerate}
+
+\section{Method}
+
+\subsection{Hyperdimensional Equation Encoding}
+
+Each equation is encoded via four parallel channels:
+
+\begin{enumerate}
+\item \textbf{Full encoding}: Recursive AST traversal with role-binding.
+      Each node type (Field, Constant, DiffOperator, Sum, Product, Exponential,
+      Power) gets a deterministic role vector. Children are position-bound to
+      preserve ordering.
+
+\item \textbf{Skeleton encoding}: Names stripped, leaving pure operator
+      structure. This enables cross-domain analogy: the Helmholtz and
+      Schr\"odinger equations have \emph{identical skeletons} ($\nabla^2\psi +
+      k^2\psi = 0$) despite different physics domains.
+
+\item \textbf{Symmetry encoding}: Lie groups (SO(n), SU(n), U(1), Lorentz,
+      Poincar\'e) and discrete symmetries (C, P, T, CPT, $\mathbb{Z}_2$)
+      encoded via algebra dimension scaling.
+
+\item \textbf{Dimensional encoding}: 7 SI base dimensions as orthogonal
+      basis vectors, scaled by exponent.
+\end{enumerate}
+
+Similarity is computed as a weighted combination:
+\begin{equation}
+S = 0.4 \cdot S_{\text{skeleton}} + 0.3 \cdot S_{\text{symmetry}} + 0.2 \cdot S_{\text{dimensional}} + 0.1 \cdot S_{\text{full}}
+\end{equation}
+
+\subsection{LEM Cube Classification}
+
+The LEM Cube assigns three orthogonal epistemic coordinates:
+
+\begin{itemize}
+\item \textbf{E-axis (Empirical)}: E0 (unverifiable) through E4 (publicly
+      reproducible), determined by simulation confidence and data availability.
+\item \textbf{N-axis (Normative)}: N0 (personal) through N3 (axiomatic),
+      determined by catalog similarity---high similarity to known equations
+      implies higher normative authority.
+\item \textbf{M-axis (Materiality)}: M0 (ephemeral) through M3 (foundational),
+      determined by the physics domain.
+\end{itemize}
+
+\section{Catalog}
+
+The catalog contains 208 equations across 20 physics domains (Table~\ref{tab:domains}).
+
+\begin{table}[h]
+\centering
+\caption{Equation catalog coverage by domain.}
+\label{tab:domains}
+\begin{tabular}{lr|lr}
+\toprule
+Domain & Count & Domain & Count \\
+\midrule
+Classical Mechanics & 14 & Optics & 8 \\
+Electromagnetism & 13 & Condensed Matter & 14 \\
+General Relativity & 12 & Particle Physics & 6 \\
+Quantum Mechanics & 17 & Modified Gravity & 3 \\
+Quantum Field Theory & 4 & Information Theory & 14 \\
+Statistical Mechanics & 13 & Biophysics & 9 \\
+Fluid Dynamics & 7 & Acoustics & 3 \\
+Cosmology & 6 & Plasma Physics & 11 \\
+Nuclear Physics & 9 & Mathematics & 4 \\
+Thermodynamics & 18 & Astrophysics & 6 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Case Studies}
+
+We demonstrate the system on 10 case studies in 5 paired comparisons
+(Table~\ref{tab:cases}). Each pair contrasts a verification failure with a
+verification success using the same physics.
+
+\begin{table}[h]
+\centering
+\caption{Case studies with LEM classifications.}
+\label{tab:cases}
+\begin{tabular}{lcccp{5cm}}
+\toprule
+Case & E & N & M & Verdict \\
+\midrule
+Cold Fusion (1989) & 0 & 0 & 0 & Never replicated; Gamow factor $\sim 10^{-2700}$ \\
+NIF Ignition (2022--25) & 4 & 3 & 3 & Q: 1.54 $\to$ 4.13; 8 ignitions \\
+\midrule
+LK-99 (2023) & 0 & 0 & 0 & Cu$_2$S impurity; debunked in 3 weeks \\
+Nickelates (2023--25) & 3 & 2 & 2 & Multiple groups; SLAC ambient pressure \\
+\midrule
+Sch\"on (2002) & 0 & 2 & 0 & Identical noise; 25+ retractions \\
+Dias (2020--23) & 0 & 2 & 0 & Same pattern; 5 retractions \\
+\midrule
+LIGO GW150914 & 4 & 3 & 3 & SNR=24; false alarm $< 1/203{,}000$ yr \\
+Higgs boson (2012) & 4 & 3 & 3 & ATLAS+CMS; 5.9$\sigma$ \\
+\midrule
+Hubble Tension & 4 & 2 & 3 & Both sides E4; 5$\sigma$ discrepancy \\
+EMDrive & 0 & 0 & 0 & Conservation violation; thrust=0 shielded \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Structural Search Results}
+
+For the Lazar ``Gravity-A'' claim, the top-5 structural neighbors are:
+Heat Equation (0.629), Yukawa Potential (0.603), Schwarzschild Metric (0.583),
+de Sitter Metric (0.581), FLRW Metric (0.579). The claim sits between nuclear
+force and gravitational field equations at moderate similarity ($\sim$0.6),
+indicating a structural analog exists but no exact match.
+
+For the Art's Parts metamaterial, the nearest neighbor is the Waveguide
+Dispersion Relation at 0.915 similarity---the claimed physics is textbook
+optics. ORNL (2022) confirmed the physical sample fails.
+
+\section{Nuclear Discovery}
+
+The nuclear discovery engine combines Bethe-Weizs\"acker SEMF with Woods-Saxon
+shell model corrections, calibrated against 70 AME2020 reference nuclei. A
+systematic sweep of Z=110-120, N=170-190 reveals a stability island centered at
+Z=115, N=180 with shell corrections -17 to -23 MeV, consistent with published
+predictions by M\"oller et al. and Oganessian \& Utyonkov.
+
+\section{Discussion}
+
+\paragraph{Limitations.} The SEMF + simplified shell model is educational, not
+research-grade; calibrated predictions carry $\sigma > 5$ MeV uncertainty for
+superheavy elements. The structural search uses name-hash encoding for 106 of
+208 equations, limiting skeleton clustering accuracy for those entries.
+
+\paragraph{Comparison.} No existing DeSci platform (DeSci Labs, ResearchHub,
+Bio Protocol) performs computational verification of claims against a physics
+equation catalog. ResearchHub's AI reviewer catches math errors; our system
+identifies structural analogs across 20 domains.
+
+\section{Conclusion}
+
+We have demonstrated that hyperdimensional structural search, combined with
+multi-dimensional epistemic classification, provides a practical framework for
+automated scientific claim verification. The system correctly distinguishes
+verified discoveries, debunked claims, fraudulent publications, and active
+controversies. The open-source implementation at
+\url{https://desci.mycelix.net} serves as both a DeSci portal and an
+educational physics resource.
+
+\bibliographystyle{plainnat}
+
+\begin{thebibliography}{99}
+\bibitem[Ioannidis(2005)]{ioannidis2005} Ioannidis, J.P.A. (2005).
+Why most published research findings are false. \textit{PLoS Medicine}, 2(8), e124.
+
+\bibitem[Wang et~al.(2021)]{ame2020} Wang, M., Huang, W.J., et~al. (2021).
+The AME2020 atomic mass evaluation. \textit{Chinese Physics C}, 45(3), 030003.
+
+\bibitem[Alcubierre(1994)]{alcubierre1994} Alcubierre, M. (1994).
+The warp drive: hyper-fast travel within general relativity. \textit{Class. Quantum Grav.}, 11, L73.
+
+\bibitem[Kanerva(2009)]{kanerva2009hd} Kanerva, P. (2009).
+Hyperdimensional computing: An introduction to computing in distributed representation. \textit{Cognitive Computation}, 1(2), 139--159.
+
+\bibitem[Nature(2025)]{nature2025fraud} Nature (2025).
+A wave of retractions is shaking physics. \textit{MIT Technology Review}.
+
+\bibitem[Nature(2026)]{nature2026citations} Nature (2026).
+Hallucinated citations in scientific papers rising sharply. \textit{Nature News}.
+
+\bibitem[DeSci(2025)]{desci2025frontier} California Management Review (2025).
+Can decentralized science be the next frontier?
+
+\bibitem[M\"oller et~al.(2016)]{moller2016} M\"oller, P., et~al. (2016).
+Nuclear ground-state masses and deformations: FRDM(2012). \textit{At. Data Nucl. Data Tables}, 109-110.
+
+\bibitem[Oganessian \& Utyonkov(2015)]{oganessian2015} Oganessian, Yu.Ts. \& Utyonkov, V.K. (2015).
+Super-heavy element research. \textit{Rep. Prog. Phys.}, 78, 036301.
+\end{thebibliography}
+
+\end{document}
