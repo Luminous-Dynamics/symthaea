@@ -204,7 +204,7 @@ pub fn setup_globe_view(
     let earth_texture: Handle<Image> = asset_server.load(sol_atlas_bevy::globe::EARTH_TEXTURE_PATH);
     let holo_globe = holo_materials.add(sol_atlas_bevy::holographic_material::HolographicMaterial {
         base: StandardMaterial {
-            base_color: Color::linear_rgba(0.04, 0.08, 0.10, 0.25), // abyssal ghost — see through to far side
+            base_color: Color::linear_rgba(0.12, 0.18, 0.22, 0.4), // brighter — landmasses visible as ghost contours
             base_color_texture: Some(earth_texture),
             alpha_mode: AlphaMode::Blend,
             double_sided: true,
