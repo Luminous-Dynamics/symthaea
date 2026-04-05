@@ -72,8 +72,10 @@ pub struct CfCConfig {
 impl Default for CfCConfig {
     fn default() -> Self {
         Self {
-            num_neurons: 256,
-            input_dim: 256, // Must match num_neurons for train_step compatibility
+            num_neurons: 512,     // Was 256: increased for better learning capacity.
+            input_dim: 512,       // Must match num_neurons for train_step compatibility.
+                                  // 512 neurons = 25.6 per stimulus class (vs 12.8 at 256).
+                                  // CfC step cost: ~1.6ms (4x of 0.4ms at 256), still fast.
             learning_rate: 0.001,
             delta_t: 0.02, // 50Hz base rate
             // Multi-scale prediction: t+1, t+5, t+10 steps
