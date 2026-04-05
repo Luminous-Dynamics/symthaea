@@ -963,6 +963,8 @@ pub fn setup_globe_view(
             "←/→    Timeline",
             "Scroll Zoom",
             "Drag   Rotate",
+            "F1-F6  Planets",
+            "F7     Earth",
             "F9     Record",
         ] {
             parent.spawn((
@@ -1291,6 +1293,52 @@ pub fn timeline_scrubber_system(
     let progress = (timeline.year as f32 / 500.0).clamp(0.0, 1.0) * 100.0;
     for mut node in fills.iter_mut() {
         node.width = Val::Percent(progress);
+    }
+}
+
+/// Planet focus — F1-F6 fly camera to a planet, F7 returns to Earth.
+pub fn planet_focus_system(
+    kb: Res<ButtonInput<KeyCode>>,
+    time: Res<Time>,
+    mut camera: ResMut<sol_atlas_bevy::camera::OrbitalCameraConfig>,
+) {
+    let t = time.elapsed_secs();
+    let bodies = sol_atlas_core::solar_system::solar_system_bodies();
+
+    let target_body = if kb.just_pressed(KeyCode::F1) {
+        Some("Moon")
+    } else if kb.just_pressed(KeyCode::F2) {
+        Some("Venus")
+    } else if kb.just_pressed(KeyCode::F3) {
+        Some("Mars")
+    } else if kb.just_pressed(KeyCode::F4) {
+        Some("Jupiter")
+    } else if kb.just_pressed(KeyCode::F5) {
+        Some("Saturn")
+    } else if kb.just_pressed(KeyCode::F6) {
+        Some("Sun")
+    } else if kb.just_pressed(KeyCode::F7) {
+        // Return to Earth
+        camera.distance = 4.2;
+        camera.theta = 0.0;
+        camera.phi = 0.1;
+        camera.auto_rotate = true;
+        info!("[atlas] Camera → Earth");
+        None
+    } else {
+        None
+    };
+
+    if let Some(name) = target_body {
+        if let Some(body) = bodies.iter().find(|b| b.name == name) {
+            let pos = sol_atlas_core::solar_system::body_position(body, t);
+            camera.theta = pos[2].atan2(pos[0]);
+            camera.phi = (pos[1] / (pos[0].hypot(pos[2]))).atan();
+            camera.distance = (pos[0] * pos[0] + pos[1] * pos[1] + pos[2] * pos[2]).sqrt()
+                - body.visual_radius * 2.0;
+            camera.auto_rotate = false;
+            info!("[atlas] Camera → {} (distance {:.1})", name, camera.distance);
+        }
     }
 }
 

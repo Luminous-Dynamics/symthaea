@@ -141,6 +141,7 @@ impl Plugin for SymtropyPlugin {
                     systems::atlas::cloud_rotation_system,
                     systems::atlas::marker_pulse_system,
                     systems::atlas::consciousness_shader_system,
+                    systems::atlas::planet_focus_system,
                 ).run_if(in_state(GamePhase::GlobeView)))
                 .add_systems(Update, (
                     systems::atlas::city_stress_evolution_system,

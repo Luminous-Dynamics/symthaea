@@ -35,16 +35,16 @@ pub struct CelestialBody {
 /// All solar system bodies visible from Earth's perspective.
 pub fn solar_system_bodies() -> Vec<CelestialBody> {
     vec![
-        // Sizes: relative to Earth (radius 1.0)
-        // Real ratios: Sun=109×, Moon=0.27×, Venus=0.95×, Mars=0.53×, Jupiter=11.2×, Saturn=9.4×
-        // Compressed for visual composition (sqrt scale):
+        // Sizes use log-compressed real ratios so everything is visible:
+        // Real: Sun=109×, Jupiter=11.2×, Saturn=9.4×, Venus=0.95×, Mars=0.53×, Moon=0.27×
+        // Display: exaggerate small bodies, compress large ones
         CelestialBody {
             name: "Sun".into(),
-            orbit_radius: 25.0,
-            visual_radius: 2.5,   // much larger — it's a star
-            orbit_speed: 0.003,
+            orbit_radius: 30.0,
+            visual_radius: 3.0,
+            orbit_speed: 0.002,
             orbit_offset: 0.0,
-            y_offset: 0.0,        // on ecliptic
+            y_offset: 0.0,
             is_sun: true,
             texture: "sun.jpg".into(),
             roughness: 1.0,
@@ -53,11 +53,11 @@ pub fn solar_system_bodies() -> Vec<CelestialBody> {
         },
         CelestialBody {
             name: "Moon".into(),
-            orbit_radius: 2.2,
-            visual_radius: 0.06,  // 0.27× Earth, compressed to 0.06
+            orbit_radius: 2.0,
+            visual_radius: 0.08, // exaggerated from 0.27× so it's visible
             orbit_speed: 0.04,
             orbit_offset: 1.2,
-            y_offset: 0.08,
+            y_offset: 0.05,
             is_sun: false,
             texture: "moon.jpg".into(),
             roughness: 0.95,
@@ -66,11 +66,11 @@ pub fn solar_system_bodies() -> Vec<CelestialBody> {
         },
         CelestialBody {
             name: "Venus".into(),
-            orbit_radius: 7.0,
-            visual_radius: 0.18,  // ~Earth size
-            orbit_speed: 0.006,
+            orbit_radius: 5.5,
+            visual_radius: 0.18,
+            orbit_speed: 0.007,
             orbit_offset: 2.4,
-            y_offset: -0.1,
+            y_offset: 0.0,
             is_sun: false,
             texture: "venus.jpg".into(),
             roughness: 0.8,
@@ -79,11 +79,11 @@ pub fn solar_system_bodies() -> Vec<CelestialBody> {
         },
         CelestialBody {
             name: "Mars".into(),
-            orbit_radius: 9.0,
-            visual_radius: 0.12,  // 0.53× Earth
+            orbit_radius: 7.0,
+            visual_radius: 0.14,
             orbit_speed: 0.004,
             orbit_offset: 4.1,
-            y_offset: 0.05,
+            y_offset: 0.0,
             is_sun: false,
             texture: "mars.jpg".into(),
             roughness: 0.9,
@@ -92,11 +92,11 @@ pub fn solar_system_bodies() -> Vec<CelestialBody> {
         },
         CelestialBody {
             name: "Jupiter".into(),
-            orbit_radius: 14.0,
-            visual_radius: 0.8,   // 11.2× Earth, compressed to 0.8
-            orbit_speed: 0.002,
+            orbit_radius: 12.0,
+            visual_radius: 1.2, // gas giant — clearly larger than Earth
+            orbit_speed: 0.0015,
             orbit_offset: 0.8,
-            y_offset: -0.05,
+            y_offset: 0.0,
             is_sun: false,
             texture: "jupiter.jpg".into(),
             roughness: 0.7,
@@ -105,11 +105,11 @@ pub fn solar_system_bodies() -> Vec<CelestialBody> {
         },
         CelestialBody {
             name: "Saturn".into(),
-            orbit_radius: 18.0,
-            visual_radius: 0.7,   // 9.4× Earth, compressed to 0.7
+            orbit_radius: 16.0,
+            visual_radius: 1.0, // slightly smaller than Jupiter
             orbit_speed: 0.001,
             orbit_offset: 3.5,
-            y_offset: 0.1,
+            y_offset: 0.0,
             is_sun: false,
             texture: "saturn.jpg".into(),
             roughness: 0.75,
