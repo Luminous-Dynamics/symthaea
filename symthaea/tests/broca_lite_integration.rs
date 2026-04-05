@@ -56,3 +56,39 @@ fn test_language_output_field_always_present() {
     // It may be None on the first cycle — that's fine
     let _: &Option<String> = &result.language_output;
 }
+
+/// Verify async voice synthesis pipeline: enable → run cycles → drain audio.
+#[test]
+fn test_voice_synthesis_end_to_end() {
+    let config = CognitiveLoopConfig::default();
+    let mut service = CognitiveLoopService::new(config).expect("service should construct");
+
+    // Enable voice synthesis (spawns background thread)
+    service.enable_voice_synthesis();
+
+    // Run cycles until language_output is populated
+    for i in 0..100 {
+        let input = if i % 2 == 0 {
+            "consciousness flows through integrated patterns"
+        } else {
+            "awareness emerges from the binding of experience"
+        };
+        let result = service.cycle(input);
+        if result.language_output.is_some() {
+            // Give the background thread time to synthesize
+            std::thread::sleep(std::time::Duration::from_millis(200));
+            break;
+        }
+    }
+
+    // Drain audio responses from background thread
+    let responses = service.drain_voice_audio();
+    // Note: voice synthesis may or may not have completed in 200ms
+    // depending on the synthesis backend. The important thing is that
+    // the pipeline doesn't crash or deadlock.
+    eprintln!(
+        "[Voice] {} audio responses drained, total samples: {}",
+        responses.len(),
+        responses.iter().map(|r| r.audio.len()).sum::<usize>()
+    );
+}

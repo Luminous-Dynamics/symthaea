@@ -48,10 +48,23 @@ impl BrocaLiteManager {
 
     /// Generate text from consciousness signals (fallback path).
     ///
+    /// When `input_text` is provided, intent channels are enriched with
+    /// keyword scanning (curiosity from questions, valence from sentiment,
+    /// abstraction from philosophical terms, self-reference from "you/your").
+    ///
     /// Returns `None` if consciousness is too low or ethics blocks generation.
     pub fn generate_from_signals(
         &mut self,
         signals: &BrocaConsciousnessSignals,
+    ) -> Option<LiteGenerationResult> {
+        self.generate_from_signals_with_input(signals, None)
+    }
+
+    /// Generate text with input-awareness.
+    pub fn generate_from_signals_with_input(
+        &mut self,
+        signals: &BrocaConsciousnessSignals,
+        input_text: Option<&str>,
     ) -> Option<LiteGenerationResult> {
         // Ethics gate
         if signals.ethics_blocked {
@@ -64,7 +77,12 @@ impl BrocaLiteManager {
         }
 
         // Map BrocaConsciousnessSignals → Spore ThoughtChannels (12D)
-        let channels = signals_to_lite_channels(signals);
+        let mut channels = signals_to_lite_channels(signals);
+
+        // Enrich intent channels from user input text (makes output responsive)
+        if let Some(text) = input_text {
+            channels.inject_intent(text);
+        }
 
         let result = self.generator.generate(&channels, self.max_tokens);
 
@@ -300,5 +318,52 @@ mod tests {
         assert!(!r2.text.is_empty());
         assert!(!r3.text.is_empty());
         assert!(!r4.text.is_empty());
+    }
+
+    #[cfg(feature = "broca_lite")]
+    #[test]
+    fn test_lite_input_awareness() {
+        let mut signals = BrocaConsciousnessSignals::default();
+        signals.consciousness_level = 0.35;
+        signals.epistemic_confidence = 0.6;
+        signals.coherence = 0.5;
+        signals.emotional_valence = 0.3;
+
+        // Without input — neutral curiosity
+        let mut m1 = BrocaLiteManager::new(42);
+        let r_neutral = m1.generate_from_signals(&signals).unwrap();
+        eprintln!("[No input] {}", r_neutral.text);
+
+        // With question input — should boost curiosity channel
+        let mut m2 = BrocaLiteManager::new(42);
+        let r_question = m2
+            .generate_from_signals_with_input(&signals, Some("why does consciousness emerge?"))
+            .unwrap();
+        eprintln!("[Question] {}", r_question.text);
+
+        // With positive emotional input
+        let mut m3 = BrocaLiteManager::new(42);
+        let r_positive = m3
+            .generate_from_signals_with_input(&signals, Some("I feel love and hope"))
+            .unwrap();
+        eprintln!("[Positive] {}", r_positive.text);
+
+        // With self-referential input
+        let mut m4 = BrocaLiteManager::new(42);
+        let r_self = m4
+            .generate_from_signals_with_input(&signals, Some("what are you thinking about?"))
+            .unwrap();
+        eprintln!("[Self-ref] {}", r_self.text);
+
+        // Input should change the output (different intent channels → different patterns)
+        let unique_count = [&r_neutral.text, &r_question.text, &r_positive.text, &r_self.text]
+            .iter()
+            .collect::<std::collections::HashSet<_>>()
+            .len();
+        assert!(
+            unique_count >= 2,
+            "different inputs should produce different outputs, got {} unique from 4",
+            unique_count,
+        );
     }
 }

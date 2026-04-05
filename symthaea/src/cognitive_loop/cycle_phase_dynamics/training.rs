@@ -302,7 +302,7 @@ impl CognitiveLoopService {
                 detected_primitives: perception.encoding.encoding_result.detected_primitives.clone(),
                 ..Default::default()
             };
-            if let Some(result) = self.language_comm.broca_lite.generate_from_signals(&signals) {
+            if let Some(result) = self.language_comm.broca_lite.generate_from_signals_with_input(&signals, Some(input)) {
                 self.language_comm.last_broca_text = Some(result.text);
             }
         }
