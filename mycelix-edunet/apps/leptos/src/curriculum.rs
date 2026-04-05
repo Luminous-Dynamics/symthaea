@@ -119,7 +119,14 @@ impl CapsGraph {
         let mut prerequisites: HashMap<String, Vec<String>> = HashMap::new();
         let mut dependents: HashMap<String, Vec<String>> = HashMap::new();
 
-        for (i, node) in raw.nodes.iter().enumerate() {
+        // Normalize subject names (collapse spaces for consistency —
+        // CAPS JSON has both "EnglishLanguageArts" and "English Language Arts")
+        let mut nodes = raw.nodes;
+        for node in &mut nodes {
+            node.subject_area = node.subject_area.replace(' ', "");
+        }
+
+        for (i, node) in nodes.iter().enumerate() {
             by_id.insert(node.id.clone(), i);
             let grade = node.grade_levels.first().cloned().unwrap_or_default();
             by_subject_grade
@@ -148,7 +155,7 @@ impl CapsGraph {
         }
 
         CapsGraph {
-            nodes: raw.nodes,
+            nodes,
             edges: raw.edges,
             by_id,
             by_subject_grade,

@@ -8,6 +8,7 @@
 
 use leptos::prelude::*;
 use serde::Deserialize;
+use wasm_bindgen::JsCast;
 use wasm_bindgen_futures::JsFuture;
 
 use crate::curriculum::{caps_graph, use_progress, use_set_progress};
@@ -74,6 +75,20 @@ pub fn MockExamPage() -> impl IntoView {
     let (time_left, set_time_left) = signal(30 * 60_i32); // seconds
     let (revealed, set_revealed) = signal(false);
     let set_tracker = crate::study_tracker::use_set_tracker();
+
+    // Store interval ID so we can clear it (prevents timer leak).
+    // Using RwSignal<Option<i32>> since gloo Interval isn't Send+Sync.
+    let timer_id = RwSignal::new(Option::<i32>::None);
+
+    let clear_timer = move || {
+        if let Some(id) = timer_id.get_untracked() {
+            web_sys::window().unwrap().clear_interval_with_handle(id);
+            timer_id.set(None);
+        }
+    };
+
+    // Clear timer on component unmount
+    on_cleanup(move || { clear_timer(); });
 
     // Real NSC-style exam problems — hand-crafted, not templates
     let generate_problems = move |p: ExamPaper, quick: bool| {
@@ -172,8 +187,15 @@ pub fn MockExamPage() -> impl IntoView {
         // Record study activity
         set_tracker.update(|t| t.record_study_day());
 
-        // Start timer
-        let handle = gloo_timers::callback::Interval::new(1_000, move || {
+        // Clear any existing timer before starting a new one
+        clear_timer();
+
+        // Start timer via web_sys (raw i32 handle, avoids non-Send gloo Interval)
+        let cb = wasm_bindgen::closure::Closure::<dyn FnMut()>::new(move || {
+            // Guard: stop ticking if exam is no longer in progress
+            if state.get_untracked() != ExamState::InProgress {
+                return;
+            }
             set_time_left.update(|t| {
                 if *t > 0 {
                     *t -= 1;
@@ -182,7 +204,15 @@ pub fn MockExamPage() -> impl IntoView {
                 }
             });
         });
-        std::mem::forget(handle);
+        let id = web_sys::window()
+            .unwrap()
+            .set_interval_with_callback_and_timeout_and_arguments_0(
+                cb.as_ref().unchecked_ref(),
+                1_000,
+            )
+            .unwrap();
+        cb.forget(); // intentional: closure must outlive the interval; cleared via clear_timer()
+        timer_id.set(Some(id));
     };
 
     let minutes = move || time_left.get() / 60;
