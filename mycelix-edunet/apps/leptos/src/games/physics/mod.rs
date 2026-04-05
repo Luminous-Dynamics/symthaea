@@ -3,4 +3,7 @@
 
 pub mod circuits;
 pub mod equation_explorer;
+pub mod gravity_explorer;
+pub mod ideal_gas_explorer;
 pub mod projectile;
+pub mod schwarzschild_explorer;

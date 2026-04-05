@@ -47,6 +47,14 @@ fn game_type(node_id: &str) -> Option<&'static str> {
         // Equation Explorer (Physics Discovery)
         "CAPS.PhysicalSciences.Gr12.P1.EQUATIONS" | "CAPS.PhysicalSciences.Gr11.P1.EQUATIONS" |
         "UNIVERSAL.PhysicsEquations" | "UNIVERSAL.EquationExplorer" => Some("equation_explorer"),
+        // Newton's Gravitation
+        "CAPS.PhysicalSciences.Gr11.P1.GRAV" | "CAPS.PhysicalSciences.Gr12.P1.GRAV" |
+        "UNIVERSAL.Gravitation" => Some("gravity"),
+        // Ideal Gas Law
+        "CAPS.PhysicalSciences.Gr11.P1.GASES" | "CAPS.PhysicalSciences.Gr12.P2.GASES" |
+        "UNIVERSAL.IdealGas" => Some("ideal_gas"),
+        // Schwarzschild Radius / Black Holes
+        "UNIVERSAL.BlackHoles" | "UNIVERSAL.Schwarzschild" => Some("schwarzschild"),
         // Financial Literacy (Budget Simulator)
         id if id.contains("FinancialLiteracy") || id.contains("FINLIT") => Some("budget"),
         // Cybersecurity (Password Strength)
@@ -90,6 +98,9 @@ pub fn GameContainer(node_id: String) -> impl IntoView {
         Some("equation_balance") => view! { <intermediate::equation_balance::EquationBalance node_id=id /> }.into_any(),
         Some("pythagoras") => view! { <intermediate::pythagoras::PythagorasExplorer node_id=id /> }.into_any(),
         Some("equation_explorer") => view! { <physics::equation_explorer::EquationExplorer node_id=id /> }.into_any(),
+        Some("gravity") => view! { <physics::gravity_explorer::GravityExplorer node_id=id /> }.into_any(),
+        Some("ideal_gas") => view! { <physics::ideal_gas_explorer::IdealGasExplorer node_id=id /> }.into_any(),
+        Some("schwarzschild") => view! { <physics::schwarzschild_explorer::SchwarzschildExplorer node_id=id /> }.into_any(),
         _ => view! { <p style="color: var(--text-secondary)">"No interactive game available yet."</p> }.into_any(),
     }
 }
