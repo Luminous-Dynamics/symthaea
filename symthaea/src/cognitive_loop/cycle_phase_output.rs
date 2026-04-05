@@ -2052,10 +2052,22 @@ impl CognitiveLoopService {
             thought_vector,
             wisdom_hv: perception.encoding.hv16_cached,
             language_output: {
-                #[cfg(feature = "ssm_language")]
-                { self.language_comm.last_broca_text.take() }
-                #[cfg(not(feature = "ssm_language"))]
-                { None }
+                let text = self.language_comm.last_broca_text.take();
+                // Send to async voice synthesis (non-blocking) if enabled
+                if let (Some(ref t), Some(ref vs)) = (&text, &self.voice_synthesis) {
+                    let _ = vs.send(super::voice_channel::VoiceRequest {
+                        text: t.clone(),
+                        cfc_output: dynamics.core.output.clone(),
+                        prediction_error: dynamics.core.prediction_error,
+                        detected_primitives: perception
+                            .encoding
+                            .encoding_result
+                            .detected_primitives
+                            .clone(),
+                        cycle_num: self.stats.total_cycles as u64,
+                    });
+                }
+                text
             },
             #[cfg(feature = "canvas")]
             canvas_svg: self.sensorimotor.motor_rendering.last_canvas_svg.take(),

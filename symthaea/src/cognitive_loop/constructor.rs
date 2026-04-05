@@ -774,6 +774,7 @@ impl CognitiveLoopService {
                 },
                 broca_code_channels: None,
             },
+            voice_synthesis: None, // Spawned on demand via enable_voice_synthesis()
             behavior: super::behavioral_synthesis::BehavioralSynthesis::new(
                 FlowState::default(),
                 EmotionContagion::default(),
@@ -1396,7 +1397,6 @@ impl CognitiveLoopService {
             } else {
                 None
             },
-            voice_synthesis: None,
         };
 
         // Initialize Epistemic Auditor if configured

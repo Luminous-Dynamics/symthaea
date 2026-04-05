@@ -1398,4 +1398,27 @@ impl CognitiveLoopService {
     pub fn clear_ethics_override(&mut self) {
         self.ethics_verdict_override = None;
     }
+
+    /// Enable async voice synthesis: spawns a background thread that converts
+    /// Broca/BrocaLite text output to audio without blocking the cognitive cycle.
+    ///
+    /// Call once after constructing the service. Audio is retrieved via
+    /// `drain_voice_audio()` in subsequent cycles.
+    pub fn enable_voice_synthesis(&mut self) {
+        if self.voice_synthesis.is_none() {
+            self.voice_synthesis =
+                Some(super::super::voice_channel::VoiceSynthesisChannel::spawn());
+        }
+    }
+
+    /// Drain completed voice audio from the background synthesis thread.
+    ///
+    /// Returns audio samples generated from previous cycles' text output.
+    /// Non-blocking — returns empty vec if no audio is ready.
+    pub fn drain_voice_audio(&self) -> Vec<super::super::voice_channel::VoiceResponse> {
+        self.voice_synthesis
+            .as_ref()
+            .map(|vs| vs.drain_responses())
+            .unwrap_or_default()
+    }
 }
