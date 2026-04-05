@@ -153,10 +153,45 @@ impl LlmLanguageChannel {
 
             // Only send if we got meaningful text
             if !result.text.is_empty() && result.text.len() > 3 {
+                // ── Distillation: capture (signals, text) for Broca training ──
+                // When SYMTHAEA_LLM_DISTILL_PATH is set, save each LLM response
+                // as training data for the full Broca CfC-HDC backend.
+                if let Ok(path) = std::env::var("SYMTHAEA_LLM_DISTILL_PATH") {
+                    if !path.is_empty() {
+                        let pair = serde_json::json!({
+                            "channels": [
+                                latest.signals.epistemic_confidence,
+                                latest.signals.emotional_valence,
+                                latest.signals.emotional_arousal,
+                                latest.signals.emotional_warmth,
+                                latest.signals.consciousness_level,
+                                latest.signals.meta_awareness,
+                                latest.signals.coherence,
+                                latest.signals.knowledge_grounding,
+                                latest.signals.primitive_grounding,
+                                latest.signals.semantic_confidence,
+                                latest.signals.cube_h_value,
+                                latest.signals.cube_quality,
+                            ],
+                            "target_text": result.text,
+                            "input_text": latest.input_text,
+                            "from_llm": true,
+                        });
+                        if let Ok(mut f) = std::fs::OpenOptions::new()
+                            .create(true)
+                            .append(true)
+                            .open(&path)
+                        {
+                            use std::io::Write;
+                            let _ = writeln!(f, "{}", pair);
+                        }
+                    }
+                }
+
                 let _ = response_tx.send(LlmLanguageResponse {
                     text: result.text,
                     generation_time_ms,
-                    from_llm: result.confidence > 0.5, // Real LLM has confidence 0.9
+                    from_llm: result.confidence > 0.5,
                     cycle_num: latest.cycle_num,
                 });
             }
