@@ -177,10 +177,8 @@ pub fn setup_globe_view(
     hud_texts: Query<Entity, With<crate::systems::rendering::HudText>>,
 ) {
     // Hide the 2D dungeon camera
-    for entity in dungeon_cameras.iter() {
-        commands.entity(entity).insert(Visibility::Hidden);
-    }
-    // Hide the dungeon HUD
+    // Keep Camera2d visible — Bevy UI needs it for text/panel rendering.
+    // Only hide the dungeon HUD text (not the globe HUD).
     for entity in hud_texts.iter() {
         commands.entity(entity).insert(Visibility::Hidden);
     }

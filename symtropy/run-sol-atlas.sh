@@ -5,16 +5,22 @@ set -euo pipefail
 
 cd "$(dirname "$0")"
 
-echo "[symtropy] Starting Sol Atlas..."
+EXTRA_ARGS="${*}"
+
+echo "[symtropy] Starting Sol Atlas... (args: --globe $EXTRA_ARGS)"
 
 exec nix-shell -p \
-  xorg.libX11 \
-  xorg.libXcursor \
-  xorg.libXi \
-  xorg.libXrandr \
+  libx11 \
+  libxcursor \
+  libxi \
+  libxrandr \
   vulkan-loader \
   libxkbcommon \
   --run "
-    export LD_LIBRARY_PATH=/run/opengl-driver/lib:\$LD_LIBRARY_PATH
-    exec ./target/release/symtropy --globe \"\$@\"
-  " -- "$@"
+    # Extract library paths from NIX_LDFLAGS
+    NIXLIBS=\$(echo \$NIX_LDFLAGS | grep -oP '(?<=-L)[^ ]+' | tr '\n' ':')
+    export LD_LIBRARY_PATH=\"/run/opengl-driver/lib:\${NIXLIBS}\${LD_LIBRARY_PATH:-}\"
+    unset WAYLAND_DISPLAY
+    export WINIT_UNIX_BACKEND=x11
+    exec ./target/release/symtropy --globe $EXTRA_ARGS
+  "
