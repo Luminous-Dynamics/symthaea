@@ -41,12 +41,50 @@ fn demo_verifications() -> Vec<Verification> {
     ]
 }
 
+/// Look up a claim by ID from the browse page's demo data, or return default.
+fn find_claim_by_id(id: &str) -> ClaimResponse {
+    // Import the browse page's demo claim constructor
+    let known_claims = vec![
+        ("lazar-gravity-a", EpistemicTier::E0, "Extended strong nuclear force (Gravity-A) via Element 115 produces gravity wave at 11.4 GHz", "Modified Gravity"),
+        ("arts-parts-waveguide", EpistemicTier::E0, "Bi-Mg(Zn) layered metamaterial acts as THz waveguide for anti-gravity propulsion", "Metamaterials"),
+        ("island-stability-z120", EpistemicTier::E2, "Superheavy stability island centered at Z=115-120, N=180. Element 120 (A=294) has shell correction -22.81 MeV", "Nuclear Physics"),
+        ("nif-ignition", EpistemicTier::E4, "NIF fusion ignition: Q ratio 1.54→4.13, eight successful shots independently verified", "Nuclear Physics"),
+        ("higgs-boson", EpistemicTier::E4, "Higgs boson at ~125 GeV: ATLAS + CMS independent discovery, 5.9σ significance. Nobel 2013", "Particle Physics"),
+        ("ligo-gw150914", EpistemicTier::E4, "Gravitational wave detection: binary black hole merger, SNR=24, false alarm < 1/203,000 years", "General Relativity"),
+        ("cold-fusion", EpistemicTier::E0, "Cold fusion: deuterium fusion at room temperature. Gamow factor ~10^-2700. Never replicated", "Nuclear Physics"),
+        ("lk99", EpistemicTier::E0, "LK-99 room-temperature superconductor: Cu₂S impurity, debunked in 3 weeks", "Condensed Matter"),
+    ];
+
+    for (cid, tier, desc, cat) in &known_claims {
+        if *cid == id {
+            return ClaimResponse {
+                id: cid.to_string(),
+                tier: *tier,
+                content: ClaimContent {
+                    dataset_hash: cid.to_string(),
+                    description: desc.to_string(),
+                    category: cat.to_string(),
+                    keywords: vec![],
+                    storage_ref: None,
+                    reproducibility_score: None,
+                    license: None,
+                },
+                creator: "See case studies".to_string(),
+                created_at: "2026-04-04T00:00:00Z".to_string(),
+                verifications_count: if *tier == EpistemicTier::E4 { 10 } else { 0 },
+                provenance_count: 1,
+            };
+        }
+    }
+    demo_claim() // Fallback
+}
+
 #[component]
 pub fn ClaimDetailPage() -> impl IntoView {
     let params = use_params_map();
     let claim_id = move || params.read().get("id").unwrap_or_default();
 
-    let claim = demo_claim();
+    let claim = find_claim_by_id(&claim_id());
     let verifications = demo_verifications();
 
     view! {

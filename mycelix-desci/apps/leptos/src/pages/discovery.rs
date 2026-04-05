@@ -7,6 +7,7 @@ use leptos::prelude::*;
 use wasm_bindgen::JsCast;
 use crate::types::DiscoveryResult;
 use crate::components::nuclear_chart::NuclearChart;
+use crate::components::equation::Equation;
 use symthaea_physics_catalog::catalog::PhysicsCatalog;
 use symthaea_physics_catalog::search;
 
@@ -73,7 +74,7 @@ fn arts_parts_results() -> Vec<DiscoveryResult> {
 #[component]
 pub fn DiscoveryPage() -> impl IntoView {
     let (active_case, set_active_case) = signal("lazar".to_string());
-    let (search_query, set_search_query) = signal(String::new());
+    let (search_query, set_search_query) = signal("superconductor".to_string()); // Pre-filled demo query
 
     // Live WASM catalog search — runs entirely client-side
     let search_results = move || {
@@ -113,12 +114,14 @@ pub fn DiscoveryPage() -> impl IntoView {
                 <h2 style="font-size: 1.25rem; margin-bottom: 0.75rem;">"Structural Equation Search"</h2>
                 <p style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 0.75rem;">
                     "Search " {total_equations} " equations across " {live_domains.len()} " physics domains. "
-                    "HDC structural similarity runs entirely in your browser — no server needed."
+                    "HDC structural similarity runs entirely in your browser — no server needed. "
+                    "Try: 'superconductor', 'gravitational wave', 'entropy', 'diffusion'"
                 </p>
                 <input
                     type="text"
                     placeholder="Type any equation or physics concept (e.g., 'superconductor gap', 'gravitational wave', 'entropy')..."
                     style="width: 100%; padding: 0.75rem; background: var(--bg-secondary); border: 1px solid var(--border-glass); border-radius: 0.375rem; color: var(--text-primary); font-size: 0.875rem;"
+                    prop:value=move || search_query.get()
                     on:input=move |ev| {
                         let target: web_sys::HtmlInputElement = ev.target().unwrap().unchecked_into();
                         set_search_query.set(target.value());
@@ -139,10 +142,12 @@ pub fn DiscoveryPage() -> impl IntoView {
                                     let bar_width = format!("{}%", (r.score * 100.0) as u32);
                                     view! {
                                         <div class="discovery-result">
-                                            <div>
-                                                <span style="font-weight: 600; margin-right: 0.5rem;">{format!("{}.", i + 1)}</span>
-                                                <span>{r.name}</span>
-                                                <span class="domain">{format!(" ({})", r.domain)}</span>
+                                            <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                                <span style="font-weight: 600; font-size: 0.8rem; color: var(--text-secondary);">{format!("{}.", i + 1)}</span>
+                                                <div>
+                                                    <span style="font-weight: 600;">{r.name.clone()}</span>
+                                                    <span class="domain">{format!(" ({})", r.domain)}</span>
+                                                </div>
                                             </div>
                                             <div style="display: flex; align-items: center; gap: 0.5rem;">
                                                 <div style="width: 100px; height: 6px; background: var(--bg-secondary); border-radius: 3px;">
@@ -158,6 +163,9 @@ pub fn DiscoveryPage() -> impl IntoView {
                     }
                 }}
             </div>
+
+            // Interactive Nuclear Chart — above fold for visibility
+            <NuclearChart z_min=104 z_max=120 n_min=150 n_max=190 />
 
             // Catalog overview
             <div class="glass-panel" style="margin-bottom: 1.5rem;">
@@ -268,8 +276,6 @@ pub fn DiscoveryPage() -> impl IntoView {
                 </div>
             </div>
 
-            // Interactive Nuclear Chart
-            <NuclearChart z_min=100 z_max=120 n_min=140 n_max=190 />
         </div>
     }
 }
