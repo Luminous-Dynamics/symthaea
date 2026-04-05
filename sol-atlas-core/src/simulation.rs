@@ -266,3 +266,52 @@ mod tests {
         assert!(c[0] > c[1], "Crisis should be reddish");
     }
 }
+
+#[cfg(test)]
+mod integration_tests {
+    use super::*;
+    use crate::energy_trading;
+
+    #[test]
+    fn full_timeline_sweep() {
+        // Sweep through 500 years and verify no panics
+        for year in (0..500).step_by(10) {
+            let stress = evolve_grid_stress(year);
+            assert_eq!(stress.len(), 16, "Expected 16 cities at year {}", year);
+            
+            let phase = secular_phase_at_year(year);
+            assert!(!phase.label().is_empty());
+            
+            let colonies = colonies_at_year(year);
+            // Colonies should grow monotonically
+            if year >= 120 {
+                assert_eq!(colonies.len(), 4, "All 4 colonies by year {}", year);
+            }
+        }
+    }
+
+    #[test]
+    fn stress_colors_valid() {
+        for load in [0.0, 0.15, 0.3, 0.5, 0.6, 0.8, 1.0] {
+            let c = energy_trading::stress_color(load);
+            for channel in c {
+                assert!(channel >= 0.0 && channel <= 1.0,
+                    "Color channel out of range at load {}: {:?}", load, c);
+            }
+        }
+    }
+
+    #[test]
+    fn colony_self_sufficiency_bounded() {
+        for year in (0..500).step_by(25) {
+            for colony in colonies_at_year(year) {
+                assert!(colony.self_sufficiency >= 0.0 && colony.self_sufficiency <= 1.0,
+                    "Self-sufficiency out of range for {} at year {}: {}",
+                    colony.name, year, colony.self_sufficiency);
+                assert!(colony.phi >= 0.0 && colony.phi <= 1.0,
+                    "Phi out of range for {} at year {}: {}",
+                    colony.name, year, colony.phi);
+            }
+        }
+    }
+}
