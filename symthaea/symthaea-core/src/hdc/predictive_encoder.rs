@@ -596,7 +596,16 @@ impl PredictiveHdcEncoder {
         }
     }
 
-    /// Get compressed representation for LTC input
+    /// Get compressed representation for LTC input via sparse random projection.
+    ///
+    /// Uses sparse Rademacher projection (Achlioptas 2003) with K=8 non-zeros
+    /// per output dimension. Each non-zero is ±1/√K, selected deterministically
+    /// from the input. This preserves pairwise distances (Johnson-Lindenstrauss
+    /// lemma) while maintaining magnitude (no near-zero collapse from averaging).
+    ///
+    /// Prior approach (average pooling) collapsed values to near-zero via Law of
+    /// Large Numbers, triggering excessive CfC backward passes (2x throughput hit).
+    /// Sparse projection preserves variance: output σ ≈ input σ.
     pub fn compress_for_ltc(&self, hdv: &ContinuousHV, output_dim: usize) -> Vec<f32> {
         if output_dim == 0 {
             return Vec::new();
@@ -605,20 +614,23 @@ impl PredictiveHdcEncoder {
         if input_len <= output_dim {
             return hdv.values[..output_dim.min(input_len)].to_vec();
         }
-        // Average pooling over blocks: each output element is the mean of a
-        // block of (input_len / output_dim) consecutive input elements.
-        // This preserves far more information than stride-based subsampling
-        // (which discards 63/64 elements at 16384→256).
-        // Science: average pooling is a low-pass filter that retains the
-        // energy distribution across the HDC vector, preserving the semantic
-        // structure that stride sampling destroys.
-        let block_size = input_len / output_dim;
+        // Sparse Rademacher: K non-zeros per output dimension.
+        // K=8 gives good accuracy at O(256×8) = O(2048) operations.
+        // Deterministic selection via hash: reproducible across calls.
+        let k = 8usize;
+        let scale = 1.0 / (k as f32).sqrt();
         (0..output_dim)
             .map(|i| {
-                let start = i * block_size;
-                let end = (start + block_size).min(input_len);
-                let sum: f32 = hdv.values[start..end].iter().sum();
-                sum / (end - start) as f32
+                let mut sum = 0.0f32;
+                for j in 0..k {
+                    // Deterministic pseudo-random index selection via mixing
+                    let hash = ((i as u64).wrapping_mul(2654435761) ^ (j as u64).wrapping_mul(2246822519)) as usize;
+                    let idx = hash % input_len;
+                    // Deterministic sign: ±1 based on hash bit
+                    let sign = if (hash >> 16) & 1 == 0 { 1.0f32 } else { -1.0f32 };
+                    sum += sign * hdv.values[idx];
+                }
+                sum * scale
             })
             .collect()
     }
