@@ -48,7 +48,7 @@ impl ConnectionStatus {
             Self::Disconnected => "Disconnected",
             Self::Connecting => "Connecting...",
             Self::Connected => "Connected",
-            Self::Mock => "Mock",
+            Self::Mock => "Local",
         }
     }
 }

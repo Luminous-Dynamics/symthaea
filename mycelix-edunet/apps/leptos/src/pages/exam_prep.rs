@@ -58,7 +58,7 @@ pub fn ExamPrepPage() -> impl IntoView {
     // Physics totals
     let phys_stats = Memo::new(move |_| {
         let topics = exam_topics.get();
-        let phys: Vec<_> = topics.iter().filter(|t| t.2 == "Physical Sciences").collect();
+        let phys: Vec<_> = topics.iter().filter(|t| t.2 == "PhysicalSciences").collect();
         let mastered = phys.iter().filter(|t| t.7 == ProgressStatus::Mastered).count();
         (phys.len(), mastered)
     });
@@ -75,7 +75,7 @@ pub fn ExamPrepPage() -> impl IntoView {
             </p>
 
             // Mock exam link
-            <a href="/mock-exam" style="display: block; padding: 0.75rem 1rem; background: linear-gradient(135deg, var(--primary), #6d28d9); border-radius: 10px; text-decoration: none; color: var(--text-on-primary); margin-bottom: 1.5rem; text-align: center; font-weight: 600; transition: transform 0.15s">
+            <a href="/mock-exam" style="display: block; padding: 0.75rem 1rem; background: linear-gradient(135deg, var(--primary), #06b6d4); border-radius: 10px; text-decoration: none; color: var(--text-on-primary); margin-bottom: 1.5rem; text-align: center; font-weight: 600; transition: transform 0.15s">
                 "\u{23F1} Take a Mock Exam"
             </a>
 

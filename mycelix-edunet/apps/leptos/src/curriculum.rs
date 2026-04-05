@@ -568,13 +568,13 @@ impl Grade {
 
     pub fn label(&self) -> &'static str {
         match self {
-            Grade::Kindergarten => "Kindergarten",
-            Grade::Gr1 => "Grade 1", Grade::Gr2 => "Grade 2", Grade::Gr3 => "Grade 3",
-            Grade::Gr4 => "Grade 4", Grade::Gr5 => "Grade 5", Grade::Gr6 => "Grade 6",
-            Grade::Gr7 => "Grade 7", Grade::Gr8 => "Grade 8", Grade::Gr9 => "Grade 9",
-            Grade::Gr10 => "Grade 10", Grade::Gr11 => "Grade 11", Grade::Gr12 => "Grade 12",
-            Grade::Undergraduate => "University", Grade::Graduate => "Postgrad",
-            Grade::Doctoral => "Doctoral", Grade::Adult => "Life Skills",
+            Grade::Kindergarten => "K",
+            Grade::Gr1 => "1", Grade::Gr2 => "2", Grade::Gr3 => "3",
+            Grade::Gr4 => "4", Grade::Gr5 => "5", Grade::Gr6 => "6",
+            Grade::Gr7 => "7", Grade::Gr8 => "8", Grade::Gr9 => "9",
+            Grade::Gr10 => "10", Grade::Gr11 => "11", Grade::Gr12 => "12",
+            Grade::Undergraduate => "Uni", Grade::Graduate => "Postgrad",
+            Grade::Doctoral => "PhD", Grade::Adult => "Life",
         }
     }
 

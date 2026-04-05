@@ -17,6 +17,19 @@ use crate::cognitive_adaptivity::*;
 use crate::components::suggestion_overlay::SuggestionOverlay;
 use crate::curriculum::{use_progress, use_set_progress};
 
+/// Insert spaces before uppercase letters in camelCase subject names.
+/// e.g. "EnglishLanguageArts" -> "English Language Arts"
+fn display_subject(s: &str) -> String {
+    let mut result = String::with_capacity(s.len() + 4);
+    for (i, c) in s.chars().enumerate() {
+        if i > 0 && c.is_uppercase() {
+            result.push(' ');
+        }
+        result.push(c);
+    }
+    result
+}
+
 // ---------------------------------------------------------------------------
 // Review state machine
 // ---------------------------------------------------------------------------
@@ -486,7 +499,7 @@ pub fn ReviewPage() -> impl IntoView {
                                 {
                                     let graph = crate::curriculum::caps_graph();
                                     let mut subjects: Vec<(String, usize)> = graph.subjects().iter()
-                                        .filter(|s| !["Mathematics", "Physical Sciences", "Natural Sciences"].contains(s))
+                                        .filter(|s| !["Mathematics", "PhysicalSciences", "NaturalSciences"].contains(s))
                                         .map(|s| {
                                             let count = graph.nodes.iter().filter(|n| n.subject_area == *s).count();
                                             (s.to_string(), count)
@@ -498,7 +511,8 @@ pub fn ReviewPage() -> impl IntoView {
 
                                     subjects.into_iter().map(|(subject, count)| {
                                         let subj = subject.clone();
-                                        let label = if subject.len() > 20 { format!("{}...", &subject[..18]) } else { subject.clone() };
+                                        let display = display_subject(&subject);
+                                        let label = if display.len() > 22 { format!("{}...", &display[..20]) } else { display };
                                         let select = select_source.clone();
                                         view! {
                                             <button
