@@ -147,6 +147,7 @@ impl Plugin for SymtropyPlugin {
                     systems::atlas::timeline_hud_system,
                     systems::atlas::data_view_switch_system,
                     systems::atlas::data_view_filter_system,
+                    systems::atlas::panel_metrics_system,
                     systems::atlas::aesthetic_switch_system,
                     systems::atlas::aesthetic_apply_system,
                     sol_atlas_bevy::selection::click_select_system,

@@ -117,6 +117,14 @@ impl DataView {
 #[derive(Component)]
 pub struct ViewHud;
 
+/// Side panel UI marker.
+#[derive(Component)]
+pub struct SidePanel;
+
+/// Side panel metrics text.
+#[derive(Component)]
+pub struct PanelMetrics;
+
 /// Marker pulse — makes data markers breathe with sinusoidal scale modulation.
 #[derive(Component)]
 pub struct MarkerPulse {
@@ -910,6 +918,60 @@ pub fn setup_globe_view(
         ));
     }
 
+    // ─── Side Panel UI ───────────────────────────────────────────
+    commands.spawn((
+        Node {
+            position_type: PositionType::Absolute,
+            left: Val::Px(0.0),
+            top: Val::Px(80.0),
+            width: Val::Px(200.0),
+            height: Val::Auto,
+            flex_direction: FlexDirection::Column,
+            padding: UiRect::all(Val::Px(12.0)),
+            ..default()
+        },
+        BackgroundColor(Color::srgba(0.02, 0.03, 0.05, 0.6)),
+        SidePanel,
+        AtlasEntity,
+    )).with_children(|parent| {
+        // Section: Controls
+        parent.spawn((
+            Text::new("─ Controls ─"),
+            TextFont { font_size: 11.0, ..default() },
+            TextColor(Color::srgba(0.5, 0.7, 0.8, 0.7)),
+            Node { margin: UiRect::bottom(Val::Px(6.0)), ..default() },
+        ));
+        for line in [
+            "Tab    Data View",
+            "1-5    Aesthetic",
+            "←/→    Timeline",
+            "Scroll Zoom",
+            "Drag   Rotate",
+            "F9     Record",
+        ] {
+            parent.spawn((
+                Text::new(line),
+                TextFont { font_size: 10.0, ..default() },
+                TextColor(Color::srgba(0.4, 0.55, 0.5, 0.5)),
+                Node { margin: UiRect::bottom(Val::Px(2.0)), ..default() },
+            ));
+        }
+
+        // Section: Metrics
+        parent.spawn((
+            Text::new("─ Metrics ─"),
+            TextFont { font_size: 11.0, ..default() },
+            TextColor(Color::srgba(0.5, 0.7, 0.8, 0.7)),
+            Node { margin: UiRect::top(Val::Px(10.0)).with_bottom(Val::Px(6.0)), ..default() },
+        ));
+        parent.spawn((
+            Text::new("Loading..."),
+            TextFont { font_size: 10.0, ..default() },
+            TextColor(Color::srgba(0.4, 0.6, 0.5, 0.6)),
+            PanelMetrics,
+        ));
+    });
+
     // Store data for arc rendering (gizmos are immediate-mode)
     commands.insert_resource(AtlasData { data });
 
@@ -1144,6 +1206,33 @@ pub fn temporal_4d_system(
         } else {
             Visibility::Hidden
         };
+    }
+}
+
+/// Update side panel metrics with live data.
+pub fn panel_metrics_system(
+    timeline: Res<TimelineState>,
+    view: Res<DataView>,
+    aesthetic: Res<CurrentAesthetic>,
+    mut texts: Query<&mut Text, With<PanelMetrics>>,
+) {
+    let year = timeline.year;
+    let phase = sol_atlas_core::simulation::secular_phase_at_year(year);
+    let colonies = sol_atlas_core::simulation::colonies_at_year(year);
+    let total_colony_pop: u32 = colonies.iter().map(|c| c.population).sum();
+
+    let metrics = format!(
+        "Year: {}\nPhase: {}\nView: {}\nStyle: {:?}\nColonies: {}\nOff-world: {}",
+        year,
+        phase.label(),
+        view.label(),
+        aesthetic.aesthetic,
+        colonies.len(),
+        total_colony_pop,
+    );
+
+    for mut text in texts.iter_mut() {
+        *text = Text::new(metrics.clone());
     }
 }
 
