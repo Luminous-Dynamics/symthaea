@@ -109,4 +109,5 @@
 \contentsline {section}{\numberline {17.6}The Last Word}{69}{section.17.6}%
 \contentsline {section}{\numberline {17.7}Appendix Note}{69}{section.17.7}%
 \contentsline {chapter}{Appendix B: Old Interpretation vs Revised Interpretation}{71}{chapter*.3}%
-\contentsline {chapter}{Reproduction}{73}{chapter*.4}%
+\contentsline {chapter}{Afterword: What This Changes}{73}{chapter*.4}%
+\contentsline {chapter}{Reproduction}{75}{chapter*.5}%
