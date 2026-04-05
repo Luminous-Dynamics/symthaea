@@ -7,6 +7,7 @@ use leptos::prelude::*;
 mod api;
 mod app;
 mod components;
+mod holochain;
 mod pages;
 mod types;
 

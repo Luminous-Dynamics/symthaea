@@ -112,6 +112,28 @@ pub fn ClaimDetailPage() -> impl IntoView {
                                 <div>"Reproducibility: " <span style="color: var(--accent-emerald);">{format!("{:.0}%", s * 100.0)}</span></div>
                             })}
                         </div>
+                    // Fact-check from knowledge graph
+                    {
+                        let fc = crate::holochain::mock_fact_check(&claim.content.description);
+                        view! {
+                            <div class="glass-panel" style="margin-top: 1rem;">
+                                <h4 style="font-size: 0.875rem; margin-bottom: 0.5rem;">"Knowledge Graph Fact-Check"</h4>
+                                <div style=format!("font-size: 1.25rem; font-weight: 700; color: {};", fc.verdict.css_color())>
+                                    {fc.verdict.label()}
+                                </div>
+                                <div style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 0.25rem;">
+                                    {format!("Confidence: {:.0}% | {} supporting, {} contradicting",
+                                        fc.confidence * 100.0, fc.supporting_claims, fc.contradicting_claims)}
+                                </div>
+                                <div style="font-size: 0.7rem; color: var(--text-secondary); margin-top: 0.375rem;">
+                                    {
+                                        let status = crate::holochain::check_conductor_status();
+                                        format!("Source: {}", status.label())
+                                    }
+                                </div>
+                            </div>
+                        }
+                    }
                     </div>
                 </div>
             </div>
