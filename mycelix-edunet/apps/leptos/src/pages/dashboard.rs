@@ -249,6 +249,13 @@ pub fn DashboardPage() -> impl IntoView {
             // Pending TEND — economic value from learning
             <PendingTendCard />
 
+            // Solo cooperation prompt
+            <div class="cooperation-prompt">
+                "Learning solo? Connect to the mesh to find peers studying the same topics."
+                <br />
+                <strong>"Cooperation multiplier: 1.2x TEND for group study sessions."</strong>
+            </div>
+
             // Suggestion overlay
             <SuggestionOverlay />
 

@@ -354,18 +354,21 @@ pub fn MockExamPage() -> impl IntoView {
                         // Question navigation dots
                         <div style="display: flex; gap: 4px; flex-wrap: wrap; justify-content: center">
                             {(0..total).map(|i| {
-                                let color = move || {
+                                let cls = move || {
                                     let a = answers.get();
+                                    let is_current = i == current_q.get();
+                                    let mut c = String::from("exam-dot");
                                     match a.get(i) {
-                                        Some(Some(true)) => "var(--mastery-green)",
-                                        Some(Some(false)) => "var(--warning)",
-                                        _ => if i == current_q.get() { "var(--primary)" } else { "var(--border)" },
+                                        Some(Some(true)) => c.push_str(" exam-dot-correct"),
+                                        Some(Some(false)) => c.push_str(" exam-dot-incorrect"),
+                                        _ => {}
                                     }
+                                    if is_current { c.push_str(" exam-dot-current"); }
+                                    c
                                 };
                                 view! {
                                     <button
-                                        style=move || format!("width: 24px; height: 24px; border-radius: 50%; border: 2px solid {}; background: {}; cursor: pointer; font-size: 0.6rem; color: var(--text); font-family: inherit",
-                                            color(), if i == current_q.get() { color() } else { "transparent" })
+                                        class=cls
                                         on:click=move |_| { set_current_q.set(i); set_revealed.set(false); }
                                     >
                                         {i + 1}

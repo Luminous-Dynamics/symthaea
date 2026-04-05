@@ -107,12 +107,12 @@ fn RoleNav(role: ReadSignal<Option<UserRole>>) -> impl IntoView {
         Some(UserRole::Teacher) => view! {
             <A href="/teacher">"Dashboard"</A>
             <A href="/courses">"Courses"</A>
-            <A href="/skill-map">"Skill Map"</A>
+            <A href="/skill-map">"Knowledge Garden"</A>
             <A href="/credentials">"Assessments"</A>
         }.into_any(),
         Some(UserRole::Student) => view! {
             <A href="/dashboard">"Dashboard"</A>
-            <A href="/skill-map">"Skill Map"</A>
+            <A href="/skill-map">"Knowledge Garden"</A>
             <A href="/review">"Review"</A>
             <A href="/exam-prep">"Exam Prep"</A>
         }.into_any(),

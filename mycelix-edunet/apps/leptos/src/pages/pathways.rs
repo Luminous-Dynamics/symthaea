@@ -44,6 +44,29 @@ const PATHWAYS: &[(&str, &str, &str)] = &[
     ("Legal Awareness", "Legal Awareness", "SA Constitution, employment law, consumer rights, tax, POPIA, business registration"),
 ];
 
+/// Returns a CSS class suffix for the pathway category based on subject name.
+fn pathway_category_class(subject: &str) -> &'static str {
+    match subject {
+        "Cybersecurity" | "Computer Science" | "Consciousness Computing"
+        | "Decentralized Systems" | "IT Support" => "pathway-card-tech",
+
+        "Critical Thinking" | "Philosophy" | "Learning Science" | "Statistics"
+        | "Economics" | "Mathematics" | "Physics" => "pathway-card-academic",
+
+        "Financial Literacy" | "Health" | "Emotional Intelligence" | "Communication"
+        | "Civic Literacy" | "Digital Literacy" | "Legal Awareness"
+        | "Hospitality" => "pathway-card-life",
+
+        "Sustainability" | "Agriculture" | "Systems Thinking" => "pathway-card-sustainability",
+
+        // Trades default to tech
+        "Electrical Trade" | "Plumbing Trade" | "Welding Trade"
+        | "Automotive Trade" | "Construction Trade" => "pathway-card-tech",
+
+        _ => "",
+    }
+}
+
 #[component]
 pub fn PathwaysPage() -> impl IntoView {
     let (selected, set_selected) = signal::<Option<String>>(None);
@@ -81,9 +104,10 @@ pub fn PathwaysPage() -> impl IntoView {
                                 let display = display_name.to_string();
                                 let description = desc.to_string();
 
+                                let cat_class = pathway_category_class(subject);
                                 view! {
                                     <button
-                                        class="pathway-card"
+                                        class=format!("pathway-card {}", cat_class)
                                         on:click=move |_| set_selected.set(Some(subj_click.clone()))
                                     >
                                         <div style="font-weight: 600; font-size: 0.95rem; margin-bottom: 0.25rem">{display}</div>

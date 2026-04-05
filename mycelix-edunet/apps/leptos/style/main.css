@@ -5220,3 +5220,71 @@ html[dir="rtl"] pre, html[dir="rtl"] code { direction: ltr; text-align: left; }
 
 /* Heatmap table stays LTR (data grid) */
 html[dir="rtl"] .heatmap-table { direction: ltr; }
+
+/* ===========================================================================
+   Exam navigation dots (P2-1)
+   =========================================================================== */
+
+.exam-dot {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    border: 2px solid var(--border);
+    background: transparent;
+    cursor: pointer;
+    font-size: 0.6rem;
+    color: var(--text);
+    font-family: inherit;
+    transition: box-shadow 0.2s, opacity 0.2s, border-color 0.2s;
+}
+
+.exam-dot-correct {
+    border-color: var(--mastery-green);
+    box-shadow: 0 0 8px rgba(14, 212, 168, 0.6);
+}
+
+.exam-dot-incorrect {
+    border-color: var(--warning);
+    opacity: 0.4;
+}
+
+.exam-dot-current {
+    border-color: var(--primary);
+    background: var(--primary);
+    animation: exam-dot-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes exam-dot-pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(14, 212, 168, 0.4); }
+    50% { box-shadow: 0 0 0 6px rgba(14, 212, 168, 0); }
+}
+
+/* ===========================================================================
+   Cooperation prompt (P2-2)
+   =========================================================================== */
+
+.cooperation-prompt {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--primary);
+    border-radius: var(--radius);
+    padding: 1rem 1.25rem;
+    margin-top: 0.75rem;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    line-height: 1.6;
+}
+
+.cooperation-prompt strong {
+    color: var(--primary);
+    font-size: 0.8rem;
+}
+
+/* ===========================================================================
+   Pathway category borders (P2-3)
+   =========================================================================== */
+
+.pathway-card-tech    { border-left: 3px solid var(--primary); }
+.pathway-card-academic { border-left: 3px solid #3b82f6; }
+.pathway-card-life    { border-left: 3px solid #f59e0b; }
+.pathway-card-sustainability { border-left: 3px solid #22c55e; }
