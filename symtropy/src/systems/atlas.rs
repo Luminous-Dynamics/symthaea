@@ -715,17 +715,18 @@ pub fn setup_globe_view(
     let region_mesh = meshes.add(Sphere::new(1.0).mesh().uv(8, 8));
     for region in &data.earth_regions {
         let pos = geo::lat_lon_to_xyz(region.lat, region.lon, 1.04);
-        // Color by vulnerability: green (resilient) → red (vulnerable)
+        // Color by vulnerability: blue (resilient) → purple (vulnerable)
+        // NOT red — red is reserved for emergencies/earthquakes
         let v = region.climate_vulnerability as f32;
         let c = [
-            0.1 + v * 0.8,       // R: increases with vulnerability
-            0.7 * (1.0 - v),     // G: decreases
-            0.2 * (1.0 - v),     // B: decreases
+            0.2 + v * 0.4,      // R: slight increase
+            0.3 * (1.0 - v),    // G: decreases
+            0.6 + v * 0.3,      // B: stays high (blue→purple)
         ];
-        let size = 0.012 + (region.population_m as f32 / 2000.0).min(1.0) * 0.012;
+        let size = 0.006 + (region.population_m as f32 / 3000.0).min(1.0) * 0.006;
         let mat = materials.add(StandardMaterial {
-            base_color: Color::linear_rgba(c[0], c[1], c[2], 0.5),
-            emissive: LinearRgba::new(c[0] * 0.3, c[1] * 0.3, c[2] * 0.3, 1.0),
+            base_color: Color::linear_rgba(c[0], c[1], c[2], 0.4),
+            emissive: LinearRgba::new(c[0] * 0.1, c[1] * 0.1, c[2] * 0.1, 1.0), // minimal emissive
             alpha_mode: AlphaMode::Blend,
             unlit: true,
             ..default()
@@ -741,9 +742,11 @@ pub fn setup_globe_view(
     }
 
     // ─── Major World Cities (232 cities, pop >= 1M) ──────────────
-    // Tiny dots showing global population distribution at orbit zoom.
+    // Only show top 30 megacities to avoid visual noise.
     let city_dot_mesh = meshes.add(Sphere::new(1.0).mesh().uv(4, 4));
-    for city in &data.major_cities {
+    let mut sorted_cities = data.major_cities.clone();
+    sorted_cities.sort_by(|a, b| b.population.cmp(&a.population));
+    for city in sorted_cities.iter().take(30) {
         let pos = geo::lat_lon_to_xyz(city.lat, city.lon, 1.04);
         let pop_scale = (city.population as f32 / 20_000_000.0).clamp(0.0, 1.0);
         let size = 0.003 + pop_scale * 0.005; // tiny dots, larger for megacities
@@ -770,10 +773,11 @@ pub fn setup_globe_view(
     let event_mesh = meshes.add(Sphere::new(1.0).mesh().uv(6, 6));
     for event in &data.natural_events {
         // Filter: only show significant events (M4+ quakes, high-confidence fires)
-        // Only show significant events to reduce visual noise
+        // Strict filter — only major events to avoid visual noise
         match event.event_type {
-            sol_atlas_core::types::NaturalEventType::Earthquake if event.magnitude < 6.0 => continue,
-            sol_atlas_core::types::NaturalEventType::Fire if event.magnitude < 0.5 => continue,
+            sol_atlas_core::types::NaturalEventType::Earthquake if event.magnitude < 5.5 => continue,
+            sol_atlas_core::types::NaturalEventType::Fire => continue, // fires disabled — too many, too noisy
+            sol_atlas_core::types::NaturalEventType::Storm if event.magnitude < 30.0 => continue, // only major storms
             _ => {}
         }
         let pos = geo::lat_lon_to_xyz(event.lat, event.lon, 1.04);
