@@ -32,6 +32,10 @@ const VOLCANOES_JSON: &str =
     include_str!("../../sol-atlas-leptos/assets/data/volcanoes.json");
 const MAJOR_CITIES_JSON: &str =
     include_str!("../../sol-atlas-leptos/assets/data/major-cities-1m.json");
+const CHOKEPOINTS_JSON: &str =
+    include_str!("../../sol-atlas-leptos/assets/data/chokepoints.json");
+const CRITICAL_INFRA_JSON: &str =
+    include_str!("../../sol-atlas-leptos/assets/data/critical-infrastructure.json");
 const SHIPPING_LANES_JSON: &str =
     include_str!("../../sol-atlas-leptos/assets/data/shipping-lanes-simplified.json");
 
@@ -58,5 +62,7 @@ pub fn load_all() -> LoadedData {
         STORMS_JSON,
         VOLCANOES_JSON,
         MAJOR_CITIES_JSON,
+        CHOKEPOINTS_JSON,
+        CRITICAL_INFRA_JSON,
     )
 }

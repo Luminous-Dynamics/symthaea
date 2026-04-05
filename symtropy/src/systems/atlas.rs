@@ -106,7 +106,7 @@ impl DataView {
             ],
             Self::Infrastructure => vec![
                 Layer::Maglev, Layer::SupplyChain, Layer::ResontiaVaults,
-                Layer::Robotics,
+                Layer::Robotics, Layer::Infrastructure, Layer::Chokepoints,
             ],
             Self::Interplanetary => vec![], // planets + colonies only (no Earth markers)
         }
@@ -796,6 +796,61 @@ pub fn setup_globe_view(
         ));
     }
     info!("[atlas] {} natural events loaded (earthquakes + fires + storms + volcanoes)", data.natural_events.len());
+
+    // ─── Maritime Chokepoints (ALWAYS VISIBLE) ──────────────────
+    // 8 critical bottlenecks in global trade — diamond-shaped, warning color.
+    let choke_mesh = meshes.add(Sphere::new(1.0).mesh().uv(6, 6));
+    for choke in &data.chokepoints {
+        let pos = geo::lat_lon_to_xyz(choke.lat, choke.lon, 1.03);
+        let size = 0.008 + (choke.daily_barrels_m as f32 / 25.0).min(1.0) * 0.008;
+        let mat = materials.add(StandardMaterial {
+            base_color: Color::linear_rgba(1.0, 0.6, 0.1, 0.8),
+            emissive: LinearRgba::new(0.8, 0.4, 0.05, 1.0),
+            unlit: true,
+            alpha_mode: AlphaMode::Blend,
+            ..default()
+        });
+        commands.spawn((
+            Mesh3d(choke_mesh.clone()),
+            MeshMaterial3d(mat),
+            Transform::from_xyz(pos[0], pos[1], pos[2]).with_scale(Vec3::splat(size)),
+            MarkerPulse { speed: 0.8, amplitude: 0.2, phase: choke.lat as f32, base_scale: size },
+            DataMarker { layer: Layer::Chokepoints, name: format!("{} ({}M bbl/day)", choke.name, choke.daily_barrels_m) },
+            AtlasEntity,
+        ));
+    }
+
+    // ─── Critical Infrastructure (ALWAYS VISIBLE) ───────────────
+    // 10 single points of failure — bright warning markers.
+    let crit_mesh = meshes.add(Sphere::new(1.0).mesh().uv(8, 8));
+    for infra in &data.critical_infrastructure {
+        let pos = geo::lat_lon_to_xyz(infra.lat, infra.lon, 1.035);
+        let size = 0.006 + (infra.global_share as f32).min(1.0) * 0.010;
+        // Color by type: semiconductor=purple, port=blue, oil=amber, other=cyan
+        let c = match infra.infra_type.as_str() {
+            "semiconductor" => [0.7, 0.3, 0.9],
+            "port" => [0.2, 0.5, 0.9],
+            "oil_hub" | "gas_pipeline" => [0.9, 0.6, 0.1],
+            "submarine_cable" => [0.1, 0.8, 0.7],
+            "seed_bank" => [0.2, 0.8, 0.3],
+            _ => [0.5, 0.7, 0.8],
+        };
+        let mat = materials.add(StandardMaterial {
+            base_color: Color::linear_rgba(c[0], c[1], c[2], 0.75),
+            emissive: LinearRgba::new(c[0] * 0.5, c[1] * 0.5, c[2] * 0.5, 1.0),
+            unlit: true,
+            alpha_mode: AlphaMode::Blend,
+            ..default()
+        });
+        commands.spawn((
+            Mesh3d(crit_mesh.clone()),
+            MeshMaterial3d(mat),
+            Transform::from_xyz(pos[0], pos[1], pos[2]).with_scale(Vec3::splat(size)),
+            MarkerPulse { speed: 1.2, amplitude: 0.15, phase: infra.lon as f32 * 0.1, base_scale: size },
+            DataMarker { layer: Layer::Infrastructure, name: format!("{} ({}, risk: {})", infra.name, infra.infra_type, infra.risk) },
+            AtlasEntity,
+        ));
+    }
 
     // ─── Solar System Bodies ────────────────────────────────────
     let bodies = sol_atlas_core::solar_system::solar_system_bodies();

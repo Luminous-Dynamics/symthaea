@@ -1,0 +1,12 @@
+[
+  {"name": "TSMC Fab 18", "lat": 23.75, "lon": 120.32, "type": "semiconductor", "global_share": 0.54, "risk": "earthquake/invasion"},
+  {"name": "Samsung Pyeongtaek", "lat": 37.0, "lon": 127.0, "type": "semiconductor", "global_share": 0.17, "risk": "geopolitical"},
+  {"name": "Kanal Istanbul", "lat": 41.1, "lon": 28.7, "type": "waterway", "global_share": 0.03, "risk": "congestion"},
+  {"name": "Rotterdam-Europoort", "lat": 51.9, "lon": 4.3, "type": "port", "global_share": 0.05, "risk": "sea_level"},
+  {"name": "Singapore Port", "lat": 1.26, "lon": 103.84, "type": "port", "global_share": 0.04, "risk": "geopolitical"},
+  {"name": "Cushing OK Hub", "lat": 35.98, "lon": -96.77, "type": "oil_hub", "global_share": 0.08, "risk": "tornado"},
+  {"name": "Three Gorges Dam", "lat": 30.82, "lon": 111.0, "type": "hydroelectric", "global_share": 0.01, "risk": "structural"},
+  {"name": "Nord Stream Junction", "lat": 54.5, "lon": 13.5, "type": "gas_pipeline", "global_share": 0.06, "risk": "sabotage"},
+  {"name": "FLAG Telecom Landing", "lat": 22.3, "lon": 114.2, "type": "submarine_cable", "global_share": 0.12, "risk": "anchor_damage"},
+  {"name": "Svalbard Seed Vault", "lat": 78.24, "lon": 15.45, "type": "seed_bank", "global_share": 1.0, "risk": "permafrost_melt"}
+]

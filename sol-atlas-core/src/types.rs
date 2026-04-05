@@ -27,6 +27,8 @@ pub enum Layer {
     Fires,
     Storms,
     Volcanoes,
+    Infrastructure,
+    Chokepoints,
 }
 
 impl Layer {
@@ -36,6 +38,7 @@ impl Layer {
             Self::TerraLumina, Self::Regions, Self::SupplyChain, Self::Climate,
             Self::Emergency, Self::Health, Self::Robotics, Self::FossilDeposits, Self::Nuclear,
             Self::Earthquakes, Self::Fires, Self::Storms, Self::Volcanoes,
+            Self::Infrastructure, Self::Chokepoints,
         ]
         .into_iter()
         .collect()
@@ -60,6 +63,8 @@ impl Layer {
             Self::Fires => "Active Fires",
             Self::Storms => "Storms",
             Self::Volcanoes => "Volcanoes",
+            Self::Infrastructure => "Critical Infrastructure",
+            Self::Chokepoints => "Maritime Chokepoints",
         }
     }
 
@@ -82,6 +87,8 @@ impl Layer {
             Self::Fires => "#ed8936",
             Self::Storms => "#4299e1",
             Self::Volcanoes => "#e53e3e",
+            Self::Infrastructure => "#9f7aea",
+            Self::Chokepoints => "#ed8936",
         }
     }
 
@@ -105,6 +112,8 @@ impl Layer {
             Self::Fires => [0.95, 0.5, 0.1],
             Self::Storms => [0.1, 0.7, 0.9],
             Self::Volcanoes => [0.9, 0.3, 0.05],
+            Self::Infrastructure => [0.62, 0.48, 0.92],
+            Self::Chokepoints => [0.93, 0.54, 0.21],
         }
     }
 }
@@ -469,6 +478,8 @@ pub struct LoadedData {
     pub nuclear_sites: Vec<NuclearSite>,
     pub natural_events: Vec<NaturalEvent>,
     pub major_cities: Vec<MajorCity>,
+    pub chokepoints: Vec<Chokepoint>,
+    pub critical_infrastructure: Vec<CriticalInfrastructure>,
 }
 
 /// Major world city (population >= 1M).
@@ -547,4 +558,27 @@ impl MarkerInstance {
             self.marker_type,
         ]
     }
+}
+
+/// Maritime chokepoint — critical bottleneck in global trade.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Chokepoint {
+    pub name: String,
+    pub lat: f64,
+    pub lon: f64,
+    pub daily_barrels_m: f64,
+    #[serde(rename = "type")]
+    pub chokepoint_type: String,
+}
+
+/// Critical infrastructure — single points of failure in civilization.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CriticalInfrastructure {
+    pub name: String,
+    pub lat: f64,
+    pub lon: f64,
+    #[serde(rename = "type")]
+    pub infra_type: String,
+    pub global_share: f64,
+    pub risk: String,
 }
