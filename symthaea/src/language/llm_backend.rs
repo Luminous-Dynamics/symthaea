@@ -399,6 +399,13 @@ impl LLMBackend for OllamaBackend {
             },
         };
 
+        tracing::info!(
+            target: "llm_backend",
+            model = %self.model,
+            num_predict = params.max_tokens,
+            "Ollama chat request"
+        );
+
         let response = self
             .client
             .post(&url)
@@ -420,6 +427,12 @@ impl LLMBackend for OllamaBackend {
             .json()
             .await
             .map_err(|e| anyhow::anyhow!("Failed to parse Ollama chat response: {e}"))?;
+
+        tracing::info!(
+            target: "llm_backend",
+            len = chat_response.message.content.len(),
+            "Ollama chat response"
+        );
 
         Ok(chat_response.message.content)
     }

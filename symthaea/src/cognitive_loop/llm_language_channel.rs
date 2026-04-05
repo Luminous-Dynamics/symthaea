@@ -113,7 +113,10 @@ impl LlmLanguageChannel {
         let backend = std::sync::Arc::new(crate::language::llm_backend::OllamaBackend::new());
         let config = crate::language::llm_organ::LLMOrganConfig {
             temperature: 0.7,
-            max_generation_length: 128,
+            // Gemma 4:e2b is a reasoning model — thinking tokens consume ~300-400
+            // of the budget before producing visible output. 512 ensures enough
+            // room for thinking + a 1-3 sentence response.
+            max_generation_length: 512,
             memory_enabled: false, // Stateless per-request
             ..Default::default()
         };
@@ -144,7 +147,7 @@ impl LlmLanguageChannel {
                 ),
                 params: Some(crate::language::llm_organ::LLMQueryParams {
                     temperature: Some(0.7),
-                    max_length: Some(128),
+                    max_length: Some(512), // Gemma 4 thinking tokens need ~300-400
                     stop_sequences: Vec::new(),
                 }),
             }));
