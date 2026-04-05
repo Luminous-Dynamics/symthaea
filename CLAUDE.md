@@ -247,7 +247,7 @@ Quick guide: @.claude/guides/SERVICES.md
 ---
 
 ## AI Models (Approved)
-embeddinggemma:300m | gemma3:1b | qwen3:1.7b | gemma3:4b | mistral:7b | qwen2.5-coder:7b
+embeddinggemma:300m | gemma3:1b | qwen3:1.7b | gemma4:e2b | mistral:7b | qwen2.5-coder:7b
 
 **Do NOT use**: qwen2.5 *general* variants (qwen2.5:7b, etc.)
 **Exception**: `qwen2.5-coder:7b` is approved for Symthaea code generation (Phase 4 School, Tier 2 fallback)
