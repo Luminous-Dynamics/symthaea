@@ -122,6 +122,56 @@ char* litert_generate(void* engine, const char* prompt, uint32_t max_tokens) {
 #endif
 }
 
+char* litert_generate_stream(
+    void* engine,
+    const char* prompt,
+    uint32_t max_tokens,
+    litert_stream_callback callback,
+    void* context
+) {
+    if (!engine || !prompt) return nullptr;
+    auto* wrapper = static_cast<LiteRTEngine*>(engine);
+    if (!wrapper->ready) return nullptr;
+
+#ifdef LITERT_LM_AVAILABLE
+    auto conv_config = litert::lm::ConversationConfig::CreateDefault(*wrapper->engine);
+    if (!conv_config) return nullptr;
+
+    auto conv = litert::lm::Conversation::Create(*conv_config);
+    if (!conv) return nullptr;
+
+    // Streaming: accumulate tokens and invoke callback for each
+    std::string accumulated;
+    std::string request = std::string("{\"text\": \"") + prompt + "\"}";
+
+    // Use streaming SendMessage with per-token callback
+    auto on_token = [&accumulated, callback, context](const std::string& token) {
+        accumulated += token;
+        if (callback) {
+            callback(token.c_str(), context);
+        }
+    };
+
+    // Note: exact streaming API depends on LiteRT-LM SDK version.
+    // SendMessage with callback is the documented pattern.
+    conv->SendMessage(request, on_token);
+
+    if (accumulated.empty()) return nullptr;
+
+    char* result = static_cast<char*>(malloc(accumulated.size() + 1));
+    if (result) {
+        memcpy(result, accumulated.c_str(), accumulated.size() + 1);
+    }
+    return result;
+#else
+    (void)prompt;
+    (void)max_tokens;
+    (void)callback;
+    (void)context;
+    return nullptr;
+#endif
+}
+
 void litert_free_response(char* response) {
     free(response);
 }

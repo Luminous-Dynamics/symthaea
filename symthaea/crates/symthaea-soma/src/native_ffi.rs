@@ -630,6 +630,62 @@ pub unsafe extern "C" fn soma_engine_litert_generate(
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// Prism epistemic search (offline-capable, sub-ms)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Initialize the Prism epistemic search engine with pre-seeded claims.
+///
+/// # Safety: `engine` must be valid.
+#[cfg(feature = "prism-search")]
+#[no_mangle]
+pub unsafe extern "C" fn soma_engine_prism_init(engine: *mut SomaEngine) {
+    unsafe { &mut *engine }.prism_init();
+}
+
+/// Search Prism epistemic claims. Returns JSON array of results.
+/// Caller must free with `soma_string_free()`.
+///
+/// # Safety: `engine` must be valid. `query` must be valid null-terminated UTF-8.
+#[cfg(feature = "prism-search")]
+#[no_mangle]
+pub unsafe extern "C" fn soma_engine_prism_search(
+    engine: *const SomaEngine,
+    query: *const c_char,
+    top_k: u32,
+) -> *mut c_char {
+    if query.is_null() {
+        return std::ptr::null_mut();
+    }
+    let query_str = match unsafe { CStr::from_ptr(query) }.to_str() {
+        Ok(s) => s,
+        Err(_) => return std::ptr::null_mut(),
+    };
+    let results = unsafe { &*engine }.prism_search(query_str, top_k as usize);
+    let json: Vec<serde_json::Value> = results
+        .iter()
+        .map(|r| {
+            serde_json::json!({
+                "content": r.content,
+                "sources": r.sources,
+                "empirical_level": format!("{:?}", r.empirical_level),
+                "similarity": r.query_similarity,
+            })
+        })
+        .collect();
+    CString::new(serde_json::to_string(&json).unwrap_or_else(|_| "[]".to_string()))
+        .map_or(std::ptr::null_mut(), |c| c.into_raw())
+}
+
+/// Whether Prism search is initialized and has claims.
+///
+/// # Safety: `engine` must be valid.
+#[cfg(feature = "prism-search")]
+#[no_mangle]
+pub unsafe extern "C" fn soma_engine_prism_available(engine: *const SomaEngine) -> u8 {
+    if unsafe { &*engine }.prism_available() { 1 } else { 0 }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // Screen vision (Phase 3)
 // ═══════════════════════════════════════════════════════════════════════════════
 

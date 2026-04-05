@@ -20,6 +20,8 @@ use symthaea_spore::engine::{CycleResult, SporeEngine};
 use crate::broca_soma::BrocaSoma;
 #[cfg(feature = "litert")]
 use crate::litert_bridge::{LiteRTBackend, LiteRTBridge};
+#[cfg(feature = "prism-search")]
+use plexus_search::SearchEngine;
 #[cfg(feature = "screen-vision")]
 use crate::screen_vision::{ScreenPerception, ScreenVisionBridge, ScreenVisionConfig};
 #[cfg(feature = "screen-vision")]
@@ -92,6 +94,10 @@ pub struct SomaEngine {
     #[cfg(feature = "litert")]
     pub(crate) litert: Option<LiteRTBridge>,
 
+    /// Prism epistemic search engine (16,384-bit BinaryHV, offline-capable).
+    #[cfg(feature = "prism-search")]
+    pub(crate) prism_search: Option<SearchEngine>,
+
     // Platform state (set via native FFI or programmatically)
     /// Current thermal level (0=Nominal, 1=Fair, 2=Serious, 3=Critical, 4=Emergency).
     pub thermal_level: u8,
@@ -132,6 +138,8 @@ impl SomaEngine {
             broca_soma: BrocaSoma::new(),
             #[cfg(feature = "litert")]
             litert: None,
+            #[cfg(feature = "prism-search")]
+            prism_search: None,
             thermal_level: 0,
             battery_percent: 100,
             battery_charging: false,
@@ -715,6 +723,37 @@ impl SomaEngine {
             max_tokens,
             consciousness,
         ).map(|r| r.text)
+    }
+
+    // ======================================================================
+    // Prism epistemic search (offline-capable, sub-ms)
+    // ======================================================================
+
+    /// Initialize the Prism epistemic search engine with pre-seeded claims.
+    #[cfg(feature = "prism-search")]
+    pub fn prism_init(&mut self) {
+        self.prism_search = Some(SearchEngine::with_seed_claims());
+        tracing::info!(
+            claims = self.prism_search.as_ref().map_or(0, |s| s.claim_count()),
+            "Prism epistemic search initialized"
+        );
+    }
+
+    /// Search local epistemic claims via Prism's 16,384-bit BinaryHV engine.
+    #[cfg(feature = "prism-search")]
+    pub fn prism_search(&self, query: &str, top_k: usize) -> Vec<plexus_common::SearchResult> {
+        self.prism_search
+            .as_ref()
+            .map(|s| s.search(query, top_k))
+            .unwrap_or_default()
+    }
+
+    /// Whether Prism search is initialized and has claims.
+    #[cfg(feature = "prism-search")]
+    pub fn prism_available(&self) -> bool {
+        self.prism_search
+            .as_ref()
+            .map_or(false, |s| s.claim_count() > 0)
     }
 
     /// Set persistence storage backend.

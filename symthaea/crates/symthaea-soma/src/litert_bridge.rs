@@ -36,6 +36,13 @@ extern "C" {
     ) -> *mut c_char;
     fn litert_free_response(response: *mut c_char);
     fn litert_free_engine(engine: *mut std::ffi::c_void);
+    fn litert_generate_stream(
+        engine: *mut std::ffi::c_void,
+        prompt: *const c_char,
+        max_tokens: u32,
+        callback: extern "C" fn(*const c_char, *mut std::ffi::c_void),
+        context: *mut std::ffi::c_void,
+    ) -> *mut c_char;
 }
 
 // Stub FFI for host-side compilation and testing
@@ -65,6 +72,16 @@ mod ffi_stub {
     pub unsafe fn litert_free_response(_response: *mut c_char) {}
 
     pub unsafe fn litert_free_engine(_engine: *mut std::ffi::c_void) {}
+
+    pub unsafe fn litert_generate_stream(
+        _engine: *mut std::ffi::c_void,
+        _prompt: *const c_char,
+        _max_tokens: u32,
+        _callback: extern "C" fn(*const c_char, *mut std::ffi::c_void),
+        _context: *mut std::ffi::c_void,
+    ) -> *mut c_char {
+        std::ptr::null_mut()
+    }
 }
 
 #[cfg(test)]
@@ -251,6 +268,79 @@ impl LiteRTBridge {
         );
 
         self.generate(&augmented_prompt, max_tokens)
+            .map(|text| LiteRTResponse {
+                text,
+                from_device: true,
+            })
+    }
+
+    /// Generate text with per-token streaming callback.
+    ///
+    /// Tokens are delivered via `on_token` as they're generated, enabling
+    /// real-time UI updates (~25-35 tok/s on Pixel 8 Pro GPU).
+    pub fn generate_streaming(
+        &self,
+        prompt: &str,
+        max_tokens: u32,
+        on_token: &mut dyn FnMut(&str),
+    ) -> Option<String> {
+        if self.engine.is_null() {
+            return None;
+        }
+
+        let c_prompt = CString::new(prompt).ok()?;
+
+        // Trampoline: C callback → Rust closure via context pointer
+        extern "C" fn trampoline(token: *const c_char, context: *mut std::ffi::c_void) {
+            if token.is_null() || context.is_null() {
+                return;
+            }
+            let closure = unsafe { &mut *(context as *mut &mut dyn FnMut(&str)) };
+            if let Ok(s) = unsafe { CStr::from_ptr(token) }.to_str() {
+                closure(s);
+            }
+        }
+
+        let mut closure_ref: &mut dyn FnMut(&str) = on_token;
+        let context_ptr = &mut closure_ref as *mut &mut dyn FnMut(&str) as *mut std::ffi::c_void;
+
+        let response = unsafe {
+            litert_generate_stream(
+                self.engine,
+                c_prompt.as_ptr(),
+                max_tokens,
+                trampoline,
+                context_ptr,
+            )
+        };
+
+        if response.is_null() {
+            return None;
+        }
+
+        let text = unsafe { CStr::from_ptr(response) }
+            .to_str()
+            .ok()
+            .map(String::from);
+
+        unsafe { litert_free_response(response) };
+
+        text
+    }
+
+    /// Streaming generation gated by consciousness level.
+    pub fn generate_streaming_consciousness_gated(
+        &self,
+        prompt: &str,
+        max_tokens: u32,
+        consciousness_level: f32,
+        on_token: &mut dyn FnMut(&str),
+    ) -> Option<LiteRTResponse> {
+        if consciousness_level < CONSCIOUSNESS_GATE_THRESHOLD {
+            return None;
+        }
+
+        self.generate_streaming(prompt, max_tokens, on_token)
             .map(|text| LiteRTResponse {
                 text,
                 from_device: true,

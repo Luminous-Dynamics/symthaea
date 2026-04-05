@@ -37,7 +37,24 @@ bool litert_is_ready(const void* engine);
 /// @param max_tokens  Maximum tokens to generate.
 char* litert_generate(void* engine, const char* prompt, uint32_t max_tokens);
 
-/// Free a response string returned by litert_generate().
+/// Callback type for streaming generation.
+/// @param token    The next generated token (null-terminated UTF-8).
+/// @param context  User-provided context pointer (passed through unchanged).
+typedef void (*litert_stream_callback)(const char* token, void* context);
+
+/// Generate text with per-token streaming callback.
+/// The callback is invoked for each generated token.
+/// Returns the full concatenated response (caller must free with litert_free_response),
+/// or NULL on failure.
+char* litert_generate_stream(
+    void* engine,
+    const char* prompt,
+    uint32_t max_tokens,
+    litert_stream_callback callback,
+    void* context
+);
+
+/// Free a response string returned by litert_generate() or litert_generate_stream().
 void litert_free_response(char* response);
 
 /// Free the engine and all associated resources.
