@@ -1828,7 +1828,6 @@ const MULTI_PROTO_K: usize = 5;
 /// let (verdict, confidence) = classifier.classify("stealing is wrong");
 /// assert_eq!(verdict, MoralVerdict::Bad);
 /// ```
-#[derive(Clone)]
 pub struct SpinozistClassifier {
     basis: NsmPrimeBasis,
     affects: AffectBasis,
@@ -1847,15 +1846,6 @@ pub struct SpinozistClassifier {
     surface_subclusters: Option<Vec<(ContinuousHV, usize)>>,
     // k-NN exemplar store for full-fidelity classification (k=31)
     surface_exemplars: Option<ExemplarStore>,
-}
-
-impl std::fmt::Debug for SpinozistClassifier {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("SpinozistClassifier")
-            .field("valence_threshold", &self.valence_threshold)
-            .field("hybrid_trained", &self.hybrid_trained)
-            .finish_non_exhaustive()
-    }
 }
 
 impl SpinozistClassifier {

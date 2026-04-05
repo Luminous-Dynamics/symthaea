@@ -1099,4 +1099,7 @@ impl CognitiveLoopService {
     pub fn threshold_overrides(&self) -> &super::super::threshold_overrides::ThresholdOverrides {
         &self.threshold_overrides
     }
+
+    // Voice synthesis API is in accessors/behavior.rs:
+    // enable_voice_synthesis(), drain_voice_audio(), voice_synthesis_enabled()
 }
