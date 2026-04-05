@@ -4,10 +4,25 @@
 //! Physics Discovery page — catalog browser, structural search, case studies.
 
 use leptos::prelude::*;
+use wasm_bindgen::JsCast;
 use crate::types::DiscoveryResult;
 use crate::components::nuclear_chart::NuclearChart;
+use symthaea_physics_catalog::catalog::PhysicsCatalog;
+use symthaea_physics_catalog::search;
 
-/// Physics equation domains and counts (from the 148-equation catalog).
+/// Build domain counts from the live WASM catalog.
+fn catalog_domains_live() -> Vec<(String, usize)> {
+    let catalog = PhysicsCatalog::new();
+    let mut counts = std::collections::HashMap::new();
+    for entry in catalog.entries() {
+        *counts.entry(entry.domain.label().to_string()).or_insert(0usize) += 1;
+    }
+    let mut result: Vec<_> = counts.into_iter().collect();
+    result.sort_by(|a, b| b.1.cmp(&a.1)); // Sort by count descending
+    result
+}
+
+/// Physics equation domains and counts (from the live WASM catalog).
 fn catalog_domains() -> Vec<(&'static str, usize)> {
     vec![
         ("Classical Mechanics", 12),
@@ -58,6 +73,29 @@ fn arts_parts_results() -> Vec<DiscoveryResult> {
 #[component]
 pub fn DiscoveryPage() -> impl IntoView {
     let (active_case, set_active_case) = signal("lazar".to_string());
+    let (search_query, set_search_query) = signal(String::new());
+
+    // Live WASM catalog search — runs entirely client-side
+    let search_results = move || {
+        let q = search_query.get();
+        if q.len() < 2 {
+            return vec![];
+        }
+        let catalog = PhysicsCatalog::new();
+        let results = search::search_by_text(&catalog, &q, 8);
+        results
+            .into_iter()
+            .map(|r| DiscoveryResult {
+                name: r.name,
+                domain: format!("{:?}", r.domain),
+                score: r.score,
+            })
+            .collect::<Vec<_>>()
+    };
+
+    // Live domain counts from WASM catalog
+    let live_domains = catalog_domains_live();
+    let total_equations: usize = live_domains.iter().map(|(_, c)| c).sum();
 
     let case_results = move || {
         match active_case.get().as_str() {
@@ -70,15 +108,66 @@ pub fn DiscoveryPage() -> impl IntoView {
         <div class="page-container">
             <h1 class="page-title">"Physics Discovery Engine"</h1>
 
+            // ── Interactive Search (WASM-powered) ──
+            <div class="glass-panel" style="margin-bottom: 1.5rem;">
+                <h2 style="font-size: 1.25rem; margin-bottom: 0.75rem;">"Structural Equation Search"</h2>
+                <p style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 0.75rem;">
+                    "Search " {total_equations} " equations across " {live_domains.len()} " physics domains. "
+                    "HDC structural similarity runs entirely in your browser — no server needed."
+                </p>
+                <input
+                    type="text"
+                    placeholder="Type any equation or physics concept (e.g., 'superconductor gap', 'gravitational wave', 'entropy')..."
+                    style="width: 100%; padding: 0.75rem; background: var(--bg-secondary); border: 1px solid var(--border-glass); border-radius: 0.375rem; color: var(--text-primary); font-size: 0.875rem;"
+                    on:input=move |ev| {
+                        let target: web_sys::HtmlInputElement = ev.target().unwrap().unchecked_into();
+                        set_search_query.set(target.value());
+                    }
+                />
+
+                {move || {
+                    let results = search_results();
+                    if results.is_empty() {
+                        view! { <div></div> }.into_any()
+                    } else {
+                        view! {
+                            <div style="margin-top: 0.75rem;">
+                                <h3 style="font-size: 0.875rem; color: var(--text-secondary); margin-bottom: 0.5rem;">
+                                    {format!("Top {} matches:", results.len())}
+                                </h3>
+                                {results.into_iter().enumerate().map(|(i, r)| {
+                                    let bar_width = format!("{}%", (r.score * 100.0) as u32);
+                                    view! {
+                                        <div class="discovery-result">
+                                            <div>
+                                                <span style="font-weight: 600; margin-right: 0.5rem;">{format!("{}.", i + 1)}</span>
+                                                <span>{r.name}</span>
+                                                <span class="domain">{format!(" ({})", r.domain)}</span>
+                                            </div>
+                                            <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                                <div style="width: 100px; height: 6px; background: var(--bg-secondary); border-radius: 3px;">
+                                                    <div style=format!("width: {}; height: 100%; background: var(--accent-emerald); border-radius: 3px;", bar_width)></div>
+                                                </div>
+                                                <span class="score">{format!("{:.3}", r.score)}</span>
+                                            </div>
+                                        </div>
+                                    }
+                                }).collect::<Vec<_>>()}
+                            </div>
+                        }.into_any()
+                    }
+                }}
+            </div>
+
             // Catalog overview
             <div class="glass-panel" style="margin-bottom: 1.5rem;">
-                <h2 style="font-size: 1.25rem; margin-bottom: 1rem;">"Equation Catalog — 148 Equations across 19 Domains"</h2>
+                <h2 style="font-size: 1.25rem; margin-bottom: 1rem;">{format!("Equation Catalog — {} Equations across {} Domains", total_equations, live_domains.len())}</h2>
                 <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 0.5rem;">
-                    {catalog_domains().into_iter().map(|(name, count)| {
+                    {live_domains.iter().map(|(name, count)| {
                         view! {
                             <div style="display: flex; justify-content: space-between; padding: 0.375rem 0.75rem; background: var(--bg-secondary); border-radius: 0.375rem;">
-                                <span style="font-size: 0.8rem;">{name}</span>
-                                <span style="font-size: 0.8rem; color: var(--accent-indigo); font-weight: 600;">{count}</span>
+                                <span style="font-size: 0.8rem;">{name.clone()}</span>
+                                <span style="font-size: 0.8rem; color: var(--accent-indigo); font-weight: 600;">{*count}</span>
                             </div>
                         }
                     }).collect::<Vec<_>>()}

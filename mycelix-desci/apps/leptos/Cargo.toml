@@ -25,3 +25,6 @@ web-sys = { version = "0.3", features = [
 ] }
 console_error_panic_hook = "0.1"
 gloo-net = { version = "0.6", features = ["http"] }
+
+# Physics equation catalog — HDC structural search runs client-side in WASM
+symthaea-physics-catalog = { path = "../../../symthaea/crates/symthaea-physics-catalog" }
