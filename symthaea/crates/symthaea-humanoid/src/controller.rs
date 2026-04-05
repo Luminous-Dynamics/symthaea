@@ -43,10 +43,17 @@ pub struct ControllerCheckpoint {
 /// 2. `output = network.output()` — bundled final layer (16,384D)
 /// 3. `output_weights @ output + output_bias` → 21D raw
 /// 4. Activation: tanh for all actuators (bipolar torques)
+/// Bottleneck dimension for the nonlinear output head.
+/// Random projection 16384→BOTTLENECK preserves distance (Johnson-Lindenstrauss).
+/// Only the BOTTLENECK→num_outputs weights are learned (1.4K vs 344K trainable params).
+const BOTTLENECK_DIM: usize = 64;
+
 pub struct HumanoidController {
     /// The temporal dynamics engine — full 16,384D HDC-LTC.
     network: HdcLtcUnifiedNetwork,
-    /// Output projection weights: num_outputs rows × 16,384 columns (flat row-major).
+    /// Random projection vectors for bottleneck (BOTTLENECK_DIM × HDC_DIMENSION, fixed).
+    bottleneck_projections: Vec<ContinuousHV>,
+    /// Output weights: num_outputs × BOTTLENECK_DIM (learned, small!).
     output_weights: Vec<f32>,
     /// Output bias.
     output_bias: Vec<f32>,
@@ -78,20 +85,25 @@ impl HumanoidController {
 
         let network = HdcLtcUnifiedNetwork::from_genesis(net_config, genesis);
 
-        // Initialize output weights from genesis (small values for stability)
+        // Random projection bottleneck: 64 fixed HVs for 16384→64 dimensionality reduction
+        let bottleneck_projections: Vec<ContinuousHV> = (0..BOTTLENECK_DIM)
+            .map(|i| genesis.hv(&format!("humanoid::bottleneck::{i}"), HDC_DIMENSION))
+            .collect();
+
+        // Output weights: num_outputs × BOTTLENECK_DIM (only 1.4K trainable params!)
         let num_outputs = config.morphology.num_actuators();
-        let total_weights = num_outputs * HDC_DIMENSION;
-        let weight_hv = genesis.hv("humanoid::output_weights", total_weights);
+        let total_weights = num_outputs * BOTTLENECK_DIM;
+        let weight_hv = genesis.hv("humanoid::output_weights_v2", total_weights);
         let mut output_weights = weight_hv.values;
         for w in &mut output_weights {
-            *w *= 0.01;
+            *w *= 0.1; // Larger init since fewer weights
         }
 
-        // Bias initialized to zero (upright default pose)
         let output_bias = vec![0.0f32; num_outputs];
 
         Self {
             network,
+            bottleneck_projections,
             output_weights,
             output_bias,
             num_outputs,
@@ -105,17 +117,19 @@ impl HumanoidController {
     /// The output projection is freshly generated from `genesis` (since the source domain
     /// has a different output dimensionality). Only the network backbone is reused.
     pub fn from_network(network: HdcLtcUnifiedNetwork, genesis: &GenesisSeed) -> Self {
-        let num_outputs = NUM_ACTUATORS; // Default to DMC21 for transfer learning
-        let total_weights = num_outputs * HDC_DIMENSION;
-        let weight_hv = genesis.hv("humanoid::output_weights", total_weights);
+        let num_outputs = NUM_ACTUATORS;
+        let bottleneck_projections: Vec<ContinuousHV> = (0..BOTTLENECK_DIM)
+            .map(|i| genesis.hv(&format!("humanoid::bottleneck::{i}"), HDC_DIMENSION))
+            .collect();
+        let total_weights = num_outputs * BOTTLENECK_DIM;
+        let weight_hv = genesis.hv("humanoid::output_weights_v2", total_weights);
         let mut output_weights = weight_hv.values;
-        for w in &mut output_weights {
-            *w *= 0.01;
-        }
+        for w in &mut output_weights { *w *= 0.1; }
         let output_bias = vec![0.0f32; num_outputs];
 
         Self {
             network,
+            bottleneck_projections,
             output_weights,
             output_bias,
             num_outputs,
@@ -136,13 +150,23 @@ impl HumanoidController {
         let output_hv = self.network.output().normalize();
         let hv_values = output_hv.as_slice();
 
-        // 3. Linear projection: output_weights @ hv + bias → 21D
+        // 3. Bottleneck: 16384→64 via fixed random projections (dot products)
+        let mut bottleneck = vec![0.0f32; BOTTLENECK_DIM];
+        for (b, proj) in bottleneck.iter_mut().zip(self.bottleneck_projections.iter()) {
+            *b = proj.similarity(&output_hv); // Cosine similarity = normalized dot product
+        }
+        // Apply tanh nonlinearity — this is what enables learning nonlinear control laws
+        for b in bottleneck.iter_mut() {
+            *b = fast_tanh(*b * 3.0); // Scale by 3 to use more of tanh range
+        }
+
+        // 4. Small linear projection: 64→num_outputs
         let mut raw = vec![0.0f32; self.num_outputs];
         for i in 0..self.num_outputs {
-            let row_offset = i * HDC_DIMENSION;
+            let row_offset = i * BOTTLENECK_DIM;
             let mut sum = self.output_bias[i];
-            for j in 0..HDC_DIMENSION {
-                sum += self.output_weights[row_offset + j] * hv_values[j];
+            for j in 0..BOTTLENECK_DIM {
+                sum += self.output_weights[row_offset + j] * bottleneck[j];
             }
             raw[i] = sum;
         }
@@ -173,59 +197,87 @@ impl HumanoidController {
         let output_lr = (lr * (HDC_DIMENSION as f32).sqrt()).min(lr * 10.0);
 
         let output_hv = self.network.output().normalize();
-        let hv_values = output_hv.as_slice();
 
-        // Compute current raw outputs
+        // Forward pass through bottleneck (recompute for gradient)
+        let mut bottleneck = vec![0.0f32; BOTTLENECK_DIM];
+        for (b, proj) in bottleneck.iter_mut().zip(self.bottleneck_projections.iter()) {
+            *b = proj.similarity(&output_hv);
+        }
+        let mut bottleneck_activated = vec![0.0f32; BOTTLENECK_DIM];
+        for j in 0..BOTTLENECK_DIM {
+            bottleneck_activated[j] = fast_tanh(bottleneck[j] * 3.0);
+        }
+
+        // Compute raw outputs from bottleneck
         let mut raw = vec![0.0f32; self.num_outputs];
         for i in 0..self.num_outputs {
-            let row_offset = i * HDC_DIMENSION;
+            let row_offset = i * BOTTLENECK_DIM;
             let mut sum = self.output_bias[i];
-            for j in 0..HDC_DIMENSION {
-                sum += self.output_weights[row_offset + j] * hv_values[j];
+            for j in 0..BOTTLENECK_DIM {
+                sum += self.output_weights[row_offset + j] * bottleneck_activated[j];
             }
             raw[i] = sum;
         }
 
-        // Compute activated outputs and errors
+        // Output error + tanh derivative
         let mut d_raw = vec![0.0f32; self.num_outputs];
         for i in 0..self.num_outputs {
             let pred = fast_tanh(raw[i]);
             let error = pred - target.torques[i];
-            // Backprop through tanh: d/dx tanh(x) = 1 - tanh(x)^2
             let tanh_deriv = 1.0 - pred * pred;
             d_raw[i] = error * tanh_deriv;
         }
 
-        // Gradient clipping — tighter to prevent output projection instability
+        // Gradient clipping
         const GRAD_CLIP: f32 = 0.5;
         for g in &mut d_raw {
             *g = g.clamp(-GRAD_CLIP, GRAD_CLIP);
         }
 
-        // Weight decay — reduced to prevent weights decaying to zero over long training
-        // At 1e-5 per step × 200K steps: (1-1e-5)^200000 ≈ 0.135 (preserves ~14% of initial magnitude)
+        // Weight decay
         const WEIGHT_DECAY: f32 = 1e-5;
         let decay = 1.0 - WEIGHT_DECAY;
         for w in self.output_weights.iter_mut() {
             *w *= decay;
         }
 
-        // Update output weights: dW[i][j] = -output_lr * d_raw[i] * hv[j]
+        // Update output weights (BOTTLENECK_DIM × num_outputs — only 1.4K params!)
         for i in 0..self.num_outputs {
-            let row_offset = i * HDC_DIMENSION;
-            for j in 0..HDC_DIMENSION {
-                self.output_weights[row_offset + j] -= output_lr * d_raw[i] * hv_values[j];
+            let row_offset = i * BOTTLENECK_DIM;
+            for j in 0..BOTTLENECK_DIM {
+                self.output_weights[row_offset + j] -= output_lr * d_raw[i] * bottleneck_activated[j];
             }
             self.output_bias[i] -= output_lr * d_raw[i];
         }
 
         // Full BPTT through network layers
+        // Backprop: d_raw → output_weights → d_bottleneck → tanh' → bottleneck_projections → d_hv
         let dim = HDC_DIMENSION;
-        let mut grad_hv_values = vec![0.0f32; dim];
+
+        // d_bottleneck_activated = output_weights^T × d_raw
+        let mut d_bottleneck = vec![0.0f32; BOTTLENECK_DIM];
         for i in 0..self.num_outputs {
-            let row_offset = i * dim;
-            for j in 0..dim {
-                grad_hv_values[j] += d_raw[i] * self.output_weights[row_offset + j];
+            let row_offset = i * BOTTLENECK_DIM;
+            for j in 0..BOTTLENECK_DIM {
+                d_bottleneck[j] += d_raw[i] * self.output_weights[row_offset + j];
+            }
+        }
+
+        // Through tanh: d_bottleneck_pre = d_bottleneck * tanh'(bottleneck * 3) * 3
+        for j in 0..BOTTLENECK_DIM {
+            let tanh_deriv = 1.0 - bottleneck_activated[j] * bottleneck_activated[j];
+            d_bottleneck[j] *= tanh_deriv * 3.0;
+        }
+
+        // Through random projections: d_hv = Σ_j d_bottleneck[j] × projection[j]
+        let mut grad_hv_values = vec![0.0f32; dim];
+        for (j, proj) in self.bottleneck_projections.iter().enumerate() {
+            let proj_values = proj.as_slice();
+            let grad = d_bottleneck[j];
+            if grad.abs() > 1e-8 {
+                for k in 0..dim {
+                    grad_hv_values[k] += grad * proj_values[k];
+                }
             }
         }
 
@@ -423,8 +475,13 @@ impl HumanoidController {
             output_bias[i] = v;
         }
 
+        let bottleneck_projections: Vec<ContinuousHV> = (0..BOTTLENECK_DIM)
+            .map(|i| genesis.hv(&format!("humanoid::bottleneck::{i}"), HDC_DIMENSION))
+            .collect();
+
         Ok(Self {
             network,
+            bottleneck_projections,
             output_weights: checkpoint.output_weights,
             output_bias,
             num_outputs,
