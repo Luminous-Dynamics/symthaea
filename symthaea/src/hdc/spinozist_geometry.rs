@@ -42,7 +42,7 @@ use symthaea_core::hdc::ContinuousHV;
 use symthaea_core::hdc::HDC_DIMENSION;
 
 use super::moral_algebra::MoralVerdict;
-use super::moral_prototypes::MoralLabel;
+use super::moral_prototypes::{ExemplarStore, MoralLabel};
 use super::moral_text_encoder::TextHdcEncoder;
 
 // ============================================================================
@@ -1844,6 +1844,8 @@ pub struct SpinozistClassifier {
     hybrid_trained: bool,
     // Per-class sub-centroids in full 16,384D for similarity-weighted voting
     surface_subclusters: Option<Vec<(ContinuousHV, usize)>>,
+    // k-NN exemplar store for full-fidelity classification (k=31)
+    surface_exemplars: Option<ExemplarStore>,
 }
 
 impl SpinozistClassifier {
@@ -1899,6 +1901,7 @@ impl SpinozistClassifier {
             hybrid_ensemble_weights: [0.5, 0.5],
             hybrid_trained: false,
             surface_subclusters: None,
+            surface_exemplars: None,
         }
     }
 
@@ -2299,9 +2302,17 @@ impl SpinozistClassifier {
         self.fit_normalizer(&labeled);
         let normed: Vec<(Vec<f32>, usize)> = labeled.iter().map(|(f, c)| (self.norm_features(f), *c)).collect();
         self.train_multi_proto(&normed);
-        // Train surface sub-centroids in full 16,384D for similarity-weighted voting.
-        // 5 sub-centroids per class via K-means captures within-class variance
-        // that a single centroid misses — closing the gap to k-NN.
+        // Build exemplar store for k-NN classification in full 16,384D.
+        // Stores all training HVs for similarity²-weighted voting (k=31).
+        let exemplar_data: Vec<(Vec<f32>, MoralLabel)> = surface_hvs.iter()
+            .map(|(hv, cls)| {
+                let label = match cls { 0 => MoralLabel::Good, 1 => MoralLabel::Bad, _ => MoralLabel::Neutral };
+                (hv.values.clone(), label)
+            })
+            .collect();
+        self.surface_exemplars = Some(ExemplarStore::from_encoded(exemplar_data));
+
+        // Also train sub-centroids as fast fallback
         self.train_surface_subclusters(&surface_hvs);
 
         // Only use hybrid when training set is large enough for stable centroids.
@@ -2419,6 +2430,17 @@ impl SpinozistClassifier {
         if !self.hybrid_trained { return (MoralVerdict::Neutral, 0.0); }
 
         let surface_hv = self.surface_encoder.encode(text);
+
+        // Tier 1: k-NN exemplar store (highest fidelity, ~40ms per query)
+        if let Some(store) = &self.surface_exemplars {
+            let (label, confidence) = store.classify_knn(&surface_hv.values, 31);
+            let verdict = match label {
+                MoralLabel::Good => MoralVerdict::Good,
+                MoralLabel::Bad => MoralVerdict::Bad,
+                MoralLabel::Neutral => MoralVerdict::Neutral,
+            };
+            return (verdict, confidence);
+        }
 
         // Similarity-weighted voting across per-class sub-centroids.
         // Each sub-centroid votes for its class, weighted by similarity².
