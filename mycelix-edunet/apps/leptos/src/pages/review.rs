@@ -17,18 +17,7 @@ use crate::cognitive_adaptivity::*;
 use crate::components::suggestion_overlay::SuggestionOverlay;
 use crate::curriculum::{use_progress, use_set_progress};
 
-/// Insert spaces before uppercase letters in camelCase subject names.
-/// e.g. "EnglishLanguageArts" -> "English Language Arts"
-fn display_subject(s: &str) -> String {
-    let mut result = String::with_capacity(s.len() + 4);
-    for (i, c) in s.chars().enumerate() {
-        if i > 0 && c.is_uppercase() {
-            result.push(' ');
-        }
-        result.push(c);
-    }
-    result
-}
+use crate::curriculum::display_subject;
 
 // ---------------------------------------------------------------------------
 // Review state machine

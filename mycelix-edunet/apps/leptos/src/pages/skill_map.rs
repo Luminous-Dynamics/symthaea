@@ -9,8 +9,8 @@
 use leptos::prelude::*;
 
 use crate::curriculum::{
-    caps_graph, use_grade, use_progress, use_set_grade, use_set_progress, use_set_subject,
-    use_subject, CapsNode, Grade, ProgressStatus, Subject,
+    caps_graph, display_subject, use_grade, use_progress, use_set_grade, use_set_progress,
+    use_set_subject, use_subject, CapsNode, Grade, ProgressStatus, Subject,
 };
 
 // ============================================================
@@ -157,7 +157,8 @@ pub fn SkillMapPage() -> impl IntoView {
                         subject_counts.into_iter().take(8).map(|(s, count)| {
                             let s_for_check = Subject(s.clone());
                             let s_for_click = Subject(s.clone());
-                            let label = if s.chars().count() > 15 { format!("{}...", s.chars().take(13).collect::<String>()) } else { s.clone() };
+                            let display = display_subject(&s);
+                            let label = if display.chars().count() > 20 { format!("{}...", display.chars().take(18).collect::<String>()) } else { display };
                             view! {
                                 <button
                                     class=move || if subject.get() == s_for_check { "caps-filter-btn active" } else { "caps-filter-btn" }
@@ -277,8 +278,8 @@ pub fn SkillMapPage() -> impl IntoView {
                                 let decay = *decay;
                                 let is_recommended = *is_recommended;
                                 let id_click = id.clone();
-                                let title_short: String = if title.chars().count() > 18 {
-                                    title.chars().take(16).collect::<String>() + "..."
+                                let title_short: String = if title.chars().count() > 28 {
+                                    title.chars().take(25).collect::<String>() + "..."
                                 } else {
                                     title.clone()
                                 };

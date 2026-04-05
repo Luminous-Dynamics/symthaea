@@ -5180,7 +5180,7 @@ h2 { font-size: 1.75rem; margin-bottom: 0.5rem; }
 
     /* Review page fixes */
     .topic-selector { padding: 1rem 0.5rem; }
-    .topic-selector h2 { font-size: 1.1rem; }
+    .topic-selector h2 { font-size: 1.1rem; word-wrap: break-word; overflow-wrap: break-word; }
     .source-cards { grid-template-columns: 1fr 1fr; gap: 0.5rem; }
     .source-card { padding: 1rem 0.5rem; min-width: 0; }
     .source-label { font-size: 0.8rem; }
@@ -5189,6 +5189,7 @@ h2 { font-size: 1.75rem; margin-bottom: 0.5rem; }
 
     /* Exam prep fixes */
     .caps-badge-exam { font-size: 0.6rem; padding: 1px 5px; }
+    .caps-skill-map > p { font-size: 0.8rem; word-wrap: break-word; overflow-wrap: break-word; }
 }
 
 @media (max-width: 360px) {

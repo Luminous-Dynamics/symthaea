@@ -530,6 +530,19 @@ const PROGRESS_KEY: &str = "edunet_progress";
 // Leptos context provider
 // ============================================================
 
+/// Insert spaces before uppercase letters in camelCase subject names.
+/// e.g. "EnglishLanguageArts" -> "English Language Arts"
+pub fn display_subject(s: &str) -> String {
+    let mut result = String::with_capacity(s.len() + 4);
+    for (i, c) in s.chars().enumerate() {
+        if i > 0 && c.is_uppercase() {
+            result.push(' ');
+        }
+        result.push(c);
+    }
+    result
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Subject(pub String);
 
