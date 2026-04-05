@@ -12,10 +12,10 @@
 //! and doubles the effective dataset size.
 //!
 //! Usage:
-//!   broca-collect --model gemma3:1b --output data/distillation.jsonl
-//!   broca-collect --model gemma3:1b --model2 mistral:7b --output data/distillation.jsonl
-//!   broca-collect --model gemma3:1b --output data/distillation.jsonl --repeats 3 --augment
-//!   broca-collect --model gemma3:1b --output data/distillation.jsonl --temperature 0.7
+//!   broca-collect --model gemma4:e2b --output data/distillation.jsonl
+//!   broca-collect --model gemma4:e2b --model2 mistral:7b --output data/distillation.jsonl
+//!   broca-collect --model gemma4:e2b --output data/distillation.jsonl --repeats 3 --augment
+//!   broca-collect --model gemma4:e2b --output data/distillation.jsonl --temperature 0.7
 
 use std::io::Write;
 use std::process;
@@ -436,7 +436,7 @@ fn print_usage() {
     eprintln!("Usage: broca-collect [OPTIONS]");
     eprintln!();
     eprintln!("Required:");
-    eprintln!("  --model, -m NAME     Ollama model name (e.g., gemma3:1b)");
+    eprintln!("  --model, -m NAME     Ollama model name (e.g., gemma4:e2b)");
     eprintln!("  --output, -o PATH    Output JSONL file path");
     eprintln!();
     eprintln!("Optional:");

@@ -767,17 +767,17 @@ async fn holon_search(
                     .iter()
                     .take(req.max_results)
                     .map(|c| SearchClaimSummary {
-                        text: c.claim.clone(),
+                        text: c.text.clone(),
                         confidence: c.confidence,
-                        source_url: c.sources.first().map_or(String::new(), |s| s.url.clone()),
-                        epistemic_status: format!("{:?}", c.epistemic_status),
+                        source_url: c.supporting_sources.first().cloned().unwrap_or_default(),
+                        epistemic_status: format!("{:?}", c.status),
                     })
                     .collect();
 
                 let sources: Vec<String> = result
                     .claims
                     .iter()
-                    .flat_map(|c| c.sources.iter().map(|s| s.url.clone()))
+                    .flat_map(|c| c.supporting_sources.iter().cloned())
                     .collect::<std::collections::HashSet<_>>()
                     .into_iter()
                     .collect();
