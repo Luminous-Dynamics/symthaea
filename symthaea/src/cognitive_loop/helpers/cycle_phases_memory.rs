@@ -443,10 +443,25 @@ impl CognitiveLoopService {
                 surprise_replay_batch_size = boosted_batch;
 
                 if let TemporalNetwork::CfC(ref mut cfc) = self.temporal_network {
-                    let learning_rate = self.config.cfc_config.learning_rate;
-                    // State-dependent replay: prioritize episodes encoded in similar bath state
-                    // Science: Godden & Baddeley (1975) — state-dependent memory
-                    let current_bath = Some(self.neuromod.bath.state_vector());
+                    let base_learning_rate = self.config.cfc_config.learning_rate;
+
+                    // NREM/REM phase modulation: advance phase and adapt replay strategy.
+                    // NREM: focused replay (state-dependent, high LR, recent + old interleaved)
+                    // REM: broad replay (no state bias, lower LR, cross-episode abstraction)
+                    // Science: WSCL (2024) — alternating NREM/REM prevents catastrophic forgetting
+                    let phase = self.cantor_dream.advance_phase();
+                    let (learning_rate, current_bath) = match phase {
+                        super::super::cantor_dream_manager::DreamPhase::Nrem => {
+                            // NREM: state-dependent, full LR — strengthen specific traces
+                            (base_learning_rate, Some(self.neuromod.bath.state_vector()))
+                        }
+                        super::super::cantor_dream_manager::DreamPhase::Rem => {
+                            // REM: context-free, 0.5x LR — abstract cross-episode patterns
+                            // No bath conditioning forces sampling across diverse states
+                            (base_learning_rate * 0.5, None)
+                        }
+                    };
+
                     let result =
                         replay.replay_session_conditioned(cfc, learning_rate, current_bath);
 
