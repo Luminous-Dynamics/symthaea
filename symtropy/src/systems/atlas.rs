@@ -342,7 +342,7 @@ pub fn setup_globe_view(
         bevy::core_pipeline::tonemapping::Tonemapping::AcesFitted,
         // [6] Bloom — makes emissive markers glow through the hologram
         bevy::post_process::bloom::Bloom {
-            intensity: 0.18, // aggressive — sun halo, atmosphere glow, marker bloom
+            intensity: 0.10, // balanced — sun glow without amplifying heat blobs
             ..default()
         },
         // [3] Chromatic aberration — holographic projection artifact
@@ -496,15 +496,18 @@ pub fn setup_globe_view(
         }
 
         let clusters = sol_atlas_core::lod::cluster_markers(&all_markers, 4, 8); // coarser = fewer blobs
+        // Heat blobs disabled — city indicators + event markers provide better data.
         let blob_mesh = meshes.add(Sphere::new(1.0).mesh().uv(10, 10));
+        let _spawn_blobs = false;
         for cell in &clusters {
+            if !_spawn_blobs { continue; }
             let pos = geo::lat_lon_to_xyz(cell.center_lat, cell.center_lon, 1.04);
             let size = sol_atlas_core::lod::heat_blob_size(cell.count);
             let c = cell.avg_color;
             let mat = materials.add(StandardMaterial {
-                base_color: Color::linear_rgba(c[0] * 0.3, c[1] * 0.3, c[2] * 0.3, 0.08),
-                emissive: LinearRgba::new(c[0] * 0.2, c[1] * 0.2, c[2] * 0.2, 1.0),
-                // Additive blend — glows through instead of opaque disc
+                base_color: Color::linear_rgba(c[0] * 0.1, c[1] * 0.1, c[2] * 0.1, 0.02),
+                emissive: LinearRgba::new(0.0, 0.0, 0.0, 0.0), // no emissive — prevents bloom
+                // Ghost blobs — barely visible hint of data density
                 alpha_mode: AlphaMode::Blend,
                 unlit: true,
                 ..default()
@@ -671,8 +674,16 @@ pub fn setup_globe_view(
     let stress_data = sol_atlas_core::energy_trading::simulate_grid_stress(0);
     for stress in &stress_data {
         let pos = geo::lat_lon_to_xyz(stress.lat, stress.lon, 1.04);
-        let c = sol_atlas_core::energy_trading::stress_color(stress.allostatic_load);
-        let size = 0.022 + stress.allostatic_load * 0.018; // larger than event dots
+        // City stress uses cyan→amber (NOT red — red is for earthquakes/disasters)
+        let load = stress.allostatic_load;
+        let c = if load < 0.3 {
+            [0.1, 0.7, 0.8] // cyan — stable
+        } else if load < 0.6 {
+            [0.9, 0.7, 0.2] // amber — transitioning
+        } else {
+            [0.9, 0.4, 0.1] // orange — stressed (not red)
+        };
+        let size = 0.008 + load * 0.006;
 
         // Emissive city indicator — visible at ALL zoom levels (no LOD tag)
         let mat = materials.add(StandardMaterial {
@@ -759,30 +770,31 @@ pub fn setup_globe_view(
     let event_mesh = meshes.add(Sphere::new(1.0).mesh().uv(6, 6));
     for event in &data.natural_events {
         // Filter: only show significant events (M4+ quakes, high-confidence fires)
+        // Only show significant events to reduce visual noise
         match event.event_type {
-            sol_atlas_core::types::NaturalEventType::Earthquake if event.magnitude < 4.0 => continue,
+            sol_atlas_core::types::NaturalEventType::Earthquake if event.magnitude < 6.0 => continue,
+            sol_atlas_core::types::NaturalEventType::Fire if event.magnitude < 0.5 => continue,
             _ => {}
         }
         let pos = geo::lat_lon_to_xyz(event.lat, event.lon, 1.04);
         let (c, size, layer) = match event.event_type {
             sol_atlas_core::types::NaturalEventType::Earthquake => {
-                // M4=tiny, M7=large
-                let s = 0.004 + ((event.magnitude as f32 - 4.0) / 4.0).clamp(0.0, 1.0) * 0.008;
-                ([0.85, 0.12, 0.08], s, Layer::Earthquakes)
+                let s = 0.003 + ((event.magnitude as f32 - 4.0) / 5.0).clamp(0.0, 1.0) * 0.004;
+                ([0.8, 0.15, 0.1], s, Layer::Earthquakes)
             }
             sol_atlas_core::types::NaturalEventType::Fire => {
-                ([0.9, 0.45, 0.1], 0.003, Layer::Fires) // smaller
+                ([0.85, 0.4, 0.1], 0.002, Layer::Fires)
             }
             sol_atlas_core::types::NaturalEventType::Storm => {
-                ([0.1, 0.65, 0.85], 0.006, Layer::Storms)
+                ([0.1, 0.6, 0.8], 0.004, Layer::Storms)
             }
             sol_atlas_core::types::NaturalEventType::Volcano => {
-                ([0.85, 0.25, 0.05], 0.005, Layer::Volcanoes)
+                ([0.8, 0.25, 0.05], 0.004, Layer::Volcanoes)
             }
         };
         let mat = materials.add(StandardMaterial {
-            base_color: Color::linear_rgba(c[0], c[1], c[2], 0.7),
-            emissive: LinearRgba::new(c[0] * 0.4, c[1] * 0.4, c[2] * 0.4, 1.0),
+            base_color: Color::linear_rgba(c[0], c[1], c[2], 0.5),
+            emissive: LinearRgba::new(c[0] * 0.15, c[1] * 0.15, c[2] * 0.15, 1.0), // low emissive — won't bloom
             alpha_mode: AlphaMode::Blend,
             unlit: true,
             ..default()
@@ -792,8 +804,8 @@ pub fn setup_globe_view(
             MeshMaterial3d(mat),
             Transform::from_xyz(pos[0], pos[1], pos[2]).with_scale(Vec3::splat(size)),
             MarkerPulse {
-                speed: 2.0,
-                amplitude: 0.2,
+                speed: 1.5,
+                amplitude: 0.08, // subtle — events shouldn't dominate visually
                 phase: event.lat as f32 * 0.3,
                 base_scale: size,
             },
@@ -1155,7 +1167,7 @@ pub fn draw_arcs_system(
     for ring in 1..=8 {
         let r = ring as f32 * 0.5;
         let segments = 48;
-        let ring_alpha = 0.07 * flicker * (1.0 - ring as f32 / 10.0); // brighter gravity well
+        let ring_alpha = 0.04 * flicker * (1.0 - ring as f32 / 10.0); // subtle — doesn't compete with data
         let ring_color = Color::linear_rgba(0.0, 0.5, 0.7, ring_alpha);
         for i in 0..segments {
             let a0 = i as f32 / segments as f32 * std::f32::consts::TAU;

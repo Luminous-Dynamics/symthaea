@@ -96,8 +96,8 @@ pub fn cluster_markers(
 
 /// Size of a heat blob based on marker count in the cell.
 pub fn heat_blob_size(count: usize) -> f32 {
-    let size = (count as f32).sqrt() * 0.012;
-    size.clamp(0.012, 0.045)
+    let size = (count as f32).sqrt() * 0.008;
+    size.clamp(0.008, 0.030) // smaller — blobs are background, data markers are the hero
 }
 
 #[cfg(test)]
@@ -132,6 +132,6 @@ mod tests {
     #[test]
     fn test_heat_blob_size_scales() {
         assert!(heat_blob_size(10) > heat_blob_size(1));
-        assert!(heat_blob_size(100) <= 0.045);
+        assert!(heat_blob_size(100) <= 0.030);
     }
 }
