@@ -21,11 +21,26 @@ pub fn HomePage() -> impl IntoView {
     let total_categories = move || {
         stats.get().flatten().map(|s| s.total_categories).unwrap_or(19)
     };
-    let total_equations = 148; // From physics catalog
+    let total_equations = 208; // From physics catalog
 
     view! {
         <div class="page-container">
-            <h1 class="page-title">"Epistemic Verification Engine"</h1>
+            // ── Hero Section ──
+            <div style="text-align: center; padding: 2rem 0 3rem;">
+                <h1 style="font-size: 2.5rem; font-weight: 800; margin-bottom: 0.75rem; background: linear-gradient(135deg, var(--accent-indigo), var(--accent-emerald)); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">
+                    "Mycelix DeSci"
+                </h1>
+                <p style="font-size: 1.25rem; color: var(--text-secondary); max-width: 700px; margin: 0 auto 1.5rem; line-height: 1.6;">
+                    "The world's first epistemic verification engine for science. "
+                    "Search 208 physics equations, verify claims against known physics, "
+                    "and track reproducibility — all powered by hyperdimensional computing."
+                </p>
+                <div style="display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap;">
+                    <a href="/discovery" class="btn btn-primary" style="text-decoration: none; padding: 0.75rem 1.5rem; font-size: 1rem;">"Search 208 Equations"</a>
+                    <a href="/case-studies" class="btn btn-emerald" style="text-decoration: none; padding: 0.75rem 1.5rem; font-size: 1rem;">"View Case Studies"</a>
+                    <a href="/submit" class="btn" style="text-decoration: none; padding: 0.75rem 1.5rem; font-size: 1rem; background: var(--bg-secondary); color: var(--text-primary); border: 1px solid var(--border-glass);">"Submit a Claim"</a>
+                </div>
+            </div>
 
             <div class="stat-grid">
                 <div class="glass-panel stat-card">
