@@ -1,9 +1,9 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Service Worker v1 — {{cluster_display}} (Mycelix)
+// Service Worker v1 — Space (Mycelix)
 // Offline-first: cache shell + WASM, network-first for data
 
-const CACHE_NAME = '{{cluster_name}}-v1';
+const CACHE_NAME = 'space-v1';
 
 const SHELL_ASSETS = [
   '/',

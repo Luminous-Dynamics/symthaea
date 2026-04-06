@@ -1,0 +1,75 @@
+/* Supply Chain — Mycelix Cluster Frontend */
+/* base.css loaded via index.html <link data-trunk> */
+
+/* ================================================================
+   CLUSTER ACCENT OVERRIDE
+   ================================================================ */
+:root {
+    --primary: #10b981;
+}
+
+/* ================================================================
+   PAGE LAYOUTS
+   ================================================================ */
+.page-home {
+    text-align: center;
+    padding: var(--space-2xl) 0;
+}
+
+.page-home h1 {
+    font-size: var(--text-2xl);
+    color: var(--text-primary);
+    margin: 0 0 var(--space-sm);
+}
+
+.subtitle {
+    color: var(--text-muted);
+    margin: 0 0 var(--space-2xl);
+}
+
+.dashboard-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: var(--space-md);
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+/* ================================================================
+   DASHBOARD CARDS
+   ================================================================ */
+.dash-card {
+    display: flex;
+    flex-direction: column;
+    padding: var(--space-md) var(--space-lg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    background: var(--bg-raised);
+    text-align: left;
+}
+.dash-label {
+    font-size: var(--text-xs);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    margin-bottom: var(--space-xs);
+}
+.dash-value {
+    font-size: var(--text-xl);
+    font-weight: 700;
+    color: var(--text-primary);
+}
+.dash-sub {
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+    margin-top: var(--space-xs);
+}
+
+/* ================================================================
+   RESPONSIVE
+   ================================================================ */
+@media (max-width: 720px) {
+    .dashboard-grid {
+        grid-template-columns: 1fr;
+    }
+}

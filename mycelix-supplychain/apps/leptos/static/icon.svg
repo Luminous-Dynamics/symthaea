@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="64" fill="#0a0a0a"/>
+  <circle cx="256" cy="220" r="80" fill="none" stroke="#0ed4a8" stroke-width="6"/>
+  <circle cx="256" cy="220" r="40" fill="#0ed4a8" opacity="0.3"/>
+  <path d="M176 340 c0-44 36-80 80-80 44 0 80 36 80 80" fill="none" stroke="#0ed4a8" stroke-width="4" opacity="0.5"/>
+  <text x="256" y="420" font-family="system-ui" font-size="48" font-weight="700" fill="#0ed4a8" text-anchor="middle">mycelix</text>
+</svg>
