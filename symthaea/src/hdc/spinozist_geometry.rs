@@ -1814,6 +1814,19 @@ const NUM_ANCHORS: usize = 48;
 const NUM_HYBRID_FEATURES: usize = NUM_AFFECTS + NUM_ANCHORS + 3;
 const MULTI_PROTO_K: usize = 5;
 
+/// Seed for agent role HV (deterministic, orthogonal to other HVs).
+const AGENT_ROLE_SEED: u64 = 0xA6E0_7001_0000_0000;
+/// Seed for patient role HV.
+const PATIENT_ROLE_SEED: u64 = 0xDA71_E070_0000_0000;
+
+/// Agent pronouns — words indicating the subject/doer.
+const AGENT_WORDS: &[&str] = &["i", "we", "you", "he", "she", "they", "who", "someone"];
+/// Patient pronouns/patterns — words indicating the object/recipient.
+const PATIENT_WORDS: &[&str] = &[
+    "me", "us", "him", "her", "them", "my", "his", "our", "their",
+    "friend", "child", "parent", "person", "people", "someone",
+];
+
 /// NSM-grounded moral classifier using Spinozist affect geometry.
 ///
 /// Encodes text via NSM lexicon decomposition, projects into 18D affect space,
@@ -1846,6 +1859,9 @@ pub struct SpinozistClassifier {
     surface_subclusters: Option<Vec<(ContinuousHV, usize)>>,
     // k-NN exemplar store for full-fidelity classification (k=31)
     surface_exemplars: Option<ExemplarStore>,
+    // Role-binding HVs for agent/patient directional encoding
+    agent_role_hv: ContinuousHV,
+    patient_role_hv: ContinuousHV,
 }
 
 impl SpinozistClassifier {
@@ -1902,6 +1918,8 @@ impl SpinozistClassifier {
             hybrid_trained: false,
             surface_subclusters: None,
             surface_exemplars: None,
+            agent_role_hv: ContinuousHV::random(HDC_DIMENSION, AGENT_ROLE_SEED),
+            patient_role_hv: ContinuousHV::random(HDC_DIMENSION, PATIENT_ROLE_SEED),
         }
     }
 
@@ -2338,6 +2356,61 @@ impl SpinozistClassifier {
     pub fn extract_hybrid_features(&self, text: &str) -> Vec<f32> {
         let shv = self.surface_encoder.encode(text);
         self.extract_hybrid_features_inner(text, &shv)
+    }
+
+    /// Encode text with TextHdcEncoder + role-binding enhancement.
+    ///
+    /// Detects agent/patient words in the text and blends role-bound HVs
+    /// into the surface encoding. This makes "I harmed him" and "he harmed me"
+    /// distinguishable — the agent/patient binding is non-commutative.
+    ///
+    /// The role signal is blended at 15% weight to avoid overwhelming the
+    /// surface encoder's proven discriminative signal.
+    fn encode_surface_with_roles(&self, text: &str) -> ContinuousHV {
+        let surface_hv = self.surface_encoder.encode(text);
+        let lower = text.to_lowercase();
+        let words: Vec<&str> = lower.split_whitespace().collect();
+
+        let mut has_agent = false;
+        let mut has_patient = false;
+        let mut agent_word_hv = ContinuousHV::zero(HDC_DIMENSION);
+        let mut patient_word_hv = ContinuousHV::zero(HDC_DIMENSION);
+
+        for word in &words {
+            let clean = word.trim_matches(|c: char| !c.is_alphanumeric());
+            if AGENT_WORDS.contains(&clean) && !has_agent {
+                // First agent word: bind with agent role marker
+                let word_hv = self.surface_encoder.encode(clean);
+                agent_word_hv = word_hv.bind(&self.agent_role_hv);
+                has_agent = true;
+            } else if PATIENT_WORDS.contains(&clean) && !has_patient {
+                // First patient word: bind with patient role marker
+                let word_hv = self.surface_encoder.encode(clean);
+                patient_word_hv = word_hv.bind(&self.patient_role_hv);
+                has_patient = true;
+            }
+        }
+
+        if !has_agent && !has_patient {
+            return surface_hv; // No role information detected
+        }
+
+        // Blend: 95% surface + 5% role signal (light touch — role info is noisy)
+        let role_weight = 0.05;
+        let surface_weight = 1.0 - role_weight;
+        let mut result = surface_hv;
+        result.scale_in_place(surface_weight);
+        if has_agent {
+            let mut agent_scaled = agent_word_hv;
+            agent_scaled.scale_in_place(role_weight * 0.5);
+            result.add_in_place(&agent_scaled);
+        }
+        if has_patient {
+            let mut patient_scaled = patient_word_hv;
+            patient_scaled.scale_in_place(role_weight * 0.5);
+            result.add_in_place(&patient_scaled);
+        }
+        result
     }
 
     fn fit_normalizer(&mut self, samples: &[(Vec<f32>, usize)]) {
