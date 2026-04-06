@@ -24,19 +24,20 @@ Full details: @.claude/rules/CREDENTIALS.md
 | 8094 | SSH Relay | — |
 | **81XX** | **Mycelix Frontends** (alphabetical) | |
 | 8104 | Commons UI | commons.luminousdynamics.io |
-| 8107 | EduNet UI | edunet.mycelix.net |
+| 8107 | Praxis UI | praxis.mycelix.net |
 | 8110 | Civic UI (Governance+Finance) | governance.luminousdynamics.io |
 | 8111 | Health UI | health.luminousdynamics.io |
 | 8112 | Hearth UI | hearth.luminousdynamics.io |
 | 8121 | Music UI | music.luminousdynamics.io |
 | 8124 | Portal UI | portal.mycelix.net |
+| 8129 | Craft UI | craft.mycelix.net |
 | **82XX/83XX** | **Holochain Conductors** (admin/app) | |
 | 8400-8409 | Dev/test (ad-hoc) | — |
 
 Full allocation: @.claude/rules/PORTS.md
 
 ### Holochain Ecosystem Conductor
-A single shared conductor runs ALL Mycelix hApps (EduNet, Portal, Health, etc.):
+A single shared conductor runs ALL Mycelix hApps (Praxis, Portal, Health, etc.):
 - **Data**: `/tmp/C0qrby_9EFM6egCrrUWTo/` (dev sandbox)
 - **Admin WebSocket**: `ws://localhost:33743` (auto-assigned)
 - **App WebSocket**: `ws://localhost:8888`
@@ -45,14 +46,14 @@ A single shared conductor runs ALL Mycelix hApps (EduNet, Portal, Health, etc.):
 
 **Installing a new hApp onto the shared conductor:**
 ```bash
-cd mycelix-edunet  # or any cluster
+cd mycelix-praxis  # or any cluster
 nix develop
 # 1. Build WASM zomes
 cargo build --workspace --target wasm32-unknown-unknown --release
 # 2. Pack DNA + hApp
-hc dna pack dna/ -o dna/edunet.dna
-cp dna/edunet.dna happ/edunet.dna
-hc app pack happ/ -o happ/mycelix-edunet.happ
+hc dna pack dna/ -o dna/praxis.dna
+cp dna/praxis.dna happ/praxis.dna
+hc app pack happ/ -o happ/mycelix-praxis.happ
 # 3. Install onto shared conductor via admin WebSocket (port 33743)
 # Use hc sandbox or admin API to install the hApp
 ```
@@ -82,10 +83,10 @@ Full rules: @.claude/rules/DEVELOPMENT.md
 - **DB**: `bws get supabase-prod-url`
 - **Focus**: USACE data, SMR pipeline, investments
 
-### EduNet (Learning Platform)
-- **Live**: https://edunet.mycelix.net (Cloudflare Tunnel → :8107)
+### Praxis (Learning Platform)
+- **Live**: https://praxis.mycelix.net (Cloudflare Tunnel → :8107)
 - **IPFS**: `QmcB9rh3yQzmMP6kwQtXVgrBWdyCumTE2aEAg2Pb46gDCM` (decentralized fallback)
-- **Path**: `mycelix-edunet/apps/leptos/` (Leptos 0.8 CSR WASM)
+- **Path**: `mycelix-praxis/apps/leptos/` (Leptos 0.8 CSR WASM)
 - **Code**: ~50 Rust source files, 4.5MB WASM (wasm-opt'd, ~1MB gzipped), 19 content modules, 13 standards sources
 - **Coverage**: 2,002 curriculum nodes, 172 lesson JSONs, 48 subjects, K-to-PhD
 - **Frameworks**: CAPS (SA Gr1-12), Common Core (US), NGSS, ACM CS2013, MIT OCW, NICE Cybersecurity, Philosophy, 12 Universal subjects
@@ -93,10 +94,21 @@ Full rules: @.claude/rules/DEVELOPMENT.md
 - **Games**: 12 interactive SVG (parabola, tangent, unit circle, stats, analytical geom, projectile, circuits, equilibrium, acid-base, budget simulator, password strength, fallacy detector)
 - **Learning Science**: BKT adaptive difficulty, SM-2 spaced repetition (46 cards), session orchestrator, knowledge decay (Ebbinghaus), Pomodoro timer, timed mock exams (Paper 1/2)
 - **UX**: Indlela design system (growth stages, prospect/refuge, organic scores), mobile bottom nav, search bar, 13 achievements, mastery heat map, learning velocity, exam countdown, study notes, progress sharing, smart first-visit, system theme auto-detect
-- **Deploy**: `./deploy.sh` (re-pins IPFS + updates DNS), Cloudflare Tunnel `edunet` (ID: 347ade4d)
+- **Deploy**: `./deploy.sh` (re-pins IPFS + updates DNS), Cloudflare Tunnel `praxis` (ID: 347ade4d)
 - **Tests**: 187 (118 ingest + 69 content-gen)
-- **Tunnel start**: `cloudflared tunnel run edunet` (needs SPA server on :8107)
-- **NixOS service**: `_infrastructure/nixos/edunet-services.nix` (add to imports, then `sudo nixos-rebuild switch`)
+- **Tunnel start**: `cloudflared tunnel run praxis` (needs SPA server on :8107)
+- **NixOS service**: `_infrastructure/nixos/praxis-services.nix` (add to imports, then `sudo nixos-rebuild switch`)
+
+### Craft (Talent Marketplace)
+- **Path**: `mycelix-craft/` (7 zome pairs, Leptos 0.8 CSR frontend)
+- **Port**: 8129 (craft.mycelix.net)
+- **Zomes**: craft-graph (profiles, living credentials, endorsements, composites), job-postings (+ apprenticeship stakes), work-history (peer verification), connection-graph, applications (state machine), guild (consciousness-gated federations), craft-bridge (consciousness gating + cross-domain dispatch)
+- **Living Credentials**: Ebbinghaus forgetting curve decay — credentials lose vitality unless refreshed via retention checks. `R(t) = e^(-t/S)` where S = f(mastery, review_count)
+- **Guild Architecture**: 5 consciousness-gated roles (Observer→Apprentice→Journeyman→Master→Elder), CertificationPath with vitality requirements, GuildFederationLink for cross-bioregion standards
+- **Credential Pipeline**: Praxis issues (PoL + BKT mastery) → Craft publishes (living credentials + guild context + epistemic code). Cross-DNA verification via craft-bridge → praxis-bridge
+- **Frontend**: Leptos 0.8 CSR with HolochainProvider, ConnectionStatus, consciousness context, toasts from mycelix-leptos-core
+- **Tests**: 42 (11 applications + 9 job-postings + 8 craft-graph + 6 connection-graph + 4 work-history + 4 guild)
+- **Build**: `cd mycelix-craft && cargo build --workspace --target wasm32-unknown-unknown --release`
 
 ### Luminous Nix
 - **Path**: 11-meta-consciousness/luminous-nix/
@@ -176,7 +188,8 @@ Fractal CivOS with 5 tiers, consolidated into cluster DNAs (single DNA = cross-d
 | **mycelix-supplychain** | `mycelix-supplychain/` | 8 (provenance tracking) | Built |
 | **mycelix-marketplace** | `mycelix-marketplace/` | 8 (arbitration) | Built |
 | **mycelix-knowledge** | `mycelix-knowledge/` | 8 (claims, graph, query, inference, factcheck, markets, DKG, bridge) | Built |
-| **mycelix-edunet** | `mycelix-edunet/` | 10 + Leptos CSR frontend (2,002 curriculum nodes, 58 subjects, 9 games, K-to-PhD) | Built, **LIVE** at edunet.mycelix.net |
+| **mycelix-praxis** | `mycelix-praxis/` | 10 + Leptos CSR frontend (2,002 curriculum nodes, 58 subjects, 9 games, K-to-PhD) | Built, **LIVE** at praxis.mycelix.net |
+| **mycelix-craft** | `mycelix-craft/` | 7 (craft-graph, job-postings, work-history, connection-graph, applications, guild, craft-bridge) + Leptos CSR | Built |
 | **mycelix-energy** | `mycelix-energy/` | 5 (projects, investments, regenerative, grid, bridge) | Built |
 | **mycelix-climate** | `mycelix-climate/` | 3 (carbon, projects, bridge) | Built |
 | **mycelix-music** | `mycelix-music/` | 5 + 14 support crates (catalog, plays, balances, trust, music-bridge) | Built, WASM verified, DNA/hApp packed |
@@ -184,7 +197,7 @@ Fractal CivOS with 5 tiers, consolidated into cluster DNAs (single DNA = cross-d
 | **mycelix-desci** | `mycelix-desci/` | REST API (Actix-web) | 141 integration tests |
 | **mycelix-core** | `mycelix-core/` | 0TML federated learning research | 62 FL tests |
 
-- **Total**: 134+ zomes, ~785K lines Rust (~643K code, tokei-verified), 15 built hApp bundles
+- **Total**: 141+ zomes, ~785K lines Rust (~643K code, tokei-verified), 16 built hApp bundles
 - **Shared types**: `crates/mycelix-bridge-entry-types/` (DHT entries + error_messages), `crates/mycelix-bridge-common/` (coordinator dispatch + cross-cluster + consciousness gating + routing_registry, 450+ tests)
 - **Cross-cluster bridge**: All clusters via `CallTargetCell::OtherRole` (unified hApp: `mycelix-workspace/happs/mycelix-unified-happ.yaml`). Centralized routing in `routing_registry.rs` (13 routes, 35 tests). `CrossClusterRole`: Commons, Civic, Identity, Hearth, Personal, Finance, Governance, Music
 - **Consciousness gating**: 4D profile (identity/reputation/community/engagement) → 5 tiers (Observer→Guardian) → configurable vote weights (`VoteWeightConfig`: default/constitutional/budget/emergency presets)
@@ -222,7 +235,8 @@ Excluding `target/`, `node_modules/`, `venv/`, build artifacts:
 |--------|---------|
 | luminousdynamics.org | Main org |
 | atlas.luminousdynamics.io | Sol Atlas |
-| edunet.mycelix.net | EduNet (Cloudflare Tunnel → :8092) |
+| praxis.mycelix.net | Praxis (Cloudflare Tunnel → :8107) |
+| craft.mycelix.net | Craft (port 8129) |
 | nixforhumanity.org | Luminous Nix |
 | mycelix.net | Mycelix |
 
@@ -242,7 +256,14 @@ Quick guide: @.claude/guides/SERVICES.md
 **Tristan (tstoltz)** - Richardson, TX (Central)
 - NixOS 26.05 (Yarara) | Neovim | Alacritty | Zellij
 - Email: tristan.stoltz@evolvingresonantcocreationism.com
-- **Test device**: Pixel 8 Pro (Android) — available for Soma testing
+- **Test device**: Pixel 8 Pro (Android, USB-connected, dev mode ON)
+  - ADB: `adb devices` → `41201FDJG000UM` (authorized)
+  - Screenshot: `adb shell screencap -p /sdcard/screen.png && adb pull /sdcard/screen.png /tmp/pixel_screen.png`
+  - Open URL: `adb shell am start -a android.intent.action.VIEW -d "https://url"`
+  - Input tap: `adb shell input tap X Y`
+  - Input text: `adb shell input text "hello"`
+  - Swipe: `adb shell input swipe X1 Y1 X2 Y2 300`
+  - `programs.adb.enable = true` in NixOS config (luminous-dev-packages.nix)
 
 ---
 
