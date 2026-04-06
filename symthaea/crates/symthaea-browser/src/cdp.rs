@@ -279,6 +279,104 @@ impl CdpSession {
         debug!(bytes = bytes.len(), "Screenshot captured");
         Ok(bytes)
     }
+
+    /// Connect to an already-running Chrome instance by its debug URL.
+    pub async fn connect_existing(debug_url: &str) -> Result<Self> {
+        let (browser, mut handler) = Browser::connect(debug_url)
+            .await
+            .context("Failed to connect to existing Chrome")?;
+
+        tokio::spawn(async move {
+            while let Some(_event) = handler.next().await {}
+        });
+
+        let page = browser
+            .new_page("about:blank")
+            .await
+            .context("Failed to create new page")?;
+
+        Ok(Self {
+            _browser: browser,
+            page: Mutex::new(page),
+        })
+    }
+
+    /// Get page state via JS (fallback when AX tree fails on WASM-heavy pages).
+    pub async fn get_page_state_js(&self) -> Result<PageObservation> {
+        let page = self.page.lock().await;
+        let url = page.url().await.unwrap_or(None).unwrap_or_default();
+        let title = page.get_title().await.unwrap_or(None).unwrap_or_else(|| "Untitled".into());
+
+        let json = page.evaluate(r#"JSON.stringify({
+            headings: Array.from(document.querySelectorAll('h1,h2')).slice(0,10).map(e=>e.textContent?.trim()||''),
+            buttons: Array.from(document.querySelectorAll('button')).slice(0,20).map(e=>e.textContent?.trim()||''),
+            inputs: Array.from(document.querySelectorAll('input')).slice(0,10).map(e=>e.placeholder||''),
+            links: Array.from(document.querySelectorAll('a')).slice(0,10).map(e=>e.textContent?.trim()||''),
+            texts: Array.from(document.querySelectorAll('p')).slice(0,5).map(e=>e.textContent?.trim().substring(0,80)||'')
+        })"#).await.context("JS eval failed")?;
+
+        let data: serde_json::Value = serde_json::from_str(
+            &json.into_value::<String>().unwrap_or_default()
+        ).unwrap_or_default();
+
+        let mut elements = Vec::new();
+        let extract = |key: &str, role: &str| -> Vec<AccessibleElement> {
+            data.get(key).and_then(|v| v.as_array()).map(|arr| {
+                arr.iter().filter_map(|v| {
+                    let name = v.as_str().unwrap_or("").to_string();
+                    if name.is_empty() { return None; }
+                    Some(AccessibleElement {
+                        backend_node_id: -1, role: role.to_string(), name, value: None,
+                        description: None, focused: false, disabled: false,
+                    })
+                }).collect()
+            }).unwrap_or_default()
+        };
+
+        elements.extend(extract("headings", "heading"));
+        elements.extend(extract("buttons", "button"));
+        elements.extend(extract("inputs", "textbox"));
+        elements.extend(extract("links", "link"));
+        elements.extend(extract("texts", "text"));
+
+        Ok(PageObservation { url, title, elements, focused_element: None })
+    }
+
+    /// Try AX tree first, fall back to JS extraction.
+    pub async fn observe(&self) -> Result<PageObservation> {
+        match self.get_accessibility_tree().await {
+            Ok(obs) => Ok(obs),
+            Err(_) => self.get_page_state_js().await,
+        }
+    }
+
+    /// Click a button/link by its text content.
+    pub async fn click_by_text(&self, text: &str) -> Result<()> {
+        let page = self.page.lock().await;
+        let escaped = text.replace('\\', "\\\\").replace('\'', "\\'");
+        page.evaluate(format!(
+            r#"(()=>{{for(const b of document.querySelectorAll('button,a')){{if(b.textContent.includes('{escaped}')){{b.click();return}}}}}})();"#
+        )).await.context("click_by_text failed")?;
+        Ok(())
+    }
+
+    /// Type into an input by placeholder text match.
+    pub async fn type_by_placeholder(&self, placeholder: &str, text: &str) -> Result<()> {
+        let page = self.page.lock().await;
+        let ph = placeholder.replace('\\', "\\\\").replace('\'', "\\'");
+        let tx = text.replace('\\', "\\\\").replace('\'', "\\'");
+        page.evaluate(format!(
+            r#"(()=>{{for(const i of document.querySelectorAll('input')){{if((i.placeholder||'').toLowerCase().includes('{ph}')){{i.value='{tx}';i.dispatchEvent(new Event('input',{{bubbles:true}}));return}}}}}})();"#
+        )).await.context("type_by_placeholder failed")?;
+        Ok(())
+    }
+
+    /// Evaluate arbitrary JS and return string result.
+    pub async fn eval_js(&self, expr: &str) -> Result<String> {
+        let page = self.page.lock().await;
+        let result = page.evaluate(expr).await.context("JS eval failed")?;
+        Ok(result.into_value::<String>().unwrap_or_default())
+    }
 }
 
 /// Extract a string from a `serde_json::Value` (the AxValue payload).

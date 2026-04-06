@@ -55,7 +55,7 @@ impl AccessibleElement {
 }
 
 /// Snapshot of a page's state as seen through the accessibility tree.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct PageObservation {
     /// Current page URL.
     pub url: String,
