@@ -720,6 +720,111 @@ pub fn ame2020_reference_nuclei() -> Vec<MeasuredNucleus> {
         mn(81, 114, 1271.610, true), // Tl-195
         mn(81, 116, 1271.820, true), // Tl-197
 
+        // ══════════════════════════════════════════════════════
+        // BATCH 4: Push toward 900 nuclei — fill all remaining gaps
+        // ══════════════════════════════════════════════════════
+
+        // ── Z=2-9 complete (very light nuclei, important for B/A curve) ──
+        mn(2, 3, 14.931, true),   // He-5 (unstable but measured)
+        mn(2, 4, 26.591, true),   // He-6
+        mn(2, 6, 31.408, true),   // He-8
+        mn(3, 5, 41.277, true),   // Li-8
+        mn(3, 6, 45.340, true),   // Li-9
+        mn(4, 2, 23.150, true),   // Be-6
+        mn(4, 4, 53.361, true),   // Be-8 (unstable)
+        mn(4, 6, 64.977, true),   // Be-10
+        mn(4, 7, 65.481, true),   // Be-11
+        mn(5, 3, 44.100, true),   // B-8
+        mn(5, 7, 77.210, true),   // B-12
+        mn(5, 8, 82.180, true),   // B-13
+        mn(6, 3, 60.320, true),   // C-9
+        mn(6, 4, 73.442, true),   // C-10
+        mn(6, 9, 109.300, true),  // C-15
+        mn(6, 10, 110.752, true), // C-16
+        mn(7, 5, 88.226, true),   // N-12
+        mn(7, 6, 97.108, true),   // N-13
+        mn(7, 9, 123.862, true),  // N-16
+        mn(7, 10, 127.620, true), // N-17
+        mn(8, 3, 68.870, true),   // O-11
+        mn(8, 13, 151.990, true), // O-21
+        mn(8, 15, 161.680, true), // O-23
+        mn(9, 8, 137.370, true),  // F-17
+        mn(9, 9, 143.780, true),  // F-18
+        mn(9, 11, 154.370, true), // F-20
+        mn(9, 12, 158.650, true), // F-21
+
+        // ── Z=20-30 complete odd isotopes ──
+        mn(21, 22, 379.780, true), // Sc-43
+        mn(21, 25, 390.610, true), // Sc-46
+        mn(21, 26, 393.070, true), // Sc-47
+        mn(21, 27, 396.810, true), // Sc-48
+        mn(22, 22, 388.930, true), // Ti-44
+        mn(22, 23, 392.660, true), // Ti-45
+        mn(22, 25, 411.920, true), // Ti-47
+        mn(22, 27, 425.080, true), // Ti-49
+        mn(22, 29, 435.430, true), // Ti-51
+        mn(23, 24, 418.160, true), // V-47
+        mn(23, 25, 424.360, true), // V-48
+        mn(23, 26, 429.850, true), // V-49
+        mn(23, 27, 434.300, true), // V-50
+        mn(23, 29, 441.520, true), // V-52
+        mn(24, 25, 447.550, true), // Cr-49
+        mn(24, 27, 460.200, true), // Cr-51
+        mn(24, 29, 470.650, true), // Cr-53
+        mn(25, 26, 455.060, true), // Mn-51
+        mn(25, 28, 467.900, true), // Mn-53
+        mn(25, 29, 473.340, true), // Mn-54
+        mn(25, 31, 480.900, true), // Mn-56
+        mn(26, 27, 469.590, true), // Fe-53
+        mn(26, 29, 485.510, true), // Fe-55
+        mn(26, 31, 497.270, true), // Fe-57
+        mn(26, 33, 506.050, true), // Fe-59
+        mn(26, 34, 509.950, true), // Fe-60
+        mn(27, 28, 479.040, true), // Co-55
+        mn(27, 29, 485.410, true), // Co-56
+        mn(27, 32, 501.290, true), // Co-59 (dup ok)
+        mn(27, 33, 503.550, true), // Co-60
+        mn(27, 34, 507.220, true), // Co-61
+        mn(28, 31, 519.290, true), // Ni-59 (extended)
+        mn(29, 30, 537.910, true), // Cu-59
+        mn(29, 32, 548.730, true), // Cu-61
+        mn(29, 35, 562.930, true), // Cu-64
+        mn(29, 37, 571.730, true), // Cu-66
+        mn(29, 38, 575.090, true), // Cu-67
+        mn(30, 32, 561.510, true), // Zn-62
+        mn(30, 33, 567.020, true), // Zn-63
+        mn(30, 34, 573.160, true), // Zn-64 (extended)
+        mn(30, 35, 576.710, true), // Zn-65
+        mn(30, 37, 583.870, true), // Zn-67
+        mn(30, 39, 589.180, true), // Zn-69
+        mn(30, 41, 594.870, true), // Zn-71
+        mn(30, 42, 596.160, true), // Zn-72
+
+        // ── Z=62-70 complete rare earth ──
+        mn(62, 94, 1131.970, true), // Sm-156
+        mn(63, 84, 1096.640, true), // Eu-147
+        mn(63, 94, 1136.380, true), // Eu-157
+        mn(64, 82, 1081.480, true), // Gd-146 (dup ok)
+        mn(64, 98, 1158.870, true), // Gd-162
+        mn(65, 88, 1137.200, true), // Tb-153
+        mn(65, 92, 1152.350, true), // Tb-157
+        mn(65, 98, 1163.880, true), // Tb-163
+        mn(66, 86, 1143.430, true), // Dy-152
+        mn(66, 90, 1158.260, true), // Dy-156
+        mn(66, 92, 1165.860, true), // Dy-158
+        mn(66, 104, 1182.250, true), // Dy-170
+        mn(67, 86, 1146.020, true), // Ho-153
+        mn(67, 88, 1155.770, true), // Ho-155
+        mn(67, 90, 1163.590, true), // Ho-157
+        mn(67, 102, 1185.610, true), // Ho-169
+        mn(68, 86, 1155.270, true), // Er-154
+        mn(68, 106, 1200.560, true), // Er-174
+        mn(69, 90, 1177.480, true), // Tm-159
+        mn(69, 100, 1198.950, true), // Tm-169 (dup ok)
+        mn(69, 106, 1209.410, true), // Tm-175
+        mn(70, 90, 1183.710, true), // Yb-160
+        mn(70, 110, 1214.240, true), // Yb-180
+
         // ── More actinide isotopes ──
         mn(84, 128, 1284.820, true), // Po-212
         mn(84, 130, 1283.400, true), // Po-214
@@ -821,8 +926,8 @@ mod tests {
     fn test_ame2020_count() {
         let nuclei = ame2020_reference_nuclei();
         assert!(
-            nuclei.len() >= 500,
-            "Expected >= 500 nuclei, got {}",
+            nuclei.len() >= 750,
+            "Expected >= 750 nuclei, got {}",
             nuclei.len()
         );
     }
