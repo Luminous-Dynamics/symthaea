@@ -38,6 +38,7 @@ pub fn App() -> impl IntoView {
 fn AppInner() -> impl IntoView {
     provide_consciousness_context();
     provide_toast_context();
+    crate::context::provide_craft_context();
 
     view! {
         <Router>

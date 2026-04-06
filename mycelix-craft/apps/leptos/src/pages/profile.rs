@@ -1,15 +1,15 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Profile page — craft identity, work history, credentials, and endorsements.
-//! Uses mock-first pattern: renders from localStorage immediately, attempts
-//! conductor sync after connection.
+//! Mock-first: renders from localStorage, syncs to conductor when connected.
 
 use leptos::prelude::*;
 use mycelix_leptos_core::{
+    holochain_provider::use_holochain,
     toasts::{use_toasts, ToastKind},
-    loading::LoadingSkeleton,
 };
 
+use crate::context::{use_craft, CraftProfile};
 use crate::persistence;
 
 const PROFILE_KEY: &str = "craft_profile_draft";
@@ -23,9 +23,41 @@ struct ProfileDraft {
     website: String,
 }
 
+impl From<CraftProfile> for ProfileDraft {
+    fn from(p: CraftProfile) -> Self {
+        Self {
+            display_name: p.display_name,
+            headline: p.headline,
+            bio: p.bio,
+            location: p.location.unwrap_or_default(),
+            website: p.website.unwrap_or_default(),
+        }
+    }
+}
+
+impl From<&ProfileDraft> for CraftProfile {
+    fn from(d: &ProfileDraft) -> Self {
+        Self {
+            display_name: d.display_name.clone(),
+            headline: d.headline.clone(),
+            bio: d.bio.clone(),
+            location: if d.location.is_empty() { None } else { Some(d.location.clone()) },
+            website: if d.website.is_empty() { None } else { Some(d.website.clone()) },
+            avatar_url: None,
+        }
+    }
+}
+
 #[component]
 pub fn ProfilePage() -> impl IntoView {
-    let initial = persistence::load::<ProfileDraft>(PROFILE_KEY).unwrap_or_default();
+    let craft = use_craft();
+    let hc = use_holochain();
+    let toasts = use_toasts();
+
+    // Initialize from conductor profile or localStorage
+    let initial = craft.profile.get_untracked()
+        .map(ProfileDraft::from)
+        .unwrap_or_else(|| persistence::load::<ProfileDraft>(PROFILE_KEY).unwrap_or_default());
     let (draft, set_draft) = signal(initial);
     let (saving, set_saving) = signal(false);
 
@@ -34,14 +66,24 @@ pub fn ProfilePage() -> impl IntoView {
         persistence::save(PROFILE_KEY, &draft.get());
     });
 
-    // Save handler — tries conductor first, falls back to localStorage
+    // Save handler — tries conductor, falls back to localStorage
     let on_save = move |_| {
+        let hc = hc.clone();
+        let toasts = toasts.clone();
+        let profile: CraftProfile = (&draft.get_untracked()).into();
         set_saving.set(true);
-        let toasts = use_toasts();
-        // For now, localStorage is the only persistence. When conductor
-        // is connected, this will call craft_graph::set_profile via zome call.
-        toasts.push("Profile saved locally. Connect to conductor to publish to network.", ToastKind::Info);
-        set_saving.set(false);
+
+        wasm_bindgen_futures::spawn_local(async move {
+            if hc.is_mock() {
+                toasts.push("Profile saved locally. Connect conductor to publish to network.", ToastKind::Info);
+            } else {
+                match hc.call_zome_default::<CraftProfile, ()>("craft_graph", "set_profile", &profile).await {
+                    Ok(_) => toasts.success("Profile published to the Holochain network!"),
+                    Err(e) => toasts.error(format!("Failed to publish: {e}")),
+                }
+            }
+            set_saving.set(false);
+        });
     };
 
     view! {
@@ -53,10 +95,7 @@ pub fn ProfilePage() -> impl IntoView {
                     <h3>"Identity"</h3>
                     <div class="form-group">
                         <label for="display_name">"Display Name"</label>
-                        <input
-                            id="display_name"
-                            type="text"
-                            class="form-input"
+                        <input id="display_name" type="text" class="form-input"
                             placeholder="Your name"
                             prop:value=move || draft.get().display_name
                             on:input=move |ev| {
@@ -68,10 +107,7 @@ pub fn ProfilePage() -> impl IntoView {
                     </div>
                     <div class="form-group">
                         <label for="headline">"Headline"</label>
-                        <input
-                            id="headline"
-                            type="text"
-                            class="form-input"
+                        <input id="headline" type="text" class="form-input"
                             placeholder="e.g., Systems Architect | Holochain Developer"
                             prop:value=move || draft.get().headline
                             on:input=move |ev| {
@@ -83,10 +119,7 @@ pub fn ProfilePage() -> impl IntoView {
                     </div>
                     <div class="form-group">
                         <label for="bio">"Bio"</label>
-                        <textarea
-                            id="bio"
-                            rows="4"
-                            class="form-textarea"
+                        <textarea id="bio" rows="4" class="form-textarea"
                             placeholder="Tell your story..."
                             prop:value=move || draft.get().bio
                             on:input=move |ev| {
@@ -98,10 +131,7 @@ pub fn ProfilePage() -> impl IntoView {
                     </div>
                     <div class="form-group">
                         <label for="location">"Location"</label>
-                        <input
-                            id="location"
-                            type="text"
-                            class="form-input"
+                        <input id="location" type="text" class="form-input"
                             placeholder="City, Country"
                             prop:value=move || draft.get().location
                             on:input=move |ev| {
@@ -111,37 +141,69 @@ pub fn ProfilePage() -> impl IntoView {
                             }
                         />
                     </div>
-                    <button
-                        class="btn-primary"
-                        on:click=on_save
-                        disabled=move || saving.get()
-                    >
-                        {move || if saving.get() { "Saving..." } else { "Save Profile" }}
+                    <button class="btn-primary" on:click=on_save disabled=move || saving.get()>
+                        {move || if saving.get() { "Publishing..." } else { "Save & Publish" }}
                     </button>
                 </div>
 
                 <div class="profile-section">
                     <h3>"Published Credentials"</h3>
-                    <p class="text-secondary">"Credentials published from Praxis will appear here with living vitality scores."</p>
-                    <p class="text-secondary">"Each credential includes a cryptographic Proof of Learning and Ebbinghaus vitality tracking."</p>
+                    {move || {
+                        let creds = craft.credentials.get();
+                        if creds.is_empty() {
+                            view! {
+                                <p class="text-secondary">"Import credentials from Praxis to see them here with living vitality scores."</p>
+                                <a href="/credentials" class="btn-secondary">"Go to Credentials"</a>
+                            }.into_any()
+                        } else {
+                            view! {
+                                <div class="mini-cred-list">
+                                    {creds.iter().map(|c| view! {
+                                        <div class="mini-cred">
+                                            <span>{c.title.clone()}</span>
+                                            <span class="vitality-mini">{c.vitality_permille / 10}"%"</span>
+                                        </div>
+                                    }).collect_view()}
+                                </div>
+                            }.into_any()
+                        }
+                    }}
                 </div>
 
                 <div class="profile-section">
                     <h3>"Guild Memberships"</h3>
-                    <p class="text-secondary">"Your guild roles (Observer → Apprentice → Journeyman → Master → Elder) appear here."</p>
+                    {move || {
+                        let guilds = craft.guilds.get();
+                        if guilds.is_empty() {
+                            view! {
+                                <p class="text-secondary">"Join a guild to start your apprenticeship journey."</p>
+                            }.into_any()
+                        } else {
+                            view! {
+                                <div class="mini-guild-list">
+                                    {guilds.iter().map(|g| view! {
+                                        <div class="mini-guild">
+                                            <span>{g.guild_name.clone()}</span>
+                                            <span class="role-badge">{g.role.clone()}</span>
+                                        </div>
+                                    }).collect_view()}
+                                </div>
+                            }.into_any()
+                        }
+                    }}
                 </div>
 
                 <div class="profile-section">
                     <h3>"Work History"</h3>
-                    <p class="text-secondary">"Add your work experience. Peers can verify entries via link attestation."</p>
-                    <button class="btn-secondary" disabled>
-                        "Add Experience"
-                    </button>
+                    <p class="text-secondary">"Add work experience. Peers verify via link attestation."</p>
+                    <button class="btn-secondary" disabled>"Add Experience"</button>
                 </div>
 
                 <div class="profile-section">
-                    <h3>"Endorsements Received"</h3>
-                    <p class="text-secondary">"Peer attestations of your skills — no central gatekeeper."</p>
+                    <h3>"Endorsements"</h3>
+                    <p class="text-secondary">
+                        {move || format!("{} peer attestations", craft.endorsement_count.get())}
+                    </p>
                 </div>
             </div>
         </div>

@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 mod app;
+mod context;
 #[allow(dead_code)]
 mod matching;
 mod pages;
