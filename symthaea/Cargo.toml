@@ -37,6 +37,7 @@ members = [
     "crates/symthaea-vocal-tract",
     "crates/symthaea-voice",
     "crates/symthaea-vehicle",
+    "crates/symthaea-browser",
     "crates/symthaea-hal",
     "crates/symthaea-ssm",
     "crates/symthaea-zkproof",
@@ -252,6 +253,9 @@ symthaea-humanoid = { path = "crates/symthaea-humanoid", optional = true }
 
 # Symthaea Vehicle - HDC-LTC + FEP Active Inference autonomous vehicle control
 symthaea-vehicle = { path = "crates/symthaea-vehicle", optional = true }
+
+# Symthaea Browser - Consciousness-driven browser agent via CDP
+symthaea-browser = { path = "crates/symthaea-browser", optional = true }
 
 # Symthaea AUV - HDC-LTC + FEP Active Inference autonomous underwater vehicle control
 symthaea-auv = { path = "crates/symthaea-auv", optional = true }
@@ -590,6 +594,7 @@ flight-swarm = ["flight", "symthaea-flight/swarm"]     # Parallel swarm training
 helicopter = ["dep:symthaea-helicopter"]    # HDC-LTC SAR helicopter control via FEP Active Inference
 humanoid = ["dep:symthaea-humanoid"]       # HDC-LTC bipedal humanoid control via FEP Active Inference (DMC benchmark)
 vehicle = ["dep:symthaea-vehicle"]         # HDC-LTC autonomous vehicle control via FEP Active Inference
+browser-agent = ["dep:symthaea-browser"]  # Consciousness-driven browser agent via CDP + HDC encoding
 auv = ["dep:symthaea-auv"]                 # HDC-LTC autonomous underwater vehicle control
 manipulator = ["dep:symthaea-manipulator"] # HDC-LTC consciousness-coupled industrial arm control
 hal = ["dep:symthaea-hal", "humanoid"]    # Hardware abstraction layer (PCA9685 servos, I2C sensors, safety interlocks)
