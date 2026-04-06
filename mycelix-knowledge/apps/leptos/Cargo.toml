@@ -22,6 +22,7 @@ mycelix-leptos-core = { path = "../../../crates/mycelix-leptos-core" }
 mycelix-leptos-client = { path = "../../../crates/mycelix-leptos-client" }
 mycelix-leptos-i18n = { path = "../../../crates/mycelix-leptos-i18n" }
 knowledge-leptos-types = { path = "../../crates/knowledge-leptos-types" }
+mycelix-mock-data = { path = "../../../crates/mycelix-mock-data" }
 
 [workspace]
 

@@ -114,6 +114,7 @@ fn AppInner() -> impl IntoView {
                 </Routes>
             </AppShell>
             <ToastContainer />
+            <mycelix_leptos_core::ClusterLauncher current="Finance" />
         </Router>
     }
 }
