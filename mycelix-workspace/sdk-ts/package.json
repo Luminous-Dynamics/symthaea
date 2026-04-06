@@ -59,9 +59,9 @@
       "types": "./dist/integrations/marketplace/index.d.ts",
       "import": "./dist/integrations/marketplace/index.js"
     },
-    "./integrations/edunet": {
-      "types": "./dist/integrations/edunet/index.d.ts",
-      "import": "./dist/integrations/edunet/index.js"
+    "./integrations/praxis": {
+      "types": "./dist/integrations/praxis/index.d.ts",
+      "import": "./dist/integrations/praxis/index.js"
     },
     "./integrations/supplychain": {
       "types": "./dist/integrations/supplychain/index.d.ts",

@@ -33,19 +33,19 @@ conductor.call(&sweet_zome, "function_name", input).await
 
 ### Phase 1: Update Setup Functions
 
-#### 1.1 Modify `install_edunet_dna()` to Return Zome References
+#### 1.1 Modify `install_praxis_dna()` to Return Zome References
 
 **Current Code** (tests/e2e_test.rs:36-52):
 ```rust
-async fn install_edunet_dna(
+async fn install_praxis_dna(
     conductor: &mut SweetConductor,
 ) -> Result<(SweetAgents, DnaHash), Box<dyn std::error::Error>> {
-    let dna_path = std::path::PathBuf::from("../dna/edunet.dna");
+    let dna_path = std::path::PathBuf::from("../dna/praxis.dna");
     let dna = SweetDnaFile::from_bundle(&dna_path).await?;
 
     let agents = SweetAgents::get(conductor, 2).await;
     let apps = conductor
-        .setup_app_for_agents("mycelix-edunet", &agents, &[dna.clone()])
+        .setup_app_for_agents("mycelix-praxis", &agents, &[dna.clone()])
         .await?;
 
     let dna_hash = dna.dna_hash().clone();
@@ -55,15 +55,15 @@ async fn install_edunet_dna(
 
 **Updated Code** (Holochain 0.6):
 ```rust
-async fn install_edunet_dna(
+async fn install_praxis_dna(
     conductor: &mut SweetConductor,
 ) -> Result<(Vec<SweetCell>, DnaHash), Box<dyn std::error::Error>> {
-    let dna_path = std::path::PathBuf::from("../dna/edunet.dna");
+    let dna_path = std::path::PathBuf::from("../dna/praxis.dna");
     let dna = SweetDnaFile::from_bundle(&dna_path).await?;
 
     let agents = SweetAgents::get(conductor, 2).await;
     let apps = conductor
-        .setup_app_for_agents("mycelix-edunet", &agents, &[dna.clone()])
+        .setup_app_for_agents("mycelix-praxis", &agents, &[dna.clone()])
         .await?;
 
     // Extract cells from installed apps
@@ -85,12 +85,12 @@ async fn setup_conductor_with_agents(
     num_agents: usize,
 ) -> Result<(SweetConductor, Vec<AgentPubKey>), Box<dyn std::error::Error>> {
     let mut conductor = SweetConductor::from_standard_config().await;
-    let dna_path = std::path::PathBuf::from("../dna/edunet.dna");
+    let dna_path = std::path::PathBuf::from("../dna/praxis.dna");
     let dna = SweetDnaFile::from_bundle(&dna_path).await?;
 
     let agents = SweetAgents::get(&conductor, num_agents).await;
     let _apps = conductor
-        .setup_app_for_agents("mycelix-edunet", &agents, &[dna.clone()])
+        .setup_app_for_agents("mycelix-praxis", &agents, &[dna.clone()])
         .await?;
 
     // Extract agent public keys
@@ -106,12 +106,12 @@ async fn setup_conductor_with_agents(
     num_agents: usize,
 ) -> Result<(SweetConductor, Vec<SweetCell>), Box<dyn std::error::Error>> {
     let mut conductor = SweetConductor::from_standard_config().await;
-    let dna_path = std::path::PathBuf::from("../dna/edunet.dna");
+    let dna_path = std::path::PathBuf::from("../dna/praxis.dna");
     let dna = SweetDnaFile::from_bundle(&dna_path).await?;
 
     let agents = SweetAgents::get(&conductor, num_agents).await;
     let apps = conductor
-        .setup_app_for_agents("mycelix-edunet", &agents, &[dna.clone()])
+        .setup_app_for_agents("mycelix-praxis", &agents, &[dna.clone()])
         .await?;
 
     // Extract cells from all apps (one cell per agent)
@@ -251,7 +251,7 @@ for i in 0..5 {
 - [ ] Add `dao_zome()` helper
 
 ### Setup Functions
-- [ ] Update `install_edunet_dna()` to return `Vec<SweetCell>`
+- [ ] Update `install_praxis_dna()` to return `Vec<SweetCell>`
 - [ ] Update `setup_conductor_with_agents()` to return `Vec<SweetCell>`
 
 ### Scenario 1: Complete Learning Journey (lines 97-175)

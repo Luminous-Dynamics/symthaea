@@ -74,7 +74,7 @@
 - [ ] Implement `create_round()`
 - [ ] Implement `join_round()`
 - [ ] Implement `submit_update()`
-- [ ] Implement `aggregate_updates()` using edunet-agg
+- [ ] Implement `aggregate_updates()` using praxis-agg
 - [ ] Implement `get_round_status()`
 - [ ] Implement `list_rounds()`
 - [ ] Add P2P gradient transfer logic
@@ -233,5 +233,5 @@ cd apps/web && npm run dev
 ---
 
 **Last Updated**: 2025-12-10
-**Maintainer**: Mycelix EduNet Team
+**Maintainer**: Mycelix Praxis Team
 **Status**: Ready to start Phase 1

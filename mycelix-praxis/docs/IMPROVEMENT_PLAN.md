@@ -1,4 +1,4 @@
-# Mycelix EduNet - Improvement Plan
+# Mycelix Praxis - Improvement Plan
 
 **Version**: 1.0
 **Date**: 2025-11-15
@@ -8,7 +8,7 @@
 
 ## Executive Summary
 
-This document outlines a comprehensive improvement plan to evolve the mycelix-edunet repository from initial scaffold to implementation-ready state. The plan is organized into 5 phases over 4-6 weeks.
+This document outlines a comprehensive improvement plan to evolve the mycelix-praxis repository from initial scaffold to implementation-ready state. The plan is organized into 5 phases over 4-6 weeks.
 
 ---
 
@@ -188,7 +188,7 @@ This document outlines a comprehensive improvement plan to evolve the mycelix-ed
 - [ ] Add issue templates for each zome/crate
 
 #### 5.2 Project Boards
-- [ ] GitHub Project: "EduNet v0.1 MVP"
+- [ ] GitHub Project: "Praxis v0.1 MVP"
 - [ ] Columns: Backlog, Ready, In Progress, Review, Done
 - [ ] Automation: auto-move on PR/issue state changes
 
@@ -201,7 +201,7 @@ This document outlines a comprehensive improvement plan to evolve the mycelix-ed
 - [ ] `ROADMAP.md` - Public roadmap (link from README)
 
 #### 5.4 Marketing & Communication
-- [ ] Blog post: "Introducing EduNet" (draft)
+- [ ] Blog post: "Introducing Praxis" (draft)
 - [ ] Twitter announcement (draft)
 - [ ] Holochain forum post (draft)
 - [ ] DevForum post (future)

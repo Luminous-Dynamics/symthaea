@@ -1,4 +1,4 @@
-# Mycelix EduNet: Differentiation Features Implementation Complete
+# Mycelix Praxis: Differentiation Features Implementation Complete
 
 **Date**: 2025-12-30
 **Status**: Phase 1 Complete - All 4 Differentiation Zomes Implemented
@@ -8,7 +8,7 @@
 
 ## Overview
 
-The EduNet differentiation layer provides personalized, adaptive learning through four interconnected Holochain zomes:
+The Praxis differentiation layer provides personalized, adaptive learning through four interconnected Holochain zomes:
 
 1. **Spaced Repetition System (SRS)** - SM-2 algorithm for optimized memory retention
 2. **Gamification Engine** - XP, badges, streaks, and leaderboards
@@ -216,7 +216,7 @@ new_mastery = p_learn * p_slip /
 | Gamification | 4 | 1 | 5 |
 | Adaptive | 5 | 33 | 38 |
 | Integration | 11 | 6 | 17 |
-| edunet-core | 0 | 17 | 17 |
+| praxis-core | 0 | 17 | 17 |
 | **Total** | **26** | **64** | **90** |
 
 **Update (2025-12-30)**: Added comprehensive validation logic to Integration zome with 6 additional tests.
@@ -357,10 +357,10 @@ zomes/
 
 ## Structured Error Handling
 
-The EduNet differentiation layer uses structured error handling with descriptive messages, error codes, and resolution hints.
+The Praxis differentiation layer uses structured error handling with descriptive messages, error codes, and resolution hints.
 
 ### Error Module Location
-`crates/edunet-core/src/errors.rs`
+`crates/praxis-core/src/errors.rs`
 
 ### Error Categories
 | Code Range | Category | Example |
@@ -379,10 +379,10 @@ The EduNet differentiation layer uses structured error handling with descriptive
 
 ### Usage Example
 ```rust
-use edunet_core::errors::{srs_errors, EduNetError};
+use praxis_core::errors::{srs_errors, PraxisError};
 
-// Convert EduNetError to WasmError
-fn to_wasm_error(err: EduNetError) -> WasmError {
+// Convert PraxisError to WasmError
+fn to_wasm_error(err: PraxisError) -> WasmError {
     wasm_error!(WasmErrorInner::Guest(err.to_message()))
 }
 

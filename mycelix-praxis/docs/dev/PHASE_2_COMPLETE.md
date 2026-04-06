@@ -134,7 +134,7 @@ According to the v0.2.0 implementation plan, the next phase is:
 
 **Week 5-6: FL Zome Implementation**
 1. Define FlRound and FlUpdate entry types (integrity zome)
-2. Implement aggregation logic using edunet-agg crate
+2. Implement aggregation logic using praxis-agg crate
 3. Add gradient validation (clipping, differential privacy)
 4. Implement coordinator functions (start_round, submit_update, etc.)
 5. Write unit tests for FL validation

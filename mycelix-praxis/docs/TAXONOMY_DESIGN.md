@@ -1,4 +1,4 @@
-# EduNet Universal Taxonomy Design
+# Praxis Universal Taxonomy Design
 
 ## Design Principles
 
@@ -138,7 +138,7 @@ CompetencyFramework
 
 ### Dreyfus Model (skill acquisition stages)
 
-| Stage | Description | EduNet Mapping |
+| Stage | Description | Praxis Mapping |
 |-------|-------------|----------------|
 | 1. Novice | Follows rules rigidly | Beginner, Remember/Understand |
 | 2. Advanced Beginner | Recognizes patterns from experience | Intermediate, Apply |

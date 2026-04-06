@@ -12,7 +12,7 @@
 | **Core** | Identity (90%), Core FL (100%), LUCID (85%), Governance (85%) | Active development | Push to production |
 | **Cluster** | Commons (35 zomes, 4,126 tests), Civic (16 zomes, 2,030 tests) | Maintained | Bug fixes, integrity hardening |
 | **Production** | Mail (12 zomes), DeSci (141 tests), Space | Stable | Community maintenance |
-| **Beta** | Marketplace, SupplyChain, Observatory, EduNet | Various | Accept contributions |
+| **Beta** | Marketplace, SupplyChain, Observatory, Praxis | Various | Accept contributions |
 | **Scaffold** | Knowledge, Finance, Energy, Health | CRUD only | Partner opportunity |
 | **Dormant** | Climate, Music | Archived | No active work |
 

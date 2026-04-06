@@ -10,7 +10,7 @@ The `@mycelix/sdk` TypeScript SDK provides client-side implementations of the My
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                                                                             │
 │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────────┐    │
-│  │ Mycelix-Mail│  │ Marketplace │  │   EduNet    │  │  SupplyChain    │    │
+│  │ Mycelix-Mail│  │ Marketplace │  │   Praxis    │  │  SupplyChain    │    │
 │  │  (React)    │  │   (Next.js) │  │  (SvelteKit)│  │  (Dashboard)    │    │
 │  └──────┬──────┘  └──────┬──────┘  └──────┬──────┘  └───────┬─────────┘    │
 │         │                │                │                  │              │
@@ -29,7 +29,7 @@ The `@mycelix/sdk` TypeScript SDK provides client-side implementations of the My
 │  ┌─────────────────────────────────────────────────────────────────────┐   │
 │  │                    Holochain Conductor (hc 0.6+)                      │   │
 │  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐               │   │
-│  │  │ mail.dna     │  │ market.dna   │  │ edunet.dna   │               │   │
+│  │  │ mail.dna     │  │ market.dna   │  │ praxis.dna   │               │   │
 │  │  │ trust_zome   │  │ listing_zome │  │ course_zome  │               │   │
 │  │  │ mail_zome    │  │ review_zome  │  │ cert_zome    │               │   │
 │  │  └──────────────┘  └──────────────┘  └──────────────┘               │   │
@@ -214,7 +214,7 @@ class MarketplaceReputation {
   async getSellerTrust(sellerId: string) {
     return this.client.getCrossHappReputation({
       agentId: sellerId,
-      happs: ['marketplace', 'mail', 'edunet'], // Cross-reference
+      happs: ['marketplace', 'mail', 'praxis'], // Cross-reference
       aggregationMethod: 'weighted',
     });
   }
@@ -223,9 +223,9 @@ class MarketplaceReputation {
 
 ---
 
-### 3. Mycelix-EduNet Integration
+### 3. Mycelix-Praxis Integration
 
-**Location**: `/srv/luminous-dynamics/mycelix-edunet/`
+**Location**: `/srv/luminous-dynamics/mycelix-praxis/`
 **Status**: HC 0.6 Migration
 **Frontend**: Web app
 
@@ -242,7 +242,7 @@ import {
 } from '@mycelix/sdk';
 
 // Educational credential verification
-class EduNetCredentials {
+class PraxisCredentials {
   private verifier: ClaimVerifier;
   private schemas: SchemaRegistry;
 
@@ -274,7 +274,7 @@ class EduNetCredentials {
           courseId,
           grade,
           completedAt: Date.now(),
-          issuerDid: 'did:mycelix:edunet',
+          issuerDid: 'did:mycelix:praxis',
         },
       })
       .withTtl(365 * 24 * 60 * 60 * 1000) // 1 year validity

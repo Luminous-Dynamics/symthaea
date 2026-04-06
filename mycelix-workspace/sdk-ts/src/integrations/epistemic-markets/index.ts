@@ -1054,7 +1054,7 @@ export class EpistemicMarketsService {
     const query = createReputationQuery('epistemic-markets', predictorId);
     this.bridge.send('governance', query);
     this.bridge.send('knowledge', query);
-    this.bridge.send('edunet', query);
+    this.bridge.send('praxis', query);
   }
 
   /**

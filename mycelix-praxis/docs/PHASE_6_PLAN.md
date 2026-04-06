@@ -1,6 +1,6 @@
 # Phase 6: Production Readiness & Polish
 
-**Goal**: Transform mycelix-edunet into a production-ready, visually polished, fully-documented platform ready for public launch.
+**Goal**: Transform mycelix-praxis into a production-ready, visually polished, fully-documented platform ready for public launch.
 
 **Status**: Planning
 **Started**: 2025-11-15
@@ -159,7 +159,7 @@ Extra polish for excellence:
   - Loading states
 
 - [ ] OG image creation (1200x630)
-  - EduNet logo prominently
+  - Praxis logo prominently
   - Tagline: "Privacy-preserving decentralized education"
   - Tech stack icons (Holochain, React, Rust)
   - Professional gradient background
@@ -456,7 +456,7 @@ jobs:
 ```
 
 **Acceptance Criteria**:
-- Docs published at luminous-dynamics.github.io/mycelix-edunet
+- Docs published at luminous-dynamics.github.io/mycelix-praxis
 - All public APIs documented
 - Search works
 - Auto-updates on push
@@ -615,7 +615,7 @@ jobs:
   - Reddit post formatting
 
 - [ ] One-liner pitch
-  - "EduNet: Privacy-preserving decentralized education powered by Federated Learning and Holochain"
+  - "Praxis: Privacy-preserving decentralized education powered by Federated Learning and Holochain"
 
 - [ ] Feature highlights
   - 🔒 Privacy-first with differential privacy

@@ -12,7 +12,7 @@
 
 ## Context
 
-We need to define the initial federated learning protocol for EduNet. This protocol must:
+We need to define the initial federated learning protocol for Praxis. This protocol must:
 
 - **Enable collaborative learning** without sharing raw training data
 - **Resist poisoning attacks** from malicious participants
@@ -147,8 +147,8 @@ Nice-to-have:
 ### Affected Components
 
 - `fl_zome`: Core protocol implementation
-- `edunet-agg`: Aggregation algorithms (trimmed mean, median)
-- `edunet-core`: `ModelProvenance` type
+- `praxis-agg`: Aggregation algorithms (trimmed mean, median)
+- `praxis-core`: `ModelProvenance` type
 
 ### Migration Path
 

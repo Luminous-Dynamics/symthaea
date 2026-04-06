@@ -1,4 +1,4 @@
-# EduNet Phase 2 Execution Plan
+# Praxis Phase 2 Execution Plan
 
 **Version**: 2.0
 **Date**: 2025-11-15
@@ -30,7 +30,7 @@ Phase 2 focuses on polishing the developer experience, adding tooling automation
 **File**: `docs/faq.md`
 
 **Questions to answer** (25+):
-- What is EduNet?
+- What is Praxis?
 - Why Holochain instead of blockchain?
 - How does federated learning work?
 - Is my data private?
@@ -44,7 +44,7 @@ Phase 2 focuses on polishing the developer experience, adding tooling automation
 - How do I run tests?
 - Where are the zomes?
 - Why doesn't the web client connect to Holochain yet?
-- What's the difference between edunet-core and edunet-agg?
+- What's the difference between praxis-core and praxis-agg?
 - How do I add a new aggregation method?
 - How do I create a course?
 - How do I issue credentials?
@@ -132,10 +132,10 @@ Public-facing roadmap with:
 
 Add shields.io badges:
 ```markdown
-![Build Status](https://github.com/Luminous-Dynamics/mycelix-edunet/actions/workflows/ci.yml/badge.svg)
+![Build Status](https://github.com/Luminous-Dynamics/mycelix-praxis/actions/workflows/ci.yml/badge.svg)
 ![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)
 ![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)
-![Stars](https://img.shields.io/github/stars/Luminous-Dynamics/mycelix-edunet)
+![Stars](https://img.shields.io/github/stars/Luminous-Dynamics/mycelix-praxis)
 ```
 
 Add:
@@ -198,7 +198,7 @@ Auto-update:
 Labels: `good first issue`, `help wanted`, `enhancement`, etc.
 
 Issues:
-1. Add more aggregation methods to edunet-agg
+1. Add more aggregation methods to praxis-agg
 2. Implement HDK entry definitions for learning_zome
 3. Create FL round visualization
 4. Add dark mode to web app

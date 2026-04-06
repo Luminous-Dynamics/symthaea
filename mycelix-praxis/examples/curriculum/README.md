@@ -1,6 +1,6 @@
 # Curriculum Standards Mapping
 
-Example data files that map academic standards to the EduNet knowledge graph.
+Example data files that map academic standards to the Praxis knowledge graph.
 These files can be loaded by a seed script to populate the DHT with structured
 curriculum content.
 
@@ -71,7 +71,7 @@ const hashMap: Record<string, ActionHash> = {};
 // Create nodes
 for (const node of data.nodes) {
   const hash = await appWs.callZome({
-    role_name: 'edunet',
+    role_name: 'praxis',
     zome_name: 'knowledge_zome',
     fn_name: 'create_knowledge_node',
     payload: {
@@ -95,7 +95,7 @@ for (const node of data.nodes) {
 // Create edges
 for (const edge of data.edges) {
   await appWs.callZome({
-    role_name: 'edunet',
+    role_name: 'praxis',
     zome_name: 'knowledge_zome',
     fn_name: 'create_learning_edge',
     payload: {

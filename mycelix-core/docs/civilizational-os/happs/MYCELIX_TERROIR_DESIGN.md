@@ -565,7 +565,7 @@ pub struct Bioregion {
 │  │  Application reviewed by CLT (via Agora):                       │   │
 │  │  • Income verification: ✓                                       │   │
 │  │  • Community fit interview: ✓                                   │   │
-│  │  • Homebuyer education: Completed via EduNet                   │   │
+│  │  • Homebuyer education: Completed via Praxis                   │   │
 │  │  • Board approval: Passed                                       │   │
 │  └─────────────────────────────────────────────────────────────────┘   │
 │       │                                                                 │

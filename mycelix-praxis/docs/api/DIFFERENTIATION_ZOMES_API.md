@@ -1,4 +1,4 @@
-# Mycelix EduNet: Differentiation Zomes API Reference
+# Mycelix Praxis: Differentiation Zomes API Reference
 
 **Version**: 0.2.0
 **Holochain**: 0.6.x
@@ -8,7 +8,7 @@
 
 ## Overview
 
-The EduNet differentiation layer provides personalized, adaptive learning through four interconnected Holochain zomes:
+The Praxis differentiation layer provides personalized, adaptive learning through four interconnected Holochain zomes:
 
 | Zome | Purpose | Entry Types | Functions |
 |------|---------|-------------|-----------|
@@ -1642,9 +1642,9 @@ const result = await client.callZome({
 ### Usage in Zomes
 
 ```rust
-use edunet_core::errors::{srs_errors, EduNetError};
+use praxis_core::errors::{srs_errors, PraxisError};
 
-fn to_wasm_error(err: EduNetError) -> WasmError {
+fn to_wasm_error(err: PraxisError) -> WasmError {
     wasm_error!(WasmErrorInner::Guest(err.to_message()))
 }
 

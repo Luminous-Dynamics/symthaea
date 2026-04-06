@@ -232,7 +232,7 @@ Every hApp must address all four quadrants to be truly integral:
 │  │  HealthVault  - Physical health tracking                        │   │
 │  │  Attest       - Identity credentials                            │   │
 │  │  MATL         - Behavioral reputation                           │   │
-│  │  EduNet       - Skills and competencies                         │   │
+│  │  Praxis       - Skills and competencies                         │   │
 │  │  Transit      - Physical movement                               │   │
 │  └─────────────────────────────────────────────────────────────────┘   │
 │                                                                         │
@@ -354,7 +354,7 @@ Humans develop along multiple semi-independent lines:
 │  LINE              │ DESCRIPTION           │ MYCELIX SUPPORT           │
 │  ══════════════════╪═══════════════════════╪═════════════════════════  │
 │                    │                       │                           │
-│  Cognitive         │ Thinking complexity   │ EduNet, 0TML              │
+│  Cognitive         │ Thinking complexity   │ Praxis, 0TML              │
 │                    │                       │                           │
 │  Emotional         │ Feeling awareness     │ Sanctuary, Pulse          │
 │                    │                       │                           │

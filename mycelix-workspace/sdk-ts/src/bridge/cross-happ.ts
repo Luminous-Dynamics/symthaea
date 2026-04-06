@@ -30,7 +30,7 @@ export type HappId =
   | 'justice'
   | 'mail'
   | 'marketplace'
-  | 'edunet'
+  | 'praxis'
   | 'supplychain';
 
 /** Message types for cross-hApp communication */

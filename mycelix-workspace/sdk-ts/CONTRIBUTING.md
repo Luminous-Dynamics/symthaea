@@ -62,7 +62,7 @@ sdk-ts/
 │   ├── integrations/      # Domain-specific integrations
 │   │   ├── mail/
 │   │   ├── marketplace/
-│   │   ├── edunet/
+│   │   ├── praxis/
 │   │   └── ...
 │   ├── react/             # React hooks
 │   ├── svelte/            # Svelte stores

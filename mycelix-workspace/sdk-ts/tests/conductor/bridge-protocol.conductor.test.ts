@@ -51,8 +51,8 @@ describe.skipIf(!CONDUCTOR_ENABLED)('Bridge Protocol - Conductor Tests', () => {
       expect(result.latencyMs).toBeLessThan(2000); // Should complete within 2s
     });
 
-    it('should send credential verification from edunet to identity', async () => {
-      const result = await validator.testCrossHappMessage('edunet', 'identity', BridgeMessageType.CREDENTIAL_VERIFY);
+    it('should send credential verification from praxis to identity', async () => {
+      const result = await validator.testCrossHappMessage('praxis', 'identity', BridgeMessageType.CREDENTIAL_VERIFY);
 
       expect(result.success).toBe(true);
     });

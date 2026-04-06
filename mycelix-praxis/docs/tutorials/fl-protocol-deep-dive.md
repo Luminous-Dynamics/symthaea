@@ -1,6 +1,6 @@
 # Federated Learning Protocol: Deep Dive
 
-A comprehensive guide to understanding EduNet's privacy-preserving federated learning protocol.
+A comprehensive guide to understanding Praxis's privacy-preserving federated learning protocol.
 
 ---
 
@@ -19,7 +19,7 @@ A comprehensive guide to understanding EduNet's privacy-preserving federated lea
 
 ## Overview
 
-EduNet's Federated Learning (FL) protocol enables **collaborative model training** without centralizing data. Students train models locally on their devices, share only encrypted model updates, and collectively improve a shared model.
+Praxis's Federated Learning (FL) protocol enables **collaborative model training** without centralizing data. Students train models locally on their devices, share only encrypted model updates, and collectively improve a shared model.
 
 ### Key Benefits
 
@@ -368,7 +368,7 @@ pub fn submit_update(update: ModelUpdate) -> ExternResult<()> {
 - **Median**: Most robust, but slower
 - **Weighted Mean**: Weight by sample count or validation loss
 
-**Code** (`crates/edunet-agg/src/lib.rs`):
+**Code** (`crates/praxis-agg/src/lib.rs`):
 
 ```rust
 use nalgebra::DVector;
@@ -524,7 +524,7 @@ pub fn issue_fl_credential(
         context: vec!["https://www.w3.org/2018/credentials/v1".into()],
         id: format!("urn:uuid:{}", uuid::Uuid::new_v4()),
         credential_type: vec!["VerifiableCredential".into(), "FLContribution".into()],
-        issuer: "did:holo:edunet".into(),
+        issuer: "did:holo:praxis".into(),
         issuance_date: chrono::Utc::now().to_rfc3339(),
         credential_subject: CredentialSubject {
             id: agent_to_did(&agent),
@@ -546,7 +546,7 @@ pub fn issue_fl_credential(
 
 ## Aggregation Algorithms
 
-EduNet supports multiple aggregation algorithms for different threat models.
+Praxis supports multiple aggregation algorithms for different threat models.
 
 ### 1. Trimmed Mean (Default)
 
@@ -722,8 +722,8 @@ Let's simulate a complete FL round locally.
 
 ```bash
 # Clone repository
-git clone https://github.com/Luminous-Dynamics/mycelix-edunet.git
-cd mycelix-edunet
+git clone https://github.com/Luminous-Dynamics/mycelix-praxis.git
+cd mycelix-praxis
 
 # Build project
 make build
@@ -737,8 +737,8 @@ make test
 Create `examples/simulate_fl_round.rs`:
 
 ```rust
-use edunet_core::fl_round::*;
-use edunet_agg::trimmed_mean_aggregation;
+use praxis_core::fl_round::*;
+use praxis_agg::trimmed_mean_aggregation;
 use nalgebra::DVector;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -831,7 +831,7 @@ Phase 6: RELEASE
 Implement your own aggregation algorithm:
 
 ```rust
-use edunet_agg::Aggregator;
+use praxis_agg::Aggregator;
 
 pub struct CustomAggregator {
     alpha: f32,
@@ -898,9 +898,9 @@ fn compute_epsilon(round: u32, total_rounds: u32, initial_eps: f64) -> f64 {
 
 ## Questions?
 
-- 💬 [GitHub Discussions](https://github.com/Luminous-Dynamics/mycelix-edunet/discussions)
-- 🐛 [Report Issues](https://github.com/Luminous-Dynamics/mycelix-edunet/issues)
-- 📧 Contact: [edunet@luminous-dynamics.com](mailto:edunet@luminous-dynamics.com)
+- 💬 [GitHub Discussions](https://github.com/Luminous-Dynamics/mycelix-praxis/discussions)
+- 🐛 [Report Issues](https://github.com/Luminous-Dynamics/mycelix-praxis/issues)
+- 📧 Contact: [praxis@luminous-dynamics.com](mailto:praxis@luminous-dynamics.com)
 
 ---
 

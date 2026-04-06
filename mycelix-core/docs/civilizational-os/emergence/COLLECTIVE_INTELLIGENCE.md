@@ -223,7 +223,7 @@ interface CollectiveIntelligenceTypes {
       "evolving-practices",
       "developing-culture"
     ];
-    mycelixSupport: ["Chronicle", "EduNet", "Spiral"];
+    mycelixSupport: ["Chronicle", "Praxis", "Spiral"];
   };
 
   // Collective healing

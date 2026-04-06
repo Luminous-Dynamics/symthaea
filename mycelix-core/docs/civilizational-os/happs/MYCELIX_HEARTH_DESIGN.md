@@ -362,7 +362,7 @@ Remix enters commons with linked provenance
 | **Treasury** | Creator payments, royalties |
 | **Covenant** | Collaboration agreements, licensing |
 | **Marketplace** | Work sales, commissions |
-| **EduNet** | Educational content integration |
+| **Praxis** | Educational content integration |
 | **Agora** | Community governance of channels |
 | **Arbiter** | Copyright disputes, moderation appeals |
 

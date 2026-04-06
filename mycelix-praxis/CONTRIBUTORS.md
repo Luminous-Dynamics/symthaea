@@ -1,6 +1,6 @@
 # Contributors
 
-Thank you to everyone who has contributed to Mycelix EduNet! This project exists because of people like you.
+Thank you to everyone who has contributed to Mycelix Praxis! This project exists because of people like you.
 
 ---
 
@@ -24,7 +24,7 @@ Contributions of all kinds are welcome! You'll be added to this list when your f
 
 - **Luminous Dynamics** ([@Luminous-Dynamics](https://github.com/Luminous-Dynamics))
   - Core architecture and initial implementation
-  - Rust crates (edunet-core, edunet-agg)
+  - Rust crates (praxis-core, praxis-agg)
   - Holochain zome structures
   - Web client foundation
 
@@ -81,9 +81,9 @@ We plan to use the [all-contributors](https://github.com/all-contributors/all-co
 ## Our First Contributors (Coming Soon!)
 
 We're excited to welcome our first contributors! Check out:
-- **[Good First Issues](https://github.com/Luminous-Dynamics/mycelix-edunet/labels/good%20first%20issue)** - Great for newcomers
-- **[Help Wanted](https://github.com/Luminous-Dynamics/mycelix-edunet/labels/help%20wanted)** - Need community support
-- **[RFCs](https://github.com/Luminous-Dynamics/mycelix-edunet/discussions/categories/rfcs)** - Design discussions
+- **[Good First Issues](https://github.com/Luminous-Dynamics/mycelix-praxis/labels/good%20first%20issue)** - Great for newcomers
+- **[Help Wanted](https://github.com/Luminous-Dynamics/mycelix-praxis/labels/help%20wanted)** - Need community support
+- **[RFCs](https://github.com/Luminous-Dynamics/mycelix-praxis/discussions/categories/rfcs)** - Design discussions
 
 ---
 
@@ -93,7 +93,7 @@ Every contribution, no matter how small, moves this project forward. We deeply a
 
 **Star the repo** ⭐ if you find this project interesting!
 
-**Join the conversation** 💬 in [Discussions](https://github.com/Luminous-Dynamics/mycelix-edunet/discussions)
+**Join the conversation** 💬 in [Discussions](https://github.com/Luminous-Dynamics/mycelix-praxis/discussions)
 
 **Spread the word** 📢 and help us build a privacy-preserving education future!
 

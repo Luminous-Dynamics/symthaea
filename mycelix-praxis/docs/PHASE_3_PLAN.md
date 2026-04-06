@@ -1,4 +1,4 @@
-# EduNet Phase 3 Execution Plan
+# Praxis Phase 3 Execution Plan
 
 **Version**: 3.0
 **Date**: 2025-11-15
@@ -120,7 +120,7 @@ const round = await client.callZome('fl_zome', 'create_round', params);
 **Design** (Simple, Clean):
 ```
 ┌─────────────────────────────────────────┐
-│  EduNet  [Search...]  [Filter ▼]       │
+│  Praxis  [Search...]  [Filter ▼]       │
 ├─────────────────────────────────────────┤
 │                                         │
 │  ┌──────┐  ┌──────┐  ┌──────┐         │
@@ -205,7 +205,7 @@ DISCOVER → JOIN → ASSIGN → UPDATE → AGGREGATE → RELEASE
 - `/courses` - Course discovery
 - `/rounds` - FL rounds
 - `/credentials` - My credentials
-- `/about` - About EduNet
+- `/about` - About Praxis
 
 **Impact**: Feels like a real app
 
@@ -283,7 +283,7 @@ DISCOVER → JOIN → ASSIGN → UPDATE → AGGREGATE → RELEASE
 **File**: `.github/social-preview.png` (1200x630)
 
 **Content**:
-- EduNet logo
+- Praxis logo
 - Tagline: "Privacy-Preserving Decentralized Education"
 - Key features (3 bullet points)
 - "Star us on GitHub"

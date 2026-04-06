@@ -1,6 +1,6 @@
-# EduNet Privacy Model v0.1
+# Praxis Privacy Model v0.1
 
-This document describes privacy protections and data handling in Mycelix EduNet.
+This document describes privacy protections and data handling in Mycelix Praxis.
 
 ## Core Principles
 

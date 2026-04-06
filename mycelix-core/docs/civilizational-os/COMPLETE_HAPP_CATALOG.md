@@ -54,7 +54,7 @@ Domain-specific hApps that address core human needs.
 
 | hApp | Purpose | Design Doc |
 |------|---------|------------|
-| **EduNet** | Education and credentials | Existing |
+| **Praxis** | Education and credentials | Existing |
 | **Guild** | Professional associations | [Extended Overview](happs/EXTENDED_HAPPS_OVERVIEW.md) |
 | **Hearth** | Media, publishing, culture | [MYCELIX_HEARTH_DESIGN.md](happs/MYCELIX_HEARTH_DESIGN.md) |
 | **Loom** | Narrative and storytelling | [Extended Overview](happs/EXTENDED_HAPPS_OVERVIEW.md) |
@@ -281,7 +281,7 @@ Meta-intelligence and emergent pattern detection.
 ### Esteem Needs
 - **Attest** - Identity
 - **MATL** - Reputation
-- **EduNet** - Learning
+- **Praxis** - Learning
 - **Guild** - Professional recognition
 - **Collab** - Contribution
 
@@ -314,7 +314,7 @@ Meta-intelligence and emergent pattern detection.
 - Agora, Arbiter, Oracle, Marketplace, Treasury, Covenant
 
 ### Phase 3: Essential Domain (Months 7-12)
-- HealthVault, Sanctuary, EduNet, Collab
+- HealthVault, Sanctuary, Praxis, Collab
 - Terroir, Provision, Transit, Ember
 - Kinship, Beacon, Commons, Accord
 

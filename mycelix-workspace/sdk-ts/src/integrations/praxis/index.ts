@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 /**
- * @mycelix/sdk EduNet Integration
+ * @mycelix/sdk Praxis Integration
  *
- * hApp-specific adapter for Mycelix-EduNet providing:
+ * hApp-specific adapter for Mycelix-Praxis providing:
  * - Educational credential issuance and verification
  * - Course completion certificates with epistemic claims
  * - Skill certification with proficiency levels
@@ -12,18 +12,18 @@
  * - Cross-hApp reputation integration via Bridge
  *
  * @packageDocumentation
- * @module integrations/edunet
- * @see {@link EduNetCredentialService} - Main service class
- * @see {@link getEduNetService} - Singleton accessor
+ * @module integrations/praxis
+ * @see {@link PraxisCredentialService} - Main service class
+ * @see {@link getPraxisService} - Singleton accessor
  *
  * @example Issuing course completion certificate
  * ```typescript
- * import { getEduNetService } from '@mycelix/sdk/integrations/edunet';
+ * import { getPraxisService } from '@mycelix/sdk/integrations/praxis';
  *
- * const edunet = getEduNetService();
+ * const praxis = getPraxisService();
  *
  * // Issue certificate for course completion
- * const credential = edunet.issueCertificate({
+ * const credential = praxis.issueCertificate({
  *   studentId: 'student-alice',
  *   courseId: 'nix-fundamentals',
  *   courseName: 'NixOS Fundamentals',
@@ -36,7 +36,7 @@
  *
  * @example Skill certification
  * ```typescript
- * const skillCert = edunet.issueSkillCertification({
+ * const skillCert = praxis.issueSkillCertification({
  *   holderId: 'developer-bob',
  *   skillId: 'typescript-advanced',
  *   skillName: 'Advanced TypeScript',
@@ -44,7 +44,7 @@
  * });
  *
  * // Verify the credential
- * const verification = edunet.verifyCredential(skillCert.id);
+ * const verification = praxis.verifyCredential(skillCert.id);
  * if (verification.valid) {
  *   console.log('Credential is valid');
  * }
@@ -68,7 +68,7 @@ import {
 
 
 // ============================================================================
-// EduNet-Specific Types
+// Praxis-Specific Types
 // ============================================================================
 
 /**
@@ -148,18 +148,18 @@ export interface LearnerProfile {
 }
 
 // ============================================================================
-// EduNet Credential Service
+// Praxis Credential Service
 // ============================================================================
 
 /**
- * EduNetCredentialService - Educational credential and trust management
+ * PraxisCredentialService - Educational credential and trust management
  *
  * @example
  * ```typescript
- * const edunet = new EduNetCredentialService();
+ * const praxis = new PraxisCredentialService();
  *
  * // Issue a course completion certificate
- * const credential = edunet.issueCertificate({
+ * const credential = praxis.issueCertificate({
  *   studentId: 'student-123',
  *   courseId: 'nix-fundamentals',
  *   courseName: 'NixOS Fundamentals',
@@ -167,10 +167,10 @@ export interface LearnerProfile {
  * });
  *
  * // Verify a credential
- * const verified = edunet.verifyCredential(credential.id);
+ * const verified = praxis.verifyCredential(credential.id);
  * ```
  */
-export class EduNetCredentialService {
+export class PraxisCredentialService {
   private learnerReputations: Map<string, ReputationScore> = new Map();
   private credentials: Map<string, EducationalCredential> = new Map();
   private completionCounts: Map<string, number> = new Map();
@@ -178,7 +178,7 @@ export class EduNetCredentialService {
 
   constructor() {
     this.bridge = new LocalBridge();
-    this.bridge.registerHapp('edunet');
+    this.bridge.registerHapp('praxis');
   }
 
   /**
@@ -236,8 +236,8 @@ export class EduNetCredentialService {
     const credential: EducationalCredential = {
       id: `cred-${Date.now()}-${Math.random().toString(36).slice(2)}`,
       type: 'course_completion',
-      issuerId: 'edunet-issuer',
-      issuerDid: issuerDid || 'did:mycelix:edunet',
+      issuerId: 'praxis-issuer',
+      issuerDid: issuerDid || 'did:mycelix:praxis',
       holderId: studentId,
       holderDid: `did:mycelix:${studentId}`,
       courseId,
@@ -260,7 +260,7 @@ export class EduNetCredentialService {
     this.completionCounts.set(studentId, count);
 
     // Store reputation in bridge for cross-hApp queries
-    this.bridge.setReputation('edunet', studentId, learnerRep);
+    this.bridge.setReputation('praxis', studentId, learnerRep);
 
     return credential;
   }
@@ -314,8 +314,8 @@ export class EduNetCredentialService {
     const credential: EducationalCredential = {
       id: `skill-${Date.now()}-${Math.random().toString(36).slice(2)}`,
       type: 'skill_certification',
-      issuerId: 'edunet-skill-issuer',
-      issuerDid: 'did:mycelix:edunet:skills',
+      issuerId: 'praxis-skill-issuer',
+      issuerDid: 'did:mycelix:praxis:skills',
       holderId,
       holderDid: `did:mycelix:${holderId}`,
       skillId,
@@ -431,7 +431,7 @@ export class EduNetCredentialService {
    * Query learner reputation from other hApps
    */
   queryExternalReputation(learnerId: string): void {
-    const query = createReputationQuery('edunet', learnerId);
+    const query = createReputationQuery('praxis', learnerId);
     this.bridge.send('marketplace', query);
     this.bridge.send('mail', query);
   }
@@ -452,15 +452,15 @@ export class EduNetCredentialService {
 
 import { type MycelixClient } from '../../client/index.js';
 
-const EDUNET_ROLE = 'edunet';
+const EDUNET_ROLE = 'praxis';
 
 /**
- * EduNetBridgeClient - Direct Holochain zome calls for educational operations
+ * PraxisBridgeClient - Direct Holochain zome calls for educational operations
  *
- * Provides the same capabilities as EduNetCredentialService but backed by the
+ * Provides the same capabilities as PraxisCredentialService but backed by the
  * Holochain conductor instead of in-memory Maps.
  */
-export class EduNetBridgeClient {
+export class PraxisBridgeClient {
   constructor(private client: MycelixClient) {}
 
   // --- learning_zome ---
@@ -683,15 +683,15 @@ export class EduNetBridgeClient {
 }
 
 // Bridge client singleton
-let edunetBridgeInstance: EduNetBridgeClient | null = null;
+let praxisBridgeInstance: PraxisBridgeClient | null = null;
 
-export function getEduNetBridgeClient(client: MycelixClient): EduNetBridgeClient {
-  if (!edunetBridgeInstance) edunetBridgeInstance = new EduNetBridgeClient(client);
-  return edunetBridgeInstance;
+export function getPraxisBridgeClient(client: MycelixClient): PraxisBridgeClient {
+  if (!praxisBridgeInstance) praxisBridgeInstance = new PraxisBridgeClient(client);
+  return praxisBridgeInstance;
 }
 
-export function resetEduNetBridgeClient(): void {
-  edunetBridgeInstance = null;
+export function resetPraxisBridgeClient(): void {
+  praxisBridgeInstance = null;
 }
 
 // ============================================================================
@@ -709,14 +709,14 @@ export {
 };
 
 // Default service instance
-let defaultService: EduNetCredentialService | null = null;
+let defaultService: PraxisCredentialService | null = null;
 
 /**
- * Get the default EduNet credential service instance
+ * Get the default Praxis credential service instance
  */
-export function getEduNetService(): EduNetCredentialService {
+export function getPraxisService(): PraxisCredentialService {
   if (!defaultService) {
-    defaultService = new EduNetCredentialService();
+    defaultService = new PraxisCredentialService();
   }
   return defaultService;
 }

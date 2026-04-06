@@ -9,7 +9,7 @@
 
 The Mycelix ecosystem consists of multiple interconnected Holochain applications:
 
-1. **Mycelix EduNet** - Privacy-preserving education platform
+1. **Mycelix Praxis** - Privacy-preserving education platform
 2. **Mycelix FL** - Federated learning infrastructure
 3. **Mycelix Core** - Identity and core services
 4. **Mycelix DAO** - Governance and decision-making
@@ -30,7 +30,7 @@ The Mycelix ecosystem consists of multiple interconnected Holochain applications
 │  App Interface:   localhost:8888                │
 │                                                  │
 │  ┌──────────┐ ┌──────────┐ ┌──────────┐       │
-│  │ EduNet   │ │ FL Core  │ │DAO Core  │       │
+│  │ Praxis   │ │ FL Core  │ │DAO Core  │       │
 │  │   DNA    │ │   DNA    │ │   DNA    │       │
 │  └──────────┘ └──────────┘ └──────────┘       │
 │                                                  │
@@ -55,11 +55,11 @@ The Mycelix ecosystem consists of multiple interconnected Holochain applications
 
 ```
 ┌──────────────────────┐  ┌──────────────────────┐
-│  EduNet Conductor    │  │  FL Conductor        │
+│  Praxis Conductor    │  │  FL Conductor        │
 │  Admin: 4444         │  │  Admin: 4445         │
 │  App:   8888         │  │  App:   8889         │
 │  ┌──────────┐        │  │  ┌──────────┐        │
-│  │ EduNet   │        │  │  │ FL Core  │        │
+│  │ Praxis   │        │  │  │ FL Core  │        │
 │  │   DNA    │        │  │  │   DNA    │        │
 │  └──────────┘        │  │  └──────────┘        │
 └──────────────────────┘  └──────────────────────┘
@@ -94,14 +94,14 @@ The Mycelix ecosystem consists of multiple interconnected Holochain applications
 
 ```bash
 # Mycelix Admin Interfaces (4444-4499)
-4444  # Shared conductor OR EduNet dev conductor
+4444  # Shared conductor OR Praxis dev conductor
 4445  # FL dev conductor
 4446  # Core dev conductor
 4447  # DAO dev conductor
 4448-4499  # Reserved for future Mycelix apps
 
 # Mycelix App Interfaces (8888-8949)
-8888  # Shared conductor OR EduNet dev conductor
+8888  # Shared conductor OR Praxis dev conductor
 8889  # FL dev conductor
 8890  # Core dev conductor
 8891  # DAO dev conductor
@@ -125,7 +125,7 @@ The Mycelix ecosystem consists of multiple interconnected Holochain applications
 When using a shared conductor, apps can call each other's zomes:
 
 ```rust
-// In EduNet coordinator zome
+// In Praxis coordinator zome
 // Call FL zome to start federated learning round
 let fl_response: ExternResult<FlRoundId> = call(
     CallTargetCell::OtherCell(fl_cell_id),
@@ -141,7 +141,7 @@ let fl_response: ExternResult<FlRoundId> = call(
 Apps can emit and listen to signals:
 
 ```typescript
-// EduNet web client
+// Praxis web client
 client.on('signal', (signal) => {
   if (signal.type === 'fl_round_complete') {
     // Update UI when FL round completes
@@ -155,7 +155,7 @@ client.on('signal', (signal) => {
 Apps can read each other's DHT entries if they're in the same conductor:
 
 ```rust
-// Access credential from credential zome while in EduNet zome
+// Access credential from credential zome while in Praxis zome
 let credential: Record = get(credential_hash, GetOptions::default())?;
 ```
 
@@ -171,8 +171,8 @@ let credential: Record = get(credential_hash, GetOptions::default())?;
 
 # 2. Install all apps
 hc app install --admin-port 4444 \
-  --app-id mycelix-edunet \
-  --bundle dna/edunet.dna
+  --app-id mycelix-praxis \
+  --bundle dna/praxis.dna
 
 hc app install --admin-port 4444 \
   --app-id mycelix-fl \
@@ -183,7 +183,7 @@ hc app install --admin-port 4444 \
   --bundle ../Mycelix-Core/0TML/core.dna
 
 # 3. Enable all apps
-hc app enable --admin-port 4444 mycelix-edunet
+hc app enable --admin-port 4444 mycelix-praxis
 hc app enable --admin-port 4444 mycelix-fl
 hc app enable --admin-port 4444 mycelix-core
 ```
@@ -191,8 +191,8 @@ hc app enable --admin-port 4444 mycelix-core
 ### Separate Conductor Setup (Development)
 
 ```bash
-# Terminal 1: EduNet
-cd mycelix-edunet
+# Terminal 1: Praxis
+cd mycelix-praxis
 ./scripts/run-conductor.sh  # Ports: 4444, 8888
 
 # Terminal 2: FL
@@ -211,20 +211,20 @@ holochain -c conductor-config.yaml  # Ports: 4446, 8890
 ### Example: Federated Learning in Education Context
 
 ```
-1. User completes course in EduNet
-   └─> EduNet stores progress in its DHT
+1. User completes course in Praxis
+   └─> Praxis stores progress in its DHT
 
 2. User opts into FL for course improvement
-   └─> EduNet calls FL zome to register for round
+   └─> Praxis calls FL zome to register for round
        └─> FL zome creates FL round
 
 3. FL round completes gradient aggregation
    └─> FL zome emits signal
-       └─> EduNet receives signal
-           └─> EduNet updates course recommendations
+       └─> Praxis receives signal
+           └─> Praxis updates course recommendations
 
 4. User earns credential for participation
-   └─> EduNet calls Credential zome
+   └─> Praxis calls Credential zome
        └─> Credential zome issues W3C VC
 ```
 
@@ -282,7 +282,7 @@ holochain -c conductor-config.yaml  # Ports: 4446, 8890
 **Recommendation**: **Continue with separate conductors** for now:
 
 ```bash
-# Mycelix EduNet (current project)
+# Mycelix Praxis (current project)
 Admin: 4444
 App: 8888
 
@@ -294,7 +294,7 @@ App: 8889
 ```
 
 **Reasons**:
-1. You're in Phase 2 of EduNet (still building core functionality)
+1. You're in Phase 2 of Praxis (still building core functionality)
 2. FL integration planned for later phases
 3. Easier to develop and test independently
 4. Can consolidate to shared conductor when ready for production
@@ -307,7 +307,7 @@ App: 8889
 
 **Triggers**:
 - ✅ All individual apps are stable and tested
-- ✅ Cross-app features are needed (FL + EduNet integration)
+- ✅ Cross-app features are needed (FL + Praxis integration)
 - ✅ Ready for production deployment
 - ✅ Need shared agent identity across apps
 
@@ -327,9 +327,9 @@ App: 8889
 
 See:
 - `scripts/run-mycelix-ecosystem.sh` - Start shared conductor
-- `scripts/run-conductor.sh` - Start EduNet dev conductor
+- `scripts/run-conductor.sh` - Start Praxis dev conductor
 - `conductor/mycelix-ecosystem-conductor.yaml` - Shared conductor config
-- `conductor/dev-conductor-config.yaml` - EduNet dev config
+- `conductor/dev-conductor-config.yaml` - Praxis dev config
 
 ---
 

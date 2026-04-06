@@ -6,7 +6,7 @@
  *
  * Comprehensive tests for hApp-specific integration services:
  * - MarketplaceReputationService
- * - EduNetCredentialService
+ * - PraxisCredentialService
  * - SupplyChainProvenanceService
  *
  * Also tests the main integrations barrel exports.
@@ -18,8 +18,8 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import {
   MarketplaceReputationService,
   getMarketplaceService,
-  EduNetCredentialService,
-  getEduNetService,
+  PraxisCredentialService,
+  getPraxisService,
   SupplyChainProvenanceService,
   getSupplyChainService,
   MailTrustService,
@@ -84,7 +84,7 @@ import {
   createReputation as eduCreateReputation,
   recordPositive as eduRecordPositive,
   reputationValue as eduReputationValue,
-} from '../src/integrations/edunet/index.js';
+} from '../src/integrations/praxis/index.js';
 
 import {
   type EvidenceType,
@@ -508,15 +508,15 @@ describe('Marketplace Integration', () => {
 });
 
 // =============================================================================
-// EduNet Integration Tests
+// Praxis Integration Tests
 // =============================================================================
 
-describe('EduNet Integration', () => {
-  describe('EduNetCredentialService', () => {
-    let service: EduNetCredentialService;
+describe('Praxis Integration', () => {
+  describe('PraxisCredentialService', () => {
+    let service: PraxisCredentialService;
 
     beforeEach(() => {
-      service = new EduNetCredentialService();
+      service = new PraxisCredentialService();
     });
 
     describe('certificate issuance', () => {
@@ -815,10 +815,10 @@ describe('EduNet Integration', () => {
     });
   });
 
-  describe('getEduNetService', () => {
+  describe('getPraxisService', () => {
     it('should return singleton instance', () => {
-      const service1 = getEduNetService();
-      const service2 = getEduNetService();
+      const service1 = getPraxisService();
+      const service2 = getPraxisService();
 
       expect(service1).toBe(service2);
     });
@@ -1378,9 +1378,9 @@ describe('Integrations Barrel Exports', () => {
       expect(getMarketplaceService).toBeDefined();
     });
 
-    it('should export EduNetCredentialService', () => {
-      expect(EduNetCredentialService).toBeDefined();
-      expect(getEduNetService).toBeDefined();
+    it('should export PraxisCredentialService', () => {
+      expect(PraxisCredentialService).toBeDefined();
+      expect(getPraxisService).toBeDefined();
     });
 
     it('should export SupplyChainProvenanceService', () => {

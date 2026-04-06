@@ -78,7 +78,7 @@ describe('Bridge - Message Creation', () => {
   });
 
   it('should create credential verification', () => {
-    const msg = createCredentialVerification('edunet', 'hash123', 'cert-issuer');
+    const msg = createCredentialVerification('praxis', 'hash123', 'cert-issuer');
 
     expect(msg.type).toBe(BridgeMessageType.CredentialVerification);
     expect(msg.credentialHash).toBe('hash123');
@@ -154,22 +154,22 @@ describe('Bridge - LocalBridge', () => {
     const bridge = new LocalBridge();
     bridge.registerHapp('mail');
     bridge.registerHapp('marketplace');
-    bridge.registerHapp('edunet');
+    bridge.registerHapp('praxis');
 
     const received: string[] = [];
 
     bridge.on('marketplace', BridgeMessageType.BroadcastEvent, () => {
       received.push('marketplace');
     });
-    bridge.on('edunet', BridgeMessageType.BroadcastEvent, () => {
-      received.push('edunet');
+    bridge.on('praxis', BridgeMessageType.BroadcastEvent, () => {
+      received.push('praxis');
     });
 
     const event = createBroadcastEvent('mail', 'test', new Uint8Array());
     bridge.broadcast(event);
 
     expect(received).toContain('marketplace');
-    expect(received).toContain('edunet');
+    expect(received).toContain('praxis');
     expect(received).not.toContain('mail'); // Source should not receive
   });
 

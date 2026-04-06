@@ -1,6 +1,6 @@
-# EduNet Architecture
+# Praxis Architecture
 
-This document provides a comprehensive overview of the Mycelix EduNet architecture.
+This document provides a comprehensive overview of the Mycelix Praxis architecture.
 
 ## Table of Contents
 
@@ -24,7 +24,7 @@ graph TB
 
     subgraph "Holochain Layer"
         CONDUCTOR[Holochain Conductor]
-        DNA[EduNet DNA]
+        DNA[Praxis DNA]
 
         subgraph "Zomes"
             LEARNING[Learning Zome]
@@ -35,8 +35,8 @@ graph TB
     end
 
     subgraph "Shared Libraries"
-        CORE[edunet-core<br/>Types, Crypto, Provenance]
-        AGG[edunet-agg<br/>Robust Aggregation]
+        CORE[praxis-core<br/>Types, Crypto, Provenance]
+        AGG[praxis-agg<br/>Robust Aggregation]
     end
 
     subgraph "Storage"
@@ -95,13 +95,13 @@ apps/web/
 
 ```
 crates/
-├── edunet-core/
+├── praxis-core/
 │   ├── src/
 │   │   ├── types.rs      # RoundId, ModelId, PrivacyParams
 │   │   ├── crypto.rs     # BLAKE3 hashing, commitments
 │   │   └── provenance.rs # ModelProvenance, ProvenanceChain
 │   └── Cargo.toml
-└── edunet-agg/
+└── praxis-agg/
     ├── src/
     │   ├── methods.rs    # trimmed_mean, median, weighted_mean
     │   └── errors.rs     # AggregationError
@@ -293,7 +293,7 @@ Time  →
 │  ┌──────────▼──────────────────┐   │
 │  │  Holochain Conductor        │   │
 │  │  (hc sandbox)               │   │
-│  │  - EduNet DNA loaded        │   │
+│  │  - Praxis DNA loaded        │   │
 │  │  - Agent key generated      │   │
 │  └─────────────────────────────┘   │
 │                                     │
@@ -369,8 +369,8 @@ Time  →
 - **Ed25519**: Digital signatures
 
 ### Libraries
-- **edunet-core**: Core types, crypto, provenance
-- **edunet-agg**: Robust aggregation algorithms
+- **praxis-core**: Core types, crypto, provenance
+- **praxis-agg**: Robust aggregation algorithms
 - **BLAKE3**: Cryptographic hashing
 - **serde**: Serialization/deserialization
 

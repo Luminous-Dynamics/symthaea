@@ -59,7 +59,7 @@ describe('CrossHappBridge - Construction', () => {
   });
 
   it('should return not verified for unregistered hApps', async () => {
-    const result = await bridge.requestVerification('identity', 'edunet', {
+    const result = await bridge.requestVerification('identity', 'praxis', {
       subjectDid: 'did:test:1',
       verificationType: 'identity',
     });
@@ -315,7 +315,7 @@ describe('CrossHappBridge - Verification', () => {
   });
 
   it('should return not verified for unregistered hApps', async () => {
-    const result = await bridge.requestVerification('governance', 'edunet', {
+    const result = await bridge.requestVerification('governance', 'praxis', {
       subjectDid: 'did:test:1',
       verificationType: 'credential',
     });

@@ -1,6 +1,6 @@
-# EduNet Schemas
+# Praxis Schemas
 
-This directory contains schema definitions for Mycelix EduNet.
+This directory contains schema definitions for Mycelix Praxis.
 
 ## Structure
 
@@ -9,14 +9,14 @@ schemas/
 ├── vc/                           # Verifiable Credentials schemas
 │   ├── EduAchievementCredential.schema.json
 │   └── contexts/
-│       └── edunet-v1.jsonld      # JSON-LD context
+│       └── praxis-v1.jsonld      # JSON-LD context
 └── dht/                          # Holochain DHT entry schemas
     └── entries.md                # Entry definitions reference
 ```
 
 ## Verifiable Credentials (VC)
 
-EduNet uses [W3C Verifiable Credentials](https://www.w3.org/TR/vc-data-model/) for educational achievements.
+Praxis uses [W3C Verifiable Credentials](https://www.w3.org/TR/vc-data-model/) for educational achievements.
 
 ### EduAchievementCredential
 
@@ -30,7 +30,7 @@ See `vc/EduAchievementCredential.schema.json` for full schema.
 
 ### JSON-LD Context
 
-The `contexts/edunet-v1.jsonld` file defines our custom vocabulary for:
+The `contexts/praxis-v1.jsonld` file defines our custom vocabulary for:
 - Course and model identifiers
 - Federated learning provenance
 - Achievement scoring

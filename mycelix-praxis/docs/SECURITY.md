@@ -7,7 +7,7 @@
 ### How to Report
 
 1. **Email**: Send details to **security@luminous-dynamics.com**
-2. **GitHub Security**: Use [GitHub Security Advisories](https://github.com/Luminous-Dynamics/mycelix-edunet/security/advisories/new)
+2. **GitHub Security**: Use [GitHub Security Advisories](https://github.com/Luminous-Dynamics/mycelix-praxis/security/advisories/new)
 
 ### What to Include
 
@@ -113,7 +113,7 @@ location /api/ {
 
 #### Input Validation
 
-**Rust** (`crates/edunet-core/src/validation.rs`):
+**Rust** (`crates/praxis-core/src/validation.rs`):
 ```rust
 /// Validate course title
 pub fn validate_course_title(title: &str) -> Result<(), String> {
@@ -165,7 +165,7 @@ export function validateCourseId(id: string): boolean {
 - ✅ `rand` with OS RNG for randomness
 - ❌ Never roll your own crypto
 
-**Example** (`crates/edunet-core/src/crypto.rs`):
+**Example** (`crates/praxis-core/src/crypto.rs`):
 ```rust
 use ed25519_dalek::{Keypair, Signature, Signer, Verifier};
 use sha2::{Sha256, Digest};

@@ -51,7 +51,7 @@ Archives are useless if they can't be found.
 ┌─────────────────────────────────────────────────────────────────────┐
 │                      Content Sources                                 │
 │  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐  │
-│  │ Arbiter  │ │  Agora   │ │ EduNet   │ │   All    │ │ External │  │
+│  │ Arbiter  │ │  Agora   │ │ Praxis   │ │   All    │ │ External │  │
 │  │(Rulings) │ │ (Votes)  │ │(Research)│ │  hApps   │ │ (IPFS)   │  │
 │  └──────────┘ └──────────┘ └──────────┘ └──────────┘ └──────────┘  │
 ├─────────────────────────────────────────────────────────────────────┤
@@ -1191,7 +1191,7 @@ pub fn register_auto_archive_sources() -> ExternResult<()> {
         },
     )?;
 
-    // EduNet credentials
+    // Praxis credentials
     bridge_call::<()>(
         "edunet",
         "register_event_listener",

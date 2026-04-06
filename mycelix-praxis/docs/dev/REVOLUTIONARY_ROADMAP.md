@@ -1,4 +1,4 @@
-# 🚀 Mycelix EduNet - Revolutionary Improvement Roadmap
+# 🚀 Mycelix Praxis - Revolutionary Improvement Roadmap
 
 **Created**: 2025-12-10
 **Status**: Active Planning
@@ -36,7 +36,7 @@
 
 #### 1.2.1 FL Zome (Week 1-2)
 - [ ] Apply integrity/coordinator split pattern
-- [ ] Implement gradient aggregation with edunet-agg
+- [ ] Implement gradient aggregation with praxis-agg
 - [ ] Add Byzantine-robust aggregation (Krum, coordinate-wise median)
 - [ ] **REVOLUTIONARY**: Adaptive privacy budgets based on data sensitivity
   - Dynamic ε-δ adjustment based on learning context
@@ -297,13 +297,13 @@
 
 ### Code Organization
 ```
-mycelix-edunet/
+mycelix-praxis/
 ├── crates/
-│   ├── edunet-core/          # Core types (stable)
-│   ├── edunet-agg/           # FL aggregation (stable)
-│   ├── edunet-privacy/       # NEW: Advanced privacy features
-│   ├── edunet-matching/      # NEW: P2P learning coordination
-│   └── edunet-zkp/           # NEW: Zero-knowledge proofs
+│   ├── praxis-core/          # Core types (stable)
+│   ├── praxis-agg/           # FL aggregation (stable)
+│   ├── praxis-privacy/       # NEW: Advanced privacy features
+│   ├── praxis-matching/      # NEW: P2P learning coordination
+│   └── praxis-zkp/           # NEW: Zero-knowledge proofs
 ├── zomes/
 │   ├── learning_zome/        # ✅ COMPLETE
 │   ├── fl_zome/              # 🚧 IN PROGRESS
@@ -354,7 +354,7 @@ mycelix-edunet/
 
 ## 🌟 The Vision
 
-By 2026, Mycelix EduNet will demonstrate that:
+By 2026, Mycelix Praxis will demonstrate that:
 
 1. **Privacy and collaboration are not contradictory**
    - Federated learning proves you can learn together without sharing data

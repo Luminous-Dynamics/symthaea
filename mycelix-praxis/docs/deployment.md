@@ -1,6 +1,6 @@
 # Deployment Guide
 
-Complete guide for deploying Mycelix EduNet to production environments.
+Complete guide for deploying Mycelix Praxis to production environments.
 
 ---
 
@@ -46,8 +46,8 @@ Before deploying to production:
 
 ```bash
 # Clone repository
-git clone https://github.com/Luminous-Dynamics/mycelix-edunet.git
-cd mycelix-edunet
+git clone https://github.com/Luminous-Dynamics/mycelix-praxis.git
+cd mycelix-praxis
 
 # Configure environment
 cp .env.example .env
@@ -77,12 +77,12 @@ docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d --force-re
 
 ### Behind Reverse Proxy (nginx/Traefik)
 
-**nginx example** (`/etc/nginx/sites-available/edunet`):
+**nginx example** (`/etc/nginx/sites-available/praxis`):
 
 ```nginx
 server {
     listen 80;
-    server_name edunet.example.com;
+    server_name praxis.example.com;
 
     # Redirect to HTTPS
     return 301 https://$server_name$request_uri;
@@ -90,11 +90,11 @@ server {
 
 server {
     listen 443 ssl http2;
-    server_name edunet.example.com;
+    server_name praxis.example.com;
 
     # SSL certificates (Let's Encrypt)
-    ssl_certificate /etc/letsencrypt/live/edunet.example.com/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/edunet.example.com/privkey.pem;
+    ssl_certificate /etc/letsencrypt/live/praxis.example.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/praxis.example.com/privkey.pem;
 
     # SSL configuration
     ssl_protocols TLSv1.2 TLSv1.3;
@@ -118,7 +118,7 @@ server {
 
 **Enable and restart nginx**:
 ```bash
-sudo ln -s /etc/nginx/sites-available/edunet /etc/nginx/sites-enabled/
+sudo ln -s /etc/nginx/sites-available/praxis /etc/nginx/sites-enabled/
 sudo nginx -t
 sudo systemctl reload nginx
 ```
@@ -151,8 +151,8 @@ ssh root@your-server-ip
 apt update && apt upgrade -y
 
 # Create non-root user
-adduser edunet
-usermod -aG sudo edunet
+adduser praxis
+usermod -aG sudo praxis
 
 # Configure firewall
 ufw allow OpenSSH
@@ -160,8 +160,8 @@ ufw allow 80/tcp
 ufw allow 443/tcp
 ufw enable
 
-# Switch to edunet user
-su - edunet
+# Switch to praxis user
+su - praxis
 ```
 
 ### Step 3: Install Dependencies
@@ -185,8 +185,8 @@ docker compose version
 ```bash
 # Clone repository
 cd ~
-git clone https://github.com/Luminous-Dynamics/mycelix-edunet.git
-cd mycelix-edunet
+git clone https://github.com/Luminous-Dynamics/mycelix-praxis.git
+cd mycelix-praxis
 
 # Configure environment
 cp .env.example .env
@@ -209,34 +209,34 @@ sudo apt install nginx -y
 sudo apt install certbot python3-certbot-nginx -y
 
 # Get SSL certificate
-sudo certbot --nginx -d edunet.example.com
+sudo certbot --nginx -d praxis.example.com
 
 # Configure nginx (see nginx example above)
-sudo nano /etc/nginx/sites-available/edunet
+sudo nano /etc/nginx/sites-available/praxis
 
 # Enable site
-sudo ln -s /etc/nginx/sites-available/edunet /etc/nginx/sites-enabled/
+sudo ln -s /etc/nginx/sites-available/praxis /etc/nginx/sites-enabled/
 sudo nginx -t
 sudo systemctl reload nginx
 ```
 
 ### Step 6: Setup Systemd Service (Auto-start)
 
-Create `/etc/systemd/system/edunet.service`:
+Create `/etc/systemd/system/praxis.service`:
 
 ```ini
 [Unit]
-Description=Mycelix EduNet
+Description=Mycelix Praxis
 Requires=docker.service
 After=docker.service
 
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-WorkingDirectory=/home/edunet/mycelix-edunet
+WorkingDirectory=/home/praxis/mycelix-praxis
 ExecStart=/usr/bin/docker compose up -d
 ExecStop=/usr/bin/docker compose down
-User=edunet
+User=praxis
 
 [Install]
 WantedBy=multi-user.target
@@ -245,9 +245,9 @@ WantedBy=multi-user.target
 **Enable and start**:
 ```bash
 sudo systemctl daemon-reload
-sudo systemctl enable edunet
-sudo systemctl start edunet
-sudo systemctl status edunet
+sudo systemctl enable praxis
+sudo systemctl start praxis
+sudo systemctl status praxis
 ```
 
 ---
@@ -261,10 +261,10 @@ sudo systemctl status edunet
 pip install awsebcli
 
 # Initialize
-eb init -p docker edunet-app
+eb init -p docker praxis-app
 
 # Create environment
-eb create edunet-prod
+eb create praxis-prod
 
 # Deploy
 eb deploy
@@ -277,11 +277,11 @@ eb open
 
 ```bash
 # Build and push Docker image
-gcloud builds submit --tag gcr.io/PROJECT_ID/edunet
+gcloud builds submit --tag gcr.io/PROJECT_ID/praxis
 
 # Deploy to Cloud Run
-gcloud run deploy edunet \
-  --image gcr.io/PROJECT_ID/edunet \
+gcloud run deploy praxis \
+  --image gcr.io/PROJECT_ID/praxis \
   --platform managed \
   --region us-central1 \
   --allow-unauthenticated
@@ -294,7 +294,7 @@ gcloud run deploy edunet \
 heroku login
 
 # Create app
-heroku create edunet-app
+heroku create praxis-app
 
 # Set buildpack
 heroku buildpacks:set heroku/nodejs
@@ -348,7 +348,7 @@ fly open
 ```bash
 NODE_ENV=production
 WEB_PORT=3000
-PUBLIC_URL=https://edunet.example.com
+PUBLIC_URL=https://praxis.example.com
 RUST_LOG=warn
 VITE_MOCK_MODE=true
 ```
@@ -398,7 +398,7 @@ docker compose logs --tail=100 web
 
 **System logs** (if using systemd):
 ```bash
-sudo journalctl -u edunet -f
+sudo journalctl -u praxis -f
 ```
 
 ### Metrics
@@ -566,8 +566,8 @@ Increase resource limits in `docker-compose.prod.yml`.
 
 **Need help?**
 - 📖 [Documentation](README.md)
-- 💬 [GitHub Discussions](https://github.com/Luminous-Dynamics/mycelix-edunet/discussions)
-- 🐛 [Report Issues](https://github.com/Luminous-Dynamics/mycelix-edunet/issues)
+- 💬 [GitHub Discussions](https://github.com/Luminous-Dynamics/mycelix-praxis/discussions)
+- 🐛 [Report Issues](https://github.com/Luminous-Dynamics/mycelix-praxis/issues)
 
 ---
 

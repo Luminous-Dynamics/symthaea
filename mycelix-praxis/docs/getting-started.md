@@ -1,6 +1,6 @@
-# Getting Started with EduNet
+# Getting Started with Praxis
 
-Welcome to Mycelix EduNet! This guide will help you set up your development environment and make your first contribution.
+Welcome to Mycelix Praxis! This guide will help you set up your development environment and make your first contribution.
 
 ## Table of Contents
 
@@ -55,8 +55,8 @@ Welcome to Mycelix EduNet! This guide will help you set up your development envi
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/Luminous-Dynamics/mycelix-edunet.git
-cd mycelix-edunet
+git clone https://github.com/Luminous-Dynamics/mycelix-praxis.git
+cd mycelix-praxis
 ```
 
 ### 2. Build the Project
@@ -69,8 +69,8 @@ make build
 **Expected output:**
 ```
 ▶ Building Rust workspace...
-   Compiling edunet-core v0.1.0
-   Compiling edunet-agg v0.1.0
+   Compiling praxis-core v0.1.0
+   Compiling praxis-agg v0.1.0
    ...
    Finished `dev` profile
 
@@ -104,14 +104,14 @@ make test
 ## Project Structure
 
 ```
-mycelix-edunet/
+mycelix-praxis/
 ├── apps/web/              # React web client
 │   ├── src/               # Source code
 │   ├── public/            # Static assets
 │   └── package.json       # Dependencies
 ├── crates/                # Rust libraries
-│   ├── edunet-core/       # Core types, crypto, provenance
-│   └── edunet-agg/        # Robust aggregation
+│   ├── praxis-core/       # Core types, crypto, provenance
+│   └── praxis-agg/        # Robust aggregation
 ├── zomes/                 # Holochain zomes (future HDK integration)
 │   ├── learning_zome/     # Courses, progress
 │   ├── fl_zome/           # Federated learning
@@ -184,7 +184,7 @@ cd apps/web && npm run dev
 
 ### Step 1: Find an Issue
 
-Browse [good first issues](https://github.com/Luminous-Dynamics/mycelix-edunet/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22) or create a new one.
+Browse [good first issues](https://github.com/Luminous-Dynamics/mycelix-praxis/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22) or create a new one.
 
 ### Step 2: Create a Branch
 
@@ -204,7 +204,7 @@ git checkout -b fix/your-bug-fix
 
 **Example: Add a new aggregation method**
 
-1. Edit `crates/edunet-agg/src/methods.rs`:
+1. Edit `crates/praxis-agg/src/methods.rs`:
    ```rust
    /// Compute geometric mean of vectors
    pub fn geometric_mean(updates: &[Vec<f32>]) -> Result<Vec<f32>> {
@@ -224,7 +224,7 @@ git checkout -b fix/your-bug-fix
 
 3. Run tests:
    ```bash
-   cargo test -p edunet-agg
+   cargo test -p praxis-agg
    ```
 
 ### Step 4: Commit
@@ -265,7 +265,7 @@ Then open a PR on GitHub. See [CONTRIBUTING.md](../CONTRIBUTING.md) for PR check
 cargo test --workspace
 
 # Specific crate
-cargo test -p edunet-core
+cargo test -p praxis-core
 
 # Specific test
 cargo test test_trimmed_mean
@@ -300,7 +300,7 @@ cargo test --test integration_fl_round
 
 ## Troubleshooting
 
-### "error: could not compile `edunet-core`"
+### "error: could not compile `praxis-core`"
 
 **Cause**: Missing Rust toolchain or dependencies
 
@@ -384,7 +384,7 @@ make dev                # Restart
 ### Pick a Task
 
 **Beginner-friendly:**
-- Add more tests to `edunet-agg`
+- Add more tests to `praxis-agg`
 - Improve web UI components
 - Write more examples
 - Fix typos in documentation
@@ -439,8 +439,8 @@ make reset          # Reset Holochain state (future)
 
 - **Documentation**: `docs/`
 - **FAQ**: [faq.md](faq.md)
-- **Issues**: [GitHub Issues](https://github.com/Luminous-Dynamics/mycelix-edunet/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/Luminous-Dynamics/mycelix-edunet/discussions)
+- **Issues**: [GitHub Issues](https://github.com/Luminous-Dynamics/mycelix-praxis/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/Luminous-Dynamics/mycelix-praxis/discussions)
 
 ---
 

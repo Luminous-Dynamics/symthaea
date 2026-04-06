@@ -1,6 +1,6 @@
-# Contributing to Mycelix EduNet
+# Contributing to Mycelix Praxis
 
-Thank you for your interest in contributing to Mycelix EduNet! This document provides guidelines and instructions for contributing.
+Thank you for your interest in contributing to Mycelix Praxis! This document provides guidelines and instructions for contributing.
 
 ## Table of Contents
 
@@ -32,8 +32,8 @@ This project and everyone participating in it is governed by our [Code of Conduc
 
 ```bash
 # Clone the repository
-git clone https://github.com/Luminous-Dynamics/mycelix-edunet.git
-cd mycelix-edunet
+git clone https://github.com/Luminous-Dynamics/mycelix-praxis.git
+cd mycelix-praxis
 
 # Install dependencies and build
 make build
@@ -287,7 +287,7 @@ When you open a PR, ensure:
 cargo test --all
 
 # Run specific crate tests
-cargo test -p edunet-core
+cargo test -p praxis-core
 
 # Run with output
 cargo test -- --nocapture
@@ -552,9 +552,9 @@ make reset               # Reset Holochain state (dev only)
 
 ## Questions?
 
-- **General questions**: Open a [Discussion](https://github.com/Luminous-Dynamics/mycelix-edunet/discussions)
-- **Bug reports**: Open an [Issue](https://github.com/Luminous-Dynamics/mycelix-edunet/issues)
-- **Feature requests**: Open an [Issue](https://github.com/Luminous-Dynamics/mycelix-edunet/issues) with `type: feature` label
+- **General questions**: Open a [Discussion](https://github.com/Luminous-Dynamics/mycelix-praxis/discussions)
+- **Bug reports**: Open an [Issue](https://github.com/Luminous-Dynamics/mycelix-praxis/issues)
+- **Feature requests**: Open an [Issue](https://github.com/Luminous-Dynamics/mycelix-praxis/issues) with `type: feature` label
 - **Real-time chat**: Join our community (link TBD)
 
 ## License

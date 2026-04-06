@@ -20,7 +20,7 @@ All 29 integration modules in `/mycelix-workspace/sdk-ts/src/integrations/` are 
 | climate | 337 | 11 | Real | No | Carbon credits, RECs, climate projects |
 | consensus | 677 | 10 | Real | No | MATL-weighted BFT consensus, threshold sigs |
 | desci | 605 | 10 | Real | No | Peer review, publications, research grants |
-| edunet | 472 | 9 | Real | Yes | Course completion, skill certification |
+| praxis | 472 | 9 | Real | Yes | Course completion, skill certification |
 | energy | 292 | 28 | Real | Yes | Unified client + 6 zome clients + legacy |
 | epistemic-markets | 1120 | 46 | Real | No | 3D E-N-M classification, multi-stake, reasoning traces |
 | fabrication | 1269 | 59 | Real | No | HDC designs, PoGF, Cincinnati algorithm |
@@ -81,7 +81,7 @@ All 29 integration modules in `/mycelix-workspace/sdk-ts/src/integrations/` are 
 
 ### Tier 3: Focused Implementations (300-600 lines)
 
-24. **edunet** (472 lines) - Course completion, skill certification
+24. **praxis** (472 lines) - Course completion, skill certification
 25. **marketplace** (435 lines) - Transaction reputation
 26. **mail** (368 lines) - Sender trust, email verification
 27. **mutualaid** (367 lines) - Gift circles, timebanking
@@ -97,7 +97,7 @@ All 29 integration modules in `/mycelix-workspace/sdk-ts/src/integrations/` are 
 | Module | Test File | Size (bytes) |
 |--------|-----------|--------------|
 | cross-happ-workflows | cross-happ-workflows.test.ts | 15,781 |
-| edunet | edunet.test.ts | 14,187 |
+| praxis | praxis.test.ts | 14,187 |
 | energy | energy.test.ts | 13,538 |
 | finance | finance.test.ts | 11,451 |
 | governance | governance.test.ts | 19,633 |

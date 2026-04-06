@@ -1,4 +1,4 @@
-# EduNet Design Philosophy: Emotionally Responsive Educational UI
+# Praxis Design Philosophy: Emotionally Responsive Educational UI
 
 ## Core Principle
 The app should feel like a calm, competent study companion — not a game, not a test, not a tool. It should meet the student where they are emotionally and adapt its presence accordingly.

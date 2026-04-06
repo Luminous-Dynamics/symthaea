@@ -44,7 +44,7 @@ Last updated: 2026-03-06
 | `mycelix-knowledge/` | 1,000 | Stale | Knowledge graph |
 | `mycelix-climate/` | 13 | Stub | Barely started |
 | `mycelix-desci/` | 113 | Stale | Decentralized science |
-| `mycelix-edunet/` | 4,776 | Active | Education network |
+| `mycelix-praxis/` | 4,776 | Active | Education network |
 | `mycelix-mail/` | 511 | Archived | Decentralized email |
 | `mycelix-marketplace/` | 99 | Archived | P2P marketplace |
 | `mycelix-music/` | 823 | Archived | Music streaming |
@@ -134,7 +134,7 @@ Last updated: 2026-03-06
 | `Mycelix-Core` | Archived — superseded by monorepo |
 | `mycelix-desci` | Archived |
 | `Mycelix-Mail` | Archived |
-| `mycelix-edunet` | Archived |
+| `mycelix-praxis` | Archived |
 | `mycelix-supplychain` | Archived |
 | `Mycelix-Marketplace` | Archived |
 | `Mycelix-Music` | Archived |

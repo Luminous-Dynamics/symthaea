@@ -398,14 +398,14 @@ This governance infrastructure builds directly on Mycelix 0TML (Zero-Trust Machi
 ## 📊 Project Context
 
 ### Where This Fits
-- **Mycelix EduNet v0.2.0**: Phase 7 - End-to-End Testing
+- **Mycelix Praxis v0.2.0**: Phase 7 - End-to-End Testing
 - **Component**: Reusable governance infrastructure crate
 - **Purpose**: Enable DAO governance across all Mycelix hApps
-- **Scope**: Foundation for EduNet DAO + future ecosystem DAOs
+- **Scope**: Foundation for Praxis DAO + future ecosystem DAOs
 
 ### Reusability
 This crate is designed to be reusable across:
-- ✅ Mycelix EduNet (education platform DAO)
+- ✅ Mycelix Praxis (education platform DAO)
 - ✅ Future Mycelix hApps (any app needing governance)
 - ✅ External projects using reputation-weighted voting
 - ✅ Research into BFT-enhanced governance

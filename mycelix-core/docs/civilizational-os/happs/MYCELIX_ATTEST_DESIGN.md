@@ -11,7 +11,7 @@
 
 ## Executive Summary
 
-Mycelix-Attest is the identity layer for the entire Mycelix ecosystem. It provides self-sovereign identity management with progressive disclosure, allowing agents to prove claims about themselves without revealing unnecessary information. Built on W3C Verifiable Credentials and integrated with EduNet's credential system, Attest becomes the foundation for trust across all hApps.
+Mycelix-Attest is the identity layer for the entire Mycelix ecosystem. It provides self-sovereign identity management with progressive disclosure, allowing agents to prove claims about themselves without revealing unnecessary information. Built on W3C Verifiable Credentials and integrated with Praxis's credential system, Attest becomes the foundation for trust across all hApps.
 
 ### Why Attest?
 
@@ -798,7 +798,7 @@ pub fn issue_credential(input: IssueCredentialInput) -> ExternResult<ActionHash>
     // Notify subject
     send_signal_to_agent(&input.subject, Signal::CredentialIssued(hash.clone()))?;
 
-    // Register with EduNet if educational
+    // Register with Praxis if educational
     if matches!(issuer.issuer_type, IssuerType::Educational { .. }) {
         bridge_call::<()>(
             "edunet",

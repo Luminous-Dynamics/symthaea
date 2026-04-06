@@ -1,4 +1,4 @@
-# EduNet Educational Games Plan
+# Praxis Educational Games Plan
 
 ## Evidence Base
 - Game-based STEM learning: effect size g=0.624 (medium-large) over conventional instruction

@@ -1,6 +1,6 @@
-# EduNet Examples
+# Praxis Examples
 
-This directory contains example data demonstrating EduNet's key features.
+This directory contains example data demonstrating Praxis's key features.
 
 ## Structure
 
@@ -105,7 +105,7 @@ fn test_valid_credential() {
 
 Use FL round data to simulate aggregation:
 ```rust
-use edunet_agg::trimmed_mean;
+use praxis_agg::trimmed_mean;
 
 // Load round config
 let round = serde_json::from_str(include_str!("../examples/fl-rounds/round-001-discover.json"))?;
@@ -155,4 +155,4 @@ Planned additions:
 
 ## Questions?
 
-See [FAQ](../docs/faq.md) or open a [Discussion](https://github.com/Luminous-Dynamics/mycelix-edunet/discussions).
+See [FAQ](../docs/faq.md) or open a [Discussion](https://github.com/Luminous-Dynamics/mycelix-praxis/discussions).

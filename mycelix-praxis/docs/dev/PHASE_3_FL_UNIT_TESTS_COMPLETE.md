@@ -149,7 +149,7 @@ Created comprehensive test structure with placeholders for:
 - **Multi-Agent Tests** (4 tests) - Multiple participants, concurrent updates, dropout, late joiners
 - **Error Handling Tests** (6 tests) - Invalid IDs, unauthorized updates, duplicates, state transitions, min participants, malformed data
 - **Performance Tests** (3 tests) - Many participants, large gradients, concurrent rounds
-- **Integration Tests** (2 tests) - edunet-agg integration
+- **Integration Tests** (2 tests) - praxis-agg integration
 
 **Total**: 34 integration test scaffolds marked with `#[ignore]` for future implementation
 
@@ -187,7 +187,7 @@ Revolutionary features implemented:
 - Adaptive privacy budget based on data sensitivity
 - Byzantine-robust aggregation (Krum)
 - Comprehensive link management
-- Full integration with edunet-agg crate
+- Full integration with praxis-agg crate
 
 ## Success Criteria Met
 

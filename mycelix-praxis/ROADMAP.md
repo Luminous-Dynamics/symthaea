@@ -1,10 +1,10 @@
-# Mycelix EduNet Roadmap
+# Mycelix Praxis Roadmap
 
 **Status**: Public
 **Last Updated**: 2025-11-15
 **Version**: 1.0
 
-This roadmap outlines our vision and planned milestones for Mycelix EduNet. Dates are targets and may shift based on community feedback and development progress.
+This roadmap outlines our vision and planned milestones for Mycelix Praxis. Dates are targets and may shift based on community feedback and development progress.
 
 ---
 
@@ -46,7 +46,7 @@ Build a **privacy-preserving, decentralized education platform** where:
 
 ### Delivered
 - ✅ Monorepo structure (apps, crates, zomes, docs)
-- ✅ Core Rust libraries (`edunet-core`, `edunet-agg`)
+- ✅ Core Rust libraries (`praxis-core`, `praxis-agg`)
 - ✅ Zome data structures (library-only)
 - ✅ React web client (UI mockups)
 - ✅ W3C VC schemas
@@ -350,7 +350,7 @@ Build a **privacy-preserving, decentralized education platform** where:
 We welcome community input!
 
 ### Propose Features
-1. Open a [Discussion](https://github.com/Luminous-Dynamics/mycelix-edunet/discussions) with tag `roadmap`
+1. Open a [Discussion](https://github.com/Luminous-Dynamics/mycelix-praxis/discussions) with tag `roadmap`
 2. Describe the feature and use case
 3. Community discusses and votes
 4. Maintainers evaluate feasibility
@@ -400,8 +400,8 @@ See [CHANGELOG.md](CHANGELOG.md) for detailed version history.
 
 ## Questions?
 
-- **Roadmap feedback**: [Discussions](https://github.com/Luminous-Dynamics/mycelix-edunet/discussions)
-- **Feature requests**: [Issues](https://github.com/Luminous-Dynamics/mycelix-edunet/issues/new?template=feature_request.md)
+- **Roadmap feedback**: [Discussions](https://github.com/Luminous-Dynamics/mycelix-praxis/discussions)
+- **Feature requests**: [Issues](https://github.com/Luminous-Dynamics/mycelix-praxis/issues/new?template=feature_request.md)
 - **General questions**: [FAQ](docs/faq.md)
 
 ---

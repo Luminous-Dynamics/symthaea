@@ -1,4 +1,4 @@
-# Mycelix EduNet: Strategic Improvement Plan
+# Mycelix Praxis: Strategic Improvement Plan
 
 **Created**: December 30, 2025
 **Status**: Living Document
@@ -8,7 +8,7 @@
 
 ## Executive Summary
 
-After comprehensive review of both the Mycelix Ecosystem Roadmap and EduNet implementation, this document provides strategic guidance on:
+After comprehensive review of both the Mycelix Ecosystem Roadmap and Praxis implementation, this document provides strategic guidance on:
 1. **Naming & Branding** - Analysis and recommendations
 2. **Technology Stack** - Rust rewrite considerations
 3. **Architecture Improvements** - Critical enhancements
@@ -19,21 +19,21 @@ After comprehensive review of both the Mycelix Ecosystem Roadmap and EduNet impl
 
 ## Part 1: Naming Analysis
 
-### Current Name: "Mycelix EduNet"
+### Current Name: "Mycelix Praxis"
 
 **Strengths:**
 - "Mycelix" evokes mycelium networks (distributed, resilient, interconnected)
 - Communicates the ecosystem connection
-- "EduNet" is clear about purpose
+- "Praxis" is clear about purpose
 
 **Weaknesses:**
-- "EduNet" feels dated (90s era naming: CompuServe, EduNet, etc.)
+- "Praxis" feels dated (90s era naming: CompuServe, Praxis, etc.)
 - Two-word compound is harder to brand/remember
 - Doesn't communicate the revolutionary aspects (privacy, sovereignty, credentials)
 
 ### Naming Options
 
-#### Option A: Keep "Mycelix EduNet" (Recommended for Now)
+#### Option A: Keep "Mycelix Praxis" (Recommended for Now)
 **Rationale**: During v0.x development, name recognition in the Holochain ecosystem matters more than perfect branding. Wait until v1.0 for potential rebrand.
 
 #### Option B: Evolve the Name
@@ -47,7 +47,7 @@ After comprehensive review of both the Mycelix Ecosystem Roadmap and EduNet impl
 | **Bloom** | Growth, education, positive | Very common word |
 
 #### Recommendation
-**Keep "Mycelix EduNet" for v0.x/v1.0**. The name works and changing it mid-development creates confusion. Consider a rebrand for v2.0 if market research indicates need.
+**Keep "Mycelix Praxis" for v0.x/v1.0**. The name works and changing it mid-development creates confusion. Consider a rebrand for v2.0 if market research indicates need.
 
 If rebranding becomes necessary, **"Mycelix Bloom"** or **"Mycelix Spore"** would align with the ecosystem metaphor while feeling more modern.
 
@@ -57,7 +57,7 @@ If rebranding becomes necessary, **"Mycelix Bloom"** or **"Mycelix Spore"** woul
 
 ### Current Architecture
 - **Zomes**: Rust (required by Holochain HDK)
-- **Core Libraries**: Rust (edunet-core, edunet-agg)
+- **Core Libraries**: Rust (praxis-core, praxis-agg)
 - **Web Client**: React/TypeScript
 - **Backend Services**: Mixed (planned)
 
@@ -107,9 +107,9 @@ If rebranding becomes necessary, **"Mycelix Bloom"** or **"Mycelix Spore"** woul
 ├──────────────────────────────────────────────────────────────┤
 │                     NEW: RUST ADDITIONS                       │
 ├──────────────────────────────────────────────────────────────┤
-│  • mycelix-edunet-cli            - CLI tool for operators    │
-│  • edunet-ml                     - ML model training (Burn)  │
-│  • edunet-crypto                 - Post-quantum crypto       │
+│  • mycelix-praxis-cli            - CLI tool for operators    │
+│  • praxis-ml                     - ML model training (Burn)  │
+│  • praxis-crypto                 - Post-quantum crypto       │
 │  • Tauri desktop app backend     - Native performance        │
 └──────────────────────────────────────────────────────────────┘
 ```
@@ -150,7 +150,7 @@ hdi = "0.7.0"
 
 **Integrate from Mycelix-Core 0TML:**
 ```rust
-// Add to edunet-agg/Cargo.toml
+// Add to praxis-agg/Cargo.toml
 [dependencies]
 mycelix-sdk = { path = "../../sdk" }
 
@@ -279,7 +279,7 @@ registerRoute(
 
 | Feature | Description |
 |---------|-------------|
-| **Cross-hApp Credentials** | Credentials from EduNet usable in Marketplace |
+| **Cross-hApp Credentials** | Credentials from Praxis usable in Marketplace |
 | **MATL Integration** | Unified trust scoring across ecosystem |
 | **Bridge Protocol** | Inter-hApp communication |
 | **Observatory Integration** | Network-wide visibility |
@@ -301,7 +301,7 @@ registerRoute(
 | **LearnWeb3** | Web3 education | Centralized platform |
 | **Rabbithole** | Incentivized learning | Token-dependent |
 
-#### Mycelix EduNet's Unique Value Proposition
+#### Mycelix Praxis's Unique Value Proposition
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -464,7 +464,7 @@ pub fn create_course(input: CreateCourseInput) -> ExternResult<ActionHash> {
 
 // Add proper error types
 #[derive(Debug, thiserror::Error)]
-pub enum EduNetError {
+pub enum PraxisError {
     #[error("Course not found: {0}")]
     CourseNotFound(String),
     #[error("Unauthorized: {0}")]
@@ -511,7 +511,7 @@ pub enum EduNetError {
 
 ## Conclusion
 
-Mycelix EduNet is well-positioned to become a leading decentralized education platform. The architecture is sound, the technology choices are correct, and the roadmap is clear.
+Mycelix Praxis is well-positioned to become a leading decentralized education platform. The architecture is sound, the technology choices are correct, and the roadmap is clear.
 
 **Key Recommendations:**
 1. **Keep the name** for now - focus on shipping

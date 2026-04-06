@@ -78,7 +78,7 @@ export const BRIDGE_ENABLED_HAPPS = [
   'marketplace',
   'supplychain',
   'mail',
-  'edunet',
+  'praxis',
   'justice',
   'finance',
   'property',

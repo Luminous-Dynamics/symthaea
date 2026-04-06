@@ -272,10 +272,10 @@ export { MailTrustService, getMailTrustService } from './mail/index.js';
 export { MarketplaceReputationService, getMarketplaceService } from './marketplace/index.js';
 
 // ============================================================================
-// EduNet Integration
+// Praxis Integration
 // ============================================================================
 
-export { EduNetCredentialService, getEduNetService } from './edunet/index.js';
+export { PraxisCredentialService, getPraxisService } from './praxis/index.js';
 
 // ============================================================================
 // SupplyChain Integration

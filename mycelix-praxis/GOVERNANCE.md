@@ -1,6 +1,6 @@
 # Governance
 
-This document describes the governance model for Mycelix EduNet, including decision-making processes, roles, and responsibilities.
+This document describes the governance model for Mycelix Praxis, including decision-making processes, roles, and responsibilities.
 
 ## Principles
 
@@ -208,7 +208,7 @@ This governance document can be amended via the **slow path**:
 ## Community Input
 
 We welcome community feedback on governance:
-- Open a [Discussion](https://github.com/Luminous-Dynamics/mycelix-edunet/discussions)
+- Open a [Discussion](https://github.com/Luminous-Dynamics/mycelix-praxis/discussions)
 - Propose governance improvements via PR to this document
 - Participate in roadmap planning
 

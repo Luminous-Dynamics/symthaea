@@ -33,7 +33,7 @@ This curriculum develops the human capacities needed to make Mycelix communities
 | Curriculum Tier | Primary DAO Tier | Credential Authority |
 |-----------------|-----------------|---------------------|
 | Tier 1: Foundations | Local DAO | Community learning coordinator |
-| Tier 2: Facilitation | Local/Sector DAO | EduNet credential system |
+| Tier 2: Facilitation | Local/Sector DAO | Praxis credential system |
 | Tier 3: Leadership | Regional DAO | Cross-community validation |
 | Tier 4: Mastery | Global DAO | Network-wide recognition |
 
@@ -47,7 +47,7 @@ Leadership credentials integrate with MATL trust scoring:
 ### Key Institution References
 
 - **Knowledge Council**: Oversees curriculum epistemic quality; validates Tier 4 credentials
-- **EduNet Integration**: All credentials issued through EduNet hApp
+- **Praxis Integration**: All credentials issued through Praxis hApp
 - **Spiral hApp**: Developmental stage assessment for stage-appropriate learning paths
 
 ---
@@ -659,7 +659,7 @@ interface ContemplativePractice {
     meditation: {
       types: ["concentration", "awareness", "loving-kindness", "body-based"];
       format: "Ongoing, individual and group";
-      instruction: "Available through EduNet";
+      instruction: "Available through Praxis";
     };
 
     contemplativeDialogue: {
@@ -827,7 +827,7 @@ interface AssessmentRecognition {
     };
 
     credentialIntegration: {
-      hApp: "EduNet credentials";
+      hApp: "Praxis credentials";
       requirements: "Demonstrated competence + peer/mentor attestation";
       display: "Visible in community profile";
     };
@@ -1038,12 +1038,12 @@ interface SpecializedPathways {
 
 ```typescript
 interface LearningInfrastructure {
-  // EduNet integration
+  // Praxis integration
   eduNet: {
-    courses: "Curriculum delivered through EduNet";
-    credentials: "Credentials issued through EduNet";
-    tracking: "Progress tracked in EduNet";
-    resources: "Learning resources in EduNet";
+    courses: "Curriculum delivered through Praxis";
+    credentials: "Credentials issued through Praxis";
+    tracking: "Progress tracked in Praxis";
+    resources: "Learning resources in Praxis";
   };
 
   // Learning support roles

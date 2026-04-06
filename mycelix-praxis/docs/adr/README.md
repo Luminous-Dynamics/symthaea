@@ -1,6 +1,6 @@
 # Architecture Decision Records (ADRs)
 
-This directory contains Architecture Decision Records for Mycelix EduNet.
+This directory contains Architecture Decision Records for Mycelix Praxis.
 
 ## What is an ADR?
 

@@ -1,10 +1,10 @@
-# EduNet Federated Learning Protocol v0.1
+# Praxis Federated Learning Protocol v0.1
 
-This document specifies the federated learning protocol for Mycelix EduNet.
+This document specifies the federated learning protocol for Mycelix Praxis.
 
 ## Overview
 
-EduNet uses federated learning (FL) to enable privacy-preserving collaborative model training. Learners train models locally on their devices and contribute only gradient updates (not raw data) to a collective model.
+Praxis uses federated learning (FL) to enable privacy-preserving collaborative model training. Learners train models locally on their devices and contribute only gradient updates (not raw data) to a collective model.
 
 ## Protocol Phases
 

@@ -18,7 +18,7 @@
 | epistemic-markets | ✅ 3.2M | - | v0 | Built |
 | fabrication | ✅ 7.4M | 6 | v0 | Built |
 | supplychain | ✅ 1.9M | 8 | v0 | Built (submodule: holochain/) |
-| edunet | ✅ 948K | 10 | v0 | Built (submodule: happ/) |
+| praxis | ✅ 948K | 10 | v0 | Built (submodule: happ/) |
 | health | ✅ 8.4M | 7 (MVP) | v0/v1 | ✅ MVP Core (22 zomes archived 2026-02-15) |
 | energy | ✅ | 11 | v0 | ✅ Scaffolded |
 | climate | ⏳ | 6 | v0 | ✅ Scaffolded (workdir/) |
@@ -82,7 +82,7 @@ All 10 scaffolded hApps (health, energy, climate, mutualaid, property, media, co
 | **Observatory** | N/A (SvelteKit) | None | Live at [observatory.mycelix.net](https://luminous-dynamics.github.io/mycelix-observatory/). Demo mode + conductor fallback. DNS CNAME pending. |
 | **Epistemic Markets** | Native workspace | Compiles | Heavy documentation (manifesto, rituals, personas), light implementation. Core zome logic exists. |
 | **Fabrication** | 6 (bridge, designs, materials, printers, prints, verification) | Compiles | Native workspace hApp. |
-| **EduNet** | 10 | Restored | Restored from archive. Needs verification. |
+| **Praxis** | 10 | Restored | Restored from archive. Needs verification. |
 | **Consensus (RBBFT)** | 1 | Compiles | Native workspace hApp. Minimal. |
 
 ### Core Four (fully implemented, integrated)
@@ -204,7 +204,7 @@ All 37 integration modules have real implementations (types + classes + methods)
 | supplychain | 7 | 6 | 623 |
 | desci | 14 | 7 | 605 |
 | music | 11 | 7 | 545 |
-| edunet | 8 | 6 | 471 |
+| praxis | 8 | 6 | 471 |
 | marketplace | 9 | 5 | 435 |
 | mail | 6 | 4 | 368 |
 | mutualaid | 11 | 6 | 367 |
@@ -238,7 +238,7 @@ All 37 integration modules have real implementations (types + classes + methods)
 5. ~~**hApp scaffolding incomplete**~~: Fixed 2026-02-08. All 10 ready-to-build hApps have v0 manifest format.
 6. **Scope sprawl**: 24 hApps total, 12 with bundles, 10 scaffolded (ready to build), 2 REST APIs.
 7. ~~**SDK-TS bundle size**~~: Re-audited 2026-03-06. All 37 integration modules have real implementations (0 stubs). 22 are zome-connected (callZome), 15 are local-only (in-memory Map + LocalBridge). Total ~37,500 LOC.
-8. ~~**Cross-hApp bridges**~~: Unified hApp expanded to 17 roles (added energy, knowledge, climate, edunet). `CrossClusterRole` expanded 8→16 variants. 36 cross-cluster routes registered (was 13). 102 route tests pass. Notification fanout, saga orchestrator, geo-spatial queries, reputation aggregator, participatory budgeting all wired.
+8. ~~**Cross-hApp bridges**~~: Unified hApp expanded to 17 roles (added energy, knowledge, climate, praxis). `CrossClusterRole` expanded 8→16 variants. 36 cross-cluster routes registered (was 13). 102 route tests pass. Notification fanout, saga orchestrator, geo-spatial queries, reputation aggregator, participatory budgeting all wired.
 9. ~~**WASM builds pending**~~: Climate and music have happ.yaml + dna.yaml ready. Others (mutualaid, food, transport) are commons domain zomes — already built as part of commons DNA. Needs `nix develop` for `hc dna pack`.
 10. ~~**TS SDK local-only modules**~~: All 15 local-only modules now have BridgeClient classes for callZome access (alongside existing LocalBridge for offline-first mode).
 10. ~~**FL consciousness integration**~~: `ConsciousnessAwareByzantinePlugin` added 2026-02-15. Uses Phi scores for weight adjustment (boost/dampen/veto). 110 tests pass.

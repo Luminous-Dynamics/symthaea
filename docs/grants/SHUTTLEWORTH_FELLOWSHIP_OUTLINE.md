@@ -91,7 +91,7 @@ Together they form a universal trust fabric: Symthaea measures coherence and eng
 |---------|-----------|-------------|
 | Q1 | Healthcare pilot | 100-patient FQHC deployment with mycelix-health |
 | Q2 | Paper publication (2) | Spectral MIP (NeurIPS/PNAS) + QCM (BRM/CogSci) |
-| Q3 | Education pilot | 200-student deployment with mycelix-edunet |
+| Q3 | Education pilot | 200-student deployment with mycelix-praxis |
 | Q4 | Seed fundraise | $2-5M round at $15-25M valuation using pilot data |
 
 ### Video Script Updates

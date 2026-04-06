@@ -1,6 +1,6 @@
-# EduNet Threat Model v0.1
+# Praxis Threat Model v0.1
 
-This document analyzes security threats to Mycelix EduNet and our mitigation strategies.
+This document analyzes security threats to Mycelix Praxis and our mitigation strategies.
 
 ## Threat Actors
 

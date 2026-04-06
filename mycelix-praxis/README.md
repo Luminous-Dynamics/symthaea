@@ -1,12 +1,12 @@
 <div align="center">
-  <img src="assets/logo.svg" alt="EduNet Logo" width="200" height="200"/>
+  <img src="assets/logo.svg" alt="Praxis Logo" width="200" height="200"/>
 
-  # Mycelix EduNet
+  # Mycelix Praxis
 
   **Privacy-preserving decentralized education powered by Holochain and Federated Learning**
 
-  [![CI](https://github.com/Luminous-Dynamics/mycelix-edunet/actions/workflows/ci.yml/badge.svg)](https://github.com/Luminous-Dynamics/mycelix-edunet/actions/workflows/ci.yml)
-  [![codecov](https://codecov.io/gh/Luminous-Dynamics/mycelix-edunet/branch/main/graph/badge.svg)](https://codecov.io/gh/Luminous-Dynamics/mycelix-edunet)
+  [![CI](https://github.com/Luminous-Dynamics/mycelix-praxis/actions/workflows/ci.yml/badge.svg)](https://github.com/Luminous-Dynamics/mycelix-praxis/actions/workflows/ci.yml)
+  [![codecov](https://codecov.io/gh/Luminous-Dynamics/mycelix-praxis/branch/main/graph/badge.svg)](https://codecov.io/gh/Luminous-Dynamics/mycelix-praxis)
   [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
   [![Rust Version](https://img.shields.io/badge/rust-stable-orange.svg)](https://www.rust-lang.org)
   [![Holochain](https://img.shields.io/badge/Holochain-agent--centric-purple)](https://holochain.org)
@@ -21,7 +21,7 @@
 
 ## Vision
 
-EduNet reimagines online learning by putting **learners in control** of their data while enabling **collaborative intelligence**. Using federated learning, models improve from collective experience without any single server seeing your private learning data.
+Praxis reimagines online learning by putting **learners in control** of their data while enabling **collaborative intelligence**. Using federated learning, models improve from collective experience without any single server seeing your private learning data.
 
 ## Features
 
@@ -54,8 +54,8 @@ Get started in under 10 minutes! Follow our **[📖 Quick Start Tutorial](docs/t
 
 ```bash
 # Clone the repository
-git clone https://github.com/Luminous-Dynamics/mycelix-edunet.git
-cd mycelix-edunet
+git clone https://github.com/Luminous-Dynamics/mycelix-praxis.git
+cd mycelix-praxis
 
 # Build all components
 make build
@@ -84,16 +84,16 @@ docker-compose up --build
 
 ## Architecture
 
-EduNet is a **monorepo** combining Rust crates, Holochain zomes, and a React web client.
+Praxis is a **monorepo** combining Rust crates, Holochain zomes, and a React web client.
 
 ### Repository Structure
 
 ```
-mycelix-edunet/
+mycelix-praxis/
 ├── apps/web/              # React + TypeScript web client
 ├── crates/                # Rust libraries
-│   ├── edunet-core/       # Core types, crypto, provenance
-│   └── edunet-agg/        # Robust aggregation (trimmed mean, median)
+│   ├── praxis-core/       # Core types, crypto, provenance
+│   └── praxis-agg/        # Robust aggregation (trimmed mean, median)
 ├── zomes/                 # Holochain zomes (Rust → WASM)
 │   ├── learning_zome/     # Courses, progress, activities
 │   ├── fl_zome/           # Federated learning rounds & updates
@@ -166,12 +166,12 @@ make reset       # Reset local Holochain state (dev only)
 
 #### Rust Crates
 
-**edunet-core** (`crates/edunet-core/`):
+**praxis-core** (`crates/praxis-core/`):
 - Core types: `RoundId`, `ModelId`, `PrivacyParams`
 - Cryptographic utilities (BLAKE3, commitments)
 - Provenance tracking
 
-**edunet-agg** (`crates/edunet-agg/`):
+**praxis-agg** (`crates/praxis-agg/`):
 - Trimmed mean aggregation (default: 10% trim)
 - Median aggregation (max robustness)
 - Weighted mean
@@ -242,9 +242,9 @@ We welcome contributions! Please read our **[Contributing Guide](CONTRIBUTING.md
 
 ### Getting Help
 
-- **Questions**: Open a [Discussion](https://github.com/Luminous-Dynamics/mycelix-edunet/discussions)
-- **Bug reports**: [Open an issue](https://github.com/Luminous-Dynamics/mycelix-edunet/issues/new?template=bug_report.md)
-- **Feature requests**: [Open an issue](https://github.com/Luminous-Dynamics/mycelix-edunet/issues/new?template=feature_request.md)
+- **Questions**: Open a [Discussion](https://github.com/Luminous-Dynamics/mycelix-praxis/discussions)
+- **Bug reports**: [Open an issue](https://github.com/Luminous-Dynamics/mycelix-praxis/issues/new?template=bug_report.md)
+- **Feature requests**: [Open an issue](https://github.com/Luminous-Dynamics/mycelix-praxis/issues/new?template=feature_request.md)
 
 ---
 
@@ -262,7 +262,7 @@ We take security seriously. See **[SECURITY.md](SECURITY.md)** for:
 
 ## Governance
 
-EduNet uses a **tiered decision framework**:
+Praxis uses a **tiered decision framework**:
 
 - **Fast path** (0-48h): Security fixes, critical bugs
 - **Normal path** (3-14 days): Features, non-critical bugs
@@ -300,7 +300,7 @@ See **[GOVERNANCE.md](GOVERNANCE.md)** for roles, responsibilities, and DAO alig
 - [ ] External security audit
 - [ ] Public launch
 
-See [GitHub Projects](https://github.com/Luminous-Dynamics/mycelix-edunet/projects) for detailed milestones.
+See [GitHub Projects](https://github.com/Luminous-Dynamics/mycelix-praxis/projects) for detailed milestones.
 
 ---
 
@@ -340,7 +340,7 @@ Licensed under the **Apache License 2.0**. See [LICENSE](LICENSE) for details.
 - **Project maintainers**: @Luminous-Dynamics/maintainers
 - **General inquiries**: info@mycelix.org
 - **Security**: security@mycelix.org
-- **GitHub**: [Luminous-Dynamics/mycelix-edunet](https://github.com/Luminous-Dynamics/mycelix-edunet)
+- **GitHub**: [Luminous-Dynamics/mycelix-praxis](https://github.com/Luminous-Dynamics/mycelix-praxis)
 
 ---
 

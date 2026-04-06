@@ -223,7 +223,7 @@ build-marketplace:
     cd mycelix-marketplace/holochain && hc dna pack . && hc app pack .
 
 build-edunet:
-    cd mycelix-edunet/holochain && hc dna pack . && hc app pack .
+    cd mycelix-praxis/holochain && hc dna pack . && hc app pack .
 
 build-supplychain:
     cd mycelix-supplychain/holochain && hc dna pack . && hc app pack .
@@ -242,7 +242,7 @@ test-sdk:
 test-happs:
     cd Mycelix-Mail/happ && npm test
     cd mycelix-marketplace && npm test
-    cd mycelix-edunet && npm test
+    cd mycelix-praxis && npm test
 
 test-integration:
     cd tests/integration && npm test
@@ -257,7 +257,7 @@ test-byzantine:
 migration-status:
     @echo "=== Holochain 0.6 Migration Status ==="
     @echo ""
-    @for dir in Mycelix-Mail mycelix-marketplace mycelix-edunet mycelix-supplychain; do \
+    @for dir in Mycelix-Mail mycelix-marketplace mycelix-praxis mycelix-supplychain; do \
         echo "[$dir]"; \
         grep -r "hdk = " $dir/*/Cargo.toml 2>/dev/null || echo "  No Cargo.toml found"; \
         echo ""; \
@@ -352,7 +352,7 @@ Same migration pattern as Mail. Additional considerations:
 - SvelteKit frontend already modern
 - Ensure MRC (Mutual Reputation Consensus) zome migrates cleanly
 
-#### Task 0.2.3: Mycelix-EduNet Migration
+#### Task 0.2.3: Mycelix-Praxis Migration
 **Duration**: 7 days
 **Priority**: HIGH
 
@@ -413,7 +413,7 @@ Same migration pattern as Mail. Additional considerations:
 │   │   ├── happ.yaml
 │   │   └── README.md
 │   ├── marketplace/            # Mycelix-Marketplace
-│   ├── edunet/                 # Mycelix-EduNet
+│   ├── edunet/                 # Mycelix-Praxis
 │   └── supplychain/            # Mycelix-SupplyChain
 │
 ├── core/                       # Mycelix-Core (0TML + Governance)
@@ -1118,7 +1118,7 @@ export async function verifySellerCredentials(
 }
 ```
 
-### 2.3 Mycelix-EduNet Integration
+### 2.3 Mycelix-Praxis Integration
 
 #### Task 2.3.1: W3C VC with Epistemic Classification
 **Duration**: 7 days
@@ -1352,7 +1352,7 @@ pub fn get_events(event_type: String, since: u64) -> ExternResult<Vec<BridgeEven
 |-----------|-------------|
 | All hApps use SDK | No duplicate implementations |
 | Bridge Protocol working | Cross-hApp reputation queries succeed |
-| Credential portability | EduNet credentials verifiable in Marketplace |
+| Credential portability | Praxis credentials verifiable in Marketplace |
 | Integration tests | 100% pass rate |
 | Performance | <500ms for cross-hApp queries |
 

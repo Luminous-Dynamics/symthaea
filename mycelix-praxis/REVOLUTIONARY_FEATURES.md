@@ -1,4 +1,4 @@
-# Mycelix EduNet: Revolutionary Features
+# Mycelix Praxis: Revolutionary Features
 
 **Version**: 0.2.0-dev
 **Updated**: December 30, 2025
@@ -8,13 +8,13 @@
 
 ## Executive Summary
 
-Mycelix EduNet is now positioned to be **the world's best decentralized education platform** with three revolutionary features that no other platform offers:
+Mycelix Praxis is now positioned to be **the world's best decentralized education platform** with three revolutionary features that no other platform offers:
 
 1. **Learning Pods** - Novel social learning circles
 2. **Knowledge Roots** - Decentralized curriculum graph
 3. **Proof of Learning** - Verifiable genuine learning (extending PoGQ)
 
-Combined with the existing core features (FL, W3C VCs, DAO governance), EduNet offers:
+Combined with the existing core features (FL, W3C VCs, DAO governance), Praxis offers:
 - **Complete data sovereignty** - Your learning data stays on YOUR device
 - **Privacy-preserving improvement** - Courses get better without exposing your mistakes
 - **Verifiable, portable credentials** - W3C standards that work everywhere
@@ -45,8 +45,8 @@ Combined with the existing core features (FL, W3C VCs, DAO governance), EduNet o
 ├─────────────────────────────────────────────────────────────┤
 │  SUPPORTING CRATES                                           │
 │  ─────────────────                                           │
-│  • edunet-core      - Types, crypto, Proof of Learning       │
-│  • edunet-agg       - FL aggregation algorithms              │
+│  • praxis-core      - Types, crypto, Proof of Learning       │
+│  • praxis-agg       - FL aggregation algorithms              │
 │  • mycelix-governance - DAO utilities                        │
 └─────────────────────────────────────────────────────────────┘
 ```
@@ -273,11 +273,11 @@ pub struct PoLMATLScore {
 
 ---
 
-## Combined Power: The EduNet Difference
+## Combined Power: The Praxis Difference
 
 ### Complete Feature Matrix
 
-| Feature | EduNet | Coursera | Khan | Duolingo | Web3 Learn |
+| Feature | Praxis | Coursera | Khan | Duolingo | Web3 Learn |
 |---------|--------|----------|------|----------|------------|
 | Data Sovereignty | ✅ | ❌ | ❌ | ❌ | Partial |
 | Privacy-Preserving FL | ✅ | ❌ | ❌ | ❌ | ❌ |
@@ -370,7 +370,7 @@ zomes/knowledge_zome/
     ├── Cargo.toml
     └── src/lib.rs           # 20+ zome functions
 
-crates/edunet-core/src/
+crates/praxis-core/src/
 └── proof_of_learning.rs     # PoL algorithm & MATL integration
 ```
 
@@ -407,7 +407,7 @@ crates/edunet-core/src/
 
 ## Conclusion
 
-Mycelix EduNet is now architecturally complete for its differentiation features. With **Learning Pods**, **Knowledge Roots**, and **Proof of Learning**, we have created a platform that offers genuine innovations no competitor can match.
+Mycelix Praxis is now architecturally complete for its differentiation features. With **Learning Pods**, **Knowledge Roots**, and **Proof of Learning**, we have created a platform that offers genuine innovations no competitor can match.
 
 The path forward is clear:
 1. **Complete testing** - Ensure all zomes work correctly

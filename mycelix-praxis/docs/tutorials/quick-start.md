@@ -1,6 +1,6 @@
 # Quick Start Guide
 
-Get up and running with Mycelix EduNet in under 10 minutes!
+Get up and running with Mycelix Praxis in under 10 minutes!
 
 ---
 
@@ -28,10 +28,10 @@ make --version
 
 ```bash
 # Clone the repository
-git clone https://github.com/Luminous-Dynamics/mycelix-edunet.git
+git clone https://github.com/Luminous-Dynamics/mycelix-praxis.git
 
 # Navigate into the directory
-cd mycelix-edunet
+cd mycelix-praxis
 ```
 
 ---
@@ -111,7 +111,7 @@ docker-compose up --build
 Open your browser to **http://localhost:5173** (or **:3000** if using Docker)
 
 ### 🏠 Home Page
-- Overview of EduNet features
+- Overview of Praxis features
 - Navigation to different sections
 
 ### 📚 Courses Page (`/courses`)
@@ -169,10 +169,10 @@ cargo bench --workspace
 ### Key Directories
 
 ```
-mycelix-edunet/
+mycelix-praxis/
 ├── crates/              # Rust libraries
-│   ├── edunet-core/    # Core types, crypto, provenance
-│   └── edunet-agg/     # Robust aggregation algorithms
+│   ├── praxis-core/    # Core types, crypto, provenance
+│   └── praxis-agg/     # Robust aggregation algorithms
 ├── zomes/              # Holochain zome scaffolds
 │   ├── learning_zome/  # Course management
 │   ├── fl_zome/        # Federated learning
@@ -268,13 +268,13 @@ cargo test --all         # Run tests
 
 ## Step 10: Next Steps
 
-Congratulations! You're now set up with Mycelix EduNet! 🎉
+Congratulations! You're now set up with Mycelix Praxis! 🎉
 
 ### 🚀 What's Next?
 
 **Want to contribute?**
 1. Read [CONTRIBUTING.md](../../CONTRIBUTING.md)
-2. Check [Good First Issues](https://github.com/Luminous-Dynamics/mycelix-edunet/labels/good%20first%20issue)
+2. Check [Good First Issues](https://github.com/Luminous-Dynamics/mycelix-praxis/labels/good%20first%20issue)
 3. Pick an issue and comment that you're working on it
 
 **Want to learn more?**
@@ -287,8 +287,8 @@ Congratulations! You're now set up with Mycelix EduNet! 🎉
 - 🐳 [Docker Setup](../../docker-compose.yml)
 
 **Want to chat?**
-- 💬 [GitHub Discussions](https://github.com/Luminous-Dynamics/mycelix-edunet/discussions)
-- 🐛 [Report Issues](https://github.com/Luminous-Dynamics/mycelix-edunet/issues)
+- 💬 [GitHub Discussions](https://github.com/Luminous-Dynamics/mycelix-praxis/discussions)
+- 🐛 [Report Issues](https://github.com/Luminous-Dynamics/mycelix-praxis/issues)
 
 ---
 
@@ -357,7 +357,7 @@ In this guide, you:
 ## Feedback
 
 Found an issue with this guide? Have suggestions?
-[Open an issue](https://github.com/Luminous-Dynamics/mycelix-edunet/issues) or submit a PR!
+[Open an issue](https://github.com/Luminous-Dynamics/mycelix-praxis/issues) or submit a PR!
 
 ---
 

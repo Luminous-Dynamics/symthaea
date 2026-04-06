@@ -551,7 +551,7 @@ export class DeSciService {
   queryExternalReputation(researcherId: string): void {
     const query = createReputationQuery('desci', researcherId);
     this.bridge.send('identity', query);
-    this.bridge.send('edunet', query);
+    this.bridge.send('praxis', query);
     this.bridge.send('knowledge', query);
   }
 

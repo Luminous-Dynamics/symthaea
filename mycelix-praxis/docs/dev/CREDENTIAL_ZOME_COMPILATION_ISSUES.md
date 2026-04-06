@@ -49,9 +49,9 @@ The `#[hdk_entry_helper]` macro expects the entire struct to be compatible with 
 #[hdk_entry_helper]
 #[derive(Clone, PartialEq)]
 pub struct FlUpdate {
-    pub round_id: RoundId,      // From edunet-core
+    pub round_id: RoundId,      // From praxis-core
     pub model_id: String,
-    pub parent_model_hash: ModelHash,  // From edunet-core
+    pub parent_model_hash: ModelHash,  // From praxis-core
     pub grad_commitment: Vec<u8>,
     // ... other fields
 }
@@ -62,7 +62,7 @@ pub struct FlUpdate {
 #[hdk_entry_helper]
 #[derive(Clone, PartialEq)]
 pub struct Course {
-    pub course_id: CourseId,    // From edunet-core
+    pub course_id: CourseId,    // From praxis-core
     pub name: String,
     // ... other fields
 }
@@ -89,7 +89,7 @@ The credential zome has **nested custom structs** (`CredentialSubject`, `Credent
 - Primitive types (String, i64, f32, bool)
 - Vec<primitive>
 - Option<primitive>
-- Types from edunet-core (which are properly defined)
+- Types from praxis-core (which are properly defined)
 
 ---
 
@@ -221,7 +221,7 @@ pub struct VerifiableCredential {
 1. ✅ Flattened all nested structs (CredentialSubject, CredentialStatus, Proof) into VerifiableCredential
 2. ✅ Removed all `#[serde(...)]` attributes from the entry type
 3. ✅ Fixed outdated nested struct reference in coordinator (line 348: `credential.proof.proof_value` → `credential.proof_value`)
-4. ✅ Verified CourseId from edunet-core has proper Serialize/Deserialize traits
+4. ✅ Verified CourseId from praxis-core has proper Serialize/Deserialize traits
 
 ### ❌ Still Failing
 - 11 compilation errors persist in credential_integrity
@@ -236,7 +236,7 @@ pub struct VerifiableCredential {
 #[derive(Clone, PartialEq)]
 pub struct VerifiableCredential {
     // All String, Vec<String>, Option<String>, Option<f32>, Option<u32>
-    // Plus CourseId from edunet-core (has Serialize, Deserialize)
+    // Plus CourseId from praxis-core (has Serialize, Deserialize)
 }
 ```
 
@@ -247,12 +247,12 @@ pub struct VerifiableCredential {
 #### Why does FL zome work but credential zome doesn't?
 
 **FL zome (WORKS)**:
-- Uses: RoundId, ModelHash, RoundState from edunet-core
+- Uses: RoundId, ModelHash, RoundState from praxis-core
 - All primitives + Vec<u8>
 - Same `#[hdk_entry_helper]` and `#[derive(Clone, PartialEq)]`
 
 **Credential zome (FAILS)**:
-- Uses: CourseId from edunet-core (same traits as RoundId/ModelHash)
+- Uses: CourseId from praxis-core (same traits as RoundId/ModelHash)
 - All primitives + Vec<String>
 - Same `#[hdk_entry_helper]` and `#[derive(Clone, PartialEq)]`
 
@@ -270,7 +270,7 @@ pub struct VerifiableCredential {
 3. **Module organization?**
    - Both integrity/src/lib.rs files look similar
    - Same imports from HDI prelude
-   - Same edunet-core dependency
+   - Same praxis-core dependency
 
 4. **Macro expansion issue?**
    - Need to check `cargo expand` output for both zomes

@@ -2,7 +2,7 @@
 
 **Date**: December 17, 2025
 **Status**: Design Complete - Ready for Implementation
-**Scope**: Cross-Mycelix Infrastructure (EduNet, Marketplace, Mail, Music, Civitas)
+**Scope**: Cross-Mycelix Infrastructure (Praxis, Marketplace, Mail, Music, Civitas)
 
 ---
 
@@ -14,7 +14,7 @@ This document proposes a **revolutionary unified governance infrastructure** tha
 
 1. **Hierarchical Federated DAOs**: Multi-level governance with automatic escalation (Local → Regional → Global)
 2. **Reputation-Weighted Voting**: Breaking the 33% BFT limit using composite trust scores from 0TML
-3. **Cross-hApp Reputation Propagation**: Marketplace scammer's reputation affects EduNet voting power
+3. **Cross-hApp Reputation Propagation**: Marketplace scammer's reputation affects Praxis voting power
 4. **Dynamic Quorum Adaptation**: Participation requirements adjust based on historical engagement
 5. **Epistemic Tier Integration**: E0-E4 validation from Mycelix-Core LEM system
 
@@ -24,7 +24,7 @@ This document proposes a **revolutionary unified governance infrastructure** tha
 
 ### Current State: Fragmented Governance
 
-**EduNet DAO** (recently completed):
+**Praxis DAO** (recently completed):
 - 3-tier governance (Fast/Normal/Slow)
 - Simple majority voting
 - Local to single hApp
@@ -38,7 +38,7 @@ This document proposes a **revolutionary unified governance infrastructure** tha
 ### Fundamental Limitations of Current Approach
 
 1. **33% BFT Limit**: Traditional voting breaks with >33% Byzantine actors
-2. **Isolated Reputation**: Good behavior in Marketplace doesn't improve EduNet voting weight
+2. **Isolated Reputation**: Good behavior in Marketplace doesn't improve Praxis voting weight
 3. **No Escalation**: Local decisions can't bubble up to ecosystem-wide governance
 4. **Static Quorum**: Same participation threshold for all proposals regardless of importance
 
@@ -91,7 +91,7 @@ pub struct HierarchicalProposal {
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub enum ProposalScope {
-    Local,    // Single hApp only (e.g., EduNet course approval)
+    Local,    // Single hApp only (e.g., Praxis course approval)
     Regional, // Multiple hApps in same category (e.g., all education hApps)
     Global,   // Entire Mycelix ecosystem (e.g., protocol upgrade)
 }
@@ -198,7 +198,7 @@ impl CrossHappReputationSync {
     ///
     /// Example: Marketplace scammer gets caught
     /// -> Reputation drops in Marketplace DAO
-    /// -> This function propagates drop to EduNet, Mail, Music, Civitas DAOs
+    /// -> This function propagates drop to Praxis, Mail, Music, Civitas DAOs
     /// -> Scammer's voting power reduced ecosystem-wide
     pub async fn propagate_reputation_update(
         &self,
@@ -242,7 +242,7 @@ pub struct ProposalEscalationEngine {
 impl ProposalEscalationEngine {
     /// Automatically escalate proposal to parent DAO if threshold met
     ///
-    /// Example: EduNet course approval proposal gets 82% "escalate" votes
+    /// Example: Praxis course approval proposal gets 82% "escalate" votes
     /// -> Automatically creates proposal in Regional Education DAO
     /// -> Links back to original Local proposal
     /// -> Result of Regional vote applies back to Local
@@ -291,7 +291,7 @@ impl ProposalEscalationEngine {
 
 ## 🔄 Integration with Existing Systems
 
-### EduNet DAO Migration Path
+### Praxis DAO Migration Path
 
 1. **Extract**: Move current DAO types to `mycelix-governance` crate
 2. **Enhance**: Add reputation weighting to existing vote tallying
@@ -300,7 +300,7 @@ impl ProposalEscalationEngine {
 
 **File Changes**:
 ```rust
-// Before: edunet/dao_zome/integrity/src/lib.rs
+// Before: praxis/dao_zome/integrity/src/lib.rs
 pub struct Proposal {
     pub for_votes: u64,  // ❌ Never updates - critical bug!
     // ...
@@ -347,20 +347,20 @@ pub fn create_marketplace_proposal(input: CreateProposalInput) -> ExternResult<A
 
 ### Cross-hApp Security
 
-**Scenario**: Marketplace scammer attempts EduNet governance attack
+**Scenario**: Marketplace scammer attempts Praxis governance attack
 
 **Without Cross-hApp Reputation**:
 1. Scammer has 0 Marketplace reputation (caught scamming)
-2. Creates new EduNet account
-3. Full voting power in EduNet DAO
+2. Creates new Praxis account
+3. Full voting power in Praxis DAO
 4. Can manipulate curriculum decisions
 
 **With Cross-hApp Reputation**:
 1. Scammer has 0 Marketplace reputation
-2. Creates new EduNet account
-3. **Reputation syncs**: EduNet DAO sees 0 Marketplace reputation
+2. Creates new Praxis account
+3. **Reputation syncs**: Praxis DAO sees 0 Marketplace reputation
 4. Voting weight reduced to 0.1x (or even blocked if below threshold)
-5. **Cannot manipulate EduNet governance**
+5. **Cannot manipulate Praxis governance**
 
 ### Dynamic Quorum Intelligence
 
@@ -383,7 +383,7 @@ pub fn create_marketplace_proposal(input: CreateProposalInput) -> ExternResult<A
 
 **Deliverables**:
 - Create `crates/mycelix-governance` with types, validation, execution modules
-- Migrate EduNet DAO to use unified types
+- Migrate Praxis DAO to use unified types
 - Fix critical vote tallying bug
 
 **Files Created**:
@@ -420,7 +420,7 @@ crates/mycelix-governance/
 **Deliverables**:
 - Integrate 0TML algorithms (PoGQ, TCDM, Entropy)
 - Implement composite trust scoring
-- Test reputation-weighted voting in EduNet
+- Test reputation-weighted voting in Praxis
 
 **Dependencies**:
 - Mycelix-Core 0TML crate
@@ -499,7 +499,7 @@ crates/mycelix-governance/
 This architecture builds on:
 - **0TML Research**: Byzantine-resistant ML algorithms (PoGQ, TCDM, Entropy)
 - **Civitas**: Token economics and stake weighting
-- **EduNet DAO**: Production-tested 3-tier governance
+- **Praxis DAO**: Production-tested 3-tier governance
 - **Mycelix Protocol**: Epistemic tier system (LEM E0-E4)
 
 ---
@@ -514,7 +514,7 @@ pub enum ProposalType {
 }
 
 pub enum ProposalCategory {
-    Curriculum,       // EduNet course content
+    Curriculum,       // Praxis course content
     Marketplace,      // Marketplace policies
     TrustSafety,      // Cross-hApp moderation
     Economics,        // Token parameters

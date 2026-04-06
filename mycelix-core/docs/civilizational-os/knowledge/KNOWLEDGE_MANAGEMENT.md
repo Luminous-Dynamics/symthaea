@@ -1093,7 +1093,7 @@ interface LoomHApp {
 
 ```typescript
 interface LearningIntegration {
-  // EduNet integration
+  // Praxis integration
   eduNet: {
     courses: "Create courses from knowledge base";
     resources: "Chronicle as learning resource";

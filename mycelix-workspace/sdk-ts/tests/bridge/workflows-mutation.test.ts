@@ -1101,7 +1101,7 @@ describe('Readiness Threshold - Mutation Targets', () => {
     // Should have certification step first
     const certStep = result.steps.find((s) => s.name === 'Verify Operator Certifications');
     expect(certStep).toBeDefined();
-    expect(certStep?.happ).toBe('edunet');
+    expect(certStep?.happ).toBe('praxis');
   });
 
   it('should verify readiness step may exist after certification', async () => {

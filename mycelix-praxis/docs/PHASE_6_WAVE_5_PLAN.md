@@ -238,7 +238,7 @@ export const ERROR_MESSAGES = {
 
 ### README Enhancements
 ```markdown
-# 🎓 EduNet - Decentralized Federated Learning Platform
+# 🎓 Praxis - Decentralized Federated Learning Platform
 
 Privacy-preserving, peer-to-peer education platform powered by Holochain and Federated Learning.
 
@@ -268,12 +268,12 @@ npm run build
 ## 📁 Project Structure
 
 ```
-mycelix-edunet/
+mycelix-praxis/
 ├── apps/
 │   └── web/           # React frontend
 ├── crates/
-│   ├── edunet-agg/    # Aggregation algorithms
-│   └── edunet-core/   # Core types
+│   ├── praxis-agg/    # Aggregation algorithms
+│   └── praxis-core/   # Core types
 ├── zomes/             # Holochain zomes
 └── docs/              # Documentation
 ```
@@ -282,7 +282,7 @@ mycelix-edunet/
 
 - **Frontend**: React + TypeScript + Vite
 - **Backend**: Holochain (Rust)
-- **FL Algorithms**: Rust (edunet-agg crate)
+- **FL Algorithms**: Rust (praxis-agg crate)
 - **Credentials**: W3C Verifiable Credentials
 - **Crypto**: Ed25519 signatures
 ```

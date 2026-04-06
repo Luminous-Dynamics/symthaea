@@ -420,7 +420,7 @@ cargo mutants --test test_dao_voting_logic
 /*!
 # DAO Governance Lifecycle
 
-This test demonstrates the complete governance flow in Mycelix EduNet.
+This test demonstrates the complete governance flow in Mycelix Praxis.
 
 ## Overview
 

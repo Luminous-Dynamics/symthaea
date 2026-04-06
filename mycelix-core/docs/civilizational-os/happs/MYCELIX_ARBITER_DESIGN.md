@@ -18,7 +18,7 @@ Mycelix-Arbiter is a decentralized dispute resolution system that provides fair,
 Every coordination system eventually encounters disputes:
 - **Marketplace**: Buyer claims product wasn't delivered
 - **SupplyChain**: Supplier disputes quality assessment
-- **EduNet**: Student challenges credential denial
+- **Praxis**: Student challenges credential denial
 - **Collab**: Team members disagree on contribution credit
 
 Without dispute resolution, participants must either accept injustice or exit the system. Arbiter provides a third path: fair resolution within the ecosystem.
@@ -147,7 +147,7 @@ pub enum DisputeType {
     DeliveryTimeline,
     ContractBreach,
 
-    // EduNet
+    // Praxis
     CredentialDenial,
     PlagiarismAccusation,
     GradeDispute,
@@ -278,7 +278,7 @@ pub struct ArbitratorProfile {
     pub agent: AgentPubKey,
     /// Dispute types they can arbitrate
     pub specializations: Vec<DisputeType>,
-    /// Required EduNet credentials
+    /// Required Praxis credentials
     pub credentials: Vec<ActionHash>,
     /// Languages spoken
     pub languages: Vec<String>,
@@ -841,7 +841,7 @@ fn classify_evidence(
 pub fn register_as_arbitrator(input: ArbitratorRegistration) -> ExternResult<ActionHash> {
     let agent = agent_info()?.agent_latest_pubkey;
 
-    // Verify credentials via EduNet
+    // Verify credentials via Praxis
     let credentials_valid = verify_arbitrator_credentials(&input.credentials)?;
     if !credentials_valid {
         return Err(WasmError::Guest("Invalid credentials".into()));

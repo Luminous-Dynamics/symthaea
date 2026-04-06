@@ -258,7 +258,7 @@ Traditional knowledge preserved in Chronicle
 | **Beacon** | Emergency food coordination |
 | **Commons** | Shared equipment, land access |
 | **Oracle** | Weather data, market prices |
-| **EduNet** | Agricultural education |
+| **Praxis** | Agricultural education |
 | **Chronicle** | Traditional knowledge archive |
 | **HealthVault** | Dietary requirement integration |
 

@@ -167,7 +167,7 @@ Small groups can form, govern themselves, and interact with other groups—all w
 
 | hApp | Function | Civilizational Analog |
 |------|----------|----------------------|
-| **Mycelix-EduNet** | Credentials & learning | Universities, certifications |
+| **Mycelix-Praxis** | Credentials & learning | Universities, certifications |
 | **0TML/ZeroTrustML** | Collective intelligence | Research institutions |
 | **Mycelix-Sentinel** | Security monitoring | Police, intelligence |
 
@@ -186,7 +186,7 @@ Small groups can form, govern themselves, and interact with other groups—all w
 ### Existing hApps (5)
 1. Mycelix-Mail
 2. Mycelix-Marketplace
-3. Mycelix-EduNet
+3. Mycelix-Praxis
 4. Mycelix-SupplyChain
 5. Civitas
 

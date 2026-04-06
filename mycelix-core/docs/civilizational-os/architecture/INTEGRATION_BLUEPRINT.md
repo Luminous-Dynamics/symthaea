@@ -442,7 +442,7 @@ All significant operations in the ecosystem are weighted by MATL trust scores:
 │  └───────────► SupplyChain (physical goods)                            │
 │                                                                         │
 │  KNOWLEDGE FLOW                                                         │
-│  EduNet ◄───► Chronicle (knowledge archival)                           │
+│  Praxis ◄───► Chronicle (knowledge archival)                           │
 │  │      ◄───► Guild (professional credentials)                         │
 │  │      ◄───► Collab (skill verification)                              │
 │  └──────► Attest (credential issuance)                                 │
@@ -695,7 +695,7 @@ The 32 hApps naturally form functional clusters:
 │  ┌───────────────────────────────────────────────────────────────┐     │
 │  │                  KNOWLEDGE CLUSTER                            │     │
 │  │  ┌─────────┐  ┌─────────┐  ┌─────────┐  ┌─────────┐          │     │
-│  │  │ EduNet  │──│Chronicle│──│  Loom   │──│  Guild  │          │     │
+│  │  │ Praxis  │──│Chronicle│──│  Loom   │──│  Guild  │          │     │
 │  │  └─────────┘  └─────────┘  └─────────┘  └─────────┘          │     │
 │  │  learning     archive      narrative    profession            │     │
 │  └───────────────────────────────────────────────────────────────┘     │
@@ -1182,7 +1182,7 @@ impl EmergencyResponse {
 │  PHASE 2: DOMAIN SPECIFIC (Months 7-12)                                │
 │  ┌─────────────────────────────────────────────────────────────────┐   │
 │  │  Deploy Domain hApps:                                           │   │
-│  │  • HealthVault, EduNet, SupplyChain                            │   │
+│  │  • HealthVault, Praxis, SupplyChain                            │   │
 │  │  • Collab, Seed, Guild                                         │   │
 │  │  • Commons, Mutual, Beacon                                      │   │
 │  │  • Nexus, Anchor, Cycle                                         │   │
@@ -1239,7 +1239,7 @@ impl EmergencyResponse {
                          Phase 2 │
      ┌──────────┬──────────┬───┴───┬──────────┬──────────┐
      ▼          ▼          ▼       ▼          ▼          ▼
- HealthVault  EduNet  SupplyChain Collab    Commons   Mutual
+ HealthVault  Praxis  SupplyChain Collab    Commons   Mutual
      │          │          │       │          │          │
      └──────────┴──────────┴───────┴──────────┴──────────┘
                                │
@@ -1526,7 +1526,7 @@ The Mycelix Civilizational OS represents a complete infrastructure for human coo
 
 **Tier 2 - Domain (12)**
 12. HealthVault - Health records
-13. EduNet - Education
+13. Praxis - Education
 14. SupplyChain - Logistics
 15. Collab - Projects
 16. Seed - Incubation

@@ -36,7 +36,7 @@ This workspace orchestrates 25 domain-specific clusters:
 |------|----------|
 | **Core** | commons, civic, hearth, identity, governance, personal |
 | **Economy** | finance (MYCEL/SAP/TEND), music, marketplace, attribution |
-| **Services** | health (FHIR), edunet, energy, climate, supplychain, manufacturing |
+| **Services** | health (FHIR), praxis, energy, climate, supplychain, manufacturing |
 | **Knowledge** | knowledge, desci, core (FL research) |
 | **Communication** | mail (PQC-encrypted) |
 | **Frontier** | space (orbital coordination), lunar |

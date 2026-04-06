@@ -208,7 +208,7 @@ describe('Client - MockMycelixClient', () => {
 
     client.addMockEvent({
       event_type: 'other_event',
-      source_happ: 'edunet',
+      source_happ: 'praxis',
       payload: new Uint8Array(),
       timestamp: now,
       targets: [],
@@ -306,7 +306,7 @@ describe('Client - Integration Patterns', () => {
       scores: [
         { happ: 'mail', score: 0.95, weight: 200, lastUpdate: Date.now() },
         { happ: 'marketplace', score: 0.88, weight: 50, lastUpdate: Date.now() },
-        { happ: 'edunet', score: 0.92, weight: 30, lastUpdate: Date.now() },
+        { happ: 'praxis', score: 0.92, weight: 30, lastUpdate: Date.now() },
       ],
       aggregate: 0.93,
       total_interactions: 280,

@@ -129,7 +129,7 @@ The original kosmic-lab Python project at `kosmic-lab/` (gitignored) has 33 loca
 | `mycelix-desci` | 2026-02-15 | DeSci platform. |
 | `Mycelix-Mail` | 2026-02-15 | Decentralized email. |
 | `terra-atlas` | 2026-02-09 | Energy platform. |
-| `mycelix-edunet` | 2026-02-09 | Education network. |
+| `mycelix-praxis` | 2026-02-09 | Education network. |
 | `Mycelix-Marketplace` | 2026-02-06 | P2P marketplace. |
 | `.github` | 2026-02-01 | Org profile. |
 | `mycelix-supplychain` | 2026-02-01 | Supply chain. |

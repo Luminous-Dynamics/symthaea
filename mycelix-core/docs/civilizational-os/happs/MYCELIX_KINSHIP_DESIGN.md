@@ -318,7 +318,7 @@ Stories and skills preserved in Chronicle
 | **Transit** | Care-related transportation |
 | **Chronicle** | Memory preservation, family history |
 | **Legacy** | Succession planning, end-of-life |
-| **EduNet** | Caregiver training, parenting education |
+| **Praxis** | Caregiver training, parenting education |
 | **Nexus** | Family events, community gatherings |
 
 ---

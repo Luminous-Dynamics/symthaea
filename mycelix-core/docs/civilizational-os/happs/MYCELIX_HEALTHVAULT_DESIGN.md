@@ -40,7 +40,7 @@ Life-saving information must be accessible in emergencies, with appropriate safe
 Aggregate insights can be extracted without exposing individual records, using federated learning.
 
 ### 5. Provider Verification
-Only verified healthcare providers can receive sensitive information, using EduNet credential chains.
+Only verified healthcare providers can receive sensitive information, using Praxis credential chains.
 
 ---
 
@@ -74,7 +74,7 @@ Only verified healthcare providers can receive sensitive information, using EduN
 ├─────────────────────────────────────────────────────────────────────┤
 │                     Cross-hApp Integrations                          │
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────────────────┐   │
-│  │ EduNet       │  │ 0TML         │  │ Bridge Protocol          │   │
+│  │ Praxis       │  │ 0TML         │  │ Bridge Protocol          │   │
 │  │ (Provider    │  │ (Federated   │  │ (Reputation,             │   │
 │  │  Credentials)│  │  Learning)   │  │  Identity)               │   │
 │  └──────────────┘  └──────────────┘  └──────────────────────────┘   │
@@ -380,7 +380,7 @@ pub struct RecordFilters {
 #[hdk_extern]
 pub fn grant_access(input: GrantAccessInput) -> ExternResult<ActionHash> {
     // Verify I am the patient
-    // Verify provider's EduNet credential
+    // Verify provider's Praxis credential
     let credential = verify_provider_credential(&input.provider)?;
 
     // Create consent grant
@@ -438,9 +438,9 @@ pub fn generate_share_package(input: SharePackageInput) -> ExternResult<SharePac
     // Return package with access instructions
 }
 
-/// Verify provider credential via EduNet bridge
+/// Verify provider credential via Praxis bridge
 fn verify_provider_credential(provider: &AgentPubKey) -> ExternResult<ActionHash> {
-    // Call EduNet via Bridge Protocol
+    // Call Praxis via Bridge Protocol
     let credential = bridge_call(
         "edunet",
         "verify_provider",
@@ -654,10 +654,10 @@ pub enum AnonymizationLevel {
 ```rust
 // provider_verify/src/lib.rs
 
-/// Verify a provider's credentials (calls EduNet)
+/// Verify a provider's credentials (calls Praxis)
 #[hdk_extern]
 pub fn verify_provider(provider: AgentPubKey) -> ExternResult<ProviderVerification> {
-    // Query EduNet via Bridge
+    // Query Praxis via Bridge
     let credentials = bridge_call::<Vec<VerifiableCredential>>(
         "edunet",
         "get_agent_credentials",
@@ -859,7 +859,7 @@ fn detect_anomalies(recent: &[AccessLog], current: &AccessLog) -> Vec<AnomalyDet
 
 ## Cross-hApp Integration
 
-### EduNet Integration
+### Praxis Integration
 ```rust
 // Verify provider credentials
 let credentials = bridge_call::<Vec<VerifiableCredential>>(
@@ -953,7 +953,7 @@ let identity = bridge_call::<IdentityAttestation>(
 | Unauthorized access | Consent grants, credential verification, encryption |
 | Insider threat (provider) | Access logs, anomaly detection, limited scope grants |
 | Data breach | Client-side encryption, no central database to breach |
-| Identity theft | EduNet credential chains, multi-factor for sensitive ops |
+| Identity theft | Praxis credential chains, multi-factor for sensitive ops |
 | Coercion | Dead man's switch, time-delayed access options |
 
 ---
@@ -974,7 +974,7 @@ let identity = bridge_call::<IdentityAttestation>(
 #### Sharing with Provider
 ```
 1. Provider requests access (or patient initiates)
-2. Patient reviews provider's credentials (from EduNet)
+2. Patient reviews provider's credentials (from Praxis)
 3. Patient selects scope (record types, date range, duration)
 4. Consent grant created
 5. Provider notified
@@ -1078,7 +1078,7 @@ This classification informs:
 - [ ] Access logging
 
 ### Phase 2: Provider Integration (Q2 2026)
-- [ ] EduNet credential verification
+- [ ] Praxis credential verification
 - [ ] Provider onboarding
 - [ ] Specialty-based access
 - [ ] Audit trail enhancement

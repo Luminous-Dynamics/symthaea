@@ -769,12 +769,12 @@ export async function executeWorkflow<T>(
 }
 
 // ============================================================================
-// Regenerative Exit Workflow (Energy + Finance + EduNet)
+// Regenerative Exit Workflow (Energy + Finance + Praxis)
 // ============================================================================
 
 /**
  * Execute a regenerative exit workflow for community energy ownership
- * 1. Verify community readiness via EduNet certifications
+ * 1. Verify community readiness via Praxis certifications
  * 2. Check exit conditions are met
  * 3. Calculate exit tranche
  * 4. Process ownership transfer via Finance
@@ -798,9 +798,9 @@ export async function executeRegenerativeExitWorkflow(params: {
   const steps: WorkflowStep[] = [];
 
   try {
-    // Step 1: Check community EduNet certifications
-    steps.push({ name: 'Verify Operator Certifications', happ: 'edunet', status: 'running' });
-    const certVerification = await bridge.requestVerification('energy', 'edunet', {
+    // Step 1: Check community Praxis certifications
+    steps.push({ name: 'Verify Operator Certifications', happ: 'praxis', status: 'running' });
+    const certVerification = await bridge.requestVerification('energy', 'praxis', {
       subjectDid: params.communityDid,
       verificationType: 'credential',
       resource: 'energy_operator_certification',

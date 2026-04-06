@@ -146,9 +146,9 @@ Transaction reputation and scam detection:
 
 Best for: Building marketplace trust systems.
 
-### 09 - EduNet Integration
+### 09 - Praxis Integration
 
-**File:** `09-edunet-integration.ts`
+**File:** `09-praxis-integration.ts`
 
 Educational credentials and verification:
 
@@ -182,7 +182,7 @@ Best for: Building traceability systems.
 All integrations working together:
 
 - Complete supply chain journey
-- All 4 hApp integrations (Mail, Marketplace, EduNet, SupplyChain)
+- All 4 hApp integrations (Mail, Marketplace, Praxis, SupplyChain)
 - Bridge-based reputation sharing
 - Federated Learning integration
 
@@ -302,7 +302,7 @@ Best for: Production-grade storage implementations.
 | ------------- | ------------------------------------------------------------------------------- | ----------------------- |
 | `mail`        | `import { getMailTrustService } from '@mycelix/sdk/integrations/mail'`          | Email sender trust      |
 | `marketplace` | `import { getMarketplaceService } from '@mycelix/sdk/integrations/marketplace'` | Transaction reputation  |
-| `edunet`      | `import { getEduNetService } from '@mycelix/sdk/integrations/edunet'`           | Educational credentials |
+| `praxis`      | `import { getPraxisService } from '@mycelix/sdk/integrations/praxis'`           | Educational credentials |
 | `supplychain` | `import { getSupplyChainService } from '@mycelix/sdk/integrations/supplychain'` | Product provenance      |
 
 ## Common Patterns

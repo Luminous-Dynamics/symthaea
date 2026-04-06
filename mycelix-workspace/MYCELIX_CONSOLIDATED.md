@@ -337,7 +337,7 @@ Plugins compose via `ExternalWeightMap` — multiple plugins can contribute weig
 | **Core Four** | 4 | Identity (9z, 23 sweettests), Governance (7z, DKG+treasury), Core FL (6z, 62 tests), LUCID (8z, 92 functions) |
 | **Clusters** | 2 | Commons (35z, 4,126 tests), Civic (16z, 2,030 tests) |
 | **Production** | 3 | Mail (12z), DeSci (141 tests, REST API), Space |
-| **Beta** | 7 | Marketplace (8z), SupplyChain (8z), Observatory (SvelteKit), Epistemic-Markets, Fabrication (6z), EduNet (10z), Consensus (RBBFT) |
+| **Beta** | 7 | Marketplace (8z), SupplyChain (8z), Observatory (SvelteKit), Epistemic-Markets, Fabrication (6z), Praxis (10z), Consensus (RBBFT) |
 | **Scaffold** | 4 | Knowledge, Finance, Energy, Health (7z MVP) |
 | **Dormant** | 1 | Climate |
 

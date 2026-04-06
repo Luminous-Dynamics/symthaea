@@ -112,7 +112,7 @@ Location: `Mycelix-Music/dnas/mycelix-music/`
 ### Pending Migrations
 
 #### 6. Application Zomes
-- `mycelix-edunet` - Needs assessment
+- `mycelix-praxis` - Needs assessment
 - `mycelix-supplychain` - Needs assessment
 
 ### DNA Manifest Updated

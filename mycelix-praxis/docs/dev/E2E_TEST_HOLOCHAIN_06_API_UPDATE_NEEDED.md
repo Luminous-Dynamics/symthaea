@@ -217,7 +217,7 @@ let course_hash: ActionHash = conductor
    # Step 2: Fix Scenario 1 as proof-of-concept
    # Step 3: Apply pattern to Scenarios 2-5
    # Step 4: Verify compilation
-   cd /srv/luminous-dynamics/mycelix-edunet
+   cd /srv/luminous-dynamics/mycelix-praxis
    nix develop --command cargo check --test e2e_test
    ```
 

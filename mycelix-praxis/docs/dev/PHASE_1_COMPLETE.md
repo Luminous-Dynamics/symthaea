@@ -68,7 +68,7 @@ All 8 WASM targets built successfully:
 **Total size**: ~21.2M uncompressed
 
 ### DNA Bundle Created
-- **File**: `dna/edunet.dna`
+- **File**: `dna/praxis.dna`
 - **Size**: 4.2M (gzip compressed)
 - **Hash**: `uhC0k6mlIf0wtyTFI_8E6puPEGXK75ljGQL4bhA5MZRMsYGAP1RUk`
 - **Format**: Holochain 0.6 bundle format
@@ -93,10 +93,10 @@ nix develop
 ## 📁 Project Structure After Phase 1
 
 ```
-mycelix-edunet/
+mycelix-praxis/
 ├── dna/
 │   ├── dna.yaml              ✅ NEW - DNA manifest
-│   ├── edunet.dna            ✅ NEW - Packaged DNA bundle
+│   ├── praxis.dna            ✅ NEW - Packaged DNA bundle
 │   └── workdir/              ✅ NEW - Build artifacts
 ├── conductor/
 │   ├── dev-conductor-config.yaml  ✅ NEW - Dev config
@@ -111,8 +111,8 @@ mycelix-edunet/
 │   ├── credential_zome/      ✅ Library setup complete
 │   └── dao_zome/             ✅ Library setup complete
 ├── crates/
-│   ├── edunet-core/          ✅ Core types ready
-│   └── edunet-agg/           ✅ Aggregation libs ready
+│   ├── praxis-core/          ✅ Core types ready
+│   └── praxis-agg/           ✅ Aggregation libs ready
 ├── flake.nix                 ✅ Holochain 0.6 tooling
 └── Cargo.toml                ✅ Workspace configuration
 ```
@@ -124,7 +124,7 @@ mycelix-edunet/
 ### DNA Manifest Format
 ```yaml
 manifest_version: "0"
-name: edunet
+name: praxis
 
 integrity:
   zomes:
@@ -232,7 +232,7 @@ cd dna
 hc dna pack .
 
 # Calculate DNA hash
-hc dna hash edunet.dna
+hc dna hash praxis.dna
 
 # List installed apps
 hc app list --admin-port 4444

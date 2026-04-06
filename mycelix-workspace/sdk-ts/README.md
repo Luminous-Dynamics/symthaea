@@ -650,13 +650,13 @@ console.log(`Trust: ${seller.trustScore}, Verified: ${seller.verified}`);
 const verification = marketplace.verifyListing('listing-1', 'seller-1');
 console.log(`Safe: ${verification.verified}, Risk: ${verification.scamRiskScore}`);
 
-// === EduNet Integration ===
-import { getEduNetService } from '@mycelix/sdk/integrations/edunet';
+// === Praxis Integration ===
+import { getPraxisService } from '@mycelix/sdk/integrations/praxis';
 
-const edunet = getEduNetService();
+const praxis = getPraxisService();
 
 // Issue course completion certificate
-const credential = edunet.issueCertificate({
+const credential = praxis.issueCertificate({
   studentId: 'student-123',
   courseId: 'nix-fundamentals',
   courseName: 'NixOS Fundamentals',
@@ -664,10 +664,10 @@ const credential = edunet.issueCertificate({
 });
 
 // Verify credential
-const { valid, credential: cred, reason } = edunet.verifyCredential(credential.id);
+const { valid, credential: cred, reason } = praxis.verifyCredential(credential.id);
 
 // Get learner profile
-const learner = edunet.getLearnerProfile('student-123');
+const learner = praxis.getLearnerProfile('student-123');
 console.log(`Completed: ${learner.coursesCompleted}, Trust: ${learner.trustScore}`);
 
 // === SupplyChain Integration ===
@@ -2178,7 +2178,7 @@ import * as graphql from '@mycelix/sdk/graphql';
 // hApp Integration imports (all 12 Civilizational OS domains)
 import { getMailTrustService } from '@mycelix/sdk/integrations/mail';
 import { getMarketplaceService } from '@mycelix/sdk/integrations/marketplace';
-import { getEduNetService } from '@mycelix/sdk/integrations/edunet';
+import { getPraxisService } from '@mycelix/sdk/integrations/praxis';
 import { getSupplyChainService } from '@mycelix/sdk/integrations/supplychain';
 import { IdentityBridgeClient } from '@mycelix/sdk/integrations/identity';
 import { FinanceBridgeClient } from '@mycelix/sdk/integrations/finance';

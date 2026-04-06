@@ -149,10 +149,10 @@ const handleClick = useCallback((id: string) => {
 
 ### API Documentation
 **Files to document:**
-- `crates/edunet-agg/src/lib.rs` - Module overview
-- `crates/edunet-agg/src/aggregation.rs` - Public API
-- `crates/edunet-agg/src/privacy.rs` - Public API
-- `crates/edunet-agg/src/validation.rs` - Public API
+- `crates/praxis-agg/src/lib.rs` - Module overview
+- `crates/praxis-agg/src/aggregation.rs` - Public API
+- `crates/praxis-agg/src/privacy.rs` - Public API
+- `crates/praxis-agg/src/validation.rs` - Public API
 
 **Documentation template:**
 ```rust
@@ -174,7 +174,7 @@ const handleClick = useCallback((id: string) => {
 /// # Examples
 ///
 /// ```
-/// use edunet_agg::{aggregate_updates, AggregationMethod};
+/// use praxis_agg::{aggregate_updates, AggregationMethod};
 ///
 /// let updates = vec![update1, update2, update3];
 /// let result = aggregate_updates(updates, AggregationMethod::Mean, None)?;

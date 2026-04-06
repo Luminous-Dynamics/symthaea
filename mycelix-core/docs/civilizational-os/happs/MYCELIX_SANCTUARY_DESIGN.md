@@ -356,7 +356,7 @@ pub struct TrainingCredential {
     pub training_name: String,
     pub provider: String,
     pub completed_at: Timestamp,
-    pub credential_hash: Option<ActionHash>,  // Via Attest/EduNet
+    pub credential_hash: Option<ActionHash>,  // Via Attest/Praxis
     pub renewal_required: Option<Timestamp>,
 }
 
@@ -930,7 +930,7 @@ pub enum HealingFormat {
 │                                                                         │
 │  LEARNING                                                               │
 │  ┌─────────────────────────────────────────────────────────────────┐   │
-│  │  EduNet ──► Peer support training credentials                   │   │
+│  │  Praxis ──► Peer support training credentials                   │   │
 │  │         ──► Continuing education for supporters                 │   │
 │  │  Guild ───► Professional supervision networks                   │   │
 │  └─────────────────────────────────────────────────────────────────┘   │
@@ -1172,7 +1172,7 @@ pub enum AgentNotification {
 │  │  Supervision: Peer supervision circle                           │   │
 │  └─────────────────────────────────────────────────────────────────┘   │
 │                                                                         │
-│  All credentials issued via EduNet, tracked in Attest                  │
+│  All credentials issued via Praxis, tracked in Attest                  │
 │                                                                         │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
@@ -1217,4 +1217,4 @@ Sanctuary recognizes that human flourishing requires emotional infrastructure as
 
 *Document Version: 1.0*
 *Classification: Tier 2 - Essential (Foundational for human wellbeing)*
-*Dependencies: Attest, MATL, HealthVault, EduNet, Beacon, Nexus, Agora*
+*Dependencies: Attest, MATL, HealthVault, Praxis, Beacon, Nexus, Agora*

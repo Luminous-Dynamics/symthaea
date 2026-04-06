@@ -17,7 +17,7 @@ We actively support the following versions with security updates:
 
 ### Preferred Method: GitHub Security Advisories
 
-1. Navigate to the [Security Advisories](https://github.com/Luminous-Dynamics/mycelix-edunet/security/advisories) page
+1. Navigate to the [Security Advisories](https://github.com/Luminous-Dynamics/mycelix-praxis/security/advisories) page
 2. Click "Report a vulnerability"
 3. Fill out the form with detailed information
 4. Submit privately to maintainers
@@ -165,9 +165,9 @@ Contributors who have responsibly disclosed security issues:
 
 For security-related questions that are **not vulnerability reports**:
 
-- Open a [Discussion](https://github.com/Luminous-Dynamics/mycelix-edunet/discussions) with `security` tag
+- Open a [Discussion](https://github.com/Luminous-Dynamics/mycelix-praxis/discussions) with `security` tag
 - Email **security@mycelix.org** for private inquiries
 
 ---
 
-**Thank you for helping keep Mycelix EduNet and our community safe!**
+**Thank you for helping keep Mycelix Praxis and our community safe!**

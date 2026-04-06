@@ -258,8 +258,8 @@ Comprehensive WebSocket-based Holochain client with typed zome call wrappers for
 ```typescript
 export interface HolochainClientConfig {
   appWsUrl?: string;  // Default: ws://localhost:8888
-  appId?: InstalledAppId;  // Default: mycelix-edunet
-  roleName?: RoleName;  // Default: edunet
+  appId?: InstalledAppId;  // Default: mycelix-praxis
+  roleName?: RoleName;  // Default: praxis
   connectionTimeout?: number;  // Default: 10000ms
   verbose?: boolean;  // Default: false
   autoReconnect?: boolean;  // Default: true
@@ -430,11 +430,11 @@ VITE_APP_WS_URL=ws://localhost:8888
 
 # Installed App ID in the conductor
 # Must match the app ID when installing the DNA
-VITE_APP_ID=mycelix-edunet
+VITE_APP_ID=mycelix-praxis
 
 # Role name within the app
 # Typically matches the DNA name
-VITE_ROLE_NAME=edunet
+VITE_ROLE_NAME=praxis
 
 # Enable verbose Holochain client logs (default: false)
 VITE_VERBOSE_LOGS=false
@@ -538,8 +538,8 @@ VITE_USE_MOCK_CLIENT=true
 # .env.production
 VITE_USE_REAL_CLIENT=true
 VITE_APP_WS_URL=ws://conductor.example.com:8888
-VITE_APP_ID=mycelix-edunet
-VITE_ROLE_NAME=edunet
+VITE_APP_ID=mycelix-praxis
+VITE_ROLE_NAME=praxis
 ```
 
 ### Programmatic Mode Selection
@@ -629,7 +629,7 @@ npm run test
 ```bash
 # .env.production
 VITE_USE_REAL_CLIENT=true
-VITE_APP_WS_URL=wss://conductor.mycelix-edunet.com:443
+VITE_APP_WS_URL=wss://conductor.mycelix-praxis.com:443
 
 # Build for production
 npm run build

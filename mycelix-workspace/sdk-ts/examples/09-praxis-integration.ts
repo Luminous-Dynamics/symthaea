@@ -2,23 +2,23 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 /**
- * @mycelix/sdk EduNet Integration Example
+ * @mycelix/sdk Praxis Integration Example
  *
  * Demonstrates educational credential issuance, verification, and learner profiles.
  *
- * Run with: npx tsx examples/09-edunet-integration.ts
+ * Run with: npx tsx examples/09-praxis-integration.ts
  */
 
 import {
-  getEduNetService,
-  EduNetCredentialService,
+  getPraxisService,
+  PraxisCredentialService,
   type EducationalCredential,
   type LearnerProfile,
-} from '../src/integrations/edunet/index.js';
+} from '../src/integrations/praxis/index.js';
 
-console.log('=== EduNet Credential Integration ===\n');
+console.log('=== Praxis Credential Integration ===\n');
 
-const edunet = getEduNetService();
+const praxis = getPraxisService();
 
 // === Issuing Course Completion Certificates ===
 
@@ -40,7 +40,7 @@ const aliceCourses = [
 console.log(`\nIssuing certificates for ${students.alice}:`);
 const aliceCreds: EducationalCredential[] = [];
 for (const course of aliceCourses) {
-  const credential = edunet.issueCertificate({
+  const credential = praxis.issueCertificate({
     studentId: students.alice,
     courseId: course.courseId,
     courseName: course.courseName,
@@ -54,7 +54,7 @@ for (const course of aliceCourses) {
 
 // Bob completes one course
 console.log(`\nIssuing certificate for ${students.bob}:`);
-const bobCred = edunet.issueCertificate({
+const bobCred = praxis.issueCertificate({
   studentId: students.bob,
   courseId: 'nix-101',
   courseName: 'NixOS Fundamentals',
@@ -74,7 +74,7 @@ const aliceSkills = [
 
 console.log(`\nSkill certifications for ${students.alice}:`);
 for (const skill of aliceSkills) {
-  const skillCert = edunet.issueSkillCertification({
+  const skillCert = praxis.issueSkillCertification({
     holderId: students.alice,
     skillId: skill.skillId,
     skillName: skill.skillName,
@@ -90,7 +90,7 @@ for (const skill of aliceSkills) {
 console.log('\n--- Credential Verification ---');
 
 // Verify Alice's first credential
-const verification1 = edunet.verifyCredential(aliceCreds[0].id);
+const verification1 = praxis.verifyCredential(aliceCreds[0].id);
 console.log(`\nVerifying: ${aliceCreds[0].id}`);
 console.log(`  Valid: ${verification1.valid ? '✅ Yes' : '❌ No'}`);
 if (verification1.credential) {
@@ -100,7 +100,7 @@ if (verification1.credential) {
 }
 
 // Try to verify non-existent credential
-const verification2 = edunet.verifyCredential('fake-credential-xyz');
+const verification2 = praxis.verifyCredential('fake-credential-xyz');
 console.log(`\nVerifying: fake-credential-xyz`);
 console.log(`  Valid: ${verification2.valid ? '✅ Yes' : '❌ No'}`);
 console.log(`  Reason: ${verification2.reason}`);
@@ -110,7 +110,7 @@ console.log(`  Reason: ${verification2.reason}`);
 console.log('\n--- Learner Profiles ---');
 
 for (const [name, learnerId] of Object.entries(students)) {
-  const profile = edunet.getLearnerProfile(learnerId);
+  const profile = praxis.getLearnerProfile(learnerId);
   console.log(`\n${name} (${learnerId}):`);
   console.log(`  Courses Completed: ${profile.coursesCompleted}`);
   console.log(`  Certifications Earned: ${profile.certificationsEarned}`);
@@ -122,15 +122,15 @@ for (const [name, learnerId] of Object.entries(students)) {
 // === Trust Checks ===
 
 console.log('\n--- Learner Trust Checks ---');
-console.log(`Alice trusted (0.5): ${edunet.isLearnerTrusted(students.alice, 0.5)}`);
-console.log(`Alice trusted (0.7): ${edunet.isLearnerTrusted(students.alice, 0.7)}`);
-console.log(`Bob trusted (0.5): ${edunet.isLearnerTrusted(students.bob, 0.5)}`);
-console.log(`Carol trusted (0.5): ${edunet.isLearnerTrusted(students.carol, 0.5)}`);
+console.log(`Alice trusted (0.5): ${praxis.isLearnerTrusted(students.alice, 0.5)}`);
+console.log(`Alice trusted (0.7): ${praxis.isLearnerTrusted(students.alice, 0.7)}`);
+console.log(`Bob trusted (0.5): ${praxis.isLearnerTrusted(students.bob, 0.5)}`);
+console.log(`Carol trusted (0.5): ${praxis.isLearnerTrusted(students.carol, 0.5)}`);
 
 // === Get All Credentials for a Holder ===
 
 console.log('\n--- All Credentials for Alice ---');
-const allAliceCreds = edunet.getCredentialsForHolder(students.alice);
+const allAliceCreds = praxis.getCredentialsForHolder(students.alice);
 console.log(`Total credentials: ${allAliceCreds.length}`);
 for (const cred of allAliceCreds) {
   const type = cred.type === 'course_completion' ? '📚' : '🎯';
@@ -158,7 +158,7 @@ function checkCandidateQualifications(
   candidateId: string,
   requirements: JobRequirement[]
 ): { qualified: boolean; missing: string[] } {
-  const credentials = edunet.getCredentialsForHolder(candidateId);
+  const credentials = praxis.getCredentialsForHolder(candidateId);
   const missing: string[] = [];
 
   for (const req of requirements) {
@@ -176,7 +176,7 @@ function checkCandidateQualifications(
     }
 
     // Verify credential is still valid
-    const verification = edunet.verifyCredential(matchingCred.id);
+    const verification = praxis.verifyCredential(matchingCred.id);
     if (!verification.valid) {
       missing.push(`${req.type}: ${req.id} (expired)`);
       continue;
@@ -200,4 +200,4 @@ for (const [name, candidateId] of Object.entries(students)) {
   }
 }
 
-console.log('\n=== EduNet Integration Complete ===');
+console.log('\n=== Praxis Integration Complete ===');

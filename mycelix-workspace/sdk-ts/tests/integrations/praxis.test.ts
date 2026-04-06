@@ -2,27 +2,27 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 /**
- * EduNet Integration Tests
+ * Praxis Integration Tests
  *
- * Tests for EduNetCredentialService - educational credentials and learner trust
+ * Tests for PraxisCredentialService - educational credentials and learner trust
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
-  EduNetCredentialService,
-  getEduNetService,
+  PraxisCredentialService,
+  getPraxisService,
   type EducationalCredential,
   type LearnerProfile,
-} from '../../src/integrations/edunet/index.js';
+} from '../../src/integrations/praxis/index.js';
 
-describe('EduNet Integration', () => {
-  let service: EduNetCredentialService;
+describe('Praxis Integration', () => {
+  let service: PraxisCredentialService;
 
   beforeEach(() => {
-    service = new EduNetCredentialService();
+    service = new PraxisCredentialService();
   });
 
-  describe('EduNetCredentialService', () => {
+  describe('PraxisCredentialService', () => {
     describe('issueCertificate', () => {
       it('should issue course completion certificate', () => {
         const credential = service.issueCertificate({
@@ -387,16 +387,16 @@ describe('EduNet Integration', () => {
     });
   });
 
-  describe('getEduNetService', () => {
+  describe('getPraxisService', () => {
     it('should return singleton instance', () => {
-      const service1 = getEduNetService();
-      const service2 = getEduNetService();
+      const service1 = getPraxisService();
+      const service2 = getPraxisService();
 
       expect(service1).toBe(service2);
     });
 
     it('should maintain state across calls', () => {
-      const service1 = getEduNetService();
+      const service1 = getPraxisService();
       service1.issueCertificate({
         studentId: 'singleton-student',
         courseId: 'singleton-course',
@@ -404,7 +404,7 @@ describe('EduNet Integration', () => {
         grade: 92,
       });
 
-      const service2 = getEduNetService();
+      const service2 = getPraxisService();
       const credentials = service2.getCredentialsForHolder('singleton-student');
 
       expect(credentials.length).toBe(1);

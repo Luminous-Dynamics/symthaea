@@ -28,7 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Initial monorepo structure
   - `apps/web`: React + TypeScript web client with Vite
-  - `crates/`: Rust libraries (edunet-core, edunet-agg)
+  - `crates/`: Rust libraries (praxis-core, praxis-agg)
   - `zomes/`: Holochain zome scaffolds (learning, FL, credentials, DAO)
   - `schemas/`: W3C VC schemas + DHT entry definitions
   - `docs/`: Protocol, threat model, privacy, ADRs
@@ -44,8 +44,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `SECURITY.md` - Vulnerability reporting policy
   - `GOVERNANCE.md` - Decision-making framework (fast/normal/slow paths)
 - Rust workspace
-  - **edunet-core**: Core types, crypto (BLAKE3), provenance tracking
-  - **edunet-agg**: Robust aggregation (trimmed mean, median, weighted mean) with tests
+  - **praxis-core**: Core types, crypto (BLAKE3), provenance tracking
+  - **praxis-agg**: Robust aggregation (trimmed mean, median, weighted mean) with tests
 - Holochain zome scaffolds
   - **learning_zome**: Courses, learner progress, learning activities
   - **fl_zome**: Federated learning rounds and updates
@@ -57,7 +57,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Sample UI demonstrating platform features
 - Verifiable Credentials schemas
   - `EduAchievementCredential.schema.json` (W3C VC spec)
-  - JSON-LD context (`edunet-v1.jsonld`)
+  - JSON-LD context (`praxis-v1.jsonld`)
 - Comprehensive documentation
   - **Protocol specification** (`docs/protocol.md`): 6-phase FL lifecycle
   - **Threat model** (`docs/threat-model.md`): 10 attack vectors + mitigations
@@ -107,6 +107,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-[Unreleased]: https://github.com/Luminous-Dynamics/mycelix-edunet/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/Luminous-Dynamics/mycelix-edunet/releases/tag/v0.1.0
-[0.0.0]: https://github.com/Luminous-Dynamics/mycelix-edunet/commit/initial
+[Unreleased]: https://github.com/Luminous-Dynamics/mycelix-praxis/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/Luminous-Dynamics/mycelix-praxis/releases/tag/v0.1.0
+[0.0.0]: https://github.com/Luminous-Dynamics/mycelix-praxis/commit/initial

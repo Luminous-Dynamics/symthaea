@@ -384,7 +384,7 @@ export class MarketplaceReputationService {
   queryExternalReputation(sellerId: string): void {
     const query = createReputationQuery('marketplace', sellerId);
     this.bridge.send('mail', query);
-    this.bridge.send('edunet', query);
+    this.bridge.send('praxis', query);
   }
 
   /**

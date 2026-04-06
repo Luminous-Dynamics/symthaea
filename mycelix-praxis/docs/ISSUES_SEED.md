@@ -1,4 +1,4 @@
-# Seed GitHub Issues for EduNet
+# Seed GitHub Issues for Praxis
 
 This document contains template issues to seed the GitHub repository with contributor-friendly tasks. These should be created manually via the GitHub UI or `gh` CLI.
 
@@ -9,13 +9,13 @@ This document contains template issues to seed the GitHub repository with contri
 ### Issue #1: Add geometric_mean aggregation method
 **Labels**: `good first issue`, `rust`, `enhancement`, `p2`
 
-**Title**: Add geometric_mean aggregation method to edunet-agg
+**Title**: Add geometric_mean aggregation method to praxis-agg
 
 **Description**:
 Add a geometric mean aggregation method to complement the existing trimmed_mean, median, and weighted_mean methods.
 
 **Task**:
-Implement `geometric_mean` function in `crates/edunet-agg/src/methods.rs` that:
+Implement `geometric_mean` function in `crates/praxis-agg/src/methods.rs` that:
 - Takes a vector of gradient updates
 - Computes the geometric mean per dimension
 - Handles edge cases (zeros, negative values)
@@ -31,7 +31,7 @@ Implement `geometric_mean` function in `crates/edunet-agg/src/methods.rs` that:
 - [ ] All tests pass
 
 **Resources**:
-- See existing methods in `crates/edunet-agg/src/methods.rs`
+- See existing methods in `crates/praxis-agg/src/methods.rs`
 - Geometric mean formula: nth root of product of n numbers
 - Test fixtures available in `tests/fixtures/aggregation.rs`
 
@@ -150,10 +150,10 @@ Help improve documentation quality by finding and fixing typos, grammar issues, 
 **Title**: Improve test coverage for clip_l2_norm function
 
 **Description**:
-The `clip_l2_norm` function in `edunet-agg` needs better edge case testing.
+The `clip_l2_norm` function in `praxis-agg` needs better edge case testing.
 
 **Task**:
-Add tests in `crates/edunet-agg/src/methods.rs` for:
+Add tests in `crates/praxis-agg/src/methods.rs` for:
 - Zero vector (norm = 0)
 - Very small vectors (norm < 0.001)
 - Very large vectors (norm > 1000)
@@ -169,7 +169,7 @@ Add tests in `crates/edunet-agg/src/methods.rs` for:
 - [ ] Code coverage increased
 
 **Resources**:
-- Function: `crates/edunet-agg/src/methods.rs:clip_l2_norm`
+- Function: `crates/praxis-agg/src/methods.rs:clip_l2_norm`
 - Existing tests in same file
 - Test fixtures: `tests/fixtures/aggregation.rs`
 
@@ -392,7 +392,7 @@ The `trimmed_mean` function processes gradients sequentially. For large particip
 - [ ] No regressions
 
 **Resources**:
-- Current implementation: `crates/edunet-agg/src/methods.rs`
+- Current implementation: `crates/praxis-agg/src/methods.rs`
 - Rayon docs: https://docs.rs/rayon/latest/rayon/
 - Benchmarks: `benches/aggregation_bench.rs`
 
@@ -478,7 +478,7 @@ Create UI for DAO governance: create proposals, vote, view results.
 **Title**: Create Jupyter notebook demonstrating FL simulation
 
 **Description**:
-Educational notebook showing how federated learning works with EduNet's protocol.
+Educational notebook showing how federated learning works with Praxis's protocol.
 
 **Task**:
 Create `notebooks/fl_simulation.ipynb` that:
@@ -498,7 +498,7 @@ Create `notebooks/fl_simulation.ipynb` that:
 - [ ] README in notebooks/ folder
 
 **Resources**:
-- Aggregation methods: `crates/edunet-agg/src/methods.rs`
+- Aggregation methods: `crates/praxis-agg/src/methods.rs`
 - Protocol: `docs/protocol.md`
 - Python FL libraries: PySyft, Flower, TensorFlow Federated
 
@@ -512,7 +512,7 @@ Create `notebooks/fl_simulation.ipynb` that:
 **Title**: Proof-of-concept mobile app for iOS and Android
 
 **Description**:
-Create a basic React Native app that connects to EduNet (mock mode initially).
+Create a basic React Native app that connects to Praxis (mock mode initially).
 
 **Task**:
 1. Set up React Native project
@@ -547,7 +547,7 @@ Create a basic React Native app that connects to EduNet (mock mode initially).
 To create these issues on GitHub:
 
 **Via GitHub UI**:
-1. Go to https://github.com/Luminous-Dynamics/mycelix-edunet/issues
+1. Go to https://github.com/Luminous-Dynamics/mycelix-praxis/issues
 2. Click "New Issue"
 3. Copy/paste title and description
 4. Add appropriate labels
@@ -558,7 +558,7 @@ To create these issues on GitHub:
 ```bash
 # Example for issue #1
 gh issue create \
-  --title "Add geometric_mean aggregation method to edunet-agg" \
+  --title "Add geometric_mean aggregation method to praxis-agg" \
   --body "$(cat issue-templates/001-geometric-mean.md)" \
   --label "good first issue,rust,enhancement,p2" \
   --milestone "Phase 3"

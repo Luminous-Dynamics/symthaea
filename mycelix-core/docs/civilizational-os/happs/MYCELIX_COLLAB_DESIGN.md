@@ -11,7 +11,7 @@
 
 ## Executive Summary
 
-Mycelix-Collab is a decentralized project coordination platform that enables teams to collaborate on complex projects with transparent contribution tracking, milestone-based payments, and reputation-aware team formation. It bridges Marketplace (for project-based work), EduNet (for skill verification), and MATL (for trust-based collaboration).
+Mycelix-Collab is a decentralized project coordination platform that enables teams to collaborate on complex projects with transparent contribution tracking, milestone-based payments, and reputation-aware team formation. It bridges Marketplace (for project-based work), Praxis (for skill verification), and MATL (for trust-based collaboration).
 
 ### Why Collab?
 
@@ -35,7 +35,7 @@ Every contribution is recorded, verified, and visible.
 Pay is proportional to verified contribution, not politics.
 
 ### 3. Skill Discovery
-Work reveals and builds skills, recognized via EduNet.
+Work reveals and builds skills, recognized via Praxis.
 
 ### 4. Reputation Staking
 Team members stake reputation on project success.
@@ -64,7 +64,7 @@ Teams self-organize around shared goals.
 ├─────────────────────────────────────────────────────────────────────┤
 │                     Cross-hApp Integration                           │
 │  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐            │
-│  │Marketplace│  │ EduNet   │  │ MATL/    │  │ Arbiter  │            │
+│  │Marketplace│  │ Praxis   │  │ MATL/    │  │ Arbiter  │            │
 │  │(Funding)  │  │(Skills)  │  │ Bridge   │  │(Disputes)│            │
 │  └──────────┘  └──────────┘  └──────────┘  └──────────┘            │
 └─────────────────────────────────────────────────────────────────────┘
@@ -280,7 +280,7 @@ pub struct TeamMember {
     /// Status
     pub status: MemberStatus,
     /// Verified skills
-    pub verified_skills: Vec<ActionHash>, // EduNet credentials
+    pub verified_skills: Vec<ActionHash>, // Praxis credentials
     /// Reputation at join time
     pub reputation_at_join: f64,
     /// Contribution score (updated)
@@ -449,7 +449,7 @@ pub enum ReviewRating {
 pub fn create_project(input: CreateProjectInput) -> ExternResult<ActionHash> {
     let creator = agent_info()?.agent_latest_pubkey;
 
-    // Validate required skills exist in EduNet
+    // Validate required skills exist in Praxis
     for skill in &input.required_skills {
         verify_skill_exists(&skill.skill_id)?;
     }
@@ -1122,7 +1122,7 @@ fn calculate_payout_distribution(
 
 ## Cross-hApp Integration
 
-### EduNet Integration
+### Praxis Integration
 ```rust
 // Issue skill credential based on project work
 if project.status == ProjectStatus::Completed {

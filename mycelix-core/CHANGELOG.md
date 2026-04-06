@@ -190,7 +190,7 @@ Initial release of production-ready core libraries:
 - **mycelix-governance** (9,518 LOC) - Governance with 6 zomes
 - **mycelix-finance** (9,044 LOC) - DeFi primitives with 9 zomes
 - **mycelix-property** (2,670 LOC) - Property rights with 5 zomes
-- **mycelix-edunet** (~220,000 LOC) - Educational platform with 10 zomes
+- **mycelix-praxis** (~220,000 LOC) - Educational platform with 10 zomes
 - **mycelix-knowledge** (10,730 LOC) - Knowledge graphs with 7 zomes
 - **mycelix-energy** (2,955 LOC) - Energy markets with 4 zomes
 - **mycelix-identity** (~2,000 LOC) - Identity management with 7 zomes

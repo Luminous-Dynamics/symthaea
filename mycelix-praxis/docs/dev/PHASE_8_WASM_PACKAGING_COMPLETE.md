@@ -8,7 +8,7 @@
 
 ## Summary
 
-Successfully built and deployed the full 20-zome Mycelix EduNet hApp on Holochain 0.6. All zome calls verified working through WebSocket API.
+Successfully built and deployed the full 20-zome Mycelix Praxis hApp on Holochain 0.6. All zome calls verified working through WebSocket API.
 
 ## Final Metrics
 
@@ -56,9 +56,9 @@ rustflags = ["--cfg", "getrandom_backend=\"custom\""]
 
 **Problem**: `fl_coordinator` failed to build due to getrandom 0.2 error.
 
-**Root Cause**: Dependency chain: `edunet-agg` → `statrs` → `nalgebra` → `rand 0.8` → `getrandom 0.2`
+**Root Cause**: Dependency chain: `praxis-agg` → `statrs` → `nalgebra` → `rand 0.8` → `getrandom 0.2`
 
-**Fix**: Removed `edunet-agg` dependency and added inline aggregation functions:
+**Fix**: Removed `praxis-agg` dependency and added inline aggregation functions:
 ```rust
 // In fl_coordinator/src/lib.rs
 pub fn trimmed_mean(gradients: &[Vec<f32>], config: &AggregationConfig) -> Result<Vec<f32>, String> { ... }
@@ -125,7 +125,7 @@ fn validate_all_courses_link(link: &RegisterCreateLink) -> ExternResult<Validate
 | `.cargo/config.toml` | getrandom backend: wasm_js → custom |
 | `dna/dna.yaml` | Added dependencies for all coordinator zomes |
 | `zomes/fl_zome/coordinator/src/lib.rs` | Added inline aggregation functions |
-| `zomes/fl_zome/coordinator/Cargo.toml` | Removed edunet-agg dependency |
+| `zomes/fl_zome/coordinator/Cargo.toml` | Removed praxis-agg dependency |
 | `zomes/credential_zome/coordinator/src/lib.rs` | Added inline epistemic types |
 | `zomes/credential_zome/coordinator/Cargo.toml` | Removed mycelix-sdk dependency |
 | `zomes/learning_zome/integrity/src/lib.rs` | Fixed AllCourses link validation |
@@ -143,7 +143,7 @@ fn validate_all_courses_link(link: &RegisterCreateLink) -> ExternResult<Validate
 📋 Listing installed apps...
 ✅ Found 1 installed app(s):
    - 9999 (enabled)
-   Cell ID found for role 'edunet'
+   Cell ID found for role 'praxis'
 
 🔑 Issuing app authentication token...
 ✅ App token issued
@@ -156,7 +156,7 @@ fn validate_all_courses_link(link: &RegisterCreateLink) -> ExternResult<Validate
 
 📊 Getting app info...
 ✅ App ID: 9999
-   - Role 'edunet': 1 cell(s)
+   - Role 'praxis': 1 cell(s)
 
 🔧 Testing zome call: list_courses...
 ✅ Zome call succeeded!

@@ -957,7 +957,7 @@ pub enum SpiralEvent {
 | **Agora** | Decision presentation by stage | Traditional: clear rules; Modern: outcome focus; Green: consensus; Teal: emergence |
 | **Nudge** | Stage-appropriate framing | Uses Spiral for personalized nudge delivery |
 | **Sanctuary** | Stage-appropriate support | Different therapeutic approaches per stage |
-| **EduNet** | Learning style adaptation | Teaching methods matched to developmental stage |
+| **Praxis** | Learning style adaptation | Teaching methods matched to developmental stage |
 | **Hearth** | Content recommendations | Cultural content matched to stage interests |
 | **Collab** | Team composition analysis | Stage diversity for healthy team dynamics |
 | **Kinship** | Family dynamics support | Understanding intergenerational stage differences |

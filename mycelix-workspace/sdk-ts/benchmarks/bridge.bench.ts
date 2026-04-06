@@ -333,7 +333,7 @@ describe('Bridge: Realistic Scenarios', () => {
     const bridge = new LocalBridge();
 
     // Register happs
-    const happs = ['marketplace', 'edunet', 'mail', 'supplychain'];
+    const happs = ['marketplace', 'praxis', 'mail', 'supplychain'];
     happs.forEach((h) => bridge.registerHapp(h));
 
     // Set up handlers

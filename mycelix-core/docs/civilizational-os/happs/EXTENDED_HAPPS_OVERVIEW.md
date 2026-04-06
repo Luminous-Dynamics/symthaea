@@ -81,7 +81,7 @@ pub struct SpendingProposal {
 - Knowledge sharing
 
 **Key Integrations**:
-- EduNet (credentials)
+- Praxis (credentials)
 - Collab (project staffing)
 - Attest (professional identity)
 
@@ -216,7 +216,7 @@ pub enum EmergencyType {
 - Collab (graduation to full projects)
 - Treasury (seed funding)
 - Guild (mentor matching)
-- EduNet (skill development)
+- Praxis (skill development)
 
 **Data Model Highlights**:
 ```rust
@@ -547,7 +547,7 @@ Like a cell membrane: selective permeability, not a wall. Some things flow freel
 ## Priority Ranking for Implementation
 
 ### Phase 1 (2025 Q1-Q2): Core + Tier 1
-1. Existing hApps (Mail, Marketplace, EduNet, SupplyChain, Civitas)
+1. Existing hApps (Mail, Marketplace, Praxis, SupplyChain, Civitas)
 2. HealthVault, Arbiter, Oracle, Attest
 3. Agora, Collab, Sentinel, Chronicle
 

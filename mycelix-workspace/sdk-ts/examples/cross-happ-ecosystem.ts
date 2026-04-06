@@ -18,7 +18,7 @@ import { matl, epistemic, bridge, fl } from '../src/index.js';
 // Import hApp-specific services
 import { getMailTrustService } from '../src/integrations/mail/index.js';
 import { getMarketplaceService } from '../src/integrations/marketplace/index.js';
-import { getEduNetService } from '../src/integrations/edunet/index.js';
+import { getPraxisService } from '../src/integrations/praxis/index.js';
 import { getSupplyChainService } from '../src/integrations/supplychain/index.js';
 
 // ============================================================================
@@ -32,21 +32,21 @@ console.log('Scenario: Organic Coffee from Farm to Cup\n');
 // Initialize services
 const mailService = getMailTrustService();
 const marketplaceService = getMarketplaceService();
-const eduNetService = getEduNetService();
+const eduNetService = getPraxisService();
 const supplyChainService = getSupplyChainService();
 
 // Initialize local bridge for cross-hApp communication
 const localBridge = new bridge.LocalBridge();
 localBridge.registerHapp('mail');
 localBridge.registerHapp('marketplace');
-localBridge.registerHapp('edunet');
+localBridge.registerHapp('praxis');
 localBridge.registerHapp('supplychain');
 
 // ============================================================================
 // Step 1: Farm Origin - Farmer Credentials
 // ============================================================================
 
-console.log('📚 Step 1: Farmer Credentials (EduNet)');
+console.log('📚 Step 1: Farmer Credentials (Praxis)');
 console.log('-'.repeat(40));
 
 // Farmer has completed organic farming certification
@@ -298,7 +298,7 @@ const productClaim = epistemic.claim('Organic coffee verified through complete s
 const withFarmerEvidence = epistemic.addEvidence(productClaim, {
   type: 'credential',
   data: organicCert.id,
-  source: 'edunet',
+  source: 'praxis',
   timestamp: Date.now(),
 });
 
@@ -331,7 +331,7 @@ console.log('═'.repeat(50));
 console.log(`
 The Mycelix ecosystem enables:
 
-1. 📚 Educational Credentials (EduNet)
+1. 📚 Educational Credentials (Praxis)
    - Farmer certifications verified and tracked
    - Skills contribute to overall trust
 

@@ -242,11 +242,11 @@ mod e2e_tests {
     async fn test_complete_learning_journey() {
         // 1. Setup conductor
         let conductor = SweetConductor::from_standard_config().await;
-        let dna = SweetDnaFile::from_bundle("./dna/edunet.dna").await?;
+        let dna = SweetDnaFile::from_bundle("./dna/praxis.dna").await?;
 
         // 2. Install app
         let apps = conductor
-            .setup_app("mycelix-edunet", &[dna])
+            .setup_app("mycelix-praxis", &[dna])
             .await?;
 
         let (alice, bobbo) = apps.into_tuples();

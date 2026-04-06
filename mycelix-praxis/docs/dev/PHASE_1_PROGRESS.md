@@ -33,7 +33,7 @@ Created development conductor configuration with:
 - **App Interface**: WebSocket on port 8889
 - **Network**: QUIC transport with Holo bootstrap service
 - **Keystore**: In-process Lair keystore for development
-- **Environment**: `/tmp/mycelix-edunet-dev` for local testing
+- **Environment**: `/tmp/mycelix-praxis-dev` for local testing
 
 ### 3. ✅ WASM Build Targets Enabled
 **Modified Files**:
@@ -80,7 +80,7 @@ $ cargo check --workspace
 ## File Structure Created
 
 ```
-mycelix-edunet/
+mycelix-praxis/
 ├── dna/
 │   └── dna.yaml                    # DNA manifest (NEW)
 ├── conductor-config.yaml           # Development conductor config (NEW)

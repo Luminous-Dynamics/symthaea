@@ -5,7 +5,7 @@
  * Cross-hApp Integration Tests
  *
  * Tests ecosystem-level integration between Mycelix hApps:
- * - MATL trust propagation across Mail, Marketplace, EduNet, SupplyChain
+ * - MATL trust propagation across Mail, Marketplace, Praxis, SupplyChain
  * - Bridge protocol reputation queries
  * - Epistemic Charter consistency
  * - Multi-hApp user journey scenarios
@@ -21,7 +21,7 @@ import * as bridge from '../../src/bridge/index.js';
 // Integration modules
 import { getMailTrustService, MailTrustService } from '../../src/integrations/mail/index.js';
 import { getMarketplaceService, MarketplaceReputationService } from '../../src/integrations/marketplace/index.js';
-import { getEduNetService, EduNetCredentialService } from '../../src/integrations/edunet/index.js';
+import { getPraxisService, PraxisCredentialService } from '../../src/integrations/praxis/index.js';
 import { getSupplyChainService, SupplyChainProvenanceService } from '../../src/integrations/supplychain/index.js';
 
 describe('Cross-hApp Ecosystem Integration', () => {
@@ -32,7 +32,7 @@ describe('Cross-hApp Ecosystem Integration', () => {
     // Register all hApps
     localBridge.registerHapp('mail');
     localBridge.registerHapp('marketplace');
-    localBridge.registerHapp('edunet');
+    localBridge.registerHapp('praxis');
     localBridge.registerHapp('supplychain');
   });
 
@@ -78,12 +78,12 @@ describe('Cross-hApp Ecosystem Integration', () => {
       }
       localBridge.setReputation('marketplace', agentId, marketRep);
 
-      // Low reputation in EduNet
+      // Low reputation in Praxis
       let eduRep = matl.createReputation(agentId);
       for (let i = 0; i < 2; i++) {
         eduRep = matl.recordNegative(eduRep);
       }
-      localBridge.setReputation('edunet', agentId, eduRep);
+      localBridge.setReputation('praxis', agentId, eduRep);
 
       // Aggregate should reflect weighted combination
       const aggregate = localBridge.getAggregateReputation(agentId);
@@ -151,7 +151,7 @@ describe('Cross-hApp Ecosystem Integration', () => {
         .withMateriality(epistemic.MaterialityLevel.M2_Persistent)
         .build();
 
-      // Credential claim (from EduNet)
+      // Credential claim (from Praxis)
       const credentialClaim = epistemic
         .claim('Course completion certificate')
         .withEmpirical(epistemic.EmpiricalLevel.E3_Cryptographic)
@@ -212,11 +212,11 @@ describe('Cross-hApp Ecosystem Integration', () => {
       expect(aggregate).toBeGreaterThan(0.4);
       expect(aggregate).toBeLessThan(0.8);
 
-      // Step 2: User completes first course in EduNet
+      // Step 2: User completes first course in Praxis
       let eduRep = matl.createReputation(newUser);
       eduRep = matl.recordPositive(eduRep);
       eduRep = matl.recordPositive(eduRep);
-      localBridge.setReputation('edunet', newUser, eduRep);
+      localBridge.setReputation('praxis', newUser, eduRep);
 
       // Aggregate should increase
       const afterEdunet = localBridge.getAggregateReputation(newUser);
@@ -285,24 +285,24 @@ describe('Cross-hApp Ecosystem Integration', () => {
     it('should handle cross-hApp credential verification', () => {
       const credentialHash = 'credential-hash-abc123';
 
-      // Create verification request from EduNet
+      // Create verification request from Praxis
       const verifyRequest: bridge.CredentialVerificationMessage = {
         type: bridge.BridgeMessageType.CredentialVerification,
         timestamp: Date.now(),
-        sourceHapp: 'edunet',
+        sourceHapp: 'praxis',
         credentialHash,
-        issuerHapp: 'edunet',
+        issuerHapp: 'praxis',
       };
 
       expect(verifyRequest.type).toBe(bridge.BridgeMessageType.CredentialVerification);
-      expect(verifyRequest.issuerHapp).toBe('edunet');
+      expect(verifyRequest.issuerHapp).toBe('praxis');
     });
 
     it('should broadcast events to all registered hApps', () => {
       const receivedEvents: bridge.BroadcastEventMessage[] = [];
 
       // Register event handlers for each hApp to receive broadcasts
-      ['mail', 'edunet', 'supplychain'].forEach(happId => {
+      ['mail', 'praxis', 'supplychain'].forEach(happId => {
         localBridge.on(happId, bridge.BridgeMessageType.BroadcastEvent, (msg) => {
           receivedEvents.push(msg as bridge.BroadcastEventMessage);
         });

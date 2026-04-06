@@ -77,7 +77,7 @@ Created `apps/web/.env.local`:
 VITE_USE_REAL_CLIENT=true
 VITE_APP_WS_URL=ws://localhost:8888
 VITE_APP_ID=9999
-VITE_ROLE_NAME=edunet
+VITE_ROLE_NAME=praxis
 VITE_VERBOSE_LOGS=true
 VITE_AUTO_RECONNECT=true
 ```
@@ -172,7 +172,7 @@ Added complete TypeScript wrappers for all 4 differentiation zomes:
 
 📊 Step 6: Getting app info...
 ✅ App ID: 9999
-   Roles: edunet
+   Roles: praxis
 
 🔧 Step 7: Testing learning_coordinator.list_courses...
 ✅ list_courses returned 1 course(s)
@@ -235,9 +235,9 @@ Added complete TypeScript wrappers for all 4 differentiation zomes:
 
 ```bash
 # 1. Start conductor (if not already running)
-cd /srv/luminous-dynamics/mycelix-edunet
+cd /srv/luminous-dynamics/mycelix-praxis
 nix develop
-echo "" | hc sandbox --piped generate -a 9999 happ/mycelix-edunet.happ --run=8888
+echo "" | hc sandbox --piped generate -a 9999 happ/mycelix-praxis.happ --run=8888
 
 # 2. Get admin port from output (look for admin_port)
 

@@ -175,12 +175,12 @@ COLLECTIVE │  Worldviews, values          │  Infrastructure, networks  │
 
 | hApp | UL (I) | UR (It) | LL (We) | LR (Its) | Primary Focus |
 |------|--------|---------|---------|----------|---------------|
-| **EduNet** | ● | ★ | ● | ● | Learning outcomes |
+| **Praxis** | ● | ★ | ● | ● | Learning outcomes |
 | **Guild** | ● | ● | ★ | ● | Professional community |
 | **Hearth** | ★ | ○ | ★ | ○ | Cultural creation |
 | **Loom** | ★ | ○ | ● | ○ | Narrative meaning |
 
-**EduNet (UR Primary)**
+**Praxis (UR Primary)**
 - *It*: Learning outcomes, credential achievements, skill acquisition
 - *I*: Understanding, personal growth, knowledge integration
 - *We*: Learning communities, mentorship relationships

@@ -235,7 +235,7 @@ docs/tutorials/fl-protocol-deep-dive.md
 **Effort**: 1.5 hours
 
 Document public APIs:
-- Rust crate APIs (edunet-core, edunet-agg)
+- Rust crate APIs (praxis-core, praxis-agg)
 - Zome function signatures (with examples)
 - Web client API (MockHolochainClient)
 - Example usage for each function
@@ -343,7 +343,7 @@ docs/LAUNCH_CHECKLIST.md
 **Effort**: 1 hour
 
 Announcement blog post draft:
-- "Introducing Mycelix EduNet"
+- "Introducing Mycelix Praxis"
 - Problem statement
 - Solution overview
 - Key features
@@ -353,7 +353,7 @@ Announcement blog post draft:
 
 **Deliverables**:
 ```
-docs/blog/introducing-edunet.md
+docs/blog/introducing-praxis.md
 ```
 
 ### Task 6.2: Social Media Assets

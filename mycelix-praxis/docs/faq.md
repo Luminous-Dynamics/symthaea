@@ -1,6 +1,6 @@
 # Frequently Asked Questions (FAQ)
 
-Common questions about Mycelix EduNet, federated learning, and contributing.
+Common questions about Mycelix Praxis, federated learning, and contributing.
 
 ## Table of Contents
 
@@ -16,9 +16,9 @@ Common questions about Mycelix EduNet, federated learning, and contributing.
 
 ## General
 
-### What is EduNet?
+### What is Praxis?
 
-EduNet is a **decentralized education platform** that combines Holochain's agent-centric architecture with federated learning (FL) to enable privacy-preserving, personalized learning experiences. Think of it as:
+Praxis is a **decentralized education platform** that combines Holochain's agent-centric architecture with federated learning (FL) to enable privacy-preserving, personalized learning experiences. Think of it as:
 - **Wikipedia** (community-driven content) +
 - **Khan Academy** (personalized learning) +
 - **Blockchain** (verifiable credentials) −
@@ -32,7 +32,7 @@ Traditional online learning platforms have problems:
 3. **Privacy concerns**: Platforms profit from your learning behavior
 4. **Centralized control**: Platforms decide what you can learn
 
-EduNet solves this by:
+Praxis solves this by:
 - Keeping your data **on your device**
 - Using **W3C Verifiable Credentials** for portable achievements
 - Enabling **collaborative AI** without sharing raw data
@@ -115,9 +115,9 @@ For education, we need:
 
 Holochain enables all of this.
 
-### What's the difference between `edunet-core` and `edunet-agg`?
+### What's the difference between `praxis-core` and `praxis-agg`?
 
-**`edunet-core`** (`crates/edunet-core/`):
+**`praxis-core`** (`crates/praxis-core/`):
 - **Purpose**: Core types, crypto, provenance
 - **What it provides**:
   - Types: `RoundId`, `ModelId`, `PrivacyParams`
@@ -125,7 +125,7 @@ Holochain enables all of this.
   - Provenance: `ModelProvenance`, `ProvenanceChain`
 - **Used by**: All zomes, aggregation crate
 
-**`edunet-agg`** (`crates/edunet-agg/`):
+**`praxis-agg`** (`crates/praxis-agg/`):
 - **Purpose**: Robust aggregation algorithms for FL
 - **What it provides**:
   - Trimmed mean (default)
@@ -134,7 +134,7 @@ Holochain enables all of this.
   - L2 norm clipping
 - **Used by**: FL zome for gradient aggregation
 
-**Analogy**: `edunet-core` is the foundation, `edunet-agg` is a specialized tool built on it.
+**Analogy**: `praxis-core` is the foundation, `praxis-agg` is a specialized tool built on it.
 
 ### What are "zomes"?
 
@@ -145,7 +145,7 @@ Think of zomes as:
 - **Smart contracts** (but agent-centric, not blockchain)
 - **Modules** that define data types and validation rules
 
-EduNet has 4 zomes:
+Praxis has 4 zomes:
 1. **`learning_zome`**: Courses, progress, activities
 2. **`fl_zome`**: Federated learning rounds
 3. **`credential_zome`**: W3C Verifiable Credentials
@@ -159,7 +159,7 @@ Each zome:
 ### Where's the actual Holochain DNA?
 
 **Not implemented yet.** v0.1.0 focuses on:
-- ✅ Core Rust libraries (`edunet-core`, `edunet-agg`)
+- ✅ Core Rust libraries (`praxis-core`, `praxis-agg`)
 - ✅ Zome data structures (types, not HDK implementation)
 - ✅ Web client UI
 - ✅ Documentation and examples
@@ -262,7 +262,7 @@ See [Threat Model](threat-model.md) for full analysis.
 **Do NOT** open a public issue. Instead:
 
 1. Email **security@mycelix.org**
-2. Or use [GitHub Security Advisories](https://github.com/Luminous-Dynamics/mycelix-edunet/security/advisories)
+2. Or use [GitHub Security Advisories](https://github.com/Luminous-Dynamics/mycelix-praxis/security/advisories)
 
 We'll:
 - Acknowledge within 48 hours
@@ -327,13 +327,13 @@ This:
    - Good for heterogeneous data
    - Vulnerable to weight manipulation
 
-See `crates/edunet-agg/src/methods.rs` for implementations.
+See `crates/praxis-agg/src/methods.rs` for implementations.
 
 ### Can I add my own aggregation method?
 
 **Yes!** It's a great first contribution:
 
-1. Add function to `crates/edunet-agg/src/methods.rs`:
+1. Add function to `crates/praxis-agg/src/methods.rs`:
    ```rust
    pub fn my_method(updates: &[Vec<f32>]) -> Result<Vec<f32>> {
        // Your implementation
@@ -461,7 +461,7 @@ See [GOVERNANCE.md](../GOVERNANCE.md) for details.
 - ✅ Security audits
 - ✅ Unsafe code review
 
-See [good first issues](https://github.com/Luminous-Dynamics/mycelix-edunet/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22) to start!
+See [good first issues](https://github.com/Luminous-Dynamics/mycelix-praxis/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22) to start!
 
 ### How do I run the tests?
 
@@ -473,7 +473,7 @@ make test
 cargo test --workspace
 
 # Specific crate
-cargo test -p edunet-core
+cargo test -p praxis-core
 
 # Web only
 cd apps/web && npm test
@@ -544,7 +544,7 @@ See [examples/README.md](../examples/README.md) for guidelines.
 - Include license and copyright notice
 - State changes made
 
-**We'd love to hear about it!** Open a [Discussion](https://github.com/Luminous-Dynamics/mycelix-edunet/discussions) to share your project.
+**We'd love to hear about it!** Open a [Discussion](https://github.com/Luminous-Dynamics/mycelix-praxis/discussions) to share your project.
 
 ---
 
@@ -615,7 +615,7 @@ See [ROADMAP.md](../ROADMAP.md) for detailed timeline.
 
 ### Is there a business model?
 
-**EduNet core is free and open source** (always will be).
+**Praxis core is free and open source** (always will be).
 
 **Potential revenue streams** (future):
 - Premium course hosting
@@ -634,15 +634,15 @@ See [ROADMAP.md](../ROADMAP.md) for detailed timeline.
 - ✅ [Threat model](threat-model.md)
 - ⏳ Academic paper (planned for v1.0)
 
-**If you're interested in writing one**: Open a [Discussion](https://github.com/Luminous-Dynamics/mycelix-edunet/discussions)!
+**If you're interested in writing one**: Open a [Discussion](https://github.com/Luminous-Dynamics/mycelix-praxis/discussions)!
 
 ---
 
 ## Still have questions?
 
 - **Search**: Use GitHub search (often faster than asking)
-- **Discussions**: [GitHub Discussions](https://github.com/Luminous-Dynamics/mycelix-edunet/discussions)
-- **Issues**: [GitHub Issues](https://github.com/Luminous-Dynamics/mycelix-edunet/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/Luminous-Dynamics/mycelix-praxis/discussions)
+- **Issues**: [GitHub Issues](https://github.com/Luminous-Dynamics/mycelix-praxis/issues)
 - **Email**: info@mycelix.org (for press, partnerships, etc.)
 
 **Pro tip**: Before asking, check:

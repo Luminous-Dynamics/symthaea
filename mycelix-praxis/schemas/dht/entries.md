@@ -1,6 +1,6 @@
 # Holochain DHT Entry Definitions
 
-This document describes the entry types stored in the EduNet Holochain DHT.
+This document describes the entry types stored in the Praxis Holochain DHT.
 
 ## Entry Types Overview
 

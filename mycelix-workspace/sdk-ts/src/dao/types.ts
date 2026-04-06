@@ -336,7 +336,7 @@ export interface CrossHappReputation {
   agent: AgentPubKey;
   mail_reputation?: number;
   marketplace_reputation?: number;
-  edunet_reputation?: number;
+  praxis_reputation?: number;
   supplychain_reputation?: number;
   aggregate: number;
 }

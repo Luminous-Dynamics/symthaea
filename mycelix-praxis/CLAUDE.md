@@ -1,4 +1,4 @@
-# Mycelix EduNet - Claude Context
+# Mycelix Praxis - Claude Context
 
 **Version**: v0.2.0-dev (Holochain 0.6)
 **Status**: Phase 9 (Web Client Integration), 210 tests passing
@@ -15,9 +15,9 @@ cargo test --all                               # Run tests
 cargo build --target wasm32-unknown-unknown --release  # Build WASM
 
 # Package and run
-hc dna pack dna/ -o dna/edunet.dna
-hc app pack happ/ -o happ/mycelix-edunet.happ
-echo "" | hc sandbox --piped generate -a 9999 happ/mycelix-edunet.happ --run=8888
+hc dna pack dna/ -o dna/praxis.dna
+hc app pack happ/ -o happ/mycelix-praxis.happ
+echo "" | hc sandbox --piped generate -a 9999 happ/mycelix-praxis.happ --run=8888
 ```
 
 ---
@@ -25,9 +25,9 @@ echo "" | hc sandbox --piped generate -a 9999 happ/mycelix-edunet.happ --run=888
 ## Project Structure
 
 ```
-mycelix-edunet/
+mycelix-praxis/
 ├── crates/
-│   └── edunet-core/       # Core types, crypto, provenance
+│   └── praxis-core/       # Core types, crypto, provenance
 ├── zomes/
 │   ├── learning_zome/     # Courses, progress (31 tests)
 │   ├── fl_zome/           # Federated learning (27 tests)

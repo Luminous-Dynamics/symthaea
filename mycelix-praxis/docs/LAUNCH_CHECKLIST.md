@@ -1,6 +1,6 @@
 # Launch Checklist
 
-Pre-launch verification checklist for Mycelix EduNet before public release.
+Pre-launch verification checklist for Mycelix Praxis before public release.
 
 ---
 
