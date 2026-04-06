@@ -54,7 +54,7 @@ Alphabetical by cluster short name. Port = 81XX.
 | 8104 | mycelix-commons | commons.mycelix.net | Reserved |
 | 8105 | mycelix-core | — | Reserved |
 | 8106 | mycelix-desci | desci.mycelix.net | Reserved |
-| 8107 | **mycelix-edunet** | **edunet.luminousdynamics.io** | **LIVE** |
+| 8107 | **mycelix-praxis** | **praxis.mycelix.net** | **LIVE** |
 | 8108 | mycelix-energy | energy.mycelix.net | Reserved |
 | 8109 | mycelix-finance | finance.mycelix.net | Reserved |
 | 8110 | **mycelix-governance** (Civic UI) | **governance.luminousdynamics.io** | **Built** |
@@ -87,7 +87,7 @@ Admin on 82XX, App on 83XX. Last two digits match frontend port.
 
 | Admin | App | Cluster | Status |
 |-------|-----|---------|--------|
-| 8207 | 8307 | mycelix-edunet | Reserved (currently 8888/8889) |
+| 8207 | 8307 | mycelix-praxis | Reserved (currently 8888/8889) |
 | 8211 | 8311 | mycelix-health | Reserved |
 | 8212 | 8312 | mycelix-hearth | Reserved |
 | 8221 | 8321 | mycelix-music | Reserved |
