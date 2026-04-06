@@ -8,9 +8,8 @@ use leptos_router::{
 };
 
 use mycelix_leptos_core::{
-    holochain_provider::HolochainProviderAuto,
+    holochain_provider::{HolochainProviderAuto, HolochainProviderConfig, ConnectStrategy},
     connection_status::ConnectionStatusIndicator,
-    theme::provide_theme_context,
     consciousness::provide_consciousness_context,
     toasts::{provide_toast_context, ToastContainer},
     empty_state::EmptyState,
@@ -20,12 +19,16 @@ use crate::pages::*;
 
 #[component]
 pub fn App() -> impl IntoView {
+    let config = HolochainProviderConfig {
+        app_id: "mycelix-craft".to_string(),
+        default_role: Some("craft".to_string()),
+        log_prefix: "[Craft]",
+        connect_strategy: ConnectStrategy::JsStatusOnly,
+        status_labels: None,
+    };
+
     view! {
-        <HolochainProviderAuto
-            app_id="mycelix-craft"
-            role_name="craft"
-            ws_url="ws://localhost:8888"
-        >
+        <HolochainProviderAuto config=config>
             <AppInner />
         </HolochainProviderAuto>
     }
@@ -33,7 +36,6 @@ pub fn App() -> impl IntoView {
 
 #[component]
 fn AppInner() -> impl IntoView {
-    provide_theme_context("craft-theme", mycelix_leptos_core::theme::AppThemeVariant::Dark);
     provide_consciousness_context();
     provide_toast_context();
 
