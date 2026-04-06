@@ -41,7 +41,7 @@ pub struct MoralAlgebra {
     /// Optional learned moral prototype classifier (trained on Social Chemistry etc.)
     learned_classifier: Option<super::super::moral_prototypes::MoralPrototypeClassifier>,
 
-    /// Optional Spinozist classifier (72-77% on Social Chemistry with affect interpretability).
+    /// Optional Spinozist classifier (77.2% on Social Chemistry with 18D affect interpretability).
     /// Arc-wrapped: SpinozistClassifier contains ExemplarStore (5000 HVs), too expensive to clone.
     spinozist: Option<std::sync::Arc<super::super::spinozist_geometry::SpinozistClassifier>>,
 

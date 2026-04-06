@@ -1147,7 +1147,12 @@ impl CognitiveLoopService {
             ),
             ethics_engine: {
                 let engine_mp = MoralParser::new();
-                let engine_ma = MoralAlgebra::default_dim();
+                let mut engine_ma = MoralAlgebra::default_dim();
+                // Wire Spinozist as 5th ensemble signal (untrained at startup;
+                // train via train_hybrid() when training data becomes available)
+                engine_ma.set_spinozist(
+                    crate::hdc::spinozist_geometry::SpinozistClassifier::new(),
+                );
                 let engine_ve = if has_primitive_processor {
                     Some(
                         crate::consciousness::unified_value_evaluator::UnifiedValueEvaluator::new(),
