@@ -257,13 +257,39 @@ fn build_all_equations() -> Vec<PhysicsEquation> {
     // ── Phase 1B: Expand to 150 ──
     // Classical Mechanics
     eqs.push(simple_eq("Simple Harmonic Oscillator", PhysicsDomain::ClassicalMechanics, "x = A cos(ωt + φ)", DimensionalSignature::LENGTH));
-    eqs.push(simple_eq("Angular Momentum", PhysicsDomain::ClassicalMechanics, "L = Iω", DimensionalSignature::ACTION));
+    // Angular momentum: L = Iω — product structure (clusters with p=mv)
+    eqs.push(PhysicsEquation {
+        name: "Angular Momentum".to_string(),
+        domain: PhysicsDomain::ClassicalMechanics,
+        ast: make_equals(make_const("L"), make_product(vec![make_const("I"), make_const("ω")])),
+        symmetries: SymmetryDescriptor::from_lie_groups(vec![LieGroup::SO(3)], false),
+        dimensions: DimensionalSignature::ACTION,
+        tensor: None,
+    });
     eqs.push(simple_eq("Torque", PhysicsDomain::ClassicalMechanics, "τ = r × F", DimensionalSignature { mass: 1, length: 2, time: -2, current: 0, temperature: 0, amount: 0, luminous: 0 }));
     eqs.push(simple_eq("Work-Energy Theorem", PhysicsDomain::ClassicalMechanics, "W = ΔKE", DimensionalSignature::ENERGY));
     eqs.push(simple_eq("Moment of Inertia", PhysicsDomain::ClassicalMechanics, "I = Σ mᵢrᵢ²", DimensionalSignature { mass: 1, length: 2, time: 0, current: 0, temperature: 0, amount: 0, luminous: 0 }));
     // Electromagnetism
     eqs.push(simple_eq("Biot-Savart Law", PhysicsDomain::Electromagnetism, "dB = (μ₀/4π)(Idl × r̂)/r²", DimensionalSignature::MAGNETIC_FIELD));
-    eqs.push(simple_eq("Larmor Radiation Formula", PhysicsDomain::Electromagnetism, "P = q²a²/(6πε₀c³)", DimensionalSignature { mass: 1, length: 2, time: -3, current: 0, temperature: 0, amount: 0, luminous: 0 }));
+    // Larmor radiation: P = q²a²/(6πε₀c³) — power law in charge and acceleration
+    eqs.push(PhysicsEquation {
+        name: "Larmor Radiation Formula".to_string(),
+        domain: PhysicsDomain::Electromagnetism,
+        ast: make_equals(
+            make_const("P"),
+            make_product(vec![
+                EquationNode::Power { base: Box::new(make_const("q")), exponent: Box::new(EquationNode::Scalar(2.0)) },
+                EquationNode::Power { base: Box::new(make_const("a")), exponent: Box::new(EquationNode::Scalar(2.0)) },
+                EquationNode::Power {
+                    base: Box::new(make_product(vec![make_const("6πε₀"), EquationNode::Power { base: Box::new(make_const("c")), exponent: Box::new(EquationNode::Scalar(3.0)) }])),
+                    exponent: Box::new(EquationNode::Scalar(-1.0)),
+                },
+            ]),
+        ),
+        symmetries: SymmetryDescriptor::new(vec![LieGroup::U(1)], vec![], true),
+        dimensions: DimensionalSignature { mass: 1, length: 2, time: -3, current: 0, temperature: 0, amount: 0, luminous: 0 },
+        tensor: None,
+    });
     eqs.push(simple_eq("Poynting Vector", PhysicsDomain::Electromagnetism, "S = (1/μ₀)(E × B)", DimensionalSignature { mass: 1, length: 0, time: -3, current: 0, temperature: 0, amount: 0, luminous: 0 }));
     eqs.push(simple_eq("Magnetic Dipole Moment", PhysicsDomain::Electromagnetism, "m = NIA", DimensionalSignature { mass: 0, length: 2, time: 0, current: 1, temperature: 0, amount: 0, luminous: 0 }));
     // Thermodynamics
@@ -336,9 +362,31 @@ fn build_all_equations() -> Vec<PhysicsEquation> {
         dimensions: DimensionalSignature::DIMENSIONLESS,
         tensor: None,
     });
-    eqs.push(simple_eq("Nuclear Magnetic Resonance", PhysicsDomain::NuclearPhysics, "ω₀ = γB₀", DimensionalSignature { mass: 0, length: 0, time: -1, current: 0, temperature: 0, amount: 0, luminous: 0 }));
+    // NMR: ω₀ = γB₀ — linear proportionality (clusters with Larmor, cyclotron)
+    eqs.push(PhysicsEquation {
+        name: "Nuclear Magnetic Resonance".to_string(),
+        domain: PhysicsDomain::NuclearPhysics,
+        ast: make_equals(make_const("ω₀"), make_product(vec![make_const("γ"), make_const("B₀")])),
+        symmetries: SymmetryDescriptor::none(),
+        dimensions: DimensionalSignature { mass: 0, length: 0, time: -1, current: 0, temperature: 0, amount: 0, luminous: 0 },
+        tensor: None,
+    });
     // Fluid Dynamics
-    eqs.push(simple_eq("Reynolds Number", PhysicsDomain::FluidDynamics, "Re = ρvL/μ", DimensionalSignature::DIMENSIONLESS));
+    // Reynolds: Re = ρvL/μ — dimensionless ratio (clusters with Mach, fissility)
+    eqs.push(PhysicsEquation {
+        name: "Reynolds Number".to_string(),
+        domain: PhysicsDomain::FluidDynamics,
+        ast: make_equals(
+            make_const("Re"),
+            make_product(vec![
+                make_const("ρ"), make_const("v"), make_const("L"),
+                EquationNode::Power { base: Box::new(make_const("μ")), exponent: Box::new(EquationNode::Scalar(-1.0)) },
+            ]),
+        ),
+        symmetries: SymmetryDescriptor::none(),
+        dimensions: DimensionalSignature::DIMENSIONLESS,
+        tensor: None,
+    });
     // Stokes drag: F = 6πμRv — linear force (clusters with Hooke, Ohm)
     eqs.push(PhysicsEquation {
         name: "Stokes Drag".to_string(),
@@ -373,7 +421,18 @@ fn build_all_equations() -> Vec<PhysicsEquation> {
     });
     // Optics
     eqs.push(simple_eq("Brewster Angle", PhysicsDomain::Optics, "tan(θ_B) = n₂/n₁", DimensionalSignature::DIMENSIONLESS));
-    eqs.push(simple_eq("Diffraction Grating", PhysicsDomain::Optics, "d sin(θ) = mλ", DimensionalSignature::LENGTH));
+    // Diffraction grating: d sin(θ) = mλ — product (clusters with Bragg, Snell)
+    eqs.push(PhysicsEquation {
+        name: "Diffraction Grating".to_string(),
+        domain: PhysicsDomain::Optics,
+        ast: make_equals(
+            make_product(vec![make_const("d"), make_const("sin(θ)")]),
+            make_product(vec![make_const("m"), make_const("λ")]),
+        ),
+        symmetries: SymmetryDescriptor::new(vec![], vec![DiscreteSymmetry::T], false),
+        dimensions: DimensionalSignature::LENGTH,
+        tensor: None,
+    });
     eqs.push(simple_eq("Abbe Diffraction Limit", PhysicsDomain::Optics, "d = λ/(2n sin α)", DimensionalSignature::LENGTH));
     // Cosmology
     eqs.push(simple_eq("Hubble Parameter Evolution", PhysicsDomain::Cosmology, "H² = H₀²[Ω_r/a⁴ + Ω_m/a³ + Ω_k/a² + Ω_Λ]", DimensionalSignature { mass: 0, length: 0, time: -2, current: 0, temperature: 0, amount: 0, luminous: 0 }));
