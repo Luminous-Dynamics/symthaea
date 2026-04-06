@@ -299,6 +299,15 @@ pub const PRAXIS_LOCAL_ZOMES: &[&str] = &[
     "praxis_bridge",
 ];
 
+/// Zomes allowed for local dispatch within the Craft cluster.
+pub const CRAFT_LOCAL_ZOMES: &[&str] = &[
+    "craft_graph",
+    "job_postings_coordinator",
+    "work_history_coordinator",
+    "connection_graph_coordinator",
+    "applications_coordinator",
+];
+
 /// Zomes allowed for local dispatch within the Legacy cluster.
 pub const LEGACY_LOCAL_ZOMES: &[&str] = &[
     "legacy_testament",
@@ -711,6 +720,20 @@ const PRAXIS_TO_FINANCE: &[&str] = &["finance_bridge", "tend"];
 /// Praxis-side zomes that finance-bridge is allowed to call cross-cluster (payment confirmations).
 const FINANCE_TO_PRAXIS: &[&str] = &["praxis_bridge"];
 
+// --- Craft cluster routes ---
+
+/// Craft-side zomes that praxis-bridge is allowed to call cross-cluster.
+const PRAXIS_TO_CRAFT: &[&str] = &["craft_graph"];
+
+/// Praxis-side zomes that craft can call cross-cluster (credential verification).
+const CRAFT_TO_PRAXIS: &[&str] = &["praxis_bridge", "credential_coordinator"];
+
+/// Identity-side zomes that craft can call cross-cluster.
+const CRAFT_TO_IDENTITY: &[&str] = &["identity_bridge", "verifiable_credential", "did_registry"];
+
+/// Craft-side zomes that identity can call cross-cluster.
+const IDENTITY_TO_CRAFT: &[&str] = &["craft_graph"];
+
 /// Finance-side zomes that cafe-bridge is allowed to call cross-cluster.
 const CAFE_TO_FINANCE: &[&str] = &["finance_bridge", "payments", "tend", "price_oracle"];
 
@@ -821,6 +844,16 @@ pub const fn get_allowed_zomes(initiator: CrossClusterRole, target: CrossCluster
         // Inbound to Praxis
         (CrossClusterRole::Finance, CrossClusterRole::Praxis) => FINANCE_TO_PRAXIS,
 
+        // Craft outbound
+        (CrossClusterRole::Craft, CrossClusterRole::Praxis) => CRAFT_TO_PRAXIS,
+        (CrossClusterRole::Craft, CrossClusterRole::Identity) => CRAFT_TO_IDENTITY,
+
+        // Praxis <-> Craft
+        (CrossClusterRole::Praxis, CrossClusterRole::Craft) => PRAXIS_TO_CRAFT,
+
+        // Inbound to Craft
+        (CrossClusterRole::Identity, CrossClusterRole::Craft) => IDENTITY_TO_CRAFT,
+
         // Cafe outbound
         (CrossClusterRole::Cafe, CrossClusterRole::Finance) => CAFE_TO_FINANCE,
         (CrossClusterRole::Cafe, CrossClusterRole::Identity) => CAFE_TO_IDENTITY,
@@ -893,6 +926,7 @@ pub const fn get_local_zomes(cluster: CrossClusterRole) -> Option<&'static [&'st
         CrossClusterRole::Energy => Some(ENERGY_LOCAL_ZOMES),
         CrossClusterRole::Knowledge => Some(KNOWLEDGE_LOCAL_ZOMES),
         CrossClusterRole::Climate => Some(CLIMATE_LOCAL_ZOMES),
+        CrossClusterRole::Craft => Some(CRAFT_LOCAL_ZOMES),
         CrossClusterRole::Manufacturing => Some(MANUFACTURING_LOCAL_ZOMES),
         CrossClusterRole::Supplychain => Some(SUPPLYCHAIN_LOCAL_ZOMES),
         CrossClusterRole::Praxis => Some(PRAXIS_LOCAL_ZOMES),
@@ -1219,6 +1253,7 @@ mod tests {
             ("ENERGY_LOCAL_ZOMES", ENERGY_LOCAL_ZOMES),
             ("KNOWLEDGE_LOCAL_ZOMES", KNOWLEDGE_LOCAL_ZOMES),
             ("CLIMATE_LOCAL_ZOMES", CLIMATE_LOCAL_ZOMES),
+            ("CRAFT_LOCAL_ZOMES", CRAFT_LOCAL_ZOMES),
             ("MANUFACTURING_LOCAL_ZOMES", MANUFACTURING_LOCAL_ZOMES),
             ("SUPPLYCHAIN_LOCAL_ZOMES", SUPPLYCHAIN_LOCAL_ZOMES),
             ("PRAXIS_LOCAL_ZOMES", PRAXIS_LOCAL_ZOMES),
@@ -1268,6 +1303,10 @@ mod tests {
             ("HEALTH_TO_PERSONAL", HEALTH_TO_PERSONAL),
             ("HEALTH_TO_IDENTITY", HEALTH_TO_IDENTITY),
             ("PRAXIS_TO_IDENTITY", PRAXIS_TO_IDENTITY),
+            ("PRAXIS_TO_CRAFT", PRAXIS_TO_CRAFT),
+            ("CRAFT_TO_PRAXIS", CRAFT_TO_PRAXIS),
+            ("CRAFT_TO_IDENTITY", CRAFT_TO_IDENTITY),
+            ("IDENTITY_TO_CRAFT", IDENTITY_TO_CRAFT),
             ("CAFE_LOCAL_ZOMES", CAFE_LOCAL_ZOMES),
             ("CAFE_TO_FINANCE", CAFE_TO_FINANCE),
             ("CAFE_TO_IDENTITY", CAFE_TO_IDENTITY),
@@ -1333,6 +1372,7 @@ mod tests {
         assert_eq!(get_local_zomes(CrossClusterRole::Energy).unwrap().len(), 5);
         assert_eq!(get_local_zomes(CrossClusterRole::Knowledge).unwrap().len(), 8);
         assert_eq!(get_local_zomes(CrossClusterRole::Climate).unwrap().len(), 3);
+        assert_eq!(get_local_zomes(CrossClusterRole::Craft).unwrap().len(), 5);
         assert_eq!(get_local_zomes(CrossClusterRole::Manufacturing).unwrap().len(), 6);
         assert_eq!(get_local_zomes(CrossClusterRole::Supplychain).unwrap().len(), 8);
         assert_eq!(get_local_zomes(CrossClusterRole::Praxis).unwrap().len(), 12);
@@ -1511,10 +1551,11 @@ mod tests {
                 }
             }
         }
-        // 45 registered directional routes:
+        // 51 registered directional routes:
         //   36 original + 4 Cafe + 5 new (Mail→Identity, Marketplace→Finance,
         //   Space→Identity, Attribution→Identity, Attribution→Finance)
         //   + 2 additional routes added for Health↔Identity and Praxis
-        assert_eq!(count, 47, "Expected 47 registered cross-cluster routes");
+        //   + 4 Craft routes (Craft↔Praxis, Craft→Identity, Identity→Craft)
+        assert_eq!(count, 51, "Expected 51 registered cross-cluster routes");
     }
 }

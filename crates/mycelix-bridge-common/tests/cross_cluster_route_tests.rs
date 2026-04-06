@@ -697,29 +697,29 @@ fn health_to_identity_has_2_zomes() {
     assert_eq!(zomes.len(), 2);
 }
 
-// --- Edunet → Identity (2 zomes) ---
+// --- Praxis → Identity (2 zomes) ---
 
 #[test]
-fn edunet_to_identity_allows_identity_bridge() {
+fn praxis_to_identity_allows_identity_bridge() {
     assert!(is_allowed(
-        CrossClusterRole::Edunet,
+        CrossClusterRole::Praxis,
         CrossClusterRole::Identity,
         "identity_bridge"
     ));
 }
 
 #[test]
-fn edunet_to_identity_allows_verifiable_credential() {
+fn praxis_to_identity_allows_verifiable_credential() {
     assert!(is_allowed(
-        CrossClusterRole::Edunet,
+        CrossClusterRole::Praxis,
         CrossClusterRole::Identity,
         "verifiable_credential"
     ));
 }
 
 #[test]
-fn edunet_to_identity_has_2_zomes() {
-    let zomes = get_allowed_zomes(CrossClusterRole::Edunet, CrossClusterRole::Identity);
+fn praxis_to_identity_has_2_zomes() {
+    let zomes = get_allowed_zomes(CrossClusterRole::Praxis, CrossClusterRole::Identity);
     assert_eq!(zomes.len(), 2);
 }
 
@@ -742,8 +742,8 @@ fn total_registered_routes_is_36() {
         }
     }
     assert_eq!(
-        count, 45,
-        "Expected 45 registered routes, found {count}"
+        count, 51,
+        "Expected 51 registered routes, found {count}"
     );
 }
 
@@ -765,13 +765,13 @@ fn every_route_has_at_least_one_zome() {
     }
 }
 
-/// CrossClusterRole::ALL has exactly 29 variants.
+/// CrossClusterRole::ALL has exactly 30 variants (added Craft).
 #[test]
-fn cross_cluster_role_has_29_variants() {
+fn cross_cluster_role_has_30_variants() {
     assert_eq!(
         CrossClusterRole::ALL.len(),
-        29,
-        "Expected 29 CrossClusterRole variants, found {}",
+        30,
+        "Expected 30 CrossClusterRole variants, found {}",
         CrossClusterRole::ALL.len()
     );
 }
@@ -886,12 +886,10 @@ fn legacy_to_energy_not_registered() {
 }
 
 #[test]
-fn edunet_to_finance_not_registered() {
-    let zomes = get_allowed_zomes(CrossClusterRole::Edunet, CrossClusterRole::Finance);
-    assert!(
-        zomes.is_empty(),
-        "Edunet -> Finance should not have a route"
-    );
+fn praxis_to_finance_allows_tend() {
+    let zomes = get_allowed_zomes(CrossClusterRole::Praxis, CrossClusterRole::Finance);
+    assert_eq!(zomes.len(), 2, "Praxis -> Finance should have 2 zomes (finance_bridge, tend)");
+    assert!(zomes.contains(&"tend"), "Praxis -> Finance should allow TEND learning credits");
 }
 
 #[test]
@@ -939,10 +937,10 @@ fn health_to_personal_blocks_credential_wallet() {
 }
 
 #[test]
-fn edunet_to_identity_blocks_mfa() {
-    // Edunet can reach identity_bridge + verifiable_credential, but NOT mfa.
+fn praxis_to_identity_blocks_mfa() {
+    // Praxis can reach identity_bridge + verifiable_credential, but NOT mfa.
     assert!(!is_allowed(
-        CrossClusterRole::Edunet,
+        CrossClusterRole::Praxis,
         CrossClusterRole::Identity,
         "mfa"
     ));
