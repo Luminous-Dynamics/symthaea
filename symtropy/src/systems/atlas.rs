@@ -1214,11 +1214,14 @@ pub fn draw_arcs_system(
         }
     }
 
-    // ═══ SHIPPING LANES ═════════════════════════════════════════════
-    // Global maritime trade routes — blue, very faint background layer
+    // ═══ SHIPPING LANES (Infrastructure view only) ════════════════
     let lanes = sol_atlas_bevy::data::load_shipping_lanes();
-    let lane_color = Color::linear_rgba(0.2, 0.35, 0.65, 0.15); // brighter — maritime arteries
+    let lane_color = Color::linear_rgba(0.15, 0.3, 0.55, 0.10);
+    let show_lanes = atlas_data.as_ref().map(|_| true).unwrap_or(false); // placeholder — need view resource
+    // TODO: gate on DataView::Infrastructure when accessible from draw_arcs_system
+    let _ = show_lanes;
     for route in &lanes {
+        break; // disabled by default — too noisy. Enable in Infrastructure view.
         for w in route.windows(2) {
             let a = geo::lat_lon_to_xyz(w[0][1], w[0][0], 1.04);
             let b = geo::lat_lon_to_xyz(w[1][1], w[1][0], 1.04);
