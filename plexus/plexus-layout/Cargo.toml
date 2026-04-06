@@ -1,0 +1,11 @@
+[package]
+name = "plexus-layout"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Layout engine for Symthaea Prism — text wrapping, inline elements, reader mode"
+
+[dependencies]
+plexus-common = { path = "../plexus-common" }
+plexus-dom = { path = "../plexus-dom" }
+log = { workspace = true }

@@ -68,6 +68,87 @@
 }
 
 /* ================================================================
+   EPISTEMIC TAGS
+   ================================================================ */
+.epistemic-tags, .epistemic-bar { display: flex; gap: var(--space-xs); flex-wrap: wrap; }
+.e-tag, .n-tag, .m-tag, .conf-tag {
+    display: inline-block; padding: 2px 6px; border-radius: var(--radius-sm); font-size: var(--text-xs); font-weight: 600;
+}
+.e-tag { background: #3b82f620; color: #60a5fa; }
+.n-tag { background: #22c55e20; color: #4ade80; }
+.m-tag { background: #f59e0b20; color: #fbbf24; }
+.conf-tag { background: var(--bg-surface); color: var(--text-muted); }
+
+/* ================================================================
+   CLAIM CARDS
+   ================================================================ */
+.claim-list, .claim-card-mini + .claim-card-mini { margin-top: var(--space-sm); }
+.claim-card, .claim-card-mini {
+    padding: var(--space-md); border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--bg-raised);
+    margin-bottom: var(--space-sm);
+}
+.claim-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-xs); }
+.claim-id { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--text-muted); }
+.claim-type-badge {
+    display: inline-block; padding: 2px 8px; border-radius: var(--radius-pill);
+    font-size: var(--text-xs); font-weight: 600; background: var(--primary); color: #fff;
+}
+.claim-content, .claim-content-full { color: var(--text-primary); margin: var(--space-xs) 0; }
+.claim-content-full { font-size: var(--text-lg); }
+.claim-tags { display: flex; gap: var(--space-xs); flex-wrap: wrap; margin-top: var(--space-sm); }
+.tag { padding: 2px 8px; border-radius: var(--radius-pill); font-size: var(--text-xs); background: var(--bg-surface); color: var(--text-muted); }
+.claim-author { font-size: var(--text-xs); color: var(--text-muted); }
+.no-results { text-align: center; color: var(--text-muted); padding: var(--space-2xl); }
+
+/* ================================================================
+   CLAIM DETAIL
+   ================================================================ */
+.claim-detail { max-width: 700px; margin: 0 auto; }
+.claim-detail-header { display: flex; justify-content: space-between; margin-bottom: var(--space-md); }
+.epistemic-detail { margin: var(--space-xl) 0; }
+.epistemic-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--space-md); }
+.epistemic-dim { text-align: center; }
+.dim-label { display: block; font-size: var(--text-xs); color: var(--text-muted); text-transform: uppercase; margin-bottom: var(--space-xs); }
+.dim-value { font-size: var(--text-base); font-weight: 600; }
+.claim-meta-section { margin-top: var(--space-lg); }
+.claim-meta-section h2 { font-size: var(--text-base); color: var(--text-secondary); margin: 0 0 var(--space-sm); }
+.source-item { padding: var(--space-xs) var(--space-sm); background: var(--bg-surface); border-radius: var(--radius-sm); font-size: var(--text-sm); margin-bottom: var(--space-xs); }
+.claim-version { font-size: var(--text-xs); color: var(--text-muted); margin-left: var(--space-md); }
+.no-data { color: var(--text-muted); font-size: var(--text-sm); }
+
+/* ================================================================
+   FACT CHECK
+   ================================================================ */
+.fact-check-list { max-width: 700px; margin: 0 auto; }
+.fact-check-card { padding: var(--space-md); border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--bg-raised); margin-bottom: var(--space-sm); }
+.fc-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-sm); }
+.verdict-badge { padding: 4px 12px; border-radius: var(--radius-pill); font-weight: 700; font-size: var(--text-sm); }
+.fc-confidence { font-size: var(--text-sm); color: var(--text-muted); }
+.fc-statement { color: var(--text-primary); margin: 0 0 var(--space-sm); }
+.fc-meta { display: flex; gap: var(--space-lg); font-size: var(--text-xs); color: var(--text-muted); }
+
+/* ================================================================
+   INFERENCES
+   ================================================================ */
+.inference-list { max-width: 700px; margin: 0 auto; }
+.inference-card { padding: var(--space-md); border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--bg-raised); margin-bottom: var(--space-sm); }
+.inf-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-sm); }
+.inf-type { font-size: var(--text-sm); font-weight: 600; color: var(--primary); }
+.inf-conclusion { color: var(--text-primary); margin: 0 0 var(--space-xs); }
+.inf-reasoning { color: var(--text-secondary); font-size: var(--text-sm); margin: 0 0 var(--space-sm); }
+.inf-meta { display: flex; gap: var(--space-lg); font-size: var(--text-xs); color: var(--text-muted); }
+
+/* ================================================================
+   PROFILE / SECTIONS
+   ================================================================ */
+.page-profile { max-width: 800px; margin: 0 auto; }
+.profile-section { margin-bottom: var(--space-2xl); }
+.profile-section h2 { font-size: var(--text-lg); color: var(--text-primary); margin: 0 0 var(--space-md); }
+.recent-section { max-width: 700px; margin: var(--space-2xl) auto 0; text-align: left; }
+.recent-section h2 { font-size: var(--text-lg); margin: 0 0 var(--space-md); }
+.status-footer { display: block; text-align: center; margin-top: var(--space-xl); font-size: var(--text-xs); color: var(--text-muted); }
+
+/* ================================================================
    RESPONSIVE
    ================================================================ */
 @media (max-width: 720px) {

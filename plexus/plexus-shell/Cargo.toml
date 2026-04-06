@@ -1,0 +1,25 @@
+[package]
+name = "plexus-shell"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Symthaea Prism — main executable with GPU rendering, navigation, and search"
+
+[dependencies]
+plexus-common = { path = "../plexus-common" }
+plexus-dom = { path = "../plexus-dom" }
+plexus-layout = { path = "../plexus-layout" }
+plexus-net = { path = "../plexus-net" }
+plexus-reflex = { path = "../plexus-reflex" }
+plexus-bridge = { path = "../plexus-bridge" }
+plexus-privacy = { path = "../plexus-privacy" }
+plexus-search = { path = "../plexus-search" }
+vello = { workspace = true }
+winit = { workspace = true }
+pollster = "0.4"
+tokio = { workspace = true }
+url = { workspace = true }
+log = { workspace = true }
+env_logger = { workspace = true }
+anyhow = "1"
+skrifa = { workspace = true }

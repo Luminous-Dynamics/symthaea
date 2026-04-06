@@ -1,0 +1,41 @@
+[package]
+name = "plexus-ui"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Symthaea Prism — Leptos 0.8 CSR frontend with epistemic search"
+
+[dependencies]
+# Prism engine crates
+plexus-common = { path = "../plexus-common" }
+plexus-dom = { path = "../plexus-dom" }
+plexus-reflex = { path = "../plexus-reflex" }
+plexus-privacy = { path = "../plexus-privacy" }
+plexus-search = { path = "../plexus-search" }
+plexus-ingest = { path = "../plexus-ingest" }
+
+# Leptos
+leptos = { workspace = true }
+
+# HTML sanitization
+ammonia = { workspace = true }
+
+# WASM
+wasm-bindgen = { workspace = true }
+wasm-bindgen-futures = { workspace = true }
+web-sys = { workspace = true, features = [
+    "Window", "Document", "Element", "HtmlElement", "CssStyleDeclaration",
+    "HtmlInputElement", "Event",
+    "KeyboardEvent", "MouseEvent", "FocusEvent",
+    "Storage",
+] }
+gloo-net = { workspace = true }
+gloo-timers = { workspace = true }
+
+# Utilities
+serde = { workspace = true }
+serde_json = { workspace = true }
+url = { workspace = true }
+log = { workspace = true }
+console_log = { workspace = true }
+console_error_panic_hook = { workspace = true }

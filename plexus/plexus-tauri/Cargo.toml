@@ -1,0 +1,32 @@
+[package]
+name = "plexus-tauri"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Symthaea Prism — Tauri v2 desktop app (The Local Hub)"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["devtools"] }
+tauri-plugin-shell = "2"
+
+# Prism engine crates (fetch URLs directly — no CORS proxy needed)
+plexus-common = { path = "../plexus-common" }
+plexus-dom = { path = "../plexus-dom" }
+plexus-reflex = { path = "../plexus-reflex" }
+plexus-privacy = { path = "../plexus-privacy" }
+plexus-search = { path = "../plexus-search" }
+plexus-ingest = { path = "../plexus-ingest" }
+
+# Direct HTTP fetch (no CORS restrictions in native)
+reqwest = { workspace = true }
+tokio = { workspace = true }
+
+serde = { workspace = true }
+serde_json = { workspace = true }
+url = { workspace = true }
+log = { workspace = true }
+env_logger = { workspace = true }
+ammonia = { workspace = true }

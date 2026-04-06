@@ -1,0 +1,13 @@
+[package]
+name = "plexus-serve"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Static file server for Symthaea Prism (production deployment)"
+
+[dependencies]
+axum = "0.8"
+tower-http = { version = "0.6", features = ["fs", "compression-gzip", "set-header"] }
+tokio = { workspace = true }
+log = { workspace = true }
+env_logger = { workspace = true }

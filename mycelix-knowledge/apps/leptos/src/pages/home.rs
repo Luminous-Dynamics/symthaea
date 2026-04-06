@@ -4,46 +4,64 @@
 use leptos::prelude::*;
 use mycelix_leptos_core::ConnectionStatus;
 use mycelix_leptos_core::holochain_provider;
-use mycelix_leptos_core::consciousness::use_consciousness;
 use crate::context::use_knowledge_context;
 
 #[component]
 pub fn HomePage() -> impl IntoView {
     let hc = holochain_provider::use_holochain();
-    let consciousness = use_consciousness();
     let ctx = use_knowledge_context();
 
     view! {
         <div class="page-home">
-            <h1>"Knowledge"</h1>
-            <p class="subtitle">"Welcome to the Knowledge cluster."</p>
+            <h1>"Knowledge Graph"</h1>
+            <p class="subtitle">"Epistemic commons \u{2014} claims, evidence, and truth."</p>
 
             <div class="dashboard-grid">
                 <div class="dash-card">
-                    <span class="dash-label">"Status"</span>
-                    <span class="dash-value">
-                        {move || match hc.status.get() {
-                            ConnectionStatus::Connected => "Connected",
-                            ConnectionStatus::Mock => "Mock mode",
-                            ConnectionStatus::Connecting => "Connecting...",
-                            ConnectionStatus::Disconnected => "Disconnected",
-                        }}
-                    </span>
+                    <span class="dash-label">"Claims"</span>
+                    <span class="dash-value">{move || ctx.claims.get().len().to_string()}</span>
                 </div>
                 <div class="dash-card">
-                    <span class="dash-label">"Tier"</span>
-                    <span class="dash-value">
-                        {move || consciousness.tier.get().label()}
-                    </span>
+                    <span class="dash-label">"Relationships"</span>
+                    <span class="dash-value">{move || ctx.graph_stats.get().relationship_count.to_string()}</span>
                 </div>
                 <div class="dash-card">
-                    <span class="dash-label">"Items"</span>
-                    <span class="dash-value">
-                        {move || ctx.items.get().len().to_string()}
-                    </span>
-                    <span class="dash-sub">"mock data"</span>
+                    <span class="dash-label">"Fact Checks"</span>
+                    <span class="dash-value">{move || ctx.fact_checks.get().len().to_string()}</span>
+                </div>
+                <div class="dash-card">
+                    <span class="dash-label">"Inferences"</span>
+                    <span class="dash-value">{move || ctx.inferences.get().len().to_string()}</span>
                 </div>
             </div>
+
+            <div class="recent-section">
+                <h2>"Recent Claims"</h2>
+                {move || ctx.claims.get().iter().take(3).map(|c| {
+                    let content = c.content.clone();
+                    let e = c.classification.empirical.label();
+                    let n = c.classification.normative.label();
+                    let m = c.classification.materiality.label();
+                    let ct = c.claim_type.label();
+                    view! {
+                        <div class="claim-card-mini">
+                            <span class="claim-type-badge">{ct}</span>
+                            <p class="claim-content">{content}</p>
+                            <div class="epistemic-tags">
+                                <span class="e-tag">{format!("E: {e}")}</span>
+                                <span class="n-tag">{format!("N: {n}")}</span>
+                                <span class="m-tag">{format!("M: {m}")}</span>
+                            </div>
+                        </div>
+                    }
+                }).collect_view()}
+            </div>
+
+            <span class="status-footer">{move || match hc.status.get() {
+                ConnectionStatus::Mock => "Mock mode",
+                ConnectionStatus::Connected => "Connected",
+                _ => "",
+            }}</span>
         </div>
     }
 }

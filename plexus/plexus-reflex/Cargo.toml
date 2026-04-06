@@ -1,0 +1,14 @@
+[package]
+name = "plexus-reflex"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "In-process reflex arc immune system for Symthaea Prism"
+
+[dependencies]
+plexus-common = { path = "../plexus-common" }
+plexus-dom = { path = "../plexus-dom" }
+aho-corasick = { workspace = true }
+url = { workspace = true }
+log = { workspace = true }
+serde = { workspace = true }

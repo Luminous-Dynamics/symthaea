@@ -83,7 +83,10 @@ fn AppInner() -> impl IntoView {
 
     let nav_links = vec![
         NavLink { href: "/", label: "Home", icon: None },
-        // Add your cluster-specific nav links here
+        NavLink { href: "/browse", label: "Claims", icon: Some("📋") },
+        NavLink { href: "/fact-check", label: "Fact Check", icon: Some("✓") },
+        NavLink { href: "/inferences", label: "Inferences", icon: Some("🔗") },
+        NavLink { href: "/profile", label: "Profile", icon: Some("👤") },
     ];
 
     view! {
@@ -97,6 +100,11 @@ fn AppInner() -> impl IntoView {
                     <EmptyState icon="?" title="Page not found" />
                 }>
                     <Route path=path!("/") view=pages::HomePage />
+                    <Route path=path!("/browse") view=pages::BrowsePage />
+                    <Route path=path!("/claim/:id") view=pages::ClaimDetailPage />
+                    <Route path=path!("/fact-check") view=pages::FactCheckPage />
+                    <Route path=path!("/inferences") view=pages::InferencesPage />
+                    <Route path=path!("/profile") view=pages::ProfilePage />
                 </Routes>
             </AppShell>
             <ToastContainer />
