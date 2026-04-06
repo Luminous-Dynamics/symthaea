@@ -126,6 +126,7 @@ impl VoiceSynthesisChannel {
                 thought_vector: Vec::new(),
                 wisdom_hv: symthaea_core::hdc::BinaryHV::zero(),
                 language_output: None,
+                language_source: None,
                 #[cfg(feature = "canvas")]
                 canvas_svg: None,
                 #[cfg(feature = "identity")]

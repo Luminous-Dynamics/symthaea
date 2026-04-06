@@ -28,6 +28,9 @@ pub struct LanguageAndCommunicationManager {
     /// Always present (unconditional) — populated by full Broca or BrocaLite fallback.
     pub last_broca_text: Option<String>,
 
+    /// Source tier that produced `last_broca_text`: "broca_lite", "broca", or "llm".
+    pub last_language_source: Option<String>,
+
     /// User state inference for adaptive response generation.
     pub user_state: Option<crate::user_state_inference::UserStateInference>,
     /// Code channels injected by CodingAgent for Broca's CodeGate.
@@ -52,5 +55,6 @@ impl LanguageAndCommunicationManager {
         }
         // Clear pending text (Broca manager preserves learned weights).
         self.last_broca_text = None;
+        self.last_language_source = None;
     }
 }

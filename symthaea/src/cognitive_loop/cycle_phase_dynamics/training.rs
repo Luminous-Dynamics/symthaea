@@ -304,6 +304,7 @@ impl CognitiveLoopService {
             };
             if let Some(result) = self.language_comm.broca_lite.generate_from_signals_with_input(&signals, Some(input)) {
                 self.language_comm.last_broca_text = Some(result.text.clone());
+                self.language_comm.last_language_source = Some("broca_lite".into());
 
                 // Also send to LLM channel for higher-quality async translation.
                 // LLM response will be available in a future cycle via drain.
@@ -322,8 +323,9 @@ impl CognitiveLoopService {
         if let Some(ref llm) = self.llm_language {
             for response in llm.drain_responses() {
                 if response.from_llm && !response.text.is_empty() {
-                    // LLM response ready — use it as the language output for this cycle
+                    // LLM response ready — upgrade language output
                     self.language_comm.last_broca_text = Some(response.text);
+                    self.language_comm.last_language_source = Some("llm".into());
                 }
             }
         }
@@ -810,6 +812,7 @@ impl CognitiveLoopService {
                     #[cfg(not(feature = "therapeutic"))]
                     let text = std::mem::take(&mut result.text);
                     self.language_comm.last_broca_text = Some(text);
+                    self.language_comm.last_language_source = Some("broca".into());
                 }
 
                 // ── Factcheck bridge: extract claims from Broca output ──

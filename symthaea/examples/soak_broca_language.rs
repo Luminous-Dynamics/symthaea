@@ -126,16 +126,9 @@ fn main() {
 
             // Print first 10 outputs and then every 50th
             if language_count <= 10 || i % 50 == 0 {
-                let source = if text.contains("phi reads")
-                    || text.contains("coherence at")
-                    || text.contains("prediction error")
-                {
-                    "BrocaLite"
-                } else {
-                    "LLM"
-                };
+                let source = result.language_source.as_deref().unwrap_or("unknown");
                 println!(
-                    "  [Cycle {:>4}] ({source:>9}) \"{:.80}{}\"",
+                    "  [Cycle {:>4}] ({source:>10}) \"{:.80}{}\"",
                     i,
                     text,
                     if text.len() > 80 { "…" } else { "" }
@@ -143,27 +136,10 @@ fn main() {
             }
         }
 
-        // Count LLM upgrades: training.rs drains and applies them internally,
-        // so we detect by checking metadata rather than draining ourselves.
-        // The language_output text is already upgraded if an LLM response was ready.
+        // Count LLM upgrades via the language_source field
         if enable_llm {
-            if let Some(ref text) = result.language_output {
-                // LLM-generated text tends to be longer and lack metric keywords
-                let is_broca_lite = text.contains("phi reads")
-                    || text.contains("coherence at")
-                    || text.contains("prediction error")
-                    || text.contains("harmony alignment")
-                    || text.contains("awareness depth")
-                    || text.contains("integration level");
-                if !is_broca_lite && text.len() > 20 {
-                    // Could be LLM or structured grammar — check for LLM-typical patterns
-                    // (proper sentences, pronouns, conjunctions)
-                    let has_pronoun = text.contains(" I ") || text.starts_with("I ");
-                    let has_period = text.contains(". ");
-                    if has_pronoun || has_period {
-                        llm_upgrade_count += 1;
-                    }
-                }
+            if result.language_source.as_deref() == Some("llm") {
+                llm_upgrade_count += 1;
             }
         }
 

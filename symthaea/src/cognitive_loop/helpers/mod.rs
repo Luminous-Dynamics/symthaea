@@ -243,6 +243,7 @@ impl CognitiveLoopService {
             thought_vector: vec![0.0; 32],
             wisdom_hv: symthaea_core::hdc::phi_topology_validation::real_hv_to_hv16(&hdv),
             language_output: None,
+            language_source: None,
             #[cfg(feature = "canvas")]
             canvas_svg: None,
             #[cfg(feature = "identity")]
@@ -454,6 +455,7 @@ impl CognitiveLoopService {
             thought_vector: vec![0.0; 32],
             wisdom_hv: symthaea_core::hdc::phi_topology_validation::real_hv_to_hv16(hdv),
             language_output: None,
+            language_source: None,
             #[cfg(feature = "canvas")]
             canvas_svg: None,
             #[cfg(feature = "identity")]
