@@ -28,7 +28,7 @@ pub struct ReputationScore {
     /// Last update timestamp
     pub last_updated: u64,
 
-    /// Source system (e.g., "mail", "marketplace", "edunet")
+    /// Source system (e.g., "mail", "marketplace", "praxis")
     pub source: String,
 }
 

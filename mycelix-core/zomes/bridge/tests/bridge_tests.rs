@@ -107,7 +107,7 @@ mod validation_tests {
         let mut scores: HashMap<String, f64> = HashMap::new();
         scores.insert("mail".to_string(), 0.9);
         scores.insert("marketplace".to_string(), 0.8);
-        scores.insert("edunet".to_string(), 0.95);
+        scores.insert("praxis".to_string(), 0.95);
 
         let scores_json = serde_json::to_string(&scores).unwrap();
 
@@ -135,7 +135,7 @@ mod validation_tests {
             source_happ: "marketplace".to_string(),
             payload: b"test payload".to_vec(),
             timestamp: 1704067200,
-            targets: vec!["mail".to_string(), "edunet".to_string()],
+            targets: vec!["mail".to_string(), "praxis".to_string()],
             priority: 1,
         };
 
@@ -266,8 +266,8 @@ mod reputation_aggregation_tests {
                 last_updated: 0,
             },
             HappReputationScore {
-                happ_id: "edunet".to_string(),
-                happ_name: "Mycelix EduNet".to_string(),
+                happ_id: "praxis".to_string(),
+                happ_name: "Mycelix Praxis".to_string(),
                 score: 0.75,
                 interactions: 25,
                 last_updated: 0,

@@ -1,8 +1,8 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
-// EduNet Service Worker v3 — offline-first with proactive lesson caching
-const CACHE_NAME = 'edunet-v4';
+// Praxis Service Worker v3 — offline-first with proactive lesson caching
+const CACHE_NAME = 'praxis-v4';
 const PRECACHE = [
   '/',
   '/index.html',

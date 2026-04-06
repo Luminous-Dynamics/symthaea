@@ -158,7 +158,7 @@ describe('Ecosystem Health Check', () => {
       'civic',
       'core',
       'marketplace',
-      'edunet',
+      'praxis',
       'epistemicMarkets',
       'fabrication',
     ] as const;

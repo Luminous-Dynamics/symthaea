@@ -1,8 +1,8 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-//! # EduNet Tauri v2 Backend
+//! # Praxis Tauri v2 Backend
 //!
-//! Native Rust backend for the EduNet desktop/mobile client.
+//! Native Rust backend for the Praxis desktop/mobile client.
 //!
 //! ## Architecture
 //!
@@ -108,7 +108,7 @@ fn validate_pwa_import(progress_json: String) -> Result<PwaImportResult, String>
     let mut total_validated_tend = 0.0f32;
     let mut rejections = Vec::new();
 
-    // Validate each BKT state using the same formula as edunet-core::validation
+    // Validate each BKT state using the same formula as praxis-core::validation
     for (node_id, bkt) in &import.bkt_states {
         let valid = validate_bkt_state(
             bkt.p_mastery,
@@ -185,7 +185,7 @@ struct PlatformInfo {
     version: String,
 }
 
-// ============== BKT Validation (inlined from edunet-core::validation) ==============
+// ============== BKT Validation (inlined from praxis-core::validation) ==============
 
 /// BKT parameters matching the Leptos frontend exactly.
 const P_TRANSIT: f32 = 0.1;
@@ -323,5 +323,5 @@ fn main() {
             tick_consciousness,
         ])
         .run(tauri::generate_context!())
-        .expect("error while running EduNet");
+        .expect("error while running Praxis");
 }

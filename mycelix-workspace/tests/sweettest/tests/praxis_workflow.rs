@@ -1,16 +1,16 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
-//! EduNet hApp sweettest integration tests.
+//! Praxis hApp sweettest integration tests.
 //!
 //! Tests learning workflows including course management, progress tracking,
 //! federated learning, and credentials using the Holochain sweettest framework.
 //!
 //! Prerequisites:
-//!   cd mycelix-edunet && cargo build --release --target wasm32-unknown-unknown
-//!   hc dna pack dna/ -o dna/edunet.dna
+//!   cd mycelix-praxis && cargo build --release --target wasm32-unknown-unknown
+//!   hc dna pack dna/ -o dna/praxis.dna
 //!
-//! Run: cargo test --release -p mycelix-sweettest -- --ignored edunet
+//! Run: cargo test --release -p mycelix-sweettest -- --ignored praxis
 //!
 //! Updated for Holochain 0.6 sweettest API.
 
@@ -30,8 +30,8 @@ use serial_test::serial;
 #[ignore] // Requires DNA bundle
 async fn test_create_and_get_course() {
     let agents = setup_test_agents(
-        &DnaPaths::edunet(),
-        "mycelix-edunet",
+        &DnaPaths::praxis(),
+        "mycelix-praxis",
         1,
     )
     .await;
@@ -72,8 +72,8 @@ async fn test_create_and_get_course() {
 #[ignore]
 async fn test_list_courses() {
     let agents = setup_test_agents(
-        &DnaPaths::edunet(),
-        "mycelix-edunet",
+        &DnaPaths::praxis(),
+        "mycelix-praxis",
         1,
     )
     .await;
@@ -117,8 +117,8 @@ async fn test_list_courses() {
 #[ignore]
 async fn test_enrollment_and_progress() {
     let agents = setup_test_agents(
-        &DnaPaths::edunet(),
-        "mycelix-edunet",
+        &DnaPaths::praxis(),
+        "mycelix-praxis",
         2,
     )
     .await;
@@ -184,8 +184,8 @@ async fn test_enrollment_and_progress() {
 #[ignore]
 async fn test_record_activity() {
     let agents = setup_test_agents(
-        &DnaPaths::edunet(),
-        "mycelix-edunet",
+        &DnaPaths::praxis(),
+        "mycelix-praxis",
         1,
     )
     .await;
@@ -222,8 +222,8 @@ async fn test_record_activity() {
 #[ignore]
 async fn test_fl_gradient_submission() {
     let agents = setup_test_agents(
-        &DnaPaths::edunet(),
-        "mycelix-edunet",
+        &DnaPaths::praxis(),
+        "mycelix-praxis",
         2,
     )
     .await;
@@ -284,8 +284,8 @@ async fn test_fl_gradient_submission() {
 #[ignore]
 async fn test_issue_completion_credential() {
     let agents = setup_test_agents(
-        &DnaPaths::edunet(),
-        "mycelix-edunet",
+        &DnaPaths::praxis(),
+        "mycelix-praxis",
         2,
     )
     .await;
@@ -345,8 +345,8 @@ async fn test_issue_completion_credential() {
 #[ignore]
 async fn test_curriculum_proposal_voting() {
     let agents = setup_test_agents(
-        &DnaPaths::edunet(),
-        "mycelix-edunet",
+        &DnaPaths::praxis(),
+        "mycelix-praxis",
         3,
     )
     .await;

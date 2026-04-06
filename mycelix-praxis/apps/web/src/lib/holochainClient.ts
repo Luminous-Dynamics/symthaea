@@ -102,10 +102,10 @@ export interface HolochainClientConfig {
   /** WebSocket URL for app interface (default: ws://localhost:8888) */
   appWsUrl?: string;
 
-  /** Installed app ID (default: mycelix-edunet) */
+  /** Installed app ID (default: mycelix-praxis) */
   appId?: InstalledAppId;
 
-  /** Role name within the app (default: edunet) */
+  /** Role name within the app (default: praxis) */
   roleName?: RoleName;
 
   /** Timeout for connection attempts in ms (default: 10000) */
@@ -127,7 +127,7 @@ export interface HolochainClientConfig {
 const DEFAULT_CONFIG: Required<HolochainClientConfig> = {
   appWsUrl: 'ws://localhost:8888',
   appId: '9999', // Matches hc sandbox -a 9999
-  roleName: 'edunet',
+  roleName: 'praxis',
   connectionTimeout: 10000,
   verbose: false,
   autoReconnect: true,

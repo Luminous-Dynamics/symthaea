@@ -35,7 +35,7 @@ Phase 2C successfully delivers a revolutionary composable voting system that ach
 
 ### 1. UnifiedVote System (611 Lines)
 
-**Location**: `/srv/luminous-dynamics/mycelix-edunet/crates/mycelix-governance/src/types/unified_vote.rs`
+**Location**: `/srv/luminous-dynamics/mycelix-praxis/crates/mycelix-governance/src/types/unified_vote.rs`
 
 **Key Components**:
 ```rust
@@ -99,7 +99,7 @@ pub struct DelegationModifier {
 
 ### 3. Comprehensive Test Suite (7 Tests)
 
-**Location**: `/srv/luminous-dynamics/mycelix-edunet/crates/mycelix-governance/src/types/unified_vote.rs` (lines 440-611)
+**Location**: `/srv/luminous-dynamics/mycelix-praxis/crates/mycelix-governance/src/types/unified_vote.rs` (lines 440-611)
 
 | Test | Purpose | Result |
 |------|---------|--------|
@@ -129,7 +129,7 @@ Attack cost ratio: 6.0x  ✅ (Attackers pay 6x per influence unit)
 
 ### 4. Mathematical BFT Proof (515 Lines)
 
-**Location**: `/srv/luminous-dynamics/mycelix-edunet/crates/mycelix-governance/docs/MATHEMATICAL_BFT_PROOF.md`
+**Location**: `/srv/luminous-dynamics/mycelix-praxis/crates/mycelix-governance/docs/MATHEMATICAL_BFT_PROOF.md`
 
 **Contents**:
 1. **Background**: The BFT problem and traditional limits (33%)

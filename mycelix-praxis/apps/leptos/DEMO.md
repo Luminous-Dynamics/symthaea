@@ -1,9 +1,9 @@
-# EduNet Demo Walkthrough (5 minutes)
+# Praxis Demo Walkthrough (5 minutes)
 
 ## Setup
 
-- Terminal 1: `cd mycelix-edunet && nix develop` then `hc sandbox generate -a edunet happ-minimal/edunet-minimal.happ --run=8888`
-- Terminal 2: `cd mycelix-edunet/apps/leptos && trunk serve --port 3001`
+- Terminal 1: `cd mycelix-praxis && nix develop` then `hc sandbox generate -a praxis happ-minimal/praxis-minimal.happ --run=8888`
+- Terminal 2: `cd mycelix-praxis/apps/leptos && trunk serve --port 3001`
 - Open browser: `http://localhost:3001`
 
 The app runs in Mock mode by default. All pages are fully functional with simulated data.
@@ -13,7 +13,7 @@ If the conductor is not running, every zome call gracefully falls back to mock d
 
 ## Act 1: Student Arrives (1 min)
 
-1. **Home page** -- "Mycelix EduNet: Privacy-preserving decentralized education"
+1. **Home page** -- "Mycelix Praxis: Privacy-preserving decentralized education"
    - Four feature cards link to the core workflows:
      - Adaptive Learning (BKT, ZPD, VARK) -> /courses
      - Spaced Repetition (SM-2) -> /review

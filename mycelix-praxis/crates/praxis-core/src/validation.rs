@@ -175,7 +175,7 @@ fn bkt_update_step(p_l: f32, correct: bool) -> f32 {
 
 // ============== TEND Formula Validation ==============
 
-/// TEND computation constants (must match edunet-bridge coordinator)
+/// TEND computation constants (must match praxis-bridge coordinator)
 const MAX_TEND_PER_EVENT: f32 = 2.0;
 const BASE_TEND_RATE: f32 = 0.25;
 const MIN_QUALITY_FOR_TEND: u16 = 600;

@@ -9,7 +9,7 @@
 // under various conditions to establish baselines and identify optimization opportunities.
 
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
-use edunet_agg::{
+use praxis_agg::{
     methods::{clip_l2_norm, median, trimmed_mean, weighted_mean},
     AggregationConfig,
 };

@@ -1,11 +1,11 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-//! Test the browser agent against live EduNet.
+//! Test the browser agent against live Praxis.
 //!
 //! Prerequisites: Chrome running with --remote-debugging-port=9222
-//!               EduNet served on localhost:8107
+//!               Praxis served on localhost:8107
 //!
-//! Usage: cargo run -p symthaea-browser --example edunet_journey
+//! Usage: cargo run -p symthaea-browser --example praxis_journey
 
 use symthaea_browser::observation::{AccessibleElement, PageObservation};
 
@@ -112,7 +112,7 @@ async fn observe(page: &chromiumoxide::Page) -> PageObservation {
 
 #[tokio::main]
 async fn main() {
-    println!("=== Symthaea Browser Agent: EduNet Journey ===\n");
+    println!("=== Symthaea Browser Agent: Praxis Journey ===\n");
 
     // Connect to existing Chrome on :9222
     let (browser, mut handler) = Browser::connect("http://localhost:9222")
@@ -125,8 +125,8 @@ async fn main() {
 
     let page = browser.new_page("about:blank").await.expect("New page");
 
-    // Step 1: Navigate to EduNet
-    println!("[1] Navigating to EduNet...");
+    // Step 1: Navigate to Praxis
+    println!("[1] Navigating to Praxis...");
     page.goto("http://localhost:8107").await.expect("Navigate");
     tokio::time::sleep(std::time::Duration::from_secs(6)).await;
 
@@ -141,7 +141,7 @@ async fn main() {
     // Step 2: Skip onboarding via localStorage
     println!("\n[2] Setting student profile (Symthaea, Grade 12, CAPS)...");
     page.evaluate(
-        r#"localStorage.setItem('edunet_student_profile', JSON.stringify({
+        r#"localStorage.setItem('praxis_student_profile', JSON.stringify({
             name: 'Symthaea', grade: 12, exam_date: '2026-10-26',
             onboarding_complete: true, framework: 'caps'
         }))"#,
@@ -211,5 +211,5 @@ async fn main() {
 
     println!("\n=== Journey Complete ===");
     println!("The consciousness engine can perceive every interactive element,");
-    println!("gate actions by Phi threshold, and navigate the full EduNet experience.");
+    println!("gate actions by Phi threshold, and navigate the full Praxis experience.");
 }

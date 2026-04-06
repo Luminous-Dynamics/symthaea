@@ -26,7 +26,7 @@ Then open http://localhost:5173
 ## What You'll See
 
 ### Network Health
-- **hApp Status**: Real-time health of Mycelix-Core, Mail, Marketplace, EduNet, SupplyChain
+- **hApp Status**: Real-time health of Mycelix-Core, Mail, Marketplace, Praxis, SupplyChain
 - **Byzantine Tolerance**: 34% BFT threshold monitoring
 - **Trust Scores**: Network-wide reputation metrics
 

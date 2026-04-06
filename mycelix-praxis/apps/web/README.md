@@ -1,6 +1,6 @@
-# EduNet Web Client
+# Praxis Web Client
 
-React + TypeScript + Vite web client for Mycelix EduNet.
+React + TypeScript + Vite web client for Mycelix Praxis.
 
 ## Development
 

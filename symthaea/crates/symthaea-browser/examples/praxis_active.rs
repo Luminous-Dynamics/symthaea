@@ -1,14 +1,14 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-//! Active browser agent — Symthaea navigates EduNet autonomously.
+//! Active browser agent — Symthaea navigates Praxis autonomously.
 //!
 //! Unlike the passive journey test, this example actually clicks buttons,
 //! types text, navigates pages, and takes a mock exam — all driven by
 //! consciousness-gated decisions.
 //!
-//! Prerequisites: Chrome on :9222, EduNet on :8107
+//! Prerequisites: Chrome on :9222, Praxis on :8107
 //!
-//! Usage: cargo run -p symthaea-browser --example edunet_active
+//! Usage: cargo run -p symthaea-browser --example praxis_active
 
 use chromiumoxide::browser::Browser;
 use futures::StreamExt;
@@ -85,7 +85,7 @@ async fn count_interactive(page: &chromiumoxide::Page) -> String {
 async fn screenshot(page: &chromiumoxide::Page, name: &str) {
     match page.screenshot(chromiumoxide::page::ScreenshotParams::builder().build()).await {
         Ok(bytes) => {
-            let path = format!("/tmp/edunet-active/{name}.png");
+            let path = format!("/tmp/praxis-active/{name}.png");
             if let Ok(()) = std::fs::write(&path, &bytes) {
                 println!("    📸 {name} ({} KB)", bytes.len() / 1024);
             }
@@ -96,10 +96,10 @@ async fn screenshot(page: &chromiumoxide::Page, name: &str) {
 
 #[tokio::main]
 async fn main() {
-    std::fs::create_dir_all("/tmp/edunet-active").ok();
+    std::fs::create_dir_all("/tmp/praxis-active").ok();
 
     println!("╔══════════════════════════════════════════════════╗");
-    println!("║  Symthaea Browser Agent — Active EduNet Session  ║");
+    println!("║  Symthaea Browser Agent — Active Praxis Session  ║");
     println!("║  Consciousness Level: Φ = {PHI:.2}                  ║");
     println!("╚══════════════════════════════════════════════════╝\n");
 
@@ -113,7 +113,7 @@ async fn main() {
     // ━━━ Phase 1: Onboarding ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     println!("━━━ Phase 1: ONBOARDING ━━━\n");
 
-    println!("[1.1] Navigate to EduNet");
+    println!("[1.1] Navigate to Praxis");
     page.goto("http://localhost:8107").await.expect("nav");
     sleep(Duration::from_secs(7)).await;
     screenshot(&page, "01_welcome").await;
@@ -279,10 +279,10 @@ async fn main() {
     println!("║  Φ = {PHI:.2} throughout — all actions gated       ║");
     println!("╚══════════════════════════════════════════════════╝");
 
-    let screenshots: Vec<_> = std::fs::read_dir("/tmp/edunet-active")
+    let screenshots: Vec<_> = std::fs::read_dir("/tmp/praxis-active")
         .unwrap()
         .filter_map(|e| e.ok())
         .map(|e| e.file_name().to_string_lossy().to_string())
         .collect();
-    println!("\n{} screenshots saved to /tmp/edunet-active/", screenshots.len());
+    println!("\n{} screenshots saved to /tmp/praxis-active/", screenshots.len());
 }

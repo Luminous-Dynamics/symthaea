@@ -1,9 +1,9 @@
 [package]
-name = "mycelix-edunet-desktop"
+name = "mycelix-praxis-desktop"
 version = "0.1.0"
 edition = "2021"
 license = "AGPL-3.0-or-later"
-description = "Tauri v2 native client for EduNet — wraps Leptos frontend with Holochain conductor"
+description = "Tauri v2 native client for Praxis — wraps Leptos frontend with Holochain conductor"
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }

@@ -1131,7 +1131,7 @@ if project.status == ProjectStatus::Completed {
 
         for skill in demonstrated_skills {
             bridge_call::<ActionHash>(
-                "edunet",
+                "praxis",
                 "issue_skill_endorsement",
                 SkillEndorsement {
                     recipient: member.member.clone(),

@@ -442,7 +442,7 @@ pub fn generate_share_package(input: SharePackageInput) -> ExternResult<SharePac
 fn verify_provider_credential(provider: &AgentPubKey) -> ExternResult<ActionHash> {
     // Call Praxis via Bridge Protocol
     let credential = bridge_call(
-        "edunet",
+        "praxis",
         "verify_provider",
         provider,
     )?;
@@ -659,7 +659,7 @@ pub enum AnonymizationLevel {
 pub fn verify_provider(provider: AgentPubKey) -> ExternResult<ProviderVerification> {
     // Query Praxis via Bridge
     let credentials = bridge_call::<Vec<VerifiableCredential>>(
-        "edunet",
+        "praxis",
         "get_agent_credentials",
         provider.clone(),
     )?;
@@ -863,7 +863,7 @@ fn detect_anomalies(recent: &[AccessLog], current: &AccessLog) -> Vec<AnomalyDet
 ```rust
 // Verify provider credentials
 let credentials = bridge_call::<Vec<VerifiableCredential>>(
-    "edunet",
+    "praxis",
     "get_agent_credentials",
     provider,
 )?;

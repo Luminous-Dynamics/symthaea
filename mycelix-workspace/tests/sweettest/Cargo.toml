@@ -94,8 +94,8 @@ name = "climate_workflow"
 path = "tests/climate_workflow.rs"
 
 [[test]]
-name = "edunet_workflow"
-path = "tests/edunet_workflow.rs"
+name = "praxis_workflow"
+path = "tests/praxis_workflow.rs"
 
 [[test]]
 name = "supplychain_workflow"

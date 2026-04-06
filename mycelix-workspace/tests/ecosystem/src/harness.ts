@@ -59,9 +59,9 @@ const HAPP_SPECS = {
     bundleRelPath: 'happs/marketplace/backend/mycelix_marketplace.happ',
     roleName: 'marketplace',
   },
-  edunet: {
-    bundleRelPath: 'happs/edunet/happ/mycelix-edunet.happ',
-    roleName: 'edunet',
+  praxis: {
+    bundleRelPath: 'happs/praxis/happ/mycelix-praxis.happ',
+    roleName: 'praxis',
   },
   mail: {
     searchDirRelPath: 'happs/mail',

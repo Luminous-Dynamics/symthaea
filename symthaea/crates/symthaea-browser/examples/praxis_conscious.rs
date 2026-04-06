@@ -2,16 +2,16 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Consciousness-in-the-loop browser agent.
 //!
-//! Unlike the scripted `edunet_active` example, this agent feeds page
+//! Unlike the scripted `praxis_active` example, this agent feeds page
 //! observations into a real CognitiveLoopService and lets the FEP
 //! motor system decide when to observe, think, or act.
 //!
 //! The agent chooses its own actions based on prediction error,
 //! consciousness level, and free energy minimization.
 //!
-//! Prerequisites: Chrome on :9222, EduNet on :8107
+//! Prerequisites: Chrome on :9222, Praxis on :8107
 //!
-//! Usage: cargo run -p symthaea-browser --example edunet_conscious
+//! Usage: cargo run -p symthaea-browser --example praxis_conscious
 
 use chromiumoxide::browser::Browser;
 use futures::StreamExt;
@@ -336,7 +336,7 @@ async fn execute_action(page: &chromiumoxide::Page, action: &AgentAction) {
 
 #[tokio::main]
 async fn main() {
-    std::fs::create_dir_all("/tmp/edunet-conscious").ok();
+    std::fs::create_dir_all("/tmp/praxis-conscious").ok();
 
     println!("╔══════════════════════════════════════════════════════╗");
     println!("║  Symthaea Conscious Browser Agent                    ║");
@@ -349,7 +349,7 @@ async fn main() {
     tokio::spawn(async move { while handler.next().await.is_some() {} });
     let page = browser.new_page("about:blank").await.expect("page");
 
-    // Navigate to EduNet
+    // Navigate to Praxis
     page.goto("http://localhost:8107").await.expect("nav");
     sleep(Duration::from_secs(7)).await;
 
@@ -404,7 +404,7 @@ async fn main() {
                 if let Ok(bytes) = page.screenshot(
                     chromiumoxide::page::ScreenshotParams::builder().build()
                 ).await {
-                    let path = format!("/tmp/edunet-conscious/{screenshot_count:02}.png");
+                    let path = format!("/tmp/praxis-conscious/{screenshot_count:02}.png");
                     std::fs::write(&path, &bytes).ok();
                 }
             }

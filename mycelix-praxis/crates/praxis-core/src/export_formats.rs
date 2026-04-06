@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! # Export Formats
 //!
-//! Standards-compliant export of EduNet learning data for interoperability
+//! Standards-compliant export of Praxis learning data for interoperability
 //! with legacy LMS platforms, credential wallets, and institutional systems.
 //!
 //! ## Supported Formats
@@ -169,7 +169,7 @@ pub fn learning_event_to_xapi(
     );
     extensions.insert(
         "https://mycelix.net/xapi/extensions/platform".to_string(),
-        serde_json::json!("EduNet"),
+        serde_json::json!("Praxis"),
     );
 
     XapiStatement {
@@ -180,7 +180,7 @@ pub fn learning_event_to_xapi(
         },
         verb: XapiVerb { id: verb_id.to_string(), display },
         object: XapiObject {
-            id: format!("https://edunet.mycelix.net/curriculum/{}", topic_id),
+            id: format!("https://praxis.mycelix.net/curriculum/{}", topic_id),
             object_type: "Activity".to_string(),
             definition: Some(XapiDefinition {
                 name: Some(name_map),
@@ -200,7 +200,7 @@ pub fn learning_event_to_xapi(
             duration: Some(duration),
         }),
         context: Some(XapiContext {
-            platform: Some("EduNet by Mycelix".to_string()),
+            platform: Some("Praxis by Mycelix".to_string()),
             language: Some("en".to_string()),
             extensions: Some(extensions),
         }),
@@ -269,7 +269,7 @@ pub struct BadgeCriteria {
     pub narrative: String,
 }
 
-/// Convert an EduNet credential to Open Badges 3.0 format.
+/// Convert an Praxis credential to Open Badges 3.0 format.
 pub fn credential_to_open_badge(
     learner_id: &str,
     credential_title: &str,
@@ -299,9 +299,9 @@ pub fn credential_to_open_badge(
             "OpenBadgeCredential".to_string(),
         ],
         issuer: BadgeIssuer {
-            id: format!("https://edunet.mycelix.net/issuers/{}", issuer_name.to_lowercase().replace(' ', "-")),
+            id: format!("https://praxis.mycelix.net/issuers/{}", issuer_name.to_lowercase().replace(' ', "-")),
             name: issuer_name.to_string(),
-            url: Some("https://edunet.mycelix.net".to_string()),
+            url: Some("https://praxis.mycelix.net".to_string()),
         },
         issuance_date: issuance_date.to_string(),
         credential_subject: BadgeSubject {
@@ -411,7 +411,7 @@ mod tests {
             "agent123",
             "CAPS Mathematics Grade 12",
             "Mastery of the full CAPS Grade 12 Mathematics curriculum",
-            "EduNet",
+            "Praxis",
             "2026-04-03T10:00:00Z",
             Some(0.87),
             Some(920),
@@ -447,7 +447,7 @@ mod tests {
                 version: "1.0".to_string(),
                 exported_at: "2026-04-03T10:00:00Z".to_string(),
                 learner_id: "agent123".to_string(),
-                platform: "EduNet".to_string(),
+                platform: "Praxis".to_string(),
             },
             xapi_statements: vec![],
             open_badges: vec![],

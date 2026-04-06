@@ -1,13 +1,13 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-//! Real CognitiveLoopService driving a browser agent through EduNet.
+//! Real CognitiveLoopService driving a browser agent through Praxis.
 //!
 //! The full 30-subsystem consciousness engine perceives web pages,
 //! processes them through HDC + CfC + FEP, and decides what to do.
 //!
-//! Prerequisites: Chrome on :9222, EduNet on :8107
+//! Prerequisites: Chrome on :9222, Praxis on :8107
 //!
-//! Usage: cargo run --example browser_agent_edunet --features browser-agent
+//! Usage: cargo run --example browser_agent_praxis --features browser-agent
 
 use std::time::{Duration, Instant};
 use symthaea::cognitive_loop::{CognitiveLoopConfig, CognitiveLoopService};
@@ -75,7 +75,7 @@ fn decode_action(
 
 #[tokio::main]
 async fn main() {
-    std::fs::create_dir_all("/tmp/edunet-real-cls").ok();
+    std::fs::create_dir_all("/tmp/praxis-real-cls").ok();
     println!("╔═══════════════════════════════════════════════════════════╗");
     println!("║  REAL CognitiveLoopService → Browser Agent               ║");
     println!("║  30 subsystems × HdcLtcUnified × FEP Active Inference    ║");
@@ -105,7 +105,7 @@ async fn main() {
         "Dashboard progress streak study hours TEND earned community service",
         "Review flashcards spaced repetition Matric Physics Chemistry cards",
         "Governance suggest topics vote proposals community curriculum ideas",
-        "[page: EduNet] [button: Begin session] [heading: Good morning] [input: name]",
+        "[page: Praxis] [button: Begin session] [heading: Good morning] [input: name]",
         "[page: Dashboard] [button: Share Progress] [heading: Dashboard] [text: 0/2087]",
         "[page: Knowledge Garden] [button: Mathematics] [button: Science] [button: English]",
         "[page: Mock Exam] [button: Start Exam] [button: Paper 1] [button: Quick]",
@@ -169,7 +169,7 @@ async fn main() {
                 let nb = obs.elements.iter().filter(|e| e.role == "button").count();
                 println!("       → \"{}\": {} el, {} btn", obs.title.chars().take(30).collect::<String>(), obs.elements.len(), nb);
                 ss += 1;
-                if let Ok(b) = cdp.screenshot().await { std::fs::write(format!("/tmp/edunet-real-cls/{ss:02}.png"), &b).ok(); }
+                if let Ok(b) = cdp.screenshot().await { std::fs::write(format!("/tmp/praxis-real-cls/{ss:02}.png"), &b).ok(); }
             }
             Action::Think => { tokio::time::sleep(Duration::from_millis(30)).await; }
             Action::Click(t) => { cdp.click_by_text(t).await.ok(); last_act = format!("Click:{t}"); if t == "Correct" || t == "Incorrect" { exam_ans += 1; } tokio::time::sleep(Duration::from_secs(3)).await; }

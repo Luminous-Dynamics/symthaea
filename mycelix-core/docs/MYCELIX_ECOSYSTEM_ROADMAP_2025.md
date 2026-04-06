@@ -210,7 +210,7 @@ build:
     just build-sdk
     just build-mail
     just build-marketplace
-    just build-edunet
+    just build-praxis
     just build-supplychain
 
 build-sdk:
@@ -222,7 +222,7 @@ build-mail:
 build-marketplace:
     cd mycelix-marketplace/holochain && hc dna pack . && hc app pack .
 
-build-edunet:
+build-praxis:
     cd mycelix-praxis/holochain && hc dna pack . && hc app pack .
 
 build-supplychain:
@@ -413,7 +413,7 @@ Same migration pattern as Mail. Additional considerations:
 │   │   ├── happ.yaml
 │   │   └── README.md
 │   ├── marketplace/            # Mycelix-Marketplace
-│   ├── edunet/                 # Mycelix-Praxis
+│   ├── praxis/                 # Mycelix-Praxis
 │   └── supplychain/            # Mycelix-SupplyChain
 │
 ├── core/                       # Mycelix-Core (0TML + Governance)
@@ -1124,7 +1124,7 @@ export async function verifySellerCredentials(
 **Duration**: 7 days
 
 ```rust
-// happs/edunet/dna/zomes/coordinator/src/credentials.rs
+// happs/praxis/dna/zomes/coordinator/src/credentials.rs
 use mycelix_sdk::credentials::{VerifiableCredential, CredentialBuilder};
 use mycelix_sdk::epistemic::{EpistemicClaim, EmpiricalLevel, NormativeLevel, MaterialityLevel};
 
@@ -1382,7 +1382,7 @@ observatory/
 │   │   │   ├── +page.svelte       # hApp overview
 │   │   │   ├── mail/
 │   │   │   ├── marketplace/
-│   │   │   ├── edunet/
+│   │   │   ├── praxis/
 │   │   │   └── supplychain/
 │   │   ├── governance/
 │   │   │   └── +page.svelte       # DAO proposals

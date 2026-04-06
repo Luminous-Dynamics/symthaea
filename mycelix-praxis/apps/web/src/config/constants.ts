@@ -4,7 +4,7 @@
 /**
  * Application Constants
  *
- * Centralized configuration and constants for the EduNet application
+ * Centralized configuration and constants for the Praxis application
  */
 
 // ==================== API Configuration ====================
@@ -148,9 +148,9 @@ export const INFO_MESSAGES = {
 
 // ==================== External Links ====================
 export const EXTERNAL_LINKS = {
-  GITHUB_REPO: 'https://github.com/Luminous-Dynamics/mycelix-edunet',
-  GITHUB_ISSUES: 'https://github.com/Luminous-Dynamics/mycelix-edunet/issues',
-  DOCUMENTATION: 'https://docs.mycelix-edunet.org',
+  GITHUB_REPO: 'https://github.com/Luminous-Dynamics/mycelix-praxis',
+  GITHUB_ISSUES: 'https://github.com/Luminous-Dynamics/mycelix-praxis/issues',
+  DOCUMENTATION: 'https://docs.mycelix-praxis.org',
 } as const;
 
 // ==================== Route Paths ====================

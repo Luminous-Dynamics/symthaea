@@ -36,8 +36,8 @@ impl DnaPaths {
         Self::workspace_root().join("../mycelix-finance/dna/mycelix_finance.dna")
     }
 
-    pub fn edunet() -> PathBuf {
-        Self::workspace_root().join("../mycelix-edunet/dna/edunet.dna")
+    pub fn praxis() -> PathBuf {
+        Self::workspace_root().join("../mycelix-praxis/dna/praxis.dna")
     }
 
     pub fn supplychain() -> PathBuf {

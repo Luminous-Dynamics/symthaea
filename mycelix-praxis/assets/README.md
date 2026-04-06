@@ -1,4 +1,4 @@
-# Mycelix EduNet Assets
+# Mycelix Praxis Assets
 
 This directory contains visual assets for the project.
 
@@ -63,12 +63,12 @@ convert -background none assets/logo.svg -resize 512x512 apps/web/public/android
 ```tsx
 import logo from '../../../assets/logo.svg';
 
-<img src={logo} alt="EduNet Logo" width={48} height={48} />
+<img src={logo} alt="Praxis Logo" width={48} height={48} />
 ```
 
 ### In README
 ```markdown
-![EduNet Logo](assets/logo.svg)
+![Praxis Logo](assets/logo.svg)
 ```
 
 ### As Favicon

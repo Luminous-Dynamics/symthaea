@@ -393,9 +393,11 @@ fn main() {
                         .collect();
                     s.calibrate(&cal_samples);
                     s.train_prototypes(&cal_samples);
+                    // Enable Ollama contextual embeddings if available
+                    s.set_ollama_embeddings(true);
                     s.train_hybrid(&cal_samples);
                     println!(
-                        "  Spinozist classifier calibrated + hybrid trained on {} samples in {:.1}s\n",
+                        "  Spinozist hybrid trained on {} samples in {:.1}s\n",
                         cal_samples.len(), cal_start.elapsed().as_secs_f64()
                     );
                 }

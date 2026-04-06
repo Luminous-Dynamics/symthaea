@@ -801,7 +801,7 @@ pub fn issue_credential(input: IssueCredentialInput) -> ExternResult<ActionHash>
     // Register with Praxis if educational
     if matches!(issuer.issuer_type, IssuerType::Educational { .. }) {
         bridge_call::<()>(
-            "edunet",
+            "praxis",
             "register_credential",
             hash.clone(),
         )?;

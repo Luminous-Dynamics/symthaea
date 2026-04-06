@@ -142,7 +142,7 @@ mod tests {
         let mut conductor = MockConductor::with_mycelix_zomes();
         let agent = conductor.add_agent();
 
-        let happs = ["marketplace", "governance", "edunet", "finance"];
+        let happs = ["marketplace", "governance", "praxis", "finance"];
 
         for happ_id in happs {
             let result: serde_json::Value = conductor.call(

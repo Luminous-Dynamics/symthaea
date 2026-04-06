@@ -71,7 +71,7 @@ pub enum ConnectStrategy {
 /// Configuration for the auto-connecting Holochain provider.
 #[derive(Clone, Debug)]
 pub struct HolochainProviderConfig {
-    /// hApp identifier (e.g. "edunet", "hearth", "mycelix-unified").
+    /// hApp identifier (e.g. "praxis", "hearth", "mycelix-unified").
     pub app_id: String,
     /// Default role for single-role apps (e.g. Some("hearth")).
     /// Multi-role apps (governance) set this to None and pass role explicitly.

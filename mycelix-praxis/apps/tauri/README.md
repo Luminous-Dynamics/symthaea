@@ -1,4 +1,4 @@
-# EduNet Desktop — Tauri v2 Native Client
+# Praxis Desktop — Tauri v2 Native Client
 
 Wraps the existing Leptos CSR frontend in a native Tauri v2 shell with:
 - Holochain conductor management (background DHT gossip)

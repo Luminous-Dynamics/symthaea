@@ -1,16 +1,16 @@
-# EduNet Leptos App -- Developer Setup
+# Praxis Leptos App -- Developer Setup
 
 ## Prerequisites
 
 - Rust stable (1.94+) with `wasm32-unknown-unknown` target
 - Trunk (`cargo install trunk`)
 - wasm-bindgen-cli 0.2.114 (`~/.cargo/bin/wasm-bindgen`)
-- Holochain tools (provided by `nix develop` from `mycelix-edunet/`)
+- Holochain tools (provided by `nix develop` from `mycelix-praxis/`)
 
 ## Quick Start (Mock Mode)
 
 ```bash
-cd mycelix-edunet/apps/leptos
+cd mycelix-praxis/apps/leptos
 trunk serve --port 3001
 # Open http://localhost:3001
 ```
@@ -23,15 +23,15 @@ coupled oscillators at 20 Hz.
 
 ```bash
 # Terminal 1: Build WASM zomes + start conductor
-cd mycelix-edunet
+cd mycelix-praxis
 nix develop
 CARGO_TARGET_DIR=target cargo build --target wasm32-unknown-unknown --release
-hc dna pack dna-minimal/ -o dna-minimal/edunet-minimal.dna
-hc app pack happ-minimal/ -o happ-minimal/edunet-minimal.happ
-hc sandbox generate -a edunet happ-minimal/edunet-minimal.happ --run=8888
+hc dna pack dna-minimal/ -o dna-minimal/praxis-minimal.dna
+hc app pack happ-minimal/ -o happ-minimal/praxis-minimal.happ
+hc sandbox generate -a praxis happ-minimal/praxis-minimal.happ --run=8888
 
 # Terminal 2: Serve Leptos app
-cd mycelix-edunet/apps/leptos
+cd mycelix-praxis/apps/leptos
 trunk serve --port 3001
 # Open http://localhost:3001
 ```
@@ -50,7 +50,7 @@ Browser:
     '-- LearningEngineProvider (consciousness -> learning decisions at 1Hz)
 
 Holochain Conductor (port 8888):
-  '-- EduNet DNA
+  '-- Praxis DNA
        |-- learning         (courses, modules, progress tracking)
        |-- fl               (federated learning, gradient aggregation)
        |-- credential       (W3C VCs, assessments, epistemic classification)
@@ -61,7 +61,7 @@ Holochain Conductor (port 8888):
        |-- pods             (learning communities)
        |-- knowledge        (curriculum graph, standards alignment)
        |-- classroom        (teacher/student/parent roles, class management)
-       |-- edunet-bridge    (cross-cluster bridge to unified hApp)
+       |-- praxis-bridge    (cross-cluster bridge to unified hApp)
        '-- integration      (cross-zome orchestration)
 ```
 

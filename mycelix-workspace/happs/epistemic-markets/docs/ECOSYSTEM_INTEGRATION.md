@@ -375,12 +375,12 @@ interface SupplyChainIntelligence {
 
 ---
 
-### 8. EduNet Integration
+### 8. Praxis Integration
 
-**From EduNet → Epistemic Markets:**
+**From Praxis → Epistemic Markets:**
 ```typescript
 // Education creates prediction markets for learning outcomes
-interface EduNetMarketRequest {
+interface PraxisMarketRequest {
   // Learning predictions
   learner_id: AgentPubKey;
   module_id: ActionHash;
@@ -396,9 +396,9 @@ interface EduNetMarketRequest {
 }
 ```
 
-**From Epistemic Markets → EduNet:**
+**From Epistemic Markets → Praxis:**
 ```typescript
-interface EduNetIntelligence {
+interface PraxisIntelligence {
   // Personalized predictions
   learning_predictions: Map<LearnerId, LearningForecast>;
   optimal_paths: Map<LearnerId, LearningPath[]>;

@@ -1193,7 +1193,7 @@ pub fn register_auto_archive_sources() -> ExternResult<()> {
 
     // Praxis credentials
     bridge_call::<()>(
-        "edunet",
+        "praxis",
         "register_event_listener",
         EventListener {
             event_type: "credential_issued".to_string(),

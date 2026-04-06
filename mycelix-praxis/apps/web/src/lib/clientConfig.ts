@@ -246,8 +246,8 @@ export function getEnvConfig(): ClientConfig {
     mode,
     holochain: {
       appWsUrl: import.meta.env.VITE_APP_WS_URL || 'ws://localhost:8888',
-      appId: import.meta.env.VITE_APP_ID || 'mycelix-edunet',
-      roleName: import.meta.env.VITE_ROLE_NAME || 'edunet',
+      appId: import.meta.env.VITE_APP_ID || 'mycelix-praxis',
+      roleName: import.meta.env.VITE_ROLE_NAME || 'praxis',
       verbose: import.meta.env.VITE_VERBOSE_LOGS === 'true',
       autoReconnect: import.meta.env.VITE_AUTO_RECONNECT !== 'false',
     },

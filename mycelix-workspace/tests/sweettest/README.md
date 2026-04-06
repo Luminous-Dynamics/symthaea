@@ -11,7 +11,7 @@ just test-sweettest-identity    # Run identity suite only (4 tests)
 just test-sweettest-governance  # Run governance suite only (3 tests)
 just test-sweettest-bridge      # Run bridge suite only (2 tests)
 just test-sweettest-privacy     # Run privacy/ZK suite only (6 tests)
-just test-sweettest-edunet      # Run edunet suite only (7 tests)
+just test-sweettest-praxis      # Run praxis suite only (7 tests)
 just test-sweettest-supplychain # Run supplychain suite only (11 tests)
 just test-sweettest-health      # Run health suite only (10 tests)
 just test-sweettest-marketplace # Run marketplace suite only (10 tests)
@@ -30,8 +30,8 @@ Sweettest MUST run with `--release` due to Holochain's hardcoded 5-minute nonce 
 
 ## Test Suites
 
-### EduNet Workflow (7 tests) - NEW
-**File:** `tests/edunet_workflow.rs`
+### Praxis Workflow (7 tests) - NEW
+**File:** `tests/praxis_workflow.rs`
 
 | Test | Agents | Description |
 |------|--------|-------------|
@@ -171,7 +171,7 @@ tests/sweettest/
     ├── governance_workflow.rs   # Governance hApp tests (3)
     ├── cross_happ_bridge.rs     # Multi-hApp tests (2)
     ├── privacy_zk_attestation.rs # LUCID privacy tests (6)
-    ├── edunet_workflow.rs       # EduNet hApp tests (7)
+    ├── praxis_workflow.rs       # Praxis hApp tests (7)
     ├── supplychain_workflow.rs  # Supply chain hApp tests (11)
     ├── health_workflow.rs       # Health hApp tests (10)
     ├── marketplace_workflow.rs  # Marketplace hApp tests (10)
@@ -194,7 +194,7 @@ Tests expect pre-built DNA bundles at:
 - `mycelix-identity/dna/mycelix_identity_dna.dna`
 - `mycelix-governance/dna/mycelix_governance.dna`
 - `mycelix-workspace/happs/lucid/lucid.dna`
-- `mycelix-edunet/dna/edunet.dna`
+- `mycelix-praxis/dna/praxis.dna`
 - `mycelix-supplychain/holochain/dna/supplychain.dna`
 - `mycelix-health/dna/health.dna`
 - `mycelix-marketplace/backend/mycelix_marketplace.dna`
@@ -205,7 +205,7 @@ Build them with:
 ```bash
 cd mycelix-identity && cargo build --release --target wasm32-unknown-unknown && hc dna pack dna/
 cd mycelix-governance && cargo build --release --target wasm32-unknown-unknown && hc dna pack dna/
-cd mycelix-edunet && cargo build --release --target wasm32-unknown-unknown && hc dna pack dna/
+cd mycelix-praxis && cargo build --release --target wasm32-unknown-unknown && hc dna pack dna/
 cd mycelix-supplychain/holochain && cargo build --release --target wasm32-unknown-unknown && hc dna pack dna/
 cd mycelix-health && cargo build --release --target wasm32-unknown-unknown && hc dna pack dna/
 cd mycelix-marketplace/backend && cargo build --release --target wasm32-unknown-unknown && hc dna pack .
@@ -239,8 +239,8 @@ The GitHub Actions workflow (`holochain.yml`) runs all 9 suites (64 tests):
 - name: Run sweettest - Privacy/ZK Attestation (6 tests)
   run: cargo test --release privacy -- --ignored --test-threads=1 --nocapture
 
-- name: Run sweettest - EduNet (7 tests)
-  run: cargo test --release edunet -- --ignored --test-threads=1 --nocapture
+- name: Run sweettest - Praxis (7 tests)
+  run: cargo test --release praxis -- --ignored --test-threads=1 --nocapture
 
 - name: Run sweettest - Supply Chain (11 tests)
   run: cargo test --release supplychain -- --ignored --test-threads=1 --nocapture
