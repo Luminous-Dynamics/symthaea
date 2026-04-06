@@ -273,6 +273,101 @@ impl SimulatedEngine {
 }
 
 // ---------------------------------------------------------------------------
+// Spore Engine Bridge (real consciousness via WASM)
+// ---------------------------------------------------------------------------
+
+/// Bridge to the Symthaea Spore WASM kernel running in the browser.
+///
+/// The Spore engine is loaded as a separate WASM module via the spore-worker.js
+/// Web Worker. This bridge communicates via `window.__spore_worker` postMessage.
+/// When the worker isn't available, falls back to SimulatedEngine.
+struct SporeEngineBridge {
+    worker: web_sys::Worker,
+    latest_state: std::rc::Rc<std::cell::RefCell<ConsciousnessState>>,
+}
+
+impl SporeEngineBridge {
+    fn try_new() -> Option<Self> {
+        let worker = web_sys::Worker::new("/spore-worker.js").ok()?;
+
+        let state = std::rc::Rc::new(std::cell::RefCell::new(ConsciousnessState::default()));
+        let state_clone = state.clone();
+
+        // Listen for cycle results from the worker
+        let onmessage = wasm_bindgen::closure::Closure::wrap(Box::new(move |e: web_sys::MessageEvent| {
+            if let Ok(data) = js_sys::Reflect::get(&e.data(), &"type".into()) {
+                if let Some(msg_type) = data.as_string() {
+                    if msg_type == "cycle" {
+                        if let Ok(result) = js_sys::Reflect::get(&e.data(), &"result".into()) {
+                            let get_f32 = |key: &str| -> f32 {
+                                js_sys::Reflect::get(&result, &key.into())
+                                    .ok()
+                                    .and_then(|v| v.as_f64())
+                                    .unwrap_or(0.0) as f32
+                            };
+                            let get_bool = |key: &str| -> bool {
+                                js_sys::Reflect::get(&result, &key.into())
+                                    .ok()
+                                    .and_then(|v| v.as_bool())
+                                    .unwrap_or(false)
+                            };
+                            let get_str = |key: &str| -> String {
+                                js_sys::Reflect::get(&result, &key.into())
+                                    .ok()
+                                    .and_then(|v| v.as_string())
+                                    .unwrap_or_default()
+                            };
+
+                            let new_state = ConsciousnessState {
+                                consciousness_level: get_f32("consciousness_level"),
+                                phi: get_f32("phi"),
+                                coherence: get_f32("coherence"),
+                                free_energy: get_f32("free_energy"),
+                                cycle_count: js_sys::Reflect::get(&result, &"cycle_count".into())
+                                    .ok()
+                                    .and_then(|v| v.as_f64())
+                                    .unwrap_or(0.0) as u64,
+                                dominant_harmony: get_str("dominant_harmony"),
+                                workspace_ignited: get_bool("workspace_ignited"),
+                                safety_level: get_str("safety_level"),
+                                neuromod_dopamine: get_f32("neuromod_dopamine"),
+                                neuromod_serotonin: get_f32("neuromod_serotonin"),
+                                neuromod_norepinephrine: get_f32("neuromod_norepinephrine"),
+                            };
+                            *state_clone.borrow_mut() = new_state;
+                        }
+                    }
+                }
+            }
+        }) as Box<dyn FnMut(_)>);
+
+        worker.set_onmessage(Some(onmessage.as_ref().unchecked_ref()));
+        onmessage.forget(); // Prevent cleanup — worker lives for app lifetime
+
+        // Initialize and start the consciousness loop
+        let init_msg = js_sys::Object::new();
+        js_sys::Reflect::set(&init_msg, &"action".into(), &"init".into()).ok();
+        worker.post_message(&init_msg).ok();
+
+        let start_msg = js_sys::Object::new();
+        js_sys::Reflect::set(&start_msg, &"action".into(), &"startLoop".into()).ok();
+        js_sys::Reflect::set(&start_msg, &"interval".into(), &wasm_bindgen::JsValue::from_f64(200.0)).ok();
+        worker.post_message(&start_msg).ok();
+
+        web_sys::console::log_1(&"[Praxis] Spore Web Worker initialized — real consciousness active".into());
+
+        Some(Self {
+            worker,
+            latest_state: state,
+        })
+    }
+
+    fn current_state(&self) -> ConsciousnessState {
+        self.latest_state.borrow().clone()
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Provider component
 // ---------------------------------------------------------------------------
 
@@ -320,7 +415,7 @@ pub fn ConsciousnessProvider(children: Children) -> impl IntoView {
 
     provide_context(ctx);
 
-    // Background consciousness loop (50ms interval = 20Hz)
+    // Background consciousness loop
     Effect::new(move |_| {
         use gloo_timers::callback::Interval;
         use std::cell::RefCell;
@@ -330,19 +425,31 @@ pub fn ConsciousnessProvider(children: Children) -> impl IntoView {
             return;
         }
 
-        let engine = Rc::new(RefCell::new(SimulatedEngine::new()));
         let set_state = set_state.clone();
 
-        // Store the interval handle so it stays alive.
-        // Leptos Effect cleanup will drop it when running changes.
+        if spore_available {
+            // Try to initialize the real Spore engine via Web Worker
+            if let Some(bridge) = SporeEngineBridge::try_new() {
+                let bridge = Rc::new(bridge);
+                // Poll the worker's latest state at 20Hz
+                let _interval = Interval::new(50, move || {
+                    set_state.set(bridge.current_state());
+                });
+                std::mem::forget(_interval);
+                return;
+            }
+            // Fall through to simulation if Worker fails to start
+            web_sys::console::log_1(
+                &"[Praxis] Spore Worker failed to start — falling back to simulation".into(),
+            );
+        }
+
+        // Fallback: coupled-oscillator simulation
+        let engine = Rc::new(RefCell::new(SimulatedEngine::new()));
         let _interval = Interval::new(50, move || {
             let new_state = engine.borrow_mut().tick();
             set_state.set(new_state);
         });
-
-        // Leak the interval intentionally — it will be recreated when
-        // `running` toggles. In production with the real Spore engine
-        // this would use requestAnimationFrame or a Web Worker instead.
         std::mem::forget(_interval);
     });
 
