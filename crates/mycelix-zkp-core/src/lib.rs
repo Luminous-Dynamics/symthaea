@@ -29,6 +29,7 @@
 //! - `full`: All backends + Dilithium (native testing only)
 
 pub mod backend;
+pub mod circuits;
 #[cfg(feature = "dilithium")]
 pub mod dilithium;
 pub mod domain;
