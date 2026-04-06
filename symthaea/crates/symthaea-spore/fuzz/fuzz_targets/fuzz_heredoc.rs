@@ -3,16 +3,7 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 #![no_main]
 use libfuzzer_sys::fuzz_target;
-
-/// Exact copy of sanitize_heredoc from ssh_relay.rs.
-/// Must never allow delimiter to appear on its own line in output.
-fn sanitize_heredoc(content: &str, delimiter: &str) -> String {
-    content
-        .lines()
-        .filter(|line| line.trim() != delimiter)
-        .collect::<Vec<_>>()
-        .join("\n")
-}
+use symthaea_spore::security::sanitize_heredoc;
 
 fuzz_target!(|data: &str| {
     let delimiters = ["NIXCONF", "FLAKEEOF", "SCRIPTEOF", "SYSPATCH"];

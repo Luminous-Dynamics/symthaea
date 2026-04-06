@@ -21,6 +21,12 @@ use tokio::sync::Mutex;
 use tokio_tungstenite::accept_hdr_async;
 use tokio_tungstenite::tungstenite::Message;
 
+// Security validators from the library (shared with fuzz targets)
+use symthaea_spore::security::{
+    sanitize_heredoc, sanitize_input, token_eq, validate_disk_path,
+    validate_hostname as validate_hostname_relay,
+};
+
 // TLS support
 use tokio_rustls::TlsAcceptor;
 use rustls::ServerConfig;
@@ -130,86 +136,10 @@ fn parse_stage(output: &str) -> Option<NixosAnywhereStage> {
     }
 }
 
-// ── Security: constant-time token comparison (prevents timing attacks) ──
+// Security validators imported from symthaea_spore::security (see use statement above).
+// Local definitions removed — single source of truth for fuzzing and testing.
 
-fn token_eq(a: &str, b: &str) -> bool {
-    if a.len() != b.len() {
-        return false;
-    }
-    let mut result = 0u8;
-    for (x, y) in a.bytes().zip(b.bytes()) {
-        result |= x ^ y;
-    }
-    result == 0
-}
-
-// ── Security: input validation for shell-interpolated fields ──
-
-/// Sanitize a string for safe use in shell commands and Nix config.
-/// Only allows alphanumeric, hyphens, underscores, dots, and optionally forward slashes.
-fn sanitize_input(s: &str, field_name: &str, allow_slashes: bool) -> Result<String, String> {
-    let s = s.trim();
-    if s.is_empty() {
-        return Err(format!("{} cannot be empty", field_name));
-    }
-    for ch in s.chars() {
-        match ch {
-            'a'..='z' | 'A'..='Z' | '0'..='9' | '-' | '_' | '.' => {}
-            '/' if allow_slashes => {}
-            _ => return Err(format!("{} contains invalid character '{}'", field_name, ch)),
-        }
-    }
-    Ok(s.to_string())
-}
-
-/// Validate disk device path — must match known block device patterns.
-/// Prevents targeting arbitrary /dev/ nodes (symlinks, char devices, pseudo-devices).
-fn validate_disk_path(d: &str) -> Result<String, String> {
-    let d = d.trim();
-    if !d.starts_with("/dev/") {
-        return Err("Disk must start with /dev/".into());
-    }
-    let dev = &d[5..];
-    if dev.is_empty() {
-        return Err("Invalid disk device: /dev/".into());
-    }
-    // Only allow alphanumeric (no path traversal via . or /)
-    if !dev.chars().all(|c| c.is_alphanumeric()) {
-        return Err(format!("Invalid disk device: {}", d));
-    }
-    // Whitelist known block device prefixes
-    let allowed_prefixes = ["sd", "vd", "nvme", "mmcblk", "xvd", "hd", "fd", "loop"];
-    if !allowed_prefixes.iter().any(|p| dev.starts_with(p)) {
-        return Err(format!(
-            "Unrecognized device class '{}'. Allowed: sd*, vd*, nvme*, mmcblk*, xvd*, hd*",
-            d
-        ));
-    }
-    // Block pseudo-devices
-    let blocked = ["/dev/null", "/dev/zero", "/dev/random", "/dev/urandom", "/dev/stdin", "/dev/stdout"];
-    if blocked.contains(&d) {
-        return Err("Not a valid disk device".into());
-    }
-    Ok(d.to_string())
-}
-
-/// Validate hostname — RFC 1123
-fn validate_hostname_relay(h: &str) -> Result<String, String> {
-    let h = h.trim().to_lowercase();
-    if h.is_empty() {
-        return Ok("guardian".into());
-    }
-    if h.len() > 63 {
-        return Err("Hostname too long (max 63)".into());
-    }
-    if !h
-        .chars()
-        .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
-    {
-        return Err("Hostname can only contain lowercase letters, numbers, hyphens".into());
-    }
-    Ok(h)
-}
+// ── sanitize_heredoc also imported from security module ──
 
 /// Rate limiter: 1 active session per IP, with auth failure tracking.
 struct SessionTracker {
@@ -558,16 +488,7 @@ sed -i 's|imports = \[|imports = [ ./system-config.nix|' /mnt/etc/nixos/configur
 ///
 /// The content is written via heredoc so that braces in the Nix source are never
 /// passed through Rust's `format!()` (which would require `{{`/`}}` escaping).
-/// SECURITY: Strip any line that exactly matches a heredoc delimiter to prevent
-/// heredoc escape injection.  An attacker who can inject "NIXCONF" or "FLAKEEOF"
-/// on its own line would break out of the heredoc and execute arbitrary shell.
-fn sanitize_heredoc(content: &str, delimiter: &str) -> String {
-    content
-        .lines()
-        .filter(|line| line.trim() != delimiter)
-        .collect::<Vec<_>>()
-        .join("\n")
-}
+// sanitize_heredoc imported from symthaea_spore::security
 
 fn config_write_commands(
     browser_config: &str,

@@ -91,6 +91,8 @@ exclude = [
     "crates/symthaea-zkproof/host",
     # WASM crate targets wasm32-unknown-unknown; excluded so `cargo build` works normally.
     "crates/symthaea-muse-wasm",
+    # Fuzz crates use libfuzzer-sys and require nightly + sanitizer flags.
+    "crates/symthaea-spore/fuzz",
 ]
 # Only build core crates by default; platform-specific crates (quicken-fb) require explicit -p flag.
 default-members = [

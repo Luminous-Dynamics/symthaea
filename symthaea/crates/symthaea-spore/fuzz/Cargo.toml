@@ -4,15 +4,14 @@ version = "0.0.0"
 publish = false
 edition = "2021"
 
+[workspace]
+
 [package.metadata]
 cargo-fuzz = true
 
 [dependencies]
 libfuzzer-sys = "0.4"
-
-# Fuzz targets for relay security validators.
-# The functions are duplicated here (pure functions, no dependencies)
-# to avoid pulling in the full server dependency tree.
+symthaea-spore = { path = "..", default-features = false }
 
 [[bin]]
 name = "fuzz_heredoc"
