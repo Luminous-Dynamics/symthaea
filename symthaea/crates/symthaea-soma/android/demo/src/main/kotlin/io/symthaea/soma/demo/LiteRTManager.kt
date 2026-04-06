@@ -3,8 +3,7 @@ package io.symthaea.soma.demo
 import android.content.Context
 import android.util.Log
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
@@ -12,15 +11,16 @@ import java.net.HttpURLConnection
 import java.net.URL
 
 /**
- * Manages on-device Gemma 4 E2B model via LiteRT-LM.
+ * Manages on-device Gemma 4 E2B model via LiteRT-LM Kotlin API.
+ *
+ * Uses the official Maven package (com.google.ai.edge.litertlm:litertlm-android)
+ * which bundles the native inference engine. No custom C FFI needed.
  *
  * Lifecycle:
  *   1. Check if model exists on disk (~2.58 GB)
  *   2. If not, download from HuggingFace (WiFi only)
- *   3. Initialize native engine via JNI → litert_shim.cpp
- *   4. Provide generate() for on-device inference
- *
- * Falls back to OllamaBridge (network LLM) if model is not downloaded.
+ *   3. Initialize Engine with GPU backend
+ *   4. Provide generate() and generateStreaming() for on-device inference
  */
 class LiteRTManager(private val context: Context) {
 
@@ -29,7 +29,7 @@ class LiteRTManager(private val context: Context) {
         private const val MODEL_FILENAME = "gemma4-e2b.litertlm"
         private const val MODEL_URL =
             "https://huggingface.co/litert-community/gemma-4-E2B-it-litert-lm/resolve/main/gemma-4-E2B-it-litert-lm.task"
-        private const val MODEL_SIZE_BYTES = 2_580_000_000L // ~2.58 GB
+        private const val MODEL_SIZE_BYTES = 2_580_000_000L
     }
 
     /** Download progress (0.0 to 1.0), or -1 if not downloading. */
@@ -39,6 +39,9 @@ class LiteRTManager(private val context: Context) {
     /** Whether the on-device model is ready for inference. */
     private val _isReady = MutableStateFlow(false)
     val isReady: StateFlow<Boolean> = _isReady
+
+    /** LiteRT-LM engine (null until initialized). */
+    private var engine: com.google.ai.edge.litertlm.Engine? = null
 
     /** Path to the model file in app-private storage. */
     private val modelFile: File
@@ -51,39 +54,85 @@ class LiteRTManager(private val context: Context) {
     }
 
     /**
-     * Initialize the native LiteRT-LM engine.
-     * Call after model download completes or on startup if model exists.
-     * Returns true if engine is ready.
+     * Initialize the LiteRT-LM engine with GPU backend.
+     * This can take up to 10 seconds — call from a background thread.
      */
-    fun initEngine(): Boolean {
+    suspend fun initEngine(): Boolean = withContext(Dispatchers.IO) {
         if (!isModelDownloaded()) {
-            Log.w(TAG, "Model not downloaded yet — cannot initialize engine")
-            return false
+            Log.w(TAG, "Model not downloaded yet")
+            return@withContext false
         }
 
-        val success = nativeInitEngine(modelFile.absolutePath, true /* use GPU */)
-        _isReady.value = success
+        try {
+            com.google.ai.edge.litertlm.Engine.setNativeMinLogSeverity(
+                com.google.ai.edge.litertlm.LogSeverity.WARNING
+            )
 
-        if (success) {
-            Log.i(TAG, "LiteRT-LM engine initialized (gemma4:e2b on-device, GPU backend)")
-        } else {
-            Log.e(TAG, "Failed to initialize LiteRT-LM engine")
+            val config = com.google.ai.edge.litertlm.EngineConfig(
+                modelPath = modelFile.absolutePath,
+                backend = com.google.ai.edge.litertlm.Backend.GPU(),
+                cacheDir = context.cacheDir.path,
+            )
+
+            val e = com.google.ai.edge.litertlm.Engine(config)
+            e.initialize()
+            engine = e
+            _isReady.value = true
+            Log.i(TAG, "LiteRT-LM engine ready (gemma4:e2b, GPU backend)")
+            true
+        } catch (ex: Exception) {
+            Log.e(TAG, "Engine init failed: ${ex.message}")
+            // Fallback to CPU
+            try {
+                val config = com.google.ai.edge.litertlm.EngineConfig(
+                    modelPath = modelFile.absolutePath,
+                    backend = com.google.ai.edge.litertlm.Backend.CPU(),
+                    cacheDir = context.cacheDir.path,
+                )
+                val e = com.google.ai.edge.litertlm.Engine(config)
+                e.initialize()
+                engine = e
+                _isReady.value = true
+                Log.i(TAG, "LiteRT-LM engine ready (gemma4:e2b, CPU fallback)")
+                true
+            } catch (ex2: Exception) {
+                Log.e(TAG, "CPU fallback also failed: ${ex2.message}")
+                false
+            }
         }
-
-        return success
     }
 
     /**
-     * Generate text on-device. Returns null if engine is not ready.
+     * Generate text on-device (blocking). Returns null if engine not ready.
      */
     fun generate(prompt: String, maxTokens: Int = 256): String? {
-        if (!_isReady.value) return null
-        return nativeGenerate(prompt, maxTokens)
+        val e = engine ?: return null
+        return try {
+            e.createConversation().use { conv ->
+                val response = conv.sendMessage(prompt)
+                response
+            }
+        } catch (ex: Exception) {
+            Log.w(TAG, "Generation failed: ${ex.message}")
+            null
+        }
     }
+
+    /**
+     * Generate with streaming — tokens emitted as they're produced.
+     * Returns a Flow<String> of token chunks.
+     */
+    fun generateStreaming(prompt: String): Flow<String> = flow {
+        val e = engine ?: return@flow
+        e.createConversation().use { conv ->
+            conv.sendMessageAsync(prompt).collect { chunk ->
+                emit(chunk)
+            }
+        }
+    }.flowOn(Dispatchers.IO)
 
     /**
      * Download the model file from HuggingFace.
-     * Should be called on a background thread (e.g., via viewModelScope).
      * Supports resume on interruption.
      */
     suspend fun downloadModel(): Boolean = withContext(Dispatchers.IO) {
@@ -101,7 +150,6 @@ class LiteRTManager(private val context: Context) {
             conn.connectTimeout = 15_000
             conn.readTimeout = 30_000
 
-            // Resume support
             val existingBytes = if (partFile.exists()) partFile.length() else 0L
             if (existingBytes > 0) {
                 conn.setRequestProperty("Range", "bytes=$existingBytes-")
@@ -134,41 +182,25 @@ class LiteRTManager(private val context: Context) {
 
             conn.disconnect()
 
-            // Rename .part to final filename
             if (partFile.renameTo(modelFile)) {
                 _downloadProgress.value = -1f
                 Log.i(TAG, "Model download complete: ${modelFile.absolutePath}")
-                return@withContext true
+                true
             } else {
-                Log.e(TAG, "Failed to rename part file to final model file")
-                return@withContext false
+                Log.e(TAG, "Failed to rename part file")
+                false
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Model download failed: ${e.message}")
+            Log.e(TAG, "Download failed: ${e.message}")
             _downloadProgress.value = -1f
-            return@withContext false
+            false
         }
     }
 
-    /** Release the native engine. Call from Activity.onDestroy(). */
+    /** Release the engine. Call from Activity.onDestroy(). */
     fun release() {
-        nativeReleaseEngine()
+        engine?.close()
+        engine = null
         _isReady.value = false
-    }
-
-    // ─────────────────────────────────────────────────────────────────
-    // JNI bindings → litert_shim.cpp → LiteRT-LM C++ API
-    // ───────────────────────────��─────────────────────────────────────
-
-    private external fun nativeInitEngine(modelPath: String, useGpu: Boolean): Boolean
-    private external fun nativeGenerate(prompt: String, maxTokens: Int): String?
-    private external fun nativeReleaseEngine()
-
-    init {
-        try {
-            System.loadLibrary("litert_shim")
-        } catch (e: UnsatisfiedLinkError) {
-            Log.w(TAG, "litert_shim native library not available — on-device LLM disabled")
-        }
     }
 }

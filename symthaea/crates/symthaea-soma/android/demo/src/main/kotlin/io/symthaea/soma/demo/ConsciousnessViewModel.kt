@@ -143,7 +143,7 @@ class ConsciousnessViewModel : ViewModel() {
                 android.util.Log.i("SomaVM", "Restored checkpoint — consciousness continues")
             }
 
-            // Initialize on-device LLM (LiteRT-LM / Gemma 4 E2B)
+            // Initialize on-device LLM (LiteRT-LM / Gemma 4 E2B via Maven SDK)
             try {
                 val mgr = LiteRTManager(context)
                 if (mgr.isModelDownloaded()) {
@@ -151,7 +151,7 @@ class ConsciousnessViewModel : ViewModel() {
                         android.util.Log.i("SomaVM", "LiteRT-LM engine ready (gemma4:e2b on-device)")
                     }
                 } else {
-                    android.util.Log.i("SomaVM", "LiteRT model not downloaded — on-device LLM disabled")
+                    android.util.Log.i("SomaVM", "LiteRT model not downloaded — on-device LLM disabled. Call downloadModel() to fetch 2.58GB.")
                 }
                 liteRTManager = mgr
             } catch (ex: Exception) {
