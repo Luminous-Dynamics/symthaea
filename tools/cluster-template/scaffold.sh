@@ -85,6 +85,9 @@ for tmpl in $(find "$TEMPLATE_DIR/apps/leptos" -name "*.tmpl" -type f); do
         "$tmpl" > "$dest"
 done
 
+# Copy non-template static files (icons, etc.)
+find "$TEMPLATE_DIR/apps/leptos/static" -type f ! -name "*.tmpl" -exec cp {} "$TARGET_DIR/apps/leptos/static/" \; 2>/dev/null
+
 # --- Copy and process Tauri desktop ---
 echo "Creating Tauri desktop wrapper..."
 mkdir -p "$TARGET_DIR/apps/tauri/src-tauri/src"

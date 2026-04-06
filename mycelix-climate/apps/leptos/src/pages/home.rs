@@ -44,7 +44,7 @@ pub fn HomePage() -> impl IntoView {
                 <div class="dash-card">
                     <span class="dash-label">"Projects"</span>
                     <span class="dash-value">
-                        {move || ctx.items.get().len().to_string()}
+                        {move || ctx.projects.get().len().to_string()}
                     </span>
                     <span class="dash-sub">"active"</span>
                 </div>

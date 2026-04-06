@@ -1,7 +1,5 @@
 /* Climate — Mycelix Cluster Frontend */
-
-/* Import shared design system */
-@import "../../../../crates/mycelix-leptos-core/style/base.css";
+/* base.css loaded via index.html <link data-trunk> */
 
 /* ================================================================
    CLUSTER ACCENT OVERRIDE
