@@ -3,7 +3,12 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 // Symthaea Service Worker — caches large WASM assets for instant reload.
 // Includes SRI integrity verification for binary checkpoints before caching.
-const CACHE_NAME = 'symthaea-v2';
+// Cache name derived from build version. Trunk embeds content hashes in filenames,
+// so each deploy creates a new cache name, automatically invalidating stale caches.
+// The SW registration in index.html sets this via query param: sw.js?v=<hash>
+const urlParams = new URL(self.location).searchParams;
+const CACHE_VERSION = urlParams.get('v') || 'v2';
+const CACHE_NAME = 'symthaea-' + CACHE_VERSION;
 
 // SHA-384 integrity hashes for Broca binary checkpoints.
 // Must match the hashes in spore-worker.js.

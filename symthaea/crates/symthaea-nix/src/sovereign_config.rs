@@ -903,7 +903,7 @@ mod tests {
     fn validate_nix_syntax(nix: &str) -> Result<(), String> {
         // Phase 1: rnix parse — catches real syntax errors
         let parse = rnix::Root::parse(nix);
-        let errors: Vec<_> = parse.errors().collect();
+        let errors = parse.errors();
         if !errors.is_empty() {
             // Collect up to 5 errors for the diagnostic
             let msgs: Vec<String> = errors.iter().take(5).map(|e| format!("{}", e)).collect();

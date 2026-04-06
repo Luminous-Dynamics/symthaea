@@ -235,16 +235,43 @@ self.onmessage = async function(e) {
         break;
       case 'loadBrocaPipeline':
         if (engine) {
+          self.postMessage({ type: 'pipeline_progress', stage: 'downloading', percent: 0 });
           // Try local first (self-hosted), fall back to GitHub LFS
           var response = await fetch('./assets/broca-pipeline.bin').catch(function() { return { ok: false }; });
+          var source = 'local';
           if (!response.ok) {
+            source = 'github';
             response = await fetch('https://media.githubusercontent.com/media/Luminous-Dynamics/symthaea/main/crates/symthaea-spore/data/broca-pipeline-distilled.bin');
           }
           if (!response.ok) throw new Error('Pipeline checkpoint fetch failed: ' + response.status);
-          var buffer = await response.arrayBuffer();
+          // Stream download with progress reporting
+          var contentLength = parseInt(response.headers.get('content-length') || '0', 10);
+          var buffer;
+          if (contentLength > 0 && response.body) {
+            var reader = response.body.getReader();
+            var chunks = [];
+            var received = 0;
+            while (true) {
+              var _r = await reader.read();
+              if (_r.done) break;
+              chunks.push(_r.value);
+              received += _r.value.length;
+              var pct = Math.round((received / contentLength) * 100);
+              self.postMessage({ type: 'pipeline_progress', stage: 'downloading', percent: pct, bytes: received, total: contentLength, source: source });
+            }
+            var combined = new Uint8Array(received);
+            var offset = 0;
+            for (var ch of chunks) { combined.set(ch, offset); offset += ch.length; }
+            buffer = combined.buffer;
+          } else {
+            buffer = await response.arrayBuffer();
+          }
+          self.postMessage({ type: 'pipeline_progress', stage: 'verifying', percent: 100 });
           await verifyIntegrity(buffer, SRI_HASHES['broca-pipeline'], 'broca-pipeline.bin');
+          self.postMessage({ type: 'pipeline_progress', stage: 'loading', percent: 100 });
           engine.load_broca_pipeline_checkpoint(new Uint8Array(buffer));
-          result = { ok: true, size: buffer.byteLength, pipeline: true, integrity: 'verified' };
+          self.postMessage({ type: 'pipeline_progress', stage: 'ready', percent: 100 });
+          result = { ok: true, size: buffer.byteLength, pipeline: true, integrity: 'verified', source: source };
         }
         break;
       // Phase 1: Language generation (Broca)

@@ -18,7 +18,7 @@ use std::sync::Arc;
 use std::time::Instant;
 use tokio::net::TcpListener;
 use tokio::sync::Mutex;
-use tokio_tungstenite::accept_async;
+use tokio_tungstenite::accept_hdr_async;
 use tokio_tungstenite::tungstenite::Message;
 
 // TLS support
@@ -1833,8 +1833,33 @@ async fn handle_connection(
     tracker: SharedTracker,
     auth_token: Arc<String>,
 ) {
-    // Upgrade to WebSocket
-    let ws_stream = match accept_async(stream).await {
+    // Upgrade to WebSocket with Origin header validation.
+    // Only allow connections from localhost, 127.0.0.1, or our known domains.
+    let origin_check = |req: &tungstenite::handshake::server::Request,
+                        resp: tungstenite::handshake::server::Response|
+        -> Result<tungstenite::handshake::server::Response, tungstenite::handshake::server::ErrorResponse> {
+        if let Some(origin) = req.headers().get("origin") {
+            let origin_str = origin.to_str().unwrap_or("");
+            let allowed = origin_str.starts_with("http://localhost")
+                || origin_str.starts_with("https://localhost")
+                || origin_str.starts_with("http://127.0.0.1")
+                || origin_str.starts_with("https://127.0.0.1")
+                || origin_str.contains("luminousdynamics.io")
+                || origin_str.contains("nixforhumanity.org")
+                || origin_str.contains("mycelix.net")
+                || origin_str.contains("relationalharmonics.org");
+            if !allowed {
+                eprintln!("[{}] Rejected WebSocket: disallowed Origin '{}'", peer_addr, origin_str);
+                let mut resp = tungstenite::handshake::server::ErrorResponse::new(Some("Forbidden origin".into()));
+                *resp.status_mut() = tungstenite::http::StatusCode::FORBIDDEN;
+                return Err(resp);
+            }
+        }
+        // No Origin header = non-browser client (curl, relay tools) — allow
+        Ok(resp)
+    };
+
+    let ws_stream = match accept_hdr_async(stream, origin_check).await {
         Ok(ws) => ws,
         Err(e) => {
             eprintln!("[{}] WebSocket upgrade failed: {}", peer_addr, e);
@@ -1881,8 +1906,8 @@ async fn handle_connection_ws<S: tokio::io::AsyncRead + tokio::io::AsyncWrite + 
 
         // Auth gate: require an explicit `"auth"` action with the correct token.
         // This prevents CSWSH-style attacks against ws://127.0.0.1:* services.
-        // Note: Origin header validation is not possible after WebSocket upgrade with
-        // tokio-tungstenite's accept_async. The token auth provides the primary security boundary.
+        // Origin header validated during WebSocket upgrade (handle_connection).
+        // Token auth provides the primary security boundary.
         if !authed {
             // Check if this IP is blocked due to too many failed auth attempts
             if tracker.lock().await.is_blocked(&peer_addr) {
@@ -4134,8 +4159,27 @@ async fn main() {
             tokio::spawn(async move {
                 match acceptor.accept(stream).await {
                     Ok(tls_stream) => {
-                        // WebSocket upgrade over TLS stream
-                        let ws_stream = match accept_async(tls_stream).await {
+                        // WebSocket upgrade over TLS stream (Origin validated in callback)
+                        let peer_ref = peer.clone();
+                        let origin_check = |req: &tungstenite::handshake::server::Request,
+                                            resp: tungstenite::handshake::server::Response|
+                            -> Result<tungstenite::handshake::server::Response, tungstenite::handshake::server::ErrorResponse> {
+                            if let Some(origin) = req.headers().get("origin") {
+                                let o = origin.to_str().unwrap_or("");
+                                let ok = o.starts_with("http://localhost") || o.starts_with("https://localhost")
+                                    || o.starts_with("http://127.0.0.1") || o.starts_with("https://127.0.0.1")
+                                    || o.contains("luminousdynamics.io") || o.contains("nixforhumanity.org")
+                                    || o.contains("mycelix.net") || o.contains("relationalharmonics.org");
+                                if !ok {
+                                    eprintln!("[{}] Rejected TLS WebSocket: disallowed Origin '{}'", peer_ref, o);
+                                    let mut r = tungstenite::handshake::server::ErrorResponse::new(Some("Forbidden origin".into()));
+                                    *r.status_mut() = tungstenite::http::StatusCode::FORBIDDEN;
+                                    return Err(r);
+                                }
+                            }
+                            Ok(resp)
+                        };
+                        let ws_stream = match accept_hdr_async(tls_stream, origin_check).await {
                             Ok(ws) => ws,
                             Err(e) => { eprintln!("[{}] TLS WebSocket upgrade failed: {}", peer, e); return; }
                         };

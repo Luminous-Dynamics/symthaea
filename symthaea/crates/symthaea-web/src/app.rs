@@ -183,6 +183,20 @@ pub fn App() -> impl IntoView {
                 "battery_progress" => {
                     // Experiment battery progress — handled by experiments page
                 }
+                "pipeline_progress" => {
+                    let stage = js_sys::Reflect::get(&data, &"stage".into())
+                        .ok().and_then(|v| v.as_string()).unwrap_or_default();
+                    let pct = js_sys::Reflect::get(&data, &"percent".into())
+                        .ok().and_then(|v| v.as_f64()).unwrap_or(0.0) as u32;
+                    let status = match stage.as_str() {
+                        "downloading" => format!("downloading {}%", pct),
+                        "verifying" => "verifying integrity".to_string(),
+                        "loading" => "loading into engine".to_string(),
+                        "ready" => "ready".to_string(),
+                        _ => stage,
+                    };
+                    state.pipeline_status.set(status);
+                }
                 _ => {}
             }
         });

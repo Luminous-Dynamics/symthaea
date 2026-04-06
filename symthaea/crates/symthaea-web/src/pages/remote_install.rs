@@ -15,7 +15,8 @@ use wasm_bindgen::JsCast;
 use crate::components::glass_panel::GlassPanel;
 
 // ═══════════════════════════════════════════════════════
-// LocalStorage persistence helpers
+// Storage helpers — localStorage for non-sensitive data,
+// sessionStorage for credentials (dies with tab close)
 // ═══════════════════════════════════════════════════════
 
 fn save_to_storage(key: &str, value: &str) {
@@ -34,6 +35,20 @@ fn remove_from_storage(key: &str) {
     if let Some(storage) = web_sys::window().and_then(|w| w.local_storage().ok().flatten()) {
         let _ = storage.remove_item(key);
     }
+}
+
+/// Save sensitive data to sessionStorage (cleared when tab closes).
+/// Prevents credential persistence across browser sessions.
+fn save_to_session(key: &str, value: &str) {
+    if let Some(storage) = web_sys::window().and_then(|w| w.session_storage().ok().flatten()) {
+        let _ = storage.set_item(key, value);
+    }
+}
+
+fn load_from_session(key: &str) -> Option<String> {
+    web_sys::window()
+        .and_then(|w| w.session_storage().ok().flatten())
+        .and_then(|s| s.get_item(key).ok().flatten())
 }
 
 // ═══════════════════════════════════════════════════════
@@ -302,7 +317,8 @@ pub fn RemoteInstallPanel(
     let show_advanced = RwSignal::new(false);
     let saved_relay_url = load_from_storage("si_relay_url").unwrap_or_default();
     let (relay_url, set_relay_url) = signal(saved_relay_url);
-    let saved_token = load_from_storage("si_relay_token").unwrap_or_default();
+    // SECURITY: Token in sessionStorage (cleared on tab close, not persisted)
+    let saved_token = load_from_session("si_relay_token").unwrap_or_default();
     let (relay_token, set_relay_token) = signal(saved_token);
     let (ssh_host, set_ssh_host) = signal("127.0.0.1".to_string());
     let (ssh_port, set_ssh_port) = signal("22".to_string());
@@ -360,7 +376,7 @@ pub fn RemoteInstallPanel(
             set_install_log.update(|l| l.push("Error: Auth token is required. Copy it from the relay's console output.".into()));
             return;
         }
-        save_to_storage("si_relay_token", &token);
+        save_to_session("si_relay_token", &token);
         // SSH connects to localhost on the ISO (relay bridges to local sshd)
         let target_host = ssh_host.get();
         let target_port: u16 = ssh_port.get().parse().unwrap_or(22);
@@ -556,7 +572,8 @@ pub fn RemoteInstallPanel(
                         if !line.trim().is_empty() {
                             set_install_log.update(|l| {
                                 l.push(line.to_string());
-                                if l.len() > 500 { l.drain(..100); }
+                                // Cap at 1000 lines to prevent memory exhaustion from relay flooding
+                                if l.len() > 1000 { l.drain(..200); }
                             });
                             persist_log();
                         }

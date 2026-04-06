@@ -65,6 +65,15 @@ pub mod tui;
 #[cfg(feature = "observability")]
 pub mod observability;
 
+/// App intelligence database — package search, migration analysis
+pub mod app_database;
+
+/// Sovereign NixOS configuration generator — hardware-aware, consciousness-coupled
+pub mod sovereign_config;
+
+/// Conversational NixOS installer — dialogue-driven config generation
+pub mod sovereign_conversation;
+
 // Re-export key types at crate root
 pub use action::executor::{ExecutionResult, NixOSCommand, NixOSExecutor, SafetyLevel};
 pub use parser::nix_code_parser::NixCodeParser;
