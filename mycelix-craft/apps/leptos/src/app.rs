@@ -7,10 +7,36 @@ use leptos_router::{
     path,
 };
 
+use mycelix_leptos_core::{
+    holochain_provider::HolochainProviderAuto,
+    connection_status::ConnectionStatusIndicator,
+    theme::provide_theme_context,
+    consciousness::provide_consciousness_context,
+    toasts::{provide_toast_context, ToastContainer},
+    empty_state::EmptyState,
+};
+
 use crate::pages::*;
 
 #[component]
 pub fn App() -> impl IntoView {
+    view! {
+        <HolochainProviderAuto
+            app_id="mycelix-craft"
+            role_name="craft"
+            ws_url="ws://localhost:8888"
+        >
+            <AppInner />
+        </HolochainProviderAuto>
+    }
+}
+
+#[component]
+fn AppInner() -> impl IntoView {
+    provide_theme_context("craft-theme", mycelix_leptos_core::theme::AppThemeVariant::Dark);
+    provide_consciousness_context();
+    provide_toast_context();
+
     view! {
         <Router>
             <a href="#main-content" class="skip-link">"Skip to main content"</a>
@@ -23,10 +49,10 @@ pub fn App() -> impl IntoView {
                     <A href="/applications">"Applications"</A>
                     <A href="/profile">"Profile"</A>
                 </div>
-                <span class="connection-tag">"Local Mode"</span>
+                <ConnectionStatusIndicator />
             </nav>
             <main id="main-content">
-                <Routes fallback=|| view! { <p>"Page not found"</p> }>
+                <Routes fallback=|| view! { <EmptyState icon="?" title="Page not found" /> }>
                     <Route path=path!("/") view=DashboardPage />
                     <Route path=path!("/employer") view=EmployerDashboard />
                     <Route path=path!("/jobs") view=JobsPage />
@@ -35,6 +61,7 @@ pub fn App() -> impl IntoView {
                     <Route path=path!("/profile") view=ProfilePage />
                 </Routes>
             </main>
+            <ToastContainer />
         </Router>
     }
 }
