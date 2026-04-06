@@ -42,6 +42,8 @@ fn run() {
 
     let config = HumanoidConfig {
         genesis_phrase: "residual-standing-v1".to_string(),
+        network_layers: 1,       // Minimal network for CMA-ES speed
+        neurons_per_layer: 2,    // 2 neurons × 1 layer = 2 CfC neurons total
         ..HumanoidConfig::default()
     };
 
@@ -57,9 +59,9 @@ fn run() {
     println!("  Parameters: {} (weights + bias + residual_gain)", n_params);
 
     // CMA-ES — larger population since we know the landscape is hard
-    let pop_size = 32;
-    let n_generations = 200;
-    let eval_steps = 500;
+    let pop_size = 16;
+    let n_generations = 50;
+    let eval_steps = 200;       // 5 seconds of simulated standing
     let dt = 0.025;
 
     let mut mean: Vec<f64> = vec![0.0; n_params]; // Start at zero residual
@@ -74,6 +76,8 @@ fn run() {
 
     println!("  Pop: {pop_size}, Gens: {n_generations}, Steps: {eval_steps}, Sigma: {sigma}");
     println!();
+    use std::io::Write;
+    std::io::stdout().flush().unwrap_or(());
 
     let start = Instant::now();
     let mut best_ever_fitness = f64::NEG_INFINITY;
@@ -142,10 +146,12 @@ fn run() {
 
         mean = new_mean;
 
-        if gen % 10 == 0 || gen == n_generations - 1 {
+        if gen % 5 == 0 || gen == n_generations - 1 {
             let gain = best_ever_params[n_params - 1];
             println!("{:>5} {:>12.4} {:>12.4} {:>12.4} {:>8.5} gain={:.3}",
                 gen, best_fitness, mean_fitness, best_ever_fitness, sigma, gain);
+            use std::io::Write;
+            std::io::stdout().flush().unwrap_or(());
         }
     }
 
