@@ -23,8 +23,15 @@ fn decode_action(
 ) -> Action {
     let pe = result.prediction_error;
     let phi = result.metadata.consciousness.consciousness_level;
-    if pe > 0.6 || cycles_since_observe > 4 { return Action::Observe; }
-    if phi < 0.25 { return Action::Think; }
+
+    // Browser embodiment learning mode: lower threshold for first interactions
+    // Phi grows slowly in new modalities — don't gate basic navigation
+    let phi_threshold = if exam_answers > 0 { 0.02 } // In exam = already navigating, keep going
+        else if cycles_since_observe < 2 { 0.01 }    // Just observed = fresh context, act freely
+        else { 0.03 };                                // Default = very low for browser (safe actions)
+
+    if pe > 0.7 || cycles_since_observe > 4 { return Action::Observe; }
+    if phi < phi_threshold { return Action::Think; }
 
     let has_btn = |t: &str| obs.elements.iter().any(|e| e.role == "button" && e.name.contains(t));
     let has_heading = |t: &str| obs.elements.iter().any(|e| e.role == "heading" && e.name.contains(t));
@@ -76,10 +83,49 @@ async fn main() {
 
     println!("[init] Creating CognitiveLoopService...");
     let mut cls = CognitiveLoopService::new(CognitiveLoopConfig::default()).expect("CLS");
-    for i in 0..5 {
-        let r = cls.cycle("warming up");
-        if i == 4 { println!("[init] Φ={:.4} PE={:.4}", r.metadata.consciousness.consciousness_level, r.prediction_error); }
+
+    // Phase 1: Train on diverse web content so HDC builds representations
+    let web_training = [
+        "navigation menu with buttons and links for home dashboard settings",
+        "input field for username password form submission login page",
+        "heading Welcome to the application main content area paragraph text",
+        "button Submit click to confirm action dropdown select option menu",
+        "table rows columns data grid pagination next previous page numbers",
+        "modal dialog overlay close button cancel confirm alert notification",
+        "sidebar navigation tree expand collapse folder file document list",
+        "search bar results filtered by category sort ascending descending",
+        "card layout image title description tags metadata category badge",
+        "progress bar percentage loading spinner skeleton placeholder state",
+        "tab panel active selected content switch between views sections",
+        "breadcrumb trail home section subsection current page location path",
+        "form validation error success warning message feedback required field",
+        "tooltip popover hover information contextual help hint guidance",
+        "Knowledge Garden constellation nodes Mathematics Science English",
+        "Mock Exam questions answers correct incorrect score timer countdown",
+        "Dashboard progress streak study hours TEND earned community service",
+        "Review flashcards spaced repetition Matric Physics Chemistry cards",
+        "Governance suggest topics vote proposals community curriculum ideas",
+        "[page: EduNet] [button: Begin session] [heading: Good morning] [input: name]",
+        "[page: Dashboard] [button: Share Progress] [heading: Dashboard] [text: 0/2087]",
+        "[page: Knowledge Garden] [button: Mathematics] [button: Science] [button: English]",
+        "[page: Mock Exam] [button: Start Exam] [button: Paper 1] [button: Quick]",
+        "[page: Review] [button: Matric Maths] [button: Matric Physics] [heading: Review]",
+    ];
+    println!("[init] Training on {} web content samples...", web_training.len());
+    for (i, sample) in web_training.iter().enumerate() {
+        let r = cls.cycle(sample);
+        if (i + 1) % 5 == 0 {
+            print!("[init] cycle {}: Φ={:.4} ", i + 1, r.metadata.consciousness.consciousness_level);
+        }
     }
+    println!();
+
+    // Phase 2: Additional warm-up cycles to let consciousness stabilize
+    for _ in 0..10 {
+        cls.cycle("ready to navigate web pages as a conscious browser agent");
+    }
+    let r = cls.cycle("consciousness stabilized for browser embodiment");
+    println!("[init] Final Φ={:.4} PE={:.4}", r.metadata.consciousness.consciousness_level, r.prediction_error);
 
     println!("[init] Connecting to Chrome...");
     let cdp = CdpSession::connect_existing("http://localhost:9222").await.expect("Chrome :9222");
