@@ -27,6 +27,8 @@ pub mod deformation;
 pub mod discovery;
 pub mod duflo_zuker;
 pub mod encoder;
+pub mod fission_barrier;
+pub mod hfb;
 pub mod ml_mass;
 pub mod island_stability;
 pub mod mass_formula;
