@@ -4,42 +4,217 @@
 
 use leptos::prelude::*;
 
+// ---------------------------------------------------------------------------
+// Mock data types
+// ---------------------------------------------------------------------------
+
+#[derive(Clone)]
+struct Connection {
+    display_name: String,
+    headline: String,
+    connected_since: String,
+}
+
+#[derive(Clone)]
+struct PendingRequest {
+    display_name: String,
+    headline: String,
+    received: String,
+}
+
+#[derive(Clone)]
+struct Recommendation {
+    from_name: String,
+    text: String,
+    date: String,
+}
+
+// ---------------------------------------------------------------------------
+// Mock data
+// ---------------------------------------------------------------------------
+
+fn mock_connections() -> Vec<Connection> {
+    vec![
+        Connection {
+            display_name: "Nia Modise".into(),
+            headline: "Holochain hApp Developer".into(),
+            connected_since: "2026-01-15".into(),
+        },
+        Connection {
+            display_name: "Erik Lindqvist".into(),
+            headline: "NixOS Infrastructure Engineer".into(),
+            connected_since: "2026-02-03".into(),
+        },
+        Connection {
+            display_name: "Amara Osei".into(),
+            headline: "Data Science & ML Researcher".into(),
+            connected_since: "2026-03-22".into(),
+        },
+    ]
+}
+
+fn mock_pending() -> Vec<PendingRequest> {
+    vec![PendingRequest {
+        display_name: "Jun Tanaka".into(),
+        headline: "Cybersecurity Consultant".into(),
+        received: "2026-04-02".into(),
+    }]
+}
+
+fn mock_recommendations() -> Vec<Recommendation> {
+    vec![Recommendation {
+        from_name: "Nia Modise".into(),
+        text: "Exceptional systems thinker. Built a full Holochain cluster in two weeks and documented every design decision. Highly recommended for distributed systems work.".into(),
+        date: "2026-03-10".into(),
+    }]
+}
+
+// ---------------------------------------------------------------------------
+// Component
+// ---------------------------------------------------------------------------
+
 #[component]
 pub fn NetworkPage() -> impl IntoView {
+    let connections = mock_connections();
+    let pending = mock_pending();
+    let recommendations = mock_recommendations();
+
+    let conn_count = connections.len();
+    let pending_count = pending.len();
+    let rec_count = recommendations.len();
+
     view! {
         <div class="page network-page">
             <h1>"Craft Network"</h1>
 
+            // Summary stats
+            <div class="stat-cards">
+                <div class="stat-card">
+                    <p class="stat-value">{conn_count}</p>
+                    <p class="stat-label">"Connections"</p>
+                </div>
+                <div class="stat-card">
+                    <p class="stat-value">{pending_count}</p>
+                    <p class="stat-label">"Pending"</p>
+                </div>
+                <div class="stat-card">
+                    <p class="stat-value">{rec_count}</p>
+                    <p class="stat-label">"Recommendations"</p>
+                </div>
+                <div class="stat-card">
+                    <p class="stat-value">"0"</p>
+                    <p class="stat-label">"Endorsements"</p>
+                </div>
+            </div>
+
             <div class="network-grid">
+                // Connections
                 <div class="network-section">
                     <h3>"Connections"</h3>
-                    <p class="text-secondary">"Your craft connections appear here."</p>
                     <div class="connections-list">
-                        <p class="empty-state">"No connections yet. Send a connection request to get started."</p>
+                        {connections
+                            .into_iter()
+                            .map(|c| {
+                                view! {
+                                    <div class="connection-card">
+                                        <div class="connection-info">
+                                            <p class="connection-name">{c.display_name}</p>
+                                            <p class="connection-headline">{c.headline}</p>
+                                        </div>
+                                        <p class="connection-date">
+                                            {format!("Connected {}", c.connected_since)}
+                                        </p>
+                                    </div>
+                                }
+                            })
+                            .collect::<Vec<_>>()}
                     </div>
                 </div>
 
+                // Pending requests
                 <div class="network-section">
                     <h3>"Pending Requests"</h3>
                     <p class="text-secondary">"Incoming connection requests."</p>
                     <div class="requests-list">
-                        <p class="empty-state">"No pending requests."</p>
+                        {if pending.is_empty() {
+                            view! { <p class="empty-state">"No pending requests."</p> }.into_any()
+                        } else {
+                            view! {
+                                <div>
+                                    {pending
+                                        .into_iter()
+                                        .map(|r| {
+                                            view! {
+                                                <div class="request-card">
+                                                    <div class="request-info">
+                                                        <p class="connection-name">
+                                                            {r.display_name}
+                                                        </p>
+                                                        <p class="connection-headline">
+                                                            {r.headline}
+                                                        </p>
+                                                        <p class="connection-date">
+                                                            {format!("Received {}", r.received)}
+                                                        </p>
+                                                    </div>
+                                                    <div class="request-actions">
+                                                        <button class="btn-primary btn-sm">
+                                                            "Accept"
+                                                        </button>
+                                                        <button class="btn-secondary btn-sm">
+                                                            "Decline"
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            }
+                                        })
+                                        .collect::<Vec<_>>()}
+                                </div>
+                            }
+                            .into_any()
+                        }}
                     </div>
                 </div>
 
+                // Recommendations
                 <div class="network-section">
                     <h3>"Recommendations"</h3>
                     <p class="text-secondary">"Recommendations from your network."</p>
                     <div class="recommendations-list">
-                        <p class="empty-state">"No recommendations yet."</p>
+                        {if recommendations.is_empty() {
+                            view! { <p class="empty-state">"No recommendations yet."</p> }
+                                .into_any()
+                        } else {
+                            view! {
+                                <div>
+                                    {recommendations
+                                        .into_iter()
+                                        .map(|r| {
+                                            view! {
+                                                <div class="recommendation-card">
+                                                    <blockquote>{r.text}</blockquote>
+                                                    <p class="rec-attribution">
+                                                        {format!("-- {}, {}", r.from_name, r.date)}
+                                                    </p>
+                                                </div>
+                                            }
+                                        })
+                                        .collect::<Vec<_>>()}
+                                </div>
+                            }
+                            .into_any()
+                        }}
                     </div>
                 </div>
 
+                // Endorsements (still empty — data comes from Holochain)
                 <div class="network-section">
                     <h3>"Skill Endorsements"</h3>
                     <p class="text-secondary">"Peer attestations of your skills."</p>
                     <div class="endorsements-list">
-                        <p class="empty-state">"No endorsements yet. Share your agent pubkey with peers."</p>
+                        <p class="empty-state">
+                            "No endorsements yet. Share your agent pubkey with peers."
+                        </p>
                     </div>
                 </div>
             </div>

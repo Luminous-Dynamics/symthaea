@@ -47,6 +47,7 @@ fn AppInner() -> impl IntoView {
                     <A href="/jobs">"Jobs"</A>
                     <A href="/network">"Network"</A>
                     <A href="/applications">"Applications"</A>
+                    <A href="/credentials">"Credentials"</A>
                     <A href="/profile">"Profile"</A>
                 </div>
                 <ConnectionStatusIndicator />
@@ -58,6 +59,7 @@ fn AppInner() -> impl IntoView {
                     <Route path=path!("/jobs") view=JobsPage />
                     <Route path=path!("/network") view=NetworkPage />
                     <Route path=path!("/applications") view=ApplicationsPage />
+                    <Route path=path!("/credentials") view=CredentialsPage />
                     <Route path=path!("/profile") view=ProfilePage />
                 </Routes>
             </main>

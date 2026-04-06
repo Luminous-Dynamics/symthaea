@@ -7,6 +7,7 @@ mod jobs;
 mod network;
 mod applications;
 mod profile;
+mod credentials;
 
 pub use dashboard::DashboardPage;
 pub use employer::EmployerDashboard;
@@ -14,3 +15,4 @@ pub use jobs::JobsPage;
 pub use network::NetworkPage;
 pub use applications::ApplicationsPage;
 pub use profile::ProfilePage;
+pub use credentials::CredentialsPage;

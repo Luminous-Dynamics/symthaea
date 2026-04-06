@@ -16,7 +16,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 
 /// A job posting as returned by the zome (simplified view for matching).
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct JobView {
     pub title: String,
     pub organization: String,
@@ -27,7 +27,7 @@ pub struct JobView {
 }
 
 /// A scored job match result.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct JobMatch {
     pub job: JobView,
     pub score: f32,

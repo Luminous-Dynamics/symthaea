@@ -4,57 +4,271 @@
 //! Job matching runs client-side using the matching engine.
 
 use leptos::prelude::*;
+use std::collections::HashSet;
 use wasm_bindgen::JsCast;
+
+use crate::matching::{rank_jobs, JobMatch, JobView};
+
+/// Return a set of mock job postings spanning diverse skill domains.
+fn mock_jobs() -> Vec<JobView> {
+    vec![
+        JobView {
+            title: "Rust / Holochain Engineer".into(),
+            organization: "Luminous Dynamics".into(),
+            required_skills: vec!["rust".into(), "holochain".into(), "wasm".into()],
+            preferred_skills: vec!["leptos".into(), "nix".into()],
+            education_level: Some("Bachelor's".into()),
+            remote_ok: true,
+        },
+        JobView {
+            title: "Data Science Lead".into(),
+            organization: "Mycelix Foundation".into(),
+            required_skills: vec!["python".into(), "data-science".into(), "machine-learning".into()],
+            preferred_skills: vec!["rust".into(), "sql".into()],
+            education_level: Some("Master's".into()),
+            remote_ok: true,
+        },
+        JobView {
+            title: "Cybersecurity Analyst".into(),
+            organization: "NixForHumanity".into(),
+            required_skills: vec!["cybersecurity".into(), "linux".into(), "networking".into()],
+            preferred_skills: vec!["nix".into(), "rust".into(), "python".into()],
+            education_level: None,
+            remote_ok: false,
+        },
+        JobView {
+            title: "Full-Stack Web Developer".into(),
+            organization: "Resontia Labs".into(),
+            required_skills: vec!["typescript".into(), "react".into(), "node".into()],
+            preferred_skills: vec!["rust".into(), "wasm".into(), "holochain".into()],
+            education_level: None,
+            remote_ok: true,
+        },
+        JobView {
+            title: "Distributed Systems Researcher".into(),
+            organization: "Symthaea Institute".into(),
+            required_skills: vec!["rust".into(), "distributed-systems".into()],
+            preferred_skills: vec![
+                "holochain".into(),
+                "cryptography".into(),
+                "python".into(),
+                "data-science".into(),
+            ],
+            education_level: Some("PhD".into()),
+            remote_ok: true,
+        },
+    ]
+}
 
 #[component]
 pub fn JobsPage() -> impl IntoView {
     let (search_query, set_search_query) = signal(String::new());
+    let (skills_input, set_skills_input) = signal(String::from("rust, holochain"));
+
+    // Parse comma-separated skills into a HashSet, updated reactively.
+    let agent_skills = Memo::new(move |_| {
+        skills_input
+            .get()
+            .split(',')
+            .map(|s| s.trim().to_lowercase())
+            .filter(|s| !s.is_empty())
+            .collect::<HashSet<String>>()
+    });
+
+    let jobs = mock_jobs();
+
+    // Rank jobs whenever agent_skills changes.
+    let matched_jobs = Memo::new(move |_| {
+        let skills = agent_skills.get();
+        let query = search_query.get().to_lowercase();
+        let mut ranked = rank_jobs(&jobs, &skills, None, 0.0, 20);
+        // Additionally filter by free-text search if present.
+        if !query.is_empty() {
+            ranked.retain(|m| {
+                m.job.title.to_lowercase().contains(&query)
+                    || m.job.organization.to_lowercase().contains(&query)
+                    || m.job
+                        .required_skills
+                        .iter()
+                        .any(|s| s.contains(&query))
+                    || m.job
+                        .preferred_skills
+                        .iter()
+                        .any(|s| s.contains(&query))
+            });
+        }
+        ranked
+    });
 
     view! {
         <div class="page jobs-page">
             <h1>"Job Opportunities"</h1>
 
+            // Skills input for the matching engine
+            <div class="skills-input-section">
+                <label for="agent-skills"><strong>"Your Skills"</strong>" (comma-separated)"</label>
+                <input
+                    id="agent-skills"
+                    type="text"
+                    placeholder="e.g. rust, holochain, python, data-science"
+                    class="search-input"
+                    aria-label="Your skills for job matching"
+                    prop:value=move || skills_input.get()
+                    on:input=move |ev| {
+                        let input: web_sys::HtmlInputElement = ev.target().unwrap().dyn_into().unwrap();
+                        set_skills_input.set(input.value());
+                    }
+                />
+                <p class="text-secondary">
+                    {move || {
+                        let count = agent_skills.get().len();
+                        format!("{count} skill{} active", if count == 1 { "" } else { "s" })
+                    }}
+                </p>
+            </div>
+
+            // Free-text search bar
             <div class="search-bar">
                 <input
                     type="text"
-                    placeholder="Search by skill (e.g., rust, holochain, python)..."
+                    placeholder="Filter by keyword (title, org, skill)..."
                     class="search-input"
-                    aria-label="Search jobs by skill"
+                    aria-label="Search jobs by keyword"
                     prop:value=move || search_query.get()
                     on:input=move |ev| {
                         let input: web_sys::HtmlInputElement = ev.target().unwrap().dyn_into().unwrap();
                         set_search_query.set(input.value());
                     }
                 />
-                <button class="btn-primary">"Search"</button>
             </div>
 
+            // Matched jobs grid
             <div class="jobs-grid">
-                <div class="job-card">
-                    <h3>"Rust Developer"</h3>
-                    <p class="job-org">"Luminous Dynamics"</p>
-                    <div class="job-skills">
-                        <span class="skill-tag">"rust"</span>
-                        <span class="skill-tag">"holochain"</span>
-                        <span class="skill-tag">"wasm"</span>
-                    </div>
-                    <div class="job-meta">
-                        <span>"Remote"</span>
-                        <span>"$80k-$120k"</span>
-                    </div>
-                </div>
-
-                <div class="placeholder-card">
-                    <p>"Job listings will appear here when the Holochain conductor is connected."</p>
-                    <p class="text-secondary">"Post a job or search by skill to get started."</p>
-                </div>
+                {move || {
+                    let matches = matched_jobs.get();
+                    if matches.is_empty() {
+                        view! {
+                            <div class="placeholder-card">
+                                <p>"No matching jobs found. Try adding more skills above."</p>
+                            </div>
+                        }
+                        .into_any()
+                    } else {
+                        view! {
+                            <div class="matched-jobs-list">
+                                {matches
+                                    .into_iter()
+                                    .map(|m| job_card_view(m, agent_skills.get()))
+                                    .collect::<Vec<_>>()}
+                            </div>
+                        }
+                        .into_any()
+                    }
+                }}
             </div>
 
+            // Post a job
             <div class="post-job-section">
                 <h3>"Post a Job"</h3>
-                <p class="text-secondary">"Create a job posting visible to the entire craft network."</p>
-                <button class="btn-primary" disabled title="Connect to Holochain conductor to post jobs">"Create Job Posting"</button>
+                <p class="text-secondary">
+                    "Create a job posting visible to the entire craft network."
+                </p>
+                <button
+                    class="btn-primary"
+                    disabled
+                    title="Connect to Holochain conductor to post jobs"
+                >
+                    "Create Job Posting"
+                </button>
             </div>
+        </div>
+    }
+}
+
+/// Render a single matched job card with score bar and highlighted tags.
+fn job_card_view(m: JobMatch, agent_skills: HashSet<String>) -> impl IntoView {
+    let pct = (m.score * 100.0).round() as u32;
+    let pct_label = format!("{}% match", pct);
+    let bar_width = format!("{}%", pct);
+    let location = if m.job.remote_ok { "Remote" } else { "On-site" };
+
+    view! {
+        <div class="job-card">
+            <div class="job-header">
+                <h3>{m.job.title.clone()}</h3>
+                <span class="match-badge">{pct_label}</span>
+            </div>
+            <p class="job-org">{m.job.organization.clone()}</p>
+
+            // Score bar
+            <div
+                class="score-bar-bg"
+                role="progressbar"
+                aria-valuenow=pct
+                aria-valuemin=0
+                aria-valuemax=100
+            >
+                <div class="score-bar-fill" style:width=bar_width></div>
+            </div>
+
+            // Required skills
+            <div class="job-skills">
+                <span class="skill-label">"Required: "</span>
+                {m.job
+                    .required_skills
+                    .iter()
+                    .map(|s| {
+                        let matched = agent_skills.contains(s);
+                        let cls = if matched { "skill-tag matched" } else { "skill-tag" };
+                        view! { <span class=cls>{s.clone()}</span> }
+                    })
+                    .collect::<Vec<_>>()}
+            </div>
+
+            // Preferred skills (if any)
+            {if !m.job.preferred_skills.is_empty() {
+                Some(
+                    view! {
+                        <div class="job-skills">
+                            <span class="skill-label">"Preferred: "</span>
+                            {m.job
+                                .preferred_skills
+                                .iter()
+                                .map(|s| {
+                                    let matched = agent_skills.contains(s);
+                                    let cls = if matched {
+                                        "skill-tag preferred matched"
+                                    } else {
+                                        "skill-tag preferred"
+                                    };
+                                    view! { <span class=cls>{s.clone()}</span> }
+                                })
+                                .collect::<Vec<_>>()}
+                        </div>
+                    },
+                )
+            } else {
+                None
+            }}
+
+            <div class="job-meta">
+                <span>{location}</span>
+                {m.job
+                    .education_level
+                    .as_ref()
+                    .map(|ed| {
+                        view! { <span>{format!("Edu: {ed}")}</span> }
+                    })}
+                {if m.credential_bonus {
+                    Some(view! { <span class="credential-ok">"Credential match"</span> })
+                } else {
+                    None
+                }}
+            </div>
+
+            <button class="btn-primary" disabled title="Connect to Holochain to apply">
+                "Apply"
+            </button>
         </div>
     }
 }
