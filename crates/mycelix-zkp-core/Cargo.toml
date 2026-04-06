@@ -55,9 +55,11 @@ winter-crypto = { version = "0.13.1", optional = true }
 pqcrypto-dilithium = { version = "0.5", optional = true }
 pqcrypto-traits = { version = "0.3", optional = true }
 
+# Random number generation (needed for benchmarks and STARK witness generation)
+rand = "0.8"
+
 [dev-dependencies]
 serde_json = "1.0"
-rand = "0.8"
 
 [[bench]]
 name = "zkp_core_bench"
