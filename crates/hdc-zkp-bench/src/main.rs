@@ -23,6 +23,8 @@
 //! - Verifier time (ms)
 //! - Proof size (bytes)
 
+mod cfc_temporal;
+
 use std::time::Instant;
 
 // ═══════════════════════════════════════════════════════════════════
@@ -253,6 +255,30 @@ fn main() {
         println!("non-linear constraints, while prime-field STARKs need {} constraints", winterfell_result.constraint_count);
         println!("for the same operation on 16,384-bit vectors.");
     }
+
+    // CfC temporal proofs
+    println!("\n\n{}", "=".repeat(60));
+    println!("CfC TEMPORAL PROOF BENCHMARKS");
+    println!("{}", "=".repeat(60));
+
+    let cfc_small = cfc_temporal::bench_cfc_temporal(8, 10);    // 8 neurons, 10 steps
+    let cfc_medium = cfc_temporal::bench_cfc_temporal(64, 100);  // 64 neurons, 100 steps
+
+    println!("\n╔══════════════════════════════════════════════════════════════╗");
+    println!("║              CfC TEMPORAL PROOF SUMMARY                      ║");
+    println!("╠══════════════════════════════════════════════════════════════╣");
+    println!("║ Config           │ Constraints │ Prove (ms) │ Proof (KB) ║");
+    println!("╠══════════════════════════════════════════════════════════════╣");
+    println!("║  8N × 10T        │ {:>11} │ {:>10.1} │ {:>10.1} ║",
+        cfc_small.and_constraints, cfc_small.prove_time_ms, cfc_small.proof_size_bytes as f64 / 1024.0);
+    println!("║ 64N × 100T       │ {:>11} │ {:>10.1} │ {:>10.1} ║",
+        cfc_medium.and_constraints, cfc_medium.prove_time_ms, cfc_medium.proof_size_bytes as f64 / 1024.0);
+    println!("╚══════════════════════════════════════════════════════════════╝");
+
+    println!("\nKey insight: CfC closed-form h(t) = h + σ*(x_inf - h) requires");
+    println!("exactly 1 AND constraint per neuron per timestep in Binius.");
+    println!("XOR additions (delta computation, state update) are FREE.");
+    println!("LTC with RK4 would need ~16x more constraints for ODE integration.");
 
     // Output JSON for paper data
     println!("\n--- JSON (for paper) ---");
