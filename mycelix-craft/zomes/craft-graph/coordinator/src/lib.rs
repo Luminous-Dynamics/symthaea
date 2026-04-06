@@ -756,6 +756,82 @@ mod tests {
         let s20 = ebbinghaus_stability(500, 20);
         assert!((s10 - s20).abs() < 0.01); // Reviews beyond 10 don't increase stability
     }
+
+    // ---- Credential pipeline data model tests ----
+
+    #[test]
+    fn published_credential_guild_fields_default_to_none() {
+        let json = r#"{
+            "credential_id": "test",
+            "title": "Rust Dev",
+            "issuer": "alice",
+            "issued_on": "2026-01-01",
+            "expires_on": null,
+            "source_dna": null,
+            "entry_hash": null,
+            "action_hash": null,
+            "summary": null,
+            "vitality_permille": 1000,
+            "last_retention_check": null,
+            "mastery_level_at_issue": null
+        }"#;
+        let cred: PublishedCredential = serde_json::from_str(json).unwrap();
+        assert!(cred.guild_id.is_none());
+        assert!(cred.epistemic_code.is_none());
+        assert!(cred.mastery_permille.is_none());
+        assert!(cred.verified.is_none());
+    }
+
+    #[test]
+    fn published_credential_with_guild_context() {
+        let json = r#"{
+            "credential_id": "vc:praxis:rust-101",
+            "title": "Rust Fundamentals",
+            "issuer": "praxis-academy",
+            "issued_on": "1712000000000000",
+            "expires_on": null,
+            "source_dna": "praxis",
+            "entry_hash": "uhCkk",
+            "action_hash": "uhCkk",
+            "summary": "Completed Rust fundamentals course",
+            "vitality_permille": 1000,
+            "last_retention_check": "1712000000000000",
+            "mastery_level_at_issue": 850,
+            "guild_id": "rust-developers-guild",
+            "guild_name": "Rust Developers",
+            "epistemic_code": "E3-N1-M2",
+            "fl_model_version": "rust-2026-v1.0",
+            "mastery_permille": 850,
+            "verified": true
+        }"#;
+        let cred: PublishedCredential = serde_json::from_str(json).unwrap();
+        assert_eq!(cred.guild_id.as_deref(), Some("rust-developers-guild"));
+        assert_eq!(cred.epistemic_code.as_deref(), Some("E3-N1-M2"));
+        assert_eq!(cred.mastery_permille, Some(850));
+        assert_eq!(cred.verified, Some(true));
+    }
+
+    #[test]
+    fn mastery_permille_feeds_stability() {
+        let s_low = ebbinghaus_stability(200, 0);
+        let s_high = ebbinghaus_stability(900, 0);
+        assert!(s_high > s_low);
+        let elapsed = 2000.0;
+        let v_low = predict_vitality(s_low, elapsed);
+        let v_high = predict_vitality(s_high, elapsed);
+        assert!(v_high > v_low, "high mastery vitality {v_high} > low mastery {v_low}");
+    }
+
+    #[test]
+    fn retention_checks_extend_credential_life() {
+        let elapsed = 5000.0;
+        let mastery = 500;
+        let v_0 = predict_vitality(ebbinghaus_stability(mastery, 0), elapsed);
+        let v_5 = predict_vitality(ebbinghaus_stability(mastery, 5), elapsed);
+        let v_10 = predict_vitality(ebbinghaus_stability(mastery, 10), elapsed);
+        assert!(v_5 > v_0, "5 reviews should extend life");
+        assert!(v_10 > v_5, "10 reviews should extend more");
+    }
 }
 
 #[hdk_extern]
