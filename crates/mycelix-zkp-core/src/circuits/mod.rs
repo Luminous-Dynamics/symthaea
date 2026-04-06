@@ -7,3 +7,9 @@
 
 #[cfg(feature = "backend-winterfell")]
 pub mod range_proof;
+
+#[cfg(feature = "backend-winterfell")]
+pub mod winterfell_bench;
+
+#[cfg(feature = "backend-winterfell")]
+pub mod winterfell_xor;
