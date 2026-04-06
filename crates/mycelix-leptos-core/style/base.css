@@ -685,7 +685,42 @@
 }
 
 /* ================================================================
-   22. CLUSTER LAUNCHER
+   22. INDLELA GROWTH SYSTEM
+   ================================================================ */
+.growth-seed    { opacity: 0.45; }
+.growth-sprout  { opacity: 0.7; }
+.growth-sapling { opacity: 0.85; }
+.growth-tree    { opacity: 1.0; }
+
+.growth-node {
+    transition: r var(--duration-interact), opacity var(--duration-interact);
+}
+.growth-seed .growth-node    { fill: var(--text-muted); }
+.growth-sprout .growth-node  { fill: var(--semantic-warning); }
+.growth-sapling .growth-node { fill: var(--brand-cyan); }
+.growth-tree .growth-node    { fill: var(--semantic-success); }
+
+.pulse-ring {
+    animation: indlela-pulse 2s ease-in-out infinite;
+    fill: none;
+    stroke: var(--brand-cyan);
+    stroke-width: 1.5;
+}
+
+@keyframes indlela-pulse {
+    0%, 100% { opacity: 0.3; transform: scale(1); }
+    50% { opacity: 0.8; transform: scale(1.15); }
+}
+
+.freshness-ring {
+    fill: none;
+    stroke: var(--semantic-warning);
+    stroke-dasharray: 3 4;
+    opacity: 0.3;
+}
+
+/* ================================================================
+   23. CLUSTER LAUNCHER
    ================================================================ */
 .cluster-launcher {
     position: fixed;

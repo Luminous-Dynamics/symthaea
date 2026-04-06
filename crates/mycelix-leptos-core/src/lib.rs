@@ -60,6 +60,8 @@ pub mod empty_state;
 pub mod search_bar;
 pub mod badge;
 pub mod cluster_launcher;
+pub mod indlela;
+pub mod spore_bridge;
 
 // --- Reactive systems ---
 pub mod theme;
@@ -113,6 +115,8 @@ pub use empty_state::EmptyState;
 pub use search_bar::SearchBar;
 pub use badge::{Badge, BadgeVariant, StatusDot};
 pub use cluster_launcher::{ClusterLauncher, ClusterLink, default_clusters};
+pub use indlela::{GrowthStage, community_warmth, knowledge_freshness};
+pub use spore_bridge::{SporeState, provide_spore_bridge, use_spore};
 
 // Re-exports — utilities
 pub use util::{set_css_var, set_root_attribute};
