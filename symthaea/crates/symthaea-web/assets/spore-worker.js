@@ -8,6 +8,26 @@ import init, { SporeEngine } from './pkg/symthaea_spore.js';
 
 let engine = null;
 let running = false;
+
+// SRI integrity hashes for binary checkpoints (SHA-384, base64)
+const SRI_HASHES = {
+  'broca-spore-v1':  'sha384-64PfK8W4PXmIQFZRarpCpZy9Rt+PrfASbeebbvwUwhA6q6HOpx9Pzq6ycrmrAsij',
+  'broca-pipeline':  'sha384-zg2Z4NjVMxVkRCtcs66FQK0nCBSrghMQ3uh9gChjx6HTl2bYvuhvttRXJdBQkr4j',
+};
+
+// Verify SHA-384 integrity of a fetched ArrayBuffer.
+// Throws if the hash does not match the expected value.
+async function verifyIntegrity(buffer, expectedSRI, label) {
+  const hashBuf = await crypto.subtle.digest('SHA-384', buffer);
+  const hashArr = new Uint8Array(hashBuf);
+  let binary = '';
+  for (let i = 0; i < hashArr.length; i++) binary += String.fromCharCode(hashArr[i]);
+  const computed = 'sha384-' + btoa(binary);
+  if (computed !== expectedSRI) {
+    throw new Error('SRI integrity check FAILED for ' + label +
+      '. Expected ' + expectedSRI + ', got ' + computed);
+  }
+}
 let cycleInterval = null;
 let currentThought = 'awareness';
 let cycleCount = 0;
@@ -202,14 +222,15 @@ self.onmessage = async function(e) {
       case 'report':
         if (engine) result = engine.consciousness_report();
         break;
-      // Broca checkpoint loading
+      // Broca checkpoint loading (with SRI integrity verification)
       case 'loadBrocaCheckpoint':
         if (engine) {
           var response = await fetch('./assets/broca-spore-v1.bin');
           if (!response.ok) throw new Error('Checkpoint fetch failed: ' + response.status);
           var buffer = await response.arrayBuffer();
+          await verifyIntegrity(buffer, SRI_HASHES['broca-spore-v1'], 'broca-spore-v1.bin');
           engine.load_broca_checkpoint(new Uint8Array(buffer));
-          result = { ok: true, size: buffer.byteLength };
+          result = { ok: true, size: buffer.byteLength, integrity: 'verified' };
         }
         break;
       case 'loadBrocaPipeline':
@@ -221,8 +242,9 @@ self.onmessage = async function(e) {
           }
           if (!response.ok) throw new Error('Pipeline checkpoint fetch failed: ' + response.status);
           var buffer = await response.arrayBuffer();
+          await verifyIntegrity(buffer, SRI_HASHES['broca-pipeline'], 'broca-pipeline.bin');
           engine.load_broca_pipeline_checkpoint(new Uint8Array(buffer));
-          result = { ok: true, size: buffer.byteLength, pipeline: true };
+          result = { ok: true, size: buffer.byteLength, pipeline: true, integrity: 'verified' };
         }
         break;
       // Phase 1: Language generation (Broca)
