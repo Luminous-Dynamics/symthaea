@@ -11,6 +11,8 @@ members = [
     "zomes/connection-graph/coordinator",
     "zomes/applications/integrity",
     "zomes/applications/coordinator",
+    "zomes/guild/integrity",
+    "zomes/guild/coordinator",
 ]
 
 resolver = "2"

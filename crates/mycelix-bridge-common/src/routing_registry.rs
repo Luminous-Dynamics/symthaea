@@ -306,6 +306,7 @@ pub const CRAFT_LOCAL_ZOMES: &[&str] = &[
     "work_history_coordinator",
     "connection_graph_coordinator",
     "applications_coordinator",
+    "guild_coordinator",
 ];
 
 /// Zomes allowed for local dispatch within the Legacy cluster.
@@ -1372,7 +1373,7 @@ mod tests {
         assert_eq!(get_local_zomes(CrossClusterRole::Energy).unwrap().len(), 5);
         assert_eq!(get_local_zomes(CrossClusterRole::Knowledge).unwrap().len(), 8);
         assert_eq!(get_local_zomes(CrossClusterRole::Climate).unwrap().len(), 3);
-        assert_eq!(get_local_zomes(CrossClusterRole::Craft).unwrap().len(), 5);
+        assert_eq!(get_local_zomes(CrossClusterRole::Craft).unwrap().len(), 6);
         assert_eq!(get_local_zomes(CrossClusterRole::Manufacturing).unwrap().len(), 6);
         assert_eq!(get_local_zomes(CrossClusterRole::Supplychain).unwrap().len(), 8);
         assert_eq!(get_local_zomes(CrossClusterRole::Praxis).unwrap().len(), 12);
