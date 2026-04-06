@@ -6,7 +6,7 @@
 //! AI-interactable: data-agent-did, data-tier, all balances as data-* attributes.
 
 use leptos::prelude::*;
-use crate::consciousness_provider::use_consciousness;
+use mycelix_leptos_core::use_consciousness;
 use crate::contexts::governance_context::use_governance;
 use crate::contexts::finance_context::use_finance;
 

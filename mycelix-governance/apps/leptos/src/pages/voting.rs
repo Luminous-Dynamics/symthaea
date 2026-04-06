@@ -6,7 +6,7 @@
 
 use leptos::prelude::*;
 use crate::contexts::governance_context::use_governance;
-use crate::consciousness_provider::use_consciousness;
+use mycelix_leptos_core::use_consciousness;
 use governance_leptos_types::*;
 
 #[component]

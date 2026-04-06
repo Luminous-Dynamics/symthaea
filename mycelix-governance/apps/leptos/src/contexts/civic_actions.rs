@@ -7,10 +7,9 @@
 use leptos::prelude::*;
 use wasm_bindgen_futures::spawn_local;
 use governance_leptos_types::*;
-use crate::holochain::use_holochain;
+use mycelix_leptos_core::holochain_provider::use_holochain;
+use mycelix_leptos_core::{use_toasts, use_consciousness, ToastKind};
 use crate::contexts::governance_context::use_governance;
-use crate::toasts::use_toasts;
-use crate::consciousness_provider::use_consciousness;
 
 /// Marker struct for action dispatch context.
 #[derive(Clone)]
@@ -45,7 +44,7 @@ pub fn cast_vote(proposal_id: String, choice: VoteChoice, reasoning: Option<Stri
                 created: now_micros(),
             });
         });
-        toasts.push("your voice has been heard", "governance");
+        toasts.push("your voice has been heard", ToastKind::Custom("governance".into()));
     } else {
         let hc = hc.clone();
         spawn_local(async move {
@@ -73,10 +72,10 @@ pub fn cast_vote(proposal_id: String, choice: VoteChoice, reasoning: Option<Stri
             match hc.call_zome::<_, serde_json::Value>(
                 "governance", "voting", "cast_phi_weighted_vote", &input,
             ).await {
-                Ok(_) => toasts.push("your voice has been heard", "governance"),
+                Ok(_) => toasts.push("your voice has been heard", ToastKind::Custom("governance".into())),
                 Err(e) => {
                     web_sys::console::log_1(&format!("cast vote failed: {e}").into());
-                    toasts.push("your voice could not reach the commons", "error");
+                    toasts.push("your voice could not reach the commons", ToastKind::Error);
                 }
             }
         });
@@ -109,7 +108,7 @@ pub fn create_proposal(title: String, description: String, proposal_type: Propos
                 version: 1,
             });
         });
-        toasts.push(format!("{id} has begun to grow"), "governance");
+        toasts.push(format!("{id} has begun to grow"), ToastKind::Custom("governance".into()));
     } else {
         let hc = hc.clone();
         spawn_local(async move {
@@ -135,10 +134,10 @@ pub fn create_proposal(title: String, description: String, proposal_type: Propos
             match hc.call_zome::<_, serde_json::Value>(
                 "governance", "proposals", "create_proposal", &input,
             ).await {
-                Ok(_) => toasts.push("a new proposal has begun to grow", "governance"),
+                Ok(_) => toasts.push("a new proposal has begun to grow", ToastKind::Custom("governance".into())),
                 Err(e) => {
                     web_sys::console::log_1(&format!("create proposal failed: {e}").into());
-                    toasts.push("the proposal could not take root", "error");
+                    toasts.push("the proposal could not take root", ToastKind::Error);
                 }
             }
         });
@@ -151,7 +150,7 @@ pub fn add_contribution(proposal_id: String, content: String, stance: Option<Con
     let toasts = use_toasts();
 
     if hc.is_mock() {
-        toasts.push("your perspective has joined the discussion", "governance");
+        toasts.push("your perspective has joined the discussion", ToastKind::Custom("governance".into()));
     } else {
         let hc = hc.clone();
         spawn_local(async move {
@@ -177,7 +176,7 @@ pub fn add_contribution(proposal_id: String, content: String, stance: Option<Con
             match hc.call_zome::<_, serde_json::Value>(
                 "governance", "proposals", "add_contribution", &input,
             ).await {
-                Ok(_) => toasts.push("your perspective has joined the discussion", "governance"),
+                Ok(_) => toasts.push("your perspective has joined the discussion", ToastKind::Custom("governance".into())),
                 Err(e) => {
                     web_sys::console::log_1(&format!("add contribution failed: {e}").into());
                 }
@@ -198,7 +197,7 @@ pub fn record_tend_exchange(receiver_did: String, hours: f32, description: Strin
     if hc.is_mock() {
         toasts.push(
             format!("recorded {hours:.1}h of care — thank you"),
-            "finance",
+            ToastKind::Custom("finance".into()),
         );
     } else {
         let hc = hc.clone();
@@ -225,10 +224,10 @@ pub fn record_tend_exchange(receiver_did: String, hours: f32, description: Strin
             match hc.call_zome::<_, serde_json::Value>(
                 "finance", "tend", "record_exchange", &input,
             ).await {
-                Ok(_) => toasts.push("care recorded — the community is richer", "finance"),
+                Ok(_) => toasts.push("care recorded \u{2014} the community is richer", ToastKind::Custom("finance".into())),
                 Err(e) => {
                     web_sys::console::log_1(&format!("record exchange failed: {e}").into());
-                    toasts.push("the exchange could not be recorded", "error");
+                    toasts.push("the exchange could not be recorded", ToastKind::Error);
                 }
             }
         });
@@ -245,7 +244,7 @@ pub fn recognize_member(recipient_did: String, contribution_type: String) {
             .unwrap_or(&recipient_did).to_string();
         toasts.push(
             format!("{short}'s contribution has been recognized"),
-            "finance",
+            ToastKind::Custom("finance".into()),
         );
     } else {
         let hc = hc.clone();
@@ -271,10 +270,10 @@ pub fn recognize_member(recipient_did: String, contribution_type: String) {
             match hc.call_zome::<_, serde_json::Value>(
                 "finance", "recognition", "recognize_member", &input,
             ).await {
-                Ok(_) => toasts.push("recognition has been given", "finance"),
+                Ok(_) => toasts.push("recognition has been given", ToastKind::Custom("finance".into())),
                 Err(e) => {
                     web_sys::console::log_1(&format!("recognize member failed: {e}").into());
-                    toasts.push("recognition could not be recorded", "error");
+                    toasts.push("recognition could not be recorded", ToastKind::Error);
                 }
             }
         });

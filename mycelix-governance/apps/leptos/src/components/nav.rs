@@ -6,8 +6,7 @@
 
 use leptos::prelude::*;
 use leptos_router::components::A;
-use crate::holochain::ConnectionBadge;
-use crate::consciousness_provider::use_consciousness;
+use mycelix_leptos_core::{ConnectionBadge, use_consciousness};
 
 #[component]
 pub fn Nav() -> impl IntoView {

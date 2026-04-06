@@ -7,7 +7,7 @@ use leptos::prelude::*;
 use leptos_router::hooks::use_params_map;
 use crate::contexts::governance_context::use_governance;
 use crate::contexts::civic_actions;
-use crate::consciousness_provider::use_consciousness;
+use mycelix_leptos_core::use_consciousness;
 use governance_leptos_types::*;
 
 #[component]
