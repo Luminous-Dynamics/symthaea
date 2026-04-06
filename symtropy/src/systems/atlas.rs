@@ -268,12 +268,16 @@ pub fn setup_globe_view(
     // ═══ HOLOGRAPHIC GLOBE ═══════════════════════════════════════
 
     // [1] Globe with custom holographic shader — Fresnel + scanlines
-    let earth_mesh = meshes.add(Sphere::new(1.0).mesh().uv(64, 64)); // 64 = smooth at distance, 4x fewer verts
+    // Night lights as emissive — cities glow through any transparency level
+    let earth_mesh = meshes.add(Sphere::new(1.0).mesh().uv(64, 64));
     let earth_texture: Handle<Image> = asset_server.load(sol_atlas_bevy::globe::EARTH_TEXTURE_PATH);
+    let night_texture: Handle<Image> = asset_server.load("textures/earth-night-8k.jpg");
     let holo_globe = holo_materials.add(sol_atlas_bevy::holographic_material::HolographicMaterial {
         base: StandardMaterial {
-            base_color: Color::linear_rgba(0.12, 0.18, 0.22, 0.4), // brighter — landmasses visible as ghost contours
+            base_color: Color::linear_rgba(0.15, 0.22, 0.28, 0.5),
             base_color_texture: Some(earth_texture),
+            emissive: LinearRgba::new(4.0, 3.0, 1.5, 1.0), // strong glow — city lights visible through hologram
+            emissive_texture: Some(night_texture), // city lights glow through holographic transparency
             alpha_mode: AlphaMode::Blend,
             double_sided: true,
             cull_mode: None,
@@ -1217,9 +1221,7 @@ pub fn draw_arcs_system(
     // ═══ SHIPPING LANES (Infrastructure view only) ════════════════
     let lanes = sol_atlas_bevy::data::load_shipping_lanes();
     let lane_color = Color::linear_rgba(0.15, 0.3, 0.55, 0.10);
-    let show_lanes = atlas_data.as_ref().map(|_| true).unwrap_or(false); // placeholder — need view resource
-    // TODO: gate on DataView::Infrastructure when accessible from draw_arcs_system
-    let _ = show_lanes;
+    // Shipping lanes disabled by default — enable in Infrastructure view
     for route in &lanes {
         break; // disabled by default — too noisy. Enable in Infrastructure view.
         for w in route.windows(2) {

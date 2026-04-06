@@ -63,7 +63,7 @@ fn fragment(
         let noise_mod = mix(0.85, 1.0, noise);
         pbr_input.material.base_color = vec4<f32>(
             pbr_input.material.base_color.rgb * scan_mod * noise_mod,
-            pbr_input.material.base_color.a * holographic.hologram_alpha * (0.08 + 0.92 * pow(fresnel, 1.5))
+            pbr_input.material.base_color.a * holographic.hologram_alpha * (0.15 + 0.85 * pow(fresnel, 1.5))
         );
 
         // Add Fresnel glow to emissive
