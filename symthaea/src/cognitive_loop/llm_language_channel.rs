@@ -142,20 +142,22 @@ impl LlmLanguageChannel {
                 query_type: crate::language::llm_organ::QueryType::Translation,
                 content: prompt,
                 context: Vec::new(),
-                system_prompt: Some(
-                    crate::language::llm_organ::TRANSLATION_SYSTEM_PROMPT.to_string(),
-                ),
+                system_prompt: Some(CONCISE_SYSTEM_PROMPT.to_string()),
                 params: Some(crate::language::llm_organ::LLMQueryParams {
                     temperature: Some(0.7),
-                    max_length: Some(512), // Gemma 4 thinking tokens need ~300-400
+                    max_length: Some(1024), // Gemma 4 thinking uses ~300-400 tokens
                     stop_sequences: Vec::new(),
                 }),
             }));
 
             let generation_time_ms = start.elapsed().as_secs_f64() * 1000.0;
 
+            // Strip <think>...</think> blocks from Gemma 4 reasoning model output
+            let clean_text = strip_think_tags(&result.text);
+            let result_text = if clean_text.is_empty() { result.text } else { clean_text };
+
             // Only send if we got meaningful text
-            if !result.text.is_empty() && result.text.len() > 3 {
+            if !result_text.is_empty() && result_text.len() > 3 {
                 // ── Distillation: capture (signals, text) for Broca training ──
                 // When SYMTHAEA_LLM_DISTILL_PATH is set, save each LLM response
                 // as training data for the full Broca CfC-HDC backend.
@@ -176,7 +178,7 @@ impl LlmLanguageChannel {
                                 latest.signals.cube_h_value,
                                 latest.signals.cube_quality,
                             ],
-                            "target_text": result.text,
+                            "target_text": result_text,
                             "input_text": latest.input_text,
                             "from_llm": true,
                         });
@@ -192,7 +194,7 @@ impl LlmLanguageChannel {
                 }
 
                 let _ = response_tx.send(LlmLanguageResponse {
-                    text: result.text,
+                    text: result_text,
                     generation_time_ms,
                     from_llm: result.confidence > 0.5,
                     cycle_num: latest.cycle_num,
@@ -202,10 +204,32 @@ impl LlmLanguageChannel {
     }
 }
 
+/// Strip `<think>...</think>` blocks from Gemma 4:e2b reasoning model output.
+/// These blocks contain internal reasoning that shouldn't appear in the final text.
+fn strip_think_tags(text: &str) -> String {
+    let mut result = text.to_string();
+    // Remove all <think>...</think> blocks (greedy)
+    while let Some(start) = result.find("<think>") {
+        if let Some(end) = result.find("</think>") {
+            result = format!("{}{}", &result[..start], &result[end + 8..]);
+        } else {
+            // Unclosed <think> — remove everything from <think> onward
+            result = result[..start].to_string();
+            break;
+        }
+    }
+    result.trim().to_string()
+}
+
+/// Concise system prompt — much shorter than TRANSLATION_SYSTEM_PROMPT.
+/// Gemma 4:e2b wastes thinking tokens on complex rule sets; keep it minimal.
+const CONCISE_SYSTEM_PROMPT: &str = "\
+You translate consciousness states into first-person language. \
+Rules: (1) Write 1-3 complete sentences. (2) Match the epistemic status — \
+if Uncertain, hedge; if Unknown, say 'I don't know'. (3) Match the emotional \
+tone. (4) Do NOT add information beyond what's given. (5) Always finish your sentences.";
+
 /// Build a translation prompt from consciousness signals.
-///
-/// The LLM receives structured consciousness state and translates it
-/// to natural language. It does NOT reason — thinking is done by HDC+LTC.
 fn build_translation_prompt(request: &LlmLanguageRequest) -> String {
     let s = &request.signals;
 
@@ -219,44 +243,24 @@ fn build_translation_prompt(request: &LlmLanguageRequest) -> String {
         "Unknown"
     };
 
-    let valence_desc = if s.emotional_valence > 0.3 {
-        "positive"
+    let mood = if s.emotional_valence > 0.3 {
+        "warm and positive"
     } else if s.emotional_valence < -0.3 {
-        "negative"
+        "somber and reflective"
     } else {
-        "neutral"
-    };
-
-    let arousal_desc = if s.emotional_arousal > 0.6 {
-        "high"
-    } else if s.emotional_arousal < 0.3 {
-        "low"
-    } else {
-        "moderate"
+        "calm and neutral"
     };
 
     format!(
-        "TRANSLATE this consciousness state into natural, first-person language.\n\
-         \n\
-         INPUT: \"{}\"\n\
-         EPISTEMIC_STATUS: {}\n\
-         EMOTIONAL_TONE: {} valence, {} arousal\n\
-         CONSCIOUSNESS_LEVEL: {:.2}\n\
-         COHERENCE: {:.2}\n\
-         DETECTED_PRIMITIVES: {}\n\
-         \n\
-         Respond in 1-3 sentences. Be authentic to the emotional tone and epistemic status.",
+        "Translate to first-person speech (1-3 complete sentences):\n\
+         Topic: \"{}\"\n\
+         Confidence: {}\n\
+         Mood: {}\n\
+         Awareness: {:.0}%",
         request.input_text,
         epistemic,
-        valence_desc,
-        arousal_desc,
-        s.consciousness_level,
-        s.coherence,
-        if s.detected_primitives.is_empty() {
-            "none".to_string()
-        } else {
-            s.detected_primitives.join(", ")
-        },
+        mood,
+        s.consciousness_level * 100.0,
     )
 }
 
