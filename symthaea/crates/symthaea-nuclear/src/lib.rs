@@ -23,7 +23,9 @@
 
 pub mod ame2020;
 pub mod constants;
+pub mod deformation;
 pub mod discovery;
+pub mod duflo_zuker;
 pub mod encoder;
 pub mod island_stability;
 pub mod mass_formula;
@@ -31,6 +33,8 @@ pub mod shell_model;
 
 pub use ame2020::*;
 pub use constants::*;
+pub use deformation::*;
+pub use duflo_zuker::*;
 pub use discovery::*;
 pub use encoder::*;
 pub use island_stability::*;
