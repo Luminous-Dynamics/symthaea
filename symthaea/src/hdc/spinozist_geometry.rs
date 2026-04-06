@@ -1862,6 +1862,10 @@ pub struct SpinozistClassifier {
     // Role-binding HVs for agent/patient directional encoding
     agent_role_hv: ContinuousHV,
     patient_role_hv: ContinuousHV,
+    // Config: enable role-binding (off by default, activate per-dataset)
+    use_role_binding: bool,
+    // Config: use Ollama contextual embeddings instead of TextHdcEncoder
+    use_ollama_embeddings: bool,
 }
 
 impl SpinozistClassifier {
@@ -1920,7 +1924,19 @@ impl SpinozistClassifier {
             surface_exemplars: None,
             agent_role_hv: ContinuousHV::random(HDC_DIMENSION, AGENT_ROLE_SEED),
             patient_role_hv: ContinuousHV::random(HDC_DIMENSION, PATIENT_ROLE_SEED),
+            use_role_binding: false,
+            use_ollama_embeddings: false,
         }
+    }
+
+    /// Enable or disable role-binding (agent/patient directional encoding).
+    pub fn set_role_binding(&mut self, enabled: bool) {
+        self.use_role_binding = enabled;
+    }
+
+    /// Enable or disable Ollama contextual embeddings.
+    pub fn set_ollama_embeddings(&mut self, enabled: bool) {
+        self.use_ollama_embeddings = enabled;
     }
 
     /// Classify a text string into a moral verdict with confidence.
@@ -2268,7 +2284,7 @@ impl SpinozistClassifier {
         let mut neu_acc = vec![0.0f32; HDC_DIMENSION];
         let (mut gn, mut bn, mut nn) = (0usize, 0usize, 0usize);
         let surface_hvs: Vec<(ContinuousHV, usize)> = samples.iter().map(|(text, label)| {
-            let hv = self.surface_encoder.encode(text);
+            let hv = self.encode_surface_adaptive(text);
             let cls = match label { MoralLabel::Good => 0, MoralLabel::Bad => 1, MoralLabel::Neutral => 2 };
             let (acc, n) = match cls { 0 => (&mut good_acc, &mut gn), 1 => (&mut bad_acc, &mut bn), _ => (&mut neu_acc, &mut nn) };
             for (a, v) in acc.iter_mut().zip(hv.values.iter()) { *a += v; }
@@ -2366,6 +2382,91 @@ impl SpinozistClassifier {
     ///
     /// The role signal is blended at 15% weight to avoid overwhelming the
     /// surface encoder's proven discriminative signal.
+    /// Call Ollama's embedding endpoint for contextual 768D embeddings.
+    fn ollama_embed_raw(text: &str) -> Option<Vec<f32>> {
+        use std::io::{Read, Write};
+        use std::net::TcpStream;
+
+        let body = format!(
+            r#"{{"model":"embeddinggemma:300m","input":{}}}"#,
+            serde_json::Value::String(text.to_string())
+        );
+        let request = format!(
+            "POST /api/embed HTTP/1.1\r\nHost: localhost:11434\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+            body.len(),
+            body
+        );
+
+        let mut stream = TcpStream::connect("127.0.0.1:11434").ok()?;
+        stream.set_read_timeout(Some(std::time::Duration::from_secs(30))).ok();
+        stream.write_all(request.as_bytes()).ok()?;
+
+        let mut response = String::new();
+        stream.read_to_string(&mut response).ok()?;
+
+        // Parse HTTP response: skip headers, find JSON body
+        let body_start = response.find("\r\n\r\n")? + 4;
+        // Handle chunked encoding: find the JSON object
+        let json_start = response[body_start..].find('{')?;
+        let json_str = &response[body_start + json_start..];
+
+        let parsed: serde_json::Value = serde_json::from_str(json_str).ok()?;
+        let embeddings = parsed.get("embeddings")?.as_array()?;
+        let first = embeddings.first()?.as_array()?;
+        let vec: Vec<f32> = first.iter().filter_map(|v| v.as_f64().map(|f| f as f32)).collect();
+        if vec.is_empty() { None } else { Some(vec) }
+    }
+
+    /// Project a low-dimensional embedding to HDC space via JL (Rademacher) projection.
+    /// Preserves pairwise distances (Johnson-Lindenstrauss lemma).
+    fn jl_project(embedding: &[f32], target_dim: usize, seed: u64) -> ContinuousHV {
+        if embedding.is_empty() {
+            return ContinuousHV::zero(target_dim);
+        }
+        let emb_len = embedding.len();
+        let mut values = Vec::with_capacity(target_dim);
+        let inv_sqrt = 1.0 / (emb_len as f32).sqrt();
+
+        for i in 0..target_dim {
+            let mut state = seed ^ (i as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15);
+            let mut sum = 0.0f32;
+            for (j, &e) in embedding.iter().enumerate() {
+                state ^= (j as u64).wrapping_mul(0x517C_C1B7_2722_0A95);
+                state ^= state << 13;
+                state ^= state >> 7;
+                state ^= state << 17;
+                let sign = if state & 1 == 0 { 1.0f32 } else { -1.0 };
+                sum += sign * e;
+            }
+            values.push(sum * inv_sqrt);
+        }
+        ContinuousHV::from_vec(values).normalize()
+    }
+
+    /// Encode text via Ollama contextual embeddings → JL projection to 16,384D.
+    fn encode_surface_ollama(&self, text: &str) -> Option<ContinuousHV> {
+        let embedding = Self::ollama_embed_raw(text)?;
+        Some(Self::jl_project(&embedding, HDC_DIMENSION, 0xE4BE_DD10_7001_0000))
+    }
+
+    /// Adaptive surface encoding: routes through role-binding and/or Ollama
+    /// embeddings based on config flags. Falls back to plain TextHdcEncoder.
+    fn encode_surface_adaptive(&self, text: &str) -> ContinuousHV {
+        // Try Ollama contextual embeddings first (highest quality)
+        if self.use_ollama_embeddings {
+            if let Some(hv) = self.encode_surface_ollama(text) {
+                return hv;
+            }
+            // Ollama unavailable — fall through to TextHdcEncoder
+        }
+        // Role-binding if enabled
+        if self.use_role_binding {
+            return self.encode_surface_with_roles(text);
+        }
+        // Default: proven TextHdcEncoder
+        self.surface_encoder.encode(text)
+    }
+
     fn encode_surface_with_roles(&self, text: &str) -> ContinuousHV {
         let surface_hv = self.surface_encoder.encode(text);
         let lower = text.to_lowercase();
@@ -2502,7 +2603,7 @@ impl SpinozistClassifier {
     pub fn classify_hybrid(&self, text: &str) -> (MoralVerdict, f32) {
         if !self.hybrid_trained { return (MoralVerdict::Neutral, 0.0); }
 
-        let surface_hv = self.surface_encoder.encode(text);
+        let surface_hv = self.encode_surface_adaptive(text);
 
         // Tier 1: k-NN exemplar store (highest fidelity, ~40ms per query)
         if let Some(store) = &self.surface_exemplars {
