@@ -109,9 +109,12 @@ done
 cp "$TEMPLATE_DIR/apps/tauri/src-tauri/capabilities/default.json" \
    "$TARGET_DIR/apps/tauri/src-tauri/capabilities/default.json"
 
-# --- Copy and process types crate ---
-echo "Creating types crate..."
+# --- Copy and process types crate (skip if exists) ---
 TYPES_DIR="$TARGET_DIR/crates/${CLUSTER}-leptos-types"
+if [[ -f "$TYPES_DIR/src/lib.rs" ]]; then
+    echo "Types crate already exists at $TYPES_DIR — skipping."
+else
+    echo "Creating types crate..."
 mkdir -p "$TYPES_DIR/src"
 
 for tmpl in $(find "$TEMPLATE_DIR/crates/CLUSTER-leptos-types" -name "*.tmpl" -type f); do
@@ -125,6 +128,7 @@ for tmpl in $(find "$TEMPLATE_DIR/crates/CLUSTER-leptos-types" -name "*.tmpl" -t
         -e "s|{{cluster_pascal}}|${PASCAL}|g" \
         "$tmpl" > "$dest"
 done
+fi
 
 # --- Done ---
 echo ""

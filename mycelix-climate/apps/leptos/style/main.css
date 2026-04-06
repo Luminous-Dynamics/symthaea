@@ -1,7 +1,7 @@
 /* Climate — Mycelix Cluster Frontend */
 
 /* Import shared design system */
-@import "../../../../../../crates/mycelix-leptos-core/style/base.css";
+@import "../../../../crates/mycelix-leptos-core/style/base.css";
 
 /* ================================================================
    CLUSTER ACCENT OVERRIDE
@@ -36,6 +36,117 @@
     max-width: 800px;
     margin: 0 auto;
 }
+
+/* ================================================================
+   DASHBOARD CARDS
+   ================================================================ */
+.dash-card {
+    display: flex;
+    flex-direction: column;
+    padding: var(--space-md) var(--space-lg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    background: var(--bg-raised);
+    text-align: left;
+}
+.dash-label {
+    font-size: var(--text-xs);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    margin-bottom: var(--space-xs);
+}
+.dash-value {
+    font-size: var(--text-xl);
+    font-weight: 700;
+    color: var(--text-primary);
+}
+.dash-sub {
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+    margin-top: var(--space-xs);
+}
+
+/* ================================================================
+   SUMMARY BAR
+   ================================================================ */
+.summary-bar {
+    display: flex;
+    gap: var(--space-lg);
+    justify-content: center;
+    margin-bottom: var(--space-xl);
+    flex-wrap: wrap;
+}
+.summary-item { text-align: center; }
+.summary-label { display: block; font-size: var(--text-xs); color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; }
+.summary-value { display: block; font-size: var(--text-xl); font-weight: 700; color: var(--text-primary); }
+.summary-value.accent { color: var(--primary); }
+
+/* ================================================================
+   CREDIT CARDS
+   ================================================================ */
+.credit-list { display: flex; flex-direction: column; gap: var(--space-sm); max-width: 600px; margin: 0 auto; }
+.credit-card { padding: var(--space-md); border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--bg-raised); }
+.credit-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-sm); }
+.credit-id { font-family: var(--font-mono); font-size: var(--text-sm); color: var(--text-muted); }
+.credit-body { display: flex; flex-direction: column; gap: var(--space-xs); }
+.credit-tonnes { font-size: var(--text-lg); font-weight: 600; color: var(--text-primary); }
+.credit-meta { font-size: var(--text-xs); color: var(--text-muted); }
+
+.badge-active { background: var(--semantic-success); color: #fff; }
+.badge-retired { background: var(--text-muted); color: #fff; }
+.badge-transferred { background: var(--semantic-info); color: #fff; }
+
+/* ================================================================
+   EMISSIONS
+   ================================================================ */
+.emissions-card { padding: var(--space-lg); border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--bg-raised); max-width: 600px; margin: 0 auto; }
+.emissions-total { text-align: center; margin-bottom: var(--space-md); }
+.emissions-value { font-size: 2.5rem; font-weight: 700; color: var(--text-primary); }
+.emissions-unit { display: block; font-size: var(--text-sm); color: var(--text-muted); }
+
+.scope-breakdown { margin-bottom: var(--space-md); }
+.scope-bar { display: flex; height: 12px; border-radius: var(--radius-pill); overflow: hidden; background: var(--bg-surface); }
+.scope-fill { height: 100%; transition: width 0.3s ease; }
+.scope1 { background: #ef4444; }
+.scope2 { background: #f59e0b; }
+.scope3 { background: #3b82f6; }
+
+.scope-legend { display: flex; gap: var(--space-md); justify-content: center; margin-top: var(--space-sm); flex-wrap: wrap; }
+.scope-item { display: flex; align-items: center; gap: 4px; font-size: var(--text-xs); color: var(--text-muted); }
+.dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+.scope1-dot { background: #ef4444; }
+.scope2-dot { background: #f59e0b; }
+.scope3-dot { background: #3b82f6; }
+
+.emissions-meta { display: flex; justify-content: space-between; align-items: center; font-size: var(--text-sm); color: var(--text-muted); }
+
+/* ================================================================
+   PROJECT CARDS
+   ================================================================ */
+.project-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: var(--space-md); }
+.project-card { padding: var(--space-md); border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--bg-raised); }
+.project-header { display: flex; align-items: flex-start; gap: var(--space-sm); margin-bottom: var(--space-sm); }
+.project-icon { font-size: 1.5rem; }
+.project-title-group { flex: 1; }
+.project-name { margin: 0; font-size: var(--text-base); color: var(--text-primary); }
+.project-type { font-size: var(--text-xs); color: var(--text-muted); }
+.project-body { display: flex; flex-direction: column; gap: var(--space-xs); font-size: var(--text-sm); }
+.project-location { color: var(--text-muted); }
+.project-credits { color: var(--text-secondary); }
+.project-footer { margin-top: var(--space-sm); }
+
+.badge-phase-proposed { background: var(--semantic-warning); color: #000; }
+.badge-phase-verified { background: var(--semantic-info); color: #fff; }
+.badge-phase-active { background: var(--semantic-success); color: #fff; }
+.badge-phase-completed { background: var(--text-muted); color: #fff; }
+
+/* ================================================================
+   PROFILE
+   ================================================================ */
+.page-profile { max-width: 800px; margin: 0 auto; }
+.profile-section { margin-bottom: var(--space-2xl); }
+.profile-section h2 { font-size: var(--text-lg); color: var(--text-primary); margin: 0 0 var(--space-md); }
 
 /* ================================================================
    RESPONSIVE

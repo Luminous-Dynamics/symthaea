@@ -2,5 +2,13 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 mod home;
+mod credits;
+mod emissions;
+mod projects;
+mod profile;
 
 pub use home::HomePage;
+pub use credits::CreditsPage;
+pub use emissions::EmissionsPage;
+pub use projects::ProjectsPage;
+pub use profile::ProfilePage;

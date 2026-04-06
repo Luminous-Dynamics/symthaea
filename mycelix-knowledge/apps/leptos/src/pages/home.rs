@@ -5,18 +5,18 @@ use leptos::prelude::*;
 use mycelix_leptos_core::ConnectionStatus;
 use mycelix_leptos_core::holochain_provider;
 use mycelix_leptos_core::consciousness::use_consciousness;
-use crate::context::use_{{cluster_name}}_context;
+use crate::context::use_knowledge_context;
 
 #[component]
 pub fn HomePage() -> impl IntoView {
     let hc = holochain_provider::use_holochain();
     let consciousness = use_consciousness();
-    let ctx = use_{{cluster_name}}_context();
+    let ctx = use_knowledge_context();
 
     view! {
         <div class="page-home">
-            <h1>"{{cluster_display}}"</h1>
-            <p class="subtitle">"Welcome to the {{cluster_display}} cluster."</p>
+            <h1>"Knowledge"</h1>
+            <p class="subtitle">"Welcome to the Knowledge cluster."</p>
 
             <div class="dashboard-grid">
                 <div class="dash-card">

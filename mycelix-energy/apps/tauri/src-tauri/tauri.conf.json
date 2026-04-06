@@ -1,0 +1,36 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Energy",
+  "version": "0.1.0",
+  "identifier": "net.mycelix.energy",
+  "build": {
+    "frontendDist": "../../leptos/dist",
+    "devUrl": "http://localhost:8108",
+    "beforeBuildCommand": "cd ../../leptos && trunk build --release",
+    "beforeDevCommand": "cd ../../leptos && trunk serve --port 8108"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [
+      {
+        "title": "Energy — Mycelix",
+        "width": 1280,
+        "height": 800,
+        "minWidth": 360,
+        "minHeight": 640,
+        "resizable": true,
+        "center": true
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; style-src 'self' 'unsafe-inline' https:; connect-src 'self' https: wss: ws://localhost:*; font-src 'self' https: data:; img-src 'self' https: data: blob:"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all"
+  },
+  "plugins": {
+    "shell": { "open": true }
+  }
+}

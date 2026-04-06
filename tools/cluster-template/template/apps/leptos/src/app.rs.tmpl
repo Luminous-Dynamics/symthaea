@@ -57,7 +57,9 @@ pub fn App() -> impl IntoView {
     let config = HolochainProviderConfig {
         app_id: "mycelix-unified".into(),
         default_role: Some("{{cluster_name}}".into()),
-        ..Default::default()
+        log_prefix: "[{{cluster_display}}]",
+        connect_strategy: mycelix_leptos_core::ConnectStrategy::WebSocket,
+        status_labels: None,
     };
 
     view! {

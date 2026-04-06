@@ -1,4 +1,4 @@
-/* {{cluster_display}} — Mycelix Cluster Frontend */
+/* Knowledge — Mycelix Cluster Frontend */
 
 /* Import shared design system */
 @import "../../../../crates/mycelix-leptos-core/style/base.css";
@@ -7,7 +7,7 @@
    CLUSTER ACCENT OVERRIDE
    ================================================================ */
 :root {
-    --primary: {{accent_color}};
+    --primary: #8b5cf6;
 }
 
 /* ================================================================

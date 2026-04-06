@@ -14,7 +14,7 @@ use mycelix_leptos_core::{
 };
 use mycelix_leptos_i18n::provide_i18n;
 
-use crate::context::provide_climate_context;
+use crate::context::provide_knowledge_context;
 use crate::pages;
 
 // ---------------------------------------------------------------------------
@@ -56,8 +56,8 @@ impl mycelix_leptos_core::AppTheme for AppThemeVariant {
 pub fn App() -> impl IntoView {
     let config = HolochainProviderConfig {
         app_id: "mycelix-unified".into(),
-        default_role: Some("climate".into()),
-        log_prefix: "[Climate]",
+        default_role: Some("knowledge".into()),
+        log_prefix: "[Knowledge]",
         connect_strategy: mycelix_leptos_core::ConnectStrategy::WebSocket,
         status_labels: None,
     };
@@ -72,38 +72,31 @@ pub fn App() -> impl IntoView {
 #[component]
 fn AppInner() -> impl IntoView {
     // Provider stack (order matters)
-    provide_theme_context("climate-theme", AppThemeVariant::Dark);
+    provide_theme_context("knowledge-theme", AppThemeVariant::Dark);
     provide_thermodynamic_context();
     provide_consciousness_context();
     provide_toast_context();
     provide_homeostasis_context(2, "--homeostasis");
-    provide_i18n("climate-lang");
-    provide_climate_context();
+    provide_i18n("knowledge-lang");
+    provide_knowledge_context();
     init_consciousness_ui();
 
     let nav_links = vec![
         NavLink { href: "/", label: "Home", icon: None },
-        NavLink { href: "/credits", label: "Credits", icon: Some("💎") },
-        NavLink { href: "/emissions", label: "Emissions", icon: Some("📊") },
-        NavLink { href: "/projects", label: "Projects", icon: Some("🌳") },
-        NavLink { href: "/profile", label: "Profile", icon: Some("👤") },
+        // Add your cluster-specific nav links here
     ];
 
     view! {
         <Router>
             <AppShell
-                brand_name="Climate"
-                brand_icon="🌍"
+                brand_name="Knowledge"
+                brand_icon="🧠"
                 nav_links=nav_links
             >
                 <Routes fallback=|| view! {
                     <EmptyState icon="?" title="Page not found" />
                 }>
                     <Route path=path!("/") view=pages::HomePage />
-                    <Route path=path!("/credits") view=pages::CreditsPage />
-                    <Route path=path!("/emissions") view=pages::EmissionsPage />
-                    <Route path=path!("/projects") view=pages::ProjectsPage />
-                    <Route path=path!("/profile") view=pages::ProfilePage />
                 </Routes>
             </AppShell>
             <ToastContainer />
