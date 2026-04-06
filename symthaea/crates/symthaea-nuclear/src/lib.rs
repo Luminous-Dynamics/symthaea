@@ -28,6 +28,7 @@ pub mod discovery;
 pub mod duflo_zuker;
 pub mod encoder;
 pub mod fission_barrier;
+pub mod hdc_mass;
 pub mod hfb;
 pub mod ml_mass;
 pub mod island_stability;
