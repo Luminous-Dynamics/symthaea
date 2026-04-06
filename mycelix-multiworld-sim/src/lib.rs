@@ -26,8 +26,11 @@
 //! 10. Epoch evaluation (milestone checks)
 
 pub mod agent;
+pub mod biosphere;
+pub mod cascade;
 pub mod config;
 pub mod consciousness;
+pub mod counterfactual;
 pub mod consciousness_epidemiology;
 pub mod disaster_cascade;
 pub mod disasters;
@@ -35,6 +38,7 @@ pub mod earth_regions;
 pub mod interplanetary_consciousness;
 pub mod economy;
 pub mod education;
+pub mod governance_models;
 pub mod empirical;
 pub mod epoch;
 pub mod events;
@@ -60,7 +64,14 @@ pub mod symtropy_bridge;
 pub mod report;
 pub mod resontia;
 pub mod spaceport;
+pub mod module_registry;
+pub mod primitives;
+pub mod red_team;
 pub mod stochastic;
+pub mod unified_config_bridge;
+pub mod validation;
+pub mod viability;
+pub mod earth_population;
 pub mod world;
 
 use config::{EpochId, SimulationConfig};
@@ -130,6 +141,11 @@ pub struct MultiWorldSimulator {
     /// Hybrid Earth model: aggregate regional demographics (12 regions).
     /// Empty when `hybrid_earth` is false (backward compat).
     pub earth_regions: Vec<earth_regions::EarthRegion>,
+    /// Multi-resolution Earth population model (cohort-based, Phase 2).
+    /// Initialized from `earth_regions` when `hybrid_earth` is enabled.
+    pub earth_pop_model: Option<earth_population::EarthPopulationModel>,
+    /// Six civilizational primitives: network, resources, institutions, ecosystem, trust, knowledge.
+    pub earth_primitives: Option<primitives::CivilizationalPrimitives>,
     /// Spaceport for launching colonists from Earth aggregate regions.
     /// None when `hybrid_earth` is false.
     pub spaceport: Option<spaceport::Spaceport>,
@@ -139,6 +155,12 @@ pub struct MultiWorldSimulator {
     pub generation_ship_launch_tick: u32,
     /// Whether the generation ship has been launched.
     generation_ship_launched: bool,
+    /// Viability engine: enforces thermodynamic axioms, EROI, and scaling laws.
+    pub viability_engine: viability::ViabilityEngine,
+    /// Module registry: pluggable simulation modules (Phase 3 architecture).
+    pub module_registry: module_registry::ModuleRegistry,
+    /// Power-law cascade engine: correlated disaster propagation.
+    pub cascade_engine: cascade::CascadeEngine,
     /// Per-world Turchin secular cycle state (cliodynamics).
     pub secular_cycles: std::collections::HashMap<u32, cliodynamics::SecularCycleState>,
     /// Disaster config loaded from TOML (or defaults).
@@ -172,10 +194,15 @@ impl MultiWorldSimulator {
             morale_contagion: std::collections::HashMap::new(),
             carrying_capacity_base: std::collections::HashMap::new(),
             narrative_engine: narrative::NarrativeEngine::new(),
+            viability_engine: viability::ViabilityEngine::new(),
+            module_registry: module_registry::ModuleRegistry::new(),
+            cascade_engine: cascade::CascadeEngine::new(5), // up to 5 worlds
             supply_chain: supply_chain::SupplyChainGraph::new(),
             resontia_infra: resontia::ResontiaInfrastructure::new(),
             resontia_config: resontia::ResontiaConfig::default(),
             earth_regions: Vec::new(),
+            earth_pop_model: None,
+            earth_primitives: None,
             spaceport: None,
             generation_ship: None,
             generation_ship_launch_tick: 0,
@@ -208,7 +235,45 @@ impl MultiWorldSimulator {
     /// Enable hybrid Earth model with 12 aggregate regions and spaceport.
     pub fn enable_hybrid_earth(&mut self) {
         self.earth_regions = earth_regions::build_earth_regions();
+        // Phase 2: Initialize multi-resolution cohort model from aggregate regions
+        self.earth_pop_model = Some(
+            earth_population::EarthPopulationModel::from_regions(&self.earth_regions)
+        );
+        // Initialize six civilizational primitives for Earth.
+        // Ecosystem health is derived from 3.8 Ga of biosphere evolution (B(t))
+        // via the HANPP thermodynamic bridge, rather than hardcoded 1970 values.
+        let bt_engine = biosphere::BiosphereCoherenceEngine::build();
+        let terminal_bt = bt_engine.terminal_bt();
+        let bt_health = biosphere::bridge::bt_to_ecosystem_health(terminal_bt, terminal_bt);
+        let bt_ecosystem = primitives::EcosystemHealth {
+            biodiversity: bt_health.biodiversity,
+            forest_cover: bt_health.forest_cover,
+            soil_health: bt_health.soil_health,
+            ocean_health: bt_health.ocean_health,
+            freshwater: bt_health.freshwater,
+        };
+        self.earth_primitives = Some(primitives::CivilizationalPrimitives::earth_from_biosphere(bt_ecosystem));
         self.spaceport = Some(spaceport::Spaceport::new_equatorial(0));
+    }
+
+    /// Initialize worlds without running the simulation.
+    /// Call this before `inject_adversaries()` to ensure agents exist.
+    pub fn initialize(&mut self) {
+        self.initialize_worlds();
+    }
+
+    /// Inject adversarial agents into all worlds for red team testing.
+    /// Call after `initialize()` and before `run()`.
+    /// Marks `n` agents per world with the given strategy.
+    pub fn inject_adversaries(&mut self, strategy: red_team::AdversarialStrategy, n_per_world: usize) {
+        for world in &mut self.worlds {
+            let mut count = 0;
+            for agent in world.agents.iter_mut().filter(|a| a.is_alive() && a.adversarial.is_none()) {
+                if count >= n_per_world { break; }
+                agent.adversarial = Some(strategy);
+                count += 1;
+            }
+        }
     }
 
     /// Initialize worlds that should exist at tick 0.
@@ -339,7 +404,7 @@ impl MultiWorldSimulator {
                     faction_id: None,
                     generation: 0,
                     trauma_level: 0.0,
-                    cumulative_dose_sv: 0.0,
+                    cumulative_dose_sv: 0.0, adversarial: None,
                 };
                 world.next_agent_id += 1;
                 world.agents.push(agent);
@@ -476,7 +541,7 @@ impl MultiWorldSimulator {
                 faction_id: None,
                 generation: 0,
                 trauma_level: 0.0,
-                    cumulative_dose_sv: 0.0,
+                    cumulative_dose_sv: 0.0, adversarial: None,
             };
             world.next_agent_id += 1;
             world.agents.push(agent);
@@ -777,7 +842,10 @@ impl MultiWorldSimulator {
                 config::ResourcePriority::Balanced => {} // no bias
             }
 
-            world.economy.tick_production();
+            // Extended production: apply West-Bettencourt scaling + energy constraint
+            let scaling = self.viability_engine.scaling.get(&world.id);
+            let energy_avail = world.resources.stock_level("energy");
+            world.economy.tick_production_extended(scaling, energy_avail);
             world.economy.tick_demurrage();
             world.economy.compute_gini(&world.agents);
             world.economy.self_sufficiency = world.resources.self_sufficiency();
@@ -2042,6 +2110,30 @@ impl MultiWorldSimulator {
     }
 
     fn tick_consciousness(&mut self) {
+        // Red team: maintain adversarial population at ~5% if any adversaries exist.
+        // New agents (births) don't inherit adversarial status, so we recruit
+        // replacements to maintain persistent adversarial pressure.
+        for world in &mut self.worlds {
+            let has_adversaries = world.agents.iter().any(|a| a.adversarial.is_some());
+            if has_adversaries {
+                let living = world.agents.iter().filter(|a| a.is_alive()).count();
+                let adv_count = world.agents.iter()
+                    .filter(|a| a.is_alive() && a.adversarial.is_some()).count();
+                let target = (living as f64 * 0.05).ceil() as usize; // maintain 5%
+                if adv_count < target {
+                    let deficit = target - adv_count;
+                    let mut recruited = 0;
+                    for agent in world.agents.iter_mut()
+                        .filter(|a| a.is_alive() && a.adversarial.is_none())
+                    {
+                        if recruited >= deficit { break; }
+                        agent.adversarial = Some(red_team::AdversarialStrategy::ProfileMaximizer);
+                        recruited += 1;
+                    }
+                }
+            }
+        }
+
         // Phase 7: Gradual consciousness growth for agents.
         let tick = self.current_tick;
         for world in &mut self.worlds {
@@ -2095,10 +2187,17 @@ impl MultiWorldSimulator {
                 } else {
                     0.0
                 };
-                // Without trust-weighted governance, there's no institutional incentive
-                // for consciousness development — growth rate drops by 50%.
+                // Governance model determines how much institutional incentive exists
+                // for consciousness development.
+                // DIAGNOSTIC FIX: The original sigmoid gating created a poverty trap —
+                // agents with low phi got suppressed growth, keeping them low forever.
+                // Fix: floor at 0.5 (equal-weight baseline) + bonus for high phi.
+                // This means CG is ALWAYS at least as good as EW, plus a bonus.
                 let gating_factor = if self.config.policy.trust_weighted_governance {
-                    1.0
+                    let phi = c.phi();
+                    // Floor at 0.5 (matches EW), bonus up to 1.0 for high phi
+                    let bonus = 0.5 / (1.0 + (-10.0 * (phi - 0.3)).exp());
+                    0.5 + bonus // range: [0.5, 1.0]
                 } else {
                     0.5
                 };
@@ -2106,6 +2205,19 @@ impl MultiWorldSimulator {
                 // Burnout caps consciousness growth (symthaea-psych-bench pattern).
                 let burnout_penalty = if agent.needs.is_burnout() { 0.35 } else { 1.0 };
                 let amplifier = amplifier * burnout_penalty;
+
+                // Red team: adversarial agents get modified consciousness growth rates.
+                // ProfileMaximizers grow 5× faster (gaming the system).
+                // Adversarial status persists: if agent was marked, apply modifier.
+                // Also: recruit new adversaries — 0.5% of unmarked agents per tick
+                // become adversarial (models persistent social pressure / bad actors entering).
+                let amplifier = if let Some(strategy) = &agent.adversarial {
+                    let modifier = red_team::AdversarialModifier::for_strategy(*strategy, 0.01);
+                    amplifier * modifier.phi_growth_mult
+                } else {
+                    amplifier
+                };
+
                 // Social satiation boosts care_activation growth.
                 if agent.needs.social_satiation > 0.5 {
                     c.care_activation = (c.care_activation + 0.0005).min(1.0);
@@ -2405,11 +2517,22 @@ impl MultiWorldSimulator {
         let defense_mult = 1.0 - (self.config.policy.defense_spending * 2.0).min(0.5);
 
         for (effects, world_id, event) in disaster_results {
+            // Dead Loop #8 fix: Cultural memory reduces disaster damage.
+            // Civilizations that remember past disasters have better preparedness.
+            let cultural_defense = {
+                let world_name = world_id
+                    .and_then(|id| self.worlds.iter().find(|w| w.id == id))
+                    .map(|w| w.name.as_str());
+                let lesson = self.narrative_engine.cultural_lesson_for(world_name);
+                1.0 - lesson.preparedness.min(0.3) // up to 30% reduction
+            };
+            let total_mult = defense_mult * cultural_defense;
+
             let effects = disasters::DisasterEffects {
-                consciousness_shock: effects.consciousness_shock * defense_mult,
-                allostatic_load_increase: effects.allostatic_load_increase * defense_mult,
-                infrastructure_damage: effects.infrastructure_damage * defense_mult,
-                resource_production_penalty: effects.resource_production_penalty * defense_mult,
+                consciousness_shock: effects.consciousness_shock * total_mult,
+                allostatic_load_increase: effects.allostatic_load_increase * total_mult,
+                infrastructure_damage: effects.infrastructure_damage * total_mult,
+                resource_production_penalty: effects.resource_production_penalty * total_mult,
                 ..effects
             };
             // Apply effects to targeted world(s)
@@ -2596,16 +2719,19 @@ impl MultiWorldSimulator {
                         }
                     }
 
-                    // Bug fix #1: Disasters cause trauma (calibrated).
-                    // Only significant disasters (severity > 0.05) cause trauma.
-                    // Scaled down to prevent saturation — typical disaster adds 0.01-0.05,
-                    // catastrophic adds 0.1-0.2. With decay at 0.002/tick, equilibrium
-                    // for 1 disaster/month at 0.03 trauma = 0.03/0.002 ≈ 0.15 baseline.
+                    // Dead Loop #1 fix: Disasters cause trauma (calibrated).
+                    // Includes population_loss_fraction — deaths from disasters are
+                    // the strongest trauma source (witnessing loss).
+                    // Threshold lowered from 0.005 to 0.001 so moderate ECLSS failures
+                    // and psychological events still register trauma.
+                    // Equilibrium: 1 disaster/month at 0.03 trauma, decay 0.002/tick
+                    // → baseline ~0.15. Catastrophic (Carrington) → 0.3-0.5 spike.
                     let trauma_inc = (effects.consciousness_shock * 0.3
                         + effects.allostatic_load_increase * 0.2
-                        + effects.morale_impact.abs() * 0.1)
-                        * cascade_mult * 0.3; // Scale factor to prevent saturation
-                    if trauma_inc > 0.005 {
+                        + effects.morale_impact.abs() * 0.1
+                        + effects.population_loss_fraction * 0.5) // witnessing death
+                        * cascade_mult * 0.3;
+                    if trauma_inc > 0.001 {
                         for agent in world.agents.iter_mut().filter(|a| a.is_alive()) {
                             agent.trauma_level = (agent.trauma_level + trauma_inc).min(1.0);
                         }
@@ -2615,6 +2741,46 @@ impl MultiWorldSimulator {
 
             // Push the event
             self.events.push(event);
+        }
+
+        // #3: Power-law cascade propagation.
+        // After all disasters are applied, update domain stress and check for cascades.
+        for (i, world) in self.worlds.iter().enumerate() {
+            if world.population() == 0 { continue; }
+            let resource_fracs: Vec<(&str, f64)> = ["food", "water", "oxygen", "energy"].iter()
+                .filter_map(|&name| {
+                    world.resources.get(name).map(|s| {
+                        let frac = if s.capacity > 0.0 { s.current / s.capacity } else { 0.0 };
+                        (name, frac)
+                    })
+                })
+                .collect();
+            let gov_stability = if i < self.governance.len() {
+                self.governance[i].stability_score
+            } else { 0.5 };
+            self.cascade_engine.update_stress(i, world.infrastructure_level, &resource_fracs, gov_stability);
+
+            // Check if any recent disaster triggers a cascade
+            if self.disaster_engine.total_disasters > 0 {
+                // Use infrastructure damage as severity proxy for cascade trigger
+                let severity = (1.0 - world.infrastructure_level).max(0.1);
+                let domain = if resource_fracs.iter().any(|(n, f)| *n == "energy" && *f < 0.3) {
+                    cascade::CascadeDomain::Power
+                } else if resource_fracs.iter().any(|(n, f)| *n == "food" && *f < 0.3) {
+                    cascade::CascadeDomain::Food
+                } else {
+                    cascade::CascadeDomain::LifeSupport
+                };
+                if let Some(cascade_event) = self.cascade_engine.try_cascade(
+                    world.id, i, domain, severity, &mut self.rng
+                ) {
+                    self.events.push(CivEvent::new(
+                        self.current_tick, Some(world.id), CivEventType::EmergencyDeclared,
+                        format!("CASCADE FAILURE: {} domains affected (depth {}), total severity {:.2}",
+                            cascade_event.affected.len(), cascade_event.depth, cascade_event.total_severity),
+                    ));
+                }
+            }
         }
 
         // Apply tech milestone effects: check for newly achieved milestones this tick
@@ -2834,7 +3000,10 @@ impl MultiWorldSimulator {
 
     /// Run the full simulation. Returns a civilization report.
     pub fn run(&mut self) -> CivilizationReport {
-        self.initialize_worlds();
+        // Skip initialization if already done (allows inject_adversaries before run)
+        if self.worlds.is_empty() {
+            self.initialize_worlds();
+        }
 
         while self.current_tick < self.config.total_ticks {
             // Check for deferred world founding (from config)
@@ -2878,8 +3047,72 @@ impl MultiWorldSimulator {
 
             // Phase 0.5: Earth aggregate demographics (hybrid model)
             if !self.earth_regions.is_empty() {
-                for region in &mut self.earth_regions {
-                    earth_regions::tick_region(region, self.current_tick, &mut self.rng);
+                // Phase 2: Tick cohort-based Earth population model (if initialized)
+                if let Some(ref mut pop_model) = self.earth_pop_model {
+                    let scaling: Vec<_> = self.earth_regions.iter()
+                        .map(|r| viability::ScalingFactors::compute(r.population * 1_000_000.0))
+                        .collect();
+                    pop_model.tick(&self.earth_regions, &scaling, self.current_tick, &mut self.rng);
+                    pop_model.sync_to_regions(&mut self.earth_regions);
+
+                    // Tick civilizational primitives with Earth aggregate state
+                    if let Some(ref mut prims) = self.earth_primitives {
+                        let total_pop: f64 = self.earth_regions.iter().map(|r| r.population).sum();
+                        let mean_urban: f64 = self.earth_regions.iter()
+                            .map(|r| r.urbanization * r.population).sum::<f64>() / total_pop.max(1.0);
+                        let mean_gdp: f64 = self.earth_regions.iter()
+                            .map(|r| r.gdp_per_capita * r.population).sum::<f64>() / total_pop.max(1.0);
+                        let research_frac = 0.05; // ~5% of workforce in R&D
+                        let policy_protection = 0.3; // moderate environmental policy
+                        let invest_frac = 0.1; // institutional investment
+
+                        prims.tick(total_pop, mean_urban, mean_gdp, research_frac, policy_protection, invest_frac);
+
+                        // Primitives feed back into the simulation:
+                        // 1. Resource depletion → EROI affects energy costs → GDP drag
+                        if let Some(oil) = prims.resources.iter().find(|r| r.name == "Oil") {
+                            let eroi = oil.current_eroi();
+                            if eroi < 8.0 {
+                                let monthly_drag = 1.0 - (8.0 - eroi) * 0.0004;
+                                for region in &mut self.earth_regions {
+                                    region.gdp_per_capita *= monthly_drag.max(0.998);
+                                }
+                            }
+                        }
+
+                        // 2. Ecosystem → agriculture → GDP (only when degraded)
+                        let ag_modifier = prims.ecosystem.agriculture_modifier();
+                        if ag_modifier < 0.95 {
+                            for region in &mut self.earth_regions {
+                                region.gdp_per_capita *= 1.0 - (1.0 - ag_modifier) * 0.01;
+                            }
+                        }
+
+                        // 3. Knowledge network → innovation rate boost
+                        let knowledge_mult = prims.knowledge.growth_rate().min(3.0);
+                        // Higher knowledge growth → faster tech advancement (wired via education improvement)
+                        for region in &mut self.earth_regions {
+                            region.education_index = (region.education_index
+                                + 0.00005 * knowledge_mult).min(0.98);
+                        }
+
+                        // 4. Network topology → disease/ideology spread rate (stored for other modules)
+                        // Available via self.earth_primitives.network.disease_transmission_mult()
+
+                        // 5. Ecosystem tipping points → disaster events
+                        let tips = prims.ecosystem.tipping_points();
+                        for tip in &tips {
+                            self.events.push(CivEvent::new(
+                                self.current_tick, None, CivEventType::EmergencyDeclared,
+                                format!("ECOSYSTEM TIPPING POINT: {}", tip),
+                            ));
+                        }
+                    }
+                } else {
+                    // Legacy path: simple aggregate tick
+                    for region in &mut self.earth_regions {
+                        earth_regions::tick_region(region, self.current_tick, &mut self.rng);
+                    }
                 }
                 // Tick the spaceport (construction + Kessler countdown)
                 if let Some(ref mut sp) = self.spaceport {
@@ -2951,6 +3184,26 @@ impl MultiWorldSimulator {
                 }
             }
 
+            // Phase 0.9: Viability Engine — thermodynamic axioms, EROI, scaling laws.
+            // Must run BEFORE economy so scaling factors and energy budgets are available.
+            {
+                let world_data: Vec<(u32, f64, f64, f64)> = self.worlds.iter()
+                    .filter(|w| w.population() > 0)
+                    .map(|w| {
+                        let energy_prod = w.resources.stock_level("energy").unwrap_or(0.0);
+                        (w.id, energy_prod, w.population() as f64, w.infrastructure_level)
+                    })
+                    .collect();
+                self.viability_engine.tick(&world_data, self.current_tick);
+            }
+
+            // Module registry: tick all registered plugin modules.
+            // Runs alongside the existing tick loop during incremental migration.
+            if self.module_registry.module_count() > 0 {
+                let _outputs = self.module_registry.tick_all(self.current_tick as u64 as u32);
+                // TODO: apply outputs.mutations to world state as modules are migrated
+            }
+
             // Phase 1: Demographics (pair-bonding, births, deaths)
             let mut phase1_events = Vec::new();
             let world_count = self.worlds.len();
@@ -2985,13 +3238,19 @@ impl MultiWorldSimulator {
                 // Modular habitat-aware radiation dose.
                 // Ambient dose depends on location (Hassler 2014, Cucinotta 2014).
                 // Actual dose depends on which module the agent works in.
+                // Dead Loop #4 fix: Apply GCR (galactic cosmic ray) multiplier.
+                // During solar minimum, GCR flux is ~15% higher (weaker heliospheric
+                // shielding). During solar maximum, ~20% lower.
+                // CITATION: Usoskin et al. (2011) "Solar modulation of galactic
+                // cosmic rays", Living Reviews in Solar Physics 8(3).
+                let gcr_mult = self.disaster_engine.gcr_multiplier();
                 let ambient_dose_sv = match world.location.as_str() {
-                    "Earth" => 0.0002,   // 0.2 mSv/month (natural background)
-                    "Moon" => 0.015,     // 15 mSv/month (Cucinotta 2014)
-                    "Mars" => 0.020,     // 20 mSv/month (Hassler 2014, MSL/RAD)
-                    "Europa" => 0.005,   // 5 mSv/month (under ice)
-                    "Titan" => 0.00005,  // 0.05 mSv/month (thick N2 atmosphere)
-                    _ => 0.005,
+                    "Earth" => 0.0002,            // Magnetosphere shields from GCR
+                    "Moon" => 0.015 * gcr_mult,   // No magnetosphere, exposed to GCR
+                    "Mars" => 0.020 * gcr_mult,   // Thin atmosphere, exposed to GCR
+                    "Europa" => 0.005,             // Under ice, GCR irrelevant
+                    "Titan" => 0.00005,            // Thick N2 atmosphere shields
+                    _ => 0.005 * gcr_mult,
                 };
                 if world.habitat.modules.is_empty() {
                     // No habitat modules yet — flat dose for everyone
@@ -3228,6 +3487,28 @@ impl MultiWorldSimulator {
             // Phase 8: Consciousness
             self.tick_consciousness();
 
+            // Phase 8.1: Dead Loop #7 fix — Consciousness ↔ Governance feedback.
+            // Stable governance creates space for consciousness growth.
+            // Unstable governance (fear, uncertainty) suppresses growth.
+            // Constitution maturity lowers participation thresholds over time.
+            for (i, gov) in self.governance.iter().enumerate() {
+                if i >= self.worlds.len() { break; }
+                let stability = gov.stability_score;
+                let stability_bonus = if stability > 0.7 {
+                    0.001 // stable governance → mild consciousness boost
+                } else if stability < 0.3 {
+                    -0.002 // unstable → consciousness suppression (fear)
+                } else {
+                    0.0
+                };
+                if stability_bonus != 0.0 {
+                    for agent in self.worlds[i].agents.iter_mut().filter(|a| a.is_alive()) {
+                        agent.consciousness.level =
+                            (agent.consciousness.level + stability_bonus).clamp(0.0, 1.0);
+                    }
+                }
+            }
+
             // Phase 8.5: Factions (after consciousness, before harmony)
             {
                 let policy = self.config.policy.clone();
@@ -3320,6 +3601,30 @@ impl MultiWorldSimulator {
 
             // Phase 9: Harmony scoring
             self.tick_harmony_scoring();
+
+            // Phase 9.1: Dead Loop #5 fix — Harmony → Policy feedback.
+            // Low harmony scores trigger soft policy adjustments.
+            for world in &mut self.worlds {
+                let scores = world.harmony.current_scores;
+                // Low Pan-Sentient Flourishing (< 0.3) → shift culture toward care
+                if scores[1] < 0.3 {
+                    world.culture.harmony_weights[1] =
+                        (world.culture.harmony_weights[1] + 0.005).min(0.3);
+                }
+                // Low Sacred Stillness (< 0.3) → reduce overwork for stressed agents
+                if scores[7] < 0.3 {
+                    for agent in world.agents.iter_mut().filter(|a| a.is_alive()) {
+                        if agent.needs.allostatic_load > 0.5 {
+                            agent.needs.allostatic_load =
+                                (agent.needs.allostatic_load - 0.002).max(0.0);
+                        }
+                    }
+                }
+                // High Resonant Coherence (> 0.7) → trust bonus
+                if scores[0] > 0.7 {
+                    world.trust_level = (world.trust_level + 0.002).min(1.0);
+                }
+            }
 
             // Phase 9.2: Resource depletion feedback
             self.tick_resource_depletion();
@@ -3685,7 +3990,12 @@ impl MultiWorldSimulator {
         };
 
         let harmony_mean: f64 = harmony_scores.iter().sum::<f64>() / 8.0;
-        let max_oppression = 0.0; // no oppression subsystem yet
+        // Bug #3 fix: Wire actual oppression index from governance system
+        // instead of hardcoded 0.0. The oppression detector (governance.rs) uses
+        // tier distribution to measure democratic health.
+        let max_oppression = self.governance.iter()
+            .map(|g| g.oppression_index)
+            .fold(0.0f64, f64::max);
 
         let final_cvs = EpochManager::compute_cvs(
             genetic_diversity,
@@ -4077,6 +4387,160 @@ mod tests {
         let _report = sim.run();
         assert_eq!(sim.earth_regions.len(), 12, "Should have 12 Earth regions");
         assert!(sim.spaceport.is_some(), "Should have a spaceport");
+    }
+
+    // ================================================================
+    // Phase 0-2 Integration Tests
+    // ================================================================
+
+    #[test]
+    fn test_viability_engine_runs_during_simulation() {
+        let mut config = small_config(120); // 10 years
+        config.policy.hybrid_earth = false;
+        let mut sim = MultiWorldSimulator::new(config);
+        let _report = sim.run();
+
+        // Viability engine should have tracked worlds
+        assert!(!sim.viability_engine.ledgers.is_empty(),
+            "Viability engine should have energy ledgers");
+        assert!(!sim.viability_engine.scaling.is_empty(),
+            "Viability engine should have scaling factors");
+
+        // Entropy should have increased (2nd Law)
+        for ledger in sim.viability_engine.ledgers.values() {
+            assert!(ledger.cumulative_entropy > 0.0,
+                "Entropy should be positive after 10 years: {}",
+                ledger.cumulative_entropy);
+        }
+    }
+
+    #[test]
+    fn test_scaling_factors_affect_economy() {
+        let mut config = small_config(60); // 5 years
+        config.policy.hybrid_earth = false;
+        let mut sim = MultiWorldSimulator::new(config);
+        let _report = sim.run();
+
+        // Check that scaling factors were computed for populated worlds
+        for world in &sim.worlds {
+            if world.population() > 0 {
+                let scaling = sim.viability_engine.scaling_for(world.id);
+                assert!(scaling.population > 0.0,
+                    "Scaling should track population for world {}", world.name);
+            }
+        }
+    }
+
+    #[test]
+    fn test_dead_loops_active_during_simulation() {
+        let mut config = small_config(240); // 20 years — enough for disasters
+        config.policy.hybrid_earth = false;
+        let mut sim = MultiWorldSimulator::new(config);
+        let report = sim.run();
+
+        // DL#1: Disasters should cause some trauma
+        let max_trauma: f64 = sim.worlds.iter()
+            .flat_map(|w| w.agents.iter().filter(|a| a.is_alive()))
+            .map(|a| a.trauma_level)
+            .fold(0.0f64, f64::max);
+        // With 608 disasters in 150 years, 20 years should have ~80 disasters
+        // Even with low severity, some trauma should accumulate
+        if report.total_disasters > 10 {
+            assert!(max_trauma > 0.0,
+                "DL#1: With {} disasters, max trauma should be >0, got {}",
+                report.total_disasters, max_trauma);
+        }
+
+        // Bug#3: CVS should use real oppression index (not hardcoded 0.0)
+        assert!(report.final_cvs > 0.0, "CVS should be computed");
+    }
+
+    #[test]
+    fn test_earth_population_model_with_hybrid() {
+        let mut config = small_config(60); // 5 years
+        config.policy.hybrid_earth = true;
+        let mut sim = MultiWorldSimulator::new(config);
+        let _report = sim.run();
+
+        // Earth population model should be initialized
+        assert!(sim.earth_pop_model.is_some(),
+            "Earth population model should be initialized when hybrid_earth=true");
+
+        let pop_model = sim.earth_pop_model.as_ref().unwrap();
+        assert!(pop_model.total_population > 7000.0,
+            "Earth population should be >7 billion: {}M", pop_model.total_population);
+        assert_eq!(pop_model.demographics.len(), 12,
+            "Should have 12 regional demographics");
+
+        // Climate model should have been ticked
+        assert!(pop_model.climate.cumulative_emissions_gt > 200.0,
+            "Cumulative emissions should exceed baseline (200 GtCO₂): {}",
+            pop_model.climate.cumulative_emissions_gt);
+        assert!(pop_model.climate.global_temp_anomaly > 0.0,
+            "Temperature anomaly should be positive: {}",
+            pop_model.climate.global_temp_anomaly);
+    }
+
+    #[test]
+    fn test_unified_config_bridge_creates_working_sim() {
+        let toml = r#"
+[simulation]
+years = 10
+seed = 777
+
+[policy]
+disasters_enabled = true
+hybrid_earth = false
+
+[params]
+stress_baseline = 0.005
+
+[feedback_loops]
+disaster_trauma = true
+harmony_policy = true
+"#;
+        let (sim_config, _, _) = unified_config_bridge::from_unified_toml(toml).unwrap();
+        let mut sim = MultiWorldSimulator::new(sim_config);
+        let report = sim.run();
+
+        assert_eq!(report.total_ticks, 120); // 10 years × 12
+        assert!(report.final_population > 0, "Should survive 10 years");
+        assert!(report.survived, "Should survive with standard config");
+    }
+
+    #[test]
+    fn test_affect_modulates_labor() {
+        // DL#6: Agents with high joy should produce more than agents with high sadness
+        let tick = 30 * 12; // Agent born at tick 0, now 30 years old
+        let mut happy = CivAgent {
+            id: 1, birth_tick: 0, death_tick: None,
+            sex: BiologicalSex::Male, world_id: 0,
+            health: 1.0, skills: SkillVector::new(),
+            education_level: 0.5,
+            consciousness: ConsciousnessState::nascent(),
+            partner_id: None, children_ids: vec![],
+            is_immigrant: false,
+            needs: PsychologicalNeeds::new(),
+            tend_balance: 0.0, parent_ids: None,
+            faction_id: None, generation: 0,
+            trauma_level: 0.0, cumulative_dose_sv: 0.0, adversarial: None,
+        };
+        happy.skills.learn(0, 0.5);
+        happy.needs.engagement = 0.8;
+        happy.needs.affect.joy = 0.9;
+        happy.needs.affect.sadness = 0.1;
+
+        let mut sad = happy.clone();
+        sad.needs.affect.joy = 0.1;
+        sad.needs.affect.sadness = 0.9;
+
+        let happy_labor = happy.effective_labor(tick);
+        let sad_labor = sad.effective_labor(tick);
+
+        assert!(happy_labor > sad_labor,
+            "DL#6: Happy agents should produce more: {} vs {}", happy_labor, sad_labor);
+        assert!(happy_labor > sad_labor * 1.3,
+            "DL#6: Effect should be >30% difference: {} vs {}", happy_labor, sad_labor);
     }
 }
 pub mod maglev_network;

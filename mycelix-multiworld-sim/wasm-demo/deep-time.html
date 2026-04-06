@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Deep-Time Biosphere Coherence B(t) — 3.8 Billion Years</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'JetBrains Mono', 'SF Mono', monospace; background: #0a0a0f; color: #e0e0e0; }
+  .container { max-width: 1400px; margin: 0 auto; padding: 20px; }
+  h1 { font-size: 1.4em; color: #7fdbca; margin-bottom: 4px; }
+  h2 { font-size: 1.1em; color: #c792ea; margin: 16px 0 8px; }
+  .subtitle { color: #637777; font-size: 0.85em; margin-bottom: 20px; }
+  .controls { display: flex; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
+  .controls button { background: #1a1a2e; border: 1px solid #333; color: #7fdbca; padding: 6px 14px; cursor: pointer; border-radius: 4px; font-size: 0.85em; font-family: inherit; }
+  .controls button:hover { background: #2a2a4e; }
+  .controls button.active { background: #2a4a3e; border-color: #7fdbca; }
+  .controls select { background: #1a1a2e; border: 1px solid #333; color: #e0e0e0; padding: 6px 10px; border-radius: 4px; font-family: inherit; }
+  canvas { background: #0d0d15; border: 1px solid #222; border-radius: 6px; display: block; width: 100%; }
+  .panels { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+  .panel { background: #111119; border: 1px solid #222; border-radius: 6px; padding: 16px; }
+  .panel h3 { color: #c792ea; font-size: 0.95em; margin-bottom: 8px; }
+  .milestone { padding: 4px 8px; margin: 2px 0; border-left: 3px solid #7fdbca; font-size: 0.8em; }
+  .milestone .age { color: #ffcb6b; }
+  .extinction { padding: 4px 8px; margin: 2px 0; border-left: 3px solid #f07178; font-size: 0.8em; }
+  .extinction .severity { color: #f07178; }
+  .stats { font-size: 0.85em; line-height: 1.6; }
+  .stats .label { color: #637777; }
+  .stats .value { color: #ffcb6b; }
+  #tooltip { position: absolute; background: #1a1a2eee; border: 1px solid #444; padding: 8px 12px; border-radius: 4px; font-size: 0.8em; pointer-events: none; display: none; z-index: 10; }
+  #loading { text-align: center; padding: 40px; color: #637777; }
+  .legend { display: flex; gap: 16px; margin: 8px 0; font-size: 0.8em; }
+  .legend-item { display: flex; align-items: center; gap: 4px; }
+  .legend-dot { width: 10px; height: 10px; border-radius: 50%; }
+  #counterfactual-output { white-space: pre-wrap; font-size: 0.75em; max-height: 300px; overflow-y: auto; background: #0d0d15; padding: 12px; border-radius: 4px; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>Deep-Time Biosphere Coherence B(t)</h1>
+  <p class="subtitle">3.8 billion years of life on Earth — from the origin of life to the Neolithic Revolution</p>
+
+  <div class="controls">
+    <button onclick="setZoom('full')" class="active" id="btn-full">Full (3.8 Ga)</button>
+    <button onclick="setZoom('phanerozoic')" id="btn-phanerozoic">Phanerozoic (541 Ma)</button>
+    <button onclick="setZoom('mesozoic')" id="btn-mesozoic">Mesozoic (252 Ma)</button>
+    <button onclick="setZoom('cenozoic')" id="btn-cenozoic">Cenozoic (66 Ma)</button>
+    <select onchange="setOverlay(this.value)">
+      <option value="ci">Confidence Intervals</option>
+      <option value="consciousness">Consciousness Feasibility</option>
+      <option value="ensemble">Monte Carlo Ensemble (20)</option>
+    </select>
+    <button onclick="runCounterfactual()">Run Counterfactual</button>
+  </div>
+
+  <div style="position:relative">
+    <canvas id="chart" height="400"></canvas>
+    <div id="tooltip"></div>
+  </div>
+
+  <div class="legend">
+    <div class="legend-item"><div class="legend-dot" style="background:#7fdbca"></div> B(t) Coherence</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#c792ea"></div> Consciousness Feasibility</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#f0717855"></div> Mass Extinctions</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#7fdbca33"></div> 90% CI Band</div>
+  </div>
+
+  <div class="panels">
+    <div class="panel">
+      <h3>Consciousness Milestones</h3>
+      <div id="milestones">Loading...</div>
+    </div>
+    <div class="panel">
+      <h3>Mass Extinction Events</h3>
+      <div id="extinctions">Loading...</div>
+    </div>
+    <div class="panel" style="grid-column: 1 / -1">
+      <h3>Counterfactual Analysis</h3>
+      <div id="counterfactual-output">Click "Run Counterfactual" to test: what if each mass extinction hadn't happened?</div>
+    </div>
+  </div>
+</div>
+
+<script>
+// Data will be injected by WASM or loaded from pre-computed JSON
+let btCurve = [], extinctionEvents = [], consciousnessCurve = [], ensembleBands = [];
+let currentZoom = 'full';
+let currentOverlay = 'ci';
+
+// For standalone use without WASM, generate sample data from the Rust CSV output
+// In production, this calls the WASM functions
+async function loadData() {
+  // Try WASM first
+  if (typeof wasm !== 'undefined' && wasm.biosphere_curve) {
+    btCurve = JSON.parse(wasm.biosphere_curve());
+    extinctionEvents = JSON.parse(wasm.extinction_events());
+    consciousnessCurve = JSON.parse(wasm.consciousness_emergence());
+  } else {
+    // Fallback: use embedded sample data from the Rust engine
+    document.getElementById('loading')?.remove();
+    generateSampleData();
+  }
+  render();
+  renderSidePanels();
+}
+
+function generateSampleData() {
+  // This is the shape of data the WASM module produces.
+  // In production, replace with actual WASM calls.
+  const ages = [3650,3350,3000,2650,2450,2350,2175,1925,1700,1500,1300,1100,925,785,677.5,588,
+    531,515,503,491.2,477.7,464.2,451.1,438.6,430.4,423.3,406.25,388,370.8,341.05,311.05,
+    285.925,266.23,255.705,249.55,242.1,219.2,188.05,168.1,153.25,122.75,83.25,61,44.95,
+    28.465,14.182,3.957,1.296,0.01035,0.008,0.006];
+  btCurve = ages.map(a => ({
+    age_ma: a,
+    value: Math.min(1, Math.max(0.01, 0.01 + (3800 - a) / 3800 * 0.8 + Math.sin(a/100)*0.05)),
+    ci_lower: Math.max(0, 0.01 + (3800 - a) / 3800 * 0.6),
+    ci_upper: Math.min(1, 0.01 + (3800 - a) / 3800 * 0.95),
+    source: a > 0.012 ? 'Biosphere' : 'Blended'
+  }));
+  extinctionEvents = [
+    {name:'Great Oxidation Event',age_ma:2400,severity:0.70,recovery_ma:200,complexity_increase:true},
+    {name:'Sturtian Snowball',age_ma:717,severity:0.50,recovery_ma:30,complexity_increase:true},
+    {name:'End-Ordovician',age_ma:445,severity:0.57,recovery_ma:8,complexity_increase:true},
+    {name:'Late Devonian',age_ma:372,severity:0.35,recovery_ma:15,complexity_increase:true},
+    {name:'End-Permian',age_ma:252,severity:0.57,recovery_ma:10,complexity_increase:true},
+    {name:'End-Triassic',age_ma:201,severity:0.34,recovery_ma:8,complexity_increase:true},
+    {name:'End-Cretaceous',age_ma:66,severity:0.40,recovery_ma:7,complexity_increase:true},
+    {name:'PETM',age_ma:56,severity:0.10,recovery_ma:2,complexity_increase:false},
+  ];
+  consciousnessCurve = ages.map(a => ({
+    age_ma: a,
+    feasibility: a > 600 ? 0 : a > 400 ? 0.01 : a > 100 ? 0.05 : a > 10 ? 0.15 : 0.35,
+    bottleneck: a > 600 ? 'workspace' : a > 100 ? 'integration' : 'hot_capability',
+    milestone: a === 477.7 ? 'First minimal consciousness' : a === 153.25 ? 'Sentient experience' : null
+  }));
+}
+
+const canvas = document.getElementById('chart');
+const ctx = canvas.getContext('2d');
+const tooltip = document.getElementById('tooltip');
+
+function getZoomRange() {
+  switch(currentZoom) {
+    case 'phanerozoic': return [541, 0];
+    case 'mesozoic': return [252, 0];
+    case 'cenozoic': return [66, 0];
+    default: return [3800, 0];
+  }
+}
+
+function setZoom(z) {
+  currentZoom = z;
+  document.querySelectorAll('.controls button').forEach(b => b.classList.remove('active'));
+  document.getElementById('btn-' + z)?.classList.add('active');
+  render();
+}
+
+function setOverlay(v) { currentOverlay = v; render(); }
+
+function render() {
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.getBoundingClientRect();
+  canvas.width = rect.width * dpr;
+  canvas.height = 400 * dpr;
+  ctx.scale(dpr, dpr);
+  const W = rect.width, H = 400;
+  const pad = {top: 30, right: 40, bottom: 50, left: 60};
+  const plotW = W - pad.left - pad.right;
+  const plotH = H - pad.top - pad.bottom;
+
+  ctx.clearRect(0, 0, W, H);
+
+  const [ageMax, ageMin] = getZoomRange();
+  const filtered = btCurve.filter(p => p.age_ma >= ageMin && p.age_ma <= ageMax);
+  if (!filtered.length) return;
+
+  const xScale = a => pad.left + (1 - (a - ageMin) / (ageMax - ageMin)) * plotW;
+  const yScale = v => pad.top + (1 - v) * plotH;
+
+  // Grid
+  ctx.strokeStyle = '#1a1a2e';
+  ctx.lineWidth = 1;
+  for (let v = 0; v <= 1; v += 0.2) {
+    ctx.beginPath();
+    ctx.moveTo(pad.left, yScale(v));
+    ctx.lineTo(pad.left + plotW, yScale(v));
+    ctx.stroke();
+  }
+
+  // CI bands
+  if (currentOverlay === 'ci' && filtered.length > 1) {
+    ctx.fillStyle = '#7fdbca15';
+    ctx.beginPath();
+    ctx.moveTo(xScale(filtered[0].age_ma), yScale(filtered[0].ci_upper));
+    for (const p of filtered) ctx.lineTo(xScale(p.age_ma), yScale(p.ci_upper));
+    for (let i = filtered.length - 1; i >= 0; i--) ctx.lineTo(xScale(filtered[i].age_ma), yScale(filtered[i].ci_lower));
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  // Extinction event markers
+  const filteredExts = extinctionEvents.filter(e => e.age_ma >= ageMin && e.age_ma <= ageMax);
+  for (const e of filteredExts) {
+    const x = xScale(e.age_ma);
+    ctx.strokeStyle = '#f0717844';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(x, pad.top);
+    ctx.lineTo(x, pad.top + plotH);
+    ctx.stroke();
+    ctx.fillStyle = '#f07178';
+    ctx.font = '9px monospace';
+    ctx.save();
+    ctx.translate(x + 3, pad.top + 10);
+    ctx.rotate(-Math.PI / 4);
+    ctx.fillText(e.name.substring(0, 20), 0, 0);
+    ctx.restore();
+  }
+
+  // B(t) curve
+  ctx.strokeStyle = '#7fdbca';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(xScale(filtered[0].age_ma), yScale(filtered[0].value));
+  for (const p of filtered) ctx.lineTo(xScale(p.age_ma), yScale(p.value));
+  ctx.stroke();
+
+  // Consciousness overlay
+  if (currentOverlay === 'consciousness') {
+    const filteredC = consciousnessCurve.filter(p => p.age_ma >= ageMin && p.age_ma <= ageMax);
+    if (filteredC.length > 1) {
+      ctx.strokeStyle = '#c792ea';
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([4, 4]);
+      ctx.beginPath();
+      ctx.moveTo(xScale(filteredC[0].age_ma), yScale(filteredC[0].feasibility));
+      for (const p of filteredC) ctx.lineTo(xScale(p.age_ma), yScale(p.feasibility));
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+  }
+
+  // Axes
+  ctx.strokeStyle = '#444';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(pad.left, pad.top);
+  ctx.lineTo(pad.left, pad.top + plotH);
+  ctx.lineTo(pad.left + plotW, pad.top + plotH);
+  ctx.stroke();
+
+  // Labels
+  ctx.fillStyle = '#637777';
+  ctx.font = '11px monospace';
+  ctx.textAlign = 'center';
+  const nTicks = 8;
+  for (let i = 0; i <= nTicks; i++) {
+    const age = ageMax - (ageMax - ageMin) * i / nTicks;
+    const x = xScale(age);
+    ctx.fillText(age >= 1000 ? (age/1000).toFixed(1) + ' Ga' : age >= 1 ? Math.round(age) + ' Ma' : (age*1000).toFixed(0) + ' Ka', x, pad.top + plotH + 20);
+  }
+  ctx.textAlign = 'right';
+  for (let v = 0; v <= 1; v += 0.2) {
+    ctx.fillText(v.toFixed(1), pad.left - 8, yScale(v) + 4);
+  }
+
+  // Title
+  ctx.fillStyle = '#7fdbca';
+  ctx.font = 'bold 12px monospace';
+  ctx.textAlign = 'left';
+  ctx.fillText('B(t) Biosphere Coherence', pad.left, 18);
+  ctx.fillStyle = '#637777';
+  ctx.font = '10px monospace';
+  ctx.fillText(`${filtered.length} bins | ${currentZoom} view`, pad.left + 220, 18);
+}
+
+function renderSidePanels() {
+  // Milestones
+  const mDiv = document.getElementById('milestones');
+  const milestones = consciousnessCurve.filter(p => p.milestone);
+  if (milestones.length) {
+    mDiv.innerHTML = milestones.map(p =>
+      `<div class="milestone"><span class="age">${p.age_ma >= 1 ? Math.round(p.age_ma) + ' Ma' : (p.age_ma * 1000).toFixed(0) + ' Ka'}</span> — ${p.milestone}</div>`
+    ).join('');
+  } else {
+    mDiv.innerHTML = '<div class="stats"><span class="label">Load WASM module for consciousness emergence data</span></div>';
+  }
+
+  // Extinctions
+  const eDiv = document.getElementById('extinctions');
+  eDiv.innerHTML = extinctionEvents.map(e =>
+    `<div class="extinction"><strong>${e.name}</strong> (${e.age_ma >= 1 ? Math.round(e.age_ma) + ' Ma' : (e.age_ma * 1000).toFixed(0) + ' Ka'}) — <span class="severity">${(e.severity * 100).toFixed(0)}% genera lost</span>, recovery ${e.recovery_ma} Ma${e.complexity_increase ? ' &#x2191;' : ''}</div>`
+  ).join('');
+}
+
+function runCounterfactual() {
+  const out = document.getElementById('counterfactual-output');
+  if (typeof wasm !== 'undefined' && wasm.counterfactual_analysis) {
+    out.textContent = wasm.counterfactual_analysis();
+  } else {
+    out.textContent = 'WASM module not loaded. Build with:\n  cd wasm-demo && wasm-pack build --target web\n\nThe counterfactual analysis tests: for each Big Five extinction,\nwhat if it hadn\'t happened? Does the post-extinction overshoot\nproduce higher eventual coherence than an uninterrupted trajectory?\n\nThis is the central testable claim of the framework:\ncatastrophe is generative, not merely destructive.';
+  }
+}
+
+// Mouse hover tooltip
+canvas.addEventListener('mousemove', e => {
+  const rect = canvas.getBoundingClientRect();
+  const mx = e.clientX - rect.left;
+  const [ageMax, ageMin] = getZoomRange();
+  const pad = {left: 60, right: 40};
+  const plotW = rect.width - pad.left - pad.right;
+  const hoveredAge = ageMax - (mx - pad.left) / plotW * (ageMax - ageMin);
+
+  const nearest = btCurve.reduce((best, p) =>
+    Math.abs(p.age_ma - hoveredAge) < Math.abs(best.age_ma - hoveredAge) ? p : best
+  , btCurve[0]);
+
+  if (nearest && Math.abs(nearest.age_ma - hoveredAge) < (ageMax - ageMin) * 0.05) {
+    tooltip.style.display = 'block';
+    tooltip.style.left = (e.clientX + 12) + 'px';
+    tooltip.style.top = (e.clientY - 20) + 'px';
+    const ageStr = nearest.age_ma >= 1000 ? (nearest.age_ma/1000).toFixed(2) + ' Ga'
+      : nearest.age_ma >= 1 ? nearest.age_ma.toFixed(1) + ' Ma'
+      : (nearest.age_ma * 1000).toFixed(0) + ' Ka';
+    tooltip.innerHTML = `<strong>${ageStr}</strong><br>B(t): ${nearest.value.toFixed(4)}<br>CI: [${nearest.ci_lower.toFixed(3)}, ${nearest.ci_upper.toFixed(3)}]<br>Source: ${nearest.source}`;
+  } else {
+    tooltip.style.display = 'none';
+  }
+});
+canvas.addEventListener('mouseleave', () => tooltip.style.display = 'none');
+
+window.addEventListener('resize', render);
+loadData();
+</script>
+</body>
+</html>

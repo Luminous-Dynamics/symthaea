@@ -1,0 +1,12 @@
+age_ma,diameter_km,name,source
+3470.0,50,Barberton_spherule_beds,Lowe2003
+2023.0,300,Vredefort,EarthImpactDB
+1850.0,250,Sudbury,EarthImpactDB
+580.0,90,Acraman,EarthImpactDB
+470.0,56,Lockne_Malingen,EarthImpactDB
+380.0,52,Siljan,EarthImpactDB
+214.0,100,Manicouagan,EarthImpactDB
+66.0,180,Chicxulub,EarthImpactDB
+35.5,85,Popigai,EarthImpactDB
+35.0,24,Chesapeake_Bay,EarthImpactDB
+14.7,24,Ries,EarthImpactDB
