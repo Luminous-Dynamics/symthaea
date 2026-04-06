@@ -117,6 +117,74 @@ impl DataView {
 #[derive(Component)]
 pub struct ViewHud;
 
+/// Overlay manager — toggles HUD elements on/off.
+#[derive(Resource)]
+pub struct OverlayManager {
+    pub show_controls: bool,
+    pub show_metrics: bool,
+    pub show_labels: bool,      // SOL ATLAS + year + view labels
+    pub show_timeline_bar: bool,
+    pub show_grid: bool,        // gravity well grid
+    pub show_orbits: bool,      // orbital rings around planets
+}
+
+impl Default for OverlayManager {
+    fn default() -> Self {
+        Self {
+            show_controls: true,
+            show_metrics: true,
+            show_labels: true,
+            show_timeline_bar: true,
+            show_grid: true,
+            show_orbits: true,
+        }
+    }
+}
+
+/// Toggle overlays with H key (cycle: all → labels only → minimal → all).
+pub fn overlay_toggle_system(
+    kb: Res<ButtonInput<KeyCode>>,
+    mut overlays: ResMut<OverlayManager>,
+    mut panels: Query<&mut Visibility, With<SidePanel>>,
+    mut scrubbers: Query<&mut Visibility, (With<TimelineScrubber>, Without<SidePanel>)>,
+) {
+    if kb.just_pressed(KeyCode::KeyH) {
+        if overlays.show_controls && overlays.show_metrics {
+            // All visible → labels only (hide panel + scrubber)
+            overlays.show_controls = false;
+            overlays.show_metrics = false;
+            overlays.show_timeline_bar = false;
+            info!("[overlay] Minimal HUD");
+        } else if !overlays.show_controls {
+            // Labels only → everything hidden
+            overlays.show_labels = false;
+            overlays.show_grid = false;
+            overlays.show_orbits = false;
+            info!("[overlay] HUD off");
+        } else {
+            // Hidden → restore all
+            overlays.show_controls = true;
+            overlays.show_metrics = true;
+            overlays.show_labels = true;
+            overlays.show_timeline_bar = true;
+            overlays.show_grid = true;
+            overlays.show_orbits = true;
+            info!("[overlay] Full HUD");
+        }
+
+        // Apply visibility
+        let panel_vis = if overlays.show_controls || overlays.show_metrics {
+            Visibility::Visible
+        } else {
+            Visibility::Hidden
+        };
+        for mut vis in panels.iter_mut() { *vis = panel_vis; }
+
+        let scrub_vis = if overlays.show_timeline_bar { Visibility::Visible } else { Visibility::Hidden };
+        for mut vis in scrubbers.iter_mut() { *vis = scrub_vis; }
+    }
+}
+
 /// Side panel UI marker.
 #[derive(Component)]
 pub struct SidePanel;
@@ -982,6 +1050,8 @@ pub fn setup_globe_view(
             "Drag   Rotate",
             "F1-F6  Planets",
             "F7     Earth",
+            "H      Toggle HUD",
+            "Space  Play/Pause",
             "F9     Record",
         ] {
             parent.spawn((

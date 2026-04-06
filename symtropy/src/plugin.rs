@@ -113,6 +113,7 @@ impl Plugin for SymtropyPlugin {
                 .init_resource::<sol_atlas_bevy::selection::SelectedMarker>()
                 .init_resource::<systems::atlas::CurrentAesthetic>()
                 .init_resource::<systems::atlas::DataView>()
+                .init_resource::<systems::atlas::OverlayManager>()
                 .init_resource::<sol_atlas_bevy::frame_capture::FrameCaptureConfig>()
                 .init_resource::<systems::demo_director::DemoDirector>()
                 .add_systems(Update,
@@ -142,6 +143,7 @@ impl Plugin for SymtropyPlugin {
                     systems::atlas::marker_pulse_system,
                     systems::atlas::consciousness_shader_system,
                     systems::atlas::planet_focus_system,
+                    systems::atlas::overlay_toggle_system,
                 ).run_if(in_state(GamePhase::GlobeView)))
                 .add_systems(Update, (
                     systems::atlas::city_stress_evolution_system,
