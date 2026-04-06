@@ -1,8 +1,18 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Network page — connections, recommendations, and endorsements.
+//!
+//! Uses `CraftCtx::connections` from the conductor when available and falls
+//! back to mock data otherwise.  Action buttons (Send Request, Write
+//! Recommendation) notify via toast and are disabled in mock mode.
 
 use leptos::prelude::*;
+use mycelix_leptos_core::{
+    holochain_provider::use_holochain,
+    toasts::{use_toasts, ToastKind},
+};
+
+use crate::context::use_craft;
 
 // ---------------------------------------------------------------------------
 // Mock data types
@@ -75,13 +85,85 @@ fn mock_recommendations() -> Vec<Recommendation> {
 
 #[component]
 pub fn NetworkPage() -> impl IntoView {
+    let craft = use_craft();
+    let hc = use_holochain();
+    let toasts = use_toasts();
+
     let connections = mock_connections();
     let pending = mock_pending();
     let recommendations = mock_recommendations();
 
-    let conn_count = connections.len();
+    // Use conductor connection count when available, else mock count.
+    let conn_count = Memo::new(move |_| {
+        let conductor_conns = craft.connections.get();
+        if conductor_conns.is_empty() {
+            3usize // mock count
+        } else {
+            conductor_conns.len()
+        }
+    });
     let pending_count = pending.len();
     let rec_count = recommendations.len();
+
+    // Send connection request handler
+    let on_send_request = {
+        let hc = hc.clone();
+        let toasts = toasts.clone();
+        move |_| {
+            let hc = hc.clone();
+            let toasts = toasts.clone();
+            wasm_bindgen_futures::spawn_local(async move {
+                if hc.is_mock() {
+                    toasts.push(
+                        "Connect to the Holochain conductor to send connection requests.",
+                        ToastKind::Info,
+                    );
+                    return;
+                }
+                match hc
+                    .call_zome_default::<(), ()>(
+                        "connection_graph_coordinator",
+                        "send_connection_request",
+                        &(),
+                    )
+                    .await
+                {
+                    Ok(_) => toasts.success("Connection request sent!"),
+                    Err(e) => toasts.error(format!("Failed to send request: {e}")),
+                }
+            });
+        }
+    };
+
+    // Write recommendation handler
+    let on_write_recommendation = {
+        let hc = hc.clone();
+        let toasts = toasts.clone();
+        move |_| {
+            let hc = hc.clone();
+            let toasts = toasts.clone();
+            wasm_bindgen_futures::spawn_local(async move {
+                if hc.is_mock() {
+                    toasts.push(
+                        "Connect to the Holochain conductor to write recommendations.",
+                        ToastKind::Info,
+                    );
+                    return;
+                }
+                match hc
+                    .call_zome_default::<(), ()>(
+                        "connection_graph_coordinator",
+                        "create_recommendation",
+                        &(),
+                    )
+                    .await
+                {
+                    Ok(_) => toasts.success("Recommendation published!"),
+                    Err(e) => toasts.error(format!("Failed to publish: {e}")),
+                }
+            });
+        }
+    };
 
     view! {
         <div class="page network-page">
@@ -90,7 +172,7 @@ pub fn NetworkPage() -> impl IntoView {
             // Summary stats
             <div class="stat-cards">
                 <div class="stat-card">
-                    <p class="stat-value">{conn_count}</p>
+                    <p class="stat-value">{move || conn_count.get()}</p>
                     <p class="stat-label">"Connections"</p>
                 </div>
                 <div class="stat-card">
@@ -102,9 +184,35 @@ pub fn NetworkPage() -> impl IntoView {
                     <p class="stat-label">"Recommendations"</p>
                 </div>
                 <div class="stat-card">
-                    <p class="stat-value">"0"</p>
+                    <p class="stat-value">{move || craft.endorsement_count.get()}</p>
                     <p class="stat-label">"Endorsements"</p>
                 </div>
+            </div>
+
+            // Action buttons
+            <div class="network-actions">
+                <button
+                    class="btn-primary"
+                    on:click=on_send_request
+                    disabled=move || hc.is_mock()
+                    title=move || if hc.is_mock() { "Connect to conductor first" } else { "Send a connection request" }
+                >
+                    "Send Request"
+                </button>
+                <button
+                    class="btn-secondary"
+                    on:click=on_write_recommendation
+                    disabled=move || hc.is_mock()
+                    title=move || if hc.is_mock() { "Connect to conductor first" } else { "Write a recommendation" }
+                >
+                    "Write Recommendation"
+                </button>
+                {move || hc.is_mock().then(|| view! {
+                    <span class="status-indicator mock">"Local demo"</span>
+                })}
+                {move || (!hc.is_mock()).then(|| view! {
+                    <span class="status-indicator connected">"Connected to conductor"</span>
+                })}
             </div>
 
             <div class="network-grid">

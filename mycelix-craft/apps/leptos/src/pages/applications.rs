@@ -1,8 +1,16 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Applications page — track job application lifecycle.
+//!
+//! When connected to the Holochain conductor the Withdraw button calls
+//! `applications_coordinator::withdraw_application`.  In mock mode the
+//! withdrawal happens client-side only.
 
 use leptos::prelude::*;
+use mycelix_leptos_core::{
+    holochain_provider::use_holochain,
+    toasts::{use_toasts, ToastKind},
+};
 
 // ---------------------------------------------------------------------------
 // Mock data types
@@ -91,12 +99,21 @@ fn stage_counts(apps: &[Application]) -> [usize; 5] {
     counts
 }
 
+/// Input for the withdraw zome call.
+#[derive(Clone, Debug, serde::Serialize)]
+struct WithdrawInput {
+    application_id: u32,
+}
+
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 
 #[component]
 pub fn ApplicationsPage() -> impl IntoView {
+    let hc = use_holochain();
+    let toasts = use_toasts();
+
     let (applications, set_applications) = signal(mock_applications());
 
     // Derive pipeline counts reactively.
@@ -107,6 +124,15 @@ pub fn ApplicationsPage() -> impl IntoView {
     view! {
         <div class="page applications-page">
             <h1>"My Applications"</h1>
+
+            // Conductor status indicator
+            <div class="conductor-status">
+                {move || if hc.is_mock() {
+                    view! { <span class="status-indicator mock">"Local demo -- withdrawals are client-side only"</span> }.into_any()
+                } else {
+                    view! { <span class="status-indicator connected">"Connected to conductor"</span> }.into_any()
+                }}
+            </div>
 
             // Pipeline stages with live counts
             <div class="app-pipeline" role="list" aria-label="Application pipeline">
@@ -134,6 +160,8 @@ pub fn ApplicationsPage() -> impl IntoView {
                         }
                         .into_any()
                     } else {
+                        let hc = hc.clone();
+                        let toasts = toasts.clone();
                         view! {
                             <div class="app-cards">
                                 {apps
@@ -142,6 +170,8 @@ pub fn ApplicationsPage() -> impl IntoView {
                                         let app_id = app.id;
                                         let badge_cls = format!("status-badge {}", app.status.css_class());
                                         let can_withdraw = app.status.withdrawable();
+                                        let hc = hc.clone();
+                                        let toasts = toasts.clone();
                                         view! {
                                             <div class="application-card">
                                                 <div class="app-card-header">
@@ -154,15 +184,42 @@ pub fn ApplicationsPage() -> impl IntoView {
                                                 </p>
                                                 {if can_withdraw {
                                                     let set_apps = set_applications;
+                                                    let hc = hc.clone();
+                                                    let toasts = toasts.clone();
                                                     Some(
                                                         view! {
                                                             <button
                                                                 class="btn-danger btn-sm"
                                                                 on:click=move |_| {
+                                                                    let hc = hc.clone();
+                                                                    let toasts = toasts.clone();
+                                                                    // Always remove locally
                                                                     set_apps
                                                                         .update(|apps| {
                                                                             apps.retain(|a| a.id != app_id);
                                                                         });
+                                                                    // If conductor connected, also withdraw on-chain
+                                                                    if !hc.is_mock() {
+                                                                        let input = WithdrawInput { application_id: app_id };
+                                                                        wasm_bindgen_futures::spawn_local(async move {
+                                                                            match hc
+                                                                                .call_zome_default::<WithdrawInput, ()>(
+                                                                                    "applications_coordinator",
+                                                                                    "withdraw_application",
+                                                                                    &input,
+                                                                                )
+                                                                                .await
+                                                                            {
+                                                                                Ok(_) => toasts.success("Application withdrawn from the network."),
+                                                                                Err(e) => toasts.error(format!("Conductor withdrawal failed: {e}")),
+                                                                            }
+                                                                        });
+                                                                    } else {
+                                                                        toasts.push(
+                                                                            "Application withdrawn locally. Connect conductor to sync.",
+                                                                            ToastKind::Info,
+                                                                        );
+                                                                    }
                                                                 }
                                                             >
                                                                 "Withdraw"

@@ -2,10 +2,18 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Jobs page — search, browse, and post job opportunities.
 //! Job matching runs client-side using the matching engine.
+//!
+//! When connected to the Holochain conductor, posting jobs calls
+//! `job_postings_coordinator::create_job_posting`.
 
 use leptos::prelude::*;
 use std::collections::HashSet;
 use wasm_bindgen::JsCast;
+
+use mycelix_leptos_core::{
+    holochain_provider::use_holochain,
+    toasts::{use_toasts, ToastKind},
+};
 
 use crate::matching::{rank_jobs, JobMatch, JobView};
 
@@ -60,8 +68,21 @@ fn mock_jobs() -> Vec<JobView> {
     ]
 }
 
+/// Lightweight input for the `create_job_posting` zome call.
+#[derive(Clone, Debug, serde::Serialize)]
+struct CreateJobPostingInput {
+    title: String,
+    organization: String,
+    required_skills: Vec<String>,
+    preferred_skills: Vec<String>,
+    remote_ok: bool,
+}
+
 #[component]
 pub fn JobsPage() -> impl IntoView {
+    let hc = use_holochain();
+    let toasts = use_toasts();
+
     let (search_query, set_search_query) = signal(String::new());
     let (skills_input, set_skills_input) = signal(String::from("rust, holochain"));
 
@@ -100,9 +121,51 @@ pub fn JobsPage() -> impl IntoView {
         ranked
     });
 
+    // Post-job handler
+    let on_post_job = move |_| {
+        let hc = hc.clone();
+        let toasts = toasts.clone();
+        wasm_bindgen_futures::spawn_local(async move {
+            if hc.is_mock() {
+                toasts.push(
+                    "Connect to the Holochain conductor to post jobs.",
+                    ToastKind::Info,
+                );
+                return;
+            }
+            let input = CreateJobPostingInput {
+                title: "New Job Posting".into(),
+                organization: "My Organization".into(),
+                required_skills: vec![],
+                preferred_skills: vec![],
+                remote_ok: true,
+            };
+            match hc
+                .call_zome_default::<CreateJobPostingInput, ()>(
+                    "job_postings_coordinator",
+                    "create_job_posting",
+                    &input,
+                )
+                .await
+            {
+                Ok(_) => toasts.success("Job posting created on the network!"),
+                Err(e) => toasts.error(format!("Failed to create posting: {e}")),
+            }
+        });
+    };
+
     view! {
         <div class="page jobs-page">
             <h1>"Job Opportunities"</h1>
+
+            // Conductor status
+            <div class="conductor-status">
+                {move || if hc.is_mock() {
+                    view! { <span class="status-indicator mock">"Local demo -- matching engine active"</span> }.into_any()
+                } else {
+                    view! { <span class="status-indicator connected">"Connected to conductor"</span> }.into_any()
+                }}
+            </div>
 
             // Skills input for the matching engine
             <div class="skills-input-section">
@@ -175,8 +238,9 @@ pub fn JobsPage() -> impl IntoView {
                 </p>
                 <button
                     class="btn-primary"
-                    disabled
-                    title="Connect to Holochain conductor to post jobs"
+                    on:click=on_post_job
+                    disabled=move || hc.is_mock()
+                    title=move || if hc.is_mock() { "Connect to Holochain conductor to post jobs" } else { "Create a new job posting" }
                 >
                     "Create Job Posting"
                 </button>
