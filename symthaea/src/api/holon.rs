@@ -744,7 +744,43 @@ async fn holon_search(
         });
     }
 
-    // Run web research via the epistemic researcher
+    // Fast path: Prism local epistemic search (sub-ms, offline, no network)
+    #[cfg(feature = "prism_search")]
+    {
+        let engine = plexus_search::SearchEngine::with_seed_claims();
+        let local_results = engine.search(&req.query, req.max_results);
+        if !local_results.is_empty() {
+            let claims: Vec<SearchClaimSummary> = local_results
+                .iter()
+                .map(|r| SearchClaimSummary {
+                    text: r.content.clone(),
+                    confidence: r.query_similarity,
+                    source_url: r.sources.first().cloned().unwrap_or_default(),
+                    epistemic_status: format!("{:?}", r.empirical_level),
+                })
+                .collect();
+            let sources: Vec<String> = local_results
+                .iter()
+                .flat_map(|r| r.sources.clone())
+                .collect::<std::collections::HashSet<_>>()
+                .into_iter()
+                .collect();
+
+            // If local results have good epistemic quality, return without web fetch
+            let avg_sim: f32 =
+                local_results.iter().map(|r| r.query_similarity).sum::<f32>()
+                    / local_results.len() as f32;
+            if avg_sim > 0.3 {
+                return Json(SearchResponse {
+                    claims,
+                    sources,
+                    status: "prism_local".to_string(),
+                });
+            }
+        }
+    }
+
+    // Slow path: web research via the epistemic researcher
     #[cfg(feature = "web_research_module")]
     {
         use crate::web_research::researcher::WebResearcher;

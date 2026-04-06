@@ -35,7 +35,8 @@ LITERT_SRC="$SOMA_CRATE/native"
 LITERT_FLAGS=""
 
 if [[ -d "${LITERT_LM_SDK:-}" ]]; then
-    LITERT_FLAGS="-DLITERT_LM_AVAILABLE -I$LITERT_LM_SDK/include -L$LITERT_LM_SDK/lib -llitert_lm"
+    # SDK provides c/engine.h and prebuilt libs
+    LITERT_FLAGS="-DLITERT_LM_AVAILABLE -I$LITERT_LM_SDK -L$LITERT_LM_SDK/prebuilt/android/arm64-v8a -llitert_lm"
     echo "  LiteRT-LM SDK found at $LITERT_LM_SDK — building with full inference"
 else
     echo "  LiteRT-LM SDK not found — building stub (set LITERT_LM_SDK to enable)"

@@ -2,11 +2,12 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //
 // LiteRT-LM C shim implementation.
-// Wraps the LiteRT-LM C++ API (ModelAssets, Engine, Conversation)
-// into C-compatible functions for Rust FFI.
+// Wraps the LiteRT-LM C API (engine.h) into our simplified interface
+// for Rust FFI (litert_bridge.rs).
 //
-// Requires: LiteRT-LM SDK headers + linked library.
-// Build: see litert_shim.h for instructions.
+// When LITERT_LM_AVAILABLE is defined (set by build-jni.sh when SDK is present),
+// this links against the real LiteRT-LM library. Otherwise, all functions
+// return null/false (stub mode).
 
 #include "litert_shim.h"
 
@@ -14,27 +15,32 @@
 #include <cstring>
 #include <string>
 
-// LiteRT-LM C++ API headers
-// These come from the LiteRT-LM SDK (github.com/google-ai-edge/LiteRT-LM)
 #ifdef LITERT_LM_AVAILABLE
-#include "litert_lm/engine.h"
-#include "litert_lm/conversation.h"
-#include "litert_lm/model_assets.h"
-#include "litert_lm/engine_settings.h"
-#include "litert_lm/conversation_config.h"
+#include "c/engine.h"  // LiteRT-LM C API
 #endif
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Internal engine wrapper (hides C++ types from C interface)
-// ──────────────��──────────────────────────────────────────────────────────────
+// Internal engine wrapper
+// ─────────────────────────────────────────────────────────────────────────────
 
 struct LiteRTEngine {
 #ifdef LITERT_LM_AVAILABLE
-    std::unique_ptr<litert::lm::Engine> engine;
-    std::unique_ptr<litert::lm::ModelAssets> model_assets;
+    LiteRtLmEngine* engine;
+    LiteRtLmSession* session;
+    LiteRtLmEngineSettings* settings;
+    LiteRtLmSessionConfig* session_config;
 #endif
     bool ready;
 };
+
+// Helper: duplicate a string for return to caller (must be freed with litert_free_response)
+static char* dup_string(const char* s) {
+    if (!s) return nullptr;
+    size_t len = strlen(s);
+    char* copy = static_cast<char*>(malloc(len + 1));
+    if (copy) memcpy(copy, s, len + 1);
+    return copy;
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Public C API
@@ -50,35 +56,51 @@ void* litert_create_engine(const char* model_path, bool use_gpu) {
     wrapper->ready = false;
 
 #ifdef LITERT_LM_AVAILABLE
-    // Load model assets from file
-    auto model_assets = litert::lm::ModelAssets::Create(model_path);
-    if (!model_assets) {
-        delete wrapper;
-        return nullptr;
-    }
+    // Suppress verbose logging
+    litert_lm_set_min_log_level(2);  // ERROR only
 
-    // Configure backend (GPU preferred for Tensor G3 Mali)
-    auto backend = use_gpu
-        ? litert::lm::Backend::kGpu
-        : litert::lm::Backend::kCpu;
-    auto settings = litert::lm::EngineSettings::CreateDefault(*model_assets, backend);
-    if (!settings) {
-        delete wrapper;
-        return nullptr;
-    }
+    // Create engine settings
+    wrapper->settings = litert_lm_engine_settings_create(model_path);
+    if (!wrapper->settings) { delete wrapper; return nullptr; }
+
+    // Configure for mobile: reasonable token limits
+    litert_lm_engine_settings_set_max_num_tokens(wrapper->settings, 2048);
 
     // Create engine
-    auto engine = litert::lm::Engine::CreateEngine(*settings);
-    if (!engine) {
+    wrapper->engine = litert_lm_engine_create(wrapper->settings);
+    if (!wrapper->engine) {
+        litert_lm_engine_settings_delete(wrapper->settings);
         delete wrapper;
         return nullptr;
     }
 
-    wrapper->model_assets = std::move(model_assets);
-    wrapper->engine = std::move(engine);
+    // Create session config with default parameters
+    wrapper->session_config = litert_lm_session_config_create();
+    if (!wrapper->session_config) {
+        litert_lm_engine_delete(wrapper->engine);
+        litert_lm_engine_settings_delete(wrapper->settings);
+        delete wrapper;
+        return nullptr;
+    }
+
+    // Default: max 256 output tokens, top-k sampling
+    litert_lm_session_config_set_max_output_tokens(wrapper->session_config, 256);
+    SamplerParams sampler = { kTopK, 40, 0.9f, 0.7f };
+    litert_lm_session_config_set_sampler_params(wrapper->session_config, sampler);
+
+    // Create session
+    wrapper->session = litert_lm_engine_create_session(
+        wrapper->engine, wrapper->session_config);
+    if (!wrapper->session) {
+        litert_lm_session_config_delete(wrapper->session_config);
+        litert_lm_engine_delete(wrapper->engine);
+        litert_lm_engine_settings_delete(wrapper->settings);
+        delete wrapper;
+        return nullptr;
+    }
+
     wrapper->ready = true;
 #else
-    // SDK not linked — engine creation is a no-op stub
     (void)model_path;
     (void)use_gpu;
 #endif
@@ -97,23 +119,28 @@ char* litert_generate(void* engine, const char* prompt, uint32_t max_tokens) {
     if (!wrapper->ready) return nullptr;
 
 #ifdef LITERT_LM_AVAILABLE
-    // Create a conversation for this generation
-    auto conv_config = litert::lm::ConversationConfig::CreateDefault(*wrapper->engine);
-    if (!conv_config) return nullptr;
+    // Build text input
+    InputData input;
+    input.type = kInputText;
+    input.data = prompt;
+    input.size = strlen(prompt);
 
-    auto conv = litert::lm::Conversation::Create(*conv_config);
-    if (!conv) return nullptr;
-
-    // Build the request message (simple text prompt)
-    std::string request = std::string("{\"text\": \"") + prompt + "\"}";
-    auto response = conv->SendMessage(request);
-    if (response.empty()) return nullptr;
-
-    // Allocate a C string copy for the caller
-    char* result = static_cast<char*>(malloc(response.size() + 1));
-    if (result) {
-        memcpy(result, response.c_str(), response.size() + 1);
+    // Override max tokens if specified
+    if (max_tokens > 0 && max_tokens != 256) {
+        litert_lm_session_config_set_max_output_tokens(
+            wrapper->session_config, max_tokens);
     }
+
+    // Generate
+    LiteRtLmResponses* responses = litert_lm_session_generate_content(
+        wrapper->session, &input, 1);
+    if (!responses) return nullptr;
+
+    // Extract first candidate
+    const char* text = litert_lm_responses_get_response_text_at(responses, 0);
+    char* result = dup_string(text);
+
+    litert_lm_responses_delete(responses);
     return result;
 #else
     (void)prompt;
@@ -134,35 +161,46 @@ char* litert_generate_stream(
     if (!wrapper->ready) return nullptr;
 
 #ifdef LITERT_LM_AVAILABLE
-    auto conv_config = litert::lm::ConversationConfig::CreateDefault(*wrapper->engine);
-    if (!conv_config) return nullptr;
+    InputData input;
+    input.type = kInputText;
+    input.data = prompt;
+    input.size = strlen(prompt);
 
-    auto conv = litert::lm::Conversation::Create(*conv_config);
-    if (!conv) return nullptr;
+    if (max_tokens > 0 && max_tokens != 256) {
+        litert_lm_session_config_set_max_output_tokens(
+            wrapper->session_config, max_tokens);
+    }
 
-    // Streaming: accumulate tokens and invoke callback for each
-    std::string accumulated;
-    std::string request = std::string("{\"text\": \"") + prompt + "\"}";
+    // Accumulate chunks for the return value
+    struct StreamState {
+        std::string accumulated;
+        litert_stream_callback user_callback;
+        void* user_context;
+    };
 
-    // Use streaming SendMessage with per-token callback
-    auto on_token = [&accumulated, callback, context](const std::string& token) {
-        accumulated += token;
-        if (callback) {
-            callback(token.c_str(), context);
+    StreamState state;
+    state.user_callback = callback;
+    state.user_context = context;
+
+    // LiteRT-LM streaming callback
+    auto sdk_callback = [](void* cb_data, const char* chunk,
+                           bool is_final, const char* error_msg) {
+        auto* s = static_cast<StreamState*>(cb_data);
+        if (error_msg) return;  // skip errors
+        if (chunk) {
+            s->accumulated += chunk;
+            if (s->user_callback) {
+                s->user_callback(chunk, s->user_context);
+            }
         }
     };
 
-    // Note: exact streaming API depends on LiteRT-LM SDK version.
-    // SendMessage with callback is the documented pattern.
-    conv->SendMessage(request, on_token);
+    int rc = litert_lm_session_generate_content_stream(
+        wrapper->session, &input, 1, sdk_callback, &state);
 
-    if (accumulated.empty()) return nullptr;
+    if (rc != 0 || state.accumulated.empty()) return nullptr;
 
-    char* result = static_cast<char*>(malloc(accumulated.size() + 1));
-    if (result) {
-        memcpy(result, accumulated.c_str(), accumulated.size() + 1);
-    }
-    return result;
+    return dup_string(state.accumulated.c_str());
 #else
     (void)prompt;
     (void)max_tokens;
@@ -177,9 +215,17 @@ void litert_free_response(char* response) {
 }
 
 void litert_free_engine(void* engine) {
-    if (engine) {
-        delete static_cast<LiteRTEngine*>(engine);
-    }
+    if (!engine) return;
+    auto* wrapper = static_cast<LiteRTEngine*>(engine);
+
+#ifdef LITERT_LM_AVAILABLE
+    if (wrapper->session) litert_lm_session_delete(wrapper->session);
+    if (wrapper->session_config) litert_lm_session_config_delete(wrapper->session_config);
+    if (wrapper->engine) litert_lm_engine_delete(wrapper->engine);
+    if (wrapper->settings) litert_lm_engine_settings_delete(wrapper->settings);
+#endif
+
+    delete wrapper;
 }
 
 } // extern "C"

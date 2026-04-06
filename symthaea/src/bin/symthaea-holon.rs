@@ -151,6 +151,35 @@ async fn main() -> Result<()> {
         }
     });
 
+    // Advertise Holon via mDNS so Soma can auto-discover on LAN.
+    // Uses avahi-publish if available (NixOS has avahi by default).
+    let mdns_port = port;
+    tokio::spawn(async move {
+        let hostname = std::env::var("HOSTNAME")
+            .or_else(|_| std::env::var("HOST"))
+            .unwrap_or_else(|_| "symthaea".to_string());
+        let service_name = format!("Symthaea Holon ({})", hostname);
+        info!("Advertising mDNS: _symthaea._tcp port {}", mdns_port);
+
+        let result = tokio::process::Command::new("avahi-publish-service")
+            .arg(&service_name)
+            .arg("_symthaea._tcp")
+            .arg(mdns_port.to_string())
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .spawn();
+
+        match result {
+            Ok(mut child) => {
+                info!("mDNS: advertising as '{}'", service_name);
+                let _ = child.wait().await;
+            }
+            Err(_) => {
+                warn!("mDNS: avahi-publish-service not found — Soma must connect manually");
+            }
+        }
+    });
+
     // Run cognitive loop on a blocking thread (CLS is !Send due to internal state).
     info!(
         "Starting consciousness loop at {} Hz (interval {:?})",
