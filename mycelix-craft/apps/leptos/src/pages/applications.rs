@@ -121,13 +121,17 @@ pub fn ApplicationsPage() -> impl IntoView {
 
     let stage_names = ["Draft", "Submitted", "Under Review", "Interview", "Offered"];
 
+    // Clone hc for each closure that captures it.
+    let hc_for_status = hc.clone();
+    let hc_for_list = hc.clone();
+
     view! {
         <div class="page applications-page">
             <h1>"My Applications"</h1>
 
             // Conductor status indicator
             <div class="conductor-status">
-                {move || if hc.is_mock() {
+                {move || if hc_for_status.is_mock() {
                     view! { <span class="status-indicator mock">"Local demo -- withdrawals are client-side only"</span> }.into_any()
                 } else {
                     view! { <span class="status-indicator connected">"Connected to conductor"</span> }.into_any()
@@ -160,7 +164,7 @@ pub fn ApplicationsPage() -> impl IntoView {
                         }
                         .into_any()
                     } else {
-                        let hc = hc.clone();
+                        let hc = hc_for_list.clone();
                         let toasts = toasts.clone();
                         view! {
                             <div class="app-cards">

@@ -121,10 +121,17 @@ pub fn JobsPage() -> impl IntoView {
         ranked
     });
 
+    // Clone hc/toasts for each closure that captures them.
+    let hc_for_post = hc.clone();
+    let toasts_for_post = toasts.clone();
+    let hc_for_status = hc.clone();
+    let hc_for_disabled = hc.clone();
+    let hc_for_title = hc.clone();
+
     // Post-job handler
     let on_post_job = move |_| {
-        let hc = hc.clone();
-        let toasts = toasts.clone();
+        let hc = hc_for_post.clone();
+        let toasts = toasts_for_post.clone();
         wasm_bindgen_futures::spawn_local(async move {
             if hc.is_mock() {
                 toasts.push(
@@ -160,7 +167,7 @@ pub fn JobsPage() -> impl IntoView {
 
             // Conductor status
             <div class="conductor-status">
-                {move || if hc.is_mock() {
+                {move || if hc_for_status.is_mock() {
                     view! { <span class="status-indicator mock">"Local demo -- matching engine active"</span> }.into_any()
                 } else {
                     view! { <span class="status-indicator connected">"Connected to conductor"</span> }.into_any()
@@ -239,8 +246,8 @@ pub fn JobsPage() -> impl IntoView {
                 <button
                     class="btn-primary"
                     on:click=on_post_job
-                    disabled=move || hc.is_mock()
-                    title=move || if hc.is_mock() { "Connect to Holochain conductor to post jobs" } else { "Create a new job posting" }
+                    disabled=move || hc_for_disabled.is_mock()
+                    title=move || if hc_for_title.is_mock() { "Connect to Holochain conductor to post jobs" } else { "Create a new job posting" }
                 >
                     "Create Job Posting"
                 </button>

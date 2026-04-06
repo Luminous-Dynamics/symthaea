@@ -66,9 +66,9 @@ fn bench_binius_hdc_xor() -> BenchResult {
     let circuit = builder.build();
 
     // Get constraint stats BEFORE proving
-    let stat = binius_frontend::CircuitStat::from_circuit(&circuit);
-    let and_constraints = stat.n_and();
-    let mul_constraints = stat.n_mul();
+    let stat = binius_frontend::CircuitStat::collect(&circuit);
+    let and_constraints = stat.n_and_constraints;
+    let mul_constraints = stat.n_mul_constraints;
     println!("  AND constraints: {} (should be 0 for pure XOR)", and_constraints);
     println!("  MUL constraints: {} (should be 0 for pure XOR)", mul_constraints);
     println!("  Total non-linear constraints: {}", and_constraints + mul_constraints);

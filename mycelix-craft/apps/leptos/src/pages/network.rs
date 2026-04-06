@@ -105,10 +105,22 @@ pub fn NetworkPage() -> impl IntoView {
     let pending_count = pending.len();
     let rec_count = recommendations.len();
 
+    // Clone hc/toasts for each closure that captures them.
+    let hc_for_send = hc.clone();
+    let toasts_for_send = toasts.clone();
+    let hc_for_rec = hc.clone();
+    let toasts_for_rec = toasts.clone();
+    let hc_for_disabled1 = hc.clone();
+    let hc_for_title1 = hc.clone();
+    let hc_for_disabled2 = hc.clone();
+    let hc_for_title2 = hc.clone();
+    let hc_for_mock_indicator = hc.clone();
+    let hc_for_connected_indicator = hc.clone();
+
     // Send connection request handler
     let on_send_request = {
-        let hc = hc.clone();
-        let toasts = toasts.clone();
+        let hc = hc_for_send.clone();
+        let toasts = toasts_for_send.clone();
         move |_| {
             let hc = hc.clone();
             let toasts = toasts.clone();
@@ -137,8 +149,8 @@ pub fn NetworkPage() -> impl IntoView {
 
     // Write recommendation handler
     let on_write_recommendation = {
-        let hc = hc.clone();
-        let toasts = toasts.clone();
+        let hc = hc_for_rec.clone();
+        let toasts = toasts_for_rec.clone();
         move |_| {
             let hc = hc.clone();
             let toasts = toasts.clone();
@@ -194,23 +206,23 @@ pub fn NetworkPage() -> impl IntoView {
                 <button
                     class="btn-primary"
                     on:click=on_send_request
-                    disabled=move || hc.is_mock()
-                    title=move || if hc.is_mock() { "Connect to conductor first" } else { "Send a connection request" }
+                    disabled=move || hc_for_disabled1.is_mock()
+                    title=move || if hc_for_title1.is_mock() { "Connect to conductor first" } else { "Send a connection request" }
                 >
                     "Send Request"
                 </button>
                 <button
                     class="btn-secondary"
                     on:click=on_write_recommendation
-                    disabled=move || hc.is_mock()
-                    title=move || if hc.is_mock() { "Connect to conductor first" } else { "Write a recommendation" }
+                    disabled=move || hc_for_disabled2.is_mock()
+                    title=move || if hc_for_title2.is_mock() { "Connect to conductor first" } else { "Write a recommendation" }
                 >
                     "Write Recommendation"
                 </button>
-                {move || hc.is_mock().then(|| view! {
+                {move || hc_for_mock_indicator.is_mock().then(|| view! {
                     <span class="status-indicator mock">"Local demo"</span>
                 })}
-                {move || (!hc.is_mock()).then(|| view! {
+                {move || (!hc_for_connected_indicator.is_mock()).then(|| view! {
                     <span class="status-indicator connected">"Connected to conductor"</span>
                 })}
             </div>
