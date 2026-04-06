@@ -37,12 +37,22 @@ pub struct HdcMassPrediction {
     pub ba: f64,
 }
 
-/// HDC+LTC nuclear mass predictor.
+/// HDC+LTC nuclear mass predictor with Gated Linear Unit decoder.
+///
+/// The GLU decoder uses multiplicative gating — the same operation as
+/// HDC binding — to introduce nonlinearity:
+///
+///   correction = sigmoid(dot(state, w_gate)) × (dot(state, w_value) × scale + bias)
+///
+/// This is architecturally aligned with HDC philosophy and proven in
+/// modern LLMs (GPT-4, Llama use GLU variants).
 pub struct HdcMassPredictor {
     encoder: NuclearStateEncoder,
     neuron: HdcLtcUnifiedNeuron,
-    /// Learned projection vector for decoding state → scalar correction
-    decoder: Vec<f32>,
+    /// Gate projection: learns WHEN to activate
+    w_gate: Vec<f32>,
+    /// Value projection: learns the regression magnitude
+    w_value: Vec<f32>,
     /// Output scale factor
     scale: f64,
     /// Output bias
@@ -65,15 +75,18 @@ impl HdcMassPredictor {
         let mut predictor = Self {
             encoder: NuclearStateEncoder::new(),
             neuron: HdcLtcUnifiedNeuron::new(config, 0xA0C1_DEAD),
-            decoder: vec![0.0; HDC_DIMENSION],
-            scale: 100.0, // Initial scale for corrections (~100 MeV range)
+            w_gate: vec![0.0; HDC_DIMENSION],
+            w_value: vec![0.0; HDC_DIMENSION],
+            scale: 100.0,
             bias: 0.0,
         };
 
-        // Initialize decoder with small random values
-        let init_hv = ContinuousHV::random(HDC_DIMENSION, 0xDEC0_DE01);
+        // Initialize GLU projections with small random values
+        let gate_init = ContinuousHV::random(HDC_DIMENSION, 0xDA7E_0001);
+        let value_init = ContinuousHV::random(HDC_DIMENSION, 0xFA1E_0002);
         for i in 0..HDC_DIMENSION {
-            predictor.decoder[i] = init_hv.values[i] * 0.01;
+            predictor.w_gate[i] = gate_init.values[i] * 0.01;
+            predictor.w_value[i] = value_init.values[i] * 0.01;
         }
 
         // Train on AME2020
@@ -107,15 +120,22 @@ impl HdcMassPredictor {
         neuron.evolve_closed_form(1.0, &input_hv);
         let state = neuron.state();
 
-        // Decode: dot product with learned decoder
-        let dot: f64 = state
+        // GLU decode: correction = sigmoid(gate_dot) × (value_dot × scale + bias)
+        let gate_dot: f64 = state
             .values
             .iter()
-            .zip(self.decoder.iter())
-            .map(|(&s, &d)| s as f64 * d as f64)
+            .zip(self.w_gate.iter())
+            .map(|(&s, &g)| s as f64 * g as f64)
+            .sum();
+        let value_dot: f64 = state
+            .values
+            .iter()
+            .zip(self.w_value.iter())
+            .map(|(&s, &v)| s as f64 * v as f64)
             .sum();
 
-        let correction = dot * self.scale + self.bias;
+        let gate = 1.0 / (1.0 + (-gate_dot.clamp(-20.0, 20.0)).exp()); // sigmoid with clamp
+        let correction = gate * (value_dot * self.scale + self.bias);
         let dz = dz_binding_energy(z, n);
         let total = dz + correction;
 
@@ -151,26 +171,33 @@ impl HdcMassPredictor {
                 neuron_copy.evolve_closed_form(1.0, &input_hv);
                 let state = neuron_copy.state();
 
-                // Decode
-                let dot: f64 = state
-                    .values
-                    .iter()
-                    .zip(self.decoder.iter())
-                    .map(|(&s, &d)| s as f64 * d as f64)
-                    .sum();
-                let predicted_residual = dot * self.scale + self.bias;
+                // GLU decode
+                let gate_dot: f64 = state.values.iter().zip(self.w_gate.iter())
+                    .map(|(&s, &g)| s as f64 * g as f64).sum();
+                let value_dot: f64 = state.values.iter().zip(self.w_value.iter())
+                    .map(|(&s, &v)| s as f64 * v as f64).sum();
+
+                let gate = 1.0 / (1.0 + (-gate_dot.clamp(-20.0, 20.0)).exp());
+                let value = value_dot * self.scale + self.bias;
+                let predicted_residual = gate * value;
                 let error = predicted_residual - target_residual;
                 total_sq_error += error * error;
 
-                // Update decoder (gradient descent)
-                let grad_scale = lr * error;
+                // GLU gradients
+                // ∂L/∂w_value = error × gate × scale × state
+                // ∂L/∂w_gate = error × value × gate × (1-gate) × state
+                let grad_value = lr * error * gate * self.scale;
+                let grad_gate = lr * error * value * gate * (1.0 - gate);
                 for i in 0..HDC_DIMENSION {
-                    self.decoder[i] -= (grad_scale * state.values[i] as f64 * self.scale) as f32;
+                    let s = state.values[i] as f64;
+                    self.w_value[i] -= (grad_value * s) as f32;
+                    self.w_gate[i] -= (grad_gate * s) as f32;
                 }
 
-                // Update scale and bias
-                self.scale -= lr * error * dot;
-                self.bias -= lr * error;
+                // ∂L/∂scale = error × gate × value_dot
+                // ∂L/∂bias = error × gate
+                self.scale -= lr * error * gate * value_dot;
+                self.bias -= lr * error * gate;
 
                 // Clamp to prevent divergence
                 self.scale = self.scale.clamp(-1000.0, 1000.0);
@@ -243,14 +270,17 @@ impl HdcMassPredictor {
             let mut predictor = HdcMassPredictor {
                 encoder: NuclearStateEncoder::new(),
                 neuron: HdcLtcUnifiedNeuron::new(config, 0xA0C1_DEAD + fold as u64),
-                decoder: vec![0.0; HDC_DIMENSION],
+                w_gate: vec![0.0; HDC_DIMENSION],
+                w_value: vec![0.0; HDC_DIMENSION],
                 scale: 100.0,
                 bias: 0.0,
             };
 
-            let init_hv = ContinuousHV::random(HDC_DIMENSION, 0xDEC0_DE01 + fold as u64);
+            let gate_init = ContinuousHV::random(HDC_DIMENSION, 0xDA7E_0001 + fold as u64);
+            let value_init = ContinuousHV::random(HDC_DIMENSION, 0xFA1E_0002 + fold as u64);
             for i in 0..HDC_DIMENSION {
-                predictor.decoder[i] = init_hv.values[i] * 0.01;
+                predictor.w_gate[i] = gate_init.values[i] * 0.01;
+                predictor.w_value[i] = value_init.values[i] * 0.01;
             }
 
             predictor.train(&train_nuclei, 20); // Fewer epochs for CV speed
