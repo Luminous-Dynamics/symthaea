@@ -7,7 +7,7 @@ UI connected to a local WebSocket relay. The threat model accounts for:
 
 | Threat | Vector | Mitigation |
 |--------|--------|------------|
-| **Heredoc injection** | Attacker embeds delimiter in browser-supplied Nix config | `sanitize_heredoc()` strips delimiter lines; SCP transfer planned to eliminate heredocs entirely |
+| **Heredoc injection** | Attacker embeds delimiter in browser-supplied Nix config | **ELIMINATED**: Browser configs pre-staged via `tokio::fs::write()` and copied by install script. No heredoc for user input. Server-generated fallbacks use heredoc (safe: not user-controlled). `sanitize_heredoc()` retained as defense-in-depth. |
 | **Shell command injection** | Metacharacters in hostname, timezone, disk path | `sanitize_input()` allowlist (alphanumeric + `-_.`), `validate_disk_path()` device class whitelist |
 | **CSRF via WebSocket** | Cross-origin page connects to relay | Origin header validated in `accept_hdr_async` before upgrade |
 | **Token brute force** | Attacker guesses relay auth token | Cryptographic 256-bit tokens via `/dev/urandom`, constant-time comparison, per-IP rate limiting |
