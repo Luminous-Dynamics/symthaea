@@ -66,6 +66,7 @@
 //! - `generate_text(max_tokens) -> GenerationResult` — Broca output
 
 use leptos::prelude::*;
+use wasm_bindgen::JsCast;
 
 // ---------------------------------------------------------------------------
 // Consciousness state

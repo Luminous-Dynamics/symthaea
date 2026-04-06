@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Deploy EduNet to IPFS + Cloudflare gateway
+# Deploy Praxis to IPFS + Cloudflare gateway
 # Usage: ./deploy.sh
 #
 # Builds the Leptos app, pins to local IPFS, updates DNS record.
@@ -9,9 +9,9 @@ set -euo pipefail
 
 DIST_DIR="$(cd "$(dirname "$0")" && pwd)/dist"
 ZONE_ID="3f3a2baaa758ed78459447577d2fa3bb"  # luminousdynamics.io
-RECORD_NAME="_dnslink.edunet"
+RECORD_NAME="_dnslink.praxis"
 
-echo "=== EduNet Deploy to IPFS ==="
+echo "=== Praxis Deploy to IPFS ==="
 
 # Pre-flight checks
 if ! curl -s --max-time 3 "http://127.0.0.1:5001/api/v0/id" > /dev/null 2>&1; then
@@ -74,7 +74,7 @@ fi
 echo "[4/4] Done!"
 echo ""
 echo "  IPFS: ipfs://$CID"
-echo "  URL:  https://edunet.luminousdynamics.io"
+echo "  URL:  https://praxis.mycelix.net"
 echo "  Gateway: https://cloudflare-ipfs.com/ipfs/$CID/"
 echo ""
 echo "  DNS propagation may take 1-5 minutes."
