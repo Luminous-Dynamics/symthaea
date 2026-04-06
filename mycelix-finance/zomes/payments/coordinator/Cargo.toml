@@ -17,3 +17,4 @@ serde_json = { workspace = true }
 payments_integrity = { path = "../integrity" }
 mycelix_finance_shared = { path = "../../shared" }
 mycelix_finance_types = { path = "../../../types" }
+mycelix-zkp-core = { workspace = true }

@@ -662,7 +662,10 @@ pub fn verify_supply_chain_sustainability(
             pending_count += 1;
         } else {
             // Use the most recent verification status
-            let last = verif_arr.last().unwrap();
+            let Some(last) = verif_arr.last() else {
+                pending_count += 1;
+                continue;
+            };
             let status = last
                 .get("entry")
                 .and_then(|e| e.get("status"))

@@ -651,9 +651,8 @@ pub fn detect_circular_dependencies(claim_id: String) -> ExternResult<Vec<Vec<St
                 .ok()
                 .flatten()
             {
-                if path.contains(&rel.target) {
+                if let Some(cycle_start) = path.iter().position(|x| x == &rel.target) {
                     // Cycle detected
-                    let cycle_start = path.iter().position(|x| x == &rel.target).unwrap();
                     let mut cycle = path[cycle_start..].to_vec();
                     cycle.push(rel.target.clone());
                     cycles.push(cycle);
