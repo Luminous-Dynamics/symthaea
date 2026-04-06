@@ -1,0 +1,9 @@
+[package]
+name = "prism-node"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Symthaea Prism — prism-node"
+
+[dependencies]
+prism-common = { path = "../prism-common" }

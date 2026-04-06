@@ -1,0 +1,11 @@
+[package]
+name = "prism-layout"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Layout engine for Symthaea Prism — text wrapping, inline elements, reader mode"
+
+[dependencies]
+prism-common = { path = "../prism-common" }
+prism-dom = { path = "../prism-dom" }
+log = { workspace = true }

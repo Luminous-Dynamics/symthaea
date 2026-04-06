@@ -1,0 +1,15 @@
+[package]
+name = "prism-net"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "HTTP networking for Symthaea Prism"
+
+[dependencies]
+prism-common = { path = "../prism-common" }
+prism-dom = { path = "../prism-dom" }
+reqwest = { workspace = true }
+tokio = { workspace = true }
+url = { workspace = true }
+log = { workspace = true }
+thiserror = { workspace = true }

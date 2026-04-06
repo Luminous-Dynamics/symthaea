@@ -266,7 +266,10 @@ pub fn get_nutrient_profile(crop_name: String) -> ExternResult<Option<Record>> {
     if links.is_empty() {
         return Ok(None);
     }
-    let latest = links.last().unwrap();
+    let latest = match links.last() {
+        Some(l) => l,
+        None => return Ok(None),
+    };
     let action_hash = ActionHash::try_from(latest.target.clone())
         .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
     get(action_hash, GetOptions::default())

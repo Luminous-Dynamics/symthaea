@@ -75,9 +75,7 @@ pub fn bootstrap_consciousness_config(_: ()) -> ExternResult<Record> {
         LinkQuery::try_new(anchor.clone(), LinkTypes::ConsciousnessConfigIndex)?,
         GetStrategy::default(),
     )?;
-    if !links.is_empty() {
-        // Config already exists — return the latest
-        let link = links.into_iter().max_by_key(|l| l.timestamp).unwrap();
+    if let Some(link) = links.into_iter().max_by_key(|l| l.timestamp) {
         let action_hash = ActionHash::try_from(link.target)
             .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
         return get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(

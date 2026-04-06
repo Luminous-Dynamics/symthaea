@@ -514,7 +514,8 @@ pub fn route_waste_stream(input: RouteWasteStreamInput) -> ExternResult<Option<R
 
     let facility_hash = best_facility_hash
         .ok_or(wasm_error!(WasmErrorInner::Guest("No matching facility found".into())))?;
-    let factors = best_factors.unwrap();
+    let factors = best_factors
+        .ok_or(wasm_error!(WasmErrorInner::Guest("No matching factors found".into())))?;
 
     // Create route entry
     let route = WasteRoute {

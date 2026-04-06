@@ -1,0 +1,47 @@
+{
+  "$schema": "https://raw.githubusercontent.com/nicovell3/tauri/refs/heads/v2/packages/tauri-cli/schema.json",
+  "productName": "Symthaea Prism",
+  "version": "0.2.0",
+  "identifier": "net.mycelix.prism",
+  "build": {
+    "frontendDist": "../plexus-ui/dist",
+    "devUrl": "http://localhost:8130",
+    "beforeDevCommand": "cd ../plexus-ui && trunk serve --port 8130",
+    "beforeBuildCommand": "cd ../plexus-ui && trunk build --release"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "Symthaea Prism",
+        "width": 1024,
+        "height": 768,
+        "resizable": true,
+        "center": true,
+        "decorations": true
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; connect-src 'self' https: http:; img-src 'self' https: data:;"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/prism-icon.png"
+    ],
+    "linux": {
+      "deb": {
+        "depends": []
+      },
+      "appimage": {
+        "bundleMediaFramework": false
+      }
+    }
+  },
+  "plugins": {
+    "shell": {
+      "open": true
+    }
+  }
+}

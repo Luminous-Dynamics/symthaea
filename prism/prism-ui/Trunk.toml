@@ -1,0 +1,13 @@
+[build]
+target = "index.html"
+dist = "dist"
+
+[watch]
+watch = ["src", "style", "index.html"]
+
+[serve]
+port = 8130
+open = false
+
+[tools]
+wasm_opt = "version_124"

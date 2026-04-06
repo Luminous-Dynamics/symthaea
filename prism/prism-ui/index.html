@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Symthaea Prism</title>
+    <meta name="description" content="Symthaea Prism — consciousness-aware epistemic search browser. Pure Rust. Zero C++. Powered by Symthaea." />
+    <meta name="theme-color" content="#0d1a24" />
+    <meta name="color-scheme" content="dark light" />
+
+    <!-- Open Graph -->
+    <meta property="og:title" content="Symthaea Prism" />
+    <meta property="og:description" content="Symthaea Prism — epistemic search powered by 16,384-bit hyperdimensional computing. Every result is epistemically classified." />
+    <meta property="og:type" content="website" />
+
+    <!-- Epistemic Diffractor icon -->
+    <link rel="icon" type="image/svg+xml" href="/static/prism-icon.svg" />
+    <link rel="apple-touch-icon" href="/static/prism-icon.svg" />
+
+    <link data-trunk rel="css" href="style/prism.css" />
+    <link data-trunk rel="copy-dir" href="static" />
+
+    <!-- Keyboard shortcut: Ctrl+L / Cmd+L focuses search bar -->
+    <script>
+    document.addEventListener('keydown', function(e) {
+        if ((e.ctrlKey || e.metaKey) && e.key === 'l') {
+            e.preventDefault();
+            var input = document.querySelector('.search-input');
+            if (input) { input.focus(); input.select(); }
+        }
+    });
+    </script>
+</head>
+<body>
+</body>
+</html>

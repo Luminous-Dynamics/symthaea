@@ -1,0 +1,15 @@
+[package]
+name = "prism-search"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Epistemic knowledge search engine for Symthaea Prism"
+
+[dependencies]
+prism-common = { path = "../prism-common" }
+prism-ingest = { path = "../prism-ingest" }
+serde = { workspace = true }
+log = { workspace = true }
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+getrandom = { workspace = true }

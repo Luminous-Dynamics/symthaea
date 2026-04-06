@@ -18,3 +18,4 @@ governance-utils = { workspace = true }
 holochain_serialized_bytes = { workspace = true }
 mycelix-core-types = { workspace = true }
 mycelix-zome-helpers = { workspace = true }
+mycelix-zkp-core = { workspace = true }

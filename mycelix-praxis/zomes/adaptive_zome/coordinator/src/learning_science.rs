@@ -853,7 +853,7 @@ pub(crate) fn calculate_desirable_difficulties(input: DesirableDifficultyInput) 
         (variability_score, DifficultyDimension::Variability),
         (transfer_score, DifficultyDimension::Transfer),
     ];
-    let weakest = scores.iter().min_by_key(|(s, _)| *s).unwrap().1.clone();
+    let weakest = scores.iter().min_by_key(|(s, _)| *s).map(|(_, d)| d.clone()).unwrap_or(DifficultyDimension::Spacing);
 
     // Calculate overall difficulty index
     let difficulty_index = ((spacing_score as u32 + interleaving_score as u32 +
@@ -3840,8 +3840,8 @@ pub(crate) fn assess_sel_competencies(input: SELInput) -> ExternResult<SELAssess
         (SELCompetency::ResponsibleDecisionMaking, decision_making),
     ];
 
-    let strongest = scores.iter().max_by_key(|x| x.1).unwrap().0.clone();
-    let growth_area = scores.iter().min_by_key(|x| x.1).unwrap().0.clone();
+    let strongest = scores.iter().max_by_key(|x| x.1).map(|x| x.0.clone()).unwrap_or(SELCompetency::SelfAwareness);
+    let growth_area = scores.iter().min_by_key(|x| x.1).map(|x| x.0.clone()).unwrap_or(SELCompetency::SelfAwareness);
 
     Ok(SELAssessment {
         profile: SELProfile {

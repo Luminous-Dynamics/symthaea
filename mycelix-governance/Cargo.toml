@@ -62,6 +62,9 @@ k256 = { version = "0.13", default-features = false, features = ["arithmetic", "
 governance-utils = { path = "crates/governance-utils" }
 mycelix-zome-helpers = { path = "../mycelix-workspace/crates/mycelix-zome-helpers" }
 
+# ZKP verification for anonymous voting
+mycelix-zkp-core = { path = "../crates/mycelix-zkp-core" }
+
 [profile.dev]
 opt-level = "z"
 

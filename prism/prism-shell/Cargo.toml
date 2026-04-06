@@ -1,0 +1,25 @@
+[package]
+name = "prism-shell"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Symthaea Prism — main executable with GPU rendering, navigation, and search"
+
+[dependencies]
+prism-common = { path = "../prism-common" }
+prism-dom = { path = "../prism-dom" }
+prism-layout = { path = "../prism-layout" }
+prism-net = { path = "../prism-net" }
+prism-reflex = { path = "../prism-reflex" }
+prism-bridge = { path = "../prism-bridge" }
+prism-privacy = { path = "../prism-privacy" }
+prism-search = { path = "../prism-search" }
+vello = { workspace = true }
+winit = { workspace = true }
+pollster = "0.4"
+tokio = { workspace = true }
+url = { workspace = true }
+log = { workspace = true }
+env_logger = { workspace = true }
+anyhow = "1"
+skrifa = { workspace = true }

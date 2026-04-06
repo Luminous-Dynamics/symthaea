@@ -150,7 +150,10 @@ pub fn get_privacy_preference(agent: AgentPubKey) -> ExternResult<Option<Record>
     // Return the latest link (highest timestamp)
     let mut sorted = links;
     sorted.sort_by_key(|l| l.timestamp);
-    let latest = sorted.last().unwrap();
+    let latest = match sorted.last() {
+        Some(l) => l,
+        None => return Ok(None),
+    };
 
     let action_hash = ActionHash::try_from(latest.target.clone())
         .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;

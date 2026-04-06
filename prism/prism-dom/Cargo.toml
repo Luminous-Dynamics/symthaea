@@ -1,0 +1,16 @@
+[package]
+name = "prism-dom"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "DOM tree with HTML parsing and CSS resolution for Symthaea Prism"
+
+[dependencies]
+prism-common = { path = "../prism-common" }
+html5ever = { workspace = true }
+markup5ever = { workspace = true }
+taffy = { workspace = true }
+url = { workspace = true }
+log = { workspace = true }
+thiserror = { workspace = true }
+serde = { workspace = true }

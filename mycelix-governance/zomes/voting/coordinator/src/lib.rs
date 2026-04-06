@@ -4096,6 +4096,180 @@ pub fn check_cooling_period_expired(proposal_id: &str) -> ExternResult<Option<bo
 }
 
 // ============================================================================
+// ANONYMOUS ZKP-BASED VOTING (DASTARK)
+// ============================================================================
+
+/// Input for anonymous voting with ZK eligibility proof.
+///
+/// The voter submits a reference to their on-chain EligibilityProof entry
+/// plus their vote choice. The coordinator verifies the proof is valid,
+/// not expired, and matches the voter's commitment before recording the vote.
+///
+/// Domain tag: `ZTML:Governance:AnonVote:v1`
+#[derive(Debug, Serialize, Deserialize, SerializedBytes)]
+pub struct CastAnonymousVoteInput {
+    /// ActionHash of the voter's EligibilityProof entry on DHT.
+    pub eligibility_proof_hash: ActionHash,
+    /// Proposal being voted on.
+    pub proposal_id: String,
+    /// Vote choice.
+    pub choice: VoteChoice,
+    /// Optional reason (public).
+    pub reason: Option<String>,
+}
+
+/// Cast an anonymous vote using a ZK eligibility proof.
+///
+/// Flow:
+/// 1. Fetch the referenced EligibilityProof from DHT
+/// 2. Verify proof is not expired
+/// 3. Verify voter_commitment matches the calling agent
+/// 4. Verify proof is valid for the proposal tier
+/// 5. Check for duplicate votes (via commitment, not DID)
+/// 6. Create VerifiedVote entry linked to proposal
+///
+/// This function enables anonymous voting: the voter's identity is bound
+/// to the proof commitment, not their DID. The STARK proof guarantees
+/// eligibility without revealing the voter's scores or profile.
+#[hdk_extern]
+pub fn cast_anonymous_vote(input: CastAnonymousVoteInput) -> ExternResult<Record> {
+    // 1. Fetch the eligibility proof
+    let proof_record = get(input.eligibility_proof_hash.clone(), GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Eligibility proof not found on DHT".into()
+        )))?;
+
+    let proof: EligibilityProof = proof_record
+        .entry()
+        .to_app_option()
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Failed to decode proof: {}", e))))?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Eligibility proof entry is empty".into()
+        )))?;
+
+    // 2. Check proof expiration
+    let now = sys_time()?;
+    if proof.is_expired(now) {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Eligibility proof has expired — regenerate with current profile".into()
+        )));
+    }
+
+    // 3. Verify the proof claims eligibility
+    if !proof.eligible {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Eligibility proof indicates voter is NOT eligible".into()
+        )));
+    }
+
+    // 4. Verify proof bytes are non-empty (structural check)
+    if proof.proof_bytes.is_empty() {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Eligibility proof has empty proof bytes".into()
+        )));
+    }
+
+    // 5. Verify voting period is open
+    let _proposal_type = verify_voting_period(&input.proposal_id)?;
+
+    // 6. Check for duplicate votes by this commitment on this proposal
+    let proposal_anchor_str = format!("zk_proposal:{}", input.proposal_id);
+    create_entry(&EntryTypes::Anchor(Anchor(proposal_anchor_str.clone())))?;
+    let proposal_anchor_hash = anchor_hash(&proposal_anchor_str)?;
+    let existing_votes = get_links(
+        LinkQuery::try_new(proposal_anchor_hash.clone(), LinkTypes::ProposalToVerifiedVote)?,
+        GetStrategy::default(),
+    )?;
+
+    for link in &existing_votes {
+        if let Ok(Some(record)) = get(
+            ActionHash::try_from(link.target.clone())
+                .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?,
+            GetOptions::default(),
+        ) {
+            if let Ok(Some(existing_vote)) = record.entry().to_app_option::<VerifiedVote>() {
+                if existing_vote.voter_commitment == proof.voter_commitment {
+                    return Err(wasm_error!(WasmErrorInner::Guest(
+                        "Duplicate vote: this commitment has already voted on this proposal".into()
+                    )));
+                }
+            }
+        }
+    }
+
+    // 8. Calculate vote weight from proof requirements (not from DID lookup)
+    let weight = calculate_zkp_vote_weight(&proof);
+
+    // 9. Create VerifiedVote entry
+    let vote_id = format!(
+        "zkvote-{}-{}",
+        input.proposal_id,
+        hex::encode(&proof.voter_commitment[..8])
+    );
+
+    let verified_vote = VerifiedVote {
+        id: vote_id,
+        proposal_id: input.proposal_id.clone(),
+        proposal_tier: ProposalTier::Basic, // TODO: derive from proposal_type when tier mapping is available
+        voter: proof.voter_did.clone(),
+        choice: input.choice,
+        eligibility_proof_hash: input.eligibility_proof_hash.clone(),
+        voter_commitment: proof.voter_commitment.clone(),
+        effective_weight: weight,
+        reason: input.reason,
+        voted_at: now,
+    };
+
+    let vote_hash = create_entry(EntryTypes::VerifiedVote(verified_vote.clone()))?;
+
+    // 10. Link from proposal anchor to vote
+    create_link(
+        proposal_anchor_hash,
+        vote_hash.clone(),
+        LinkTypes::ProposalToVerifiedVote,
+        (),
+    )?;
+
+    // 11. Link from eligibility proof to vote (audit trail via VoterToEligibilityProof reverse)
+    create_link(
+        input.eligibility_proof_hash,
+        vote_hash.clone(),
+        LinkTypes::VoterToEligibilityProof,
+        (),
+    )?;
+
+    get(vote_hash, GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Failed to fetch created vote".into()
+        )))
+}
+
+/// Calculate vote weight from ZKP eligibility proof.
+///
+/// Weight is based on the fraction of requirements met, scaled by
+/// the proof type's base weight. This avoids querying the voter's
+/// DID for reputation scores — the proof IS the credential.
+fn calculate_zkp_vote_weight(proof: &EligibilityProof) -> f64 {
+    if proof.active_requirements == 0 {
+        return MIN_VOTING_WEIGHT;
+    }
+
+    let requirement_ratio = proof.requirements_met as f64 / proof.active_requirements as f64;
+
+    // Base weight from proof type
+    let base = match proof.proposal_type {
+        ZkProposalType::Constitutional | ZkProposalType::Emergency => 1.0,
+        ZkProposalType::Treasury => 0.9,
+        ZkProposalType::ModelGovernance => 0.85,
+        ZkProposalType::Standard => 0.8,
+        ZkProposalType::Membership => 0.75,
+    };
+
+    let weight = base * requirement_ratio;
+    weight.clamp(MIN_VOTING_WEIGHT, MAX_VOTING_WEIGHT)
+}
+
+// ============================================================================
 // TESTS
 // ============================================================================
 

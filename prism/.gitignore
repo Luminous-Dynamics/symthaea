@@ -1,0 +1,14 @@
+# Build artifacts
+target/
+dist/
+.claude-proxy-check/
+.claude/targets/
+
+# OS
+.DS_Store
+*.swp
+*~
+
+# IDE
+.idea/
+.vscode/

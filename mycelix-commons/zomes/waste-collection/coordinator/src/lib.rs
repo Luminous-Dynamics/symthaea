@@ -433,8 +433,8 @@ pub fn plan_optimized_route(input: PlanOptimizedRouteInput) -> ExternResult<Opti
         n_prev_lat = cand.lat;
         n_prev_lon = cand.lon;
     }
-    if !route.is_empty() {
-        let last = &candidates[*route.last().unwrap()];
+    if let Some(&last_idx) = route.last() {
+        let last = &candidates[last_idx];
         naive_distance += haversine_km(last.lat, last.lon, input.facility_lat, input.facility_lon);
     }
 
