@@ -1,7 +1,4 @@
 [workspace]
-
-[workspace.package]
-license = "AGPL-3.0-or-later"
 resolver = "2"
 members = [
     "zomes/carbon/integrity",
@@ -12,6 +9,9 @@ members = [
     "zomes/bridge/coordinator",
     "tests",
 ]
+
+[workspace.package]
+license = "AGPL-3.0-or-later"
 
 [workspace.dependencies]
 # Holochain 0.6 compatible
