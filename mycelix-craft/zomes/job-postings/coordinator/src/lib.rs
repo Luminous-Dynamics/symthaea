@@ -111,6 +111,9 @@ pub fn create_job_posting(input: CreateJobPostingInput) -> ExternResult<ActionHa
         expires_at: None,
         status: JobPostingStatus::Open,
         career_profile_field: input.career_profile_field,
+        guild_id: None,
+        min_epistemic_level: None,
+        consciousness_tier_required: None,
     };
 
     let action_hash = create_entry(EntryTypes::JobPosting(posting.clone()))?;
@@ -174,6 +177,9 @@ pub fn update_job_posting(input: UpdateJobPostingInput) -> ExternResult<ActionHa
         expires_at: None,
         status: JobPostingStatus::Open,
         career_profile_field: input.career_profile_field,
+        guild_id: None,
+        min_epistemic_level: None,
+        consciousness_tier_required: None,
     };
 
     update_entry(input.original_hash, &posting)
@@ -382,6 +388,7 @@ pub fn create_apprenticeship_stake(input: CreateStakeInput) -> ExternResult<Acti
         required_skills: input.required_skills.iter().map(|s| s.to_lowercase()).collect(),
         created_at: now,
         status: StakeStatus::Active,
+        guild_id: None,
     };
 
     let hash = create_entry(EntryTypes::ApprenticeshipStake(stake))?;

@@ -30,6 +30,16 @@ pub struct PublishedCredentialInput {
     pub entry_hash: Option<String>,
     pub action_hash: Option<String>,
     pub summary: Option<String>,
+    /// Guild that issued or endorsed this credential
+    pub guild_id: Option<String>,
+    /// Human-readable guild name
+    pub guild_name: Option<String>,
+    /// Epistemic classification from PoL (e.g., "E3-N1-M2")
+    pub epistemic_code: Option<String>,
+    /// FL model version used for assessment
+    pub fl_model_version: Option<String>,
+    /// Canonical mastery level (0-1000 permille)
+    pub mastery_permille: Option<u16>,
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -226,7 +236,14 @@ pub fn publish_credential(input: PublishedCredentialInput) -> ExternResult<()> {
         // Living Credentials: initialize vitality at full strength
         vitality_permille: Some(1000),
         last_retention_check: Some(now_micros),
-        mastery_level_at_issue: None, // Set by caller if available
+        mastery_level_at_issue: input.mastery_permille,
+        // Credential pipeline fields
+        guild_id: input.guild_id.clone(),
+        guild_name: input.guild_name,
+        epistemic_code: input.epistemic_code,
+        fl_model_version: input.fl_model_version,
+        mastery_permille: input.mastery_permille,
+        verified: None, // Set by cross-DNA verification
     };
 
     let action_hash = create_entry(&EntryTypes::PublishedCredential(published))?;
@@ -238,6 +255,14 @@ pub fn publish_credential(input: PublishedCredentialInput) -> ExternResult<()> {
         GetStrategy::default(),
     )?) {
         create_link(profile_action, action_hash.clone(), LinkTypes::ProfileToCredential, ())?;
+    }
+
+    // If guild-endorsed, create guild→credential link
+    if let Some(ref guild_id_str) = input.guild_id {
+        let anchor = Anchor(format!("guild:{}", guild_id_str));
+        let anchor_hash = hash_entry(&anchor)?;
+        create_entry(&EntryTypes::Anchor(anchor))?;
+        create_link(anchor_hash, action_hash.clone(), LinkTypes::GuildToCredential, ())?;
     }
 
     Ok(())

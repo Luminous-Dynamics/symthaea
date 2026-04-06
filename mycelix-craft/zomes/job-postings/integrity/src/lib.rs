@@ -42,6 +42,15 @@ pub struct JobPosting {
     pub status: JobPostingStatus,
     /// Optional link to CareerProfile field for career intelligence
     pub career_profile_field: Option<String>,
+    /// Guild that posted or endorses this job
+    #[serde(default)]
+    pub guild_id: Option<String>,
+    /// Minimum epistemic level required to apply (e.g., "E3")
+    #[serde(default)]
+    pub min_epistemic_level: Option<String>,
+    /// Minimum consciousness tier required to apply
+    #[serde(default)]
+    pub consciousness_tier_required: Option<String>,
 }
 
 /// Salary range in USD
@@ -99,6 +108,9 @@ pub struct ApprenticeshipStake {
     pub created_at: Timestamp,
     /// Status
     pub status: StakeStatus,
+    /// Guild that sponsors this apprenticeship (optional)
+    #[serde(default)]
+    pub guild_id: Option<String>,
 }
 
 /// Status of an apprenticeship stake
@@ -283,6 +295,9 @@ mod tests {
             expires_at: None,
             status: JobPostingStatus::Open,
             career_profile_field: Some("Software Development".to_string()),
+            guild_id: None,
+            min_epistemic_level: None,
+            consciousness_tier_required: None,
         }
     }
 

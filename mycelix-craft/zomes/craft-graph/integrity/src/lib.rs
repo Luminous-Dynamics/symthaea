@@ -37,6 +37,24 @@ pub struct PublishedCredential {
     /// Mastery level at time of credential issuance (for stability calculation)
     #[serde(default)]
     pub mastery_level_at_issue: Option<u16>,
+    /// Guild that issued or endorsed this credential
+    #[serde(default)]
+    pub guild_id: Option<String>,
+    /// Human-readable guild name
+    #[serde(default)]
+    pub guild_name: Option<String>,
+    /// Epistemic classification code from Proof of Learning (e.g., "E3-N1-M2")
+    #[serde(default)]
+    pub epistemic_code: Option<String>,
+    /// Federated Learning model version used for assessment
+    #[serde(default)]
+    pub fl_model_version: Option<String>,
+    /// Canonical mastery level (0-1000 permille, from BKT)
+    #[serde(default)]
+    pub mastery_permille: Option<u16>,
+    /// Cross-DNA verification status (true = verified against source DNA)
+    #[serde(default)]
+    pub verified: Option<bool>,
 }
 
 /// A retention check proving the holder still knows the material.
@@ -121,6 +139,10 @@ pub enum LinkTypes {
     CredentialToRetentionCheck,
     /// Agent -> composite profiles detected
     AgentToCompositeProfile,
+    /// Guild -> credentials issued/endorsed under that guild
+    GuildToCredential,
+    /// Guild -> endorsements from guild members
+    GuildToEndorsement,
 }
 
 #[hdk_extern]
