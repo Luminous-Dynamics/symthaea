@@ -526,8 +526,38 @@ async fn write_config_files(
     Ok(())
 }
 
-/// Legacy heredoc-based config writing — used as fallback when direct
-/// file writes fail (e.g., /mnt not yet mounted during script generation).
+/// Write NixOS configs by copying pre-staged files from /tmp (no heredoc for user input).
+/// Falls back to heredoc only for server-generated fallback configs (safe: not user-controlled).
+fn config_write_commands(
+    browser_config: &str,
+    fallback_config: &str,
+    browser_flake: &str,
+    session_id: u64,
+) -> String {
+    let staging = format!("/tmp/symthaea-config-{}", session_id);
+    let mut out = String::new();
+    out.push_str("mkdir -p /mnt/etc/nixos\n");
+
+    if !browser_config.is_empty() {
+        // Browser config pre-staged via tokio::fs::write — no heredoc, no injection
+        out.push_str(&format!("cp {}/configuration.nix /mnt/etc/nixos/configuration.nix\n", staging));
+    } else {
+        // Server-generated fallback — safe to use heredoc (not user input)
+        out.push_str("cat > /mnt/etc/nixos/configuration.nix << 'NIXCONF'\n");
+        out.push_str(fallback_config);
+        if !fallback_config.ends_with('\n') { out.push('\n'); }
+        out.push_str("NIXCONF\n");
+    }
+
+    if !browser_flake.is_empty() {
+        out.push_str(&format!("cp {}/flake.nix /mnt/etc/nixos/flake.nix\n", staging));
+    }
+
+    out.push_str(&format!("rm -rf {}\n", staging));
+    out
+}
+
+/// Legacy heredoc-based config writing (kept for tests and fallback reference).
 fn config_write_commands_heredoc(
     browser_config: &str,
     fallback_config: &str,
@@ -561,7 +591,7 @@ fn config_write_commands_heredoc(
     out
 }
 
-fn generate_install_script(msg: &ClientMessage) -> String {
+fn generate_install_script(msg: &ClientMessage, session_id: u64) -> String {
     // SECURITY: All user inputs (disk, hostname, timezone, keyboard, desktop, gpu_driver)
     // MUST be validated by the caller before reaching this function.
     // See validate_disk_path(), validate_hostname_relay(), sanitize_input().
@@ -674,10 +704,11 @@ nixos-generate-config --root /mnt
                  }}",
                 hostname = hostname,
             );
-            script.push_str(&config_write_commands_heredoc(
+            script.push_str(&config_write_commands(
                 &msg.configuration_nix,
                 &fallback_alongside,
                 &msg.flake_nix,
+                session_id,
             ));
 
             script.push_str(&format!(r#"
@@ -848,10 +879,11 @@ nixos-generate-config --root /mnt || echo "WARNING: nixos-generate-config failed
                  }}",
                 hostname = hostname,
             );
-            script.push_str(&config_write_commands_heredoc(
+            script.push_str(&config_write_commands(
                 &msg.configuration_nix,
                 &fallback_single,
                 &msg.flake_nix,
+                session_id,
             ));
 
             script.push_str(&format!(r#"
@@ -1009,10 +1041,11 @@ echo '  networking.hostId = "deadbeef";' >> /mnt/etc/nixos/hardware-configuratio
                 "{{ config, pkgs, ... }}:\n{{\n  imports = [ ./hardware-configuration.nix ];\n  networking.hostName = \"{hostname}\";\n  boot.loader.systemd-boot.enable = true;\n  boot.loader.efi.canTouchEfiVariables = true;\n  boot.supportedFilesystems = [ \"zfs\" ];\n  boot.zfs.devNodes = \"/dev/disk/by-id\";\n  networking.hostId = \"deadbeef\";\n  services.zfs.autoScrub.enable = true;\n  services.zfs.trim.enable = true;\n  users.users.{hostname} = {{ isNormalUser = true; extraGroups = [ \"wheel\" \"video\" \"networkmanager\" ]; initialPassword = \"changeme\"; }};\n  environment.systemPackages = with pkgs; [ vim git curl wget htop ];\n  system.stateVersion = \"25.05\";\n}}",
                 hostname = hostname,
             );
-            script.push_str(&config_write_commands_heredoc(
+            script.push_str(&config_write_commands(
                 &msg.configuration_nix,
                 &fallback_zfs,
                 &msg.flake_nix,
+                session_id,
             ));
 
             // ZFS doesn't need separate swap file setup — zvol already created
@@ -1115,11 +1148,13 @@ nixos-generate-config --root /mnt
             // When the browser supplies a config, it is written with a quoted heredoc
             // ('NIXCONF') since it should already contain the correct UUID or be self-contained.
             if !msg.configuration_nix.is_empty() {
-                script.push_str(&config_write_commands_heredoc(
-                    &msg.configuration_nix,
-                    "",  // unused — browser config is non-empty
-                    &msg.flake_nix,
-                ));
+                // Browser config pre-staged — copy from temp dir (no heredoc)
+                let staging = format!("/tmp/symthaea-config-{}", session_id);
+                script.push_str(&format!("mkdir -p /mnt/etc/nixos\ncp {}/configuration.nix /mnt/etc/nixos/configuration.nix\n", staging));
+                if !msg.flake_nix.is_empty() {
+                    script.push_str(&format!("cp {}/flake.nix /mnt/etc/nixos/flake.nix\n", staging));
+                }
+                script.push_str(&format!("rm -rf {}\n", staging));
             } else {
                 // Fallback: unquoted heredoc for $CRYPT_UUID expansion
                 script.push_str(&format!(
@@ -1329,10 +1364,11 @@ nixos-generate-config --root /mnt
                  }}",
                 hostname = hostname,
             );
-            script.push_str(&config_write_commands_heredoc(
+            script.push_str(&config_write_commands(
                 &msg.configuration_nix,
                 &fallback_dual,
                 &msg.flake_nix,
+                session_id,
             ));
 
             script.push_str(&format!(r#"
@@ -1457,10 +1493,11 @@ nixos-generate-config --root /mnt
                  }}",
                 hostname = hostname,
             );
-            script.push_str(&config_write_commands_heredoc(
+            script.push_str(&config_write_commands(
                 &msg.configuration_nix,
                 &fallback_raid1_btrfs,
                 &msg.flake_nix,
+                session_id,
             ));
 
             script.push_str(&format!(r#"
@@ -1583,10 +1620,11 @@ mdadm --detail --scan >> /mnt/etc/mdadm.conf
                  }}",
                 hostname = hostname,
             );
-            script.push_str(&config_write_commands_heredoc(
+            script.push_str(&config_write_commands(
                 &msg.configuration_nix,
                 &fallback_raid1_mdadm,
                 &msg.flake_nix,
+                session_id,
             ));
 
             script.push_str(&format!(r#"
@@ -2056,6 +2094,23 @@ async fn handle_connection_ws<S: tokio::io::AsyncRead + tokio::io::AsyncWrite + 
                 // Create log file with restrictive permissions
                 let _ = run_cmd(&format!("touch {} && chmod 600 {}", log_path, log_path)).await;
 
+                // SECURITY: Pre-stage config files to temp dir via direct file write.
+                // The install script copies them after mount — no heredoc injection possible.
+                let config_staging_dir = format!("/tmp/symthaea-config-{}", session_id);
+                let _ = tokio::fs::create_dir_all(&config_staging_dir).await;
+                // Stage configuration.nix (browser-supplied or will be generated by fallback in script)
+                if !client_msg.configuration_nix.is_empty() {
+                    let config_path = format!("{}/configuration.nix", config_staging_dir);
+                    let _ = tokio::fs::write(&config_path, &client_msg.configuration_nix).await;
+                    let _ = run_cmd(&format!("chmod 600 {}", config_path)).await;
+                }
+                // Stage flake.nix if provided
+                if !client_msg.flake_nix.is_empty() {
+                    let flake_path = format!("{}/flake.nix", config_staging_dir);
+                    let _ = tokio::fs::write(&flake_path, &client_msg.flake_nix).await;
+                    let _ = run_cmd(&format!("chmod 600 {}", flake_path)).await;
+                }
+
                 // Fully automated install — generates and executes the entire
                 // partition → format → install → configure sequence.
                 // The user only clicked "Deploy" in the browser.
@@ -2075,7 +2130,7 @@ async fn handle_connection_ws<S: tokio::io::AsyncRead + tokio::io::AsyncWrite + 
                     }
                 }
 
-                let mut script = generate_install_script(&client_msg);
+                let mut script = generate_install_script(&client_msg, session_id);
 
                 // Always: pre-install disk snapshot (instant, non-destructive)
                 let snapshot = disk_snapshot(&disk);
