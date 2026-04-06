@@ -49,6 +49,9 @@ personal-types = { path = "crates/personal-types" }
 mycelix-bridge-common = { path = "../crates/mycelix-bridge-common" }
 mycelix-bridge-entry-types = { path = "../crates/mycelix-bridge-entry-types" }
 
+# ZKP verification for vault access proofs
+mycelix-zkp-core = { path = "../crates/mycelix-zkp-core" }
+
 [profile.dev]
 opt-level = "z"
 

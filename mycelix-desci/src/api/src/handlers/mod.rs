@@ -7,8 +7,10 @@ pub mod claims;
 pub mod query;
 pub mod system;
 pub mod trust;
+pub mod zkp_review;
 
 pub use claims::*;
 pub use query::*;
 pub use system::*;
 pub use trust::*;
+pub use zkp_review::*;

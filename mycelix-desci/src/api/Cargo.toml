@@ -53,6 +53,7 @@ lazy_static = "1.4"
 
 # Project dependencies
 mycelix-desci-core = { path = "../core" }
+mycelix-zkp-core = { workspace = true }
 
 [dev-dependencies]
 tokio-test = "0.4"

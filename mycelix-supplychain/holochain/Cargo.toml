@@ -33,6 +33,9 @@ thiserror = "1"
 # WASM Compatibility - getrandom 0.3 with wasm_js feature for WASM
 getrandom = { version = "0.3", features = ["wasm_js"] }
 
+# ZKP verification for provenance chain proofs
+mycelix-zkp-core = { path = "../../crates/mycelix-zkp-core" }
+
 [profile.release]
 opt-level = "z"
 lto = true

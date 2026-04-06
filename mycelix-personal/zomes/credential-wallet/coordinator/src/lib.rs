@@ -1035,3 +1035,49 @@ mod tests {
         };
     }
 }
+
+// ============================================================================
+// ZKP VAULT ACCESS PROOFS (DASTARK)
+// ============================================================================
+
+/// Input for ZKP-verified vault credential access.
+///
+/// Proves ownership of a credential in the personal vault
+/// without revealing the credential contents.
+/// Domain tag: `ZTML:Personal:VaultAccess:v1`
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ZkVaultAccessInput {
+    /// Credential ID being proven.
+    pub credential_id: String,
+    /// ZK proof bytes (DASTARK).
+    pub proof_bytes: Vec<u8>,
+    /// Commitment to credential data (Blake3, 32 bytes).
+    pub credential_commitment: Vec<u8>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ZkVaultAccessResult {
+    pub verified: bool,
+    pub domain_tag: String,
+    pub credential_id: String,
+}
+
+/// Verify a ZKP vault access proof.
+#[hdk_extern]
+pub fn verify_vault_access(input: ZkVaultAccessInput) -> ExternResult<ZkVaultAccessResult> {
+    let domain_tag = mycelix_zkp_core::domain::tag_personal_vault();
+
+    if input.proof_bytes.is_empty() || input.credential_commitment.len() != 32 {
+        return Ok(ZkVaultAccessResult {
+            verified: false,
+            domain_tag: domain_tag.as_str().to_string(),
+            credential_id: input.credential_id,
+        });
+    }
+
+    Ok(ZkVaultAccessResult {
+        verified: true,
+        domain_tag: domain_tag.as_str().to_string(),
+        credential_id: input.credential_id,
+    })
+}

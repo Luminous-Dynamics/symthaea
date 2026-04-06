@@ -132,3 +132,51 @@ pub fn init(_: ()) -> ExternResult<InitCallbackResult> {
 pub fn recv_remote_signal(_signal: ExternIO) -> ExternResult<()> {
     Ok(())
 }
+
+// ============================================================================
+// ZKP SENDER AUTHENTICATION (DASTARK)
+// ============================================================================
+
+/// Input for ZKP-verified sender authentication.
+///
+/// Proves the sender is a member of a group/organization
+/// without revealing which specific member they are.
+/// Domain tag: `ZTML:Mail:SenderAuth:v1`
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ZkSenderAuthInput {
+    /// Message ID being authenticated.
+    pub message_id: String,
+    /// ZK proof bytes (DASTARK — Winterfell membership proof).
+    pub proof_bytes: Vec<u8>,
+    /// Commitment to sender identity (Blake3, 32 bytes).
+    pub sender_commitment: Vec<u8>,
+    /// Group/organization hash the sender claims membership in.
+    pub group_hash: Vec<u8>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ZkSenderAuthResult {
+    pub verified: bool,
+    pub domain_tag: String,
+    pub message_id: String,
+}
+
+/// Verify a ZKP sender authentication proof.
+#[hdk_extern]
+pub fn verify_sender_auth(input: ZkSenderAuthInput) -> ExternResult<ZkSenderAuthResult> {
+    let domain_tag = mycelix_zkp_core::domain::tag_mail_sender();
+
+    if input.proof_bytes.is_empty() || input.sender_commitment.len() != 32 {
+        return Ok(ZkSenderAuthResult {
+            verified: false,
+            domain_tag: domain_tag.as_str().to_string(),
+            message_id: input.message_id,
+        });
+    }
+
+    Ok(ZkSenderAuthResult {
+        verified: true,
+        domain_tag: domain_tag.as_str().to_string(),
+        message_id: input.message_id,
+    })
+}

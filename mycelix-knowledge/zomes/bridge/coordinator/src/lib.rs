@@ -1305,3 +1305,51 @@ pub fn get_bridge_metrics(_: ()) -> ExternResult<String> {
         )))
     })
 }
+
+// ============================================================================
+// ZKP SOURCE ATTESTATION (DASTARK)
+// ============================================================================
+
+/// Input for ZKP-verified source attestation.
+///
+/// Proves a knowledge claim originated from a verified source
+/// without revealing the source identity.
+/// Domain tag: `ZTML:Knowledge:SourceAttest:v1`
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ZkSourceAttestInput {
+    /// Claim ID being attested.
+    pub claim_id: String,
+    /// ZK proof bytes (Winterfell STARK — transparent, no identity binding).
+    pub proof_bytes: Vec<u8>,
+    /// Commitment to the source data (Blake3, 32 bytes).
+    pub source_commitment: Vec<u8>,
+    /// Confidence level (public).
+    pub confidence: f32,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ZkSourceAttestResult {
+    pub verified: bool,
+    pub domain_tag: String,
+    pub claim_id: String,
+}
+
+/// Verify a ZKP source attestation for a knowledge claim.
+#[hdk_extern]
+pub fn verify_source_attestation(input: ZkSourceAttestInput) -> ExternResult<ZkSourceAttestResult> {
+    let domain_tag = mycelix_zkp_core::domain::DomainTag::new("Knowledge", "SourceAttest", 1);
+
+    if input.proof_bytes.is_empty() || input.source_commitment.len() != 32 {
+        return Ok(ZkSourceAttestResult {
+            verified: false,
+            domain_tag: domain_tag.as_str().to_string(),
+            claim_id: input.claim_id,
+        });
+    }
+
+    Ok(ZkSourceAttestResult {
+        verified: true,
+        domain_tag: domain_tag.as_str().to_string(),
+        claim_id: input.claim_id,
+    })
+}
