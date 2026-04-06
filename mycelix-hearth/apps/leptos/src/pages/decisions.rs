@@ -4,7 +4,7 @@
 use leptos::prelude::*;
 use crate::hearth_context::{use_hearth, member_name};
 use crate::hearth_actions;
-use crate::consciousness_provider::use_consciousness;
+use mycelix_leptos_core::use_consciousness;
 use crate::components::TierGate;
 use hearth_leptos_types::*;
 use personal_leptos_types::TrustTier;

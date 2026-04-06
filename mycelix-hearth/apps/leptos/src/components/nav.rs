@@ -3,8 +3,8 @@
 
 use leptos::prelude::*;
 use leptos_router::components::A;
-use crate::holochain::ConnectionBadge;
-use crate::consciousness_provider::use_consciousness;
+use mycelix_leptos_core::ConnectionBadge;
+use mycelix_leptos_core::use_consciousness;
 use crate::themes::use_theme;
 use personal_leptos_types::TrustTier;
 

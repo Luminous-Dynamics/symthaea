@@ -5,10 +5,10 @@
 //! Only visible when the conductor is in mock mode.
 
 use leptos::prelude::*;
-use crate::consciousness_provider::use_consciousness;
-use crate::holochain::use_holochain;
-use crate::thermodynamic::use_thermodynamic;
-use crate::homeostasis::use_homeostasis;
+use mycelix_leptos_core::use_consciousness;
+use mycelix_leptos_core::holochain_provider::use_holochain;
+use mycelix_leptos_core::use_thermodynamic;
+use mycelix_leptos_core::use_homeostasis;
 
 #[component]
 pub fn DevPanel() -> impl IntoView {
@@ -16,6 +16,8 @@ pub fn DevPanel() -> impl IntoView {
     let consciousness = use_consciousness();
     let thermo = use_thermodynamic();
     let homeostasis = use_homeostasis();
+    let pending_care = homeostasis.pending_counts.get(0).copied();
+    let pending_decisions = homeostasis.pending_counts.get(1).copied();
 
     let (collapsed, set_collapsed) = signal(true);
 
@@ -111,8 +113,8 @@ pub fn DevPanel() -> impl IntoView {
                                     <span>{move || if homeostasis.in_homeostasis.get() { "VOID ACTIVE" } else { "Normal" }}</span>
                                     <span>
                                         {move || format!(" (care:{}, decisions:{})",
-                                            homeostasis.pending_care_tasks.get(),
-                                            homeostasis.pending_decisions.get()
+                                            pending_care.map(|s| s.get()).unwrap_or(0),
+                                            pending_decisions.map(|s| s.get()).unwrap_or(0)
                                         )}
                                     </span>
                                 </div>

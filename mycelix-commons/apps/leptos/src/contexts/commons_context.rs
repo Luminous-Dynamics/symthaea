@@ -5,7 +5,7 @@ use leptos::prelude::*;
 use wasm_bindgen_futures::spawn_local;
 use commons_leptos_types::*;
 use crate::mock_data;
-use crate::holochain::use_holochain;
+use mycelix_leptos_core::holochain_provider::use_holochain;
 
 #[derive(Clone)]
 pub struct CommonsCtx {

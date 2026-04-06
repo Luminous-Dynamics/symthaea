@@ -3,7 +3,7 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 use leptos::prelude::*;
 use crate::mock_data;
-use crate::consciousness_provider::use_consciousness;
+use mycelix_leptos_core::use_consciousness;
 
 #[component]
 pub fn ProfilePage() -> impl IntoView {

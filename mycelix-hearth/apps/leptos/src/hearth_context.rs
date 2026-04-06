@@ -11,7 +11,7 @@ use leptos::prelude::*;
 use wasm_bindgen_futures::spawn_local;
 use hearth_leptos_types::*;
 use crate::mock_data;
-use crate::holochain::use_holochain;
+use mycelix_leptos_core::holochain_provider::use_holochain;
 use crate::record_bridge::{self, WireRecord};
 
 /// The active hearth context shared across pages.
@@ -95,7 +95,7 @@ async fn try_load_real_data(ctx: HearthCtx) {
     web_sys::console::log_1(&"[Hearth] Connected — loading real data...".into());
 
     // Step 1: Get my hearths
-    match hc.call_zome::<(), Vec<WireRecord>>("hearth_kinship", "get_my_hearths", &()).await {
+    match hc.call_zome_default::<(), Vec<WireRecord>>("hearth_kinship", "get_my_hearths", &()).await {
         Ok(hearth_records) => {
             web_sys::console::log_1(
                 &format!("[Hearth] Found {} hearths", hearth_records.len()).into()
@@ -105,7 +105,7 @@ async fn try_load_real_data(ctx: HearthCtx) {
                 let hearth_hash = first_hearth.action_hash_b64();
 
                 // Step 2: Get members for this hearth
-                match hc.call_zome::<String, Vec<WireRecord>>(
+                match hc.call_zome_default::<String, Vec<WireRecord>>(
                     "hearth_kinship", "get_hearth_members", &hearth_hash
                 ).await {
                     Ok(member_records) => {
@@ -123,7 +123,7 @@ async fn try_load_real_data(ctx: HearthCtx) {
                 }
 
                 // Step 3: Get bonds
-                match hc.call_zome::<String, Vec<WireRecord>>(
+                match hc.call_zome_default::<String, Vec<WireRecord>>(
                     "hearth_kinship", "get_kinship_graph", &hearth_hash
                 ).await {
                     Ok(bond_records) => {
@@ -141,7 +141,7 @@ async fn try_load_real_data(ctx: HearthCtx) {
                 }
 
                 // Step 4: Get gratitude
-                match hc.call_zome::<String, Vec<WireRecord>>(
+                match hc.call_zome_default::<String, Vec<WireRecord>>(
                     "hearth_gratitude", "get_gratitude_stream", &hearth_hash
                 ).await {
                     Ok(grat_records) => {

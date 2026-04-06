@@ -4,7 +4,7 @@
 use leptos::prelude::*;
 use leptos_router::components::A;
 
-use crate::holochain::{use_holochain, ConnectionStatus};
+use mycelix_leptos_core::{ConnectionStatus, holochain_provider::use_holochain};
 
 #[component]
 pub fn Nav() -> impl IntoView {

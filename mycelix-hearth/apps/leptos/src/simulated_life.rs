@@ -15,7 +15,7 @@ use leptos::prelude::*;
 use gloo_timers::callback::Interval;
 
 use crate::hearth_context::use_hearth;
-use crate::toasts::use_toasts;
+use mycelix_leptos_core::{use_toasts, ToastKind};
 use crate::hearth_context::{member_name, mock_now};
 use hearth_leptos_types::*;
 
@@ -76,7 +76,7 @@ pub fn start_simulated_life() {
 
         toasts.push(
             format!("{from_name} → {to_name}: “{msg}”"),
-            "gratitude",
+            ToastKind::Custom("gratitude".into()),
         );
     });
     std::mem::forget(_gratitude_timer);
@@ -116,7 +116,7 @@ pub fn start_simulated_life() {
             PresenceStatusType::DoNotDisturb => "needs quiet",
         };
 
-        toasts.push(format!("{name} {verb}"), "presence");
+        toasts.push(format!("{name} {verb}"), ToastKind::Custom("presence".into()));
     });
     std::mem::forget(_presence_timer);
 
@@ -150,7 +150,7 @@ pub fn start_simulated_life() {
                 // Crossed into neglected territory
                 toasts.push(
                     format!("the bond between {name_a} and {name_b} needs tending"),
-                    "bond",
+                    ToastKind::Custom("bond".into()),
                 );
             }
         }

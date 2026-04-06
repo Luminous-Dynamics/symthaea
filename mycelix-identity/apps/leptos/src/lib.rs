@@ -8,9 +8,7 @@
 //! Holochain with graceful mock fallback.
 
 pub mod app;
-pub mod holochain;
 pub mod identity_context;
 pub mod mock_data;
-pub mod toasts;
 pub mod components;
 pub mod pages;

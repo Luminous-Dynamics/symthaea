@@ -11,7 +11,7 @@ use leptos::prelude::*;
 use wasm_bindgen_futures::spawn_local;
 use identity_leptos_types::*;
 
-use crate::holochain::use_holochain;
+use mycelix_leptos_core::holochain_provider::use_holochain;
 use crate::mock_data;
 
 /// Version signals — bumped by actions to trigger data reload.
@@ -99,7 +99,7 @@ async fn load_did(ctx: IdentityCtx) {
     let hc = use_holochain();
     if hc.is_mock() { return; }
 
-    match hc.call_zome::<(), serde_json::Value>("did_registry", "get_my_did", &()).await {
+    match hc.call_zome_default::<(), serde_json::Value>("did_registry", "get_my_did", &()).await {
         Ok(record) => {
             match serde_json::from_value::<DidDocumentView>(record) {
                 Ok(did) => {
@@ -123,7 +123,7 @@ async fn load_mfa(ctx: IdentityCtx) {
     let hc = use_holochain();
     if hc.is_mock() { return; }
 
-    match hc.call_zome::<String, serde_json::Value>(
+    match hc.call_zome_default::<String, serde_json::Value>(
         "mfa", "get_mfa_state", &"self".to_string()
     ).await {
         Ok(record) => {
@@ -147,7 +147,7 @@ async fn load_mfa(ctx: IdentityCtx) {
     }
 
     // Also load recovery config (same spawn — minimal latency)
-    match hc.call_zome::<String, serde_json::Value>(
+    match hc.call_zome_default::<String, serde_json::Value>(
         "recovery", "get_recovery_config", &"self".to_string()
     ).await {
         Ok(record) => {
@@ -163,7 +163,7 @@ async fn load_credentials(ctx: IdentityCtx) {
     let hc = use_holochain();
     if hc.is_mock() { return; }
 
-    match hc.call_zome::<(), Vec<serde_json::Value>>(
+    match hc.call_zome_default::<(), Vec<serde_json::Value>>(
         "verifiable_credential", "get_my_credentials", &()
     ).await {
         Ok(records) => {
@@ -194,7 +194,7 @@ async fn load_reputation(ctx: IdentityCtx) {
     let hc = use_holochain();
     if hc.is_mock() { return; }
 
-    match hc.call_zome::<String, serde_json::Value>(
+    match hc.call_zome_default::<String, serde_json::Value>(
         "reputation_aggregator", "get_composite_reputation", &"self".to_string()
     ).await {
         Ok(record) => {

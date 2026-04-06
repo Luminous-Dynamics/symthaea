@@ -11,8 +11,8 @@ use leptos::prelude::*;
 use wasm_bindgen_futures::spawn_local;
 
 use crate::hearth_context::{use_hearth, member_name, mock_now};
-use crate::holochain::use_holochain;
-use crate::toasts::use_toasts;
+use mycelix_leptos_core::holochain_provider::use_holochain;
+use mycelix_leptos_core::{use_toasts, ToastKind};
 use hearth_leptos_types::*;
 
 /// Shared action dispatcher.
@@ -56,7 +56,7 @@ pub fn tend_bond(bond_hash: String) {
                 let name_b = member_name(&members, &bond.member_b);
                 toasts.push(
                     format!("you tended the bond between {name_a} and {name_b}"),
-                    "bond",
+                    ToastKind::Custom("bond".into()),
                 );
             }
         });
@@ -75,7 +75,7 @@ pub fn tend_bond(bond_hash: String) {
                 quality_bp: u32,
             }
 
-            match hc.call_zome::<TendBondInput, ()>(
+            match hc.call_zome_default::<TendBondInput, ()>(
                 "hearth_kinship",
                 "tend_bond",
                 &TendBondInput {
@@ -86,16 +86,16 @@ pub fn tend_bond(bond_hash: String) {
             ).await {
                 Ok(_) => {
                     // Refresh bonds from conductor
-                    if let Ok(bonds) = hc.call_zome::<(), Vec<BondView>>(
+                    if let Ok(bonds) = hc.call_zome_default::<(), Vec<BondView>>(
                         "hearth_kinship", "get_kinship_graph", &()
                     ).await {
                         hearth.bonds.set(bonds);
                     }
-                    toasts.push("bond tended", "bond");
+                    toasts.push("bond tended", ToastKind::Custom("bond".into()));
                 }
                 Err(e) => {
                     web_sys::console::log_1(&format!("tend_bond failed: {e}").into());
-                    toasts.push("couldn’t tend that bond right now", "bond");
+                    toasts.push("couldn’t tend that bond right now", ToastKind::Custom("bond".into()));
                 }
             }
         });
@@ -132,7 +132,7 @@ pub fn express_gratitude(to_agent: String, message: String) {
 
         toasts.push(
             format!("{from_name} → {to_name}: “{msg_preview}”"),
-            "gratitude",
+            ToastKind::Custom("gratitude".into()),
         );
     } else {
         let hc = hc.clone();
@@ -150,7 +150,7 @@ pub fn express_gratitude(to_agent: String, message: String) {
                 .map(|h| h.hash)
                 .unwrap_or_default();
 
-            match hc.call_zome::<ExpressGratitudeInput, ()>(
+            match hc.call_zome_default::<ExpressGratitudeInput, ()>(
                 "hearth_gratitude",
                 "express_gratitude",
                 &ExpressGratitudeInput {
@@ -161,7 +161,7 @@ pub fn express_gratitude(to_agent: String, message: String) {
                     visibility: HearthVisibility::AllMembers,
                 },
             ).await {
-                Ok(_) => toasts.push("gratitude expressed", "gratitude"),
+                Ok(_) => toasts.push("gratitude expressed", ToastKind::Custom("gratitude".into())),
                 Err(e) => {
                     web_sys::console::log_1(&format!("express_gratitude failed: {e}").into());
                 }
@@ -192,7 +192,7 @@ pub fn cast_vote(decision_hash: String, choice: u32, reasoning: Option<String>, 
                 created_at: mock_now(),
             });
         });
-        toasts.push("vote cast", "decision");
+        toasts.push("vote cast", ToastKind::Custom("decision".into()));
     } else {
         let hc = hc.clone();
         spawn_local(async move {
@@ -203,12 +203,12 @@ pub fn cast_vote(decision_hash: String, choice: u32, reasoning: Option<String>, 
                 reasoning: Option<String>,
             }
 
-            match hc.call_zome::<CastVoteInput, ()>(
+            match hc.call_zome_default::<CastVoteInput, ()>(
                 "hearth_decisions",
                 "cast_vote",
                 &CastVoteInput { decision_hash, choice, reasoning },
             ).await {
-                Ok(_) => toasts.push("vote cast", "decision"),
+                Ok(_) => toasts.push("vote cast", ToastKind::Custom("decision".into())),
                 Err(e) => {
                     web_sys::console::log_1(&format!("cast_vote failed: {e}").into());
                 }
@@ -247,7 +247,7 @@ pub fn change_presence(new_status: PresenceStatusType) {
                 .map(|h| h.hash)
                 .unwrap_or_default();
 
-            let _ = hc.call_zome::<SetPresenceInput, ()>(
+            let _ = hc.call_zome_default::<SetPresenceInput, ()>(
                 "hearth_rhythms",
                 "set_presence",
                 &SetPresenceInput {
@@ -283,7 +283,7 @@ pub fn complete_care_task(task_hash: String) {
                 .count() as u32;
             set_care.set(active);
         }
-        toasts.push("task completed", "care");
+        toasts.push("task completed", ToastKind::Custom("care".into()));
     } else {
         let hc = hc.clone();
         spawn_local(async move {
@@ -291,12 +291,12 @@ pub fn complete_care_task(task_hash: String) {
             #[derive(serde::Serialize)]
             struct CompleteTaskInput { schedule_hash: String }
 
-            let _ = hc.call_zome::<CompleteTaskInput, ()>(
+            let _ = hc.call_zome_default::<CompleteTaskInput, ()>(
                 "hearth_care",
                 "complete_task",
                 &CompleteTaskInput { schedule_hash: task_hash },
             ).await;
-            toasts.push("task completed", "care");
+            toasts.push("task completed", ToastKind::Custom("care".into()));
         });
     }
 }
@@ -321,7 +321,7 @@ pub fn invite_member(display_name: String, role: MemberRole) {
                 joined_at: mock_now(),
             });
         });
-        toasts.push(format!("invited {display_name} to the hearth"), "presence");
+        toasts.push(format!("invited {display_name} to the hearth"), ToastKind::Custom("presence".into()));
     } else {
         let hc = hc.clone();
         spawn_local(async move {
@@ -341,7 +341,7 @@ pub fn invite_member(display_name: String, role: MemberRole) {
                 .map(|h| h.hash)
                 .unwrap_or_default();
 
-            let _ = hc.call_zome::<InviteInput, ()>(
+            let _ = hc.call_zome_default::<InviteInput, ()>(
                 "hearth_kinship",
                 "invite_member",
                 &InviteInput {

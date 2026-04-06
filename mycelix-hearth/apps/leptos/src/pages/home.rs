@@ -3,7 +3,7 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 use leptos::prelude::*;
 use crate::hearth_context::{use_hearth, member_name};
-use crate::homeostasis::use_homeostasis;
+use mycelix_leptos_core::use_homeostasis;
 use crate::components::MemberAvatar;
 use crate::visualization::KinshipCanvas;
 use hearth_leptos_types::*;

@@ -6,7 +6,10 @@ use leptos::prelude::*;
 
 mod app;
 mod components;
+mod contexts;
+mod mock_data;
 mod pages;
+mod themes;
 
 fn main() {
     console_error_panic_hook::set_once();

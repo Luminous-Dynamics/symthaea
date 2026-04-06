@@ -16,8 +16,8 @@ use std::rc::Rc;
 use super::shared_state::*;
 use super::layout;
 use crate::hearth_context::use_hearth;
-use crate::homeostasis::use_homeostasis;
-use crate::thermodynamic::use_thermodynamic;
+use mycelix_leptos_core::use_homeostasis;
+use mycelix_leptos_core::use_thermodynamic;
 use crate::themes::{use_theme, HearthTheme};
 use hearth_leptos_types::*;
 

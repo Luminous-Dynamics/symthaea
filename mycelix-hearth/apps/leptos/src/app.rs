@@ -8,21 +8,29 @@ use leptos_router::{
 };
 
 use crate::components::{Nav, DevPanel};
-use crate::consciousness_provider::provide_consciousness_context;
 use crate::hearth_context::provide_hearth_context;
-use crate::holochain::HolochainProvider;
-use crate::homeostasis::provide_homeostasis_context;
-use crate::thermodynamic::provide_thermodynamic_context;
-use crate::toasts::{provide_toast_context, ToastContainer};
 use crate::pages::*;
 use crate::pages::personal;
+use mycelix_leptos_core::{
+    HolochainProviderAuto, HolochainProviderConfig, ConnectStrategy,
+    provide_consciousness_context, init_consciousness_ui,
+    provide_thermodynamic_context, provide_homeostasis_context,
+    provide_toast_context, ToastContainer,
+};
 
 #[component]
 pub fn App() -> impl IntoView {
+    let config = HolochainProviderConfig {
+        app_id: "mycelix-unified".into(),
+        default_role: Some("hearth".into()),
+        log_prefix: "[Hearth]",
+        connect_strategy: ConnectStrategy::WebSocket,
+        status_labels: None,
+    };
     view! {
-        <HolochainProvider>
+        <HolochainProviderAuto config=config>
             <AppInner />
-        </HolochainProvider>
+        </HolochainProviderAuto>
     }
 }
 
@@ -35,14 +43,14 @@ fn AppInner() -> impl IntoView {
     provide_thermodynamic_context();
     provide_consciousness_context();
     provide_toast_context();
-    provide_homeostasis_context();
+    provide_homeostasis_context(2, "--homeostasis");
     provide_hearth_context();
 
     // Action dispatch layer (real zome calls when connected, mock when not)
     crate::hearth_actions::provide_hearth_actions();
 
     // Wire consciousness + circadian → CSS custom properties
-    crate::consciousness_ui::init_consciousness_ui();
+    init_consciousness_ui();
 
     // Real-time signals from conductor (when connected)
     crate::signal_listener::start_signal_listener();

@@ -12,18 +12,27 @@ use leptos_router::{
     path,
 };
 
-use crate::holochain::HolochainProvider;
+use mycelix_leptos_core::{
+    HolochainProviderAuto, HolochainProviderConfig, ConnectStrategy,
+    provide_toast_context, ToastContainer,
+};
 use crate::identity_context::provide_identity_context;
-use crate::toasts::{provide_toast_context, ToastContainer};
 use crate::pages::*;
 use crate::components::Nav;
 
 #[component]
 pub fn App() -> impl IntoView {
+    let config = HolochainProviderConfig {
+        app_id: "mycelix-unified".into(),
+        default_role: Some("identity".into()),
+        log_prefix: "[Identity]",
+        connect_strategy: ConnectStrategy::WebSocket,
+        status_labels: None,
+    };
     view! {
-        <HolochainProvider>
+        <HolochainProviderAuto config=config>
             <AppInner />
-        </HolochainProvider>
+        </HolochainProviderAuto>
     }
 }
 

@@ -4,9 +4,9 @@
 use leptos::prelude::*;
 use wasm_bindgen_futures::spawn_local;
 use commons_leptos_types::*;
-use crate::holochain::use_holochain;
+use mycelix_leptos_core::holochain_provider::use_holochain;
+use mycelix_leptos_core::{use_toasts, ToastKind};
 use crate::contexts::commons_context::use_commons;
-use crate::toasts::use_toasts;
 
 #[derive(Clone)]
 pub struct CommonsActions;
@@ -27,7 +27,7 @@ pub fn post_need(title: String, description: String, category: NeedCategory, urg
                 created: (js_sys::Date::now() * 1000.0) as i64,
             });
         });
-        toasts.push("your need has been shared with the commons", "commons");
+        toasts.push("your need has been shared with the commons", ToastKind::Custom("commons".into()));
     } else {
         let hc = hc.clone();
         spawn_local(async move {
@@ -35,7 +35,7 @@ pub fn post_need(title: String, description: String, category: NeedCategory, urg
             struct CreateNeedInput { title: String, description: String, category: String, urgency: String }
             let input = CreateNeedInput { title, description, category: format!("{:?}", category), urgency: format!("{:?}", urgency) };
             match hc.call_zome::<_, serde_json::Value>("commons_care", "mutualaid-needs", "create_need", &input).await {
-                Ok(_) => toasts.push("your need has been shared with the commons", "commons"),
+                Ok(_) => toasts.push("your need has been shared with the commons", ToastKind::Custom("commons".into())),
                 Err(e) => { web_sys::console::log_1(&format!("create need failed: {e}").into()); }
             }
         });
@@ -55,7 +55,7 @@ pub fn post_offer(title: String, description: String, category: NeedCategory) {
                 created: (js_sys::Date::now() * 1000.0) as i64,
             });
         });
-        toasts.push("your offer has been planted in the commons", "commons");
+        toasts.push("your offer has been planted in the commons", ToastKind::Custom("commons".into()));
     } else {
         let hc = hc.clone();
         spawn_local(async move {
@@ -63,7 +63,7 @@ pub fn post_offer(title: String, description: String, category: NeedCategory) {
             struct CreateOfferInput { title: String, description: String, category: String }
             let input = CreateOfferInput { title, description, category: format!("{:?}", category) };
             match hc.call_zome::<_, serde_json::Value>("commons_care", "mutualaid-needs", "create_offer", &input).await {
-                Ok(_) => toasts.push("your offer has been planted", "commons"),
+                Ok(_) => toasts.push("your offer has been planted", ToastKind::Custom("commons".into())),
                 Err(e) => { web_sys::console::log_1(&format!("create offer failed: {e}").into()); }
             }
         });

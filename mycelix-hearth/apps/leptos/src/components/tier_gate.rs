@@ -4,7 +4,7 @@
 //! Consciousness tier gate component.
 
 use leptos::prelude::*;
-use crate::consciousness_provider::use_consciousness;
+use mycelix_leptos_core::use_consciousness;
 use personal_leptos_types::TrustTier;
 
 /// Gate content behind a minimum consciousness tier.

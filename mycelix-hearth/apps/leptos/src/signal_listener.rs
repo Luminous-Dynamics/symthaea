@@ -9,8 +9,8 @@
 //!
 //! When in mock mode, simulated_life.rs handles this instead.
 
-use crate::holochain::use_holochain;
-use crate::toasts::use_toasts;
+use mycelix_leptos_core::holochain_provider::use_holochain;
+use mycelix_leptos_core::use_toasts;
 use crate::hearth_context::use_hearth;
 
 /// Start listening for real-time signals from the conductor.

@@ -26,10 +26,13 @@ web-sys = { version = "0.3", features = [
     "Window", "Storage", "Document",
 ] }
 console_error_panic_hook = "0.1"
+gloo-timers = "0.3"
 
 # Shared Mycelix Leptos infrastructure
 mycelix-leptos-core = { path = "../../../crates/mycelix-leptos-core" }
-mycelix-leptos-client = { path = "../../../crates/mycelix-leptos-client" }
+
+# Cluster types
+commons-leptos-types = { path = "../../crates/commons-leptos-types" }
 
 [profile.release]
 opt-level = "z"
