@@ -301,8 +301,9 @@ fn intent_max_tokens(channels: &ThoughtChannels, model: &str) -> usize {
         6 => 128, // Continue — extended thought
         _ => 96,  // Fallback
     };
-    // Gemma 4 models use ~250 thinking tokens before visible output
-    let thinking_budget = if model.contains("gemma4") { 300 } else { 0 };
+    // Gemma 4 models use 300-400 thinking tokens before visible output.
+    // Budget 500 to ensure all intents produce visible text.
+    let thinking_budget = if model.contains("gemma4") { 500 } else { 0 };
     base + thinking_budget
 }
 
