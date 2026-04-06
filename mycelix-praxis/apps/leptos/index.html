@@ -49,12 +49,15 @@
     }
     </script>
 
-    <!-- Spore WASM integration (loaded when available) -->
+    <!-- Spore WASM integration (synchronous detection before app mount) -->
     <script id="spore-loader">
         window.__SPORE_AVAILABLE = false;
-        fetch('/spore/symthaea_spore_bg.wasm', { method: 'HEAD' })
-            .then(r => { if (r.ok) window.__SPORE_AVAILABLE = true; })
-            .catch(() => {});
+        try {
+            var xhr = new XMLHttpRequest();
+            xhr.open('HEAD', '/spore/symthaea_spore_bg.wasm', false);
+            xhr.send();
+            if (xhr.status === 200) window.__SPORE_AVAILABLE = true;
+        } catch(e) {}
     </script>
 
     <!-- Holochain conductor bridge -->

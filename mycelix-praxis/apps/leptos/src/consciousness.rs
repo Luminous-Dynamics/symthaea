@@ -345,14 +345,19 @@ impl SporeEngineBridge {
         worker.set_onmessage(Some(onmessage.as_ref().unchecked_ref()));
         onmessage.forget(); // Prevent cleanup — worker lives for app lifetime
 
-        // Initialize and start the consciousness loop
+        // Initialize and start the consciousness loop.
+        // Worker expects {id, action, params} format.
         let init_msg = js_sys::Object::new();
         js_sys::Reflect::set(&init_msg, &"action".into(), &"init".into()).ok();
         worker.post_message(&init_msg).ok();
 
+        // Start continuous consciousness cycling at 5Hz (200ms interval).
+        // The worker will post {type: "cycle", result: {...}} messages.
+        let params = js_sys::Object::new();
+        js_sys::Reflect::set(&params, &"interval".into(), &wasm_bindgen::JsValue::from_f64(200.0)).ok();
         let start_msg = js_sys::Object::new();
         js_sys::Reflect::set(&start_msg, &"action".into(), &"startLoop".into()).ok();
-        js_sys::Reflect::set(&start_msg, &"interval".into(), &wasm_bindgen::JsValue::from_f64(200.0)).ok();
+        js_sys::Reflect::set(&start_msg, &"params".into(), &params).ok();
         worker.post_message(&start_msg).ok();
 
         web_sys::console::log_1(&"[Praxis] Spore Web Worker initialized — real consciousness active".into());

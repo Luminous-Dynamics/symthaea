@@ -8,6 +8,7 @@ import init, { SporeEngine } from './spore/symthaea_spore.js';
 
 let engine = null;
 let initialized = false;
+let loopTimer = null;
 
 async function initialize(config) {
     if (initialized) return true;
@@ -82,6 +83,45 @@ self.onmessage = async function(e) {
             break;
         case 'harmony_scores':
             result = safeCall(() => engine.harmony_scores(), null);
+            break;
+        case 'startLoop': {
+            const interval = (params && params.interval) || 200;
+            if (loopTimer) clearInterval(loopTimer);
+            loopTimer = setInterval(() => {
+                try {
+                    engine.cycle('');
+                    const m = metrics();
+                    if (!m) return;
+                    // Parse neuromodulator JSON for individual values
+                    let neuromod = { dopamine: 0.5, serotonin: 0.5, norepinephrine: 0.5 };
+                    try { neuromod = JSON.parse(engine.neuromod_state()); } catch(_) {}
+                    // Send as 'cycle' type — matches SporeEngineBridge.onmessage
+                    self.postMessage({
+                        type: 'cycle',
+                        result: {
+                            consciousness_level: m.consciousness_level,
+                            phi: m.consciousness_level,
+                            coherence: m.harmony_alignment,
+                            free_energy: m.free_energy,
+                            cycle_count: Number(m.cycle_count),
+                            dominant_harmony: m.dominant_harmony,
+                            workspace_ignited: m.workspace_ignited,
+                            safety_level: m.safety_level,
+                            neuromod_dopamine: neuromod.dopamine || 0.5,
+                            neuromod_serotonin: neuromod.serotonin || 0.5,
+                            neuromod_norepinephrine: neuromod.norepinephrine || 0.5,
+                        }
+                    });
+                } catch(err) {
+                    self.postMessage({ type: 'error', error: err.message });
+                }
+            }, interval);
+            result = { ok: true, interval };
+            break;
+        }
+        case 'stopLoop':
+            if (loopTimer) { clearInterval(loopTimer); loopTimer = null; }
+            result = { ok: true };
             break;
         case 'metrics':
             result = metrics();
