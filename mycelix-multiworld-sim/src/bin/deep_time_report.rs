@@ -7,7 +7,7 @@
 
 use mycelix_multiworld_sim::biosphere::{
     consciousness_emergence::{compute_emergence_curve, emergence_report},
-    counterfactual::run_counterfactual,
+    counterfactual::{run_counterfactual, run_multi_regime_kpg, multi_regime_markdown},
     counterfactual_consciousness::run_counterfactual_consciousness,
     sensitivity::run_sensitivity,
     validation::validate_against_sepkoski,
@@ -170,7 +170,12 @@ fn main() {
         }
     }
 
-    // ── 7. Sepkoski validation ──
+    // ── 7. Multi-regime counterfactual ──
+    println!("\n── Multi-Regime Counterfactual ──");
+    let multi_results = run_multi_regime_kpg();
+    print!("{}", multi_regime_markdown(&multi_results));
+
+    // ── 8. Sepkoski validation ──
     println!("\n── Sepkoski Validation ──");
     let validation = validate_against_sepkoski();
     print!("{}", validation.to_markdown());
