@@ -1,0 +1,50 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
+use leptos::prelude::*;
+use mycelix_leptos_core::{StatCard, ConnectionStatus};
+use mycelix_leptos_core::holochain_provider;
+use mycelix_leptos_core::consciousness::use_consciousness;
+use crate::context::use_climate_context;
+
+#[component]
+pub fn HomePage() -> impl IntoView {
+    let hc = holochain_provider::use_holochain();
+    let consciousness = use_consciousness();
+    let ctx = use_climate_context();
+
+    let status_label = move || match hc.status.get() {
+        ConnectionStatus::Connected => "Connected",
+        ConnectionStatus::Mock => "Mock mode",
+        ConnectionStatus::Connecting => "Connecting...",
+        ConnectionStatus::Disconnected => "Disconnected",
+    };
+
+    view! {
+        <div class="page-home">
+            <h1>"Climate"</h1>
+            <p class="subtitle">"Welcome to the Climate cluster."</p>
+
+            <div class="dashboard-grid">
+                <StatCard
+                    label="Status"
+                    value=status_label
+                    subtitle=""
+                    icon=""
+                />
+                <StatCard
+                    label="Tier"
+                    value=move || consciousness.tier.get().label().to_string()
+                    subtitle=""
+                    icon=""
+                />
+                <StatCard
+                    label="Items"
+                    value=move || ctx.items.get().len().to_string()
+                    subtitle="from mock data"
+                    icon=""
+                />
+            </div>
+        </div>
+    }
+}

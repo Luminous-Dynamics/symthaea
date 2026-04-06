@@ -1,0 +1,15 @@
+[build]
+target = "index.html"
+dist = "dist"
+
+[[hooks]]
+stage = "post_build"
+command = "sh"
+command_arguments = ["-c", "cp -r static/* dist/ 2>/dev/null; true"]
+
+[watch]
+watch = ["src", "style", "index.html"]
+
+[serve]
+port = 8103
+open = false
