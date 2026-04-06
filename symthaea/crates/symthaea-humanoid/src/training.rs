@@ -804,6 +804,122 @@ impl HumanoidTrainer {
         (all_metrics, controller, encoder)
     }
 
+    /// DAgger training: periodically expose controller to PD-free states.
+    ///
+    /// Every `dagger_interval` episodes, runs the controller ALONE for `dagger_steps`
+    /// steps, collects the resulting (out-of-distribution) states, and trains the
+    /// controller on "what PD would output" for those states. This closes the
+    /// distribution shift gap between PD-supported training and PD-free evaluation.
+    pub fn train_dagger(
+        &mut self,
+        dagger_interval: usize,
+        dagger_steps: usize,
+    ) -> (Vec<EpisodeMetrics>, HumanoidController, HumanoidHdcEncoder) {
+        self.curriculum_state = CurriculumState::new();
+
+        let genesis = self.genesis.clone();
+        let num_levels = self.config.num_levels;
+        let mut encoder = HumanoidHdcEncoder::new_predictive(
+            &genesis, num_levels, self.config.morphology,
+        );
+        let mut controller = self
+            .initial_controller
+            .take()
+            .unwrap_or_else(|| HumanoidController::new(&genesis, &self.config));
+        let fep_config = HumanoidFepConfig {
+            exploration_decay_rate: self.config.exploration_decay_rate,
+            ..HumanoidFepConfig::default()
+        };
+        let mut fep_agent = ActiveInferenceHumanoidAgent::new(fep_config, self.config.task);
+
+        // Warmup
+        let warmup_samples: Vec<(ContinuousHV, HumanoidCommand)> = (0..20)
+            .map(|i| {
+                let mut state = HumanoidState::standing();
+                let offset = (i as f64 - 10.0) * 0.005;
+                state.joint_angles[0] += offset;
+                let hv = encoder.encode(&state);
+                let target = pd_standing_baseline(&state, &self.pd_gains);
+                (hv, target)
+            })
+            .collect();
+        controller.warmup(&warmup_samples, 100, self.config.learning_rate * 10.0);
+        encoder.reset();
+
+        let mut all_metrics = Vec::with_capacity(self.config.num_episodes);
+        let mut best_reward = f64::NEG_INFINITY;
+        let mut best_weights: Option<(Vec<f32>, Vec<f32>)> = None;
+        let mut consecutive_low = 0u32;
+        let dt = self.config.physics_dt();
+
+        for ep in 0..self.config.num_episodes {
+            // Normal training episode (with PD curriculum)
+            let metrics = self.run_episode(&mut encoder, &mut controller, &mut fep_agent, ep);
+
+            // Best-checkpoint logic
+            if metrics.avg_episode_reward > best_reward {
+                best_reward = metrics.avg_episode_reward;
+                best_weights = Some(controller.output_projection());
+                consecutive_low = 0;
+            } else {
+                consecutive_low += 1;
+                if consecutive_low >= 3 && best_reward > 0.5 {
+                    if let Some((ref w, ref b)) = best_weights {
+                        controller.set_output_projection(w, b);
+                    }
+                    consecutive_low = 0;
+                }
+            }
+
+            all_metrics.push(metrics);
+
+            // DAgger round: every dagger_interval episodes, run controller ALONE
+            // and train on the out-of-distribution states
+            if ep > 0 && ep % dagger_interval == 0 {
+                let mut dagger_sim = SimpleHumanoidSimulator::new();
+                let mut dagger_encoder = HumanoidHdcEncoder::new(&genesis, num_levels);
+
+                // Collect OOD states by running controller alone
+                let mut ood_samples: Vec<(ContinuousHV, HumanoidCommand)> = Vec::new();
+
+                for step in 0..dagger_steps {
+                    let state = dagger_sim.state().clone();
+                    let hv = dagger_encoder.encode(&state);
+
+                    // What the controller outputs (possibly bad)
+                    let _cmd = controller.forward(&hv, dt as f32);
+
+                    // What the PD WOULD output for this state (the "expert" label)
+                    let pd_target = pd_standing_baseline(&state, &self.pd_gains);
+
+                    // Collect this (state_encoding, expert_action) pair
+                    ood_samples.push((hv, pd_target.clone()));
+
+                    // Step physics with the CONTROLLER's output (not PD)
+                    // This generates the actual OOD trajectory
+                    dagger_sim.step(&_cmd, dt);
+
+                    // Early exit if completely fallen
+                    if dagger_sim.state().head_height < 0.3 {
+                        break;
+                    }
+                }
+
+                // Train on the OOD samples
+                let dagger_lr = self.config.learning_rate * 2.0; // Higher LR for correction
+                for (hv, target) in &ood_samples {
+                    controller.forward(hv, dt as f32);
+                    controller.train_step(hv, target, dt as f32, Some(dagger_lr));
+                }
+
+                controller.reset(); // Reset network state after DAgger episode
+            }
+        }
+
+        self.metrics = all_metrics.clone();
+        (all_metrics, controller, encoder)
+    }
+
     /// Run training with CSV telemetry output.
     pub fn train_with_telemetry(&mut self, output_dir: &str) -> Vec<EpisodeMetrics> {
         self.config.collect_telemetry = true;

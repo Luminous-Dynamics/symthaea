@@ -767,6 +767,7 @@ impl CognitiveLoopService {
                 },
                 broca_lite: super::broca_lite::BrocaLiteManager::new(broca_lite_seed),
                 last_broca_text: None,
+                last_language_source: None,
                 user_state: if enable_user_state {
                     Some(crate::user_state_inference::UserStateInference::new())
                 } else {

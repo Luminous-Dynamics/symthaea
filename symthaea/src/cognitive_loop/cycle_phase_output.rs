@@ -2069,6 +2069,7 @@ impl CognitiveLoopService {
                 }
                 text
             },
+            language_source: self.language_comm.last_language_source.take(),
             #[cfg(feature = "canvas")]
             canvas_svg: self.sensorimotor.motor_rendering.last_canvas_svg.take(),
             #[cfg(feature = "identity")]

@@ -57,7 +57,8 @@ fn run() {
 
     let start = Instant::now();
     let mut trainer = HumanoidTrainer::new(config.clone());
-    let (metrics, controller, encoder) = trainer.train_and_extract();
+    // DAgger: every 10 episodes, run 200 steps without PD, train on OOD states
+    let (metrics, controller, encoder) = trainer.train_dagger(10, 200);
     let train_time = start.elapsed();
 
     println!();
