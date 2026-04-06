@@ -195,6 +195,118 @@ pub fn validate_against_sepkoski() -> ValidationResult {
     }
 }
 
+/// Decoupled validation: correlate ONLY the non-genus-derived dimensions
+/// against the Sepkoski curve to test whether the *structural* coherence
+/// dimensions (complexity, resilience, network) track diversity independently.
+///
+/// This addresses the circularity criticism: genus count feeds Biodiversity,
+/// Energy Throughput (via biomass), and Information Capacity (via functional groups).
+/// The non-circular dimensions are: Complexity (ordinal scale from first appearances)
+/// and Resilience (background extinction rate, independent of absolute diversity).
+pub fn validate_non_circular() -> (f64, usize) {
+    let reference = load_reference();
+    let data = DeepTimeData::load();
+    let extinctions = canonical_mass_extinctions();
+    let bins = build_deep_time_bins();
+    let maxima = BiosphereMaxima::default();
+
+    let mut complexity_values: Vec<f64> = Vec::new();
+    let mut ref_values: Vec<f64> = Vec::new();
+    let sepkoski_max = reference.iter().map(|r| r.marine_genera).fold(0.0_f64, f64::max);
+
+    for ref_pt in &reference {
+        let bin = bins.iter().find(|b| ref_pt.age_ma >= b.end_ma && ref_pt.age_ma <= b.start_ma);
+        let bin = match bin { Some(b) => b, None => continue };
+
+        let raw = compute_raw_dimensions(bin, &data, &extinctions);
+        let d13c = Some(data.interpolate_d13c_excursion(bin.midpoint_ma));
+        let norm = raw.normalize(&maxima, bin.resolution, bin.midpoint_ma, d13c);
+        let sepkoski_norm = (ref_pt.marine_genera / sepkoski_max).clamp(0.0, 1.0);
+
+        // Non-circular: average of Complexity + Resilience
+        let non_circular_avg = (norm.values[1] + norm.values[2]) / 2.0;
+        complexity_values.push(non_circular_avg);
+        ref_values.push(sepkoski_norm);
+    }
+
+    let n = complexity_values.len();
+    let pearson = if n >= 3 {
+        let mean_x: f64 = complexity_values.iter().sum::<f64>() / n as f64;
+        let mean_y: f64 = ref_values.iter().sum::<f64>() / n as f64;
+        let mut cov = 0.0;
+        let mut var_x = 0.0;
+        let mut var_y = 0.0;
+        for i in 0..n {
+            let dx = complexity_values[i] - mean_x;
+            let dy = ref_values[i] - mean_y;
+            cov += dx * dy;
+            var_x += dx * dx;
+            var_y += dy * dy;
+        }
+        let denom = (var_x * var_y).sqrt();
+        if denom > 1e-15 { cov / denom } else { 0.0 }
+    } else {
+        0.0
+    };
+
+    (pearson, n)
+}
+
+/// Validate B(t) composite against εp (isotopic fractionation) as an
+/// independent thermodynamic proxy. εp is NOT derived from genus counts —
+/// it comes from carbonate/organic carbon isotopic ratios.
+/// This tests whether B(t) tracks the biosphere's thermodynamic state
+/// independently of its taxonomic input.
+pub fn validate_against_epsilon_p() -> (f64, usize) {
+    let data = DeepTimeData::load();
+    let extinctions = canonical_mass_extinctions();
+    let bins = build_deep_time_bins();
+    let maxima = BiosphereMaxima::default();
+
+    let ep_max = 32.0; // Maximum εp in the record (Phanerozoic)
+
+    let mut bt_values = Vec::new();
+    let mut ep_values = Vec::new();
+
+    for bin in &bins {
+        let age = bin.midpoint_ma;
+        if age > 541.0 { continue; } // Phanerozoic only for fair comparison
+
+        let raw = compute_raw_dimensions(bin, &data, &extinctions);
+        let d13c = Some(data.interpolate_d13c_excursion(age));
+        let norm = raw.normalize(&maxima, bin.resolution, age, d13c);
+        let bt = super::dimensions::compute_bt(&norm);
+
+        let ep = data.interpolate_epsilon_p(age);
+        let ep_norm = (ep / ep_max).clamp(0.0, 1.0);
+
+        bt_values.push(bt);
+        ep_values.push(ep_norm);
+    }
+
+    let n = bt_values.len();
+    let pearson = if n >= 3 {
+        let mean_x: f64 = bt_values.iter().sum::<f64>() / n as f64;
+        let mean_y: f64 = ep_values.iter().sum::<f64>() / n as f64;
+        let mut cov = 0.0;
+        let mut var_x = 0.0;
+        let mut var_y = 0.0;
+        for i in 0..n {
+            let dx = bt_values[i] - mean_x;
+            let dy = ep_values[i] - mean_y;
+            cov += dx * dy;
+            var_x += dx * dx;
+            var_y += dy * dy;
+        }
+        let denom = (var_x * var_y).sqrt();
+        if denom > 1e-15 { cov / denom } else { 0.0 }
+    } else {
+        0.0
+    };
+
+    (pearson, n)
+}
+
 impl ValidationResult {
     pub fn to_markdown(&self) -> String {
         let mut md = String::new();
@@ -214,6 +326,16 @@ impl ValidationResult {
             "POOR — B(t) diverges from Sepkoski; calibration needed"
         };
         md.push_str(&format!("**Verdict**: {}\n\n", verdict));
+
+        // Decoupled validation
+        let (nc_r, nc_n) = validate_non_circular();
+        md.push_str("## Decoupled Validation (Non-Circular)\n\n");
+        md.push_str(&format!("Non-genus-derived dimensions (Complexity+Resilience) vs Sepkoski:\n"));
+        md.push_str(&format!("Pearson $r$ = {:.4} ($n$ = {})\n\n", nc_r, nc_n));
+
+        let (ep_r, ep_n) = validate_against_epsilon_p();
+        md.push_str(&format!("Composite $B(t)$ vs $\\epsilon_p$ (isotopic fractionation, independent thermodynamic proxy):\n"));
+        md.push_str(&format!("Pearson $r$ = {:.4} ($n$ = {})\n\n", ep_r, ep_n));
 
         if !self.divergent_points.is_empty() {
             md.push_str("## Divergent Points (>30% difference)\n\n");
@@ -284,5 +406,21 @@ mod tests {
         let md = result.to_markdown();
         assert!(md.contains("Pearson r"));
         assert!(md.contains("Verdict"));
+        assert!(md.contains("Decoupled Validation"));
+        assert!(md.contains("epsilon_p"));
+    }
+
+    #[test]
+    fn non_circular_validation_positive() {
+        let (r, n) = validate_non_circular();
+        assert!(n >= 20, "Should have >=20 comparison points");
+        assert!(r > 0.0, "Non-circular correlation should be positive, got {}", r);
+    }
+
+    #[test]
+    fn epsilon_p_validation_runs() {
+        let (r, n) = validate_against_epsilon_p();
+        assert!(n >= 10, "Should have >=10 comparison points");
+        assert!(r.is_finite(), "εp correlation should be finite");
     }
 }

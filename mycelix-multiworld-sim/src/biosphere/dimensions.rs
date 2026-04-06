@@ -196,14 +196,23 @@ pub fn compute_raw_dimensions(
     let diversity_norm = (biodiversity / max_bio).clamp(0.0, 1.0);
     let network_integration = network_integration_at(age, o2, complexity_grade, diversity_norm);
 
-    // 5. Energy throughput — scaled by standing biomass (PBDB diversity)
-    // The diversity_norm proxy captures the biomass crash during extinctions:
-    // if 96% of genera die, standing biomass drops proportionally.
-    let energy_throughput = energy_throughput_at(age, o2, complexity_grade, diversity_norm);
+    // 5. Energy throughput — scaled by standing biomass AND εp fractionation
+    // εp (δ¹³C_carb - δ¹³C_org) is a direct proxy for photosynthetic efficiency.
+    // Higher εp → more efficient carbon fixation → higher actual productivity.
+    // This replaces raw δ¹³C excursions with a thermodynamically grounded proxy.
+    // CITATION: Hayes et al. (1999), Freeman & Hayes (1992).
+    let epsilon_p = data.interpolate_epsilon_p(age);
+    let ep_factor = (epsilon_p / 27.0).clamp(0.5, 1.5); // Normalize to modern εp ≈ 27‰
+    let energy_throughput = energy_throughput_at(age, o2, complexity_grade, diversity_norm) * ep_factor;
 
-    // 6. Information capacity (genome complexity × species richness)
-    // Proxy: complexity^2 × diversity_norm — rough but grounded
-    let info_raw = (complexity_grade / 10.0).powi(2) * diversity_norm;
+    // 6. Information capacity — weighted by functional group occupancy
+    // Raw genus count suffers from functional redundancy: 1000 trilobite species
+    // performing the same ecological role ≠ high information capacity.
+    // Functional occupancy (Bambach ecospace) measures unique modes of life,
+    // not just taxonomic names.
+    // CITATION: Bambach et al. (2007), Bush & Bambach (2011).
+    let functional_occupancy = data.interpolate_functional_occupancy(age);
+    let info_raw = (complexity_grade / 10.0).powi(2) * functional_occupancy;
     let information_capacity = info_raw;
 
     BiosphereDimensionsRaw {

@@ -16,6 +16,8 @@ const IMPACT_CSV: &str = include_str!("../../data/biosphere/impact_events.csv");
 const LIP_CSV: &str = include_str!("../../data/biosphere/lip_events.csv");
 const D13C_CSV: &str = include_str!("../../data/biosphere/d13c_proxy.csv");
 const BACKGROUND_EXT_CSV: &str = include_str!("../../data/biosphere/background_extinction_rate.csv");
+const EPSILON_P_CSV: &str = include_str!("../../data/biosphere/epsilon_p.csv");
+const FUNCTIONAL_GROUPS_CSV: &str = include_str!("../../data/biosphere/functional_groups.csv");
 
 // ── Taphonomic correction ──
 // CITATION: Alroy (2010) "Fair sampling of taxonomic richness" — SQS method.
@@ -257,6 +259,12 @@ pub struct DeepTimeData {
     pub lips: Vec<LipEvent>,
     pub d13c: Vec<D13cPoint>,
     pub extinction_rates: Vec<ExtinctionRatePoint>,
+    /// εp = δ¹³C_carb - δ¹³C_org (‰). Direct proxy for photosynthetic efficiency.
+    /// CITATION: Hayes et al. (1999).
+    pub epsilon_p: Vec<ProxyPoint>,
+    /// Functional group occupancy (Bambach ecospace model).
+    /// CITATION: Bambach et al. (2007), Bush & Bambach (2011).
+    pub functional_groups: Vec<ProxyPoint>,
 }
 
 impl DeepTimeData {
@@ -269,6 +277,8 @@ impl DeepTimeData {
             lips: parse_lips(LIP_CSV),
             d13c: parse_d13c_csv(D13C_CSV),
             extinction_rates: parse_extinction_rate_csv(BACKGROUND_EXT_CSV),
+            epsilon_p: parse_proxy_csv(EPSILON_P_CSV),
+            functional_groups: parse_proxy_csv(FUNCTIONAL_GROUPS_CSV),
         }
     }
 
@@ -321,6 +331,22 @@ impl DeepTimeData {
             .map(|a| ProxyPoint { age_ma: a.age_ma, value: a.co2_ppm })
             .collect();
         Self::interpolate_proxy(&proxy, age_ma)
+    }
+
+    /// Interpolate εp (isotopic fractionation, ‰) at a given age.
+    /// εp = δ¹³C_carb - δ¹³C_org. Direct proxy for photosynthetic efficiency
+    /// and pCO₂. Higher εp → more efficient carbon fixation → higher productivity.
+    /// CITATION: Hayes et al. (1999), Freeman & Hayes (1992).
+    pub fn interpolate_epsilon_p(&self, age_ma: MaAge) -> f64 {
+        Self::interpolate_proxy(&self.epsilon_p, age_ma)
+    }
+
+    /// Interpolate functional group occupancy (fraction of Bambach ecospace modes occupied).
+    /// CITATION: Bambach et al. (2007), Bush & Bambach (2011).
+    pub fn interpolate_functional_occupancy(&self, age_ma: MaAge) -> f64 {
+        let raw = Self::interpolate_proxy(&self.functional_groups, age_ma);
+        // Normalize: functional_groups CSV stores occupied_modes out of 120 total
+        (raw / 120.0).clamp(0.0, 1.0)
     }
 
     /// Interpolate background extinction rate (per Ma) at a given age.

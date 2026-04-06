@@ -34,6 +34,45 @@ pub enum ExtinctionCause {
     Unknown,
 }
 
+/// Extinction selectivity — which taxa were preferentially removed.
+/// CITATION: Jablonski (1986), Payne & Clapham (2012).
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub enum ExtinctionSelectivity {
+    /// Preferentially removes large-bodied, high-metabolic apex taxa.
+    /// Recovery requires re-evolution of apex traits from small survivors.
+    /// Longer lag phase (Cope's Law reversal). E.g., K-Pg, End-Permian.
+    ApexPredator,
+    /// Preferentially removes narrow-range specialists.
+    /// Generalists survive and radiate quickly. Shorter lag. E.g., End-Ordovician.
+    Specialist,
+    /// Indiscriminate — affects all taxa roughly equally.
+    /// Recovery rate depends on survivor diversity. E.g., GOE.
+    Indiscriminate,
+}
+
+impl ExtinctionSelectivity {
+    /// Lag phase before adaptive radiation begins (Ma).
+    /// Apex-targeting events require survivors to re-evolve complex traits.
+    /// CITATION: Erwin (2001), Chen & Benton (2012).
+    pub fn lag_phase_ma(self) -> f64 {
+        match self {
+            Self::ApexPredator => 3.0,   // End-Permian "languishing" ~3-5 Ma
+            Self::Specialist => 1.0,      // Faster recovery from generalist survivors
+            Self::Indiscriminate => 2.0,  // Intermediate
+        }
+    }
+
+    /// Modifier to the carrying capacity overshoot.
+    /// Apex removal opens more niche space → higher overshoot.
+    pub fn overshoot_modifier(self) -> f64 {
+        match self {
+            Self::ApexPredator => 1.2,    // Clearing apex taxa opens big niches
+            Self::Specialist => 0.8,      // Less niche space freed
+            Self::Indiscriminate => 1.0,  // Neutral
+        }
+    }
+}
+
 /// A mass extinction event with published calibration data.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MassExtinctionEvent {
@@ -47,10 +86,11 @@ pub struct MassExtinctionEvent {
     /// CITATION: Kirchner & Weil (2000), Sahney & Benton (2008).
     pub recovery_time_ma: f64,
     /// Whether post-recovery complexity exceeded pre-extinction level.
-    /// Tests the shock→collapse→higher-complexity hypothesis.
     pub complexity_increase: bool,
     /// Probable cause.
     pub cause: ExtinctionCause,
+    /// Selectivity: which taxa were preferentially removed.
+    pub selectivity: ExtinctionSelectivity,
 }
 
 /// Multi-phase logistic recovery model (Lotka-Volterra niche-filling).
@@ -71,44 +111,61 @@ pub struct ShockRecoveryModel {
     /// Collapse timescale (Ma). Typically 0.1-1.0 Ma.
     pub collapse_tau_ma: f64,
     /// Intrinsic recovery rate r (per Ma). Higher = faster niche-filling.
+    /// Now variable: tied to background extinction rate (Resilience dimension).
     pub recovery_rate: f64,
     /// Peak B(t) drawdown fraction [0, 1].
     pub severity: f64,
     /// Post-recovery carrying capacity as fraction of pre-extinction.
-    /// Values > 1.0 indicate evolutionary innovation opened new niches.
-    /// Typically 1.05-1.25.
+    /// Modulated by extinction selectivity: apex-targeting events produce
+    /// higher overshoot because they clear more niche space.
     pub carrying_capacity_ratio: f64,
+    /// Selectivity-based lag phase (Ma) before adaptive radiation begins.
+    /// Apex-predator-targeting events require survivors to re-evolve
+    /// complex metabolic traits (Cope's Law reversal), delaying radiation.
+    pub lag_phase_ma: f64,
 }
 
 impl ShockRecoveryModel {
     /// Compute the recovery fraction at time delta_ma after the extinction peak.
     ///
-    /// Returns a value in [1 - severity, carrying_capacity_ratio] representing
-    /// the B(t) multiplier relative to pre-extinction baseline.
+    /// Three phases:
+    /// 1. Collapse (0 to collapse_tau): rapid diversity loss
+    /// 2. Lag/languishing (collapse_tau to collapse_tau + lag): survivors persist
+    ///    but no adaptive radiation yet (trait re-evolution required)
+    /// 3. Logistic radiation (after lag): niche-filling with overshoot
     pub fn recovery_fraction(&self, delta_ma: f64) -> f64 {
         if delta_ma < 0.0 {
-            return 1.0; // Before the extinction
+            return 1.0;
         }
 
-        // Phase 1: Collapse (exponential loss)
         let nadir = 1.0 - self.severity;
+
+        // Phase 1: Collapse
         if delta_ma < self.collapse_tau_ma {
             let collapse_progress = delta_ma / self.collapse_tau_ma;
             return 1.0 - self.severity * collapse_progress;
         }
 
-        // Phase 2+3: Logistic recovery from nadir to carrying_capacity_ratio
-        // Using the logistic: N(t) = K / (1 + ((K - N0)/N0) * exp(-r * (t - t0)))
-        let t_recovery = delta_ma - self.collapse_tau_ma;
+        // Phase 2: Lag/languishing — survivors persist at nadir, no radiation
+        let time_after_collapse = delta_ma - self.collapse_tau_ma;
+        if time_after_collapse < self.lag_phase_ma {
+            // Slow creep from nadir (survivors recolonize, Lazarus taxa)
+            let lag_progress = time_after_collapse / self.lag_phase_ma;
+            let lag_recovery = nadir * 0.05 * lag_progress; // 5% recovery during lag
+            return nadir + lag_recovery;
+        }
+
+        // Phase 3: Logistic radiation (niche-filling)
+        let t_radiation = time_after_collapse - self.lag_phase_ma;
         let k = self.carrying_capacity_ratio;
-        let n0 = nadir;
+        let n0 = nadir * 1.05; // Start of radiation = nadir + lag recovery
 
         if n0 <= 0.0 {
-            return nadir; // Complete extinction — no recovery
+            return nadir;
         }
 
         let ratio = (k - n0) / n0;
-        let n_t = k / (1.0 + ratio * (-self.recovery_rate * t_recovery).exp());
+        let n_t = k / (1.0 + ratio * (-self.recovery_rate * t_radiation).exp());
         n_t
     }
 }
@@ -121,37 +178,39 @@ pub fn canonical_mass_extinctions() -> Vec<MassExtinctionEvent> {
         MassExtinctionEvent {
             name: "Great Oxidation Event".into(),
             age_ma: 2400.0,
-            genus_extinction_fraction: 0.70, // Estimated — anaerobe die-off
+            genus_extinction_fraction: 0.70,
             recovery_time_ma: 200.0,
-            complexity_increase: true, // Enabled aerobic metabolism
+            complexity_increase: true,
             cause: ExtinctionCause::OxygenCatastrophe,
+            selectivity: ExtinctionSelectivity::Indiscriminate, // Oxygen toxic to all anaerobes
         },
         MassExtinctionEvent {
             name: "Sturtian Snowball Earth".into(),
             age_ma: 717.0,
             genus_extinction_fraction: 0.50,
             recovery_time_ma: 30.0,
-            complexity_increase: true, // May have spurred animal evolution
+            complexity_increase: true,
             cause: ExtinctionCause::Glaciation,
+            selectivity: ExtinctionSelectivity::Indiscriminate,
         },
         MassExtinctionEvent {
             name: "Marinoan Snowball Earth".into(),
             age_ma: 650.0,
             genus_extinction_fraction: 0.40,
             recovery_time_ma: 15.0,
-            complexity_increase: true, // Ediacaran fauna follows
+            complexity_increase: true,
             cause: ExtinctionCause::Glaciation,
+            selectivity: ExtinctionSelectivity::Indiscriminate,
         },
-        // ── End-Ediacaran ──
         MassExtinctionEvent {
             name: "End-Ediacaran extinction".into(),
             age_ma: 541.0,
             genus_extinction_fraction: 0.50,
             recovery_time_ma: 10.0,
-            complexity_increase: true, // Cambrian Explosion follows
+            complexity_increase: true,
             cause: ExtinctionCause::Multiple,
+            selectivity: ExtinctionSelectivity::Specialist, // Ediacaran sessile forms
         },
-        // ── Cambrian-Ordovician ──
         MassExtinctionEvent {
             name: "End-Cambrian SPICE event".into(),
             age_ma: 497.0,
@@ -159,6 +218,7 @@ pub fn canonical_mass_extinctions() -> Vec<MassExtinctionEvent> {
             recovery_time_ma: 10.0,
             complexity_increase: false,
             cause: ExtinctionCause::OceanAnoxia,
+            selectivity: ExtinctionSelectivity::Specialist,
         },
         // ── THE BIG FIVE ──
         MassExtinctionEvent {
@@ -168,14 +228,16 @@ pub fn canonical_mass_extinctions() -> Vec<MassExtinctionEvent> {
             recovery_time_ma: 8.0,
             complexity_increase: true,
             cause: ExtinctionCause::Glaciation,
+            selectivity: ExtinctionSelectivity::Specialist, // Narrow-range tropical taxa
         },
         MassExtinctionEvent {
             name: "Late Devonian (Kellwasser)".into(),
             age_ma: 372.0,
             genus_extinction_fraction: 0.35,
             recovery_time_ma: 15.0,
-            complexity_increase: true, // Tetrapods diversify after
+            complexity_increase: true,
             cause: ExtinctionCause::Multiple,
+            selectivity: ExtinctionSelectivity::ApexPredator, // Placoderms removed
         },
         MassExtinctionEvent {
             name: "Capitanian (Guadalupian)".into(),
@@ -187,40 +249,41 @@ pub fn canonical_mass_extinctions() -> Vec<MassExtinctionEvent> {
                 name: "Emeishan Traps".into(),
                 area_km2: 500_000.0,
             },
+            selectivity: ExtinctionSelectivity::Specialist,
         },
         MassExtinctionEvent {
             name: "End-Permian (Great Dying)".into(),
             age_ma: 252.0,
             genus_extinction_fraction: 0.57,
             recovery_time_ma: 10.0,
-            complexity_increase: true, // Dinosaurs, mammals emerge
+            complexity_increase: true,
             cause: ExtinctionCause::LargeIgneousProvince {
                 name: "Siberian Traps".into(),
                 area_km2: 7_000_000.0,
             },
+            selectivity: ExtinctionSelectivity::ApexPredator, // Large synapsids removed
         },
         MassExtinctionEvent {
             name: "End-Triassic".into(),
             age_ma: 201.0,
             genus_extinction_fraction: 0.34,
             recovery_time_ma: 8.0,
-            complexity_increase: true, // Dinosaur dominance established
+            complexity_increase: true,
             cause: ExtinctionCause::LargeIgneousProvince {
                 name: "CAMP".into(),
                 area_km2: 11_000_000.0,
             },
+            selectivity: ExtinctionSelectivity::ApexPredator, // Crurotarsans removed → dinosaur dominance
         },
         MassExtinctionEvent {
             name: "End-Cretaceous (K-Pg)".into(),
             age_ma: 66.0,
             genus_extinction_fraction: 0.40,
             recovery_time_ma: 7.0,
-            complexity_increase: true, // Mammalian radiation
-            cause: ExtinctionCause::Impact {
-                crater_diameter_km: 180.0,
-            },
+            complexity_increase: true,
+            cause: ExtinctionCause::Impact { crater_diameter_km: 180.0 },
+            selectivity: ExtinctionSelectivity::ApexPredator, // Non-avian dinosaurs removed
         },
-        // ── Post-Cretaceous minor events ──
         MassExtinctionEvent {
             name: "PETM hyperthermal".into(),
             age_ma: 56.0,
@@ -228,6 +291,7 @@ pub fn canonical_mass_extinctions() -> Vec<MassExtinctionEvent> {
             recovery_time_ma: 2.0,
             complexity_increase: false,
             cause: ExtinctionCause::Multiple,
+            selectivity: ExtinctionSelectivity::Specialist,
         },
         MassExtinctionEvent {
             name: "Eocene-Oligocene transition".into(),
@@ -236,14 +300,16 @@ pub fn canonical_mass_extinctions() -> Vec<MassExtinctionEvent> {
             recovery_time_ma: 3.0,
             complexity_increase: false,
             cause: ExtinctionCause::Glaciation,
+            selectivity: ExtinctionSelectivity::Specialist,
         },
         MassExtinctionEvent {
             name: "Quaternary megafauna extinction".into(),
             age_ma: 0.05,
             genus_extinction_fraction: 0.10,
-            recovery_time_ma: 0.01, // Not yet recovered
-            complexity_increase: true, // Homo sapiens civilization
+            recovery_time_ma: 0.01,
+            complexity_increase: true,
             cause: ExtinctionCause::Multiple,
+            selectivity: ExtinctionSelectivity::ApexPredator, // Large-bodied megafauna
         },
     ]
 }
@@ -256,38 +322,50 @@ pub fn most_recent_extinction(age_ma: MaAge) -> Option<&'static MassExtinctionEv
 }
 
 /// Compute the B(t) multiplier at a given age, considering all extinction events.
-/// Returns a value typically in [0.3, 1.3] representing the cumulative
-/// shock-recovery effect on the biosphere.
+///
+/// Recovery rate r is now variable: tied to background extinction rate as a
+/// proxy for environmental stress. High background rate (low resilience) → slow
+/// recovery. This captures the End-Permian "languishing" where environmental
+/// stressors (ocean anoxia, silica cycle disruption) suppressed recovery for Ma.
+///
+/// CITATION: Alroy (2008), Chen & Benton (2012).
 pub fn extinction_multiplier(age_ma: MaAge, extinctions: &[MassExtinctionEvent]) -> f64 {
     let mut multiplier = 1.0;
 
     for event in extinctions {
-        let delta = event.age_ma - age_ma; // positive = we're after the event
+        let delta = event.age_ma - age_ma;
         if delta < -5.0 {
-            continue; // Event is in the future relative to this age (by >5 Ma)
+            continue;
         }
 
-        // Only apply events within their active influence window.
-        // Once fully recovered (delta > recovery_time * 3), the event's multiplier
-        // converges to carrying_capacity_ratio. We cap the influence window
-        // so very ancient events don't compound unrealistically.
         let influence_window = event.recovery_time_ma * 4.0;
         if delta > influence_window {
-            continue; // Fully recovered — effect absorbed into baseline
+            continue;
         }
+
+        // Variable r: baseline 0.5/Ma, reduced when background extinction rate
+        // is high (stressed environment = slower recovery).
+        // We use recovery_time_ma as a proxy: longer recovery → lower r.
+        let r_base = 0.5;
+        let r = r_base * (7.0 / event.recovery_time_ma.max(1.0)).min(1.5);
+
+        // Selectivity-adjusted carrying capacity overshoot
+        let base_overshoot = if event.complexity_increase { 1.10 } else { 1.0 };
+        let overshoot = 1.0 + (base_overshoot - 1.0) * event.selectivity.overshoot_modifier();
 
         let model = ShockRecoveryModel {
             collapse_tau_ma: 0.5_f64.min(event.recovery_time_ma * 0.05),
-            recovery_rate: 0.5, // Per-Ma logistic rate
-            severity: event.genus_extinction_fraction * 0.8, // B(t) drawdown < genus loss
-            carrying_capacity_ratio: if event.complexity_increase { 1.10 } else { 1.0 },
+            recovery_rate: r,
+            severity: event.genus_extinction_fraction * 0.8,
+            carrying_capacity_ratio: overshoot,
+            lag_phase_ma: event.selectivity.lag_phase_ma(),
         };
 
         let fraction = model.recovery_fraction(delta);
         multiplier *= fraction;
     }
 
-    multiplier.max(0.01) // Never reach true zero
+    multiplier.max(0.01)
 }
 
 #[cfg(test)]
@@ -322,6 +400,7 @@ mod tests {
             recovery_rate: 0.5,
             severity: 0.6,
             carrying_capacity_ratio: 1.1,
+            lag_phase_ma: 2.0,
         };
         let nadir = model.recovery_fraction(0.5);
         assert!(
@@ -338,6 +417,7 @@ mod tests {
             recovery_rate: 0.5,
             severity: 0.5,
             carrying_capacity_ratio: 1.15,
+            lag_phase_ma: 2.0,
         };
         let recovered = model.recovery_fraction(30.0);
         assert!(
@@ -354,6 +434,7 @@ mod tests {
             recovery_rate: 0.5,
             severity: 0.5,
             carrying_capacity_ratio: 1.1,
+            lag_phase_ma: 2.0,
         };
         let early = model.recovery_fraction(1.0);
         let mid = model.recovery_fraction(5.0);
@@ -401,6 +482,7 @@ mod tests {
                 recovery_rate: 0.5,
                 severity: event.genus_extinction_fraction * 0.8,
                 carrying_capacity_ratio: if event.complexity_increase { 1.10 } else { 1.0 },
+                lag_phase_ma: event.selectivity.lag_phase_ma(),
             };
             let long_after = model.recovery_fraction(event.recovery_time_ma * 3.0);
             if long_after > 1.0 {

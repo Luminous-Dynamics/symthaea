@@ -127,6 +127,7 @@ fn compute_bt_with_params(params: &EnsembleParams) -> Vec<f64> {
                     } else {
                         1.0
                     },
+                    lag_phase_ma: event.selectivity.lag_phase_ma(),
                 };
                 ext_mult *= model.recovery_fraction(delta);
             }
