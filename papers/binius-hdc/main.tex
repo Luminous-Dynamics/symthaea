@@ -28,7 +28,7 @@ Luminous Dynamics\\
 \maketitle
 
 \begin{abstract}
-Hyperdimensional Computing (HDC) represents information using high-dimensional binary vectors and manipulates them via bitwise operations---predominantly XOR binding, majority bundling, and cyclic permutation. We observe that these operations share the same algebraic substrate as binary tower field arithmetic in \emph{Binius}, a recently proposed STARK proof system over $\mathrm{GF}(2^k)$. This alignment means that HDC's core XOR binding operation translates to \emph{native field addition} in Binius, requiring \textbf{zero non-linear constraints}---compared to $O(N)$ constraints in prime-field STARKs, where $N$ is the vector dimensionality. We implement and benchmark a Binius proof of 16,384-bit HDC XOR binding, demonstrating \textbf{192$\times$ fewer constraints}, \textbf{5.7$\times$ faster proving}, and \textbf{2.6$\times$ smaller proofs} compared to prime-field STARKs. We further show that Closed-form Continuous-time (CfC) neural networks, which underpin temporal HDC processing, require only \textbf{1~AND constraint per neuron per timestep} in Binius, with all additive state updates being free. These results establish binary-field STARKs as the natural proof system for privacy-preserving HDC applications, including federated learning, anonymous governance, and decentralized identity.
+Hyperdimensional Computing (HDC) represents information using high-dimensional binary vectors and manipulates them via bitwise operations---predominantly XOR binding, majority bundling, and cyclic permutation. We observe that these operations share the same algebraic substrate as binary tower field arithmetic in \emph{Binius}, a recently proposed STARK proof system over $\mathrm{GF}(2^k)$. This alignment means that HDC's core XOR binding operation translates to \emph{native field addition} in Binius, requiring \textbf{zero non-linear constraints}---compared to $O(N)$ constraints in prime-field STARKs, where $N$ is the vector dimensionality. We implement and benchmark a real Binius proof of 16,384-bit HDC XOR binding, demonstrating \textbf{192$\times$ fewer non-linear constraints} compared to the $O(3N)$ bit-decomposition approach required in prime-field STARKs. The Binius proof completes in 430~ms with a 75~KB proof, while a measured Winterfell baseline confirms that prime-field bit decomposition costs 27~ms per 32 bits. We further show that Closed-form Continuous-time (CfC) neural networks, which underpin temporal HDC processing, require only \textbf{1~AND constraint per neuron per timestep} in Binius, with all additive state updates being free. These results establish binary-field STARKs as the natural proof system for privacy-preserving HDC applications, including federated learning, anonymous governance, and decentralized identity.
 \end{abstract}
 
 \noindent\textbf{Keywords:} zero-knowledge proofs, hyperdimensional computing, binary fields, STARKs, Binius, privacy-preserving machine learning, CfC networks
@@ -148,7 +148,9 @@ p &= \sigma \wedge \delta \quad &\text{(AND: 1 constraint)} \\
 h' &= h \oplus p \quad &\text{(XOR: FREE)}
 \end{align}
 
-where $\sigma$ is provided as a witness (precomputed sigmoid value) and verified via a range check. Each CfC timestep thus costs \textbf{exactly 1 AND constraint per neuron} in Binius, with 2 free XOR operations.
+where $\sigma$ is provided as a \emph{witness} (precomputed sigmoid value). Each CfC timestep thus costs \textbf{exactly 1 AND constraint per neuron} in Binius, with 2 free XOR operations.
+
+\textbf{Important caveat}: The quoted cost is for the update relation \emph{given a supplied gating value}. Proving that $\sigma$ was correctly computed from $f(t)$ via sigmoid would require additional constraints (e.g., a lookup table or piecewise approximation). The end-to-end cost of proving a complete CfC step including sigmoid computation remains future work.
 
 For comparison, an LTC network with RK4 integration requires $S \approx 16$ substeps per timestep, each involving multiple multiplications:
 $$\text{CfC: } N \cdot T \text{ ANDs} \quad \text{vs.} \quad \text{LTC+RK4: } \sim 16 \cdot N \cdot T \text{ ANDs}$$
@@ -183,11 +185,41 @@ pub trait ProofBackend: Send + Sync {
 The system is deployed across 11 Holochain clusters with unique domain tags preventing cross-protocol replay (e.g., \texttt{ZTML:Health:RecordAttest:v1}).
 
 % ============================================================================
+\section{What Is Free, What Is Not}
+\label{sec:costs}
+% ============================================================================
+
+To prevent overreading the ``zero-cost XOR'' claim, we explicitly enumerate the cost structure:
+
+\begin{itemize}
+    \item \textbf{Free} (zero non-linear constraints): XOR/addition, cyclic permutation (reindexing), subtraction.
+    \item \textbf{Cheap} (1 AND per operation): Bitwise AND, comparison gates, threshold checks.
+    \item \textbf{Structural overhead}: \texttt{assert\_eq} bookkeeping (256 ANDs for 16,384-bit binding in our benchmark---from constraint wiring, not the XOR operation itself).
+    \item \textbf{Witness assumptions}: Sigmoid/gating values in CfC proofs are witness-supplied and range-checked, not computed inside the circuit. The quoted CfC cost is for the \emph{update relation given a supplied gating value}, not for proving the full neural computation end-to-end.
+    \item \textbf{Not addressed}: Majority-vote bundling requires $O(D \log n)$ ANDs for threshold comparison; this remains unmeasured.
+\end{itemize}
+
+\subsection{Claim Hierarchy}
+
+We distinguish four levels of evidence strength:
+
+\begin{enumerate}
+    \item \textbf{Provable algebraic result}: XOR binding is linear in binary-field STARK AIR and incurs zero non-linear constraints. This follows from the definition of $\mathrm{GF}(2^k)$ addition.
+    \item \textbf{Measured implementation result}: Binius benchmark on 16,384-bit binding produces 256 AND constraints (structural only) with real cryptographic proof generation and verification.
+    \item \textbf{Measured baseline with extrapolation}: Winterfell proves 32-bit decomposition in 27.19~ms (measured, 10-iteration average). Prime-field XOR on 16,384 bits would require $\sim$49,152 constraints via bit decomposition.
+    \item \textbf{Forward-looking implication}: Binary-field STARKs are the natural proof system for XOR-dominant HDC workloads. The triple-stack (HDC+FHE+ZKP) remains speculative.
+\end{enumerate}
+
+% ============================================================================
 \section{Evaluation}
 \label{sec:evaluation}
 % ============================================================================
 
-All benchmarks run on a single machine (AMD Ryzen, 32GB RAM, NixOS) with \texttt{RUSTFLAGS="-C target-cpu=native"} and release-mode compilation. Binius proofs are real cryptographic proofs generated by the Binius64 library~\cite{binius64} with Blake3 Merkle commitments and FRI verification. Winterfell estimates are based on the known $\sim$50\textmu s/constraint proving performance of Winterfell 0.13.1.
+All benchmarks run on a single machine (AMD Ryzen, 32GB RAM, NixOS) with \texttt{RUSTFLAGS="-C target-cpu=native"} and release-mode compilation.
+
+\textbf{Binius proofs are real}: generated by Binius64~\cite{binius64} with Blake3 Merkle commitments and FRI verification. Every proof is cryptographically generated and verified---not mocked or estimated.
+
+\textbf{Winterfell baseline is measured}: We implement a real Winterfell STARK circuit (HealthRangeAir) that performs 32-bit decomposition with binary checks and range verification. Proving takes 27.19~ms averaged over 10 iterations. The extrapolation to 16,384-bit XOR uses the measured per-constraint cost.
 
 \subsection{HDC XOR Binding (16,384 bits)}
 
@@ -197,15 +229,18 @@ Table~\ref{tab:xor_results} shows the benchmark results for proving XOR binding 
 \centering
 \caption{HDC XOR Binding Proof: Binius vs.\ Prime-Field STARK}
 \label{tab:xor_results}
-\begin{tabular}{@{}lrr@{}}
+\begin{tabular}{@{}lrrr@{}}
 \toprule
-\textbf{Metric} & \textbf{Binius (GF(2))} & \textbf{Prime STARK (est.)} \\
+\textbf{Metric} & \textbf{Binius} & \textbf{Winterfell} & \textbf{Evidence} \\
+ & \textbf{(16,384-bit)} & \textbf{(32-bit $\to$ extrap.)} & \\
 \midrule
-Non-linear constraints & \textbf{256} & 49,152 \\
-Prover time & \textbf{430 ms} & $\sim$2,458 ms \\
-Verifier time & \textbf{10.4 ms} & $\sim$98 ms \\
-Proof size & \textbf{75 KB} & $\sim$195 KB \\
+Non-linear constr. & \textbf{256} & 49,152$^\dagger$ & algebraic \\
+Prover time & \textbf{430 ms} & 27.19 ms (32-bit) & measured \\
+Verifier time & \textbf{10.4 ms} & 4.48 ms (32-bit) & measured \\
+Proof size & \textbf{75 KB} & 7.7 KB (32-bit) & measured \\
 \bottomrule
+\multicolumn{4}{l}{\footnotesize $^\dagger$Extrapolated: 3 constraints/bit $\times$ 16,384 bits.} \\
+\multicolumn{4}{l}{\footnotesize Binius: real 16,384-bit proof. Winterfell: real 32-bit proof.}
 \end{tabular}
 \end{table}
 
@@ -251,7 +286,7 @@ To validate the real-proof infrastructure, we also implemented Winterfell STARK 
 \section{Discussion}
 % ============================================================================
 
-\textbf{The Triple Stack.} Our results suggest a unified privacy-computation-integrity stack where HDC operations are simultaneously cheap under (1) FHE (XOR-only, no multiplications---1.2$\times$ overhead vs.\ 10,000$\times$ for lattice FHE), (2) Binius STARKs (XOR = free), and (3) plaintext execution (bitwise ops, nanoseconds). This ``triple alignment'' in $\mathrm{GF}(2)$ is unique to HDC among representation systems.
+\textbf{The Triple Stack (Speculative).} HDC operations are simultaneously cheap under (1) FHE (XOR-only, no multiplications), (2) Binius STARKs (XOR = free), and (3) plaintext (nanoseconds). This alignment in $\mathrm{GF}(2)$ is suggestive but unverified---a prototype combining all three layers is needed before claiming a practical triple stack.
 
 \textbf{Limitations.} Our Winterfell comparison uses performance estimates rather than measured values for the full 49,152-constraint AIR. The Binius proofs are real. The CfC benchmark uses random sigmoid values rather than neurally computed ones; production deployment would include sigmoid lookup table constraints.
 
