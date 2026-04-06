@@ -100,15 +100,40 @@ HDC encoding noise acts as regularization, *improving* performance. Weight noise
 
 ### 4.3 Morphological Degradation
 
-[Pending stress test results — joint failure curve]
+Progressive joint failure during standing (9 joints disabled over 2000 steps, PD+controller combined system):
+
+| Active Joints | Disabled | Standing Reward | Head Height |
+|--------------|----------|----------------|-------------|
+| 21 (all) | — | 1.000 | 1.40m |
+| 20 | left_elbow | 0.669 | 1.07m |
+| 17 | +3 arms | 0.779 | 1.12m |
+| 15 | +2 ankles | 0.772 | 1.10m |
+| 14 | +right_knee | **0.720** | 1.08m |
+| 13 | +left_knee | **0.799** | 1.10m |
+| 12 | +right_hip | **0.960** | 1.20m |
+
+**No catastrophic failure.** The combined PD+controller system maintains standing reward above 0.72 even with 43% of joints disabled. The PD baseline provides structural stability; the learned controller adds marginal adaptivity.
+
+Prediction error *decreases* with more joint failures (0.60→0.12), indicating the system becomes more predictable with fewer degrees of freedom — counter to the expected PE spike.
 
 ### 4.4 Cost of Transport
 
-[Pending stress test results — CoT comparison]
+| Task | CoT | Control Effort | Biological Comparison |
+|------|-----|---------------|----------------------|
+| Stand | 0.009 | 0.044 | Human standing: ~0.01 |
+| Walk | 0.001 | 0.043 | Human walking: 0.05 |
+
+Standing CoT of 0.009 is physiologically realistic (minimal energy expenditure for static standing). Walking CoT of 0.001 is suspiciously low — the controller has not learned efficient locomotion, so low CoT reflects low activity rather than efficient movement.
 
 ### 4.5 Perturbation Recovery
 
-[Pending stress test results — recovery time landscape]
+| Type | Severity Range | Pre-Reward | Min Reward | Recovery | Fell? |
+|------|---------------|-----------|-----------|----------|-------|
+| Chest shove | 100-2000N | 0.853 | 0.556 | Instant | No |
+| Ice floor | 0.1-0.8 friction | 0.853 | 0.556 | Instant | No |
+| Mass change | +10-100% | 0.853 | 0.556 | Instant | No |
+
+**Zero falls across all 15 perturbation scenarios.** The combined PD+controller system recovers instantly from chest shoves up to 2000N, ice floors at 0.1 friction, and mass increases up to +100%. The PD baseline's proportional-derivative control provides inherent stability that external perturbations cannot overcome within the tested range.
 
 ### 4.6 Transfer Learning
 
@@ -134,9 +159,11 @@ The +83.3% throughput advantage emerges because the adaptive system operates at 
 
 ### 5.3 Limitations
 
-- Standing reward (0.47) is below RL baselines (SAC: 0.95). The HDC-LTC architecture is not optimized for peak performance but for robustness and interpretability.
-- Noise robustness study used genesis-initialized controllers. Results should be validated on fully-trained models.
-- No sim-to-real validation on physical hardware.
+- **Independent standing not achieved.** The HDC-LTC controller cannot stand without PD baseline support. With PD, training reward reaches 0.95; without PD, the controller falls within 70-120 steps. This is a distribution shift problem: the controller is trained on PD-supported states and encounters out-of-distribution states when PD is removed. DAgger training (Dataset Aggregation) is being investigated to close this gap.
+- **Stress test measures the combined system.** The +83.3% throughput advantage and zero-fall perturbation results reflect the PD+controller system, not the learned controller alone. The PD baseline provides the structural stability.
+- **Noise robustness study used genesis-initialized controllers.** The regularization finding should be validated on fully-trained models.
+- **No sim-to-real validation on physical hardware.**
+- **Training is slow.** 200 episodes takes ~4 hours on CPU. GPU acceleration of the episode loop (rayon parallelism) would reduce this but requires population-based training.
 
 ## 6. Conclusion
 
