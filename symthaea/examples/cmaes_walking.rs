@@ -214,7 +214,7 @@ fn evaluate_walking(
     controller.set_output_projection(&weights, &bias);
 
     let mut encoder = HumanoidHdcEncoder::new(genesis, config.num_levels);
-    let mut sim = SimpleHumanoidSimulator::new();
+    let mut sim = SimpleHumanoidSimulator::new().with_ground_contact(true);
 
     let mut total_reward = 0.0;
     let mut total_speed = 0.0;
