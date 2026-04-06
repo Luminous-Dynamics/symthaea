@@ -2,46 +2,35 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 use leptos::prelude::*;
-use mycelix_leptos_core::ConnectionStatus;
-use mycelix_leptos_core::holochain_provider;
-use mycelix_leptos_core::consciousness::use_consciousness;
 use crate::context::use_finance_context;
 
 #[component]
 pub fn HomePage() -> impl IntoView {
-    let hc = holochain_provider::use_holochain();
-    let consciousness = use_consciousness();
     let ctx = use_finance_context();
 
     view! {
         <div class="page-home">
             <h1>"Finance"</h1>
-            <p class="subtitle">"Welcome to the Finance cluster."</p>
+            <p class="subtitle">"Three currencies, one commons."</p>
 
-            <div class="dashboard-grid">
-                <div class="dash-card">
-                    <span class="dash-label">"Status"</span>
-                    <span class="dash-value">
-                        {move || match hc.status.get() {
-                            ConnectionStatus::Connected => "Connected",
-                            ConnectionStatus::Mock => "Mock mode",
-                            ConnectionStatus::Connecting => "Connecting...",
-                            ConnectionStatus::Disconnected => "Disconnected",
-                        }}
-                    </span>
+            <div class="currency-grid">
+                <div class="currency-card tend-card">
+                    <span class="currency-icon">"🤝"</span>
+                    <span class="currency-name">"TEND"</span>
+                    <span class="currency-value">{move || format!("{} hours", ctx.tend_balance.get().balance)}</span>
+                    <span class="currency-desc">{move || ctx.tend_balance.get().equilibrium_label()}</span>
                 </div>
-                <div class="dash-card">
-                    <span class="dash-label">"Tier"</span>
-                    <span class="dash-value">
-                        {move || consciousness.tier.get().label()}
-                    </span>
+                <div class="currency-card sap-card">
+                    <span class="currency-icon">"💧"</span>
+                    <span class="currency-name">"SAP"</span>
+                    <span class="currency-value">{move || format!("{:.2}", ctx.sap_balance.get().display_balance())}</span>
+                    <span class="currency-desc">"transferable with 2%/yr demurrage"</span>
                 </div>
-                <div class="dash-card">
-                    <span class="dash-label">"Items"</span>
-                    <span class="dash-value">
-                        {move || ctx.items.get().len().to_string()}
-                    </span>
-                    <span class="dash-sub">"mock data"</span>
+                <div class="currency-card mycel-card">
+                    <span class="currency-icon">"🍄"</span>
+                    <span class="currency-name">"MYCEL"</span>
+                    <span class="currency-value">{move || format!("{:.2}", ctx.mycel_score.get().score)}</span>
+                    <span class="currency-desc">{move || ctx.mycel_score.get().tier.label()}</span>
                 </div>
             </div>
         </div>

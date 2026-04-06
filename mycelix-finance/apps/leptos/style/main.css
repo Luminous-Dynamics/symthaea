@@ -1,7 +1,5 @@
 /* Finance — Mycelix Cluster Frontend */
-
-/* Import shared design system */
-@import "../../../../crates/mycelix-leptos-core/style/base.css";
+/* base.css loaded via index.html <link data-trunk> */
 
 /* ================================================================
    CLUSTER ACCENT OVERRIDE
@@ -66,6 +64,99 @@
     color: var(--text-muted);
     margin-top: var(--space-xs);
 }
+
+/* ================================================================
+   CURRENCY CARDS
+   ================================================================ */
+.currency-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-md); max-width: 800px; margin: 0 auto; }
+.currency-card { display: flex; flex-direction: column; align-items: center; padding: var(--space-lg); border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--bg-raised); text-align: center; }
+.currency-icon { font-size: 2rem; margin-bottom: var(--space-sm); }
+.currency-name { font-size: var(--text-xs); text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-muted); }
+.currency-value { font-size: var(--text-2xl); font-weight: 700; color: var(--text-primary); margin: var(--space-xs) 0; }
+.currency-desc { font-size: var(--text-xs); color: var(--text-muted); }
+.tend-card { border-color: #4ade8040; }
+.sap-card { border-color: #c4956440; }
+.mycel-card { border-color: #a78bfa40; }
+
+@media (max-width: 720px) { .currency-grid { grid-template-columns: 1fr; } }
+
+/* ================================================================
+   TEND
+   ================================================================ */
+.tend-balance-display { text-align: center; margin-bottom: var(--space-xl); }
+.tend-balance { font-size: 3rem; font-weight: 700; }
+.tend-positive { color: #4ade80; }
+.tend-negative { color: #f87171; }
+.tend-equilibrium { color: var(--text-muted); }
+.tend-label { display: block; font-size: var(--text-sm); color: var(--text-muted); margin-top: var(--space-xs); }
+
+.exchange-list { max-width: 600px; margin: 0 auto; }
+.exchange-card { padding: var(--space-md); border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--bg-raised); margin-bottom: var(--space-sm); }
+.exchange-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-xs); }
+.exchange-hours { font-size: var(--text-lg); font-weight: 600; color: #4ade80; }
+.exchange-desc { color: var(--text-primary); margin: 0 0 var(--space-xs); }
+.exchange-category { font-size: var(--text-xs); color: var(--text-muted); }
+
+/* ================================================================
+   SAP
+   ================================================================ */
+.sap-balance-display { text-align: center; margin-bottom: var(--space-xl); }
+.sap-amount { font-size: 2.5rem; font-weight: 700; color: #c49564; display: block; }
+.sap-demurrage { font-size: var(--text-sm); color: var(--text-muted); display: block; margin-top: var(--space-xs); }
+
+.payment-list { max-width: 600px; margin: 0 auto; }
+.payment-card { padding: var(--space-md); border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--bg-raised); margin-bottom: var(--space-sm); }
+.payment-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-xs); }
+.payment-amount { font-weight: 600; color: var(--text-primary); }
+.payment-to { font-size: var(--text-xs); color: var(--text-muted); display: block; }
+.payment-memo { font-size: var(--text-sm); color: var(--text-secondary); display: block; margin-top: var(--space-xs); }
+
+/* ================================================================
+   MYCEL
+   ================================================================ */
+.mycel-display { text-align: center; margin-bottom: var(--space-xl); }
+.mycel-score { font-size: 3rem; font-weight: 700; display: block; }
+.mycel-newcomer { color: #6b7280; }
+.mycel-apprentice { color: #60a5fa; }
+.mycel-member { color: #34d399; }
+.mycel-steward { color: #a78bfa; }
+.mycel-elder { color: #fbbf24; }
+.mycel-tier { display: block; font-size: var(--text-sm); color: var(--text-muted); margin-top: var(--space-xs); }
+.mycel-breakdown { max-width: 600px; margin: 0 auto; }
+.mycel-months { display: block; text-align: center; font-size: var(--text-sm); color: var(--text-muted); margin-top: var(--space-md); }
+
+/* ================================================================
+   RECOGNITION / STAKING / ORACLE
+   ================================================================ */
+.recognition-list, .stake-list { max-width: 600px; margin: 0 auto; }
+.recognition-card, .stake-card { padding: var(--space-md); border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--bg-raised); margin-bottom: var(--space-sm); }
+.recog-header, .stake-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-xs); }
+.recog-type { font-weight: 600; color: var(--primary); }
+.recog-weight { font-size: var(--text-sm); color: var(--text-muted); }
+.recog-from, .recog-cycle { font-size: var(--text-xs); color: var(--text-muted); display: block; }
+.stake-amount { font-weight: 600; color: var(--text-primary); }
+.stake-weight { font-size: var(--text-sm); color: var(--text-muted); }
+
+.oracle-normal { color: #4ade80; }
+.oracle-elevated { color: #fbbf24; }
+.oracle-high { color: #f97316; }
+.oracle-emergency { color: #ef4444; }
+
+/* ================================================================
+   PROFILE / SECTIONS
+   ================================================================ */
+.page-profile { max-width: 800px; margin: 0 auto; }
+.profile-section { margin-bottom: var(--space-2xl); }
+.profile-section h2 { font-size: var(--text-lg); color: var(--text-primary); margin: 0 0 var(--space-md); }
+.accent { color: var(--primary); }
+
+.summary-bar { display: flex; gap: var(--space-lg); justify-content: center; margin-bottom: var(--space-xl); flex-wrap: wrap; }
+.summary-item { text-align: center; }
+.summary-label { display: block; font-size: var(--text-xs); color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; }
+.summary-value { display: block; font-size: var(--text-xl); font-weight: 700; color: var(--text-primary); }
+
+.status-footer { display: block; text-align: center; margin-top: var(--space-xl); font-size: var(--text-xs); color: var(--text-muted); }
+.no-data { color: var(--text-muted); text-align: center; padding: var(--space-lg); }
 
 /* ================================================================
    RESPONSIVE
