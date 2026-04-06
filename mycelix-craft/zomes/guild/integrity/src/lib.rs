@@ -379,4 +379,203 @@ mod tests {
             );
         }
     }
+
+    // ---- Validation tests ----
+
+    fn valid_guild() -> Guild {
+        Guild {
+            name: "Rust Developers".to_string(),
+            description: "Guild for Rust practitioners".to_string(),
+            professional_domain: "software_engineering".to_string(),
+            consciousness_minimum_permille: 300,
+            parent_guild: None,
+            bioregion: Some("global".to_string()),
+            governance_model: GuildGovernanceModel::Consensus,
+            created_at: Timestamp::from_micros(0),
+        }
+    }
+
+    #[test]
+    fn valid_guild_passes() {
+        assert!(matches!(
+            validate_guild(&valid_guild()),
+            Ok(ValidateCallbackResult::Valid)
+        ));
+    }
+
+    #[test]
+    fn empty_guild_name_rejected() {
+        let mut g = valid_guild();
+        g.name = String::new();
+        assert!(matches!(
+            validate_guild(&g),
+            Ok(ValidateCallbackResult::Invalid(_))
+        ));
+    }
+
+    #[test]
+    fn guild_name_too_long_rejected() {
+        let mut g = valid_guild();
+        g.name = "x".repeat(201);
+        assert!(matches!(
+            validate_guild(&g),
+            Ok(ValidateCallbackResult::Invalid(_))
+        ));
+    }
+
+    #[test]
+    fn guild_description_too_long_rejected() {
+        let mut g = valid_guild();
+        g.description = "x".repeat(2001);
+        assert!(matches!(
+            validate_guild(&g),
+            Ok(ValidateCallbackResult::Invalid(_))
+        ));
+    }
+
+    #[test]
+    fn empty_domain_rejected() {
+        let mut g = valid_guild();
+        g.professional_domain = String::new();
+        assert!(matches!(
+            validate_guild(&g),
+            Ok(ValidateCallbackResult::Invalid(_))
+        ));
+    }
+
+    #[test]
+    fn consciousness_over_1000_rejected() {
+        let mut g = valid_guild();
+        g.consciousness_minimum_permille = 1001;
+        assert!(matches!(
+            validate_guild(&g),
+            Ok(ValidateCallbackResult::Invalid(_))
+        ));
+    }
+
+    #[test]
+    fn membership_role_consciousness_enforced() {
+        // Observer needs 100, so 50 should fail
+        let m = GuildMembership {
+            guild_id: ActionHash::from_raw_36(vec![0; 36]),
+            member: AgentPubKey::from_raw_36(vec![0; 36]),
+            role: GuildRole::Observer,
+            joined_at: Timestamp::from_micros(0),
+            last_role_change: Timestamp::from_micros(0),
+            consciousness_at_join_permille: 50,
+        };
+        assert!(matches!(
+            validate_membership(&m),
+            Ok(ValidateCallbackResult::Invalid(_))
+        ));
+    }
+
+    #[test]
+    fn membership_sufficient_consciousness_passes() {
+        let m = GuildMembership {
+            guild_id: ActionHash::from_raw_36(vec![0; 36]),
+            member: AgentPubKey::from_raw_36(vec![0; 36]),
+            role: GuildRole::Apprentice,
+            joined_at: Timestamp::from_micros(0),
+            last_role_change: Timestamp::from_micros(0),
+            consciousness_at_join_permille: 400,
+        };
+        assert!(matches!(
+            validate_membership(&m),
+            Ok(ValidateCallbackResult::Valid)
+        ));
+    }
+
+    #[test]
+    fn master_needs_750_consciousness() {
+        let m = GuildMembership {
+            guild_id: ActionHash::from_raw_36(vec![0; 36]),
+            member: AgentPubKey::from_raw_36(vec![0; 36]),
+            role: GuildRole::Master,
+            joined_at: Timestamp::from_micros(0),
+            last_role_change: Timestamp::from_micros(0),
+            consciousness_at_join_permille: 700,
+        };
+        assert!(matches!(
+            validate_membership(&m),
+            Ok(ValidateCallbackResult::Invalid(_))
+        ));
+    }
+
+    #[test]
+    fn certification_path_needs_name() {
+        let path = CertificationPath {
+            guild_id: ActionHash::from_raw_36(vec![0; 36]),
+            name: String::new(),
+            description: "test".to_string(),
+            requirements: vec![CertificationRequirement {
+                description: "Know Rust".to_string(),
+                credential_type: Some("rust".to_string()),
+                minimum_vitality_permille: 800,
+                evidence_required: true,
+            }],
+            required_assessors: 2,
+            minimum_role: GuildRole::Apprentice,
+            created_at: Timestamp::from_micros(0),
+        };
+        assert!(matches!(
+            validate_certification_path(&path),
+            Ok(ValidateCallbackResult::Invalid(_))
+        ));
+    }
+
+    #[test]
+    fn certification_path_needs_requirements() {
+        let path = CertificationPath {
+            guild_id: ActionHash::from_raw_36(vec![0; 36]),
+            name: "Rust Developer L1".to_string(),
+            description: "test".to_string(),
+            requirements: vec![],
+            required_assessors: 2,
+            minimum_role: GuildRole::Apprentice,
+            created_at: Timestamp::from_micros(0),
+        };
+        assert!(matches!(
+            validate_certification_path(&path),
+            Ok(ValidateCallbackResult::Invalid(_))
+        ));
+    }
+
+    #[test]
+    fn certification_path_needs_assessors() {
+        let path = CertificationPath {
+            guild_id: ActionHash::from_raw_36(vec![0; 36]),
+            name: "Rust Developer L1".to_string(),
+            description: "test".to_string(),
+            requirements: vec![CertificationRequirement {
+                description: "Know Rust".to_string(),
+                credential_type: None,
+                minimum_vitality_permille: 500,
+                evidence_required: false,
+            }],
+            required_assessors: 0,
+            minimum_role: GuildRole::Apprentice,
+            created_at: Timestamp::from_micros(0),
+        };
+        assert!(matches!(
+            validate_certification_path(&path),
+            Ok(ValidateCallbackResult::Invalid(_))
+        ));
+    }
+
+    #[test]
+    fn governance_model_serialization() {
+        let json = serde_json::to_string(&GuildGovernanceModel::SociocraticCircle).unwrap();
+        let deserialized: GuildGovernanceModel = serde_json::from_str(&json).unwrap();
+        assert_eq!(deserialized, GuildGovernanceModel::SociocraticCircle);
+    }
+
+    #[test]
+    fn guild_role_serialization_roundtrip() {
+        for role in [GuildRole::Observer, GuildRole::Apprentice, GuildRole::Journeyman, GuildRole::Master, GuildRole::Elder] {
+            let json = serde_json::to_string(&role).unwrap();
+            let deserialized: GuildRole = serde_json::from_str(&json).unwrap();
+            assert_eq!(role, deserialized);
+        }
+    }
 }
