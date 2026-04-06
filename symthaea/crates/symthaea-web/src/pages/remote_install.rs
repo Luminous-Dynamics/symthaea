@@ -52,6 +52,47 @@ fn load_from_session(key: &str) -> Option<String> {
 }
 
 // ═══════════════════════════════════════════════════════
+// Typed relay messages (match server-side RelayMessage)
+// ═══════════════════════════════════════════════════════
+
+/// Typed relay response — deserialized from WebSocket JSON.
+/// Eliminates ad-hoc js_sys::Reflect::get() parsing.
+#[derive(serde::Deserialize, Debug, Clone)]
+pub struct RelayResponse {
+    #[serde(rename = "type")]
+    pub msg_type: String,
+    #[serde(default)]
+    pub data: Option<String>,
+    #[serde(default)]
+    pub stream: Option<String>,
+    #[serde(default)]
+    pub code: Option<i64>,
+    #[serde(default)]
+    pub message: Option<String>,
+    #[serde(default)]
+    pub stage: Option<String>,
+    #[serde(default)]
+    pub percentage: Option<u8>,
+    #[serde(default)]
+    pub phase: Option<String>,
+    // Hardware probe fields
+    #[serde(default)]
+    pub cpu: Option<String>,
+    #[serde(default)]
+    pub ram_gb: Option<f64>,
+    #[serde(default)]
+    pub gpu: Option<String>,
+    #[serde(default)]
+    pub disks: Option<Vec<serde_json::Value>>,
+    // Backup fields
+    #[serde(default)]
+    pub detail: Option<String>,
+    // Error
+    #[serde(default)]
+    pub error: Option<String>,
+}
+
+// ═══════════════════════════════════════════════════════
 // State types
 // ═══════════════════════════════════════════════════════
 
@@ -444,8 +485,12 @@ pub fn RemoteInstallPanel(
         let ws_for_msg = ws.clone();
         let onmessage = wasm_bindgen::closure::Closure::<dyn Fn(web_sys::MessageEvent)>::new(move |e: web_sys::MessageEvent| {
             let Some(text) = e.data().as_string() else { return };
+            // Parse as typed RelayResponse first, fall back to Value for complex nested data
             let Ok(msg) = serde_json::from_str::<serde_json::Value>(&text) else { return };
-            let msg_type = msg.get("type").and_then(|v| v.as_str()).unwrap_or("");
+            let typed: Option<RelayResponse> = serde_json::from_str(&text).ok();
+            let msg_type = typed.as_ref().map(|t| t.msg_type.as_str()).unwrap_or(
+                msg.get("type").and_then(|v| v.as_str()).unwrap_or("")
+            );
 
             match msg_type {
                 "connected" => {
@@ -558,17 +603,20 @@ pub fn RemoteInstallPanel(
                 }
 
                 "progress" => {
-                    let stage = msg.get("stage").and_then(|v| v.as_str()).unwrap_or("").to_string();
-                    let pct = msg.get("percentage").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
-                    let phase = msg.get("phase").and_then(|v| v.as_str()).unwrap_or("").to_string();
-                    let message = msg.get("message").and_then(|v| v.as_str()).unwrap_or("").to_string();
+                    let t = typed.as_ref();
+                    let stage = t.and_then(|t| t.stage.clone()).unwrap_or_default();
+                    let pct = t.and_then(|t| t.percentage).unwrap_or(0) as u32;
+                    let phase = t.and_then(|t| t.phase.clone()).unwrap_or_default();
+                    let message = t.and_then(|t| t.message.clone()).unwrap_or_default();
                     progress.set(InstallProgress { stage: stage.clone(), percentage: pct, phase, message });
                     set_install_log.update(|l| l.push(format!("[{}%] {}", pct, stage)));
                     persist_log();
                 }
 
                 "output" => {
-                    if let Some(line) = msg.get("data").and_then(|v| v.as_str()) {
+                    let line_opt = typed.as_ref().and_then(|t| t.data.as_deref())
+                        .or_else(|| msg.get("data").and_then(|v| v.as_str()));
+                    if let Some(line) = line_opt {
                         if !line.trim().is_empty() {
                             set_install_log.update(|l| {
                                 l.push(line.to_string());
@@ -581,7 +629,7 @@ pub fn RemoteInstallPanel(
                 }
 
                 "exit" => {
-                    let code = msg.get("code").and_then(|v| v.as_i64()).unwrap_or(-1);
+                    let code = typed.as_ref().and_then(|t| t.code).unwrap_or(-1);
                     if code == 0 {
                         relay_state.set(RelayState::Complete);
                         progress.set(InstallProgress {

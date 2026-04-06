@@ -109,6 +109,46 @@ pub fn token_eq(a: &str, b: &str) -> bool {
     result == 0
 }
 
+/// Validate a Nix expression by running `nix eval --pure-eval --expr` on it.
+///
+/// Pure eval disables network access, filesystem access outside the Nix store,
+/// and `builtins.exec` — preventing malicious Nix expressions from exfiltrating
+/// data or executing commands during evaluation.
+///
+/// Returns Ok(()) if the expression parses and evaluates without error,
+/// or Err with the nix error output if evaluation fails.
+///
+/// Note: This is a best-effort check. Some valid NixOS module patterns may
+/// fail pure eval (e.g., those that reference `<nixpkgs>`). Use alongside
+/// rnix-parser for syntax validation.
+#[cfg(not(target_arch = "wasm32"))]
+pub fn validate_nix_pure_eval(nix_content: &str) -> Result<(), String> {
+    use std::process::Command;
+
+    // Wrap in a trivial evaluator — we just want to check it parses
+    let expr = format!(
+        "let config = {{}}; pkgs = {{}}; lib = {{}}; in builtins.tryEval ({})",
+        nix_content
+    );
+
+    let output = Command::new("nix")
+        .args(["eval", "--pure-eval", "--expr", &expr])
+        .output()
+        .map_err(|e| format!("Failed to run nix eval: {} (is nix installed?)", e))?;
+
+    if output.status.success() {
+        Ok(())
+    } else {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        // Extract just the error message, not the full trace
+        let msg = stderr
+            .lines()
+            .find(|l| l.contains("error:"))
+            .unwrap_or("unknown evaluation error");
+        Err(format!("Nix pure-eval failed: {}", msg))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

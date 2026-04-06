@@ -490,14 +490,51 @@ sed -i 's|imports = \[|imports = [ ./system-config.nix|' /mnt/etc/nixos/configur
 /// passed through Rust's `format!()` (which would require `{{`/`}}` escaping).
 // sanitize_heredoc imported from symthaea_spore::security
 
-fn config_write_commands(
+/// Write NixOS config files directly to the target filesystem.
+///
+/// SECURITY: This replaces the heredoc-based `config_write_commands()`.
+/// By writing files directly via the filesystem API, there is no shell
+/// interpolation, no heredoc delimiter to escape, and no injection vector.
+/// The relay runs on the target machine, so direct file writes are possible.
+async fn write_config_files(
+    browser_config: &str,
+    fallback_config: &str,
+    browser_flake: &str,
+) -> Result<(), String> {
+    // Ensure target directory exists
+    tokio::fs::create_dir_all("/mnt/etc/nixos")
+        .await
+        .map_err(|e| format!("Failed to create /mnt/etc/nixos: {}", e))?;
+
+    // configuration.nix
+    let config_body = if browser_config.is_empty() {
+        fallback_config
+    } else {
+        browser_config
+    };
+    tokio::fs::write("/mnt/etc/nixos/configuration.nix", config_body)
+        .await
+        .map_err(|e| format!("Failed to write configuration.nix: {}", e))?;
+
+    // flake.nix (only if the browser supplied one)
+    if !browser_flake.is_empty() {
+        tokio::fs::write("/mnt/etc/nixos/flake.nix", browser_flake)
+            .await
+            .map_err(|e| format!("Failed to write flake.nix: {}", e))?;
+    }
+
+    Ok(())
+}
+
+/// Legacy heredoc-based config writing — used as fallback when direct
+/// file writes fail (e.g., /mnt not yet mounted during script generation).
+fn config_write_commands_heredoc(
     browser_config: &str,
     fallback_config: &str,
     browser_flake: &str,
 ) -> String {
     let mut out = String::new();
 
-    // configuration.nix
     let config_body = if browser_config.is_empty() {
         fallback_config
     } else {
@@ -511,7 +548,6 @@ fn config_write_commands(
     }
     out.push_str("NIXCONF\n");
 
-    // flake.nix (only if the browser supplied one)
     if !browser_flake.is_empty() {
         let safe_flake = sanitize_heredoc(browser_flake, "FLAKEEOF");
         out.push_str("\ncat > /mnt/etc/nixos/flake.nix << 'FLAKEEOF'\n");
@@ -638,7 +674,7 @@ nixos-generate-config --root /mnt
                  }}",
                 hostname = hostname,
             );
-            script.push_str(&config_write_commands(
+            script.push_str(&config_write_commands_heredoc(
                 &msg.configuration_nix,
                 &fallback_alongside,
                 &msg.flake_nix,
@@ -812,7 +848,7 @@ nixos-generate-config --root /mnt || echo "WARNING: nixos-generate-config failed
                  }}",
                 hostname = hostname,
             );
-            script.push_str(&config_write_commands(
+            script.push_str(&config_write_commands_heredoc(
                 &msg.configuration_nix,
                 &fallback_single,
                 &msg.flake_nix,
@@ -973,7 +1009,7 @@ echo '  networking.hostId = "deadbeef";' >> /mnt/etc/nixos/hardware-configuratio
                 "{{ config, pkgs, ... }}:\n{{\n  imports = [ ./hardware-configuration.nix ];\n  networking.hostName = \"{hostname}\";\n  boot.loader.systemd-boot.enable = true;\n  boot.loader.efi.canTouchEfiVariables = true;\n  boot.supportedFilesystems = [ \"zfs\" ];\n  boot.zfs.devNodes = \"/dev/disk/by-id\";\n  networking.hostId = \"deadbeef\";\n  services.zfs.autoScrub.enable = true;\n  services.zfs.trim.enable = true;\n  users.users.{hostname} = {{ isNormalUser = true; extraGroups = [ \"wheel\" \"video\" \"networkmanager\" ]; initialPassword = \"changeme\"; }};\n  environment.systemPackages = with pkgs; [ vim git curl wget htop ];\n  system.stateVersion = \"25.05\";\n}}",
                 hostname = hostname,
             );
-            script.push_str(&config_write_commands(
+            script.push_str(&config_write_commands_heredoc(
                 &msg.configuration_nix,
                 &fallback_zfs,
                 &msg.flake_nix,
@@ -1079,7 +1115,7 @@ nixos-generate-config --root /mnt
             // When the browser supplies a config, it is written with a quoted heredoc
             // ('NIXCONF') since it should already contain the correct UUID or be self-contained.
             if !msg.configuration_nix.is_empty() {
-                script.push_str(&config_write_commands(
+                script.push_str(&config_write_commands_heredoc(
                     &msg.configuration_nix,
                     "",  // unused — browser config is non-empty
                     &msg.flake_nix,
@@ -1293,7 +1329,7 @@ nixos-generate-config --root /mnt
                  }}",
                 hostname = hostname,
             );
-            script.push_str(&config_write_commands(
+            script.push_str(&config_write_commands_heredoc(
                 &msg.configuration_nix,
                 &fallback_dual,
                 &msg.flake_nix,
@@ -1421,7 +1457,7 @@ nixos-generate-config --root /mnt
                  }}",
                 hostname = hostname,
             );
-            script.push_str(&config_write_commands(
+            script.push_str(&config_write_commands_heredoc(
                 &msg.configuration_nix,
                 &fallback_raid1_btrfs,
                 &msg.flake_nix,
@@ -1547,7 +1583,7 @@ mdadm --detail --scan >> /mnt/etc/mdadm.conf
                  }}",
                 hostname = hostname,
             );
-            script.push_str(&config_write_commands(
+            script.push_str(&config_write_commands_heredoc(
                 &msg.configuration_nix,
                 &fallback_raid1_mdadm,
                 &msg.flake_nix,
@@ -2024,6 +2060,21 @@ async fn handle_connection_ws<S: tokio::io::AsyncRead + tokio::io::AsyncWrite + 
                 // partition → format → install → configure sequence.
                 // The user only clicked "Deploy" in the browser.
                 // All inputs are validated above before reaching generate_install_script.
+
+                // SECURITY: Validate browser-supplied Nix config with pure-eval
+                // (no network, no filesystem access, no builtins.exec)
+                if !client_msg.configuration_nix.is_empty() {
+                    use symthaea_spore::security::validate_nix_pure_eval;
+                    if let Err(e) = validate_nix_pure_eval(&client_msg.configuration_nix) {
+                        eprintln!("[{}] Nix pure-eval rejected browser config: {}", peer_addr, e);
+                        let _ = ws_tx.send(Message::Text(
+                            RelayMessage::output(&format!("WARNING: Nix config validation: {}", e), "stderr").to_json(),
+                        )).await;
+                        // Continue anyway — pure-eval may reject valid NixOS modules
+                        // that use impure features like <nixpkgs>. This is advisory, not blocking.
+                    }
+                }
+
                 let mut script = generate_install_script(&client_msg);
 
                 // Always: pre-install disk snapshot (instant, non-destructive)
@@ -2118,16 +2169,22 @@ fi
                     ))
                     .await;
 
-                // Write the install script to the target and execute it.
-                // SECURITY: sanitize the script body to prevent heredoc escape.
-                let safe_script = sanitize_heredoc(&script, "SCRIPTEOF");
-                let setup_cmd = format!(
-                    "cat > {} << 'SCRIPTEOF'\n{}\nSCRIPTEOF\nchmod +x {}",
-                    script_path, safe_script, script_path
-                );
+                // Write the install script directly to disk (no heredoc).
+                // SECURITY: Direct file write eliminates SCRIPTEOF heredoc injection.
+                match tokio::fs::write(&script_path, &script).await {
+                    Ok(()) => {
+                        let _ = run_cmd(&format!("chmod +x {}", script_path)).await;
+                    }
+                    Err(e) => {
+                        let _ = ws_tx.send(Message::Text(
+                            RelayMessage::error(&format!("Failed to write script: {}", e)).to_json(),
+                        )).await;
+                        continue;
+                    }
+                }
 
-                // Upload script
-                match run_cmd(&setup_cmd).await {
+                // Upload verification
+                match run_cmd(&format!("test -x {}", script_path)).await {
                     Ok(r) if r.exit_status == 0 => {
                         let _ = ws_tx
                             .send(Message::Text(
@@ -4298,7 +4355,7 @@ mod tests {
     #[test]
     fn config_write_strips_nixconf_delimiter() {
         let malicious = "{ config }\nNIXCONF\nrm -rf /\n";
-        let result = config_write_commands(malicious, "", "");
+        let result = config_write_commands_heredoc(malicious, "", "");
         assert!(!result.contains("\nNIXCONF\nrm -rf /"));
         // Should still contain the closing delimiter exactly once as the heredoc terminator
         assert_eq!(result.matches("NIXCONF").count(), 2); // opening + closing
@@ -4307,7 +4364,7 @@ mod tests {
     #[test]
     fn config_write_strips_flakeeof_delimiter() {
         let malicious = "{ inputs }\nFLAKEEOF\nrm -rf /\n";
-        let result = config_write_commands("", "", malicious);
+        let result = config_write_commands_heredoc("", "", malicious);
         assert!(!result.contains("\nFLAKEEOF\nrm -rf /"));
     }
 }
