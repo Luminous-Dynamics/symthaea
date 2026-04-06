@@ -4,46 +4,46 @@
 use leptos::prelude::*;
 use mycelix_leptos_core::ConnectionStatus;
 use mycelix_leptos_core::holochain_provider;
-use mycelix_leptos_core::consciousness::use_consciousness;
 use crate::context::use_energy_context;
 
 #[component]
 pub fn HomePage() -> impl IntoView {
     let hc = holochain_provider::use_holochain();
-    let consciousness = use_consciousness();
     let ctx = use_energy_context();
+
+    let total_mw = move || {
+        ctx.projects.get().iter().map(|p| p.capacity_mw).sum::<f64>()
+    };
 
     view! {
         <div class="page-home">
             <h1>"Energy"</h1>
-            <p class="subtitle">"Welcome to the Energy cluster."</p>
+            <p class="subtitle">"Renewable energy projects, P2P trading, and regenerative ownership."</p>
 
             <div class="dashboard-grid">
                 <div class="dash-card">
-                    <span class="dash-label">"Status"</span>
-                    <span class="dash-value">
-                        {move || match hc.status.get() {
-                            ConnectionStatus::Connected => "Connected",
-                            ConnectionStatus::Mock => "Mock mode",
-                            ConnectionStatus::Connecting => "Connecting...",
-                            ConnectionStatus::Disconnected => "Disconnected",
-                        }}
-                    </span>
+                    <span class="dash-label">"Total Capacity"</span>
+                    <span class="dash-value">{move || format!("{:.0} MW", total_mw())}</span>
                 </div>
                 <div class="dash-card">
-                    <span class="dash-label">"Tier"</span>
-                    <span class="dash-value">
-                        {move || consciousness.tier.get().label()}
-                    </span>
+                    <span class="dash-label">"Projects"</span>
+                    <span class="dash-value">{move || ctx.projects.get().len().to_string()}</span>
                 </div>
                 <div class="dash-card">
-                    <span class="dash-label">"Items"</span>
-                    <span class="dash-value">
-                        {move || ctx.items.get().len().to_string()}
-                    </span>
-                    <span class="dash-sub">"mock data"</span>
+                    <span class="dash-label">"Active Offers"</span>
+                    <span class="dash-value">{move || ctx.offers.get().len().to_string()}</span>
+                </div>
+                <div class="dash-card">
+                    <span class="dash-label">"Investments"</span>
+                    <span class="dash-value">{move || ctx.investments.get().len().to_string()}</span>
                 </div>
             </div>
+
+            <span class="status-footer">{move || match hc.status.get() {
+                ConnectionStatus::Mock => "Mock mode",
+                ConnectionStatus::Connected => "Connected",
+                _ => "",
+            }}</span>
         </div>
     }
 }
