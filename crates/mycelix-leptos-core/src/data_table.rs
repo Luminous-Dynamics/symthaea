@@ -37,7 +37,7 @@ pub fn DataTable<T: Clone + Send + Sync + 'static>(
 
     view! {
         <div class="data-table-wrapper">
-            <table class="data-table">
+            <table class="data-table" role="grid">
                 <thead>
                     <tr>
                         {cols_header.iter().map(|col| {
@@ -45,7 +45,7 @@ pub fn DataTable<T: Clone + Send + Sync + 'static>(
                                 .map(|w| format!("width: {w}"))
                                 .unwrap_or_default();
                             let header = col.header.clone();
-                            view! { <th style=style>{header}</th> }
+                            view! { <th scope="col" style=style>{header}</th> }
                         }).collect_view()}
                     </tr>
                 </thead>

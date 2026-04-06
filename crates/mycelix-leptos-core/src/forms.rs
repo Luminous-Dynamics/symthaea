@@ -43,6 +43,8 @@ pub fn TextInput(
     #[prop(optional)] placeholder: &'static str,
     #[prop(optional, default = "text")] input_type: &'static str,
     #[prop(optional)] disabled: bool,
+    #[prop(optional)] required: bool,
+    #[prop(optional)] invalid: bool,
 ) -> impl IntoView {
     view! {
         <input
@@ -50,6 +52,8 @@ pub fn TextInput(
             type=input_type
             placeholder=placeholder
             disabled=disabled
+            aria-required=required.to_string()
+            aria-invalid=invalid.to_string()
             prop:value=move || value.get()
             on:input=move |ev| {
                 on_change.run(event_target_value(&ev));
@@ -65,12 +69,14 @@ pub fn TextArea(
     on_change: Callback<String>,
     #[prop(optional, default = 4)] rows: u32,
     #[prop(optional)] placeholder: &'static str,
+    #[prop(optional)] required: bool,
 ) -> impl IntoView {
     view! {
         <textarea
             class="form-textarea"
             rows=rows
             placeholder=placeholder
+            aria-required=required.to_string()
             prop:value=move || value.get()
             on:input=move |ev| {
                 on_change.run(event_target_value(&ev));

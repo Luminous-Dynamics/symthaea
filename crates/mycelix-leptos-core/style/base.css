@@ -685,7 +685,57 @@
 }
 
 /* ================================================================
-   22. REDUCED MOTION
+   22. CLUSTER LAUNCHER
+   ================================================================ */
+.cluster-launcher {
+    position: fixed;
+    bottom: var(--space-lg);
+    left: var(--space-lg);
+    z-index: 9998;
+}
+.cluster-launcher-btn {
+    width: 48px; height: 48px;
+    border-radius: 50%;
+    border: 1px solid var(--border);
+    background: var(--bg-raised);
+    font-size: 1.3rem;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    transition: transform var(--duration-interact);
+}
+.cluster-launcher-btn:hover { transform: scale(1.1); }
+.cluster-launcher-menu {
+    position: absolute;
+    bottom: 56px; left: 0;
+    flex-direction: column;
+    gap: 2px;
+    background: var(--bg-raised);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: var(--space-xs);
+    box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+    min-width: 160px;
+    animation: modal-in 0.15s ease-out;
+}
+.cluster-launcher-item {
+    display: flex; align-items: center; gap: var(--space-sm);
+    padding: var(--space-xs) var(--space-sm);
+    border-radius: var(--radius-sm);
+    text-decoration: none;
+    color: var(--text-secondary);
+    font-size: var(--text-sm);
+    transition: background var(--duration-interact);
+}
+.cluster-launcher-item:hover { background: var(--bg-surface); color: var(--text-primary); }
+.cluster-launcher-icon { font-size: 1.1rem; }
+
+@media (max-width: 720px) {
+    .cluster-launcher { bottom: 80px; } /* above mobile nav */
+}
+
+/* ================================================================
+   23. REDUCED MOTION
    ================================================================ */
 @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after {

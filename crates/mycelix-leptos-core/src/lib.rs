@@ -59,6 +59,7 @@ pub mod tabs;
 pub mod empty_state;
 pub mod search_bar;
 pub mod badge;
+pub mod cluster_launcher;
 
 // --- Reactive systems ---
 pub mod theme;
@@ -111,6 +112,7 @@ pub use tabs::{Tabs, TabPanel};
 pub use empty_state::EmptyState;
 pub use search_bar::SearchBar;
 pub use badge::{Badge, BadgeVariant, StatusDot};
+pub use cluster_launcher::{ClusterLauncher, ClusterLink, default_clusters};
 
 // Re-exports — utilities
 pub use util::{set_css_var, set_root_attribute};
