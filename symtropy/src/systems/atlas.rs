@@ -36,6 +36,15 @@ use crate::resources::GamePhase;
 #[derive(Component)]
 pub struct AtlasEntity;
 
+/// Marker for a solar system body mesh — enables per-frame orbital position updates.
+#[derive(Component)]
+pub struct CelestialBodyMesh {
+    /// Index into solar_system_bodies() for position lookup.
+    pub body_index: usize,
+    /// Whether this is a corona (outer glow) vs the body itself.
+    pub is_corona: bool,
+}
+
 /// Cloud layer marker — rotates independently for parallax depth.
 #[derive(Component)]
 pub struct CloudLayer;
@@ -950,8 +959,8 @@ pub fn setup_globe_view(
 
     // ─── Solar System Bodies ────────────────────────────────────
     let bodies = sol_atlas_core::solar_system::solar_system_bodies();
-    let body_mesh = meshes.add(Sphere::new(1.0).mesh().uv(32, 32)); // higher detail for textured planets
-    for body in &bodies {
+    let body_mesh = meshes.add(Sphere::new(1.0).mesh().uv(32, 32));
+    for (body_idx, body) in bodies.iter().enumerate() {
         let pos = sol_atlas_core::solar_system::body_position(body, 0.0);
         let texture: Handle<Image> = asset_server.load(format!("textures/{}", body.texture));
         let mat = if body.is_sun {
@@ -969,7 +978,8 @@ pub fn setup_globe_view(
                 Mesh3d(body_mesh.clone()),
                 MeshMaterial3d(corona),
                 Transform::from_xyz(pos[0], pos[1], pos[2])
-                    .with_scale(Vec3::splat(body.visual_radius * 2.2)),
+                    .with_scale(Vec3::splat(body.visual_radius * 1.4)), // tight corona — no overlap
+                CelestialBodyMesh { body_index: body_idx, is_corona: true },
                 AtlasEntity,
             ));
             // The sun itself — white-hot, extreme HDR emissive
@@ -997,6 +1007,7 @@ pub fn setup_globe_view(
             MeshMaterial3d(mat),
             Transform::from_xyz(pos[0], pos[1], pos[2])
                 .with_scale(Vec3::splat(body.visual_radius)),
+            CelestialBodyMesh { body_index: body_idx, is_corona: false },
             AtlasEntity,
         ));
     }
@@ -1823,6 +1834,25 @@ pub fn celestial_orbit_system(
             gizmos.line(earth_pos, mid, sync_color);
             gizmos.line(mid, colony_pos, sync_color);
         }
+    }
+}
+
+/// Update celestial body mesh positions to match their calculated orbital positions.
+/// This keeps meshes in sync with the gizmo orbit rings and camera focus targets.
+pub fn celestial_body_update_system(
+    time: Res<Time>,
+    mut query: Query<(&CelestialBodyMesh, &mut Transform)>,
+) {
+    let t = time.elapsed_secs();
+    let bodies = sol_atlas_core::solar_system::solar_system_bodies();
+
+    for (body_marker, mut transform) in &mut query {
+        if body_marker.body_index >= bodies.len() { continue; }
+        let body = &bodies[body_marker.body_index];
+        let pos = sol_atlas_core::solar_system::body_position(body, t);
+
+        // Update position, preserve existing scale
+        transform.translation = Vec3::new(pos[0], pos[1], pos[2]);
     }
 }
 
