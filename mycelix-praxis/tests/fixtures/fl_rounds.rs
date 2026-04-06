@@ -6,7 +6,7 @@
 // Generators for FL rounds, updates, and related data structures
 
 use super::{random_hex, seeded_rng, DEFAULT_SEED};
-use edunet_core::types::{ModelHash, RoundId, RoundState};
+use praxis_core::types::{ModelHash, RoundId, RoundState};
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 

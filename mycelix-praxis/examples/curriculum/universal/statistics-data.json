@@ -1,0 +1,195 @@
+{
+  "metadata": {
+    "title": "Statistics & Data Literacy",
+    "framework": "EduNet Universal Curriculum",
+    "source": "https://edunet.luminousdynamics.io",
+    "grade_level": "Adult",
+    "subject_area": "Statistics",
+    "domain": "Statistics",
+    "version": "2026",
+    "total_standards": 5,
+    "domains": [
+      "Statistics"
+    ],
+    "created_at": "2026-03-30",
+    "notes": "Essential Statistics knowledge curated for universal access."
+  },
+  "nodes": [
+    {
+      "id": "UNI.STATISTICS.STAT.PROB",
+      "title": "Probability Basics",
+      "description": "Events, conditional probability, Bayes' theorem, expected value.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Statistics",
+      "subdomain": "STAT",
+      "tags": [
+        "probability",
+        "bayes",
+        "expected-value",
+        "statistics"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Adult"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Statistics",
+      "academic_standards": [
+        {
+          "framework": "EduNet Universal Curriculum",
+          "code": "UNI.STATISTICS.STAT.PROB",
+          "description": "Events, conditional probability, Bayes' theorem, expected value.",
+          "grade_level": "Adult"
+        }
+      ]
+    },
+    {
+      "id": "UNI.STATISTICS.STAT.DESC",
+      "title": "Descriptive Statistics",
+      "description": "Mean, median, mode, standard deviation, distributions, visualisation.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Statistics",
+      "subdomain": "STAT",
+      "tags": [
+        "descriptive",
+        "distributions",
+        "visualisation",
+        "statistics"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Adult"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Statistics",
+      "academic_standards": [
+        {
+          "framework": "EduNet Universal Curriculum",
+          "code": "UNI.STATISTICS.STAT.DESC",
+          "description": "Mean, median, mode, standard deviation, distributions, visualisation.",
+          "grade_level": "Adult"
+        }
+      ]
+    },
+    {
+      "id": "UNI.STATISTICS.STAT.INFER",
+      "title": "Inference & Hypothesis Testing",
+      "description": "Confidence intervals, p-values, significance, Type I/II errors.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Statistics",
+      "subdomain": "STAT",
+      "tags": [
+        "inference",
+        "p-values",
+        "hypothesis-testing",
+        "statistics"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Adult"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Statistics",
+      "academic_standards": [
+        {
+          "framework": "EduNet Universal Curriculum",
+          "code": "UNI.STATISTICS.STAT.INFER",
+          "description": "Confidence intervals, p-values, significance, Type I/II errors.",
+          "grade_level": "Adult"
+        }
+      ]
+    },
+    {
+      "id": "UNI.STATISTICS.STAT.BIAS",
+      "title": "Data Bias & Ethics",
+      "description": "Selection bias, survivorship bias, Simpson's paradox, ethical data use.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Statistics",
+      "subdomain": "STAT",
+      "tags": [
+        "bias",
+        "survivorship",
+        "simpsons-paradox",
+        "ethics",
+        "statistics"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Adult"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Statistics",
+      "academic_standards": [
+        {
+          "framework": "EduNet Universal Curriculum",
+          "code": "UNI.STATISTICS.STAT.BIAS",
+          "description": "Selection bias, survivorship bias, Simpson's paradox, ethical data use.",
+          "grade_level": "Adult"
+        }
+      ]
+    },
+    {
+      "id": "UNI.STATISTICS.STAT.VIZ",
+      "title": "Data Visualisation",
+      "description": "Charts, graphs, dashboards, misleading visualisations, storytelling with data.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Statistics",
+      "subdomain": "STAT",
+      "tags": [
+        "visualisation",
+        "charts",
+        "dashboards",
+        "statistics"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Adult"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Statistics",
+      "academic_standards": [
+        {
+          "framework": "EduNet Universal Curriculum",
+          "code": "UNI.STATISTICS.STAT.VIZ",
+          "description": "Charts, graphs, dashboards, misleading visualisations, storytelling with data.",
+          "grade_level": "Adult"
+        }
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "from": "UNI.STATISTICS.STAT.PROB",
+      "to": "UNI.STATISTICS.STAT.DESC",
+      "edge_type": "Recommends",
+      "strength_permille": 600,
+      "rationale": "Sequential learning"
+    },
+    {
+      "from": "UNI.STATISTICS.STAT.DESC",
+      "to": "UNI.STATISTICS.STAT.INFER",
+      "edge_type": "Recommends",
+      "strength_permille": 600,
+      "rationale": "Sequential learning"
+    },
+    {
+      "from": "UNI.STATISTICS.STAT.INFER",
+      "to": "UNI.STATISTICS.STAT.BIAS",
+      "edge_type": "Recommends",
+      "strength_permille": 600,
+      "rationale": "Sequential learning"
+    },
+    {
+      "from": "UNI.STATISTICS.STAT.BIAS",
+      "to": "UNI.STATISTICS.STAT.VIZ",
+      "edge_type": "Recommends",
+      "strength_permille": 600,
+      "rationale": "Sequential learning"
+    }
+  ]
+}

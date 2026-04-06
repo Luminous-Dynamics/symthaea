@@ -3,7 +3,7 @@ name = "portal-games"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "Interactive educational games for Mycelix Portal — ported from EduNet Leptos"
+description = "Interactive educational games for Mycelix Portal — ported from Praxis Leptos"
 
 [dependencies]
 leptos = { version = "0.8", features = ["csr"] }

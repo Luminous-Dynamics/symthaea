@@ -11,5 +11,5 @@ command_arguments = ["-c", "cp -r static/* dist/ 2>/dev/null; true"]
 watch = ["src", "style", "index.html"]
 
 [serve]
-port = 8125
+port = 8129
 open = false

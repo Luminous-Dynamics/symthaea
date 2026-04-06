@@ -1,19 +1,19 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
-//! EduNet Bridge Coordinator Zome
+//! Praxis Bridge Coordinator Zome
 //!
-//! Unified cross-domain dispatch for the EduNet cluster.
+//! Unified cross-domain dispatch for the Praxis cluster.
 //! Provides three integration patterns:
 //!
 //! 1. **dispatch_call** — synchronous RPC to any domain zome via
 //!    `call(CallTargetCell::Local, ...)`. The core value of clustering.
-//! 2. **query_edunet** — audited async query/response with auto-dispatch
+//! 2. **query_praxis** — audited async query/response with auto-dispatch
 //! 3. **broadcast_event** — pub-sub event distribution across domains
 
 #![deny(unsafe_code)]
 
-use edunet_bridge_integrity::*;
+use praxis_bridge_integrity::*;
 use hdk::prelude::*;
 use mycelix_bridge_common::{
     self as bridge, check_rate_limit_count, DispatchInput, DispatchResult, EventTypeQuery,
@@ -25,7 +25,7 @@ use mycelix_bridge_common::{
 // Allowed zome names — security boundary for dispatch
 // ============================================================================
 
-/// All 10 coordinator zome names in the EduNet cluster.
+/// All 10 coordinator zome names in the Praxis cluster.
 const ALLOWED_ZOMES: &[&str] = &[
     "learning_coordinator",
     "fl_coordinator",
@@ -91,7 +91,7 @@ fn enforce_rate_limit(target_zome: &str) -> ExternResult<()> {
 // Cross-Domain Dispatch (synchronous RPC)
 // ============================================================================
 
-/// Dispatch a synchronous call to any domain zome within the EduNet DNA.
+/// Dispatch a synchronous call to any domain zome within the Praxis DNA.
 ///
 /// Rate-limited to 100 calls per 60 seconds per agent. Validates the target
 /// zome against an allowlist, then uses `call(CallTargetCell::Local, ...)`.
@@ -135,17 +135,17 @@ pub fn dispatch_call(input: DispatchInput) -> ExternResult<DispatchResult> {
 // Audited Query/Response (with trust tier gating)
 // ============================================================================
 
-/// Submit a cross-domain edunet query.
+/// Submit a cross-domain praxis query.
 ///
 /// Stores the query on the DHT for auditability. Requires at least Participant
 /// trust tier (consciousness gating via bridge-common).
 #[hdk_extern]
-pub fn query_edunet(query: EdunetQueryEntry) -> ExternResult<Record> {
+pub fn query_praxis(query: EdunetQueryEntry) -> ExternResult<Record> {
     // Require at least Participant tier to submit queries
     mycelix_bridge_common::gate_consciousness(
-        "edunet_bridge",
+        "praxis_bridge",
         &mycelix_bridge_common::requirement_for_basic(),
-        "query_edunet",
+        "query_praxis",
     )?;
 
     // Reject empty or whitespace-only domain
@@ -163,7 +163,7 @@ pub fn query_edunet(query: EdunetQueryEntry) -> ExternResult<Record> {
 
     let action_hash = create_entry(&EntryTypes::Query(query.clone()))?;
 
-    let all_anchor = ensure_anchor("all_edunet_queries")?;
+    let all_anchor = ensure_anchor("all_praxis_queries")?;
     create_link(all_anchor, action_hash.clone(), LinkTypes::AllQueries, ())?;
 
     let agent_anchor = ensure_anchor(&format!("agent_queries:{}", query.requester))?;
@@ -235,7 +235,7 @@ pub fn query_edunet(query: EdunetQueryEntry) -> ExternResult<Record> {
 pub fn resolve_query(input: ResolveQueryInput) -> ExternResult<Record> {
     // Require Citizen tier to resolve queries (modifies existing data)
     mycelix_bridge_common::gate_consciousness(
-        "edunet_bridge",
+        "praxis_bridge",
         &mycelix_bridge_common::requirement_for_voting(),
         "resolve_query",
     )?;
@@ -286,7 +286,7 @@ pub struct BridgeEventSignal {
 pub fn broadcast_event(event: EdunetEventEntry) -> ExternResult<Record> {
     // Require at least Participant tier to broadcast events
     mycelix_bridge_common::gate_consciousness(
-        "edunet_bridge",
+        "praxis_bridge",
         &mycelix_bridge_common::requirement_for_basic(),
         "broadcast_event",
     )?;
@@ -312,7 +312,7 @@ pub fn broadcast_event(event: EdunetEventEntry) -> ExternResult<Record> {
 
     let action_hash = create_entry(&EntryTypes::Event(event.clone()))?;
 
-    let all_anchor = ensure_anchor("all_edunet_events")?;
+    let all_anchor = ensure_anchor("all_praxis_events")?;
     create_link(all_anchor, action_hash.clone(), LinkTypes::AllEvents, ())?;
 
     let type_anchor = ensure_anchor(&format!("event_type:{}:{}", event.domain, event.event_type))?;
@@ -341,7 +341,7 @@ pub fn broadcast_event(event: EdunetEventEntry) -> ExternResult<Record> {
 
     // Emit signal to connected UI clients
     let signal = BridgeEventSignal {
-        signal_type: "edunet_bridge_event".to_string(),
+        signal_type: "praxis_bridge_event".to_string(),
         domain: event.domain.clone(),
         event_type: event.event_type.clone(),
         payload: event.payload.clone(),
@@ -377,7 +377,7 @@ pub fn log_governance_gate(input: GateAuditInput) -> ExternResult<()> {
     let action_hash = create_entry(&EntryTypes::Event(event))?;
 
     // All events index
-    let all_anchor = ensure_anchor("all_edunet_events")?;
+    let all_anchor = ensure_anchor("all_praxis_events")?;
     create_link(all_anchor, action_hash.clone(), LinkTypes::AllEvents, ())?;
 
     // Event type index
@@ -478,7 +478,7 @@ pub fn get_domain_events(domain: String) -> ExternResult<Vec<Record>> {
 /// Get all events
 #[hdk_extern]
 pub fn get_all_events(_: ()) -> ExternResult<Vec<Record>> {
-    let all_anchor = anchor_hash("all_edunet_events")?;
+    let all_anchor = anchor_hash("all_praxis_events")?;
     let links = get_links(
         LinkQuery::try_new(all_anchor, LinkTypes::AllEvents)?,
         GetStrategy::default(),
@@ -542,12 +542,12 @@ pub fn get_bridge_health(_: ()) -> ExternResult<bridge::BridgeHealth> {
     let agent = agent_info()?.agent_initial_pubkey;
     // Count events and queries from their respective anchors
     let event_links = get_links(
-        LinkQuery::try_new(anchor_hash("all_edunet_events")?, LinkTypes::AllEvents)?,
+        LinkQuery::try_new(anchor_hash("all_praxis_events")?, LinkTypes::AllEvents)?,
         GetStrategy::Local,
     )
     .unwrap_or_default();
     let query_links = get_links(
-        LinkQuery::try_new(anchor_hash("all_edunet_queries")?, LinkTypes::AllQueries)?,
+        LinkQuery::try_new(anchor_hash("all_praxis_queries")?, LinkTypes::AllQueries)?,
         GetStrategy::Local,
     )
     .unwrap_or_default();

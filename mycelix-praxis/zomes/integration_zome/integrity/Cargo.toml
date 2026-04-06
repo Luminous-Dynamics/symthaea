@@ -16,7 +16,7 @@ hdi.workspace = true
 
 # Core types (NO other integrity zomes - they conflict with HDI symbols)
 # Inter-zome communication happens at the coordinator level via `call`
-edunet-core = { path = "../../../crates/edunet-core" }
+praxis-core = { path = "../../../crates/praxis-core" }
 
 # Serialization
 serde.workspace = true

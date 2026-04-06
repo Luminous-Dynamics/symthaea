@@ -4,7 +4,7 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! # Work History Coordinator Zome
 //!
-//! Manages professional work experience entries with peer verification.
+//! Manages work experience entries with peer verification.
 //! Verification uses link-based attestation (existence of link = verified).
 
 use hdk::prelude::*;

@@ -17,7 +17,7 @@ use credential_integrity::{
     VerifiableCredential, CredentialStatus,
     EntryTypes, LinkTypes
 };
-use edunet_core::CourseId;
+use praxis_core::CourseId;
 use base64::engine::general_purpose::STANDARD as BASE64_ENGINE;
 use base64::Engine as _;
 use hdk::prelude::HdkPathExt;
@@ -558,7 +558,7 @@ pub struct EpistemicClassificationResult {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use edunet_core::CourseId;
+    use praxis_core::CourseId;
     use credential_integrity::VerifiableCredential;
 
     #[test]

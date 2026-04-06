@@ -1,6 +1,6 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-//! EduNet domain — learning dashboard with interactive SVG explorations.
+//! Praxis domain — learning dashboard with interactive SVG explorations.
 
 use leptos::prelude::*;
 use portal_viz::{BarChart, bar_chart::Bar};
@@ -27,14 +27,14 @@ impl EduState {
 }
 
 #[component]
-pub fn EdunetOverview() -> impl IntoView {
+pub fn PraxisOverview() -> impl IntoView {
     let (active_view, set_active_view) = signal(EduView::Dashboard);
     let (_progress_read, _progress_write) = provide_progress_store();
     let state = EduState::new();
     provide_context(state.clone());
 
     view! {
-        <div class="edunet-content">
+        <div class="praxis-content">
             <div class="governance-nav">
                 <button class=move || if active_view.get() == EduView::Dashboard { "domain-nav-btn active" } else { "domain-nav-btn" }
                     on:click=move |_| set_active_view.set(EduView::Dashboard)>"Dashboard"</button>

@@ -12,7 +12,7 @@
 //! into the main VerifiableCredential entry type to ensure HDI compatibility.
 
 use hdi::prelude::*;
-use edunet_core::CourseId;
+use praxis_core::CourseId;
 // Note: Epistemic levels stored as u8 for HDI compatibility
 // See mycelix_sdk::epistemic for level definitions
 

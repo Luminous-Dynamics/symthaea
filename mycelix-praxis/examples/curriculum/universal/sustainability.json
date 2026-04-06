@@ -1,0 +1,158 @@
+{
+  "metadata": {
+    "title": "Sustainability",
+    "framework": "EduNet Universal Curriculum",
+    "source": "https://edunet.luminousdynamics.io",
+    "grade_level": "Adult",
+    "subject_area": "Sustainability",
+    "domain": "Sustainability",
+    "version": "2026",
+    "total_standards": 4,
+    "domains": [
+      "Sustainability"
+    ],
+    "created_at": "2026-03-30",
+    "notes": "Essential Sustainability knowledge curated for universal access."
+  },
+  "nodes": [
+    {
+      "id": "UNI.SUSTAINABILITY.SUST.CLIMATE",
+      "title": "Climate Science",
+      "description": "Greenhouse effect, carbon cycle, evidence, projections, tipping points.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Sustainability",
+      "subdomain": "SUST",
+      "tags": [
+        "climate",
+        "greenhouse",
+        "carbon",
+        "sustainability"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Adult"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Sustainability",
+      "academic_standards": [
+        {
+          "framework": "EduNet Universal Curriculum",
+          "code": "UNI.SUSTAINABILITY.SUST.CLIMATE",
+          "description": "Greenhouse effect, carbon cycle, evidence, projections, tipping points.",
+          "grade_level": "Adult"
+        }
+      ]
+    },
+    {
+      "id": "UNI.SUSTAINABILITY.SUST.RESOURCE",
+      "title": "Resource Management",
+      "description": "Renewable vs non-renewable, water, food systems, circular economy.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Sustainability",
+      "subdomain": "SUST",
+      "tags": [
+        "resources",
+        "renewable",
+        "circular-economy",
+        "sustainability"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Adult"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Sustainability",
+      "academic_standards": [
+        {
+          "framework": "EduNet Universal Curriculum",
+          "code": "UNI.SUSTAINABILITY.SUST.RESOURCE",
+          "description": "Renewable vs non-renewable, water, food systems, circular economy.",
+          "grade_level": "Adult"
+        }
+      ]
+    },
+    {
+      "id": "UNI.SUSTAINABILITY.SUST.ACTION",
+      "title": "Sustainable Action",
+      "description": "Individual footprint, collective action, policy, SDGs, greenwashing.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Sustainability",
+      "subdomain": "SUST",
+      "tags": [
+        "action",
+        "sdgs",
+        "footprint",
+        "sustainability"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Adult"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Sustainability",
+      "academic_standards": [
+        {
+          "framework": "EduNet Universal Curriculum",
+          "code": "UNI.SUSTAINABILITY.SUST.ACTION",
+          "description": "Individual footprint, collective action, policy, SDGs, greenwashing.",
+          "grade_level": "Adult"
+        }
+      ]
+    },
+    {
+      "id": "UNI.SUSTAINABILITY.SUST.JUST",
+      "title": "Environmental Justice",
+      "description": "Climate inequality, indigenous rights, pollution burden, just transition.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Sustainability",
+      "subdomain": "SUST",
+      "tags": [
+        "justice",
+        "inequality",
+        "just-transition",
+        "sustainability"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Adult"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Sustainability",
+      "academic_standards": [
+        {
+          "framework": "EduNet Universal Curriculum",
+          "code": "UNI.SUSTAINABILITY.SUST.JUST",
+          "description": "Climate inequality, indigenous rights, pollution burden, just transition.",
+          "grade_level": "Adult"
+        }
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "from": "UNI.SUSTAINABILITY.SUST.CLIMATE",
+      "to": "UNI.SUSTAINABILITY.SUST.RESOURCE",
+      "edge_type": "Recommends",
+      "strength_permille": 600,
+      "rationale": "Sequential learning"
+    },
+    {
+      "from": "UNI.SUSTAINABILITY.SUST.RESOURCE",
+      "to": "UNI.SUSTAINABILITY.SUST.ACTION",
+      "edge_type": "Recommends",
+      "strength_permille": 600,
+      "rationale": "Sequential learning"
+    },
+    {
+      "from": "UNI.SUSTAINABILITY.SUST.ACTION",
+      "to": "UNI.SUSTAINABILITY.SUST.JUST",
+      "edge_type": "Recommends",
+      "strength_permille": 600,
+      "rationale": "Sequential learning"
+    }
+  ]
+}

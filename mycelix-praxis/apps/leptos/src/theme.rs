@@ -50,7 +50,7 @@ impl Theme {
     }
 }
 
-const THEME_KEY: &str = "edunet_theme";
+const THEME_KEY: &str = "praxis_theme";
 
 /// Detect system color scheme preference.
 fn system_theme() -> Theme {

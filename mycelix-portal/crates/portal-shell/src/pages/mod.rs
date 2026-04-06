@@ -4,7 +4,7 @@
 
 pub mod admin;
 pub mod commons;
-pub mod edunet;
+pub mod praxis;
 pub mod finance;
 pub mod governance;
 pub mod health;
@@ -24,7 +24,7 @@ pub fn DomainContent(domain_id: String) -> impl IntoView {
         "commons" => view! { <commons::CommonsOverview /> }.into_any(),
         "finance" => view! { <finance::FinanceOverview /> }.into_any(),
         "health" => view! { <health::HealthOverview /> }.into_any(),
-        "edunet" => view! { <edunet::EdunetOverview /> }.into_any(),
+        "praxis" => view! { <praxis::PraxisOverview /> }.into_any(),
         "hearth" => view! { <hearth::HearthOverview /> }.into_any(),
         "knowledge" => view! { <knowledge::KnowledgeOverview /> }.into_any(),
         "mail" => view! { <mail::MailOverview /> }.into_any(),

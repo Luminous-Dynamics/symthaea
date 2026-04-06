@@ -14,7 +14,7 @@ pub enum UserRole {
     Parent,
 }
 
-const ROLE_KEY: &str = "edunet_role";
+const ROLE_KEY: &str = "praxis_role";
 
 /// Provide the selected role as a context signal.
 /// Returns (read, write) signals for the optional role.

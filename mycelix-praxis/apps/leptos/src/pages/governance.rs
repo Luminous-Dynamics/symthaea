@@ -593,7 +593,7 @@ fn CreateProposalForm(on_close: impl Fn() + Send + Sync + 'static) -> impl IntoV
                                     class="btn-primary"
                                     on:click=move |_| {
                                         if !title.get().is_empty() && !description.get().is_empty() {
-                                            let profile = crate::persistence::load::<crate::student_profile::StudentProfile>("edunet_profile");
+                                            let profile = crate::persistence::load::<crate::student_profile::StudentProfile>("praxis_profile");
                                             let name = profile.map(|p| p.name).unwrap_or_else(|| "Anonymous".into());
                                             let mut store = crate::persistence::GovernanceStore::load();
                                             store.create_proposal(

@@ -1,0 +1,158 @@
+{
+  "metadata": {
+    "title": "Communication Skills",
+    "framework": "EduNet Universal Curriculum",
+    "source": "https://edunet.luminousdynamics.io",
+    "grade_level": "Adult",
+    "subject_area": "Communication",
+    "domain": "Communication",
+    "version": "2026",
+    "total_standards": 4,
+    "domains": [
+      "Communication"
+    ],
+    "created_at": "2026-03-30",
+    "notes": "Essential Communication knowledge curated for universal access."
+  },
+  "nodes": [
+    {
+      "id": "UNI.COMMUNICATION.COM.WRITE",
+      "title": "Clear Writing",
+      "description": "Structure, clarity, audience awareness, editing, professional email.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Communication",
+      "subdomain": "COM",
+      "tags": [
+        "writing",
+        "clarity",
+        "structure",
+        "communication"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Adult"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Communication",
+      "academic_standards": [
+        {
+          "framework": "EduNet Universal Curriculum",
+          "code": "UNI.COMMUNICATION.COM.WRITE",
+          "description": "Structure, clarity, audience awareness, editing, professional email.",
+          "grade_level": "Adult"
+        }
+      ]
+    },
+    {
+      "id": "UNI.COMMUNICATION.COM.SPEAK",
+      "title": "Public Speaking",
+      "description": "Presentation skills, overcoming anxiety, storytelling, body language.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Communication",
+      "subdomain": "COM",
+      "tags": [
+        "speaking",
+        "presentations",
+        "storytelling",
+        "communication"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Adult"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Communication",
+      "academic_standards": [
+        {
+          "framework": "EduNet Universal Curriculum",
+          "code": "UNI.COMMUNICATION.COM.SPEAK",
+          "description": "Presentation skills, overcoming anxiety, storytelling, body language.",
+          "grade_level": "Adult"
+        }
+      ]
+    },
+    {
+      "id": "UNI.COMMUNICATION.COM.LISTEN",
+      "title": "Active Listening",
+      "description": "Reflective listening, asking good questions, non-verbal cues.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Communication",
+      "subdomain": "COM",
+      "tags": [
+        "listening",
+        "questions",
+        "non-verbal",
+        "communication"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Adult"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Communication",
+      "academic_standards": [
+        {
+          "framework": "EduNet Universal Curriculum",
+          "code": "UNI.COMMUNICATION.COM.LISTEN",
+          "description": "Reflective listening, asking good questions, non-verbal cues.",
+          "grade_level": "Adult"
+        }
+      ]
+    },
+    {
+      "id": "UNI.COMMUNICATION.COM.PERSUADE",
+      "title": "Persuasion & Negotiation",
+      "description": "Rhetoric, framing, finding common ground, win-win negotiation.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Communication",
+      "subdomain": "COM",
+      "tags": [
+        "persuasion",
+        "negotiation",
+        "rhetoric",
+        "communication"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Adult"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Communication",
+      "academic_standards": [
+        {
+          "framework": "EduNet Universal Curriculum",
+          "code": "UNI.COMMUNICATION.COM.PERSUADE",
+          "description": "Rhetoric, framing, finding common ground, win-win negotiation.",
+          "grade_level": "Adult"
+        }
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "from": "UNI.COMMUNICATION.COM.WRITE",
+      "to": "UNI.COMMUNICATION.COM.SPEAK",
+      "edge_type": "Recommends",
+      "strength_permille": 600,
+      "rationale": "Sequential learning"
+    },
+    {
+      "from": "UNI.COMMUNICATION.COM.SPEAK",
+      "to": "UNI.COMMUNICATION.COM.LISTEN",
+      "edge_type": "Recommends",
+      "strength_permille": 600,
+      "rationale": "Sequential learning"
+    },
+    {
+      "from": "UNI.COMMUNICATION.COM.LISTEN",
+      "to": "UNI.COMMUNICATION.COM.PERSUADE",
+      "edge_type": "Recommends",
+      "strength_permille": 600,
+      "rationale": "Sequential learning"
+    }
+  ]
+}

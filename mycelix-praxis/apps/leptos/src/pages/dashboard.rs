@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 
-//! Unified learner dashboard -- the most valuable page in EduNet.
+//! Unified learner dashboard -- the most valuable page in Praxis.
 //!
 //! Shows XP/level, streak, due reviews, skill mastery, recommendations,
 //! and recent activity. Integrated with the adaptivity engine to show
@@ -667,7 +667,7 @@ fn XpLevelCard() -> impl IntoView {
         async move {
             match hc.call_zome::<(), LearnerStats>("gamification", "get_learner_stats", &()).await {
                 Ok(s) => s,
-                Err(_) => { let p = crate::persistence::load::<crate::curriculum::ProgressStore>("edunet_progress").unwrap_or_default(); let t = crate::persistence::load::<crate::study_tracker::StudyTracker>("edunet_study_tracker").unwrap_or_default(); real_stats(&p, &t) },
+                Err(_) => { let p = crate::persistence::load::<crate::curriculum::ProgressStore>("praxis_progress").unwrap_or_default(); let t = crate::persistence::load::<crate::study_tracker::StudyTracker>("praxis_study_tracker").unwrap_or_default(); real_stats(&p, &t) },
             }
         }
     });
@@ -719,7 +719,7 @@ fn StreakCard() -> impl IntoView {
         async move {
             match hc.call_zome::<(), StreakInfo>("gamification", "get_streak", &()).await {
                 Ok(s) => s,
-                Err(_) => { let t = crate::persistence::load::<crate::study_tracker::StudyTracker>("edunet_study_tracker").unwrap_or_default(); real_streak(&t) },
+                Err(_) => { let t = crate::persistence::load::<crate::study_tracker::StudyTracker>("praxis_study_tracker").unwrap_or_default(); real_streak(&t) },
             }
         }
     });
@@ -770,7 +770,7 @@ fn DueReviewsCard() -> impl IntoView {
         async move {
             match hc.call_zome::<(), DueReviews>("srs", "get_due_summary", &()).await {
                 Ok(r) => r,
-                Err(_) => { let p = crate::persistence::load::<crate::curriculum::ProgressStore>("edunet_progress").unwrap_or_default(); real_due_reviews(&p) },
+                Err(_) => { let p = crate::persistence::load::<crate::curriculum::ProgressStore>("praxis_progress").unwrap_or_default(); real_due_reviews(&p) },
             }
         }
     });
@@ -813,7 +813,7 @@ fn SkillsCard() -> impl IntoView {
         async move {
             match hc.call_zome::<(), Vec<SkillMastery>>("adaptive", "get_top_skills", &()).await {
                 Ok(s) => s,
-                Err(_) => { let p = crate::persistence::load::<crate::curriculum::ProgressStore>("edunet_progress").unwrap_or_default(); real_skills(&p) },
+                Err(_) => { let p = crate::persistence::load::<crate::curriculum::ProgressStore>("praxis_progress").unwrap_or_default(); real_skills(&p) },
             }
         }
     });
@@ -873,7 +873,7 @@ fn RecommendationsSection() -> impl IntoView {
                 .await
             {
                 Ok(r) => r,
-                Err(_) => { let p = crate::persistence::load::<crate::curriculum::ProgressStore>("edunet_progress").unwrap_or_default(); real_recommendations(&p) },
+                Err(_) => { let p = crate::persistence::load::<crate::curriculum::ProgressStore>("praxis_progress").unwrap_or_default(); real_recommendations(&p) },
             }
         }
     });
@@ -925,7 +925,7 @@ fn RecentActivitySection() -> impl IntoView {
                 .await
             {
                 Ok(a) => a,
-                Err(_) => { let t = crate::persistence::load::<crate::study_tracker::StudyTracker>("edunet_study_tracker").unwrap_or_default(); let p = crate::persistence::load::<crate::curriculum::ProgressStore>("edunet_progress").unwrap_or_default(); real_activity(&t, &p) },
+                Err(_) => { let t = crate::persistence::load::<crate::study_tracker::StudyTracker>("praxis_study_tracker").unwrap_or_default(); let p = crate::persistence::load::<crate::curriculum::ProgressStore>("praxis_progress").unwrap_or_default(); real_activity(&t, &p) },
             }
         }
     });
@@ -1247,7 +1247,7 @@ fn ShareProgress() -> impl IntoView {
 
         let name = if prof.name.is_empty() { "A student".to_string() } else { prof.name.clone() };
         format!(
-            "{} on EduNet:\n\u{1F331} {} topics mastered ({}% of curriculum)\n\u{1F525} {}-day study streak\n\u{23F0} {:.0} hours studied\n\u{1F3AF} {} days until exams\n\nhttps://edunet.luminousdynamics.io",
+            "{} on Praxis:\n\u{1F331} {} topics mastered ({}% of curriculum)\n\u{1F525} {}-day study streak\n\u{23F0} {:.0} hours studied\n\u{1F3AF} {} days until exams\n\nhttps://praxis.mycelix.net",
             name, mastered, pct, streak, hours, days_left
         )
     });
@@ -1285,7 +1285,7 @@ fn ProgressPortability() -> impl IntoView {
                 style="flex: 1; min-width: 120px; padding: 0.5rem; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; color: var(--text-secondary); font-size: 0.8rem; cursor: pointer; font-family: inherit"
                 on:click=move |_| {
                     let json = crate::persistence::export_all();
-                    crate::persistence::trigger_download("edunet-progress.json", &json);
+                    crate::persistence::trigger_download("praxis-progress.json", &json);
                 }
             >"\u{1F4E5} Export Progress"</button>
 

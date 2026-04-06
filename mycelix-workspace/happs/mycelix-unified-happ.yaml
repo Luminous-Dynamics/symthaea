@@ -214,12 +214,12 @@ roles:
         properties: ~
       clone_limit: 0
 
-  - name: edunet
+  - name: praxis
     provisioning:
       strategy: create
       deferred: false
     dna:
-      path: ../../mycelix-edunet/dna/edunet.dna
+      path: ../../mycelix-praxis/dna/praxis.dna
       modifiers:
         network_seed: ~
         properties: ~

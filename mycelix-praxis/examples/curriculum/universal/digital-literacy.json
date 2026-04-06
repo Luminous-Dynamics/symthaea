@@ -1,0 +1,159 @@
+{
+  "metadata": {
+    "title": "Digital Literacy",
+    "framework": "EduNet Universal Curriculum",
+    "source": "https://edunet.luminousdynamics.io",
+    "grade_level": "Adult",
+    "subject_area": "Digital Literacy",
+    "domain": "Digital Literacy",
+    "version": "2026",
+    "total_standards": 4,
+    "domains": [
+      "Digital Literacy"
+    ],
+    "created_at": "2026-03-30",
+    "notes": "Essential Digital Literacy knowledge curated for universal access."
+  },
+  "nodes": [
+    {
+      "id": "UNI.DIGITAL.DL.INFO",
+      "title": "Information Literacy",
+      "description": "Search effectively, evaluate sources, manage information.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Digital Literacy",
+      "subdomain": "DL",
+      "tags": [
+        "search",
+        "sources",
+        "information",
+        "digital literacy"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Adult"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Digital Literacy",
+      "academic_standards": [
+        {
+          "framework": "EduNet Universal Curriculum",
+          "code": "UNI.DIGITAL.DL.INFO",
+          "description": "Search effectively, evaluate sources, manage information.",
+          "grade_level": "Adult"
+        }
+      ]
+    },
+    {
+      "id": "UNI.DIGITAL.DL.SAFE",
+      "title": "Digital Safety",
+      "description": "Strong passwords, phishing recognition, privacy settings, 2FA.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Digital Literacy",
+      "subdomain": "DL",
+      "tags": [
+        "passwords",
+        "phishing",
+        "privacy",
+        "2fa",
+        "digital literacy"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Adult"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Digital Literacy",
+      "academic_standards": [
+        {
+          "framework": "EduNet Universal Curriculum",
+          "code": "UNI.DIGITAL.DL.SAFE",
+          "description": "Strong passwords, phishing recognition, privacy settings, 2FA.",
+          "grade_level": "Adult"
+        }
+      ]
+    },
+    {
+      "id": "UNI.DIGITAL.DL.CREATE",
+      "title": "Digital Creation",
+      "description": "Documents, spreadsheets, presentations, basic coding concepts.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Digital Literacy",
+      "subdomain": "DL",
+      "tags": [
+        "documents",
+        "spreadsheets",
+        "coding",
+        "digital literacy"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Adult"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Digital Literacy",
+      "academic_standards": [
+        {
+          "framework": "EduNet Universal Curriculum",
+          "code": "UNI.DIGITAL.DL.CREATE",
+          "description": "Documents, spreadsheets, presentations, basic coding concepts.",
+          "grade_level": "Adult"
+        }
+      ]
+    },
+    {
+      "id": "UNI.DIGITAL.DL.CITIZEN",
+      "title": "Digital Citizenship",
+      "description": "Online ethics, digital footprint, responsible sharing, copyright.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Digital Literacy",
+      "subdomain": "DL",
+      "tags": [
+        "ethics",
+        "footprint",
+        "copyright",
+        "digital literacy"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Adult"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Digital Literacy",
+      "academic_standards": [
+        {
+          "framework": "EduNet Universal Curriculum",
+          "code": "UNI.DIGITAL.DL.CITIZEN",
+          "description": "Online ethics, digital footprint, responsible sharing, copyright.",
+          "grade_level": "Adult"
+        }
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "from": "UNI.DIGITAL.DL.INFO",
+      "to": "UNI.DIGITAL.DL.SAFE",
+      "edge_type": "Recommends",
+      "strength_permille": 600,
+      "rationale": "Sequential learning"
+    },
+    {
+      "from": "UNI.DIGITAL.DL.SAFE",
+      "to": "UNI.DIGITAL.DL.CREATE",
+      "edge_type": "Recommends",
+      "strength_permille": 600,
+      "rationale": "Sequential learning"
+    },
+    {
+      "from": "UNI.DIGITAL.DL.CREATE",
+      "to": "UNI.DIGITAL.DL.CITIZEN",
+      "edge_type": "Recommends",
+      "strength_permille": 600,
+      "rationale": "Sequential learning"
+    }
+  ]
+}

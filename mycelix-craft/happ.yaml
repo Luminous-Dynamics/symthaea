@@ -1,13 +1,13 @@
 ---
 manifest_version: "0"
-name: mycelix-professional
+name: mycelix-craft
 roles:
-  - name: professional
+  - name: craft
     provisioning:
       strategy: create
       deferred: false
     dna:
-      path: "./dna/mycelix_professional.dna"
+      path: "./dna/mycelix_craft.dna"
       modifiers:
         network_seed: ~
         properties: ~

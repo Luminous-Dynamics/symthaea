@@ -15,7 +15,7 @@
 //! They are currently scaffolding and will be activated when the conductor
 //! and test framework are properly configured.
 
-use edunet_core::{ModelHash, RoundId, RoundState};
+use praxis_core::{ModelHash, RoundId, RoundState};
 use fl_coordinator::{
     aggregate_round, create_round, get_privacy_params, get_round, get_round_updates,
     set_privacy_params, submit_update, update_round,

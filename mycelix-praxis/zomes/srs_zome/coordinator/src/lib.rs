@@ -9,7 +9,7 @@
 
 use hdk::prelude::*;
 use srs_integrity::*;
-use edunet_core::errors::{srs_errors, EduNetError};
+use praxis_core::errors::{srs_errors, EduNetError};
 
 /// Convert an EduNetError to a WasmError
 fn to_wasm_error(err: EduNetError) -> WasmError {
@@ -287,7 +287,7 @@ pub fn suspend_card(action_hash: ActionHash) -> ExternResult<Record> {
         .to_app_option()
         .map_err(|e| wasm_error!(e))?
         .ok_or_else(|| to_wasm_error(
-            edunet_core::errors::errors::invalid_entry("ReviewCard", &hash_str)
+            praxis_core::errors::errors::invalid_entry("ReviewCard", &hash_str)
         ))?;
 
     card.status = CardStatus::Suspended;
@@ -297,7 +297,7 @@ pub fn suspend_card(action_hash: ActionHash) -> ExternResult<Record> {
 
     get(new_hash, GetOptions::default())?
         .ok_or_else(|| to_wasm_error(
-            edunet_core::errors::errors::update_failed("ReviewCard", "suspend")
+            praxis_core::errors::errors::update_failed("ReviewCard", "suspend")
         ))
 }
 
@@ -312,7 +312,7 @@ pub fn unsuspend_card(action_hash: ActionHash) -> ExternResult<Record> {
         .to_app_option()
         .map_err(|e| wasm_error!(e))?
         .ok_or_else(|| to_wasm_error(
-            edunet_core::errors::errors::invalid_entry("ReviewCard", &hash_str)
+            praxis_core::errors::errors::invalid_entry("ReviewCard", &hash_str)
         ))?;
 
     card.status = CardStatus::Review;
@@ -322,7 +322,7 @@ pub fn unsuspend_card(action_hash: ActionHash) -> ExternResult<Record> {
 
     get(new_hash, GetOptions::default())?
         .ok_or_else(|| to_wasm_error(
-            edunet_core::errors::errors::update_failed("ReviewCard", "unsuspend")
+            praxis_core::errors::errors::update_failed("ReviewCard", "unsuspend")
         ))
 }
 
@@ -337,7 +337,7 @@ pub fn bury_card(action_hash: ActionHash) -> ExternResult<Record> {
         .to_app_option()
         .map_err(|e| wasm_error!(e))?
         .ok_or_else(|| to_wasm_error(
-            edunet_core::errors::errors::invalid_entry("ReviewCard", &hash_str)
+            praxis_core::errors::errors::invalid_entry("ReviewCard", &hash_str)
         ))?;
 
     let now = current_time()?;
@@ -349,7 +349,7 @@ pub fn bury_card(action_hash: ActionHash) -> ExternResult<Record> {
 
     get(new_hash, GetOptions::default())?
         .ok_or_else(|| to_wasm_error(
-            edunet_core::errors::errors::update_failed("ReviewCard", "bury")
+            praxis_core::errors::errors::update_failed("ReviewCard", "bury")
         ))
 }
 
@@ -375,14 +375,14 @@ pub fn submit_review(input: SubmitReviewInput) -> ExternResult<Record> {
         .to_app_option()
         .map_err(|e| wasm_error!(e))?
         .ok_or_else(|| to_wasm_error(
-            edunet_core::errors::errors::invalid_entry("ReviewCard", &hash_str)
+            praxis_core::errors::errors::invalid_entry("ReviewCard", &hash_str)
         ))?;
 
     // Check if card is suspended (shouldn't be reviewed)
     if card.status == CardStatus::Suspended {
         return Err(to_wasm_error(
             EduNetError::new(
-                edunet_core::errors::ErrorCode::InvalidEntityState,
+                praxis_core::errors::ErrorCode::InvalidEntityState,
                 "ReviewCard",
                 "review",
                 "Cannot review a suspended card"
@@ -398,7 +398,7 @@ pub fn submit_review(input: SubmitReviewInput) -> ExternResult<Record> {
         .to_app_option()
         .map_err(|e| wasm_error!(e))?
         .ok_or_else(|| to_wasm_error(
-            edunet_core::errors::errors::invalid_entry("SrsConfig", "default")
+            praxis_core::errors::errors::invalid_entry("SrsConfig", "default")
         ))?;
 
     // Store old values for the event

@@ -11,7 +11,7 @@
 //!
 //! These tests verify complete learning workflows and cross-zome interactions.
 
-use edunet_core::errors::{
+use praxis_core::errors::{
     adaptive_errors, errors, gamification_errors, integration_errors, srs_errors,
     EduNetError, ErrorCode,
 };

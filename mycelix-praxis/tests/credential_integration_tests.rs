@@ -15,7 +15,7 @@
 //! They are currently scaffolding and will be activated when the conductor
 //! and test framework are properly configured.
 
-use edunet_core::CourseId;
+use praxis_core::CourseId;
 use credential_coordinator::{
     issue_credential, get_credential, get_learner_credentials, get_course_credentials,
     verify_credential, revoke_credential, get_issuer_credentials,

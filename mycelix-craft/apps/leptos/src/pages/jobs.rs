@@ -52,7 +52,7 @@ pub fn JobsPage() -> impl IntoView {
 
             <div class="post-job-section">
                 <h3>"Post a Job"</h3>
-                <p class="text-secondary">"Create a job posting visible to the entire professional network."</p>
+                <p class="text-secondary">"Create a job posting visible to the entire craft network."</p>
                 <button class="btn-primary" disabled title="Connect to Holochain conductor to post jobs">"Create Job Posting"</button>
             </div>
         </div>

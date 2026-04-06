@@ -9,7 +9,7 @@
 //! - PrivacyParams
 
 use super::*;
-use edunet_core::{ModelHash, RoundId, RoundState};
+use praxis_core::{ModelHash, RoundId, RoundState};
 
 // =============================================================================
 // Helper functions for creating test data

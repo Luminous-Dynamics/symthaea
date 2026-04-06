@@ -354,7 +354,7 @@ mod scenario_1_learning_journey {
 mod scenario_2_fl_round_lifecycle {
     use super::*;
     use fl_integrity::{FlRound, FlUpdate};
-    use edunet_core::{RoundId, ModelHash, RoundState};
+    use praxis_core::{RoundId, ModelHash, RoundState};
 
     #[tokio::test]
     #[ignore] // Requires DNA bundle to be built

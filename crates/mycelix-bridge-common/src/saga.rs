@@ -400,7 +400,7 @@ pub fn emergency_response_saga(
     SagaDefinition::new("emergency-response", steps, now_us, 120_000_000)
 }
 
-/// Create a course completion saga template (Edunet -> Identity -> Finance).
+/// Create a course completion saga template (Praxis -> Identity -> Finance).
 pub fn course_completion_saga(
     course_id: String,
     student_did: String,

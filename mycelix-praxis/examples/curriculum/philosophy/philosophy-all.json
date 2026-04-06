@@ -1,0 +1,707 @@
+{
+  "metadata": {
+    "title": "Philosophy — Logic to Applied Ethics",
+    "framework": "APA Guidelines",
+    "source": "https://www.apaonline.org/",
+    "grade_level": "Undergraduate",
+    "subject_area": "Philosophy",
+    "domain": "Philosophy",
+    "version": "2025",
+    "total_standards": 17,
+    "domains": [
+      "Foundations",
+      "Core",
+      "Ethics",
+      "Practical",
+      "Philosophy of Science"
+    ],
+    "created_at": "2026-03-30",
+    "notes": "Curated philosophy curriculum from ancient to contemporary.",
+    "academic_level": "Undergraduate-Graduate",
+    "cip_code": "38.0101"
+  },
+  "nodes": [
+    {
+      "id": "PHIL.FOUND.INTRO",
+      "title": "Introduction to Philosophy",
+      "description": "Survey of major philosophical questions: What is real? What can we know? What should we do? How should we live? Major thinkers from Socrates to contemporary.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Philosophy",
+      "subdomain": "FOUND",
+      "tags": [
+        "philosophy",
+        "introduction",
+        "survey",
+        "philosophy"
+      ],
+      "estimated_hours": 30,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Philosophy",
+      "academic_standards": [
+        {
+          "framework": "Philosophy Curriculum (APA Guidelines)",
+          "code": "PHIL.FOUND.INTRO",
+          "description": "Survey of major philosophical questions: What is real? What can we know? What should we do? How should we live? Major thinkers from Socrates to contemporary.",
+          "grade_level": "Beginner"
+        }
+      ],
+      "credit_hours": 3,
+      "cip_code": "38.0101"
+    },
+    {
+      "id": "PHIL.FOUND.LOGIC",
+      "title": "Logic and Critical Thinking",
+      "description": "Formal and informal logic. Argument structure (premises, conclusions). Validity vs soundness. Common fallacies (ad hominem, straw man, false dichotomy). Truth tables. Syllogisms.",
+      "node_type": "Skill",
+      "difficulty": "Beginner",
+      "domain": "Philosophy",
+      "subdomain": "FOUND",
+      "tags": [
+        "logic",
+        "critical-thinking",
+        "fallacies",
+        "arguments",
+        "philosophy"
+      ],
+      "estimated_hours": 25,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Philosophy",
+      "academic_standards": [
+        {
+          "framework": "Philosophy Curriculum (APA Guidelines)",
+          "code": "PHIL.FOUND.LOGIC",
+          "description": "Formal and informal logic. Argument structure (premises, conclusions). Validity vs soundness. Common fallacies (ad hominem, straw man, false dichotomy). Truth tables. Syllogisms.",
+          "grade_level": "Beginner"
+        }
+      ],
+      "credit_hours": 3,
+      "cip_code": "38.0101"
+    },
+    {
+      "id": "PHIL.FOUND.ANCIENT",
+      "title": "History of Ancient Philosophy",
+      "description": "Pre-Socratics through Hellenistic philosophy. Plato's Forms and the Allegory of the Cave. Aristotle's ethics and metaphysics. Stoicism, Epicureanism, Skepticism.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Philosophy",
+      "subdomain": "FOUND",
+      "tags": [
+        "ancient",
+        "plato",
+        "aristotle",
+        "stoicism",
+        "epicureanism",
+        "philosophy"
+      ],
+      "estimated_hours": 30,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Philosophy",
+      "academic_standards": [
+        {
+          "framework": "Philosophy Curriculum (APA Guidelines)",
+          "code": "PHIL.FOUND.ANCIENT",
+          "description": "Pre-Socratics through Hellenistic philosophy. Plato's Forms and the Allegory of the Cave. Aristotle's ethics and metaphysics. Stoicism, Epicureanism, Skepticism.",
+          "grade_level": "Beginner"
+        }
+      ],
+      "credit_hours": 3,
+      "cip_code": "38.0101"
+    },
+    {
+      "id": "PHIL.FOUND.MODERN",
+      "title": "History of Modern Philosophy",
+      "description": "Descartes' Meditations and the mind-body problem. Empiricism (Locke, Hume). Kant's Critique. German Idealism. Existentialism.",
+      "node_type": "Concept",
+      "difficulty": "Intermediate",
+      "domain": "Philosophy",
+      "subdomain": "FOUND",
+      "tags": [
+        "modern",
+        "descartes",
+        "kant",
+        "hume",
+        "existentialism",
+        "philosophy"
+      ],
+      "estimated_hours": 30,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Philosophy",
+      "academic_standards": [
+        {
+          "framework": "Philosophy Curriculum (APA Guidelines)",
+          "code": "PHIL.FOUND.MODERN",
+          "description": "Descartes' Meditations and the mind-body problem. Empiricism (Locke, Hume). Kant's Critique. German Idealism. Existentialism.",
+          "grade_level": "Intermediate"
+        }
+      ],
+      "credit_hours": 3,
+      "cip_code": "38.0101"
+    },
+    {
+      "id": "PHIL.CORE.EPIST",
+      "title": "Epistemology",
+      "description": "What is knowledge? Justified true belief and Gettier problems. Skepticism. Empiricism vs rationalism. Social epistemology. Epistemic virtues and vices.",
+      "node_type": "Skill",
+      "difficulty": "Intermediate",
+      "domain": "Philosophy",
+      "subdomain": "CORE",
+      "tags": [
+        "epistemology",
+        "knowledge",
+        "justification",
+        "skepticism",
+        "philosophy"
+      ],
+      "estimated_hours": 25,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Philosophy",
+      "academic_standards": [
+        {
+          "framework": "Philosophy Curriculum (APA Guidelines)",
+          "code": "PHIL.CORE.EPIST",
+          "description": "What is knowledge? Justified true belief and Gettier problems. Skepticism. Empiricism vs rationalism. Social epistemology. Epistemic virtues and vices.",
+          "grade_level": "Intermediate"
+        }
+      ],
+      "credit_hours": 3,
+      "cip_code": "38.0101"
+    },
+    {
+      "id": "PHIL.CORE.META",
+      "title": "Metaphysics",
+      "description": "What exists? Free will vs determinism. Personal identity. Time. Causation. Properties and universals. Possible worlds.",
+      "node_type": "Skill",
+      "difficulty": "Intermediate",
+      "domain": "Philosophy",
+      "subdomain": "CORE",
+      "tags": [
+        "metaphysics",
+        "free-will",
+        "identity",
+        "causation",
+        "existence",
+        "philosophy"
+      ],
+      "estimated_hours": 25,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Philosophy",
+      "academic_standards": [
+        {
+          "framework": "Philosophy Curriculum (APA Guidelines)",
+          "code": "PHIL.CORE.META",
+          "description": "What exists? Free will vs determinism. Personal identity. Time. Causation. Properties and universals. Possible worlds.",
+          "grade_level": "Intermediate"
+        }
+      ],
+      "credit_hours": 3,
+      "cip_code": "38.0101"
+    },
+    {
+      "id": "PHIL.CORE.MIND",
+      "title": "Philosophy of Mind",
+      "description": "The mind-body problem. Consciousness and qualia. Functionalism, dualism, physicalism. Intentionality. Artificial intelligence and Chinese Room.",
+      "node_type": "Skill",
+      "difficulty": "Intermediate",
+      "domain": "Philosophy",
+      "subdomain": "CORE",
+      "tags": [
+        "philosophy-of-mind",
+        "consciousness",
+        "qualia",
+        "ai",
+        "functionalism",
+        "philosophy"
+      ],
+      "estimated_hours": 25,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Philosophy",
+      "academic_standards": [
+        {
+          "framework": "Philosophy Curriculum (APA Guidelines)",
+          "code": "PHIL.CORE.MIND",
+          "description": "The mind-body problem. Consciousness and qualia. Functionalism, dualism, physicalism. Intentionality. Artificial intelligence and Chinese Room.",
+          "grade_level": "Intermediate"
+        }
+      ],
+      "credit_hours": 3,
+      "cip_code": "38.0101"
+    },
+    {
+      "id": "PHIL.CORE.LANG",
+      "title": "Philosophy of Language",
+      "description": "Meaning and reference. Speech acts. Wittgenstein's language games. Semantics vs pragmatics. Truth theories.",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "Philosophy",
+      "subdomain": "CORE",
+      "tags": [
+        "language",
+        "meaning",
+        "reference",
+        "wittgenstein",
+        "semantics",
+        "philosophy"
+      ],
+      "estimated_hours": 20,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Philosophy",
+      "academic_standards": [
+        {
+          "framework": "Philosophy Curriculum (APA Guidelines)",
+          "code": "PHIL.CORE.LANG",
+          "description": "Meaning and reference. Speech acts. Wittgenstein's language games. Semantics vs pragmatics. Truth theories.",
+          "grade_level": "Advanced"
+        }
+      ],
+      "credit_hours": 3,
+      "cip_code": "38.0101"
+    },
+    {
+      "id": "PHIL.ETH.META",
+      "title": "Metaethics",
+      "description": "Moral realism vs anti-realism. Moral relativism. Is-ought problem. Emotivism. Error theory. Constructivism.",
+      "node_type": "Skill",
+      "difficulty": "Intermediate",
+      "domain": "Philosophy",
+      "subdomain": "ETH",
+      "tags": [
+        "metaethics",
+        "moral-realism",
+        "relativism",
+        "is-ought",
+        "philosophy"
+      ],
+      "estimated_hours": 20,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Philosophy",
+      "academic_standards": [
+        {
+          "framework": "Philosophy Curriculum (APA Guidelines)",
+          "code": "PHIL.ETH.META",
+          "description": "Moral realism vs anti-realism. Moral relativism. Is-ought problem. Emotivism. Error theory. Constructivism.",
+          "grade_level": "Intermediate"
+        }
+      ],
+      "credit_hours": 3,
+      "cip_code": "38.0101"
+    },
+    {
+      "id": "PHIL.ETH.NORM",
+      "title": "Normative Ethics",
+      "description": "Consequentialism (utilitarianism). Deontology (Kantian ethics, rights-based). Virtue ethics (Aristotelian). Care ethics. Comparing frameworks.",
+      "node_type": "Skill",
+      "difficulty": "Intermediate",
+      "domain": "Philosophy",
+      "subdomain": "ETH",
+      "tags": [
+        "normative-ethics",
+        "utilitarianism",
+        "deontology",
+        "virtue-ethics",
+        "philosophy"
+      ],
+      "estimated_hours": 25,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Philosophy",
+      "academic_standards": [
+        {
+          "framework": "Philosophy Curriculum (APA Guidelines)",
+          "code": "PHIL.ETH.NORM",
+          "description": "Consequentialism (utilitarianism). Deontology (Kantian ethics, rights-based). Virtue ethics (Aristotelian). Care ethics. Comparing frameworks.",
+          "grade_level": "Intermediate"
+        }
+      ],
+      "credit_hours": 3,
+      "cip_code": "38.0101"
+    },
+    {
+      "id": "PHIL.ETH.APPLIED",
+      "title": "Applied Ethics",
+      "description": "Bioethics (euthanasia, genetic engineering). Environmental ethics. Business ethics. Technology ethics. Animal rights. Just war theory.",
+      "node_type": "Skill",
+      "difficulty": "Intermediate",
+      "domain": "Philosophy",
+      "subdomain": "ETH",
+      "tags": [
+        "applied-ethics",
+        "bioethics",
+        "environmental-ethics",
+        "business-ethics",
+        "philosophy"
+      ],
+      "estimated_hours": 25,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Evaluate",
+      "subject_area": "Philosophy",
+      "academic_standards": [
+        {
+          "framework": "Philosophy Curriculum (APA Guidelines)",
+          "code": "PHIL.ETH.APPLIED",
+          "description": "Bioethics (euthanasia, genetic engineering). Environmental ethics. Business ethics. Technology ethics. Animal rights. Just war theory.",
+          "grade_level": "Intermediate"
+        }
+      ],
+      "credit_hours": 3,
+      "cip_code": "38.0101"
+    },
+    {
+      "id": "PHIL.ETH.AI",
+      "title": "AI Ethics and Philosophy of Technology",
+      "description": "Algorithmic bias. Autonomous weapons. Privacy and surveillance. Digital rights. Superintelligence. Value alignment.",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "Philosophy",
+      "subdomain": "ETH",
+      "tags": [
+        "ai-ethics",
+        "algorithmic-bias",
+        "autonomy",
+        "value-alignment",
+        "surveillance",
+        "philosophy"
+      ],
+      "estimated_hours": 20,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Evaluate",
+      "subject_area": "Philosophy",
+      "academic_standards": [
+        {
+          "framework": "Philosophy Curriculum (APA Guidelines)",
+          "code": "PHIL.ETH.AI",
+          "description": "Algorithmic bias. Autonomous weapons. Privacy and surveillance. Digital rights. Superintelligence. Value alignment.",
+          "grade_level": "Advanced"
+        }
+      ],
+      "credit_hours": 3,
+      "cip_code": "38.0101"
+    },
+    {
+      "id": "PHIL.ETH.POLITICAL",
+      "title": "Political Philosophy",
+      "description": "Justice (Rawls). Liberty (Mill). Social contract (Hobbes, Locke, Rousseau). Democracy. Distributive justice. Rights theories.",
+      "node_type": "Skill",
+      "difficulty": "Intermediate",
+      "domain": "Philosophy",
+      "subdomain": "ETH",
+      "tags": [
+        "political-philosophy",
+        "justice",
+        "liberty",
+        "social-contract",
+        "rawls",
+        "philosophy"
+      ],
+      "estimated_hours": 25,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Philosophy",
+      "academic_standards": [
+        {
+          "framework": "Philosophy Curriculum (APA Guidelines)",
+          "code": "PHIL.ETH.POLITICAL",
+          "description": "Justice (Rawls). Liberty (Mill). Social contract (Hobbes, Locke, Rousseau). Democracy. Distributive justice. Rights theories.",
+          "grade_level": "Intermediate"
+        }
+      ],
+      "credit_hours": 3,
+      "cip_code": "38.0101"
+    },
+    {
+      "id": "PHIL.PRAC.STOIC",
+      "title": "Stoicism — Practical Philosophy",
+      "description": "Marcus Aurelius, Epictetus, Seneca. The dichotomy of control. Negative visualisation. Amor fati. Daily Stoic practices for resilience.",
+      "node_type": "Skill",
+      "difficulty": "Beginner",
+      "domain": "Philosophy",
+      "subdomain": "PRAC",
+      "tags": [
+        "stoicism",
+        "marcus-aurelius",
+        "epictetus",
+        "seneca",
+        "resilience",
+        "philosophy"
+      ],
+      "estimated_hours": 15,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Philosophy",
+      "academic_standards": [
+        {
+          "framework": "Philosophy Curriculum (APA Guidelines)",
+          "code": "PHIL.PRAC.STOIC",
+          "description": "Marcus Aurelius, Epictetus, Seneca. The dichotomy of control. Negative visualisation. Amor fati. Daily Stoic practices for resilience.",
+          "grade_level": "Beginner"
+        }
+      ],
+      "credit_hours": 3,
+      "cip_code": "38.0101"
+    },
+    {
+      "id": "PHIL.PRAC.EXIST",
+      "title": "Existentialism — Freedom and Meaning",
+      "description": "Kierkegaard, Nietzsche, Sartre, Camus. Existence precedes essence. Absurdism. Authenticity. Bad faith. Creating meaning.",
+      "node_type": "Skill",
+      "difficulty": "Intermediate",
+      "domain": "Philosophy",
+      "subdomain": "PRAC",
+      "tags": [
+        "existentialism",
+        "sartre",
+        "camus",
+        "nietzsche",
+        "authenticity",
+        "absurdism",
+        "philosophy"
+      ],
+      "estimated_hours": 20,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Philosophy",
+      "academic_standards": [
+        {
+          "framework": "Philosophy Curriculum (APA Guidelines)",
+          "code": "PHIL.PRAC.EXIST",
+          "description": "Kierkegaard, Nietzsche, Sartre, Camus. Existence precedes essence. Absurdism. Authenticity. Bad faith. Creating meaning.",
+          "grade_level": "Intermediate"
+        }
+      ],
+      "credit_hours": 3,
+      "cip_code": "38.0101"
+    },
+    {
+      "id": "PHIL.PRAC.THOUGHT",
+      "title": "Thought Experiments",
+      "description": "Trolley problem, Ship of Theseus, Brain in a Vat, Mary's Room, Zombie argument, Original Position, Experience Machine.",
+      "node_type": "Skill",
+      "difficulty": "Beginner",
+      "domain": "Philosophy",
+      "subdomain": "PRAC",
+      "tags": [
+        "thought-experiments",
+        "trolley-problem",
+        "brain-in-vat",
+        "ship-of-theseus",
+        "philosophy"
+      ],
+      "estimated_hours": 10,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Philosophy",
+      "academic_standards": [
+        {
+          "framework": "Philosophy Curriculum (APA Guidelines)",
+          "code": "PHIL.PRAC.THOUGHT",
+          "description": "Trolley problem, Ship of Theseus, Brain in a Vat, Mary's Room, Zombie argument, Original Position, Experience Machine.",
+          "grade_level": "Beginner"
+        }
+      ],
+      "credit_hours": 3,
+      "cip_code": "38.0101"
+    },
+    {
+      "id": "PHIL.SCI.PHIL",
+      "title": "Philosophy of Science",
+      "description": "Scientific method. Falsifiability (Popper). Paradigm shifts (Kuhn). Theory-ladenness. Underdetermination. Scientific realism.",
+      "node_type": "Skill",
+      "difficulty": "Intermediate",
+      "domain": "Philosophy",
+      "subdomain": "SCI",
+      "tags": [
+        "philosophy-of-science",
+        "popper",
+        "kuhn",
+        "falsifiability",
+        "paradigm",
+        "philosophy"
+      ],
+      "estimated_hours": 20,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Philosophy",
+      "academic_standards": [
+        {
+          "framework": "Philosophy Curriculum (APA Guidelines)",
+          "code": "PHIL.SCI.PHIL",
+          "description": "Scientific method. Falsifiability (Popper). Paradigm shifts (Kuhn). Theory-ladenness. Underdetermination. Scientific realism.",
+          "grade_level": "Intermediate"
+        }
+      ],
+      "credit_hours": 3,
+      "cip_code": "38.0101"
+    }
+  ],
+  "edges": [
+    {
+      "from": "PHIL.FOUND.INTRO",
+      "to": "PHIL.FOUND.ANCIENT",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "FOUND.INTRO is prerequisite"
+    },
+    {
+      "from": "PHIL.FOUND.ANCIENT",
+      "to": "PHIL.FOUND.MODERN",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "FOUND.ANCIENT is prerequisite"
+    },
+    {
+      "from": "PHIL.FOUND.LOGIC",
+      "to": "PHIL.CORE.EPIST",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "FOUND.LOGIC is prerequisite"
+    },
+    {
+      "from": "PHIL.FOUND.MODERN",
+      "to": "PHIL.CORE.EPIST",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "FOUND.MODERN is prerequisite"
+    },
+    {
+      "from": "PHIL.FOUND.MODERN",
+      "to": "PHIL.CORE.META",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "FOUND.MODERN is prerequisite"
+    },
+    {
+      "from": "PHIL.CORE.META",
+      "to": "PHIL.CORE.MIND",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CORE.META is prerequisite"
+    },
+    {
+      "from": "PHIL.FOUND.LOGIC",
+      "to": "PHIL.CORE.LANG",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "FOUND.LOGIC is prerequisite"
+    },
+    {
+      "from": "PHIL.FOUND.INTRO",
+      "to": "PHIL.ETH.META",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "FOUND.INTRO is prerequisite"
+    },
+    {
+      "from": "PHIL.ETH.META",
+      "to": "PHIL.ETH.NORM",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "ETH.META is prerequisite"
+    },
+    {
+      "from": "PHIL.ETH.NORM",
+      "to": "PHIL.ETH.APPLIED",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "ETH.NORM is prerequisite"
+    },
+    {
+      "from": "PHIL.ETH.APPLIED",
+      "to": "PHIL.ETH.AI",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "ETH.APPLIED is prerequisite"
+    },
+    {
+      "from": "PHIL.CORE.MIND",
+      "to": "PHIL.ETH.AI",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CORE.MIND is prerequisite"
+    },
+    {
+      "from": "PHIL.ETH.NORM",
+      "to": "PHIL.ETH.POLITICAL",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "ETH.NORM is prerequisite"
+    },
+    {
+      "from": "PHIL.FOUND.ANCIENT",
+      "to": "PHIL.PRAC.STOIC",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "FOUND.ANCIENT is prerequisite"
+    },
+    {
+      "from": "PHIL.FOUND.MODERN",
+      "to": "PHIL.PRAC.EXIST",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "FOUND.MODERN is prerequisite"
+    },
+    {
+      "from": "PHIL.FOUND.INTRO",
+      "to": "PHIL.PRAC.THOUGHT",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "FOUND.INTRO is prerequisite"
+    },
+    {
+      "from": "PHIL.CORE.EPIST",
+      "to": "PHIL.SCI.PHIL",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CORE.EPIST is prerequisite"
+    },
+    {
+      "from": "PHIL.FOUND.LOGIC",
+      "to": "PHIL.SCI.PHIL",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "FOUND.LOGIC is prerequisite"
+    }
+  ]
+}

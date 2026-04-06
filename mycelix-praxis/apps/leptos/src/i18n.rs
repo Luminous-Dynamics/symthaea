@@ -336,7 +336,7 @@ fn t_sw(key: &str) -> &'static str {
 // Language context provider
 // ============================================================
 
-const LANG_KEY: &str = "edunet_lang";
+const LANG_KEY: &str = "praxis_lang";
 
 /// Detect browser language
 fn detect_language() -> Lang {

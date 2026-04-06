@@ -1,0 +1,71 @@
+{
+  "version": 2,
+  "name": "edunet",
+  "buildCommand": "",
+  "outputDirectory": "dist",
+  "routes": [
+    {
+      "src": "/caps/(.*)",
+      "dest": "/caps/$1"
+    },
+    {
+      "src": "/sw.js",
+      "dest": "/sw.js"
+    },
+    {
+      "src": "/manifest.json",
+      "dest": "/manifest.json"
+    },
+    {
+      "src": "/(.*)\\.wasm",
+      "dest": "/$1.wasm",
+      "headers": {
+        "Content-Type": "application/wasm"
+      }
+    },
+    {
+      "src": "/(.*)\\.js",
+      "dest": "/$1.js"
+    },
+    {
+      "src": "/(.*)\\.css",
+      "dest": "/$1.css"
+    },
+    {
+      "src": "/(.*)\\.png",
+      "dest": "/$1.png"
+    },
+    {
+      "src": "/(.*)\\.json",
+      "dest": "/$1.json"
+    },
+    {
+      "handle": "filesystem"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/index.html"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/(.*)\\.wasm",
+      "headers": [
+        { "key": "Content-Type", "value": "application/wasm" },
+        { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }
+      ]
+    },
+    {
+      "source": "/(.*)\\.js",
+      "headers": [
+        { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }
+      ]
+    },
+    {
+      "source": "/sw.js",
+      "headers": [
+        { "key": "Cache-Control", "value": "no-cache" }
+      ]
+    }
+  ]
+}

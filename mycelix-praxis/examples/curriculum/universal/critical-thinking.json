@@ -1,0 +1,233 @@
+{
+  "metadata": {
+    "title": "Critical Thinking & Logic",
+    "framework": "EduNet Universal Curriculum",
+    "source": "https://edunet.luminousdynamics.io",
+    "grade_level": "Adult",
+    "subject_area": "Critical Thinking",
+    "domain": "Critical Thinking",
+    "version": "2026",
+    "total_standards": 6,
+    "domains": [
+      "Critical Thinking"
+    ],
+    "created_at": "2026-03-30",
+    "notes": "Essential Critical Thinking knowledge curated for universal access."
+  },
+  "nodes": [
+    {
+      "id": "UNI.CRITICAL.CT.ARGS",
+      "title": "Argument Structure",
+      "description": "Premises, conclusions, validity, soundness. Identifying hidden assumptions.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Critical Thinking",
+      "subdomain": "CT",
+      "tags": [
+        "arguments",
+        "premises",
+        "conclusions",
+        "validity",
+        "critical thinking"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Adult"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Critical Thinking",
+      "academic_standards": [
+        {
+          "framework": "EduNet Universal Curriculum",
+          "code": "UNI.CRITICAL.CT.ARGS",
+          "description": "Premises, conclusions, validity, soundness. Identifying hidden assumptions.",
+          "grade_level": "Adult"
+        }
+      ]
+    },
+    {
+      "id": "UNI.CRITICAL.CT.FALL",
+      "title": "Logical Fallacies",
+      "description": "Ad hominem, straw man, false dichotomy, appeal to authority, slippery slope, circular reasoning, red herring.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Critical Thinking",
+      "subdomain": "CT",
+      "tags": [
+        "fallacies",
+        "ad-hominem",
+        "straw-man",
+        "critical thinking"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Adult"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Critical Thinking",
+      "academic_standards": [
+        {
+          "framework": "EduNet Universal Curriculum",
+          "code": "UNI.CRITICAL.CT.FALL",
+          "description": "Ad hominem, straw man, false dichotomy, appeal to authority, slippery slope, circular reasoning, red herring.",
+          "grade_level": "Adult"
+        }
+      ]
+    },
+    {
+      "id": "UNI.CRITICAL.CT.EVID",
+      "title": "Evidence Evaluation",
+      "description": "Anecdotal vs statistical evidence, correlation vs causation, sample size, peer review.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Critical Thinking",
+      "subdomain": "CT",
+      "tags": [
+        "evidence",
+        "correlation",
+        "causation",
+        "peer-review",
+        "critical thinking"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Adult"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Critical Thinking",
+      "academic_standards": [
+        {
+          "framework": "EduNet Universal Curriculum",
+          "code": "UNI.CRITICAL.CT.EVID",
+          "description": "Anecdotal vs statistical evidence, correlation vs causation, sample size, peer review.",
+          "grade_level": "Adult"
+        }
+      ]
+    },
+    {
+      "id": "UNI.CRITICAL.CT.BIAS",
+      "title": "Cognitive Biases",
+      "description": "Confirmation bias, anchoring, availability heuristic, Dunning-Kruger, sunk cost fallacy.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Critical Thinking",
+      "subdomain": "CT",
+      "tags": [
+        "cognitive-biases",
+        "confirmation-bias",
+        "anchoring",
+        "critical thinking"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Adult"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Critical Thinking",
+      "academic_standards": [
+        {
+          "framework": "EduNet Universal Curriculum",
+          "code": "UNI.CRITICAL.CT.BIAS",
+          "description": "Confirmation bias, anchoring, availability heuristic, Dunning-Kruger, sunk cost fallacy.",
+          "grade_level": "Adult"
+        }
+      ]
+    },
+    {
+      "id": "UNI.CRITICAL.CT.MEDIA",
+      "title": "Media Literacy",
+      "description": "Source verification, detecting misinformation, understanding bias in reporting, fact-checking methods.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Critical Thinking",
+      "subdomain": "CT",
+      "tags": [
+        "media-literacy",
+        "misinformation",
+        "fact-checking",
+        "critical thinking"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Adult"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Critical Thinking",
+      "academic_standards": [
+        {
+          "framework": "EduNet Universal Curriculum",
+          "code": "UNI.CRITICAL.CT.MEDIA",
+          "description": "Source verification, detecting misinformation, understanding bias in reporting, fact-checking methods.",
+          "grade_level": "Adult"
+        }
+      ]
+    },
+    {
+      "id": "UNI.CRITICAL.CT.STAT",
+      "title": "Statistical Reasoning",
+      "description": "Understanding percentages, risk communication, base rate neglect, Simpson's paradox.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Critical Thinking",
+      "subdomain": "CT",
+      "tags": [
+        "statistics",
+        "risk",
+        "base-rate",
+        "percentages",
+        "critical thinking"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Adult"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Critical Thinking",
+      "academic_standards": [
+        {
+          "framework": "EduNet Universal Curriculum",
+          "code": "UNI.CRITICAL.CT.STAT",
+          "description": "Understanding percentages, risk communication, base rate neglect, Simpson's paradox.",
+          "grade_level": "Adult"
+        }
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "from": "UNI.CRITICAL.CT.ARGS",
+      "to": "UNI.CRITICAL.CT.FALL",
+      "edge_type": "Recommends",
+      "strength_permille": 600,
+      "rationale": "Sequential learning"
+    },
+    {
+      "from": "UNI.CRITICAL.CT.FALL",
+      "to": "UNI.CRITICAL.CT.EVID",
+      "edge_type": "Recommends",
+      "strength_permille": 600,
+      "rationale": "Sequential learning"
+    },
+    {
+      "from": "UNI.CRITICAL.CT.EVID",
+      "to": "UNI.CRITICAL.CT.BIAS",
+      "edge_type": "Recommends",
+      "strength_permille": 600,
+      "rationale": "Sequential learning"
+    },
+    {
+      "from": "UNI.CRITICAL.CT.BIAS",
+      "to": "UNI.CRITICAL.CT.MEDIA",
+      "edge_type": "Recommends",
+      "strength_permille": 600,
+      "rationale": "Sequential learning"
+    },
+    {
+      "from": "UNI.CRITICAL.CT.MEDIA",
+      "to": "UNI.CRITICAL.CT.STAT",
+      "edge_type": "Recommends",
+      "strength_permille": 600,
+      "rationale": "Sequential learning"
+    }
+  ]
+}

@@ -5,7 +5,7 @@
 //! # Job Postings Integrity Zome
 //!
 //! Entry types and validation for decentralized job postings in the
-//! Mycelix Professional Network. Jobs are discoverable via anchor-indexed
+//! Mycelix Craft. Jobs are discoverable via anchor-indexed
 //! skill links — the client-side matching engine queries these.
 
 use hdi::prelude::*;

@@ -5,7 +5,7 @@
 //!
 //! Manages courses, learning materials, and learner progress.
 
-use edunet_core::CourseId;
+use praxis_core::CourseId;
 use serde::{Deserialize, Serialize};
 
 /// Course entry

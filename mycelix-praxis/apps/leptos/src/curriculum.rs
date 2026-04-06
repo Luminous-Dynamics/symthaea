@@ -524,7 +524,7 @@ impl ProgressStore {
     }
 }
 
-const PROGRESS_KEY: &str = "edunet_progress";
+const PROGRESS_KEY: &str = "praxis_progress";
 
 // ============================================================
 // Leptos context provider
@@ -637,7 +637,7 @@ pub fn provide_curriculum_context() {
         .unwrap_or_default();
 
     // Default grade from student profile (so constellation shows relevant content)
-    let profile_grade = persistence::load::<crate::student_profile::StudentProfile>("edunet_profile")
+    let profile_grade = persistence::load::<crate::student_profile::StudentProfile>("praxis_profile")
         .map(|p| Grade::from_profile_grade(p.grade))
         .unwrap_or(Grade::Gr12);
     let default_subject = match profile_grade {

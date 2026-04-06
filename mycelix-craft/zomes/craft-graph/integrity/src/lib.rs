@@ -6,7 +6,7 @@ use hdi::prelude::*;
 
 #[hdk_entry_helper]
 #[derive(Clone, PartialEq)]
-pub struct ProfessionalProfile {
+pub struct CraftProfile {
     pub display_name: String,
     pub headline: String,
     pub bio: String,
@@ -96,7 +96,7 @@ pub struct Anchor(pub String);
 #[unit_enum(UnitEntryTypes)]
 pub enum EntryTypes {
     #[entry_type(visibility = "public")]
-    ProfessionalProfile(ProfessionalProfile),
+    CraftProfile(CraftProfile),
     #[entry_type(visibility = "public")]
     PublishedCredential(PublishedCredential),
     #[entry_type(visibility = "public")]

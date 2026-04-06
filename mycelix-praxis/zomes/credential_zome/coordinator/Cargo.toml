@@ -15,7 +15,7 @@ name = "credential_coordinator"
 hdk.workspace = true
 
 # Core types
-edunet-core = { path = "../../../crates/edunet-core" }
+praxis-core = { path = "../../../crates/praxis-core" }
 
 # Integrity zome (for entry types)
 credential_integrity = { path = "../integrity" }

@@ -483,7 +483,7 @@ fn OnboardingFlow(
                 view! {
                     <div class="onboarding-step" style="animation: card-in 0.4s ease-out">
                         <h1 style="font-size: 2rem; margin-bottom: 0.5rem; color: var(--primary)">"Hey there."</h1>
-                        <p style="color: var(--text-secondary); margin-bottom: 2rem">"Welcome to EduNet."</p>
+                        <p style="color: var(--text-secondary); margin-bottom: 2rem">"Welcome to Praxis."</p>
                         <p style="font-size: 1.1rem; margin-bottom: 1rem">"What should I call you?"</p>
                         <input
                             type="text"

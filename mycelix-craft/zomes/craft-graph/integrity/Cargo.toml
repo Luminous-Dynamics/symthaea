@@ -1,5 +1,5 @@
 [package]
-name = "professional_graph_integrity"
+name = "craft_graph_integrity"
 version = "0.1.0"
 edition = "2021"
 

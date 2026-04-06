@@ -1,0 +1,194 @@
+{
+  "metadata": {
+    "title": "Emotional Intelligence",
+    "framework": "EduNet Universal Curriculum",
+    "source": "https://edunet.luminousdynamics.io",
+    "grade_level": "Adult",
+    "subject_area": "Emotional Intelligence",
+    "domain": "Emotional Intelligence",
+    "version": "2026",
+    "total_standards": 5,
+    "domains": [
+      "Emotional Intelligence"
+    ],
+    "created_at": "2026-03-30",
+    "notes": "Essential Emotional Intelligence knowledge curated for universal access."
+  },
+  "nodes": [
+    {
+      "id": "UNI.EMOTIONAL.EQ.SELF",
+      "title": "Self-Awareness",
+      "description": "Recognising emotions, understanding triggers, emotional vocabulary, mindfulness.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Emotional Intelligence",
+      "subdomain": "EQ",
+      "tags": [
+        "self-awareness",
+        "emotions",
+        "mindfulness",
+        "emotional intelligence"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Adult"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Emotional Intelligence",
+      "academic_standards": [
+        {
+          "framework": "EduNet Universal Curriculum",
+          "code": "UNI.EMOTIONAL.EQ.SELF",
+          "description": "Recognising emotions, understanding triggers, emotional vocabulary, mindfulness.",
+          "grade_level": "Adult"
+        }
+      ]
+    },
+    {
+      "id": "UNI.EMOTIONAL.EQ.MGMT",
+      "title": "Self-Management",
+      "description": "Emotion regulation, impulse control, stress management, adaptability, growth mindset.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Emotional Intelligence",
+      "subdomain": "EQ",
+      "tags": [
+        "self-management",
+        "regulation",
+        "growth-mindset",
+        "emotional intelligence"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Adult"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Emotional Intelligence",
+      "academic_standards": [
+        {
+          "framework": "EduNet Universal Curriculum",
+          "code": "UNI.EMOTIONAL.EQ.MGMT",
+          "description": "Emotion regulation, impulse control, stress management, adaptability, growth mindset.",
+          "grade_level": "Adult"
+        }
+      ]
+    },
+    {
+      "id": "UNI.EMOTIONAL.EQ.SOCIAL",
+      "title": "Social Awareness",
+      "description": "Empathy, perspective-taking, reading social cues, cultural awareness, compassion.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Emotional Intelligence",
+      "subdomain": "EQ",
+      "tags": [
+        "empathy",
+        "perspective-taking",
+        "social-awareness",
+        "emotional intelligence"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Adult"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Emotional Intelligence",
+      "academic_standards": [
+        {
+          "framework": "EduNet Universal Curriculum",
+          "code": "UNI.EMOTIONAL.EQ.SOCIAL",
+          "description": "Empathy, perspective-taking, reading social cues, cultural awareness, compassion.",
+          "grade_level": "Adult"
+        }
+      ]
+    },
+    {
+      "id": "UNI.EMOTIONAL.EQ.REL",
+      "title": "Relationship Skills",
+      "description": "Active listening, clear communication, teamwork, conflict resolution, boundary-setting.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Emotional Intelligence",
+      "subdomain": "EQ",
+      "tags": [
+        "relationships",
+        "listening",
+        "conflict-resolution",
+        "emotional intelligence"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Adult"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Emotional Intelligence",
+      "academic_standards": [
+        {
+          "framework": "EduNet Universal Curriculum",
+          "code": "UNI.EMOTIONAL.EQ.REL",
+          "description": "Active listening, clear communication, teamwork, conflict resolution, boundary-setting.",
+          "grade_level": "Adult"
+        }
+      ]
+    },
+    {
+      "id": "UNI.EMOTIONAL.EQ.DECIDE",
+      "title": "Responsible Decision-Making",
+      "description": "Ethical considerations, consequence evaluation, help-seeking, reflective practice.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Emotional Intelligence",
+      "subdomain": "EQ",
+      "tags": [
+        "decision-making",
+        "ethics",
+        "reflection",
+        "emotional intelligence"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Adult"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Emotional Intelligence",
+      "academic_standards": [
+        {
+          "framework": "EduNet Universal Curriculum",
+          "code": "UNI.EMOTIONAL.EQ.DECIDE",
+          "description": "Ethical considerations, consequence evaluation, help-seeking, reflective practice.",
+          "grade_level": "Adult"
+        }
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "from": "UNI.EMOTIONAL.EQ.SELF",
+      "to": "UNI.EMOTIONAL.EQ.MGMT",
+      "edge_type": "Recommends",
+      "strength_permille": 600,
+      "rationale": "Sequential learning"
+    },
+    {
+      "from": "UNI.EMOTIONAL.EQ.MGMT",
+      "to": "UNI.EMOTIONAL.EQ.SOCIAL",
+      "edge_type": "Recommends",
+      "strength_permille": 600,
+      "rationale": "Sequential learning"
+    },
+    {
+      "from": "UNI.EMOTIONAL.EQ.SOCIAL",
+      "to": "UNI.EMOTIONAL.EQ.REL",
+      "edge_type": "Recommends",
+      "strength_permille": 600,
+      "rationale": "Sequential learning"
+    },
+    {
+      "from": "UNI.EMOTIONAL.EQ.REL",
+      "to": "UNI.EMOTIONAL.EQ.DECIDE",
+      "edge_type": "Recommends",
+      "strength_permille": 600,
+      "rationale": "Sequential learning"
+    }
+  ]
+}

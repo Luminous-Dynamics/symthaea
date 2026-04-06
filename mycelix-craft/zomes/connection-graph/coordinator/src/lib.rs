@@ -4,7 +4,7 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! # Connection Graph Coordinator Zome
 //!
-//! Professional network connections and recommendations.
+//! Craft network connections and recommendations.
 //! Connection counts use link-counting (never mutable entry counters).
 //! Bidirectional links created on accept ensure both parties can query.
 
@@ -130,20 +130,17 @@ pub fn accept_connection(request_hash: ActionHash) -> ExternResult<ActionHash> {
     let new_hash = update_entry(request_hash, &accepted)?;
 
     // Create bidirectional connection links
-    let sender_hash: AnyDhtHash = request.sender.clone().into();
-    let target_hash: AnyDhtHash = agent.clone().into();
-
     // Sender -> Target (as connection)
     create_link(
-        sender_hash,
-        target_hash.clone().into_agent_pub_key().unwrap(),
+        request.sender.clone(),
+        agent.clone(),
         LinkTypes::AgentToConnection,
         vec![],
     )?;
 
     // Target -> Sender (as connection)
     create_link(
-        target_hash,
+        agent,
         request.sender,
         LinkTypes::AgentToConnection,
         vec![],
@@ -224,7 +221,7 @@ pub fn get_connection_count(agent: AgentPubKey) -> ExternResult<u32> {
     Ok(links.len() as u32)
 }
 
-/// Write a professional recommendation for another agent.
+/// Write a recommendation for another agent.
 #[hdk_extern]
 pub fn write_recommendation(input: WriteRecommendationInput) -> ExternResult<ActionHash> {
     let agent = agent_info()?.agent_initial_pubkey;

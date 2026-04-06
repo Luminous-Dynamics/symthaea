@@ -1,12 +1,12 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-//! Profile page — professional identity, work history, credentials, and endorsements.
+//! Profile page — craft identity, work history, credentials, and endorsements.
 
 use leptos::prelude::*;
 
 use crate::persistence;
 
-const PROFILE_KEY: &str = "professional_profile_draft";
+const PROFILE_KEY: &str = "craft_profile_draft";
 
 #[derive(Clone, Debug, Default, serde::Serialize, serde::Deserialize)]
 struct ProfileDraft {
@@ -29,7 +29,7 @@ pub fn ProfilePage() -> impl IntoView {
 
     view! {
         <div class="page profile-page">
-            <h1>"Professional Profile"</h1>
+            <h1>"Craft Profile"</h1>
 
             <div class="profile-grid">
                 <div class="profile-section">
@@ -67,7 +67,7 @@ pub fn ProfilePage() -> impl IntoView {
                         <textarea
                             id="bio"
                             rows="4"
-                            placeholder="Tell your professional story..."
+                            placeholder="Tell your your story..."
                             prop:value=move || draft.get().bio
                             on:input=move |ev| {
                                 use wasm_bindgen::JsCast;

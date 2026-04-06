@@ -1,6 +1,6 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-//! Professional Network Dashboard — overview of profile, connections, and job matches.
+//! Craft Dashboard — overview of profile, connections, and job matches.
 
 use leptos::prelude::*;
 
@@ -8,18 +8,18 @@ use leptos::prelude::*;
 pub fn DashboardPage() -> impl IntoView {
     view! {
         <div class="page dashboard-page">
-            <h1>"Professional Dashboard"</h1>
+            <h1>"Craft Dashboard"</h1>
 
             <div class="dashboard-grid">
                 <div class="dash-card">
                     <h3>"Profile"</h3>
-                    <p class="dash-stat">"Set up your professional profile to get started."</p>
+                    <p class="dash-stat">"Set up your craft profile to get started."</p>
                     <a href="/profile" class="btn-primary">"Edit Profile"</a>
                 </div>
 
                 <div class="dash-card">
                     <h3>"Connections"</h3>
-                    <p class="dash-stat">"Build your professional network."</p>
+                    <p class="dash-stat">"Build your craft network."</p>
                     <a href="/network" class="btn-secondary">"View Network"</a>
                 </div>
 

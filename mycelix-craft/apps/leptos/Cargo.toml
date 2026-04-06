@@ -2,11 +2,11 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 [package]
-name = "mycelix-professional-ui"
+name = "mycelix-craft-ui"
 version = "0.1.0"
 edition = "2021"
 license = "AGPL-3.0-or-later"
-description = "Leptos CSR frontend for Mycelix Professional Network"
+description = "Leptos CSR frontend for Mycelix Craft — decentralized talent marketplace with living credentials"
 
 [dependencies]
 leptos = { version = "0.8", features = ["csr"] }

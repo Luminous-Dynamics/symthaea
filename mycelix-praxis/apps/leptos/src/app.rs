@@ -49,7 +49,7 @@ fn AppInner() -> impl IntoView {
     view! {
         <Router>
             <nav class="navbar">
-                <a href="/" class="logo">"EduNet"</a>
+                <a href="/" class="logo">"Praxis"</a>
                 <div class="nav-links">
                     <RoleNav role=role />
                 </div>

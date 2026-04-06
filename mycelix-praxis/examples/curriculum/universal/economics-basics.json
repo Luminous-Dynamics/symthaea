@@ -1,0 +1,159 @@
+{
+  "metadata": {
+    "title": "Economics Basics",
+    "framework": "EduNet Universal Curriculum",
+    "source": "https://edunet.luminousdynamics.io",
+    "grade_level": "Adult",
+    "subject_area": "Economics",
+    "domain": "Economics",
+    "version": "2026",
+    "total_standards": 4,
+    "domains": [
+      "Economics"
+    ],
+    "created_at": "2026-03-30",
+    "notes": "Essential Economics knowledge curated for universal access."
+  },
+  "nodes": [
+    {
+      "id": "UNI.ECONOMICS.ECON.SUPPLY",
+      "title": "Supply & Demand",
+      "description": "Market equilibrium, price signals, elasticity, surpluses and shortages.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Economics",
+      "subdomain": "ECON",
+      "tags": [
+        "supply",
+        "demand",
+        "equilibrium",
+        "economics"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Adult"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Economics",
+      "academic_standards": [
+        {
+          "framework": "EduNet Universal Curriculum",
+          "code": "UNI.ECONOMICS.ECON.SUPPLY",
+          "description": "Market equilibrium, price signals, elasticity, surpluses and shortages.",
+          "grade_level": "Adult"
+        }
+      ]
+    },
+    {
+      "id": "UNI.ECONOMICS.ECON.INCENT",
+      "title": "Incentives",
+      "description": "How incentives shape behaviour, moral hazard, externalities, Pigouvian taxes.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Economics",
+      "subdomain": "ECON",
+      "tags": [
+        "incentives",
+        "externalities",
+        "moral-hazard",
+        "economics"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Adult"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Economics",
+      "academic_standards": [
+        {
+          "framework": "EduNet Universal Curriculum",
+          "code": "UNI.ECONOMICS.ECON.INCENT",
+          "description": "How incentives shape behaviour, moral hazard, externalities, Pigouvian taxes.",
+          "grade_level": "Adult"
+        }
+      ]
+    },
+    {
+      "id": "UNI.ECONOMICS.ECON.MACRO",
+      "title": "Macroeconomics Basics",
+      "description": "GDP, inflation, unemployment, monetary/fiscal policy, trade.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Economics",
+      "subdomain": "ECON",
+      "tags": [
+        "gdp",
+        "inflation",
+        "unemployment",
+        "monetary-policy",
+        "economics"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Adult"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Economics",
+      "academic_standards": [
+        {
+          "framework": "EduNet Universal Curriculum",
+          "code": "UNI.ECONOMICS.ECON.MACRO",
+          "description": "GDP, inflation, unemployment, monetary/fiscal policy, trade.",
+          "grade_level": "Adult"
+        }
+      ]
+    },
+    {
+      "id": "UNI.ECONOMICS.ECON.BEHAV",
+      "title": "Behavioural Economics",
+      "description": "Nudges, loss aversion, framing, bounded rationality, choice architecture.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Economics",
+      "subdomain": "ECON",
+      "tags": [
+        "behavioural-economics",
+        "nudges",
+        "loss-aversion",
+        "economics"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Adult"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Economics",
+      "academic_standards": [
+        {
+          "framework": "EduNet Universal Curriculum",
+          "code": "UNI.ECONOMICS.ECON.BEHAV",
+          "description": "Nudges, loss aversion, framing, bounded rationality, choice architecture.",
+          "grade_level": "Adult"
+        }
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "from": "UNI.ECONOMICS.ECON.SUPPLY",
+      "to": "UNI.ECONOMICS.ECON.INCENT",
+      "edge_type": "Recommends",
+      "strength_permille": 600,
+      "rationale": "Sequential learning"
+    },
+    {
+      "from": "UNI.ECONOMICS.ECON.INCENT",
+      "to": "UNI.ECONOMICS.ECON.MACRO",
+      "edge_type": "Recommends",
+      "strength_permille": 600,
+      "rationale": "Sequential learning"
+    },
+    {
+      "from": "UNI.ECONOMICS.ECON.MACRO",
+      "to": "UNI.ECONOMICS.ECON.BEHAV",
+      "edge_type": "Recommends",
+      "strength_permille": 600,
+      "rationale": "Sequential learning"
+    }
+  ]
+}

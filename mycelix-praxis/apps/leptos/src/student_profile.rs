@@ -25,7 +25,7 @@ pub struct StudentProfile {
     pub framework: String,
 }
 
-const PROFILE_KEY: &str = "edunet_student_profile";
+const PROFILE_KEY: &str = "praxis_student_profile";
 
 /// Provide student profile context. Call once at app root.
 pub fn provide_profile_context() -> (ReadSignal<StudentProfile>, WriteSignal<StudentProfile>) {

@@ -1,0 +1,230 @@
+{
+  "metadata": {
+    "title": "Systems Thinking",
+    "framework": "EduNet Universal Curriculum",
+    "source": "https://edunet.luminousdynamics.io",
+    "grade_level": "Adult",
+    "subject_area": "Systems Thinking",
+    "domain": "Systems Thinking",
+    "version": "2026",
+    "total_standards": 6,
+    "domains": [
+      "Systems Thinking"
+    ],
+    "created_at": "2026-03-30",
+    "notes": "Essential Systems Thinking knowledge curated for universal access."
+  },
+  "nodes": [
+    {
+      "id": "UNI.SYSTEMS.SYS.FEED",
+      "title": "Feedback Loops",
+      "description": "Positive (reinforcing) and negative (balancing) feedback. Examples in nature, economy, technology.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Systems Thinking",
+      "subdomain": "SYS",
+      "tags": [
+        "feedback-loops",
+        "reinforcing",
+        "balancing",
+        "systems thinking"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Adult"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Systems Thinking",
+      "academic_standards": [
+        {
+          "framework": "EduNet Universal Curriculum",
+          "code": "UNI.SYSTEMS.SYS.FEED",
+          "description": "Positive (reinforcing) and negative (balancing) feedback. Examples in nature, economy, technology.",
+          "grade_level": "Adult"
+        }
+      ]
+    },
+    {
+      "id": "UNI.SYSTEMS.SYS.STOCK",
+      "title": "Stocks and Flows",
+      "description": "Accumulation and depletion. Bathtub analogy. Why systems resist change.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Systems Thinking",
+      "subdomain": "SYS",
+      "tags": [
+        "stocks",
+        "flows",
+        "accumulation",
+        "systems thinking"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Adult"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Systems Thinking",
+      "academic_standards": [
+        {
+          "framework": "EduNet Universal Curriculum",
+          "code": "UNI.SYSTEMS.SYS.STOCK",
+          "description": "Accumulation and depletion. Bathtub analogy. Why systems resist change.",
+          "grade_level": "Adult"
+        }
+      ]
+    },
+    {
+      "id": "UNI.SYSTEMS.SYS.EMERGE",
+      "title": "Emergence",
+      "description": "How simple rules create complex behaviour. Ant colonies, traffic, markets, consciousness.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Systems Thinking",
+      "subdomain": "SYS",
+      "tags": [
+        "emergence",
+        "complexity",
+        "self-organisation",
+        "systems thinking"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Adult"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Systems Thinking",
+      "academic_standards": [
+        {
+          "framework": "EduNet Universal Curriculum",
+          "code": "UNI.SYSTEMS.SYS.EMERGE",
+          "description": "How simple rules create complex behaviour. Ant colonies, traffic, markets, consciousness.",
+          "grade_level": "Adult"
+        }
+      ]
+    },
+    {
+      "id": "UNI.SYSTEMS.SYS.LEVER",
+      "title": "Leverage Points",
+      "description": "Donella Meadows' 12 leverage points. Where to intervene in a system for maximum effect.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Systems Thinking",
+      "subdomain": "SYS",
+      "tags": [
+        "leverage-points",
+        "meadows",
+        "intervention",
+        "systems thinking"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Adult"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Systems Thinking",
+      "academic_standards": [
+        {
+          "framework": "EduNet Universal Curriculum",
+          "code": "UNI.SYSTEMS.SYS.LEVER",
+          "description": "Donella Meadows' 12 leverage points. Where to intervene in a system for maximum effect.",
+          "grade_level": "Adult"
+        }
+      ]
+    },
+    {
+      "id": "UNI.SYSTEMS.SYS.MENTAL",
+      "title": "Mental Models",
+      "description": "How assumptions shape perception. Challenging mental models. Double-loop learning.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Systems Thinking",
+      "subdomain": "SYS",
+      "tags": [
+        "mental-models",
+        "assumptions",
+        "double-loop-learning",
+        "systems thinking"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Adult"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Systems Thinking",
+      "academic_standards": [
+        {
+          "framework": "EduNet Universal Curriculum",
+          "code": "UNI.SYSTEMS.SYS.MENTAL",
+          "description": "How assumptions shape perception. Challenging mental models. Double-loop learning.",
+          "grade_level": "Adult"
+        }
+      ]
+    },
+    {
+      "id": "UNI.SYSTEMS.SYS.MAP",
+      "title": "System Mapping",
+      "description": "Causal loop diagrams, stock-and-flow diagrams, iceberg model, behaviour-over-time graphs.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Systems Thinking",
+      "subdomain": "SYS",
+      "tags": [
+        "system-mapping",
+        "causal-loops",
+        "iceberg-model",
+        "systems thinking"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Adult"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Systems Thinking",
+      "academic_standards": [
+        {
+          "framework": "EduNet Universal Curriculum",
+          "code": "UNI.SYSTEMS.SYS.MAP",
+          "description": "Causal loop diagrams, stock-and-flow diagrams, iceberg model, behaviour-over-time graphs.",
+          "grade_level": "Adult"
+        }
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "from": "UNI.SYSTEMS.SYS.FEED",
+      "to": "UNI.SYSTEMS.SYS.STOCK",
+      "edge_type": "Recommends",
+      "strength_permille": 600,
+      "rationale": "Sequential learning"
+    },
+    {
+      "from": "UNI.SYSTEMS.SYS.STOCK",
+      "to": "UNI.SYSTEMS.SYS.EMERGE",
+      "edge_type": "Recommends",
+      "strength_permille": 600,
+      "rationale": "Sequential learning"
+    },
+    {
+      "from": "UNI.SYSTEMS.SYS.EMERGE",
+      "to": "UNI.SYSTEMS.SYS.LEVER",
+      "edge_type": "Recommends",
+      "strength_permille": 600,
+      "rationale": "Sequential learning"
+    },
+    {
+      "from": "UNI.SYSTEMS.SYS.LEVER",
+      "to": "UNI.SYSTEMS.SYS.MENTAL",
+      "edge_type": "Recommends",
+      "strength_permille": 600,
+      "rationale": "Sequential learning"
+    },
+    {
+      "from": "UNI.SYSTEMS.SYS.MENTAL",
+      "to": "UNI.SYSTEMS.SYS.MAP",
+      "edge_type": "Recommends",
+      "strength_permille": 600,
+      "rationale": "Sequential learning"
+    }
+  ]
+}

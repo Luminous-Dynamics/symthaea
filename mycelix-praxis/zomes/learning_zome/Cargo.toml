@@ -13,7 +13,7 @@ crate-type = ["cdylib", "rlib"]
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
-edunet-core = { path = "../../crates/edunet-core" }
+praxis-core = { path = "../../crates/praxis-core" }
 
 # Holochain 0.6 dependencies for zome implementation
 hdk.workspace = true

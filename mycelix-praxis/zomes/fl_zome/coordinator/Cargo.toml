@@ -15,7 +15,7 @@ name = "fl_coordinator"
 hdk.workspace = true
 
 # Core types
-edunet-core = { path = "../../../crates/edunet-core" }
+praxis-core = { path = "../../../crates/praxis-core" }
 # Note: edunet-agg removed - aggregation happens client-side, not in WASM zome
 
 # Integrity zome (for entry types)

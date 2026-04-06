@@ -74,11 +74,11 @@ struct EndorsementDraft {
     evidence: String,
 }
 
-const PROFILE_DRAFT_KEY: &str = "edunet_professional_profile_draft";
-const PROFILE_PUBLISH_KEY: &str = "edunet_professional_published";
-const ENDORSE_DRAFT_KEY: &str = "edunet_professional_endorsement_draft";
-const PROFILE_VIEW_KEY: &str = "edunet_professional_view_agent";
-const PROFILE_FILTER_KEY: &str = "edunet_professional_filter_skill";
+const PROFILE_DRAFT_KEY: &str = "praxis_professional_profile_draft";
+const PROFILE_PUBLISH_KEY: &str = "praxis_professional_published";
+const ENDORSE_DRAFT_KEY: &str = "praxis_professional_endorsement_draft";
+const PROFILE_VIEW_KEY: &str = "praxis_professional_view_agent";
+const PROFILE_FILTER_KEY: &str = "praxis_professional_filter_skill";
 
 fn initial_profile(student_name: String) -> ProfessionalProfileDraft {
     let mut draft = persistence::load::<ProfessionalProfileDraft>(PROFILE_DRAFT_KEY).unwrap_or_default();
@@ -433,7 +433,7 @@ fn ProfileInner() -> impl IntoView {
                                 issuer: payload_issuer.clone(),
                                 issued_on: payload_issuance_date.clone(),
                                 expires_on: payload_expiration_date.clone(),
-                                source_dna: Some("edunet".into()),
+                                source_dna: Some("praxis".into()),
                                 entry_hash: None,
                                 action_hash: None,
                                 summary: Some(format!("Score band: {}", payload_score_band)),

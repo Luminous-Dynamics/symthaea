@@ -15,7 +15,7 @@ name = "knowledge_integrity"
 hdi.workspace = true
 
 # Core types
-edunet-core = { path = "../../../crates/edunet-core" }
+praxis-core = { path = "../../../crates/praxis-core" }
 
 # Serialization
 serde.workspace = true

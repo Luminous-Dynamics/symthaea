@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 
-//! Sovereignty-respecting cognitive adaptivity engine for EduNet.
+//! Sovereignty-respecting cognitive adaptivity engine for Praxis.
 //!
 //! This module adapts learning content in real-time based on the student's
 //! cognitive state. It **offers, never imposes**. Every suggestion includes

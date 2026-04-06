@@ -4,13 +4,13 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 use hdk::prelude::*;
 
-use professional_graph_integrity::{
-    Anchor, CompositeProfile, EntryTypes, LinkTypes, ProfessionalProfile,
+use craft_graph_integrity::{
+    Anchor, CompositeProfile, EntryTypes, LinkTypes, CraftProfile,
     PublishedCredential, RetentionCheck, SkillEndorsement,
 };
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-pub struct ProfessionalProfileInput {
+pub struct CraftProfileInput {
     pub display_name: String,
     pub headline: String,
     pub bio: String,
@@ -166,8 +166,8 @@ where
 }
 
 #[hdk_extern]
-pub fn set_profile(input: ProfessionalProfileInput) -> ExternResult<()> {
-    let profile = ProfessionalProfile {
+pub fn set_profile(input: CraftProfileInput) -> ExternResult<()> {
+    let profile = CraftProfile {
         display_name: input.display_name,
         headline: input.headline,
         bio: input.bio,
@@ -177,7 +177,7 @@ pub fn set_profile(input: ProfessionalProfileInput) -> ExternResult<()> {
         updated_at: sys_time()?,
     };
 
-    let action_hash = create_entry(&EntryTypes::ProfessionalProfile(profile))?;
+    let action_hash = create_entry(&EntryTypes::CraftProfile(profile))?;
     let agent = agent_info()?.agent_initial_pubkey;
     create_link(agent, action_hash.clone(), LinkTypes::AgentToProfile, ())?;
 
@@ -185,13 +185,13 @@ pub fn set_profile(input: ProfessionalProfileInput) -> ExternResult<()> {
 }
 
 #[hdk_extern]
-pub fn get_my_profile() -> ExternResult<Option<ProfessionalProfile>> {
+pub fn get_my_profile() -> ExternResult<Option<CraftProfile>> {
     let agent = agent_info()?.agent_initial_pubkey;
     get_profile(agent)
 }
 
 #[hdk_extern]
-pub fn get_profile(agent: AgentPubKey) -> ExternResult<Option<ProfessionalProfile>> {
+pub fn get_profile(agent: AgentPubKey) -> ExternResult<Option<CraftProfile>> {
     let links = get_links(
         LinkQuery::try_new(agent, LinkTypes::AgentToProfile)?,
         GetStrategy::default(),
@@ -199,7 +199,7 @@ pub fn get_profile(agent: AgentPubKey) -> ExternResult<Option<ProfessionalProfil
     if let Some(action_hash) = latest_action_from_links(links) {
         if let Some(record) = get(action_hash, GetOptions::default())? {
             if let Some(Entry::App(bytes)) = record.entry().as_option() {
-                if let Ok(profile) = ProfessionalProfile::try_from(
+                if let Ok(profile) = CraftProfile::try_from(
                     SerializedBytes::from(UnsafeBytes::from(bytes.bytes().to_vec())),
                 ) {
                     return Ok(Some(profile));
@@ -395,17 +395,39 @@ pub fn get_credential_vitality(credential_hash: ActionHash) -> ExternResult<Cred
     let mastery = credential.mastery_level_at_issue.unwrap_or(500); // Default: 50% mastery
     let stability = ebbinghaus_stability(mastery, checks_count);
 
-    // Compute elapsed time since last check (or issue date)
+    // Compute elapsed time since last retention check (or publish time).
+    // Find the most recent RetentionCheck's checked_at timestamp from links,
+    // since the credential's last_retention_check field is only set at publish time.
     let now = sys_time()?;
     let now_micros = now.as_micros();
 
-    let last_check_micros = if let Some(ref check_ts) = credential.last_retention_check {
-        // Parse ISO 8601 → microseconds (approximate)
-        check_ts.parse::<i64>().unwrap_or(now_micros)
-    } else {
-        // Use issued_on as the starting point
-        credential.issued_on.parse::<i64>().unwrap_or(now_micros)
+    let most_recent_check_micros: Option<i64> = {
+        let mut latest: Option<i64> = None;
+        for link in &retention_links {
+            if let Some(hash) = link.target.clone().into_action_hash() {
+                if let Some(record) = get(hash, GetOptions::default())? {
+                    if let Some(Entry::App(bytes)) = record.entry().as_option() {
+                        if let Ok(check) = RetentionCheck::try_from(
+                            SerializedBytes::from(UnsafeBytes::from(bytes.bytes().to_vec())),
+                        ) {
+                            let ts = check.checked_at.as_micros();
+                            latest = Some(latest.map_or(ts, |prev: i64| prev.max(ts)));
+                        }
+                    }
+                }
+            }
+        }
+        latest
     };
+
+    let last_check_micros = most_recent_check_micros.unwrap_or_else(|| {
+        // No retention checks yet — use publish timestamp or issued_on as baseline
+        if let Some(ref check_ts) = credential.last_retention_check {
+            check_ts.parse::<i64>().unwrap_or(now_micros)
+        } else {
+            credential.issued_on.parse::<i64>().unwrap_or(now_micros)
+        }
+    });
 
     let elapsed_minutes = ((now_micros - last_check_micros) as f64) / (60.0 * 1_000_000.0);
     let vitality = predict_vitality(stability, elapsed_minutes.max(0.0));

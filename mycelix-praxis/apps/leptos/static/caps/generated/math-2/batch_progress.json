@@ -1,0 +1,16 @@
+{
+  "total": 8,
+  "completed": [
+    "CAPS.Mathematics.Gr2.NUM",
+    "CAPS.Mathematics.Gr2.ADD",
+    "CAPS.Mathematics.Gr2.MUL",
+    "CAPS.Mathematics.Gr2.FRC",
+    "CAPS.Mathematics.Gr2.PAT",
+    "CAPS.Mathematics.Gr2.SHP",
+    "CAPS.Mathematics.Gr2.MEA",
+    "CAPS.Mathematics.Gr2.DAT"
+  ],
+  "failed": [],
+  "started_at": "2026-03-30T13:17:27",
+  "last_updated": "2026-03-30T13:17:28"
+}

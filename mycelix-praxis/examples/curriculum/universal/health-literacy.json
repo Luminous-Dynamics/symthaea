@@ -1,0 +1,197 @@
+{
+  "metadata": {
+    "title": "Health Literacy",
+    "framework": "EduNet Universal Curriculum",
+    "source": "https://edunet.luminousdynamics.io",
+    "grade_level": "Adult",
+    "subject_area": "Health",
+    "domain": "Health",
+    "version": "2026",
+    "total_standards": 5,
+    "domains": [
+      "Health"
+    ],
+    "created_at": "2026-03-30",
+    "notes": "Essential Health knowledge curated for universal access."
+  },
+  "nodes": [
+    {
+      "id": "UNI.HEALTH.HL.BODY",
+      "title": "How Your Body Works",
+      "description": "Major systems (cardiovascular, respiratory, digestive, nervous). What symptoms mean.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Health",
+      "subdomain": "HL",
+      "tags": [
+        "anatomy",
+        "body-systems",
+        "symptoms",
+        "health"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Adult"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Health",
+      "academic_standards": [
+        {
+          "framework": "EduNet Universal Curriculum",
+          "code": "UNI.HEALTH.HL.BODY",
+          "description": "Major systems (cardiovascular, respiratory, digestive, nervous). What symptoms mean.",
+          "grade_level": "Adult"
+        }
+      ]
+    },
+    {
+      "id": "UNI.HEALTH.HL.NUTR",
+      "title": "Nutrition & Diet",
+      "description": "Macronutrients, micronutrients, balanced diet, hydration, reading food labels.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Health",
+      "subdomain": "HL",
+      "tags": [
+        "nutrition",
+        "diet",
+        "macronutrients",
+        "food-labels",
+        "health"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Adult"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Health",
+      "academic_standards": [
+        {
+          "framework": "EduNet Universal Curriculum",
+          "code": "UNI.HEALTH.HL.NUTR",
+          "description": "Macronutrients, micronutrients, balanced diet, hydration, reading food labels.",
+          "grade_level": "Adult"
+        }
+      ]
+    },
+    {
+      "id": "UNI.HEALTH.HL.MENTAL",
+      "title": "Mental Health",
+      "description": "Stress management, anxiety, depression awareness, when to seek help, stigma reduction.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Health",
+      "subdomain": "HL",
+      "tags": [
+        "mental-health",
+        "stress",
+        "anxiety",
+        "depression",
+        "health"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Adult"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Health",
+      "academic_standards": [
+        {
+          "framework": "EduNet Universal Curriculum",
+          "code": "UNI.HEALTH.HL.MENTAL",
+          "description": "Stress management, anxiety, depression awareness, when to seek help, stigma reduction.",
+          "grade_level": "Adult"
+        }
+      ]
+    },
+    {
+      "id": "UNI.HEALTH.HL.FIRST",
+      "title": "First Aid Basics",
+      "description": "CPR, choking response, wound care, burns, when to call emergency services.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Health",
+      "subdomain": "HL",
+      "tags": [
+        "first-aid",
+        "cpr",
+        "emergency",
+        "health"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Adult"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Health",
+      "academic_standards": [
+        {
+          "framework": "EduNet Universal Curriculum",
+          "code": "UNI.HEALTH.HL.FIRST",
+          "description": "CPR, choking response, wound care, burns, when to call emergency services.",
+          "grade_level": "Adult"
+        }
+      ]
+    },
+    {
+      "id": "UNI.HEALTH.HL.PREVENT",
+      "title": "Disease Prevention",
+      "description": "Vaccines, hygiene, sleep, exercise, screening, chronic disease prevention.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Health",
+      "subdomain": "HL",
+      "tags": [
+        "prevention",
+        "vaccines",
+        "hygiene",
+        "exercise",
+        "health"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Adult"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Health",
+      "academic_standards": [
+        {
+          "framework": "EduNet Universal Curriculum",
+          "code": "UNI.HEALTH.HL.PREVENT",
+          "description": "Vaccines, hygiene, sleep, exercise, screening, chronic disease prevention.",
+          "grade_level": "Adult"
+        }
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "from": "UNI.HEALTH.HL.BODY",
+      "to": "UNI.HEALTH.HL.NUTR",
+      "edge_type": "Recommends",
+      "strength_permille": 600,
+      "rationale": "Sequential learning"
+    },
+    {
+      "from": "UNI.HEALTH.HL.NUTR",
+      "to": "UNI.HEALTH.HL.MENTAL",
+      "edge_type": "Recommends",
+      "strength_permille": 600,
+      "rationale": "Sequential learning"
+    },
+    {
+      "from": "UNI.HEALTH.HL.MENTAL",
+      "to": "UNI.HEALTH.HL.FIRST",
+      "edge_type": "Recommends",
+      "strength_permille": 600,
+      "rationale": "Sequential learning"
+    },
+    {
+      "from": "UNI.HEALTH.HL.FIRST",
+      "to": "UNI.HEALTH.HL.PREVENT",
+      "edge_type": "Recommends",
+      "strength_permille": 600,
+      "rationale": "Sequential learning"
+    }
+  ]
+}

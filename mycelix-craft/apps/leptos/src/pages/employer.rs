@@ -13,7 +13,7 @@ use leptos::prelude::*;
 
 use crate::persistence;
 
-const STAKES_KEY: &str = "professional_employer_stakes";
+const STAKES_KEY: &str = "craft_employer_stakes";
 
 #[derive(Clone, Debug, Default, serde::Serialize, serde::Deserialize)]
 struct LocalStake {

@@ -6,7 +6,7 @@
 // Tests all validation functions comprehensively to ensure data integrity
 
 use super::*;
-use edunet_core::CourseId;
+use praxis_core::CourseId;
 
 // =================================================================================
 // Helper Functions for Test Data Generation

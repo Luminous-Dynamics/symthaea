@@ -4,12 +4,12 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! # Work History Integrity Zome
 //!
-//! Entry types for professional work experience with peer verification.
+//! Entry types for work experience with peer verification.
 //! Verification status is tracked via links, not entry mutation.
 
 use hdi::prelude::*;
 
-/// A work experience entry on a professional timeline.
+/// A work experience entry on a craft timeline.
 #[hdk_entry_helper]
 #[derive(Clone, PartialEq)]
 pub struct WorkExperience {

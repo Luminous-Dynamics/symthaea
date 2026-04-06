@@ -4,7 +4,7 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! # Connection Graph Integrity Zome
 //!
-//! Professional network connections and recommendations.
+//! Craft network connections and recommendations.
 //! Connection counts derived from links (never stored as mutable counters).
 
 use hdi::prelude::*;

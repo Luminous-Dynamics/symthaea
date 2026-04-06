@@ -14,7 +14,7 @@
 use hdk::prelude::*;
 use hdk::prelude::HdkPathExt;
 use fl_integrity::{FlUpdate, FlRound, PrivacyParams, EntryTypes, LinkTypes};
-use edunet_core::{RoundId, ModelHash};
+use praxis_core::{RoundId, ModelHash};
 
 // =============================================================================
 // Inline Aggregation Functions
@@ -656,9 +656,9 @@ pub fn contribute_mastery_signal(input: MasterySignalInput) -> ExternResult<Acti
     // Use the existing FlUpdate as the carrier (grad_commitment = signal bytes)
     let now = sys_time()?.as_micros() / 1_000_000;
     let update = FlUpdate {
-        round_id: edunet_core::RoundId(format!("skill-intel-{}", input.skill)),
+        round_id: praxis_core::RoundId(format!("skill-intel-{}", input.skill)),
         model_id: "skill-intelligence-v1".to_string(),
-        parent_model_hash: edunet_core::ModelHash("none".to_string()),
+        parent_model_hash: praxis_core::ModelHash("none".to_string()),
         grad_commitment: signal_bytes,
         clipped_l2_norm: 0.0,
         local_val_loss: 0.0,

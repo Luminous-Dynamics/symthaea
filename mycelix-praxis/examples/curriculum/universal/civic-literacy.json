@@ -1,0 +1,158 @@
+{
+  "metadata": {
+    "title": "Civic Literacy",
+    "framework": "EduNet Universal Curriculum",
+    "source": "https://edunet.luminousdynamics.io",
+    "grade_level": "Adult",
+    "subject_area": "Civic Literacy",
+    "domain": "Civic Literacy",
+    "version": "2026",
+    "total_standards": 4,
+    "domains": [
+      "Civic Literacy"
+    ],
+    "created_at": "2026-03-30",
+    "notes": "Essential Civic Literacy knowledge curated for universal access."
+  },
+  "nodes": [
+    {
+      "id": "UNI.CIVIC.CIV.GOV",
+      "title": "How Government Works",
+      "description": "Branches of government, constitution, separation of powers.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Civic Literacy",
+      "subdomain": "CIV",
+      "tags": [
+        "government",
+        "constitution",
+        "separation-of-powers",
+        "civic literacy"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Adult"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Civic Literacy",
+      "academic_standards": [
+        {
+          "framework": "EduNet Universal Curriculum",
+          "code": "UNI.CIVIC.CIV.GOV",
+          "description": "Branches of government, constitution, separation of powers.",
+          "grade_level": "Adult"
+        }
+      ]
+    },
+    {
+      "id": "UNI.CIVIC.CIV.RIGHTS",
+      "title": "Rights & Responsibilities",
+      "description": "Bill of rights, human rights, civic duties, rule of law.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Civic Literacy",
+      "subdomain": "CIV",
+      "tags": [
+        "rights",
+        "responsibilities",
+        "human-rights",
+        "civic literacy"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Adult"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Civic Literacy",
+      "academic_standards": [
+        {
+          "framework": "EduNet Universal Curriculum",
+          "code": "UNI.CIVIC.CIV.RIGHTS",
+          "description": "Bill of rights, human rights, civic duties, rule of law.",
+          "grade_level": "Adult"
+        }
+      ]
+    },
+    {
+      "id": "UNI.CIVIC.CIV.VOTE",
+      "title": "Voting & Elections",
+      "description": "Electoral systems, informed voting, political parties, media in politics.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Civic Literacy",
+      "subdomain": "CIV",
+      "tags": [
+        "voting",
+        "elections",
+        "political-parties",
+        "civic literacy"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Adult"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Civic Literacy",
+      "academic_standards": [
+        {
+          "framework": "EduNet Universal Curriculum",
+          "code": "UNI.CIVIC.CIV.VOTE",
+          "description": "Electoral systems, informed voting, political parties, media in politics.",
+          "grade_level": "Adult"
+        }
+      ]
+    },
+    {
+      "id": "UNI.CIVIC.CIV.ENGAGE",
+      "title": "Civic Engagement",
+      "description": "Community participation, activism, volunteering, local government.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Civic Literacy",
+      "subdomain": "CIV",
+      "tags": [
+        "engagement",
+        "volunteering",
+        "community",
+        "civic literacy"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Adult"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Civic Literacy",
+      "academic_standards": [
+        {
+          "framework": "EduNet Universal Curriculum",
+          "code": "UNI.CIVIC.CIV.ENGAGE",
+          "description": "Community participation, activism, volunteering, local government.",
+          "grade_level": "Adult"
+        }
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "from": "UNI.CIVIC.CIV.GOV",
+      "to": "UNI.CIVIC.CIV.RIGHTS",
+      "edge_type": "Recommends",
+      "strength_permille": 600,
+      "rationale": "Sequential learning"
+    },
+    {
+      "from": "UNI.CIVIC.CIV.RIGHTS",
+      "to": "UNI.CIVIC.CIV.VOTE",
+      "edge_type": "Recommends",
+      "strength_permille": 600,
+      "rationale": "Sequential learning"
+    },
+    {
+      "from": "UNI.CIVIC.CIV.VOTE",
+      "to": "UNI.CIVIC.CIV.ENGAGE",
+      "edge_type": "Recommends",
+      "strength_permille": 600,
+      "rationale": "Sequential learning"
+    }
+  ]
+}

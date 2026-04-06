@@ -80,25 +80,25 @@ impl AdaptivityCtx {
     /// Enter sandbox mode — no tracking, no adaptation, just exploration.
     pub fn enter_sandbox(&self) {
         self.set_sovereignty.update(|s| s.enter_sandbox());
-        crate::persistence::save("edunet_sovereignty", &self.sovereignty.get());
+        crate::persistence::save("praxis_sovereignty", &self.sovereignty.get());
     }
 
     /// Leave sandbox mode — return to normal.
     pub fn leave_sandbox(&self) {
         self.set_sovereignty.update(|s| s.leave_sandbox());
-        crate::persistence::save("edunet_sovereignty", &self.sovereignty.get());
+        crate::persistence::save("praxis_sovereignty", &self.sovereignty.get());
     }
 
     /// Student requests more support (lowers effective mode by one level).
     pub fn request_support(&self) {
         self.set_sovereignty.update(|s| s.request_support());
-        crate::persistence::save("edunet_sovereignty", &self.sovereignty.get());
+        crate::persistence::save("praxis_sovereignty", &self.sovereignty.get());
     }
 
     /// Student dismisses extra support.
     pub fn dismiss_support(&self) {
         self.set_sovereignty.update(|s| s.dismiss_support());
-        crate::persistence::save("edunet_sovereignty", &self.sovereignty.get());
+        crate::persistence::save("praxis_sovereignty", &self.sovereignty.get());
     }
 
     /// Is sandbox mode active?
@@ -158,7 +158,7 @@ pub fn AdaptivityProvider(children: Children) -> impl IntoView {
     let consciousness = use_consciousness();
 
     // -- Core state signals --
-    let initial_sovereignty = persistence::load::<SovereigntyLevel>("edunet_sovereignty")
+    let initial_sovereignty = persistence::load::<SovereigntyLevel>("praxis_sovereignty")
         .unwrap_or_else(SovereigntyLevel::new);
     let (sovereignty, set_sovereignty) = signal(initial_sovereignty);
     let (current_skill, set_current_skill) = signal("multiplication".to_string());
@@ -274,7 +274,7 @@ pub fn AdaptivityProvider(children: Children) -> impl IntoView {
     // -- Effect: persist sovereignty to localStorage on every change --
     Effect::new(move |_| {
         let sov = sovereignty.get();
-        persistence::save("edunet_sovereignty", &sov);
+        persistence::save("praxis_sovereignty", &sov);
     });
 
     // -- Effect: handle suggestion dismiss --

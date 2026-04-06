@@ -16,7 +16,7 @@
 pub enum ConsciousnessTier {
     /// Score < 0.3 — can see Identity, Personal
     Observer = 0,
-    /// Score >= 0.3 — can see Health, EduNet, Hearth
+    /// Score >= 0.3 — can see Health, Praxis, Hearth
     Participant = 1,
     /// Score >= 0.4 — can see Governance, Commons, Finance
     Citizen = 2,
@@ -77,7 +77,7 @@ pub struct NavItem {
 
 /// The contract every Mycelix domain implements for portal integration.
 pub trait DomainModule {
-    /// Unique identifier (e.g., "health", "governance", "edunet").
+    /// Unique identifier (e.g., "health", "governance", "praxis").
     fn id(&self) -> &'static str;
 
     /// Human-readable name (e.g., "Health", "Governance").

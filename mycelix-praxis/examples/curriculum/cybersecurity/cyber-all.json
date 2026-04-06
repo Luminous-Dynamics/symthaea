@@ -1,0 +1,1075 @@
+{
+  "metadata": {
+    "title": "Cybersecurity — NICE Framework & CompTIA Pathway",
+    "framework": "NIST NICE SP 800-181r1",
+    "source": "https://www.nist.gov/itl/applied-cybersecurity/nice",
+    "grade_level": "Undergraduate",
+    "subject_area": "Cybersecurity",
+    "domain": "Cybersecurity",
+    "version": "2025",
+    "total_standards": 25,
+    "domains": [
+      "Foundations",
+      "CompTIA Security+",
+      "CySA+",
+      "PenTest+",
+      "Work Roles"
+    ],
+    "created_at": "2026-03-30",
+    "notes": "Curated from NIST NICE Framework (SP 800-181r1) and CompTIA certification pathway.",
+    "academic_level": "Undergraduate-Graduate",
+    "cip_code": "11.1003"
+  },
+  "nodes": [
+    {
+      "id": "CYBER.FND.CIA",
+      "title": "CIA Triad & Security Principles",
+      "description": "Confidentiality, Integrity, Availability. Defence in depth. Least privilege. Zero trust architecture.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Cybersecurity",
+      "subdomain": "FND",
+      "tags": [
+        "cia-triad",
+        "security-principles",
+        "zero-trust",
+        "cybersecurity"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Cybersecurity",
+      "academic_standards": [
+        {
+          "framework": "NIST NICE SP 800-181r1",
+          "code": "CYBER.FND.CIA",
+          "description": "Confidentiality, Integrity, Availability. Defence in depth. Least privilege. Zero trust architecture.",
+          "grade_level": "Beginner"
+        }
+      ],
+      "cip_code": "11.1003"
+    },
+    {
+      "id": "CYBER.FND.RISK",
+      "title": "Risk Management",
+      "description": "Risk assessment, threat modelling, vulnerability analysis, risk treatment (avoid, mitigate, transfer, accept). NIST RMF.",
+      "node_type": "Skill",
+      "difficulty": "Beginner",
+      "domain": "Cybersecurity",
+      "subdomain": "FND",
+      "tags": [
+        "risk-management",
+        "threat-modelling",
+        "nist-rmf",
+        "cybersecurity"
+      ],
+      "estimated_hours": 10,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Cybersecurity",
+      "academic_standards": [
+        {
+          "framework": "NIST NICE SP 800-181r1",
+          "code": "CYBER.FND.RISK",
+          "description": "Risk assessment, threat modelling, vulnerability analysis, risk treatment (avoid, mitigate, transfer, accept). NIST RMF.",
+          "grade_level": "Beginner"
+        }
+      ],
+      "cip_code": "11.1003"
+    },
+    {
+      "id": "CYBER.FND.CRYPTO",
+      "title": "Cryptography Fundamentals",
+      "description": "Symmetric (AES) vs asymmetric (RSA, ECC). Hashing (SHA-256). Digital signatures. PKI. TLS/SSL.",
+      "node_type": "Skill",
+      "difficulty": "Beginner",
+      "domain": "Cybersecurity",
+      "subdomain": "FND",
+      "tags": [
+        "cryptography",
+        "encryption",
+        "hashing",
+        "pki",
+        "tls",
+        "cybersecurity"
+      ],
+      "estimated_hours": 12,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Cybersecurity",
+      "academic_standards": [
+        {
+          "framework": "NIST NICE SP 800-181r1",
+          "code": "CYBER.FND.CRYPTO",
+          "description": "Symmetric (AES) vs asymmetric (RSA, ECC). Hashing (SHA-256). Digital signatures. PKI. TLS/SSL.",
+          "grade_level": "Beginner"
+        }
+      ],
+      "cip_code": "11.1003"
+    },
+    {
+      "id": "CYBER.FND.NET",
+      "title": "Network Security Basics",
+      "description": "TCP/IP, DNS, firewalls, IDS/IPS, VPNs, network segmentation, DMZ architecture.",
+      "node_type": "Skill",
+      "difficulty": "Beginner",
+      "domain": "Cybersecurity",
+      "subdomain": "FND",
+      "tags": [
+        "network-security",
+        "firewalls",
+        "ids",
+        "vpn",
+        "dmz",
+        "cybersecurity"
+      ],
+      "estimated_hours": 10,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Cybersecurity",
+      "academic_standards": [
+        {
+          "framework": "NIST NICE SP 800-181r1",
+          "code": "CYBER.FND.NET",
+          "description": "TCP/IP, DNS, firewalls, IDS/IPS, VPNs, network segmentation, DMZ architecture.",
+          "grade_level": "Beginner"
+        }
+      ],
+      "cip_code": "11.1003"
+    },
+    {
+      "id": "CYBER.FND.ACCESS",
+      "title": "Access Control & Identity",
+      "description": "Authentication factors (MFA), authorisation models (RBAC, ABAC), IAM, SSO, OAuth, SAML.",
+      "node_type": "Skill",
+      "difficulty": "Beginner",
+      "domain": "Cybersecurity",
+      "subdomain": "FND",
+      "tags": [
+        "access-control",
+        "authentication",
+        "mfa",
+        "iam",
+        "rbac",
+        "cybersecurity"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Cybersecurity",
+      "academic_standards": [
+        {
+          "framework": "NIST NICE SP 800-181r1",
+          "code": "CYBER.FND.ACCESS",
+          "description": "Authentication factors (MFA), authorisation models (RBAC, ABAC), IAM, SSO, OAuth, SAML.",
+          "grade_level": "Beginner"
+        }
+      ],
+      "cip_code": "11.1003"
+    },
+    {
+      "id": "CYBER.FND.OPS",
+      "title": "Security Operations Fundamentals",
+      "description": "SOC operations, SIEM, log analysis, incident detection, security monitoring, alert triage.",
+      "node_type": "Skill",
+      "difficulty": "Intermediate",
+      "domain": "Cybersecurity",
+      "subdomain": "FND",
+      "tags": [
+        "soc",
+        "siem",
+        "monitoring",
+        "incident-detection",
+        "cybersecurity"
+      ],
+      "estimated_hours": 10,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Cybersecurity",
+      "academic_standards": [
+        {
+          "framework": "NIST NICE SP 800-181r1",
+          "code": "CYBER.FND.OPS",
+          "description": "SOC operations, SIEM, log analysis, incident detection, security monitoring, alert triage.",
+          "grade_level": "Intermediate"
+        }
+      ],
+      "cip_code": "11.1003"
+    },
+    {
+      "id": "CYBER.FND.LEGAL",
+      "title": "Legal, Ethics & Compliance",
+      "description": "GDPR, POPIA (SA), HIPAA, PCI-DSS, computer crime laws, ethical hacking rules of engagement.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Cybersecurity",
+      "subdomain": "FND",
+      "tags": [
+        "gdpr",
+        "popia",
+        "compliance",
+        "ethics",
+        "legal",
+        "cybersecurity"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Cybersecurity",
+      "academic_standards": [
+        {
+          "framework": "NIST NICE SP 800-181r1",
+          "code": "CYBER.FND.LEGAL",
+          "description": "GDPR, POPIA (SA), HIPAA, PCI-DSS, computer crime laws, ethical hacking rules of engagement.",
+          "grade_level": "Beginner"
+        }
+      ],
+      "cip_code": "11.1003"
+    },
+    {
+      "id": "CYBER.FND.ACAD",
+      "title": "Academic Security Research",
+      "description": "Responsible disclosure, CVE process, security research methodology, peer review.",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "Cybersecurity",
+      "subdomain": "FND",
+      "tags": [
+        "research",
+        "cve",
+        "disclosure",
+        "methodology",
+        "cybersecurity"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Evaluate",
+      "subject_area": "Cybersecurity",
+      "academic_standards": [
+        {
+          "framework": "NIST NICE SP 800-181r1",
+          "code": "CYBER.FND.ACAD",
+          "description": "Responsible disclosure, CVE process, security research methodology, peer review.",
+          "grade_level": "Advanced"
+        }
+      ],
+      "cip_code": "11.1003"
+    },
+    {
+      "id": "CYBER.SEC.THREATS",
+      "title": "Threats, Attacks & Vulnerabilities",
+      "description": "Malware types, social engineering, application attacks, network attacks, threat actors, vulnerability types.",
+      "node_type": "Skill",
+      "difficulty": "Intermediate",
+      "domain": "Cybersecurity",
+      "subdomain": "SEC",
+      "tags": [
+        "malware",
+        "social-engineering",
+        "attacks",
+        "vulnerability",
+        "cybersecurity"
+      ],
+      "estimated_hours": 15,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Cybersecurity",
+      "academic_standards": [
+        {
+          "framework": "NIST NICE SP 800-181r1",
+          "code": "CYBER.SEC.THREATS",
+          "description": "Malware types, social engineering, application attacks, network attacks, threat actors, vulnerability types.",
+          "grade_level": "Intermediate"
+        }
+      ],
+      "cip_code": "11.1003"
+    },
+    {
+      "id": "CYBER.SEC.ARCH",
+      "title": "Security Architecture & Design",
+      "description": "Secure network design, cloud security, virtualisation security, IoT security, embedded systems.",
+      "node_type": "Skill",
+      "difficulty": "Intermediate",
+      "domain": "Cybersecurity",
+      "subdomain": "SEC",
+      "tags": [
+        "architecture",
+        "cloud-security",
+        "iot-security",
+        "cybersecurity"
+      ],
+      "estimated_hours": 12,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Cybersecurity",
+      "academic_standards": [
+        {
+          "framework": "NIST NICE SP 800-181r1",
+          "code": "CYBER.SEC.ARCH",
+          "description": "Secure network design, cloud security, virtualisation security, IoT security, embedded systems.",
+          "grade_level": "Intermediate"
+        }
+      ],
+      "cip_code": "11.1003"
+    },
+    {
+      "id": "CYBER.SEC.IMPL",
+      "title": "Security Implementation",
+      "description": "Secure protocols, endpoint protection, PKI implementation, wireless security, mobile security.",
+      "node_type": "Skill",
+      "difficulty": "Intermediate",
+      "domain": "Cybersecurity",
+      "subdomain": "SEC",
+      "tags": [
+        "implementation",
+        "endpoint",
+        "wireless",
+        "mobile-security",
+        "cybersecurity"
+      ],
+      "estimated_hours": 12,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Cybersecurity",
+      "academic_standards": [
+        {
+          "framework": "NIST NICE SP 800-181r1",
+          "code": "CYBER.SEC.IMPL",
+          "description": "Secure protocols, endpoint protection, PKI implementation, wireless security, mobile security.",
+          "grade_level": "Intermediate"
+        }
+      ],
+      "cip_code": "11.1003"
+    },
+    {
+      "id": "CYBER.SEC.OPS",
+      "title": "Security Operations & IR",
+      "description": "Incident response lifecycle, digital forensics basics, disaster recovery, BCP, security automation.",
+      "node_type": "Skill",
+      "difficulty": "Intermediate",
+      "domain": "Cybersecurity",
+      "subdomain": "SEC",
+      "tags": [
+        "incident-response",
+        "forensics",
+        "disaster-recovery",
+        "bcp",
+        "cybersecurity"
+      ],
+      "estimated_hours": 15,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Cybersecurity",
+      "academic_standards": [
+        {
+          "framework": "NIST NICE SP 800-181r1",
+          "code": "CYBER.SEC.OPS",
+          "description": "Incident response lifecycle, digital forensics basics, disaster recovery, BCP, security automation.",
+          "grade_level": "Intermediate"
+        }
+      ],
+      "cip_code": "11.1003"
+    },
+    {
+      "id": "CYBER.SEC.GRC",
+      "title": "Governance, Risk & Compliance",
+      "description": "Security frameworks (NIST CSF, ISO 27001), policies, procedures, security awareness training.",
+      "node_type": "Skill",
+      "difficulty": "Intermediate",
+      "domain": "Cybersecurity",
+      "subdomain": "SEC",
+      "tags": [
+        "governance",
+        "nist-csf",
+        "iso-27001",
+        "policies",
+        "cybersecurity"
+      ],
+      "estimated_hours": 10,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Cybersecurity",
+      "academic_standards": [
+        {
+          "framework": "NIST NICE SP 800-181r1",
+          "code": "CYBER.SEC.GRC",
+          "description": "Security frameworks (NIST CSF, ISO 27001), policies, procedures, security awareness training.",
+          "grade_level": "Intermediate"
+        }
+      ],
+      "cip_code": "11.1003"
+    },
+    {
+      "id": "CYBER.CYSA.THREAT",
+      "title": "Threat Intelligence & Management",
+      "description": "Threat intelligence sources, IOC analysis, MITRE ATT&CK, threat hunting, intelligence sharing.",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "Cybersecurity",
+      "subdomain": "CYSA",
+      "tags": [
+        "threat-intelligence",
+        "mitre-attack",
+        "threat-hunting",
+        "ioc",
+        "cybersecurity"
+      ],
+      "estimated_hours": 15,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Cybersecurity",
+      "academic_standards": [
+        {
+          "framework": "NIST NICE SP 800-181r1",
+          "code": "CYBER.CYSA.THREAT",
+          "description": "Threat intelligence sources, IOC analysis, MITRE ATT&CK, threat hunting, intelligence sharing.",
+          "grade_level": "Advanced"
+        }
+      ],
+      "cip_code": "11.1003"
+    },
+    {
+      "id": "CYBER.CYSA.VULN",
+      "title": "Vulnerability Management",
+      "description": "Vulnerability scanning (Nessus, OpenVAS), CVSS scoring, remediation prioritisation, patch management.",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "Cybersecurity",
+      "subdomain": "CYSA",
+      "tags": [
+        "vulnerability-scanning",
+        "cvss",
+        "patch-management",
+        "nessus",
+        "cybersecurity"
+      ],
+      "estimated_hours": 12,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Cybersecurity",
+      "academic_standards": [
+        {
+          "framework": "NIST NICE SP 800-181r1",
+          "code": "CYBER.CYSA.VULN",
+          "description": "Vulnerability scanning (Nessus, OpenVAS), CVSS scoring, remediation prioritisation, patch management.",
+          "grade_level": "Advanced"
+        }
+      ],
+      "cip_code": "11.1003"
+    },
+    {
+      "id": "CYBER.CYSA.SECOPS",
+      "title": "Advanced Security Operations",
+      "description": "SIEM tuning, EDR/XDR, SOAR, threat detection engineering, playbook development.",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "Cybersecurity",
+      "subdomain": "CYSA",
+      "tags": [
+        "siem",
+        "edr",
+        "xdr",
+        "soar",
+        "detection-engineering",
+        "cybersecurity"
+      ],
+      "estimated_hours": 15,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Cybersecurity",
+      "academic_standards": [
+        {
+          "framework": "NIST NICE SP 800-181r1",
+          "code": "CYBER.CYSA.SECOPS",
+          "description": "SIEM tuning, EDR/XDR, SOAR, threat detection engineering, playbook development.",
+          "grade_level": "Advanced"
+        }
+      ],
+      "cip_code": "11.1003"
+    },
+    {
+      "id": "CYBER.PEN.PLAN",
+      "title": "Penetration Testing Planning & Scoping",
+      "description": "Rules of engagement, scope definition, legal considerations, methodology selection (OWASP, PTES).",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "Cybersecurity",
+      "subdomain": "PEN",
+      "tags": [
+        "pentest",
+        "scoping",
+        "owasp",
+        "ptes",
+        "methodology",
+        "cybersecurity"
+      ],
+      "estimated_hours": 10,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Cybersecurity",
+      "academic_standards": [
+        {
+          "framework": "NIST NICE SP 800-181r1",
+          "code": "CYBER.PEN.PLAN",
+          "description": "Rules of engagement, scope definition, legal considerations, methodology selection (OWASP, PTES).",
+          "grade_level": "Advanced"
+        }
+      ],
+      "cip_code": "11.1003"
+    },
+    {
+      "id": "CYBER.PEN.RECON",
+      "title": "Information Gathering & Reconnaissance",
+      "description": "OSINT, passive/active recon, network scanning (Nmap), service enumeration, social engineering recon.",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "Cybersecurity",
+      "subdomain": "PEN",
+      "tags": [
+        "osint",
+        "recon",
+        "nmap",
+        "enumeration",
+        "scanning",
+        "cybersecurity"
+      ],
+      "estimated_hours": 12,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Cybersecurity",
+      "academic_standards": [
+        {
+          "framework": "NIST NICE SP 800-181r1",
+          "code": "CYBER.PEN.RECON",
+          "description": "OSINT, passive/active recon, network scanning (Nmap), service enumeration, social engineering recon.",
+          "grade_level": "Advanced"
+        }
+      ],
+      "cip_code": "11.1003"
+    },
+    {
+      "id": "CYBER.PEN.ATTACK",
+      "title": "Exploitation & Attacks",
+      "description": "Web app attacks (OWASP Top 10), network exploitation, privilege escalation, lateral movement, post-exploitation.",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "Cybersecurity",
+      "subdomain": "PEN",
+      "tags": [
+        "exploitation",
+        "owasp-top10",
+        "privilege-escalation",
+        "lateral-movement",
+        "cybersecurity"
+      ],
+      "estimated_hours": 18,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Cybersecurity",
+      "academic_standards": [
+        {
+          "framework": "NIST NICE SP 800-181r1",
+          "code": "CYBER.PEN.ATTACK",
+          "description": "Web app attacks (OWASP Top 10), network exploitation, privilege escalation, lateral movement, post-exploitation.",
+          "grade_level": "Advanced"
+        }
+      ],
+      "cip_code": "11.1003"
+    },
+    {
+      "id": "CYBER.PEN.REPORT",
+      "title": "Reporting & Remediation",
+      "description": "Technical and executive reporting, risk rating, remediation guidance, retesting, client communication.",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "Cybersecurity",
+      "subdomain": "PEN",
+      "tags": [
+        "reporting",
+        "remediation",
+        "risk-rating",
+        "communication",
+        "cybersecurity"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Evaluate",
+      "subject_area": "Cybersecurity",
+      "academic_standards": [
+        {
+          "framework": "NIST NICE SP 800-181r1",
+          "code": "CYBER.PEN.REPORT",
+          "description": "Technical and executive reporting, risk rating, remediation guidance, retesting, client communication.",
+          "grade_level": "Advanced"
+        }
+      ],
+      "cip_code": "11.1003"
+    },
+    {
+      "id": "CYBER.ROLE.SOC",
+      "title": "SOC Analyst",
+      "description": "Monitor security alerts, analyse events, escalate incidents, maintain documentation, shift operations.",
+      "node_type": "Skill",
+      "difficulty": "Intermediate",
+      "domain": "Cybersecurity",
+      "subdomain": "ROLE",
+      "tags": [
+        "soc-analyst",
+        "monitoring",
+        "triage",
+        "cybersecurity"
+      ],
+      "estimated_hours": 20,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Cybersecurity",
+      "academic_standards": [
+        {
+          "framework": "NIST NICE SP 800-181r1",
+          "code": "CYBER.ROLE.SOC",
+          "description": "Monitor security alerts, analyse events, escalate incidents, maintain documentation, shift operations.",
+          "grade_level": "Intermediate"
+        }
+      ],
+      "cip_code": "11.1003"
+    },
+    {
+      "id": "CYBER.ROLE.IR",
+      "title": "Incident Responder",
+      "description": "Lead incident response, contain threats, perform forensic analysis, document findings, improve processes.",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "Cybersecurity",
+      "subdomain": "ROLE",
+      "tags": [
+        "incident-responder",
+        "forensics",
+        "containment",
+        "cybersecurity"
+      ],
+      "estimated_hours": 25,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Cybersecurity",
+      "academic_standards": [
+        {
+          "framework": "NIST NICE SP 800-181r1",
+          "code": "CYBER.ROLE.IR",
+          "description": "Lead incident response, contain threats, perform forensic analysis, document findings, improve processes.",
+          "grade_level": "Advanced"
+        }
+      ],
+      "cip_code": "11.1003"
+    },
+    {
+      "id": "CYBER.ROLE.PENTEST",
+      "title": "Penetration Tester",
+      "description": "Conduct authorised attack simulations, identify vulnerabilities, write detailed reports, recommend fixes.",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "Cybersecurity",
+      "subdomain": "ROLE",
+      "tags": [
+        "pentester",
+        "ethical-hacking",
+        "red-team",
+        "cybersecurity"
+      ],
+      "estimated_hours": 30,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Cybersecurity",
+      "academic_standards": [
+        {
+          "framework": "NIST NICE SP 800-181r1",
+          "code": "CYBER.ROLE.PENTEST",
+          "description": "Conduct authorised attack simulations, identify vulnerabilities, write detailed reports, recommend fixes.",
+          "grade_level": "Advanced"
+        }
+      ],
+      "cip_code": "11.1003"
+    },
+    {
+      "id": "CYBER.ROLE.ARCH",
+      "title": "Security Architect",
+      "description": "Design secure systems, evaluate architectures, create security standards, threat model designs.",
+      "node_type": "Skill",
+      "difficulty": "Expert",
+      "domain": "Cybersecurity",
+      "subdomain": "ROLE",
+      "tags": [
+        "security-architect",
+        "design",
+        "standards",
+        "cybersecurity"
+      ],
+      "estimated_hours": 40,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Create",
+      "subject_area": "Cybersecurity",
+      "academic_standards": [
+        {
+          "framework": "NIST NICE SP 800-181r1",
+          "code": "CYBER.ROLE.ARCH",
+          "description": "Design secure systems, evaluate architectures, create security standards, threat model designs.",
+          "grade_level": "Expert"
+        }
+      ],
+      "cip_code": "11.1003"
+    },
+    {
+      "id": "CYBER.ROLE.CISO",
+      "title": "Chief Information Security Officer",
+      "description": "Strategic security leadership, risk management, board communication, security program management.",
+      "node_type": "Skill",
+      "difficulty": "Expert",
+      "domain": "Cybersecurity",
+      "subdomain": "ROLE",
+      "tags": [
+        "ciso",
+        "leadership",
+        "strategy",
+        "governance",
+        "cybersecurity"
+      ],
+      "estimated_hours": 50,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Evaluate",
+      "subject_area": "Cybersecurity",
+      "academic_standards": [
+        {
+          "framework": "NIST NICE SP 800-181r1",
+          "code": "CYBER.ROLE.CISO",
+          "description": "Strategic security leadership, risk management, board communication, security program management.",
+          "grade_level": "Expert"
+        }
+      ],
+      "cip_code": "11.1003"
+    }
+  ],
+  "edges": [
+    {
+      "from": "CYBER.FND.CIA",
+      "to": "CYBER.FND.RISK",
+      "edge_type": "Requires",
+      "strength_permille": 850,
+      "rationale": "FND.CIA is prerequisite for FND.RISK"
+    },
+    {
+      "from": "CYBER.FND.CIA",
+      "to": "CYBER.FND.CRYPTO",
+      "edge_type": "Requires",
+      "strength_permille": 850,
+      "rationale": "FND.CIA is prerequisite for FND.CRYPTO"
+    },
+    {
+      "from": "CYBER.FND.CIA",
+      "to": "CYBER.FND.NET",
+      "edge_type": "Requires",
+      "strength_permille": 850,
+      "rationale": "FND.CIA is prerequisite for FND.NET"
+    },
+    {
+      "from": "CYBER.FND.CIA",
+      "to": "CYBER.FND.ACCESS",
+      "edge_type": "Requires",
+      "strength_permille": 850,
+      "rationale": "FND.CIA is prerequisite for FND.ACCESS"
+    },
+    {
+      "from": "CYBER.FND.NET",
+      "to": "CYBER.FND.OPS",
+      "edge_type": "Requires",
+      "strength_permille": 850,
+      "rationale": "FND.NET is prerequisite for FND.OPS"
+    },
+    {
+      "from": "CYBER.FND.ACCESS",
+      "to": "CYBER.FND.OPS",
+      "edge_type": "Requires",
+      "strength_permille": 850,
+      "rationale": "FND.ACCESS is prerequisite for FND.OPS"
+    },
+    {
+      "from": "CYBER.FND.CIA",
+      "to": "CYBER.FND.LEGAL",
+      "edge_type": "Requires",
+      "strength_permille": 850,
+      "rationale": "FND.CIA is prerequisite for FND.LEGAL"
+    },
+    {
+      "from": "CYBER.FND.LEGAL",
+      "to": "CYBER.FND.ACAD",
+      "edge_type": "Requires",
+      "strength_permille": 850,
+      "rationale": "FND.LEGAL is prerequisite for FND.ACAD"
+    },
+    {
+      "from": "CYBER.FND.NET",
+      "to": "CYBER.SEC.THREATS",
+      "edge_type": "Requires",
+      "strength_permille": 850,
+      "rationale": "FND.NET is prerequisite for SEC.THREATS"
+    },
+    {
+      "from": "CYBER.FND.CRYPTO",
+      "to": "CYBER.SEC.THREATS",
+      "edge_type": "Requires",
+      "strength_permille": 850,
+      "rationale": "FND.CRYPTO is prerequisite for SEC.THREATS"
+    },
+    {
+      "from": "CYBER.FND.NET",
+      "to": "CYBER.SEC.ARCH",
+      "edge_type": "Requires",
+      "strength_permille": 850,
+      "rationale": "FND.NET is prerequisite for SEC.ARCH"
+    },
+    {
+      "from": "CYBER.SEC.THREATS",
+      "to": "CYBER.SEC.ARCH",
+      "edge_type": "Requires",
+      "strength_permille": 850,
+      "rationale": "SEC.THREATS is prerequisite for SEC.ARCH"
+    },
+    {
+      "from": "CYBER.SEC.ARCH",
+      "to": "CYBER.SEC.IMPL",
+      "edge_type": "Requires",
+      "strength_permille": 850,
+      "rationale": "SEC.ARCH is prerequisite for SEC.IMPL"
+    },
+    {
+      "from": "CYBER.FND.CRYPTO",
+      "to": "CYBER.SEC.IMPL",
+      "edge_type": "Requires",
+      "strength_permille": 850,
+      "rationale": "FND.CRYPTO is prerequisite for SEC.IMPL"
+    },
+    {
+      "from": "CYBER.FND.OPS",
+      "to": "CYBER.SEC.OPS",
+      "edge_type": "Requires",
+      "strength_permille": 850,
+      "rationale": "FND.OPS is prerequisite for SEC.OPS"
+    },
+    {
+      "from": "CYBER.SEC.THREATS",
+      "to": "CYBER.SEC.OPS",
+      "edge_type": "Requires",
+      "strength_permille": 850,
+      "rationale": "SEC.THREATS is prerequisite for SEC.OPS"
+    },
+    {
+      "from": "CYBER.FND.RISK",
+      "to": "CYBER.SEC.GRC",
+      "edge_type": "Requires",
+      "strength_permille": 850,
+      "rationale": "FND.RISK is prerequisite for SEC.GRC"
+    },
+    {
+      "from": "CYBER.FND.LEGAL",
+      "to": "CYBER.SEC.GRC",
+      "edge_type": "Requires",
+      "strength_permille": 850,
+      "rationale": "FND.LEGAL is prerequisite for SEC.GRC"
+    },
+    {
+      "from": "CYBER.SEC.THREATS",
+      "to": "CYBER.CYSA.THREAT",
+      "edge_type": "Requires",
+      "strength_permille": 850,
+      "rationale": "SEC.THREATS is prerequisite for CYSA.THREAT"
+    },
+    {
+      "from": "CYBER.SEC.OPS",
+      "to": "CYBER.CYSA.THREAT",
+      "edge_type": "Requires",
+      "strength_permille": 850,
+      "rationale": "SEC.OPS is prerequisite for CYSA.THREAT"
+    },
+    {
+      "from": "CYBER.SEC.THREATS",
+      "to": "CYBER.CYSA.VULN",
+      "edge_type": "Requires",
+      "strength_permille": 850,
+      "rationale": "SEC.THREATS is prerequisite for CYSA.VULN"
+    },
+    {
+      "from": "CYBER.FND.OPS",
+      "to": "CYBER.CYSA.SECOPS",
+      "edge_type": "Requires",
+      "strength_permille": 850,
+      "rationale": "FND.OPS is prerequisite for CYSA.SECOPS"
+    },
+    {
+      "from": "CYBER.CYSA.THREAT",
+      "to": "CYBER.CYSA.SECOPS",
+      "edge_type": "Requires",
+      "strength_permille": 850,
+      "rationale": "CYSA.THREAT is prerequisite for CYSA.SECOPS"
+    },
+    {
+      "from": "CYBER.SEC.THREATS",
+      "to": "CYBER.PEN.PLAN",
+      "edge_type": "Requires",
+      "strength_permille": 850,
+      "rationale": "SEC.THREATS is prerequisite for PEN.PLAN"
+    },
+    {
+      "from": "CYBER.FND.LEGAL",
+      "to": "CYBER.PEN.PLAN",
+      "edge_type": "Requires",
+      "strength_permille": 850,
+      "rationale": "FND.LEGAL is prerequisite for PEN.PLAN"
+    },
+    {
+      "from": "CYBER.PEN.PLAN",
+      "to": "CYBER.PEN.RECON",
+      "edge_type": "Requires",
+      "strength_permille": 850,
+      "rationale": "PEN.PLAN is prerequisite for PEN.RECON"
+    },
+    {
+      "from": "CYBER.FND.NET",
+      "to": "CYBER.PEN.RECON",
+      "edge_type": "Requires",
+      "strength_permille": 850,
+      "rationale": "FND.NET is prerequisite for PEN.RECON"
+    },
+    {
+      "from": "CYBER.PEN.RECON",
+      "to": "CYBER.PEN.ATTACK",
+      "edge_type": "Requires",
+      "strength_permille": 850,
+      "rationale": "PEN.RECON is prerequisite for PEN.ATTACK"
+    },
+    {
+      "from": "CYBER.FND.CRYPTO",
+      "to": "CYBER.PEN.ATTACK",
+      "edge_type": "Requires",
+      "strength_permille": 850,
+      "rationale": "FND.CRYPTO is prerequisite for PEN.ATTACK"
+    },
+    {
+      "from": "CYBER.PEN.ATTACK",
+      "to": "CYBER.PEN.REPORT",
+      "edge_type": "Requires",
+      "strength_permille": 850,
+      "rationale": "PEN.ATTACK is prerequisite for PEN.REPORT"
+    },
+    {
+      "from": "CYBER.FND.OPS",
+      "to": "CYBER.ROLE.SOC",
+      "edge_type": "Requires",
+      "strength_permille": 850,
+      "rationale": "FND.OPS is prerequisite for ROLE.SOC"
+    },
+    {
+      "from": "CYBER.SEC.OPS",
+      "to": "CYBER.ROLE.IR",
+      "edge_type": "Requires",
+      "strength_permille": 850,
+      "rationale": "SEC.OPS is prerequisite for ROLE.IR"
+    },
+    {
+      "from": "CYBER.CYSA.SECOPS",
+      "to": "CYBER.ROLE.IR",
+      "edge_type": "Requires",
+      "strength_permille": 850,
+      "rationale": "CYSA.SECOPS is prerequisite for ROLE.IR"
+    },
+    {
+      "from": "CYBER.PEN.ATTACK",
+      "to": "CYBER.ROLE.PENTEST",
+      "edge_type": "Requires",
+      "strength_permille": 850,
+      "rationale": "PEN.ATTACK is prerequisite for ROLE.PENTEST"
+    },
+    {
+      "from": "CYBER.PEN.REPORT",
+      "to": "CYBER.ROLE.PENTEST",
+      "edge_type": "Requires",
+      "strength_permille": 850,
+      "rationale": "PEN.REPORT is prerequisite for ROLE.PENTEST"
+    },
+    {
+      "from": "CYBER.SEC.ARCH",
+      "to": "CYBER.ROLE.ARCH",
+      "edge_type": "Requires",
+      "strength_permille": 850,
+      "rationale": "SEC.ARCH is prerequisite for ROLE.ARCH"
+    },
+    {
+      "from": "CYBER.SEC.GRC",
+      "to": "CYBER.ROLE.ARCH",
+      "edge_type": "Requires",
+      "strength_permille": 850,
+      "rationale": "SEC.GRC is prerequisite for ROLE.ARCH"
+    },
+    {
+      "from": "CYBER.SEC.GRC",
+      "to": "CYBER.ROLE.CISO",
+      "edge_type": "Requires",
+      "strength_permille": 850,
+      "rationale": "SEC.GRC is prerequisite for ROLE.CISO"
+    },
+    {
+      "from": "CYBER.ROLE.ARCH",
+      "to": "CYBER.ROLE.CISO",
+      "edge_type": "Requires",
+      "strength_permille": 850,
+      "rationale": "ROLE.ARCH is prerequisite for ROLE.CISO"
+    }
+  ]
+}

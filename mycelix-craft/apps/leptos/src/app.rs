@@ -15,7 +15,7 @@ pub fn App() -> impl IntoView {
         <Router>
             <a href="#main-content" class="skip-link">"Skip to main content"</a>
             <nav class="navbar" aria-label="Primary navigation">
-                <a href="/" class="logo">"Mycelix Professional"</a>
+                <a href="/" class="logo">"Mycelix Craft"</a>
                 <div class="nav-links">
                     <A href="/employer">"Employer"</A>
                     <A href="/jobs">"Jobs"</A>

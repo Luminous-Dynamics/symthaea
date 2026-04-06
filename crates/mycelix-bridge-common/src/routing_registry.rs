@@ -283,8 +283,8 @@ pub const SUPPLYCHAIN_LOCAL_ZOMES: &[&str] = &[
     "verification_coordinator",
 ];
 
-/// Zomes allowed for local dispatch within the Edunet cluster.
-pub const EDUNET_LOCAL_ZOMES: &[&str] = &[
+/// Zomes allowed for local dispatch within the Praxis cluster.
+pub const PRAXIS_LOCAL_ZOMES: &[&str] = &[
     "learning_zome",
     "fl_zome",
     "credential_zome",
@@ -296,7 +296,7 @@ pub const EDUNET_LOCAL_ZOMES: &[&str] = &[
     "knowledge_zome",
     "integration_zome",
     "mentorship_zome",
-    "edunet_bridge",
+    "praxis_bridge",
 ];
 
 /// Zomes allowed for local dispatch within the Legacy cluster.
@@ -702,14 +702,14 @@ const HEALTH_TO_PERSONAL: &[&str] = &["personal_bridge", "health_vault"];
 /// Identity-side zomes that health-bridge is allowed to call cross-cluster.
 const HEALTH_TO_IDENTITY: &[&str] = &["identity_bridge", "did_registry"];
 
-/// Identity-side zomes that edunet-bridge is allowed to call cross-cluster.
-const EDUNET_TO_IDENTITY: &[&str] = &["identity_bridge", "verifiable_credential"];
+/// Identity-side zomes that praxis-bridge is allowed to call cross-cluster.
+const PRAXIS_TO_IDENTITY: &[&str] = &["identity_bridge", "verifiable_credential"];
 
-/// Finance-side zomes that edunet-bridge is allowed to call cross-cluster (TEND learning credits).
-const EDUNET_TO_FINANCE: &[&str] = &["finance_bridge", "tend"];
+/// Finance-side zomes that praxis-bridge is allowed to call cross-cluster (TEND learning credits).
+const PRAXIS_TO_FINANCE: &[&str] = &["finance_bridge", "tend"];
 
-/// Edunet-side zomes that finance-bridge is allowed to call cross-cluster (payment confirmations).
-const FINANCE_TO_EDUNET: &[&str] = &["edunet_bridge"];
+/// Praxis-side zomes that finance-bridge is allowed to call cross-cluster (payment confirmations).
+const FINANCE_TO_PRAXIS: &[&str] = &["praxis_bridge"];
 
 /// Finance-side zomes that cafe-bridge is allowed to call cross-cluster.
 const CAFE_TO_FINANCE: &[&str] = &["finance_bridge", "payments", "tend", "price_oracle"];
@@ -814,12 +814,12 @@ pub const fn get_allowed_zomes(initiator: CrossClusterRole, target: CrossCluster
         (CrossClusterRole::Health, CrossClusterRole::Personal) => HEALTH_TO_PERSONAL,
         (CrossClusterRole::Health, CrossClusterRole::Identity) => HEALTH_TO_IDENTITY,
 
-        // Edunet outbound
-        (CrossClusterRole::Edunet, CrossClusterRole::Identity) => EDUNET_TO_IDENTITY,
-        (CrossClusterRole::Edunet, CrossClusterRole::Finance) => EDUNET_TO_FINANCE,
+        // Praxis outbound
+        (CrossClusterRole::Praxis, CrossClusterRole::Identity) => PRAXIS_TO_IDENTITY,
+        (CrossClusterRole::Praxis, CrossClusterRole::Finance) => PRAXIS_TO_FINANCE,
 
-        // Inbound to Edunet
-        (CrossClusterRole::Finance, CrossClusterRole::Edunet) => FINANCE_TO_EDUNET,
+        // Inbound to Praxis
+        (CrossClusterRole::Finance, CrossClusterRole::Praxis) => FINANCE_TO_PRAXIS,
 
         // Cafe outbound
         (CrossClusterRole::Cafe, CrossClusterRole::Finance) => CAFE_TO_FINANCE,
@@ -895,7 +895,7 @@ pub const fn get_local_zomes(cluster: CrossClusterRole) -> Option<&'static [&'st
         CrossClusterRole::Climate => Some(CLIMATE_LOCAL_ZOMES),
         CrossClusterRole::Manufacturing => Some(MANUFACTURING_LOCAL_ZOMES),
         CrossClusterRole::Supplychain => Some(SUPPLYCHAIN_LOCAL_ZOMES),
-        CrossClusterRole::Edunet => Some(EDUNET_LOCAL_ZOMES),
+        CrossClusterRole::Praxis => Some(PRAXIS_LOCAL_ZOMES),
         CrossClusterRole::Legacy => Some(LEGACY_LOCAL_ZOMES),
         CrossClusterRole::Identity => Some(IDENTITY_LOCAL_ZOMES),
         CrossClusterRole::Finance => Some(FINANCE_LOCAL_ZOMES),
@@ -1187,7 +1187,7 @@ mod tests {
         assert_eq!(role_name(CrossClusterRole::Climate), "climate");
         assert_eq!(role_name(CrossClusterRole::Manufacturing), "manufacturing");
         assert_eq!(role_name(CrossClusterRole::Supplychain), "supplychain");
-        assert_eq!(role_name(CrossClusterRole::Edunet), "edunet");
+        assert_eq!(role_name(CrossClusterRole::Praxis), "praxis");
         assert_eq!(role_name(CrossClusterRole::Legacy), "legacy");
         assert_eq!(role_name(CrossClusterRole::Atlas), "atlas");
         assert_eq!(role_name(CrossClusterRole::Attribution), "attribution");
@@ -1221,7 +1221,7 @@ mod tests {
             ("CLIMATE_LOCAL_ZOMES", CLIMATE_LOCAL_ZOMES),
             ("MANUFACTURING_LOCAL_ZOMES", MANUFACTURING_LOCAL_ZOMES),
             ("SUPPLYCHAIN_LOCAL_ZOMES", SUPPLYCHAIN_LOCAL_ZOMES),
-            ("EDUNET_LOCAL_ZOMES", EDUNET_LOCAL_ZOMES),
+            ("PRAXIS_LOCAL_ZOMES", PRAXIS_LOCAL_ZOMES),
             ("LEGACY_LOCAL_ZOMES", LEGACY_LOCAL_ZOMES),
             ("IDENTITY_LOCAL_ZOMES", IDENTITY_LOCAL_ZOMES),
             ("FINANCE_LOCAL_ZOMES", FINANCE_LOCAL_ZOMES),
@@ -1267,7 +1267,7 @@ mod tests {
             ("IDENTITY_TO_GOVERNANCE", IDENTITY_TO_GOVERNANCE),
             ("HEALTH_TO_PERSONAL", HEALTH_TO_PERSONAL),
             ("HEALTH_TO_IDENTITY", HEALTH_TO_IDENTITY),
-            ("EDUNET_TO_IDENTITY", EDUNET_TO_IDENTITY),
+            ("PRAXIS_TO_IDENTITY", PRAXIS_TO_IDENTITY),
             ("CAFE_LOCAL_ZOMES", CAFE_LOCAL_ZOMES),
             ("CAFE_TO_FINANCE", CAFE_TO_FINANCE),
             ("CAFE_TO_IDENTITY", CAFE_TO_IDENTITY),
@@ -1335,7 +1335,7 @@ mod tests {
         assert_eq!(get_local_zomes(CrossClusterRole::Climate).unwrap().len(), 3);
         assert_eq!(get_local_zomes(CrossClusterRole::Manufacturing).unwrap().len(), 6);
         assert_eq!(get_local_zomes(CrossClusterRole::Supplychain).unwrap().len(), 8);
-        assert_eq!(get_local_zomes(CrossClusterRole::Edunet).unwrap().len(), 12);
+        assert_eq!(get_local_zomes(CrossClusterRole::Praxis).unwrap().len(), 12);
         assert_eq!(get_local_zomes(CrossClusterRole::Legacy).unwrap().len(), 5);
         assert_eq!(get_local_zomes(CrossClusterRole::Identity).unwrap().len(), 12);
         assert_eq!(get_local_zomes(CrossClusterRole::Finance).unwrap().len(), 8);
@@ -1423,8 +1423,8 @@ mod tests {
     }
 
     #[test]
-    fn edunet_to_identity_count() {
-        assert_eq!(get_allowed_zomes(CrossClusterRole::Edunet, CrossClusterRole::Identity).len(), 2);
+    fn praxis_to_identity_count() {
+        assert_eq!(get_allowed_zomes(CrossClusterRole::Praxis, CrossClusterRole::Identity).len(), 2);
     }
 
     // ---- is_allowed positive tests for new routes ----
@@ -1450,8 +1450,8 @@ mod tests {
     }
 
     #[test]
-    fn is_allowed_edunet_to_identity_verifiable_credential() {
-        assert!(is_allowed(CrossClusterRole::Edunet, CrossClusterRole::Identity, "verifiable_credential"));
+    fn is_allowed_praxis_to_identity_verifiable_credential() {
+        assert!(is_allowed(CrossClusterRole::Praxis, CrossClusterRole::Identity, "verifiable_credential"));
     }
 
     // ---- New cluster route count tests ----
@@ -1514,7 +1514,7 @@ mod tests {
         // 45 registered directional routes:
         //   36 original + 4 Cafe + 5 new (Mail→Identity, Marketplace→Finance,
         //   Space→Identity, Attribution→Identity, Attribution→Finance)
-        //   + 2 additional routes added for Health↔Identity and EduNet
+        //   + 2 additional routes added for Health↔Identity and Praxis
         assert_eq!(count, 47, "Expected 47 registered cross-cluster routes");
     }
 }

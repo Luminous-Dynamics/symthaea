@@ -1,0 +1,306 @@
+{
+  "metadata": {
+    "title": "Financial Literacy",
+    "framework": "EduNet Universal Curriculum",
+    "source": "https://edunet.luminousdynamics.io",
+    "grade_level": "Adult",
+    "subject_area": "Financial Literacy",
+    "domain": "Financial Literacy",
+    "version": "2026",
+    "total_standards": 8,
+    "domains": [
+      "Financial Literacy"
+    ],
+    "created_at": "2026-03-30",
+    "notes": "Essential Financial Literacy knowledge curated for universal access."
+  },
+  "nodes": [
+    {
+      "id": "UNI.FINANCIAL.FIN.EARN",
+      "title": "Earning & Income",
+      "description": "Career earnings potential, salary negotiation, taxes (income tax, VAT), benefits, side income.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Financial Literacy",
+      "subdomain": "FIN",
+      "tags": [
+        "earning",
+        "taxes",
+        "income",
+        "financial literacy"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Adult"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Financial Literacy",
+      "academic_standards": [
+        {
+          "framework": "EduNet Universal Curriculum",
+          "code": "UNI.FINANCIAL.FIN.EARN",
+          "description": "Career earnings potential, salary negotiation, taxes (income tax, VAT), benefits, side income.",
+          "grade_level": "Adult"
+        }
+      ]
+    },
+    {
+      "id": "UNI.FINANCIAL.FIN.BUDGET",
+      "title": "Budgeting",
+      "description": "50/30/20 rule, tracking expenses, needs vs wants, emergency fund, opportunity cost.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Financial Literacy",
+      "subdomain": "FIN",
+      "tags": [
+        "budgeting",
+        "expenses",
+        "emergency-fund",
+        "financial literacy"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Adult"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Financial Literacy",
+      "academic_standards": [
+        {
+          "framework": "EduNet Universal Curriculum",
+          "code": "UNI.FINANCIAL.FIN.BUDGET",
+          "description": "50/30/20 rule, tracking expenses, needs vs wants, emergency fund, opportunity cost.",
+          "grade_level": "Adult"
+        }
+      ]
+    },
+    {
+      "id": "UNI.FINANCIAL.FIN.SAVE",
+      "title": "Saving & Compound Interest",
+      "description": "Power of compound interest, savings accounts, tax-free savings (SA), Rule of 72.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Financial Literacy",
+      "subdomain": "FIN",
+      "tags": [
+        "saving",
+        "compound-interest",
+        "rule-of-72",
+        "financial literacy"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Adult"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Financial Literacy",
+      "academic_standards": [
+        {
+          "framework": "EduNet Universal Curriculum",
+          "code": "UNI.FINANCIAL.FIN.SAVE",
+          "description": "Power of compound interest, savings accounts, tax-free savings (SA), Rule of 72.",
+          "grade_level": "Adult"
+        }
+      ]
+    },
+    {
+      "id": "UNI.FINANCIAL.FIN.INVEST",
+      "title": "Investing Basics",
+      "description": "Stocks, bonds, ETFs, index funds, diversification, risk vs return, time in market.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Financial Literacy",
+      "subdomain": "FIN",
+      "tags": [
+        "investing",
+        "stocks",
+        "bonds",
+        "etf",
+        "diversification",
+        "financial literacy"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Adult"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Financial Literacy",
+      "academic_standards": [
+        {
+          "framework": "EduNet Universal Curriculum",
+          "code": "UNI.FINANCIAL.FIN.INVEST",
+          "description": "Stocks, bonds, ETFs, index funds, diversification, risk vs return, time in market.",
+          "grade_level": "Adult"
+        }
+      ]
+    },
+    {
+      "id": "UNI.FINANCIAL.FIN.DEBT",
+      "title": "Borrowing & Credit",
+      "description": "Credit scores, interest rates, good vs bad debt, student loans, credit cards, mortgage basics.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Financial Literacy",
+      "subdomain": "FIN",
+      "tags": [
+        "credit",
+        "debt",
+        "loans",
+        "interest-rates",
+        "financial literacy"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Adult"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Financial Literacy",
+      "academic_standards": [
+        {
+          "framework": "EduNet Universal Curriculum",
+          "code": "UNI.FINANCIAL.FIN.DEBT",
+          "description": "Credit scores, interest rates, good vs bad debt, student loans, credit cards, mortgage basics.",
+          "grade_level": "Adult"
+        }
+      ]
+    },
+    {
+      "id": "UNI.FINANCIAL.FIN.PROTECT",
+      "title": "Insurance & Protection",
+      "description": "Health, life, car, home insurance. Identity theft protection. Scam recognition.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Financial Literacy",
+      "subdomain": "FIN",
+      "tags": [
+        "insurance",
+        "identity-protection",
+        "scams",
+        "financial literacy"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Adult"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Financial Literacy",
+      "academic_standards": [
+        {
+          "framework": "EduNet Universal Curriculum",
+          "code": "UNI.FINANCIAL.FIN.PROTECT",
+          "description": "Health, life, car, home insurance. Identity theft protection. Scam recognition.",
+          "grade_level": "Adult"
+        }
+      ]
+    },
+    {
+      "id": "UNI.FINANCIAL.FIN.RETIRE",
+      "title": "Retirement Planning",
+      "description": "Pension funds, provident funds (SA), retirement annuities, social security, starting early.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Financial Literacy",
+      "subdomain": "FIN",
+      "tags": [
+        "retirement",
+        "pension",
+        "annuity",
+        "financial literacy"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Adult"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Financial Literacy",
+      "academic_standards": [
+        {
+          "framework": "EduNet Universal Curriculum",
+          "code": "UNI.FINANCIAL.FIN.RETIRE",
+          "description": "Pension funds, provident funds (SA), retirement annuities, social security, starting early.",
+          "grade_level": "Adult"
+        }
+      ]
+    },
+    {
+      "id": "UNI.FINANCIAL.FIN.PLAN",
+      "title": "Financial Planning",
+      "description": "Goal setting, life event planning, estate basics, wills, financial advisor role.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Financial Literacy",
+      "subdomain": "FIN",
+      "tags": [
+        "planning",
+        "goals",
+        "estate",
+        "wills",
+        "financial literacy"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Adult"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Financial Literacy",
+      "academic_standards": [
+        {
+          "framework": "EduNet Universal Curriculum",
+          "code": "UNI.FINANCIAL.FIN.PLAN",
+          "description": "Goal setting, life event planning, estate basics, wills, financial advisor role.",
+          "grade_level": "Adult"
+        }
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "from": "UNI.FINANCIAL.FIN.EARN",
+      "to": "UNI.FINANCIAL.FIN.BUDGET",
+      "edge_type": "Recommends",
+      "strength_permille": 600,
+      "rationale": "Sequential learning"
+    },
+    {
+      "from": "UNI.FINANCIAL.FIN.BUDGET",
+      "to": "UNI.FINANCIAL.FIN.SAVE",
+      "edge_type": "Recommends",
+      "strength_permille": 600,
+      "rationale": "Sequential learning"
+    },
+    {
+      "from": "UNI.FINANCIAL.FIN.SAVE",
+      "to": "UNI.FINANCIAL.FIN.INVEST",
+      "edge_type": "Recommends",
+      "strength_permille": 600,
+      "rationale": "Sequential learning"
+    },
+    {
+      "from": "UNI.FINANCIAL.FIN.INVEST",
+      "to": "UNI.FINANCIAL.FIN.DEBT",
+      "edge_type": "Recommends",
+      "strength_permille": 600,
+      "rationale": "Sequential learning"
+    },
+    {
+      "from": "UNI.FINANCIAL.FIN.DEBT",
+      "to": "UNI.FINANCIAL.FIN.PROTECT",
+      "edge_type": "Recommends",
+      "strength_permille": 600,
+      "rationale": "Sequential learning"
+    },
+    {
+      "from": "UNI.FINANCIAL.FIN.PROTECT",
+      "to": "UNI.FINANCIAL.FIN.RETIRE",
+      "edge_type": "Recommends",
+      "strength_permille": 600,
+      "rationale": "Sequential learning"
+    },
+    {
+      "from": "UNI.FINANCIAL.FIN.RETIRE",
+      "to": "UNI.FINANCIAL.FIN.PLAN",
+      "edge_type": "Recommends",
+      "strength_permille": 600,
+      "rationale": "Sequential learning"
+    }
+  ]
+}

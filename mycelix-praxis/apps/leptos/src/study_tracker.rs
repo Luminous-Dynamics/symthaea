@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::persistence;
 
-const TRACKER_KEY: &str = "edunet_study_tracker";
+const TRACKER_KEY: &str = "praxis_study_tracker";
 
 // ============================================================
 // Persistent study state

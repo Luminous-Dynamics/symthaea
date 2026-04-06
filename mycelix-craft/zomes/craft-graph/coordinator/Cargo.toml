@@ -1,5 +1,5 @@
 [package]
-name = "professional_graph"
+name = "craft_graph"
 version = "0.1.0"
 edition = "2021"
 
@@ -12,4 +12,4 @@ holochain_serialized_bytes = { workspace = true }
 hdk = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
-professional_graph_integrity = { path = "../integrity" }
+craft_graph_integrity = { path = "../integrity" }

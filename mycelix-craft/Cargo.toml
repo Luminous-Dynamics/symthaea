@@ -1,8 +1,8 @@
 [workspace]
 exclude = ["apps/leptos"]
 members = [
-    "zomes/professional-graph/integrity",
-    "zomes/professional-graph/coordinator",
+    "zomes/craft-graph/integrity",
+    "zomes/craft-graph/coordinator",
     "zomes/job-postings/integrity",
     "zomes/job-postings/coordinator",
     "zomes/work-history/integrity",

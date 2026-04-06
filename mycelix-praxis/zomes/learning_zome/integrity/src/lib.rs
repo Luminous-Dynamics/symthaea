@@ -7,7 +7,7 @@
 //! This zome is immutable - it defines the data structures that cannot change.
 
 use hdi::prelude::*;
-use edunet_core::CourseId;
+use praxis_core::CourseId;
 
 /// Course entry - represents a learning course
 #[hdk_entry_helper]

@@ -580,7 +580,7 @@ pub fn StudyPage(node_id: String) -> impl IntoView {
                                     // Notes tab
                                     <div style=move || if active_tab.get() == "notes" { "display: block" } else { "display: none" }>
                                         {
-                                            let notes_key = format!("edunet_notes_{}", node_id);
+                                            let notes_key = format!("praxis_notes_{}", node_id);
                                             let initial_notes = persistence::load::<String>(&notes_key).unwrap_or_default();
                                             let (notes, set_notes) = signal(initial_notes);
                                             let notes_key_save = notes_key.clone();
@@ -646,7 +646,7 @@ pub fn StudyPage(node_id: String) -> impl IntoView {
 
             // Feedback widget — "Was this helpful?"
             {
-                let feedback_key = format!("edunet_feedback_{}", node_id_for_status2);
+                let feedback_key = format!("praxis_feedback_{}", node_id_for_status2);
                 let initial_fb = persistence::load::<String>(&feedback_key);
                 let (fb_given, set_fb_given) = signal(initial_fb.is_some());
                 let (show_text, set_show_text) = signal(false);

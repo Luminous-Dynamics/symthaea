@@ -95,7 +95,7 @@ impl HolochainCtx {
         let payload = encode(input).map_err(|e| format!("Encode error: {e}"))?;
 
         let response_bytes = transport
-            .call_zome("edunet", zome, fn_name, payload)
+            .call_zome("praxis", zome, fn_name, payload)
             .await
             .map_err(|e| format!("Zome call {}.{} failed: {e}", zome, fn_name))?;
 
@@ -156,20 +156,20 @@ pub fn HolochainProvider(children: Children) -> impl IntoView {
         let url = conductor_url();
         let token = auth_token();
         web_sys::console::log_1(
-            &format!("[EduNet] Connecting to conductor at {url}...").into(),
+            &format!("[Praxis] Connecting to conductor at {url}...").into(),
         );
 
         let ws_transport = BrowserWsTransport::new();
         let config = ConnectConfig {
             url,
-            app_id: "edunet".to_string(),
+            app_id: "praxis".to_string(),
             auth_token: token.map(|s| s.into_bytes()),
         };
 
         match ws_transport.connect(config).await {
             Ok(()) => {
                 web_sys::console::log_1(
-                    &"[EduNet] Connected to conductor!".into(),
+                    &"[Praxis] Connected to conductor!".into(),
                 );
                 *transport_for_connect.borrow_mut() = Some(ws_transport);
                 set_status.set(ConnectionStatus::Connected);
@@ -177,7 +177,7 @@ pub fn HolochainProvider(children: Children) -> impl IntoView {
             Err(e) => {
                 web_sys::console::log_1(
                     &format!(
-                        "[EduNet] Could not connect: {e}. Running in mock mode."
+                        "[Praxis] Could not connect: {e}. Running in mock mode."
                     )
                     .into(),
                 );

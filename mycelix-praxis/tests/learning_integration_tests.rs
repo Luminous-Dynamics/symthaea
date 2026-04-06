@@ -12,7 +12,7 @@ use learning_coordinator::UpdateCourseInput;
 /// Helper to create a valid test course
 fn create_test_course(title: &str, creator: &str) -> Course {
     Course {
-        course_id: edunet_core::CourseId(format!("course_{}", title)),
+        course_id: praxis_core::CourseId(format!("course_{}", title)),
         title: title.to_string(),
         description: format!("Test course: {}", title),
         creator: creator.to_string(),
@@ -27,7 +27,7 @@ fn create_test_course(title: &str, creator: &str) -> Course {
 /// Helper to create test learner progress
 fn create_test_progress(course_id: &str, learner: &str, progress: f32) -> LearnerProgress {
     LearnerProgress {
-        course_id: edunet_core::CourseId(course_id.to_string()),
+        course_id: praxis_core::CourseId(course_id.to_string()),
         learner: learner.to_string(),
         progress_percent: progress,
         completed_items: vec!["lesson1".to_string()],
@@ -40,7 +40,7 @@ fn create_test_progress(course_id: &str, learner: &str, progress: f32) -> Learne
 /// Helper to create test learning activity
 fn create_test_activity(course_id: &str) -> LearningActivity {
     LearningActivity {
-        course_id: edunet_core::CourseId(course_id.to_string()),
+        course_id: praxis_core::CourseId(course_id.to_string()),
         activity_type: "quiz".to_string(),
         item_id: "quiz_1".to_string(),
         outcome: Some(85.0),

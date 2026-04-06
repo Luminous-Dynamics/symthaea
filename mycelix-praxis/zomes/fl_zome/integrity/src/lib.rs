@@ -7,7 +7,7 @@
 //! This zome is immutable - entry definitions cannot change without breaking data.
 
 use hdi::prelude::*;
-use edunet_core::{ModelHash, RoundId, RoundState};
+use praxis_core::{ModelHash, RoundId, RoundState};
 
 /// Federated learning update entry
 ///

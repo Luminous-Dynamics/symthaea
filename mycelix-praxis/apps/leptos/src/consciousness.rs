@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 
-//! Consciousness feed integration for EduNet.
+//! Consciousness feed integration for Praxis.
 //!
 //! This module provides a Leptos context that exposes live consciousness
 //! metrics from the Symthaea Spore WASM kernel. It runs consciousness
@@ -30,7 +30,7 @@
 //! When ready to use the actual Spore WASM:
 //!
 //! 1. Copy `symthaea/crates/symthaea-spore/www/pkg/` contents to
-//!    `mycelix-edunet/apps/leptos/static/spore/`
+//!    `mycelix-praxis/apps/leptos/static/spore/`
 //!
 //! 2. Add to `index.html`:
 //!    ```html
@@ -297,11 +297,11 @@ pub fn ConsciousnessProvider(children: Children) -> impl IntoView {
 
     if spore_available {
         web_sys::console::log_1(
-            &"[EduNet] Spore WASM detected \u{2014} real consciousness engine available".into(),
+            &"[Praxis] Spore WASM detected \u{2014} real consciousness engine available".into(),
         );
     } else {
         web_sys::console::log_1(
-            &"[EduNet] Spore WASM not found \u{2014} using simulation".into(),
+            &"[Praxis] Spore WASM not found \u{2014} using simulation".into(),
         );
     }
 

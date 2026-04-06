@@ -1,7 +1,7 @@
 ---
 # Mycelix Unified hApp (Testable Subset)
 # Includes all clusters with packed DNAs. Excludes manufacturing, music,
-# energy, knowledge, climate, edunet (add when DNAs are packed).
+# energy, knowledge, climate, praxis (add when DNAs are packed).
 manifest_version: "0"
 name: mycelix-unified-testable
 description: |

@@ -5,7 +5,7 @@
 //!
 //! Manages federated learning rounds, updates, and aggregation.
 
-use edunet_core::{ModelHash, RoundId, RoundState};
+use praxis_core::{ModelHash, RoundId, RoundState};
 use serde::{Deserialize, Serialize};
 
 /// Federated learning update entry

@@ -6,7 +6,7 @@ authors = ["Luminous Dynamics <info@mycelix.org>"]
 license = "AGPL-3.0-or-later"
 
 [dependencies]
-edunet-core = { path = "../crates/edunet-core" }
+praxis-core = { path = "../crates/praxis-core" }
 # edunet-agg excluded — has workspace inheritance issues when outside workspace
 
 # Learning zome dependencies (for integration tests)

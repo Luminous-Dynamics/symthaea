@@ -359,7 +359,7 @@ pub fn HomeostasisBackground() -> impl IntoView {
                         "health"     => (0.05, 0.45, 0.47, 1.0, 0.0), // organic
                         "governance" => (0.49, 0.23, 0.93, 1.0, 1.0), // crystalline
                         "finance"    => (0.85, 0.47, 0.02, 1.0, 2.0), // pulse
-                        "edunet"     => (0.15, 0.39, 0.92, 1.0, 3.0), // branching
+                        "praxis"     => (0.15, 0.39, 0.92, 1.0, 3.0), // branching
                         "commons"    => (0.02, 0.59, 0.41, 1.0, 0.0), // organic
                         "hearth"     => (0.86, 0.15, 0.47, 1.0, 0.0), // organic
                         "knowledge"  => (0.03, 0.57, 0.70, 1.0, 3.0), // branching

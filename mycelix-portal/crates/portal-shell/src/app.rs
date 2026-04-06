@@ -130,7 +130,7 @@ pub fn App() -> impl IntoView {
             angle: std::f64::consts::TAU / 11.0, activity: 0.4,
         },
         OrbitalDomain {
-            id: "edunet", name: "Education", bio_name: "Growth",
+            id: "praxis", name: "Education", bio_name: "Growth",
             color: "#2563EB", glow: "#60A5FA",
             min_tier: ConsciousnessTier::Participant,
             angle: 2.0 * std::f64::consts::TAU / 11.0, activity: 0.3,
@@ -481,7 +481,7 @@ fn domain_app_url(domain_id: &str) -> Option<&'static str> {
     match domain_id {
         "governance" => Some("http://localhost:8110"),
         "hearth" => Some("http://localhost:8096"),
-        "edunet" => Some("http://localhost:8107"),
+        "praxis" => Some("http://localhost:8107"),
         "health" => Some("http://localhost:8111"),
         "music" => Some("http://localhost:8121"),
         _ => None,
@@ -494,7 +494,7 @@ fn play_domain_tone(domain_id: &str) {
         "health" => 262.0,     // C4 — grounded, organic
         "governance" => 330.0, // E4 — structured, clear
         "finance" => 392.0,    // G4 — active, energetic
-        "edunet" => 349.0,     // F4 — growing, warm
+        "praxis" => 349.0,     // F4 — growing, warm
         "commons" => 294.0,    // D4 — communal, solid
         "hearth" => 277.0,     // C#4 — intimate, warm
         "knowledge" => 440.0,  // A4 — resonant, bright

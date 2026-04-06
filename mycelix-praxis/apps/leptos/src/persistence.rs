@@ -75,7 +75,7 @@ pub struct LocalProposal {
     pub voted: bool, // has current user voted
 }
 
-const GOV_KEY: &str = "edunet_governance";
+const GOV_KEY: &str = "praxis_governance";
 
 impl GovernanceStore {
     pub fn load() -> Self {
@@ -130,7 +130,7 @@ impl GovernanceStore {
 // DESIGN PRINCIPLE: Learning is NEVER blocked behind a conductor.
 // Pending TEND accumulates freely. Connection unlocks real value.
 
-const TEND_KEY: &str = "edunet_pending_tend";
+const TEND_KEY: &str = "praxis_pending_tend";
 
 /// A record of a TEND-earning learning event (pre-conductor).
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -249,9 +249,9 @@ pub fn export_all() -> String {
     let bundle = ExportBundle {
         version: 1,
         exported_at,
-        progress: load::<ProgressStore>("edunet_progress"),
-        study_tracker: load::<StudyTracker>("edunet_study_tracker"),
-        profile: load::<StudentProfile>("edunet_profile"),
+        progress: load::<ProgressStore>("praxis_progress"),
+        study_tracker: load::<StudyTracker>("praxis_study_tracker"),
+        profile: load::<StudentProfile>("praxis_profile"),
     };
 
     serde_json::to_string_pretty(&bundle).unwrap_or_default()
@@ -264,14 +264,14 @@ pub fn import_all(json: &str) -> Result<String, String> {
         .map_err(|e| format!("Invalid format: {}", e))?;
 
     if bundle.version > 1 {
-        return Err("This export is from a newer version of EduNet. Please update the app.".into());
+        return Err("This export is from a newer version of Praxis. Please update the app.".into());
     }
 
     let mut summary = Vec::new();
 
     // Merge progress (keep higher mastery, more recent reviews)
     if let Some(imported) = bundle.progress {
-        let mut existing = load::<ProgressStore>("edunet_progress").unwrap_or_default();
+        let mut existing = load::<ProgressStore>("praxis_progress").unwrap_or_default();
         let mut merged_count = 0u32;
 
         for (id, imp_node) in &imported.nodes {
@@ -306,7 +306,7 @@ pub fn import_all(json: &str) -> Result<String, String> {
             }
         }
 
-        save("edunet_progress", &existing);
+        save("praxis_progress", &existing);
         summary.push(format!("{} topics merged", imported.nodes.len()));
         if merged_count > 0 {
             summary.push(format!("{} mastery levels updated", merged_count));
@@ -315,7 +315,7 @@ pub fn import_all(json: &str) -> Result<String, String> {
 
     // Merge study tracker (combine study days, keep max)
     if let Some(imported) = bundle.study_tracker {
-        let mut existing = load::<StudyTracker>("edunet_study_tracker").unwrap_or_default();
+        let mut existing = load::<StudyTracker>("praxis_study_tracker").unwrap_or_default();
         for day in &imported.study_days {
             if !existing.study_days.contains(day) {
                 existing.study_days.push(day.clone());
@@ -326,15 +326,15 @@ pub fn import_all(json: &str) -> Result<String, String> {
         if imported.exam_date.is_some() && existing.exam_date.is_none() {
             existing.exam_date = imported.exam_date;
         }
-        save("edunet_study_tracker", &existing);
+        save("praxis_study_tracker", &existing);
         summary.push("study tracker merged".into());
     }
 
     // Import profile (only if current is empty)
     if let Some(imported) = bundle.profile {
-        let existing = load::<StudentProfile>("edunet_profile");
+        let existing = load::<StudentProfile>("praxis_profile");
         if existing.is_none() || existing.as_ref().map(|p| p.name.is_empty()).unwrap_or(true) {
-            save("edunet_profile", &imported);
+            save("praxis_profile", &imported);
             summary.push("profile imported".into());
         }
     }

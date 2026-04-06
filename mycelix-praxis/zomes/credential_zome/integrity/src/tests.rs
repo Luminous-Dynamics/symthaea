@@ -7,7 +7,7 @@
 //! - VerifiableCredential
 
 use super::*;
-use edunet_core::CourseId;
+use praxis_core::CourseId;
 
 // =============================================================================
 // Helper functions for creating test data

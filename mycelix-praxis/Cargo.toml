@@ -1,7 +1,7 @@
 [workspace]
 resolver = "2"
 members = [
-  "crates/edunet-core",
+  "crates/praxis-core",
   "zomes/learning_zome/integrity",
   "zomes/learning_zome/coordinator",
   "zomes/fl_zome/integrity",
@@ -34,8 +34,8 @@ members = [
   "zomes/mentorship_zome/integrity",
   "zomes/mentorship_zome/coordinator",
   # Trust Tier Bridge (cross-domain dispatch + consciousness gating)
-  "zomes/edunet-bridge/integrity",
-  "zomes/edunet-bridge/coordinator",
+  "zomes/praxis-bridge/integrity",
+  "zomes/praxis-bridge/coordinator",
   # Community Translation (multilingual content with trust-weighted verification)
   "zomes/translation_zome/integrity",
   "zomes/translation_zome/coordinator",
@@ -44,14 +44,14 @@ members = [
 # - tests: full holochain conductor (tokio/mio)
 # - edunet-agg, mycelix-governance: statrs/nalgebra (rand -> getrandom 0.2)
 # Run tests with: cargo test --manifest-path tests/Cargo.toml
-exclude = ["tests", "crates/edunet-agg", "crates/edunet-content-gen", "crates/edunet-standards-ingest", "crates/mycelix-governance", "apps/leptos"]
+exclude = ["tests", "crates/praxis-agg", "crates/praxis-content-gen", "crates/praxis-standards-ingest", "crates/mycelix-governance", "apps/leptos"]
 
 [workspace.package]
 version = "0.1.0"
 edition = "2021"
 authors = ["Luminous Dynamics <info@mycelix.org>"]
 license = "AGPL-3.0-or-later"
-repository = "https://github.com/Luminous-Dynamics/mycelix-edunet"
+repository = "https://github.com/Luminous-Dynamics/mycelix-praxis"
 
 [workspace.dependencies]
 # Holochain 0.6.0 compatible dependencies

@@ -57,9 +57,9 @@ fn skill_full_names() -> Vec<String> {
 }
 
 fn real_students() -> Vec<StudentMastery> {
-    let progress = crate::persistence::load::<crate::curriculum::ProgressStore>("edunet_progress")
+    let progress = crate::persistence::load::<crate::curriculum::ProgressStore>("praxis_progress")
         .unwrap_or_default();
-    let profile = crate::persistence::load::<crate::student_profile::StudentProfile>("edunet_profile");
+    let profile = crate::persistence::load::<crate::student_profile::StudentProfile>("praxis_profile");
     let name = profile.map(|p| p.name).unwrap_or_else(|| "Student".into());
     let name_static: &'static str = Box::leak(name.into_boxed_str());
 
@@ -78,9 +78,9 @@ fn real_students() -> Vec<StudentMastery> {
 }
 
 fn real_at_risk() -> Vec<AtRiskAlert> {
-    let progress = crate::persistence::load::<crate::curriculum::ProgressStore>("edunet_progress")
+    let progress = crate::persistence::load::<crate::curriculum::ProgressStore>("praxis_progress")
         .unwrap_or_default();
-    let tracker = crate::persistence::load::<crate::study_tracker::StudyTracker>("edunet_study_tracker")
+    let tracker = crate::persistence::load::<crate::study_tracker::StudyTracker>("praxis_study_tracker")
         .unwrap_or_default();
 
     let mut alerts = Vec::new();
@@ -123,7 +123,7 @@ fn real_at_risk() -> Vec<AtRiskAlert> {
 }
 
 fn real_class_stats() -> ClassStats {
-    let progress = crate::persistence::load::<crate::curriculum::ProgressStore>("edunet_progress")
+    let progress = crate::persistence::load::<crate::curriculum::ProgressStore>("praxis_progress")
         .unwrap_or_default();
     let graph = crate::curriculum::caps_graph();
     let total_nodes = graph.nodes.len();

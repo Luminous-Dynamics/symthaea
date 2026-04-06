@@ -8,12 +8,12 @@ use leptos::prelude::*;
 pub fn NetworkPage() -> impl IntoView {
     view! {
         <div class="page network-page">
-            <h1>"Professional Network"</h1>
+            <h1>"Craft Network"</h1>
 
             <div class="network-grid">
                 <div class="network-section">
                     <h3>"Connections"</h3>
-                    <p class="text-secondary">"Your professional connections appear here."</p>
+                    <p class="text-secondary">"Your craft connections appear here."</p>
                     <div class="connections-list">
                         <p class="empty-state">"No connections yet. Send a connection request to get started."</p>
                     </div>
@@ -29,7 +29,7 @@ pub fn NetworkPage() -> impl IntoView {
 
                 <div class="network-section">
                     <h3>"Recommendations"</h3>
-                    <p class="text-secondary">"Professional recommendations from your network."</p>
+                    <p class="text-secondary">"Recommendations from your network."</p>
                     <div class="recommendations-list">
                         <p class="empty-state">"No recommendations yet."</p>
                     </div>

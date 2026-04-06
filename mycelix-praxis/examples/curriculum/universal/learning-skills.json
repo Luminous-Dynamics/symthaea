@@ -1,0 +1,230 @@
+{
+  "metadata": {
+    "title": "Learning How to Learn",
+    "framework": "EduNet Universal Curriculum",
+    "source": "https://edunet.luminousdynamics.io",
+    "grade_level": "Adult",
+    "subject_area": "Learning Science",
+    "domain": "Learning Science",
+    "version": "2026",
+    "total_standards": 6,
+    "domains": [
+      "Learning Science"
+    ],
+    "created_at": "2026-03-30",
+    "notes": "Essential Learning Science knowledge curated for universal access."
+  },
+  "nodes": [
+    {
+      "id": "UNI.LEARNING.LEARN.META",
+      "title": "Metacognition",
+      "description": "Thinking about thinking. Planning, monitoring, evaluating your own learning. Self-testing.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Learning Science",
+      "subdomain": "LEARN",
+      "tags": [
+        "metacognition",
+        "self-testing",
+        "reflection",
+        "learning science"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Adult"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Learning Science",
+      "academic_standards": [
+        {
+          "framework": "EduNet Universal Curriculum",
+          "code": "UNI.LEARNING.LEARN.META",
+          "description": "Thinking about thinking. Planning, monitoring, evaluating your own learning. Self-testing.",
+          "grade_level": "Adult"
+        }
+      ]
+    },
+    {
+      "id": "UNI.LEARNING.LEARN.SRS",
+      "title": "Spaced Repetition",
+      "description": "The forgetting curve. How spaced review beats massed practice. Optimal spacing intervals.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Learning Science",
+      "subdomain": "LEARN",
+      "tags": [
+        "spaced-repetition",
+        "forgetting-curve",
+        "memory",
+        "learning science"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Adult"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Learning Science",
+      "academic_standards": [
+        {
+          "framework": "EduNet Universal Curriculum",
+          "code": "UNI.LEARNING.LEARN.SRS",
+          "description": "The forgetting curve. How spaced review beats massed practice. Optimal spacing intervals.",
+          "grade_level": "Adult"
+        }
+      ]
+    },
+    {
+      "id": "UNI.LEARNING.LEARN.DELIB",
+      "title": "Deliberate Practice",
+      "description": "Purposeful practice vs naive practice. Feedback loops. Working at the edge of ability.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Learning Science",
+      "subdomain": "LEARN",
+      "tags": [
+        "deliberate-practice",
+        "feedback",
+        "skill-development",
+        "learning science"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Adult"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Learning Science",
+      "academic_standards": [
+        {
+          "framework": "EduNet Universal Curriculum",
+          "code": "UNI.LEARNING.LEARN.DELIB",
+          "description": "Purposeful practice vs naive practice. Feedback loops. Working at the edge of ability.",
+          "grade_level": "Adult"
+        }
+      ]
+    },
+    {
+      "id": "UNI.LEARNING.LEARN.INTER",
+      "title": "Interleaving & Variation",
+      "description": "Mixing topics during study. Why it feels harder but produces better long-term learning.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Learning Science",
+      "subdomain": "LEARN",
+      "tags": [
+        "interleaving",
+        "variation",
+        "desirable-difficulties",
+        "learning science"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Adult"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Learning Science",
+      "academic_standards": [
+        {
+          "framework": "EduNet Universal Curriculum",
+          "code": "UNI.LEARNING.LEARN.INTER",
+          "description": "Mixing topics during study. Why it feels harder but produces better long-term learning.",
+          "grade_level": "Adult"
+        }
+      ]
+    },
+    {
+      "id": "UNI.LEARNING.LEARN.RECALL",
+      "title": "Active Recall",
+      "description": "Retrieval practice. Why re-reading is ineffective. Testing effect. Elaborative interrogation.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Learning Science",
+      "subdomain": "LEARN",
+      "tags": [
+        "active-recall",
+        "testing-effect",
+        "retrieval-practice",
+        "learning science"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Adult"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Learning Science",
+      "academic_standards": [
+        {
+          "framework": "EduNet Universal Curriculum",
+          "code": "UNI.LEARNING.LEARN.RECALL",
+          "description": "Retrieval practice. Why re-reading is ineffective. Testing effect. Elaborative interrogation.",
+          "grade_level": "Adult"
+        }
+      ]
+    },
+    {
+      "id": "UNI.LEARNING.LEARN.SLEEP",
+      "title": "Sleep & Learning",
+      "description": "Memory consolidation during sleep. Sleep stages. How sleep deprivation impairs learning.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Learning Science",
+      "subdomain": "LEARN",
+      "tags": [
+        "sleep",
+        "memory-consolidation",
+        "rest",
+        "learning science"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Adult"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Learning Science",
+      "academic_standards": [
+        {
+          "framework": "EduNet Universal Curriculum",
+          "code": "UNI.LEARNING.LEARN.SLEEP",
+          "description": "Memory consolidation during sleep. Sleep stages. How sleep deprivation impairs learning.",
+          "grade_level": "Adult"
+        }
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "from": "UNI.LEARNING.LEARN.META",
+      "to": "UNI.LEARNING.LEARN.SRS",
+      "edge_type": "Recommends",
+      "strength_permille": 600,
+      "rationale": "Sequential learning"
+    },
+    {
+      "from": "UNI.LEARNING.LEARN.SRS",
+      "to": "UNI.LEARNING.LEARN.DELIB",
+      "edge_type": "Recommends",
+      "strength_permille": 600,
+      "rationale": "Sequential learning"
+    },
+    {
+      "from": "UNI.LEARNING.LEARN.DELIB",
+      "to": "UNI.LEARNING.LEARN.INTER",
+      "edge_type": "Recommends",
+      "strength_permille": 600,
+      "rationale": "Sequential learning"
+    },
+    {
+      "from": "UNI.LEARNING.LEARN.INTER",
+      "to": "UNI.LEARNING.LEARN.RECALL",
+      "edge_type": "Recommends",
+      "strength_permille": 600,
+      "rationale": "Sequential learning"
+    },
+    {
+      "from": "UNI.LEARNING.LEARN.RECALL",
+      "to": "UNI.LEARNING.LEARN.SLEEP",
+      "edge_type": "Recommends",
+      "strength_permille": 600,
+      "rationale": "Sequential learning"
+    }
+  ]
+}

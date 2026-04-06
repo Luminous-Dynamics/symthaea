@@ -1,11 +1,11 @@
 [package]
-name = "edunet-core"
+name = "praxis-core"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true
 license.workspace = true
 repository.workspace = true
-description = "Core types, crypto helpers, and provenance utilities for Mycelix EduNet"
+description = "Core types, crypto helpers, and provenance utilities for Mycelix Praxis"
 
 [dependencies]
 serde.workspace = true

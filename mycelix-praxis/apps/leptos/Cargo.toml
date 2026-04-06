@@ -3,11 +3,11 @@
 # Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 
 [package]
-name = "mycelix-edunet-ui"
+name = "mycelix-praxis-ui"
 version = "0.1.0"
 edition = "2021"
 license = "AGPL-3.0-or-later"
-description = "Leptos CSR frontend for Mycelix EduNet — pilot for ecosystem-wide Leptos migration"
+description = "Leptos CSR frontend for Mycelix Praxis — pilot for ecosystem-wide Leptos migration"
 
 [dependencies]
 leptos = { version = "0.8", features = ["csr"] }
@@ -23,8 +23,8 @@ web-sys = { version = "0.3", features = ["console", "HtmlSelectElement", "HtmlIn
 console_error_panic_hook = "0.1"
 gloo-timers = { version = "0.3", features = ["futures"] }
 
-# Shared types from the edunet backend
-edunet-core = { path = "../../crates/edunet-core", default-features = false }
+# Shared types from the praxis backend
+praxis-core = { path = "../../crates/praxis-core", default-features = false }
 
 # Shared Holochain transport for Leptos apps
 mycelix-leptos-client = { path = "../../../crates/mycelix-leptos-client", features = ["browser"] }

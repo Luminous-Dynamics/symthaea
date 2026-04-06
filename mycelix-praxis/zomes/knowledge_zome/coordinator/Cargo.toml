@@ -18,7 +18,7 @@ hdk.workspace = true
 knowledge_integrity = { path = "../integrity" }
 
 # Core types
-edunet-core = { path = "../../../crates/edunet-core" }
+praxis-core = { path = "../../../crates/praxis-core" }
 
 # Serialization
 serde.workspace = true

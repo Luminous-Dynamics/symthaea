@@ -41,7 +41,7 @@ pub struct CredentialView {
 
 /// Generate real credentials from mastered topics
 fn real_credentials() -> Vec<CredentialView> {
-    let progress = crate::persistence::load::<crate::curriculum::ProgressStore>("edunet_progress")
+    let progress = crate::persistence::load::<crate::curriculum::ProgressStore>("praxis_progress")
         .unwrap_or_default();
     let graph = crate::curriculum::caps_graph();
 
@@ -69,10 +69,10 @@ fn real_credentials() -> Vec<CredentialView> {
             now.get_full_year(), now.get_month() + 1, now.get_date());
 
         creds.push(CredentialView {
-            credential_id: format!("vc:edunet:local_{}", cred_num),
+            credential_id: format!("vc:praxis:local_{}", cred_num),
             course_name: node.title.clone(),
             course_id: node.id.clone(),
-            issuer: "EduNet (self-attested, pending Holochain verification)".into(),
+            issuer: "Praxis (self-attested, pending Holochain verification)".into(),
             issuance_date: date.clone(),
             expiration_date: None,
             score: Some(score),
@@ -92,10 +92,10 @@ fn real_credentials() -> Vec<CredentialView> {
     if creds.is_empty() {
         // Show encouragement for new users
         creds.push(CredentialView {
-            credential_id: "vc:edunet:placeholder".into(),
+            credential_id: "vc:praxis:placeholder".into(),
             course_name: "Your first credential awaits".into(),
             course_id: "".into(),
-            issuer: "EduNet".into(),
+            issuer: "Praxis".into(),
             issuance_date: "".into(),
             expiration_date: None,
             score: None,
@@ -255,7 +255,7 @@ fn AchievementCard(
     credential: CredentialView,
     on_select: impl Fn() + 'static,
 ) -> impl IntoView {
-    let is_placeholder = credential.credential_id == "vc:edunet:placeholder";
+    let is_placeholder = credential.credential_id == "vc:praxis:placeholder";
     let trophy = trophy_for_band(&credential.score_band);
     let grade = grade_display(credential.score, &credential.score_band);
     let date = friendly_date(&credential.issuance_date);

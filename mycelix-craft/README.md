@@ -1,23 +1,28 @@
-# Mycelix Professional
+# Mycelix Craft
 
-Standalone hApp DNA for the Mycelix Professional Network. This DNA stores
-opt-in profile metadata and publicly indexed credential pointers, while
-verifiable credentials remain in the Identity/EduNet DNAs and are referenced
-via hashes.
+Decentralized talent marketplace with living credentials, guild-based mastery, and
+employer-funded apprenticeship pathways. This DNA stores opt-in profile metadata,
+publicly indexed credential pointers with Ebbinghaus vitality decay, and peer
+attestations. Verifiable credentials remain in the Identity/Praxis DNAs and are
+referenced via hashes.
 
 ## Scope
-- Professional profile metadata (opt-in, user-authored)
-- Published credential pointers (explicitly opt-in)
+- Craft profiles (opt-in, user-authored professional identity)
+- Living credentials with Ebbinghaus forgetting curve decay
 - Skill endorsements (peer attestations)
+- Job postings with apprenticeship stakes
+- Work history with peer verification
+- Connection graph and recommendations
+- Application lifecycle (Draft -> Submitted -> Interview -> Offered -> Accepted)
 
 ## Build
 ```sh
-cd mycelix-professional
+cd mycelix-craft
 cargo build --release --target wasm32-unknown-unknown
 ```
 
 Then package the DNA/hApp:
 ```sh
-hc dna pack -o dna/mycelix_professional.dna dna/dna.yaml
-hc app pack -o mycelix-professional.happ happ.yaml
+hc dna pack -o dna/mycelix_craft.dna dna/dna.yaml
+hc app pack -o mycelix-craft.happ happ.yaml
 ```
