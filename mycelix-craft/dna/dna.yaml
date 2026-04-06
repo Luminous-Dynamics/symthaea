@@ -17,6 +17,8 @@ integrity:
       bundled: ../target/wasm32-unknown-unknown/release/applications_integrity.wasm
     - name: guild_integrity
       bundled: ../target/wasm32-unknown-unknown/release/guild_integrity.wasm
+    - name: craft_bridge_integrity
+      bundled: ../target/wasm32-unknown-unknown/release/craft_bridge_integrity.wasm
 coordinator:
   zomes:
     - name: craft_graph
@@ -44,3 +46,7 @@ coordinator:
       dependencies:
         - name: guild_integrity
         - name: craft_graph_integrity
+    - name: craft_bridge
+      bundled: ../target/wasm32-unknown-unknown/release/craft_bridge.wasm
+      dependencies:
+        - name: craft_bridge_integrity

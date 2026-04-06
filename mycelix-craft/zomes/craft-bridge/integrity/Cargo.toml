@@ -1,0 +1,16 @@
+[package]
+name = "craft_bridge_integrity"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+name = "craft_bridge_integrity"
+
+[dependencies]
+hdi = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+holochain_serialized_bytes = { workspace = true }
+thiserror = { workspace = true }
+mycelix-bridge-entry-types = { path = "../../../../crates/mycelix-bridge-entry-types" }
