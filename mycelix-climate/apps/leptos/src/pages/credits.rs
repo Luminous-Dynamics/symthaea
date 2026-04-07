@@ -3,6 +3,7 @@
 
 use leptos::prelude::*;
 use crate::context::use_climate_context;
+use crate::actions;
 
 #[component]
 pub fn CreditsPage() -> impl IntoView {
@@ -31,6 +32,7 @@ pub fn CreditsPage() -> impl IntoView {
             <div class="credit-list">
                 {move || ctx.credits.get().iter().map(|c| {
                     let id = c.id.clone();
+                    let retire_id = id.clone();
                     let project = c.project_id.clone();
                     let tonnes = c.tonnes_co2e;
                     let year = c.vintage_year;
@@ -46,6 +48,16 @@ pub fn CreditsPage() -> impl IntoView {
                                 <span class="credit-tonnes">{format!("{tonnes:.0} tCO2e")}</span>
                                 <span class="credit-meta">{format!("Vintage {year} | Project {project}")}</span>
                             </div>
+                            {(css == "active").then(|| {
+                                let retire_id = retire_id.clone();
+                                view! {
+                                    <button class="btn btn-ghost" on:click=move |_| {
+                                        actions::retire_credit(retire_id.clone());
+                                    }>
+                                        "Retire this credit"
+                                    </button>
+                                }
+                            })}
                         </div>
                     }
                 }).collect_view()}
