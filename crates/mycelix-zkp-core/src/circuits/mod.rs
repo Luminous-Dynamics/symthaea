@@ -8,6 +8,9 @@
 #[cfg(feature = "backend-winterfell")]
 pub mod range_proof;
 
+pub mod merkle_membership;
+pub mod nullifier;
+
 #[cfg(feature = "backend-winterfell")]
 pub mod winterfell_bench;
 
