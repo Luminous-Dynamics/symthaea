@@ -49,6 +49,26 @@ pub fn CalculatorPage() -> impl IntoView {
     let (gas_kg, set_gas) = signal(String::new());
     let (calculated, set_calculated) = signal(false);
 
+    // Parse URL hash on load: #country=US&kwh=4800&km=15000&flights=5000&gas=0
+    if let Some(hash) = web_sys::window()
+        .and_then(|w| w.location().hash().ok())
+        .filter(|h| h.len() > 1)
+    {
+        let params: std::collections::HashMap<String, String> = hash[1..]
+            .split('&')
+            .filter_map(|kv| {
+                let mut parts = kv.splitn(2, '=');
+                Some((parts.next()?.to_string(), parts.next()?.to_string()))
+            })
+            .collect();
+        if let Some(v) = params.get("country") { set_country.set(v.clone()); }
+        if let Some(v) = params.get("kwh") { set_electricity.set(v.clone()); }
+        if let Some(v) = params.get("km") { set_driving.set(v.clone()); }
+        if let Some(v) = params.get("flights") { set_flights.set(v.clone()); }
+        if let Some(v) = params.get("gas") { set_gas.set(v.clone()); }
+        if !params.is_empty() { set_calculated.set(true); }
+    }
+
     let scope1 = move || {
         let driving: f64 = driving_km.get().parse().unwrap_or(0.0);
         let gas: f64 = gas_kg.get().parse().unwrap_or(0.0);
@@ -199,6 +219,29 @@ pub fn CalculatorPage() -> impl IntoView {
                         <div class="calc-actions">
                             <button class="btn btn-primary" on:click=on_save>
                                 "Save to my profile"
+                            </button>
+                            <button class="btn btn-ghost" on:click=move |_| {
+                                // Build shareable URL
+                                if let Some(window) = web_sys::window() {
+                                    let base = window.location().origin().unwrap_or_default();
+                                    let hash = format!(
+                                        "#country={}&kwh={}&km={}&flights={}&gas={}",
+                                        country.get_untracked(),
+                                        electricity_kwh.get_untracked(),
+                                        driving_km.get_untracked(),
+                                        flights_km.get_untracked(),
+                                        gas_kg.get_untracked(),
+                                    );
+                                    let url = format!("{base}/calculator{hash}");
+                                    // Copy to clipboard via JS eval
+                                    let _ = js_sys::eval(&format!(
+                                        "navigator.clipboard.writeText('{url}')"
+                                    ));
+                                    let toasts = mycelix_leptos_core::use_toasts();
+                                    toasts.push("Link copied \u{2014} share your footprint!", mycelix_leptos_core::ToastKind::Success);
+                                }
+                            }>
+                                "Share your footprint"
                             </button>
                         </div>
                     </div>
