@@ -29,41 +29,13 @@
 /// while maintaining API compatibility.
 pub mod traits;
 
-/// Layer 1: Perception — Nix source parsing via tree-sitter
-pub mod parser;
+// ── WASM-safe modules (compile on all targets) ──
 
 /// Layer 2: Perception — Structured data → HDC hypervectors
 pub mod encoding;
 
 /// Layer 3: Cognition — World model, active inference, causal graph
 pub mod mind;
-
-/// Layer 4: Sensory input — System state observation
-pub mod observe;
-
-/// Layer 5: Motor output — Φ-gated command execution
-pub mod action;
-
-/// Layer 6: Integration with full Symthaea brain
-pub mod plugin;
-
-/// Proactive NixOS support: health checks, watchdog, predictions, knowledge base
-pub mod support;
-
-/// Daemon ↔ TUI inter-process communication
-pub mod ipc;
-
-/// Layer 7: Command-line interface
-#[cfg(feature = "cli")]
-pub mod cli;
-
-/// Layer 8: Terminal UI
-#[cfg(feature = "tui")]
-pub mod tui;
-
-/// Production observability: Prometheus metrics, structured logging, /metrics endpoint
-#[cfg(feature = "observability")]
-pub mod observability;
 
 /// App intelligence database — package search, migration analysis
 pub mod app_database;
@@ -74,8 +46,50 @@ pub mod sovereign_config;
 /// Conversational NixOS installer — dialogue-driven config generation
 pub mod sovereign_conversation;
 
-// Re-export key types at crate root
+// ── Native-only modules (require filesystem, process, async) ──
+
+/// Layer 1: Perception — Nix source parsing via tree-sitter
+#[cfg(feature = "native")]
+pub mod parser;
+
+/// Layer 4: Sensory input — System state observation
+#[cfg(feature = "native")]
+pub mod observe;
+
+/// Layer 5: Motor output — Φ-gated command execution
+#[cfg(feature = "native")]
+pub mod action;
+
+/// Layer 6: Integration with full Symthaea brain
+#[cfg(feature = "native")]
+pub mod plugin;
+
+/// Proactive NixOS support: health checks, watchdog, predictions, knowledge base
+#[cfg(feature = "native")]
+pub mod support;
+
+/// Daemon ↔ TUI inter-process communication
+#[cfg(feature = "native")]
+pub mod ipc;
+
+/// Layer 7: Command-line interface
+#[cfg(feature = "cli")]
+pub mod cli;
+
+/// Layer 8: Terminal UI
+#[cfg(feature = "tui")]
+pub mod tui;
+
+/// Production observability
+#[cfg(feature = "observability")]
+pub mod observability;
+
+// Re-export key types (native only — these depend on parser/action/plugin)
+#[cfg(feature = "native")]
 pub use action::executor::{ExecutionResult, NixOSCommand, NixOSExecutor, SafetyLevel};
+#[cfg(feature = "native")]
 pub use parser::nix_code_parser::NixCodeParser;
+#[cfg(feature = "native")]
 pub use parser::nix_parser::{NixConfig, NixOption, NixParser, NixValue};
+#[cfg(feature = "native")]
 pub use plugin::domain_plugin::NixOsPlugin;

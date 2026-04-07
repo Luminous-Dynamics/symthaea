@@ -9,6 +9,7 @@
 
 use super::codebook::NixCodebook;
 use super::option_encoder::OptionEncoder;
+#[cfg(feature = "native")]
 use crate::parser::nix_parser::{NixConfig, NixValue};
 use symthaea_core::hdc::ContinuousHV;
 
@@ -27,6 +28,7 @@ impl<'a> ConfigEncoder<'a> {
     ///
     /// Each option binding is encoded via `OptionEncoder`, then all bindings
     /// are bundled together into a configuration-level vector.
+    #[cfg(feature = "native")]
     pub fn encode_config(&mut self, config: &NixConfig) -> ContinuousHV {
         let dim = self.codebook.dim();
         let options = &config.options;
@@ -78,6 +80,7 @@ impl<'a> ConfigEncoder<'a> {
     }
 
     /// Convert a NixValue to a string for encoding.
+    #[cfg(feature = "native")]
     fn value_to_string(value: &NixValue) -> String {
         match value {
             NixValue::Bool(b) => b.to_string(),
@@ -117,7 +120,7 @@ impl<'a> ConfigEncoder<'a> {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "native"))]
 mod tests {
     use super::*;
     use crate::parser::nix_parser::NixParser;

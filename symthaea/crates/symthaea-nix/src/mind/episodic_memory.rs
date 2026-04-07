@@ -8,6 +8,7 @@
 //! weighted consolidation pattern). Enables learning from past experience:
 //! "last time this pattern led to failure."
 
+#[cfg(feature = "native")]
 use crate::action::executor::NixOSCommand;
 use symthaea_core::hdc::ContinuousHV;
 
@@ -95,6 +96,7 @@ impl NixEpisodicMemory {
     }
 
     /// Record from components (convenience method).
+    #[cfg(feature = "native")]
     pub fn record_transition(
         &mut self,
         state_before: ContinuousHV,

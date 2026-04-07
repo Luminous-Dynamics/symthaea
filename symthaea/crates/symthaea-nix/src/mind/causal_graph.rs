@@ -12,6 +12,7 @@
 use crate::traits::{CausalDirection, CausalDiscoveryEngine};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
+#[cfg(not(target_arch = "wasm32"))]
 use std::path::Path;
 
 /// Serializable snapshot of the causal graph for persistence.
@@ -380,6 +381,7 @@ impl NixCausalGraph {
     }
 
     /// Save the causal graph to a JSON file for persistence across sessions.
+    #[cfg(not(target_arch = "wasm32"))]
     ///
     /// Saves edges and observations so the graph can be restored without
     /// re-discovering structure from scratch.
@@ -396,6 +398,7 @@ impl NixCausalGraph {
     }
 
     /// Load a previously saved causal graph, merging edges into this instance.
+    #[cfg(not(target_arch = "wasm32"))]
     ///
     /// Existing edges are preserved; loaded edges are added with their saved
     /// confidence values. Observations are merged (appended).
@@ -456,6 +459,7 @@ impl NixCausalGraph {
     /// - `services.X.package` ← `nixpkgs.config.allowUnfree` (if unfree)
     /// - `networking.firewall.enable` → `networking.firewall.allowed*`
     /// - Sibling `.enable` options under the same parent are potential conflicts
+    #[cfg(feature = "native")]
     pub fn bootstrap_from_schemas(
         &mut self,
         schemas: &[crate::parser::option_schema::NixOptionSchema],
