@@ -29,9 +29,10 @@
    2. BORDER RADIUS SCALE
    ================================================================ */
 :root {
-    --radius-xs:   4px;
-    --radius-sm:   8px;
-    --radius:      16px;
+    --radius-xs:   6px;
+    --radius-sm:   10px;
+    --radius-md:   14px;
+    --radius:      18px;
     --radius-lg:   24px;
     --radius-pill: 999px;
 }
@@ -69,45 +70,66 @@
 }
 
 /* ================================================================
-   5. MYCELIX BRAND COLORS (domain-neutral)
+   5. SOLARPUNK PALETTE — bioluminescent technology serving nature
    ================================================================ */
 :root {
-    /* Brand primaries — each app overrides --primary and --accent */
-    --mycelix-indigo:  #8b7ec8;
-    --mycelix-cyan:    #06D6C8;
-    --mycelix-amber:   #d4a574;
-    --mycelix-green:   #4ade80;
-    --mycelix-red:     #ef4444;
+    /* Brand primaries — warm organic tones */
+    --mycelix-indigo:  #7c9a6e;    /* sage green (was indigo) */
+    --mycelix-cyan:    #4ecdc4;    /* soft teal */
+    --mycelix-amber:   #d4a574;    /* warm amber */
+    --mycelix-green:   #7bc67e;    /* living green */
+    --mycelix-red:     #c75c5c;    /* muted terracotta */
+    --brand-cyan:      #4ecdc4;
+    --brand-indigo:    #7c9a6e;
 
-    /* Semantic colors (apps override as needed) */
-    --success: var(--mycelix-green);
-    --warning: #f59e0b;
-    --error:   var(--mycelix-red);
-    --info:    #60a5fa;
+    /* Semantic colors — nature-inspired */
+    --semantic-success: #6abf69;   /* growth green */
+    --semantic-warning: #d4a574;   /* amber sun */
+    --semantic-error:   #c75c5c;   /* terracotta */
+    --semantic-info:    #5ba0c9;   /* sky blue */
 
-    /* Consciousness tiers */
-    --tier-observer:    #6b7280;
-    --tier-participant: #60a5fa;
-    --tier-citizen:     #34d399;
-    --tier-steward:     #a78bfa;
-    --tier-guardian:    #fbbf24;
+    /* Consciousness tiers — ascending warmth */
+    --tier-observer:    #7a8575;   /* moss stone */
+    --tier-participant: #5ba0c9;   /* clear sky */
+    --tier-citizen:     #6abf69;   /* forest canopy */
+    --tier-steward:     #b08fd4;   /* twilight bloom */
+    --tier-guardian:    #e8c547;   /* golden sun */
 }
 
 /* ================================================================
-   6. DARK THEME DEFAULTS (all apps are dark-first)
+   6. SOLARPUNK DARK THEME — deep forest floor
    ================================================================ */
 :root {
-    --bg:         #08080c;
-    --bg-raised:  #0e1218;
-    --bg-surface: #141820;
-    --surface:    #1a2028;
+    --bg:         #0a100e;         /* deep forest night */
+    --bg-raised:  #111a16;         /* mossy understory */
+    --bg-surface: #162019;         /* rich earth */
+    --surface:    #1c2820;         /* leaf shadow */
 
-    --text-primary:   #e2e8f0;
-    --text-secondary: #94a3b8;
-    --text-muted:     #64748b;
+    --text-primary:   #d8e4d4;    /* moonlit green-white */
+    --text-secondary: #9aab94;    /* fern frond */
+    --text-muted:     #687a64;    /* deep moss */
 
-    --border:         rgba(148, 163, 184, 0.12);
-    --border-visible: rgba(148, 163, 184, 0.18);
+    --border:         rgba(106, 191, 105, 0.10);   /* green glow */
+    --border-visible: rgba(106, 191, 105, 0.16);
+}
+
+/* Solarpunk global styles */
+html {
+    background: var(--bg);
+    color: var(--text-primary);
+    font-family: var(--font-sans);
+}
+
+body {
+    margin: 0;
+    background: linear-gradient(
+        175deg,
+        var(--bg) 0%,
+        #0d1510 30%,
+        #0a100e 70%,
+        #080e0b 100%
+    );
+    min-height: 100vh;
 }
 
 /* ================================================================
@@ -123,12 +145,12 @@
     font-size: var(--text-sm);
     font-weight: 500;
     line-height: var(--leading-tight);
-    border-radius: var(--radius-sm);
+    border-radius: var(--radius);
     border: 1px solid var(--border-visible);
     background: var(--bg-surface);
     color: var(--text-primary);
     cursor: pointer;
-    transition: all var(--duration-interact) var(--ease-interact);
+    transition: all var(--duration-interact) var(--ease-organic);
     -webkit-tap-highlight-color: transparent;
 }
 
@@ -154,13 +176,15 @@
 }
 
 .btn-primary {
-    background: var(--primary, var(--mycelix-indigo));
-    border-color: var(--primary, var(--mycelix-indigo));
-    color: #fff;
+    background: linear-gradient(135deg, var(--primary, var(--mycelix-green)), var(--mycelix-cyan));
+    border-color: transparent;
+    color: #0a100e;
+    font-weight: 600;
 }
 
 .btn-primary:hover {
-    filter: brightness(1.15);
+    filter: brightness(1.1);
+    box-shadow: 0 0 12px rgba(78, 205, 196, 0.2);
 }
 
 .btn-ghost {
@@ -207,8 +231,8 @@
 .form-textarea:focus-visible,
 .form-select:focus-visible {
     outline: none;
-    border-color: var(--primary, var(--mycelix-indigo));
-    box-shadow: 0 0 0 2px rgba(139, 126, 200, 0.15);
+    border-color: var(--mycelix-cyan);
+    box-shadow: 0 0 0 2px rgba(78, 205, 196, 0.12);
 }
 
 .form-input::placeholder,
