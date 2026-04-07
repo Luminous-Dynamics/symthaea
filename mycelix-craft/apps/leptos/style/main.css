@@ -93,12 +93,15 @@ body {
 .nav-links a {
     color: var(--text-secondary);
     text-decoration: none;
-    padding: 0.35rem 0.65rem;
+    padding: 0.4rem 0.75rem;
     border-radius: 2rem;
     font-size: 0.85rem;
     font-weight: 500;
     white-space: nowrap;
     transition: all 0.15s;
+    min-height: 36px;
+    display: flex;
+    align-items: center;
 }
 .nav-links a:hover,
 .nav-links a.active {
