@@ -3,8 +3,8 @@
 
 //! Cross-cluster navigation launcher.
 //!
-//! Provides a floating menu linking to other Mycelix cluster apps.
-//! Each cluster app includes this component with its own cluster list.
+//! Detects whether running on `*.mycelix.net` or localhost and
+//! generates appropriate links for the environment.
 
 use leptos::prelude::*;
 
@@ -13,30 +13,64 @@ use leptos::prelude::*;
 pub struct ClusterLink {
     pub name: &'static str,
     pub icon: &'static str,
-    pub href: &'static str,
+    pub href: String,
 }
 
-/// Default cluster links for the Mycelix ecosystem.
+/// Default cluster links — auto-detects localhost vs public deployment.
 pub fn default_clusters() -> Vec<ClusterLink> {
+    if is_public_domain() {
+        public_clusters()
+    } else {
+        localhost_clusters()
+    }
+}
+
+fn is_public_domain() -> bool {
+    web_sys::window()
+        .and_then(|w| w.location().hostname().ok())
+        .map(|h| h.contains("mycelix.net") || h.contains("luminousdynamics.io"))
+        .unwrap_or(false)
+}
+
+fn public_clusters() -> Vec<ClusterLink> {
     vec![
-        ClusterLink { name: "Climate", icon: "🌍", href: "http://localhost:8103" },
-        ClusterLink { name: "Knowledge", icon: "🧠", href: "http://localhost:8114" },
-        ClusterLink { name: "Energy", icon: "⚡", href: "http://localhost:8108" },
-        ClusterLink { name: "Finance", icon: "💰", href: "http://localhost:8109" },
-        ClusterLink { name: "Governance", icon: "⚖", href: "http://localhost:8110" },
-        ClusterLink { name: "Health", icon: "💚", href: "http://localhost:8111" },
-        ClusterLink { name: "Hearth", icon: "🏠", href: "http://localhost:8112" },
-        ClusterLink { name: "Commons", icon: "🤲", href: "http://localhost:8104" },
-        ClusterLink { name: "Music", icon: "🎵", href: "http://localhost:8121" },
-        ClusterLink { name: "Praxis", icon: "📚", href: "http://localhost:8107" },
-        ClusterLink { name: "Portal", icon: "🌀", href: "http://localhost:8124" },
+        ClusterLink { name: "Climate", icon: "🌍", href: "https://climate.mycelix.net".into() },
+        ClusterLink { name: "Knowledge", icon: "🧠", href: "https://knowledge.mycelix.net".into() },
+        ClusterLink { name: "Energy", icon: "⚡", href: "https://energy.mycelix.net".into() },
+        ClusterLink { name: "Finance", icon: "💰", href: "https://finance.mycelix.net".into() },
+        ClusterLink { name: "Governance", icon: "⚖", href: "https://governance.mycelix.net".into() },
+        ClusterLink { name: "Health", icon: "💚", href: "https://health.mycelix.net".into() },
+        ClusterLink { name: "Hearth", icon: "🏠", href: "https://hearth.mycelix.net".into() },
+        ClusterLink { name: "Commons", icon: "🤲", href: "https://commons.mycelix.net".into() },
+        ClusterLink { name: "Music", icon: "🎵", href: "https://music.mycelix.net".into() },
+        ClusterLink { name: "Praxis", icon: "📚", href: "https://praxis.mycelix.net".into() },
+        ClusterLink { name: "Portal", icon: "🌀", href: "https://portal.mycelix.net".into() },
+        ClusterLink { name: "Attribution", icon: "🏷", href: "https://attribution.mycelix.net".into() },
+        ClusterLink { name: "Space", icon: "🛰", href: "https://space.mycelix.net".into() },
+        ClusterLink { name: "Supply Chain", icon: "📦", href: "https://supplychain.mycelix.net".into() },
+    ]
+}
+
+fn localhost_clusters() -> Vec<ClusterLink> {
+    vec![
+        ClusterLink { name: "Climate", icon: "🌍", href: "http://localhost:8103".into() },
+        ClusterLink { name: "Knowledge", icon: "🧠", href: "http://localhost:8114".into() },
+        ClusterLink { name: "Energy", icon: "⚡", href: "http://localhost:8108".into() },
+        ClusterLink { name: "Finance", icon: "💰", href: "http://localhost:8109".into() },
+        ClusterLink { name: "Governance", icon: "⚖", href: "http://localhost:8110".into() },
+        ClusterLink { name: "Health", icon: "💚", href: "http://localhost:8111".into() },
+        ClusterLink { name: "Hearth", icon: "🏠", href: "http://localhost:8112".into() },
+        ClusterLink { name: "Commons", icon: "🤲", href: "http://localhost:8104".into() },
+        ClusterLink { name: "Music", icon: "🎵", href: "http://localhost:8121".into() },
+        ClusterLink { name: "Praxis", icon: "📚", href: "http://localhost:8107".into() },
+        ClusterLink { name: "Portal", icon: "🌀", href: "http://localhost:8124".into() },
+        ClusterLink { name: "Attribution", icon: "🏷", href: "http://localhost:8101".into() },
+        ClusterLink { name: "Space", icon: "🛰", href: "http://localhost:8126".into() },
+        ClusterLink { name: "Supply Chain", icon: "📦", href: "http://localhost:8127".into() },
     ]
 }
 
 /// Floating cluster launcher button + dropdown.
-///
-/// Shows a button that expands to reveal links to other clusters.
-/// Excludes the current cluster (matched by name).
 #[component]
 pub fn ClusterLauncher(
     #[prop(into)] current: String,
@@ -66,10 +100,11 @@ pub fn ClusterLauncher(
                 role="menu"
             >
                 {filtered.into_iter().map(|cluster| {
+                    let href = cluster.href.clone();
                     view! {
                         <a
                             class="cluster-launcher-item"
-                            href=cluster.href
+                            href=href
                             role="menuitem"
                             on:click=move |_| set_open.set(false)
                         >

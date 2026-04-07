@@ -37,7 +37,89 @@ pub fn provide_supplychain_context() {
             ProvenanceClaimView { id: "PV-001".into(), item_id: "ITM-001".into(), claim_type: "Fair Trade".into(), origin: "SA Solar Co, Western Cape".into(), verified: true, certifications: vec!["ISO 14001".into(), "B-Corp".into()] },
         ]),
     };
-    provide_context(state);
+    provide_context(state.clone());
+
+    // Attempt real data load from conductor
+    let hc = mycelix_leptos_core::holochain_provider::use_holochain();
+    wasm_bindgen_futures::spawn_local(async move {
+        gloo_timers::future::TimeoutFuture::new(4_000).await;
+        if !hc.is_mock() {
+            web_sys::console::log_1(&"[SupplyChain] Conductor connected — loading real data...".into());
+
+            // Load inventory items
+            if let Ok(records) = hc.call_zome_default::<(), Vec<serde_json::Value>>(
+                "inventory", "get_all_items", &()
+            ).await {
+                let items: Vec<InventoryItemView> = records.iter()
+                    .filter_map(|r| extract_entry(r))
+                    .collect();
+                if !items.is_empty() {
+                    web_sys::console::log_1(&format!("[SupplyChain] Loaded {} inventory items", items.len()).into());
+                    state.inventory.set(items);
+                }
+            }
+
+            // Load purchase orders
+            let owner = "did:mycelix:user-001".to_string();
+            if let Ok(records) = hc.call_zome_default::<String, Vec<serde_json::Value>>(
+                "inventory", "get_orders_by_buyer", &owner
+            ).await {
+                let orders: Vec<PurchaseOrderView> = records.iter()
+                    .filter_map(|r| extract_entry(r))
+                    .collect();
+                if !orders.is_empty() {
+                    web_sys::console::log_1(&format!("[SupplyChain] Loaded {} orders", orders.len()).into());
+                    state.orders.set(orders);
+                }
+            }
+
+            // Load shipments
+            if let Ok(records) = hc.call_zome_default::<String, Vec<serde_json::Value>>(
+                "provenance", "get_shipments_by_buyer", &owner
+            ).await {
+                let shipments: Vec<ShipmentView> = records.iter()
+                    .filter_map(|r| extract_entry(r))
+                    .collect();
+                if !shipments.is_empty() {
+                    web_sys::console::log_1(&format!("[SupplyChain] Loaded {} shipments", shipments.len()).into());
+                    state.shipments.set(shipments);
+                }
+            }
+
+            // Load supplier trust scores
+            if let Ok(records) = hc.call_zome_default::<(), Vec<serde_json::Value>>(
+                "provenance", "get_all_suppliers", &()
+            ).await {
+                let suppliers: Vec<SupplierTrustView> = records.iter()
+                    .filter_map(|r| extract_entry(r))
+                    .collect();
+                if !suppliers.is_empty() {
+                    web_sys::console::log_1(&format!("[SupplyChain] Loaded {} suppliers", suppliers.len()).into());
+                    state.suppliers.set(suppliers);
+                }
+            }
+
+            // Load provenance claims
+            if let Ok(records) = hc.call_zome_default::<(), Vec<serde_json::Value>>(
+                "provenance", "get_all_claims", &()
+            ).await {
+                let claims: Vec<ProvenanceClaimView> = records.iter()
+                    .filter_map(|r| extract_entry(r))
+                    .collect();
+                if !claims.is_empty() {
+                    web_sys::console::log_1(&format!("[SupplyChain] Loaded {} provenance claims", claims.len()).into());
+                    state.provenance.set(claims);
+                }
+            }
+        }
+    });
+}
+
+/// Extract the entry from a Holochain Record JSON value.
+/// Records have structure: { "entry": { "Present": { ...fields... } } }
+fn extract_entry<T: serde::de::DeserializeOwned>(record: &serde_json::Value) -> Option<T> {
+    let entry = record.get("entry")?.get("Present")?;
+    serde_json::from_value(entry.clone()).ok()
 }
 
 pub fn use_supplychain_context() -> SupplychainCtx {
