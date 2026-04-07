@@ -3,12 +3,44 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <meta name="theme-color" content="#0f766e" />
+    <meta name="theme-color" content="#0c0c18" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <title>Mycelix Craft</title>
     <meta name="description" content="Decentralized talent marketplace with living credentials, guild-based mastery, and proof of learning" />
     <link data-trunk rel="css" href="style/main.css" />
 </head>
 <body>
+    <!-- Holochain conductor probe — sets __HC_STATUS before WASM mounts -->
+    <script id="holochain-bridge">
+    (function() {
+        window.__HC_STATUS = 'connecting';
+        var WS_URL = window.__HC_CONDUCTOR_URL || 'ws://localhost:8888';
+        var TIMEOUT_MS = 3000;
+        try {
+            var ws = new WebSocket(WS_URL);
+            var timer = setTimeout(function() {
+                ws.close();
+                window.__HC_STATUS = 'mock';
+                console.log('[Craft] Conductor timeout — mock mode');
+            }, TIMEOUT_MS);
+            ws.onopen = function() {
+                clearTimeout(timer);
+                window.__HC_STATUS = 'connected';
+                console.log('[Craft] Conductor connected at ' + WS_URL);
+                ws.close();
+            };
+            ws.onerror = function() {
+                clearTimeout(timer);
+                window.__HC_STATUS = 'mock';
+                console.log('[Craft] Conductor unavailable — mock mode');
+            };
+        } catch (e) {
+            window.__HC_STATUS = 'mock';
+        }
+    })();
+    </script>
+
     <div id="app"></div>
 </body>
 </html>
