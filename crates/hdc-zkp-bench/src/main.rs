@@ -23,6 +23,7 @@
 //! - Verifier time (ms)
 //! - Proof size (bytes)
 
+mod bundling;
 mod cfc_temporal;
 
 use std::time::Instant;
@@ -255,6 +256,28 @@ fn main() {
         println!("non-linear constraints, while prime-field STARKs need {} constraints", winterfell_result.constraint_count);
         println!("for the same operation on 16,384-bit vectors.");
     }
+
+    // HDC Bundling
+    println!("\n\n{}", "=".repeat(60));
+    println!("HDC BUNDLING BENCHMARKS");
+    println!("{}", "=".repeat(60));
+
+    let bundle_3x256 = bundling::bench_bundling(3, 256); // 3 vectors × 256 words = 16,384 bits
+    let bundle_8x256 = bundling::bench_bundling(8, 256); // 8 vectors × 256 words
+
+    println!("\n╔══════════════════════════════════════════════════════════════╗");
+    println!("║              HDC BUNDLING SUMMARY (Binius)                   ║");
+    println!("╠══════════════════════════════════════════════════════════════╣");
+    println!("║ Config           │ AND Constr. │ Prove (ms) │ Proof (KB)  ║");
+    println!("╠══════════════════════════════════════════════════════════════╣");
+    println!("║ 3 vecs × 16Kbit  │ {:>10} │ {:>10.1} │ {:>10.1}  ║",
+        bundle_3x256.and_constraints, bundle_3x256.prove_time_ms, bundle_3x256.proof_size_bytes as f64 / 1024.0);
+    println!("║ 8 vecs × 16Kbit  │ {:>10} │ {:>10.1} │ {:>10.1}  ║",
+        bundle_8x256.and_constraints, bundle_8x256.prove_time_ms, bundle_8x256.proof_size_bytes as f64 / 1024.0);
+    println!("╚══════════════════════════════════════════════════════════════╝");
+
+    println!("\nKey insight: Bundling costs O(N × D) AND constraints in Binius.");
+    println!("XOR vote counting is FREE. Only the comparison/reduction uses AND gates.");
 
     // CfC temporal proofs
     println!("\n\n{}", "=".repeat(60));
