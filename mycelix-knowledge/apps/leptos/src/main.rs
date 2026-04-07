@@ -3,6 +3,7 @@
 
 use leptos::prelude::*;
 
+mod actions;
 mod app;
 mod context;
 mod pages;
