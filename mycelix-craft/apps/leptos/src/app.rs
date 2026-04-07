@@ -23,7 +23,7 @@ pub fn App() -> impl IntoView {
         app_id: "mycelix-craft".to_string(),
         default_role: Some("craft".to_string()),
         log_prefix: "[Craft]",
-        connect_strategy: ConnectStrategy::JsStatusOnly,
+        connect_strategy: ConnectStrategy::WebSocket,
         status_labels: None,
     };
 
