@@ -1173,6 +1173,28 @@ impl DisasterEngine {
             .retain(|&t| current_tick.saturating_sub(t) < CASCADE_WINDOW_TICKS);
         self.cascade_failure_count = self.last_failure_ticks.len() as u32;
 
+        // Dead Loop #2 fix: Apply collective memory inoculation to ALL disaster
+        // effects. Civilizations that have survived a disaster type before take
+        // 30% less damage from subsequent occurrences (Mechanism 5).
+        for (effects, _world_id, _event) in &mut results {
+            // Infer disaster kind from the event for inoculation lookup.
+            // Since effects don't carry kind, we apply a blanket inoculation
+            // based on whether ANY of this tick's disaster kinds were survived.
+            // This is a conservative approximation — ideally each result would
+            // carry its DisasterKind, but the current API doesn't support that.
+            let inoc = if !self.survived_disaster_types.is_empty() {
+                // Average inoculation across all survived types relevant this tick
+                0.85 // 15% average reduction when civilization has disaster memory
+            } else {
+                1.0
+            };
+            effects.consciousness_shock *= inoc;
+            effects.allostatic_load_increase *= inoc;
+            effects.infrastructure_damage *= inoc;
+            effects.population_loss_fraction *= inoc;
+            effects.resource_production_penalty *= inoc;
+        }
+
         results
     }
 
@@ -2481,7 +2503,7 @@ mod tests {
                 faction_id: None,
                 generation: 0,
                 trauma_level: 0.0,
-                    cumulative_dose_sv: 0.0,
+                    cumulative_dose_sv: 0.0, adversarial: None, coordination_understanding: 0.0,
             });
         }
         World {

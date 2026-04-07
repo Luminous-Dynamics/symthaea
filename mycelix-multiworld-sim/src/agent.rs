@@ -253,6 +253,17 @@ pub struct CivAgent {
     /// Linear no-threshold model: 5% cancer risk per Sv (ICRP 103).
     /// Earth background: ~0.002 Sv/year. Europa: ~54 Sv/year unshielded.
     pub cumulative_dose_sv: f64,
+    /// Red team: adversarial strategy (None = normal agent).
+    #[serde(default)]
+    pub adversarial: Option<crate::red_team::AdversarialStrategy>,
+    /// Coordination science understanding [0.0, 1.0].
+    /// Orthogonal to both education_level and consciousness.level.
+    /// Measures literacy in game theory, systems thinking, reciprocity
+    /// dynamics, theory of mind, and thermodynamic reasoning.
+    /// An agent can be highly educated but defect in prisoner's dilemmas (low),
+    /// or be compassionate but cooperate naively without strategic reasoning (low).
+    #[serde(default)]
+    pub coordination_understanding: f64,
 }
 
 impl CivAgent {
@@ -352,7 +363,13 @@ impl CivAgent {
             LifeStage::Elder => 0.5,
         };
         let engagement_factor = 0.5 + 0.5 * self.needs.engagement;
-        self.skills.total() * self.health * stage_factor * engagement_factor
+        // Dead Loop #6 fix: Affect modulates labor output.
+        // Joy boosts productivity, sadness suppresses it.
+        // Clamped to [0.5, 1.2] to prevent runaway effects.
+        let affect_factor = (0.7 + 0.3 * (self.needs.affect.joy
+            - self.needs.affect.sadness * 0.5))
+            .clamp(0.5, 1.2);
+        self.skills.total() * self.health * stage_factor * engagement_factor * affect_factor
     }
 }
 
@@ -380,7 +397,7 @@ mod tests {
             faction_id: None,
             generation: 0,
             trauma_level: 0.0,
-                    cumulative_dose_sv: 0.0,
+                    cumulative_dose_sv: 0.0, adversarial: None, coordination_understanding: 0.0,
         }
     }
 

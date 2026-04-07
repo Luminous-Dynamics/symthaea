@@ -13,6 +13,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::agent::{CivAgent, SKILL_SECTORS};
+use crate::viability::ScalingFactors;
 use crate::world::WorldResources;
 
 /// Number of economic sectors (matches [`SKILL_SECTORS`]).
@@ -21,8 +22,22 @@ pub const NUM_SECTORS: usize = 8;
 /// Labor share exponent in Cobb-Douglas production (alpha).
 const LABOR_EXPONENT: f64 = 0.7;
 
-/// Capital share exponent in Cobb-Douglas production (1 - alpha).
+/// Capital share exponent in Cobb-Douglas production.
+/// When energy is included: α=0.60 labor, β=0.25 capital, γ=0.15 energy (sum=1.0).
+/// When energy is NOT included (legacy): α=0.7, β=0.3.
 const CAPITAL_EXPONENT: f64 = 0.3;
+
+/// Energy share exponent in extended Cobb-Douglas production.
+/// Output = A × L^α × K^β × E^γ where γ captures energy's role in production.
+/// CITATION: Stern (2011) "The role of energy in economic growth",
+/// Annals of the New York Academy of Sciences 1219(1), pp. 26-51.
+/// LIMITATION: Exponent is approximate. Real economies show γ ≈ 0.10-0.20.
+const ENERGY_EXPONENT: f64 = 0.15;
+
+/// When energy factor is active, labor and capital exponents are rescaled
+/// to maintain constant returns to scale (α + β + γ = 1.0).
+const LABOR_EXPONENT_WITH_ENERGY: f64 = 0.60;
+const CAPITAL_EXPONENT_WITH_ENERGY: f64 = 0.25;
 
 /// Minimum workforce fraction per sector when population > 20.
 const MIN_SECTOR_FRACTION: f64 = 0.05;
@@ -159,11 +174,53 @@ impl WorldEconomy {
 
     /// Run one tick of Cobb-Douglas production.
     ///
+    /// **Legacy (no energy/scaling)**:
     /// `output_i = tech_mult_i * (effective_labor_i)^0.7 * infrastructure^0.3`
     ///
-    /// Labor exponent is 0.7 (labor-intensive early colony). Capital exponent is 0.3.
+    /// **Extended (with energy + West-Bettencourt scaling)**:
+    /// `output_i = tech_mult_i * scaling.innovation * (effective_labor_i)^0.60 * infrastructure^0.25 * energy^0.15`
+    ///
+    /// The extended form adds energy as a production factor (Stern 2011) and applies
+    /// superlinear scaling from West-Bettencourt (2007): larger populations produce
+    /// MORE per capita due to network effects and knowledge spillovers.
     pub fn tick_production(&mut self) {
+        self.tick_production_extended(None, None);
+    }
+
+    /// Extended production with optional scaling and energy factors.
+    ///
+    /// - `scaling`: West-Bettencourt scaling factors (superlinear innovation boost).
+    ///   When None, falls back to legacy exponents (α=0.7, β=0.3).
+    /// - `energy_available`: Net energy available for production (from ViabilityEngine).
+    ///   When None, energy is not a production constraint (legacy behavior).
+    pub fn tick_production_extended(
+        &mut self,
+        scaling: Option<&ScalingFactors>,
+        energy_available: Option<f64>,
+    ) {
         self.total_production = 0.0;
+
+        // Choose exponents based on whether energy is modeled
+        let (alpha, beta, gamma) = if energy_available.is_some() {
+            (LABOR_EXPONENT_WITH_ENERGY, CAPITAL_EXPONENT_WITH_ENERGY, ENERGY_EXPONENT)
+        } else {
+            (LABOR_EXPONENT, CAPITAL_EXPONENT, 0.0)
+        };
+
+        // Innovation multiplier from scaling laws (default 1.0 if not provided)
+        let innovation_mult = scaling.map_or(1.0, |s| s.innovation_multiplier);
+
+        // Energy factor: normalized to [0, ∞) where 1.0 = baseline adequate
+        // Energy of 0 should heavily suppress output but not zero it entirely
+        // (people can still do manual labor without electricity)
+        let energy_factor = match energy_available {
+            Some(e) if gamma > 0.0 => {
+                // Normalize: 100 ARU = baseline adequate for ~100 people
+                let normalized = (e / 100.0).max(0.01);
+                normalized.powf(gamma)
+            }
+            _ => 1.0,
+        };
 
         for i in 0..NUM_SECTORS {
             let workers = self.sector_workers[i] as f64;
@@ -174,8 +231,10 @@ impl WorldEconomy {
 
             let effective_labor = workers * self.labor_productivity[i];
             let output = self.technology_multiplier[i]
-                * effective_labor.powf(LABOR_EXPONENT)
-                * self.infrastructure_capital.max(0.01).powf(CAPITAL_EXPONENT);
+                * innovation_mult
+                * effective_labor.powf(alpha)
+                * self.infrastructure_capital.max(0.01).powf(beta)
+                * energy_factor;
 
             self.sector_output[i] = output;
             self.total_production += output;
@@ -337,7 +396,7 @@ mod tests {
                     faction_id: None,
                     generation: 0,
                     trauma_level: 0.0,
-                    cumulative_dose_sv: 0.0,
+                    cumulative_dose_sv: 0.0, adversarial: None, coordination_understanding: 0.0,
         }
     }
 
@@ -444,7 +503,7 @@ mod tests {
                     faction_id: None,
                     generation: 0,
                     trauma_level: 0.0,
-                    cumulative_dose_sv: 0.0,
+                    cumulative_dose_sv: 0.0, adversarial: None, coordination_understanding: 0.0,
             };
             diverse_agents.push(a);
         }
@@ -592,5 +651,60 @@ mod tests {
             high_cap > low_cap,
             "Higher capital should produce more: {high_cap} vs {low_cap}"
         );
+    }
+
+    #[test]
+    fn test_extended_production_with_scaling() {
+        let mut econ = WorldEconomy::new();
+        econ.sector_workers = [10, 10, 10, 10, 10, 10, 10, 10];
+
+        // Baseline: no scaling
+        econ.tick_production_extended(None, None);
+        let baseline = econ.total_production;
+
+        // With superlinear scaling (large population = more innovation per capita)
+        let scaling_10k = ScalingFactors::compute(10000.0);
+        econ.tick_production_extended(Some(&scaling_10k), None);
+        let scaled = econ.total_production;
+
+        assert!(scaled > baseline,
+            "Superlinear scaling should boost production: {scaled} vs {baseline}");
+        // 10k pop at ref 1k => ratio 10, innovation mult = 10^(1/6) ≈ 1.468
+        assert!(scaled > baseline * 1.3,
+            "Should be at least 1.3x boost: {scaled} vs {} (baseline*1.3)", baseline * 1.3);
+    }
+
+    #[test]
+    fn test_extended_production_with_energy() {
+        let mut econ = WorldEconomy::new();
+        econ.sector_workers = [10, 10, 10, 10, 10, 10, 10, 10];
+
+        // Abundant energy
+        econ.tick_production_extended(None, Some(200.0));
+        let abundant = econ.total_production;
+
+        // Scarce energy
+        econ.tick_production_extended(None, Some(10.0));
+        let scarce = econ.total_production;
+
+        assert!(abundant > scarce,
+            "More energy should produce more: {abundant} vs {scarce}");
+    }
+
+    #[test]
+    fn test_legacy_production_unchanged() {
+        let mut econ1 = WorldEconomy::new();
+        let mut econ2 = WorldEconomy::new();
+        econ1.sector_workers = [15, 5, 5, 5, 5, 5, 5, 5];
+        econ2.sector_workers = [15, 5, 5, 5, 5, 5, 5, 5];
+
+        // Legacy path
+        econ1.tick_production();
+        // Extended path with None (should be identical)
+        econ2.tick_production_extended(None, None);
+
+        assert!((econ1.total_production - econ2.total_production).abs() < 0.001,
+            "Legacy and extended(None,None) should be identical: {} vs {}",
+            econ1.total_production, econ2.total_production);
     }
 }

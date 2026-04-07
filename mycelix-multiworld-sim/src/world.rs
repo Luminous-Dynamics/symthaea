@@ -93,6 +93,11 @@ impl WorldResources {
         self.stocks.insert(name.into(), stock);
     }
 
+    /// Get the current stock level for a named resource (None → None).
+    pub fn stock_level(&self, name: &str) -> Option<f64> {
+        self.stocks.get(name).map(|s| s.current)
+    }
+
     /// Whether any resource is at critical level.
     pub fn any_critical(&self) -> bool {
         self.stocks.values().any(|s| s.is_critical())
@@ -936,7 +941,7 @@ mod tests {
                 faction_id: None,
                 generation: 0,
                 trauma_level: 0.0,
-                    cumulative_dose_sv: 0.0,
+                    cumulative_dose_sv: 0.0, adversarial: None, coordination_understanding: 0.0,
             };
             world.agents.push(agent);
         }

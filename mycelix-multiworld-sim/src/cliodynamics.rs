@@ -113,6 +113,10 @@ pub struct CycleInputs {
     pub secession_capable: bool,
     /// Current tick.
     pub current_tick: u32,
+    /// Mean coordination science understanding across population [0, 1].
+    /// Coordination-literate populations recognize and de-escalate secular
+    /// cycle dynamics before they reach crisis phase.
+    pub mean_coordination_understanding: f64,
 }
 
 // ============================================================================
@@ -207,8 +211,11 @@ impl SecularCycleState {
         // Use log(Ψ) for stability effect — Ψ of 2 is normal, Ψ of 5 is severe
         // This prevents low-level elite overproduction from crashing stability
         let psi_effect = (self.psi / 1.0).ln().max(0.0); // ln(1)=0, ln(2)=0.69, ln(5)=1.6
-        let ds_dt = -ALPHA * psi_effect
-                    - BETA * self.immiseration
+        // Coordination-literate populations buffer stability decay:
+        // they recognize destabilizing dynamics (elite overproduction,
+        // rising immiseration) and de-escalate before crisis.
+        let coordination_buffer = 1.0 - inputs.mean_coordination_understanding * 0.3;
+        let ds_dt = (-ALPHA * psi_effect - BETA * self.immiseration) * coordination_buffer
                     + GAMMA * inputs.governance_quality;
 
         // Phase-dependent stability dynamics
@@ -367,6 +374,7 @@ mod tests {
             non_elite_mean_phi: 0.5,         // Healthy consciousness
             secession_capable: false,
             current_tick: 100,
+            mean_coordination_understanding: 0.0,
         }
     }
 
@@ -383,6 +391,7 @@ mod tests {
             non_elite_mean_phi: 0.2,         // Consciousness collapsing
             secession_capable: false,
             current_tick: 500,
+            mean_coordination_understanding: 0.0,
         }
     }
 

@@ -19,10 +19,12 @@ use serde::{Deserialize, Serialize};
 const DECAY_RATE: f64 = 0.0015;
 
 /// Maximum number of agents to sample for pairwise coherence.
-const COHERENCE_SAMPLE_AGENTS: usize = 100;
+/// Bug #2 fix: increased from 100 to 200 for better statistical estimate.
+const COHERENCE_SAMPLE_AGENTS: usize = 200;
 
 /// Maximum number of pairwise comparisons for inter-agent coherence.
-const COHERENCE_SAMPLE_PAIRS: usize = 50;
+/// Bug #2 fix: increased from 50 to 200 for more stable coherence estimate.
+const COHERENCE_SAMPLE_PAIRS: usize = 200;
 
 /// History length: 120 ticks = 10 years at monthly resolution.
 const PHI_HISTORY_LEN: usize = 120;
@@ -193,6 +195,16 @@ impl ConsciousnessEngine {
             } else {
                 0.0
             };
+
+            // Bug #2 fix: Add institutional coherence floor.
+            // Even a diverse population has shared institutions (language, governance,
+            // infrastructure) that maintain collective coherence. Without this floor,
+            // collective_phi collapses toward zero for large populations because
+            // pairwise cosine similarity drops with diversity — physically wrong.
+            // Floor: 0.2 base + 0.1 dampened by population size.
+            let n = living.len() as f64;
+            let institutional_floor = 0.2 + 0.1 / (1.0 + (n / 500.0).max(0.0).ln().max(0.0));
+            self.inter_agent_coherence = self.inter_agent_coherence.max(institutional_floor);
         } else {
             self.inter_agent_coherence = 1.0; // single agent is perfectly coherent with itself
         }
@@ -408,7 +420,7 @@ mod tests {
                     faction_id: None,
                     generation: 0,
                     trauma_level: 0.0,
-                    cumulative_dose_sv: 0.0,
+                    cumulative_dose_sv: 0.0, adversarial: None, coordination_understanding: 0.0,
         }
     }
 

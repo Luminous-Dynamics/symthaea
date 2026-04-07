@@ -372,7 +372,7 @@ impl PopulationEngine {
                     faction_id: None,
                     generation: birth.generation,
                     trauma_level: birth.trauma,
-                    cumulative_dose_sv: 0.0,
+                    cumulative_dose_sv: 0.0, adversarial: None, coordination_understanding: 0.0,
                 };
 
                 events.push(CivEvent::new(
@@ -704,7 +704,7 @@ mod tests {
                 faction_id: None,
                 generation: 0,
                 trauma_level: 0.0,
-                    cumulative_dose_sv: 0.0,
+                    cumulative_dose_sv: 0.0, adversarial: None, coordination_understanding: 0.0,
             };
             world.next_agent_id += 1;
             world.agents.push(agent);
@@ -802,7 +802,7 @@ mod tests {
                 partner_id: Some(1), children_ids: vec![2, 3],
                 is_immigrant: false, needs: PsychologicalNeeds::new(),
                 tend_balance: 0.0, parent_ids: None, faction_id: None,
-                generation: 0, trauma_level: 0.0, cumulative_dose_sv: 0.0,
+                generation: 0, trauma_level: 0.0, cumulative_dose_sv: 0.0, adversarial: None, coordination_understanding: 0.0,
             },
             CivAgent {
                 id: 1, birth_tick: 0, death_tick: None, sex: BiologicalSex::Female,
@@ -811,7 +811,7 @@ mod tests {
                 partner_id: Some(0), children_ids: vec![2, 3],
                 is_immigrant: false, needs: PsychologicalNeeds::new(),
                 tend_balance: 0.0, parent_ids: None, faction_id: None,
-                generation: 0, trauma_level: 0.0, cumulative_dose_sv: 0.0,
+                generation: 0, trauma_level: 0.0, cumulative_dose_sv: 0.0, adversarial: None, coordination_understanding: 0.0,
             },
             CivAgent {
                 id: 2, birth_tick: 100, death_tick: None, sex: BiologicalSex::Male,
@@ -820,7 +820,7 @@ mod tests {
                 partner_id: None, children_ids: vec![],
                 is_immigrant: false, needs: PsychologicalNeeds::new(),
                 tend_balance: 0.0, parent_ids: Some((0, 1)), faction_id: None,
-                generation: 1, trauma_level: 0.0, cumulative_dose_sv: 0.0,
+                generation: 1, trauma_level: 0.0, cumulative_dose_sv: 0.0, adversarial: None, coordination_understanding: 0.0,
             },
             CivAgent {
                 id: 3, birth_tick: 100, death_tick: None, sex: BiologicalSex::Female,
@@ -829,7 +829,7 @@ mod tests {
                 partner_id: None, children_ids: vec![],
                 is_immigrant: false, needs: PsychologicalNeeds::new(),
                 tend_balance: 0.0, parent_ids: Some((0, 1)), faction_id: None,
-                generation: 1, trauma_level: 0.0, cumulative_dose_sv: 0.0,
+                generation: 1, trauma_level: 0.0, cumulative_dose_sv: 0.0, adversarial: None, coordination_understanding: 0.0,
             },
         ];
 

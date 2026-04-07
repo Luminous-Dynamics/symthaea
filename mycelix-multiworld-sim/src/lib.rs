@@ -404,7 +404,7 @@ impl MultiWorldSimulator {
                     faction_id: None,
                     generation: 0,
                     trauma_level: 0.0,
-                    cumulative_dose_sv: 0.0, adversarial: None,
+                    cumulative_dose_sv: 0.0, adversarial: None, coordination_understanding: 0.0,
                 };
                 world.next_agent_id += 1;
                 world.agents.push(agent);
@@ -541,7 +541,7 @@ impl MultiWorldSimulator {
                 faction_id: None,
                 generation: 0,
                 trauma_level: 0.0,
-                    cumulative_dose_sv: 0.0, adversarial: None,
+                    cumulative_dose_sv: 0.0, adversarial: None, coordination_understanding: 0.0,
             };
             world.next_agent_id += 1;
             world.agents.push(agent);
@@ -3720,6 +3720,15 @@ impl MultiWorldSimulator {
                         secession_capable: world.location != "Earth"
                             && world.resources.self_sufficiency() > 0.7,
                         current_tick: self.current_tick,
+                        mean_coordination_understanding: {
+                            let alive: Vec<&agent::CivAgent> = world.agents.iter()
+                                .filter(|a| a.is_alive())
+                                .collect();
+                            if alive.is_empty() { 0.0 } else {
+                                alive.iter().map(|a| a.coordination_understanding).sum::<f64>()
+                                    / alive.len() as f64
+                            }
+                        },
                     };
 
                     let cycle_state = self.secular_cycles
@@ -4523,7 +4532,7 @@ harmony_policy = true
             needs: PsychologicalNeeds::new(),
             tend_balance: 0.0, parent_ids: None,
             faction_id: None, generation: 0,
-            trauma_level: 0.0, cumulative_dose_sv: 0.0, adversarial: None,
+            trauma_level: 0.0, cumulative_dose_sv: 0.0, adversarial: None, coordination_understanding: 0.0,
         };
         happy.skills.learn(0, 0.5);
         happy.needs.engagement = 0.8;

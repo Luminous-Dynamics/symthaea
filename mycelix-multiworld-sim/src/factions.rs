@@ -170,19 +170,21 @@ impl FactionEngine {
             let gini = world.economy.gini_coefficient;
             let stability = world.infrastructure_level.min(1.0); // proxy for governance stability
 
-            // Bug fix #3: Broader faction emergence conditions.
-            // Original: Gini > 0.3 OR stability < 0.7 — too strict.
-            // Added: mean trauma > 0.1, population > 1000, or independence pressure.
+            // Bug #4 fix: Lowered faction emergence thresholds.
+            // Original thresholds (gini > 0.3, stability < 0.7, trauma > 0.1) were
+            // too strict — factions almost never formed. Now with Dead Loop #1 fixed
+            // (disasters cause trauma), trauma should flow naturally into faction emergence.
             let mean_trauma = {
                 let living: Vec<_> = world.agents.iter().filter(|a| a.is_alive()).collect();
                 if living.is_empty() { 0.0 } else {
                     living.iter().map(|a| a.trauma_level).sum::<f64>() / living.len() as f64
                 }
             };
-            let can_emerge = gini > 0.3
-                || stability < 0.7
-                || mean_trauma > 0.1
-                || (world.population() > 1000 && world.trust_level < 0.5);
+            let can_emerge = gini > 0.25
+                || stability < 0.75
+                || mean_trauma > 0.05
+                || (world.population() > 500 && world.trust_level < 0.6)
+                || (world.population() > 200 && gini > 0.2 && mean_trauma > 0.03);
             if !can_emerge {
                 continue;
             }
@@ -261,7 +263,11 @@ impl FactionEngine {
                 ];
 
                 let dist = cosine_distance(&agent_ideology, &faction.ideology);
-                if dist < 0.3 {
+                // Coordination-literate agents have a higher bar for joining factions.
+                // They recognize that factional polarization is a negative-sum dynamic
+                // and only join factions with very strong ideological alignment.
+                let threshold = 0.3 * (1.0 - agent.coordination_understanding * 0.5);
+                if dist < threshold {
                     agent.faction_id = Some(faction.id);
                 }
             }
@@ -689,7 +695,7 @@ mod tests {
                 faction_id: None,
                 generation: 0,
                 trauma_level: 0.0,
-                    cumulative_dose_sv: 0.0,
+                    cumulative_dose_sv: 0.0, adversarial: None, coordination_understanding: 0.0,
             };
             world.agents.push(agent);
             world.next_agent_id += 1;
@@ -932,7 +938,7 @@ mod tests {
                 is_immigrant: false, needs: crate::needs::PsychologicalNeeds::new(),
                 tend_balance: 0.0, parent_ids: None,
                 faction_id: if i < 60 { Some(1) } else if i < 90 { Some(2) } else { None },
-                generation: 0, trauma_level: 0.0, cumulative_dose_sv: 0.0,
+                generation: 0, trauma_level: 0.0, cumulative_dose_sv: 0.0, adversarial: None, coordination_understanding: 0.0,
             }
         }).collect();
 

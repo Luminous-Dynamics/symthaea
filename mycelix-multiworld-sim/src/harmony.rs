@@ -173,9 +173,12 @@ impl HarmonyTracker {
             + 0.3 * consciousness.mean_phi)
             .clamp(0.0, 1.0);
 
-        // 4. Infinite Play = art_per_capita * innovation_rate
+        // 4. Infinite Play = sqrt(art_per_capita * innovation_rate)
+        // Bug #3 fix: Product of two small numbers (e.g., 0.1 × 0.2 = 0.02) produces
+        // a near-zero score. Geometric mean (sqrt of product) is more appropriate —
+        // a civilization with modest art AND modest innovation should score ~0.14, not 0.02.
         self.current_scores[3] =
-            (inputs.art_per_capita * inputs.innovation_rate).clamp(0.0, 1.0);
+            (inputs.art_per_capita * inputs.innovation_rate).max(0.0).sqrt().clamp(0.0, 1.0);
 
         // 5. Universal Interconnectedness = trade_connections / 5 (max 5)
         self.current_scores[4] =
@@ -185,10 +188,12 @@ impl HarmonyTracker {
         self.current_scores[5] =
             ((1.0 - inputs.gini_coefficient) * inputs.self_sufficiency).clamp(0.0, 1.0);
 
-        // 7. Evolutionary Progression = knowledge_growth * pop_stability * genetic_diversity
-        self.current_scores[6] = (inputs.knowledge_growth_rate
-            * inputs.pop_stability
-            * inputs.genetic_diversity)
+        // 7. Evolutionary Progression = weighted average of knowledge, stability, genetics
+        // Bug #3 fix: Triple product of small numbers collapses to near-zero
+        // (0.3 × 0.5 × 0.4 = 0.06). Weighted average better captures partial progress.
+        self.current_scores[6] = (0.4 * inputs.knowledge_growth_rate
+            + 0.3 * inputs.pop_stability
+            + 0.3 * inputs.genetic_diversity)
             .clamp(0.0, 1.0);
 
         // 8. Sacred Stillness = (1 - emergency_fraction) * (1 - overwork) * presence
@@ -435,7 +440,7 @@ mod tests {
                 faction_id: None,
                 generation: 0,
                 trauma_level: 0.0,
-                    cumulative_dose_sv: 0.0,
+                    cumulative_dose_sv: 0.0, adversarial: None, coordination_understanding: 0.0,
             });
         }
         world.next_agent_id = pop as u64;
