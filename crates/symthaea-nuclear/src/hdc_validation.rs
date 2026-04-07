@@ -19,7 +19,7 @@ mod tests {
     use crate::duflo_zuker::dz_binding_energy;
     use crate::hdc_mass::HdcMassPredictor;
 
-    const EPOCHS: usize = 8;
+    const EPOCHS: usize = 50;
 
     /// Load the standard measured nuclei set (Z >= 3).
     fn load_nuclei() -> Vec<MeasuredNucleus> {

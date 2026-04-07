@@ -16,10 +16,12 @@
 //! - Sliding window baseline for adapting to system changes
 
 use crate::encoding::NixCodebook;
+#[cfg(feature = "native")]
 use crate::observe::journal::JournalEntry;
 use symthaea_core::hdc::ContinuousHV;
 
 /// A detected anomaly in the journal.
+#[cfg(feature = "native")]
 #[derive(Debug, Clone)]
 pub struct JournalAnomaly {
     /// The journal entry that triggered the anomaly.
@@ -79,6 +81,7 @@ impl JournalAnomalyDetector {
     /// - Unit identity (permuted by unit name hash)
     /// - Priority level (scaled by severity)
     /// - Message content tokens (bundled)
+    #[cfg(feature = "native")]
     pub fn encode_entry(&mut self, entry: &JournalEntry) -> ContinuousHV {
         // Encode the unit name
         let unit_hv = self.codebook.get_or_create(&entry.unit).clone();
@@ -113,6 +116,7 @@ impl JournalAnomalyDetector {
     }
 
     /// Process a batch of journal entries, updating the baseline and returning anomalies.
+    #[cfg(feature = "native")]
     pub fn process_entries(&mut self, entries: &[JournalEntry]) -> Vec<JournalAnomaly> {
         let mut anomalies = Vec::new();
 
@@ -160,6 +164,7 @@ impl JournalAnomalyDetector {
     }
 
     /// Get the current baseline similarity for a given entry (without updating).
+    #[cfg(feature = "native")]
     pub fn score_entry(&mut self, entry: &JournalEntry) -> f32 {
         let hv = self.encode_entry(entry);
         match &self.baseline {
@@ -207,6 +212,7 @@ fn priority_to_weight(priority: u8) -> f32 {
 }
 
 /// Classify why an entry is anomalous based on content and similarity.
+#[cfg(feature = "native")]
 fn classify_anomaly(entry: &JournalEntry, similarity: f32) -> String {
     let msg_lower = entry.message.to_lowercase();
 
@@ -236,7 +242,7 @@ fn classify_anomaly(entry: &JournalEntry, similarity: f32) -> String {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "native"))]
 mod tests {
     use super::*;
 

@@ -16,6 +16,7 @@ mod tests {
     use crate::space_nuclear::*;
     use crate::fundamental::*;
     use crate::isotope_properties::*;
+    use std::io::Write;
 
     fn predictor() -> MlMassPredictor {
         MlMassPredictor::new()
@@ -29,16 +30,21 @@ mod tests {
     fn explore_rprocess() {
         eprintln!("\n{} R-PROCESS NUCLEOSYNTHESIS {}", "=".repeat(20), "=".repeat(20));
         let mut net = RProcessNetwork::new();
+        // "Hot dynamical" NSM ejecta: moderate density, tuned expansion
+        // timescale to balance neutron supply against shell quenching.
+        // The key physics: N=82 and N=126 shell closures suppress (n,γ)
+        // by ~1000×, creating abundance peaks as material accumulates at
+        // waiting points before beta-decaying through them.
         let config = RProcessConfig {
             conditions: RProcessConditions {
-                temperature_gk: 1.5,
+                temperature_gk: 2.0,
                 neutron_density: 1.0e24,
                 ye: 0.15,
-                expansion_timescale: 0.3,
+                expansion_timescale: 0.85,
             },
             dt: 1.0e-3,
-            max_time: 1.5,
-            freezeout_steps: 3000,
+            max_time: 2.5,
+            freezeout_steps: 5000,
             freezeout_dt: 5.0e-3,
             enable_equilibrium: true,
             waiting_point_sn: 2.5,
@@ -51,14 +57,14 @@ mod tests {
         eprintln!("Waiting points found: {}", result.waiting_points.len());
         eprintln!("Path length: {} steps", result.path.len());
 
-        // Top 20 most abundant mass numbers
+        // Top 30 most abundant mass numbers
         let mut sorted: Vec<_> = result.abundances.iter().collect();
         sorted.sort_by(|a, b| b.abundance.partial_cmp(&a.abundance).unwrap());
 
-        eprintln!("\n--- Top 20 Most Abundant Mass Numbers ---");
+        eprintln!("\n--- Top 30 Most Abundant Mass Numbers ---");
         eprintln!("{:>6} {:>12}", "A", "Abundance");
         eprintln!("{}", "-".repeat(20));
-        for m in sorted.iter().take(20) {
+        for m in sorted.iter().take(30) {
             eprintln!("{:>6} {:>12.6e}", m.a, m.abundance);
         }
 
@@ -91,6 +97,48 @@ mod tests {
         {
             eprintln!("\nHeaviest element with Y > 1e-6: A={}", heaviest.a);
         }
+
+        // Write TSV for plotting
+        let tsv_dir = "/tmp/nuclear_figures";
+        std::fs::create_dir_all(tsv_dir).expect("create /tmp/nuclear_figures");
+        let tsv_path = format!("{}/rprocess_abundances.tsv", tsv_dir);
+        let mut f = std::fs::File::create(&tsv_path).expect("create TSV");
+        writeln!(f, "A\tabundance").unwrap();
+        let mut by_a: Vec<_> = result.abundances.iter()
+            .filter(|m| m.abundance > 1.0e-8)
+            .collect();
+        by_a.sort_by_key(|m| m.a);
+        for m in &by_a {
+            writeln!(f, "{}\t{:.6e}", m.a, m.abundance).unwrap();
+        }
+        eprintln!("\nWrote {} entries to {}", by_a.len(), tsv_path);
+
+        // Solar r-process comparison
+        eprintln!("\n--- Solar R-Process Comparison (Arlandini 1999) ---");
+        let solar = &result.solar_comparison;
+        let solar_tsv = format!("{}/solar_comparison.tsv", tsv_dir);
+        let mut sf = std::fs::File::create(&solar_tsv).expect("create solar TSV");
+        writeln!(sf, "A\tpredicted\tsolar\tratio").unwrap();
+        let mut chi2 = 0.0_f64;
+        let mut n_points = 0usize;
+        let mut log_resid_sq_sum = 0.0_f64;
+        eprintln!("{:>6} {:>12} {:>12} {:>8}", "A", "Predicted", "Solar", "Ratio");
+        eprintln!("{}", "-".repeat(44));
+        for sc in solar {
+            writeln!(sf, "{}\t{:.6e}\t{:.6e}\t{:.4}", sc.a, sc.predicted, sc.solar, sc.ratio).unwrap();
+            eprintln!("{:>6} {:>12.4e} {:>12.4e} {:>8.3}", sc.a, sc.predicted, sc.solar, sc.ratio);
+            if sc.solar > 0.0 && sc.predicted > 0.0 {
+                let diff = sc.predicted - sc.solar;
+                chi2 += (diff * diff) / sc.solar;
+                let log_r = (sc.predicted / sc.solar).ln();
+                log_resid_sq_sum += log_r * log_r;
+                n_points += 1;
+            }
+        }
+        let rms_log_ratio = if n_points > 0 { (log_resid_sq_sum / n_points as f64).sqrt() } else { 0.0 };
+        eprintln!("\nSolar comparison: {} points, chi2 = {:.4}, RMS(log ratio) = {:.4}",
+                  n_points, chi2, rms_log_ratio);
+        eprintln!("Wrote solar comparison to {}", solar_tsv);
     }
 
     // ═══════════════════════════════════════════════════════════════════════

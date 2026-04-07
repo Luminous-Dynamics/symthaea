@@ -62,7 +62,7 @@ impl MatchQuality {
 }
 
 /// Application category for bundle detection.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub enum AppCategory {
     Browser,
     Email,
@@ -179,6 +179,31 @@ pub struct MigrationReport {
     pub readiness_score: f32,
     pub suggested_bundles: Vec<&'static AppBundle>,
     pub summary: String,
+}
+
+// Custom Serialize — handles static references in matched/bundles
+impl serde::Serialize for MigrationReport {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        use serde::ser::SerializeStruct;
+        let mut s = serializer.serialize_struct("MigrationReport", 6)?;
+        s.serialize_field("total_apps", &self.total_apps)?;
+        // Serialize matched apps with their nix package names
+        let matched: Vec<serde_json::Value> = self.matched.iter().map(|m| {
+            serde_json::json!({
+                "source_name": m.source_name,
+                "nix_package": m.entry.name,
+                "category": format!("{:?}", m.entry.category),
+            })
+        }).collect();
+        s.serialize_field("matched", &matched)?;
+        s.serialize_field("unmatched", &self.unmatched)?;
+        s.serialize_field("readiness_score", &self.readiness_score)?;
+        // Serialize bundle names
+        let bundles: Vec<&str> = self.suggested_bundles.iter().map(|b| b.name).collect();
+        s.serialize_field("suggested_bundles", &bundles)?;
+        s.serialize_field("summary", &self.summary)?;
+        s.end()
+    }
 }
 
 #[derive(Debug, Clone)]

@@ -8,6 +8,7 @@
 //! in the full symthaea-core dependency graph.
 
 use std::collections::HashMap;
+#[cfg(feature = "native")]
 use tree_sitter::Tree;
 
 // ============================================================================
@@ -15,6 +16,7 @@ use tree_sitter::Tree;
 // ============================================================================
 
 /// Trait for language-specific code parsers.
+#[cfg(feature = "native")]
 pub trait CodeParser: Send + Sync {
     fn language_name(&self) -> &str;
     fn parse(&mut self, source: &str) -> Result<ParsedCode, CodeDiagnostic>;
@@ -30,6 +32,7 @@ pub struct ParsedCode {
     pub language: String,
     pub entities: Vec<CodeEntity>,
     pub diagnostics: Vec<CodeDiagnostic>,
+    #[cfg(feature = "native")]
     tree: Option<Tree>,
 }
 
@@ -40,10 +43,12 @@ impl ParsedCode {
             language: language.to_string(),
             entities: Vec::new(),
             diagnostics: Vec::new(),
+            #[cfg(feature = "native")]
             tree: None,
         }
     }
 
+    #[cfg(feature = "native")]
     pub fn with_tree(mut self, tree: Tree) -> Self {
         self.tree = Some(tree);
         self

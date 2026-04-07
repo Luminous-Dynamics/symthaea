@@ -222,6 +222,90 @@ def plot_wigner():
         print(f"Saved: {out}")
 
 
+# ═══════════════════════════════════════════════════════════════════════
+# Figure 5: R-Process Abundance Pattern
+# ═══════════════════════════════════════════════════════════════════════
+
+def plot_rprocess():
+    header, data = load_tsv("rprocess_abundances.tsv")
+    A = data[:, 0].astype(int)
+    Y = data[:, 1]
+
+    if HAS_MPL:
+        fig, ax = plt.subplots(figsize=(10, 6))
+        ax.semilogy(A, Y, 'b-', linewidth=1.5, alpha=0.8, label='DZ10+RF r-process')
+        ax.semilogy(A, Y, 'b.', markersize=4, alpha=0.6)
+
+        # Mark expected solar r-process peaks
+        peak_positions = [80, 130, 195]
+        peak_labels = ['A~80\n(N=50)', 'A~130\n(N=82)', 'A~195\n(N=126)']
+        peak_colors = ['#e74c3c', '#2ecc71', '#9b59b6']
+        for pos, label, color in zip(peak_positions, peak_labels, peak_colors):
+            ax.axvline(x=pos, color=color, linestyle='--', alpha=0.6, linewidth=1.5)
+            ax.text(pos + 2, ax.get_ylim()[1] * 0.3, label,
+                    color=color, fontsize=10, fontweight='bold',
+                    verticalalignment='top')
+
+        ax.set_xlabel('Mass Number A', fontsize=13)
+        ax.set_ylabel('Abundance Y(A)', fontsize=13)
+        ax.set_title('R-Process Nucleosynthesis: DZ10+RF Network Simulation\n'
+                      r'($T_9 = 2.0$ GK, $n_n = 10^{24}$ cm$^{-3}$, '
+                      r'$\tau_{exp} = 0.85$ s)', fontsize=13)
+        ax.set_xlim(60, 320)
+        ax.set_ylim(1e-8, 2)
+        ax.legend(loc='upper right', fontsize=11)
+        ax.grid(alpha=0.3, which='both')
+
+        # Annotate the two main peaks
+        # Find the peak in A~130 region
+        mask_130 = (A >= 125) & (A <= 140)
+        if np.any(mask_130):
+            peak_a = A[mask_130][np.argmax(Y[mask_130])]
+            peak_y = Y[mask_130].max()
+            ax.annotate(f'A={peak_a}\nY={peak_y:.2e}',
+                        xy=(peak_a, peak_y),
+                        xytext=(peak_a + 15, peak_y * 2),
+                        fontsize=9, color='#2ecc71',
+                        arrowprops=dict(arrowstyle='->', color='#2ecc71'))
+
+        # Find the peak in A~195-210 region (broadened third peak)
+        mask_195 = (A >= 190) & (A <= 210)
+        if np.any(mask_195):
+            peak_a = A[mask_195][np.argmax(Y[mask_195])]
+            peak_y = Y[mask_195].max()
+            ax.annotate(f'A={peak_a}\nY={peak_y:.2e}',
+                        xy=(peak_a, peak_y),
+                        xytext=(peak_a + 15, peak_y * 5),
+                        fontsize=9, color='#9b59b6',
+                        arrowprops=dict(arrowstyle='->', color='#9b59b6'))
+
+        plt.tight_layout()
+        out = os.path.join(OUT_DIR, "fig5_rprocess_abundances.pdf")
+        plt.savefig(out, dpi=300)
+        plt.savefig(out.replace('.pdf', '.png'), dpi=150)
+        print(f"Saved: {out}")
+    else:
+        gp = os.path.join(OUT_DIR, "fig5_rprocess.gp")
+        with open(gp, 'w') as f:
+            f.write(f"""set terminal pdfcairo size 10,6 font "Times,12"
+set output "{OUT_DIR}/fig5_rprocess_abundances.pdf"
+set xlabel "Mass Number A"
+set ylabel "Abundance Y(A)"
+set title "R-Process Nucleosynthesis: DZ10+RF Network Simulation"
+set logscale y
+set format y "10^{{%L}}"
+set xrange [60:320]
+set yrange [1e-8:2]
+set datafile separator "\\t"
+set grid
+set arrow from 80,1e-8 to 80,2 nohead dt 2 lc rgb "red"
+set arrow from 130,1e-8 to 130,2 nohead dt 2 lc rgb "green"
+set arrow from 195,1e-8 to 195,2 nohead dt 2 lc rgb "purple"
+plot "{DATA_DIR}/rprocess_abundances.tsv" u 1:2 with linespoints pt 7 ps 0.5 lw 1.5 title "DZ10+RF r-process"
+""")
+        print(f"Gnuplot script: {gp}")
+
+
 if __name__ == '__main__':
     os.makedirs(OUT_DIR, exist_ok=True)
     print(f"Data dir: {DATA_DIR}")
@@ -231,4 +315,5 @@ if __name__ == '__main__':
     plot_shell_evolution()
     plot_validation()
     plot_wigner()
+    plot_rprocess()
     print("\nDone. Figures saved to:", OUT_DIR)

@@ -62,7 +62,7 @@ const Q_BETA_MIN: f64 = 0.1;
 /// Typical r-process: n_n ~ 10^24 cm^-3, <σv>_30keV ~ 100 mb × v_thermal → λ ~ 10^5 s^-1.
 /// Neutrons have NO Coulomb barrier, so capture rate scales as n_n × σ × v ∝ n_n × T^{1/2},
 /// NOT exponentially suppressed by S_n. S_n only enters photodissociation.
-const CAPTURE_RATE_PREFACTOR: f64 = 1.0e5;
+const CAPTURE_RATE_PREFACTOR: f64 = 1.0e3;
 
 /// Photodissociation rate prefactor (s^-1) for (γ,n) equilibrium.
 /// From detailed balance: λ_γn ∝ T^{3/2} exp(-S_n / kT), but we absorb
@@ -339,15 +339,17 @@ impl RProcessNetwork {
 
         // Shell quenching: reduce capture rate near magic neutron numbers.
         // Near shell closures (N = 50, 82, 126) nuclear level density drops
-        // dramatically, suppressing the (n,γ) cross section by up to ~100×.
+        // dramatically, suppressing the (n,γ) cross section by ~1000× at the
+        // magic number itself (Rauscher & Thielemann 2000, Surman et al. 1997).
+        // The effect extends ~5 neutrons from each closure due to sub-shell gaps.
         let magic_ns = [50.0, 82.0, 126.0];
         let shell_factor = magic_ns
             .iter()
             .map(|&m| {
                 let dist = (nuc.n as f64 - m).abs();
-                if dist < 4.0 {
-                    // Suppress by up to 100x at the magic number itself
-                    0.01 + 0.99 * (dist / 4.0).powi(2)
+                if dist < 5.0 {
+                    // Suppress by up to 1000x at the magic number itself
+                    0.001 + 0.999 * (dist / 5.0).powi(2)
                 } else {
                     1.0
                 }

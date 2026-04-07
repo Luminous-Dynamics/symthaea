@@ -252,7 +252,7 @@ mod tests {
             "=".repeat(10),
             "=".repeat(10)
         );
-        eprintln!("ΔE_C = BE(Z_high,N_low) - BE(Z_low,N_high) for mirror pairs.");
+        eprintln!("ΔE_C = BE(Z_low,N_high) - BE(Z_high,N_low) for mirror pairs.");
         eprintln!("Nolen-Schiffer: ΔE_C ≈ 0.7 × (2Z_low-1) / A^(1/3) MeV.\n");
 
         // Mirror pairs: (A, Z_low, N_low, label)
@@ -278,7 +278,7 @@ mod tests {
 
             let be_high = pred.predict(z_high, n_high).binding_energy;
             let be_low = pred.predict(z_low, n_low).binding_energy;
-            let delta_e_pred = be_high - be_low;
+            let delta_e_pred = be_low - be_high;
 
             // Nolen-Schiffer formula
             let delta_e_ns = 0.7 * (2.0 * z_low as f64 - 1.0) / (a as f64).powf(1.0 / 3.0);
@@ -340,8 +340,14 @@ mod tests {
                 let nn = n as u16;
                 if !measured.contains(&(zz, nn)) { continue; }
                 let be = be_map[&(zz, nn)];
+                // Subtract Coulomb contribution before fitting symmetry term
+                let a_c = 0.7; // Coulomb coefficient (MeV)
+                let z_f = z as f64;
+                let a_f = a as f64;
+                let coulomb = a_c * z_f * (z_f - 1.0) / a_f.powf(1.0 / 3.0);
+                let be_corrected = be + coulomb;
                 let x = ((n as f64 - z as f64).powi(2)) / a as f64;
-                points.push((x, be));
+                points.push((x, be_corrected));
             }
             if points.len() < 3 { continue; }
 
@@ -451,8 +457,14 @@ mod tests {
                 if n < 1 { continue; }
                 if !measured.contains(&(z as u16, n as u16)) { continue; }
                 let be = be_map[&(z as u16, n as u16)];
+                // Subtract Coulomb contribution before fitting symmetry term
+                let a_c = 0.7; // Coulomb coefficient (MeV)
+                let z_f = z as f64;
+                let a_f = a as f64;
+                let coulomb = a_c * z_f * (z_f - 1.0) / a_f.powf(1.0 / 3.0);
+                let be_corrected = be + coulomb;
                 let x = ((n as f64 - z as f64).powi(2)) / a as f64;
-                points.push((x, be));
+                points.push((x, be_corrected));
             }
             if points.len() < 4 { continue; }
 
@@ -553,5 +565,147 @@ mod tests {
             r_14_c
         );
         eprintln!("  NICER observation:  R = 12.4 ± 1.0 km (Miller et al. 2021)");
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // 8. COULOMB CORRECTION FOR DOUBLE-BETA DECAY Q-VALUES
+    // ═══════════════════════════════════════════════════════════════════════
+
+    #[test]
+    fn coulomb_correction_for_qbb() {
+        let pred = predictor();
+
+        eprintln!(
+            "\n{} COULOMB CORRECTION FOR ββ Q-VALUES {}",
+            "=".repeat(12),
+            "=".repeat(12)
+        );
+        eprintln!("Fitting a single Coulomb asymmetry parameter to reduce");
+        eprintln!("the systematic bias in double-beta decay Q-value predictions.\n");
+
+        // 13 double-beta decay candidates: (Z, N, name, Q_exp in keV)
+        let candidates: &[(u16, u16, &str, f64)] = &[
+            (20, 28, "Ca-48", 4268.0),
+            (32, 44, "Ge-76", 2039.0),
+            (34, 48, "Se-82", 2998.0),
+            (36, 50, "Kr-86", 1257.0),
+            (40, 56, "Zr-96", 3356.0),
+            (42, 58, "Mo-100", 3034.0),
+            (46, 64, "Pd-110", 2018.0),
+            (48, 68, "Cd-116", 2814.0),
+            (50, 74, "Sn-124", 2289.0),
+            (52, 78, "Te-130", 2527.0),
+            (54, 82, "Xe-136", 2458.0),
+            (60, 90, "Nd-150", 3371.0),
+            (92, 146, "U-238", 1145.0),
+        ];
+
+        let m_e_mev = 0.51100; // electron mass in MeV
+        let two_m_e = 2.0 * m_e_mev; // 1.022 MeV
+
+        // Compute predicted Q-values and Coulomb asymmetry variable
+        struct QbbEntry {
+            name: &'static str,
+            z: u16,
+            n: u16,
+            q_exp: f64,    // keV
+            q_pred: f64,   // keV
+            residual: f64, // keV (exp - pred)
+            x_coulomb: f64,
+        }
+
+        let mut entries: Vec<QbbEntry> = Vec::new();
+
+        for &(z, n, name, q_exp_kev) in candidates {
+            // Daughter: Z+2, N-2
+            let be_parent = pred.predict(z, n).binding_energy;         // MeV
+            let be_daughter = pred.predict(z + 2, n - 2).binding_energy; // MeV
+
+            // Q_bb = BE(daughter) - BE(parent) + 2*m_e - 2*m_e
+            // More precisely: Q = [M(parent) - M(daughter) - 2*m_e] c^2
+            //   = [BE(Z+2,N-2) - BE(Z,N)] + 2*0.78235 - 1.022 MeV
+            // where 0.78235 MeV = (m_n - m_p) c^2
+            let q_pred_mev = (be_daughter - be_parent) + 2.0 * 0.78235 - two_m_e;
+            let q_pred_kev = q_pred_mev * 1000.0;
+            let residual = q_exp_kev - q_pred_kev;
+
+            // Coulomb asymmetry variable:
+            // x_i = (Z+2)(Z+1)/A^{1/3} - Z(Z-1)/A^{1/3}
+            let a = (z as f64) + (n as f64);
+            let a_cbrt = a.powf(1.0 / 3.0);
+            let z_f = z as f64;
+            let x_coulomb = ((z_f + 2.0) * (z_f + 1.0) - z_f * (z_f - 1.0)) / a_cbrt;
+
+            entries.push(QbbEntry {
+                name,
+                z,
+                n,
+                q_exp: q_exp_kev,
+                q_pred: q_pred_kev,
+                residual,
+                x_coulomb,
+            });
+        }
+
+        // Fit single parameter c via least squares:
+        // c = sum(residual_i * x_i) / sum(x_i^2)
+        let sum_rx: f64 = entries.iter().map(|e| e.residual * e.x_coulomb).sum();
+        let sum_xx: f64 = entries.iter().map(|e| e.x_coulomb * e.x_coulomb).sum();
+        let c_fit = sum_rx / sum_xx;
+
+        // Compute RMS before and after correction
+        let n_pts = entries.len() as f64;
+        let rms_orig = (entries.iter().map(|e| e.residual * e.residual).sum::<f64>() / n_pts).sqrt();
+        let rms_corr = (entries
+            .iter()
+            .map(|e| {
+                let corr_resid = e.residual - c_fit * e.x_coulomb;
+                corr_resid * corr_resid
+            })
+            .sum::<f64>()
+            / n_pts)
+            .sqrt();
+
+        let mean_orig = entries.iter().map(|e| e.residual).sum::<f64>() / n_pts;
+        let mean_corr =
+            entries.iter().map(|e| e.residual - c_fit * e.x_coulomb).sum::<f64>() / n_pts;
+
+        eprintln!("Fitted Coulomb correction coefficient: c = {:.3} keV", c_fit);
+        eprintln!();
+        eprintln!(
+            "{:<10} {:>4} {:>4} {:>4}  {:>8} {:>8} {:>8} {:>8} {:>10} {:>10}",
+            "Nucleus", "Z", "N", "A", "Q_exp", "Q_pred", "Resid", "x_C", "Q_corr", "Resid_c"
+        );
+        eprintln!(
+            "{:<10} {:>4} {:>4} {:>4}  {:>8} {:>8} {:>8} {:>8} {:>10} {:>10}",
+            "", "", "", "", "(keV)", "(keV)", "(keV)", "", "(keV)", "(keV)"
+        );
+
+        for e in &entries {
+            let q_corrected = e.q_pred + c_fit * e.x_coulomb;
+            let resid_corrected = e.q_exp - q_corrected;
+            eprintln!(
+                "{:<10} {:4} {:4} {:4}  {:8.1} {:8.1} {:8.1} {:8.3} {:10.1} {:10.1}",
+                e.name,
+                e.z,
+                e.n,
+                e.z as u32 + e.n as u32,
+                e.q_exp,
+                e.q_pred,
+                e.residual,
+                e.x_coulomb,
+                q_corrected,
+                resid_corrected
+            );
+        }
+
+        eprintln!();
+        eprintln!("── Summary ──");
+        eprintln!("  Original  mean bias: {:+.1} keV", mean_orig);
+        eprintln!("  Corrected mean bias: {:+.1} keV", mean_corr);
+        eprintln!("  Original  RMS:       {:.1} keV", rms_orig);
+        eprintln!("  Corrected RMS:       {:.1} keV", rms_corr);
+        eprintln!("  Improvement:         {:.1}%", 100.0 * (1.0 - rms_corr / rms_orig));
+        eprintln!("  Coulomb coeff c:     {:.3} keV", c_fit);
     }
 }

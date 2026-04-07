@@ -222,41 +222,59 @@ impl NixActiveInference {
         let prediction_error = 1.0 - predicted.similarity(state_after).max(0.0) as f64;
 
         // Record in episodic memory (Φ-gated)
-        use crate::action::executor::NixOSCommand;
-        let cmd = match &action {
-            ActionCategory::Install => NixOSCommand::EnvInstall {
-                packages: vec!["unknown".into()],
-            },
-            ActionCategory::Remove => NixOSCommand::EnvRemove {
-                packages: vec!["unknown".into()],
-            },
-            ActionCategory::Rebuild => NixOSCommand::RebuildSwitch {
-                flake: None,
-                extra_args: vec![],
-            },
-            ActionCategory::Rollback => NixOSCommand::EnvRollback,
-            ActionCategory::GarbageCollect => NixOSCommand::CollectGarbage {
-                older_than_days: None,
-                delete_all: false,
-            },
-            ActionCategory::Update => NixOSCommand::Channel {
-                operation: crate::action::executor::ChannelOperation::Update { channel: None },
-            },
-            _ => NixOSCommand::Custom {
-                command: format!("{action:?}"),
-                args: vec![],
-                safety_level: crate::action::executor::SafetyLevel::ReadOnly,
-            },
-        };
+        #[cfg(feature = "native")]
+        {
+            use crate::action::executor::NixOSCommand;
+            let cmd = match &action {
+                ActionCategory::Install => NixOSCommand::EnvInstall {
+                    packages: vec!["unknown".into()],
+                },
+                ActionCategory::Remove => NixOSCommand::EnvRemove {
+                    packages: vec!["unknown".into()],
+                },
+                ActionCategory::Rebuild => NixOSCommand::RebuildSwitch {
+                    flake: None,
+                    extra_args: vec![],
+                },
+                ActionCategory::Rollback => NixOSCommand::EnvRollback,
+                ActionCategory::GarbageCollect => NixOSCommand::CollectGarbage {
+                    older_than_days: None,
+                    delete_all: false,
+                },
+                ActionCategory::Update => NixOSCommand::Channel {
+                    operation: crate::action::executor::ChannelOperation::Update { channel: None },
+                },
+                _ => NixOSCommand::Custom {
+                    command: format!("{action:?}"),
+                    args: vec![],
+                    safety_level: crate::action::executor::SafetyLevel::ReadOnly,
+                },
+            };
 
-        self.episodic_memory.record_transition(
-            state_before.clone(),
-            &cmd,
-            state_after.clone(),
-            outcome,
-            phi,
-            prediction_error,
-        );
+            self.episodic_memory.record_transition(
+                state_before.clone(),
+                &cmd,
+                state_after.clone(),
+                outcome,
+                phi,
+                prediction_error,
+            );
+        }
+        #[cfg(not(feature = "native"))]
+        {
+            // Without native, record a simplified episode directly
+            let episode = super::episodic_memory::SystemEpisode {
+                state_before: state_before.clone(),
+                action: format!("{action:?}"),
+                state_after: state_after.clone(),
+                outcome,
+                phi_at_encoding: phi,
+                prediction_error,
+                emotional_valence: 0.0,
+                timestamp: 0,
+            };
+            self.episodic_memory.record(episode);
+        }
     }
 
     /// All standard NixOS action categories.

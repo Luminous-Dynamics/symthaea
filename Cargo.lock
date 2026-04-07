@@ -16384,6 +16384,7 @@ dependencies = [
  "symthaea-harmonies",
  "symthaea-neuroevolution",
  "symthaea-neuromodulators",
+ "symthaea-nix",
  "symthaea-types",
  "tokio",
  "tokio-rustls 0.26.4",

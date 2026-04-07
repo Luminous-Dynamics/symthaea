@@ -26,7 +26,7 @@ use crate::sovereign_config::{
 };
 
 /// What Symthaea knows about the user's intent so far.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, serde::Serialize)]
 pub struct ConversationState {
     /// Accumulated knowledge from conversation turns.
     pub known_desktop: Option<String>,
@@ -49,20 +49,20 @@ pub struct ConversationState {
     pub confirmed: bool,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize)]
 pub struct ConversationTurn {
     pub speaker: Speaker,
     pub message: String,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize)]
 pub enum Speaker {
     Symthaea,
     Human,
 }
 
 /// Symthaea's response to a conversation turn.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ConversationResponse {
     /// What Symthaea says.
     pub message: String,

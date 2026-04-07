@@ -27,12 +27,15 @@ required-features = ["daemon"]
 
 [dependencies]
 symthaea-core = { path = "../../symthaea-core" }
-tree-sitter = { workspace = true }
-tree-sitter-nix = { workspace = true }
+# Native-only (C FFI, async)
+tree-sitter = { workspace = true, optional = true }
+tree-sitter-nix = { workspace = true, optional = true }
+tokio = { workspace = true, optional = true }
+
+# WASM-safe
 petgraph = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
-tokio = { workspace = true }
 regex = { workspace = true }
 strsim = { workspace = true }
 anyhow = { workspace = true }
@@ -41,8 +44,8 @@ tracing = { workspace = true }
 chrono = { workspace = true }
 lru = { workspace = true }
 dashmap = { workspace = true }
-nix = "0.27"
-rusqlite = { workspace = true }
+nix = { version = "0.27", optional = true }
+rusqlite = { workspace = true, optional = true }
 rnix = "0.11"
 
 # CLI (optional)
@@ -75,10 +78,14 @@ name = "hdc_benchmarks"
 harness = false
 
 [features]
-default = []
-cli = ["clap", "clap_complete"]
+default = ["native"]
+# Native: includes parser (tree-sitter), filesystem ops, async (tokio), SQLite
+native = ["nix", "rusqlite", "tree-sitter", "tree-sitter-nix", "tokio"]
+# WASM-safe subset: sovereign_config, sovereign_conversation, app_database, encoding, mind
+# Use: symthaea-nix = { default-features = false }
+cli = ["clap", "clap_complete", "native"]
 tui = ["crossterm", "ratatui", "cli"]
-daemon = ["tokio/full"]
-systemd = ["zbus", "libsystemd"]
+daemon = ["tokio/full", "native"]
+systemd = ["zbus", "libsystemd", "native"]
 observability = ["tracing-subscriber", "metrics", "metrics-exporter-prometheus", "hyper", "hyper-util", "http-body-util", "daemon"]
 full = ["cli", "tui", "daemon", "systemd"]
