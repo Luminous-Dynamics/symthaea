@@ -72,11 +72,12 @@ fn render_panel(
                 {points.iter().map(|(x, y, color, radius)| {
                     let cx = margin + (x / x_max) * plot_w;
                     let cy = grid_h - (y / y_max) * plot_h;
-                    let color = color.clone();
+                    let color_fill = color.clone();
+                    let color_stroke = color.clone();
                     let r = *radius;
                     view! {
-                        <circle cx=cx cy=cy r=r fill=color opacity="0.8" />
-                        <circle cx=cx cy=cy r=r fill="none" stroke=color stroke-width="0.5" opacity="0.4" />
+                        <circle cx=cx cy=cy r=r fill=color_fill opacity="0.8" />
+                        <circle cx=cx cy=cy r=r fill="none" stroke=color_stroke stroke-width="0.5" opacity="0.4" />
                     }
                 }).collect_view()}
 
@@ -149,7 +150,7 @@ pub fn LemHeatmap() -> impl IntoView {
                     let radius = 2.0 + (cred.mastery_permille as f64 / 1000.0) * 4.0; // 2-6px
                     en_points.push((e as f64, n as f64, color.clone(), radius));
                     em_points.push((e as f64, m as f64, color.clone(), radius));
-                    nm_points.push((n as f64, m as f64, color, radius));
+                    nm_points.push((n as f64, m as f64, color.clone(), radius));
                 }
             }
         }
