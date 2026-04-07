@@ -493,6 +493,22 @@ fi
 "#, n = boot_part_num, next = boot_part_num + 1, disk = disk_var)
 }
 
+/// Format and mount the boot partition based on boot mode.
+/// EFI: mkfs.vfat + mount to /boot. BIOS: mkfs.ext4 + mount to /boot.
+fn boot_format_mount(boot_part_var: &str) -> String {
+    format!(r#"
+if [ "$BOOT_MODE" = "efi" ]; then
+  mkfs.vfat -F 32 "{boot}"
+else
+  # BIOS boot: format the /boot partition (not the 1MB BIOS boot partition)
+  # The BIOS boot partition (EF02) is left unformatted — GRUB writes to it directly
+  mkfs.ext4 -F -L boot "{boot}"
+fi
+mkdir -p /mnt/boot
+mount "{boot}" /mnt/boot
+"#, boot = boot_part_var)
+}
+
 /// Generate a shell snippet that patches configuration.nix with system config (DE, GPU, locale).
 /// Appended after the configuration.nix heredoc in each layout.
 fn system_config_patch(msg: &ClientMessage) -> String {
@@ -859,6 +875,7 @@ nixos-generate-config --root /mnt
                 &msg.flake_nix,
                 session_id,
             ));
+            script.push_str(&bootloader_patch_commands(&msg.disk));
 
             script.push_str(&format!(r#"
 # Step 6: Create swap file
@@ -936,38 +953,49 @@ echo "COMPLETE"
             // Uses sgdisk + mkfs directly (no disko download needed on live ISO)
             let mut script = format!(r#"set -eo pipefail
 echo "=== Symthaea Sovereign Birth: Single Disk ==="
+{boot_detect}
 
 # Step 1: Wipe and partition
 echo "STAGE: Partitioning disk {disk}..."
-# Unmount anything on this disk first
 umount -R /mnt 2>/dev/null || true
 swapoff {disk}* 2>/dev/null || true
-# Wipe all signatures (filesystem, partition table, raid)
 wipefs -af {disk} 2>/dev/null || true
 sgdisk --zap-all {disk}
-sgdisk -n 1:0:+512M -t 1:EF00 -c 1:boot {disk}
-sgdisk -n 2:0:0 -t 2:8300 -c 2:nixos {disk}
+
+# Boot partition (EFI or BIOS, auto-detected)
+if [ "$BOOT_MODE" = "efi" ]; then
+  sgdisk -n 1:0:+512M -t 1:EF00 -c 1:boot {disk}
+  sgdisk -n 2:0:0 -t 2:8300 -c 2:nixos {disk}
+  ROOT_NUM=2
+else
+  sgdisk -n 1:0:+1M -t 1:EF02 -c 1:bios-boot {disk}
+  sgdisk -n 2:0:+512M -t 2:8300 -c 2:boot {disk}
+  sgdisk -n 3:0:0 -t 3:8300 -c 3:nixos {disk}
+  ROOT_NUM=3
+fi
 partprobe {disk} 2>/dev/null || true
 blockdev --rereadpt {disk} 2>/dev/null || true
 udevadm settle 2>/dev/null || true
 sleep 3
 
 # Detect partition names (nvme uses p1/p2, sata uses 1/2)
-if [ -b "{disk}p1" ]; then
-  BOOT="{disk}p1"
-  ROOT="{disk}p2"
+if [ "$BOOT_MODE" = "efi" ]; then
+  if [ -b "{disk}p1" ]; then BOOT="{disk}p1"; ROOT="{disk}p2"; else BOOT="{disk}1"; ROOT="{disk}2"; fi
 else
-  BOOT="{disk}1"
-  ROOT="{disk}2"
+  if [ -b "{disk}p2" ]; then BOOT="{disk}p2"; ROOT="{disk}p3"; else BOOT="{disk}2"; ROOT="{disk}3"; fi
 fi
-echo "  Boot: $BOOT"
+echo "  Boot: $BOOT ($BOOT_MODE)"
 echo "  Root: $ROOT"
 
 # Step 2: Format with btrfs (snapshots, compression, rollback)
 echo "STAGE: Formatting with btrfs..."
 wipefs -af "$BOOT" 2>/dev/null || true
 wipefs -af "$ROOT" 2>/dev/null || true
-mkfs.vfat -F 32 "$BOOT"
+if [ "$BOOT_MODE" = "efi" ]; then
+  mkfs.vfat -F 32 "$BOOT"
+else
+  mkfs.ext4 -F -L boot "$BOOT"
+fi
 mkfs.btrfs -f -L nixos "$ROOT"
 
 # Step 3: Create btrfs subvolumes
@@ -995,7 +1023,7 @@ mount -o subvol=@swap,noatime "$ROOT" /mnt/swap
 echo "STAGE: Generating configuration..."
 mkdir -p /mnt/etc/nixos
 nixos-generate-config --root /mnt || echo "WARNING: nixos-generate-config failed (may be normal for some layouts)"
-"#, disk = msg.disk);
+"#, disk = msg.disk, boot_detect = boot_mode_detection());
 
             // Append configuration.nix (and optionally flake.nix) via heredoc —
             // avoids passing Nix braces through format!().
@@ -1034,6 +1062,8 @@ nixos-generate-config --root /mnt || echo "WARNING: nixos-generate-config failed
                 &msg.flake_nix,
                 session_id,
             ));
+            // Patch bootloader for BIOS mode
+            script.push_str(&bootloader_patch_commands(&msg.disk));
 
             script.push_str(&format!(r#"
 # Step 5: Create swap file
@@ -1196,6 +1226,7 @@ echo '  networking.hostId = "deadbeef";' >> /mnt/etc/nixos/hardware-configuratio
                 &msg.flake_nix,
                 session_id,
             ));
+            script.push_str(&bootloader_patch_commands(&msg.disk));
 
             // ZFS doesn't need separate swap file setup — zvol already created
             script.push_str(&format!(r#"
@@ -1353,6 +1384,9 @@ nixos-generate-config --root /mnt
                     script.push_str("FLAKEEOF\n");
                 }
             }
+
+            // Patch bootloader for BIOS mode (LUKS layout)
+            script.push_str(&bootloader_patch_commands(&msg.disk));
 
             script.push_str(&format!(r#"
 # Step 7: Create swap file
@@ -1519,6 +1553,7 @@ nixos-generate-config --root /mnt
                 &msg.flake_nix,
                 session_id,
             ));
+            script.push_str(&bootloader_patch_commands(&msg.standard_disk));
 
             script.push_str(&format!(r#"
 # Step 7: Create swap file on fast drive
@@ -1648,6 +1683,7 @@ nixos-generate-config --root /mnt
                 &msg.flake_nix,
                 session_id,
             ));
+            script.push_str(&bootloader_patch_commands(&msg.disk));
 
             script.push_str(&format!(r#"
 echo "STAGE: Configuring swap..."
@@ -1775,6 +1811,7 @@ mdadm --detail --scan >> /mnt/etc/mdadm.conf
                 &msg.flake_nix,
                 session_id,
             ));
+            script.push_str(&bootloader_patch_commands(&msg.disk));
 
             script.push_str(&format!(r#"
 echo "STAGE: Configuring swap..."
@@ -1904,6 +1941,7 @@ mdadm --detail --scan >> /mnt/etc/mdadm.conf 2>/dev/null || true
                 &msg.flake_nix,
                 session_id,
             ));
+            script.push_str(&bootloader_patch_commands(&msg.disk));
             script.push_str(r#"
 echo "STAGE: Installing NixOS..."
 nixos-install --no-root-passwd 2>&1
@@ -2019,6 +2057,7 @@ nixos-generate-config --root /mnt
                 &msg.flake_nix,
                 session_id,
             ));
+            script.push_str(&bootloader_patch_commands(&msg.disk));
             script.push_str(r#"
 echo "STAGE: Installing NixOS..."
 nixos-install --no-root-passwd 2>&1
