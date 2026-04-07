@@ -37,26 +37,28 @@ Full details: @.claude/rules/CREDENTIALS.md
 Full allocation: @.claude/rules/PORTS.md
 
 ### Holochain Ecosystem Conductor
-A single shared conductor runs ALL Mycelix hApps (Praxis, Portal, Health, etc.):
-- **Data**: `/tmp/C0qrby_9EFM6egCrrUWTo/` (dev sandbox)
-- **Admin WebSocket**: `ws://localhost:33743` (auto-assigned)
+A single shared conductor runs ALL Mycelix hApps:
+- **Admin WebSocket**: `ws://localhost:33800`
 - **App WebSocket**: `ws://localhost:8888`
 - **Bootstrap**: `https://dev-test-bootstrap2.holochain.org/`
 - **Keystore**: lair_server in-proc
+- **Installed apps (Apr 2026)**: mycelix-craft, mycelix-praxis, mycelix_mail, hearth, finance, commons, identity, governance
 
 **Installing a new hApp onto the shared conductor:**
 ```bash
-cd mycelix-praxis  # or any cluster
-nix develop
+cd /srv/luminous-dynamics
+nix develop ./mycelix-praxis  # provides hc, holochain, lair-keystore
 # 1. Build WASM zomes
-cargo build --workspace --target wasm32-unknown-unknown --release
-# 2. Pack DNA + hApp
-hc dna pack dna/ -o dna/praxis.dna
-cp dna/praxis.dna happ/praxis.dna
-hc app pack happ/ -o happ/mycelix-praxis.happ
-# 3. Install onto shared conductor via admin WebSocket (port 33743)
-# Use hc sandbox or admin API to install the hApp
+cd mycelix-craft && cargo build --workspace --target wasm32-unknown-unknown --release
+# 2. Pack DNA + hApp (manifest_version must be "0", use path: not bundled:)
+hc dna pack dna/ -o dna/mycelix_craft.dna
+hc app pack . -o mycelix-craft.happ
+# 3. Install onto shared conductor (use ABSOLUTE paths)
+hc sandbox call --running=33800 install-app /srv/luminous-dynamics/mycelix-craft/mycelix-craft.happ --app-id mycelix-craft
+# 4. Enable (positional arg, not --app-id)
+hc sandbox call --running=33800 enable-app mycelix-craft
 ```
+**Important**: Craft WASM requires `.cargo/config.toml` with `getrandom_backend="custom"` for wasm32 target.
 
 **PWA connection**: Each Leptos frontend connects via `ws://localhost:8888` (app interface).
 Override per-app via `window.__HC_CONDUCTOR_URL` in index.html.
