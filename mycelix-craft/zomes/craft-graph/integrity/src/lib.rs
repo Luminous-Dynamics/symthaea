@@ -106,6 +106,30 @@ pub struct CompositeProfile {
     pub detected_at: Timestamp,
 }
 
+/// A zero-knowledge proof that a retention check score meets a threshold.
+///
+/// Generated client-side using Winterfell STARK range proof circuit.
+/// Proves "my retention_score >= threshold" without revealing the exact score.
+/// Stored on DHT for any verifier to check independently.
+///
+/// Domain tag: ZTML:Craft:RetentionScore:v1
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct RetentionProof {
+    /// Hash of the credential this proof is for
+    pub credential_id: String,
+    /// Minimum score threshold proven (0-1000 permille)
+    pub threshold_permille: u16,
+    /// Winterfell STARK proof bytes (~200KB)
+    pub proof_bytes: Vec<u8>,
+    /// SHA-256 commitment to the actual score (for binding)
+    pub score_commitment: Vec<u8>,
+    /// Domain separation tag
+    pub domain_tag: String,
+    /// When the proof was generated
+    pub proven_at: Timestamp,
+}
+
 #[hdk_entry_helper]
 #[derive(Clone, PartialEq)]
 pub struct Anchor(pub String);
@@ -125,6 +149,8 @@ pub enum EntryTypes {
     RetentionCheck(RetentionCheck),
     #[entry_type(visibility = "public")]
     CompositeProfile(CompositeProfile),
+    #[entry_type(visibility = "public")]
+    RetentionProof(RetentionProof),
 }
 
 #[hdk_link_types]
@@ -143,6 +169,8 @@ pub enum LinkTypes {
     GuildToCredential,
     /// Guild -> endorsements from guild members
     GuildToEndorsement,
+    /// Credential -> zero-knowledge retention proofs
+    CredentialToRetentionProof,
 }
 
 #[hdk_extern]

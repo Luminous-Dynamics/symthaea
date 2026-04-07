@@ -187,6 +187,8 @@ mod tests {
             relationship: "self".to_string(),
             text: "I recommend myself".to_string(),
             created_at: Timestamp::from_micros(0),
+            staked_sap: None,
+            stake_id: None,
         };
         assert!(matches!(validate_recommendation(&rec).unwrap(), ValidateCallbackResult::Invalid(_)));
     }
@@ -201,6 +203,8 @@ mod tests {
             relationship: "colleague".to_string(),
             text: "".to_string(),
             created_at: Timestamp::from_micros(0),
+            staked_sap: None,
+            stake_id: None,
         };
         assert!(matches!(validate_recommendation(&rec).unwrap(), ValidateCallbackResult::Invalid(_)));
     }
@@ -243,6 +247,8 @@ mod tests {
             relationship: "Collaborated on Mycelix".to_string(),
             text: "Outstanding systems architect with deep Holochain expertise".to_string(),
             created_at: Timestamp::from_micros(0),
+            staked_sap: None,
+            stake_id: None,
         };
         assert_eq!(validate_recommendation(&rec).unwrap(), ValidateCallbackResult::Valid);
     }
