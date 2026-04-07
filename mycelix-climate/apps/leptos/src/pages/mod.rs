@@ -6,9 +6,11 @@ mod credits;
 mod emissions;
 mod projects;
 mod profile;
+mod calculator;
 
 pub use home::HomePage;
 pub use credits::CreditsPage;
 pub use emissions::EmissionsPage;
 pub use projects::ProjectsPage;
 pub use profile::ProfilePage;
+pub use calculator::CalculatorPage;

@@ -147,6 +147,23 @@
 .profile-section h2 { font-size: var(--text-lg); color: var(--text-primary); margin: 0 0 var(--space-md); }
 
 /* ================================================================
+   CALCULATOR
+   ================================================================ */
+.page-calculator { max-width: 600px; margin: 0 auto; }
+.calculator-form { padding: var(--space-lg); border: 1px solid var(--border-visible); border-radius: var(--radius); background: var(--bg-raised); }
+.calc-field { margin-bottom: var(--space-lg); }
+.calc-field label { display: block; font-size: var(--text-sm); font-weight: 600; color: var(--text-primary); margin-bottom: var(--space-xs); }
+.calc-hint { display: block; font-size: var(--text-xs); color: var(--text-muted); margin-top: var(--space-xs); font-style: italic; }
+
+.calc-results { margin-top: var(--space-xl); text-align: center; }
+.calc-total { margin-bottom: var(--space-md); }
+.calc-total-value { font-size: 3rem; font-weight: 700; color: var(--text-primary); display: block; text-shadow: 0 0 20px rgba(78, 205, 196, 0.2); }
+.calc-total-unit { font-size: var(--text-sm); color: var(--text-muted); }
+.calc-comparison { font-size: var(--text-sm); color: var(--text-secondary); margin-bottom: var(--space-lg); padding: var(--space-sm) var(--space-md); border-radius: var(--radius-sm); background: var(--bg-surface); }
+.calc-breakdown { margin-bottom: var(--space-lg); }
+.calc-actions { display: flex; gap: var(--space-md); justify-content: center; }
+
+/* ================================================================
    RESPONSIVE
    ================================================================ */
 @media (max-width: 720px) {

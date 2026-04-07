@@ -87,6 +87,7 @@ fn AppInner() -> impl IntoView {
         NavLink { href: "/credits", label: "Credits", icon: Some("💎") },
         NavLink { href: "/emissions", label: "Emissions", icon: Some("📊") },
         NavLink { href: "/projects", label: "Projects", icon: Some("🌳") },
+        NavLink { href: "/calculator", label: "Calculator", icon: Some("🔢") },
         NavLink { href: "/profile", label: "Profile", icon: Some("👤") },
     ];
 
@@ -104,6 +105,7 @@ fn AppInner() -> impl IntoView {
                     <Route path=path!("/credits") view=pages::CreditsPage />
                     <Route path=path!("/emissions") view=pages::EmissionsPage />
                     <Route path=path!("/projects") view=pages::ProjectsPage />
+                    <Route path=path!("/calculator") view=pages::CalculatorPage />
                     <Route path=path!("/profile") view=pages::ProfilePage />
                 </Routes>
             </AppShell>
