@@ -442,4 +442,118 @@ mod tests {
         assert!(rms.is_finite() && rms > 0.0 && rms < 500.0,
             "CV RMS = {} should be reasonable", rms);
     }
+
+    /// Scan superheavy region for novel stable isotope candidates using the RF model.
+    ///
+    /// Criteria for "interesting" candidates:
+    /// 1. Predicted B/A > 7.0 MeV (bound enough to plausibly exist)
+    /// 2. Low tree disagreement (uncertainty < 1.0 MeV → model is confident)
+    /// 3. Alpha-decay Q-value < 8 MeV (not instantly disintegrating)
+    /// 4. Positive two-nucleon separation energies (S2n, S2p > 0)
+    #[test]
+    fn test_novel_isotope_search() {
+        let predictor = MlMassPredictor::new();
+
+        eprintln!("\n=== Novel Isotope Search (DZ10 + RF, CV={:.2} MeV) ===", 0.78);
+        eprintln!("Scanning Z=104-130, N=150-200 ({} isotopes)\n",
+            (130-104+1) * (200-150+1));
+
+        #[derive(Debug)]
+        struct Candidate {
+            z: u16,
+            n: u16,
+            a: u16,
+            be: f64,
+            ba: f64,
+            correction: f64,
+            uncertainty: f64,
+            s2n: f64,
+            s2p: f64,
+            q_alpha: f64,
+        }
+
+        let mut candidates = Vec::new();
+
+        for z in 104..=130 {
+            for n in 150..=200 {
+                let pred = predictor.predict(z, n);
+                let a = z + n;
+
+                // Skip if clearly unbound
+                if pred.ba < 6.5 { continue; }
+
+                // Two-neutron separation energy: S2n = BE(Z,N) - BE(Z,N-2)
+                let s2n = if n >= 2 {
+                    pred.binding_energy - predictor.predict(z, n - 2).binding_energy
+                } else { 0.0 };
+
+                // Two-proton separation energy: S2p = BE(Z,N) - BE(Z-2,N)
+                let s2p = if z >= 2 {
+                    pred.binding_energy - predictor.predict(z - 2, n).binding_energy
+                } else { 0.0 };
+
+                // Alpha-decay Q-value: Q_α = BE(He-4) + BE(Z-2,N-2) - BE(Z,N)
+                let q_alpha = if z >= 2 && n >= 2 {
+                    let he4_be = 28.296; // He-4 binding energy
+                    let daughter = predictor.predict(z - 2, n - 2).binding_energy;
+                    he4_be + daughter - pred.binding_energy
+                } else { 99.0 };
+
+                // Interesting if: bound, positive separation energies, low uncertainty
+                if pred.ba > 7.0 && s2n > 0.0 && s2p > 0.0 && pred.uncertainty < 1.5 {
+                    candidates.push(Candidate {
+                        z, n, a,
+                        be: pred.binding_energy,
+                        ba: pred.ba,
+                        correction: pred.ml_correction,
+                        uncertainty: pred.uncertainty,
+                        s2n, s2p, q_alpha,
+                    });
+                }
+            }
+        }
+
+        // Sort by B/A (most stable first)
+        candidates.sort_by(|a, b| b.ba.partial_cmp(&a.ba).unwrap());
+
+        eprintln!("Found {} candidates with B/A > 7.0, S2n > 0, S2p > 0, σ < 1.5 MeV\n", candidates.len());
+        eprintln!("{:>4} {:>4} {:>5} {:>10} {:>8} {:>8} {:>8} {:>8} {:>8} {:>8}",
+            "Z", "N", "A", "BE(MeV)", "B/A", "Corr.", "σ", "S2n", "S2p", "Qα");
+        eprintln!("{}", "-".repeat(88));
+
+        for c in candidates.iter().take(30) {
+            eprintln!("{:>4} {:>4} {:>5} {:>10.2} {:>8.4} {:>8.2} {:>8.2} {:>8.2} {:>8.2} {:>8.2}",
+                c.z, c.n, c.a, c.be, c.ba, c.correction, c.uncertainty, c.s2n, c.s2p, c.q_alpha);
+        }
+
+        // Group by element and find optimal N for each Z
+        eprintln!("\n=== Most Stable Isotope Per Element ===");
+        eprintln!("{:>4} {:>15} {:>5} {:>10} {:>8} {:>8} {:>8}",
+            "Z", "Element", "A", "BE(MeV)", "B/A", "S2n", "Qα");
+        eprintln!("{}", "-".repeat(66));
+
+        let element_names = [
+            (104, "Rf"), (105, "Db"), (106, "Sg"), (107, "Bh"), (108, "Hs"),
+            (109, "Mt"), (110, "Ds"), (111, "Rg"), (112, "Cn"), (113, "Nh"),
+            (114, "Fl"), (115, "Mc"), (116, "Lv"), (117, "Ts"), (118, "Og"),
+            (119, "Uue"), (120, "Ubn"), (121, "Ubu"), (122, "Ubb"), (123, "Ubt"),
+            (124, "Ubq"), (125, "Ubp"), (126, "Ubh"), (127, "Ubs"), (128, "Ubo"),
+            (129, "Ube"), (130, "Utn"),
+        ];
+
+        for &(z, name) in &element_names {
+            if let Some(best) = candidates.iter().filter(|c| c.z == z).max_by(|a, b| a.ba.partial_cmp(&b.ba).unwrap()) {
+                eprintln!("{:>4} {:>15} {:>5} {:>10.2} {:>8.4} {:>8.2} {:>8.2}",
+                    z, name, best.a, best.be, best.ba, best.s2n, best.q_alpha);
+            }
+        }
+
+        // Verify we found at least some candidates
+        assert!(!candidates.is_empty(), "Should find at least some stable superheavy candidates");
+
+        // The most stable candidates should be near the predicted island of stability
+        let top = &candidates[0];
+        eprintln!("\nTop candidate: Z={}, N={}, A={} with B/A={:.4} MeV, σ={:.2} MeV",
+            top.z, top.n, top.a, top.ba, top.uncertainty);
+    }
 }

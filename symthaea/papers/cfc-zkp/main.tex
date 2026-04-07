@@ -1,0 +1,128 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{hyperref}
+
+\title{Closed-Form ZK: Efficient Temporal Proofs\\via CfC Neural Networks}
+
+\author{
+Tristan Stoltz\\
+Luminous Dynamics\\
+\texttt{tristan.stoltz@evolvingresonantcocreationism.com}
+}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+We show that Closed-form Continuous-time (CfC) neural networks enable significantly more efficient zero-knowledge temporal proofs than ODE-based alternatives. The CfC closed-form solution $h(t) = (1-\sigma(f)) \cdot h(0) + \sigma(f) \cdot x_\infty$ decomposes into exactly \textbf{1 AND constraint per neuron per timestep} in Binius (a binary-field STARK system), with all additive state updates free. With in-circuit sigmoid approximation, this increases to 2 AND per step. By contrast, Liquid Time-Constant (LTC) networks with RK4 integration require $\sim$16 AND per step. We benchmark real Binius proofs at two scales: 8 neurons $\times$ 10 timesteps (96 AND, 493~ms) and 64 neurons $\times$ 100 timesteps (7,360 AND, 954~ms without sigmoid; 13,760 AND, 680~ms with sigmoid). These results demonstrate that CfC's algebraic structure, combined with binary-field proof systems, makes verifiable temporal neural computation practical for the first time.
+\end{abstract}
+
+\section{Introduction}
+
+Temporal neural networks model continuous-time dynamics in time-series data. Liquid Time-Constant (LTC) networks~\cite{hasani2021ltc} and their closed-form counterpart CfC~\cite{hasani2022cfc} have shown strong performance in autonomous driving, medical monitoring, and robotics. A growing need exists for \emph{verifiable} temporal computation: proving that a neural network processed a time series correctly without revealing the input data.
+
+Zero-knowledge proofs (ZKPs) can provide this guarantee, but the computational cost of proving ODE integration is prohibitive. Each RK4 substep requires multiple multiplications per neuron, and $S \approx 16$ substeps per timestep is typical for numerical accuracy. For $N$ neurons over $T$ timesteps, an ODE-based LTC requires $O(16 \cdot N \cdot T)$ non-linear constraints.
+
+CfC networks eliminate this overhead with a closed-form solution that replaces iterative integration with a single expression per timestep. We show that this algebraic simplification has a direct correspondence in binary-field STARK proof systems (Binius~\cite{diamond2023binius}), where the CfC update decomposes into:
+\begin{align}
+\delta &= x_\infty \oplus h \quad &\text{(XOR: free in Binius)} \\
+p &= \sigma \wedge \delta \quad &\text{(AND: 1 constraint)} \\
+h' &= h \oplus p \quad &\text{(XOR: free)}
+\end{align}
+
+\section{Background}
+
+\textbf{CfC Networks.} The CfC solution~\cite{hasani2022cfc} is:
+$$h(t) = (1 - \sigma(f(t))) \cdot h(0) + \sigma(f(t)) \cdot x_\infty$$
+where $\sigma$ is sigmoid and $f(t) = -\Delta t / \tau$. This is an $O(1)$ expression per neuron per timestep --- no numerical integration needed.
+
+\textbf{Binius.} A STARK proof system over binary tower fields $\mathrm{GF}(2^k)$~\cite{diamond2023binius}. Addition (XOR) is native field addition and costs zero non-linear constraints. Only AND/MUL operations incur constraints.
+
+\section{CfC Temporal Proof Circuit}
+
+\subsection{Without Sigmoid (Witness-Supplied)}
+
+When $\sigma$ is provided as a precomputed witness value, the CfC update requires exactly \textbf{1 AND per neuron per timestep}: the multiplication $\sigma \wedge \delta$. Both XOR operations are free in Binius.
+
+\subsection{With In-Circuit Sigmoid}
+
+We implement sigmoid as a piecewise mask approximation:
+$$\sigma(f) \approx f \wedge \texttt{0xFF}$$
+This extracts the low 8 bits of $f$ as a crude sigmoid output, requiring 1 additional AND per step. Total: \textbf{2 AND per neuron per timestep}.
+
+A production-grade piecewise linear sigmoid (5--10 segments) would require 5--10 AND per step, still far fewer than the $\sim$16 for ODE-based LTC.
+
+\section{Experimental Results}
+
+All benchmarks use Binius64~\cite{binius64} with real cryptographic proof generation and verification. Hardware: AMD Ryzen, 32~GB RAM, NixOS.
+
+\begin{table}[h]
+\centering
+\caption{CfC Temporal Proofs in Binius (Real Proofs)}
+\label{tab:cfc}
+\begin{tabular}{@{}lrrrr@{}}
+\toprule
+\textbf{Config} & \textbf{AND} & \textbf{XOR (free)} & \textbf{Prove} & \textbf{Size} \\
+\midrule
+\multicolumn{5}{l}{\emph{Without sigmoid (witness-supplied $\sigma$)}} \\
+8N $\times$ 10T & 96 & 160 & 493 ms & 478 KB \\
+64N $\times$ 100T & 7,360 & 12,800 & 954 ms & 156 KB \\
+\midrule
+\multicolumn{5}{l}{\emph{With in-circuit sigmoid ($\sigma = f \wedge$ \texttt{0xFF})}} \\
+64N $\times$ 100T & 13,760 & 12,800 & 680 ms & 166 KB \\
+\midrule
+\multicolumn{5}{l}{\emph{Estimated: LTC + RK4 (16 substeps per timestep)}} \\
+64N $\times$ 100T & $\sim$117,760 & --- & $\sim$10s+ & --- \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The 64-neuron, 100-timestep CfC proof generates in under 1 second with 7,360 AND constraints. An equivalent LTC+RK4 circuit would require $\sim$117,760 AND constraints ($16\times$ more).
+
+\section{Limitations}
+
+\begin{itemize}
+    \item Our sigmoid approximation ($f \wedge \texttt{0xFF}$) is crude. A numerically accurate piecewise linear sigmoid would add 5--10 AND per step instead of 1.
+    \item We benchmark temporal evolution in isolation. A full neural inference proof would also need to prove input encoding and output decoding.
+    \item The LTC+RK4 comparison is estimated, not measured. Implementing a full ODE-based temporal proof circuit is future work.
+    \item Binius64 is pre-1.0 software; API and performance may change.
+\end{itemize}
+
+\section{Related Work}
+
+zkRNN~\cite{zkrnn2026} proves RNN execution but does not exploit closed-form temporal solutions. SUMMER~\cite{summer2025} adds recursive ZKPs for RNN training. Neither addresses the CfC/LTC distinction or binary-field alignment. Our companion paper~\cite{binius_hdc} establishes the broader algebraic alignment between HDC and binary-field STARKs.
+
+\section{Conclusion}
+
+CfC's closed-form solution translates directly into efficient binary-field STARK circuits: 1--2 AND per neuron per timestep, with all additive operations free. This is $\sim$16$\times$ fewer constraints than ODE-based temporal networks, making verifiable neural computation practical for temporal data processing.
+
+\bibliographystyle{plain}
+\begin{thebibliography}{9}
+
+\bibitem{hasani2022cfc}
+R.~Hasani et~al., ``Closed-form continuous-time neural networks,'' \emph{Nature Machine Intelligence}, vol.~4, pp.~992--1003, 2022.
+
+\bibitem{hasani2021ltc}
+R.~Hasani et~al., ``Liquid time-constant networks,'' in \emph{Proc. AAAI}, 2021.
+
+\bibitem{diamond2023binius}
+B.~Diamond and J.~Posen, ``Succinct arguments over towers of binary fields,'' \emph{ePrint} 2023/1784, 2023.
+
+\bibitem{binius64}
+Irreducible, Inc., ``Binius64,'' \url{https://github.com/IrreducibleOSS/binius64}, 2025.
+
+\bibitem{zkrnn2026}
+M.~Zarinjouei et~al., ``zkRNN,'' \emph{ePrint} 2026/073, 2026.
+
+\bibitem{summer2025}
+``SUMMER: Recursive ZKPs for RNN training,'' \emph{ePrint} 2025/1688, 2025.
+
+\bibitem{binius_hdc}
+T.~Stoltz, ``Binary-field STARKs for hyperdimensional computing,'' 2026. Companion paper.
+
+\end{thebibliography}
+
+\end{document}

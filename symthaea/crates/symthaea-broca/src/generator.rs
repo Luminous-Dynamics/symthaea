@@ -101,6 +101,12 @@ pub struct BrocaConfig {
     /// Science: Grice (1975) — cooperative principle.
     #[serde(default = "default_nsm_coverage_veto_scale")]
     pub nsm_coverage_veto_scale: f32,
+    /// Bypass all gating (epistemic, emotional, coherence, consciousness, veto)
+    /// for clean quality iteration on raw CfC output. Default: false.
+    /// Use this during training evaluation to isolate generation quality
+    /// from the gating stack.
+    #[serde(default)]
+    pub bypass_gating: bool,
 }
 
 fn default_true() -> bool {
@@ -137,7 +143,7 @@ impl Default for BrocaConfig {
             enable_emotional_modulation: true,
             enable_coherence_feedback: true,
             enable_consciousness_gating: true,
-            enable_semantic_veto: true,
+            enable_semantic_veto: false,
             veto_hesitation: "-- wait, ".to_string(),
             repetition_penalty: default_repetition_penalty(),
             sampling_seed: None,
@@ -148,6 +154,7 @@ impl Default for BrocaConfig {
             enable_nsm_gate: false,
             nsm_prime_logit_boost: default_nsm_prime_logit_boost(),
             nsm_coverage_veto_scale: default_nsm_coverage_veto_scale(),
+            bypass_gating: false,
         }
     }
 }
@@ -497,7 +504,8 @@ impl BrocaGenerator {
             }
 
             // Apply gating and compute audit trail values
-            let this_epistemic_boost = if self.config.enable_epistemic_gate {
+            // When bypass_gating is true, skip all gating for raw CfC quality iteration.
+            let this_epistemic_boost = if !self.config.bypass_gating && self.config.enable_epistemic_gate {
                 let ordinal = channels.epistemic_ordinal();
                 self.epistemic_gate.apply(&mut logits, ordinal);
                 // Compute representative boost magnitude for the trace
@@ -519,11 +527,11 @@ impl BrocaGenerator {
             // Complements the 1D ordinal gate with fine-grained axis modulation:
             // E-axis controls assertion vs hedging, N-axis social framing,
             // M-axis temporal framing, H-axis coherence depth.
-            if self.config.enable_epistemic_cube_gate {
+            if !self.config.bypass_gating && self.config.enable_epistemic_cube_gate {
                 self.epistemic_cube_gate.apply(&mut logits, channels);
             }
 
-            let this_emotional_boost = if self.config.enable_emotional_modulation {
+            let this_emotional_boost = if !self.config.bypass_gating && self.config.enable_emotional_modulation {
                 self.emotional_modulator.apply(&mut logits, channels, pos);
                 // Compute maximum boost magnitude from arousal/valence/warmth effects
                 let arousal = channels.arousal();
@@ -560,26 +568,32 @@ impl BrocaGenerator {
 
             // Therapeutic gating: modulate logits based on clinical context
             #[cfg(feature = "therapeutic")]
-            {
+            if !self.config.bypass_gating {
                 TherapeuticGate::apply_to_logits(&mut logits, channels, &self.tokenizer);
             }
 
             // NSM semantic gate: boost logits for tokens expressing active primes.
             // Inserted after epistemic/emotional/therapeutic gates, before coherence feedback.
-            let this_nsm_boost = if let Some(ref gate) = self.nsm_gate {
-                gate.apply(
-                    &mut logits,
-                    active_primes,
-                    self.config.nsm_prime_logit_boost,
-                );
-                self.config.nsm_prime_logit_boost
+            let this_nsm_boost = if !self.config.bypass_gating {
+                if let Some(ref gate) = self.nsm_gate {
+                    gate.apply(
+                        &mut logits,
+                        active_primes,
+                        self.config.nsm_prime_logit_boost,
+                    );
+                    self.config.nsm_prime_logit_boost
+                } else {
+                    0.0
+                }
             } else {
                 0.0
             };
 
             // Code-aware gate: boost/suppress tokens based on code channels (24-27).
             // Structural keywords when complex, error handling when error-prone, etc.
-            self.code_gate.apply(&mut logits, channels);
+            if !self.config.bypass_gating {
+                self.code_gate.apply(&mut logits, channels);
+            }
 
             // Coherence feedback: scale thought HV to strengthen binding when coherence drifts
             let mut this_binding_weight = 1.0f32;
@@ -589,7 +603,7 @@ impl BrocaGenerator {
                 channels.response_confidence(),
                 self.config.gating.confidence_veto_scale,
             );
-            if self.config.enable_coherence_feedback {
+            if !self.config.bypass_gating && self.config.enable_coherence_feedback {
                 let output_hv = self.controller.output_hv();
                 let binding_weight = self.coherence_feedback.update(&output_hv, &thought_hv);
                 this_binding_weight = binding_weight;

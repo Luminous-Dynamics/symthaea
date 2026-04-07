@@ -6,6 +6,7 @@
 
 use leptos::prelude::*;
 use wasm_bindgen::JsCast;
+use wasm_bindgen_futures::JsFuture;
 
 use symthaea_app_db::{AppDatabase, AppEntry, MatchQuality, AppCategory};
 use symthaea_app_db::config_gen;
@@ -13,6 +14,7 @@ use symthaea_app_db::validation;
 use crate::components::glass_panel::GlassPanel;
 use crate::i18n::{self, Lang};
 use crate::pages::remote_install::RemoteInstallPanel;
+use crate::worker::EngineWorker;
 
 // ═══════════════════════════════════════════════════════
 // LocalStorage persistence helpers
@@ -888,6 +890,565 @@ fn NextSteps(encrypt: RwSignal<bool>) -> impl IntoView {
 }
 
 // ═══════════════════════════════════════════════════════
+// 6. App Paste & Match (via SporeEngine WASM)
+// ═══════════════════════════════════════════════════════
+
+#[derive(Clone, Debug, Default)]
+struct MigrationReport {
+    total_apps: usize,
+    matched: Vec<(String, String, String)>, // (source, nix_pkg, category)
+    unmatched: Vec<String>,
+    readiness_score: f64,
+    summary: String,
+    bundles: Vec<String>,
+}
+
+#[component]
+fn AppPastePanel() -> impl IntoView {
+    let engine = use_context::<EngineWorker>();
+    let (paste_text, set_paste_text) = signal(String::new());
+    let (report, set_report) = signal(Option::<MigrationReport>::None);
+    let (matching, set_matching) = signal(false);
+
+    let do_match = move || {
+        let text = paste_text.get();
+        if text.trim().is_empty() { return; }
+
+        // Try worker first (SporeEngine WASM), fall back to local AppDatabase
+        if let Some(ref engine) = engine {
+            if engine.is_available() {
+                let engine = engine.clone();
+                set_matching.set(true);
+                wasm_bindgen_futures::spawn_local(async move {
+                    let params = js_sys::Object::new();
+                    let _ = js_sys::Reflect::set(&params, &"text".into(), &wasm_bindgen::JsValue::from_str(&text));
+                    let promise = engine.send("matchAppList", &params.into());
+                    match JsFuture::from(promise).await {
+                        Ok(result) => {
+                            let r = parse_migration_report(&result);
+                            set_report.set(Some(r));
+                        }
+                        Err(_) => {
+                            // Fallback: local AppDatabase
+                            let r = local_match_apps(&text);
+                            set_report.set(Some(r));
+                        }
+                    }
+                    set_matching.set(false);
+                });
+                return;
+            }
+        }
+
+        // No worker — use local AppDatabase directly
+        let r = local_match_apps(&text);
+        set_report.set(Some(r));
+    };
+
+    view! {
+        <GlassPanel title="Paste Your Apps">
+            <p class="section-desc">
+                "Paste output from "<code>"winget list"</code>", "<code>"brew list"</code>
+                ", "<code>"dpkg --list"</code>", or "<code>"pacman -Qe"</code>
+                ". We'll match them to NixOS packages instantly."
+            </p>
+            <textarea class="app-paste-area"
+                placeholder="Paste your app list here...
+
+Examples:
+  winget list
+  brew list --cask
+  dpkg --list | awk '{print $2}'
+  pacman -Qe"
+                prop:value=paste_text
+                on:input=move |ev| set_paste_text.set(event_target_value(&ev))
+            />
+            <div style="display:flex; gap:0.5rem; margin-top:0.5rem; align-items:center;">
+                <button class="btn-primary" on:click=move |_| do_match()
+                    prop:disabled=move || matching.get() || paste_text.get().trim().is_empty()
+                >{move || if matching.get() { "Matching..." } else { "Match Apps" }}</button>
+                {move || report.get().as_ref().map(|r| {
+                    let total = r.total_apps;
+                    let matched = r.matched.len();
+                    view! { <span class="field-hint">{format!("{matched} of {total} matched")}</span> }
+                })}
+            </div>
+
+            {move || report.get().map(|r| {
+                let score_class = if r.readiness_score > 0.85 { "migration-score-high" }
+                    else if r.readiness_score > 0.55 { "migration-score-med" }
+                    else { "migration-score-low" };
+                view! {
+                    <div class="migration-report">
+                        <div class={format!("migration-score {score_class}")}>
+                            {format!("{}%", (r.readiness_score * 100.0) as u32)}
+                        </div>
+                        <p class="migration-summary">{r.summary.clone()}</p>
+
+                        {(!r.bundles.is_empty()).then(|| view! {
+                            <div class="migration-bundles">
+                                {r.bundles.iter().map(|b| view! {
+                                    <span class="migration-bundle">{b.clone()}</span>
+                                }).collect::<Vec<_>>()}
+                            </div>
+                        })}
+
+                        {(!r.matched.is_empty()).then(|| view! {
+                            <div class="migration-matched">
+                                <h5>{format!("Matched ({})", r.matched.len())}</h5>
+                                {r.matched.iter().map(|(src, nix, cat)| view! {
+                                    <div class="migration-item">
+                                        <span class="migration-item-source">{src.clone()}</span>
+                                        <span class="migration-item-arrow">"→"</span>
+                                        <span class="migration-item-nix">{nix.clone()}</span>
+                                        <span class="migration-item-category">{cat.clone()}</span>
+                                    </div>
+                                }).collect::<Vec<_>>()}
+                            </div>
+                        })}
+
+                        {(!r.unmatched.is_empty()).then(|| view! {
+                            <div class="migration-unmatched">
+                                <h5>{format!("Unmatched ({})", r.unmatched.len())}</h5>
+                                {r.unmatched.iter().map(|name| view! {
+                                    <div class="migration-unmatched-item">{name.clone()}</div>
+                                }).collect::<Vec<_>>()}
+                            </div>
+                        })}
+                    </div>
+                }
+            })}
+        </GlassPanel>
+    }
+}
+
+/// Parse a JsValue migration report from the worker.
+fn parse_migration_report(val: &wasm_bindgen::JsValue) -> MigrationReport {
+    let total = js_sys::Reflect::get(val, &"total_apps".into())
+        .ok().and_then(|v| v.as_f64()).unwrap_or(0.0) as usize;
+    let readiness = js_sys::Reflect::get(val, &"readiness_score".into())
+        .ok().and_then(|v| v.as_f64()).unwrap_or(0.0);
+    let summary = js_sys::Reflect::get(val, &"summary".into())
+        .ok().and_then(|v| v.as_string()).unwrap_or_default();
+
+    let mut matched = Vec::new();
+    if let Ok(arr) = js_sys::Reflect::get(val, &"matched".into()) {
+        if js_sys::Array::is_array(&arr) {
+            let arr = js_sys::Array::from(&arr);
+            for i in 0..arr.length() {
+                let item = arr.get(i);
+                let src = js_sys::Reflect::get(&item, &"source_name".into())
+                    .ok().and_then(|v| v.as_string()).unwrap_or_default();
+                let nix = js_sys::Reflect::get(&item, &"nix_package".into())
+                    .ok().and_then(|v| v.as_string()).unwrap_or_default();
+                let cat = js_sys::Reflect::get(&item, &"category".into())
+                    .ok().and_then(|v| v.as_string()).unwrap_or_default();
+                matched.push((src, nix, cat));
+            }
+        }
+    }
+
+    let mut unmatched = Vec::new();
+    if let Ok(arr) = js_sys::Reflect::get(val, &"unmatched".into()) {
+        if js_sys::Array::is_array(&arr) {
+            let arr = js_sys::Array::from(&arr);
+            for i in 0..arr.length() {
+                if let Some(s) = arr.get(i).as_string() {
+                    unmatched.push(s);
+                }
+            }
+        }
+    }
+
+    let mut bundles = Vec::new();
+    if let Ok(arr) = js_sys::Reflect::get(val, &"suggested_bundles".into()) {
+        if js_sys::Array::is_array(&arr) {
+            let arr = js_sys::Array::from(&arr);
+            for i in 0..arr.length() {
+                if let Some(s) = arr.get(i).as_string() {
+                    bundles.push(s);
+                }
+            }
+        }
+    }
+
+    MigrationReport { total_apps: total, matched, unmatched, readiness_score: readiness, summary, bundles }
+}
+
+/// Fallback: match apps using the local AppDatabase (no worker needed).
+fn local_match_apps(text: &str) -> MigrationReport {
+    let db = AppDatabase::new();
+    let names: Vec<String> = db.parse_app_list(text);
+    let report = db.match_list(&names);
+    MigrationReport {
+        total_apps: report.total_apps,
+        matched: report.matched.iter().map(|m| {
+            (m.source_name.clone(), m.entry.primary.display_name.to_string(), format!("{:?}", m.entry.category))
+        }).collect(),
+        unmatched: report.unmatched.clone(),
+        readiness_score: report.readiness_score as f64,
+        summary: report.summary.clone(),
+        bundles: report.suggested_bundles.iter().map(|b| b.name.to_string()).collect(),
+    }
+}
+
+// ═══════════════════════════════════════════════════════
+// 7. Conversational Mode — Talk with Symthaea
+// ═══════════════════════════════════════════════════════
+
+#[derive(Clone, PartialEq)]
+struct ConverseChatMsg {
+    id: usize,
+    is_user: bool,
+    text: String,
+    config_preview: Option<String>,
+    decisions: Vec<(String, String, String, f64)>, // (option, value, reasoning, confidence)
+    ready_to_deploy: bool,
+}
+
+#[component]
+fn ConverseMode(
+    hardware_cores: u32,
+    hardware_mem: u32,
+    gpu_vendor: String,
+    gpu_model: String,
+    config_nix_signal: RwSignal<Option<String>>,
+    flake_nix_signal: RwSignal<Option<String>>,
+    hostname: RwSignal<String>,
+    selected_desktop: RwSignal<String>,
+    gpu_driver: Signal<String>,
+    timezone: RwSignal<String>,
+    keyboard: RwSignal<String>,
+    encrypt_disk: RwSignal<bool>,
+    secure_boot: RwSignal<bool>,
+    tpm_unlock: RwSignal<bool>,
+    fido2_unlock: RwSignal<bool>,
+    disk_layout: RwSignal<String>,
+    filesystem: RwSignal<String>,
+    user_password: RwSignal<String>,
+    mode: RwSignal<String>,
+) -> impl IntoView {
+    let engine = use_context::<EngineWorker>();
+    let (messages, set_messages) = signal(Vec::<ConverseChatMsg>::new());
+    let (next_id, set_next_id) = signal(1_usize);
+    let (input_value, set_input_value) = signal(String::new());
+    let (is_thinking, set_is_thinking) = signal(false);
+    let (initialized, set_initialized) = signal(false);
+    let (ready_to_deploy, set_ready_to_deploy) = signal(false);
+    let (show_remote, set_show_remote) = signal(false);
+
+    // Initialize sovereign conversation on mount
+    {
+        let engine = engine.clone();
+        let gv = gpu_vendor.clone();
+        let gm = gpu_model.clone();
+        Effect::new(move |_| {
+            if initialized.get() { return; }
+            let Some(ref engine) = engine else { return; };
+            if !engine.is_available() { return; }
+
+            let engine = engine.clone();
+            let gv = gv.clone();
+            let gm = gm.clone();
+            set_initialized.set(true);
+            set_is_thinking.set(true);
+
+            wasm_bindgen_futures::spawn_local(async move {
+                let params = js_sys::Object::new();
+                let hw = serde_json::json!({
+                    "gpu_vendor": gv,
+                    "gpu_model": gm,
+                    "cpu_cores": hardware_cores,
+                    "memory_gb": hardware_mem,
+                    "has_wifi": true,
+                });
+                let hw_val = wasm_bindgen::JsValue::from_str(&hw.to_string());
+                let _ = js_sys::Reflect::set(&params, &"hardware".into(), &hw_val);
+                let _ = js_sys::Reflect::set(&params, &"migration".into(), &wasm_bindgen::JsValue::from_str("{}"));
+
+                let promise = engine.send("sovereignInit", &params.into());
+                match JsFuture::from(promise).await {
+                    Ok(result) => {
+                        let msg_text = js_sys::Reflect::get(&result, &"message".into())
+                            .ok().and_then(|v| v.as_string())
+                            .unwrap_or_else(|| "Hello! I'm Symthaea. Tell me what you need from your NixOS system and I'll configure it for you.".into());
+                        let config_preview = js_sys::Reflect::get(&result, &"config_preview".into())
+                            .ok().and_then(|v| v.as_string());
+
+                        set_messages.update(|msgs| msgs.push(ConverseChatMsg {
+                            id: 0, is_user: false, text: msg_text, config_preview,
+                            decisions: Vec::new(), ready_to_deploy: false,
+                        }));
+                    }
+                    Err(e) => {
+                        let err_msg = format!("{:?}", e);
+                        set_messages.update(|msgs| msgs.push(ConverseChatMsg {
+                            id: 0, is_user: false,
+                            text: format!("Hello! I'm Symthaea. The conversation engine couldn't fully initialize ({}), but you can still describe what you need and I'll help configure your NixOS system.", err_msg),
+                            config_preview: None, decisions: Vec::new(), ready_to_deploy: false,
+                        }));
+                    }
+                }
+                set_is_thinking.set(false);
+            });
+        });
+    }
+
+    // Chat submit handler
+    let engine_chat = engine.clone();
+    let on_submit = move |ev: web_sys::SubmitEvent| {
+        ev.prevent_default();
+        let text = input_value.get();
+        if text.trim().is_empty() || is_thinking.get() { return; }
+
+        // Add user message
+        let user_id = next_id.get();
+        set_next_id.set(user_id + 1);
+        set_messages.update(|msgs| msgs.push(ConverseChatMsg {
+            id: user_id, is_user: true, text: text.clone(),
+            config_preview: None, decisions: Vec::new(), ready_to_deploy: false,
+        }));
+        set_input_value.set(String::new());
+        set_is_thinking.set(true);
+
+        // Scroll chat to bottom
+        if let Some(el) = web_sys::window()
+            .and_then(|w| w.document())
+            .and_then(|d| d.query_selector(".converse-chat").ok().flatten())
+        {
+            let el: web_sys::HtmlElement = el.dyn_into().unwrap();
+            let _ = el.set_scroll_top(el.scroll_height());
+        }
+
+        let Some(ref engine) = engine_chat else {
+            set_is_thinking.set(false);
+            return;
+        };
+        let engine = engine.clone();
+
+        wasm_bindgen_futures::spawn_local(async move {
+            let params = js_sys::Object::new();
+            let _ = js_sys::Reflect::set(&params, &"message".into(), &wasm_bindgen::JsValue::from_str(&text));
+            let promise = engine.send("sovereignChat", &params.into());
+
+            let reply_id = next_id.get_untracked();
+            set_next_id.set(reply_id + 1);
+
+            match JsFuture::from(promise).await {
+                Ok(result) => {
+                    let msg_text = js_sys::Reflect::get(&result, &"message".into())
+                        .ok().and_then(|v| v.as_string())
+                        .unwrap_or_else(|| "I understand. Let me think about the best configuration...".into());
+                    let config_preview = js_sys::Reflect::get(&result, &"config_preview".into())
+                        .ok().and_then(|v| v.as_string());
+                    let is_ready = js_sys::Reflect::get(&result, &"ready_to_deploy".into())
+                        .ok().and_then(|v| v.as_bool()).unwrap_or(false);
+
+                    // Parse decisions
+                    let mut decisions = Vec::new();
+                    if let Ok(arr) = js_sys::Reflect::get(&result, &"decisions".into()) {
+                        if js_sys::Array::is_array(&arr) {
+                            let arr = js_sys::Array::from(&arr);
+                            for i in 0..arr.length() {
+                                let d = arr.get(i);
+                                let opt = js_sys::Reflect::get(&d, &"option".into())
+                                    .ok().and_then(|v| v.as_string()).unwrap_or_default();
+                                let val = js_sys::Reflect::get(&d, &"value".into())
+                                    .ok().and_then(|v| v.as_string()).unwrap_or_default();
+                                let reason = js_sys::Reflect::get(&d, &"reasoning".into())
+                                    .ok().and_then(|v| v.as_string()).unwrap_or_default();
+                                let conf = js_sys::Reflect::get(&d, &"confidence".into())
+                                    .ok().and_then(|v| v.as_f64()).unwrap_or(0.0);
+                                decisions.push((opt, val, reason, conf));
+                            }
+                        }
+                    }
+
+                    if is_ready {
+                        set_ready_to_deploy.set(true);
+                        // Store config for the deploy panel
+                        if let Some(ref cfg) = config_preview {
+                            config_nix_signal.set(Some(cfg.clone()));
+                        }
+                    }
+
+                    set_messages.update(|msgs| msgs.push(ConverseChatMsg {
+                        id: reply_id, is_user: false, text: msg_text, config_preview,
+                        decisions, ready_to_deploy: is_ready,
+                    }));
+                }
+                Err(e) => {
+                    set_messages.update(|msgs| msgs.push(ConverseChatMsg {
+                        id: reply_id, is_user: false,
+                        text: format!("Sorry, I had trouble processing that: {:?}", e),
+                        config_preview: None, decisions: Vec::new(), ready_to_deploy: false,
+                    }));
+                }
+            }
+            set_is_thinking.set(false);
+
+            // Auto-scroll
+            if let Some(el) = web_sys::window()
+                .and_then(|w| w.document())
+                .and_then(|d| d.query_selector(".converse-chat").ok().flatten())
+            {
+                let el: web_sys::HtmlElement = el.dyn_into().unwrap();
+                let _ = el.set_scroll_top(el.scroll_height());
+            }
+        });
+    };
+
+    view! {
+        <section class="install-section">
+            <GlassPanel title="Talk with Symthaea">
+                <p class="section-desc">
+                    "Describe what you need in your own words. Symthaea will configure your NixOS system through conversation."
+                </p>
+
+                // Chat messages
+                <div class="converse-chat">
+                    {move || messages.get().iter().map(|msg| {
+                        let cls = if msg.is_user { "converse-msg converse-msg-user" } else { "converse-msg converse-msg-ai" };
+                        let sender = if msg.is_user { "You" } else { "Symthaea" };
+                        let text = msg.text.clone();
+                        let config = msg.config_preview.clone();
+                        let decisions = msg.decisions.clone();
+                        let is_ready = msg.ready_to_deploy;
+                        view! {
+                            <div class=cls>
+                                <span class="converse-msg-sender">{sender}</span>
+                                <span class="converse-msg-text" inner_html=format_converse_text(&text) />
+                            </div>
+                            {config.map(|cfg| view! {
+                                <details class="converse-config-preview">
+                                    <summary>"View generated configuration"</summary>
+                                    <pre class="converse-config-code">{cfg}</pre>
+                                </details>
+                            })}
+                            {(!decisions.is_empty()).then(|| view! {
+                                <details class="converse-decisions">
+                                    <summary>{format!("Reasoning ({} decisions)", decisions.len())}</summary>
+                                    <div style="margin-top:0.5rem;">
+                                        {decisions.iter().map(|(opt, val, reason, conf)| view! {
+                                            <div class="converse-decision">
+                                                <span class="converse-decision-option">{opt.clone()}</span>
+                                                " = "{val.clone()}
+                                                <span class="converse-decision-reasoning">{reason.clone()}</span>
+                                                <span class="converse-decision-confidence">{format!("Confidence: {}%", (*conf * 100.0) as u32)}</span>
+                                            </div>
+                                        }).collect::<Vec<_>>()}
+                                    </div>
+                                </details>
+                            })}
+                            {is_ready.then(|| view! {
+                                <div class="converse-deploy">
+                                    <button class="btn-primary" on:click=move |_| set_show_remote.set(true)>
+                                        "Deploy This Configuration"
+                                    </button>
+                                    <p class="field-hint" style="margin-top:0.3rem;">"Review the config above before deploying"</p>
+                                </div>
+                            })}
+                        }
+                    }).collect::<Vec<_>>()}
+
+                    {move || is_thinking.get().then(|| view! {
+                        <div class="converse-thinking">
+                            <div class="spinner"></div>
+                            <span>"Symthaea is thinking..."</span>
+                        </div>
+                    })}
+                </div>
+
+                // Chat input
+                <form class="converse-form" on:submit=on_submit>
+                    <input class="converse-input" type="text" autocomplete="off"
+                        placeholder="I need a system for development with encryption..."
+                        prop:value=input_value
+                        prop:disabled=move || is_thinking.get()
+                        on:input=move |ev| set_input_value.set(event_target_value(&ev))
+                    />
+                    <button class="btn-primary" type="submit"
+                        prop:disabled=move || is_thinking.get() || input_value.get().trim().is_empty()
+                    >"Send"</button>
+                </form>
+            </GlassPanel>
+        </section>
+
+        // App paste panel — available alongside conversation
+        <section class="install-section">
+            <AppPastePanel />
+        </section>
+
+        // Deploy panel (shown when Symthaea says ready or user clicks deploy)
+        <Show when=move || show_remote.get() || ready_to_deploy.get()>
+            <section class="install-section">
+                <RemoteInstallPanel
+                    config_nix=config_nix_signal.into()
+                    flake_nix=flake_nix_signal.into()
+                    hostname=hostname
+                    desktop=selected_desktop
+                    gpu_driver=gpu_driver
+                    timezone=timezone
+                    keyboard=keyboard
+                    encrypt=encrypt_disk
+                    secure_boot=secure_boot
+                    tpm_unlock=tpm_unlock
+                    fido2_unlock=fido2_unlock
+                    disk_layout=disk_layout
+                    filesystem=filesystem
+                    user_password=user_password
+                />
+            </section>
+        </Show>
+
+        // Download config manually
+        {move || config_nix_signal.get().map(|cfg| {
+            let cfg_dl = cfg.clone();
+            let flake_dl = flake_nix_signal.get().unwrap_or_default();
+            view! {
+                <section class="install-section">
+                    <GlassPanel title="Download Configuration">
+                        <div class="config-buttons">
+                            <button class="btn-secondary" on:click=move |_| download_text("configuration.nix", &cfg_dl)>
+                                "Download configuration.nix"
+                            </button>
+                            <button class="btn-secondary" on:click=move |_| download_text("flake.nix", &flake_dl)>
+                                "Download flake.nix"
+                            </button>
+                        </div>
+                        <details class="advanced-section">
+                            <summary class="advanced-toggle">"View raw configuration.nix"</summary>
+                            <pre class="config-code">{cfg.clone()}</pre>
+                        </details>
+                    </GlassPanel>
+                </section>
+            }
+        })}
+
+        <div class="wizard-buttons">
+            <button class="btn-secondary" on:click=move |_| { mode.set(String::new()); }>"Back to mode selection"</button>
+            <span></span>
+        </div>
+    }
+}
+
+/// Format conversation text: replace **bold** with <strong> tags.
+fn format_converse_text(text: &str) -> String {
+    let mut result = text.replace('<', "&lt;").replace('>', "&gt;");
+    // Simple **bold** replacement
+    while let Some(start) = result.find("**") {
+        if let Some(end) = result[start + 2..].find("**") {
+            let bold_text = &result[start + 2..start + 2 + end];
+            let replacement = format!("<strong>{}</strong>", bold_text);
+            result = format!("{}{}{}", &result[..start], replacement, &result[start + 2 + end + 2..]);
+        } else {
+            break;
+        }
+    }
+    result
+}
+
+// ═══════════════════════════════════════════════════════
 // Wizard Navigation
 // ═══════════════════════════════════════════════════════
 
@@ -1420,6 +1981,15 @@ pub fn InstallPage() -> impl IntoView {
                             <span class="mode-icon">"🔧"</span>
                             <span class="mode-title">"Custom"</span>
                             <span class="mode-desc">"Choose your desktop, apps, encryption, shell, kernel — full control."</span>
+                        </div>
+
+                        <div class="mode-card mode-converse" role="button" tabindex="0"
+                            on:click=move |_| { mode.set("converse".into()); step.set(1); save_to_storage("si_mode", "converse"); }
+                            on:touchend=move |ev: web_sys::TouchEvent| { ev.prevent_default(); mode.set("converse".into()); step.set(1); save_to_storage("si_mode", "converse"); }
+                        >
+                            <span class="mode-icon">"🌿"</span>
+                            <span class="mode-title">"Talk with Symthaea"</span>
+                            <span class="mode-desc">"Describe what you need. She configures your system through conversation."</span>
                         </div>
                     </div>
                 </div>
@@ -2299,6 +2869,33 @@ pub fn InstallPage() -> impl IntoView {
             </Show>
 
             </Show> // end Custom mode
+
+            // ══════════════════════════════════════════
+            // Conversational Mode — Talk with Symthaea
+            // ══════════════════════════════════════════
+            <Show when=move || mode.get() == "converse">
+                <ConverseMode
+                    hardware_cores=hw_cores
+                    hardware_mem=hw_mem
+                    gpu_vendor=gpu_vendor_str.clone()
+                    gpu_model=gpu_model.clone()
+                    config_nix_signal=config_nix_signal
+                    flake_nix_signal=flake_nix_signal
+                    hostname=hostname
+                    selected_desktop=selected_desktop
+                    gpu_driver=gpu_driver
+                    timezone=timezone
+                    keyboard=keyboard
+                    encrypt_disk=encrypt_disk
+                    secure_boot=secure_boot
+                    tpm_unlock=tpm_unlock
+                    fido2_unlock=fido2_unlock
+                    disk_layout=disk_layout
+                    filesystem=filesystem
+                    user_password=user_password
+                    mode=mode
+                />
+            </Show>
 
             <footer class="install-footer">
                 <p>

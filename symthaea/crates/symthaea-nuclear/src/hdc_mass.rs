@@ -286,6 +286,55 @@ impl HdcMassPredictor {
         }
     }
 
+    /// Create an untrained predictor, train on the given nuclei, and return it.
+    ///
+    /// Use this for validation splits where you control train/test partitioning.
+    pub fn train_on(nuclei: &[MeasuredNucleus], epochs: usize, seed_offset: u64) -> Self {
+        let config = UnifiedConfig {
+            tau_base: 1.0,
+            backbone_tau: 2.0,
+            dimension: HDC_DIMENSION,
+            learning_rate: 0.005,
+            momentum: 0.9,
+            weight_decay: 0.0001,
+            ..UnifiedConfig::default()
+        };
+
+        let mut w_gates = Vec::with_capacity(N_HEADS);
+        let mut w_values = Vec::with_capacity(N_HEADS);
+        for h in 0..N_HEADS {
+            let gi = ContinuousHV::random(
+                HDC_DIMENSION,
+                0xDA7E_0001 + seed_offset * 100 + h as u64 * 7919,
+            );
+            let vi = ContinuousHV::random(
+                HDC_DIMENSION,
+                0xFA1E_0002 + seed_offset * 100 + h as u64 * 6263,
+            );
+            let mut wg = vec![0.0f32; HDC_DIMENSION];
+            let mut wv = vec![0.0f32; HDC_DIMENSION];
+            for i in 0..HDC_DIMENSION {
+                wg[i] = gi.values[i] * 0.01;
+                wv[i] = vi.values[i] * 0.01;
+            }
+            w_gates.push(wg);
+            w_values.push(wv);
+        }
+
+        let mut predictor = Self {
+            encoder: NuclearStateEncoder::new(),
+            neuron: HdcLtcUnifiedNeuron::new(config, 0xA0C1_DEAD + seed_offset),
+            w_gates,
+            w_values,
+            scales: vec![100.0; N_HEADS],
+            biases: vec![0.0; N_HEADS],
+            head_weights: vec![1.0 / N_HEADS as f64; N_HEADS],
+        };
+
+        predictor.train(nuclei, epochs);
+        predictor
+    }
+
     /// 5-fold cross-validation RMS.
     pub fn cross_validate() -> f64 {
         let nuclei: Vec<_> = ame2020_reference_nuclei()

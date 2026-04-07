@@ -10,7 +10,11 @@
 //! Compiles to both native (for SSH scan) and WASM (for browser-side matching).
 //! No filesystem operations — pure data and computation.
 
+pub mod aliases;
 pub mod config_gen;
+pub mod package_healer;
+pub mod semantic_search;
+pub mod validation;
 
 use std::collections::HashMap;
 
@@ -145,6 +149,9 @@ pub struct AppEntry {
     pub primary: NixRecommendation,
     /// Alternative recommendations — shown when user clicks "Alternatives"
     pub alternatives: &'static [NixRecommendation],
+
+    /// nixpkgs channel this package name was last verified against (e.g., "25.05")
+    pub verified_channel: &'static str,
 }
 
 // ═══════════════════════════════════════════════════════
@@ -469,8 +476,36 @@ macro_rules! app {
                 nix_pkg: $apkg, display_name: $adname, quality: $aquality,
                 justification: $ajust, trade_offs: &[$($atradeoff),*],
             }),*],
+            verified_channel: "25.05",
         }
     };
+}
+
+/// The nixpkgs channel that all entries in this database were verified against.
+pub const CURRENT_VERIFIED_CHANNEL: &str = "25.05";
+
+/// Check if a package entry might be stale (verified against a different channel
+/// than the target system is running). Returns true if the channels differ.
+pub fn is_potentially_stale(entry: &AppEntry, current_channel: &str) -> bool {
+    entry.verified_channel != current_channel
+}
+
+/// Extract the major.minor channel version from a full NixOS version string.
+/// e.g., "25.05.20260401.abc1234" -> "25.05", "24.11" -> "24.11"
+pub fn parse_channel_version(version_str: &str) -> &str {
+    // NixOS versions look like "25.05.20260401.abc1234" or just "25.05"
+    let trimmed = version_str.trim();
+    // Find the second dot (after major.minor)
+    let mut dots = 0;
+    for (i, c) in trimmed.char_indices() {
+        if c == '.' {
+            dots += 1;
+            if dots == 2 {
+                return &trimmed[..i];
+            }
+        }
+    }
+    trimmed
 }
 
 static APPS: &[AppEntry] = &[
@@ -1159,7 +1194,7 @@ static APPS: &[AppEntry] = &[
         flatpak: [], snap: [],
         winget: ["GitHub.GitHubDesktop"], brew: ["github"],
         primary: ("lazygit", "lazygit", MatchQuality::StrongAlternative,
-            "Terminal UI for git — faster than any GUI. Staging, committing, branching all visualized.",
+            "GitHub Desktop has no Linux version. lazygit is a fast terminal Git client with visual staging, committing, and branching.",
             ["Terminal-based", "Different UI paradigm"]),
         alts: [("gittyup", "Gittyup", MatchQuality::StrongAlternative,
              "Graphical git client for Linux. Visual commit history, staging, and branching.",
@@ -1742,5 +1777,39 @@ mod tests {
 
         // LibreOffice should be an alternative
         assert!(office.alternatives.iter().any(|a| a.nix_pkg == "libreoffice"));
+    }
+
+    #[test]
+    fn all_entries_have_verified_channel() {
+        let db = AppDatabase::new();
+        for entry in db.entries() {
+            assert!(
+                !entry.verified_channel.is_empty(),
+                "Entry '{}' has empty verified_channel",
+                entry.name
+            );
+        }
+    }
+
+    #[test]
+    fn is_potentially_stale_detects_mismatch() {
+        let db = AppDatabase::new();
+        let firefox = db.match_app("Firefox").unwrap();
+
+        // Same channel = not stale
+        assert!(!super::is_potentially_stale(firefox, "25.05"));
+
+        // Different channel = stale
+        assert!(super::is_potentially_stale(firefox, "24.11"));
+        assert!(super::is_potentially_stale(firefox, "25.11"));
+    }
+
+    #[test]
+    fn parse_channel_version_extracts_major_minor() {
+        assert_eq!(super::parse_channel_version("25.05.20260401.abc1234"), "25.05");
+        assert_eq!(super::parse_channel_version("24.11"), "24.11");
+        assert_eq!(super::parse_channel_version("25.05"), "25.05");
+        assert_eq!(super::parse_channel_version("unknown"), "unknown");
+        assert_eq!(super::parse_channel_version("  25.05.123  "), "25.05");
     }
 }

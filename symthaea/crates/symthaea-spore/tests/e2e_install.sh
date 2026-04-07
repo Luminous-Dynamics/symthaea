@@ -3,7 +3,7 @@
 #
 # Prerequisites:
 #   - QEMU installed (qemu-system-x86_64)
-#   - NixOS minimal ISO at $NIXOS_ISO (or downloads latest)
+#   - NixOS ISO (auto-downloads if not present)
 #   - ssh-relay binary built: cargo build -p symthaea-spore --bin ssh-relay --features server --release
 #   - websocat installed (for WebSocket testing)
 #
@@ -18,13 +18,20 @@
 #   8. Tear down
 #
 # Usage:
-#   ./tests/e2e_install.sh [--keep-vm]    # --keep-vm preserves QEMU for debugging
+#   ./tests/e2e_install.sh [--keep-vm] [--iso <path>] [--nixos-version <ver>]
+#
+# NixOS version options:
+#   nixforhumanity  - Custom ISO with relay pre-installed (default, recommended)
+#   25.05           - NixOS 25.05 stable minimal
+#   unstable        - NixOS unstable minimal
+#   <path>          - Use a specific ISO file
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 RELAY_BIN="${RELAY_BIN:-$(dirname "$SCRIPT_DIR")/../target/release/ssh-relay}"
-NIXOS_ISO="${NIXOS_ISO:-/tmp/nixos-minimal.iso}"
+NIXOS_VERSION="${NIXOS_VERSION:-nixforhumanity}"
+NIXOS_ISO="${NIXOS_ISO:-}"
 DISK_IMG="/tmp/e2e-test-disk.qcow2"
 RELAY_PORT=8405  # Dev/test port range
 RELAY_TOKEN=""
@@ -34,7 +41,49 @@ KEEP_VM=false
 PASS=0
 FAIL=0
 
-[[ "${1:-}" == "--keep-vm" ]] && KEEP_VM=true
+# Parse arguments
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --keep-vm) KEEP_VM=true; shift ;;
+        --iso) NIXOS_ISO="$2"; shift 2 ;;
+        --nixos-version) NIXOS_VERSION="$2"; shift 2 ;;
+        *) echo "Unknown arg: $1"; exit 1 ;;
+    esac
+done
+
+# Resolve ISO path from version if not explicitly set
+if [[ -z "$NIXOS_ISO" ]]; then
+    case "$NIXOS_VERSION" in
+        nixforhumanity)
+            NIXOS_ISO="/tmp/nixos-minimal-26.05pre-git-x86_64-linux.iso"
+            ISO_URL="https://github.com/Luminous-Dynamics/nixforhumanity/releases/download/v0.1.0/nixos-minimal-26.05pre-git-x86_64-linux.iso"
+            ;;
+        25.05)
+            NIXOS_ISO="/tmp/nixos-25.05-minimal.iso"
+            ISO_URL="https://channels.nixos.org/nixos-25.05/latest-nixos-minimal-x86_64-linux.iso"
+            ;;
+        unstable)
+            NIXOS_ISO="/tmp/nixos-unstable-minimal.iso"
+            ISO_URL="https://channels.nixos.org/nixos-unstable/latest-nixos-minimal-x86_64-linux.iso"
+            ;;
+        *)
+            # Treat as a path
+            NIXOS_ISO="$NIXOS_VERSION"
+            ISO_URL=""
+            ;;
+    esac
+
+    if [[ ! -f "$NIXOS_ISO" && -n "${ISO_URL:-}" ]]; then
+        echo "Downloading NixOS ISO ($NIXOS_VERSION)..."
+        if command -v gh >/dev/null && [[ "$NIXOS_VERSION" == "nixforhumanity" ]]; then
+            gh release download v0.1.0 --repo Luminous-Dynamics/nixforhumanity --pattern "*.iso" --dir /tmp/
+        else
+            curl -L -o "$NIXOS_ISO" "$ISO_URL" --progress-bar
+        fi
+    fi
+fi
+
+echo "Using ISO: $NIXOS_ISO ($NIXOS_VERSION)"
 
 cleanup() {
     echo "Cleaning up..."

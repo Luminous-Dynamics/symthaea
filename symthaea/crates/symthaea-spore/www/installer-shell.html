@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Install NixOS — Sovereign Inoculation</title>
+  <meta name="description" content="Install NixOS from your browser. Detect hardware, scan apps, configure your system with AI assistance. Encrypted, reproducible, yours." />
+  <meta name="theme-color" content="#1a1b26" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta property="og:title" content="Install NixOS from your browser" />
+  <meta property="og:description" content="Browser-based NixOS installer with AI configuration, app migration, and disk encryption." />
+  <meta property="og:url" content="https://install.nixforhumanity.org" />
+  <meta property="og:type" content="website" />
+  <style>
+    __INSTALLER_CSS_PLACEHOLDER__
+  </style>
+</head>
+<body>
+
+  <!-- ═══════════════════════════════════════════
+       HERO
+       ═══════════════════════════════════════════ -->
+  <header class="hero">
+    <h1 class="hero-title">Install NixOS</h1>
+    <p class="hero-sub">From your browser. Encrypted. Reproducible. Yours.</p>
+    <p class="hero-desc">
+      Boot a NixOS ISO, connect from any device, and Symthaea configures your system
+      by understanding your hardware and your needs.
+    </p>
+    <div class="hero-actions">
+      <a href="#connect" class="btn-primary">Start Install</a>
+      <a href="https://github.com/Luminous-Dynamics/symthaea" class="btn-secondary">Source Code</a>
+    </div>
+    <div class="hero-badges">
+      <span>9 disk layouts</span>
+      <span>LUKS encryption</span>
+      <span>Secure Boot</span>
+      <span>App migration</span>
+      <span>AI config</span>
+    </div>
+  </header>
+
+  <!-- ═══════════════════════════════════════════
+       HOW IT WORKS
+       ═══════════════════════════════════════════ -->
+  <section class="section" id="how">
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">1</div>
+        <h3>Boot the ISO</h3>
+        <p>Use the <strong>Sovereign ISO</strong> (relay pre-configured) or any
+           <a href="https://nixos.org/download/" class="link">NixOS minimal ISO</a>.</p>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <h3>It connects automatically</h3>
+        <p>The relay auto-starts and this page finds it via mDNS.<br>
+           <span class="muted">Standard ISO: <code>passwd root && systemctl start sshd</code></span></p>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <h3>Tell Symthaea what you need</h3>
+        <p>She detects your hardware, scans your apps, and asks what matters to you.
+           Then she generates a config with reasoning for every choice.</p>
+      </div>
+    </div>
+    <details class="prereqs">
+      <summary>What you'll need</summary>
+      <ul>
+        <li>A machine to install NixOS on</li>
+        <li>A NixOS ISO on USB (or PXE boot)</li>
+        <li>Network between this browser and the target</li>
+        <li>The SSH relay: <code>ssh-relay --port 8094</code></li>
+      </ul>
+    </details>
+  </section>
+
+  <!-- ═══════════════════════════════════════════
+       CONNECT
+       ═══════════════════════════════════════════ -->
+  <section class="section" id="connect">
+    <h2 class="section-title">Connect to Target</h2>
+    <div class="connect-grid">
+      <label class="field">
+        <span class="field-label">Host / IP</span>
+        <input id="ssh-host" type="text" placeholder="192.168.1.100" autocomplete="off">
+      </label>
+      <label class="field">
+        <span class="field-label">Port</span>
+        <input id="ssh-port" type="number" value="22">
+      </label>
+      <label class="field">
+        <span class="field-label">Username</span>
+        <input id="ssh-user" type="text" value="root">
+      </label>
+      <label class="field">
+        <span class="field-label">Password</span>
+        <input id="ssh-pass" type="password" placeholder="sovereign">
+      </label>
+    </div>
+    <label class="field relay-field">
+      <span class="field-label">SSH Relay URL <span class="muted">(for remote/mobile)</span></span>
+      <input id="ssh-relay-url" type="text" placeholder="ws://your-server:8094">
+      <span class="field-hint">Leave empty for localhost. For mobile: ws://&lt;server-ip&gt;:8094</span>
+    </label>
+    <div class="connect-action">
+      <button id="btn-connect" class="btn-primary">Connect &amp; Begin</button>
+      <div id="connect-status" class="status"></div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════
+       CONVERSATION (appears after connect)
+       ═══════════════════════════════════════════ -->
+  <section class="section hidden" id="conversation">
+    <h2 class="section-title">Talk with Symthaea</h2>
+    <p class="section-desc">Tell her what you need in your own words. She'll configure your system.</p>
+    <div id="chat-messages" class="chat-area"></div>
+    <form id="chat-form" class="chat-form">
+      <input id="chat-input" type="text" placeholder="I need a system for..." autocomplete="off">
+      <button type="submit" class="btn-primary btn-sm">Send</button>
+    </form>
+  </section>
+
+  <!-- ═══════════════════════════════════════════
+       HARDWARE (appears after connect, alongside conversation)
+       ═══════════════════════════════════════════ -->
+  <section class="section hidden" id="hardware">
+    <h2 class="section-title">Your Hardware</h2>
+    <div id="hw-summary" class="hw-grid"></div>
+    <div id="hw-warnings" class="warnings"></div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════
+       APP COMPATIBILITY (appears after scan)
+       ═══════════════════════════════════════════ -->
+  <section class="section hidden" id="apps">
+    <h2 class="section-title">App Compatibility</h2>
+    <div id="app-report"></div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════
+       DISK & CONFIG (appears when ready)
+       ═══════════════════════════════════════════ -->
+  <section class="section hidden" id="config">
+    <h2 class="section-title">Configuration</h2>
+    <div id="disk-selector"></div>
+    <div id="config-panel"></div>
+    <div id="config-preview"></div>
+    <div class="deploy-action">
+      <button id="btn-deploy" class="btn-primary btn-lg" disabled>Review &amp; Deploy</button>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════
+       INSTALL PROGRESS (appears during install)
+       ═══════════════════════════════════════════ -->
+  <section class="section hidden" id="progress">
+    <div id="progress-stage" class="progress-stage"></div>
+    <div class="progress-bar-wrap">
+      <div id="progress-bar" class="progress-bar"></div>
+    </div>
+    <div id="progress-detail" class="progress-detail"></div>
+    <canvas id="constellation-canvas" width="600" height="250"></canvas>
+    <details class="terminal-toggle">
+      <summary>Terminal Output</summary>
+      <pre id="terminal" class="terminal"></pre>
+    </details>
+  </section>
+
+  <!-- ═══════════════════════════════════════════
+       COMPLETE (appears on success)
+       ═══════════════════════════════════════════ -->
+  <section class="section hidden" id="complete">
+    <div id="welcome-message" class="welcome"></div>
+    <div id="system-card"></div>
+    <div class="addons">
+      <h3>Optional Add-ons</h3>
+      <label class="addon-check">
+        <input type="checkbox" id="addon-symthaea">
+        <span>Install <strong>Symthaea</strong> consciousness engine — AI assistant for your NixOS system</span>
+      </label>
+      <label class="addon-check">
+        <input type="checkbox" id="addon-mycelix">
+        <span>Join the <strong>Mycelix</strong> network — sovereign mesh computing</span>
+      </label>
+    </div>
+    <div class="complete-actions">
+      <button class="btn-primary">Reboot into NixOS</button>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════
+       FOOTER
+       ═══════════════════════════════════════════ -->
+  <footer class="footer">
+    <p>
+      <a href="https://github.com/Luminous-Dynamics/symthaea">Source Code</a> ·
+      <a href="https://luminousdynamics.org">Luminous Dynamics</a> ·
+      No tracking · No data collection
+    </p>
+  </footer>
+
+  <script>
+    __INSTALLER_JS_PLACEHOLDER__
+  </script>
+</body>
+</html>
