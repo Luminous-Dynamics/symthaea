@@ -118,19 +118,32 @@ html {
     background: var(--bg);
     color: var(--text-primary);
     font-family: var(--font-sans);
+    scrollbar-width: thin;
+    scrollbar-color: var(--bg-surface) var(--bg);
 }
 
 body {
     margin: 0;
-    background: linear-gradient(
-        175deg,
-        var(--bg) 0%,
-        #0d1510 30%,
-        #0a100e 70%,
-        #080e0b 100%
-    );
+    background:
+        radial-gradient(ellipse at 20% 0%, rgba(78, 205, 196, 0.03) 0%, transparent 50%),
+        radial-gradient(ellipse at 80% 100%, rgba(106, 191, 105, 0.03) 0%, transparent 50%),
+        linear-gradient(175deg, var(--bg) 0%, #0d1510 30%, #0a100e 70%, #080e0b 100%);
     min-height: 100vh;
 }
+
+::selection {
+    background: rgba(78, 205, 196, 0.25);
+    color: var(--text-primary);
+}
+
+a { color: var(--mycelix-cyan); text-decoration: none; }
+a:hover { color: var(--mycelix-green); text-decoration: underline; text-underline-offset: 3px; }
+
+/* Webkit scrollbar */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--bg-surface); border-radius: var(--radius-pill); }
+::-webkit-scrollbar-thumb:hover { background: var(--surface); }
 
 /* ================================================================
    7. SHARED BUTTON STYLES
@@ -424,11 +437,14 @@ body {
     align-items: center;
     gap: var(--space-lg);
     padding: var(--space-sm) var(--space-lg);
-    background: var(--bg-raised);
+    background: linear-gradient(180deg, var(--bg-raised) 0%, rgba(17, 26, 22, 0.95) 100%);
     border-bottom: 1px solid var(--border);
+    box-shadow: 0 1px 12px rgba(78, 205, 196, 0.04);
     position: sticky;
     top: 0;
     z-index: 100;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
 }
 
 .nav-brand { flex-shrink: 0; }
@@ -458,7 +474,11 @@ body {
     color: var(--text-secondary);
     transition: background var(--duration-interact), color var(--duration-interact);
 }
-.nav-link:hover { background: var(--bg-surface); color: var(--text-primary); }
+.nav-link:hover {
+    background: rgba(78, 205, 196, 0.08);
+    color: var(--mycelix-cyan);
+    box-shadow: inset 0 -2px 0 var(--mycelix-cyan);
+}
 .nav-icon { margin-right: 4px; }
 
 .nav-meta {
@@ -794,7 +814,254 @@ body {
 }
 
 /* ================================================================
-   23. REDUCED MOTION
+   23. SOLARPUNK ENHANCEMENTS — organic microinteractions
+   ================================================================ */
+
+/* Card glow on hover */
+.dash-card,
+.project-card,
+.claim-card,
+.credit-card,
+.offer-card,
+.bounty-card,
+.investment-card,
+.exchange-card,
+.payment-card,
+.shipment-card,
+.supplier-card,
+.pledge-card,
+.dep-card,
+.receipt-card,
+.stake-card,
+.inference-card,
+.fact-check-card,
+.conjunction-card,
+.proposal-card,
+.recognition-card,
+.regen-card,
+.emissions-card,
+.object-card,
+.order-card,
+.item-card,
+.trade-card,
+.claim-card-mini {
+    transition: border-color var(--duration-interact) var(--ease-organic),
+                box-shadow var(--duration-interact) var(--ease-organic),
+                transform var(--duration-interact) var(--ease-organic);
+}
+
+.dash-card:hover,
+.project-card:hover,
+.claim-card:hover,
+.credit-card:hover,
+.offer-card:hover,
+.bounty-card:hover,
+.investment-card:hover,
+.exchange-card:hover,
+.dep-card:hover,
+.supplier-card:hover,
+.fact-check-card:hover,
+.conjunction-card:hover,
+.emissions-card:hover,
+.object-card:hover {
+    border-color: rgba(78, 205, 196, 0.25);
+    box-shadow: 0 2px 16px rgba(78, 205, 196, 0.06),
+                inset 0 1px 0 rgba(78, 205, 196, 0.05);
+    transform: translateY(-1px);
+}
+
+/* Page titles — organic underline */
+.page-home h1,
+.page-projects h1,
+.page-credits h1,
+.page-emissions h1,
+.page-profile h1,
+.page-browse h1,
+.page-claim-detail h1,
+.page-fact-check h1,
+.page-inferences h1,
+.page-investments h1,
+.page-grid h1,
+.page-regenerative h1,
+.page-tend h1,
+.page-sap h1,
+.page-mycel h1,
+.page-treasury h1,
+.page-staking h1,
+.page-oracle h1,
+.page-recognition h1,
+.page-registry h1,
+.page-reciprocity h1,
+.page-usage h1,
+.page-catalog h1,
+.page-conjunctions h1,
+.page-bounties h1,
+.page-traffic h1,
+.page-inventory h1,
+.page-orders h1,
+.page-logistics h1,
+.page-trust h1 {
+    background: linear-gradient(135deg, var(--text-primary) 0%, var(--mycelix-cyan) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+/* Subtitles with soft color */
+.subtitle {
+    color: var(--text-secondary);
+    font-style: italic;
+    letter-spacing: 0.01em;
+}
+
+/* Summary values — warm glow */
+.summary-value,
+.dash-value,
+.currency-value,
+.tend-balance,
+.sap-amount,
+.mycel-score,
+.emissions-value {
+    text-shadow: 0 0 20px rgba(78, 205, 196, 0.15);
+}
+
+/* Badge refinement */
+.badge {
+    background: rgba(78, 205, 196, 0.12);
+    color: var(--mycelix-cyan);
+    border: 1px solid rgba(78, 205, 196, 0.15);
+}
+
+.badge-success {
+    background: rgba(106, 191, 105, 0.15);
+    color: var(--semantic-success);
+    border-color: rgba(106, 191, 105, 0.2);
+}
+
+.badge-warning {
+    background: rgba(212, 165, 116, 0.15);
+    color: var(--semantic-warning);
+    border-color: rgba(212, 165, 116, 0.2);
+}
+
+.badge-error {
+    background: rgba(199, 92, 92, 0.15);
+    color: var(--semantic-error);
+    border-color: rgba(199, 92, 92, 0.2);
+}
+
+.badge-info {
+    background: rgba(91, 160, 201, 0.15);
+    color: var(--semantic-info);
+    border-color: rgba(91, 160, 201, 0.2);
+}
+
+/* Toast notifications — organic */
+.toast {
+    border-left: 3px solid var(--mycelix-cyan);
+    background: linear-gradient(135deg, var(--bg-raised) 0%, var(--bg-surface) 100%);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3), 0 0 8px rgba(78, 205, 196, 0.05);
+}
+.toast-success { border-left-color: var(--semantic-success); }
+.toast-error   { border-left-color: var(--semantic-error); }
+.toast-warning { border-left-color: var(--semantic-warning); }
+.toast-info    { border-left-color: var(--semantic-info); }
+
+/* Modal — forest depth */
+.modal-backdrop {
+    background: rgba(10, 16, 14, 0.85);
+    backdrop-filter: blur(4px);
+}
+.modal-content {
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), 0 0 1px rgba(78, 205, 196, 0.1);
+}
+
+/* Progress bars — living growth */
+.progress-bar-fill,
+.growth-fill,
+.scope-fill {
+    background: linear-gradient(90deg, var(--mycelix-green) 0%, var(--mycelix-cyan) 100%);
+}
+
+/* Empty state — gentle */
+.empty-state-icon { filter: saturate(0.7) brightness(0.8); }
+
+/* Cross-cluster links */
+.cross-cluster-link {
+    color: var(--mycelix-cyan);
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-xs);
+    padding: var(--space-xs) var(--space-sm);
+    border-radius: var(--radius-sm);
+    margin-top: var(--space-md);
+    transition: all var(--duration-interact);
+    font-size: var(--text-sm);
+}
+.cross-cluster-link:hover {
+    background: rgba(78, 205, 196, 0.08);
+    text-decoration: none;
+}
+
+/* Credential gate styling */
+.credential-gate {
+    padding: var(--space-md);
+    border: 1px dashed rgba(212, 165, 116, 0.3);
+    border-radius: var(--radius);
+    background: rgba(212, 165, 116, 0.05);
+    color: var(--text-secondary);
+    margin-bottom: var(--space-md);
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    flex-wrap: wrap;
+}
+
+/* Create form styling */
+.create-form {
+    padding: var(--space-lg);
+    border: 1px solid var(--border-visible);
+    border-radius: var(--radius);
+    background: var(--bg-raised);
+    margin-top: var(--space-md);
+}
+.action-section {
+    margin-bottom: var(--space-xl);
+}
+
+/* Summary page (governance finance summaries) */
+.summary-page {
+    max-width: 600px;
+    margin: 0 auto;
+    text-align: center;
+    padding: var(--space-2xl) 0;
+}
+.summary-card {
+    padding: var(--space-xl);
+    border: 1px solid var(--border-visible);
+    border-radius: var(--radius-lg);
+    background: var(--bg-raised);
+    margin: var(--space-lg) 0;
+}
+.summary-balance {
+    display: block;
+    font-size: var(--text-2xl);
+    font-weight: 700;
+    color: var(--text-primary);
+    text-shadow: 0 0 20px rgba(78, 205, 196, 0.15);
+}
+.summary-stats {
+    display: flex;
+    gap: var(--space-lg);
+    justify-content: center;
+    margin-top: var(--space-md);
+    font-size: var(--text-sm);
+    color: var(--text-muted);
+}
+
+/* ================================================================
+   24. REDUCED MOTION
    ================================================================ */
 @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after {
