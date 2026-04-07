@@ -802,6 +802,79 @@ pub fn get_bridge_summary(_: ()) -> ExternResult<BridgeSummary> {
     })
 }
 
+// ============================================================================
+// Praxis Credential Pipeline
+// ============================================================================
+
+/// Verify a Praxis learning credential for climate domain authorization.
+///
+/// Calls the Praxis credential_zome to verify that a user has completed
+/// environmental science curriculum, gating project creation behind
+/// proven knowledge.
+///
+/// Returns true if credential is valid, false if invalid or Praxis unavailable.
+/// Graceful degradation: if Praxis cluster is unreachable, returns true
+/// (don't gate access when the verifier is down).
+#[hdk_extern]
+pub fn verify_praxis_credential(credential_id: String) -> ExternResult<bool> {
+    // Attempt cross-cluster call to Praxis credential_zome
+    let payload = ExternIO::encode(&credential_id)
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("encode error: {e:?}"))))?;
+    match call(
+        CallTargetCell::OtherRole("praxis".into()),
+        ZomeName::from("credential_zome"),
+        FunctionName::from("verify_credential"),
+        None,
+        payload,
+    ) {
+        Ok(ZomeCallResponse::Ok(data)) => {
+            let valid: bool = data.decode().unwrap_or(false);
+            debug!("Praxis credential {credential_id} verification: {valid}");
+            Ok(valid)
+        }
+        Ok(_) => {
+            warn!("Praxis credential verification rejected/unauthorized — allowing access");
+            Ok(true)
+        }
+        Err(e) => {
+            warn!("Praxis cluster unreachable: {e:?} — allowing access (graceful degradation)");
+            Ok(true)
+        }
+    }
+}
+
+/// Check if a user has any environmental credential from Praxis.
+///
+/// Queries Praxis for credentials matching climate-related course IDs.
+#[hdk_extern]
+pub fn check_environmental_credential(agent_did: String) -> ExternResult<bool> {
+    let payload = ExternIO::encode(&agent_did)
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("encode error: {e:?}"))))?;
+    match call(
+        CallTargetCell::OtherRole("praxis".into()),
+        ZomeName::from("credential_zome"),
+        FunctionName::from("get_credentials_by_learner"),
+        None,
+        payload,
+    ) {
+        Ok(ZomeCallResponse::Ok(data)) => {
+            let credentials: Vec<serde_json::Value> = data.decode().unwrap_or_default();
+            // Check if any credential relates to environmental science
+            let has_env = credentials.iter().any(|cred| {
+                cred.get("course_id")
+                    .and_then(|c| c.as_str())
+                    .map(|c| {
+                        c.contains("environment") || c.contains("climate")
+                            || c.contains("ecology") || c.contains("sustainability")
+                    })
+                    .unwrap_or(false)
+            });
+            Ok(has_env)
+        }
+        _ => Ok(true), // Graceful degradation
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

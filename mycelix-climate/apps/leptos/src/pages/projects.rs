@@ -9,6 +9,22 @@ use crate::actions;
 #[component]
 pub fn ProjectsPage() -> impl IntoView {
     let ctx = use_climate_context();
+    let hc = mycelix_leptos_core::holochain_provider::use_holochain();
+
+    // Credential check — async query to bridge zome
+    let (has_credential, set_has_credential) = signal(true); // default: allow in mock
+    wasm_bindgen_futures::spawn_local({
+        let hc = hc.clone();
+        async move {
+            if !hc.is_mock() {
+                let result = hc.call_zome_default::<String, bool>(
+                    "bridge", "check_environmental_credential",
+                    &"did:mycelix:user-001".to_string(),
+                ).await.unwrap_or(true);
+                set_has_credential.set(result);
+            }
+        }
+    });
 
     // Form state
     let (name, set_name) = signal(String::new());
@@ -68,10 +84,23 @@ pub fn ProjectsPage() -> impl IntoView {
                 </div>
             </div>
 
-            // Create project button + form
+            // Create project button + form (gated by Praxis credential)
             <div class="action-section">
+                {move || if !has_credential.get() {
+                    Some(view! {
+                        <div class="credential-gate">
+                            <span class="gate-icon">"🔒"</span>
+                            <span>"Complete environmental science in "</span>
+                            <a href="http://localhost:8107" class="cross-cluster-link">"Praxis"</a>
+                            <span>" to create projects."</span>
+                        </div>
+                    })
+                } else {
+                    None
+                }}
                 <button
                     class="btn btn-primary"
+                    disabled=move || !has_credential.get()
                     on:click=move |_| set_show_form.update(|s| *s = !*s)
                 >
                     {move || if show_form.get() { "Cancel" } else { "Create Project" }}

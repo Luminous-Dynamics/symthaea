@@ -9,6 +9,22 @@ use crate::context::use_climate_context;
 pub fn ProfilePage() -> impl IntoView {
     let consciousness = use_consciousness();
     let ctx = use_climate_context();
+    let hc = mycelix_leptos_core::holochain_provider::use_holochain();
+
+    // Check for Praxis environmental credential
+    let (has_env_cred, set_has_env_cred) = signal(false);
+    wasm_bindgen_futures::spawn_local({
+        let hc = hc.clone();
+        async move {
+            if !hc.is_mock() {
+                let result = hc.call_zome_default::<String, bool>(
+                    "bridge", "check_environmental_credential",
+                    &"did:mycelix:user-001".to_string(),
+                ).await.unwrap_or(false);
+                set_has_env_cred.set(result);
+            }
+        }
+    });
 
     view! {
         <div class="page-profile">
@@ -36,6 +52,25 @@ pub fn ProfilePage() -> impl IntoView {
                     <div class="dash-card">
                         <span class="dash-label">"Engagement"</span>
                         <span class="dash-value">{move || format!("{:.2}", consciousness.profile.get().engagement)}</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="profile-section">
+                <h2>"Credentials"</h2>
+                <div class="dashboard-grid">
+                    <div class="dash-card">
+                        <span class="dash-label">"Environmental Credential"</span>
+                        <span class="dash-value">
+                            {move || if has_env_cred.get() { "Verified" } else { "Not yet earned" }}
+                        </span>
+                        <span class="dash-sub">
+                            {move || if has_env_cred.get() {
+                                "Praxis environmental science — unlocks project creation"
+                            } else {
+                                "Complete environmental science in Praxis to unlock"
+                            }}
+                        </span>
                     </div>
                 </div>
             </div>
