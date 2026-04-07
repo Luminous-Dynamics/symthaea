@@ -592,3 +592,121 @@ pub fn generate_hardware_nix(hardware_json: &str) -> Result<String, JsError> {
     let nix_config = crate::hardware_probe::NixHardwareConfig::from_profile(&profile);
     Ok(nix_config.nix_hardware_config.clone())
 }
+
+// ═══════════════════════════════════════════════════════
+// Sovereign NixOS Configuration (AI-powered, WASM-safe)
+// ═══════════════════════════════════════════════════════
+
+use std::cell::RefCell;
+
+thread_local! {
+    static SOVEREIGN_CONVERSATION: RefCell<Option<symthaea_nix::sovereign_conversation::SovereignConversation>> = RefCell::new(None);
+}
+
+/// Initialize a sovereign conversation session.
+/// Takes hardware profile and migration data as JSON.
+/// Call this once, then use sovereign_chat() for each message.
+#[wasm_bindgen]
+pub fn sovereign_init(hardware_json: &str, migration_json: &str) -> Result<JsValue, JsError> {
+    let hardware: symthaea_nix::sovereign_config::HardwareProfile =
+        serde_json::from_str(hardware_json).unwrap_or_default();
+    let migration: symthaea_nix::sovereign_config::MigrationData =
+        serde_json::from_str(migration_json).unwrap_or_default();
+
+    let mut conv = symthaea_nix::sovereign_conversation::SovereignConversation::new(hardware, migration);
+    let greeting = conv.greet();
+
+    SOVEREIGN_CONVERSATION.with(|c| {
+        *c.borrow_mut() = Some(conv);
+    });
+
+    // Return greeting as JSON string (avoids serde_wasm_bindgen issues with static refs)
+    let json = serde_json::json!({
+        "message": greeting.message,
+        "config_preview": greeting.config_preview,
+    });
+    serde_wasm_bindgen::to_value(&json)
+        .map_err(|e| JsError::new(&e.to_string()))
+}
+
+/// Send a message to the sovereign conversation.
+/// Returns the AI response as JSON with message and config preview.
+#[wasm_bindgen]
+pub fn sovereign_chat(message: &str) -> Result<JsValue, JsError> {
+    SOVEREIGN_CONVERSATION.with(|c| {
+        let mut borrow = c.borrow_mut();
+        let conv = borrow.as_mut()
+            .ok_or_else(|| JsError::new("Conversation not initialized. Call sovereign_init() first."))?;
+        let response = conv.respond(message);
+        let json = serde_json::json!({
+            "message": response.message,
+            "config_preview": response.config_preview,
+        });
+        serde_wasm_bindgen::to_value(&json)
+            .map_err(|e| JsError::new(&e.to_string()))
+    })
+}
+
+/// Generate a full NixOS configuration from hardware profile and user choices.
+/// Standalone function — doesn't require a conversation session.
+#[wasm_bindgen]
+pub fn generate_sovereign_config(
+    hardware_json: &str,
+    choices_json: &str,
+    migration_json: &str,
+) -> Result<JsValue, JsError> {
+    let hardware: symthaea_nix::sovereign_config::HardwareProfile =
+        serde_json::from_str(hardware_json).unwrap_or_default();
+    let choices: symthaea_nix::sovereign_config::UserChoices =
+        serde_json::from_str(choices_json).unwrap_or_default();
+    let migration: symthaea_nix::sovereign_config::MigrationData =
+        serde_json::from_str(migration_json).unwrap_or_default();
+
+    let mut gen = symthaea_nix::sovereign_config::SovereignConfigGenerator::new();
+    let config = gen.generate(&hardware, &choices, &migration);
+
+    let json = serde_json::json!({
+        "configuration_nix": config.configuration_nix,
+        "sovereign_config_nix": config.sovereign_config_nix,
+        "flake_nix": config.flake_nix,
+        "home_nix": config.home_nix,
+        "decisions": config.decisions,
+        "welcome_message": config.welcome_message,
+        "warnings": config.warnings,
+    });
+    serde_wasm_bindgen::to_value(&json)
+        .map_err(|e| JsError::new(&e.to_string()))
+}
+
+/// Match a list of app names against the NixOS package database.
+/// Input: newline-separated app names (from winget list, brew list, dpkg -l, etc.)
+/// Returns: JSON migration report with matches, confidence, and NixOS equivalents.
+#[wasm_bindgen]
+pub fn match_app_list(app_list_text: &str) -> Result<JsValue, JsError> {
+    let mut db = symthaea_nix::app_database::AppDatabase::new();
+    let names: Vec<String> = app_list_text
+        .lines()
+        .map(|l| l.trim().to_string())
+        .filter(|l| !l.is_empty())
+        .collect();
+    let report = db.match_list(&names);
+    // Manual JSON construction to handle &'static references
+    let matched: Vec<serde_json::Value> = report.matched.iter().map(|m| {
+        serde_json::json!({
+            "source_name": m.source_name,
+            "nix_package": m.entry.name,
+            "category": format!("{:?}", m.entry.category),
+        })
+    }).collect();
+    let bundles: Vec<&str> = report.suggested_bundles.iter().map(|b| b.name).collect();
+    let json = serde_json::json!({
+        "total_apps": report.total_apps,
+        "matched": matched,
+        "unmatched": report.unmatched,
+        "readiness_score": report.readiness_score,
+        "suggested_bundles": bundles,
+        "summary": report.summary,
+    });
+    serde_wasm_bindgen::to_value(&json)
+        .map_err(|e| JsError::new(&e.to_string()))
+}

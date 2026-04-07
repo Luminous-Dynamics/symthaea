@@ -23,7 +23,7 @@ use std::collections::HashMap;
 // ═══════════════════════════════════════════════════════
 
 /// Hardware profile detected by probe_hardware.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
 pub struct HardwareProfile {
     pub gpu_vendor: String,     // "nvidia", "amd", "intel", "unknown"
     pub gpu_model: String,
@@ -41,7 +41,7 @@ pub struct HardwareProfile {
     pub total_disk_gb: u64,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct DetectedOS {
     pub name: String,
     pub os_type: String,  // "windows", "linux", "macos"
@@ -49,7 +49,7 @@ pub struct DetectedOS {
 }
 
 /// User's choices from the portal UI.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
 pub struct UserChoices {
     pub hostname: String,
     pub desktop: String,        // "gnome", "plasma", "hyprland", "sway", "xfce", "none"
@@ -63,7 +63,7 @@ pub struct UserChoices {
 }
 
 /// Deep scan data from the user's existing system.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
 pub struct MigrationData {
     pub git_user: String,
     pub git_email: String,
@@ -87,7 +87,7 @@ pub struct MigrationData {
 // ═══════════════════════════════════════════════════════
 
 /// A complete NixOS configuration with reasoning.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct SovereignConfig {
     /// The generated configuration.nix content.
     pub configuration_nix: String,
@@ -106,7 +106,7 @@ pub struct SovereignConfig {
 }
 
 /// A single configuration decision with reasoning.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ConfigDecision {
     /// NixOS option path (e.g., "services.xserver.desktopManager.gnome.enable")
     pub option_path: String,
