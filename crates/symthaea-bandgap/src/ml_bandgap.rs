@@ -56,8 +56,8 @@ impl BandgapPredictor {
 
         for d in &data {
             let baseline = electronegativity_bandgap(&d.composition);
-            let residual = d.bandgap_exp - baseline;
-            features.push(extract_features(&d.composition, &d.crystal));
+            let residual = d.bandgap_exp() - baseline;
+            features.push(extract_features(&d.composition, d.crystal()));
             residuals.push(residual);
         }
 
@@ -103,8 +103,8 @@ impl BandgapPredictor {
                     continue;
                 }
                 let baseline = electronegativity_bandgap(&d.composition);
-                train_features.push(extract_features(&d.composition, &d.crystal));
-                train_targets.push(d.bandgap_exp - baseline);
+                train_features.push(extract_features(&d.composition, d.crystal()));
+                train_targets.push(d.bandgap_exp() - baseline);
             }
 
             let forest = RandomForest::train(&train_features, &train_targets, 50, 8, 3);
@@ -112,11 +112,11 @@ impl BandgapPredictor {
             // Test on this fold
             for i in test_start..test_end {
                 let d = &data[i];
-                let features = extract_features(&d.composition, &d.crystal);
+                let features = extract_features(&d.composition, d.crystal());
                 let baseline = electronegativity_bandgap(&d.composition);
                 let (correction, _) = forest.predict(&features);
                 let predicted = (baseline + correction).max(0.0);
-                let error = predicted - d.bandgap_exp;
+                let error = predicted - d.bandgap_exp();
                 total_abs_error += error.abs();
                 total_sq_error += error * error;
                 total_count += 1;
@@ -409,9 +409,9 @@ mod tests {
 
         for d in &data {
             let baseline = electronegativity_bandgap(&d.composition);
-            let pred = predictor.predict(&d.composition, &d.crystal);
-            baseline_sq += (baseline - d.bandgap_exp).powi(2);
-            rf_sq += (pred.bandgap - d.bandgap_exp).powi(2);
+            let pred = predictor.predict(&d.composition, d.crystal());
+            baseline_sq += (baseline - d.bandgap_exp()).powi(2);
+            rf_sq += (pred.bandgap - d.bandgap_exp()).powi(2);
         }
 
         let baseline_rmse = (baseline_sq / data.len() as f64).sqrt();
@@ -446,11 +446,11 @@ mod tests {
         let predictor = BandgapPredictor::new();
         let data = load_training_data();
         for d in &data {
-            let pred = predictor.predict(&d.composition, &d.crystal);
+            let pred = predictor.predict(&d.composition, d.crystal());
             assert!(
                 pred.bandgap >= 0.0,
                 "{}: predicted {} eV (negative!)",
-                d.name,
+                d.name(),
                 pred.bandgap
             );
         }

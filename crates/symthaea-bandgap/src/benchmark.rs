@@ -51,7 +51,7 @@ mod tests {
             .iter()
             .map(|d| electronegativity_bandgap(&d.composition))
             .collect();
-        let actual: Vec<f64> = data.iter().map(|d| d.bandgap_exp).collect();
+        let actual: Vec<f64> = data.iter().map(|d| d.bandgap_exp()).collect();
 
         let (mae, rmse, r2) = metrics(&predicted, &actual);
 
@@ -85,9 +85,9 @@ mod tests {
             .collect();
         let rf_pred: Vec<f64> = data
             .iter()
-            .map(|d| predictor.predict(&d.composition, &d.crystal).bandgap)
+            .map(|d| predictor.predict(&d.composition, d.crystal()).bandgap)
             .collect();
-        let actual: Vec<f64> = data.iter().map(|d| d.bandgap_exp).collect();
+        let actual: Vec<f64> = data.iter().map(|d| d.bandgap_exp()).collect();
 
         let (b_mae, b_rmse, b_r2) = metrics(&baseline_pred, &actual);
         let (rf_mae, rf_rmse, rf_r2) = metrics(&rf_pred, &actual);
@@ -145,7 +145,7 @@ mod tests {
             for i in test_start..test_end {
                 let d = &data[i];
                 let pred = electronegativity_bandgap(&d.composition);
-                let err = pred - d.bandgap_exp;
+                let err = pred - d.bandgap_exp();
                 b_abs += err.abs();
                 b_sq += err * err;
                 count += 1;

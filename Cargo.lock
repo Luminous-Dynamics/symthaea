@@ -16292,6 +16292,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "symthaea-proteins"
+version = "0.1.0"
+dependencies = [
+ "serde",
+]
+
+[[package]]
 name = "symthaea-psych-bench"
 version = "0.1.0"
 dependencies = [
@@ -16568,6 +16575,11 @@ dependencies = [
 [[package]]
 name = "symthaea-zkproof"
 version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+]
 
 [[package]]
 name = "symthaea-zkproof-core"

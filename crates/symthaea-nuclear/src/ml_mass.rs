@@ -257,10 +257,15 @@ impl RandomForest {
     }
 
     fn predict(&self, features: &[f64; 12]) -> (f64, f64) {
-        let predictions: Vec<f64> = self.trees.iter().map(|t| t.predict(features)).collect();
-        let mean = predictions.iter().sum::<f64>() / predictions.len() as f64;
-        let variance = predictions.iter().map(|p| (p - mean).powi(2)).sum::<f64>() / predictions.len() as f64;
+        let preds = self.predict_all_trees(features);
+        let mean = preds.iter().sum::<f64>() / preds.len() as f64;
+        let variance = preds.iter().map(|p| (p - mean).powi(2)).sum::<f64>() / preds.len() as f64;
         (mean, variance.sqrt())
+    }
+
+    /// Return per-tree predictions (needed for conformal prediction, active learning).
+    fn predict_all_trees(&self, features: &[f64; 12]) -> Vec<f64> {
+        self.trees.iter().map(|t| t.predict(features)).collect()
     }
 }
 

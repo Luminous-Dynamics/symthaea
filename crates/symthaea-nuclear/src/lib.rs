@@ -34,6 +34,7 @@ mod deep_analysis;
 mod discoveries;
 mod discoveries2;
 mod discoveries3;
+mod conformal;
 mod exploration;
 mod figure_data;
 pub mod fundamental;
@@ -48,7 +49,10 @@ pub mod nuclear_forensics;
 pub mod reactor;
 pub mod rprocess;
 pub mod shell_model;
+pub mod element_embeddings;
 pub mod space_nuclear;
+mod symbolic_regression;
+mod active_learning;
 
 pub use ame2020::*;
 pub use constants::*;
