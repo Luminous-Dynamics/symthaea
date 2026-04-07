@@ -50,6 +50,65 @@ cargo build --release
 | **Psych-Bench** | 98 benchmarks, 862 tests, 20 domains; 15/20 above human baseline |
 | **Butlin Indicators** | 14/14 present (mean score 0.85) |
 
+## Zero-Knowledge Proofs: DASTARK
+
+Symthaea includes a complete ZKP infrastructure for privacy-preserving verification of HDC computations, using the **DASTARK** dual-backend system (Binius binary-field STARKs + Winterfell prime-field STARKs + CRYSTALS-Dilithium5 post-quantum signatures).
+
+### Key Result: 256× Fewer Constraints for HDC
+
+Binary-field STARKs (Binius) are the **natural algebraic substrate** for Hyperdimensional Computing. XOR binding — the core HDC operation — translates to native field addition in GF(2), requiring **zero non-linear constraints**.
+
+| Metric | Binius (16Kbit) | Winterfell (16Kbit) | Ratio |
+|--------|---------------|-------------------|-------|
+| **Constraints** | **256** | 65,532 | **256×** |
+| **Prover time** | **430 ms** | 23,762 ms | **55×** |
+| **Verifier time** | **10.4 ms** | 23.7 ms | **2.3×** |
+
+Both measured with real cryptographic proofs at identical scale. No extrapolation. See [`papers/binius-hdc/`](papers/binius-hdc/).
+
+### Zero Encryption Overhead (Triple Stack)
+
+HDC computation (XOR), OTP encryption (XOR), and Binius proving (XOR = field addition) are the **same algebraic operation**. Encryption adds **zero proof overhead**:
+
+| FL Config | AND Constraints | Prove Time | Encryption Overhead |
+|-----------|----------------|------------|-------------------|
+| 16 participants encrypted | 1,024 | 91 ms | **ZERO** |
+
+See [`papers/triple-stack-fl/`](papers/triple-stack-fl/).
+
+### Binius WASM Verification
+
+The Binius verifier compiles to **wasm32-unknown-unknown (694 KB)** — enabling in-zome STARK verification inside Holochain without off-chain trust assumptions.
+
+### ZKP Circuit Library
+
+| Circuit | AND | Prove | Use Case |
+|---------|-----|-------|----------|
+| [XOR binding](crates/hdc-zkp-bench/src/main.rs) | 256 | 430ms | HDC privacy |
+| [Bundling 3v](crates/hdc-zkp-bench/src/bundling.rs) | 768 | 925ms | Collective intelligence |
+| [Hamming similarity](crates/hdc-zkp-bench/src/hamming.rs) | 511 | 498ms | Verifiable search |
+| [CfC temporal](crates/hdc-zkp-bench/src/cfc_temporal.rs) | 7,360 | 954ms | Neural verification |
+| [CfC + sigmoid](crates/hdc-zkp-bench/src/sigmoid.rs) | 13,760 | 680ms | Full neural proof |
+| [FL triple-stack](crates/hdc-zkp-bench/src/fl_triple_stack.rs) | 1,024 | 91ms | Encrypted FL |
+| [Health range](crates/mycelix-zkp-core/src/circuits/range_proof.rs) | ~32 | 27ms | VitalsInRange, AgeRange |
+| [Consciousness tier](crates/mycelix-zkp-core/src/consciousness.rs) | ~32 | 46ms | Φ ≥ threshold |
+| [Merkle membership](crates/mycelix-zkp-core/src/circuits/merkle_membership.rs) | ~2,500 | — | Property ownership |
+| [Nullifier](crates/mycelix-zkp-core/src/circuits/nullifier.rs) | ~10,000 | — | Anonymous membership |
+
+### Applications
+
+- **Healthcare** (HIPAA 2026): 34.1ms E2E health attestation pipeline
+- **Digital Identity** (eIDAS 2.0): W3C VC 2.0 selective disclosure with `dastark-2026` cryptosuite
+- **EU Digital Product Passport**: Categorical compliance attestations
+- **Verifiable Search**: Ranking formula + similarity proofs for Prism browser
+- **Cognitive Loop Integrity**: Prove "Symthaea thought correctly" without revealing internal state
+
+### Reproducible Benchmarks
+
+```bash
+cd papers/binius-hdc && bash reproduce.sh
+```
+
 ## Fractal Variants
 
 Symthaea scales fractally from a browser tab to a bioregion. Each variant inherits the consciousness of the level below while adding new capabilities — following Ostrom's 8th Design Principle (nested enterprises).
@@ -194,6 +253,9 @@ Symthaea implements and extends multiple theories of consciousness:
 
 | Paper | Target | Status |
 |---|---|---|
+| [**Binary-Field STARKs for Hyperdimensional Computing**](papers/binius-hdc/) | IEEE S&P 2027 | **Submission-ready** (v5, 10pp, all data measured) |
+| [Closed-Form ZK: Efficient Temporal Proofs via CfC Networks](papers/cfc-zkp/) | NeurIPS 2026 workshop | 3-page draft |
+| [Triple Stack: Verifiable Privacy-Preserving FL via GF(2)](papers/triple-stack-fl/) | PoPETs / NeurIPS | 3-page draft |
 | HAI: Hyperdimensional Active Inference | PLoS Computational Biology | Manuscript complete |
 | Psych-Bench: Psychometric Benchmarking of Artificial Consciousness | -- | 98 benchmarks, 20 domains |
 | Genesis: Ethical Frameworks for Artificial Consciousness | AI & Ethics | Manuscript complete |
