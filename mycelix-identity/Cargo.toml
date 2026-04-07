@@ -5,6 +5,8 @@ exclude = ["tests", "cli", "crates/identity-leptos-types", "apps"]
 members = [
     # Shared crypto-agile types (PQE abstraction layer)
     "crates/mycelix-crypto",
+    # eIDAS 2.0 ZKP selective disclosure
+    "crates/eidas-zkp",
     # Zomes
     "zomes/did_registry/integrity",
     "zomes/did_registry/coordinator",
