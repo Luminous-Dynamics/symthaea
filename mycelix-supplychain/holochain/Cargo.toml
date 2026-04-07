@@ -18,6 +18,7 @@ members = [
     "zomes/verification/coordinator",
     "zomes/bridge/integrity",
     "zomes/bridge/coordinator",
+    "crates/dpp-zkp",
 ]
 
 [workspace.dependencies]
