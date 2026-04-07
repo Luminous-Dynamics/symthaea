@@ -13,9 +13,10 @@
 use axum::{
     extract::{
         ws::{Message, WebSocket, WebSocketUpgrade},
-        State,
+        Request, State,
     },
-    http::StatusCode,
+    http::{HeaderMap, Method, StatusCode},
+    middleware,
     response::IntoResponse,
     routing::{get, post},
     Json, Router,
@@ -31,6 +32,9 @@ use crate::consciousness::holon_receiver::{HolonResponse, SomaMessage};
 /// Lightweight — doesn't hold Symthaea. Uses channels for communication
 /// with the consciousness loop (same pattern as SwarmEvents).
 pub struct HolonHttpState {
+    /// Optional shared auth token required for all endpoints when set.
+    /// This is used to secure the Holon API when bound to non-loopback interfaces.
+    auth_token: Option<String>,
     /// Channel to send inbound Soma messages to the consciousness loop.
     pub inbound_tx: std::sync::mpsc::Sender<(String, SomaMessage)>,
     /// Outbound response buffer (consciousness loop writes, HTTP handler drains).
@@ -46,12 +50,26 @@ pub struct HolonHttpState {
 impl HolonHttpState {
     pub fn new(inbound_tx: std::sync::mpsc::Sender<(String, SomaMessage)>) -> Self {
         Self {
+            auth_token: None,
             inbound_tx,
             outbound: std::sync::Mutex::new(Vec::new()),
             consciousness_level: std::sync::atomic::AtomicU32::new(0.0f32.to_bits()),
             peer_count: std::sync::atomic::AtomicU32::new(0),
             telemetry_json: std::sync::Mutex::new("{}".to_string()),
         }
+    }
+
+    pub fn new_with_auth_token(
+        inbound_tx: std::sync::mpsc::Sender<(String, SomaMessage)>,
+        auth_token: String,
+    ) -> Self {
+        let mut state = Self::new(inbound_tx);
+        state.auth_token = Some(auth_token);
+        state
+    }
+
+    pub fn auth_token(&self) -> Option<&str> {
+        self.auth_token.as_deref()
     }
 
     /// Update consciousness level (called from consciousness loop).
@@ -101,10 +119,71 @@ pub fn holon_router(state: SharedHolonState) -> Router {
         .route("/holon/broca", post(holon_broca))
         .route("/holon/converse", post(holon_converse))
         .route("/holon/tts", post(holon_tts))
+        .route("/holon/search", post(holon_search))
         .route("/holon/dashboard", get(holon_dashboard))
         .route("/holon/telemetry", get(holon_telemetry))
         .route("/holon/ws", get(holon_ws_upgrade))
+        .layer(middleware::from_fn(holon_auth_middleware))
         .with_state(state)
+}
+
+fn token_from_query(req: &Request) -> Option<String> {
+    let query = req.uri().query()?;
+    for pair in query.split('&') {
+        let mut it = pair.splitn(2, '=');
+        let key = it.next().unwrap_or_default();
+        let val = it.next().unwrap_or_default();
+        if key == "token" && !val.is_empty() {
+            return Some(val.to_string());
+        }
+    }
+    None
+}
+
+fn token_from_headers(headers: &HeaderMap) -> Option<String> {
+    if let Some(value) = headers.get("authorization").and_then(|v| v.to_str().ok()) {
+        if let Some(token) = value.strip_prefix("Bearer ") {
+            let token = token.trim();
+            if !token.is_empty() {
+                return Some(token.to_string());
+            }
+        }
+    }
+
+    if let Some(token) = headers.get("x-holon-token").and_then(|v| v.to_str().ok()) {
+        let token = token.trim();
+        if !token.is_empty() {
+            return Some(token.to_string());
+        }
+    }
+
+    None
+}
+
+async fn holon_auth_middleware(
+    headers: HeaderMap,
+    request: Request,
+    next: middleware::Next,
+) -> Result<axum::response::Response, StatusCode> {
+    let expected = request
+        .extensions()
+        .get::<SharedHolonState>()
+        .and_then(|s| s.auth_token());
+
+    let Some(expected) = expected else {
+        return Ok(next.run(request).await);
+    };
+
+    // Allow CORS preflight regardless of token (no side effects).
+    if request.method() == Method::OPTIONS {
+        return Ok(next.run(request).await);
+    }
+
+    let provided = token_from_headers(&headers).or_else(|| token_from_query(&request));
+    match provided {
+        Some(t) if t == expected => Ok(next.run(request).await),
+        _ => Err(StatusCode::UNAUTHORIZED),
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -182,13 +261,15 @@ const DASHBOARD_HTML: &str = r#"<!DOCTYPE html>
 
 <script>
 const BASE = window.location.origin;
+const TOKEN = new URLSearchParams(window.location.search).get('token');
+const Q = TOKEN ? ('?token=' + encodeURIComponent(TOKEN)) : '';
 let cycles = 0;
 
 async function poll() {
   try {
     const [statusRes, telRes] = await Promise.all([
-      fetch(BASE + '/holon/status'),
-      fetch(BASE + '/holon/telemetry'),
+      fetch(BASE + '/holon/status' + Q),
+      fetch(BASE + '/holon/telemetry' + Q),
     ]);
     const data = await statusRes.json();
     const tel = await telRes.json();
@@ -616,4 +697,148 @@ async fn holon_tts(
     Json(_req): Json<TtsRequest>,
 ) -> StatusCode {
     StatusCode::SERVICE_UNAVAILABLE
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Web Search (Soma → desktop WebResearcher → verified claims)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+#[derive(Deserialize)]
+struct SearchRequest {
+    query: String,
+    #[serde(default = "default_max_results")]
+    max_results: usize,
+}
+
+fn default_max_results() -> usize {
+    3
+}
+
+#[derive(Serialize)]
+struct SearchClaimSummary {
+    text: String,
+    confidence: f32,
+    source_url: String,
+    epistemic_status: String,
+}
+
+#[derive(Serialize)]
+struct SearchResponse {
+    claims: Vec<SearchClaimSummary>,
+    sources: Vec<String>,
+    status: String,
+}
+
+async fn holon_search(
+    State(state): State<SharedHolonState>,
+    Json(req): Json<SearchRequest>,
+) -> Json<SearchResponse> {
+    let c = state.get_consciousness();
+
+    // Gate on consciousness — no research below threshold
+    if c < 0.1 {
+        return Json(SearchResponse {
+            claims: vec![],
+            sources: vec![],
+            status: "consciousness_below_threshold".to_string(),
+        });
+    }
+
+    // Fast path: Prism local epistemic search (sub-ms, offline, no network)
+    #[cfg(feature = "prism_search")]
+    {
+        let engine = plexus_search::SearchEngine::with_seed_claims();
+        let local_results = engine.search(&req.query, req.max_results);
+        if !local_results.is_empty() {
+            let claims: Vec<SearchClaimSummary> = local_results
+                .iter()
+                .map(|r| SearchClaimSummary {
+                    text: r.content.clone(),
+                    confidence: r.query_similarity,
+                    source_url: r.sources.first().cloned().unwrap_or_default(),
+                    epistemic_status: format!("{:?}", r.empirical_level),
+                })
+                .collect();
+            let sources: Vec<String> = local_results
+                .iter()
+                .flat_map(|r| r.sources.clone())
+                .collect::<std::collections::HashSet<_>>()
+                .into_iter()
+                .collect();
+
+            // If local results have good epistemic quality, return without web fetch
+            let avg_sim: f32 =
+                local_results.iter().map(|r| r.query_similarity).sum::<f32>()
+                    / local_results.len() as f32;
+            if avg_sim > 0.3 {
+                return Json(SearchResponse {
+                    claims,
+                    sources,
+                    status: "prism_local".to_string(),
+                });
+            }
+        }
+    }
+
+    // Slow path: web research via the epistemic researcher
+    #[cfg(feature = "web_research_module")]
+    {
+        use crate::web_research::researcher::WebResearcher;
+
+        let researcher = match WebResearcher::new() {
+            Ok(r) => r,
+            Err(_) => {
+                return Json(SearchResponse {
+                    claims: vec![],
+                    sources: vec![],
+                    status: "researcher_init_failed".to_string(),
+                });
+            }
+        };
+
+        match researcher.research_and_verify(&req.query).await {
+            Ok(result) => {
+                let claims: Vec<SearchClaimSummary> = result
+                    .claims
+                    .iter()
+                    .take(req.max_results)
+                    .map(|c| SearchClaimSummary {
+                        text: c.text.clone(),
+                        confidence: c.confidence,
+                        source_url: c.supporting_sources.first().cloned().unwrap_or_default(),
+                        epistemic_status: format!("{:?}", c.status),
+                    })
+                    .collect();
+
+                let sources: Vec<String> = result
+                    .claims
+                    .iter()
+                    .flat_map(|c| c.supporting_sources.iter().cloned())
+                    .collect::<std::collections::HashSet<_>>()
+                    .into_iter()
+                    .collect();
+
+                Json(SearchResponse {
+                    claims,
+                    sources,
+                    status: format!("{:?}", result.status),
+                })
+            }
+            Err(e) => Json(SearchResponse {
+                claims: vec![],
+                sources: vec![],
+                status: format!("error: {e}"),
+            }),
+        }
+    }
+
+    #[cfg(not(feature = "web_research_module"))]
+    {
+        let _ = req;
+        Json(SearchResponse {
+            claims: vec![],
+            sources: vec![],
+            status: "web_research_module_not_enabled".to_string(),
+        })
+    }
 }

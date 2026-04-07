@@ -17,7 +17,9 @@
 //!
 //! - `HOLON_PORT` — HTTP port (default: 7778)
 //! - `HOLON_HZ` — Consciousness loop frequency in Hz (default: 20)
-//! - `HOLON_LISTEN` — Listen address (default: 0.0.0.0)
+//! - `HOLON_LISTEN` — Listen address (default: 127.0.0.1)
+//! - `HOLON_TOKEN` — Optional shared token for all endpoints (recommended if binding to LAN)
+//! - `HOLON_INSECURE_ALLOW_UNAUTH` — If set truthy, allow unauthenticated LAN bind (NOT recommended)
 //!
 //! ## Endpoints
 //!
@@ -37,6 +39,45 @@ use tracing::{info, warn};
 use symthaea::api::holon::{holon_router, HolonHttpState};
 use symthaea::cognitive_loop::{CognitiveLoopConfig, CognitiveLoopService};
 
+fn env_truthy(key: &str) -> bool {
+    std::env::var(key)
+        .ok()
+        .map(|v| matches!(v.to_lowercase().as_str(), "1" | "true" | "yes" | "on"))
+        .unwrap_or(false)
+}
+
+fn listen_is_loopback(listen: &str) -> bool {
+    if listen == "localhost" {
+        return true;
+    }
+    if let Ok(ip) = listen.parse::<std::net::IpAddr>() {
+        return ip.is_loopback();
+    }
+    false
+}
+
+fn generate_auth_token() -> String {
+    use std::io::Read;
+
+    let mut bytes = [0u8; 32];
+    if let Ok(mut f) = std::fs::File::open("/dev/urandom") {
+        if f.read_exact(&mut bytes).is_ok() {
+            return bytes.iter().map(|b| format!("{:02x}", b)).collect();
+        }
+    }
+
+    // Fallback: only used if /dev/urandom is unavailable.
+    let seed = format!(
+        "{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_nanos()
+    );
+    blake3::hash(seed.as_bytes()).to_hex().to_string()
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     tracing_subscriber::fmt()
@@ -53,17 +94,40 @@ async fn main() -> Result<()> {
         .ok()
         .and_then(|s| s.parse().ok())
         .unwrap_or(20);
-    let listen = std::env::var("HOLON_LISTEN").unwrap_or_else(|_| "0.0.0.0".into());
+    let listen = std::env::var("HOLON_LISTEN").unwrap_or_else(|_| "127.0.0.1".into());
+    let insecure_allow_unauth = env_truthy("HOLON_INSECURE_ALLOW_UNAUTH");
+    let configured_token = std::env::var("HOLON_TOKEN")
+        .ok()
+        .and_then(|t| if t.trim().is_empty() { None } else { Some(t) });
 
     let addr = format!("{}:{}", listen, port);
     let cycle_interval = std::time::Duration::from_micros(1_000_000 / cycle_hz as u64);
+
+    // Secure-by-default: if binding to a non-loopback interface, require an auth token.
+    let require_token = !listen_is_loopback(&listen) && !insecure_allow_unauth;
+    let auth_token = if let Some(t) = configured_token {
+        Some(t)
+    } else if require_token {
+        Some(generate_auth_token())
+    } else {
+        None
+    };
+
+    if !listen_is_loopback(&listen) && insecure_allow_unauth {
+        warn!(
+            "Holon is binding to a non-loopback address WITHOUT auth (HOLON_INSECURE_ALLOW_UNAUTH=1). This is insecure."
+        );
+    }
 
     info!("Initializing CognitiveLoopService...");
     let cls = CognitiveLoopService::new(CognitiveLoopConfig::default())?;
 
     // Extract the Holon inbound sender for the HTTP layer.
     let holon_tx = cls.holon_inbound_sender();
-    let holon_http_state = Arc::new(HolonHttpState::new(holon_tx));
+    let holon_http_state = Arc::new(match auth_token {
+        Some(ref t) => HolonHttpState::new_with_auth_token(holon_tx, t.clone()),
+        None => HolonHttpState::new(holon_tx),
+    });
 
     // Build Holon HTTP router.
     let router = holon_router(holon_http_state.clone());
@@ -71,6 +135,10 @@ async fn main() -> Result<()> {
     // Spawn HTTP server.
     let listener = tokio::net::TcpListener::bind(&addr).await?;
     info!("Holon HTTP listening on http://{}", addr);
+    if let Some(ref t) = auth_token {
+        info!("Holon auth token required (send Authorization: Bearer ... or ?token=...)");
+        info!("  HOLON_TOKEN={}", t);
+    }
     info!("  GET  /holon/status");
     info!("  POST /holon/outbound");
     info!("  GET  /holon/inbound");
@@ -80,6 +148,35 @@ async fn main() -> Result<()> {
     tokio::spawn(async move {
         if let Err(e) = axum::serve(listener, router).await {
             tracing::error!("Holon HTTP server error: {}", e);
+        }
+    });
+
+    // Advertise Holon via mDNS so Soma can auto-discover on LAN.
+    // Uses avahi-publish if available (NixOS has avahi by default).
+    let mdns_port = port;
+    tokio::spawn(async move {
+        let hostname = std::env::var("HOSTNAME")
+            .or_else(|_| std::env::var("HOST"))
+            .unwrap_or_else(|_| "symthaea".to_string());
+        let service_name = format!("Symthaea Holon ({})", hostname);
+        info!("Advertising mDNS: _symthaea._tcp port {}", mdns_port);
+
+        let result = tokio::process::Command::new("avahi-publish-service")
+            .arg(&service_name)
+            .arg("_symthaea._tcp")
+            .arg(mdns_port.to_string())
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .spawn();
+
+        match result {
+            Ok(mut child) => {
+                info!("mDNS: advertising as '{}'", service_name);
+                let _ = child.wait().await;
+            }
+            Err(_) => {
+                warn!("mDNS: avahi-publish-service not found — Soma must connect manually");
+            }
         }
     });
 

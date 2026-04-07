@@ -1,0 +1,9 @@
+/srv/luminous-dynamics/symthaea/crates/symthaea-web/.claude/targets/installer-build/wasm32-unknown-unknown/debug/deps/leptos_hot_reload-08f64884ebd500a8.d: /home/tstoltz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/leptos_hot_reload-0.8.5/src/lib.rs /home/tstoltz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/leptos_hot_reload-0.8.5/src/diff.rs /home/tstoltz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/leptos_hot_reload-0.8.5/src/node.rs /home/tstoltz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/leptos_hot_reload-0.8.5/src/parsing.rs /home/tstoltz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/leptos_hot_reload-0.8.5/src/patch.js
+
+/srv/luminous-dynamics/symthaea/crates/symthaea-web/.claude/targets/installer-build/wasm32-unknown-unknown/debug/deps/libleptos_hot_reload-08f64884ebd500a8.rmeta: /home/tstoltz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/leptos_hot_reload-0.8.5/src/lib.rs /home/tstoltz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/leptos_hot_reload-0.8.5/src/diff.rs /home/tstoltz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/leptos_hot_reload-0.8.5/src/node.rs /home/tstoltz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/leptos_hot_reload-0.8.5/src/parsing.rs /home/tstoltz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/leptos_hot_reload-0.8.5/src/patch.js
+
+/home/tstoltz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/leptos_hot_reload-0.8.5/src/lib.rs:
+/home/tstoltz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/leptos_hot_reload-0.8.5/src/diff.rs:
+/home/tstoltz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/leptos_hot_reload-0.8.5/src/node.rs:
+/home/tstoltz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/leptos_hot_reload-0.8.5/src/parsing.rs:
+/home/tstoltz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/leptos_hot_reload-0.8.5/src/patch.js:

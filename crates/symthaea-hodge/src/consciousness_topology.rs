@@ -346,7 +346,8 @@ impl TopologicalPhi {
             decomposition.betti_numbers.get(1).copied().unwrap_or(0) as f64;
         let beta_2 =
             decomposition.betti_numbers.get(2).copied().unwrap_or(0) as f64;
-        let phi_betti = (beta_1 + 2.0 * beta_2) / (1.0 + beta_1 + beta_2);
+        let phi_betti =
+            ((beta_1 + 2.0 * beta_2) / (1.0 + beta_1 + beta_2)).clamp(0.0, 1.0);
 
         // Combined: geometric mean of harmonic and topological measures.
         let phi_topological = (phi_harmonic * phi_betti.max(0.01)).sqrt();

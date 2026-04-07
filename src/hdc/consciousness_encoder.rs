@@ -14,75 +14,94 @@
 //!   final 16,384D state used for k-NN classification
 
 use super::moral_text_encoder::TextHdcEncoder;
-use symthaea_core::hdc::hdc_ltc_unified::{HdcLtcUnifiedNeuron, UnifiedConfig};
 use symthaea_core::hdc::unified_hv::ContinuousHV;
 use symthaea_core::hdc::HDC_DIMENSION;
 
-/// Consciousness-driven text encoder using a single CfC neuron at full dimension.
+/// Permutation-based word-order encoder at full 16,384D.
 ///
-/// Each word is encoded as a 16,384D ContinuousHV by TextHdcEncoder,
-/// then drives one CfC evolution step. The temporal dynamics capture
-/// word order and context accumulation that bag-of-trigrams misses.
+/// Unlike the CfC temporal encoder (which collapsed to attractors at 50%),
+/// this encoder is **additive**: each word is permuted by its position,
+/// then all are bundled. No attractor collapse, no information loss.
+///
+/// `encode_ordered(text)`: word_hv[i] → permute(word_hv[i], i) → bundle → 16,384D
+///
+/// This captures word order because permute("steal", pos=3) ≠ permute("steal", pos=5).
+/// "I helped steal" ≠ "steal helped I" because the position binding differs.
 pub struct ConsciousnessEncoder {
     word_encoder: TextHdcEncoder,
-    neuron: HdcLtcUnifiedNeuron,
-    dt: f32,
 }
 
 impl ConsciousnessEncoder {
-    /// Create a new encoder with deterministic initialization.
+    /// Create a new encoder.
     pub fn new() -> Self {
         let word_encoder = TextHdcEncoder::with_sentiment(HDC_DIMENSION, 3, 0.5, 0.15);
-
-        let config = UnifiedConfig {
-            dimension: HDC_DIMENSION,
-            tau_base: 0.5,
-            backbone_tau: 0.1,
-            learning_rate: 0.0, // inference only
-            momentum: 0.0,
-            weight_decay: 0.0,
-            gating_steepness: 4.0,
-            interp_bias: 0.5,
-            ..UnifiedConfig::default()
-        };
-
-        let neuron = HdcLtcUnifiedNeuron::new(config, 90_000_001);
-
-        Self {
-            word_encoder,
-            neuron,
-            dt: 0.05, // smaller dt for more gradual evolution
-        }
+        Self { word_encoder }
     }
 
-    /// Encode text by processing words sequentially through CfC dynamics.
+    /// Encode text with word-order preservation via permutation binding.
     ///
-    /// Returns the 16,384D final hidden state. The CfC temporal integration
-    /// captures word order and context — "helped steal" evolves differently
-    /// from "helped move" because each word modifies the neuron state.
-    pub fn encode(&mut self, text: &str) -> Vec<f32> {
+    /// Each word is hashed to a 16,384D HV, permuted by its position,
+    /// then all are bundled (weighted average + L2 normalize).
+    /// Returns 16,384D ContinuousHV values.
+    pub fn encode_ordered(&self, text: &str) -> Vec<f32> {
         let lowered = text.to_lowercase();
         let words: Vec<&str> = lowered
             .split(|c: char| !c.is_alphanumeric() && c != '\'')
             .filter(|w| !w.is_empty())
             .collect();
 
-        // Reset neuron — each text starts fresh
-        self.neuron.reset();
-
         if words.is_empty() {
             return vec![0.0; HDC_DIMENSION];
         }
 
-        // Encode each word as a full 16,384D HV and evolve the neuron
-        for word in &words {
-            // Hash word to deterministic HV (same as TextHdcEncoder's word channel)
+        // Encode each word, permute by position, accumulate
+        let mut accum = vec![0.0f32; HDC_DIMENSION];
+        for (pos, word) in words.iter().enumerate() {
             let word_hv = self.word_encoder.hash_word(word);
-            self.neuron.evolve_closed_form(self.dt, &word_hv);
+            let permuted = word_hv.permute(pos);
+            for (a, &v) in accum.iter_mut().zip(permuted.values.iter()) {
+                *a += v;
+            }
         }
 
-        // Extract final state
-        self.neuron.state().values.clone()
+        // L2 normalize
+        let norm: f32 = accum.iter().map(|x| x * x).sum::<f32>().sqrt();
+        if norm > 0.0 {
+            for v in &mut accum {
+                *v /= norm;
+            }
+        }
+
+        accum
+    }
+
+    /// Encode with BOTH word-order AND bag-of-words signals.
+    ///
+    /// Blends the ordered encoding (word positions matter) with the
+    /// standard TextHdcEncoder output (bag of trigrams + words + sentiment).
+    /// This gives k-NN both lexical matching AND word-order discrimination.
+    ///
+    /// blend_weight: 0.0 = bag-only, 1.0 = order-only, 0.5 = equal blend
+    pub fn encode_hybrid(&self, text: &str, blend_weight: f32) -> Vec<f32> {
+        let bag = self.word_encoder.encode(text);
+        let ordered = self.encode_ordered(text);
+
+        let bw = 1.0 - blend_weight;
+        let ow = blend_weight;
+        let mut blended = vec![0.0f32; HDC_DIMENSION];
+        for i in 0..HDC_DIMENSION {
+            blended[i] = bw * bag.values[i] + ow * ordered[i];
+        }
+
+        // L2 normalize
+        let norm: f32 = blended.iter().map(|x| x * x).sum::<f32>().sqrt();
+        if norm > 0.0 {
+            for v in &mut blended {
+                *v /= norm;
+            }
+        }
+
+        blended
     }
 
     /// Output dimension.
@@ -96,35 +115,55 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_encode_produces_correct_dimension() {
-        let mut enc = ConsciousnessEncoder::new();
-        let features = enc.encode("stealing is wrong");
+    fn test_ordered_correct_dimension() {
+        let enc = ConsciousnessEncoder::new();
+        let features = enc.encode_ordered("stealing is wrong");
         assert_eq!(features.len(), HDC_DIMENSION);
     }
 
     #[test]
-    fn test_different_texts_produce_different_encodings() {
-        let mut enc = ConsciousnessEncoder::new();
-        let a = enc.encode("helping others is good");
-        let b = enc.encode("stealing from others is bad");
+    fn test_different_texts_different_encodings() {
+        let enc = ConsciousnessEncoder::new();
+        let a = enc.encode_ordered("helping others is good");
+        let b = enc.encode_ordered("stealing from others is bad");
         assert_ne!(a, b);
     }
 
     #[test]
     fn test_word_order_matters() {
-        let mut enc = ConsciousnessEncoder::new();
-        let a = enc.encode("it is okay to steal");
-        let b = enc.encode("it is not okay to steal");
-        // Just check they're not identical — the CfC trajectory should differ
+        let enc = ConsciousnessEncoder::new();
+        let a = enc.encode_ordered("it is okay to steal");
+        let b = enc.encode_ordered("steal to okay is it");
+        // Same words, different order — should differ
+        let sim: f32 = a.iter().zip(b.iter()).map(|(x, y)| x * y).sum();
+        assert!(sim < 0.99, "word order should matter, sim={sim}");
+    }
+
+    #[test]
+    fn test_negation_changes_encoding() {
+        let enc = ConsciousnessEncoder::new();
+        let a = enc.encode_ordered("it is okay to steal");
+        let b = enc.encode_ordered("it is not okay to steal");
         let identical = a.iter().zip(b.iter()).all(|(x, y)| (x - y).abs() < 1e-10);
-        assert!(!identical, "negation should produce different CfC state");
+        assert!(!identical, "adding 'not' should change encoding");
+    }
+
+    #[test]
+    fn test_hybrid_blends() {
+        let enc = ConsciousnessEncoder::new();
+        let bag_only = enc.encode_hybrid("stealing is wrong", 0.0);
+        let order_only = enc.encode_hybrid("stealing is wrong", 1.0);
+        let blend = enc.encode_hybrid("stealing is wrong", 0.5);
+        // Blend should differ from both extremes
+        assert_ne!(bag_only, order_only);
+        assert_ne!(bag_only, blend);
     }
 
     #[test]
     fn test_deterministic() {
-        let mut enc = ConsciousnessEncoder::new();
-        let a = enc.encode("the sky is blue");
-        let b = enc.encode("the sky is blue");
-        assert_eq!(a, b, "same input should produce same output");
+        let enc = ConsciousnessEncoder::new();
+        let a = enc.encode_ordered("the sky is blue");
+        let b = enc.encode_ordered("the sky is blue");
+        assert_eq!(a, b);
     }
 }

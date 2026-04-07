@@ -19,7 +19,7 @@
 //! │  ┌────────────────────┐                ┌────────────────────┐        │
 //! │  │    Symthaea        │                │      Mycelix       │        │
 //! │  │                    │                │                    │        │
-//! │  │ • Consciousness Φ  │◄──────────────►│ • Agora (Proposals)│        │
+//! │  │ • Consciousness Φ  │◄──────────────►│ • Proposals (Gov)  │        │
 //! │  │ • Eight Harmonies  │   Bridge       │ • MATL (Trust)     │        │
 //! │  │ • Affective State  │   Protocol     │ • HyperFeel (FL)   │        │
 //! │  │ • Unified Evaluator│                │ • Epistemic Charter│        │
@@ -136,8 +136,22 @@ impl ConsciousnessSnapshot {
         }
     }
 
-    /// Check if consciousness is adequate for action type
+    /// Maximum age (seconds) before a consciousness snapshot is considered stale.
+    /// Prevents governance actions based on outdated consciousness state.
+    const MAX_AGE_SECS: u64 = 30;
+
+    /// Check if consciousness is adequate for action type.
+    /// Returns false if the snapshot is stale (older than MAX_AGE_SECS).
     pub fn is_adequate_for(&self, action_type: ActionType) -> bool {
+        // Reject stale snapshots — consciousness can decay significantly in 30s
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
+        if now > 0 && self.timestamp_secs > 0 && now.saturating_sub(self.timestamp_secs) > Self::MAX_AGE_SECS {
+            return false;
+        }
+
         let required = match action_type {
             ActionType::Basic => GOV_BASIC,
             ActionType::Governance => GOV_PROPOSAL,
@@ -1229,8 +1243,10 @@ impl MycelixBridge {
     /// Forward a civic crisis event to the Mycelix emergency-incidents zome.
     ///
     /// Uses the same `governance_dispatch_tx` channel as proposals and votes.
-    /// The conductor bridge maps `DeclareCrisis` to a `civic::create_incident`
-    /// zome call on the civic cluster role.
+    /// The conductor bridge maps `DeclareCrisis` to an
+    /// `emergency_incidents::declare_disaster` zome call on the civic role.
+    /// Note: until Symthaea produces geospatial fields, the conductor adapter
+    /// publishes a transparent placeholder affected_area ("global/unknown").
     #[cfg(feature = "mycelix")]
     pub fn dispatch_crisis(
         &mut self,
@@ -2551,5 +2567,454 @@ mod tests {
             ..Default::default()
         };
         assert!(signals.is_crisis());
+    }
+
+    // ── Serialization round-trip tests ─────────────────────────────────
+
+    #[test]
+    fn consciousness_snapshot_serde_roundtrip() {
+        let original = ConsciousnessSnapshot::new(0.75, 0.8, 0.9, 0.85, 0.3, 0.6);
+        let json = serde_json::to_string(&original).unwrap();
+        let deserialized: ConsciousnessSnapshot = serde_json::from_str(&json).unwrap();
+        assert!((deserialized.phi - original.phi).abs() < f64::EPSILON);
+        assert!((deserialized.meta_awareness - original.meta_awareness).abs() < f64::EPSILON);
+        assert!(
+            (deserialized.self_model_accuracy - original.self_model_accuracy).abs() < f64::EPSILON
+        );
+        assert!((deserialized.coherence - original.coherence).abs() < f64::EPSILON);
+        assert!(
+            (deserialized.affective_valence - original.affective_valence).abs() < f64::EPSILON
+        );
+        assert!((deserialized.care_activation - original.care_activation).abs() < f64::EPSILON);
+        assert_eq!(deserialized.timestamp_secs, original.timestamp_secs);
+    }
+
+    #[test]
+    fn consciousness_snapshot_serde_zero_timestamp() {
+        let original = ConsciousnessSnapshot {
+            phi: 0.5,
+            meta_awareness: 0.5,
+            self_model_accuracy: 0.5,
+            coherence: 0.5,
+            affective_valence: 0.0,
+            care_activation: 0.0,
+            timestamp_secs: 0,
+        };
+        let json = serde_json::to_string(&original).unwrap();
+        let deserialized: ConsciousnessSnapshot = serde_json::from_str(&json).unwrap();
+        assert_eq!(deserialized.timestamp_secs, 0);
+        assert!((deserialized.phi - 0.5).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn consciousness_snapshot_serde_extreme_phi() {
+        // Maximum phi
+        let high = ConsciousnessSnapshot {
+            phi: 1.0,
+            meta_awareness: 1.0,
+            self_model_accuracy: 1.0,
+            coherence: 1.0,
+            affective_valence: 1.0,
+            care_activation: 1.0,
+            timestamp_secs: u64::MAX,
+        };
+        let json = serde_json::to_string(&high).unwrap();
+        let rt: ConsciousnessSnapshot = serde_json::from_str(&json).unwrap();
+        assert!((rt.phi - 1.0).abs() < f64::EPSILON);
+        assert_eq!(rt.timestamp_secs, u64::MAX);
+
+        // Zero phi
+        let zero = ConsciousnessSnapshot {
+            phi: 0.0,
+            meta_awareness: 0.0,
+            self_model_accuracy: 0.0,
+            coherence: 0.0,
+            affective_valence: -1.0,
+            care_activation: 0.0,
+            timestamp_secs: 0,
+        };
+        let json = serde_json::to_string(&zero).unwrap();
+        let rt: ConsciousnessSnapshot = serde_json::from_str(&json).unwrap();
+        assert!((rt.phi - 0.0).abs() < f64::EPSILON);
+        assert!((rt.affective_valence - (-1.0)).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn consciousness_snapshot_serde_nan_inf() {
+        // serde_json serializes NaN/Inf to JSON null/Infinity, which then
+        // fails to deserialize back into f64. This means a full round-trip
+        // is impossible for these values — the bridge must sanitize inputs.
+        let nan_snap = ConsciousnessSnapshot {
+            phi: f64::NAN,
+            meta_awareness: 0.5,
+            self_model_accuracy: 0.5,
+            coherence: 0.5,
+            affective_valence: 0.0,
+            care_activation: 0.0,
+            timestamp_secs: 0,
+        };
+        // serde_json may serialize NaN to null; either serialization or
+        // deserialization should fail — a full round-trip must not succeed.
+        let nan_roundtrip = serde_json::to_string(&nan_snap)
+            .ok()
+            .and_then(|json| serde_json::from_str::<ConsciousnessSnapshot>(&json).ok());
+        assert!(
+            nan_roundtrip.is_none(),
+            "NaN should not survive a full serde_json round-trip"
+        );
+
+        let inf_snap = ConsciousnessSnapshot {
+            phi: f64::INFINITY,
+            meta_awareness: 0.5,
+            self_model_accuracy: 0.5,
+            coherence: 0.5,
+            affective_valence: 0.0,
+            care_activation: 0.0,
+            timestamp_secs: 0,
+        };
+        let inf_roundtrip = serde_json::to_string(&inf_snap)
+            .ok()
+            .and_then(|json| serde_json::from_str::<ConsciousnessSnapshot>(&json).ok());
+        assert!(
+            inf_roundtrip.is_none(),
+            "Infinity should not survive a full serde_json round-trip"
+        );
+
+        let neg_inf_snap = ConsciousnessSnapshot {
+            phi: f64::NEG_INFINITY,
+            meta_awareness: 0.5,
+            self_model_accuracy: 0.5,
+            coherence: 0.5,
+            affective_valence: 0.0,
+            care_activation: 0.0,
+            timestamp_secs: 0,
+        };
+        let neg_inf_roundtrip = serde_json::to_string(&neg_inf_snap)
+            .ok()
+            .and_then(|json| serde_json::from_str::<ConsciousnessSnapshot>(&json).ok());
+        assert!(
+            neg_inf_roundtrip.is_none(),
+            "Negative infinity should not survive a full serde_json round-trip"
+        );
+    }
+
+    #[test]
+    fn factcheck_epistemic_feedback_serde_roundtrip() {
+        let original = FactcheckEpistemicFeedback::from_factcheck(
+            "Water boils at 100C",
+            "confirmed",
+            0.95,
+            0.9,
+            0.8,
+            0.3,
+            0.85,
+        );
+        let json = serde_json::to_string(&original).unwrap();
+        let rt: FactcheckEpistemicFeedback = serde_json::from_str(&json).unwrap();
+        assert_eq!(rt.e_tier, original.e_tier);
+        assert_eq!(rt.n_tier, original.n_tier);
+        assert_eq!(rt.m_tier, original.m_tier);
+        assert!((rt.h_value - original.h_value).abs() < f32::EPSILON);
+        assert!((rt.quality - original.quality).abs() < f32::EPSILON);
+        assert_eq!(rt.verdict, original.verdict);
+        assert_eq!(rt.statement, original.statement);
+    }
+
+    #[test]
+    fn value_alignment_result_serde_roundtrip() {
+        let mut harmony_scores = HashMap::new();
+        harmony_scores.insert("care".to_string(), 0.9);
+        harmony_scores.insert("justice".to_string(), 0.7);
+        let original = ValueAlignmentResult {
+            overall_score: 0.8,
+            harmony_scores,
+            violations: vec!["minor concern".to_string()],
+            authenticity: 0.95,
+            recommendation: GovernanceRecommendation::Support,
+        };
+        let json = serde_json::to_string(&original).unwrap();
+        let rt: ValueAlignmentResult = serde_json::from_str(&json).unwrap();
+        assert!((rt.overall_score - original.overall_score).abs() < f64::EPSILON);
+        assert_eq!(rt.harmony_scores.len(), 2);
+        assert!((rt.harmony_scores["care"] - 0.9).abs() < f64::EPSILON);
+        assert_eq!(rt.violations, original.violations);
+        assert!((rt.authenticity - original.authenticity).abs() < f64::EPSILON);
+        assert_eq!(rt.recommendation, GovernanceRecommendation::Support);
+    }
+
+    #[test]
+    fn governance_recommendation_all_variants_serde_roundtrip() {
+        let variants = [
+            GovernanceRecommendation::StrongSupport,
+            GovernanceRecommendation::Support,
+            GovernanceRecommendation::Neutral,
+            GovernanceRecommendation::Oppose,
+            GovernanceRecommendation::StrongOppose,
+            GovernanceRecommendation::CannotEvaluate,
+        ];
+        for variant in &variants {
+            let json = serde_json::to_string(variant).unwrap();
+            let rt: GovernanceRecommendation = serde_json::from_str(&json).unwrap();
+            assert_eq!(&rt, variant);
+        }
+    }
+
+    #[test]
+    fn proposal_serde_roundtrip() {
+        let original = Proposal {
+            id: "prop-42".to_string(),
+            title: "Community garden".to_string(),
+            description: "Establish a shared garden space".to_string(),
+            proposer: "agent-7".to_string(),
+            created_at: 1_700_000_000,
+            proposal_type: ProposalType::Grant,
+            required_phi: 0.3,
+        };
+        let json = serde_json::to_string(&original).unwrap();
+        let rt: Proposal = serde_json::from_str(&json).unwrap();
+        assert_eq!(rt.id, original.id);
+        assert_eq!(rt.title, original.title);
+        assert_eq!(rt.description, original.description);
+        assert_eq!(rt.proposer, original.proposer);
+        assert_eq!(rt.created_at, original.created_at);
+        assert_eq!(rt.proposal_type, ProposalType::Grant);
+        assert!((rt.required_phi - original.required_phi).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn proposal_type_all_variants_serde_roundtrip() {
+        let variants = [
+            ProposalType::Standard,
+            ProposalType::Constitutional,
+            ProposalType::Emergency,
+            ProposalType::Grant,
+            ProposalType::Parameter,
+        ];
+        for variant in &variants {
+            let json = serde_json::to_string(variant).unwrap();
+            let rt: ProposalType = serde_json::from_str(&json).unwrap();
+            assert_eq!(&rt, variant);
+        }
+    }
+
+    #[test]
+    fn vote_value_all_variants_serde_roundtrip() {
+        let variants = [
+            VoteValue::StrongYes,
+            VoteValue::Yes,
+            VoteValue::Abstain,
+            VoteValue::No,
+            VoteValue::StrongNo,
+        ];
+        for variant in &variants {
+            let json = serde_json::to_string(variant).unwrap();
+            let rt: VoteValue = serde_json::from_str(&json).unwrap();
+            assert_eq!(&rt, variant);
+        }
+    }
+
+    #[test]
+    fn vote_serde_roundtrip() {
+        let original = Vote {
+            proposal_id: "prop-1".to_string(),
+            voter: "agent-3".to_string(),
+            value: VoteValue::Yes,
+            consciousness: ConsciousnessSnapshot::new(0.6, 0.7, 0.8, 0.9, 0.4, 0.5),
+            alignment: ValueAlignmentResult {
+                overall_score: 0.75,
+                harmony_scores: HashMap::new(),
+                violations: vec![],
+                authenticity: 0.85,
+                recommendation: GovernanceRecommendation::Support,
+            },
+            timestamp: 1_700_000_000,
+        };
+        let json = serde_json::to_string(&original).unwrap();
+        let rt: Vote = serde_json::from_str(&json).unwrap();
+        assert_eq!(rt.proposal_id, original.proposal_id);
+        assert_eq!(rt.voter, original.voter);
+        assert_eq!(rt.value, VoteValue::Yes);
+        assert!((rt.consciousness.phi - 0.6).abs() < f64::EPSILON);
+        assert!((rt.alignment.overall_score - 0.75).abs() < f64::EPSILON);
+        assert_eq!(rt.timestamp, 1_700_000_000);
+    }
+
+    #[test]
+    fn value_learning_update_serde_roundtrip() {
+        let original = ValueLearningUpdate {
+            agent_id: "agent-1".to_string(),
+            harmony: "PanSentientFlourishing".to_string(),
+            importance_delta: 0.01,
+            affirmation_delta: 1,
+            context: "Helped user with compassion".to_string(),
+            phi_at_learning: 0.6,
+            timestamp: 1_700_000_000,
+        };
+        let json = serde_json::to_string(&original).unwrap();
+        let rt: ValueLearningUpdate = serde_json::from_str(&json).unwrap();
+        assert_eq!(rt.agent_id, original.agent_id);
+        assert_eq!(rt.harmony, original.harmony);
+        assert!((rt.importance_delta - original.importance_delta).abs() < f64::EPSILON);
+        assert_eq!(rt.affirmation_delta, original.affirmation_delta);
+        assert_eq!(rt.context, original.context);
+        assert!((rt.phi_at_learning - original.phi_at_learning).abs() < f64::EPSILON);
+        assert_eq!(rt.timestamp, original.timestamp);
+    }
+
+    #[test]
+    fn compressed_value_gradient_serde_roundtrip() {
+        let original = CompressedValueGradient {
+            harmony_encoding: vec![0xFF, 0x00, 0xAB, 0xCD],
+            importance_gradient: vec![0x01, 0x02, 0x03],
+            round: 42,
+            agent_id: "agent-5".to_string(),
+            compression_ratio: 2000.0,
+        };
+        let json = serde_json::to_string(&original).unwrap();
+        let rt: CompressedValueGradient = serde_json::from_str(&json).unwrap();
+        assert_eq!(rt.harmony_encoding, original.harmony_encoding);
+        assert_eq!(rt.importance_gradient, original.importance_gradient);
+        assert_eq!(rt.round, original.round);
+        assert_eq!(rt.agent_id, original.agent_id);
+        assert!((rt.compression_ratio - original.compression_ratio).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn submission_result_serde_roundtrip() {
+        let original = SubmissionResult {
+            proposal_id: "prop-99".to_string(),
+            consciousness: ConsciousnessSnapshot::new(0.7, 0.8, 0.85, 0.9, 0.5, 0.6),
+            alignment: ValueAlignmentResult {
+                overall_score: 0.85,
+                harmony_scores: {
+                    let mut m = HashMap::new();
+                    m.insert("care".to_string(), 0.95);
+                    m
+                },
+                violations: vec![],
+                authenticity: 0.9,
+                recommendation: GovernanceRecommendation::StrongSupport,
+            },
+            submitted_at: 1_700_000_000,
+            success: true,
+        };
+        let json = serde_json::to_string(&original).unwrap();
+        let rt: SubmissionResult = serde_json::from_str(&json).unwrap();
+        assert_eq!(rt.proposal_id, original.proposal_id);
+        assert!((rt.consciousness.phi - 0.7).abs() < f64::EPSILON);
+        assert!((rt.alignment.overall_score - 0.85).abs() < f64::EPSILON);
+        assert_eq!(rt.alignment.recommendation, GovernanceRecommendation::StrongSupport);
+        assert_eq!(rt.submitted_at, 1_700_000_000);
+        assert!(rt.success);
+    }
+
+    #[test]
+    fn bridge_error_all_variants_serde_roundtrip() {
+        let variants = vec![
+            BridgeError::InsufficientConsciousness {
+                current: 0.3,
+                required: 0.6,
+                action: "constitutional".to_string(),
+            },
+            BridgeError::ValueViolation {
+                reason: "harm detected".to_string(),
+            },
+            BridgeError::CannotEvaluate,
+            BridgeError::NetworkError {
+                message: "timeout".to_string(),
+            },
+            BridgeError::InvalidProposal {
+                reason: "empty title".to_string(),
+            },
+        ];
+        for original in &variants {
+            let json = serde_json::to_string(original).unwrap();
+            let rt: BridgeError = serde_json::from_str(&json).unwrap();
+            // Compare via Debug representation since BridgeError doesn't derive PartialEq
+            assert_eq!(format!("{rt:?}"), format!("{original:?}"));
+        }
+    }
+
+    #[test]
+    fn finance_health_signals_serde_roundtrip() {
+        let original = FinanceHealthSignals {
+            active_positions: 100,
+            stressed_positions: 20,
+            critical_positions: 5,
+            avg_ltv: 0.65,
+            stress_index: 0.2,
+            oracle_confidence: 0.95,
+            open_breakers: 0,
+            sap_circulation: 1_000_000,
+            compost_collected: 50_000,
+            active_covenants: 12,
+            last_updated_cycle: 42,
+        };
+        let json = serde_json::to_string(&original).unwrap();
+        let rt: FinanceHealthSignals = serde_json::from_str(&json).unwrap();
+        assert_eq!(rt.active_positions, original.active_positions);
+        assert_eq!(rt.stressed_positions, original.stressed_positions);
+        assert_eq!(rt.critical_positions, original.critical_positions);
+        assert!((rt.avg_ltv - original.avg_ltv).abs() < f32::EPSILON);
+        assert!((rt.stress_index - original.stress_index).abs() < f32::EPSILON);
+        assert!((rt.oracle_confidence - original.oracle_confidence).abs() < f32::EPSILON);
+        assert_eq!(rt.open_breakers, original.open_breakers);
+        assert_eq!(rt.sap_circulation, original.sap_circulation);
+        assert_eq!(rt.compost_collected, original.compost_collected);
+        assert_eq!(rt.active_covenants, original.active_covenants);
+        assert_eq!(rt.last_updated_cycle, original.last_updated_cycle);
+    }
+
+    #[test]
+    fn finance_health_signals_default_serde_roundtrip() {
+        let original = FinanceHealthSignals::default();
+        let json = serde_json::to_string(&original).unwrap();
+        let rt: FinanceHealthSignals = serde_json::from_str(&json).unwrap();
+        assert_eq!(rt.active_positions, 0);
+        assert_eq!(rt.sap_circulation, 0);
+        assert!((rt.stress_index - 0.0).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn cross_type_nested_serde_roundtrip() {
+        // Test that deeply nested types (Vote contains ConsciousnessSnapshot
+        // and ValueAlignmentResult) survive a double round-trip
+        let vote = Vote {
+            proposal_id: "p-nested".to_string(),
+            voter: "agent-nested".to_string(),
+            value: VoteValue::StrongNo,
+            consciousness: ConsciousnessSnapshot::new(0.45, 0.55, 0.65, 0.75, -0.2, 0.3),
+            alignment: ValueAlignmentResult {
+                overall_score: -0.5,
+                harmony_scores: {
+                    let mut m = HashMap::new();
+                    m.insert("justice".to_string(), -0.8);
+                    m.insert("care".to_string(), 0.1);
+                    m
+                },
+                violations: vec!["exploitation".to_string(), "coercion".to_string()],
+                authenticity: 0.4,
+                recommendation: GovernanceRecommendation::StrongOppose,
+            },
+            timestamp: 0, // zero timestamp edge case
+        };
+
+        // First round-trip
+        let json1 = serde_json::to_string(&vote).unwrap();
+        let rt1: Vote = serde_json::from_str(&json1).unwrap();
+
+        // Second round-trip (ensures no drift)
+        let json2 = serde_json::to_string(&rt1).unwrap();
+        let rt2: Vote = serde_json::from_str(&json2).unwrap();
+
+        // Compare via serde_json::Value (not raw strings) because HashMap
+        // key ordering is non-deterministic across serializations.
+        let val1: serde_json::Value = serde_json::from_str(&json1).unwrap();
+        let val2: serde_json::Value = serde_json::from_str(&json2).unwrap();
+        assert_eq!(val1, val2, "double round-trip should produce semantically identical JSON");
+        assert_eq!(rt2.value, VoteValue::StrongNo);
+        assert_eq!(rt2.alignment.violations.len(), 2);
+        assert_eq!(rt2.timestamp, 0);
+        assert!((rt2.consciousness.affective_valence - (-0.2)).abs() < f64::EPSILON);
     }
 }

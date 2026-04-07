@@ -102,6 +102,8 @@ pub(crate) struct SubstrateManager {
     current_substrate: SubstrateType,
 
     /// Energy spent in the most recent tick (for telemetry).
+    #[cfg(feature = "jepa")]
+    pub(crate) jepa_energy: f64,
     last_energy_spent: f64,
 }
 
@@ -140,6 +142,8 @@ impl SubstrateManager {
             transition_history: VecDeque::new(),
             current_substrate: config.substrate_type,
             last_energy_spent: 0.0,
+            #[cfg(feature = "jepa")]
+            jepa_energy: 0.0,
         };
         mgr.recompute_effective_feasibility(config);
         mgr.recompute_substrate_dynamics(config);

@@ -48,6 +48,13 @@ pub struct TasteProfile {
 impl Default for TasteProfile {
     fn default() -> Self {
         // Tristan's profile: prog/jazz/atmospheric listener
+        Self::tristan()
+    }
+}
+
+impl TasteProfile {
+    /// Tristan's taste (5,972 Spotify songs: prog/jazz/atmospheric).
+    pub fn tristan() -> Self {
         Self {
             target_repeated_pct: 10.0,
             target_steps_pct: 55.0,
@@ -59,6 +66,115 @@ impl Default for TasteProfile {
             target_pitch_range: 14.0,
             target_mean_midi: 66.0,
             min_velocity_range: 60.0,
+        }
+    }
+
+    /// Universal baseline — musical universals from research.
+    /// Jakubowski (2017), Huron (2006): preferences shared across cultures.
+    pub fn universal() -> Self {
+        Self {
+            target_repeated_pct: 15.0,  // some repetition is universal
+            target_steps_pct: 50.0,     // stepwise motion dominates everywhere
+            target_thirds_pct: 15.0,
+            target_leaps_pct: 10.0,     // fewer leaps universally
+            target_ascending_pct: 50.0, // balanced
+            min_unique_pitches: 15,     // less demanding
+            max_top_note_pct: 18.0,     // more tolerance
+            target_pitch_range: 12.0,   // octave — most singable range
+            target_mean_midi: 64.0,     // E4 — center of vocal range
+            min_velocity_range: 40.0,   // less demanding
+        }
+    }
+
+    /// Classical listener (Bach, Beethoven, Chopin).
+    pub fn classical() -> Self {
+        Self {
+            target_repeated_pct: 8.0,   // classical avoids exact repetition
+            target_steps_pct: 60.0,     // very stepwise (voice-leading rules)
+            target_thirds_pct: 18.0,    // arpeggiated thirds
+            target_leaps_pct: 10.0,     // controlled leaps
+            target_ascending_pct: 50.0,
+            min_unique_pitches: 25,     // chromatic variety
+            max_top_note_pct: 10.0,     // well-distributed
+            target_pitch_range: 18.0,   // wider range (keyboard)
+            target_mean_midi: 64.0,     // E4
+            min_velocity_range: 80.0,   // extreme dynamics (ppp to fff)
+        }
+    }
+
+    /// Metal/rock listener.
+    pub fn metal() -> Self {
+        Self {
+            target_repeated_pct: 12.0,  // riff-based repetition
+            target_steps_pct: 40.0,     // more leaps, power chords
+            target_thirds_pct: 12.0,
+            target_leaps_pct: 25.0,     // wide intervals
+            target_ascending_pct: 48.0, // slightly descending bias
+            min_unique_pitches: 18,
+            max_top_note_pct: 15.0,     // riff root repetition OK
+            target_pitch_range: 20.0,   // wide range (shredding)
+            target_mean_midi: 52.0,     // E3 — guitar range
+            min_velocity_range: 50.0,   // compressed dynamics
+        }
+    }
+
+    /// Jazz listener.
+    pub fn jazz() -> Self {
+        Self {
+            target_repeated_pct: 8.0,
+            target_steps_pct: 48.0,     // chromatic approach tones
+            target_thirds_pct: 22.0,    // chord tone arpeggiation
+            target_leaps_pct: 15.0,     // interval variety
+            target_ascending_pct: 50.0,
+            min_unique_pitches: 28,     // chromatic richness
+            max_top_note_pct: 8.0,      // very distributed
+            target_pitch_range: 16.0,   // wide but controlled
+            target_mean_midi: 67.0,     // G4 (trumpet/sax range)
+            min_velocity_range: 70.0,   // expressive dynamics
+        }
+    }
+
+    /// Electronic/ambient listener.
+    pub fn ambient() -> Self {
+        Self {
+            target_repeated_pct: 25.0,  // repetition is a feature
+            target_steps_pct: 55.0,     // smooth movement
+            target_thirds_pct: 10.0,
+            target_leaps_pct: 5.0,      // minimal leaps
+            target_ascending_pct: 50.0,
+            min_unique_pitches: 10,     // limited palette OK
+            max_top_note_pct: 25.0,     // drone notes OK
+            target_pitch_range: 10.0,   // narrow, focused
+            target_mean_midi: 60.0,     // C4
+            min_velocity_range: 30.0,   // subtle dynamics
+        }
+    }
+
+    /// Pop listener.
+    pub fn pop() -> Self {
+        Self {
+            target_repeated_pct: 18.0,  // hook repetition
+            target_steps_pct: 55.0,     // singable
+            target_thirds_pct: 15.0,
+            target_leaps_pct: 8.0,      // mostly stepwise
+            target_ascending_pct: 52.0, // slight upward bias (hooks rise)
+            min_unique_pitches: 12,     // simple palette
+            max_top_note_pct: 20.0,     // tonic emphasis OK
+            target_pitch_range: 10.0,   // singable octave
+            target_mean_midi: 65.0,     // F4 (vocal sweet spot)
+            min_velocity_range: 35.0,   // compressed
+        }
+    }
+
+    /// Derive a profile from genre preset.
+    pub fn for_genre(genre: &str) -> Self {
+        match genre.to_lowercase().as_str() {
+            "classical" | "bach" | "beethoven" => Self::classical(),
+            "metal" | "prog-metal" | "rock" => Self::metal(),
+            "jazz" => Self::jazz(),
+            "ambient" | "electronic" => Self::ambient(),
+            "pop" => Self::pop(),
+            _ => Self::universal(),
         }
     }
 }
@@ -75,6 +191,7 @@ pub fn score(notes: &[Note], profile: &TasteProfile) -> TasteScore {
 
     let midi_pitches: Vec<u8> = notes.iter()
         .map(|n| freq_to_midi(n.frequency))
+        .filter(|&p| p >= 36 && p <= 96) // filter degenerate pitches
         .collect();
     let velocities: Vec<f32> = notes.iter().map(|n| n.velocity).collect();
     let intervals: Vec<i32> = midi_pitches.windows(2)
@@ -193,7 +310,7 @@ pub fn print_report(score: &TasteScore) {
         score.composite, rating(score.composite));
     println!("╚══════════════════════════════════════════════════════════════╝");
     println!("\nDetails:");
-    for (name, value, desc) in &score.details {
+    for (name, _value, desc) in &score.details {
         println!("  {name:20}: {desc}");
     }
 }
@@ -204,6 +321,14 @@ fn rating(score: f32) -> &'static str {
     else if score >= 40.0 { "Fair                         " }
     else if score >= 20.0 { "Poor                         " }
     else { "Critical                     " }
+}
+
+/// Score against multiple taste profiles simultaneously.
+/// Returns individual scores plus a consensus (average) score.
+pub fn score_multi(notes: &[Note], profiles: &[(&str, TasteProfile)]) -> Vec<(String, TasteScore)> {
+    profiles.iter()
+        .map(|(name, profile)| (name.to_string(), score(notes, profile)))
+        .collect()
 }
 
 /// Score from a MIDI file directly.

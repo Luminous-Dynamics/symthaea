@@ -5,6 +5,7 @@ use leptos::prelude::*;
 
 mod app;
 mod components;
+pub mod i18n;
 mod pages;
 mod service_worker;
 mod state;

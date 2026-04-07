@@ -1040,6 +1040,20 @@ impl CognitiveLoopService {
         self.holon_receiver.total_processed()
     }
 
+    /// Collective QOL summary across all connected Soma devices as JSON.
+    ///
+    /// Used by the Holon dashboard for quick polling without locking/serializing in the HTTP layer.
+    pub fn holon_collective_qol_json(&self) -> String {
+        self.holon_receiver.collective_qol_json()
+    }
+
+    /// Drain all pending Holon task requests across peers.
+    ///
+    /// Returns (device_id, task_type, payload) tuples.
+    pub fn holon_drain_task_requests(&mut self) -> Vec<(String, String, String)> {
+        self.holon_receiver.drain_task_requests()
+    }
+
     /// Clone the Holon inbound sender for use by HTTP handlers.
     ///
     /// The channel is created eagerly at CLS construction. Clone the returned
@@ -1383,5 +1397,56 @@ impl CognitiveLoopService {
     /// determine the verdict normally.
     pub fn clear_ethics_override(&mut self) {
         self.ethics_verdict_override = None;
+    }
+
+    /// Enable async voice synthesis: spawns a background thread that converts
+    /// Broca/BrocaLite text output to audio without blocking the cognitive cycle.
+    ///
+    /// Call once after constructing the service. Audio is retrieved via
+    /// `drain_voice_audio()` in subsequent cycles.
+    pub fn enable_voice_synthesis(&mut self) {
+        if self.voice_synthesis.is_none() {
+            self.voice_synthesis =
+                Some(super::super::voice_channel::VoiceSynthesisChannel::spawn());
+        }
+    }
+
+    /// Drain completed voice audio from the background synthesis thread.
+    ///
+    /// Returns audio samples generated from previous cycles' text output.
+    /// Non-blocking — returns empty vec if no audio is ready.
+    pub fn drain_voice_audio(&self) -> Vec<super::super::voice_channel::VoiceResponse> {
+        self.voice_synthesis
+            .as_ref()
+            .map(|vs| vs.drain_responses())
+            .unwrap_or_default()
+    }
+
+    /// Enable async LLM language: spawns a background thread that sends
+    /// consciousness state to Gemma 4 (via Ollama) for high-quality translation.
+    ///
+    /// When enabled, BrocaLite still fires instantly each cycle (structured grammar),
+    /// but the LLM produces a higher-quality translation that replaces the output
+    /// in subsequent cycles. Architecture:
+    ///
+    /// ```text
+    /// Cycle N:   BrocaLite → immediate text + LLM request sent (async)
+    /// Cycle N+K: LLM response → upgrades language_output
+    /// ```
+    ///
+    /// Model defaults to `gemma4:e2b` via Ollama at localhost:11434.
+    /// Override with `SYMTHAEA_LLM_MODEL` env var.
+    pub fn enable_llm_language(&mut self) {
+        if self.llm_language.is_none() {
+            self.llm_language = Some(super::super::llm_language_channel::LlmLanguageChannel::spawn());
+        }
+    }
+
+    /// Drain completed LLM language responses (non-blocking).
+    pub fn drain_llm_language(&self) -> Vec<super::super::llm_language_channel::LlmLanguageResponse> {
+        self.llm_language
+            .as_ref()
+            .map(|ch| ch.drain_responses())
+            .unwrap_or_default()
     }
 }

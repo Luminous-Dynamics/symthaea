@@ -394,8 +394,10 @@ mod tests {
             coherence: 0.7,
             prediction_error: 0.3,
             attention_sensitivity: 0.5,
-            energy_per_cycle: 1e-10,
-            total_energy_spent: 5e-8,
+            // Energy budget in effective consciousness units (same scale as
+            // k_eff=0.01 Landauer costs, not physical joules).
+            energy_per_cycle: 0.1,
+            total_energy_spent: 0.5,
             energy_throughput_multiplier: 1.0,
             metabolic_stress: 0.2,
             dissipative_health: 0.7,
@@ -438,7 +440,7 @@ mod tests {
         assert!(ti.state.dissipative_health > 0.0);
         assert!(ti.state.canonical_entropy > 0.0);
         assert!(ti.state.hierarchical_free_energy > 0.0);
-        assert_eq!(ti.state.energy_per_cycle, 1e-10);
+        assert_eq!(ti.state.energy_per_cycle, 0.1);
     }
 
     #[test]

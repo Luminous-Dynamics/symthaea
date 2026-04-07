@@ -56,11 +56,11 @@ struct HumanoidBodyModel {
     /// Total body mass in kg.
     total_mass: f64,
     /// Per-joint effective inertia (mass * length^2), indexed by actuator.
-    joint_inertias: [f64; NUM_ACTUATORS],
+    joint_inertias: Vec<f64>,
     /// Per-joint damping coefficients.
-    joint_damping: [f64; NUM_ACTUATORS],
+    joint_damping: Vec<f64>,
     /// Per-joint torque scaling (normalized command -> Nm).
-    joint_torque_scale: [f64; NUM_ACTUATORS],
+    joint_torque_scale: Vec<f64>,
 }
 
 impl HumanoidBodyModel {
@@ -114,9 +114,22 @@ impl HumanoidBodyModel {
             segment_lengths,
             segment_masses,
             total_mass,
-            joint_inertias,
-            joint_damping,
-            joint_torque_scale,
+            joint_inertias: joint_inertias.to_vec(),
+            joint_damping: joint_damping.to_vec(),
+            joint_torque_scale: joint_torque_scale.to_vec(),
+        }
+    }
+
+    /// Create a body model for a specific morphology.
+    fn for_morphology(morphology: crate::morphology::HumanoidMorphology) -> Self {
+        let base = Self::new(); // Start with DMC21 base segments
+        Self {
+            segment_lengths: base.segment_lengths,
+            segment_masses: base.segment_masses,
+            total_mass: base.total_mass,
+            joint_inertias: morphology.joint_inertias(),
+            joint_damping: morphology.joint_damping(),
+            joint_torque_scale: morphology.joint_torque_scales(),
         }
     }
 }
@@ -189,9 +202,13 @@ struct SensoryJitterBuffer {
 
 impl SensoryJitterBuffer {
     fn new(max_delay: usize) -> Self {
+        Self::new_for(max_delay, crate::morphology::HumanoidMorphology::Dmc21)
+    }
+
+    fn new_for(max_delay: usize, morphology: crate::morphology::HumanoidMorphology) -> Self {
         let capacity = max_delay + 1;
         Self {
-            buffer: vec![HumanoidState::standing(); capacity],
+            buffer: vec![HumanoidState::standing_for(morphology); capacity],
             write_idx: 0,
             delay_ticks: 1,
             max_delay,
@@ -282,13 +299,13 @@ impl ActuatorNoiseModel {
     /// Apply delay and noise to a command.
     fn apply(&mut self, cmd: &HumanoidCommand) -> HumanoidCommand {
         // Push to ring buffer
-        self.command_buffer[self.write_idx] = *cmd;
+        self.command_buffer[self.write_idx] = cmd.clone();
         self.write_idx = (self.write_idx + 1) % self.command_buffer.len();
 
         // Read delayed command
         let cap = self.command_buffer.len();
         let read_idx = (self.write_idx + cap - self.delay_ticks - 1) % cap;
-        let mut delayed = self.command_buffer[read_idx];
+        let mut delayed = self.command_buffer[read_idx].clone();
 
         // Add noise per torque
         for t in &mut delayed.torques {
@@ -533,14 +550,15 @@ impl DomainRandomization {
             + (baseline.total_mass - baseline_segment_total);
 
         // Scale joint inertias: I ∝ m × L²
-        for i in 0..NUM_ACTUATORS {
+        let n = body.joint_inertias.len().min(JOINT_SEGMENT_MAP.len());
+        for i in 0..n {
             let seg = JOINT_SEGMENT_MAP[i];
             body.joint_inertias[i] =
                 baseline.joint_inertias[i] * mass_scales[seg] * length_scales[seg].powi(2);
         }
 
         // Randomize damping
-        for i in 0..NUM_ACTUATORS {
+        for i in 0..body.joint_damping.len() {
             let scale = 1.0 + next_f64() * self.damping_range;
             body.joint_damping[i] = baseline.joint_damping[i] * scale;
         }
@@ -572,24 +590,45 @@ pub struct SimpleHumanoidSimulator {
     observed_state: HumanoidState,
     ground_contact: GroundContactModel,
     terrain: TerrainModel,
+    /// Morphology variant for this simulator instance.
+    morphology: crate::morphology::HumanoidMorphology,
+    /// Per-joint limits from morphology (replaces const JOINT_LIMITS for extended morphologies).
+    joint_limits: Vec<[f64; 2]>,
+    /// Gravity scaling factor (1.0 = Earth, 0.16 = Moon, 0.38 = Mars).
+    gravity_scale: f64,
 }
 
 impl SimpleHumanoidSimulator {
-    /// Create a new simulator at default standing pose.
+    /// Create a new simulator at default standing pose (DMC21).
     pub fn new() -> Self {
-        let body = HumanoidBodyModel::new();
+        Self::new_for(crate::morphology::HumanoidMorphology::Dmc21)
+    }
+
+    /// Create a simulator for a specific morphology.
+    pub fn new_for(morphology: crate::morphology::HumanoidMorphology) -> Self {
+        let body = if morphology == crate::morphology::HumanoidMorphology::Dmc21 {
+            HumanoidBodyModel::new() // Use exact existing values for backward compat
+        } else {
+            HumanoidBodyModel::for_morphology(morphology)
+        };
+        let joint_limits = morphology.joint_limits();
+        let state = HumanoidState::standing_for(morphology);
+        let observed_state = state.clone();
         Self {
-            state: HumanoidState::standing(),
+            state,
             external_force: [0.0; 3],
             baseline_body: body.clone(),
             body,
-            jitter: SensoryJitterBuffer::new(3),
+            jitter: SensoryJitterBuffer::new_for(3, morphology),
             actuator_noise: ActuatorNoiseModel::new(3, 0.03),
             domain_rand: DomainRandomization::new(),
             observation_noise: ObservationNoiseModel::new(0.01),
-            observed_state: HumanoidState::standing(),
+            observed_state,
             ground_contact: GroundContactModel::new(),
             terrain: TerrainModel::new(),
+            morphology,
+            joint_limits,
+            gravity_scale: 1.0,
         }
     }
 
@@ -635,6 +674,12 @@ impl SimpleHumanoidSimulator {
         self.domain_rand.length_range *= scale;
         self.domain_rand.damping_range *= scale;
         self.observation_noise.noise_std *= scale;
+        self
+    }
+
+    /// Set gravity scaling factor (1.0 = Earth, 0.16 = Moon, 0.38 = Mars).
+    pub fn with_gravity(mut self, scale: f64) -> Self {
+        self.gravity_scale = scale;
         self
     }
 
@@ -712,12 +757,12 @@ impl HumanoidPhysicsSimulator for SimpleHumanoidSimulator {
         let cmd = if self.actuator_noise.enabled {
             self.actuator_noise.apply(cmd)
         } else {
-            *cmd
+            cmd.clone()
         };
-        let g = 9.81;
+        let g = 9.81 * self.gravity_scale;
 
         // 1. Joint dynamics: per-joint inertia, damping, torque scaling
-        for i in 0..NUM_ACTUATORS {
+        for i in 0..cmd.torques.len().min(self.body.joint_torque_scale.len()) {
             let torque = cmd.torques[i] as f64 * self.body.joint_torque_scale[i];
             let damping = self.body.joint_damping[i];
             let inertia = self.body.joint_inertias[i];
@@ -727,7 +772,7 @@ impl HumanoidPhysicsSimulator for SimpleHumanoidSimulator {
             self.state.joint_angles[i] += self.state.joint_velocities[i] * dt;
 
             // Per-joint anatomical limits with velocity clamping at stops
-            let [lo, hi] = JOINT_LIMITS[i];
+            let [lo, hi] = if i < self.joint_limits.len() { self.joint_limits[i] } else { [-3.14, 3.14] };
             if self.state.joint_angles[i] < lo {
                 self.state.joint_angles[i] = lo;
                 self.state.joint_velocities[i] = self.state.joint_velocities[i].max(0.0);
@@ -974,6 +1019,44 @@ impl HumanoidPhysicsSimulator for SimpleHumanoidSimulator {
         self.state.extremities[10] = 0.1;
         self.state.extremities[11] = l_foot_z;
 
+        // Hand FK for dexterous morphologies (compute fingertip centroids)
+        if self.morphology.num_actuators() > 21 && self.state.extremities.len() >= 18 {
+            let r_hand_base = [
+                self.state.extremities[0],
+                self.state.extremities[1],
+                self.state.extremities[2],
+            ];
+            let l_hand_base = [
+                self.state.extremities[3],
+                self.state.extremities[4],
+                self.state.extremities[5],
+            ];
+
+            // Right hand: joints 21..37
+            if self.state.joint_angles.len() >= 37 {
+                let r_centroid = crate::morphology::compute_hand_centroid(
+                    r_hand_base,
+                    &self.state.joint_angles[21..37],
+                    [1.0, 0.0, 0.0], // right hand forward direction
+                );
+                self.state.extremities[12] = r_centroid[0];
+                self.state.extremities[13] = r_centroid[1];
+                self.state.extremities[14] = r_centroid[2];
+            }
+
+            // Left hand: joints 37..53
+            if self.state.joint_angles.len() >= 53 {
+                let l_centroid = crate::morphology::compute_hand_centroid(
+                    l_hand_base,
+                    &self.state.joint_angles[37..53],
+                    [1.0, 0.0, 0.0], // left hand forward direction
+                );
+                self.state.extremities[15] = l_centroid[0];
+                self.state.extremities[16] = l_centroid[1];
+                self.state.extremities[17] = l_centroid[2];
+            }
+        }
+
         self.state.timestamp += dt;
         self.external_force = [0.0; 3];
 
@@ -997,7 +1080,7 @@ impl HumanoidPhysicsSimulator for SimpleHumanoidSimulator {
     }
 
     fn reset(&mut self) {
-        self.state = HumanoidState::standing();
+        self.state = HumanoidState::standing_for(self.morphology);
         self.external_force = [0.0; 3];
         self.body = self.baseline_body.clone();
         self.jitter.reset(&self.state, 0);
@@ -1030,9 +1113,10 @@ impl HumanoidPhysicsSimulator for SimpleHumanoidSimulator {
             (rng as f64 / u64::MAX as f64) * 2.0 - 1.0
         };
 
-        // Perturb joint angles within anatomical limits
-        for i in 0..NUM_ACTUATORS {
-            let [lo, hi] = JOINT_LIMITS[i];
+        // Perturb joint angles within anatomical limits (DMC21 base joints)
+        let n = self.state.joint_angles.len().min(JOINT_LIMITS.len());
+        for i in 0..n {
+            let [lo, hi] = if i < self.joint_limits.len() { self.joint_limits[i] } else { [-3.14, 3.14] };
             let range = hi - lo;
             self.state.joint_angles[i] += perturbation * next_f64() * range * 0.03;
             self.state.joint_angles[i] = self.state.joint_angles[i].clamp(lo, hi);
@@ -1219,7 +1303,7 @@ impl MuJoCoHumanoidSimulator {
     /// Write motor commands into MuJoCo ctrl array.
     fn write_ctrl(&mut self, cmd: &HumanoidCommand) {
         let ctrl = self.data.ctrl_mut();
-        for i in 0..NUM_ACTUATORS {
+        for i in 0..cmd.torques.len().min(ctrl.len()) {
             ctrl[i] = cmd.torques[i] as f64;
         }
     }
@@ -1351,7 +1435,7 @@ mod tests {
         let mut sim = SimpleHumanoidSimulator::new();
         sim.apply_external_force([500.0, 500.0, 500.0]);
         let cmd = HumanoidCommand {
-            torques: [0.5; NUM_ACTUATORS],
+            torques: vec![0.5; NUM_ACTUATORS],
         };
         sim.step(&cmd, 0.025);
 
@@ -1541,7 +1625,7 @@ mod tests {
         noise.reset(42);
 
         let cmd = HumanoidCommand {
-            torques: [0.5; NUM_ACTUATORS],
+            torques: vec![0.5; NUM_ACTUATORS],
         };
         // Push twice to fill buffer past delay
         let _ = noise.apply(&cmd);
@@ -1559,7 +1643,7 @@ mod tests {
     #[test]
     fn test_actuator_noise_deterministic() {
         let cmd = HumanoidCommand {
-            torques: [0.5; NUM_ACTUATORS],
+            torques: vec![0.5; NUM_ACTUATORS],
         };
 
         let mut noise_a = ActuatorNoiseModel::new(3, 0.05);
@@ -1574,7 +1658,7 @@ mod tests {
         let _ = noise_b.apply(&cmd);
         let out_b = noise_b.apply(&cmd);
 
-        for i in 0..NUM_ACTUATORS {
+        for i in 0..cmd.torques.len() {
             assert!(
                 (out_a.torques[i] - out_b.torques[i]).abs() < 1e-10,
                 "Same seed should produce identical noise: joint {i}"
@@ -1727,7 +1811,7 @@ mod tests {
             sim_b.step(&cmd, 0.025);
         }
 
-        for i in 0..NUM_ACTUATORS {
+        for i in 0..cmd.torques.len() {
             assert!(
                 (sim_a.observed_state.joint_angles[i] - sim_b.observed_state.joint_angles[i]).abs()
                     < 1e-10,
@@ -1898,7 +1982,7 @@ mod tests {
     fn test_mujoco_reset() {
         let mut sim = MuJoCoHumanoidSimulator::from_bundled_asset().unwrap();
         let cmd = HumanoidCommand {
-            torques: [0.5; NUM_ACTUATORS],
+            torques: vec![0.5; NUM_ACTUATORS],
         };
 
         for _ in 0..50 {
@@ -1934,5 +2018,76 @@ mod tests {
         // Perturbed state should differ from default standing
         let any_nonzero = state.joint_angles.iter().any(|a| a.abs() > 0.001);
         assert!(any_nonzero, "Perturbation should change joint angles");
+    }
+
+    #[test]
+    fn test_dexterous53_simulator_runs() {
+        use crate::morphology::HumanoidMorphology;
+        let mut sim = SimpleHumanoidSimulator::new_for(HumanoidMorphology::Dexterous53);
+        let state = sim.state();
+        assert_eq!(state.joint_angles.len(), 53);
+        assert_eq!(state.joint_velocities.len(), 53);
+        assert_eq!(state.extremities.len(), 18); // 12 base + 6 hand centroids
+
+        // Step with zero command
+        let cmd = HumanoidCommand::zero_for(53);
+        for _ in 0..100 {
+            sim.step(&cmd, 0.025);
+        }
+        let state = sim.state();
+        assert!(state.root_height > 0.5, "Should still be standing: h={}", state.root_height);
+        // Hand centroids should be computed (not all zero after stepping)
+        assert!(state.extremities.iter().all(|x| x.is_finite()), "All extremities should be finite");
+    }
+
+    #[test]
+    fn test_dexterous53_hand_centroids_respond_to_joints() {
+        use crate::morphology::HumanoidMorphology;
+        let mut sim = SimpleHumanoidSimulator::new_for(HumanoidMorphology::Dexterous53);
+
+        // Step with zero command first to establish baseline
+        let cmd = HumanoidCommand::zero_for(53);
+        sim.step(&cmd, 0.025);
+        let baseline_centroid = [
+            sim.state().extremities[12],
+            sim.state().extremities[13],
+            sim.state().extremities[14],
+        ];
+
+        // Now apply flexion to right hand fingers
+        let mut cmd2 = HumanoidCommand::zero_for(53);
+        for i in 21..37 {
+            cmd2.torques[i] = 0.8; // Strong flexion command
+        }
+        for _ in 0..200 {
+            sim.step(&cmd2, 0.025);
+        }
+        let flexed_centroid = [
+            sim.state().extremities[12],
+            sim.state().extremities[13],
+            sim.state().extremities[14],
+        ];
+
+        // Centroid should change when fingers flex
+        let dist = ((flexed_centroid[0] - baseline_centroid[0]).powi(2)
+            + (flexed_centroid[1] - baseline_centroid[1]).powi(2)
+            + (flexed_centroid[2] - baseline_centroid[2]).powi(2))
+        .sqrt();
+        assert!(
+            dist > 0.001,
+            "Hand centroid should move when fingers flex: dist={dist}"
+        );
+    }
+
+    #[test]
+    fn test_dmc21_backward_compat_new_vs_new_for() {
+        use crate::morphology::HumanoidMorphology;
+        let sim1 = SimpleHumanoidSimulator::new();
+        let sim2 = SimpleHumanoidSimulator::new_for(HumanoidMorphology::Dmc21);
+        let s1 = sim1.state();
+        let s2 = sim2.state();
+        assert_eq!(s1.joint_angles.len(), s2.joint_angles.len());
+        assert_eq!(s1.extremities.len(), s2.extremities.len());
+        assert!((s1.root_height - s2.root_height).abs() < 1e-10);
     }
 }

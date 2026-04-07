@@ -18,6 +18,10 @@ use symthaea_spore::engine::{CycleResult, SporeEngine};
 
 #[cfg(feature = "broca-full")]
 use crate::broca_soma::BrocaSoma;
+#[cfg(feature = "litert")]
+use crate::litert_bridge::{LiteRTBackend, LiteRTBridge};
+#[cfg(feature = "prism-search")]
+use plexus_search::SearchEngine;
 #[cfg(feature = "screen-vision")]
 use crate::screen_vision::{ScreenPerception, ScreenVisionBridge, ScreenVisionConfig};
 #[cfg(feature = "screen-vision")]
@@ -86,6 +90,14 @@ pub struct SomaEngine {
     #[cfg(feature = "broca-full")]
     broca_soma: BrocaSoma,
 
+    /// On-device Gemma 4 E2B via LiteRT-LM.
+    #[cfg(feature = "litert")]
+    pub(crate) litert: Option<LiteRTBridge>,
+
+    /// Prism epistemic search engine (16,384-bit BinaryHV, offline-capable).
+    #[cfg(feature = "prism-search")]
+    pub(crate) prism_search: Option<SearchEngine>,
+
     // Platform state (set via native FFI or programmatically)
     /// Current thermal level (0=Nominal, 1=Fair, 2=Serious, 3=Critical, 4=Emergency).
     pub thermal_level: u8,
@@ -124,6 +136,10 @@ impl SomaEngine {
             touch_body: TouchBody::new(),
             #[cfg(feature = "broca-full")]
             broca_soma: BrocaSoma::new(),
+            #[cfg(feature = "litert")]
+            litert: None,
+            #[cfg(feature = "prism-search")]
+            prism_search: None,
             thermal_level: 0,
             battery_percent: 100,
             battery_charging: false,
@@ -676,6 +692,190 @@ impl SomaEngine {
             self.sensor_bridge.motion_state(),
             self.sensor_bridge.privacy_mode(),
         )
+    }
+
+    // ======================================================================
+    // On-device LLM (LiteRT-LM / Gemma 4 E2B)
+    // ======================================================================
+
+    /// Initialize the on-device LLM engine with a model path.
+    /// Call after the Kotlin LiteRTManager confirms the model is downloaded.
+    #[cfg(feature = "litert")]
+    pub fn litert_init(&mut self, model_path: &str) -> bool {
+        let mut bridge = LiteRTBridge::new(model_path.to_string(), LiteRTBackend::Gpu);
+        let ready = bridge.init();
+        self.litert = Some(bridge);
+        ready
+    }
+
+    /// Whether the on-device LLM is available for inference.
+    #[cfg(feature = "litert")]
+    pub fn litert_available(&self) -> bool {
+        self.litert.as_ref().map_or(false, |b| b.is_available())
+    }
+
+    /// Generate text using the on-device LLM, gated by current consciousness level.
+    #[cfg(feature = "litert")]
+    pub fn litert_generate(&self, prompt: &str, max_tokens: u32) -> Option<String> {
+        let consciousness = self.spore.consciousness_level();
+        self.litert.as_ref()?.generate_consciousness_gated(
+            prompt,
+            max_tokens,
+            consciousness,
+        ).map(|r| r.text)
+    }
+
+    /// Generate with tool-use loop: LLM may invoke tools, results fed back.
+    ///
+    /// Tools: web_search (→ Prism/Holon), calculate, get_time, memory_recall.
+    /// Max 3 rounds to prevent infinite loops.
+    #[cfg(feature = "litert")]
+    pub fn litert_generate_with_tools(
+        &mut self,
+        prompt: &str,
+        max_tokens: u32,
+    ) -> Option<String> {
+        use crate::tool_use::{
+            execute_calculate, execute_get_time, format_tool_results, parse_tool_calls,
+            ToolRegistry, ToolResult,
+        };
+
+        let litert = self.litert.as_ref()?;
+        if !litert.is_available() {
+            return None;
+        }
+
+        let consciousness = self.spore.consciousness_level();
+        if consciousness < 0.15 {
+            return None;
+        }
+
+        let registry = ToolRegistry::default_tools();
+        let tool_block = registry.system_prompt_block();
+        let mut current_prompt = format!("{tool_block}\nUser: {prompt}\nAssistant:");
+
+        for _round in 0..3 {
+            let response = litert.generate(&current_prompt, max_tokens)?;
+            let (text, calls) = parse_tool_calls(&response);
+
+            if calls.is_empty() {
+                return Some(text);
+            }
+
+            // Execute tools
+            let mut results = Vec::new();
+            for call in &calls {
+                let result = match call.name.as_str() {
+                    "calculate" => {
+                        let expr = call.arguments["expression"]
+                            .as_str()
+                            .unwrap_or_default();
+                        execute_calculate(expr)
+                    }
+                    "get_time" => execute_get_time(),
+                    "web_search" => {
+                        let query = call.arguments["query"].as_str().unwrap_or_default();
+                        // Try Prism local search first
+                        #[cfg(feature = "prism-search")]
+                        {
+                            let prism_results = self.prism_search(query, 3);
+                            if !prism_results.is_empty() {
+                                let claims: Vec<String> =
+                                    prism_results.iter().map(|r| r.content.clone()).collect();
+                                ToolResult {
+                                    name: "web_search".into(),
+                                    success: true,
+                                    output: claims.join("\n"),
+                                }
+                            } else {
+                                // Enqueue for Holon web search (async)
+                                self.holon_bridge.enqueue_outbound(
+                                    crate::holon_bridge::HolonOutbound::SearchRequest {
+                                        query: query.to_string(),
+                                        max_results: 3,
+                                    },
+                                );
+                                ToolResult {
+                                    name: "web_search".into(),
+                                    success: true,
+                                    output: "Search request sent to desktop. No local results found."
+                                        .into(),
+                                }
+                            }
+                        }
+                        #[cfg(not(feature = "prism-search"))]
+                        {
+                            self.holon_bridge.enqueue_outbound(
+                                crate::holon_bridge::HolonOutbound::SearchRequest {
+                                    query: query.to_string(),
+                                    max_results: 3,
+                                },
+                            );
+                            ToolResult {
+                                name: "web_search".into(),
+                                success: true,
+                                output: "Search request sent to desktop.".into(),
+                            }
+                        }
+                    }
+                    "memory_recall" => {
+                        let _topic = call.arguments["topic"].as_str().unwrap_or_default();
+                        // TODO: query spore semantic memory
+                        ToolResult {
+                            name: "memory_recall".into(),
+                            success: true,
+                            output: "No memories found for this topic.".into(),
+                        }
+                    }
+                    _ => ToolResult {
+                        name: call.name.clone(),
+                        success: false,
+                        output: "Unknown tool".into(),
+                    },
+                };
+                results.push(result);
+            }
+
+            // Re-prompt with tool results
+            let results_block = format_tool_results(&results);
+            current_prompt = format!("{current_prompt}\n{response}\n{results_block}");
+        }
+
+        // Max rounds reached — return last generated text
+        let response = litert.generate(&current_prompt, max_tokens)?;
+        let (text, _) = parse_tool_calls(&response);
+        Some(text)
+    }
+
+    // ======================================================================
+    // Prism epistemic search (offline-capable, sub-ms)
+    // ======================================================================
+
+    /// Initialize the Prism epistemic search engine with pre-seeded claims.
+    #[cfg(feature = "prism-search")]
+    pub fn prism_init(&mut self) {
+        self.prism_search = Some(SearchEngine::with_seed_claims());
+        tracing::info!(
+            claims = self.prism_search.as_ref().map_or(0, |s| s.claim_count()),
+            "Prism epistemic search initialized"
+        );
+    }
+
+    /// Search local epistemic claims via Prism's 16,384-bit BinaryHV engine.
+    #[cfg(feature = "prism-search")]
+    pub fn prism_search(&self, query: &str, top_k: usize) -> Vec<plexus_common::SearchResult> {
+        self.prism_search
+            .as_ref()
+            .map(|s| s.search(query, top_k))
+            .unwrap_or_default()
+    }
+
+    /// Whether Prism search is initialized and has claims.
+    #[cfg(feature = "prism-search")]
+    pub fn prism_available(&self) -> bool {
+        self.prism_search
+            .as_ref()
+            .map_or(false, |s| s.claim_count() > 0)
     }
 
     /// Set persistence storage backend.

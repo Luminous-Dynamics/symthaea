@@ -347,5 +347,6 @@ mod tests {
         inj.inject_pointer(0.5, 0.5, 1, true);
         inj.inject_key(65, true, 0);
         inj.inject_touch(0, 0.5, 0.5, 0, 0.5);
+        // Success: NoopInjector silently discards all input without panic
     }
 }

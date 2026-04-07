@@ -38,6 +38,9 @@ async fn test_mock_proposal_dispatch_roundtrip() {
         description: "Fund community garden project".into(),
         proposer_did: "did:mycelix:alice".into(),
         consciousness_phi: 0.85,
+        meta_awareness: 0.6,
+        coherence: 0.7,
+        care_activation: 0.5,
         alignment_score: 0.92,
     };
 
@@ -60,6 +63,10 @@ async fn test_mock_vote_dispatch_roundtrip() {
         voter_did: "did:mycelix:bob".into(),
         approve: true,
         rationale: "Aligns with ecological wisdom harmony".into(),
+        consciousness_phi: 0.8,
+        meta_awareness: 0.6,
+        coherence: 0.7,
+        care_activation: 0.5,
     };
 
     let outcome = dispatcher.dispatch(cmd).await;
@@ -85,6 +92,9 @@ async fn test_mock_dispatch_loop_processes_multiple_commands() {
             description: "Proposal A".into(),
             proposer_did: "did:test:a".into(),
             consciousness_phi: 0.8,
+            meta_awareness: 0.5,
+            coherence: 0.6,
+            care_activation: 0.4,
             alignment_score: 0.9,
         })
         .unwrap();
@@ -95,6 +105,10 @@ async fn test_mock_dispatch_loop_processes_multiple_commands() {
             voter_did: "did:test:b".into(),
             approve: false,
             rationale: "Insufficient alignment".into(),
+            consciousness_phi: 0.7,
+            meta_awareness: 0.5,
+            coherence: 0.6,
+            care_activation: 0.4,
         })
         .unwrap();
     cmd_tx
@@ -103,6 +117,9 @@ async fn test_mock_dispatch_loop_processes_multiple_commands() {
             description: "Proposal B".into(),
             proposer_did: "did:test:c".into(),
             consciousness_phi: 0.9,
+            meta_awareness: 0.6,
+            coherence: 0.7,
+            care_activation: 0.5,
             alignment_score: 0.95,
         })
         .unwrap();
@@ -171,6 +188,9 @@ async fn test_failing_transport_returns_rejection() {
         description: "Should fail".into(),
         proposer_did: "did:test".into(),
         consciousness_phi: 0.5,
+        meta_awareness: 0.4,
+        coherence: 0.3,
+        care_activation: 0.4,
         alignment_score: 0.5,
     };
 

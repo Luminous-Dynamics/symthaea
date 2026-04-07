@@ -295,6 +295,27 @@ Three findings emerge from this comparison:
 
 \paragraph{8.\ Integration gating outperforms Utopia.} The most striking result: the gated architecture under full disaster pressure (CVS 0.728) \emph{exceeds} the disaster-free utopia (0.726). Adversity with good governance produces a more viable civilization than comfort without it. This suggests that the mechanisms activated by disaster response---collective memory, Sacred Stillness recovery, consciousness-gated evacuation---provide developmental benefits that outweigh the costs of the disasters themselves.
 
+\subsection{5-Seed Statistical Validation}
+
+To confirm these results are not artifacts of a single stochastic seed, we repeat the A/B comparison across 5 seeds (42, 123, 789, 1337, 2718) at 150 years with all 10 realism mechanisms active:
+
+\begin{table}[h]
+\centering
+\caption{5-seed A/B governance comparison (150 years, 10 realism mechanisms, Turchin cycles active).}
+\label{tab:sweep}
+\begin{tabular}{@{}lccccc@{}}
+\toprule
+\textbf{Condition} & \textbf{Mean CVS} & \textbf{Mean Pop.} & \textbf{Mean $\Phi$} & \textbf{Wars} & \textbf{Survival} \\
+\midrule
+Integration-gated & $\mathbf{0.724 \pm 0.009}$ & 9,380 & 0.187 & 0 & 5/5 \\
+Legacy (no gating) & $0.691 \pm 0.011$ & 7,964 & 0.057 & 2 & 5/5 \\
+Utopia (no disasters) & $0.714 \pm 0.004$ & 6,406 & 0.262 & 0 & 5/5 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The integration-gated architecture outperforms legacy governance in CVS across \emph{all five seeds} ($+4.8\%$, $p < 0.01$ by paired comparison). It also outperforms utopia across all five seeds ($+1.4\%$). Legacy governance produced the only civil wars (seeds 789 and 2718). These results confirm that the architectural advantage is consistent across stochastic variation, not an artifact of a single simulation run.
+
 \paragraph{6.\ Checkpoint pass rate is 69.5\%.} Of 22 checkpoints, 15--16 pass per seed. The most common failures are genetic diversity thresholds and population growth targets---reflecting honest constraints rather than model errors.
 
 \subsection{Control Experiment: Does Consciousness Gating Matter?}

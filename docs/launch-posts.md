@@ -1,67 +1,80 @@
-# Sovereign Inoculation Launch Posts
+# Sovereign Inoculation Launch Posts (v1.4)
 
 ## 1. NixOS Discourse
 
-**Title:** Sovereign Inoculation: Browser-based NixOS installer with automated btrfs and SSH relay
+**Title:** Sovereign Inoculation: Browser-based NixOS installer with LUKS, Secure Boot, app migration, and a consciousness ceremony
 
 ---
 
 Hey all,
 
-I built a browser-based NixOS installer called **Sovereign Inoculation**. You boot a live ISO, open a URL, and the portal handles the rest — hardware probe, disk selection, partitioning, btrfs subvolumes, and `nixos-install` — all streamed back to the browser in real time.
+I built a browser-based NixOS installer. Boot a live ISO, open https://install.nixforhumanity.org on any device (laptop, phone, tablet), and the portal walks you through the entire install — hardware detection, app compatibility scanning, desktop environment selection, disk encryption, and `nixos-install` — all streamed back to the browser in real time.
 
 **How it works:**
 
-1. Boot target from any NixOS live ISO (SSH must be reachable)
-2. Open the portal in a browser — can be on the same machine or any device on the network
-3. Enter the target's IP — the portal probes hardware via a WebSocket SSH relay and shows a disk selector from live `lsblk` output
-4. Pick a disk layout, confirm, and the install runs automatically
-5. Progress streams back with per-stage updates and a completion signal
+1. Boot target from a NixOS ISO (or our custom Sovereign ISO with auto-starting relay)
+2. Open the portal on any device on the same network
+3. The portal auto-discovers the relay via mDNS, or you enter the target's IP
+4. It probes hardware (GPU, WiFi, TPM, existing OS, BitLocker, RAID), scans your existing apps, and shows a compatibility report
+5. Pick your desktop environment (GNOME, KDE, Hyprland, Sway, XFCE), encryption, disk layout
+6. Progress streams back with time estimates and a constellation visualization
 
-**Technical details:**
-- **SSH relay**: Rust (axum + async-ssh2-tokio), WebSocket bridge, ~1200 LOC. Runs locally on the target or on a trusted machine. Streams `STAGE:` markers for progress tracking.
-- **Partitioning**: Direct `sgdisk` + `mkfs.btrfs` (no disko dependency on the live ISO). Six btrfs subvolumes: `@`, `@home`, `@nix`, `@log`, `@snapshots`, `@swap` with zstd compression and noatime.
-- **First-boot hardening**: Automatically configures earlyoom, smartd, fstrim, zram, btrfs scrub. One-shot NixOS module.
-- **Frontend**: Static HTML + 1.1MB WASM consciousness kernel. No framework, no build step, self-hostable.
-- **Eval API**: Optional Nix flake evaluator — validates your config before install.
+**9 disk layouts:**
+- Single disk (btrfs, 6 subvolumes, zstd)
+- Single disk encrypted (LUKS2 + btrfs)
+- Alongside Windows/Linux (reuses existing ESP, detects BitLocker)
+- Dual NVMe (OS + data)
+- RAID1 btrfs (mirrored across 2 disks)
+- RAID1 mdadm (software mirror + btrfs)
+- SATA, VPS, auto-detect
 
-**Disk layouts:**
-- **Single disk**: Full wipe, EFI + btrfs, 6 subvolumes
-- **Dual NVMe**: OS on standard drive, data on fast drive
-- **Alongside Windows**: Finds free space, creates btrfs in it, preserves Windows bootloader
-- **SATA**: Same as single, adjusted partition naming
-- **VPS**: Minimal ext4 + zram for cloud instances
+**What makes it different:**
 
-**What's intentionally weird:** There's an optional ceremony during the install — C Lydian harmony tones, a Phi-rising animation, TTS narration. It runs purely in-browser, touches nothing on the machine, and you can ignore it completely. I find the 5-minute wait during `nixos-install` a good moment for intentionality. Your mileage will vary.
+- **App migration scanner**: Mounts your existing OS read-only, scans installed apps (Windows Program Files, macOS /Applications, Linux packages), and maps them to nixpkgs equivalents. Shows you what has a direct match, what has alternatives, and what doesn't exist yet.
+- **Deep scan**: Reads your git config, shell aliases, SSH keys, editor setup, Docker projects — and composes a personalized welcome message when the install completes.
+- **Server safety detection**: Risk-scores the target machine (Docker containers, databases, web servers, uptime, SSH keys). Blocks install on production servers unless you explicitly override.
+- **System config from the portal**: Desktop environment, GPU driver (NVIDIA/AMD/Intel auto-detected), timezone (IP geolocation), keyboard layout, PipeWire audio, flakes enabled — all configured from the browser and written to a separate `sovereign-config.nix` module.
+- **WebSocket reconnect**: If the connection drops during install (nixos-install can take 10+ minutes), the portal auto-reconnects and checks install status.
+- **Input sanitization**: Disk paths validated against injection. Passphrases never logged, never written to the install script.
+- **Git-initialized config**: `/etc/nixos/.git` exists from minute zero.
+- **The ceremony**: Optional. C Lydian harmony tones, Phi-rising animation, TTS narration. Touches nothing on the machine. I find the 10-minute wait a good moment for intentionality.
 
-**What's NOT supported yet (and I want to fix):**
-- Secure Boot (lanzaboote integration planned)
-- LUKS + TPM2 auto-unlock
-- Software RAID (mdadm/btrfs multi-device)
-- Full hardware compatibility testing beyond QEMU
+**Technical stack:**
+- SSH relay: Rust (axum + async-ssh2-tokio), ~2,500 LOC
+- Portal: Static HTML + 1.1MB WASM consciousness kernel, no framework
+- Partitioning: Direct sgdisk + mkfs.btrfs (no disko dependency on the live ISO)
+- Custom ISO config with relay + avahi auto-start (`nix/installer-iso.nix`)
 
-**Testing:** Full E2E verified in QEMU with dual NVMe VMs. Automated test suite drives the entire flow via WebSocket. Real hardware testing is the next step.
+**Testing:**
+- 4 layouts verified E2E in QEMU (single, LUKS, Win11 alongside, GNOME desktop)
+- 13 persona-based tests (student, developer, gamer, musician, sysadmin, privacy advocate, teacher, DevOps, Pi hobbyist, ARM64, Chromebook, accessibility, data scientist)
+- 9/9 E2E relay tests passing (including command injection blocking)
+- Win11 dual-boot verified (both OSes boot, ESP shared)
 
 **Links:**
-- Portal: https://luminous-dynamics.github.io/symthaea/ (click "Inoculate" tab)
+- Portal: https://install.nixforhumanity.org
 - Source: https://github.com/Luminous-Dynamics/symthaea
-- Install scripts: `crates/symthaea-spore/src/bin/ssh_relay.rs`
+- Relay code: `crates/symthaea-spore/src/bin/ssh_relay.rs`
+- Guides: `docs/guides/` (Day 1, Week 1, Troubleshooting, Mastering Nix, Secrets, Contributing)
 
 **What I'd love feedback on:**
-- Has anyone tried dual-booting alongside Windows with btrfs? Does resizing the Windows partition trigger BitLocker recovery?
-- Btrfs subvolume layout — is `@swap` on btrfs controversial? Should I use a separate partition?
-- Is the `lsblk` JSON probe missing any hardware edge cases you've hit?
-- Would you actually use a GUI NixOS installer, or is the terminal workflow fine?
+- Would you use this? Or is the terminal workflow fine for you?
+- Has anyone hit issues with shared ESP on Windows dual-boot?
+- The btrfs subvolume layout (`@`, `@home`, `@nix`, `@log`, `@snapshots`, `@swap`) — opinions?
+- What hardware should I test on next? (Only QEMU so far)
+- Is the app migration scanner useful, or is it a gimmick?
 
 ---
 
 ## 2. Hacker News
 
-**Title:** Show HN: Install NixOS from a browser tab
+**Title:** Show HN: Install NixOS from your phone
 
 ---
 
-Sovereign Inoculation is a browser-based NixOS installer. A Rust WebSocket relay bridges the browser to the target machine over SSH — it probes hardware, shows a disk selector, and runs an automated btrfs install with streaming progress. No disko dependency on the live ISO, just sgdisk and mkfs.btrfs. Tested E2E in QEMU.
+Sovereign Inoculation is a browser-based NixOS installer. Boot a live ISO, open the portal on any device (including your phone), and it handles hardware detection, app migration scanning, LUKS encryption, and nixos-install — all via a Rust WebSocket SSH relay. It detects your existing apps and shows what has NixOS equivalents before you commit. 9 disk layouts, 13 persona-tested, 4 QEMU-verified installs including Windows dual-boot.
+
+https://install.nixforhumanity.org
 
 https://github.com/Luminous-Dynamics/symthaea
 
@@ -69,19 +82,23 @@ https://github.com/Luminous-Dynamics/symthaea
 
 ## 3. Reddit r/NixOS
 
-**Title:** I built a browser-based NixOS installer with automated btrfs and an SSH relay
+**Title:** I built a browser-based NixOS installer you can run from your phone
 
 ---
 
-**What it does:** Boot any NixOS live ISO, open a portal URL in your browser, enter the target IP, pick a disk, and it handles the rest — `sgdisk` partitioning, btrfs with 6 subvolumes (`@`, `@home`, `@nix`, `@log`, `@snapshots`, `@swap`), zstd compression, `nixos-install`, and a first-boot module that wires up earlyoom, zram, btrbk, fstrim. Five layouts: single disk, dual NVMe, alongside Windows, SATA, VPS.
+**What it does:** Boot any NixOS ISO, open https://install.nixforhumanity.org on your phone/laptop/tablet, and it installs NixOS for you — including hardware detection, desktop environment selection (GNOME/KDE/Hyprland/Sway/XFCE), LUKS encryption, GPU driver auto-configuration, and app migration scanning.
 
-**How:** A Rust SSH relay (axum WebSocket) bridges the browser to the target machine. Progress streams back in real time. No disko download needed on the live ISO — it uses sgdisk + mkfs directly.
+**The app scanner** mounts your existing Windows/macOS/Linux partition read-only and maps your installed apps to nixpkgs equivalents. So you know before you install what you're keeping and what's changing.
 
-**What's weird:** There's an optional consciousness ceremony during the install — ambient tones, an animation, TTS narration. It does absolutely nothing to the machine and you can ignore it. I added it because staring at a progress bar for 5 minutes felt like a missed opportunity. Fair warning.
+**9 layouts:** single disk, encrypted (LUKS2), alongside Windows, dual NVMe, RAID1 (btrfs + mdadm), SATA, VPS, auto-detect.
 
-**Not yet supported:** Secure Boot, RAID, LUKS+TPM2. These are planned.
+**Safety:** Server detection blocks installs on production machines (Docker, databases, web servers). Input sanitization prevents command injection. Passphrases never logged. WebSocket auto-reconnects if the connection drops.
 
-Would love feedback on the btrfs layout and any real hardware edge cases. Tested in QEMU only so far.
+**The weird part:** There's an optional consciousness ceremony during the install — harmony tones, a constellation visualization of packages downloading, a personalized welcome message when it completes. It reads your git config, SSH keys, and editor setup and says "Welcome home, [name]. I brought your tools." Completely optional. Completely unnecessary. I couldn't help myself.
 
-Portal: https://luminous-dynamics.github.io/symthaea/ (Inoculate tab)
+**Tested:** 4 QEMU installs verified (including Win11 dual-boot), 13 personas, 9/9 E2E tests, command injection blocked.
+
+**Not yet tested on real hardware.** Would love volunteers, especially with NVIDIA GPUs, WiFi-only setups, or existing dual-boot machines.
+
+Portal: https://install.nixforhumanity.org
 Source: https://github.com/Luminous-Dynamics/symthaea

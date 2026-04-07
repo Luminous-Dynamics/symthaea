@@ -35,7 +35,9 @@ members = [
     "crates/symthaea-physics",
     "crates/symthaea-physics-bridge",
     "crates/symthaea-vocal-tract",
+    "crates/symthaea-voice",
     "crates/symthaea-vehicle",
+    "crates/symthaea-browser",
     "crates/symthaea-hal",
     "crates/symthaea-ssm",
     "crates/symthaea-zkproof",
@@ -50,7 +52,11 @@ members = [
     "crates/symthaea-nurture",
     "crates/symthaea-population",
     "crates/symthaea-neuroevolution",
+    "crates/symthaea-jepa",
     "crates/symthaea-materials",
+    "crates/symthaea-gravcraft",
+    "crates/symthaea-nuclear",
+    "crates/symthaea-physics-catalog",
     "crates/symthaea-nuclear-forensics",
     "crates/symthaea-memory",
     "crates/symthaea-fabrication-kernel",
@@ -85,6 +91,8 @@ exclude = [
     "crates/symthaea-zkproof/host",
     # WASM crate targets wasm32-unknown-unknown; excluded so `cargo build` works normally.
     "crates/symthaea-muse-wasm",
+    # Fuzz crates use libfuzzer-sys and require nightly + sanitizer flags.
+    "crates/symthaea-spore/fuzz",
 ]
 # Only build core crates by default; platform-specific crates (quicken-fb) require explicit -p flag.
 default-members = [
@@ -176,8 +184,8 @@ symthaea-phi-search = { path = "crates/symthaea-phi-search" }
 # Symthaea Narrative Self - Narrative self-model (always enabled)
 symthaea-narrative-self = { path = "crates/symthaea-narrative-self" }
 
-# Symthaea Field Dynamics - Consciousness field wave equations (always enabled)
-symthaea-field-dynamics = { path = "crates/symthaea-field-dynamics" }
+# Symthaea Field Dynamics - Consciousness field wave equations (optional)
+symthaea-field-dynamics = { path = "crates/symthaea-field-dynamics", optional = true }
 
 # Symthaea Hodge - Hodge Laplacian for simplicial complexes (always enabled)
 symthaea-hodge = { path = "crates/symthaea-hodge" }
@@ -188,8 +196,8 @@ symthaea-factor-graph = { path = "crates/symthaea-factor-graph" }
 # Symthaea Enactive - Enactive cognition paradigm (always enabled)
 symthaea-enactive = { path = "crates/symthaea-enactive" }
 
-# Symthaea Sensorimotor - Sensorimotor contingency theory (always enabled)
-symthaea-sensorimotor = { path = "crates/symthaea-sensorimotor" }
+# Symthaea Sensorimotor - Sensorimotor contingency theory (optional)
+symthaea-sensorimotor = { path = "crates/symthaea-sensorimotor", optional = true }
 symthaea-consciousness-topology = { path = "crates/symthaea-consciousness-topology" }
 symthaea-exploration = { path = "crates/symthaea-exploration" }
 symthaea-wisdom = { path = "crates/symthaea-wisdom" }
@@ -230,6 +238,9 @@ symthaea-humanoid = { path = "crates/symthaea-humanoid", optional = true }
 # Symthaea Vehicle - HDC-LTC + FEP Active Inference autonomous vehicle control
 symthaea-vehicle = { path = "crates/symthaea-vehicle", optional = true }
 
+# Symthaea Browser - Consciousness-driven browser agent via CDP
+symthaea-browser = { path = "crates/symthaea-browser", optional = true }
+
 # Symthaea AUV - HDC-LTC + FEP Active Inference autonomous underwater vehicle control
 symthaea-auv = { path = "crates/symthaea-auv", optional = true }
 
@@ -251,6 +262,9 @@ symthaea-physics-bridge = { path = "crates/symthaea-physics-bridge", optional = 
 # Symthaea Broca - SSM Language Center: CfC-HDC autoregressive thought-to-text generation
 symthaea-broca = { path = "crates/symthaea-broca", optional = true }
 
+# Symthaea Spore - WASM consciousness kernel (BrocaLite fallback for always-on language)
+symthaea-spore = { path = "crates/symthaea-spore", optional = true, default-features = false }
+
 # Symthaea Muse - Consciousness-driven music synthesis (streaming PCM for cognitive loop)
 symthaea-muse = { path = "crates/symthaea-muse", optional = true }
 
@@ -259,6 +273,12 @@ symthaea-geodesic = { path = "crates/symthaea-geodesic", optional = true }
 
 # Symthaea Canvas - Living topology UI: cognitive geometry → SVG
 symthaea-canvas = { path = "crates/symthaea-canvas", optional = true }
+
+# Symthaea Aesthetic - Aesthetic evaluation and feedback
+symthaea-aesthetic = { path = "crates/symthaea-aesthetic", optional = true }
+
+# Symthaea Atelier - Generative art studio
+symthaea-atelier = { path = "crates/symthaea-atelier", optional = true }
 
 # Symthaea Clinical - Clinical assessment and therapeutic reasoning
 symthaea-clinical = { path = "crates/symthaea-clinical", optional = true }
@@ -274,7 +294,9 @@ symthaea-ectogenesis = { path = "crates/symthaea-ectogenesis", optional = true }
 symthaea-nurture = { path = "crates/symthaea-nurture", optional = true }
 symthaea-population = { path = "crates/symthaea-population", optional = true }
 symthaea-neuroevolution = { path = "crates/symthaea-neuroevolution", optional = true }
+symthaea-jepa = { path = "crates/symthaea-jepa", optional = true }
 symthaea-materials = { path = "crates/symthaea-materials", optional = true }
+symthaea-nuclear = { path = "crates/symthaea-nuclear", optional = true }
 symthaea-nuclear-forensics = { path = "crates/symthaea-nuclear-forensics", optional = true }
 symthaea-fabrication-kernel = { path = "crates/symthaea-fabrication-kernel", optional = true }
 
@@ -336,6 +358,8 @@ futures = { version = "0.3", optional = true }
 uuid = { workspace = true }  # Week 3: Enabled for Goal IDs
 mycelix-sdk = { path = "stubs/mycelix-sdk", optional = true, default-features = false, features = ["standalone"] }
 sha3 = { version = "0.10", optional = true }  # For gradient hashing
+
+# Prism epistemic search (local, offline, 16,384-bit BinaryHV)
 
 # Web Research & Epistemic Verification (Track 6)
 reqwest = { version = "0.13", features = ["json", "rustls"], default-features = false }
@@ -460,6 +484,7 @@ wait-timeout = "0.2"
 [features]
 default = ["default-mind"]
 parallel = []  # Rayon parallelism in cognitive loop (gate for WASM compat)
+turbo-quant = []  # PolarQuant HDC vector compression (hv_compression.rs, memory_bridge.rs)
 
 # ── Binary build gates ──────────────────────────────────────────────
 # These enable optional dependencies for specific binaries.
@@ -511,12 +536,14 @@ neural-bridge-cuda = ["neural-bridge", "candle-core/cuda", "candle-nn/cuda", "ca
 
 # ── Motor / Embodiment ─────────────────────────────────────────────
 cpg = []                                    # Central Pattern Generator (Kuramoto coupled oscillators)
-creative = []                               # Creative agency: motor rendering bridge, artistic expression
+creative = ["dep:symthaea-muse", "dep:symthaea-canvas", "dep:symthaea-aesthetic", "dep:symthaea-atelier"]  # Creative agency: motor rendering bridge, artistic expression
 complex_cfc = ["symthaea-core/complex_cfc"] # Complex-valued CfC neuron with native oscillation
 spectral_state = []                         # Spectral twin: frequency-domain CfC state analysis
 
 # ── Defense / Immune System ────────────────────────────────────────
 sentinel = []                                # Distributed immune system: governance anomaly detection, threat memory, collective immunity
+audio-sentinel = ["dep:symthaea-sentinel"]   # Zero-shot temporal audio pattern recognition (HDC+LTC+CfC)
+hypervisor = []                              # Hierarchical consciousness supervision
 
 # ── Consciousness Deepening ───────────────────────────────────────
 provenance = []                              # Source tracking on StructuredThought (Goldman 1986: reliabilism)
@@ -554,14 +581,17 @@ flight-swarm = ["flight", "symthaea-flight/swarm"]     # Parallel swarm training
 helicopter = ["dep:symthaea-helicopter"]    # HDC-LTC SAR helicopter control via FEP Active Inference
 humanoid = ["dep:symthaea-humanoid"]       # HDC-LTC bipedal humanoid control via FEP Active Inference (DMC benchmark)
 vehicle = ["dep:symthaea-vehicle"]         # HDC-LTC autonomous vehicle control via FEP Active Inference
+browser-agent = ["dep:symthaea-browser"]  # Consciousness-driven browser agent via CDP + HDC encoding
 auv = ["dep:symthaea-auv"]                 # HDC-LTC autonomous underwater vehicle control
 manipulator = ["dep:symthaea-manipulator"] # HDC-LTC consciousness-coupled industrial arm control
 hal = ["dep:symthaea-hal", "humanoid"]    # Hardware abstraction layer (PCA9685 servos, I2C sensors, safety interlocks)
 ssm-power = ["dep:symthaea-ssm", "mesh", "school_learning"]  # Diagonal SSM sensor integration (power stream)
 ssm-power-hal = ["ssm-power", "hal", "symthaea-hal/linux", "dep:linux-embedded-hal"]
+broca_lite = ["dep:symthaea-spore"]             # Lightweight always-on language generation (512 tokens, 1024D, ~2MB)
 ssm_language = ["dep:symthaea-broca"]          # Native CfC-HDC language center (SSM Broca's area)
 canvas = ["dep:symthaea-canvas"]               # Living topology UI: cognitive geometry → animated SVG
 neuroevolution = ["dep:symthaea-neuroevolution"]  # CfC-HDC neuroevolution: evolve neural organisms via Free Energy minimization
+jepa = ["dep:symthaea-jepa"]                         # JEPA: latent-space prediction for thermodynamically efficient FEP
 therapeutic = ["dep:symthaea-clinical", "dep:symthaea-therapeutic", "ssm_language", "symthaea-broca/therapeutic"]
 liquid-mamba = ["ssm_language", "symthaea-broca/mamba-cpu"]  # Liquid-Mamba fusion: pre-trained Mamba SSM + HDC consciousness gating (CPU; use symthaea-broca/mamba for GPU)
 humanoid-mujoco = ["humanoid", "symthaea-humanoid/mujoco"]  # Humanoid with MuJoCo physics
@@ -572,6 +602,8 @@ hdc-store = ["dep:symthaea-hdc-store"]  # Zero-copy mmap'd BinaryHV storage with
 fhe-wisdom = []                        # FHE collective wisdom pool for privacy-preserving peer learning
 space-alerts = []                      # Space situational awareness alerts from mycelix-space
 circular = []                          # Waste/circular economy tracking (SwarmEvent + telemetry)
+field-dynamics = ["dep:symthaea-field-dynamics"]   # Consciousness field wave equations
+sensorimotor = ["dep:symthaea-sensorimotor"]       # Sensorimotor contingency theory
 
 # ── Database backends ───────────────────────────────────────────────
 # DuckDB is an unconditional dep. Others deferred:
@@ -613,6 +645,7 @@ integration_module = []         # Integration module (cfg-gated in lib.rs)
 observability_module = ["dep:symthaea-observability"]  # Observability (cfg-gated in gwt_integration + lib.rs)
 support = ["dep:symthaea-support"]                     # IT support intelligence (triage, diagnostics, knowledge, privacy, actions, prediction)
 web_research_module = []        # Web research epistemic verification (cfg-gated in lib.rs)
+prism_search = ["dep:plexus-common", "dep:plexus-search"]  # Prism epistemic search (local, offline)
 unstable-examples = []          # UNTESTED: quarantine gate for examples with stale APIs (never enabled by default, gates test files only)
 
 # ── Genesis Pipeline (DNA-to-Human species stewardship) ───────────
@@ -627,9 +660,12 @@ genesis = ["genomics", "cell-foundry", "ectogenesis", "nurture", "population"]  
 fusion-twin = ["physics"]
 safety-agents = []
 materials = ["dep:symthaea-materials"]
+nuclear = ["dep:symthaea-nuclear"]                      # Computational nuclear structure: mass formula, shell model, island of stability
 nuclear-forensics = ["dep:symthaea-nuclear-forensics"]
 water-prediction = ["cell-foundry"]
 physics-bridge = ["physics", "dep:symthaea-physics-bridge"]  # HDC semantic physics bridge + guided design exploration
+analogy-engine = []   # Cross-domain analogy detection in cognitive loop (AnalogyEngine from symthaea-core)
+ucl-frames = []       # UCL cross-domain semantic frame detection in cognitive loop
 grid-scaling = ["physics"]
 fission-reactor = ["physics"]
 accelerator = ["physics"]
@@ -649,8 +685,75 @@ proliferation-safeguards = ["nuclear-forensics"]
 # REMOVED: nix_full (was alias for nix-mind) — use nix-mind directly
 all_benchmarks = ["benchmarks", "physics"]              # All benchmarking features (causal validation + tokamak plasma)
 
+# ── Tested profiles — CI-validated feature combinations ──────────
+# Each profile bundles logically related features that are tested together.
+# Run: ./scripts/test-feature-profiles.sh to validate all profiles compile.
+
+# Deep consciousness stack: IIT 4.0 + structured bottleneck + reasoning + provenance + self-schema
+profile-consciousness = [
+    "full_consciousness",
+    "provenance",
+    "self_schema",
+    "structured_bottleneck",
+    "continuous_hot",
+    "ctc_wiring",
+    "unified_precision",
+    "interoceptive_inference",
+    "england_dissipation",
+    "iit4",
+    "reasoning_engine",
+    "epistemic",
+]
+
+# Voice pipeline: vocal-tract articulatory synthesis + SSM language center (no ONNX runtime needed)
+profile-voice = [
+    "vocal-tract",
+    "ssm_language",
+    "muse",
+]
+
+# Embodiment: all robotics platforms with CPG motor control
+profile-embodiment = [
+    "cpg",
+    "humanoid",
+    "flight",
+    "helicopter",
+    "vehicle",
+    "auv",
+    "manipulator",
+]
+
+# Distributed networking: mesh radio + P2P swarm + identity + encryption
+profile-distributed = [
+    "mesh",
+    "mesh-encryption",
+    "mesh-key-exchange",
+    "swarm",
+    "identity",
+    "pqc-handshake",
+    "fhe-wisdom",
+]
+
+# Reasoning + code understanding + scientific method
+profile-reasoning = [
+    "reasoning_engine",
+    "code_generation",
+    "school_learning",
+    "scientific_method",
+    "mathematics",
+    "geodesic_synthesis",
+]
+
+# Genesis: full DNA-to-human species stewardship pipeline
+profile-genesis = [
+    "genesis",
+    "safety-agents",
+    "sentinel",
+]
+
 # ── Mind bundles (graduated consciousness stacks) ─────────────────
 default-mind = [
+    "broca_lite",
     "reasoning_engine",
     "integrity",
     "glyph_codex",
@@ -664,6 +767,7 @@ default-mind = [
     "unified_precision",      # Dynamic HFE precision (Parr 2019). Fixed: 46 Hz (was 1.1 Hz)
     "england_dissipation",    # England exploration + Prigogine-England tension resolution
     "interoceptive_inference", # Body-state prediction modulates precision + blanket (Seth 2021)
+    "observability_module",   # Prometheus metrics + GWT integration telemetry
 ]
 
 
@@ -783,6 +887,10 @@ required-features = ["flight-mujoco-renderer"]
 [[example]]
 name = "kinetic_sacrifice"
 required-features = ["flight-mujoco"]
+
+[[test]]
+name = "causal_consciousness_experiments"
+required-features = ["humanoid"]
 
 [[test]]
 name = "breaking_points_embodied"

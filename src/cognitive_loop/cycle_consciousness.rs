@@ -11,6 +11,9 @@
 
 use std::time::Instant;
 
+#[cfg(feature = "parallel")]
+use rayon::join as rayon_join;
+
 use super::thresholds::{
     CAUSAL_BINDING_THRESHOLD, HARMONIC_FIELD_BOOST_FACTOR, HARMONIC_FIELD_BOOST_THRESHOLD,
     PHI_VALIDATION_HIGH_THRESHOLD, PHI_VALIDATION_LOW_THRESHOLD, REASONING_CONFIDENCE_BOOST_FACTOR,
@@ -157,14 +160,219 @@ impl CognitiveLoopService {
             self.compute_value_evaluator_phase(unified_psi, module_timings);
 
         // ═══════════════════════════════════════════════════════════════════════
-        // CONSCIOUSNESS PROFILE: Multi-dimensional consciousness assessment
-        // [extracted to compute_consciousness_profile_phase]
+        // PARALLEL CONSCIOUSNESS METRICS: phi_validation + dissipative +
+        // consciousness_profile (Branch A) ‖ fiduciary_harmonics +
+        // primitive_reasoning + epistemic_conflict (Branch B).
+        //
+        // These 6 phases access disjoint fields of PrimitiveTierManager and
+        // produce only numeric results + deferred feedback. When the `parallel`
+        // feature is enabled, rayon::join runs them concurrently.
         // ═══════════════════════════════════════════════════════════════════════
-        let (
-            consciousness_profile_composite,
-            synergy_enhanced_composite,
-            emergent_properties_count,
-        ) = self.compute_consciousness_profile_phase(hv16_cached, module_timings);
+        let has_primitive_processor = self.primitive_tier.primitive_processor.is_some();
+
+        // Snapshot carryover values needed by parallel branches (read-only copies).
+        let snap_phi_validation_correlation = self.carryover.quality.phi_validation_correlation;
+        let snap_phi_spectral_weight = self.carryover.quality.phi_spectral_weight;
+        let snap_dissipative_health = self.carryover.quality.last_dissipative_health;
+        let snap_profile_composite = self.carryover.history.last_profile_composite;
+        let snap_synergy_composite = self.carryover.history.last_synergy_composite;
+        let snap_emergent_count = self.carryover.history.last_emergent_count;
+        let snap_harmonic_coherence = self.carryover.consciousness.last_harmonic_coherence;
+        let snap_phi_eff = self.carryover.quality.last_phi_eff;
+        let snap_body_phi_modulation = self.carryover.consciousness.body_phi_modulation;
+        let snap_prediction_confidence = self.prediction_confidence;
+        let total_cycles = self.stats.total_cycles;
+
+        // Split disjoint borrows from primitive_tier and carryover for parallel branches.
+        // Rust's borrow checker verifies these are non-overlapping struct fields.
+        let branch_a_phi_validation = &mut self.primitive_tier.phi_validation;
+        let branch_a_dissipative = &mut self.primitive_tier.dissipative_consciousness;
+        let branch_a_recent_hvs = &mut self.carryover.history.recent_hvs;
+
+        let branch_b_harmonic_field = &mut self.primitive_tier.harmonic_field;
+        let branch_b_harmonic_resolver = &self.primitive_tier.harmonic_resolver;
+        let branch_b_primitive_reasoner = &mut self.primitive_tier.primitive_reasoner;
+        let branch_b_epistemic_conflict = &mut self.primitive_tier.epistemic_conflict_detector;
+        let branch_b_theory_calibrator = &self.primitive_tier.theory_calibrator;
+
+        // `mut` required for non-parallel FnMut call; unused_mut when `parallel`
+        // moves the closure into rayon_join.
+        #[allow(unused_mut)]
+        let mut branch_a_fn = || {
+            super::helpers::parallel_consciousness_branch_a(
+                branch_a_phi_validation,
+                branch_a_dissipative,
+                has_primitive_processor,
+                hv16_cached,
+                branch_a_recent_hvs,
+                prediction_error,
+                coherence,
+                unified_psi,
+                total_cycles,
+                snap_phi_validation_correlation,
+                snap_phi_spectral_weight,
+                snap_dissipative_health,
+                snap_profile_composite,
+                snap_synergy_composite,
+                snap_emergent_count,
+            )
+        };
+        #[allow(unused_mut)]
+        let mut branch_b_fn = || {
+            super::helpers::parallel_consciousness_branch_b(
+                branch_b_harmonic_field,
+                branch_b_harmonic_resolver,
+                branch_b_primitive_reasoner,
+                branch_b_epistemic_conflict,
+                branch_b_theory_calibrator,
+                coherence,
+                prediction_error,
+                unified_psi,
+                snap_prediction_confidence,
+                total_cycles,
+                snap_harmonic_coherence,
+                snap_phi_eff,
+                snap_body_phi_modulation,
+            )
+        };
+
+        #[cfg(feature = "parallel")]
+        let (branch_a, branch_b) = {
+            use std::panic::AssertUnwindSafe;
+            rayon_join(
+                || {
+                    std::panic::catch_unwind(AssertUnwindSafe(branch_a_fn)).unwrap_or_else(|_| {
+                        tracing::error!(
+                            "Consciousness Branch A (phi_validation/dissipative/profile) panicked"
+                        );
+                        super::helpers::ConsciousnessMetricsBranchA {
+                            phi_validation_correlation: snap_phi_validation_correlation,
+                            phi_validation_timing: 0,
+                            dissipative_health: 0.0,
+                            dissipative_regime: String::new(),
+                            dissipative_entropy_rate: 0.0,
+                            dissipative_timing: 0,
+                            consciousness_profile_composite: snap_profile_composite,
+                            synergy_enhanced_composite: snap_synergy_composite,
+                            emergent_properties_count: snap_emergent_count,
+                            consciousness_profile_timing: 0,
+                            new_phi_validation_correlation: None,
+                            new_phi_spectral_weight: None,
+                            new_dissipative_health: None,
+                            new_profile_composite: None,
+                            new_synergy_composite: None,
+                            new_emergent_count: None,
+                            deferred: Vec::new(),
+                        }
+                    })
+                },
+                || {
+                    std::panic::catch_unwind(AssertUnwindSafe(branch_b_fn)).unwrap_or_else(|_| {
+                        tracing::error!(
+                            "Consciousness Branch B (harmonics/reasoning/epistemic) panicked"
+                        );
+                        super::helpers::ConsciousnessMetricsBranchB {
+                            harmonic_field_coherence: snap_harmonic_coherence,
+                            harmonic_love_resonance: 0.0,
+                            harmonic_interferences: 0,
+                            harmonics_timing: 0,
+                            reasoning_chain_confidence: 0.0,
+                            reasoning_chain_depth: 0,
+                            reasoning_timing: 0,
+                            epistemic_phi_eff: snap_phi_eff,
+                            epistemic_conflict_count: 0,
+                            epistemic_conflict_timing: 0,
+                            new_harmonic_coherence: None,
+                            new_phi_eff: None,
+                            new_epistemic_conflict_count: None,
+                            epistemic_reasoning_override: false,
+                            deferred: Vec::new(),
+                        }
+                    })
+                },
+            )
+        };
+        #[cfg(not(feature = "parallel"))]
+        let (branch_a, branch_b) = (branch_a_fn(), branch_b_fn());
+
+        // ── Apply deferred feedback from parallel branches ──────────────
+        for fb in branch_a.deferred.iter().chain(branch_b.deferred.iter()) {
+            match fb {
+                super::helpers::DeferredFeedback::AdjustConfidence(tag, delta) => {
+                    self.adjust_confidence(tag, *delta);
+                }
+                super::helpers::DeferredFeedback::ScaleLr(tag, factor) => {
+                    self.scale_lr(tag, *factor);
+                }
+                super::helpers::DeferredFeedback::AdjustExploration(tag, delta) => {
+                    self.adjust_exploration(tag, *delta);
+                }
+                super::helpers::DeferredFeedback::ScaleExploration(tag, factor) => {
+                    self.scale_exploration(tag, *factor);
+                }
+                super::helpers::DeferredFeedback::ScaleSubsystemLr(factor) => {
+                    self.carryover.learning.subsystem_lr_factor *= factor;
+                }
+            }
+        }
+
+        // ── Write back cached carryover values from Branch A ────────────
+        if let Some(v) = branch_a.new_phi_validation_correlation {
+            self.carryover.quality.phi_validation_correlation = v;
+        }
+        if let Some(v) = branch_a.new_phi_spectral_weight {
+            self.carryover.quality.phi_spectral_weight = v;
+        }
+        if let Some(v) = branch_a.new_dissipative_health {
+            self.carryover.quality.last_dissipative_health = v;
+        }
+        if let Some(v) = branch_a.new_profile_composite {
+            self.carryover.history.last_profile_composite = v;
+        }
+        if let Some(v) = branch_a.new_synergy_composite {
+            self.carryover.history.last_synergy_composite = v;
+        }
+        if let Some(v) = branch_a.new_emergent_count {
+            self.carryover.history.last_emergent_count = v;
+        }
+
+        // ── Write back cached carryover values from Branch B ────────────
+        if let Some(v) = branch_b.new_harmonic_coherence {
+            self.carryover.consciousness.last_harmonic_coherence = v;
+        }
+        if let Some(v) = branch_b.new_phi_eff {
+            self.carryover.quality.last_phi_eff = v;
+        }
+        if let Some(v) = branch_b.new_epistemic_conflict_count {
+            self.carryover.quality.last_epistemic_conflict_count = v;
+        }
+        if branch_b.epistemic_reasoning_override {
+            self.carryover.quality.epistemic_reasoning_override = true;
+        }
+
+        // ── Unpack parallel branch results ──────────────────────────────
+        let phi_validation_correlation = branch_a.phi_validation_correlation;
+        let dissipative_health = branch_a.dissipative_health;
+        let dissipative_regime = branch_a.dissipative_regime;
+        let dissipative_entropy_rate = branch_a.dissipative_entropy_rate;
+        let consciousness_profile_composite = branch_a.consciousness_profile_composite;
+        let synergy_enhanced_composite = branch_a.synergy_enhanced_composite;
+        let emergent_properties_count = branch_a.emergent_properties_count;
+        let harmonic_field_coherence = branch_b.harmonic_field_coherence;
+        let harmonic_love_resonance = branch_b.harmonic_love_resonance;
+        let harmonic_interferences = branch_b.harmonic_interferences;
+        let reasoning_chain_confidence = branch_b.reasoning_chain_confidence;
+        let reasoning_chain_depth = branch_b.reasoning_chain_depth;
+        let epistemic_phi_eff = branch_b.epistemic_phi_eff;
+        let epistemic_conflict_count = branch_b.epistemic_conflict_count;
+
+        // ── Write module timings from parallel branches ──────────────────
+        module_timings.phi_validation = branch_a.phi_validation_timing;
+        module_timings.dissipative_consciousness = branch_a.dissipative_timing;
+        module_timings.consciousness_profile = branch_a.consciousness_profile_timing;
+        module_timings.harmonics = branch_b.harmonics_timing;
+        module_timings.primitive_reasoning = branch_b.reasoning_timing;
+        module_timings.epistemic_conflict = branch_b.epistemic_conflict_timing;
 
         // ═══════════════════════════════════════════════════════════════════════
         // CONTEXT-AWARE EVOLUTION: Dynamic Φ/Harmonic/Epistemic weighting
@@ -247,45 +455,6 @@ impl CognitiveLoopService {
         module_timings.composition_rules = _t.elapsed().as_micros() as u64;
 
         // ═══════════════════════════════════════════════════════════════════════
-        // FIDUCIARY HARMONICS: Eight Harmonies field coherence + interference
-        // [extracted to compute_fiduciary_harmonics_phase]
-        // ═══════════════════════════════════════════════════════════════════════
-        let (harmonic_field_coherence, harmonic_love_resonance, harmonic_interferences) = self
-            .compute_fiduciary_harmonics_phase(
-                coherence,
-                prediction_error,
-                unified_psi,
-                module_timings,
-            );
-
-        // ═══════════════════════════════════════════════════════════════════════
-        // PRIMITIVE REASONING: HDC-based analogical reasoning
-        // Runs a quick reasoning chain on the current input for concept binding.
-        // Amortized: every 23 cycles (reasoning chains have some compute cost, co-prime).
-        // Science: Kanerva (2009) — hyperdimensional analogical reasoning.
-        // ═══════════════════════════════════════════════════════════════════════
-        let _t = Instant::now();
-        let (reasoning_chain_confidence, reasoning_chain_depth) =
-            if let Some(ref mut reasoner) = self.primitive_tier.primitive_reasoner {
-                if self.stats.total_cycles % 47 == 0 && self.stats.total_cycles > 0 {
-                    let result = reasoner.reason("cognitive_state", &[]);
-                    (result.confidence, result.reasoning_chain.len())
-                } else {
-                    (0.0, 0)
-                }
-            } else {
-                (0.0, 0)
-            };
-        module_timings.primitive_reasoning = _t.elapsed().as_micros() as u64;
-
-        // FEEDBACK: High reasoning confidence → boost prediction confidence
-        if reasoning_chain_confidence > REASONING_CONFIDENCE_BOOST_THRESHOLD {
-            let reason_boost = (reasoning_chain_confidence - REASONING_CONFIDENCE_BOOST_THRESHOLD)
-                * REASONING_CONFIDENCE_BOOST_FACTOR; // up to +0.9%
-            self.adjust_confidence("reasoning_chain", reason_boost);
-        }
-
-        // ═══════════════════════════════════════════════════════════════════════
         // CAUSAL SELF-EXPLANATION: Pearl causal model of primitive→Phi effects
         // [extracted to compute_causal_self_explanation_phase]
         // ═══════════════════════════════════════════════════════════════════════
@@ -361,30 +530,6 @@ impl CognitiveLoopService {
             0.0
         };
         module_timings.epistemic_tiers = _t.elapsed().as_micros() as u64;
-
-        // ═══════════════════════════════════════════════════════════════════════
-        // PHI VALIDATION: Empirical validation of Phi against synthetic states
-        // [extracted to compute_phi_validation_phase]
-        // ═══════════════════════════════════════════════════════════════════════
-        let phi_validation_correlation = self.compute_phi_validation_phase(module_timings);
-
-        // ═══════════════════════════════════════════════════════════════════════
-        // DISSIPATIVE CONSCIOUSNESS: Prigogine thermodynamic self-organization
-        // [extracted to compute_dissipative_phase]
-        // ═══════════════════════════════════════════════════════════════════════
-        let (dissipative_health, dissipative_regime, dissipative_entropy_rate) = self
-            .compute_dissipative_phase(prediction_error, coherence, unified_psi, module_timings);
-
-        // ═══════════════════════════════════════════════════════════════════════
-        // EPISTEMIC CONFLICT: Multi-theory conflict detection + Φ_eff reliability weighting
-        // [extracted to compute_epistemic_conflict_phase]
-        // ═══════════════════════════════════════════════════════════════════════
-        let (epistemic_phi_eff, epistemic_conflict_count) = self.compute_epistemic_conflict_phase(
-            unified_psi,
-            coherence,
-            prediction_error,
-            module_timings,
-        );
 
         // ═══════════════════════════════════════════════════════════════════════
         // CONSCIOUSNESS EQUATION V2: Unified 7-theory formula
@@ -1018,7 +1163,7 @@ impl CognitiveLoopService {
     ) -> f64 {
         let _t = Instant::now();
         let correlation = if let Some(ref mut validator) = self.primitive_tier.phi_validation {
-            if self.stats.total_cycles % 499 == 0 && self.stats.total_cycles >= 499 {
+            if self.stats.total_cycles % 997 == 0 && self.stats.total_cycles >= 997 {
                 let results = validator.run_validation_study(10);
                 let r = results.pearson_r;
                 self.carryover.quality.phi_validation_correlation = r;
@@ -1234,7 +1379,9 @@ mod tests {
 
     #[test]
     fn lattice_phase_no_lattice_returns_zeros() {
-        let mut s = make_service();
+        let mut config = super::super::CognitiveLoopConfig::default();
+        config.enable_primitive_consciousness = false;
+        let mut s = super::super::CognitiveLoopService::new(config).unwrap();
         let primitives: Vec<String> = vec![];
         let mut timings = super::super::ModuleTimings::default();
         let (height, width, join) = s.compute_lattice_phase(&primitives, &mut timings);
@@ -1260,7 +1407,9 @@ mod tests {
 
     #[test]
     fn fiduciary_harmonics_no_field_returns_zeros() {
-        let mut s = make_service();
+        let mut config = super::super::CognitiveLoopConfig::default();
+        config.enable_primitive_consciousness = false;
+        let mut s = super::super::CognitiveLoopService::new(config).unwrap();
         let mut timings = super::super::ModuleTimings::default();
         let (coherence, love, interferences) =
             s.compute_fiduciary_harmonics_phase(0.5, 0.2, 0.3, &mut timings);
@@ -1273,7 +1422,9 @@ mod tests {
 
     #[test]
     fn dissipative_phase_no_module_returns_zeros() {
-        let mut s = make_service();
+        let mut config = super::super::CognitiveLoopConfig::default();
+        config.enable_primitive_consciousness = false;
+        let mut s = super::super::CognitiveLoopService::new(config).unwrap();
         let mut timings = super::super::ModuleTimings::default();
         let (health, regime, entropy_rate) =
             s.compute_dissipative_phase(0.2, 0.5, 0.3, &mut timings);

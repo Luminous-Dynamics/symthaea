@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 // Web Worker for Spore consciousness engine.
 // Keeps experiments and heavy cycles off the main thread.
 
@@ -5,6 +8,26 @@ import init, { SporeEngine } from './pkg/symthaea_spore.js';
 
 let engine = null;
 let running = false;
+
+// SRI integrity hashes for binary checkpoints (SHA-384, base64)
+const SRI_HASHES = {
+  'broca-spore-v1':  'sha384-64PfK8W4PXmIQFZRarpCpZy9Rt+PrfASbeebbvwUwhA6q6HOpx9Pzq6ycrmrAsij',
+  'broca-pipeline':  'sha384-zg2Z4NjVMxVkRCtcs66FQK0nCBSrghMQ3uh9gChjx6HTl2bYvuhvttRXJdBQkr4j',
+};
+
+// Verify SHA-384 integrity of a fetched ArrayBuffer.
+// Throws if the hash does not match the expected value.
+async function verifyIntegrity(buffer, expectedSRI, label) {
+  const hashBuf = await crypto.subtle.digest('SHA-384', buffer);
+  const hashArr = new Uint8Array(hashBuf);
+  let binary = '';
+  for (let i = 0; i < hashArr.length; i++) binary += String.fromCharCode(hashArr[i]);
+  const computed = 'sha384-' + btoa(binary);
+  if (computed !== expectedSRI) {
+    throw new Error('SRI integrity check FAILED for ' + label +
+      '. Expected ' + expectedSRI + ', got ' + computed);
+  }
+}
 let cycleInterval = null;
 let currentThought = 'awareness';
 let cycleCount = 0;
@@ -199,27 +222,56 @@ self.onmessage = async function(e) {
       case 'report':
         if (engine) result = engine.consciousness_report();
         break;
-      // Broca checkpoint loading
+      // Broca checkpoint loading (with SRI integrity verification)
       case 'loadBrocaCheckpoint':
         if (engine) {
           var response = await fetch('./assets/broca-spore-v1.bin');
           if (!response.ok) throw new Error('Checkpoint fetch failed: ' + response.status);
           var buffer = await response.arrayBuffer();
+          await verifyIntegrity(buffer, SRI_HASHES['broca-spore-v1'], 'broca-spore-v1.bin');
           engine.load_broca_checkpoint(new Uint8Array(buffer));
-          result = { ok: true, size: buffer.byteLength };
+          result = { ok: true, size: buffer.byteLength, integrity: 'verified' };
         }
         break;
       case 'loadBrocaPipeline':
         if (engine) {
+          self.postMessage({ type: 'pipeline_progress', stage: 'downloading', percent: 0 });
           // Try local first (self-hosted), fall back to GitHub LFS
           var response = await fetch('./assets/broca-pipeline.bin').catch(function() { return { ok: false }; });
+          var source = 'local';
           if (!response.ok) {
+            source = 'github';
             response = await fetch('https://media.githubusercontent.com/media/Luminous-Dynamics/symthaea/main/crates/symthaea-spore/data/broca-pipeline-distilled.bin');
           }
           if (!response.ok) throw new Error('Pipeline checkpoint fetch failed: ' + response.status);
-          var buffer = await response.arrayBuffer();
+          // Stream download with progress reporting
+          var contentLength = parseInt(response.headers.get('content-length') || '0', 10);
+          var buffer;
+          if (contentLength > 0 && response.body) {
+            var reader = response.body.getReader();
+            var chunks = [];
+            var received = 0;
+            while (true) {
+              var _r = await reader.read();
+              if (_r.done) break;
+              chunks.push(_r.value);
+              received += _r.value.length;
+              var pct = Math.round((received / contentLength) * 100);
+              self.postMessage({ type: 'pipeline_progress', stage: 'downloading', percent: pct, bytes: received, total: contentLength, source: source });
+            }
+            var combined = new Uint8Array(received);
+            var offset = 0;
+            for (var ch of chunks) { combined.set(ch, offset); offset += ch.length; }
+            buffer = combined.buffer;
+          } else {
+            buffer = await response.arrayBuffer();
+          }
+          self.postMessage({ type: 'pipeline_progress', stage: 'verifying', percent: 100 });
+          await verifyIntegrity(buffer, SRI_HASHES['broca-pipeline'], 'broca-pipeline.bin');
+          self.postMessage({ type: 'pipeline_progress', stage: 'loading', percent: 100 });
           engine.load_broca_pipeline_checkpoint(new Uint8Array(buffer));
-          result = { ok: true, size: buffer.byteLength, pipeline: true };
+          self.postMessage({ type: 'pipeline_progress', stage: 'ready', percent: 100 });
+          result = { ok: true, size: buffer.byteLength, pipeline: true, integrity: 'verified', source: source };
         }
         break;
       // Phase 1: Language generation (Broca)

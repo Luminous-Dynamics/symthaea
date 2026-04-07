@@ -107,7 +107,7 @@ in {
       model = lib.mkOption {
         type = lib.types.str;
         default = "gemma3:1b";
-        description = "Primary Ollama model (approved: gemma3:1b, qwen3:1.7b, gemma3:4b, mistral:7b).";
+        description = "Primary Ollama model (approved: gemma3:1b, qwen3:1.7b, gemma4:e2b, mistral:7b).";
       };
 
       timeout = lib.mkOption {

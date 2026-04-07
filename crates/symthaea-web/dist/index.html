@@ -6,17 +6,20 @@
     <title>Symthaea — Consciousness-First Infrastructure</title>
     <meta name="description" content="Consciousness-first cognitive architecture running in your browser. Pure Rust, no JavaScript runtime.">
     <meta name="theme-color" content="#7ec8a0">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; connect-src 'self' ws://localhost:* wss://*; img-src 'self' data:; worker-src 'self';">
+    <meta http-equiv="X-Content-Type-Options" content="nosniff">
+    <meta http-equiv="X-Frame-Options" content="DENY">
     <link rel="manifest" href="./assets/manifest.json">
     <link rel="icon" type="image/png" sizes="32x32" href="./assets/favicon-32.png">
     <link rel="apple-touch-icon" href="./assets/icon-192.png">
-    <link rel="stylesheet" href="/main-f82b44c1dd08c72d.css" integrity="sha384-s389gR0/evT5vYghMD2WGSqG0moxhlH+iOY/OePdCBumZoIlfqKgPoayM9pAHpRp"/>
+    <link rel="stylesheet" href="/main-907e26af387b6ff2.css" integrity="sha384-uaLl8w60VyKrl2xTJqcA0K0AL6M1CFKkGdgRCTuFRs6c1y580ZT9t8zkUY5tGIaC"/>
     <!-- Copy the SporeEngine WASM + worker to dist -->
     
-<link rel="modulepreload" href="/symthaea-web-1e0aace40a38a4d4.js" crossorigin="anonymous" integrity="sha384-syNWpljlEXCJ3LwricFu7dQFDkadnqD8BdDSh9RjEqlcxKOMx85sokRhGljQ3nYA"><link rel="preload" href="/symthaea-web-1e0aace40a38a4d4_bg.wasm" crossorigin="anonymous" integrity="sha384-KyP7jQDgiU0I9TQiHPokGwJqgqnhxORf47BjzvG4re+wJh9GeR8QsbWFgmMwBLvQ" as="fetch" type="application/wasm"></head>
+<link rel="modulepreload" href="/symthaea-web-723244db8f5a5c1a.js" crossorigin="anonymous" integrity="sha384-QaEjG7IreJPr9Gzp7UREd3DjGS6jyPRDDo4tGFCbNj4ct9zePSp3c4I0qehnSxbt"><link rel="preload" href="/symthaea-web-723244db8f5a5c1a_bg.wasm" crossorigin="anonymous" integrity="sha384-g5BICqqESTzCppCSWCj0q5rSpGEe/uqC99WhhfbBggmypJUZ7mou3JeLlmihUlTY" as="fetch" type="application/wasm"></head>
 <body>
 <script type="module">
-import init, * as bindings from '/symthaea-web-1e0aace40a38a4d4.js';
-const wasm = await init({ module_or_path: '/symthaea-web-1e0aace40a38a4d4_bg.wasm' });
+import init, * as bindings from '/symthaea-web-723244db8f5a5c1a.js';
+const wasm = await init({ module_or_path: '/symthaea-web-723244db8f5a5c1a_bg.wasm' });
 
 
 window.wasmBindings = bindings;

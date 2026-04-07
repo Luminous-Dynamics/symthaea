@@ -24,6 +24,8 @@ ed25519-dalek = { version = "2", optional = true, default-features = false, feat
 hex = { version = "0.4", optional = true }
 symthaea-broca = { path = "../symthaea-broca", optional = true }
 positioning = { path = "../../../mycelix-position/lib/positioning", optional = true }
+plexus-common = { path = "../../../plexus/plexus-common", optional = true }
+plexus-search = { path = "../../../plexus/plexus-search", optional = true }
 tracing = { workspace = true }
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
@@ -37,6 +39,12 @@ pairing = ["dep:ed25519-dalek", "dep:hex"]
 screen-vision = []
 # Full 20-channel Broca language center with epistemic gating and semantic veto.
 broca-full = ["dep:symthaea-broca"]
+# On-device Gemma 4 E2B via Google LiteRT-LM (requires native/litert_shim.so on Android).
+litert = []
+# Prism epistemic search (16,384-bit BinaryHV, offline-capable, sub-ms queries).
+prism-search = ["dep:plexus-common", "dep:plexus-search"]
+# Broca + LiteRT fusion engine (consciousness skeleton + factual expansion).
+fusion = ["litert", "broca-full"]
 # Decentralized cooperative positioning (GPS-independent).
 positioning = ["dep:positioning"]
 

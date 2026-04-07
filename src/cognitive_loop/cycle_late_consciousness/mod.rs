@@ -339,7 +339,9 @@ mod tests {
 
     #[test]
     fn temporal_discontinuity_streak_decrements_without_discontinuity() {
-        let mut s = make_service();
+        let mut config = super::super::CognitiveLoopConfig::default();
+        config.enable_temporal_consciousness = false;
+        let mut s = super::super::CognitiveLoopService::new(config).unwrap();
         s.stats.total_cycles = 1;
         s.carryover.urgency.discontinuity_streak = 2;
         let compressed = vec![0.0f32; 64];

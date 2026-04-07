@@ -39,6 +39,14 @@ pub(super) struct PercMoral {
     pub(super) moral_score: f32,
     pub(super) moral_judgment: MoralJudgmentSummary,
     pub(super) soul_alignment: f32,
+    /// 18D Spinozist affect fingerprint.
+    pub(super) moral_affect_coords: [f32; 18],
+    /// FluctuatioAnimi max tension.
+    pub(super) moral_fluctuatio_tension: f32,
+    /// Moral ambiguity flag.
+    pub(super) moral_is_ambiguous: bool,
+    /// Epistemic confidence from affect adequacy.
+    pub(super) moral_epistemic_confidence: f32,
 }
 
 /// Response strategy selection.
@@ -264,6 +272,7 @@ pub(super) struct DynamicsPhaseResult {
     pub(super) epistemic_uncertainty: f32,
     pub(super) aleatoric_uncertainty: f32,
     pub(super) fep_tau_factor: f32,
+    pub(super) phi_tau_factor: f32,
     pub(super) prediction_horizon_tau: f32,
     pub(super) causal_world_model_edges: usize,
     pub(super) epistemic_budget_scale: f32,

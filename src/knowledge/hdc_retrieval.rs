@@ -234,7 +234,7 @@ mod tests {
 
     fn random_hv() -> BinaryHV {
         let seed = SEED.fetch_add(1, Ordering::Relaxed);
-        BinaryHV::random(HDC_DIMENSION, seed)
+        BinaryHV::random(seed)
     }
 
     #[test]

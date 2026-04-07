@@ -43,13 +43,22 @@ pub struct ControllerCheckpoint {
 /// 2. `output = network.output()` — bundled final layer (16,384D)
 /// 3. `output_weights @ output + output_bias` → 21D raw
 /// 4. Activation: tanh for all actuators (bipolar torques)
+/// Bottleneck dimension for the nonlinear output head.
+/// Random projection 16384→BOTTLENECK preserves distance (Johnson-Lindenstrauss).
+/// Only the BOTTLENECK→num_outputs weights are learned (1.4K vs 344K trainable params).
+const BOTTLENECK_DIM: usize = 64;
+
 pub struct HumanoidController {
     /// The temporal dynamics engine — full 16,384D HDC-LTC.
     network: HdcLtcUnifiedNetwork,
-    /// Output projection weights: 21 rows × 16,384 columns (flat row-major).
+    /// Random projection vectors for bottleneck (BOTTLENECK_DIM × HDC_DIMENSION, fixed).
+    bottleneck_projections: Vec<ContinuousHV>,
+    /// Output weights: num_outputs × BOTTLENECK_DIM (learned, small!).
     output_weights: Vec<f32>,
-    /// Output bias (21D).
-    output_bias: [f32; NUM_ACTUATORS],
+    /// Output bias.
+    output_bias: Vec<f32>,
+    /// Number of output actuators (matches morphology).
+    num_outputs: usize,
     /// Current learning rate (modulated by FEP agent).
     learning_rate: f32,
     /// Temporary LR multiplier (e.g., 3.0 during phase transitions).
@@ -76,21 +85,28 @@ impl HumanoidController {
 
         let network = HdcLtcUnifiedNetwork::from_genesis(net_config, genesis);
 
-        // Initialize output weights from genesis (small values for stability)
-        let total_weights = NUM_ACTUATORS * HDC_DIMENSION;
-        let weight_hv = genesis.hv("humanoid::output_weights", total_weights);
+        // Random projection bottleneck: 64 fixed HVs for 16384→64 dimensionality reduction
+        let bottleneck_projections: Vec<ContinuousHV> = (0..BOTTLENECK_DIM)
+            .map(|i| genesis.hv(&format!("humanoid::bottleneck::{i}"), HDC_DIMENSION))
+            .collect();
+
+        // Output weights: num_outputs × BOTTLENECK_DIM (only 1.4K trainable params!)
+        let num_outputs = config.morphology.num_actuators();
+        let total_weights = num_outputs * BOTTLENECK_DIM;
+        let weight_hv = genesis.hv("humanoid::output_weights_v2", total_weights);
         let mut output_weights = weight_hv.values;
         for w in &mut output_weights {
-            *w *= 0.01;
+            *w *= 0.1; // Larger init since fewer weights
         }
 
-        // Bias initialized to zero (upright default pose)
-        let output_bias = [0.0f32; NUM_ACTUATORS];
+        let output_bias = vec![0.0f32; num_outputs];
 
         Self {
             network,
+            bottleneck_projections,
             output_weights,
             output_bias,
+            num_outputs,
             learning_rate: config.learning_rate,
             lr_scale: 1.0,
         }
@@ -101,18 +117,22 @@ impl HumanoidController {
     /// The output projection is freshly generated from `genesis` (since the source domain
     /// has a different output dimensionality). Only the network backbone is reused.
     pub fn from_network(network: HdcLtcUnifiedNetwork, genesis: &GenesisSeed) -> Self {
-        let total_weights = NUM_ACTUATORS * HDC_DIMENSION;
-        let weight_hv = genesis.hv("humanoid::output_weights", total_weights);
+        let num_outputs = NUM_ACTUATORS;
+        let bottleneck_projections: Vec<ContinuousHV> = (0..BOTTLENECK_DIM)
+            .map(|i| genesis.hv(&format!("humanoid::bottleneck::{i}"), HDC_DIMENSION))
+            .collect();
+        let total_weights = num_outputs * BOTTLENECK_DIM;
+        let weight_hv = genesis.hv("humanoid::output_weights_v2", total_weights);
         let mut output_weights = weight_hv.values;
-        for w in &mut output_weights {
-            *w *= 0.01;
-        }
-        let output_bias = [0.0f32; NUM_ACTUATORS];
+        for w in &mut output_weights { *w *= 0.1; }
+        let output_bias = vec![0.0f32; num_outputs];
 
         Self {
             network,
+            bottleneck_projections,
             output_weights,
             output_bias,
+            num_outputs,
             learning_rate: 0.0005,
             lr_scale: 1.0,
         }
@@ -130,20 +150,30 @@ impl HumanoidController {
         let output_hv = self.network.output().normalize();
         let hv_values = output_hv.as_slice();
 
-        // 3. Linear projection: output_weights @ hv + bias → 21D
-        let mut raw = [0.0f32; NUM_ACTUATORS];
-        for i in 0..NUM_ACTUATORS {
-            let row_offset = i * HDC_DIMENSION;
+        // 3. Bottleneck: 16384→64 via fixed random projections (dot products)
+        let mut bottleneck = vec![0.0f32; BOTTLENECK_DIM];
+        for (b, proj) in bottleneck.iter_mut().zip(self.bottleneck_projections.iter()) {
+            *b = proj.similarity(&output_hv); // Cosine similarity = normalized dot product
+        }
+        // Apply tanh nonlinearity — this is what enables learning nonlinear control laws
+        for b in bottleneck.iter_mut() {
+            *b = fast_tanh(*b * 3.0); // Scale by 3 to use more of tanh range
+        }
+
+        // 4. Small linear projection: 64→num_outputs
+        let mut raw = vec![0.0f32; self.num_outputs];
+        for i in 0..self.num_outputs {
+            let row_offset = i * BOTTLENECK_DIM;
             let mut sum = self.output_bias[i];
-            for j in 0..HDC_DIMENSION {
-                sum += self.output_weights[row_offset + j] * hv_values[j];
+            for j in 0..BOTTLENECK_DIM {
+                sum += self.output_weights[row_offset + j] * bottleneck[j];
             }
             raw[i] = sum;
         }
 
         // 4. Activation: tanh for all actuators (bipolar [-1, 1])
-        let mut torques = [0.0f32; NUM_ACTUATORS];
-        for i in 0..NUM_ACTUATORS {
+        let mut torques = vec![0.0f32; self.num_outputs];
+        for i in 0..self.num_outputs {
             torques[i] = fast_tanh(raw[i]);
         }
 
@@ -161,61 +191,93 @@ impl HumanoidController {
         lr_override: Option<f32>,
     ) {
         let lr = lr_override.unwrap_or(self.learning_rate);
-        let output_lr = lr * (HDC_DIMENSION as f32).sqrt();
+        // Scale LR by sqrt(D) but cap to prevent instability
+        // sqrt(16384) = 128, which makes output_lr = lr * 128 — too aggressive
+        // Cap at 10x base LR for stability
+        let output_lr = (lr * (HDC_DIMENSION as f32).sqrt()).min(lr * 10.0);
 
         let output_hv = self.network.output().normalize();
-        let hv_values = output_hv.as_slice();
 
-        // Compute current raw outputs
-        let mut raw = [0.0f32; NUM_ACTUATORS];
-        for i in 0..NUM_ACTUATORS {
-            let row_offset = i * HDC_DIMENSION;
+        // Forward pass through bottleneck (recompute for gradient)
+        let mut bottleneck = vec![0.0f32; BOTTLENECK_DIM];
+        for (b, proj) in bottleneck.iter_mut().zip(self.bottleneck_projections.iter()) {
+            *b = proj.similarity(&output_hv);
+        }
+        let mut bottleneck_activated = vec![0.0f32; BOTTLENECK_DIM];
+        for j in 0..BOTTLENECK_DIM {
+            bottleneck_activated[j] = fast_tanh(bottleneck[j] * 3.0);
+        }
+
+        // Compute raw outputs from bottleneck
+        let mut raw = vec![0.0f32; self.num_outputs];
+        for i in 0..self.num_outputs {
+            let row_offset = i * BOTTLENECK_DIM;
             let mut sum = self.output_bias[i];
-            for j in 0..HDC_DIMENSION {
-                sum += self.output_weights[row_offset + j] * hv_values[j];
+            for j in 0..BOTTLENECK_DIM {
+                sum += self.output_weights[row_offset + j] * bottleneck_activated[j];
             }
             raw[i] = sum;
         }
 
-        // Compute activated outputs and errors
-        let mut d_raw = [0.0f32; NUM_ACTUATORS];
-        for i in 0..NUM_ACTUATORS {
+        // Output error + tanh derivative
+        let mut d_raw = vec![0.0f32; self.num_outputs];
+        for i in 0..self.num_outputs {
             let pred = fast_tanh(raw[i]);
             let error = pred - target.torques[i];
-            // Backprop through tanh: d/dx tanh(x) = 1 - tanh(x)^2
             let tanh_deriv = 1.0 - pred * pred;
             d_raw[i] = error * tanh_deriv;
         }
 
         // Gradient clipping
-        const GRAD_CLIP: f32 = 1.0;
+        const GRAD_CLIP: f32 = 0.5;
         for g in &mut d_raw {
             *g = g.clamp(-GRAD_CLIP, GRAD_CLIP);
         }
 
         // Weight decay
-        const WEIGHT_DECAY: f32 = 1e-4;
+        const WEIGHT_DECAY: f32 = 1e-5;
         let decay = 1.0 - WEIGHT_DECAY;
         for w in self.output_weights.iter_mut() {
             *w *= decay;
         }
 
-        // Update output weights: dW[i][j] = -output_lr * d_raw[i] * hv[j]
-        for i in 0..NUM_ACTUATORS {
-            let row_offset = i * HDC_DIMENSION;
-            for j in 0..HDC_DIMENSION {
-                self.output_weights[row_offset + j] -= output_lr * d_raw[i] * hv_values[j];
+        // Update output weights (BOTTLENECK_DIM × num_outputs — only 1.4K params!)
+        for i in 0..self.num_outputs {
+            let row_offset = i * BOTTLENECK_DIM;
+            for j in 0..BOTTLENECK_DIM {
+                self.output_weights[row_offset + j] -= output_lr * d_raw[i] * bottleneck_activated[j];
             }
             self.output_bias[i] -= output_lr * d_raw[i];
         }
 
         // Full BPTT through network layers
+        // Backprop: d_raw → output_weights → d_bottleneck → tanh' → bottleneck_projections → d_hv
         let dim = HDC_DIMENSION;
+
+        // d_bottleneck_activated = output_weights^T × d_raw
+        let mut d_bottleneck = vec![0.0f32; BOTTLENECK_DIM];
+        for i in 0..self.num_outputs {
+            let row_offset = i * BOTTLENECK_DIM;
+            for j in 0..BOTTLENECK_DIM {
+                d_bottleneck[j] += d_raw[i] * self.output_weights[row_offset + j];
+            }
+        }
+
+        // Through tanh: d_bottleneck_pre = d_bottleneck * tanh'(bottleneck * 3) * 3
+        for j in 0..BOTTLENECK_DIM {
+            let tanh_deriv = 1.0 - bottleneck_activated[j] * bottleneck_activated[j];
+            d_bottleneck[j] *= tanh_deriv * 3.0;
+        }
+
+        // Through random projections: d_hv = Σ_j d_bottleneck[j] × projection[j]
         let mut grad_hv_values = vec![0.0f32; dim];
-        for i in 0..NUM_ACTUATORS {
-            let row_offset = i * dim;
-            for j in 0..dim {
-                grad_hv_values[j] += d_raw[i] * self.output_weights[row_offset + j];
+        for (j, proj) in self.bottleneck_projections.iter().enumerate() {
+            let proj_values = proj.as_slice();
+            let grad = d_bottleneck[j];
+            if grad.abs() > 1e-8 {
+                for k in 0..dim {
+                    grad_hv_values[k] += grad * proj_values[k];
+                }
             }
         }
 
@@ -322,7 +384,7 @@ impl HumanoidController {
         if weights.len() == self.output_weights.len() {
             self.output_weights.copy_from_slice(weights);
         }
-        let n = bias.len().min(NUM_ACTUATORS);
+        let n = bias.len().min(self.num_outputs);
         self.output_bias[..n].copy_from_slice(&bias[..n]);
     }
 
@@ -344,7 +406,7 @@ impl HumanoidController {
     /// Mask a specific actuator output to zero (for phantom limb perturbation).
     /// Returns the previous torque at that index before masking.
     pub fn mask_actuator(cmd: &mut HumanoidCommand, joint_index: usize) {
-        if joint_index < NUM_ACTUATORS {
+        if joint_index < cmd.torques.len() {
             cmd.torques[joint_index] = 0.0;
         }
     }
@@ -402,20 +464,27 @@ impl HumanoidController {
 
         let network = HdcLtcUnifiedNetwork::from_genesis(net_config, &genesis);
 
-        let mut output_bias = [0.0f32; NUM_ACTUATORS];
+        let num_outputs = config.morphology.num_actuators();
+        let mut output_bias = vec![0.0f32; num_outputs];
         for (i, &v) in checkpoint
             .output_bias
             .iter()
             .enumerate()
-            .take(NUM_ACTUATORS)
+            .take(num_outputs)
         {
             output_bias[i] = v;
         }
 
+        let bottleneck_projections: Vec<ContinuousHV> = (0..BOTTLENECK_DIM)
+            .map(|i| genesis.hv(&format!("humanoid::bottleneck::{i}"), HDC_DIMENSION))
+            .collect();
+
         Ok(Self {
             network,
+            bottleneck_projections,
             output_weights: checkpoint.output_weights,
             output_bias,
+            num_outputs,
             learning_rate: checkpoint.learning_rate,
             lr_scale: 1.0,
         })
@@ -487,7 +556,7 @@ mod tests {
 
         let sensor = ContinuousHV::random(HDC_DIMENSION, 42);
         // Use a non-trivial target so initial error is meaningful
-        let mut target_torques = [0.0f32; NUM_ACTUATORS];
+        let mut target_torques = vec![0.0f32; NUM_ACTUATORS];
         for i in 0..NUM_ACTUATORS {
             target_torques[i] = ((i as f32 * 0.3).sin()) * 0.5;
         }
@@ -550,7 +619,7 @@ mod tests {
     #[test]
     fn test_mask_actuator() {
         let mut cmd = HumanoidCommand {
-            torques: [0.5; NUM_ACTUATORS],
+            torques: vec![0.5; NUM_ACTUATORS],
         };
         HumanoidController::mask_actuator(&mut cmd, 6); // right_knee
         assert!((cmd.torques[6] - 0.0).abs() < 1e-6);
@@ -609,7 +678,7 @@ mod tests {
         // Train the output projection
         let sensor = ContinuousHV::random(HDC_DIMENSION, 42);
         let target = HumanoidCommand {
-            torques: [0.3; NUM_ACTUATORS],
+            torques: vec![0.3; NUM_ACTUATORS],
         };
         for _ in 0..20 {
             ctrl.forward(&sensor, 0.025);

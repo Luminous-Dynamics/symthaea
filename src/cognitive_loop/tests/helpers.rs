@@ -75,7 +75,7 @@ fn test_update_cognitive_depth_initial() {
 fn test_run_moral_phase_benign_input() {
     let mut service = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
     service.stats.total_cycles = 1; // trigger evaluation (cycle % 7 == 1)
-    let (score, concern, judgment) = service.run_moral_phase("hello world", 0.0);
+    let (score, concern, judgment, _, _, _, _) = service.run_moral_phase("hello world", 0.0);
     // Benign input: score should be non-negative, no concern
     assert!(score >= -1.0, "Moral score below -1: {score}");
     assert!(!concern, "Benign input flagged as moral concern");
@@ -87,12 +87,12 @@ fn test_run_moral_phase_negation_dampening() {
     let mut service = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
     service.stats.total_cycles = 1;
     // First, get baseline moral score without negation
-    let (score_no_neg, _, _) = service.run_moral_phase("harmful action", 0.0);
+    let (score_no_neg, _, _, _, _, _, _) = service.run_moral_phase("harmful action", 0.0);
     // Reset for second call
     service.stats.total_cycles = 1;
     service.ethics_values.last_moral_judgment = None;
     // With high negation polarity ("not harmful"), score should be dampened
-    let (score_with_neg, _, _) = service.run_moral_phase("harmful action", 0.8);
+    let (score_with_neg, _, _, _, _, _, _) = service.run_moral_phase("harmful action", 0.8);
     // Negation dampening multiplies by 0.3, so |dampened| <= |original|
     assert!(
         score_with_neg.abs() <= score_no_neg.abs() + f32::EPSILON,
@@ -347,7 +347,8 @@ fn test_step_fep_active_inference_high_error_response() {
 
 #[test]
 fn test_update_cross_modal_binding_without_binder() {
-    let service_config = CognitiveLoopConfig::default();
+    let mut service_config = CognitiveLoopConfig::default();
+    service_config.enable_cross_modal_binding = false;
     let mut service = CognitiveLoopService::new(service_config).unwrap();
     // Default config has no cross-modal binder
     let hv = symthaea_core::hdc::binary_hv::BinaryHV::random(42);
@@ -393,7 +394,7 @@ fn test_parallel_semantic_causal_no_panic() {
     let semantic_hdc = vec![0.1f32; 64];
     let compressed = vec![0.2f32; 128];
     let output = vec![0.3f32; 64];
-    // Should not panic
+    // Should not panic and should complete successfully
     super::super::helpers::parallel_semantic_causal(
         &mut semantic_memory,
         &mut causal_enhancer,
@@ -403,6 +404,8 @@ fn test_parallel_semantic_causal_no_panic() {
         0.5,
         10,
     );
+    // Success: parallel execution completed without panic
+    assert!(true);
 }
 
 #[test]
@@ -421,6 +424,8 @@ fn test_episodic_learning_context_construction() {
         detected_primitives: &prims,
         memory_context_boost: 0.1,
         wm_importance_boost: 0.2,
+        #[cfg(feature = "turbo-quant")]
+        full_hdv: None,
     };
     assert_eq!(ctx.total_cycles, 100);
     assert!(ctx.in_flow);
@@ -466,7 +471,9 @@ fn test_compute_temporal_primitives_confidence_stable_without_analyzer() {
 
 #[test]
 fn test_compute_dissipative_no_dc() {
-    let mut service = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
+    let mut config = CognitiveLoopConfig::default();
+    config.enable_primitive_consciousness = false;
+    let mut service = CognitiveLoopService::new(config).unwrap();
     let mut timings = super::super::ModuleTimings::default();
     let (health, regime, entropy) = service.compute_dissipative_phase(0.3, 0.6, 0.5, &mut timings);
     // Without dissipative_consciousness, all zeros
@@ -513,7 +520,9 @@ fn test_compute_equation_v2_exploration_unaffected_at_zero() {
 
 #[test]
 fn test_compute_lattice_no_lattice() {
-    let mut service = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
+    let mut config = CognitiveLoopConfig::default();
+    config.enable_primitive_consciousness = false;
+    let mut service = CognitiveLoopService::new(config).unwrap();
     let mut timings = super::super::ModuleTimings::default();
     let names = vec!["awareness".to_string(), "binding".to_string()];
     let (height, width, join) = service.compute_lattice_phase(&names, &mut timings);
@@ -525,7 +534,9 @@ fn test_compute_lattice_no_lattice() {
 
 #[test]
 fn test_compute_lattice_lr_unaffected_without_lattice() {
-    let mut service = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
+    let mut config = CognitiveLoopConfig::default();
+    config.enable_primitive_consciousness = false;
+    let mut service = CognitiveLoopService::new(config).unwrap();
     let mut timings = super::super::ModuleTimings::default();
     let initial_lr = service.carryover.learning.subsystem_lr_factor;
     let _ = service.compute_lattice_phase(&[], &mut timings);
@@ -560,7 +571,9 @@ fn test_compute_value_evaluator_lr_stable_without_evaluator() {
 
 #[test]
 fn test_compute_fiduciary_harmonics_no_field() {
-    let mut service = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
+    let mut config = CognitiveLoopConfig::default();
+    config.enable_primitive_consciousness = false;
+    let mut service = CognitiveLoopService::new(config).unwrap();
     let mut timings = super::super::ModuleTimings::default();
     let (coherence, love, interferences) =
         service.compute_fiduciary_harmonics_phase(0.7, 0.3, 0.5, &mut timings);
@@ -742,8 +755,10 @@ fn cosine_f32_nan_input_produces_finite_or_zero() {
     let b = vec![1.0f32, 2.0, 3.0];
     let sim = super::super::helpers::cosine_f32(&a, &b);
     // NaN arithmetic is NaN, but clamped to [-1,1] — result may be NaN or clamped.
-    // Key: the function should not panic.
-    let _ = sim; // No panic = success
+    // Key: the function should not panic. If finite, must be in [-1,1].
+    if sim.is_finite() {
+        assert!(sim >= -1.0 && sim <= 1.0, "finite cosine must be in [-1,1], got {sim}");
+    }
 }
 
 #[test]

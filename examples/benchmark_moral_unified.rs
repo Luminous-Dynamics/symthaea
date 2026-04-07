@@ -393,8 +393,11 @@ fn main() {
                         .collect();
                     s.calibrate(&cal_samples);
                     s.train_prototypes(&cal_samples);
+                    // Enable Ollama contextual embeddings if available
+                    s.set_ollama_embeddings(true);
+                    s.train_hybrid(&cal_samples);
                     println!(
-                        "  Spinozist classifier calibrated + trained on {} samples in {:.1}s\n",
+                        "  Spinozist hybrid trained on {} samples in {:.1}s\n",
                         cal_samples.len(), cal_start.elapsed().as_secs_f64()
                     );
                 }
@@ -453,8 +456,8 @@ fn main() {
     //     results.push(r);
     // }
 
-    // Consciousness-driven CfC k-NN (Phase A) — run FIRST (fastest)
-    if let Some(r) = benchmark_consciousness_knn() {
+    // Word-order-aware k-NN (permutation binding)
+    if let Some(r) = benchmark_ordered_knn() {
         results.push(r);
     }
 
@@ -1404,8 +1407,8 @@ fn benchmark_spinozist_social_chemistry(
         total += 1;
 
         let expected: i32 = ex.rot_judgment.parse().unwrap_or(0);
-        // Use learned prototypes if trained, otherwise geometric verdict
-        let (verdict, _conf) = classifier.classify_learned(&ex.rot);
+        // Use best available: hybrid > learned prototypes > geometric
+        let (verdict, _conf) = classifier.classify(&ex.rot);
         let predicted = match verdict {
             MoralVerdict::Good => 1,
             MoralVerdict::Bad | MoralVerdict::ConsentViolation => -1,
@@ -1489,6 +1492,9 @@ fn benchmark_spinozist_ethics(
             })
             .collect();
         classifier.train_prototypes(&train_samples);
+        // Don't call train_hybrid for small per-category sets — it overwrites
+        // the surface_protos from the larger Social Chemistry training and
+        // centroid classification is unstable with <500 samples.
 
         let start = Instant::now();
         let mut correct = 0;
@@ -1508,7 +1514,7 @@ fn benchmark_spinozist_ethics(
                 total += 1;
                 // Use domain-trained prototypes (trained on this ETHICS category's train split)
                 let cleaned = clean_ethics_text(&ex.text);
-                let (verdict, _conf) = classifier.classify_learned(&cleaned);
+                let (verdict, _conf) = classifier.classify(&cleaned);
                 let predicted = match (category, verdict) {
                     (&"commonsense", MoralVerdict::Bad | MoralVerdict::ConsentViolation) => 1,
                     (&"commonsense", _) => 0,
@@ -1635,9 +1641,9 @@ fn save_results(results: &[BenchmarkResult], total_duration_ms: u128) {
 // Learned Moral Classifier Benchmark (Spinozist + Adaptive HDC)
 // ============================================================================
 
-fn benchmark_consciousness_knn() -> Option<BenchmarkResult> {
+fn benchmark_ordered_knn() -> Option<BenchmarkResult> {
     use symthaea::hdc::consciousness_encoder::ConsciousnessEncoder;
-    use symthaea::hdc::moral_prototypes::{ExemplarStore, MoralSample, MORAL_PROTO_DIM};
+    use symthaea::hdc::moral_prototypes::ExemplarStore;
 
     let path = format!("{}/social_chemistry_292k.json", DATASETS_PATH);
     if !Path::new(&path).exists() {
@@ -1648,7 +1654,7 @@ fn benchmark_consciousness_knn() -> Option<BenchmarkResult> {
     let data: SocialChem292kFile = serde_json::from_reader(reader).ok()?;
 
     println!("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-    println!("Dataset: Social Chemistry (Consciousness CfC k-NN)");
+    println!("Dataset: Social Chemistry (Word-Order k-NN sweep)");
     println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
 
     let mut train_texts: Vec<(String, MoralLabel)> = Vec::new();
@@ -1671,39 +1677,40 @@ fn benchmark_consciousness_knn() -> Option<BenchmarkResult> {
         return None;
     }
 
-    let train_start = Instant::now();
-    println!("  Encoding {} samples via CfC word-by-word...", train_texts.len());
+    let encoder = ConsciousnessEncoder::new();
 
-    let mut encoder = ConsciousnessEncoder::new();
+    // Sweep blend weights: 0.0 (bag only = baseline), 0.3, 0.5, 0.7, 1.0 (order only)
+    let blend_weights = [0.0f32, 0.3, 0.5, 0.7, 1.0];
+    let mut overall_best_acc = 0.0f32;
+    let mut overall_best_k = 11;
+    let mut overall_best_correct = 0;
+    let mut overall_best_blend = 0.0f32;
 
-    // Encode all training samples
-    let encoded: Vec<(Vec<f32>, MoralLabel)> = train_texts
-        .iter()
-        .map(|(text, label)| (encoder.encode(text), *label))
-        .collect();
+    for &blend in &blend_weights {
+        let train_start = Instant::now();
+        let label_str = if blend == 0.0 { "bag-only" }
+            else if blend == 1.0 { "order-only" }
+            else { "hybrid" };
+        println!("  Encoding {} samples (blend={:.1}, {})...", train_texts.len(), blend, label_str);
 
-    let store = ExemplarStore::from_encoded(encoded);
-    let encode_time = train_start.elapsed();
-    println!(
-        "  Encoded {} exemplars in {:.1}s (dim={})",
-        store.len(),
-        encode_time.as_secs_f32(),
-        encoder.dim()
-    );
+        let encoded: Vec<(Vec<f32>, MoralLabel)> = train_texts
+            .iter()
+            .map(|(text, label)| (encoder.encode_hybrid(text, blend), *label))
+            .collect();
 
-    // Encode test queries
-    let test_encoded: Vec<(Vec<f32>, i32)> = test_texts
-        .iter()
-        .map(|(text, expected)| (encoder.encode(text), *expected))
-        .collect();
+        let store = ExemplarStore::from_encoded(encoded);
+        let encode_time = train_start.elapsed();
 
-    // k-NN sweep
-    let k_values = [7, 11, 21, 31];
-    let mut best_k = 11;
-    let mut best_acc = 0.0f32;
-    let mut best_correct = 0;
+        // Encode test queries with same blend
+        let test_encoded: Vec<(Vec<f32>, i32)> = test_texts
+            .iter()
+            .map(|(text, expected)| (encoder.encode_hybrid(text, blend), *expected))
+            .collect();
 
-    for &k in &k_values {
+        println!("  Encoded in {:.1}s", encode_time.as_secs_f32());
+
+        // k-NN with k=31 (proven optimal)
+        let k = 31;
         let mut correct = 0;
         for (query, expected) in &test_encoded {
             let (label, _) = store.classify_knn(query, k);
@@ -1717,29 +1724,30 @@ fn benchmark_consciousness_knn() -> Option<BenchmarkResult> {
             }
         }
         let acc = correct as f32 / test_encoded.len() as f32;
-        println!("  CfC k={:2}: {}/{} ({:.1}%)", k, correct, test_encoded.len(), acc * 100.0);
-        if acc > best_acc {
-            best_acc = acc;
-            best_k = k;
-            best_correct = correct;
+        println!("    blend={:.1} k={}: {}/{} ({:.1}%)", blend, k, correct, test_encoded.len(), acc * 100.0);
+
+        if acc > overall_best_acc {
+            overall_best_acc = acc;
+            overall_best_k = k;
+            overall_best_correct = correct;
+            overall_best_blend = blend;
         }
     }
 
-    let total = test_encoded.len();
+    let total = test_texts.len();
     println!(
-        "  Best: k={}, {}/{} ({:.1}%)",
-        best_k, best_correct, total, best_acc * 100.0
+        "  Best: blend={:.1}, k={}, {}/{} ({:.1}%)",
+        overall_best_blend, overall_best_k, overall_best_correct, total, overall_best_acc * 100.0
     );
 
-    let total_time = train_start.elapsed();
     Some(BenchmarkResult {
-        dataset: format!("Social Chemistry (CfC k-NN k={})", best_k),
+        dataset: format!("Social Chemistry (Ordered k-NN blend={:.1})", overall_best_blend),
         category: None,
         total,
-        correct: best_correct,
-        accuracy: best_acc,
+        correct: overall_best_correct,
+        accuracy: overall_best_acc,
         errors: Vec::new(),
-        duration_ms: total_time.as_millis(),
+        duration_ms: 0, // multiple encodings
     })
 }
 

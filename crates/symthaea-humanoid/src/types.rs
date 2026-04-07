@@ -5,13 +5,18 @@
 
 use serde::{Deserialize, Serialize};
 
-/// Number of actuated joints in the dm_control humanoid.
+use crate::morphology::HumanoidMorphology;
+
+/// Default number of actuated joints (DMC standard humanoid).
+/// Kept for backward compatibility — prefer `HumanoidMorphology::num_actuators()`.
 pub const NUM_ACTUATORS: usize = 21;
 
-/// Number of state channels for HDC encoding.
+/// Number of state channels for HDC encoding (DMC21 default).
+/// For other morphologies, use `HumanoidMorphology::num_channels()`.
 pub const NUM_STATE_CHANNELS: usize = 67;
 
-/// Joint names matching the dm_control humanoid MJCF.
+/// Joint names matching the dm_control humanoid MJCF (DMC21).
+/// For other morphologies, use `HumanoidMorphology::joint_names()`.
 pub const JOINT_NAMES: [&str; NUM_ACTUATORS] = [
     "abdomen_y",
     "abdomen_z",
@@ -36,32 +41,34 @@ pub const JOINT_NAMES: [&str; NUM_ACTUATORS] = [
     "left_elbow",
 ];
 
-/// Full humanoid state (~67D): proprioceptive + computed features.
+/// Full humanoid state: proprioceptive + computed features.
 ///
-/// Extracted from MuJoCo `qpos` (28D), `qvel` (27D), `xpos`, `xmat`, `subtree_com`.
+/// Joint arrays are dynamically sized to support different morphologies.
+/// DMC21: 21 joints (72 channels). Dexterous53: 53 joints (142 channels).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HumanoidState {
-    // ── Proprioceptive (53D from qpos/qvel) ──
+    // ── Proprioceptive ──
     /// Root body height (qpos[2], z excluding global x/y).
     pub root_height: f64,
     /// Root orientation quaternion [w, x, y, z] (qpos[3..7]).
     pub root_quaternion: [f64; 4],
-    /// Joint angles for all 21 actuated joints (qpos[7..28]).
-    pub joint_angles: [f64; NUM_ACTUATORS],
+    /// Joint angles for all actuated joints. Length = morphology.num_actuators().
+    pub joint_angles: Vec<f64>,
     /// Root linear velocity in world frame (qvel[0..3]).
     pub root_linear_velocity: [f64; 3],
     /// Root angular velocity in body frame (qvel[3..6]).
     pub root_angular_velocity: [f64; 3],
-    /// Joint velocities for all 21 actuated joints (qvel[6..27]).
-    pub joint_velocities: [f64; NUM_ACTUATORS],
+    /// Joint velocities for all actuated joints. Length = morphology.num_actuators().
+    pub joint_velocities: Vec<f64>,
 
-    // ── Computed features (14D, matching dm_control observation spec) ──
+    // ── Computed features ──
     /// Head body height (xpos['head'][2]).
     pub head_height: f64,
     /// Torso vertical direction (z-column of torso rotation matrix).
     pub torso_vertical: [f64; 3],
     /// Extremity world positions: right_hand(3), left_hand(3), right_foot(3), left_foot(3).
-    pub extremities: [f64; 12],
+    /// For Dexterous53+, additional hand centroid features are appended.
+    pub extremities: Vec<f64>,
     /// Center-of-mass velocity (from subtree_com derivative).
     pub com_velocity: [f64; 3],
 
@@ -104,7 +111,7 @@ impl HumanoidState {
     ///   Total: 53 + 19 = 72. Plan says "~67D" but lists 72.
     /// For fidelity to dm_control, keep all 72 channels.
     pub fn to_channels(&self) -> Vec<f32> {
-        let mut channels = Vec::with_capacity(72);
+        let mut channels = Vec::with_capacity(self.num_channels());
 
         // Proprioceptive (53D)
         channels.push(self.root_height as f32);
@@ -140,43 +147,57 @@ impl HumanoidState {
     }
 
     /// Number of channels produced by `to_channels()`.
-    pub fn num_channels() -> usize {
-        // 1 + 4 + 21 + 3 + 3 + 21 + 1 + 3 + 12 + 3 = 72
-        72
+    pub fn num_channels(&self) -> usize {
+        // 1 + 4 + n_joints + 3 + 3 + n_joints + 1 + 3 + n_extremities + 3
+        1 + 4 + self.joint_angles.len() + 3 + 3 + self.joint_velocities.len()
+            + 1 + 3 + self.extremities.len() + 3
     }
 
-    /// Construct a default upright standing state at approximately 1.4m head height.
+    /// Number of actuated joints in this state.
+    pub fn num_actuators(&self) -> usize {
+        self.joint_angles.len()
+    }
+
+    /// Construct a default upright standing state (DMC21: 21 joints).
     pub fn standing() -> Self {
+        Self::standing_for(HumanoidMorphology::Dmc21)
+    }
+
+    /// Construct a standing state for a specific morphology.
+    pub fn standing_for(morphology: HumanoidMorphology) -> Self {
+        let n = morphology.num_actuators();
+        let n_extremities = if n > 21 { 18 } else { 12 }; // Extra hand centroids for dexterous
         Self {
             root_height: 1.3,
             root_quaternion: [1.0, 0.0, 0.0, 0.0],
-            joint_angles: [0.0; NUM_ACTUATORS],
+            joint_angles: vec![0.0; n],
             root_linear_velocity: [0.0; 3],
             root_angular_velocity: [0.0; 3],
-            joint_velocities: [0.0; NUM_ACTUATORS],
+            joint_velocities: vec![0.0; n],
             head_height: 1.4,
             torso_vertical: [0.0, 0.0, 1.0],
-            extremities: [0.0; 12],
+            extremities: vec![0.0; n_extremities],
             com_velocity: [0.0; 3],
             timestamp: 0.0,
         }
     }
 
     /// Construct from MuJoCo qpos/qvel arrays + computed features.
+    ///
+    /// For DMC21: qpos has 28 entries (7 root + 21 joints), qvel has 27 (6 root + 21 joints).
+    /// For extended morphologies: qpos and qvel are longer accordingly.
     pub fn from_mujoco(
         qpos: &[f64],
         qvel: &[f64],
         head_height: f64,
         torso_vertical: [f64; 3],
-        extremities: [f64; 12],
+        extremities: &[f64],
         com_velocity: [f64; 3],
         t: f64,
     ) -> Self {
-        let mut joint_angles = [0.0; NUM_ACTUATORS];
-        joint_angles.copy_from_slice(&qpos[7..28]);
-
-        let mut joint_velocities = [0.0; NUM_ACTUATORS];
-        joint_velocities.copy_from_slice(&qvel[6..27]);
+        let n_joints = qpos.len() - 7; // Root takes 7 qpos entries
+        let joint_angles = qpos[7..7 + n_joints].to_vec();
+        let joint_velocities = qvel[6..6 + n_joints].to_vec();
 
         Self {
             root_height: qpos[2],
@@ -187,7 +208,7 @@ impl HumanoidState {
             joint_velocities,
             head_height,
             torso_vertical,
-            extremities,
+            extremities: extremities.to_vec(),
             com_velocity,
             timestamp: t,
         }
@@ -211,61 +232,72 @@ impl HumanoidState {
 
     /// Mean absolute joint velocity (energy proxy).
     pub fn mean_joint_speed(&self) -> f64 {
+        if self.joint_velocities.is_empty() {
+            return 0.0;
+        }
         let sum: f64 = self.joint_velocities.iter().map(|v| v.abs()).sum();
-        sum / NUM_ACTUATORS as f64
+        sum / self.joint_velocities.len() as f64
     }
 }
 
-/// Motor command output (21D): joint torques in [-1, 1], mapped by MuJoCo gear ratios.
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+/// Motor command output: joint torques in [-1, 1], mapped by actuator gear ratios.
+///
+/// Dynamically sized to match the morphology's actuator count.
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HumanoidCommand {
-    /// Normalized torques for all 21 actuated joints, each in [-1, 1].
-    pub torques: [f32; NUM_ACTUATORS],
+    /// Normalized torques for all actuated joints, each in [-1, 1].
+    pub torques: Vec<f32>,
 }
 
 impl HumanoidCommand {
-    /// Zero command (no torque).
+    /// Zero command for DMC21 (21 joints). Use `zero_for()` for other morphologies.
     pub fn zero() -> Self {
+        Self::zero_for(NUM_ACTUATORS)
+    }
+
+    /// Zero command for a specific number of actuators.
+    pub fn zero_for(num_actuators: usize) -> Self {
         Self {
-            torques: [0.0; NUM_ACTUATORS],
+            torques: vec![0.0; num_actuators],
         }
     }
 
     /// Construct from a slice of raw f32 values, clamped to [-1, 1].
     pub fn from_raw(values: &[f32]) -> Self {
-        let mut torques = [0.0f32; NUM_ACTUATORS];
-        for i in 0..NUM_ACTUATORS.min(values.len()) {
-            torques[i] = values[i].clamp(-1.0, 1.0);
-        }
+        let torques: Vec<f32> = values.iter().map(|&v| v.clamp(-1.0, 1.0)).collect();
         Self { torques }
+    }
+
+    /// Number of actuators in this command.
+    pub fn num_actuators(&self) -> usize {
+        self.torques.len()
     }
 
     /// Clamp all torques to [-1, 1].
     pub fn clamped(self) -> Self {
-        let mut torques = self.torques;
-        for t in &mut torques {
-            *t = t.clamp(-1.0, 1.0);
-        }
+        let torques: Vec<f32> = self.torques.into_iter().map(|t| t.clamp(-1.0, 1.0)).collect();
         Self { torques }
     }
 
-    /// Convert to f64 array for MuJoCo ctrl.
+    /// Convert to f64 vec for MuJoCo ctrl.
     pub fn to_ctrl(&self) -> Vec<f64> {
         self.torques.iter().map(|&t| t as f64).collect()
     }
 
     /// Mean absolute torque (control effort proxy).
     pub fn control_effort(&self) -> f32 {
+        if self.torques.is_empty() {
+            return 0.0;
+        }
         let sum: f32 = self.torques.iter().map(|t| t.abs()).sum();
-        sum / NUM_ACTUATORS as f32
+        sum / self.torques.len() as f32
     }
 
     /// Add exploration noise, then clamp.
-    pub fn with_noise(self, noise: &[f32; NUM_ACTUATORS]) -> Self {
-        let mut torques = self.torques;
-        for i in 0..NUM_ACTUATORS {
-            torques[i] = (torques[i] + noise[i]).clamp(-1.0, 1.0);
-        }
+    pub fn with_noise(self, noise: &[f32]) -> Self {
+        let torques: Vec<f32> = self.torques.iter().zip(noise.iter())
+            .map(|(&t, &n)| (t + n).clamp(-1.0, 1.0))
+            .collect();
         Self { torques }
     }
 }
@@ -279,16 +311,25 @@ pub enum HumanoidTask {
     Walk,
     /// Run forward at ~10 m/s.
     Run,
+    /// Extend arm toward target object (requires Dexterous53+).
+    Reach,
+    /// Reach + close fingers around object (requires Dexterous53+).
+    Grasp,
 }
 
 impl HumanoidTask {
     /// Target horizontal speed for this task.
     pub fn target_speed(&self) -> f64 {
         match self {
-            HumanoidTask::Stand => 0.0,
+            HumanoidTask::Stand | HumanoidTask::Reach | HumanoidTask::Grasp => 0.0,
             HumanoidTask::Walk => 1.0,
             HumanoidTask::Run => 10.0,
         }
+    }
+
+    /// Whether this task requires a dexterous morphology (Dexterous53+).
+    pub fn requires_dexterous(&self) -> bool {
+        matches!(self, HumanoidTask::Reach | HumanoidTask::Grasp)
     }
 }
 
@@ -326,6 +367,8 @@ pub struct HumanoidTelemetry {
 /// Configuration for the humanoid training system.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HumanoidConfig {
+    /// Morphology variant (default: Dmc21 for backward compatibility).
+    pub morphology: HumanoidMorphology,
     /// Physics loop frequency in Hz (default: 40, DMC standard 0.025s timestep).
     pub physics_hz: f64,
     /// Cognitive tick frequency in Hz (default: 10, FEP agent rate).
@@ -378,11 +421,17 @@ pub struct HumanoidConfig {
     pub progressive_noise: bool,
     /// Enable per-episode terrain variation (slope + compliance) (default: false).
     pub terrain_variation: bool,
+    /// Target object position for Reach/Grasp tasks [x, y, z] in meters.
+    /// Default: [0.3, -0.2, 1.0] (natural right-hand reach).
+    pub object_position: [f64; 3],
+    /// Which hand to use for Reach/Grasp tasks.
+    pub reach_hand: crate::morphology::HandSide,
 }
 
 impl Default for HumanoidConfig {
     fn default() -> Self {
         Self {
+            morphology: HumanoidMorphology::Dmc21,
             physics_hz: 40.0,
             cognitive_hz: 10.0,
             learning_rate: 0.0005,
@@ -409,6 +458,8 @@ impl Default for HumanoidConfig {
             observation_noise_std: 0.01,
             progressive_noise: true,
             terrain_variation: false,
+            object_position: [0.3, -0.2, 1.0],
+            reach_hand: crate::morphology::HandSide::Right,
         }
     }
 }
@@ -433,44 +484,26 @@ impl HumanoidConfig {
 
 /// PD controller gains for generating baseline standing targets.
 ///
-/// Per-joint gains organized by body group. These serve as the initial
-/// training target: the CfC network learns to match this PD controller,
-/// then the FEP layer modulates adaptation dynamics.
+/// Dynamically sized to match the morphology. Use `default()` for DMC21
+/// or `for_morphology()` for extended morphologies.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HumanoidPdGains {
     /// Proportional gains per joint.
-    pub kp: [f64; NUM_ACTUATORS],
+    pub kp: Vec<f64>,
     /// Derivative (damping) gains per joint.
-    pub kd: [f64; NUM_ACTUATORS],
+    pub kd: Vec<f64>,
 }
 
 impl Default for HumanoidPdGains {
     fn default() -> Self {
-        // Gains tuned per body group:
-        // Abdomen (0-2): moderate stiffness for torso stability
-        // Hips (3-8, 9-14): high stiffness for stance, moderate for swing
-        // Knees (6, 12): high stiffness to prevent buckling
-        // Ankles (7-8, 13-14): moderate for balance
-        // Shoulders (15-16, 18-19): low (arms less critical for standing)
-        // Elbows (17, 20): low
-        let kp = [
-            100.0, 100.0, 100.0, // abdomen y/z/x
-            100.0, 100.0, 100.0, 120.0, // right hip x/z/y, knee
-            80.0, 80.0, // right ankle x/y
-            100.0, 100.0, 100.0, 120.0, // left hip x/z/y, knee
-            80.0, 80.0, // left ankle x/y
-            40.0, 40.0, 40.0, // right shoulder1/2, elbow
-            40.0, 40.0, 40.0, // left shoulder1/2, elbow
-        ];
-        let kd = [
-            10.0, 10.0, 10.0, // abdomen
-            10.0, 10.0, 10.0, 12.0, // right hip, knee
-            8.0, 8.0, // right ankle
-            10.0, 10.0, 10.0, 12.0, // left hip, knee
-            8.0, 8.0, // left ankle
-            4.0, 4.0, 4.0, // right arm
-            4.0, 4.0, 4.0, // left arm
-        ];
+        Self::for_morphology(HumanoidMorphology::Dmc21)
+    }
+}
+
+impl HumanoidPdGains {
+    /// Create PD gains for a specific morphology.
+    pub fn for_morphology(morphology: HumanoidMorphology) -> Self {
+        let (kp, kd) = morphology.pd_gains();
         Self { kp, kd }
     }
 }
@@ -480,8 +513,9 @@ impl Default for HumanoidPdGains {
 /// Target: all joint angles = 0 (MuJoCo default pose is approximately upright).
 /// Output: normalized torques in [-1, 1].
 pub fn pd_standing_baseline(state: &HumanoidState, gains: &HumanoidPdGains) -> HumanoidCommand {
-    let mut torques = [0.0f32; NUM_ACTUATORS];
-    for i in 0..NUM_ACTUATORS {
+    let n = state.num_actuators();
+    let mut torques = vec![0.0f32; n];
+    for i in 0..n.min(gains.kp.len()) {
         let angle_error = 0.0 - state.joint_angles[i];
         let vel_damping = state.joint_velocities[i];
         torques[i] = (gains.kp[i] * angle_error - gains.kd[i] * vel_damping) as f32;
@@ -508,7 +542,8 @@ pub fn pd_walking_baseline(
     phase: f64,
     target_speed: f64,
 ) -> HumanoidCommand {
-    let mut target_angles = [0.0f64; NUM_ACTUATORS];
+    let n = state.num_actuators();
+    let mut target_angles = vec![0.0f64; n];
 
     // Scale gait amplitude with target speed (0 at speed=0, full at speed=1+)
     let amplitude = (target_speed / 1.0).clamp(0.0, 1.0);
@@ -569,8 +604,8 @@ pub fn pd_walking_baseline(
     target_angles[19] = 0.0;
     target_angles[20] = -0.3 * amplitude; // left_elbow
 
-    let mut torques = [0.0f32; NUM_ACTUATORS];
-    for i in 0..NUM_ACTUATORS {
+    let mut torques = vec![0.0f32; n];
+    for i in 0..n.min(gains.kp.len()) {
         let angle_error = target_angles[i] - state.joint_angles[i];
         let vel_damping = state.joint_velocities[i];
         torques[i] = (gains.kp[i] * angle_error - gains.kd[i] * vel_damping) as f32;
@@ -592,7 +627,8 @@ pub fn pd_running_baseline(
     phase: f64,
     target_speed: f64,
 ) -> HumanoidCommand {
-    let mut target_angles = [0.0f64; NUM_ACTUATORS];
+    let n = state.num_actuators();
+    let mut target_angles = vec![0.0f64; n];
 
     let amplitude = (target_speed / 3.0).clamp(0.0, 1.0);
     let cycle = (phase * 2.0 * std::f64::consts::PI).sin();
@@ -648,14 +684,116 @@ pub fn pd_running_baseline(
     target_angles[19] = 0.0;
     target_angles[20] = -0.5 * amplitude;
 
-    let mut torques = [0.0f32; NUM_ACTUATORS];
-    for i in 0..NUM_ACTUATORS {
+    let mut torques = vec![0.0f32; n];
+    for i in 0..n.min(gains.kp.len()) {
         let angle_error = target_angles[i] - state.joint_angles[i];
         let vel_damping = state.joint_velocities[i];
         torques[i] = (gains.kp[i] * angle_error - gains.kd[i] * vel_damping) as f32;
         torques[i] = torques[i].clamp(-1.0, 1.0);
     }
     HumanoidCommand { torques }
+}
+
+/// Compute PD reaching baseline: standing posture + arm IK toward target object.
+///
+/// Drives shoulder/elbow toward the object position using simplified 2-link IK.
+/// Only available for Dexterous53+ morphologies.
+pub fn pd_reaching_baseline(
+    state: &HumanoidState,
+    gains: &HumanoidPdGains,
+    object_pos: [f64; 3],
+    hand: crate::morphology::HandSide,
+) -> HumanoidCommand {
+    // Start with standing baseline (keep body upright)
+    let mut cmd = pd_standing_baseline(state, gains);
+    let n = state.num_actuators();
+
+    // Shoulder/elbow indices for the reaching hand
+    let (s1, s2, elbow) = match hand {
+        crate::morphology::HandSide::Right => (15, 16, 17),
+        crate::morphology::HandSide::Left => (18, 19, 20),
+    };
+
+    // Simplified analytical arm IK toward object
+    // Compute desired shoulder flexion from object height/distance
+    let shoulder_base_z = state.root_height + 0.15; // approximate shoulder height
+    let dz = object_pos[2] - shoulder_base_z;
+    let dx = object_pos[0]; // forward distance
+    let reach_dist = (dx * dx + dz * dz).sqrt();
+    let arm_length = 0.28 + 0.25; // upper_arm + forearm
+
+    // Shoulder1 (flexion): angle to point arm toward object
+    let shoulder_target = (dz / reach_dist.max(0.01)).asin().clamp(-1.5, 1.5);
+    // Elbow: bend to match reach distance
+    let elbow_target = if reach_dist < arm_length {
+        -((arm_length - reach_dist) / arm_length * 1.5).clamp(0.0, 1.5)
+    } else {
+        0.0 // fully extended
+    };
+
+    // Lateral component for shoulder2
+    let dy = match hand {
+        crate::morphology::HandSide::Right => object_pos[1] + 0.17, // offset from right shoulder
+        crate::morphology::HandSide::Left => object_pos[1] - 0.17,
+    };
+    let shoulder2_target = (dy / reach_dist.max(0.01)).asin().clamp(-1.5, 1.5);
+
+    // Apply PD control to shoulder/elbow
+    if s1 < n {
+        let err = shoulder_target - state.joint_angles[s1];
+        cmd.torques[s1] = (gains.kp[s1] * err - gains.kd[s1] * state.joint_velocities[s1]) as f32;
+        cmd.torques[s1] = cmd.torques[s1].clamp(-1.0, 1.0);
+    }
+    if s2 < n {
+        let err = shoulder2_target - state.joint_angles[s2];
+        cmd.torques[s2] = (gains.kp[s2] * err - gains.kd[s2] * state.joint_velocities[s2]) as f32;
+        cmd.torques[s2] = cmd.torques[s2].clamp(-1.0, 1.0);
+    }
+    if elbow < n {
+        let err = elbow_target - state.joint_angles[elbow];
+        cmd.torques[elbow] = (gains.kp[elbow] * err - gains.kd[elbow] * state.joint_velocities[elbow]) as f32;
+        cmd.torques[elbow] = cmd.torques[elbow].clamp(-1.0, 1.0);
+    }
+
+    cmd
+}
+
+/// Compute PD grasping baseline: reaching + sinusoidal finger closure.
+///
+/// `grasp_phase` controls finger closure progression (0.0=open, 1.0=fully closed).
+pub fn pd_grasping_baseline(
+    state: &HumanoidState,
+    gains: &HumanoidPdGains,
+    object_pos: [f64; 3],
+    hand: crate::morphology::HandSide,
+    grasp_phase: f64,
+) -> HumanoidCommand {
+    let mut cmd = pd_reaching_baseline(state, gains, object_pos, hand);
+    let n = state.num_actuators();
+
+    // Determine hand joint range
+    let hand_start = match hand {
+        crate::morphology::HandSide::Right => 21,
+        crate::morphology::HandSide::Left => 37,
+    };
+    let hand_end = hand_start + 16;
+
+    if hand_end > n {
+        return cmd; // Not enough joints (DMC21)
+    }
+
+    // Target flexion ramps with grasp_phase
+    let target_flexion = grasp_phase * 1.2; // ~70° at full closure
+
+    for i in hand_start..hand_end.min(n) {
+        if i < gains.kp.len() {
+            let err = target_flexion - state.joint_angles[i];
+            cmd.torques[i] = (gains.kp[i] * err - gains.kd[i] * state.joint_velocities[i]) as f32;
+            cmd.torques[i] = cmd.torques[i].clamp(-1.0, 1.0);
+        }
+    }
+
+    cmd
 }
 
 #[cfg(test)]
@@ -676,7 +814,7 @@ mod tests {
     fn test_humanoid_state_to_channels() {
         let state = HumanoidState::standing();
         let channels = state.to_channels();
-        assert_eq!(channels.len(), HumanoidState::num_channels());
+        assert_eq!(channels.len(), state.num_channels());
         assert_eq!(channels.len(), 72);
         // root_height at index 0
         assert!((channels[0] - 1.3).abs() < 1e-6);
@@ -709,7 +847,7 @@ mod tests {
         cmd.torques[1] = -5.0;
         let clamped = cmd.clamped();
         assert!((clamped.torques[0] - 1.0).abs() < 1e-6);
-        assert!((clamped.torques[1] + 1.0).abs() < 1e-6);
+        assert!((clamped.torques[1] - (-1.0)).abs() < 1e-6);
     }
 
     #[test]
@@ -785,7 +923,8 @@ mod tests {
         let cmd = HumanoidCommand::zero();
         let json = serde_json::to_string(&cmd).unwrap();
         let restored: HumanoidCommand = serde_json::from_str(&json).unwrap();
-        for i in 0..NUM_ACTUATORS {
+        assert_eq!(cmd.torques.len(), restored.torques.len());
+        for i in 0..cmd.torques.len() {
             assert!((cmd.torques[i] - restored.torques[i]).abs() < 1e-10);
         }
     }
@@ -806,7 +945,7 @@ mod tests {
             &qvel,
             1.4,
             [0.0, 0.0, 1.0],
-            [0.0; 12],
+            &[0.0; 12],
             [0.5, 0.0, 0.0],
             1.0,
         );
@@ -906,5 +1045,37 @@ mod tests {
             run.torques[0],
             walk.torques[0]
         );
+    }
+
+    #[test]
+    fn test_dexterous53_standing() {
+        use crate::morphology::HumanoidMorphology;
+        let state = HumanoidState::standing_for(HumanoidMorphology::Dexterous53);
+        assert_eq!(state.num_actuators(), 53);
+        assert_eq!(state.joint_angles.len(), 53);
+        assert_eq!(state.joint_velocities.len(), 53);
+        let channels = state.to_channels();
+        // 1+4+53+3+3+53+1+3+18+3 = 142
+        assert_eq!(channels.len(), state.num_channels());
+    }
+
+    #[test]
+    fn test_dexterous53_pd_baseline() {
+        use crate::morphology::HumanoidMorphology;
+        let state = HumanoidState::standing_for(HumanoidMorphology::Dexterous53);
+        let gains = HumanoidPdGains::for_morphology(HumanoidMorphology::Dexterous53);
+        let cmd = pd_standing_baseline(&state, &gains);
+        assert_eq!(cmd.torques.len(), 53);
+        // At standing, all torques should be ~0
+        for (i, &t) in cmd.torques.iter().enumerate() {
+            assert!(t.abs() < 0.01, "Joint {i} should be near zero: {t}");
+        }
+    }
+
+    #[test]
+    fn test_command_zero_for_morphology() {
+        let cmd = HumanoidCommand::zero_for(53);
+        assert_eq!(cmd.torques.len(), 53);
+        assert!(cmd.torques.iter().all(|&t| t == 0.0));
     }
 }

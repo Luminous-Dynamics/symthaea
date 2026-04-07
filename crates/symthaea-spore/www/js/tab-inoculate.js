@@ -364,10 +364,10 @@
       evalStatus.textContent = 'Connecting to eval service...';
 
       var customEval = localStorage.getItem('symthaea-eval-url');
+      // Security: default to localhost-only eval API (no remote fallback).
       var evalUrls = customEval ? [customEval] : [
-        'http://localhost:8090/api/v1/eval',
-        'http://' + window.location.hostname + ':8090/api/v1/eval',
-        'https://eval.luminousdynamics.io/api/v1/eval'
+        'http://127.0.0.1:8090/api/v1/eval',
+        'http://localhost:8090/api/v1/eval'
       ];
       var hwContent = '';
       try {
@@ -501,10 +501,13 @@
       '  </label>',
       '</div>',
       '<div style="max-width:500px; margin:0 auto 1rem;">',
-      '  <label style="font-size:0.82rem; color:var(--fg-dim);">SSH Relay URL <span style="color:var(--fg-muted);">(for remote/mobile access)</span>',
-      '    <input id="ssh-relay-url" type="text" placeholder="ws://your-server-ip:8094" value="' + (localStorage.getItem('symthaea-relay-url') || '') + '" style="width:100%;padding:0.5rem;background:rgba(0,0,0,0.3);border:1px solid var(--border);border-radius:6px;color:var(--fg);font-family:monospace;margin-top:0.3rem;">',
+      '  <label style="font-size:0.82rem; color:var(--fg-dim);">SSH Relay URL <span style="color:var(--fg-muted);">(optional)</span>',
+      '    <input id="ssh-relay-url" type="text" placeholder="ws://127.0.0.1:8091" value="' + (localStorage.getItem('symthaea-relay-url') || '') + '" style="width:100%;padding:0.5rem;background:rgba(0,0,0,0.3);border:1px solid var(--border);border-radius:6px;color:var(--fg);font-family:monospace;margin-top:0.3rem;">',
       '  </label>',
-      '  <p style="font-size:0.72rem; color:var(--fg-muted); margin-top:0.3rem;">Leave empty for localhost. For mobile: enter ws://&lt;server-ip&gt;:8094</p>',
+      '  <label style="font-size:0.82rem; color:var(--fg-dim); margin-top:0.8rem; display:block;">SSH Relay Token <span style="color:var(--fg-muted);">(required)</span>',
+      '    <input id="ssh-relay-token" type="password" placeholder="(from ssh-relay startup)" value="' + (localStorage.getItem('symthaea-relay-token') || '') + '" style="width:100%;padding:0.5rem;background:rgba(0,0,0,0.3);border:1px solid var(--border);border-radius:6px;color:var(--fg);font-family:monospace;margin-top:0.3rem;">',
+      '  </label>',
+      '  <p style="font-size:0.72rem; color:var(--fg-muted); margin-top:0.3rem;">Start <code>ssh-relay</code> locally; copy the token it prints at startup.</p>',
       '</div>',
       '<div style="text-align:center; margin-bottom:1rem;">',
       '  <button id="btn-ssh-connect" class="btn-glow" style="padding:0.6rem 2rem; cursor:pointer;">Connect &amp; Deploy</button>',
@@ -581,19 +584,35 @@
       window.addNarration('Initiating Sovereign Birth ceremony for ' + host + '...');
 
       // Connect to SSH relay via WebSocket
-      // Relay URLs: check localStorage override, then try common ports, then remote
-      // Relay URL: check UI input, then localStorage, then auto-detect
+      // Relay URL + token: check UI inputs, then localStorage, then auto-detect localhost ports.
       var relayInput = document.getElementById('ssh-relay-url');
+      var tokenInput = document.getElementById('ssh-relay-token');
+
       var customRelay = (relayInput && relayInput.value.trim()) ||
                         localStorage.getItem('symthaea-relay-url');
       if (customRelay && relayInput) {
         localStorage.setItem('symthaea-relay-url', customRelay);
       }
+
+      var relayToken = (tokenInput && tokenInput.value.trim()) ||
+                       localStorage.getItem('symthaea-relay-token');
+      if (relayToken && tokenInput) {
+        localStorage.setItem('symthaea-relay-token', relayToken);
+      }
+      if (!relayToken) {
+        sshStatus.textContent = 'Missing SSH relay token. Start ssh-relay locally and paste the token it prints at startup.';
+        sshStatus.style.color = 'var(--clay)';
+        btn.disabled = false;
+        btn.textContent = 'Connect & Deploy';
+        return;
+      }
+
+      // Security: never auto-probe non-localhost relay URLs (prevents token leakage).
       var relayUrls = customRelay ? [customRelay] : [
-        'ws://localhost:8094', 'ws://localhost:8091', 'ws://localhost:8093',
-        'ws://' + window.location.hostname + ':8094',
-        'ws://' + window.location.hostname + ':8091',
-        'wss://relay.luminousdynamics.io'
+        'ws://127.0.0.1:8091',
+        'ws://localhost:8091',
+        'ws://127.0.0.1:8093',
+        'ws://localhost:8093'
       ];
       var ws = null;
 
@@ -608,13 +627,13 @@
           });
           break;
         } catch(e) {
-          if (i === relayUrls.length - 1) {
-            sshStatus.textContent = 'SSH relay not available. Start with: ssh-relay --port 8091';
-            sshStatus.style.color = 'var(--clay)';
-            btn.disabled = false;
-            btn.textContent = 'Connect & Deploy';
-            return;
-          }
+	          if (i === relayUrls.length - 1) {
+	            sshStatus.textContent = 'SSH relay not available. Start with: ssh-relay --port 8091 (then paste the token it prints)';
+	            sshStatus.style.color = 'var(--clay)';
+	            btn.disabled = false;
+	            btn.textContent = 'Connect & Deploy';
+	            return;
+	          }
         }
       }
 
@@ -999,7 +1018,8 @@
 
       wsRef.current = ws;
 
-      // Send connect command
+      // Authenticate to relay (required), then connect to target via SSH
+      ws.send(JSON.stringify({ action: 'auth', token: relayToken }));
       ws.send(JSON.stringify({
         action: 'connect',
         host: host,

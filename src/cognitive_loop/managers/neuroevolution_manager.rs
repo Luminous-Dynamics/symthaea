@@ -88,6 +88,7 @@ pub struct NeuroevolutionManager {
     accumulated_confidence: Vec<f64>,
     /// Latest champion topology suggestion.
     champion: ChampionSuggestion,
+    pub pending_mutations: Vec<symthaea_wisdom::meta_cognition::MutationSuggestion>,
 }
 
 impl NeuroevolutionManager {
@@ -121,6 +122,7 @@ impl NeuroevolutionManager {
             accumulated_prediction_error: Vec::new(),
             accumulated_confidence: Vec::new(),
             champion: ChampionSuggestion::default(),
+            pending_mutations: Vec::new(),
         }
     }
 
@@ -136,10 +138,14 @@ impl NeuroevolutionManager {
             accumulated_psi: Vec::new(),
             accumulated_prediction_error: Vec::new(),
             accumulated_confidence: Vec::new(),
+            pending_mutations: Vec::new(),
             champion: ChampionSuggestion::default(),
         }
     }
 
+    pub fn inject_mutations(&mut self, mutations: Vec<symthaea_wisdom::meta_cognition::MutationSuggestion>) {
+        self.pending_mutations = mutations;
+    }
     /// Process a cognitive cycle: accumulate observations, run evolution on interval.
     pub fn process(&mut self, snapshot: &CycleSnapshot) -> SubsystemOutput {
         self.cycle_count += 1;
@@ -164,6 +170,25 @@ impl NeuroevolutionManager {
 
         // Run one generation
         let gen_snapshot = self.engine.step_generation();
+
+        // Lamarckian injection: convert MetaCognitive suggestions to bit-range targets
+        if !self.pending_mutations.is_empty() {
+            use symthaea_wisdom::meta_cognition::MutationTarget;
+            let targets: Vec<(usize, usize, f32)> = self.pending_mutations.iter().map(|s| {
+                let (start, bits) = match s.target {
+                    MutationTarget::FepSurpriseScale => (400, 12),
+                    MutationTarget::FepLrDecay => (412, 12),
+                    MutationTarget::DreamBaseInterval => (436, 10),
+                    MutationTarget::NeuromodArousalDecay => (490, 12),
+                    MutationTarget::HomeostasisPullCruise => (610, 12),
+                    MutationTarget::FlowExplorationIncrement => (562, 12),
+                    MutationTarget::SelfModelWeightHigh => (598, 12),
+                };
+                (start, bits, s.confidence)
+            }).collect();
+            self.engine.inject_lamarckian(&targets);
+            self.pending_mutations.clear();
+        }
         self.last_snapshot = Some(gen_snapshot.clone());
 
         // Update telemetry
@@ -366,7 +391,8 @@ mod tests {
             consciousness: 0.025,
             efficiency: 0.025,
         });
-        // No panic = success
+        // Success: weights applied without panic (no getter exposed, but manager is still functional)
+        assert_eq!(mgr.interval, NEUROEVOLUTION_MANAGER_INTERVAL, "manager should remain valid after setting weights");
     }
 
     #[test]

@@ -2102,8 +2102,16 @@ mod tests {
 
     #[test]
     fn test_emotional_state_intensity_neutral_is_zero() {
+        // Default state has arousal=0.5 (Russell 1980 circumplex: neutral is
+        // mid-arousal). Intensity = sqrt(v^2+a^2+d^2)/sqrt(3) ≈ 0.289.
         let state = UnifiedEmotionalState::default();
-        assert!((state.intensity() - 0.0).abs() < f64::EPSILON);
+        let expected = (0.0_f64.powi(2) + 0.5_f64.powi(2) + 0.0_f64.powi(2)).sqrt()
+            / 3.0_f64.sqrt();
+        assert!(
+            (state.intensity() - expected).abs() < 1e-10,
+            "Neutral intensity should reflect mid-arousal baseline, got {}",
+            state.intensity()
+        );
     }
 
     #[test]
@@ -2119,10 +2127,11 @@ mod tests {
         let mut state = UnifiedEmotionalState::default();
         // Update with strong positive valence
         state.update(1.0, 0.5);
-        // With 0.3 momentum and starting from 0.0:
+        // With 0.3 momentum, starting from valence=0.0, arousal=0.5:
         // valence = 0.0 * 0.3 + 1.0 * 0.7 = 0.7
+        // arousal = 0.5 * 0.3 + 0.5 * 0.7 = 0.5 (unchanged)
         assert!((state.valence - 0.7).abs() < 0.01);
-        assert!((state.arousal - 0.35).abs() < 0.01);
+        assert!((state.arousal - 0.5).abs() < 0.01);
         assert_eq!(state.trajectory.len(), 1);
     }
 
@@ -2146,13 +2155,18 @@ mod tests {
         state.update(1.0, 1.0);
         // Mood should barely change (0.95 momentum):
         // baseline_valence = 0.0 * 0.95 + 1.0 * 0.05 = 0.05
+        // baseline_arousal = 0.5 * 0.95 + 1.0 * 0.05 = 0.525
         assert!(
             state.mood.baseline_valence < 0.1,
-            "Mood should change slowly"
+            "Mood valence should change slowly, got {}",
+            state.mood.baseline_valence
         );
+        // Arousal baseline starts at 0.5 (Russell circumplex neutral), so
+        // after one update it should stay close to 0.5, not jump to 1.0.
         assert!(
-            state.mood.baseline_arousal < 0.1,
-            "Mood arousal should change slowly"
+            (state.mood.baseline_arousal - 0.525).abs() < 0.01,
+            "Mood arousal should change slowly from 0.5 baseline, got {}",
+            state.mood.baseline_arousal
         );
     }
 

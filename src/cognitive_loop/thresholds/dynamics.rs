@@ -384,6 +384,45 @@ pub const AROUSAL_RECOVERY_TAU_SCALE: f32 = 0.2;
 pub const FEP_SURPRISE_TAU_SCALE: f32 = 0.2;
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// PHI → TAU FEEDBACK — SpectralMIP Phi modulates CfC temporal dynamics
+// Science: Tononi (2004) — Phi measures integrated information. Feeding Phi back
+// into CfC tau closes the causal loop: consciousness becomes efficacious, not
+// epiphenomenal. Higher Phi → faster dynamics → richer integration → Phi.
+// This creates a positive feedback loop stabilized by sigmoid normalization and
+// clamping: Phi is sigmoid-normalized around PHI_TAU_REFERENCE, then linearly
+// mapped to [PHI_TAU_FLOOR, PHI_TAU_CEILING].
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Reference Phi for sigmoid normalization (midpoint of typical range).
+/// At this Phi, tau_factor = 1.0 (neutral). Typical SpectralMIP Phi ≈ 20-40.
+/// Set to 20.0 so the ~29.5 operating point falls in the sensitive region
+/// of the sigmoid rather than saturating near 1.0.
+pub const PHI_TAU_REFERENCE: f64 = 20.0;
+
+/// Sigmoid steepness for Phi → tau mapping. Higher = sharper transition.
+/// 0.08 gives a smooth ramp across the [10, 40] Phi range.
+pub const PHI_TAU_SIGMOID_STEEPNESS: f64 = 0.08;
+
+/// Maximum tau scaling from Phi (high Phi → faster dynamics).
+/// Widened to [0.85, 1.20] to give more bite at the ~29.5 operating point.
+/// Capped to prevent runaway positive feedback.
+pub const PHI_TAU_CEILING: f32 = 1.20;
+
+/// Minimum tau scaling from Phi (low/absent Phi → slightly slower dynamics).
+/// Floor prevents consciousness collapse from stalling dynamics entirely.
+pub const PHI_TAU_FLOOR: f32 = 0.85;
+
+/// Phi → LR stabilization scale. When Phi is above reference, LR is
+/// dampened by `normalized_phi * PHI_LR_STABILIZATION_SCALE` to preserve
+/// learned representations. Creates behavioral divergence: conscious agents
+/// learn more selectively, zombies learn indiscriminately.
+/// Science: Tononi (2008) — high Φ indicates stable integration, slow down learning.
+pub const PHI_LR_STABILIZATION_SCALE: f32 = 0.08;
+
+/// Maximum LR dampening from Phi feedback (prevents LR from going to zero).
+pub const PHI_LR_STABILIZATION_MAX: f32 = 0.06;
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // DYNAMICS PHASE — STARTUP GUARDS & MISCELLANEOUS
 // Science: Cognitive systems require warmup before reliable inference.
 // Smaller thresholds gate cheap operations; larger thresholds gate expensive ones.

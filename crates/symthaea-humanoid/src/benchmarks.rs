@@ -86,6 +86,13 @@ impl BaselineScores {
                 td3_return: 0.30,  // TD3 achieves ~300/1000
                 d4pg_return: 0.40, // D4PG achieves ~400/1000
             },
+            // No published baselines for Reach/Grasp tasks
+            HumanoidTask::Reach | HumanoidTask::Grasp => Self {
+                task: *task,
+                sac_return: 0.0,
+                td3_return: 0.0,
+                d4pg_return: 0.0,
+            },
         }
     }
 }
@@ -134,7 +141,7 @@ pub fn evaluate_episode(
 
     for i in 0..n {
         let target_speed = match task {
-            HumanoidTask::Stand => 0.0,
+            HumanoidTask::Stand | HumanoidTask::Reach | HumanoidTask::Grasp => 0.0,
             HumanoidTask::Walk => 1.0,
             HumanoidTask::Run => 10.0,
         };

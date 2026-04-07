@@ -44,6 +44,8 @@ pub struct AppState {
     pub trend_harmony: RwSignal<Vec<f32>>,
     /// Active wellbeing profile
     pub wellbeing_profile: RwSignal<String>,
+    /// Broca pipeline download progress: "idle" | "downloading 45%" | "verifying" | "loading" | "ready"
+    pub pipeline_status: RwSignal<String>,
 }
 
 impl AppState {
@@ -76,6 +78,7 @@ impl AppState {
             trend_consciousness: RwSignal::new(Vec::new()),
             trend_harmony: RwSignal::new(Vec::new()),
             wellbeing_profile: RwSignal::new("Default".to_string()),
+            pipeline_status: RwSignal::new("idle".to_string()),
         }
     }
 }

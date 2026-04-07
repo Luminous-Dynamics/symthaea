@@ -211,13 +211,17 @@ mod tests {
     #[test]
     fn test_high_rtt_reduces_fps() {
         let mut engine = AdaptiveQualityEngine::new();
-        engine.last_adjustment = Instant::now() - Duration::from_secs(2); // Allow adjustment
 
-        // Feed high RTT.
-        let params = engine.update(Some(300), 0, 3, false);
+        // Feed multiple high RTT samples to push EMA above RTT_BAD_MS (200ms).
+        // EMA starts at 50.0, so we need several samples for it to converge.
+        for _ in 0..10 {
+            engine.last_adjustment = Instant::now() - Duration::from_secs(2); // Allow adjustment
+            engine.update(Some(500), 0, 3, false);
+        }
+        let params = engine.params();
         assert!(
             params.target_fps < 5,
-            "FPS should decrease on high RTT, got {}",
+            "FPS should decrease on sustained high RTT, got {}",
             params.target_fps
         );
     }

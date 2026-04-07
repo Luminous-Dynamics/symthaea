@@ -12,6 +12,8 @@ package io.symthaea.soma
  */
 internal object NativeBindings {
     init {
+        // Load LiteRT shim first — libsymthaea_soma.so depends on litert_* symbols
+        try { System.loadLibrary("litert_shim") } catch (_: UnsatisfiedLinkError) {}
         System.loadLibrary("soma_jni")
     }
 
@@ -102,6 +104,11 @@ internal object NativeBindings {
     @JvmStatic external fun bleAdvertisePayload(handle: Long): ByteArray?
     @JvmStatic external fun blePeerCount(handle: Long): Int
     @JvmStatic external fun bleCollectivePhi(handle: Long): Float
+
+    // Prism epistemic search (requires prism-search feature in Rust)
+    @JvmStatic external fun prismInit(handle: Long)
+    @JvmStatic external fun prismSearch(handle: Long, query: String, topK: Int): String?
+    @JvmStatic external fun prismAvailable(handle: Long): Boolean
 
     // Screen vision (requires screen-vision feature in Rust)
     @JvmStatic external fun injectFrame(handle: Long, data: ByteArray, width: Int, height: Int, channels: Int): Float

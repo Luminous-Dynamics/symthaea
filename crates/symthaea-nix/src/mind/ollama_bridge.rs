@@ -8,7 +8,7 @@
 //! this module sends it to a local Ollama instance for LLM-powered response.
 //!
 //! Approved models (from CLAUDE.md):
-//!   embeddinggemma:300m | gemma3:1b | qwen3:1.7b | gemma3:4b | mistral:7b
+//!   embeddinggemma:300m | gemma3:1b | qwen3:1.7b | gemma4:e2b | mistral:7b
 //!
 //! Do NOT use: qwen2.5 variants
 
@@ -37,7 +37,7 @@ impl Default for OllamaBridgeConfig {
             fallback_models: vec![
                 "gemma3:1b".into(),
                 "qwen3:1.7b".into(),
-                "gemma3:4b".into(),
+                "gemma4:e2b".into(),
                 "mistral:7b".into(),
             ],
             timeout: Duration::from_secs(30),
@@ -292,7 +292,7 @@ mod tests {
         let config = OllamaBridgeConfig::default();
         assert_eq!(config.fallback_models[0], "gemma3:1b");
         assert_eq!(config.fallback_models[1], "qwen3:1.7b");
-        assert_eq!(config.fallback_models[2], "gemma3:4b");
+        assert_eq!(config.fallback_models[2], "gemma4:e2b");
         assert_eq!(config.fallback_models[3], "mistral:7b");
     }
 }

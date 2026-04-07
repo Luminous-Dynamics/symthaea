@@ -61,7 +61,8 @@ impl CognitiveLoopService {
         // PHASE 0.4: Moral Evaluation (throttled: every Nth cycle or on new input)
         // ═══════════════════════════════════════════════════════════════════════
         let _t = Instant::now();
-        let (moral_score, moral_concern_detected, moral_judgment) =
+        let (moral_score, moral_concern_detected, moral_judgment,
+             spinozist_affect_coords, spinozist_fluctuatio, spinozist_ambiguous, spinozist_confidence) =
             self.run_moral_phase(input, input_negation_polarity);
         module_timings.moral_algebra = _t.elapsed().as_micros() as u64;
 
@@ -374,6 +375,10 @@ impl CognitiveLoopService {
                 moral_score,
                 moral_judgment,
                 soul_alignment: encoding.soul_alignment,
+                moral_affect_coords: spinozist_affect_coords,
+                moral_fluctuatio_tension: spinozist_fluctuatio,
+                moral_is_ambiguous: spinozist_ambiguous,
+                moral_epistemic_confidence: spinozist_confidence,
             },
             strategy: PercStrategy {
                 selected_strategy,

@@ -506,6 +506,23 @@ impl CognitiveLoopService {
             None
         };
 
+        #[cfg(feature = "analogy-engine")]
+        let analogy_integration = if config.enable_analogy_engine {
+            config.genesis_phrase.as_ref().map(|p| {
+                let genesis = symthaea_core::genesis::GenesisSeed::from_phrase(p);
+                super::analogy_integration::AnalogyIntegration::new(&genesis)
+            })
+        } else {
+            None
+        };
+
+        #[cfg(feature = "ucl-frames")]
+        let ucl_frame_integration = if config.enable_ucl_frames {
+            Some(super::ucl_frame_integration::UCLFrameIntegration::new())
+        } else {
+            None
+        };
+
         #[cfg(feature = "vision-manifold")]
         let vision_frame_width = config.vision_frame_width;
         #[cfg(feature = "vision-manifold")]
@@ -519,6 +536,18 @@ impl CognitiveLoopService {
         let broca_enabled = config.enable_broca_language;
         #[cfg(feature = "ssm_language")]
         let broca_genesis_phrase = config.genesis_phrase.clone();
+
+        // BrocaLite seed: hash the genesis phrase (or use default)
+        let broca_lite_seed: u64 = config.genesis_phrase.as_deref()
+            .map(|p| {
+                let mut h: u64 = 0xcbf29ce484222325;
+                for b in p.as_bytes() {
+                    h ^= *b as u64;
+                    h = h.wrapping_mul(0x100000001b3);
+                }
+                h
+            })
+            .unwrap_or(0x5f3759df_u64);
 
         let enable_visualization = config.enable_visualization;
         let enable_soul_alignment = config.enable_soul_alignment;
@@ -571,6 +600,8 @@ impl CognitiveLoopService {
         let broca_nsm_semantic = config.enable_broca_nsm_semantic;
         #[cfg(feature = "ssm_language")]
         let broca_nsm_gate = config.enable_broca_nsm_gate;
+        #[cfg(feature = "ssm_language")]
+        let broca_multi_turn_depth = config.broca_multi_turn_depth;
         // Extract trajectory planning config before moving `config` into the struct
         let trajectory_planning_enabled = config.enable_trajectory_planning;
         let trajectory_horizon_seconds = config.trajectory_horizon_seconds;
@@ -710,6 +741,8 @@ impl CognitiveLoopService {
             )
         };
 
+        #[cfg(feature = "jepa")]
+        let jepa_input_dim = config.cfc_config.input_dim;
         let mut service = Self {
             config,
             encoder,
@@ -718,6 +751,7 @@ impl CognitiveLoopService {
             stats: LoopStats::default(),
             error_history: VecDeque::with_capacity(super::thresholds::ERROR_HISTORY_CAPACITY),
             last_state: None,
+            training_state_buf: None,
             last_prediction: None,
             start_time: Instant::now(),
             is_consolidating: false,
@@ -736,16 +770,21 @@ impl CognitiveLoopService {
                     let mut broca_config = symthaea_broca::BrocaConfig::default();
                     broca_config.enable_nsm_semantic = broca_nsm_semantic;
                     broca_config.enable_nsm_gate = broca_nsm_gate;
-                    Some(super::broca_bridge::BrocaManager::new(
-                        &genesis,
-                        broca_config,
-                        broca_checkpoint_path.as_deref(),
-                    ))
+                    {
+                        let mut mgr = super::broca_bridge::BrocaManager::new(
+                            &genesis,
+                            broca_config,
+                            broca_checkpoint_path.as_deref(),
+                        );
+                        mgr.multi_turn_depth = broca_multi_turn_depth;
+                        Some(mgr)
+                    }
                 } else {
                     None
                 },
-                #[cfg(feature = "ssm_language")]
+                broca_lite: super::broca_lite::BrocaLiteManager::new(broca_lite_seed),
                 last_broca_text: None,
+                last_language_source: None,
                 user_state: if enable_user_state {
                     Some(crate::user_state_inference::UserStateInference::new())
                 } else {
@@ -753,6 +792,8 @@ impl CognitiveLoopService {
                 },
                 broca_code_channels: None,
             },
+            voice_synthesis: None, // Spawned on demand via enable_voice_synthesis()
+            llm_language: None,   // Spawned on demand via enable_llm_language()
             behavior: super::behavioral_synthesis::BehavioralSynthesis::new(
                 FlowState::default(),
                 EmotionContagion::default(),
@@ -789,6 +830,7 @@ impl CognitiveLoopService {
                     4,
                 ),
                 learning_signal: 0.0,
+                last_action_idx: 0,
                 lr_boost: 1.0,
                 surprise_bridge,
                 trajectory_config: super::fep_module::TrajectoryPlanningConfig {
@@ -951,6 +993,10 @@ impl CognitiveLoopService {
                 causal_consciousness,
                 #[cfg(feature = "physics-bridge")]
                 physics_integration,
+                #[cfg(feature = "analogy-engine")]
+                analogy_integration,
+                #[cfg(feature = "ucl-frames")]
+                ucl_frame_integration,
             },
             async_trainer,
             #[cfg(feature = "reasoning_engine")]
@@ -1046,6 +1092,7 @@ impl CognitiveLoopService {
             neuromod: super::neuromod_manager::NeuromodManager::default(),
             // somatic_bridge, pain_tx, thermal_bridge, thermal_tx moved to sensorimotor_built
             subsystem_collector: super::subsystem_trait::OutputCollector::new(),
+            subsystem_health: super::subsystem_trait::SubsystemHealthTracker::new(),
             last_snapshot: None,
 
             // ── Unified Engines (additive wiring — old fields remain) ────────
@@ -1100,6 +1147,18 @@ impl CognitiveLoopService {
                 MasterConsciousnessEquation::default(),
             ),
             substrate_manager,
+            threshold_overrides: super::threshold_overrides::ThresholdOverrides::default(),
+            #[cfg(feature = "jepa")]
+            jepa_engine: {
+                let seed: u64 = 42;
+                Some(symthaea_jepa::JepaEngine::new(
+                    symthaea_jepa::JepaConfig {
+                        input_dim: jepa_input_dim,
+                        ..Default::default()
+                    },
+                    seed,
+                ))
+            },
             #[cfg(feature = "neural_validation")]
             cortical_history: std::collections::VecDeque::with_capacity(1000),
             // physics_integration moved to feature_integ manager
@@ -1109,7 +1168,12 @@ impl CognitiveLoopService {
             ),
             ethics_engine: {
                 let engine_mp = MoralParser::new();
-                let engine_ma = MoralAlgebra::default_dim();
+                let mut engine_ma = MoralAlgebra::default_dim();
+                // Wire Spinozist as 5th ensemble signal (untrained at startup;
+                // train via train_hybrid() when training data becomes available)
+                engine_ma.set_spinozist(
+                    crate::hdc::spinozist_geometry::SpinozistClassifier::new(),
+                );
                 let engine_ve = if has_primitive_processor {
                     Some(
                         crate::consciousness::unified_value_evaluator::UnifiedValueEvaluator::new(),
@@ -1336,6 +1400,8 @@ impl CognitiveLoopService {
             pending_crisis_events: Vec::new(),
             #[cfg(feature = "neuroevolution")]
             neuroevolution_manager: super::managers::NeuroevolutionManager::default(),
+            #[cfg(feature = "hypervisor")]
+            hypervisor_manager: super::managers::HypervisorManager::new("agent".to_string()),
             #[cfg(feature = "reasoning_engine")]
             reasoning_manager: super::managers::ReasoningManager::default(),
             #[cfg(feature = "ssm_language")]
@@ -1704,7 +1770,8 @@ mod tests {
 
     #[test]
     fn primitive_consciousness_disabled_means_no_subsystems() {
-        let config = CognitiveLoopConfig::default();
+        let mut config = CognitiveLoopConfig::default();
+        config.enable_primitive_consciousness = false;
         assert!(!config.enable_primitive_consciousness);
         let service = CognitiveLoopService::new(config).unwrap();
         assert!(service.temporal_analyzer().is_none());
@@ -1829,7 +1896,8 @@ mod tests {
 
     #[test]
     fn phi_dyad_none_when_consciousness_disabled() {
-        let config = CognitiveLoopConfig::default();
+        let mut config = CognitiveLoopConfig::default();
+        config.enable_primitive_consciousness = false;
         assert!(!config.enable_primitive_consciousness);
         let service = CognitiveLoopService::new(config).unwrap();
         assert!(

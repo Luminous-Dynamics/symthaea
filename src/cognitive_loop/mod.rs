@@ -180,14 +180,17 @@ pub(crate) mod vision_sensory_manager;
 pub use substrate_manager::SubstrateTransitionRecord;
 pub(crate) mod subsystem_trait;
 pub(crate) mod thresholds;
+pub(crate) mod threshold_overrides;
 
 #[cfg(feature = "epistemic_auditor")]
 pub(crate) mod epistemic_auditor;
 pub(crate) mod virtual_body;
 pub(crate) mod voice_coherence_bridge;
 
-#[cfg(feature = "ssm_language")]
 pub mod broca_bridge;
+pub mod broca_lite;
+pub mod llm_language_channel;
+pub mod voice_channel;
 
 #[cfg(feature = "canvas")]
 pub(crate) mod canvas_bridge;
@@ -199,6 +202,12 @@ pub(crate) mod creative_bridge;
 pub(crate) mod physics_integration;
 #[cfg(feature = "physics-bridge")]
 pub use physics_integration::ParetoContext;
+
+#[cfg(feature = "analogy-engine")]
+pub(crate) mod analogy_integration;
+
+#[cfg(feature = "ucl-frames")]
+pub(crate) mod ucl_frame_integration;
 
 pub(crate) mod thermodynamic_state;
 pub(crate) mod thermodynamic_physics_bridge;
@@ -365,6 +374,12 @@ pub struct CognitiveLoopService {
     /// Last compressed state (for creating experience)
     last_state: Option<Vec<f32>>,
 
+    /// Pre-allocated buffer holding a copy of `last_state` for the training
+    /// phase.  Populated each cycle by `copy_last_state_to_training_buf()`
+    /// before `create_experience` moves `last_state` into the replay buffer.
+    /// Eliminates a per-cycle `Vec<f32>` allocation on the CfC hot path.
+    training_state_buf: Option<Vec<f32>>,
+
     /// Last prediction (for experience)
     last_prediction: Option<Vec<f32>>,
 
@@ -376,6 +391,15 @@ pub struct CognitiveLoopService {
 
     /// Language & communication: voice coherence, Broca, user state.
     pub(crate) language_comm: language_comm_manager::LanguageAndCommunicationManager,
+
+    /// Async voice synthesis: sends text to background thread, retrieves audio.
+    /// None when voice synthesis is not configured.
+    pub(crate) voice_synthesis: Option<voice_channel::VoiceSynthesisChannel>,
+
+    /// Async LLM language: sends consciousness state to Gemma 4 for translation.
+    /// None when LLM language is not configured. BrocaLite fills in immediately;
+    /// LLM response upgrades the output for subsequent cycles.
+    pub(crate) llm_language: Option<llm_language_channel::LlmLanguageChannel>,
 
     /// Behavioral synthesis group: flow, emotion, curiosity, adaptive behavior,
     /// thalamic routing, and social cognition.
@@ -620,6 +644,10 @@ pub struct CognitiveLoopService {
     /// Currently in dual-write bridge mode alongside direct mutations.
     subsystem_collector: subsystem_trait::OutputCollector,
 
+    /// Tracks consecutive panics per subsystem and disables repeat offenders.
+    /// Subsystems that panic 3 times in a row are skipped for the session.
+    subsystem_health: subsystem_trait::SubsystemHealthTracker,
+
     /// Last cycle snapshot (Phase 2.3) for telemetry and debugging.
     /// Built at the start of each cycle (Phase A: OBSERVE).
     last_snapshot: Option<subsystem_trait::CycleSnapshot>,
@@ -629,6 +657,9 @@ pub struct CognitiveLoopService {
     /// Substrate independence manager: consolidates feasibility, validation overlay,
     /// speed/scale modulation, and telemetry into a single cohesive struct.
     pub(super) substrate_manager: substrate_manager::SubstrateManager,
+    pub(crate) threshold_overrides: threshold_overrides::ThresholdOverrides,
+    #[cfg(feature = "jepa")]
+    pub(super) jepa_engine: Option<symthaea_jepa::JepaEngine>,
 
     /// Rolling window of per-cycle cortical activation maps for temporal analysis.
     /// Capacity: ~1000 cycles (~32s at 31Hz). Used for HRF convolution and EEG comparison.
@@ -828,6 +859,8 @@ pub struct CognitiveLoopService {
     /// Interval 71 (co-prime). Feature-gated behind `neuroevolution`.
     #[cfg(feature = "neuroevolution")]
     pub(crate) neuroevolution_manager: managers::NeuroevolutionManager,
+    #[cfg(feature = "hypervisor")]
+    pub(crate) hypervisor_manager: managers::HypervisorManager,
 
     /// Reasoning Manager: reasoning reliability → LR modulation, confidence, trend affect.
     /// Implements CognitiveSubsystem at interval 73. Feature-gated behind `reasoning_engine`.

@@ -555,6 +555,137 @@ pub unsafe extern "C" fn soma_ble_collective_phi(engine: *const SomaEngine) -> f
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// On-device LLM (LiteRT-LM / Gemma 4 E2B)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Initialize the on-device Gemma 4 E2B engine with a model file path.
+/// Returns 1 on success, 0 on failure.
+///
+/// # Safety
+/// `engine` must be valid. `model_path` must be a valid null-terminated UTF-8 C string.
+#[cfg(feature = "litert")]
+#[no_mangle]
+pub unsafe extern "C" fn soma_engine_litert_init(
+    engine: *mut SomaEngine,
+    model_path: *const c_char,
+) -> u8 {
+    if model_path.is_null() {
+        return 0;
+    }
+    let path = match unsafe { CStr::from_ptr(model_path) }.to_str() {
+        Ok(s) => s,
+        Err(_) => return 0,
+    };
+    if unsafe { &mut *engine }.litert_init(path) {
+        1
+    } else {
+        0
+    }
+}
+
+/// Check if the on-device LLM is available for inference.
+/// Returns 1 if ready, 0 if not.
+///
+/// # Safety: `engine` must be valid.
+#[cfg(feature = "litert")]
+#[no_mangle]
+pub unsafe extern "C" fn soma_engine_litert_available(engine: *const SomaEngine) -> u8 {
+    if unsafe { &*engine }.litert_available() {
+        1
+    } else {
+        0
+    }
+}
+
+/// Generate text using the on-device Gemma 4 E2B model.
+/// Returns a JSON string `{"text":"...","from_device":true}` or null if unavailable.
+/// Caller must free with `soma_string_free()`.
+///
+/// # Safety
+/// `engine` must be valid. `prompt` must be a valid null-terminated UTF-8 C string.
+#[cfg(feature = "litert")]
+#[no_mangle]
+pub unsafe extern "C" fn soma_engine_litert_generate(
+    engine: *mut SomaEngine,
+    prompt: *const c_char,
+    max_tokens: u32,
+) -> *mut c_char {
+    if prompt.is_null() {
+        return std::ptr::null_mut();
+    }
+    let prompt_str = match unsafe { CStr::from_ptr(prompt) }.to_str() {
+        Ok(s) => s,
+        Err(_) => return std::ptr::null_mut(),
+    };
+    match unsafe { &mut *engine }.litert_generate(prompt_str, max_tokens) {
+        Some(text) => {
+            let json = serde_json::json!({
+                "text": text,
+                "from_device": true,
+            });
+            CString::new(json.to_string()).map_or(std::ptr::null_mut(), |c| c.into_raw())
+        }
+        None => std::ptr::null_mut(),
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Prism epistemic search (offline-capable, sub-ms)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Initialize the Prism epistemic search engine with pre-seeded claims.
+///
+/// # Safety: `engine` must be valid.
+#[cfg(feature = "prism-search")]
+#[no_mangle]
+pub unsafe extern "C" fn soma_engine_prism_init(engine: *mut SomaEngine) {
+    unsafe { &mut *engine }.prism_init();
+}
+
+/// Search Prism epistemic claims. Returns JSON array of results.
+/// Caller must free with `soma_string_free()`.
+///
+/// # Safety: `engine` must be valid. `query` must be valid null-terminated UTF-8.
+#[cfg(feature = "prism-search")]
+#[no_mangle]
+pub unsafe extern "C" fn soma_engine_prism_search(
+    engine: *const SomaEngine,
+    query: *const c_char,
+    top_k: u32,
+) -> *mut c_char {
+    if query.is_null() {
+        return std::ptr::null_mut();
+    }
+    let query_str = match unsafe { CStr::from_ptr(query) }.to_str() {
+        Ok(s) => s,
+        Err(_) => return std::ptr::null_mut(),
+    };
+    let results = unsafe { &*engine }.prism_search(query_str, top_k as usize);
+    let json: Vec<serde_json::Value> = results
+        .iter()
+        .map(|r| {
+            serde_json::json!({
+                "content": r.content,
+                "sources": r.sources,
+                "empirical_level": format!("{:?}", r.empirical_level),
+                "similarity": r.query_similarity,
+            })
+        })
+        .collect();
+    CString::new(serde_json::to_string(&json).unwrap_or_else(|_| "[]".to_string()))
+        .map_or(std::ptr::null_mut(), |c| c.into_raw())
+}
+
+/// Whether Prism search is initialized and has claims.
+///
+/// # Safety: `engine` must be valid.
+#[cfg(feature = "prism-search")]
+#[no_mangle]
+pub unsafe extern "C" fn soma_engine_prism_available(engine: *const SomaEngine) -> u8 {
+    if unsafe { &*engine }.prism_available() { 1 } else { 0 }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // Screen vision (Phase 3)
 // ═══════════════════════════════════════════════════════════════════════════════
 

@@ -69,6 +69,11 @@ impl CanvasManager {
         self
     }
 
+    /// Set the generation interval on an existing manager.
+    pub fn set_generation_interval(&mut self, interval: u32) {
+        self.generation_interval = interval.max(1);
+    }
+
     /// Tick the canvas pipeline. Returns Some(svg) when a new frame is generated.
     pub fn tick(&mut self, snap: &CognitiveSnapshot) -> Option<&str> {
         self.cycles_since_generation += 1;
@@ -160,7 +165,7 @@ pub fn extract_snapshot(
 ) -> CognitiveSnapshot {
     CognitiveSnapshot {
         consciousness_level: metadata.consciousness.consciousness_level,
-        prediction_error: metadata.fep.fep_surprise,
+        prediction_error: metadata.fep.fep_surprise as f32,
         living_mind_vitality: metadata.living_mind_vitality,
         living_mind_coherence: metadata.living_mind_coherence,
         dopamine: neuromod.dopamine_effective,
@@ -177,8 +182,8 @@ pub fn extract_snapshot(
         persistence_cycles: persistence_cycles.to_vec(),
         cantor_metacognitive_depth: cantor_depth,
         cantor_last_depth: cantor_last,
-        valence: metadata.affective_valence,
-        arousal: metadata.affective_arousal,
+        valence: metadata.embodied.affective_valence,
+        arousal: metadata.embodied.affective_arousal,
         harmony_activations: *harmony_coords,
         thought_vector: thought_vector.to_vec(),
         cycle_count,

@@ -196,7 +196,7 @@ impl TemporalHierarchy {
 
         // Compute phrase-level statistics
         let n = self.phrase_accumulator.len() as f32;
-        let avg_centroid: f32 = self.phrase_accumulator.iter().map(|f| f.spectral_centroid).sum::<f32>() / n;
+        let _avg_centroid: f32 = self.phrase_accumulator.iter().map(|f| f.spectral_centroid).sum::<f32>() / n;
         let avg_tension: f32 = self.phrase_accumulator.iter().map(|f| f.harmonic_tension).sum::<f32>() / n;
         let avg_flux: f32 = self.phrase_accumulator.iter().map(|f| f.spectral_flux).sum::<f32>() / n;
         let avg_energy: f32 = self.phrase_accumulator.iter().map(|f| f.rms_energy).sum::<f32>() / n;

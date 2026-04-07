@@ -144,7 +144,7 @@ impl CognitiveLoopService {
         let _t = Instant::now();
         let (evolution_generation, evolution_phi_delta) =
             if let Some(ref mut coordinator) = self.primitive_tier.evolution_coordinator {
-                if self.stats.total_cycles % 499 == 0 && self.stats.total_cycles > 0 {
+                if self.stats.total_cycles % 997 == 0 && self.stats.total_cycles > 0 {
                     match coordinator.step() {
                         Ok(result) => (result.generation, result.primitive_psi_delta),
                         Err(_) => (coordinator.generation(), 0.0),

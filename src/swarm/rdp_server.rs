@@ -207,6 +207,9 @@ impl RdpServerHandle {
                         if let Some(session) = self.sessions.session_mut(&id) {
                             session.on_connected();
                             session.on_handshake_complete(session_key);
+                            // Auto-attest: SessionReady implies the actor already
+                            // verified the peer's consciousness attestation.
+                            session.on_attestation(1.0, &[0u8; 32], &[]);
                         }
                         // Send Welcome.
                         let welcome = RdpSessionManager::build_welcome(

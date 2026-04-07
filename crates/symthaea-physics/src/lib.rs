@@ -41,6 +41,7 @@ pub mod cmod_evaluation;
     clippy::needless_range_loop
 )]
 pub mod cross_machine_evaluation;
+pub mod antimatter;
 pub mod datacenter;
 pub mod fission;
 pub mod fusion_twin;

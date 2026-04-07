@@ -5,8 +5,8 @@
 //! adaptive HDC classification.
 //!
 //! This module bridges two systems:
-//! - [`SpinozistClassifier`]: extracts 78D affect features from text
-//!   (12 linear affects + 66 pairwise cross-terms)
+//! - [`SpinozistClassifier`]: extracts 171D affect features from text
+//!   (18 linear affects + 153 pairwise cross-terms)
 //! - [`LearnedHdcClassifier`]: adaptive prototype classification with
 //!   learnable level HVs and per-feature importance weights
 //!
@@ -38,8 +38,8 @@ use super::moral_prototypes::MoralLabel;
 use super::moral_text_encoder::TextHdcEncoder;
 use super::spinozist_geometry::SpinozistClassifier;
 
-/// Number of features: 78 Spinozist + 3 surface prototype similarities = 81.
-const N_FEATURES: usize = 81;
+/// Number of features: 171 Spinozist (18 linear + 153 cross-terms) + 3 surface prototype similarities = 174.
+const N_FEATURES: usize = 174;
 
 /// Number of moral classes: Good(0), Bad(1), Neutral(2).
 const N_CLASSES: usize = 3;
@@ -109,12 +109,12 @@ impl FeatureNormalizer {
 /// Moral classifier composing Spinozist affect extraction with adaptive HDC.
 ///
 /// The pipeline:
-/// 1. Text -> 78D affect features (via `SpinozistClassifier`)
+/// 1. Text -> 171D affect features (via `SpinozistClassifier`)
 /// 2. Normalize features to [0, 1] (via `FeatureNormalizer`)
 /// 3. Encode + classify (via `LearnedHdcClassifier` with learned levels + weights)
 ///
 /// Training adapts both the level hypervectors and per-feature importance
-/// weights, so the classifier learns which of the 78 affect dimensions
+/// weights, so the classifier learns which of the 171 affect dimensions
 /// are most discriminative for moral judgment.
 pub struct LearnedMoralClassifier {
     spinozist: SpinozistClassifier,
@@ -127,7 +127,7 @@ pub struct LearnedMoralClassifier {
 impl LearnedMoralClassifier {
     /// Create a new classifier with default configuration.
     ///
-    /// Uses 78 input features (from Spinozist affect space), 3 output classes,
+    /// Uses 171 input features (from Spinozist affect space), 3 output classes,
     /// 16,384-dimensional hypervectors, 32 quantization levels, and soft
     /// quantization for smoother gradient updates.
     pub fn new() -> Self {
@@ -151,7 +151,7 @@ impl LearnedMoralClassifier {
 
     /// Train on labeled text samples.
     ///
-    /// 1. Extracts 78D Spinozist features for each sample
+    /// 1. Extracts 171D Spinozist features for each sample
     /// 2. Fits a min-max normalizer on the feature matrix
     /// 3. Normalizes all features to [0, 1]
     /// 4. Builds initial prototypes via bundling
@@ -185,7 +185,7 @@ impl LearnedMoralClassifier {
             self.surface_prototypes = Some(protos);
         }
 
-        // Extract features (78 Spinozist + 3 surface similarities)
+        // Extract features (171 Spinozist + 3 surface similarities)
         let raw_features: Vec<Vec<f32>> = samples
             .iter()
             .map(|(text, _)| self.extract_features(text))
@@ -220,7 +220,7 @@ impl LearnedMoralClassifier {
         );
     }
 
-    /// Extract 81D feature vector: 78 Spinozist affects + 3 surface similarities.
+    /// Extract 174D feature vector: 171 Spinozist affects + 3 surface similarities.
     fn extract_features(&self, text: &str) -> Vec<f32> {
         let mut features = self.spinozist.compute_features(text);
         // Add 3 surface prototype similarities

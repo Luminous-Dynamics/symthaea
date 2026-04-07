@@ -628,6 +628,9 @@ pub mod similarity_monitor;
 pub mod state_smoother;
 pub mod taste_bench;
 pub mod taste_melody;
+pub mod taste_space;
+#[cfg(feature = "voice")]
+pub mod voice_bridge;
 pub mod binaural;
 pub mod collaborative;
 pub mod consciousness_reverb;

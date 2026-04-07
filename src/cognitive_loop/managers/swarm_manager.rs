@@ -193,6 +193,25 @@ pub enum SwarmEvent {
         /// Human-readable description.
         description: String,
     },
+    #[cfg(feature = "hypervisor")]
+    SupervisoryHeartbeat {
+        supervisor_id: String,
+        epoch: u64,
+        subordinate_count: usize,
+        aggregated_phi: f64,
+    },
+    #[cfg(feature = "hypervisor")]
+    SupervisoryEscalation {
+        supervisor_id: String,
+        reason: String,
+        severity: f32,
+    },
+    #[cfg(feature = "hypervisor")]
+    SupervisorElection {
+        supervisor_id: String,
+        phi_score: f64,
+        epoch: u64,
+    },
 }
 
 /// Type of space situational awareness alert.
@@ -1001,6 +1020,24 @@ impl SwarmManager {
                     }
                     self.distress_signals_received += 1;
                 }
+                #[cfg(feature = "hypervisor")]
+                SwarmEvent::SupervisoryHeartbeat { supervisor_id, aggregated_phi, .. } => {
+                    let phi = if aggregated_phi.is_finite() { aggregated_phi.clamp(0.0, 1.0) } else { 0.0 };
+                    let virt_id = format!("supervisor:{supervisor_id}");
+                    if let Some(entry) = self.peer_phi.iter_mut().find(|(id, _)| id == &virt_id) {
+                        entry.1 = phi;
+                    } else if self.peer_phi.len() < Self::MAX_TRACKED_PEERS {
+                        self.peer_phi.push((virt_id, phi));
+                    }
+                }
+                #[cfg(feature = "hypervisor")]
+                SwarmEvent::SupervisoryEscalation { severity, .. } => {
+                    let sev = if severity.is_finite() { severity.clamp(0.0, 1.0) } else { 0.0 };
+                    self.affective_arousal_acc += 0.1 * sev as f64;
+                    self.affective_valence_acc -= 0.05 * sev as f64;
+                }
+                #[cfg(feature = "hypervisor")]
+                SwarmEvent::SupervisorElection { .. } => {}
             }
         }
     }

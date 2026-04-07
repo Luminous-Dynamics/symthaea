@@ -1,0 +1,11 @@
+/srv/luminous-dynamics/symthaea/crates/symthaea-web/.claude/targets/installer-build/wasm32-unknown-unknown/debug/deps/slotmap-b8aea63075b84052.d: /home/tstoltz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/slotmap-1.1.1/src/lib.rs /home/tstoltz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/slotmap-1.1.1/src/basic.rs /home/tstoltz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/slotmap-1.1.1/src/dense.rs /home/tstoltz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/slotmap-1.1.1/src/hop.rs /home/tstoltz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/slotmap-1.1.1/src/secondary.rs /home/tstoltz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/slotmap-1.1.1/src/sparse_secondary.rs /home/tstoltz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/slotmap-1.1.1/src/util.rs
+
+/srv/luminous-dynamics/symthaea/crates/symthaea-web/.claude/targets/installer-build/wasm32-unknown-unknown/debug/deps/libslotmap-b8aea63075b84052.rmeta: /home/tstoltz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/slotmap-1.1.1/src/lib.rs /home/tstoltz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/slotmap-1.1.1/src/basic.rs /home/tstoltz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/slotmap-1.1.1/src/dense.rs /home/tstoltz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/slotmap-1.1.1/src/hop.rs /home/tstoltz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/slotmap-1.1.1/src/secondary.rs /home/tstoltz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/slotmap-1.1.1/src/sparse_secondary.rs /home/tstoltz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/slotmap-1.1.1/src/util.rs
+
+/home/tstoltz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/slotmap-1.1.1/src/lib.rs:
+/home/tstoltz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/slotmap-1.1.1/src/basic.rs:
+/home/tstoltz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/slotmap-1.1.1/src/dense.rs:
+/home/tstoltz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/slotmap-1.1.1/src/hop.rs:
+/home/tstoltz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/slotmap-1.1.1/src/secondary.rs:
+/home/tstoltz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/slotmap-1.1.1/src/sparse_secondary.rs:
+/home/tstoltz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/slotmap-1.1.1/src/util.rs:

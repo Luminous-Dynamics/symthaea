@@ -200,26 +200,78 @@ impl ConsciousnessEngine {
             if input.cycle % 23 == 0 && input.cycle > 0 {
                 use std::collections::HashMap;
                 let mut core_values = HashMap::with_capacity(7);
-                core_values.insert(
-                    CoreComponent::Integration,
-                    input.unified_psi.clamp(0.0, 1.0),
-                );
-                // Substrate-modulated: binding/workspace/attention capabilities
-                // scale the respective consciousness components.
-                core_values.insert(
-                    CoreComponent::Binding,
-                    input.coherence as f64 * input.binding_capability,
-                );
-                core_values.insert(
-                    CoreComponent::Workspace,
-                    input.coherence as f64 * 0.8 * input.workspace_capability,
-                );
+
+                // Integration: prefer spectral MIP Phi (actual IIT computation from
+                // Layer 1) over unified_psi (primitive consciousness proxy).
+                // Spectral Phi measures genuine integrated information via Fiedler
+                // ordering; unified_psi is a simpler pre-IIT estimate.
+                // Fallback to unified_psi when spectral Phi hasn't been computed yet.
+                let integration = self
+                    .cache
+                    .last_spectral_mip_phi
+                    .map(|phi| {
+                        // Normalize spectral phi [0,∞) → [0,1] via sigmoid
+                        let normalized = 2.0 / (1.0 + (-phi).exp()) - 1.0;
+                        // Blend: 70% spectral + 30% primitive for stability
+                        normalized * 0.7 + input.unified_psi * 0.3
+                    })
+                    .unwrap_or(input.unified_psi)
+                    .clamp(0.0, 1.0);
+                core_values.insert(CoreComponent::Integration, integration);
+
+                // Binding: prefer pipeline's oscillatory binding coherence (actual
+                // gamma-band PLV from OscillatoryBinding) over scaled coherence proxy.
+                // Substrate binding_capability still modulates as a ceiling.
+                let binding = if self.cache.last_pipeline_consciousness > 0.0 {
+                    // Pipeline has run at least once — use its binding metric
+                    // Blend: 60% oscillatory + 40% perceptual coherence for robustness
+                    let osc_binding = self.cache.last_pipeline_consciousness.min(1.0);
+                    (osc_binding * 0.6 + input.coherence as f64 * 0.4)
+                        * input.binding_capability
+                } else {
+                    input.coherence as f64 * input.binding_capability
+                };
+                core_values.insert(CoreComponent::Binding, binding.clamp(0.0, 1.0));
+
+                // Workspace: use GWT broadcast success as primary signal.
+                // gwt_broadcast_occurred from carryover indicates actual workspace
+                // ignition (Dehaene 2011), not just scaled coherence.
+                // Coalition size reflects workspace breadth.
+                let workspace = {
+                    let gwt_signal = if input.gwt_broadcast_occurred {
+                        // Broadcast happened: workspace is active.
+                        // Scale by coalition size (1-8 members typical)
+                        (0.5 + 0.5 * (input.gwt_coalition_size as f64 / 4.0).min(1.0))
+                            .clamp(0.0, 1.0)
+                    } else {
+                        // No broadcast: use coherence as fallback
+                        input.coherence as f64 * 0.6
+                    };
+                    gwt_signal * input.workspace_capability
+                };
+                core_values.insert(CoreComponent::Workspace, workspace.clamp(0.0, 1.0));
+
+                // Substrate-modulated attention capability.
                 core_values.insert(
                     CoreComponent::Attention,
                     input.phi_attention_weight as f64 * input.attention_capability,
                 );
                 core_values.insert(CoreComponent::Recursion, input.hot_depth);
-                core_values.insert(CoreComponent::Efficacy, 1.0 - input.prediction_error as f64);
+
+                // Efficacy: precision-weighted prediction error.
+                // Raw (1-PE) conflates low error with high efficacy — a sleeping
+                // system also has low PE. Precision weighting (inverse variance of
+                // recent PE) distinguishes genuine predictive success from inactivity.
+                let pe = input.prediction_error as f64;
+                let precision = if input.prediction_precision > 0.0 {
+                    input.prediction_precision as f64
+                } else {
+                    1.0 // fallback: unweighted
+                };
+                // High precision + low PE = genuine efficacy
+                // Low precision + low PE = uncertain (dampen efficacy)
+                let efficacy = ((1.0 - pe) * precision.sqrt().min(2.0)).clamp(0.0, 1.0);
+                core_values.insert(CoreComponent::Efficacy, efficacy);
 
                 // Approach C: Drift-driven epistemic humility + knowledge grounding + coherence
                 // High moral drift → attenuate Knowledge component in EquationV2.

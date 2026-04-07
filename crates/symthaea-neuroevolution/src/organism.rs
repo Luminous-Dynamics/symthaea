@@ -51,6 +51,7 @@ pub struct OrganismFitness {
     pub prediction_accuracy: f64,
     /// Energy efficiency (lower energy per useful computation).
     pub energy_efficiency: f64,
+    pub threshold_fitness: f64,
 }
 
 /// Result of a single evaluation step.
@@ -75,6 +76,16 @@ pub struct NeuralOrganism {
     pub total_free_energy: f64,
     pub total_cycles: u64,
     pub peak_phi: f32,
+    /// Accumulated Phi across evaluation steps (for mean Phi computation).
+    pub total_phi: f64,
+    /// Welford mean accumulator for Phi variance (stability objective).
+    phi_mean: f64,
+    /// Welford M2 accumulator for Phi variance.
+    phi_m2: f64,
+    /// Free energy at first evaluation step (for FE reduction rate).
+    initial_fe: f64,
+    /// Free energy at most recent evaluation step.
+    final_fe: f64,
     /// HDC dimension used for this organism's network.
     pub eval_dim: usize,
 }
@@ -125,6 +136,11 @@ impl NeuralOrganism {
             total_free_energy: 0.0,
             total_cycles: 0,
             peak_phi: 0.0,
+            total_phi: 0.0,
+            phi_mean: 0.0,
+            phi_m2: 0.0,
+            initial_fe: 0.0,
+            final_fe: 0.0,
             eval_dim: dim,
         }
     }
@@ -159,6 +175,20 @@ impl NeuralOrganism {
         if phi_proxy > self.peak_phi {
             self.peak_phi = phi_proxy;
         }
+        self.total_phi += phi_proxy as f64;
+
+        // Track Phi variance via Welford's online algorithm (for stability objective)
+        let n = (self.total_cycles + 1) as f64;
+        let delta = phi_proxy as f64 - self.phi_mean;
+        self.phi_mean += delta / n;
+        let delta2 = phi_proxy as f64 - self.phi_mean;
+        self.phi_m2 += delta * delta2;
+
+        // Track initial and final FE for reduction rate
+        if self.total_cycles == 0 {
+            self.initial_fe = fe.total;
+        }
+        self.final_fe = fe.total;
 
         self.total_free_energy += fe.total;
         self.total_cycles += 1;
@@ -177,32 +207,58 @@ impl NeuralOrganism {
             return;
         }
 
-        let mean_fe = self.total_free_energy / self.total_cycles as f64;
-        let mean_phi = self.peak_phi as f64; // Best observed Phi
+        let n = self.total_cycles.max(1) as f64;
+        let mean_fe = self.total_free_energy / n;
 
-        // Prediction accuracy from FEP agent stats
+        // Objective 1: Mean Phi (sustained consciousness, not lucky spikes)
+        let mean_phi = self.total_phi / n;
+
+        // Objective 2: FE reduction rate — system must be LEARNING, not stagnant.
+        // Goodhart defense: you can't fake learning.
+        let fe_reduction = if self.initial_fe.abs() > 1e-10 {
+            ((self.initial_fe - self.final_fe) / self.initial_fe.abs()).clamp(-1.0, 1.0)
+        } else {
+            0.0
+        };
+
+        // Objective 3: Prediction accuracy — system must actually predict.
         let pred_acc = if self.fep_agent.stats.perception_cycles > 0 {
             1.0 - (self.fep_agent.stats.avg_prediction_error / 10.0).min(1.0)
         } else {
             0.0
         };
 
-        // Energy efficiency: lower mean FE per cycle = better
+        // Objective 4: Phi stability — penalize variance.
+        // High mean + low variance = genuine sustained consciousness.
+        let phi_variance = if self.total_cycles > 1 {
+            self.phi_m2 / (n - 1.0)
+        } else {
+            0.0
+        };
+        let phi_stability = 1.0 / (1.0 + phi_variance * 10.0);
+
+        // Objective 5: Threshold consistency (existing heuristic)
+        let threshold_fit = crate::threshold_genome::evaluate_threshold_fitness(
+            &self.genome.decode_thresholds(),
+        );
+
         let efficiency = 1.0 / (1.0 + mean_fe.abs());
 
-        // Composite: negate FE (lower is better), add Phi and others
-        let composite = -mean_fe * weights.free_energy
-            + mean_phi * weights.phi
-            + mean_phi * weights.consciousness // Use phi as consciousness proxy
-            + efficiency * weights.efficiency;
+        // Composite for display/tiebreaking. Pareto sort uses individual objectives.
+        let composite = mean_phi * weights.phi
+            + fe_reduction.max(0.0) * weights.free_energy
+            + pred_acc * 0.2
+            + phi_stability * 0.15
+            + threshold_fit * 0.1;
 
         self.fitness = OrganismFitness {
             composite: composite.max(FITNESS_FLOOR),
             free_energy: mean_fe,
             phi: mean_phi,
-            consciousness: mean_phi,
+            consciousness: phi_stability,
             prediction_accuracy: pred_acc,
             energy_efficiency: efficiency,
+            threshold_fitness: threshold_fit,
         };
     }
 
@@ -242,10 +298,20 @@ impl NeuralOrganism {
     }
 
     /// Reset evaluation state for a new fitness round.
+
+    /// Get initial FE from evaluation (for FE reduction rate).
+    pub fn initial_fe(&self) -> f64 { self.initial_fe }
+    /// Get final FE from evaluation.
+    pub fn final_fe(&self) -> f64 { self.final_fe }
     pub fn reset_evaluation(&mut self) {
         self.total_free_energy = 0.0;
         self.total_cycles = 0;
         self.peak_phi = 0.0;
+        self.total_phi = 0.0;
+        self.phi_mean = 0.0;
+        self.phi_m2 = 0.0;
+        self.initial_fe = 0.0;
+        self.final_fe = 0.0;
         self.fep_agent = ActiveInferenceAgent::new(self.fep_agent.config.clone());
         // Re-instantiate network from genome with same dimension
         let phenotype = self.genome.decode();
@@ -268,25 +334,114 @@ impl NeuralOrganism {
 /// approximates Tononi's Phi: differentiation × integration.
 ///
 /// Returns a value in [0.0, ~1.0] for typical CfC outputs.
+/// Compute Phi proxy from CfC network output using spectral analysis.
+///
+/// Two components combined:
+/// 1. **Output integration**: variance × activity of the output vector
+///    (lightweight, captures differentiation)
+/// 2. **Spectral gap**: eigenvalue gap of the output's auto-correlation
+///    structure, approximating integrated information
+///    (Tononi 2004 — spectral gap correlates with Phi)
+///
+/// The combination prevents Goodhart: high variance alone (noise) scores low
+/// because spectral gap requires structured correlation.
 fn compute_phi_proxy(output: &ContinuousHV) -> f32 {
-    let n = output.dim() as f32;
-    if n < 2.0 {
+    let n = output.dim();
+    if n < 2 {
         return 0.0;
     }
 
-    let mean: f32 = output.values.iter().sum::<f32>() / n;
-    let variance: f32 = output
-        .values
-        .iter()
-        .map(|v| (v - mean).powi(2))
-        .sum::<f32>()
-        / n;
-    let mean_abs: f32 = output.values.iter().map(|v| v.abs()).sum::<f32>() / n;
+    let nf = n as f32;
+    let mean: f32 = output.values.iter().sum::<f32>() / nf;
+    let variance: f32 = output.values.iter().map(|v| (v - mean).powi(2)).sum::<f32>() / nf;
+    let mean_abs: f32 = output.values.iter().map(|v| v.abs()).sum::<f32>() / nf;
 
-    // Phi proxy = sqrt(variance) * mean_activity, clamped to [0, 1]
+    // Component 1: output differentiation × integration
     let differentiation = variance.sqrt().min(1.0);
     let integration = mean_abs.min(1.0);
-    (differentiation * integration).min(1.0)
+    let output_phi = differentiation * integration;
+
+    // Component 2: spectral gap from output auto-correlation
+    // Build a small correlation matrix from output dimensions
+    // (sample every stride to keep it manageable — max 32×32)
+    let max_dim = 32;
+    let stride = (n / max_dim).max(1);
+    let m = (n / stride).min(max_dim);
+    if m < 2 {
+        return output_phi.min(1.0);
+    }
+
+    // Build m×m correlation matrix from sampled dimensions
+    let sampled: Vec<f32> = (0..m).map(|i| output.values[i * stride]).collect();
+    let s_mean: f32 = sampled.iter().sum::<f32>() / m as f32;
+    let mut adj = vec![0.0f32; m * m];
+    for i in 0..m {
+        for j in 0..m {
+            // Correlation: (x_i - mean)(x_j - mean)
+            adj[i * m + j] = ((sampled[i] - s_mean) * (sampled[j] - s_mean)).abs();
+        }
+    }
+
+    // Power iteration for spectral gap (10 steps — fast approximation)
+    let spectral_gap = spectral_gap_f32(&adj, m);
+
+    // Combine: geometric mean of output_phi and spectral_gap
+    let combined = (output_phi * spectral_gap).sqrt();
+    combined.min(1.0)
+}
+
+/// Compute spectral gap of a symmetric matrix via power iteration.
+/// Returns normalized gap in [0, 1].
+fn spectral_gap_f32(matrix: &[f32], n: usize) -> f32 {
+    if n < 2 { return 0.0; }
+
+    // Power iteration for dominant eigenvalue
+    let mut v = vec![1.0 / (n as f32).sqrt(); n];
+    let mut lambda1 = 0.0f32;
+    for _ in 0..15 {
+        let mut w = vec![0.0f32; n];
+        for i in 0..n {
+            for j in 0..n {
+                w[i] += matrix[i * n + j] * v[j];
+            }
+        }
+        let norm: f32 = w.iter().map(|x| x * x).sum::<f32>().sqrt().max(1e-10);
+        lambda1 = norm;
+        for (vi, wi) in v.iter_mut().zip(w.iter()) {
+            *vi = wi / norm;
+        }
+    }
+
+    if lambda1 < 1e-10 { return 0.0; }
+
+    // Deflate: A' = A - lambda1 * v * v^T
+    let mut deflated = matrix.to_vec();
+    for i in 0..n {
+        for j in 0..n {
+            deflated[i * n + j] -= lambda1 * v[i] * v[j];
+        }
+    }
+
+    // Second eigenvalue
+    let mut v2 = vec![1.0 / (n as f32).sqrt(); n];
+    let mut lambda2 = 0.0f32;
+    for _ in 0..15 {
+        let mut w = vec![0.0f32; n];
+        for i in 0..n {
+            for j in 0..n {
+                w[i] += deflated[i * n + j] * v2[j];
+            }
+        }
+        let norm: f32 = w.iter().map(|x| x * x).sum::<f32>().sqrt().max(1e-10);
+        lambda2 = norm;
+        for (vi, wi) in v2.iter_mut().zip(w.iter()) {
+            *vi = wi / norm;
+        }
+    }
+
+    // Normalized spectral gap
+    let gap = (lambda1 - lambda2).max(0.0);
+    (gap / lambda1.max(1e-10)).min(1.0)
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════

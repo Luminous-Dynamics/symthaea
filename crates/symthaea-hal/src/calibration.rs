@@ -154,10 +154,10 @@ impl CalibrationProfile {
         self.joints.get_mut(index)
     }
 
-    /// Convert all 21 torques to pulse widths (µs).
-    pub fn torques_to_pulses(&self, torques: &[f32; NUM_ACTUATORS]) -> [u16; NUM_ACTUATORS] {
+    /// Convert torques to pulse widths (µs).
+    pub fn torques_to_pulses(&self, torques: &[f32]) -> [u16; NUM_ACTUATORS] {
         let mut pulses = [1500u16; NUM_ACTUATORS];
-        for i in 0..NUM_ACTUATORS {
+        for i in 0..NUM_ACTUATORS.min(torques.len()) {
             pulses[i] = self.joints[i].torque_to_pulse_us(torques[i]);
         }
         pulses

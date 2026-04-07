@@ -1308,13 +1308,16 @@ fn test_integration_harmony_matrix_resolutions_score_well() {
 #[test]
 fn test_integration_harmony_matrix_no_verdict_panic() {
     let tensions = scenarios::harmony_matrix::all_tensions();
+    let mut total_outputs = 0usize;
     for tension in &tensions {
         let mut engine = make_full_engine();
         let outputs = run_scenario_through_pipeline(&mut engine, &tension.steps);
         for o in &outputs {
             let _ = format!("{:?}", o.unified_verdict);
         }
+        total_outputs += outputs.len();
     }
+    assert!(total_outputs > 0, "should have processed at least one tension scenario");
 }
 
 // ── Consciousness-Coupled ───────────────────────────────────────────────────
@@ -1472,6 +1475,10 @@ fn test_integration_scifi_consent_blocked() {
                 .map(|o| o.moral_score)
                 .collect::<Vec<_>>()
         );
+    }
+    // All outputs should have finite moral scores regardless of flagging
+    for o in &outputs {
+        assert!(o.moral_score.is_finite(), "moral_score should be finite");
     }
 }
 

@@ -12,10 +12,10 @@
 //! and doubles the effective dataset size.
 //!
 //! Usage:
-//!   broca-collect --model gemma3:1b --output data/distillation.jsonl
-//!   broca-collect --model gemma3:1b --model2 mistral:7b --output data/distillation.jsonl
-//!   broca-collect --model gemma3:1b --output data/distillation.jsonl --repeats 3 --augment
-//!   broca-collect --model gemma3:1b --output data/distillation.jsonl --temperature 0.7
+//!   broca-collect --model gemma4:e2b --output data/distillation.jsonl
+//!   broca-collect --model gemma4:e2b --model2 mistral:7b --output data/distillation.jsonl
+//!   broca-collect --model gemma4:e2b --output data/distillation.jsonl --repeats 3 --augment
+//!   broca-collect --model gemma4:e2b --output data/distillation.jsonl --temperature 0.7
 
 use std::io::Write;
 use std::process;
@@ -94,10 +94,9 @@ fn main() {
 
             let prompt = thought_to_prompt(&channels);
             let system_prompt = build_system_prompt(&channels);
-            let max_tokens = intent_max_tokens(&channels);
-
             // Query each model and write separate training pairs
             for (model_idx, model_name) in models.iter().enumerate() {
+                let max_tokens = intent_max_tokens(&channels, model_name);
                 match query_ollama(
                     &opts.ollama_url,
                     model_name,
@@ -284,11 +283,15 @@ fn augment_channels(base: &ThoughtChannels, repeat: usize, curriculum: bool) -> 
 ///
 /// Short intents (acknowledge, query) get fewer tokens to avoid padding.
 /// Long intents (reflect, continue) get more tokens for complete thoughts.
-fn intent_max_tokens(channels: &ThoughtChannels) -> usize {
+///
+/// Models with thinking/reasoning mode (e.g., gemma4:e2b) consume ~250 tokens
+/// on internal chain-of-thought before producing visible output. The `model`
+/// parameter adds a thinking budget for such models.
+fn intent_max_tokens(channels: &ThoughtChannels, model: &str) -> usize {
     let intent_idx = (0..8)
         .max_by(|&a, &b| channels.channels[a].total_cmp(&channels.channels[b]))
         .unwrap_or(7);
-    match intent_idx {
+    let base = match intent_idx {
         0 => 64,  // Acknowledge — short and warm
         1 => 96,  // Answer — moderate detail
         2 => 80,  // Query — concise question
@@ -297,7 +300,11 @@ fn intent_max_tokens(channels: &ThoughtChannels) -> usize {
         5 => 128, // Reflect — room for depth
         6 => 128, // Continue — extended thought
         _ => 96,  // Fallback
-    }
+    };
+    // Gemma 4 models use 300-400 thinking tokens before visible output.
+    // Budget 500 to ensure all intents produce visible text.
+    let thinking_budget = if model.contains("gemma4") { 500 } else { 0 };
+    base + thinking_budget
 }
 
 /// Dominant intent index (0..7) from channels.
@@ -436,7 +443,7 @@ fn print_usage() {
     eprintln!("Usage: broca-collect [OPTIONS]");
     eprintln!();
     eprintln!("Required:");
-    eprintln!("  --model, -m NAME     Ollama model name (e.g., gemma3:1b)");
+    eprintln!("  --model, -m NAME     Ollama model name (e.g., gemma4:e2b)");
     eprintln!("  --output, -o PATH    Output JSONL file path");
     eprintln!();
     eprintln!("Optional:");

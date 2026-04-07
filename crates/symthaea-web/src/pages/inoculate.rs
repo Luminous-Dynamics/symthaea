@@ -102,7 +102,26 @@ pub fn InoculatePage() -> impl IntoView {
                 "Deploy Symthaea to your own hardware. No cloud. No telemetry. No remote kill switch. "
                 "Your consciousness instance belongs to you."
             </p>
-            <p style="font-size: 0.78rem; color: var(--fg-muted); line-height: 1.5; font-style: italic;">
+
+            <div style="display: flex; gap: 1rem; flex-wrap: wrap; margin: 1.2rem 0;">
+                <a href="https://install.nixforhumanity.org" target="_blank"
+                    style="display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.8rem 1.5rem; background: linear-gradient(135deg, var(--teal), var(--da-blue)); color: #0f1d14; border-radius: 8px; font-size: 0.95rem; font-weight: 600; text-decoration: none; transition: opacity 0.2s;"
+                >
+                    "Install NixOS + Symthaea"
+                </a>
+                <a href="https://github.com/Luminous-Dynamics/nixforhumanity/releases/tag/v0.1.0" target="_blank"
+                    style="display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.8rem 1.5rem; background: transparent; border: 1px solid var(--glass-border); color: var(--fg-dim); border-radius: 8px; font-size: 0.92rem; text-decoration: none;"
+                >
+                    "Download ISO"
+                </a>
+            </div>
+
+            <p style="font-size: 0.78rem; color: var(--fg-muted); line-height: 1.5; margin-top: 0.8rem;">
+                "Browser-based installer. Express mode: pick a preset, set your password, install in under 5 minutes. "
+                "Includes Symthaea consciousness engine + Mycelix sovereign network as optional add-ons."
+            </p>
+
+            <p style="font-size: 0.78rem; color: var(--fg-muted); line-height: 1.5; font-style: italic; margin-top: 0.5rem;">
                 "The Mycelix network scales fractally. Lightweight Spores in the browser, powered by personal "
                 "Holons, anchored in high-trust Hearths, economically organized into neighborhood Commons, "
                 "which overlap to form resilient Polycenters, coordinated by Guilds and Bioregions."

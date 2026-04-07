@@ -238,10 +238,10 @@ impl CognitiveLoopService {
         {
             let cycle_num = self.stats.total_cycles as usize;
             let interval = self.config.embodiment_step_interval.max(1);
-            if self.sensorimotor.embodiment_bridge.is_some() && cycle_num % interval == 0 {
+            if cycle_num % interval == 0 {
+                if let Some(mut bridge) = self.sensorimotor.embodiment_bridge.take() {
                 let phi = self.carryover.history.consciousness_level;
                 let dt = self.config.cfc_config.delta_t;
-                let mut bridge = self.sensorimotor.embodiment_bridge.take().unwrap();
                 let thought_hv = perception.encoding.encoding_result.hdv.clone();
                 let result = bridge.step(&thought_hv, dt, phi);
                 if result.success {
@@ -258,6 +258,7 @@ impl CognitiveLoopService {
                 }
                 self.sensorimotor.embodiment_telemetry = bridge.telemetry();
                 self.sensorimotor.embodiment_bridge = Some(bridge);
+                }
             }
         }
 
@@ -581,7 +582,7 @@ impl CognitiveLoopService {
             #[cfg(feature = "epistemic")]
             {
                 let individual_phi = feedback.consciousness.consciousness_level;
-                let collective_phi = feedback.consciousness.consciousness_level; // TODO: wire real collective phi from governance
+                let collective_phi = self.swarm_manager.mean_peer_phi();
                 self.collective_immune_state
                     .compute_echo_chamber_risk(individual_phi, collective_phi);
             }
@@ -1270,7 +1271,9 @@ mod tests {
 
     #[test]
     fn soul_alignment_zero_when_disabled() {
-        let mut s = make_service();
+        let mut config = CognitiveLoopConfig::default();
+        config.enable_soul_alignment = false;
+        let mut s = CognitiveLoopService::new(config).unwrap();
         let r = s.cycle("test without soul");
         assert_eq!(r.metadata.ethics.soul_alignment, 0.0);
         assert!(s.ethics_values.soul.is_none());

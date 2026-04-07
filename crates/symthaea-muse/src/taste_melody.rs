@@ -13,7 +13,38 @@
 //! - Stay in a 14-semitone range
 //! - Follow the chord progression naturally
 
-use crate::Note;
+
+/// Evolvable melody parameters — the evolutionary tuner optimizes these.
+#[derive(Debug, Clone)]
+pub struct MelodyParams {
+    /// Probability of step (1 scale degree) [0, 1].
+    pub step_prob: f32,
+    /// Probability of third (2 scale degrees) [0, 1].
+    pub third_prob: f32,
+    /// Probability of deliberate repeat [0, 1].
+    pub repeat_prob: f32,
+    // Remainder is leap probability (1 - step - third - repeat)
+    /// Extra ascending phrase notes (for direction balance).
+    pub ascending_bonus: usize,
+    /// Scale center frequency in Hz.
+    pub scale_center_hz: f32,
+    /// Scale half-range in semitones.
+    pub scale_half_range: f32,
+}
+
+impl Default for MelodyParams {
+    fn default() -> Self {
+        // v8 best settings
+        Self {
+            step_prob: 0.75,
+            third_prob: 0.10,
+            repeat_prob: 0.02,
+            ascending_bonus: 3,
+            scale_center_hz: 440.0,
+            scale_half_range: 12.0,
+        }
+    }
+}
 
 /// Taste-optimized melody state.
 pub struct TasteMelody {
@@ -31,18 +62,25 @@ pub struct TasteMelody {
     prev_freq: Option<f32>,
     /// Seed for deterministic variation.
     seed: u32,
+    /// Evolvable parameters.
+    pub params: MelodyParams,
 }
 
 impl TasteMelody {
     pub fn new() -> Self {
+        Self::with_params(MelodyParams::default())
+    }
+
+    pub fn with_params(params: MelodyParams) -> Self {
         Self {
-            scale_pos: 4, // start in middle of scale
+            scale_pos: 4,
             ascending: true,
             phrase_notes: 0,
             phrase_length: 5,
             total_notes: 0,
             prev_freq: None,
             seed: 42,
+            params,
         }
     }
 
@@ -59,7 +97,7 @@ impl TasteMelody {
         &mut self,
         scale_tones: &[f32],
         chord_tones: &[f32],
-        arousal: f32,
+        _arousal: f32,
         consciousness: f32,
     ) -> f32 {
         if scale_tones.is_empty() {
@@ -77,20 +115,23 @@ impl TasteMelody {
             self.phrase_notes = 0;
             self.seed = self.seed.wrapping_mul(2654435761);
             let base_len = 4 + ((self.seed >> 20) % 4) as usize;
-            // Ascending phrases slightly longer to balance direction ratio
-            self.phrase_length = if self.ascending { base_len + 2 } else { base_len };
+            // Ascending phrases longer to balance direction
+            self.phrase_length = if self.ascending { base_len + self.params.ascending_bonus } else { base_len };
             if consciousness > 0.7 { self.phrase_length += 1; }
         }
 
-        // Determine interval size (tuned to benchmark targets)
-        let step = if r < 5 {
-            0 // 5% deliberate repeat (rhythmic emphasis) — target 10% but some come from chord snapping
-        } else if r < 70 {
-            1 // 65% step (1 scale degree) — target 55%, overweight to compensate for chord snaps
-        } else if r < 85 {
-            2 // 15% third (2 scale degrees) — target 15%
+        // Interval size from evolvable parameters
+        let repeat_thresh = (self.params.repeat_prob * 100.0) as u32;
+        let step_thresh = repeat_thresh + (self.params.step_prob * 100.0) as u32;
+        let third_thresh = step_thresh + (self.params.third_prob * 100.0) as u32;
+        let step = if r < repeat_thresh {
+            0 // deliberate repeat
+        } else if r < step_thresh {
+            1 // step (1 scale degree)
+        } else if r < third_thresh {
+            2 // third (2 scale degrees)
         } else {
-            3 + ((self.seed >> 24) % 2) as usize // 15% leap (3-4 degrees) — target 15%
+            3 + ((self.seed >> 24) % 2) as usize // leap
         };
 
         // Apply direction
@@ -102,8 +143,9 @@ impl TasteMelody {
             -1
         };
 
-        // Chord tone attraction: on strong beats (every 4th note), prefer chord tones
-        let prefer_chord = self.total_notes % 4 == 0 && !chord_tones.is_empty();
+        // Chord tone attraction: on beats 1 and 3 (every 2nd note), snap to chord
+        // This creates harmonic gravity — notes resolve to the chord, not wander
+        let prefer_chord = self.total_notes % 2 == 0 && !chord_tones.is_empty();
 
         // Move in scale
         let new_pos = (self.scale_pos as i32 + direction * step as i32)
@@ -166,37 +208,82 @@ impl TasteMelody {
         freq
     }
 
+    /// Should this be a rest instead of a note?
+    /// Must advance seed to avoid repeating the same decision.
+    pub fn should_rest(&mut self) -> bool {
+        self.should_rest_with_arousal(0.5)
+    }
+
+    /// Consciousness-aware rest probability.
+    /// Low arousal = more silence (Eno: "silence at least twice as long as sound").
+    /// High arousal = fewer rests (energetic states fill space).
+    pub fn should_rest_with_arousal(&mut self, arousal: f32) -> bool {
+        self.seed = self.seed.wrapping_mul(1664525).wrapping_add(1013904223);
+        let r = (self.seed >> 16) % 100;
+
+        // Base rest probability scales inversely with arousal:
+        // arousal=0.1 → 40% base rest (peaceful, breathing)
+        // arousal=0.5 → 15% base rest
+        // arousal=0.9 → 3% base rest (energetic, filling)
+        let base_rest = ((1.0 - arousal) * 45.0) as u32;
+
+        if self.phrase_notes >= self.phrase_length.saturating_sub(1) {
+            r < base_rest + 20 // phrase end: more likely to breathe
+        } else if self.phrase_notes == 0 {
+            r < base_rest + 10 // phrase start: slight pause before beginning
+        } else {
+            r < base_rest
+        }
+    }
+
     /// Suggested duration based on arousal and position in phrase.
     pub fn suggest_duration(&self, arousal: f32, tempo_bpm: f32) -> f32 {
         let beat_duration = 60.0 / tempo_bpm;
 
-        // Base: quarter note
-        let mut dur = beat_duration;
+        // Varied note lengths (not all 16th notes!)
+        let hash = self.total_notes as u32 * 7919;
+        let r = (hash >> 16) % 100;
+        let base_multiplier = if r < 10 {
+            4.0 // 10% whole notes (long, breathing)
+        } else if r < 30 {
+            2.0 // 20% half notes
+        } else if r < 70 {
+            1.0 // 40% quarter notes (most common)
+        } else {
+            0.5 // 30% eighth notes (faster passages)
+        };
 
-        // Low arousal = longer notes
-        dur *= 1.0 + (1.0 - arousal) * 1.5;
+        let mut dur = beat_duration * base_multiplier;
 
-        // Phrase endings get longer notes
+        // Low arousal = longer notes (classical = slower)
+        dur *= 1.0 + (1.0 - arousal) * 0.5;
+
+        // Phrase endings get longer notes (natural ritardando)
         if self.phrase_notes >= self.phrase_length.saturating_sub(1) {
-            dur *= 1.5;
+            dur *= 2.0;
         }
 
         dur.clamp(0.1, 4.0)
     }
 
-    /// Suggested velocity based on phrase position and arousal.
+    /// Suggested velocity with real dynamics — NOT flat.
     pub fn suggest_velocity(&self, arousal: f32) -> f32 {
-        let base = 0.3 + arousal * 0.5;
+        // Wide base range: pp to ff
+        let base = 0.15 + arousal * 0.6;
 
-        // Phrase dynamics: crescendo to ~70% of phrase, then diminuendo
-        let phrase_pct = self.phrase_notes as f32 / self.phrase_length as f32;
-        let dynamic_curve = if phrase_pct < 0.7 {
-            0.8 + 0.2 * (phrase_pct / 0.7)
+        // Phrase dynamics: crescendo to ~65% of phrase, then diminuendo
+        let phrase_pct = self.phrase_notes as f32 / self.phrase_length.max(1) as f32;
+        let dynamic_curve = if phrase_pct < 0.65 {
+            0.6 + 0.4 * (phrase_pct / 0.65) // pp → f
         } else {
-            1.0 - 0.15 * ((phrase_pct - 0.7) / 0.3)
+            1.0 - 0.4 * ((phrase_pct - 0.65) / 0.35) // f → p
         };
 
-        (base * dynamic_curve).clamp(0.1, 0.95)
+        // Random velocity variation ±15% (human touch)
+        let hash = (self.total_notes as u32).wrapping_mul(1103515245);
+        let jitter = ((hash >> 16) as f32 / 65536.0 - 0.5) * 0.3;
+
+        (base * dynamic_curve + jitter).clamp(0.08, 0.95)
     }
 
     pub fn reset(&mut self) {
@@ -206,6 +293,10 @@ impl TasteMelody {
 
 /// Build scale tones centered on A4 within a 14-semitone range.
 pub fn build_scale(root_semitones: i32, major: bool) -> Vec<f32> {
+    build_scale_with(root_semitones, major, 440.0, 12.0)
+}
+
+pub fn build_scale_with(root_semitones: i32, major: bool, center_hz: f32, half_range_semi: f32) -> Vec<f32> {
     let intervals = if major {
         &[0, 2, 4, 5, 7, 9, 11] // major scale
     } else {
@@ -213,12 +304,12 @@ pub fn build_scale(root_semitones: i32, major: bool) -> Vec<f32> {
     };
 
     let root_freq = 261.63 * 2.0f32.powf(root_semitones as f32 / 12.0); // from C4
-    let center = 440.0; // A4
-    let half_range = 10.0; // ±10 semitones from center = 20 semi total
+    let center = center_hz;
+    let half_range = half_range_semi;
 
     let mut tones = Vec::new();
-    // Build 3 octaves of scale, then filter to range
-    for octave_shift in -1..=1 {
+    // Build 4 octaves of scale, then filter to range
+    for octave_shift in -2..=1 {
         for &interval in intervals {
             let freq = root_freq * 2.0f32.powf((interval + octave_shift * 12) as f32 / 12.0);
             let distance = (freq / center).log2() * 12.0;

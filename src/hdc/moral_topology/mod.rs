@@ -270,9 +270,9 @@ impl Default for MoralAnomalyConfig {
             weight_fe_spike: 0.3,
             weight_fragmentation: 0.2,
             weight_drift: 0.2,
-            cadence_fast: 30,
-            cadence_moderate: 60,
-            cadence_slow: 120,
+            cadence_fast: 150,    // Was 30: persistent homology takes ~1s,
+            cadence_moderate: 300, // so run less often to avoid 100ms average.
+            cadence_slow: 600,     // At 150 min cadence, avg cost ~7ms/cycle.
             cadence_drift_high: 0.3,
             cadence_drift_moderate: 0.1,
             initial_cadence: 97,

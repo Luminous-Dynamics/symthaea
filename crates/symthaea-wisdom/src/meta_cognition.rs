@@ -299,6 +299,88 @@ pub enum AccuracyTrend {
     Insufficient, // Not enough data
 }
 
+
+/// A suggested threshold mutation from the meta-cognitive layer.
+#[derive(Debug, Clone)]
+pub struct MutationSuggestion {
+    pub target: MutationTarget,
+    pub direction: f32,
+    pub confidence: f32,
+    pub reason: &'static str,
+}
+
+/// Target parameter for a mutation suggestion.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MutationTarget {
+    FepSurpriseScale,
+    FepLrDecay,
+    DreamBaseInterval,
+    NeuromodArousalDecay,
+    HomeostasisPullCruise,
+    FlowExplorationIncrement,
+    SelfModelWeightHigh,
+}
+
+impl MetaCognitiveLayer {
+    /// Suggest threshold mutations when accuracy plateaus.
+    pub fn suggest_mutations(&self) -> Vec<MutationSuggestion> {
+        let summary = self.accuracy_summary();
+        if summary.trend != AccuracyTrend::Stable || summary.predictions_made < 20 {
+            return Vec::new();
+        }
+        let mut suggestions = Vec::new();
+        let avg_error = self.error_model.average_error;
+        let error_var = self.error_model.error_variance;
+
+        if avg_error > 0.4 && error_var < 0.05 {
+            suggestions.push(MutationSuggestion {
+                target: MutationTarget::FepSurpriseScale,
+                direction: 1.0,
+                confidence: (avg_error - 0.3).clamp(0.0, 1.0),
+                reason: "high systematic error suggests insufficient surprise-driven learning",
+            });
+            suggestions.push(MutationSuggestion {
+                target: MutationTarget::FepLrDecay,
+                direction: -1.0,
+                confidence: 0.5,
+                reason: "persistent error benefits from slower LR decay",
+            });
+        }
+        if error_var > 0.1 {
+            suggestions.push(MutationSuggestion {
+                target: MutationTarget::NeuromodArousalDecay,
+                direction: 1.0,
+                confidence: (error_var - 0.05).clamp(0.0, 1.0),
+                reason: "high error variance suggests unstable arousal dynamics",
+            });
+            suggestions.push(MutationSuggestion {
+                target: MutationTarget::FlowExplorationIncrement,
+                direction: -1.0,
+                confidence: 0.4,
+                reason: "reducing exploration may stabilize error variance",
+            });
+        }
+        if self.accuracy > 0.5 && self.accuracy < 0.7 {
+            suggestions.push(MutationSuggestion {
+                target: MutationTarget::SelfModelWeightHigh,
+                direction: -1.0,
+                confidence: 0.3,
+                reason: "moderate accuracy plateau may benefit from lower self-model dominance",
+            });
+        }
+        if avg_error < 0.2 && self.accuracy < 0.8 {
+            suggestions.push(MutationSuggestion {
+                target: MutationTarget::DreamBaseInterval,
+                direction: -1.0,
+                confidence: 0.4,
+                reason: "low error with plateaued accuracy suggests consolidation gap",
+            });
+        }
+        suggestions.sort_by(|a, b| b.confidence.partial_cmp(&a.confidence).unwrap_or(std::cmp::Ordering::Equal));
+        suggestions.truncate(3);
+        suggestions
+    }
+}
 #[cfg(test)]
 mod tests {
     use super::*;

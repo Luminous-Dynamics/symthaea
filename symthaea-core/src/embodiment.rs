@@ -132,6 +132,8 @@ pub enum EmbodimentPlatform {
     Manipulator,
     /// Virtual caregiver agent — no physical embodiment.
     CareProvider,
+    /// Browser agent — web pages as sensory environment via CDP.
+    Browser,
 }
 
 // ── Embodiment Bridge Trait ────────────────────────────────────────────────

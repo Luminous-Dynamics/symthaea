@@ -2102,8 +2102,8 @@ impl BrocaLite {
         // Structured grammar produces more coherent output than the tiny autoregressive
         // model (643K params) at most consciousness levels. Reserve autoregressive for
         // high consciousness where the trained weights may add genuine novelty.
-        // Without checkpoint: structured only (autoregressive with random weights is noise).
-        let threshold = if self.checkpoint_loaded { 0.6 } else { 0.5 };
+        // Without checkpoint: ALWAYS use structured — random autoregressive is word soup.
+        let threshold = if self.checkpoint_loaded { 0.6 } else { 1.1 };
 
         if consciousness_level < threshold {
             return self.generate_structured(channels);

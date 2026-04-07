@@ -82,7 +82,7 @@ pub struct NeuralPhenotype {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /// Extract `num_bits` starting at `start_bit` from a BinaryHV, returned as u64.
-fn extract_bits(hv: &BinaryHV, start_bit: usize, num_bits: usize) -> u64 {
+pub(crate) fn extract_bits(hv: &BinaryHV, start_bit: usize, num_bits: usize) -> u64 {
     let mut value: u64 = 0;
     for i in 0..num_bits {
         let bit_index = start_bit + i;
@@ -96,7 +96,7 @@ fn extract_bits(hv: &BinaryHV, start_bit: usize, num_bits: usize) -> u64 {
 }
 
 /// Set `num_bits` starting at `start_bit` in a BinaryHV from a u64 value.
-fn set_bits(hv: &mut BinaryHV, start_bit: usize, num_bits: usize, value: u64) {
+pub(crate) fn set_bits(hv: &mut BinaryHV, start_bit: usize, num_bits: usize, value: u64) {
     for i in 0..num_bits {
         let bit_index = start_bit + i;
         let byte_index = bit_index / 8;
@@ -110,7 +110,7 @@ fn set_bits(hv: &mut BinaryHV, start_bit: usize, num_bits: usize, value: u64) {
 }
 
 /// Map a u64 (from `num_bits` bits) to a f32 in [lo, hi] linearly.
-fn bits_to_linear(raw: u64, num_bits: usize, lo: f32, hi: f32) -> f32 {
+pub(crate) fn bits_to_linear(raw: u64, num_bits: usize, lo: f32, hi: f32) -> f32 {
     let max_val = ((1u64 << num_bits) - 1) as f32;
     if max_val == 0.0 {
         return lo;
@@ -127,7 +127,7 @@ fn bits_to_log(raw: u64, num_bits: usize, lo: f32, hi: f32) -> f32 {
 }
 
 /// Inverse of bits_to_linear: f32 in [lo, hi] → u64 for `num_bits`.
-fn linear_to_bits(val: f32, num_bits: usize, lo: f32, hi: f32) -> u64 {
+pub(crate) fn linear_to_bits(val: f32, num_bits: usize, lo: f32, hi: f32) -> u64 {
     let max_val = ((1u64 << num_bits) - 1) as f32;
     let t = ((val - lo) / (hi - lo)).clamp(0.0, 1.0);
     (t * max_val).round() as u64
@@ -444,6 +444,37 @@ impl NeuralGenome {
     pub fn distance(&self, other: &Self) -> f32 {
         self.hv.hamming_distance(&other.hv) as f32 / BinaryHV::DIM as f32
     }
+
+    pub fn decode_thresholds(&self) -> crate::threshold_genome::ThresholdPhenotype {
+        crate::threshold_genome::decode_thresholds(&self.hv)
+    }
+
+    pub fn encode_thresholds(&mut self, pheno: &crate::threshold_genome::ThresholdPhenotype) {
+        crate::threshold_genome::encode_thresholds(&mut self.hv, pheno);
+    }
+
+    /// Biased mutation for Lamarckian evolution.
+    /// `targets`: slice of (start_bit, num_bits, confidence) tuples identifying
+    /// threshold loci to mutate with boosted rate (3× base_rate × confidence).
+    pub fn mutate_biased(&self, base_rate: f32, seed: u64, targets: &[(usize, usize, f32)]) -> Self {
+        let mut child = self.hv.add_noise(base_rate, seed);
+        let boost_rate = (base_rate * 3.0).min(0.5);
+        for &(start, bits, confidence) in targets {
+            let mut rng_state = seed ^ (start as u64 * 0x517CC1B727220A95);
+            for bit_idx in start..start + bits {
+                rng_state ^= rng_state << 13;
+                rng_state ^= rng_state >> 7;
+                rng_state ^= rng_state << 17;
+                let r = (rng_state >> 40) as f32 / (1u64 << 24) as f32;
+                if r < boost_rate * confidence {
+                    let byte_idx = bit_idx / 8;
+                    let bit_offset = bit_idx % 8;
+                    child.0[byte_idx] ^= 1 << bit_offset;
+                }
+            }
+        }
+        Self { hv: child }
+    }
 }
 
 /// Simple deterministic bit generator using BLAKE3.
@@ -653,3 +684,4 @@ mod tests {
         assert_ne!(g1, g3);
     }
 }
+

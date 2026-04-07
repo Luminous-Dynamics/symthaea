@@ -137,7 +137,7 @@ mod tests {
 
     #[test]
     fn test_with_presets() {
-        assert_eq!(MaterialDatabase::with_presets().len(), 5);
+        assert_eq!(MaterialDatabase::with_presets().len(), 6);
     }
     #[test]
     fn test_search_similar_returns_top_k() {
@@ -231,6 +231,6 @@ mod tests {
     fn test_search_top_k_exceeds_database() {
         let db = MaterialDatabase::with_presets();
         let results = db.search_similar(&MaterialProperty::steel_a36(), 100);
-        assert_eq!(results.len(), 5); // only 5 presets
+        assert_eq!(results.len(), 6); // 6 presets including Bi-Mg metamaterial
     }
 }

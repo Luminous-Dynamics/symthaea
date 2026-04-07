@@ -87,7 +87,11 @@ mod tests {
 
     #[test]
     fn test_disabled_self_model_tier() {
-        let config = CognitiveLoopConfig::default();
+        let mut config = CognitiveLoopConfig::default();
+        config.enable_meta_cognition = false;
+        config.enable_narrative_self = false;
+        config.enable_predictive_self = false;
+        config.enable_attention_schema = false;
         let tier = SelfModelTierManager::new(&config);
         assert!(tier.meta_cognition.is_none());
         assert!(tier.narrative_self.is_none());
@@ -113,6 +117,9 @@ mod tests {
     fn test_partial_enable_meta_cognition_only() {
         let mut config = CognitiveLoopConfig::default();
         config.enable_meta_cognition = true;
+        config.enable_narrative_self = false;
+        config.enable_predictive_self = false;
+        config.enable_attention_schema = false;
         let tier = SelfModelTierManager::new(&config);
         assert!(tier.meta_cognition.is_some());
         assert!(tier.narrative_self.is_none());
@@ -123,7 +130,10 @@ mod tests {
     #[test]
     fn test_partial_enable_predictive_self_only() {
         let mut config = CognitiveLoopConfig::default();
+        config.enable_meta_cognition = false;
+        config.enable_narrative_self = false;
         config.enable_predictive_self = true;
+        config.enable_attention_schema = false;
         let tier = SelfModelTierManager::new(&config);
         assert!(tier.meta_cognition.is_none());
         assert!(tier.narrative_self.is_none());
@@ -154,22 +164,23 @@ mod tests {
         let config = CognitiveLoopConfig::default();
         let tier = SelfModelTierManager::new(&config);
         // self_reflection is not Option — always constructed
-        let _ = &tier.self_reflection;
+        // Verify learning_effectiveness is finite at initialization
+        assert!(tier.self_reflection.learning_effectiveness().is_finite(), "self_reflection learning_effectiveness should be finite");
     }
 
     #[test]
     fn test_empty_config_defaults() {
         let config = CognitiveLoopConfig::default();
-        // Verify default config has all optional subsystems disabled
-        assert!(!config.enable_meta_cognition);
-        assert!(!config.enable_narrative_self);
-        assert!(!config.enable_predictive_self);
-        assert!(!config.enable_attention_schema);
+        // Verify default config has all optional subsystems enabled
+        assert!(config.enable_meta_cognition);
+        assert!(config.enable_narrative_self);
+        assert!(config.enable_predictive_self);
+        assert!(config.enable_attention_schema);
         let tier = SelfModelTierManager::new(&config);
-        assert!(tier.meta_cognition.is_none());
-        assert!(tier.narrative_self.is_none());
-        assert!(tier.predictive_self.is_none());
-        assert!(tier.attention_schema.is_none());
+        assert!(tier.meta_cognition.is_some());
+        assert!(tier.narrative_self.is_some());
+        assert!(tier.predictive_self.is_some());
+        assert!(tier.attention_schema.is_some());
     }
 
     #[test]
@@ -210,7 +221,9 @@ mod tests {
     #[test]
     fn test_mixed_enable_narrative_and_attention() {
         let mut config = CognitiveLoopConfig::default();
+        config.enable_meta_cognition = false;
         config.enable_narrative_self = true;
+        config.enable_predictive_self = false;
         config.enable_attention_schema = true;
         let tier = SelfModelTierManager::new(&config);
         assert!(tier.meta_cognition.is_none());

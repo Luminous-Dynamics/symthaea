@@ -150,7 +150,7 @@ impl HarmonyRecognizer {
                 scores[h] = spectral_flatness.clamp(0.0, 1.0) * 0.8;
             } else if h == 0 {
                 // Resonant Coherence: strong root + octave, weak other intervals
-                let octave_energy = chroma[root_pc]; // same pitch class
+                let _octave_energy = chroma[root_pc]; // same pitch class
                 scores[h] = (root_energy / total_energy).clamp(0.0, 1.0);
             } else {
                 // Other harmonies: strength of their characteristic interval

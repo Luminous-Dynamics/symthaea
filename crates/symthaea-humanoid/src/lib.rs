@@ -52,6 +52,7 @@ pub mod controller;
 pub mod encoder;
 pub mod fep_agent;
 pub mod gait;
+pub mod morphology;
 pub mod perturbations;
 pub mod reward;
 pub mod simulator;
@@ -69,6 +70,7 @@ pub use reward::{clearance_reward, cot_efficiency_reward, episode_reward, standi
 pub use simulator::MuJoCoHumanoidSimulator;
 pub use simulator::{HumanoidPhysicsSimulator, SimpleHumanoidSimulator};
 pub use training::HumanoidTrainer;
+pub use morphology::HumanoidMorphology;
 pub use types::*;
 
 #[cfg(test)]

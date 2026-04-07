@@ -56,6 +56,7 @@ pub mod fractal;
 pub mod memory;
 pub mod persistence;
 pub mod secure_boot;
+pub mod security;
 pub mod sovereign;
 pub mod topology;
 pub mod wellbeing_profiles;

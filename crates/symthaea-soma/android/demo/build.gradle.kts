@@ -47,4 +47,7 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.7.0")
     implementation("com.google.android.material:material:1.11.0")
     implementation("androidx.constraintlayout:constraintlayout:2.1.4")
+
+    // On-device LLM (Gemma 4 E2B via LiteRT-LM)
+    implementation("com.google.ai.edge.litertlm:litertlm-android:latest.release")
 }

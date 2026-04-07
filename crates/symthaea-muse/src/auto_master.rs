@@ -7,7 +7,7 @@
 //! apply corrective EQ, normalize to -14 LUFS (streaming standard), compress,
 //! and brick-wall limit.
 
-use crate::mixing::{Compressor, Limiter, ParametricEQ};
+use crate::mixing::{Limiter, ParametricEQ};
 
 /// LUFS measurement result.
 #[derive(Debug, Clone)]

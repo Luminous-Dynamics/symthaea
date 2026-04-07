@@ -16,6 +16,7 @@ fn make_engine() -> ConsciousnessEngine {
         window_size: 20,
         min_samples: 5,
         regularization: 1e-6,
+        ..Default::default()
     };
     let finder = SpectralMIPFinder::new(config);
     ConsciousnessEngine::new(finder, None, None, None)
@@ -51,6 +52,9 @@ fn make_input<'a>(
         cpg_sync_index: 0.5,
         cantor_metacognitive_depth: 0.5,
         governance_collective_phi: 0.0,
+        gwt_broadcast_occurred: false,
+        gwt_coalition_size: 0,
+        prediction_precision: 1.0,
         knowledge_grounding: 0.5,
         knowledge_coherence: 0.0,
         glyph_coherence: 0.0,
@@ -117,6 +121,7 @@ fn test_equation_v2_feedback_deltas() {
         window_size: 20,
         min_samples: 5,
         regularization: 1e-6,
+        ..Default::default()
     };
     let finder = SpectralMIPFinder::new(config);
     let eq = ConsciousnessEquationV2::default();
@@ -150,6 +155,9 @@ fn test_equation_v2_feedback_deltas() {
             cpg_sync_index: 0.5,
             cantor_metacognitive_depth: 0.5,
             governance_collective_phi: 0.0,
+            gwt_broadcast_occurred: false,
+            gwt_coalition_size: 0,
+            prediction_precision: 1.0,
             knowledge_grounding: 0.5,
             glyph_coherence: 0.0,
             temporal_coherence_phi: 0.0,
@@ -194,6 +202,7 @@ fn test_low_consciousness_boosts_exploration() {
         window_size: 20,
         min_samples: 5,
         regularization: 1e-6,
+        ..Default::default()
     };
     let finder = SpectralMIPFinder::new(config);
     let eq = ConsciousnessEquationV2::default();
@@ -226,6 +235,9 @@ fn test_low_consciousness_boosts_exploration() {
             cpg_sync_index: 0.5,
             cantor_metacognitive_depth: 0.5,
             governance_collective_phi: 0.0,
+            gwt_broadcast_occurred: false,
+            gwt_coalition_size: 0,
+            prediction_precision: 1.0,
             knowledge_grounding: 0.5,
             glyph_coherence: 0.0,
             temporal_coherence_phi: 0.0,
@@ -303,6 +315,9 @@ fn test_high_sht_2a_boosts_consciousness() {
         cpg_sync_index: 0.5,
         cantor_metacognitive_depth: 0.5,
         governance_collective_phi: 0.0,
+        gwt_broadcast_occurred: false,
+        gwt_coalition_size: 0,
+        prediction_precision: 1.0,
         knowledge_grounding: 0.5,
         knowledge_coherence: 0.0,
         glyph_coherence: 0.0,
@@ -351,6 +366,9 @@ fn test_high_gaba_a_dampens_consciousness() {
         cpg_sync_index: 0.5,
         cantor_metacognitive_depth: 0.5,
         governance_collective_phi: 0.0,
+        gwt_broadcast_occurred: false,
+        gwt_coalition_size: 0,
+        prediction_precision: 1.0,
         knowledge_grounding: 0.5,
         knowledge_coherence: 0.0,
         glyph_coherence: 0.0,
@@ -399,6 +417,9 @@ fn test_attractor_depresses_consciousness() {
         cpg_sync_index: 0.5,
         cantor_metacognitive_depth: 0.5,
         governance_collective_phi: 0.0,
+        gwt_broadcast_occurred: false,
+        gwt_coalition_size: 0,
+        prediction_precision: 1.0,
         knowledge_grounding: 0.5,
         knowledge_coherence: 0.0,
         glyph_coherence: 0.0,
@@ -448,6 +469,9 @@ fn test_bath_modulation_clamped() {
         cpg_sync_index: 0.5,
         cantor_metacognitive_depth: 0.5,
         governance_collective_phi: 0.0,
+        gwt_broadcast_occurred: false,
+        gwt_coalition_size: 0,
+        prediction_precision: 1.0,
         knowledge_grounding: 0.5,
         knowledge_coherence: 0.0,
         glyph_coherence: 0.0,
@@ -863,6 +887,7 @@ fn make_engine_with_eq_v2() -> ConsciousnessEngine {
         window_size: 20,
         min_samples: 5,
         regularization: 1e-6,
+        ..Default::default()
     };
     let finder = SpectralMIPFinder::new(config);
     let eq = ConsciousnessEquationV2::default();
@@ -996,6 +1021,7 @@ fn test_substrate_feasibility_affects_consciousness() {
         window_size: 20,
         min_samples: 5,
         regularization: 1e-6,
+        ..Default::default()
     };
     let finder = SpectralMIPFinder::new(config);
     let eq = ConsciousnessEquationV2::default();
@@ -1006,6 +1032,7 @@ fn test_substrate_feasibility_affects_consciousness() {
         window_size: 20,
         min_samples: 5,
         regularization: 1e-6,
+        ..Default::default()
     };
     let finder2 = SpectralMIPFinder::new(config2);
     let eq2 = ConsciousnessEquationV2::default();
@@ -1042,6 +1069,9 @@ fn test_substrate_feasibility_affects_consciousness() {
             cpg_sync_index: 0.5,
             cantor_metacognitive_depth: 0.5,
             governance_collective_phi: 0.0,
+            gwt_broadcast_occurred: false,
+            gwt_coalition_size: 0,
+            prediction_precision: 1.0,
             knowledge_grounding: 0.5,
             glyph_coherence: 0.0,
             temporal_coherence_phi: 0.0,
@@ -1089,6 +1119,7 @@ fn test_reduced_substrate_capabilities_lower_consciousness() {
         window_size: 20,
         min_samples: 5,
         regularization: 1e-6,
+        ..Default::default()
     };
 
     let eq_bio = ConsciousnessEquationV2::default();
@@ -1133,6 +1164,9 @@ fn test_reduced_substrate_capabilities_lower_consciousness() {
             cpg_sync_index: 0.5,
             cantor_metacognitive_depth: 0.5,
             governance_collective_phi: 0.0,
+            gwt_broadcast_occurred: false,
+            gwt_coalition_size: 0,
+            prediction_precision: 1.0,
             knowledge_grounding: 0.5,
             glyph_coherence: 0.0,
             temporal_coherence_phi: 0.0,

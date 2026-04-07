@@ -48,6 +48,14 @@ pub struct FeatureIntegrationManager {
     /// Physics bridge integration: HDC semantic search for physics analogies.
     #[cfg(feature = "physics-bridge")]
     pub physics_integration: Option<super::physics_integration::PhysicsIntegration>,
+
+    /// Analogy engine: cross-domain concept analogy discovery.
+    #[cfg(feature = "analogy-engine")]
+    pub analogy_integration: Option<super::analogy_integration::AnalogyIntegration>,
+
+    /// UCL cross-domain frame detection (TRADE, CONFLICT, etc.).
+    #[cfg(feature = "ucl-frames")]
+    pub ucl_frame_integration: Option<super::ucl_frame_integration::UCLFrameIntegration>,
 }
 
 impl std::fmt::Debug for FeatureIntegrationManager {

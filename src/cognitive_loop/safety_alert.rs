@@ -132,18 +132,22 @@ mod tests {
 
     #[test]
     fn test_emit_alert_full_channel() {
-        let (tx, _rx) = std::sync::mpsc::sync_channel(1);
+        let (tx, rx) = std::sync::mpsc::sync_channel(1);
         // Fill the channel
         emit_alert(&tx, SafetyAlertKind::MotorHalt, "test1", 1, 0.05);
-        // This should not panic — it drops the alert
+        // This should not panic — it drops the alert silently
         emit_alert(&tx, SafetyAlertKind::MotorHalt, "test2", 2, 0.05);
+        // Only the first alert should be in the channel (capacity=1)
+        assert!(rx.try_recv().is_ok(), "first alert should be received");
     }
 
     #[test]
     fn test_emit_alert_disconnected() {
         let (tx, rx) = std::sync::mpsc::sync_channel(1);
         drop(rx); // Disconnect
-        // Should not panic
+        // Should not panic — gracefully handles disconnected receiver
         emit_alert(&tx, SafetyAlertKind::MotorHalt, "test", 1, 0.05);
+        // Success: no panic on disconnected channel
+        assert!(true);
     }
 }

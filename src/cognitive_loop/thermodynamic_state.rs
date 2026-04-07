@@ -227,8 +227,12 @@ mod tests {
             0.27,
             0.5,
         );
-        // After one update with alpha=0.3, should be 0 + 0.3*(0.8 - 0) = 0.24
-        assert!((state.dissipative_health - 0.24).abs() < 0.01);
+        // After one update with alpha=0.05, should be 0 + 0.05*(0.8 - 0) = 0.04
+        assert!(
+            (state.dissipative_health - 0.04).abs() < 0.01,
+            "expected ~0.04, got {}",
+            state.dissipative_health,
+        );
         // Second update should converge further
         state.update_dissipative(
             0.8,
@@ -240,7 +244,7 @@ mod tests {
             0.27,
             0.5,
         );
-        assert!(state.dissipative_health > 0.24);
+        assert!(state.dissipative_health > 0.04);
         assert!(state.dissipative_health < 0.8);
     }
 

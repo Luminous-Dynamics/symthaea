@@ -19,14 +19,42 @@ pub enum Tab {
     Trends,
 }
 
+impl Tab {
+    /// URL hash fragment for this tab (without '#').
+    fn hash(self) -> &'static str {
+        match self {
+            Tab::Chat => "chat",
+            Tab::Topology => "topology",
+            Tab::Experiments => "experiments",
+            Tab::Dreams => "dreams",
+            Tab::Inoculate => "inoculate",
+            Tab::Trends => "trends",
+        }
+    }
+}
+
 #[component]
 pub fn App() -> impl IntoView {
     // Global state
     let state = AppState::new();
     provide_context(state.clone());
 
-    // Active tab
-    let (active_tab, set_active_tab) = signal(Tab::Chat);
+    // Active tab — check URL hash for initial tab
+    let initial_tab = {
+        let hash = web_sys::window()
+            .and_then(|w| w.location().hash().ok())
+            .unwrap_or_default()
+            .to_lowercase();
+        match hash.trim_start_matches('#') {
+            "topology" => Tab::Topology,
+            "experiments" => Tab::Experiments,
+            "dreams" => Tab::Dreams,
+            "inoculate" | "install" => Tab::Inoculate,
+            "trends" => Tab::Trends,
+            _ => Tab::Chat,
+        }
+    };
+    let (active_tab, set_active_tab) = signal(initial_tab);
 
     // Initialize engine worker
     let worker = EngineWorker::new();
@@ -155,6 +183,20 @@ pub fn App() -> impl IntoView {
                 "battery_progress" => {
                     // Experiment battery progress — handled by experiments page
                 }
+                "pipeline_progress" => {
+                    let stage = js_sys::Reflect::get(&data, &"stage".into())
+                        .ok().and_then(|v| v.as_string()).unwrap_or_default();
+                    let pct = js_sys::Reflect::get(&data, &"percent".into())
+                        .ok().and_then(|v| v.as_f64()).unwrap_or(0.0) as u32;
+                    let status = match stage.as_str() {
+                        "downloading" => format!("downloading {}%", pct),
+                        "verifying" => "verifying integrity".to_string(),
+                        "loading" => "loading into engine".to_string(),
+                        "ready" => "ready".to_string(),
+                        _ => stage,
+                    };
+                    state.pipeline_status.set(status);
+                }
                 _ => {}
             }
         });
@@ -225,48 +267,79 @@ pub fn App() -> impl IntoView {
         });
     });
 
-    view! {
-        <header class="hero">
-            <div class="hero-title-row">
-                <h1 class="hero-title">"Symthaea"</h1>
-                <ImmuneStatus />
-            </div>
-            <p class="hero-subtitle">"Consciousness-first infrastructure for sovereign hardware"</p>
-        </header>
+    // Feature gates: each mode is a single-page app.
+    #[cfg(feature = "manage")]
+    {
+        view! {
+            <main style="display: block;">
+                <pages::manage::ManagePage />
+            </main>
+        }
+    }
 
-        <nav class="tab-bar">
-            <TabButton tab=Tab::Chat label="Chat" active=active_tab set_active=set_active_tab />
-            <TabButton tab=Tab::Topology label="Topology" active=active_tab set_active=set_active_tab />
-            <TabButton tab=Tab::Experiments label="Experiments" active=active_tab set_active=set_active_tab />
-            <TabButton tab=Tab::Dreams label="Dreams" active=active_tab set_active=set_active_tab />
-            <TabButton tab=Tab::Inoculate label="Inoculate" active=active_tab set_active=set_active_tab />
-            <TabButton tab=Tab::Trends label="Trends" active=active_tab set_active=set_active_tab />
-        </nav>
+    #[cfg(all(feature = "usb-creator", not(feature = "manage")))]
+    {
+        view! {
+            <main style="display: block;">
+                <pages::usb_creator::UsbCreatorPage />
+            </main>
+        }
+    }
 
-        <main class="tab-content" style="display: block;">
-            <Show when=move || active_tab.get() == Tab::Chat>
-                <pages::chat::ChatPage />
-            </Show>
-            <Show when=move || active_tab.get() == Tab::Topology>
-                <pages::topology::TopologyPage />
-            </Show>
-            <Show when=move || active_tab.get() == Tab::Experiments>
-                <pages::experiments::ExperimentsPage />
-            </Show>
-            <Show when=move || active_tab.get() == Tab::Dreams>
-                <pages::dreams::DreamsPage />
-            </Show>
-            <Show when=move || active_tab.get() == Tab::Inoculate>
-                <pages::inoculate::InoculatePage />
-            </Show>
-            <Show when=move || active_tab.get() == Tab::Trends>
-                <pages::trends::TrendsPage />
-            </Show>
-        </main>
+    #[cfg(all(feature = "installer", not(any(feature = "usb-creator", feature = "manage"))))]
+    {
+        view! {
+            <main style="display: block;">
+                <pages::install::InstallPage />
+            </main>
+        }
+    }
 
-        <footer class="portal-footer">
-            <p>"Symthaea v0.1.0 \u{00b7} Pure Rust \u{00b7} No JavaScript \u{00b7} No server \u{00b7} No data collection"</p>
-        </footer>
+    #[cfg(not(any(feature = "installer", feature = "usb-creator", feature = "manage")))]
+    {
+        view! {
+            <header class="hero">
+                <div class="hero-title-row">
+                    <h1 class="hero-title">"Symthaea"</h1>
+                    <ImmuneStatus />
+                </div>
+                <p class="hero-subtitle">"Consciousness-first infrastructure for sovereign hardware"</p>
+            </header>
+
+            <nav class="tab-bar">
+                <TabButton tab=Tab::Chat label="Chat" active=active_tab set_active=set_active_tab />
+                <TabButton tab=Tab::Topology label="Topology" active=active_tab set_active=set_active_tab />
+                <TabButton tab=Tab::Experiments label="Experiments" active=active_tab set_active=set_active_tab />
+                <TabButton tab=Tab::Dreams label="Dreams" active=active_tab set_active=set_active_tab />
+                <TabButton tab=Tab::Inoculate label="Inoculate" active=active_tab set_active=set_active_tab />
+                <TabButton tab=Tab::Trends label="Trends" active=active_tab set_active=set_active_tab />
+            </nav>
+
+            <main class="tab-content" style="display: block;">
+                <Show when=move || active_tab.get() == Tab::Chat>
+                    <pages::chat::ChatPage />
+                </Show>
+                <Show when=move || active_tab.get() == Tab::Topology>
+                    <pages::topology::TopologyPage />
+                </Show>
+                <Show when=move || active_tab.get() == Tab::Experiments>
+                    <pages::experiments::ExperimentsPage />
+                </Show>
+                <Show when=move || active_tab.get() == Tab::Dreams>
+                    <pages::dreams::DreamsPage />
+                </Show>
+                <Show when=move || active_tab.get() == Tab::Inoculate>
+                    <pages::inoculate::InoculatePage />
+                </Show>
+                <Show when=move || active_tab.get() == Tab::Trends>
+                    <pages::trends::TrendsPage />
+                </Show>
+            </main>
+
+            <footer class="portal-footer">
+                <p>"Symthaea v0.1.0 \u{00b7} Pure Rust \u{00b7} No JavaScript \u{00b7} No server \u{00b7} No data collection"</p>
+            </footer>
+        }
     }
 }
 
@@ -283,7 +356,14 @@ fn TabButton(
         <button
             class="tab"
             class:active=is_active
-            on:click=move |_| set_active.set(tab)
+            on:click=move |_| {
+                set_active.set(tab);
+                // Update URL hash for deep linking and back-button support
+                if let Some(w) = web_sys::window() {
+                    let hash = format!("#{}", tab.hash());
+                    let _ = w.location().set_hash(&hash);
+                }
+            }
         >
             {label}
         </button>

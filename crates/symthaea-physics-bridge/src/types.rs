@@ -627,6 +627,15 @@ pub enum PhysicsDomain {
     NuclearPhysics,
     Thermodynamics,
     Optics,
+    CondensedMatter,
+    ParticlePhysics,
+    ModifiedGravity,
+    InformationTheory,
+    Biophysics,
+    Acoustics,
+    PlasmaPhysics,
+    Mathematics,
+    Astrophysics,
 }
 
 /// A fully described physics equation with all metadata.

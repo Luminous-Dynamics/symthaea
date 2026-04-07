@@ -232,12 +232,14 @@ fn test_known_2x2_matches_sigma() {
         window_size: 50,
         min_samples: 10,
         regularization: 1e-6,
+        ..Default::default()
     };
     let config_spectral = SpectralMIPConfig {
         num_components: 2,
         window_size: 50,
         min_samples: 10,
         regularization: 1e-6,
+        ..Default::default()
     };
 
     let mut si = SynergisticIntegration::new(config_sigma);
@@ -475,6 +477,7 @@ fn test_compute_from_covariance_consistent() {
         window_size: 30,
         min_samples: 10,
         regularization: 1e-6,
+        ..Default::default()
     };
     let mut finder = SpectralMIPFinder::new(config.clone());
 
@@ -516,6 +519,7 @@ fn test_adapt_produces_valid_dims() {
         window_size: 10,
         min_samples: 5,
         regularization: 1e-6,
+        ..Default::default()
     };
     let mut finder = SpectralMIPFinder::new(config);
 
@@ -564,6 +568,7 @@ fn test_adapt_concentrates_near_mip() {
         window_size: 15,
         min_samples: 10,
         regularization: 1e-6,
+        ..Default::default()
     };
     let mut finder = SpectralMIPFinder::new(config);
 
@@ -624,6 +629,7 @@ fn test_adapt_noop_on_small_n() {
         window_size: 5,
         min_samples: 3,
         regularization: 1e-6,
+        ..Default::default()
     };
     let mut finder = SpectralMIPFinder::new(config);
 
@@ -650,6 +656,7 @@ fn test_hierarchical_block_diagonal() {
         window_size: 30,
         min_samples: 10,
         regularization: 1e-6,
+        ..Default::default()
     };
     let mut finder = SpectralMIPFinder::new(config);
 
@@ -696,6 +703,7 @@ fn test_hierarchical_single_scale() {
         window_size: 20,
         min_samples: 5,
         regularization: 1e-6,
+        ..Default::default()
     };
     let mut finder = SpectralMIPFinder::new(config);
 
@@ -725,6 +733,7 @@ fn test_hierarchical_phi_monotonic_refinement() {
         window_size: 40,
         min_samples: 15,
         regularization: 1e-6,
+        ..Default::default()
     };
     let mut finder = SpectralMIPFinder::new(config);
 
@@ -1007,6 +1016,7 @@ fn test_spectral_mip_valid_custom_config() {
         window_size: 100,
         min_samples: 20,
         regularization: 1e-4,
+        ..Default::default()
     };
     assert!(config.validate().is_ok(), "valid custom config should pass");
 }

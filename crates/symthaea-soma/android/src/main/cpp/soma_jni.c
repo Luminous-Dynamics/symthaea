@@ -698,3 +698,36 @@ Java_io_symthaea_soma_NativeBindings_screenSalientRegionsJson(JNIEnv *env, jclas
     char *json = soma_engine_screen_salient_regions_json((const void *)(intptr_t)handle);
     return rust_string_to_jstring(env, json);
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * JNI bindings — Prism epistemic search (requires prism-search feature)
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Forward declarations (from native_ffi.rs, feature-gated) */
+void  soma_engine_prism_init(void *engine);
+char *soma_engine_prism_search(const void *engine, const char *query, uint32_t top_k);
+uint8_t soma_engine_prism_available(const void *engine);
+
+JNIEXPORT void JNICALL
+Java_io_symthaea_soma_NativeBindings_prismInit(JNIEnv *env, jclass clazz, jlong handle) {
+    (void)env; (void)clazz;
+    soma_engine_prism_init((void *)(intptr_t)handle);
+}
+
+JNIEXPORT jstring JNICALL
+Java_io_symthaea_soma_NativeBindings_prismSearch(JNIEnv *env, jclass clazz,
+                                                  jlong handle, jstring query, jint topK) {
+    (void)clazz;
+    if (query == NULL) return NULL;
+    const char *q = (*env)->GetStringUTFChars(env, query, NULL);
+    if (q == NULL) return NULL;
+    char *json = soma_engine_prism_search((const void *)(intptr_t)handle, q, (uint32_t)topK);
+    (*env)->ReleaseStringUTFChars(env, query, q);
+    return rust_string_to_jstring(env, json);
+}
+
+JNIEXPORT jboolean JNICALL
+Java_io_symthaea_soma_NativeBindings_prismAvailable(JNIEnv *env, jclass clazz, jlong handle) {
+    (void)env; (void)clazz;
+    return soma_engine_prism_available((const void *)(intptr_t)handle) != 0;
+}

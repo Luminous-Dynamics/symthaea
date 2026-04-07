@@ -212,7 +212,11 @@ impl CreativeManager {
                 let music_score = score_composition(&composition, snap);
                 let feedback =
                     self.tracker.process(&music_score, &snap.harmony_activations);
-                output.music_samples = Some(composition.samples);
+                output.music_samples = Some(match &composition.audio {
+                        symthaea_muse::AudioData::I16(v) => v.clone(),
+                        symthaea_muse::AudioData::F32(v) => v.iter().map(|s| (*s * 32767.0) as i16).collect(),
+                        symthaea_muse::AudioData::StereoF32(v) => v.iter().map(|s| ((s[0] + s[1]) * 0.5 * 32767.0) as i16).collect(),
+                    });
                 output.feedback = feedback;
                 modality_name = "music";
 
@@ -279,7 +283,11 @@ impl CreativeManager {
                 );
 
                 output.artwork_svg = Some(artwork.svg);
-                output.music_samples = Some(composition.samples);
+                output.music_samples = Some(match &composition.audio {
+                        symthaea_muse::AudioData::I16(v) => v.clone(),
+                        symthaea_muse::AudioData::F32(v) => v.iter().map(|s| (*s * 32767.0) as i16).collect(),
+                        symthaea_muse::AudioData::StereoF32(v) => v.iter().map(|s| ((s[0] + s[1]) * 0.5 * 32767.0) as i16).collect(),
+                    });
                 output.feedback = blended;
                 modality_name = "synesthetic";
 

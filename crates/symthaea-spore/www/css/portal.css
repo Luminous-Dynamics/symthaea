@@ -1171,7 +1171,6 @@ h2, h3 { letter-spacing: 0.02em; }
    =================================================================== */
 @media (max-width: 768px) {
   .hero-title { font-size: 1.8rem; }
-  .hero-subtitle { font-size: 0.9rem; }
   .soma-layout { grid-template-columns: 1fr; }
   .experiment-grid { grid-template-columns: 1fr; }
   .topo-bottom { grid-template-columns: 1fr; }
@@ -1179,74 +1178,13 @@ h2, h3 { letter-spacing: 0.02em; }
   .fep-display { grid-template-columns: 1fr; }
   .choice-cards { grid-template-columns: 1fr; }
   .probe-grid { grid-template-columns: 1fr; }
-  .tab { font-size: 0.72rem; padding: 0 0.5rem; }
-  .narration-stream { max-height: 15vh; padding: 1.5rem 0.8rem 0.8rem; }
-  /* SSH deploy panel — stack inputs vertically on mobile */
-  #ssh-deploy-panel [style*="grid-template-columns: 1fr 1fr"] {
-    grid-template-columns: 1fr !important;
-  }
-  /* Disk cards — single column */
-  .disk-card { min-width: 100% !important; }
-  /* Config panel — single column */
-  [style*="grid-template-columns: 1fr 1fr"][style*="gap: 0.8rem"] {
-    grid-template-columns: 1fr !important;
-  }
-  /* System card — full width */
-  .system-card { max-width: 100% !important; padding: 1.2rem !important; }
-  /* App compat table — horizontal scroll */
-  #app-compat-panel { overflow-x: auto; }
-  #app-compat-panel table { min-width: 500px; }
-  /* Quick start — single column */
-  .inoc-section [style*="grid-template-columns: repeat(auto-fit"] {
-    grid-template-columns: 1fr !important;
-  }
-  /* Terminal output — smaller font */
-  [style*="font-family: monospace"][style*="overflow-y"] {
-    font-size: 0.75rem !important;
-    max-height: 150px !important;
-  }
-  /* Hero badges — wrap */
-  .hero [style*="display: flex"][style*="gap: 2rem"] {
-    gap: 0.8rem !important;
-    font-size: 0.7rem !important;
-  }
-  /* Constellation canvas — shorter on mobile */
-  #constellation-canvas { height: 180px !important; }
-  /* Ceremony stage — compact */
-  #ceremony-phi { font-size: 2rem !important; }
-  #ceremony-sphere { width: 80px !important; height: 80px !important; }
+  .tab { font-size: 0.72rem; padding: 0 0.7rem; }
+  .narration-stream { max-height: 20vh; padding: 2rem 1rem 1rem; }
 }
 
 @media (max-width: 480px) {
-  .hero-title { font-size: 1.3rem; letter-spacing: 0.05em; }
-  .hero-subtitle { font-size: 0.82rem; }
-  .tab-content { padding: 0.8rem; }
-  .tab-bar { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-  .tab { white-space: nowrap; font-size: 0.68rem; padding: 0 0.4rem; }
-  .glass-panel { padding: 0.8rem; }
-  .btn-glow { padding: 0.5rem 1.2rem !important; font-size: 0.88rem !important; }
-  /* Stack hero buttons */
-  .hero [style*="display: flex"][style*="gap: 1rem"] {
-    flex-direction: column !important;
-    align-items: center !important;
-    gap: 0.5rem !important;
-  }
-  /* SSH fields — full width */
-  input[type="text"], input[type="password"], input[type="number"], select {
-    font-size: 16px !important; /* prevents iOS zoom on focus */
-  }
-  /* Welcome message — smaller */
-  [style*="white-space: pre-line"] {
-    font-size: 0.82rem !important;
-  }
-}
-
-/* Touch-friendly tap targets */
-@media (pointer: coarse) {
-  .tab { min-height: 44px; display: flex; align-items: center; }
-  button, .btn-glow, [role="button"] { min-height: 44px; }
-  input, select { min-height: 44px; }
-  details summary { min-height: 44px; display: flex; align-items: center; }
+  .hero-title { font-size: 1.5rem; letter-spacing: 0.08em; }
+  .tab-content { padding: 1rem; }
 }
 
 /* ===================================================================

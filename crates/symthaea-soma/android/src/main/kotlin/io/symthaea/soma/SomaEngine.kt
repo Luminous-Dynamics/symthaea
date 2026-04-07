@@ -369,6 +369,26 @@ class SomaEngine private constructor(private var handle: Long) : Closeable {
         check(!closed); NativeBindings.bleCollectivePhi(handle)
     }
 
+    // Prism epistemic search (offline, sub-ms)
+
+    /** Initialize Prism epistemic search with pre-seeded claims. */
+    fun prismInit() = lock.withLock {
+        check(!closed)
+        try { NativeBindings.prismInit(handle) } catch (_: UnsatisfiedLinkError) {}
+    }
+
+    /** Search Prism epistemic claims. Returns JSON array or null. */
+    fun prismSearch(query: String, topK: Int = 3): String? = lock.withLock {
+        check(!closed)
+        try { NativeBindings.prismSearch(handle, query, topK) } catch (_: UnsatisfiedLinkError) { null }
+    }
+
+    /** Whether Prism search is initialized. */
+    val prismAvailable: Boolean get() = lock.withLock {
+        check(!closed)
+        try { NativeBindings.prismAvailable(handle) } catch (_: UnsatisfiedLinkError) { false }
+    }
+
     // Lifecycle
 
     override fun close() = lock.withLock {

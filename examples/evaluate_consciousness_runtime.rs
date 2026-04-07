@@ -24,8 +24,8 @@
 use std::time::Instant;
 use symthaea::cognitive_loop::{CognitiveLoopConfig, CognitiveLoopService};
 
-/// Number of cognitive cycles to run. 200+ shows full trajectory with plateau.
-const NUM_CYCLES: usize = 200;
+/// Number of cognitive cycles to run. 1000+ shows episodic replay effects.
+const NUM_CYCLES: usize = 1000;
 
 /// Stimuli that exercise different cognitive faculties
 const STIMULI: &[&str] = &[
@@ -64,6 +64,8 @@ struct RunMetrics {
     total_cycle_time_us: u64,
     /// Per-cycle times
     cycle_times_us: Vec<u64>,
+    /// Accumulated module timings (sum across all cycles)
+    module_timing_sums: std::collections::HashMap<&'static str, u64>,
 }
 
 impl RunMetrics {
@@ -74,6 +76,7 @@ impl RunMetrics {
             gwt_broadcasts: 0,
             total_cycle_time_us: 0,
             cycle_times_us: Vec::with_capacity(NUM_CYCLES),
+            module_timing_sums: std::collections::HashMap::new(),
         }
     }
 
@@ -184,6 +187,42 @@ fn run_evaluation() -> RunMetrics {
         metrics
             .consciousness_trajectory
             .push(result.metadata.consciousness.consciousness_level);
+
+        // Accumulate module timings for profiling
+        let mt = &result.metadata.module_timings_us;
+        *metrics.module_timing_sums.entry("gwt").or_insert(0) += mt.gwt;
+        *metrics.module_timing_sums.entry("meta_cognition").or_insert(0) += mt.meta_cognition;
+        *metrics.module_timing_sums.entry("narrative_self").or_insert(0) += mt.narrative_self;
+        *metrics.module_timing_sums.entry("dream_replay").or_insert(0) += mt.dream_replay;
+        *metrics.module_timing_sums.entry("moral_algebra").or_insert(0) += mt.moral_algebra;
+        *metrics.module_timing_sums.entry("consciousness_eq_v2").or_insert(0) += mt.consciousness_equation_v2;
+        *metrics.module_timing_sums.entry("phenomenal_binding").or_insert(0) += mt.phenomenal_binding;
+        *metrics.module_timing_sums.entry("hierarchical_fe").or_insert(0) += mt.hierarchical_free_energy;
+        *metrics.module_timing_sums.entry("attention_schema").or_insert(0) += mt.attention_schema;
+        *metrics.module_timing_sums.entry("consciousness_resonance").or_insert(0) += mt.consciousness_resonance;
+        *metrics.module_timing_sums.entry("temporal_consciousness").or_insert(0) += mt.temporal_consciousness;
+        *metrics.module_timing_sums.entry("embodied_cognition").or_insert(0) += mt.embodied_cognition;
+        *metrics.module_timing_sums.entry("consciousness_thermo").or_insert(0) += mt.consciousness_thermodynamics;
+        *metrics.module_timing_sums.entry("prefrontal").or_insert(0) += mt.prefrontal;
+        *metrics.module_timing_sums.entry("cross_modal_binding").or_insert(0) += mt.cross_modal_binding;
+        *metrics.module_timing_sums.entry("resonator_recall").or_insert(0) += mt.resonator_recall;
+        // Core pipeline phases (the missing 78%)
+        *metrics.module_timing_sums.entry("CORE_hdc_encode").or_insert(0) += mt.core_hdc_encode;
+        *metrics.module_timing_sums.entry("CORE_compress").or_insert(0) += mt.core_compress;
+        *metrics.module_timing_sums.entry("CORE_semantic_lookup").or_insert(0) += mt.core_semantic_lookup;
+        *metrics.module_timing_sums.entry("CORE_cfc_step").or_insert(0) += mt.core_cfc_step;
+        *metrics.module_timing_sums.entry("CORE_predict").or_insert(0) += mt.core_predict;
+        *metrics.module_timing_sums.entry("CORE_training").or_insert(0) += mt.core_training;
+        *metrics.module_timing_sums.entry("CORE_parallel_post").or_insert(0) += mt.core_parallel_postprocess;
+        *metrics.module_timing_sums.entry("CORE_spectral_mip").or_insert(0) += mt.spectral_mip;
+        *metrics.module_timing_sums.entry("CORE_consciousness_engine").or_insert(0) += mt.consciousness_engine;
+        *metrics.module_timing_sums.entry("CORE_ethics_engine").or_insert(0) += mt.ethics_engine;
+        *metrics.module_timing_sums.entry("CORE_ethics_moral").or_insert(0) += mt.ethics_engine_moral;
+        *metrics.module_timing_sums.entry("CORE_ethics_value").or_insert(0) += mt.ethics_engine_value;
+        *metrics.module_timing_sums.entry("CORE_ethics_harmonies").or_insert(0) += mt.ethics_engine_harmonies;
+        *metrics.module_timing_sums.entry("CORE_metadata_assembly").or_insert(0) += mt.metadata_assembly;
+        *metrics.module_timing_sums.entry("cross_modal_binding").or_insert(0) += mt.cross_modal_binding;
+        *metrics.module_timing_sums.entry("resonator_recall").or_insert(0) += mt.resonator_recall;
     }
 
     metrics
@@ -304,6 +343,20 @@ fn main() {
         "  P99 cycle:       {:.0} µs",
         sorted.get((sorted.len() as f64 * 0.99) as usize).unwrap_or(&0)
     );
+
+    // ── Module Timing Profile ────────────────────────────────────────────
+    println!();
+    println!("═══ MODULE TIMING PROFILE (avg µs/cycle) ═══");
+    let mut timing_vec: Vec<_> = metrics.module_timing_sums.iter().collect();
+    timing_vec.sort_by(|a, b| b.1.cmp(a.1));
+    for (name, total_us) in &timing_vec {
+        let avg = **total_us as f64 / NUM_CYCLES as f64;
+        if avg > 1.0 {
+            let bar_len = (avg / 100.0).min(40.0) as usize;
+            let bar: String = "█".repeat(bar_len);
+            println!("  {:<25} {:>8.0} µs  {}", name, avg, bar);
+        }
+    }
 
     // ── Composite Score ──────────────────────────────────────────────────
     println!();

@@ -1033,10 +1033,9 @@ fn main() -> ! {
                     #[cfg(feature = "observability")]
                     {
                         let m = Metrics::global();
-                        m.free_energy.set(fe);
-                        m.causal_edge_count
-                            .set(state.causal_graph.edge_count() as f64);
-                        m.episodic_count.set(state.episodic_memory.len() as f64);
+                        m.set_free_energy(fe);
+                        m.set_causal_edge_count(state.causal_graph.edge_count() as f64);
+                        m.set_episodic_count(state.episodic_memory.len() as f64);
                     }
                 }
                 Err(e) => {
@@ -1061,7 +1060,9 @@ fn main() -> ! {
                 let new_anomalies = state.anomaly_count - anomaly_count_before;
                 if new_anomalies > 0 {
                     let m = Metrics::global();
-                    m.anomalies_total.inc_by(new_anomalies as f64);
+                    for _ in 0..new_anomalies {
+                        m.inc_anomalies();
+                    }
                 }
             }
         }
@@ -1083,13 +1084,13 @@ fn main() -> ! {
                 if !ipc_snap.hierarchy_errors.is_empty() {
                     let mean_err: f64 = ipc_snap.hierarchy_errors.iter().sum::<f64>()
                         / ipc_snap.hierarchy_errors.len() as f64;
-                    m.consciousness_level.set((1.0 - mean_err).clamp(0.0, 1.0));
+                    m.set_consciousness_level((1.0 - mean_err).clamp(0.0, 1.0));
                 }
                 // phi_value: use drift_similarity as a proxy (higher = more integrated)
-                m.phi_value.set(ipc_snap.drift_similarity as f64);
+                m.set_phi_value(ipc_snap.drift_similarity as f64);
                 // Refresh edge/episodic counts from the snapshot
-                m.causal_edge_count.set(ipc_snap.causal_edge_count as f64);
-                m.episodic_count.set(ipc_snap.episodic_count as f64);
+                m.set_causal_edge_count(ipc_snap.causal_edge_count as f64);
+                m.set_episodic_count(ipc_snap.episodic_count as f64);
 
                 // Increment gate_vetoes_total for any critical alerts (gate veto proxy)
                 let critical_count = ipc_snap
@@ -1098,7 +1099,9 @@ fn main() -> ! {
                     .filter(|a| matches!(a.severity, AlertSeverity::Critical))
                     .count();
                 if critical_count > 0 {
-                    m.gate_vetoes_total.inc_by(critical_count as f64);
+                    for _ in 0..critical_count {
+                        m.inc_gate_vetoes();
+                    }
                 }
             }
 
@@ -1144,7 +1147,7 @@ fn main() -> ! {
 
         // Increment the cycle counter for observability.
         #[cfg(feature = "observability")]
-        Metrics::global().consciousness_cycles_total.inc();
+        Metrics::global().inc_consciousness_cycles();
 
         thread::sleep(Duration::from_secs(config.poll_interval));
     }

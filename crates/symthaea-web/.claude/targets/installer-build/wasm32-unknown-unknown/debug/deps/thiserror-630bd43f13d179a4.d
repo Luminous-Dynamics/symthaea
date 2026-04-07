@@ -1,0 +1,12 @@
+/srv/luminous-dynamics/symthaea/crates/symthaea-web/.claude/targets/installer-build/wasm32-unknown-unknown/debug/deps/thiserror-630bd43f13d179a4.d: /home/tstoltz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/lib.rs /home/tstoltz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/aserror.rs /home/tstoltz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/display.rs /home/tstoltz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/var.rs /home/tstoltz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/private.rs /srv/luminous-dynamics/symthaea/crates/symthaea-web/.claude/targets/installer-build/wasm32-unknown-unknown/debug/build/thiserror-9ed31f1c2fa554b6/out/private.rs
+
+/srv/luminous-dynamics/symthaea/crates/symthaea-web/.claude/targets/installer-build/wasm32-unknown-unknown/debug/deps/libthiserror-630bd43f13d179a4.rmeta: /home/tstoltz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/lib.rs /home/tstoltz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/aserror.rs /home/tstoltz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/display.rs /home/tstoltz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/var.rs /home/tstoltz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/private.rs /srv/luminous-dynamics/symthaea/crates/symthaea-web/.claude/targets/installer-build/wasm32-unknown-unknown/debug/build/thiserror-9ed31f1c2fa554b6/out/private.rs
+
+/home/tstoltz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/lib.rs:
+/home/tstoltz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/aserror.rs:
+/home/tstoltz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/display.rs:
+/home/tstoltz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/var.rs:
+/home/tstoltz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/private.rs:
+/srv/luminous-dynamics/symthaea/crates/symthaea-web/.claude/targets/installer-build/wasm32-unknown-unknown/debug/build/thiserror-9ed31f1c2fa554b6/out/private.rs:
+
+# env-dep:OUT_DIR=/srv/luminous-dynamics/symthaea/crates/symthaea-web/.claude/targets/installer-build/wasm32-unknown-unknown/debug/build/thiserror-9ed31f1c2fa554b6/out

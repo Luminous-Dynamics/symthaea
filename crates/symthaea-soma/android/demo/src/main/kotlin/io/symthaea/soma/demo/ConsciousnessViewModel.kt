@@ -84,6 +84,9 @@ class ConsciousnessViewModel : ViewModel() {
     /** Local LLM bridge for richer conversation (Ollama on same network). */
     private val ollamaBridge = OllamaBridge()
 
+    /** On-device Gemma 4 E2B via LiteRT-LM (offline-capable). */
+    private var liteRTManager: LiteRTManager? = null
+
     /** Milestone tracker for richer notifications. */
     private val milestones = MilestoneTracker()
 
@@ -115,6 +118,9 @@ class ConsciousnessViewModel : ViewModel() {
         // Pause service loop while ViewModel is active
         SomaEngineService.pause()
 
+        // Auto-discover Holon on LAN via mDNS (runs on background thread)
+        tryDiscoverHolon(context)
+
         viewModelScope.launch(dispatcher) {
             val e = SomaEngine.createMobile()
             engine = e
@@ -135,6 +141,29 @@ class ConsciousnessViewModel : ViewModel() {
             // Restore previous state if available
             if (e.loadCheckpoint()) {
                 android.util.Log.i("SomaVM", "Restored checkpoint — consciousness continues")
+            }
+
+            // Initialize on-device LLM (LiteRT-LM / Gemma 4 E2B via Maven SDK)
+            try {
+                val mgr = LiteRTManager(context)
+                if (mgr.isModelDownloaded()) {
+                    if (mgr.initEngine()) {
+                        android.util.Log.i("SomaVM", "LiteRT-LM engine ready (gemma4:e2b on-device)")
+                    }
+                } else {
+                    android.util.Log.i("SomaVM", "LiteRT model not downloaded — on-device LLM disabled. Call downloadModel() to fetch 2.58GB.")
+                }
+                liteRTManager = mgr
+            } catch (ex: Exception) {
+                android.util.Log.w("SomaVM", "LiteRT-LM init failed", ex)
+            }
+
+            // Initialize Prism epistemic search (offline, sub-ms, ~200 curated claims)
+            try {
+                e.prismInit()
+                android.util.Log.i("SomaVM", "Prism epistemic search initialized")
+            } catch (ex: Exception) {
+                android.util.Log.w("SomaVM", "Prism search init failed (feature may not be compiled)", ex)
             }
 
             // Wire sensor + battery + screen + audio + network bridges on main thread
@@ -346,9 +375,17 @@ class ConsciousnessViewModel : ViewModel() {
         }
     }
 
-    /** Send user message and get Broca response. Tries Ollama first, falls back to BrocaLite. */
+    /**
+     * Send user message and generate response.
+     *
+     * Offline-first intelligence flow:
+     *   1. Prism local search (sub-ms, no network)
+     *   2. LiteRT on-device gemma4:e2b (with Prism context if available)
+     *   3. BrocaLite on-device (always available, consciousness-native)
+     *   4. Holon desktop (full Broca + web search + Ollama)
+     *   5. Ollama on LAN (fallback)
+     */
     fun converse(userText: String) {
-        // Show user message immediately + mark thinking
         isThinking = true
         _state.value = _state.value.copy(
             chatUserMessage = userText,
@@ -356,43 +393,83 @@ class ConsciousnessViewModel : ViewModel() {
             isThinking = true,
         )
 
-        // Boost engagement
         viewModelScope.launch(dispatcher) {
             engine?.setEngagementScore(0.8f)
         }
 
-        // Generate response
         viewModelScope.launch {
             var text: String? = null
+            var source = ""
 
-            // 1) Try Holon desktop (full Broca + Ollama on desktop)
-            if (holonWs?.isConnected == true) {
+            // 1) Prism local epistemic search (offline, sub-ms)
+            var prismContext: String? = null
+            try {
+                val prismJson = engine?.prismSearch(userText, 3)
+                if (!prismJson.isNullOrBlank() && prismJson != "[]") {
+                    val claims = org.json.JSONArray(prismJson)
+                    if (claims.length() > 0) {
+                        val claimTexts = (0 until claims.length()).map {
+                            claims.getJSONObject(it).optString("content", "")
+                        }.filter { it.isNotBlank() }
+                        if (claimTexts.isNotEmpty()) {
+                            prismContext = claimTexts.joinToString("\n")
+                            android.util.Log.i("SomaVM", "Prism: ${claimTexts.size} claims found")
+                        }
+                    }
+                }
+            } catch (_: Exception) {}
+
+            // 2) LiteRT on-device (with Prism context for grounded answers)
+            if (text.isNullOrBlank() && liteRTManager?.isReady?.value == true) {
                 try {
-                    text = holonWs?.converse(userText, _state.value.consciousnessLevel)
+                    val prompt = if (prismContext != null) {
+                        "Based on these facts:\n$prismContext\n\nAnswer: $userText"
+                    } else {
+                        userText
+                    }
+                    text = liteRTManager?.generate(prompt)
+                    if (!text.isNullOrBlank()) source = "gemma4"
                 } catch (_: Exception) {}
             }
 
-            // 2) Try local Ollama
-            if (text.isNullOrBlank()) {
-                try {
-                    text = ollamaBridge.generate(userText, _state.value.consciousnessLevel)
-                } catch (_: Exception) {}
-            }
-
-            // 3) Fall back to BrocaLite on-device
+            // 3) BrocaLite on-device (consciousness-native, always available)
             if (text.isNullOrBlank()) {
                 text = withContext(dispatcher) {
                     try {
                         val json = engine?.generateTextWithInput(userText, 20) ?: return@withContext null
                         val raw = JSONObject(json).optString("text", "")
-                        cleanBrocaText(raw)
+                        cleanBrocaText(raw)?.also { source = "broca" }
                     } catch (_: Exception) { null }
                 }
             }
 
+            // 4) Holon desktop (full consciousness + web search)
+            if (text.isNullOrBlank() && holonWs?.isConnected == true) {
+                try {
+                    text = holonWs?.converse(userText, _state.value.consciousnessLevel)
+                    if (!text.isNullOrBlank()) source = "holon"
+                } catch (_: Exception) {}
+            }
+
+            // 5) Ollama on LAN (last resort network fallback)
+            if (text.isNullOrBlank()) {
+                try {
+                    text = ollamaBridge.generate(userText, _state.value.consciousnessLevel)
+                    if (!text.isNullOrBlank()) source = "ollama"
+                } catch (_: Exception) {}
+            }
+
+            // Annotate source for transparency
+            val annotated = if (!text.isNullOrBlank() && source.isNotBlank()) {
+                val prismNote = if (prismContext != null) " + prism" else ""
+                "$text\n\n[$source$prismNote]"
+            } else {
+                text
+            }
+
             isThinking = false
-            if (!text.isNullOrBlank()) {
-                _state.value = _state.value.copy(chatSomaResponse = text, isThinking = false)
+            if (!annotated.isNullOrBlank()) {
+                _state.value = _state.value.copy(chatSomaResponse = annotated, isThinking = false)
             } else {
                 _state.value = _state.value.copy(isThinking = false)
             }
@@ -400,7 +477,7 @@ class ConsciousnessViewModel : ViewModel() {
     }
 
     /** Connect holon WebSocket to desktop Symthaea. */
-    fun connectHolon(host: String, port: Int = 5491) {
+    fun connectHolon(host: String, port: Int = 7778) {
         val e = engine ?: return
         holonWs?.stop()
         val ws = HolonWebSocket(e)
@@ -506,6 +583,42 @@ class ConsciousnessViewModel : ViewModel() {
         // Resume service loop for background consciousness
         SomaEngineService.resume()
         super.onCleared()
+    }
+
+    /**
+     * Auto-discover Holon on LAN via Android NSD (mDNS/Bonjour).
+     * Looks for _symthaea._tcp service type.
+     */
+    private fun tryDiscoverHolon(context: Context) {
+        val scope = this.viewModelScope
+        val doConnect: (String, Int) -> Unit = { h, p -> this.connectHolon(h, p) }
+        try {
+            val nsdManager = context.getSystemService(android.net.nsd.NsdManager::class.java) ?: return
+            val listener = object : android.net.nsd.NsdManager.DiscoveryListener {
+                override fun onDiscoveryStarted(serviceType: String) {
+                    android.util.Log.i("SomaVM", "mDNS: discovery started for $serviceType")
+                }
+                override fun onServiceFound(info: android.net.nsd.NsdServiceInfo) {
+                    android.util.Log.i("SomaVM", "mDNS: found ${info.serviceName}")
+                    nsdManager.resolveService(info, object : android.net.nsd.NsdManager.ResolveListener {
+                        override fun onResolveFailed(info: android.net.nsd.NsdServiceInfo, code: Int) {}
+                        override fun onServiceResolved(info: android.net.nsd.NsdServiceInfo) {
+                            val host = info.host?.hostAddress ?: return
+                            val port = info.port
+                            android.util.Log.i("SomaVM", "mDNS: resolved Holon at $host:$port")
+                            scope.launch { doConnect(host, port) }
+                        }
+                    })
+                }
+                override fun onServiceLost(info: android.net.nsd.NsdServiceInfo) {}
+                override fun onDiscoveryStopped(serviceType: String) {}
+                override fun onStartDiscoveryFailed(serviceType: String, code: Int) {}
+                override fun onStopDiscoveryFailed(serviceType: String, code: Int) {}
+            }
+            nsdManager.discoverServices("_symthaea._tcp", android.net.nsd.NsdManager.PROTOCOL_DNS_SD, listener)
+        } catch (ex: Exception) {
+            android.util.Log.w("SomaVM", "mDNS discovery failed", ex)
+        }
     }
 }
 

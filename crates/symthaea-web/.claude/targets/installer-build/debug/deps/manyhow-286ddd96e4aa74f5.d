@@ -1,0 +1,11 @@
+/srv/luminous-dynamics/symthaea/crates/symthaea-web/.claude/targets/installer-build/debug/deps/manyhow-286ddd96e4aa74f5.d: /home/tstoltz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/manyhow-0.11.4/src/lib.rs /home/tstoltz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/manyhow-0.11.4/src/span_ranged.rs /home/tstoltz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/manyhow-0.11.4/src/macro_rules.rs /home/tstoltz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/manyhow-0.11.4/src/error.rs /home/tstoltz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/manyhow-0.11.4/src/parse_to_tokens.rs
+
+/srv/luminous-dynamics/symthaea/crates/symthaea-web/.claude/targets/installer-build/debug/deps/libmanyhow-286ddd96e4aa74f5.rlib: /home/tstoltz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/manyhow-0.11.4/src/lib.rs /home/tstoltz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/manyhow-0.11.4/src/span_ranged.rs /home/tstoltz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/manyhow-0.11.4/src/macro_rules.rs /home/tstoltz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/manyhow-0.11.4/src/error.rs /home/tstoltz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/manyhow-0.11.4/src/parse_to_tokens.rs
+
+/srv/luminous-dynamics/symthaea/crates/symthaea-web/.claude/targets/installer-build/debug/deps/libmanyhow-286ddd96e4aa74f5.rmeta: /home/tstoltz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/manyhow-0.11.4/src/lib.rs /home/tstoltz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/manyhow-0.11.4/src/span_ranged.rs /home/tstoltz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/manyhow-0.11.4/src/macro_rules.rs /home/tstoltz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/manyhow-0.11.4/src/error.rs /home/tstoltz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/manyhow-0.11.4/src/parse_to_tokens.rs
+
+/home/tstoltz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/manyhow-0.11.4/src/lib.rs:
+/home/tstoltz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/manyhow-0.11.4/src/span_ranged.rs:
+/home/tstoltz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/manyhow-0.11.4/src/macro_rules.rs:
+/home/tstoltz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/manyhow-0.11.4/src/error.rs:
+/home/tstoltz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/manyhow-0.11.4/src/parse_to_tokens.rs:

@@ -547,8 +547,10 @@ impl NeuromodulatorBath {
     /// Science: Dayan & Huys (2009) — 5-HT biases risk assessment.
     #[inline]
     pub fn confidence_delta(&self) -> f32 {
-        let sht = self.serotonin.effective();
-        (sht - 0.5) * 0.08
+        // Use 5-HT1A (anxiolytic) subtype specifically, not total serotonin.
+        // 5-HT1A mediates calm confidence; 5-HT2A mediates hallucinogenic effects.
+        let sht_1a = self.sht_1a_signal();
+        (sht_1a - 0.5) * 0.08
     }
 
     /// ACh → attention sensitivity multiplier (0.8–1.3).
@@ -956,7 +958,9 @@ impl NeuromodulatorBath {
     /// High GABA dampens LR and exploration; low GABA allows full gain.
     #[inline]
     pub fn global_inhibition(&self) -> f32 {
-        (1.0 - self.gaba.effective() * 0.3).clamp(0.7, 1.0)
+        // Use GABA-A (fast ionotropic) specifically, not total GABA.
+        // GABA-A mediates rapid sedation/inhibition; GABA-B is slow metabotropic.
+        (1.0 - self.gaba_a_signal() * 0.3).clamp(0.7, 1.0)
     }
 
     // ── #12: Oxytocin → Social Coherence (Kosfeld et al. 2005) ───────

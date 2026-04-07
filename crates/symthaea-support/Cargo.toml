@@ -5,7 +5,7 @@ edition = "2021"
 rust-version = "1.75"
 authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
 description = "IT support intelligence for Symthaea: triage, diagnostics, knowledge, privacy, actions, prediction"
-license = "MIT"
+license = "AGPL-3.0-or-later"
 
 [dependencies]
 serde = { workspace = true }

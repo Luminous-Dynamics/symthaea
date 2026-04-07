@@ -179,7 +179,7 @@ impl SafetyInterlock {
             1.0
         };
 
-        let mut safe = *command;
+        let mut safe = command.clone();
         for i in 0..NUM_ACTUATORS {
             safe.torques[i] =
                 safe.torques[i].clamp(-self.config.max_torque[i], self.config.max_torque[i]);

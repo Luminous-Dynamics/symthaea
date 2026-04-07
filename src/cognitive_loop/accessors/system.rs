@@ -1086,4 +1086,20 @@ impl CognitiveLoopService {
     pub fn muse_musical_state(&self) -> &symthaea_muse::MusicalState {
         self.muse_manager.musical_state()
     }
+
+}
+
+impl CognitiveLoopService {
+    /// Get mutable access to threshold overrides for applying evolved parameters.
+    pub fn threshold_overrides_mut(&mut self) -> &mut super::super::threshold_overrides::ThresholdOverrides {
+        &mut self.threshold_overrides
+    }
+
+    /// Get current threshold overrides.
+    pub fn threshold_overrides(&self) -> &super::super::threshold_overrides::ThresholdOverrides {
+        &self.threshold_overrides
+    }
+
+    // Voice synthesis API is in accessors/behavior.rs:
+    // enable_voice_synthesis(), drain_voice_audio(), voice_synthesis_enabled()
 }

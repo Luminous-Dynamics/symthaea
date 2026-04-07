@@ -16,7 +16,6 @@
 //! 4. Higher error → more exploration (harmonic tension, rhythmic complexity)
 //! 5. Lower error → sustain current parameters (convergence)
 
-use crate::audio_feedback::AudioFeatures;
 use crate::MusicalState;
 
 /// Target Phi optimization mode.

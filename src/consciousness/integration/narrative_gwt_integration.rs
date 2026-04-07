@@ -1257,6 +1257,7 @@ pub struct NarrativeGWTProcessResult {
 #[allow(clippy::field_reassign_with_default)]
 mod tests {
     use super::*;
+    use crate::hdc::global_workspace::WorkspaceConfig;
 
     #[test]
     fn test_integration_creation() {
@@ -1316,16 +1317,30 @@ mod tests {
 
     #[test]
     fn test_phi_tracking() {
-        let mut integration = NarrativeGWTIntegration::default_config();
+        // Use winner_takes_all so ignition reliably fires and phi_history
+        // gets populated (ignition is required for phi tracking).
+        let gwt_config = UnifiedGWTConfig {
+            workspace_config: WorkspaceConfig {
+                winner_takes_all: true,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let mut integration = NarrativeGWTIntegration::new(
+            NarrativeSelfConfig::default(),
+            gwt_config,
+            NarrativeGWTConfig::default(),
+        );
 
-        // Process several times
+        // Process several times with high activation and "Ensemble" strategy
+        // name for high Φ weighting.
         for i in 0..5 {
             integration.submit_content(
-                &format!("Strategy{}", i),
+                &format!("Ensemble{}", i),
                 vec![BinaryHV::random(i as u64 + 1000)],
                 "processing task",
-                vec!["module".to_string()],
-                0.6,
+                vec!["moduleA".to_string(), "moduleB".to_string()],
+                0.99,
             );
             integration.process();
         }
@@ -1604,16 +1619,29 @@ mod tests {
 
     #[test]
     fn test_temporal_consciousness_observation() {
-        let mut integration = NarrativeGWTIntegration::default_config();
+        // Use winner_takes_all so ignition reliably fires (temporal
+        // observations are only recorded on ignition).
+        let gwt_config = UnifiedGWTConfig {
+            workspace_config: WorkspaceConfig {
+                winner_takes_all: true,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let mut integration = NarrativeGWTIntegration::new(
+            NarrativeSelfConfig::default(),
+            gwt_config,
+            NarrativeGWTConfig::default(),
+        );
 
         // Process several times to build temporal history
         for i in 0..10 {
             integration.submit_content(
-                &format!("TemporalTask{}", i),
+                &format!("EnsembleTask{}", i),
                 vec![BinaryHV::random(i as u64 + 8000)],
                 "temporal observation task",
-                vec!["module".to_string()],
-                0.6,
+                vec!["moduleA".to_string(), "moduleB".to_string()],
+                0.99,
             );
             let result = integration.process();
 

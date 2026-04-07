@@ -2,7 +2,7 @@
 
 ## The Commons
 
-All source code in this repository is licensed under the
+All **first-party** source code in this repository is licensed under the
 **GNU Affero General Public License v3.0 or later (AGPL-3.0-or-later)**.
 
 You are free to use, study, modify, and distribute this software under the
@@ -11,6 +11,9 @@ network service, you must make the complete source code of your modified
 version available to all users of that service.
 
 **This is how the commons is protected.**
+
+Note: vendored/third-party components and git submodules may carry their own
+licenses; see the `LICENSE` files in those directories.
 
 ## When You Need a Commercial License
 

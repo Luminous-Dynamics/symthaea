@@ -1,5 +1,8 @@
 # Licensing FAQ — Luminous Dynamics
 
+Note: some vendored/third-party components and git submodules may carry their own
+licenses; see the `LICENSE` files in those directories.
+
 ## For Researchers and Students
 
 **Q: Can I use Symthaea/Mycelix for my research?**
@@ -88,8 +91,9 @@ about a commercial license.
 
 **Q: Wasn't this repository previously BSL 1.1?**
 A: Yes. The root license was previously the Business Source License 1.1,
-which would have converted to Apache-2.0 on 2029-03-06. We replaced it
-with the AGPL-3.0-or-later because:
+which would have converted to Apache-2.0 on 2029-03-06. The legacy text is
+archived at `LICENSE-BSL-1.1.txt`. We replaced the repo-root license with
+the AGPL-3.0-or-later because:
 1. The AGPL provides stronger copyleft protection (especially the network
    interaction clause in Section 13).
 2. The AGPL is a true open-source license recognized by the OSI and FSF.
@@ -99,8 +103,8 @@ with the AGPL-3.0-or-later because:
 
 **Q: Symthaea was already AGPL. What changed?**
 A: The main Symthaea crate was already AGPL-3.0-or-later. This change
-extends AGPL coverage to all sub-crates, SDKs, and components across
-the entire monorepo that were previously MIT or Apache-2.0.
+aligns the repo-root license with Symthaea and reconciles first-party
+sub-crates/SDK metadata that previously reported MIT or Apache-2.0.
 
 ---
 
