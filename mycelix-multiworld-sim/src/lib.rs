@@ -394,7 +394,19 @@ impl MultiWorldSimulator {
                         s
                     },
                     education_level: (self.rng.next_f64() * 0.5) + self.config.policy.education_boost,
-                    consciousness: ConsciousnessState::nascent(),
+                    consciousness: {
+                        let mut c = ConsciousnessState::nascent();
+                        let boost = self.config.policy.consciousness_boost;
+                        if boost > 0.0 {
+                            c.level = (c.level + boost).min(1.0);
+                            c.meta_awareness = (c.meta_awareness + boost * 0.8).min(1.0);
+                            c.coherence = (c.coherence + boost * 0.6).min(1.0);
+                            c.care_activation = (c.care_activation + boost * 0.5).min(1.0);
+                            c.harmonic_alignment = (c.harmonic_alignment + boost * 0.4).min(1.0);
+                            c.epistemic_confidence = (c.epistemic_confidence + boost * 0.3).min(1.0);
+                        }
+                        c
+                    },
                     partner_id: None,
                     children_ids: vec![],
                     is_immigrant: false,

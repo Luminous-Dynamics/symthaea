@@ -144,6 +144,11 @@ pub struct PolicyConfig {
     /// Added on top of default education_level.
     #[serde(default)]
     pub education_boost: f64,
+    /// Initial consciousness level boost [0.0, 1.0].
+    /// When > 0, agents start with elevated consciousness state
+    /// (level, meta_awareness, coherence all boosted).
+    #[serde(default)]
+    pub consciousness_boost: f64,
 }
 
 /// How the colony prioritizes construction projects.
@@ -226,6 +231,7 @@ impl Default for PolicyConfig {
             exploration_investment: 0.05,
             coordination_understanding_initial: 0.0,
             education_boost: 0.0,
+            consciousness_boost: 0.0,
         }
     }
 }
