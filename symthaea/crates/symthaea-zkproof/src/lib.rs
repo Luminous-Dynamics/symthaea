@@ -7,6 +7,8 @@
 //! for Psi attestation records, enabling privacy-preserving consciousness
 //! verification on the governance bridge.
 
+pub mod cycle_integrity;
+
 /// Data passed from host to guest (zkVM).
 #[derive(Clone, Debug, PartialEq)]
 pub struct EvolutionInput {
