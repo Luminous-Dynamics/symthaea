@@ -44,7 +44,7 @@ const N_HEADS: usize = 1;
 const N_EVOLVE_STEPS: usize = 3;
 
 /// Evolution time steps (different timescales for multi-scale features).
-const EVOLVE_DTS: [f32; N_EVOLVE_STEPS] = [0.1, 1.0, 10.0];
+const EVOLVE_DTS: [f32; N_EVOLVE_STEPS] = [0.01, 0.1, 1.0];
 
 /// HDC+LTC nuclear mass predictor with multi-head GLU decoder.
 ///
@@ -85,7 +85,7 @@ impl HdcMassPredictor {
 
         let mut w_gates = Vec::with_capacity(N_HEADS);
         let mut w_values = Vec::with_capacity(N_HEADS);
-        let mut scales = vec![100.0; N_HEADS];
+        let mut scales = vec![10.0; N_HEADS];
         let mut biases = vec![0.0; N_HEADS];
 
         for h in 0..N_HEADS {
@@ -94,8 +94,8 @@ impl HdcMassPredictor {
             let mut wg = vec![0.0f32; HDC_DIMENSION];
             let mut wv = vec![0.0f32; HDC_DIMENSION];
             for i in 0..HDC_DIMENSION {
-                wg[i] = gate_init.values[i] * 0.01;
-                wv[i] = value_init.values[i] * 0.01;
+                wg[i] = gate_init.values[i] * 0.1;
+                wv[i] = value_init.values[i] * 0.1;
             }
             w_gates.push(wg);
             w_values.push(wv);
@@ -137,8 +137,10 @@ impl HdcMassPredictor {
     fn forward(&self, z: u16, n: u16) -> (f64, f64, f64) {
         let input_hv = self.encode_input(z, n);
 
-        // Multi-scale CfC evolution: evolve at 3 timescales, bundle states
+        // Multi-scale CfC evolution: evolve at 3 timescales
+        // Fix: seed neuron state from input (not zero) so gradients flow
         let mut neuron = self.neuron.clone();
+        neuron.set_state(input_hv.clone());
         for &dt in &EVOLVE_DTS {
             neuron.evolve_closed_form(dt, &input_hv);
         }
@@ -165,8 +167,8 @@ impl HdcMassPredictor {
 
     /// Train on a set of measured nuclei with isotope chain ordering.
     pub fn train(&mut self, nuclei: &[MeasuredNucleus], epochs: usize) {
-        let lr = 0.0005; // Tuned for single-head + multi-scale
-        let lr_neuron = 0.0002;
+        let lr = 0.005; // 10× increase to escape zero basin
+        let lr_neuron = 0.002;
         let n = nuclei.len();
 
         // Sort by (Z, N) for isotope chain sequential training

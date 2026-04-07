@@ -10347,6 +10347,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "mycelix-claim-types"
+version = "0.1.0"
+dependencies = [
+ "serde",
+]
+
+[[package]]
 name = "mycelix-crypto"
 version = "0.1.0"
 dependencies = [
@@ -12317,6 +12324,7 @@ checksum = "b4596b6d070b27117e987119b4dac604f3c58cfb0b191112e24771b2faeac1a6"
 name = "plexus-common"
 version = "0.1.0"
 dependencies = [
+ "mycelix-claim-types",
  "serde",
  "thiserror 2.0.18",
  "url",
