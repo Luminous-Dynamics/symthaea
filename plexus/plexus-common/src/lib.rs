@@ -72,32 +72,12 @@ pub enum ThreatType {
     Unknown,
 }
 
-/// Empirical evidence level (E-axis of epistemic classification).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
-pub enum EmpiricalLevel {
-    /// Unverified or known false.
-    E0 = 0,
-    /// Preliminary evidence.
-    E1 = 1,
-    /// Tested / moderate evidence.
-    E2 = 2,
-    /// Replicated / human-verified.
-    E3 = 3,
-    /// Established / authoritative.
-    E4 = 4,
-}
-
-impl EmpiricalLevel {
-    pub fn as_f32(self) -> f32 {
-        match self {
-            Self::E0 => 0.0,
-            Self::E1 => 0.25,
-            Self::E2 => 0.5,
-            Self::E3 => 0.75,
-            Self::E4 => 1.0,
-        }
-    }
-}
+// Re-export unified epistemic types from the shared crate.
+// Previously defined locally as EmpiricalLevel only; now includes full E/N/M.
+pub use mycelix_claim_types::{
+    EmpiricalLevel, NormativeLevel, MaterialityLevel,
+    ClaimType, EpistemicClassification, UnifiedClaim,
+};
 
 /// A search result from the epistemic knowledge engine.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -106,8 +86,12 @@ pub struct SearchResult {
     pub content: String,
     /// Original source URL(s).
     pub sources: Vec<String>,
-    /// Empirical evidence level.
+    /// Empirical evidence level (E0-E4).
     pub empirical_level: EmpiricalLevel,
+    /// Normative consensus level (N0-N3).
+    pub normative_level: NormativeLevel,
+    /// Materiality / real-world impact (M0-M3).
+    pub materiality_level: MaterialityLevel,
     /// HDC cosine similarity to query (0.0-1.0).
     pub query_similarity: f32,
     /// Author reputation from ConsciousnessProfile (0.0-1.0).

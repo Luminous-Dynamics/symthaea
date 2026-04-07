@@ -9,7 +9,7 @@
 //! Encoding: word-level random indexing (each word → deterministic BinaryHV,
 //! bound with position vector, bundled into document vector).
 
-use plexus_common::{EmpiricalLevel, SearchResult};
+use plexus_common::{EmpiricalLevel, NormativeLevel, MaterialityLevel, SearchResult};
 mod binary_hv;
 use binary_hv::BinaryHV;
 
@@ -25,6 +25,8 @@ struct ClaimEntry {
     content: String,
     sources: Vec<String>,
     empirical_level: EmpiricalLevel,
+    normative_level: NormativeLevel,
+    materiality_level: MaterialityLevel,
     tags: Vec<String>,
 }
 
@@ -63,6 +65,8 @@ impl SearchEngine {
                 content: claim.content.clone(),
                 sources: claim.sources.clone(),
                 empirical_level: claim.empirical_level,
+                normative_level: claim.normative_level,
+                materiality_level: claim.materiality_level,
                 tags: claim.tags.clone(),
             });
             engine.vectors.push(hv);
@@ -80,11 +84,13 @@ impl SearchEngine {
         sources: &[&str],
         tags: &[&str],
     ) {
-        let hv = encode_text(content); // Fallback to non-IDF for dynamic adds
+        let hv = encode_text(content);
         self.claims.push(ClaimEntry {
             content: content.to_string(),
             sources: sources.iter().map(|s| s.to_string()).collect(),
             empirical_level,
+            normative_level: NormativeLevel::N2, // Default for dynamic adds
+            materiality_level: MaterialityLevel::M2,
             tags: tags.iter().map(|s| s.to_string()).collect(),
         });
         self.vectors.push(hv);
@@ -151,6 +157,8 @@ impl SearchEngine {
                     content: claim.content.clone(),
                     sources: claim.sources.clone(),
                     empirical_level: claim.empirical_level,
+                    normative_level: claim.normative_level,
+                    materiality_level: claim.materiality_level,
                     query_similarity: norm_sim,
                     author_reputation: 0.9,
                     age_days: 1,

@@ -10,13 +10,15 @@ pub mod curated;
 pub mod mycelix;
 pub mod wikidata_claims;
 
-use plexus_common::EmpiricalLevel;
+use plexus_common::{EmpiricalLevel, NormativeLevel, MaterialityLevel};
 
-/// A raw claim before HDC encoding.
+/// A raw claim before HDC encoding — full E/N/M classification.
 #[derive(Debug, Clone)]
 pub struct RawClaim {
     pub content: String,
     pub empirical_level: EmpiricalLevel,
+    pub normative_level: NormativeLevel,
+    pub materiality_level: MaterialityLevel,
     pub sources: Vec<String>,
     pub tags: Vec<String>,
 }

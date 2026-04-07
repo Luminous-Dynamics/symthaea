@@ -9,3 +9,4 @@ description = "Shared types for Symthaea Prism"
 serde = { workspace = true }
 url = { workspace = true }
 thiserror = { workspace = true }
+mycelix-claim-types = { path = "../../crates/mycelix-claim-types" }

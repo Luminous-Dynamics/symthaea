@@ -5,14 +5,39 @@
 
 use crate::RawClaim;
 use plexus_common::EmpiricalLevel::*;
+use plexus_common::{EmpiricalLevel, NormativeLevel, MaterialityLevel};
 
 pub fn curated_claims() -> Vec<RawClaim> {
-    RAW.iter().map(|(content, e, sources, tags)| RawClaim {
-        content: content.to_string(),
-        empirical_level: *e,
-        sources: sources.iter().map(|s| s.to_string()).collect(),
-        tags: tags.iter().map(|s| s.to_string()).collect(),
+    RAW.iter().map(|(content, e, sources, tags)| {
+        let (n, m) = infer_nm(*e, tags);
+        RawClaim {
+            content: content.to_string(),
+            empirical_level: *e,
+            normative_level: n,
+            materiality_level: m,
+            sources: sources.iter().map(|s| s.to_string()).collect(),
+            tags: tags.iter().map(|s| s.to_string()).collect(),
+        }
     }).collect()
+}
+
+/// Infer N/M from E-level and topic tags (same heuristic as Knowledge mock data).
+fn infer_nm(e: EmpiricalLevel, tags: &[&str]) -> (NormativeLevel, MaterialityLevel) {
+    let n = match e {
+        E4 => NormativeLevel::N3,
+        E3 => NormativeLevel::N2,
+        _ => NormativeLevel::N1,
+    };
+    let has_applied = tags.iter().any(|t|
+        *t == "climate" || *t == "energy" || *t == "ecology" || *t == "health"
+    );
+    let has_abstract = tags.iter().any(|t|
+        *t == "mathematics" || *t == "physics" || *t == "quantum"
+    );
+    let m = if has_applied { MaterialityLevel::M3 }
+        else if has_abstract { MaterialityLevel::M1 }
+        else { MaterialityLevel::M2 };
+    (n, m)
 }
 
 const RAW: &[(&str, plexus_common::EmpiricalLevel, &[&str], &[&str])] = &[
