@@ -506,6 +506,23 @@ impl CognitiveLoopService {
             None
         };
 
+        #[cfg(feature = "analogy-engine")]
+        let analogy_integration = if config.enable_analogy_engine {
+            config.genesis_phrase.as_ref().map(|p| {
+                let genesis = symthaea_core::genesis::GenesisSeed::from_phrase(p);
+                super::analogy_integration::AnalogyIntegration::new(&genesis)
+            })
+        } else {
+            None
+        };
+
+        #[cfg(feature = "ucl-frames")]
+        let ucl_frame_integration = if config.enable_ucl_frames {
+            Some(super::ucl_frame_integration::UCLFrameIntegration::new())
+        } else {
+            None
+        };
+
         #[cfg(feature = "vision-manifold")]
         let vision_frame_width = config.vision_frame_width;
         #[cfg(feature = "vision-manifold")]
@@ -976,6 +993,10 @@ impl CognitiveLoopService {
                 causal_consciousness,
                 #[cfg(feature = "physics-bridge")]
                 physics_integration,
+                #[cfg(feature = "analogy-engine")]
+                analogy_integration,
+                #[cfg(feature = "ucl-frames")]
+                ucl_frame_integration,
             },
             async_trainer,
             #[cfg(feature = "reasoning_engine")]

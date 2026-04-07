@@ -275,7 +275,7 @@ pub trait ConsciousnessMetrics {
 }
 
 // Implement for each hApp
-impl ConsciousnessMetrics for EduNetClient { ... }
+impl ConsciousnessMetrics for PraxisClient { ... }
 impl ConsciousnessMetrics for MarketplaceClient { ... }
 impl ConsciousnessMetrics for SupplyChainClient { ... }
 

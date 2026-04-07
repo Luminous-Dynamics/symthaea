@@ -112,6 +112,33 @@ mod tests {
             writeln!(f, "{}\t{:.6e}", m.a, m.abundance).unwrap();
         }
         eprintln!("\nWrote {} entries to {}", by_a.len(), tsv_path);
+
+        // Solar r-process comparison
+        eprintln!("\n--- Solar R-Process Comparison (Arlandini 1999) ---");
+        let solar = &result.solar_comparison;
+        let solar_tsv = format!("{}/solar_comparison.tsv", tsv_dir);
+        let mut sf = std::fs::File::create(&solar_tsv).expect("create solar TSV");
+        writeln!(sf, "A\tpredicted\tsolar\tratio").unwrap();
+        let mut chi2 = 0.0_f64;
+        let mut n_points = 0usize;
+        let mut log_resid_sq_sum = 0.0_f64;
+        eprintln!("{:>6} {:>12} {:>12} {:>8}", "A", "Predicted", "Solar", "Ratio");
+        eprintln!("{}", "-".repeat(44));
+        for sc in solar {
+            writeln!(sf, "{}\t{:.6e}\t{:.6e}\t{:.4}", sc.a, sc.predicted, sc.solar, sc.ratio).unwrap();
+            eprintln!("{:>6} {:>12.4e} {:>12.4e} {:>8.3}", sc.a, sc.predicted, sc.solar, sc.ratio);
+            if sc.solar > 0.0 && sc.predicted > 0.0 {
+                let diff = sc.predicted - sc.solar;
+                chi2 += (diff * diff) / sc.solar;
+                let log_r = (sc.predicted / sc.solar).ln();
+                log_resid_sq_sum += log_r * log_r;
+                n_points += 1;
+            }
+        }
+        let rms_log_ratio = if n_points > 0 { (log_resid_sq_sum / n_points as f64).sqrt() } else { 0.0 };
+        eprintln!("\nSolar comparison: {} points, chi2 = {:.4}, RMS(log ratio) = {:.4}",
+                  n_points, chi2, rms_log_ratio);
+        eprintln!("Wrote solar comparison to {}", solar_tsv);
     }
 
     // ═══════════════════════════════════════════════════════════════════════

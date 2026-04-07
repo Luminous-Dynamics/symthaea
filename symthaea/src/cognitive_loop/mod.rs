@@ -203,6 +203,12 @@ pub(crate) mod physics_integration;
 #[cfg(feature = "physics-bridge")]
 pub use physics_integration::ParetoContext;
 
+#[cfg(feature = "analogy-engine")]
+pub(crate) mod analogy_integration;
+
+#[cfg(feature = "ucl-frames")]
+pub(crate) mod ucl_frame_integration;
+
 pub(crate) mod thermodynamic_state;
 pub(crate) mod thermodynamic_physics_bridge;
 pub(crate) mod thermodynamic_integration;

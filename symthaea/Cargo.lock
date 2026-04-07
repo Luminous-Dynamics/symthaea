@@ -3361,6 +3361,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "countme"
+version = "3.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7704b5fdd17b18ae31c4c1da5a2e0305a2bf17b5249300a9ee9ed7b72114c636"
+
+[[package]]
 name = "cpal"
 version = "0.15.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -10132,6 +10138,46 @@ dependencies = [
 ]
 
 [[package]]
+name = "metrics"
+version = "0.24.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5d5312e9ba3771cfa961b585728215e3d972c950a3eed9252aa093d6301277e8"
+dependencies = [
+ "ahash 0.8.12",
+ "portable-atomic",
+]
+
+[[package]]
+name = "metrics-exporter-prometheus"
+version = "0.16.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dd7399781913e5393588a8d8c6a2867bf85fb38eaf2502fdce465aad2dc6f034"
+dependencies = [
+ "base64 0.22.1",
+ "indexmap 2.11.1",
+ "metrics",
+ "metrics-util",
+ "quanta",
+ "thiserror 1.0.69",
+]
+
+[[package]]
+name = "metrics-util"
+version = "0.19.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b8496cc523d1f94c1385dd8f0f0c2c480b2b8aeccb5b7e4485ad6365523ae376"
+dependencies = [
+ "crossbeam-epoch",
+ "crossbeam-utils",
+ "hashbrown 0.15.5",
+ "metrics",
+ "quanta",
+ "rand 0.9.2",
+ "rand_xoshiro",
+ "sketches-ddsketch",
+]
+
+[[package]]
 name = "midly"
 version = "0.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -12270,32 +12316,10 @@ checksum = "b4596b6d070b27117e987119b4dac604f3c58cfb0b191112e24771b2faeac1a6"
 [[package]]
 name = "plexus-common"
 version = "0.1.0"
-dependencies = [
- "serde",
- "thiserror 2.0.18",
- "url",
-]
-
-[[package]]
-name = "plexus-ingest"
-version = "0.1.0"
-dependencies = [
- "log",
- "plexus-common",
- "serde",
- "serde_json",
-]
 
 [[package]]
 name = "plexus-search"
 version = "0.1.0"
-dependencies = [
- "getrandom 0.2.17",
- "log",
- "plexus-common",
- "plexus-ingest",
- "serde",
-]
 
 [[package]]
 name = "plist"
@@ -12676,21 +12700,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3eb8486b569e12e2c32ad3e204dbaba5e4b5b216e9367044f25f1dba42341773"
 
 [[package]]
-name = "prometheus"
-version = "0.13.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3d33c28a30771f7f96db69893f78b857f7450d7e0237e9c8fc6427a81bae7ed1"
-dependencies = [
- "cfg-if",
- "fnv",
- "lazy_static",
- "memchr",
- "parking_lot",
- "protobuf",
- "thiserror 1.0.69",
-]
-
-[[package]]
 name = "proptest"
 version = "1.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -12760,12 +12769,6 @@ checksum = "52c2c1bf36ddb1a1c396b3601a3cec27c2462e45f07c386894ec3ccf5332bd16"
 dependencies = [
  "prost",
 ]
-
-[[package]]
-name = "protobuf"
-version = "2.28.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "106dd99e98437432fed6519dedecfade6a06a73bb7b2a1e019fdd2bee5778d94"
 
 [[package]]
 name = "psm"
@@ -12858,6 +12861,21 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7f6d64c71eb498fe9eae14ce4ec935c555749aef511cca85b5568910d6e48001"
 dependencies = [
  "bytemuck",
+]
+
+[[package]]
+name = "quanta"
+version = "0.12.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f3ab5a9d756f0d97bdc89019bd2e4ea098cf9cde50ee7564dde6b81ccc8f06c7"
+dependencies = [
+ "crossbeam-utils",
+ "libc",
+ "once_cell",
+ "raw-cpuid 11.6.0",
+ "wasi",
+ "web-sys",
+ "winapi",
 ]
 
 [[package]]
@@ -13313,6 +13331,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "rcgen"
+version = "0.13.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "75e669e5202259b5314d1ea5397316ad400819437857b90861765f24c4cf80a2"
+dependencies = [
+ "pem",
+ "ring",
+ "rustls-pki-types",
+ "time",
+ "yasna",
+]
+
+[[package]]
 name = "reactive_graph"
 version = "0.2.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -13742,6 +13773,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "rnix"
+version = "0.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bb35cedbeb70e0ccabef2a31bcff0aebd114f19566086300b8f42c725fc2cb5f"
+dependencies = [
+ "rowan",
+]
+
+[[package]]
 name = "roaring"
 version = "0.10.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -13765,6 +13805,19 @@ checksum = "6006a627c1a38d37f3d3a85c6575418cfe34a5392d60a686d0071e1c8d427acb"
 dependencies = [
  "cpal 0.15.3",
  "thiserror 1.0.69",
+]
+
+[[package]]
+name = "rowan"
+version = "0.15.18"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "62f509095fc8cc0c8c8564016771d458079c11a8d857e65861f045145c0d3208"
+dependencies = [
+ "countme",
+ "hashbrown 0.14.5",
+ "memoffset",
+ "rustc-hash 1.1.0",
+ "text-size",
 ]
 
 [[package]]
@@ -15375,6 +15428,8 @@ dependencies = [
  "ort",
  "parking_lot",
  "petgraph 0.6.5",
+ "plexus-common",
+ "plexus-search",
  "proptest",
  "rand 0.8.5",
  "rand_chacha 0.3.1",
@@ -16061,12 +16116,14 @@ dependencies = [
  "hyper-util",
  "libsystemd",
  "lru 0.16.3",
+ "metrics",
+ "metrics-exporter-prometheus",
  "nix 0.27.1",
  "petgraph 0.6.5",
- "prometheus",
  "proptest",
  "ratatui 0.30.0",
  "regex",
+ "rnix",
  "rusqlite",
  "serde",
  "serde_json",
@@ -16314,7 +16371,10 @@ dependencies = [
  "getrandom 0.2.17",
  "getrandom 0.3.4",
  "getrandom 0.4.2",
+ "rcgen",
  "rmp-serde",
+ "rustls 0.23.37",
+ "rustls-pemfile",
  "serde",
  "serde-wasm-bindgen",
  "serde_json",
@@ -16324,10 +16384,13 @@ dependencies = [
  "symthaea-harmonies",
  "symthaea-neuroevolution",
  "symthaea-neuromodulators",
+ "symthaea-nix",
  "symthaea-types",
  "tokio",
+ "tokio-rustls 0.26.4",
  "tokio-tungstenite",
  "tower-http 0.5.2",
+ "tungstenite 0.24.0",
  "uuid",
  "wasm-bindgen",
 ]
@@ -16891,6 +16954,12 @@ dependencies = [
  "wezterm-input-types",
  "winapi",
 ]
+
+[[package]]
+name = "text-size"
+version = "1.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f18aa187839b2bdb1ad2fa35ead8c4c2976b64e4363c386d45ac0f7ee85c9233"
 
 [[package]]
 name = "text_placeholder"
@@ -20323,6 +20392,15 @@ name = "yansi"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cfe53a6657fd280eaa890a3bc59152892ffa3e30101319d168b781ed6529b049"
+
+[[package]]
+name = "yasna"
+version = "0.5.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e17bb3549cc1321ae1296b9cdc2698e2b6cb1992adfa19a8c72e5b7a738f44cd"
+dependencies = [
+ "time",
+]
 
 [[package]]
 name = "yoke"

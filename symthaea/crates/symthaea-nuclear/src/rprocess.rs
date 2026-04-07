@@ -73,10 +73,10 @@ const PHOTODISSOCIATION_PREFACTOR: f64 = 1.0e10;
 const SEED_Z: u16 = 26;
 const SEED_N: u16 = 30;
 
-/// Maximum Z to track (beyond uranium)
-const MAX_Z: u16 = 110;
+/// Maximum Z to track (beyond uranium, into superheavy)
+const MAX_Z: u16 = 120;
 /// Maximum N to track
-const MAX_N: u16 = 200;
+const MAX_N: u16 = 220;
 /// Minimum abundance to keep tracking
 const ABUNDANCE_FLOOR: f64 = 1.0e-20;
 
@@ -471,6 +471,42 @@ impl RProcessNetwork {
                     }
                 }
 
+                // Spontaneous fission: A > 260 → asymmetric split into heavy + light fragment.
+                // Rate ~ 1e6 s^-1 for the heaviest transactinides (Panov et al. 2010).
+                // Asymmetric split: A_heavy ≈ 0.6×A, A_light ≈ 0.4×A,
+                // Z split proportional to A fraction.
+                if nuc.a() > 260 {
+                    let fission_rate: f64 = 1.0e6; // s^-1
+                    let fission_flow = if fission_rate * dt > 0.01 {
+                        y * (1.0 - (-fission_rate * dt).exp())
+                    } else {
+                        fission_rate * y * dt
+                    };
+
+                    if fission_flow > 0.0 {
+                        let a_total = nuc.a() as f64;
+                        let a_heavy = (0.6 * a_total).round() as u16;
+                        let a_light = nuc.a() - a_heavy;
+                        let z_heavy = ((nuc.z as f64) * (a_heavy as f64) / a_total).round() as u16;
+                        let z_light = nuc.z - z_heavy;
+                        let n_heavy = a_heavy.saturating_sub(z_heavy);
+                        let n_light = a_light.saturating_sub(z_light);
+
+                        // Remove parent
+                        *delta.entry(*nuc).or_insert(0.0) -= fission_flow;
+
+                        // Each fission produces ONE heavy + ONE light fragment
+                        if z_heavy > 0 && n_heavy > 0 && z_heavy <= MAX_Z && n_heavy <= MAX_N {
+                            let heavy = Nuclide::new(z_heavy, n_heavy);
+                            *delta.entry(heavy).or_insert(0.0) += fission_flow;
+                        }
+                        if z_light > 0 && n_light > 0 && z_light <= MAX_Z && n_light <= MAX_N {
+                            let light = Nuclide::new(z_light, n_light);
+                            *delta.entry(light).or_insert(0.0) += fission_flow;
+                        }
+                    }
+                }
+
                 // Identify waiting points
                 if self.is_waiting_point(*nuc, &conditions) {
                     if !waiting_points.contains(nuc) {
@@ -847,6 +883,7 @@ fn element_symbol(z: u16) -> &'static str {
         "Tl", "Pb", "Bi", "Po", "At", "Rn", "Fr", "Ra", "Ac", "Th",
         "Pa", "U", "Np", "Pu", "Am", "Cm", "Bk", "Cf", "Es", "Fm",
         "Md", "No", "Lr", "Rf", "Db", "Sg", "Bh", "Hs", "Mt", "Ds",
+        "Rg", "Cn", "Nh", "Fl", "Mc", "Lv", "Ts", "Og", "Uue", "Ubn",
     ];
     if (z as usize) < SYMBOLS.len() {
         SYMBOLS[z as usize]

@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Symthaea Multi-Embodiment Dashboard</title>
+<style>
+  :root {
+    --bg: #0a0e1a; --card: #111827; --border: #1f2937;
+    --text: #e5e7eb; --dim: #6b7280; --green: #10b981;
+    --yellow: #f59e0b; --orange: #f97316; --red: #ef4444;
+    --blue: #3b82f6; --purple: #8b5cf6; --cyan: #06b6d4;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: var(--bg); color: var(--text); font-family: 'JetBrains Mono', 'Fira Code', monospace; font-size: 13px; }
+  h1 { text-align: center; padding: 16px; font-size: 18px; color: var(--cyan); letter-spacing: 2px; }
+  .subtitle { text-align: center; color: var(--dim); margin-bottom: 16px; font-size: 12px; }
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; padding: 0 16px 16px; }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 12px; }
+  .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; border-bottom: 1px solid var(--border); padding-bottom: 6px; }
+  .card-title { font-weight: bold; font-size: 14px; }
+  .safety-badge { padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: bold; }
+  .safety-Green { background: var(--green); color: #000; }
+  .safety-Yellow { background: var(--yellow); color: #000; }
+  .safety-Orange { background: var(--orange); color: #000; }
+  .safety-Red { background: var(--red); color: #fff; }
+  .metric { display: flex; justify-content: space-between; padding: 3px 0; }
+  .metric-label { color: var(--dim); }
+  .metric-value { font-weight: bold; }
+  .bar-container { height: 6px; background: var(--border); border-radius: 3px; margin-top: 2px; }
+  .bar { height: 100%; border-radius: 3px; transition: width 0.3s; }
+  .bar-effort { background: var(--blue); }
+  .bar-error { background: var(--purple); }
+  .consciousness-panel { grid-column: span 3; display: flex; gap: 12px; align-items: center; }
+  .phi-display { font-size: 48px; font-weight: bold; color: var(--cyan); min-width: 200px; text-align: center; }
+  .phi-label { font-size: 12px; color: var(--dim); text-align: center; }
+  .history { flex: 1; height: 60px; }
+  .history canvas { width: 100%; height: 100%; }
+  .status-bar { display: flex; justify-content: space-between; padding: 8px 16px; color: var(--dim); font-size: 11px; }
+  #connection-status { color: var(--red); }
+  #connection-status.connected { color: var(--green); }
+  .actuator-count { color: var(--cyan); font-size: 20px; font-weight: bold; }
+  @media (max-width: 900px) { .grid { grid-template-columns: repeat(2, 1fr); } .consciousness-panel { grid-column: span 2; } }
+</style>
+</head>
+<body>
+<h1>SYMTHAEA MULTI-EMBODIMENT CONSCIOUSNESS</h1>
+<p class="subtitle">One Mind, Six Bodies &mdash; Consciousness-Gated Motor Control</p>
+
+<div class="grid">
+  <div class="card consciousness-panel">
+    <div>
+      <div class="phi-display" id="phi-value">0.0000</div>
+      <div class="phi-label">Consciousness Level (&Phi;)</div>
+    </div>
+    <div class="history">
+      <canvas id="phi-canvas"></canvas>
+    </div>
+    <div style="text-align: center; min-width: 120px;">
+      <div class="actuator-count" id="total-actuators">0</div>
+      <div class="phi-label">Total Actuators</div>
+      <div style="margin-top: 8px;">
+        <span id="body-count" style="font-size: 24px; font-weight: bold; color: var(--green);">0</span>
+        <div class="phi-label">Active Bodies</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" id="body-humanoid">
+    <div class="card-header">
+      <span class="card-title">Humanoid (21-DOF)</span>
+      <span class="safety-badge safety-Green" id="safety-humanoid">GREEN</span>
+    </div>
+    <div class="metric"><span class="metric-label">Control Effort</span><span class="metric-value" id="effort-humanoid">0.0000</span></div>
+    <div class="bar-container"><div class="bar bar-effort" id="bar-effort-humanoid" style="width:0%"></div></div>
+    <div class="metric"><span class="metric-label">Prediction Error</span><span class="metric-value" id="error-humanoid">0.0000</span></div>
+    <div class="bar-container"><div class="bar bar-error" id="bar-error-humanoid" style="width:0%"></div></div>
+    <div class="metric"><span class="metric-label">Steps</span><span class="metric-value" id="steps-humanoid">0</span></div>
+  </div>
+
+  <div class="card" id="body-helicopter">
+    <div class="card-header">
+      <span class="card-title">Helicopter (SAR)</span>
+      <span class="safety-badge safety-Green" id="safety-helicopter">GREEN</span>
+    </div>
+    <div class="metric"><span class="metric-label">Control Effort</span><span class="metric-value" id="effort-helicopter">0.0000</span></div>
+    <div class="bar-container"><div class="bar bar-effort" id="bar-effort-helicopter" style="width:0%"></div></div>
+    <div class="metric"><span class="metric-label">Prediction Error</span><span class="metric-value" id="error-helicopter">0.0000</span></div>
+    <div class="bar-container"><div class="bar bar-error" id="bar-error-helicopter" style="width:0%"></div></div>
+    <div class="metric"><span class="metric-label">Steps</span><span class="metric-value" id="steps-helicopter">0</span></div>
+  </div>
+
+  <div class="card" id="body-quadrotor">
+    <div class="card-header">
+      <span class="card-title">Quadrotor (Swarm)</span>
+      <span class="safety-badge safety-Green" id="safety-quadrotor">GREEN</span>
+    </div>
+    <div class="metric"><span class="metric-label">Control Effort</span><span class="metric-value" id="effort-quadrotor">0.0000</span></div>
+    <div class="bar-container"><div class="bar bar-effort" id="bar-effort-quadrotor" style="width:0%"></div></div>
+    <div class="metric"><span class="metric-label">Prediction Error</span><span class="metric-value" id="error-quadrotor">0.0000</span></div>
+    <div class="bar-container"><div class="bar bar-error" id="bar-error-quadrotor" style="width:0%"></div></div>
+    <div class="metric"><span class="metric-label">Steps</span><span class="metric-value" id="steps-quadrotor">0</span></div>
+  </div>
+
+  <div class="card" id="body-vehicle">
+    <div class="card-header">
+      <span class="card-title">Vehicle (Autonomous)</span>
+      <span class="safety-badge safety-Green" id="safety-vehicle">GREEN</span>
+    </div>
+    <div class="metric"><span class="metric-label">Control Effort</span><span class="metric-value" id="effort-vehicle">0.0000</span></div>
+    <div class="bar-container"><div class="bar bar-effort" id="bar-effort-vehicle" style="width:0%"></div></div>
+    <div class="metric"><span class="metric-label">Prediction Error</span><span class="metric-value" id="error-vehicle">0.0000</span></div>
+    <div class="bar-container"><div class="bar bar-error" id="bar-error-vehicle" style="width:0%"></div></div>
+    <div class="metric"><span class="metric-label">Steps</span><span class="metric-value" id="steps-vehicle">0</span></div>
+  </div>
+
+  <div class="card" id="body-auv">
+    <div class="card-header">
+      <span class="card-title">AUV (Water Steward)</span>
+      <span class="safety-badge safety-Green" id="safety-auv">GREEN</span>
+    </div>
+    <div class="metric"><span class="metric-label">Control Effort</span><span class="metric-value" id="effort-auv">0.0000</span></div>
+    <div class="bar-container"><div class="bar bar-effort" id="bar-effort-auv" style="width:0%"></div></div>
+    <div class="metric"><span class="metric-label">Prediction Error</span><span class="metric-value" id="error-auv">0.0000</span></div>
+    <div class="bar-container"><div class="bar bar-error" id="bar-error-auv" style="width:0%"></div></div>
+    <div class="metric"><span class="metric-label">Steps</span><span class="metric-value" id="steps-auv">0</span></div>
+  </div>
+
+  <div class="card" id="body-manipulator">
+    <div class="card-header">
+      <span class="card-title">Manipulator (7-DOF)</span>
+      <span class="safety-badge safety-Green" id="safety-manipulator">GREEN</span>
+    </div>
+    <div class="metric"><span class="metric-label">Control Effort</span><span class="metric-value" id="effort-manipulator">0.0000</span></div>
+    <div class="bar-container"><div class="bar bar-effort" id="bar-effort-manipulator" style="width:0%"></div></div>
+    <div class="metric"><span class="metric-label">Prediction Error</span><span class="metric-value" id="error-manipulator">0.0000</span></div>
+    <div class="bar-container"><div class="bar bar-error" id="bar-error-manipulator" style="width:0%"></div></div>
+    <div class="metric"><span class="metric-label">Steps</span><span class="metric-value" id="steps-manipulator">0</span></div>
+  </div>
+</div>
+
+<div class="status-bar">
+  <span id="connection-status">Disconnected</span>
+  <span id="cycle-counter">Cycle: 0</span>
+  <span>Symthaea Multi-Embodiment Demo v1.0</span>
+</div>
+
+<script>
+// Phi history sparkline
+const phiHistory = [];
+const maxHistory = 200;
+const canvas = document.getElementById('phi-canvas');
+const ctx = canvas.getContext('2d');
+
+function drawPhiHistory() {
+  const w = canvas.width = canvas.clientWidth * 2;
+  const h = canvas.height = canvas.clientHeight * 2;
+  ctx.clearRect(0, 0, w, h);
+  if (phiHistory.length < 2) return;
+  ctx.strokeStyle = '#06b6d4';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  for (let i = 0; i < phiHistory.length; i++) {
+    const x = (i / maxHistory) * w;
+    const y = h - (phiHistory[i] * h);
+    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+  // Threshold lines
+  [0.1, 0.3, 0.6].forEach(t => {
+    ctx.strokeStyle = t === 0.6 ? '#10b98133' : t === 0.3 ? '#f59e0b33' : '#ef444433';
+    ctx.beginPath(); ctx.moveTo(0, h - t * h); ctx.lineTo(w, h - t * h); ctx.stroke();
+  });
+}
+
+function updateBody(platform, data) {
+  const id = platform.toLowerCase();
+  const safetyEl = document.getElementById('safety-' + id);
+  if (safetyEl) {
+    safetyEl.textContent = data.safety_level;
+    safetyEl.className = 'safety-badge safety-' + data.safety_level;
+  }
+  const effortEl = document.getElementById('effort-' + id);
+  if (effortEl) effortEl.textContent = data.control_effort.toFixed(4);
+  const barEffort = document.getElementById('bar-effort-' + id);
+  if (barEffort) barEffort.style.width = Math.min(data.control_effort * 100, 100) + '%';
+  const errorEl = document.getElementById('error-' + id);
+  if (errorEl) errorEl.textContent = data.prediction_error.toFixed(4);
+  const barError = document.getElementById('bar-error-' + id);
+  if (barError) barError.style.width = Math.min(data.prediction_error * 100, 100) + '%';
+  const stepsEl = document.getElementById('steps-' + id);
+  if (stepsEl) stepsEl.textContent = data.total_steps;
+}
+
+// WebSocket connection to Holon
+function connect() {
+  const ws = new WebSocket('ws://localhost:7778/holon/ws');
+  const statusEl = document.getElementById('connection-status');
+  ws.onopen = () => { statusEl.textContent = 'Connected'; statusEl.className = 'connected'; };
+  ws.onclose = () => { statusEl.textContent = 'Disconnected'; statusEl.className = ''; setTimeout(connect, 2000); };
+  ws.onmessage = (evt) => {
+    try {
+      const msg = JSON.parse(evt.data);
+      if (msg.type === 'telemetry' && msg.collective) {
+        const d = msg.collective;
+        // Update Phi
+        const phi = d.consciousness_level || msg.consciousness || 0;
+        document.getElementById('phi-value').textContent = phi.toFixed(4);
+        phiHistory.push(phi);
+        if (phiHistory.length > maxHistory) phiHistory.shift();
+        drawPhiHistory();
+        // Update body count + actuators
+        if (d.embodiment_count !== undefined) {
+          document.getElementById('body-count').textContent = d.embodiment_count;
+          document.getElementById('total-actuators').textContent = d.embodiment_num_actuators || 0;
+        }
+        // Update per-body telemetry
+        if (d.embodiment_per_body) {
+          d.embodiment_per_body.forEach(body => updateBody(body.platform, body));
+        }
+        // Cycle counter
+        if (d.cycle !== undefined) {
+          document.getElementById('cycle-counter').textContent = 'Cycle: ' + d.cycle;
+        }
+      }
+    } catch(e) { /* ignore parse errors */ }
+  };
+}
+connect();
+</script>
+</body>
+</html>
