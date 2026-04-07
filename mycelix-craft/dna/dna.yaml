@@ -1,52 +1,52 @@
-manifest_version: "1"
+---
+manifest_version: "0"
 name: mycelix_craft
+
 integrity:
-  origin_time: "2026-03-29T00:00:00.000000Z"
-  network_seed: ~
-  properties: ~
   zomes:
     - name: craft_graph_integrity
-      bundled: ../target/wasm32-unknown-unknown/release/craft_graph_integrity.wasm
+      path: ../target/wasm32-unknown-unknown/release/craft_graph_integrity.wasm
     - name: job_postings_integrity
-      bundled: ../target/wasm32-unknown-unknown/release/job_postings_integrity.wasm
+      path: ../target/wasm32-unknown-unknown/release/job_postings_integrity.wasm
     - name: work_history_integrity
-      bundled: ../target/wasm32-unknown-unknown/release/work_history_integrity.wasm
+      path: ../target/wasm32-unknown-unknown/release/work_history_integrity.wasm
     - name: connection_graph_integrity
-      bundled: ../target/wasm32-unknown-unknown/release/connection_graph_integrity.wasm
+      path: ../target/wasm32-unknown-unknown/release/connection_graph_integrity.wasm
     - name: applications_integrity
-      bundled: ../target/wasm32-unknown-unknown/release/applications_integrity.wasm
+      path: ../target/wasm32-unknown-unknown/release/applications_integrity.wasm
     - name: guild_integrity
-      bundled: ../target/wasm32-unknown-unknown/release/guild_integrity.wasm
+      path: ../target/wasm32-unknown-unknown/release/guild_integrity.wasm
     - name: craft_bridge_integrity
-      bundled: ../target/wasm32-unknown-unknown/release/craft_bridge_integrity.wasm
+      path: ../target/wasm32-unknown-unknown/release/craft_bridge_integrity.wasm
+
 coordinator:
   zomes:
     - name: craft_graph
-      bundled: ../target/wasm32-unknown-unknown/release/craft_graph.wasm
+      path: ../target/wasm32-unknown-unknown/release/craft_graph.wasm
       dependencies:
         - name: craft_graph_integrity
     - name: job_postings_coordinator
-      bundled: ../target/wasm32-unknown-unknown/release/job_postings_coordinator.wasm
+      path: ../target/wasm32-unknown-unknown/release/job_postings_coordinator.wasm
       dependencies:
         - name: job_postings_integrity
     - name: work_history_coordinator
-      bundled: ../target/wasm32-unknown-unknown/release/work_history_coordinator.wasm
+      path: ../target/wasm32-unknown-unknown/release/work_history_coordinator.wasm
       dependencies:
         - name: work_history_integrity
     - name: connection_graph_coordinator
-      bundled: ../target/wasm32-unknown-unknown/release/connection_graph_coordinator.wasm
+      path: ../target/wasm32-unknown-unknown/release/connection_graph_coordinator.wasm
       dependencies:
         - name: connection_graph_integrity
     - name: applications_coordinator
-      bundled: ../target/wasm32-unknown-unknown/release/applications_coordinator.wasm
+      path: ../target/wasm32-unknown-unknown/release/applications_coordinator.wasm
       dependencies:
         - name: applications_integrity
     - name: guild_coordinator
-      bundled: ../target/wasm32-unknown-unknown/release/guild_coordinator.wasm
+      path: ../target/wasm32-unknown-unknown/release/guild_coordinator.wasm
       dependencies:
         - name: guild_integrity
         - name: craft_graph_integrity
     - name: craft_bridge
-      bundled: ../target/wasm32-unknown-unknown/release/craft_bridge.wasm
+      path: ../target/wasm32-unknown-unknown/release/craft_bridge.wasm
       dependencies:
         - name: craft_bridge_integrity
