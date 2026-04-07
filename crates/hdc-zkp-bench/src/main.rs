@@ -25,6 +25,7 @@
 
 mod bundling;
 mod cfc_temporal;
+mod hamming;
 
 use std::time::Instant;
 
@@ -278,6 +279,17 @@ fn main() {
 
     println!("\nKey insight: Bundling costs O(N × D) AND constraints in Binius.");
     println!("XOR vote counting is FREE. Only the comparison/reduction uses AND gates.");
+
+    // Hamming similarity
+    println!("\n\n{}", "=".repeat(60));
+    println!("HDC HAMMING SIMILARITY BENCHMARK");
+    println!("{}", "=".repeat(60));
+
+    let hamming = hamming::bench_hamming(256); // 256 words = 16,384 bits
+
+    println!("\n  Hamming similarity: {} AND constraints for {}-bit vectors",
+        hamming.and_constraints, hamming.dim_words * 64);
+    println!("  XOR diff computation: FREE. Only accumulation costs AND.");
 
     // CfC temporal proofs
     println!("\n\n{}", "=".repeat(60));
