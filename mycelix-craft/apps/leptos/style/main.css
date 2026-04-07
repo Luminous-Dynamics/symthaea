@@ -789,6 +789,30 @@ h3 {
     font-size: 0.8rem;
 }
 
+/* Staked recommendation badge */
+.staked-badge {
+    display: inline-block;
+    padding: 0.15rem 0.5rem;
+    border-radius: 2rem;
+    font-size: 0.7rem;
+    font-weight: 600;
+    background: rgba(245,158,11,0.15);
+    color: var(--warning);
+    border: 1px solid rgba(245,158,11,0.3);
+}
+.rec-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 0.5rem;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+.rec-attribution {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+}
+
 /* Mini lists in profile */
 .mini-cred-list, .mini-guild-list {
     display: flex;

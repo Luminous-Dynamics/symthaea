@@ -38,6 +38,7 @@ struct Recommendation {
     from_name: String,
     text: String,
     date: String,
+    staked_sap: Option<u32>,
 }
 
 // ---------------------------------------------------------------------------
@@ -80,6 +81,7 @@ fn mock_recommendations() -> Vec<Recommendation> {
         from_name: "Nia Modise".into(),
         text: "Exceptional systems thinker. Built a full Holochain cluster in two weeks and documented every design decision. Highly recommended for distributed systems work.".into(),
         date: "2026-03-10".into(),
+        staked_sap: Some(250),
     }]
 }
 
@@ -326,13 +328,23 @@ pub fn NetworkPage() -> impl IntoView {
                                     {recommendations
                                         .into_iter()
                                         .map(|r| {
-                                            view! {
-                                                <div class="recommendation-card">
-                                                    <blockquote>{r.text}</blockquote>
-                                                    <p class="rec-attribution">
-                                                        {format!("-- {}, {}", r.from_name, r.date)}
-                                                    </p>
-                                                </div>
+                                            {
+                                                let staked = r.staked_sap;
+                                                view! {
+                                                    <div class="recommendation-card">
+                                                        <blockquote>{r.text}</blockquote>
+                                                        <div class="rec-footer">
+                                                            <p class="rec-attribution">
+                                                                {format!("-- {}, {}", r.from_name, r.date)}
+                                                            </p>
+                                                            {staked.map(|sap| view! {
+                                                                <span class="staked-badge" title="SAP staked on this recommendation — lying is cryptographically expensive">
+                                                                    {sap}" SAP staked"
+                                                                </span>
+                                                            })}
+                                                        </div>
+                                                    </div>
+                                                }
                                             }
                                         })
                                         .collect::<Vec<_>>()}

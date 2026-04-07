@@ -742,8 +742,8 @@ fn total_registered_routes_is_36() {
         }
     }
     assert_eq!(
-        count, 51,
-        "Expected 51 registered routes, found {count}"
+        count, 53,
+        "Expected 53 registered routes, found {count}"
     );
 }
 

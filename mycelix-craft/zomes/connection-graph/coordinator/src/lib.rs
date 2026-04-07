@@ -233,6 +233,8 @@ pub fn write_recommendation(input: WriteRecommendationInput) -> ExternResult<Act
         relationship: input.relationship,
         text: input.text,
         created_at: now,
+        staked_sap: None,
+        stake_id: None,
     };
 
     let action_hash = create_entry(EntryTypes::Recommendation(rec))?;

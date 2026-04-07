@@ -47,6 +47,13 @@ pub struct Recommendation {
     pub text: String,
     /// When written
     pub created_at: Timestamp,
+    /// SAP staked on this recommendation (makes lying expensive).
+    /// If set, references a CollateralStake in the Finance cluster.
+    #[serde(default)]
+    pub staked_sap: Option<u32>,
+    /// Stake ID in the Finance cluster (for cross-cluster verification).
+    #[serde(default)]
+    pub stake_id: Option<String>,
 }
 
 #[hdk_entry_types]
