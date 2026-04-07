@@ -131,6 +131,19 @@ pub struct PolicyConfig {
     pub defense_spending: f64,
     /// Exploration investment fraction (0.0 - 0.2). Accelerates discovery.
     pub exploration_investment: f64,
+
+    // === D: COORDINATION SCIENCE EXPERIMENT CONTROLS ===
+
+    /// Initial coordination science understanding for all agents [0.0, 1.0].
+    /// 0.0 = no coordination understanding (baseline).
+    /// 0.5 = moderate (coordination-literate condition).
+    /// Orthogonal to education_level and consciousness.
+    #[serde(default)]
+    pub coordination_understanding_initial: f64,
+    /// Education level boost applied at initialization (for education-only control arm).
+    /// Added on top of default education_level.
+    #[serde(default)]
+    pub education_boost: f64,
 }
 
 /// How the colony prioritizes construction projects.
@@ -211,6 +224,8 @@ impl Default for PolicyConfig {
             trade_openness: 0.8,
             defense_spending: 0.05,
             exploration_investment: 0.05,
+            coordination_understanding_initial: 0.0,
+            education_boost: 0.0,
         }
     }
 }

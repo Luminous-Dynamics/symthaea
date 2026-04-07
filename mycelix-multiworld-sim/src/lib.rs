@@ -393,7 +393,7 @@ impl MultiWorldSimulator {
                         s.learn(primary, self.rng.next_f64() * 0.5);
                         s
                     },
-                    education_level: self.rng.next_f64() * 0.5,
+                    education_level: (self.rng.next_f64() * 0.5) + self.config.policy.education_boost,
                     consciousness: ConsciousnessState::nascent(),
                     partner_id: None,
                     children_ids: vec![],
@@ -404,7 +404,8 @@ impl MultiWorldSimulator {
                     faction_id: None,
                     generation: 0,
                     trauma_level: 0.0,
-                    cumulative_dose_sv: 0.0, adversarial: None, coordination_understanding: 0.0,
+                    cumulative_dose_sv: 0.0, adversarial: None,
+                    coordination_understanding: self.config.policy.coordination_understanding_initial,
                 };
                 world.next_agent_id += 1;
                 world.agents.push(agent);
@@ -530,7 +531,7 @@ impl MultiWorldSimulator {
                     s.learn(primary, self.rng.next_f64() * 0.6);
                     s
                 },
-                education_level: self.rng.next_f64() * 0.6,
+                education_level: (self.rng.next_f64() * 0.6) + self.config.policy.education_boost,
                 consciousness: ConsciousnessState::nascent(),
                 partner_id: None,
                 children_ids: vec![],
@@ -541,7 +542,8 @@ impl MultiWorldSimulator {
                 faction_id: None,
                 generation: 0,
                 trauma_level: 0.0,
-                    cumulative_dose_sv: 0.0, adversarial: None, coordination_understanding: 0.0,
+                cumulative_dose_sv: 0.0, adversarial: None,
+                coordination_understanding: self.config.policy.coordination_understanding_initial,
             };
             world.next_agent_id += 1;
             world.agents.push(agent);

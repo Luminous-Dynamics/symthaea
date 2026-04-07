@@ -1,0 +1,21 @@
+# Experiment 1, Arm C: Coordination Science Understanding
+# No education boost, but agents understand coordination science (0.5).
+# Tests whether coordination-specific knowledge outperforms general education.
+
+[simulation]
+years = 150
+seed = 42
+
+[policy]
+birth_policy = "Natural"
+project_strategy = "Balanced"
+resource_priority = "Balanced"
+trade_openness = 0.8
+defense_spending = 0.05
+exploration_investment = 0.05
+trust_weighted_governance = true
+disasters_enabled = true
+
+# Experiment controls
+coordination_understanding_initial = 0.5
+education_boost = 0.0
