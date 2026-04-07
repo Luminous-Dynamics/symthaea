@@ -7,6 +7,10 @@ description = "eIDAS 2.0 compliant ZKP selective disclosure for EUDI Wallet"
 authors = ["Tristan Stoltz <tristan.stoltz@evolvingresonantcocreationism.com>"]
 keywords = ["eidas", "verifiable-credentials", "zkp", "selective-disclosure", "dilithium"]
 
+[[bin]]
+name = "eidas_demo"
+path = "src/bin/eidas_demo.rs"
+
 [dependencies]
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
