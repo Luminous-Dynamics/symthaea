@@ -26,6 +26,7 @@
 mod bundling;
 mod cfc_temporal;
 mod hamming;
+mod sigmoid;
 
 use std::time::Instant;
 
@@ -314,6 +315,17 @@ fn main() {
     println!("exactly 1 AND constraint per neuron per timestep in Binius.");
     println!("XOR additions (delta computation, state update) are FREE.");
     println!("LTC with RK4 would need ~16x more constraints for ODE integration.");
+
+    // CfC with sigmoid (Sprint 8.3)
+    println!("\n\n{}", "=".repeat(60));
+    println!("CfC SIGMOID BENCHMARK");
+    println!("{}", "=".repeat(60));
+
+    let sig_result = sigmoid::bench_cfc_with_sigmoid(64, 100);
+
+    println!("\n  CfC 64N×100T WITH in-circuit sigmoid:");
+    println!("    {} AND constraints (vs ~7,360 without sigmoid)", sig_result.and_constraints);
+    println!("    Sigmoid adds ~1 AND per neuron per step");
 
     // Output JSON for paper data
     println!("\n--- JSON (for paper) ---");
