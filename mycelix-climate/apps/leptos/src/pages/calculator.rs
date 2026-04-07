@@ -9,15 +9,40 @@
 use leptos::prelude::*;
 use crate::actions;
 
-// SA emission factors (2024 estimates)
-const ELECTRICITY_FACTOR: f64 = 0.95;  // kg CO2/kWh (Eskom grid)
-const PETROL_FACTOR: f64 = 2.31;       // kg CO2/litre
-const DIESEL_FACTOR: f64 = 2.68;       // kg CO2/litre
-const AVG_FUEL_CONSUMPTION: f64 = 8.0; // litres/100km (SA average)
+// Grid emission factors by country (kg CO2/kWh, 2024 IEA estimates)
+fn grid_factor(country: &str) -> f64 {
+    match country {
+        "ZA" => 0.95,  // South Africa (coal-heavy)
+        "IN" => 0.71,  // India
+        "CN" => 0.58,  // China
+        "US" => 0.39,  // United States
+        "DE" => 0.35,  // Germany
+        "GB" => 0.21,  // United Kingdom
+        "BR" => 0.07,  // Brazil (hydro-heavy)
+        "FR" => 0.06,  // France (nuclear)
+        "NO" => 0.02,  // Norway (hydro)
+        "WORLD" => 0.49, // Global average
+        _ => 0.49,
+    }
+}
+
+fn avg_per_capita(country: &str) -> f64 {
+    match country {
+        "US" => 14.4, "AU" => 15.0, "CA" => 14.2, "DE" => 8.1,
+        "GB" => 5.2, "CN" => 8.0, "IN" => 1.9, "BR" => 2.2,
+        "ZA" => 7.5, "FR" => 4.5, "NO" => 7.5,
+        "WORLD" => 4.7,
+        _ => 4.7,
+    }
+}
+
+const PETROL_FACTOR: f64 = 2.31;       // kg CO2/litre (universal)
+const AVG_FUEL_CONSUMPTION: f64 = 8.0; // litres/100km (global avg)
 const FLIGHT_FACTOR: f64 = 0.255;      // kg CO2/km (economy)
 
 #[component]
 pub fn CalculatorPage() -> impl IntoView {
+    let (country, set_country) = signal("WORLD".to_string());
     let (electricity_kwh, set_electricity) = signal(String::new());
     let (driving_km, set_driving) = signal(String::new());
     let (flights_km, set_flights) = signal(String::new());
@@ -33,7 +58,7 @@ pub fn CalculatorPage() -> impl IntoView {
 
     let scope2 = move || {
         let kwh: f64 = electricity_kwh.get().parse().unwrap_or(0.0);
-        kwh * ELECTRICITY_FACTOR / 1000.0 // tonnes
+        kwh * grid_factor(&country.get()) / 1000.0 // tonnes
     };
 
     let scope3 = move || {
@@ -53,7 +78,7 @@ pub fn CalculatorPage() -> impl IntoView {
         let s2 = scope2();
         let s3 = scope3();
         if s1 + s2 + s3 > 0.0 {
-            actions::record_footprint(s1, s2, s3, "Calculator (SA factors)".into());
+            actions::record_footprint(s1, s2, s3, format!("Calculator ({} grid)", country.get_untracked()));
         }
     };
 
@@ -66,12 +91,33 @@ pub fn CalculatorPage() -> impl IntoView {
 
             <form class="calculator-form" on:submit=on_calculate>
                 <div class="calc-field">
+                    <label>"Your country"</label>
+                    <select class="form-select"
+                        prop:value=move || country.get()
+                        on:change=move |ev| { set_country.set(event_target_value(&ev)); set_calculated.set(false); }
+                    >
+                        <option value="WORLD">"Global average"</option>
+                        <option value="ZA">"South Africa"</option>
+                        <option value="IN">"India"</option>
+                        <option value="CN">"China"</option>
+                        <option value="US">"United States"</option>
+                        <option value="GB">"United Kingdom"</option>
+                        <option value="DE">"Germany"</option>
+                        <option value="BR">"Brazil"</option>
+                        <option value="FR">"France"</option>
+                        <option value="AU">"Australia"</option>
+                        <option value="NO">"Norway"</option>
+                    </select>
+                    <span class="calc-hint">{move || format!("Grid factor: {} kg CO2/kWh", grid_factor(&country.get()))}</span>
+                </div>
+
+                <div class="calc-field">
                     <label>"Electricity (kWh/year)"</label>
                     <input class="form-input" type="number" step="100" min="0" placeholder="4800 (SA avg household)"
                         prop:value=move || electricity_kwh.get()
                         on:input=move |ev| { set_electricity.set(event_target_value(&ev)); set_calculated.set(false); }
                     />
-                    <span class="calc-hint">"Check your Eskom bill — monthly kWh \u{00D7} 12"</span>
+                    <span class="calc-hint">"Check your utility bill \u{2014} monthly kWh \u{00D7} 12"</span>
                 </div>
 
                 <div class="calc-field">
@@ -80,7 +126,7 @@ pub fn CalculatorPage() -> impl IntoView {
                         prop:value=move || driving_km.get()
                         on:input=move |ev| { set_driving.set(event_target_value(&ev)); set_calculated.set(false); }
                     />
-                    <span class="calc-hint">"Your car odometer: this year minus last year"</span>
+                    <span class="calc-hint">"Odometer: this year minus last year"</span>
                 </div>
 
                 <div class="calc-field">
@@ -89,7 +135,7 @@ pub fn CalculatorPage() -> impl IntoView {
                         prop:value=move || flights_km.get()
                         on:input=move |ev| { set_flights.set(event_target_value(&ev)); set_calculated.set(false); }
                     />
-                    <span class="calc-hint">"JNB\u{2192}CPT = 1,270 km (one way)"</span>
+                    <span class="calc-hint">"NYC\u{2192}LON = 5,570 km, SYD\u{2192}SIN = 6,290 km"</span>
                 </div>
 
                 <div class="calc-field">
@@ -109,8 +155,10 @@ pub fn CalculatorPage() -> impl IntoView {
                 let s2 = scope2();
                 let s3 = scope3();
                 let t = total();
-                let sa_avg = 7.5; // tonnes CO2/person/year SA average
-                let pct = if sa_avg > 0.0 { t / sa_avg * 100.0 } else { 0.0 };
+                let c = country.get();
+                let avg = avg_per_capita(&c);
+                let pct = if avg > 0.0 { t / avg * 100.0 } else { 0.0 };
+                let country_label = if c == "WORLD" { "global".to_string() } else { c.clone() };
 
                 view! {
                     <div class="calc-results">
@@ -121,11 +169,11 @@ pub fn CalculatorPage() -> impl IntoView {
 
                         <div class="calc-comparison">
                             {if pct < 80.0 {
-                                format!("Below SA average ({sa_avg:.1}t) \u{2014} {pct:.0}% of average")
+                                format!("Below {country_label} average ({avg:.1}t) \u{2014} {pct:.0}%")
                             } else if pct < 120.0 {
-                                format!("Near SA average ({sa_avg:.1}t)")
+                                format!("Near {country_label} average ({avg:.1}t)")
                             } else {
-                                format!("Above SA average ({sa_avg:.1}t) \u{2014} {pct:.0}% of average")
+                                format!("Above {country_label} average ({avg:.1}t) \u{2014} {pct:.0}%")
                             }}
                         </div>
 

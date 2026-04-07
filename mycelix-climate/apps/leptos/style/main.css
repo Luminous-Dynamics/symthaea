@@ -149,10 +149,11 @@
 /* ================================================================
    PROJECT MAP
    ================================================================ */
-.project-map-container { max-width: 400px; margin: 0 auto var(--space-xl); }
+.project-map-container { max-width: 100%; margin: 0 auto var(--space-xl); }
+.world-map { max-width: 800px; }
 .project-map { width: 100%; height: auto; }
-.sa-outline { fill: var(--bg-raised); stroke: rgba(78, 205, 196, 0.15); stroke-width: 1.5; }
-.lesotho { fill: var(--bg-surface); stroke: rgba(78, 205, 196, 0.1); stroke-width: 1; }
+.continent { fill: var(--bg-raised); stroke: rgba(78, 205, 196, 0.12); stroke-width: 1; }
+.equator { stroke: rgba(78, 205, 196, 0.06); stroke-width: 0.5; stroke-dasharray: 4 4; }
 .project-dot { cursor: pointer; transition: r 0.2s ease; }
 .project-dot:hover { filter: brightness(1.3); }
 .project-dot-ring { animation: map-pulse 3s ease-in-out infinite; }

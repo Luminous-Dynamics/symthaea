@@ -84,20 +84,24 @@ pub fn ProjectsPage() -> impl IntoView {
                 </div>
             </div>
 
-            // Project map — SA outline with project dots
-            <div class="project-map-container">
-                <svg viewBox="0 0 400 360" class="project-map" xmlns="http://www.w3.org/2000/svg">
-                    // Simplified SA outline
-                    <path class="sa-outline" d="M160,20 L240,15 L310,30 L350,70 L370,130 L380,200 L360,260 L320,310 L260,340 L200,350 L140,330 L100,300 L60,250 L30,190 L25,130 L40,80 L80,40 Z" />
-                    // Lesotho
-                    <ellipse class="lesotho" cx="280" cy="250" rx="20" ry="15" />
-                    // Project dots (reactive)
+            // World map with project dots
+            <div class="project-map-container world-map">
+                <svg viewBox="0 0 800 400" class="project-map" xmlns="http://www.w3.org/2000/svg">
+                    // Simplified world coastline (rectangles for continents)
+                    <rect class="continent" x="120" y="60" width="180" height="120" rx="8" /> // Americas
+                    <rect class="continent" x="340" y="40" width="120" height="100" rx="8" /> // Europe/Africa
+                    <rect class="continent" x="340" y="150" width="100" height="140" rx="8" /> // Africa
+                    <rect class="continent" x="480" y="50" width="180" height="120" rx="8" /> // Asia
+                    <rect class="continent" x="580" y="220" width="100" height="80" rx="8" /> // Oceania
+                    // Equator line
+                    <line x1="50" y1="200" x2="750" y2="200" class="equator" />
+                    // Project dots (reactive, Mercator-like projection)
                     {move || ctx.projects.get().iter().map(|p| {
-                        // Map lat/lon to SVG coordinates (rough SA bounds: lat -22 to -35, lon 16 to 33)
+                        // Map lat/lon to SVG: lon -180→180 → x 50→750, lat 80→-60 → y 20→380
                         let lat = p.location.latitude;
                         let lon = p.location.longitude;
-                        let x = ((lon - 16.0) / (33.0 - 16.0) * 360.0 + 20.0) as f32;
-                        let y = ((lat - (-22.0)) / (-35.0 - (-22.0)) * 320.0 + 20.0) as f32;
+                        let x = ((lon + 180.0) / 360.0 * 700.0 + 50.0) as f32;
+                        let y = ((80.0 - lat) / 140.0 * 360.0 + 20.0) as f32;
                         let r = match p.status {
                             climate_leptos_types::ProjectStatus::Active => 8.0,
                             climate_leptos_types::ProjectStatus::Completed => 7.0,
