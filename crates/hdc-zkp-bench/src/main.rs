@@ -26,6 +26,7 @@
 mod bundling;
 mod cfc_temporal;
 mod hamming;
+mod fl_triple_stack;
 mod sigmoid;
 mod triple_stack;
 
@@ -338,6 +339,32 @@ fn main() {
     println!("\n  Triple stack: {} AND constraints for {}-bit encrypted binding",
         triple.and_constraints, triple.dim_words * 64);
     println!("  SAME as plaintext XOR binding — encryption adds ZERO proof overhead");
+
+    // FL Triple Stack
+    println!("\n\n{}", "=".repeat(60));
+    println!("FL TRIPLE STACK: ENCRYPTED GRADIENT AGGREGATION");
+    println!("{}", "=".repeat(60));
+
+    let fl_3 = fl_triple_stack::bench_fl_triple_stack(3, 64);  // 3 participants, 4096 bits
+    let fl_8 = fl_triple_stack::bench_fl_triple_stack(8, 64);  // 8 participants, 4096 bits
+    let fl_16 = fl_triple_stack::bench_fl_triple_stack(16, 64); // 16 participants, 4096 bits
+
+    println!("\n╔══════════════════════════════════════════════════════════════╗");
+    println!("║            FL TRIPLE STACK SUMMARY                           ║");
+    println!("╠══════════════════════════════════════════════════════════════╣");
+    println!("║ Participants │ AND Constr. │ Prove (ms) │ Proof (KB)       ║");
+    println!("╠══════════════════════════════════════════════════════════════╣");
+    println!("║  3 × 4Kbit    │ {:>10} │ {:>10.1} │ {:>10.1}       ║",
+        fl_3.and_constraints, fl_3.prove_time_ms, fl_3.proof_size_bytes as f64 / 1024.0);
+    println!("║  8 × 4Kbit    │ {:>10} │ {:>10.1} │ {:>10.1}       ║",
+        fl_8.and_constraints, fl_8.prove_time_ms, fl_8.proof_size_bytes as f64 / 1024.0);
+    println!("║ 16 × 4Kbit    │ {:>10} │ {:>10.1} │ {:>10.1}       ║",
+        fl_16.and_constraints, fl_16.prove_time_ms, fl_16.proof_size_bytes as f64 / 1024.0);
+    println!("╚══════════════════════════════════════════════════════════════╝");
+
+    println!("\n  Key: ALL XOR (encryption + aggregation counting) is FREE.");
+    println!("  Only majority-vote comparison costs AND constraints.");
+    println!("  Encryption adds ZERO proof overhead (OTP = XOR = field addition).");
 
     // Output JSON for paper data
     println!("\n--- JSON (for paper) ---");
