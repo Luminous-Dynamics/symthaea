@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 use leptos::prelude::*;
+use leptos_router::components::A;
 use crate::context::use_supplychain_context;
 
 #[component]
@@ -10,8 +11,35 @@ pub fn HomePage() -> impl IntoView {
 
     view! {
         <div class="page-home">
-            <h1>"Supply Chain"</h1>
-            <p class="subtitle">"Provenance tracking, procurement, and trust."</p>
+            <section class="hero">
+                <h1>"Supply Chain"</h1>
+                <p class="hero-subtitle">"Verified provenance. Trusted suppliers."</p>
+                <div class="hero-cta">
+                    <A href="/inventory" attr:class="btn btn-primary">"Track Inventory"</A>
+                    <A href="/trust" attr:class="btn btn-ghost">"View Suppliers"</A>
+                </div>
+            </section>
+
+            <section class="how-it-works">
+                <h2>"How it works"</h2>
+                <div class="steps">
+                    <div class="step">
+                        <span class="step-icon">"🔎"</span>
+                        <h3>"Source"</h3>
+                        <p>"Verified provenance claims"</p>
+                    </div>
+                    <div class="step">
+                        <span class="step-icon">"🚚"</span>
+                        <h3>"Track"</h3>
+                        <p>"Real-time logistics"</p>
+                    </div>
+                    <div class="step">
+                        <span class="step-icon">"🤝"</span>
+                        <h3>"Trust"</h3>
+                        <p>"Decentralized reputation"</p>
+                    </div>
+                </div>
+            </section>
 
             <div class="dashboard-grid">
                 <div class="dash-card">

@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 use leptos::prelude::*;
+use leptos_router::components::A;
 use mycelix_leptos_core::ConnectionStatus;
 use mycelix_leptos_core::holochain_provider;
 use crate::context::use_energy_context;
@@ -17,8 +18,35 @@ pub fn HomePage() -> impl IntoView {
 
     view! {
         <div class="page-home">
-            <h1>"Energy"</h1>
-            <p class="subtitle">"Renewable energy projects, P2P trading, and regenerative ownership."</p>
+            <section class="hero">
+                <h1>"Energy"</h1>
+                <p class="hero-subtitle">"Community-owned renewable energy for South Africa."</p>
+                <div class="hero-cta">
+                    <A href="/projects" attr:class="btn btn-primary">"See Projects"</A>
+                    <A href="/grid" attr:class="btn btn-ghost">"Trade Energy"</A>
+                </div>
+            </section>
+
+            <section class="how-it-works">
+                <h2>"How it works"</h2>
+                <div class="steps">
+                    <div class="step">
+                        <span class="step-icon">"⚡"</span>
+                        <h3>"Generate"</h3>
+                        <p>"Solar, wind, hydro projects"</p>
+                    </div>
+                    <div class="step">
+                        <span class="step-icon">"🔄"</span>
+                        <h3>"Trade"</h3>
+                        <p>"P2P energy marketplace"</p>
+                    </div>
+                    <div class="step">
+                        <span class="step-icon">"🏘️"</span>
+                        <h3>"Own"</h3>
+                        <p>"Regenerative community ownership"</p>
+                    </div>
+                </div>
+            </section>
 
             <div class="dashboard-grid">
                 <div class="dash-card">

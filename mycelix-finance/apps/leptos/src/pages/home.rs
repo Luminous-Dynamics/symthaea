@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 use leptos::prelude::*;
+use leptos_router::components::A;
 use crate::context::use_finance_context;
 
 #[component]
@@ -10,8 +11,35 @@ pub fn HomePage() -> impl IntoView {
 
     view! {
         <div class="page-home">
-            <h1>"Finance"</h1>
-            <p class="subtitle">"Three currencies, one commons."</p>
+            <section class="hero">
+                <h1>"Finance"</h1>
+                <p class="hero-subtitle">"Three currencies. One commons. No extraction."</p>
+                <div class="hero-cta">
+                    <A href="/tend" attr:class="btn btn-primary">"View Balance"</A>
+                    <A href="/tend" attr:class="btn btn-ghost">"Give Care"</A>
+                </div>
+            </section>
+
+            <section class="how-it-works">
+                <h2>"How it works"</h2>
+                <div class="steps">
+                    <div class="step">
+                        <span class="step-icon">"🤝"</span>
+                        <h3>"TEND"</h3>
+                        <p>"Mutual credit \u{2014} 1 hour = 1 TEND"</p>
+                    </div>
+                    <div class="step">
+                        <span class="step-icon">"💧"</span>
+                        <h3>"SAP"</h3>
+                        <p>"Transferable value with demurrage"</p>
+                    </div>
+                    <div class="step">
+                        <span class="step-icon">"🍄"</span>
+                        <h3>"MYCEL"</h3>
+                        <p>"Soulbound reputation"</p>
+                    </div>
+                </div>
+            </section>
 
             <div class="currency-grid">
                 <div class="currency-card tend-card">

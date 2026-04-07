@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 use leptos::prelude::*;
+use leptos_router::components::A;
 use mycelix_leptos_core::ConnectionStatus;
 use mycelix_leptos_core::holochain_provider;
 use mycelix_leptos_core::consciousness::use_consciousness;
@@ -15,8 +16,35 @@ pub fn HomePage() -> impl IntoView {
 
     view! {
         <div class="page-home">
-            <h1>"Climate"</h1>
-            <p class="subtitle">"Carbon credits, emissions tracking, and climate projects."</p>
+            <section class="hero">
+                <h1>"Climate"</h1>
+                <p class="hero-subtitle">"Track carbon. Trade credits. Restore the earth."</p>
+                <div class="hero-cta">
+                    <A href="/projects" attr:class="btn btn-primary">"Explore Projects"</A>
+                    <A href="/emissions" attr:class="btn btn-ghost">"Record Footprint"</A>
+                </div>
+            </section>
+
+            <section class="how-it-works">
+                <h2>"How it works"</h2>
+                <div class="steps">
+                    <div class="step">
+                        <span class="step-icon">"📏"</span>
+                        <h3>"Measure"</h3>
+                        <p>"Record Scope 1/2/3 emissions"</p>
+                    </div>
+                    <div class="step">
+                        <span class="step-icon">"🌱"</span>
+                        <h3>"Reduce"</h3>
+                        <p>"Fund climate projects"</p>
+                    </div>
+                    <div class="step">
+                        <span class="step-icon">"♻️"</span>
+                        <h3>"Offset"</h3>
+                        <p>"Retire carbon credits"</p>
+                    </div>
+                </div>
+            </section>
 
             <div class="dashboard-grid">
                 <div class="dash-card">

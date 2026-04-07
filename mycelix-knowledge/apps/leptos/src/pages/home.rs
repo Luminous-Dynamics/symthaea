@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 use leptos::prelude::*;
+use leptos_router::components::A;
 use mycelix_leptos_core::ConnectionStatus;
 use mycelix_leptos_core::holochain_provider;
 use crate::context::use_knowledge_context;
@@ -13,8 +14,35 @@ pub fn HomePage() -> impl IntoView {
 
     view! {
         <div class="page-home">
-            <h1>"Knowledge Graph"</h1>
-            <p class="subtitle">"Epistemic commons \u{2014} claims, evidence, and truth."</p>
+            <section class="hero">
+                <h1>"Knowledge"</h1>
+                <p class="hero-subtitle">"Epistemic commons \u{2014} claims verified by the community."</p>
+                <div class="hero-cta">
+                    <A href="/browse" attr:class="btn btn-primary">"Browse Claims"</A>
+                    <A href="/fact-check" attr:class="btn btn-ghost">"Fact Check"</A>
+                </div>
+            </section>
+
+            <section class="how-it-works">
+                <h2>"How it works"</h2>
+                <div class="steps">
+                    <div class="step">
+                        <span class="step-icon">"📝"</span>
+                        <h3>"Claim"</h3>
+                        <p>"Submit knowledge claims with sources"</p>
+                    </div>
+                    <div class="step">
+                        <span class="step-icon">"🔍"</span>
+                        <h3>"Verify"</h3>
+                        <p>"Community fact-checking"</p>
+                    </div>
+                    <div class="step">
+                        <span class="step-icon">"🕸️"</span>
+                        <h3>"Connect"</h3>
+                        <p>"Build the knowledge graph"</p>
+                    </div>
+                </div>
+            </section>
 
             <div class="dashboard-grid">
                 <div class="dash-card">
