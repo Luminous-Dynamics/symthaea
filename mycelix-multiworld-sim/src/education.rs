@@ -285,12 +285,16 @@ impl EducationEngine {
         // Apply teaching interactions
         for m in &matches {
             // --- Learner ---
-            // Skill gain
+            // Skill gain, boosted by teacher's coordination understanding.
+            // Teachers with high cu (perspective taking) adapt to the learner's
+            // zone of proximal development, producing up to 30% more effective transfer.
+            let teacher_cu = world.agents[m.teacher_idx].coordination_understanding;
+            let cu_teaching_boost = 1.0 + teacher_cu * 0.3;
             world.agents[m.learner_idx]
                 .skills
-                .learn(m.sector, LEARNER_SKILL_GAIN);
+                .learn(m.sector, LEARNER_SKILL_GAIN * cu_teaching_boost);
             world.agents[m.learner_idx].education_level =
-                (world.agents[m.learner_idx].education_level + 0.002).min(1.0);
+                (world.agents[m.learner_idx].education_level + 0.002 * cu_teaching_boost).min(1.0);
 
             // Epistemic cost: updating priors is biologically stressful.
             // Learning is exhausting. A guild must balance education with rest.

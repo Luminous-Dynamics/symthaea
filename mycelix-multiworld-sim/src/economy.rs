@@ -122,8 +122,14 @@ impl WorldEconomy {
     pub fn assign_workers(&mut self, agents: &[CivAgent], current_tick: u32) {
         self.sector_workers = [0; NUM_SECTORS];
 
-        // Count workers by strongest skill
+        // Count workers by strongest skill, with coordination-aware reallocation.
+        // Agents with high coordination_understanding (systems thinking) detect
+        // which sectors are understaffed and probabilistically reallocate there,
+        // even if it's not their strongest skill. This models the capacity to
+        // see the system as a whole rather than just optimizing individually.
         let mut worker_count = 0usize;
+        // First pass: count natural assignments to detect bottlenecks
+        let mut natural_assignment = Vec::new();
         for agent in agents.iter().filter(|a| a.is_alive()) {
             let stage = agent.life_stage(current_tick);
             if !stage.can_work() {
@@ -137,7 +143,39 @@ impl WorldEconomy {
                 .max_by(|a, b| a.1.partial_cmp(b.1).unwrap_or(std::cmp::Ordering::Equal))
                 .map(|(i, _)| i)
                 .unwrap_or(0);
+            natural_assignment.push((best_sector, agent.coordination_understanding));
             self.sector_workers[best_sector] += 1;
+        }
+
+        // Second pass: coordination-aware reallocation.
+        // Agents with cu > 0.3 identify the most understaffed sector and have
+        // a cu-proportional probability of switching to it.
+        if worker_count > 20 {
+            let min_sector = (0..NUM_SECTORS)
+                .min_by_key(|&i| self.sector_workers[i])
+                .unwrap_or(0);
+            let min_workers = self.sector_workers[min_sector];
+            let avg_workers = worker_count / NUM_SECTORS;
+
+            // Only reallocate if there's a genuine bottleneck (< 50% of average)
+            if min_workers < avg_workers / 2 {
+                for &(natural, cu) in &natural_assignment {
+                    if cu > 0.3 && natural != min_sector {
+                        // Probability of switching = cu * 0.15 (max 7.5% chance)
+                        // This is deliberately modest — systems thinking helps
+                        // but doesn't override personal specialization entirely.
+                        let switch_prob = cu * 0.15;
+                        // Deterministic approximation: switch if cu high enough
+                        // and this sector is overstaffed (> 150% of average)
+                        if self.sector_workers[natural] > avg_workers * 3 / 2
+                            && switch_prob > 0.05
+                        {
+                            self.sector_workers[natural] -= 1;
+                            self.sector_workers[min_sector] += 1;
+                        }
+                    }
+                }
+            }
         }
 
         // Enforce minimum 5% per sector for populations > 20

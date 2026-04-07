@@ -2666,6 +2666,19 @@ impl MultiWorldSimulator {
                         }
                     };
                     recovery_rate += mean_care * 0.005; // Up to 0.5%/tick bonus from mutual aid
+
+                    // Coordination science recovery boost: populations that understand
+                    // systems thinking coordinate disaster response more effectively.
+                    // Up to 0.3%/tick additional recovery from collective coordination.
+                    let mean_cu = {
+                        let living: Vec<_> = world.agents.iter().filter(|a| a.is_alive()).collect();
+                        if living.is_empty() { 0.0 } else {
+                            living.iter().map(|a| a.coordination_understanding).sum::<f64>()
+                                / living.len() as f64
+                        }
+                    };
+                    recovery_rate += mean_cu * 0.003;
+
                     world.infrastructure_level =
                         (world.infrastructure_level + recovery_rate).min(1.0);
 
