@@ -477,14 +477,49 @@ pub fn App() -> impl IntoView {
 }
 
 /// Map domain IDs to standalone app URLs.
-fn domain_app_url(domain_id: &str) -> Option<&'static str> {
-    match domain_id {
-        "governance" => Some("http://localhost:8110"),
-        "hearth" => Some("http://localhost:8096"),
-        "praxis" => Some("http://localhost:8107"),
-        "health" => Some("http://localhost:8111"),
-        "music" => Some("http://localhost:8121"),
-        _ => None,
+/// Auto-detects public vs local deployment.
+fn domain_app_url(domain_id: &str) -> Option<String> {
+    let is_public = web_sys::window()
+        .and_then(|w| w.location().hostname().ok())
+        .map(|h| h.contains("mycelix.net") || h.contains("luminousdynamics.io"))
+        .unwrap_or(false);
+
+    if is_public {
+        match domain_id {
+            "governance" => Some("https://governance.mycelix.net".into()),
+            "hearth" => Some("https://hearth.mycelix.net".into()),
+            "praxis" => Some("https://praxis.mycelix.net".into()),
+            "health" => Some("https://health.mycelix.net".into()),
+            "music" => Some("https://music.mycelix.net".into()),
+            "climate" => Some("https://climate.mycelix.net".into()),
+            "knowledge" => Some("https://knowledge.mycelix.net".into()),
+            "energy" => Some("https://energy.mycelix.net".into()),
+            "finance" => Some("https://finance.mycelix.net".into()),
+            "commons" => Some("https://commons.mycelix.net".into()),
+            "attribution" => Some("https://attribution.mycelix.net".into()),
+            "space" => Some("https://space.mycelix.net".into()),
+            "supplychain" => Some("https://supplychain.mycelix.net".into()),
+            "mail" => Some("https://mail.mycelix.net".into()),
+            _ => None,
+        }
+    } else {
+        match domain_id {
+            "governance" => Some("http://localhost:8110".into()),
+            "hearth" => Some("http://localhost:8112".into()),
+            "praxis" => Some("http://localhost:8107".into()),
+            "health" => Some("http://localhost:8111".into()),
+            "music" => Some("http://localhost:8121".into()),
+            "climate" => Some("http://localhost:8103".into()),
+            "knowledge" => Some("http://localhost:8114".into()),
+            "energy" => Some("http://localhost:8108".into()),
+            "finance" => Some("http://localhost:8109".into()),
+            "commons" => Some("http://localhost:8104".into()),
+            "attribution" => Some("http://localhost:8101".into()),
+            "space" => Some("http://localhost:8126".into()),
+            "supplychain" => Some("http://localhost:8127".into()),
+            "mail" => Some("http://localhost:8117".into()),
+            _ => None,
+        }
     }
 }
 
