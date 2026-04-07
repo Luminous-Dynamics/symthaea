@@ -105,15 +105,15 @@ impl SovereignConversation {
     pub fn greet(&mut self) -> ConversationResponse {
         let mut msg = Vec::new();
 
-        // Acknowledge what she already knows from the scan
+        // Warm greeting
         if !self.migration.git_user.is_empty() {
-            msg.push(format!("Hello, {}.", self.migration.git_user));
+            msg.push(format!("Hi, {}! Welcome.", self.migration.git_user));
         } else {
-            msg.push("Hello.".into());
+            msg.push("Hi there! Welcome.".into());
         }
 
         msg.push(String::new());
-        msg.push("I've looked at your hardware and your existing system. Here's what I see:".into());
+        msg.push("I took a quick look at your machine. Here's what I found:".into());
         msg.push(String::new());
 
         // Hardware summary
@@ -125,7 +125,7 @@ impl SovereignConversation {
             msg.push(format!("  Existing OS: {}", os_names.join(", ")));
         }
         if self.hardware.has_tpm {
-            msg.push("  TPM 2.0: available (encryption possible)".into());
+            msg.push("  Security chip: available (can auto-unlock disk encryption)".into());
         }
 
         // Migration insights
@@ -146,7 +146,7 @@ impl SovereignConversation {
         }
 
         msg.push(String::new());
-        msg.push("What will you use this machine for? Tell me in your own words — I'll figure out the right configuration.".into());
+        msg.push("What will you use this machine for? Just describe it however you like \u{2014} I'll take it from there.\n\nSome examples: \"I write code in Rust and Python\", \"Just web browsing and documents\", \"Gaming plus some coding\", \"It's a server, no screen needed\"".into());
 
         self.state.turns.push(ConversationTurn {
             speaker: Speaker::Symthaea,
