@@ -58,11 +58,28 @@ surviving wars.
 
 ---
 
+## Stress Tests (180 additional simulations)
+
+| Test | Baseline Wars | Cell D Wars | Result |
+|---|---|---|---|
+| Replication (50 seeds) | 0.48/run | 0.34/run | FAILED (not <50%) |
+| Harsh conditions (20 seeds) | 0.35/run | 0.50/run | FAILED (Cell D worse) |
+| Adversarial (20 seeds) | 0.45/run | 0.20/run | **PASSED** (Cell D resists defectors) |
+
+The zero-wars finding from 10 seeds was a **seed-set artifact**.
+At 50 seeds, Cell D shows 66% vs 56% zero-war runs — modest, not
+a phase transition. Under harsh conditions, the effect reverses.
+
+**But the adversarial test holds**: consciousness × coordination
+reduces war rate by 56% against defector agents (0.20 vs 0.45).
+The combination specifically improves resilience against bad actors.
+
 ## Key Takeaway
 
-The "third regime" hypothesis (fully conscious coordination) was
-**partially falsified**: it does not produce higher coherence (CVS).
-But it was **partially validated**: it produces a qualitatively
-different civilization characterized by zero conflict and higher
-population carrying capacity. The interaction effect is real — it's
-just on a different axis than predicted.
+The "third regime" is not universal peace — the initial zero-wars
+finding was fragile. What survives stress testing is **adversarial
+robustness**: the combination of caring (consciousness) and strategic
+understanding (coordination science) enables detection and containment
+of defection. This is consistent with the biological precedent: the
+immune system (Symthaea's safety-agents) works by combining awareness
+(detecting threats) with coordinated response (containing them).
