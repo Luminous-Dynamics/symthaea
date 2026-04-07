@@ -4,6 +4,7 @@
 use leptos::prelude::*;
 use leptos_router::hooks::use_params_map;
 use crate::context::use_knowledge_context;
+use crate::actions;
 
 #[component]
 pub fn ClaimDetailPage() -> impl IntoView {
@@ -79,6 +80,50 @@ pub fn ClaimDetailPage() -> impl IntoView {
                                 <span class="claim-author">{format!("Author: {}", c.author)}</span>
                                 <span class="claim-version">{format!("Version {}", c.version)}</span>
                             </div>
+
+                            // Challenge section
+                            {
+                                let claim_id = c.id.clone();
+                                let (show_challenge, set_show_challenge) = signal(false);
+                                let (reason, set_reason) = signal(String::new());
+                                let can_challenge = Memo::new(move |_| !reason.get().trim().is_empty());
+                                let on_challenge = move |ev: leptos::ev::SubmitEvent| {
+                                    ev.prevent_default();
+                                    if can_challenge.get_untracked() {
+                                        actions::challenge_claim(
+                                            claim_id.clone(),
+                                            reason.get_untracked(),
+                                        );
+                                        set_reason.set(String::new());
+                                        set_show_challenge.set(false);
+                                    }
+                                };
+                                view! {
+                                    <div class="challenge-section">
+                                        <button
+                                            class="btn btn-warning"
+                                            on:click=move |_| set_show_challenge.update(|s| *s = !*s)
+                                        >
+                                            {move || if show_challenge.get() { "Cancel" } else { "Challenge this claim" }}
+                                        </button>
+                                        <div style=move || if show_challenge.get() { "display: block" } else { "display: none" }>
+                                            <form class="create-form" on:submit=on_challenge>
+                                                <div class="form-field">
+                                                    <label>"Reason for challenge"</label>
+                                                    <textarea class="form-input" rows="3"
+                                                        placeholder="Explain why this claim should be challenged..."
+                                                        prop:value=move || reason.get()
+                                                        on:input=move |ev| set_reason.set(event_target_value(&ev))
+                                                    />
+                                                </div>
+                                                <button type="submit" class="btn btn-primary" disabled=move || !can_challenge.get()>
+                                                    "Submit Challenge"
+                                                </button>
+                                            </form>
+                                        </div>
+                                    </div>
+                                }
+                            }
                         </div>
                     }.into_any()
                 }

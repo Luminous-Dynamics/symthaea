@@ -86,6 +86,7 @@ fn AppInner() -> impl IntoView {
         NavLink { href: "/browse", label: "Claims", icon: Some("📋") },
         NavLink { href: "/fact-check", label: "Fact Check", icon: Some("✓") },
         NavLink { href: "/inferences", label: "Inferences", icon: Some("🔗") },
+        NavLink { href: "/submit", label: "Submit", icon: Some("\u{270f}") },
         NavLink { href: "/profile", label: "Profile", icon: Some("👤") },
     ];
 
@@ -104,6 +105,7 @@ fn AppInner() -> impl IntoView {
                     <Route path=path!("/claim/:id") view=pages::ClaimDetailPage />
                     <Route path=path!("/fact-check") view=pages::FactCheckPage />
                     <Route path=path!("/inferences") view=pages::InferencesPage />
+                    <Route path=path!("/submit") view=pages::SubmitPage />
                     <Route path=path!("/profile") view=pages::ProfilePage />
                 </Routes>
             </AppShell>

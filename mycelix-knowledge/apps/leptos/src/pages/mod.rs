@@ -7,6 +7,7 @@ mod claim_detail;
 mod fact_check;
 mod inferences;
 mod profile;
+mod submit;
 
 pub use home::HomePage;
 pub use browse::BrowsePage;
@@ -14,3 +15,4 @@ pub use claim_detail::ClaimDetailPage;
 pub use fact_check::FactCheckPage;
 pub use inferences::InferencesPage;
 pub use profile::ProfilePage;
+pub use submit::SubmitPage;
