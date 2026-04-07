@@ -84,6 +84,44 @@ pub fn ProjectsPage() -> impl IntoView {
                 </div>
             </div>
 
+            // Project map — SA outline with project dots
+            <div class="project-map-container">
+                <svg viewBox="0 0 400 360" class="project-map" xmlns="http://www.w3.org/2000/svg">
+                    // Simplified SA outline
+                    <path class="sa-outline" d="M160,20 L240,15 L310,30 L350,70 L370,130 L380,200 L360,260 L320,310 L260,340 L200,350 L140,330 L100,300 L60,250 L30,190 L25,130 L40,80 L80,40 Z" />
+                    // Lesotho
+                    <ellipse class="lesotho" cx="280" cy="250" rx="20" ry="15" />
+                    // Project dots (reactive)
+                    {move || ctx.projects.get().iter().map(|p| {
+                        // Map lat/lon to SVG coordinates (rough SA bounds: lat -22 to -35, lon 16 to 33)
+                        let lat = p.location.latitude;
+                        let lon = p.location.longitude;
+                        let x = ((lon - 16.0) / (33.0 - 16.0) * 360.0 + 20.0) as f32;
+                        let y = ((lat - (-22.0)) / (-35.0 - (-22.0)) * 320.0 + 20.0) as f32;
+                        let r = match p.status {
+                            climate_leptos_types::ProjectStatus::Active => 8.0,
+                            climate_leptos_types::ProjectStatus::Completed => 7.0,
+                            climate_leptos_types::ProjectStatus::Proposed => 5.0,
+                            _ => 6.0,
+                        };
+                        let color = match p.project_type {
+                            climate_leptos_types::ProjectType::Reforestation => "#6abf69",
+                            climate_leptos_types::ProjectType::RenewableEnergy => "#e8c547",
+                            climate_leptos_types::ProjectType::OceanRestoration => "#5ba0c9",
+                            climate_leptos_types::ProjectType::MethaneCapture => "#d4a574",
+                            _ => "#4ecdc4",
+                        };
+                        let name = p.name.clone();
+                        view! {
+                            <circle cx=x.to_string() cy=y.to_string() r=r.to_string() fill=color opacity="0.85" class="project-dot">
+                                <title>{name}</title>
+                            </circle>
+                            <circle cx=x.to_string() cy=y.to_string() r=(r + 3.0).to_string() fill="none" stroke=color stroke-width="1" opacity="0.3" class="project-dot-ring" />
+                        }
+                    }).collect_view()}
+                </svg>
+            </div>
+
             // Create project button + form (gated by Praxis credential)
             <div class="action-section">
                 {move || if !has_credential.get() {
