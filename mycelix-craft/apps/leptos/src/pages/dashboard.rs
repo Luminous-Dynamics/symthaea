@@ -21,9 +21,41 @@ pub fn DashboardPage() -> impl IntoView {
                     <a href="/credentials" class="btn-secondary">"View Credentials"</a>
                 </div>
                 <div class="dash-card">
-                    <h3>"Guild Memberships"</h3>
+                    <h3>
+                        "Guild Memberships "
+                        <span class="consciousness-tooltip" tabindex="0">
+                            <span class="tooltip-icon">"?"</span>
+                            <span class="tooltip-content">
+                                "Guilds use consciousness scores to gate roles. "
+                                "Higher scores unlock more authority — "
+                                "like earning mastery in a craft guild."
+                                <div class="tier-list">
+                                    <div class="tier-row">
+                                        <span class="tier-name">"Observer"</span>
+                                        <span class="tier-score">"0.1+"</span>
+                                    </div>
+                                    <div class="tier-row">
+                                        <span class="tier-name">"Apprentice"</span>
+                                        <span class="tier-score">"0.3+"</span>
+                                    </div>
+                                    <div class="tier-row">
+                                        <span class="tier-name">"Journeyman"</span>
+                                        <span class="tier-score">"0.5+"</span>
+                                    </div>
+                                    <div class="tier-row">
+                                        <span class="tier-name">"Master"</span>
+                                        <span class="tier-score">"0.75+"</span>
+                                    </div>
+                                    <div class="tier-row">
+                                        <span class="tier-name">"Elder"</span>
+                                        <span class="tier-score">"0.9+"</span>
+                                    </div>
+                                </div>
+                            </span>
+                        </span>
+                    </h3>
                     <p class="dash-stat">{move || craft.guilds.get().len()}</p>
-                    <p class="text-secondary">"Consciousness-gated professional federations"</p>
+                    <p class="text-secondary">"Professional federations with mastery-based progression"</p>
                 </div>
                 <div class="dash-card">
                     <h3>"Connections"</h3>

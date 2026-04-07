@@ -783,6 +783,99 @@ h3 {
     border-radius: var(--radius);
 }
 
+/* Network stat cards */
+.stat-cards {
+    display: flex;
+    gap: 0.75rem;
+    margin-bottom: 1.25rem;
+    flex-wrap: wrap;
+}
+.stat-card {
+    flex: 1;
+    min-width: 80px;
+    text-align: center;
+    padding: 0.75rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+}
+.stat-card .stat-value {
+    font-size: 1.8rem;
+    font-weight: 800;
+    color: var(--primary-light);
+    line-height: 1.2;
+}
+.stat-card .stat-label {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+}
+
+/* Network actions */
+.network-actions {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+    margin-bottom: 1.25rem;
+    flex-wrap: wrap;
+}
+
+/* Consciousness tooltip */
+.consciousness-tooltip {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    cursor: help;
+}
+.consciousness-tooltip .tooltip-icon {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--surface-hover);
+    color: var(--text-muted);
+    font-size: 0.65rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+}
+.consciousness-tooltip .tooltip-content {
+    display: none;
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 0.75rem;
+    background: var(--surface-raised);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-sm);
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    width: 280px;
+    z-index: 50;
+    box-shadow: var(--shadow);
+    line-height: 1.5;
+}
+.consciousness-tooltip:hover .tooltip-content,
+.consciousness-tooltip:focus .tooltip-content {
+    display: block;
+}
+.tier-list {
+    margin-top: 0.5rem;
+    font-size: 0.75rem;
+}
+.tier-list .tier-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.15rem 0;
+    border-bottom: 1px solid var(--border);
+}
+.tier-list .tier-row:last-child { border-bottom: none; }
+.tier-list .tier-name { font-weight: 600; }
+.tier-list .tier-score { color: var(--text-muted); }
+
 /* Loading */
 .loading-bar {
     padding: 0.75rem;
