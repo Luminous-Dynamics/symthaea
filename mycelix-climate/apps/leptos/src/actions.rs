@@ -144,7 +144,7 @@ pub fn record_footprint(
     if hc.is_mock() {
         ctx.footprints.update(|fps| {
             fps.push(CarbonFootprintView {
-                entity_did: "did:mycelix:user-001".into(),
+                entity_did: mycelix_leptos_core::local_did(),
                 period_start: (js_sys::Date::now() / 1000.0) as i64,
                 period_end: (js_sys::Date::now() / 1000.0) as i64 + 31536000,
                 scope1, scope2, scope3,
@@ -170,7 +170,7 @@ pub fn record_footprint(
             }
             let now = (js_sys::Date::now() / 1000.0) as i64;
             let input = Input {
-                entity_did: "did:mycelix:user-001".into(),
+                entity_did: mycelix_leptos_core::local_did(),
                 period_start: now, period_end: now + 31536000,
                 scope1, scope2, scope3,
                 methodology,

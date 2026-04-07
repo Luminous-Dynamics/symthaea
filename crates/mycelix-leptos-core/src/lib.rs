@@ -62,6 +62,7 @@ pub mod badge;
 pub mod cluster_launcher;
 pub mod indlela;
 pub mod spore_bridge;
+pub mod local_identity;
 
 // --- Reactive systems ---
 pub mod theme;
@@ -117,6 +118,7 @@ pub use badge::{Badge, BadgeVariant, StatusDot};
 pub use cluster_launcher::{ClusterLauncher, ClusterLink, default_clusters};
 pub use indlela::{GrowthStage, community_warmth, knowledge_freshness};
 pub use spore_bridge::{SporeState, provide_spore_bridge, use_spore};
+pub use local_identity::{LocalIdentity, local_did, provide_local_identity, use_local_identity, load_json, save_json};
 
 // Re-exports — utilities
 pub use util::{set_css_var, set_root_attribute};

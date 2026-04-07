@@ -78,6 +78,7 @@ fn AppInner() -> impl IntoView {
     provide_toast_context();
     provide_homeostasis_context(2, "--homeostasis");
     provide_i18n("climate-lang");
+    mycelix_leptos_core::provide_local_identity();
     provide_climate_context();
     init_consciousness_ui();
 
