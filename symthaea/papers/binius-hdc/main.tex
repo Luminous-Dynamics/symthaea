@@ -313,7 +313,15 @@ The 34.1~ms total latency is compatible with clinical workflow requirements ($<$
 
 \subsection{Winterfell Range Proofs (Health)}
 
-To validate the real-proof infrastructure, we also implemented Winterfell STARK range proofs for health attestations (proving a value $\in [min, max]$ via bit decomposition). These pass 6 end-to-end tests including boundary conditions and tampered-bounds rejection.
+We implemented Winterfell STARK range proofs for health attestations (proving value $\in [min, max]$ via bit decomposition) with 6 end-to-end tests. A consciousness tier range proof (proving $\Phi \geq$ threshold without revealing $\Phi$) takes 46~ms. Hamming similarity (511 AND for 16,384 bits, 498~ms) completes all four HDC operations.
+
+\subsection{Triple-Stack: Encrypted Federated Learning}
+
+OTP encryption (XOR with mask) is free in Binius. We prove encrypted gradient aggregation from $N$ participants with \textbf{zero encryption overhead}: 3 participants (192 AND, 58~ms), 8 (512 AND, 88~ms), 16 (1,024 AND, 91~ms). The Binius verifier compiles to WASM (694~KB), enabling in-zome verification.
+
+\subsection{Applications}
+
+\textbf{Healthcare (HIPAA 2026):} 34.1~ms pipeline for health attestations. \textbf{Digital Identity (eIDAS 2.0):} W3C VC 2.0 with \texttt{dastark-2026} cryptosuite for selective disclosure + Dilithium5 PQ signatures. \textbf{EU Digital Product Passport:} Categorical compliance attestations (conflict-free, recyclable content $\geq$ 70\%) via binary STARKs. System deployed on Holochain conductor with 9 hApps.
 
 % ============================================================================
 \section{Related Work}
