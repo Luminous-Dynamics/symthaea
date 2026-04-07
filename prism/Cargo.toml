@@ -16,6 +16,7 @@ members = [
     "prism-proxy",
     "prism-tauri",
     "prism-serve",
+    "prism-zkp",
 ]
 
 [workspace.package]

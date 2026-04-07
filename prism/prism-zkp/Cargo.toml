@@ -1,0 +1,13 @@
+[package]
+name = "prism-zkp"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Verifiable epistemic search — ZKP proofs for search ranking and similarity"
+
+[dependencies]
+prism-common = { path = "../prism-common" }
+prism-search = { path = "../prism-search" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+sha2 = "0.10"
