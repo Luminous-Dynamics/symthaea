@@ -70,6 +70,11 @@ pub fn tag_identity_disclosure() -> DomainTag {
     DomainTag::new("Identity", "SelectiveDisclosure", 1)
 }
 
+/// Consciousness: Tier verification (used by 6+ clusters).
+pub fn tag_consciousness_tier() -> DomainTag {
+    DomainTag::new("Consciousness", "TierProof", 1)
+}
+
 /// Finance: Transaction privacy.
 pub fn tag_finance_tx() -> DomainTag {
     DomainTag::new("Finance", "TxPrivacy", 1)
