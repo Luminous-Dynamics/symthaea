@@ -244,6 +244,9 @@ struct ClientMessage {
     keyboard: String,       // e.g., "us", "de", "dvorak"
     #[serde(default)]
     user_password: String,  // User account password (set via chpasswd after install)
+    /// Additional disks for RAID/ZFS multi-disk layouts (comma-separated or JSON array)
+    #[serde(default)]
+    extra_disks: Vec<String>,
 }
 
 fn default_port() -> u16 {
@@ -447,6 +450,49 @@ fn generate_system_config(msg: &ClientMessage) -> String {
     config
 }
 
+/// Generate boot mode detection + partitioning commands.
+/// Returns a shell snippet that sets BOOT_MODE=efi|bios and creates boot partition accordingly.
+fn boot_mode_detection() -> &'static str {
+    r#"
+# ── Boot Mode Detection ──
+if [ -d /sys/firmware/efi ]; then
+  BOOT_MODE="efi"
+  echo "  Boot mode: EFI/UEFI"
+else
+  BOOT_MODE="bios"
+  echo "  Boot mode: Legacy BIOS (GRUB will be used)"
+fi
+"#
+}
+
+/// Generate shell commands that write the correct bootloader config to configuration.nix.
+/// Called after nixos-generate-config, patches the bootloader section based on detected boot mode.
+fn bootloader_patch_commands(disk_var: &str) -> String {
+    format!(r#"
+# Patch bootloader config based on detected boot mode
+if [ "$BOOT_MODE" = "bios" ]; then
+  echo "  Configuring GRUB for BIOS boot..."
+  sed -i 's|boot.loader.systemd-boot.enable = true|boot.loader.grub.enable = true|' /mnt/etc/nixos/configuration.nix 2>/dev/null || true
+  sed -i '/boot.loader.grub.enable/a\  boot.loader.grub.device = "{disk}";' /mnt/etc/nixos/configuration.nix 2>/dev/null || true
+  sed -i '/canTouchEfiVariables/d' /mnt/etc/nixos/configuration.nix 2>/dev/null || true
+fi
+"#, disk = disk_var)
+}
+
+/// Generate boot partition creation commands based on boot mode.
+/// EFI: 512MB FAT32 ESP. BIOS: 1MB BIOS boot + 512MB ext4 /boot.
+fn boot_partition_commands(disk_var: &str, boot_part_num: u32) -> String {
+    format!(r#"
+if [ "$BOOT_MODE" = "efi" ]; then
+  sgdisk -n {n}:0:+512M -t {n}:EF00 -c {n}:boot "{disk}"
+else
+  # BIOS: create BIOS boot partition (1MB) + /boot partition (512MB)
+  sgdisk -n {n}:0:+1M -t {n}:EF02 -c {n}:bios-boot "{disk}"
+  sgdisk -n {next}:0:+512M -t {next}:8300 -c {next}:boot "{disk}"
+fi
+"#, n = boot_part_num, next = boot_part_num + 1, disk = disk_var)
+}
+
 /// Generate a shell snippet that patches configuration.nix with system config (DE, GPU, locale).
 /// Appended after the configuration.nix heredoc in each layout.
 fn system_config_patch(msg: &ClientMessage) -> String {
@@ -607,12 +653,41 @@ DISK="{disk}"
 
 # Safety: Check for BitLocker
 echo "STAGE: Checking for BitLocker..."
-if blkid "$DISK"* 2>/dev/null | grep -qi bitlocker; then
-  echo "WARNING: BitLocker encryption detected on this disk."
-  echo "WARNING: Modifying the partition table may trigger BitLocker recovery."
-  echo "WARNING: Ensure you have your BitLocker recovery key before proceeding."
-  echo "WARNING: Consider shrinking the Windows partition from within Windows first."
-fi
+BITLOCKER_DETECTED=false
+for PART in $(blkid -o device "$DISK"* 2>/dev/null); do
+  if blkid "$PART" 2>/dev/null | grep -qi bitlocker; then
+    BITLOCKER_DETECTED=true
+    echo "BITLOCKER_DETECTED: $PART"
+    echo ""
+    echo "================================================================"
+    echo "  BITLOCKER ENCRYPTION DETECTED on $PART"
+    echo "================================================================"
+    echo ""
+    echo "  Before proceeding, you MUST:"
+    echo ""
+    echo "  1. FIND YOUR RECOVERY KEY — you will need it if BitLocker"
+    echo "     activates during partition changes."
+    echo ""
+    echo "     Where to find it:"
+    echo "     - Microsoft account: https://account.microsoft.com/devices/recoverykey"
+    echo "     - Azure AD: Check with your IT administrator"
+    echo "     - Printout: Check papers from when you set up this PC"
+    echo "     - USB drive: Check USB drives used during BitLocker setup"
+    echo ""
+    echo "  2. RECOMMENDED: Boot into Windows and SUSPEND BitLocker first:"
+    echo "     Settings > Privacy & Security > Device Encryption > Turn Off"
+    echo "     (or: manage-bde -protectors -disable C: from Admin CMD)"
+    echo ""
+    echo "  3. ALTERNATIVE: Shrink Windows partition from within Windows:"
+    echo "     Settings > System > Storage > Advanced > Disks & volumes"
+    echo "     Select C: > Shrink > Enter desired free space (min 40GB)"
+    echo ""
+    echo "  The install will continue, but if BitLocker recovery triggers,"
+    echo "  you will need your recovery key to access Windows again."
+    echo "================================================================"
+    echo ""
+  fi
+done
 
 # Step 1: Find unallocated space on the disk
 echo "STAGE: Detecting free space on {disk}..."
@@ -624,9 +699,83 @@ echo "Last partition ends at sector $LAST_END, disk ends at $DISK_END"
 echo "Free space: ~${{FREE_GB}}GB ($FREE_SECTORS sectors)"
 
 if [ "$FREE_GB" -lt 20 ]; then
-  echo "ERROR: Less than 20GB free space available (${{FREE_GB}}GB)."
-  echo "ERROR: Shrink existing partitions from within the original OS first."
-  exit 1
+  echo "STAGE: Attempting automatic NTFS partition shrink..."
+  # Find the largest NTFS partition (likely Windows C:)
+  NTFS_PART=""
+  NTFS_SIZE=0
+  for PART in $(lsblk -rno NAME,FSTYPE "$DISK" 2>/dev/null | awk '$2=="ntfs"{{print "/dev/"$1}}'); do
+    SZ=$(blockdev --getsize64 "$PART" 2>/dev/null || echo 0)
+    if [ "$SZ" -gt "$NTFS_SIZE" ]; then
+      NTFS_SIZE=$SZ
+      NTFS_PART=$PART
+    fi
+  done
+
+  if [ -n "$NTFS_PART" ] && [ "$BITLOCKER_DETECTED" = false ] && command -v ntfsresize >/dev/null 2>&1; then
+    echo "  Found NTFS partition: $NTFS_PART ($((NTFS_SIZE / 1073741824))GB)"
+    # Check NTFS consistency first
+    ntfsfix -n "$NTFS_PART" 2>/dev/null || true
+    # Get used space from ntfsinfo
+    NTFS_USED=$(ntfsresize --info --force "$NTFS_PART" 2>/dev/null | grep "resize at" | grep -oP '[0-9]+' | tail -1 || echo "0")
+    if [ "$NTFS_USED" -gt 0 ]; then
+      # New size = used + 20% headroom + 10GB safety margin (whichever is larger)
+      HEADROOM_20=$((NTFS_USED * 20 / 100))
+      MIN_HEADROOM=$((10 * 1024 * 1024 * 1024))
+      HEADROOM=$((HEADROOM_20 > MIN_HEADROOM ? HEADROOM_20 : MIN_HEADROOM))
+      NEW_SIZE=$((NTFS_USED + HEADROOM))
+      # Safety: never shrink below 50% of original
+      HALF=$((NTFS_SIZE / 2))
+      [ "$NEW_SIZE" -lt "$HALF" ] && NEW_SIZE=$HALF
+      NEW_GB=$((NEW_SIZE / 1073741824))
+      FREED_GB=$(((NTFS_SIZE - NEW_SIZE) / 1073741824))
+      echo "  Used: $((NTFS_USED / 1073741824))GB, New size: ${{NEW_GB}}GB (freeing ~${{FREED_GB}}GB)"
+      echo "  Running dry-run first..."
+      if ntfsresize --no-action --size "$NEW_SIZE" "$NTFS_PART" 2>&1; then
+        echo "  Dry-run passed. Resizing NTFS partition..."
+        ntfsresize --force --size "$NEW_SIZE" "$NTFS_PART" 2>&1
+        # Shrink the partition table entry to match
+        PART_NUM=$(echo "$NTFS_PART" | grep -oP '[0-9]+$')
+        NEW_SECTORS=$((NEW_SIZE / 512))
+        echo "  Updating partition table (partition $PART_NUM to $NEW_SECTORS sectors)..."
+        # Use sgdisk to delete and recreate the partition at the new size
+        PART_START=$(sgdisk -i "$PART_NUM" "$DISK" 2>/dev/null | grep "First sector" | awk '{{print $3}}')
+        PART_TYPE=$(sgdisk -i "$PART_NUM" "$DISK" 2>/dev/null | grep "Partition GUID code" | awk '{{print $4}}')
+        PART_NAME=$(sgdisk -i "$PART_NUM" "$DISK" 2>/dev/null | grep "Partition name" | cut -d"'" -f2)
+        if [ -n "$PART_START" ]; then
+          sgdisk -d "$PART_NUM" "$DISK" 2>/dev/null
+          sgdisk -n "$PART_NUM:$PART_START:+$NEW_SECTORS" -t "$PART_NUM:0700" -c "$PART_NUM:$PART_NAME" "$DISK" 2>/dev/null
+          partprobe "$DISK" 2>/dev/null || true
+          udevadm settle 2>/dev/null || true
+          echo "  NTFS partition shrunk successfully. Rechecking free space..."
+        fi
+        # Recheck free space
+        LAST_END=$(sgdisk -p "$DISK" 2>/dev/null | grep '^ ' | tail -1 | awk '{{print $3}}')
+        FREE_SECTORS=$((DISK_END - LAST_END - 34))
+        FREE_GB=$((FREE_SECTORS * 512 / 1073741824))
+        echo "  Free space after shrink: ~${{FREE_GB}}GB"
+      else
+        echo "  Dry-run FAILED — partition cannot be safely shrunk."
+        echo "  Please shrink from within Windows instead."
+      fi
+    else
+      echo "  Could not determine NTFS used space. Manual shrink required."
+    fi
+  elif [ "$BITLOCKER_DETECTED" = true ]; then
+    echo "  Cannot auto-shrink: BitLocker is active. Suspend BitLocker in Windows first."
+  elif [ -z "$NTFS_PART" ]; then
+    echo "  No NTFS partition found to shrink."
+  else
+    echo "  ntfsresize not available on this ISO."
+  fi
+
+  # Final check after potential shrink
+  if [ "$FREE_GB" -lt 20 ]; then
+    echo "ERROR: Still less than 20GB free space (${{FREE_GB}}GB)."
+    echo "ERROR: Boot into Windows and shrink the C: partition:"
+    echo "  Settings > System > Storage > Advanced > Disks & volumes"
+    echo "  Select C: drive > Shrink > Enter at least 40GB"
+    exit 1
+  fi
 fi
 
 # Step 2: Create NixOS partition in the free space (do NOT resize existing partitions)
@@ -1650,6 +1799,236 @@ echo "COMPLETE"
             script
         }
 
+        // ── Multi-disk RAID layouts ──
+
+        "raid5-mdadm" | "raid6-mdadm" | "raid10-mdadm" => {
+            let raid_level = match msg.layout.as_str() {
+                "raid5-mdadm" => "5",
+                "raid6-mdadm" => "6",
+                "raid10-mdadm" => "10",
+                _ => unreachable!(),
+            };
+            let min_disks: usize = match raid_level {
+                "5" => 3,
+                "6" | "10" => 4,
+                _ => 3,
+            };
+            // Collect all disks: primary disk + extra_disks
+            let mut all_disks = vec![msg.disk.clone()];
+            all_disks.extend(msg.extra_disks.iter().cloned());
+            if all_disks.len() < min_disks {
+                return format!(
+                    "echo 'ERROR: RAID{} requires at least {} disks, got {}'; exit 1",
+                    raid_level, min_disks, all_disks.len()
+                );
+            }
+            let disk_list = all_disks.join(" ");
+            let n_disks = all_disks.len();
+
+            let mut script = format!(r#"set -eo pipefail
+echo "=== Symthaea Sovereign Birth: RAID{level} (mdadm, {n} disks) ==="
+{boot_detect}
+
+# Step 1: Wipe all disks and create partitions
+echo "STAGE: Partitioning {n} disks..."
+for DISK in {disks}; do
+  umount -R /mnt 2>/dev/null || true
+  wipefs -af "$DISK" 2>/dev/null || true
+  sgdisk --zap-all "$DISK"
+  sgdisk -n 1:0:+512M -t 1:EF00 -c 1:boot "$DISK"
+  sgdisk -n 2:0:0 -t 2:FD00 -c 2:raid "$DISK"
+done
+partprobe 2>/dev/null || true
+udevadm settle 2>/dev/null || true
+sleep 3
+
+# Build partition list for mdadm
+RAID_PARTS=""
+BOOT_PART=""
+for DISK in {disks}; do
+  if [ -b "${{DISK}}p2" ]; then
+    RAID_PARTS="$RAID_PARTS ${{DISK}}p2"
+    [ -z "$BOOT_PART" ] && BOOT_PART="${{DISK}}p1"
+  else
+    RAID_PARTS="$RAID_PARTS ${{DISK}}2"
+    [ -z "$BOOT_PART" ] && BOOT_PART="${{DISK}}1"
+  fi
+done
+
+# Step 2: Create mdadm array
+echo "STAGE: Creating RAID{level} array with {n} disks..."
+mdadm --create /dev/md0 --level={level} --raid-devices={n} --metadata=1.2 --run $RAID_PARTS
+cat /proc/mdstat
+
+# Step 3: Format
+echo "STAGE: Formatting..."
+mkfs.vfat -F 32 "$BOOT_PART"
+mkfs.btrfs -f -L nixos /dev/md0
+
+# Step 4: Mount
+echo "STAGE: Mounting filesystems..."
+mount /dev/md0 /mnt
+btrfs subvolume create /mnt/@
+btrfs subvolume create /mnt/@home
+btrfs subvolume create /mnt/@nix
+btrfs subvolume create /mnt/@log
+btrfs subvolume create /mnt/@swap
+umount /mnt
+mount -o subvol=@,compress=zstd:3,noatime /dev/md0 /mnt
+mkdir -p /mnt/{{boot,home,nix,var/log,swap,etc/nixos}}
+mount "$BOOT_PART" /mnt/boot
+mount -o subvol=@home,compress=zstd:3,noatime /dev/md0 /mnt/home
+mount -o subvol=@nix,compress=zstd:3,noatime /dev/md0 /mnt/nix
+mount -o subvol=@log,compress=zstd:3,noatime /dev/md0 /mnt/var/log
+
+# Step 5: Generate config + save mdadm
+echo "STAGE: Generating configuration..."
+nixos-generate-config --root /mnt
+mdadm --detail --scan >> /mnt/etc/mdadm.conf 2>/dev/null || true
+"#, level = raid_level, n = n_disks, disks = disk_list, boot_detect = boot_mode_detection());
+
+            let fallback_config = format!(
+                "{{ config, pkgs, ... }}:\n{{\n  imports = [ ./hardware-configuration.nix ];\n  \
+                 networking.hostName = \"{hostname}\";\n  \
+                 boot.loader.systemd-boot.enable = true;\n  \
+                 boot.loader.efi.canTouchEfiVariables = true;\n  \
+                 boot.swraid.enable = true;\n  \
+                 services.openssh.enable = true;\n  \
+                 users.users.{hostname} = {{ isNormalUser = true; extraGroups = [ \"wheel\" ]; initialPassword = \"changeme\"; }};\n  \
+                 system.stateVersion = \"25.05\";\n}}",
+                hostname = hostname
+            );
+            script.push_str(&config_write_commands(
+                &msg.configuration_nix,
+                &fallback_config,
+                &msg.flake_nix,
+                session_id,
+            ));
+            script.push_str(r#"
+echo "STAGE: Installing NixOS..."
+nixos-install --no-root-passwd 2>&1
+echo "STAGE: Verifying..."
+echo "COMPLETE"
+"#);
+            script
+        }
+
+        // ── ZFS multi-disk layouts ──
+
+        "zfs-mirror" | "zfs-raidz" | "zfs-raidz2" => {
+            let zfs_type = match msg.layout.as_str() {
+                "zfs-mirror" => "mirror",
+                "zfs-raidz" => "raidz",
+                "zfs-raidz2" => "raidz2",
+                _ => unreachable!(),
+            };
+            let min_disks: usize = match zfs_type {
+                "mirror" => 2,
+                "raidz" => 3,
+                "raidz2" => 4,
+                _ => 2,
+            };
+            let mut all_disks = vec![msg.disk.clone()];
+            all_disks.extend(msg.extra_disks.iter().cloned());
+            if all_disks.len() < min_disks {
+                return format!(
+                    "echo 'ERROR: ZFS {} requires at least {} disks, got {}'; exit 1",
+                    zfs_type, min_disks, all_disks.len()
+                );
+            }
+            let disk_list = all_disks.join(" ");
+            let n_disks = all_disks.len();
+
+            let mut script = format!(r#"set -eo pipefail
+echo "=== Symthaea Sovereign Birth: ZFS {ztype} ({n} disks) ==="
+{boot_detect}
+
+# Step 1: Wipe all disks and create partitions
+echo "STAGE: Partitioning {n} disks..."
+ZFS_PARTS=""
+BOOT_PART=""
+for DISK in {disks}; do
+  umount -R /mnt 2>/dev/null || true
+  wipefs -af "$DISK" 2>/dev/null || true
+  sgdisk --zap-all "$DISK"
+  sgdisk -n 1:0:+512M -t 1:EF00 -c 1:boot "$DISK"
+  sgdisk -n 2:0:0 -t 2:BF00 -c 2:zfs "$DISK"
+  if [ -b "${{DISK}}p2" ]; then
+    ZFS_PARTS="$ZFS_PARTS ${{DISK}}p2"
+    [ -z "$BOOT_PART" ] && BOOT_PART="${{DISK}}p1"
+  else
+    ZFS_PARTS="$ZFS_PARTS ${{DISK}}2"
+    [ -z "$BOOT_PART" ] && BOOT_PART="${{DISK}}1"
+  fi
+done
+partprobe 2>/dev/null || true
+udevadm settle 2>/dev/null || true
+sleep 3
+
+# Step 2: Create ZFS pool
+echo "STAGE: Creating ZFS {ztype} pool..."
+HOSTID=$(head -c 4 /dev/urandom | od -An -tx4 | tr -d ' ')
+zpool create -f -o ashift=12 -o autotrim=on \
+  -O acltype=posixacl -O compression=zstd -O dnodesize=auto \
+  -O normalization=formD -O relatime=on -O xattr=sa \
+  -O mountpoint=none \
+  rpool {ztype} $ZFS_PARTS
+
+# Step 3: Create datasets
+echo "STAGE: Creating ZFS datasets..."
+zfs create -o mountpoint=legacy rpool/root
+zfs create -o mountpoint=legacy rpool/home
+zfs create -o mountpoint=legacy rpool/nix
+zfs create -o mountpoint=legacy rpool/var
+zfs create -o mountpoint=legacy rpool/var/log
+zfs create -V 8G rpool/swap
+mkswap /dev/zvol/rpool/swap
+
+# Step 4: Mount
+echo "STAGE: Mounting filesystems..."
+mkfs.vfat -F 32 "$BOOT_PART"
+mount -t zfs rpool/root /mnt
+mkdir -p /mnt/{{boot,home,nix,var/log,etc/nixos}}
+mount "$BOOT_PART" /mnt/boot
+mount -t zfs rpool/home /mnt/home
+mount -t zfs rpool/nix /mnt/nix
+mount -t zfs rpool/var /mnt/var
+mount -t zfs rpool/var/log /mnt/var/log
+
+# Step 5: Generate config
+echo "STAGE: Generating configuration..."
+nixos-generate-config --root /mnt
+"#, ztype = zfs_type, n = n_disks, disks = disk_list, boot_detect = boot_mode_detection());
+
+            let fallback_config = format!(
+                "{{ config, pkgs, ... }}:\n{{\n  imports = [ ./hardware-configuration.nix ];\n  \
+                 networking.hostName = \"{hostname}\";\n  \
+                 networking.hostId = \"$(head -c 4 /dev/urandom | od -An -tx4 | tr -d ' ')\";\n  \
+                 boot.loader.systemd-boot.enable = true;\n  \
+                 boot.loader.efi.canTouchEfiVariables = true;\n  \
+                 boot.supportedFilesystems = [ \"zfs\" ];\n  \
+                 services.zfs.autoScrub.enable = true;\n  \
+                 services.openssh.enable = true;\n  \
+                 users.users.{hostname} = {{ isNormalUser = true; extraGroups = [ \"wheel\" ]; initialPassword = \"changeme\"; }};\n  \
+                 system.stateVersion = \"25.05\";\n}}",
+                hostname = hostname
+            );
+            script.push_str(&config_write_commands(
+                &msg.configuration_nix,
+                &fallback_config,
+                &msg.flake_nix,
+                session_id,
+            ));
+            script.push_str(r#"
+echo "STAGE: Installing NixOS..."
+nixos-install --no-root-passwd 2>&1
+echo "STAGE: Verifying..."
+zpool status rpool
+echo "COMPLETE"
+"#);
+            script
+        }
+
         _ => format!("echo 'Unknown layout: {}'; exit 1", msg.layout),
     }
 }
@@ -2083,6 +2462,16 @@ async fn handle_connection_ws<S: tokio::io::AsyncRead + tokio::io::AsyncWrite + 
                     }
                 }
 
+                // Validate extra disks for RAID/ZFS multi-disk layouts
+                for extra_disk in &client_msg.extra_disks {
+                    if let Err(e) = validate_disk_path(extra_disk) {
+                        let _ = ws_tx.send(Message::Text(
+                            RelayMessage::error(&format!("Invalid extra disk: {}", e)).to_json(),
+                        )).await;
+                        continue;
+                    }
+                }
+
                 // Generate session-isolated log path (CRITICAL-4: prevents cross-session log tampering)
                 let session_id: u64 = std::time::SystemTime::now()
                     .duration_since(std::time::UNIX_EPOCH)
@@ -2465,6 +2854,117 @@ fi
             }
 
             // ── Comprehensive hardware probe ──
+            // ── Pre-install validation checklist ──
+            "pre_install_check" => {
+                eprintln!("[{}] Running pre-install checks...", peer_addr);
+                let disk = client_msg.disk.clone();
+                let check_script = format!(r#"
+echo '{{"checks": ['
+
+# 1. EFI vs BIOS
+if [ -d /sys/firmware/efi ]; then
+  echo '{{"name":"boot_mode","status":"pass","detail":"EFI/UEFI detected — systemd-boot will be used"}},'
+else
+  echo '{{"name":"boot_mode","status":"warn","detail":"Legacy BIOS detected — GRUB will be used (limited features)"}},'
+fi
+
+# 2. RAM check
+RAM_MB=$(free -m | awk '/Mem:/{{print $2}}')
+if [ "$RAM_MB" -ge 4096 ]; then
+  echo "{{"name":"ram","status":"pass","detail":"${{RAM_MB}}MB RAM — sufficient for any desktop"}},"
+elif [ "$RAM_MB" -ge 2048 ]; then
+  echo "{{"name":"ram","status":"warn","detail":"${{RAM_MB}}MB RAM — use XFCE or Sway for best performance"}},"
+else
+  echo "{{"name":"ram","status":"fail","detail":"${{RAM_MB}}MB RAM — insufficient for graphical desktop. CLI-only recommended"}},"
+fi
+
+# 3. Disk health (SMART)
+if command -v smartctl >/dev/null 2>&1 && [ -n "{disk}" ]; then
+  SMART=$(smartctl -H "{disk}" 2>/dev/null | grep -i "overall" | head -1)
+  if echo "$SMART" | grep -qi "PASSED\|OK"; then
+    echo '{{"name":"disk_health","status":"pass","detail":"SMART: disk healthy"}},'
+  elif [ -z "$SMART" ]; then
+    echo '{{"name":"disk_health","status":"warn","detail":"SMART not supported on this disk"}},'
+  else
+    echo "{{"name":"disk_health","status":"fail","detail":"SMART WARNING: $SMART"}},"
+  fi
+else
+  echo '{{"name":"disk_health","status":"warn","detail":"smartctl not available"}},'
+fi
+
+# 4. BitLocker detection
+BL_FOUND=false
+for PART in $(blkid -o device "{disk}"* 2>/dev/null); do
+  if blkid "$PART" 2>/dev/null | grep -qi bitlocker; then
+    BL_FOUND=true
+    echo "{{"name":"bitlocker","status":"warn","detail":"BitLocker detected on $PART — have your recovery key ready"}},"
+  fi
+done
+if [ "$BL_FOUND" = false ]; then
+  echo '{{"name":"bitlocker","status":"pass","detail":"No BitLocker encryption detected"}},'
+fi
+
+# 5. Free space (for alongside mode)
+FREE_SECTORS=$(sgdisk -p "{disk}" 2>/dev/null | awk '/Total free space/{{print $5}}' || echo "0")
+FREE_GB=$((FREE_SECTORS * 512 / 1073741824))
+if [ "$FREE_GB" -ge 40 ]; then
+  echo "{{"name":"free_space","status":"pass","detail":"${{FREE_GB}}GB free — sufficient for NixOS"}},"
+elif [ "$FREE_GB" -ge 20 ]; then
+  echo "{{"name":"free_space","status":"warn","detail":"${{FREE_GB}}GB free — tight. Consider freeing more space"}},"
+else
+  echo "{{"name":"free_space","status":"fail","detail":"${{FREE_GB}}GB free — insufficient for dual-boot. Shrink existing partitions first"}},"
+fi
+
+# 6. Existing OS detection
+OS_LIST=""
+for PART in $(lsblk -rno NAME,FSTYPE "{disk}" 2>/dev/null | awk '$2~/ntfs|ext4|btrfs|xfs/{{print "/dev/"$1}}'); do
+  MOUNT_DIR=$(mktemp -d)
+  if mount -o ro "$PART" "$MOUNT_DIR" 2>/dev/null; then
+    if [ -d "$MOUNT_DIR/Windows/System32" ]; then
+      OS_LIST="$OS_LIST Windows,"
+    elif [ -f "$MOUNT_DIR/etc/os-release" ]; then
+      OS_NAME=$(grep PRETTY_NAME "$MOUNT_DIR/etc/os-release" | cut -d'"' -f2)
+      OS_LIST="$OS_LIST $OS_NAME,"
+    fi
+    umount "$MOUNT_DIR" 2>/dev/null
+  fi
+  rmdir "$MOUNT_DIR" 2>/dev/null
+done
+if [ -n "$OS_LIST" ]; then
+  echo "{{"name":"existing_os","status":"info","detail":"Detected:$OS_LIST"}},"
+else
+  echo '{{"name":"existing_os","status":"pass","detail":"No existing OS detected on this disk"}},'
+fi
+
+# 7. Network connectivity
+if ping -c1 -W3 cache.nixos.org >/dev/null 2>&1; then
+  echo '{{"name":"network","status":"pass","detail":"Network OK — can reach NixOS cache"}}'
+else
+  echo '{{"name":"network","status":"fail","detail":"Cannot reach cache.nixos.org — install will fail without internet"}}'
+fi
+
+echo ']}}'
+"#, disk = disk);
+                match run_cmd(&check_script).await {
+                    Ok(result) if result.exit_status == 0 => {
+                        let _ = ws_tx.send(Message::Text(format!(
+                            "{{\"type\":\"checklist\",\"data\":{}}}",
+                            result.stdout.trim()
+                        ))).await;
+                    }
+                    Ok(result) => {
+                        let _ = ws_tx.send(Message::Text(
+                            RelayMessage::error(&format!("Pre-install check failed: {}", result.stderr)).to_json(),
+                        )).await;
+                    }
+                    Err(e) => {
+                        let _ = ws_tx.send(Message::Text(
+                            RelayMessage::error(&format!("Pre-install check error: {}", e)).to_json(),
+                        )).await;
+                    }
+                }
+            }
+
             "probe_hardware" => {
                 eprintln!("[{}] Probing hardware...", peer_addr);
 

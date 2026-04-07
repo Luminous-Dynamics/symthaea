@@ -353,7 +353,9 @@ pub fn RemoteInstallPanel(
     let saved_target = load_from_storage("si_target_addr")
         .unwrap_or_else(|| "sovereign-inoculation.local".to_string());
     let (target_addr, set_target_addr) = signal(saved_target);
-    let (ssh_password, set_ssh_password) = signal(String::new());
+    // SSH password restored from sessionStorage (survives page refresh, cleared on tab close)
+    let saved_ssh_pw = load_from_session("si_ssh_password").unwrap_or_default();
+    let (ssh_password, set_ssh_password) = signal(saved_ssh_pw);
     // Advanced mode: allow custom relay URL (hidden by default)
     let show_advanced = RwSignal::new(false);
     let saved_relay_url = load_from_storage("si_relay_url").unwrap_or_default();
@@ -364,6 +366,33 @@ pub fn RemoteInstallPanel(
     let (ssh_host, set_ssh_host) = signal("127.0.0.1".to_string());
     let (ssh_port, set_ssh_port) = signal("22".to_string());
     let (ssh_user, set_ssh_user) = signal("root".to_string());
+
+    // Auto-fill from URL params (QR code pairing from ISO's show-relay-url.service).
+    // URL format: install.nixforhumanity.org/?target=192.168.1.5&token=abc123
+    if let Some(window) = web_sys::window() {
+        if let Ok(search) = window.location().search() {
+            let params = web_sys::UrlSearchParams::new_with_str(&search).ok();
+            if let Some(params) = params {
+                if let Some(target) = params.get("target") {
+                    if !target.is_empty() {
+                        set_target_addr.set(target.clone());
+                        save_to_storage("si_target_addr", &target);
+                    }
+                }
+                if let Some(token) = params.get("token") {
+                    if !token.is_empty() {
+                        set_relay_token.set(token.clone());
+                        save_to_session("si_relay_token", &token);
+                    }
+                }
+                // Auto-connect if both target and token provided via QR
+                if params.get("target").is_some() && params.get("token").is_some() {
+                    // Signal auto-connect (handled by effect below)
+                    relay_state.set(RelayState::Connecting);
+                }
+            }
+        }
+    }
 
     // Store WebSocket in JS global to avoid Send/Sync issues
     fn store_ws(ws: &web_sys::WebSocket) {
@@ -1031,7 +1060,11 @@ pub fn RemoteInstallPanel(
                                     aria-label="Target machine password"
                                     placeholder="sovereign"
                                     prop:value=ssh_password
-                                    on:input=move |ev| set_ssh_password.set(event_target_value(&ev))
+                                    on:input=move |ev| {
+                                        let v = event_target_value(&ev);
+                                        save_to_session("si_ssh_password", &v);
+                                        set_ssh_password.set(v);
+                                    }
                                 />
                             </div>
                         </div>
@@ -1071,7 +1104,24 @@ pub fn RemoteInstallPanel(
 
                         {move || {
                             if let RelayState::Failed(ref msg) = relay_state.get() {
-                                Some(view! { <p class="error-msg">{msg.clone()}</p> })
+                                let msg_clone = msg.clone();
+                                Some(view! {
+                                    <div class="error-recovery">
+                                        <p class="error-msg">{msg_clone}</p>
+                                        <div class="error-actions">
+                                            <button class="btn btn-primary"
+                                                on:click=move |_| {
+                                                    relay_state.set(RelayState::Disconnected);
+                                                    set_install_log.update(|l| l.push("Manual reconnect requested...".into()));
+                                                }
+                                            >"Reconnect"</button>
+                                            <p class="error-hint">
+                                                "If the install was in progress, it may still be running on the target. "
+                                                "Check the target machine's console for status."
+                                            </p>
+                                        </div>
+                                    </div>
+                                })
                             } else { None }
                         }}
                     </div>
