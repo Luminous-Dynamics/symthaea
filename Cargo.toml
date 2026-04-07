@@ -54,6 +54,7 @@ members = [
     "crates/symthaea-neuroevolution",
     "crates/symthaea-jepa",
     "crates/symthaea-materials",
+    "crates/symthaea-bandgap",
     "crates/symthaea-gravcraft",
     "crates/symthaea-nuclear",
     "crates/symthaea-physics-catalog",

@@ -12316,10 +12316,32 @@ checksum = "b4596b6d070b27117e987119b4dac604f3c58cfb0b191112e24771b2faeac1a6"
 [[package]]
 name = "plexus-common"
 version = "0.1.0"
+dependencies = [
+ "serde",
+ "thiserror 2.0.18",
+ "url",
+]
+
+[[package]]
+name = "plexus-ingest"
+version = "0.1.0"
+dependencies = [
+ "log",
+ "plexus-common",
+ "serde",
+ "serde_json",
+]
 
 [[package]]
 name = "plexus-search"
 version = "0.1.0"
+dependencies = [
+ "getrandom 0.2.17",
+ "log",
+ "plexus-common",
+ "plexus-ingest",
+ "serde",
+]
 
 [[package]]
 name = "plist"
@@ -15578,6 +15600,13 @@ dependencies = [
  "symthaea-core",
  "symthaea-fep",
  "symthaea-hal",
+]
+
+[[package]]
+name = "symthaea-bandgap"
+version = "0.1.0"
+dependencies = [
+ "serde",
 ]
 
 [[package]]

@@ -395,6 +395,35 @@ self.onmessage = async function(e) {
       case 'workspaceIgnition':
         if (engine) result = engine.workspace_ignition();
         break;
+      // Sovereign NixOS Installer (WASM-side conversation + config gen)
+      case 'sovereignInit': {
+        // sovereign_init is a free function (not on SporeEngine)
+        const mod = await import('./pkg/symthaea_spore.js');
+        result = mod.sovereign_init(
+          JSON.stringify(params.hardware || {}),
+          JSON.stringify(params.migration || {})
+        );
+        break;
+      }
+      case 'sovereignChat': {
+        const mod = await import('./pkg/symthaea_spore.js');
+        result = mod.sovereign_chat(params.message || '');
+        break;
+      }
+      case 'generateSovereignConfig': {
+        const mod = await import('./pkg/symthaea_spore.js');
+        result = mod.generate_sovereign_config(
+          JSON.stringify(params.hardware || {}),
+          JSON.stringify(params.choices || {}),
+          JSON.stringify(params.migration || {})
+        );
+        break;
+      }
+      case 'matchAppList': {
+        const mod = await import('./pkg/symthaea_spore.js');
+        result = mod.match_app_list(params.text || '');
+        break;
+      }
       default:
         throw new Error(`Unknown action: ${action}`);
     }
