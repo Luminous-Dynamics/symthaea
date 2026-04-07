@@ -43,18 +43,23 @@ fn AppInner() -> impl IntoView {
     view! {
         <Router>
             <a href="#main-content" class="skip-link">"Skip to main content"</a>
-            <nav class="navbar" aria-label="Primary navigation">
-                <a href="/" class="logo">"Mycelix Craft"</a>
-                <div class="nav-links">
-                    <A href="/employer">"Employer"</A>
+
+            // Top nav — logo + connection status only on mobile
+            <nav class="top-bar" aria-label="Primary navigation">
+                <a href="/" class="logo">"Craft"</a>
+                // Desktop nav links (hidden on mobile)
+                <div class="desktop-nav">
+                    <A href="/">"Dashboard"</A>
                     <A href="/jobs">"Jobs"</A>
+                    <A href="/credentials">"Credentials"</A>
                     <A href="/network">"Network"</A>
                     <A href="/applications">"Applications"</A>
-                    <A href="/credentials">"Credentials"</A>
+                    <A href="/employer">"Employer"</A>
                     <A href="/profile">"Profile"</A>
                 </div>
                 <ConnectionStatusIndicator />
             </nav>
+
             <main id="main-content">
                 <Routes fallback=|| view! { <EmptyState icon="?" title="Page not found" /> }>
                     <Route path=path!("/") view=DashboardPage />
@@ -66,6 +71,31 @@ fn AppInner() -> impl IntoView {
                     <Route path=path!("/profile") view=ProfilePage />
                 </Routes>
             </main>
+
+            // Bottom tab nav — mobile primary navigation
+            <nav class="bottom-nav" aria-label="Quick navigation">
+                <a href="/" class="tab-item">
+                    <span class="tab-icon">"🏠"</span>
+                    <span class="tab-label">"Home"</span>
+                </a>
+                <a href="/jobs" class="tab-item">
+                    <span class="tab-icon">"💼"</span>
+                    <span class="tab-label">"Jobs"</span>
+                </a>
+                <a href="/credentials" class="tab-item">
+                    <span class="tab-icon">"🔑"</span>
+                    <span class="tab-label">"Credentials"</span>
+                </a>
+                <a href="/network" class="tab-item">
+                    <span class="tab-icon">"🌐"</span>
+                    <span class="tab-label">"Network"</span>
+                </a>
+                <a href="/profile" class="tab-item">
+                    <span class="tab-icon">"👤"</span>
+                    <span class="tab-label">"Profile"</span>
+                </a>
+            </nav>
+
             <ToastContainer />
         </Router>
     }

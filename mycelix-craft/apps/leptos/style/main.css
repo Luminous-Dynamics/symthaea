@@ -55,13 +55,13 @@ body {
 .skip-link:focus { top: 0; }
 
 /* ============================================ */
-/* Navigation — horizontal scroll on mobile     */
+/* Top bar — slim logo + connection status      */
 /* ============================================ */
-.navbar {
+.top-bar {
     display: flex;
     align-items: center;
     padding: 0 1.25rem;
-    height: 56px;
+    height: 48px;
     background: var(--surface);
     border-bottom: 1px solid var(--border);
     position: sticky;
@@ -71,48 +71,85 @@ body {
 
 .logo {
     font-weight: 800;
-    font-size: 1.1rem;
+    font-size: 1.15rem;
     color: var(--primary-light);
     text-decoration: none;
     white-space: nowrap;
-    margin-right: 1rem;
     letter-spacing: -0.02em;
 }
 
-.nav-links {
+/* Desktop nav links — hidden on mobile */
+.desktop-nav {
     display: flex;
     gap: 0.25rem;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
     flex: 1;
-    padding: 0.25rem 0;
+    margin-left: 1.5rem;
 }
-.nav-links::-webkit-scrollbar { display: none; }
-
-.nav-links a {
+.desktop-nav a {
     color: var(--text-secondary);
     text-decoration: none;
-    padding: 0.4rem 0.75rem;
+    padding: 0.35rem 0.7rem;
     border-radius: 2rem;
     font-size: 0.85rem;
     font-weight: 500;
     white-space: nowrap;
     transition: all 0.15s;
-    min-height: 36px;
-    display: flex;
-    align-items: center;
 }
-.nav-links a:hover,
-.nav-links a.active {
+.desktop-nav a:hover,
+.desktop-nav a[aria-current="page"] {
     color: var(--text);
     background: var(--surface-hover);
 }
 
-/* Connection status in nav */
+/* Connection status */
 .connection-status {
     margin-left: auto;
     white-space: nowrap;
+}
+
+/* ============================================ */
+/* Bottom tab nav — mobile primary navigation   */
+/* ============================================ */
+.bottom-nav {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 60px;
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    z-index: 100;
+    padding-bottom: env(safe-area-inset-bottom, 0);
+}
+
+.tab-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    text-decoration: none;
+    color: var(--text-muted);
+    padding: 4px 12px;
+    border-radius: 8px;
+    transition: color 0.15s;
+    min-width: 56px;
+}
+.tab-item:hover,
+.tab-item[aria-current="page"] {
+    color: var(--primary-light);
+}
+.tab-icon {
+    font-size: 1.3rem;
+    line-height: 1;
+}
+.tab-label {
+    font-size: 0.65rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
 }
 
 /* ============================================ */
@@ -762,18 +799,26 @@ h3 {
 /* ============================================ */
 /* Responsive                                   */
 /* ============================================ */
-@media (max-width: 640px) {
+
+/* Mobile: hide desktop nav, show bottom nav, add bottom padding */
+@media (max-width: 768px) {
+    .desktop-nav { display: none; }
+    .page { padding: 1.25rem 1rem 5rem; } /* space for bottom nav */
     .dashboard-grid, .network-grid, .profile-grid, .jobs-grid,
     .credentials-grid, .stakes-grid {
         grid-template-columns: 1fr;
     }
-    .page { padding: 1.25rem 1rem 2rem; }
     h1 { font-size: 1.35rem; }
     .credentials-stats { gap: 0.5rem; }
     .stat-pill { padding: 0.5rem 1rem; min-width: 80px; }
     .stat-pill .stat-value { font-size: 1.4rem; }
     .form-row { grid-template-columns: 1fr; }
     .application-card { flex-direction: column; align-items: flex-start; }
+}
+
+/* Desktop: hide bottom nav, show desktop nav */
+@media (min-width: 769px) {
+    .bottom-nav { display: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {
