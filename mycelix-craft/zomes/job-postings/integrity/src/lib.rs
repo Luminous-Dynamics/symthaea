@@ -51,6 +51,9 @@ pub struct JobPosting {
     /// Minimum consciousness tier required to apply
     #[serde(default)]
     pub consciousness_tier_required: Option<String>,
+    /// Minimum credential vitality (0-1000 permille) for applicants
+    #[serde(default)]
+    pub vitality_minimum: Option<u16>,
 }
 
 /// Salary range in USD
@@ -298,6 +301,7 @@ mod tests {
             guild_id: None,
             min_epistemic_level: None,
             consciousness_tier_required: None,
+            vitality_minimum: None,
         }
     }
 

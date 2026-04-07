@@ -24,6 +24,8 @@ pub struct JobView {
     pub preferred_skills: Vec<String>,
     pub education_level: Option<String>,
     pub remote_ok: bool,
+    /// Minimum credential vitality required (0-1000 permille). None = no requirement.
+    pub vitality_minimum: Option<u16>,
 }
 
 /// A scored job match result.
@@ -92,15 +94,25 @@ pub fn score_job(
 }
 
 /// Rank jobs by match score (descending), filter to minimum threshold.
+/// If `agent_avg_vitality` is provided, jobs requiring higher vitality are excluded.
 pub fn rank_jobs(
     jobs: &[JobView],
     agent_skills: &HashSet<String>,
     agent_education: Option<&str>,
+    agent_avg_vitality: Option<u16>,
     min_score: f32,
     limit: usize,
 ) -> Vec<JobMatch> {
     let mut matches: Vec<JobMatch> = jobs
         .iter()
+        .filter(|j| {
+            // Skip jobs whose vitality requirement exceeds the agent's average
+            match (j.vitality_minimum, agent_avg_vitality) {
+                (Some(min), Some(agent)) => agent >= min,
+                (Some(_), None) => false, // Job requires vitality but agent has no credentials
+                _ => true,
+            }
+        })
         .map(|j| score_job(j, agent_skills, agent_education))
         .filter(|m| m.score >= min_score)
         .collect();
@@ -122,6 +134,7 @@ mod tests {
             preferred_skills: vec!["leptos".into(), "nix".into()],
             education_level: Some("Bachelor's".into()),
             remote_ok: true,
+            vitality_minimum: None,
         }
     }
 
@@ -131,7 +144,8 @@ mod tests {
             ["rust", "holochain", "wasm", "leptos", "nix"]
                 .iter().map(|s| s.to_string()).collect();
         let m = score_job(&rust_dev_job(), &skills, Some("Bachelor's"));
-        assert!(m.score > 0.9); // 0.6 required + 0.04 preferred + 0.2 credential
+        // 3/3 required = 0.6, 2 preferred = 0.04, credential = 0.2 => 0.84
+        assert!(m.score > 0.8);
         assert_eq!(m.matched_required.len(), 3);
         assert!(m.credential_bonus);
     }
@@ -151,7 +165,7 @@ mod tests {
         let skills: HashSet<String> =
             ["rust", "wasm"].iter().map(|s| s.to_string()).collect();
         let m = score_job(&rust_dev_job(), &skills, Some("Bachelor's"));
-        // 2/3 required = 0.4, credential = 0.2 → 0.6
+        // 2/3 required = 0.4, credential = 0.2 -> 0.6
         assert!(m.score > 0.5 && m.score < 0.8);
     }
 
@@ -165,12 +179,13 @@ mod tests {
                 preferred_skills: vec![],
                 education_level: None,
                 remote_ok: true,
+                vitality_minimum: None,
             },
             rust_dev_job(),
         ];
         let skills: HashSet<String> =
             ["rust", "holochain", "wasm"].iter().map(|s| s.to_string()).collect();
-        let ranked = rank_jobs(&jobs, &skills, Some("Bachelor's"), 0.0, 10);
+        let ranked = rank_jobs(&jobs, &skills, Some("Bachelor's"), None, 0.0, 10);
         assert_eq!(ranked[0].job.title, "Rust Developer");
     }
 
@@ -178,7 +193,32 @@ mod tests {
     fn test_min_score_filter() {
         let jobs = vec![rust_dev_job()];
         let skills: HashSet<String> = HashSet::new();
-        let ranked = rank_jobs(&jobs, &skills, None, 0.5, 10);
-        assert!(ranked.is_empty()); // No skills → low score → filtered
+        let ranked = rank_jobs(&jobs, &skills, None, None, 0.5, 10);
+        assert!(ranked.is_empty()); // No skills -> low score -> filtered
+    }
+
+    #[test]
+    fn test_vitality_filter() {
+        let job = JobView {
+            title: "Senior Rust Dev".into(),
+            organization: "Luminous Dynamics".into(),
+            required_skills: vec!["rust".into()],
+            preferred_skills: vec![],
+            education_level: None,
+            remote_ok: true,
+            vitality_minimum: Some(700),
+        };
+        let jobs = vec![job];
+        let skills: HashSet<String> =
+            ["rust"].iter().map(|s| s.to_string()).collect();
+
+        // Agent vitality below minimum -- job should be filtered out
+        let ranked = rank_jobs(&jobs, &skills, None, Some(500), 0.0, 10);
+        assert!(ranked.is_empty(), "Job should be excluded when agent vitality < minimum");
+
+        // Agent vitality above minimum -- job should appear
+        let ranked = rank_jobs(&jobs, &skills, None, Some(800), 0.0, 10);
+        assert_eq!(ranked.len(), 1, "Job should appear when agent vitality >= minimum");
+        assert_eq!(ranked[0].job.title, "Senior Rust Dev");
     }
 }

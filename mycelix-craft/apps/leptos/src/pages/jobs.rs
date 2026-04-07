@@ -27,6 +27,7 @@ fn mock_jobs() -> Vec<JobView> {
             preferred_skills: vec!["leptos".into(), "nix".into()],
             education_level: Some("Bachelor's".into()),
             remote_ok: true,
+            vitality_minimum: Some(700),
         },
         JobView {
             title: "Data Science Lead".into(),
@@ -35,6 +36,7 @@ fn mock_jobs() -> Vec<JobView> {
             preferred_skills: vec!["rust".into(), "sql".into()],
             education_level: Some("Master's".into()),
             remote_ok: true,
+            vitality_minimum: None,
         },
         JobView {
             title: "Cybersecurity Analyst".into(),
@@ -43,6 +45,7 @@ fn mock_jobs() -> Vec<JobView> {
             preferred_skills: vec!["nix".into(), "rust".into(), "python".into()],
             education_level: None,
             remote_ok: false,
+            vitality_minimum: None,
         },
         JobView {
             title: "Full-Stack Web Developer".into(),
@@ -51,6 +54,7 @@ fn mock_jobs() -> Vec<JobView> {
             preferred_skills: vec!["rust".into(), "wasm".into(), "holochain".into()],
             education_level: None,
             remote_ok: true,
+            vitality_minimum: None,
         },
         JobView {
             title: "Distributed Systems Researcher".into(),
@@ -64,6 +68,7 @@ fn mock_jobs() -> Vec<JobView> {
             ],
             education_level: Some("PhD".into()),
             remote_ok: true,
+            vitality_minimum: Some(700),
         },
     ]
 }
@@ -102,7 +107,8 @@ pub fn JobsPage() -> impl IntoView {
     let matched_jobs = Memo::new(move |_| {
         let skills = agent_skills.get();
         let query = search_query.get().to_lowercase();
-        let mut ranked = rank_jobs(&jobs, &skills, None, 0.0, 20);
+        // TODO: compute avg vitality from CraftCtx credentials when available
+        let mut ranked = rank_jobs(&jobs, &skills, None, None, 0.0, 20);
         // Additionally filter by free-text search if present.
         if !query.is_empty() {
             ranked.retain(|m| {

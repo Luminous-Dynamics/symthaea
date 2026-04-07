@@ -114,6 +114,7 @@ pub fn create_job_posting(input: CreateJobPostingInput) -> ExternResult<ActionHa
         guild_id: None,
         min_epistemic_level: None,
         consciousness_tier_required: None,
+        vitality_minimum: None,
     };
 
     let action_hash = create_entry(EntryTypes::JobPosting(posting.clone()))?;
@@ -180,6 +181,7 @@ pub fn update_job_posting(input: UpdateJobPostingInput) -> ExternResult<ActionHa
         guild_id: None,
         min_epistemic_level: None,
         consciousness_tier_required: None,
+        vitality_minimum: None,
     };
 
     update_entry(input.original_hash, &posting)
