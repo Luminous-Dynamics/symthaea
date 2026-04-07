@@ -1,0 +1,48 @@
+[package]
+name = "nixforhumanity-web"
+version = "0.1.0"
+edition = "2021"
+description = "NixForHumanity — accessible NixOS installer, pure Rust/Leptos CSR"
+license = "AGPL-3.0-or-later"
+
+[dependencies]
+leptos = { version = "0.8", features = ["csr"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+wasm-bindgen = "0.2"
+wasm-bindgen-futures = "0.4"
+js-sys = "0.3"
+gloo-timers = { version = "0.3", features = ["futures"] }
+console_error_panic_hook = "0.1"
+console_log = "1"
+log = "0.4"
+serde-wasm-bindgen = "0.6"
+
+# NixOS intelligence — direct Rust, no SporeEngine
+symthaea-app-db = { path = "../symthaea/crates/symthaea-app-db", features = ["serde"] }
+symthaea-nix = { path = "../symthaea/crates/symthaea-nix", default-features = false }
+
+# WASM fixes for transitive deps (getrandom + uuid need JS RNG on wasm32)
+getrandom = { version = "0.2", features = ["js"] }
+uuid = { version = "1", features = ["js"] }
+
+[dependencies.web-sys]
+version = "0.3"
+features = [
+    "Window", "Document", "Element", "HtmlElement",
+    "HtmlCanvasElement", "CanvasRenderingContext2d",
+    "HtmlInputElement", "HtmlButtonElement",
+    "Performance", "KeyboardEvent", "MouseEvent", "TouchEvent",
+    "console",
+    "Navigator", "ServiceWorkerContainer", "ServiceWorkerRegistration",
+    "WebSocket", "CloseEvent", "MessageEvent", "Storage",
+    "Location", "UrlSearchParams",
+    "Blob", "BlobPropertyBag", "Url",
+    # Worker support (for lazy SporeEngine loading in conversational mode)
+    "Worker", "WorkerOptions", "WorkerType", "ErrorEvent",
+]
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1

@@ -1,0 +1,12 @@
+{
+  "name": "NixForHumanity — NixOS Installer",
+  "short_name": "NixForHumanity",
+  "description": "Accessible NixOS installer. Configure your system in the browser, deploy to any machine.",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#1a2e22",
+  "theme_color": "#5ab8a0",
+  "orientation": "any",
+  "categories": ["utilities"],
+  "icons": []
+}
