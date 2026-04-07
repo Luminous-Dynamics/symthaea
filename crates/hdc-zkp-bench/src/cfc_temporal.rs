@@ -123,28 +123,39 @@ pub fn bench_cfc_temporal(neurons: usize, timesteps: usize) -> CfcBenchResult {
     println!("  Expected: {} AND ({}×{})", neurons * timesteps, neurons, timesteps);
     println!("  XOR operations: {} (all FREE)", neurons * timesteps * 2);
 
-    // Fill witness: simulate CfC evolution and record all intermediate sigma values
+    // Fill witness: simulate CfC evolution matching circuit construction order
+    // Circuit builds: for each timestep, for each neuron (timestep-major)
+    // Witness must fill sigma_wires in the SAME order
     let mut witness = circuit.new_witness_filler();
-    let mut sigma_idx = 0;
+
+    // Generate all initial values
+    let h0_vals: Vec<u64> = (0..neurons).map(|_| rand::random()).collect();
+    let x_inf_vals: Vec<u64> = (0..neurons).map(|_| rand::random()).collect();
 
     for n in 0..neurons {
-        let h0: u64 = rand::random();
-        let x_inf: u64 = rand::random();
-        witness[h_wires[n]] = Word(h0);
-        witness[x_inf_wires[n]] = Word(x_inf);
+        witness[h_wires[n]] = Word(h0_vals[n]);
+        witness[x_inf_wires[n]] = Word(x_inf_vals[n]);
+    }
 
-        // Simulate CfC and fill sigma witnesses
-        let mut h = h0;
-        for _t in 0..timesteps {
-            let sigma: u64 = rand::random();
-            witness[sigma_wires[sigma_idx]] = Word(sigma);
-            sigma_idx += 1;
+    // Pre-generate all sigma values in timestep-major order (matching circuit)
+    let sigma_vals: Vec<u64> = (0..timesteps * neurons).map(|_| rand::random()).collect();
+    for (i, &sigma) in sigma_vals.iter().enumerate() {
+        witness[sigma_wires[i]] = Word(sigma);
+    }
 
-            let delta = x_inf ^ h;
+    // Simulate CfC evolution to compute final h for each neuron
+    let mut h_state = h0_vals.clone();
+    for t in 0..timesteps {
+        for n in 0..neurons {
+            let sigma = sigma_vals[t * neurons + n]; // timestep-major indexing
+            let delta = x_inf_vals[n] ^ h_state[n];
             let product = sigma & delta;
-            h ^= product;
+            h_state[n] ^= product;
         }
-        witness[final_h_wires[n]] = Word(h);
+    }
+
+    for n in 0..neurons {
+        witness[final_h_wires[n]] = Word(h_state[n]);
     }
 
     circuit.populate_wire_witness(&mut witness).expect("witness population failed");
