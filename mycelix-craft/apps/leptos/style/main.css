@@ -876,6 +876,21 @@ h3 {
 .tier-list .tier-name { font-weight: 600; }
 .tier-list .tier-score { color: var(--text-muted); }
 
+/* Skill radar */
+.skill-radar {
+    text-align: center;
+}
+.skill-radar h3 {
+    margin-bottom: 0.75rem;
+}
+.radar-svg {
+    width: 100%;
+    max-width: 220px;
+    height: auto;
+    margin: 0 auto;
+    display: block;
+}
+
 /* Loading */
 .loading-bar {
     padding: 0.75rem;
