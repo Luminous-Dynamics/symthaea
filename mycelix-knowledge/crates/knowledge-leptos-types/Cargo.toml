@@ -7,5 +7,6 @@ description = "WASM-safe mirror types for Knowledge (serde only, no HDI)"
 
 [dependencies]
 serde = { version = "1", features = ["derive"] }
+mycelix-claim-types = { path = "../../../crates/mycelix-claim-types" }
 
 [workspace]

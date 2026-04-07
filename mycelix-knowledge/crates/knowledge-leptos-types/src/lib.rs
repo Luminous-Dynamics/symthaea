@@ -2,63 +2,25 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 //! WASM-safe types for the Knowledge cluster frontend.
+//!
+//! E/N/M classification re-exported from the shared `mycelix-claim-types` crate
+//! for ecosystem-wide consistency (Prism browser uses the same types).
 
 use serde::{Deserialize, Serialize};
 
-// ---------------------------------------------------------------------------
-// Epistemic Classification (E/N/M/H)
-// ---------------------------------------------------------------------------
+// Re-export unified epistemic types — single source of truth
+pub use mycelix_claim_types::{
+    EmpiricalLevel, NormativeLevel, MaterialityLevel,
+    ClaimType, EpistemicClassification,
+};
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
-pub enum EmpiricalLevel { E0, E1, E2, E3, E4 }
-impl EmpiricalLevel {
-    pub fn label(&self) -> &'static str {
-        match self { Self::E0 => "Unverified", Self::E1 => "Preliminary", Self::E2 => "Tested", Self::E3 => "Replicated", Self::E4 => "Established" }
-    }
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
-pub enum NormativeLevel { N0, N1, N2, N3 }
-impl NormativeLevel {
-    pub fn label(&self) -> &'static str {
-        match self { Self::N0 => "Raw", Self::N1 => "Contested", Self::N2 => "Emerging", Self::N3 => "Endorsed" }
-    }
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
-pub enum MaterialityLevel { M0, M1, M2, M3 }
-impl MaterialityLevel {
-    pub fn label(&self) -> &'static str {
-        match self { Self::M0 => "Abstract", Self::M1 => "Potential", Self::M2 => "Applicable", Self::M3 => "Transformative" }
-    }
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct EpistemicClassificationView {
-    pub empirical: EmpiricalLevel,
-    pub normative: NormativeLevel,
-    pub materiality: MaterialityLevel,
-    pub confidence: f64,
-}
+/// Knowledge-specific view of an epistemic classification.
+/// Wraps the unified type for backwards compatibility.
+pub type EpistemicClassificationView = EpistemicClassification;
 
 // ---------------------------------------------------------------------------
-// Claims
+// Claims (ClaimType re-exported from mycelix-claim-types with label() + all())
 // ---------------------------------------------------------------------------
-
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
-pub enum ClaimType { Fact, Opinion, Prediction, Hypothesis, Definition, Historical, Normative, Narrative }
-impl ClaimType {
-    pub fn label(&self) -> &'static str {
-        match self {
-            Self::Fact => "Fact", Self::Opinion => "Opinion", Self::Prediction => "Prediction",
-            Self::Hypothesis => "Hypothesis", Self::Definition => "Definition",
-            Self::Historical => "Historical", Self::Normative => "Normative", Self::Narrative => "Narrative",
-        }
-    }
-    pub fn all() -> &'static [ClaimType] {
-        &[Self::Fact, Self::Opinion, Self::Prediction, Self::Hypothesis, Self::Definition, Self::Historical, Self::Normative, Self::Narrative]
-    }
-}
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ClaimView {
