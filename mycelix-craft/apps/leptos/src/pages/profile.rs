@@ -175,6 +175,10 @@ pub fn ProfilePage() -> impl IntoView {
                 </div>
 
                 <div class="profile-section">
+                    <crate::components::LemHeatmap />
+                </div>
+
+                <div class="profile-section">
                     <h3>"Guild Memberships"</h3>
                     {move || {
                         let guilds = craft.guilds.get();

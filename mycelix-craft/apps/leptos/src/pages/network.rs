@@ -23,6 +23,7 @@ struct Connection {
     display_name: String,
     headline: String,
     connected_since: String,
+    skills: Vec<String>,
 }
 
 #[derive(Clone)]
@@ -49,16 +50,19 @@ fn mock_connections() -> Vec<Connection> {
             display_name: "Nia Modise".into(),
             headline: "Holochain hApp Developer".into(),
             connected_since: "2026-01-15".into(),
+            skills: vec!["rust".into(), "holochain".into(), "wasm".into(), "leptos".into()],
         },
         Connection {
             display_name: "Erik Lindqvist".into(),
             headline: "NixOS Infrastructure Engineer".into(),
             connected_since: "2026-02-03".into(),
+            skills: vec!["nix".into(), "linux".into(), "rust".into(), "systemd".into()],
         },
         Connection {
             display_name: "Amara Osei".into(),
             headline: "Data Science & ML Researcher".into(),
             connected_since: "2026-03-22".into(),
+            skills: vec!["python".into(), "data-science".into(), "machine-learning".into()],
         },
     ]
 }
@@ -235,15 +239,27 @@ pub fn NetworkPage() -> impl IntoView {
                         {connections
                             .into_iter()
                             .map(|c| {
+                                // Compute skill affinity with mock "my skills"
+                                let my_skills: std::collections::HashSet<String> =
+                                    ["rust", "holochain", "wasm", "data-science"]
+                                        .iter().map(|s| s.to_string()).collect();
+                                let their_skills: std::collections::HashSet<String> =
+                                    c.skills.iter().cloned().collect();
+                                let affinity = crate::similarity::skill_affinity_pct(&my_skills, &their_skills);
                                 view! {
                                     <div class="connection-card">
                                         <div class="connection-info">
                                             <p class="connection-name">{c.display_name}</p>
                                             <p class="connection-headline">{c.headline}</p>
                                         </div>
-                                        <p class="connection-date">
-                                            {format!("Connected {}", c.connected_since)}
-                                        </p>
+                                        <div class="connection-meta">
+                                            <span class="affinity-badge" title="Skill set overlap (Jaccard similarity)">
+                                                {affinity}"% affinity"
+                                            </span>
+                                            <span class="connection-date">
+                                                {c.connected_since}
+                                            </span>
+                                        </div>
                                     </div>
                                 }
                             })

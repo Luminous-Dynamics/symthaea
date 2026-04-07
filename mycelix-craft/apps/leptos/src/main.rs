@@ -6,6 +6,8 @@ mod components;
 mod context;
 #[allow(dead_code)]
 mod matching;
+#[allow(dead_code)]
+mod similarity;
 mod pages;
 mod persistence;
 
