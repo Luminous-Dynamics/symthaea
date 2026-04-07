@@ -15,6 +15,7 @@
 //! depend on HDK and can be used by any Rust crate.
 
 pub mod consciousness_thresholds;
+pub mod consciousness_zkp;
 /// Backward-compatible module alias — allows `mycelix_bridge_common::phi_thresholds::*` paths.
 pub use consciousness_thresholds as phi_thresholds;
 pub use consciousness_thresholds::{ConsciousnessThresholds, PhiThresholds};
