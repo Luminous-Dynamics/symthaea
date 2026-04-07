@@ -239,15 +239,26 @@ pub fn App() -> impl IntoView {
                                 <div class="seed-pulse delay-2" />
                                 <div class="seed-core" />
                             </div>
-                            <h1 class="first-breath-title">"First Breath"</h1>
+                            <h1 class="first-breath-title">"Mycelix"</h1>
+                            <p class="first-breath-tagline">
+                                "A decentralized operating system for communities"
+                            </p>
+                            <div class="first-breath-clusters">
+                                <span class="cluster-pill">"🌍 Climate"</span>
+                                <span class="cluster-pill">"🧠 Knowledge"</span>
+                                <span class="cluster-pill">"⚡ Energy"</span>
+                                <span class="cluster-pill">"💰 Finance"</span>
+                                <span class="cluster-pill">"🛰 Space"</span>
+                                <span class="cluster-pill">"📦 Supply Chain"</span>
+                                <span class="cluster-pill">"🏷 Attribution"</span>
+                            </div>
                             <p class="first-breath-text">
-                                "One identity. Every domain. Your consciousness made sovereign."
+                                "Peer-to-peer. Consciousness-gated. Built on Holochain."
                             </p>
                             <button class="first-breath-cta" on:click=move |_| {
-                                // First Breath sound — a rising tone
                                 play_breath_tone();
                                 vault.set(VaultState::Unlocked);
-                            }>"Breathe"</button>
+                            }>"Enter"</button>
                         </div>
                     }.into_any()
                 } else if phenotype.get().is_none() {

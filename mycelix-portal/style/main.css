@@ -151,16 +151,46 @@ body {
 }
 
 .first-breath-title {
-    font-size: 1.5rem;
+    font-size: 2.2rem;
     font-weight: 300;
-    letter-spacing: 0.1em;
-    color: var(--bio-cyan);
-    margin-bottom: 0.75rem;
+    letter-spacing: 0.15em;
+    background: linear-gradient(135deg, #d8e4d4, #4ecdc4);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 0.5rem;
+}
+
+.first-breath-tagline {
+    color: var(--text-secondary);
+    font-size: 1rem;
+    font-style: italic;
+    margin-bottom: 1.5rem;
+    letter-spacing: 0.02em;
+}
+
+.first-breath-clusters {
+    display: flex;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+    justify-content: center;
+    max-width: 380px;
+    margin-bottom: 1.5rem;
+}
+
+.cluster-pill {
+    padding: 0.2rem 0.6rem;
+    border-radius: 999px;
+    font-size: 0.7rem;
+    background: rgba(78, 205, 196, 0.08);
+    border: 1px solid rgba(78, 205, 196, 0.15);
+    color: var(--text-secondary);
+    white-space: nowrap;
 }
 
 .first-breath-text {
-    color: var(--text-secondary);
-    font-size: 0.9rem;
+    color: var(--text-muted);
+    font-size: 0.8rem;
     max-width: 320px;
     line-height: 1.6;
     margin-bottom: 2rem;
