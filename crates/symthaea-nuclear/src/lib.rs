@@ -33,6 +33,7 @@ pub mod hfb;
 mod deep_analysis;
 mod discoveries;
 mod discoveries2;
+mod discoveries3;
 mod exploration;
 mod figure_data;
 pub mod fundamental;

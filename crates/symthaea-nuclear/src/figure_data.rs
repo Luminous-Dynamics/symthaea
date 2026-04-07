@@ -108,6 +108,64 @@ mod tests {
         eprintln!("Wrote {path}");
     }
 
+    /// Nuclear chart: full (Z,N) grid with BE, uncertainty, measured flag, S_n.
+    ///
+    /// Produces a TSV for the segre chart showing measured vs predicted nuclei
+    /// with uncertainty coloring and magic number annotations.
+    #[test]
+    fn nuclear_chart_data() {
+        use crate::ame2020::ame2020_reference_nuclei;
+        use std::collections::HashSet;
+
+        fs::create_dir_all(OUT_DIR).unwrap();
+        let predictor = MlMassPredictor::new();
+        let path = format!("{OUT_DIR}/nuclear_chart.tsv");
+        let mut f = fs::File::create(&path).unwrap();
+
+        // Build set of measured (Z,N) pairs
+        let measured: HashSet<(u16, u16)> = ame2020_reference_nuclei()
+            .into_iter()
+            .filter(|nuc| nuc.is_measured)
+            .map(|nuc| (nuc.z, nuc.n))
+            .collect();
+
+        writeln!(f, "Z\tN\tBE\tuncertainty\tis_measured\tS_n").unwrap();
+
+        let mut count = 0u32;
+        for z in 2u16..=110 {
+            for n in 2u16..=180 {
+                let pred = predictor.predict(z, n);
+                let a = (z + n) as f64;
+                let ba = pred.binding_energy / a;
+
+                // Filter: plausibly bound nuclei only
+                if pred.binding_energy <= 0.0 || ba <= 4.0 {
+                    continue;
+                }
+
+                let is_meas = if measured.contains(&(z, n)) { 1 } else { 0 };
+
+                // Neutron separation energy: S_n = BE(Z,N) - BE(Z,N-1)
+                let sn = if n > 2 {
+                    let prev = predictor.predict(z, n - 1);
+                    pred.binding_energy - prev.binding_energy
+                } else {
+                    0.0
+                };
+
+                writeln!(
+                    f,
+                    "{z}\t{n}\t{:.4}\t{:.4}\t{is_meas}\t{sn:.4}",
+                    pred.binding_energy, pred.uncertainty
+                )
+                .unwrap();
+                count += 1;
+            }
+        }
+
+        eprintln!("Wrote {path} ({count} nuclei)");
+    }
+
     /// Wigner energy for even-Z nuclei Z=10-50.
     ///
     /// W(Z) = BE(Z, N=Z) - 0.5 * [BE(Z, N=Z+2) + BE(Z, N=Z-2)]

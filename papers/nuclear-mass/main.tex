@@ -409,7 +409,10 @@ observed solar $A \approx 130$ peak~\cite{cowan2021}; the third peak is
 broadened and shifted from $A=195$ to $A \approx 202$, reflecting the
 DZ10 model's placement of the $N=126$ shell gap. This shift is a
 \textbf{testable prediction}: accurate masses in the $N=126$ neutron-rich
-region (measurable at FRIB) would constrain the peak position.
+region (measurable at FRIB) would constrain the peak position. With
+fission recycling (asymmetric split at $A > 260$), material is deposited
+in the rare-earth region ($A \approx 155$--170), filling the gap between
+the second and third peaks as observed in solar abundances.
 
 % ═══════════════════════════════════════════════════════════════════════
 \subsection{Other Applications}
@@ -459,18 +462,46 @@ under-prediction consistent with the known ``Nolen-Schiffer anomaly''
 ($^{13}$C/$^{13}$N, $-18.8$\%) falls in the region where meson-exchange
 corrections are largest.
 
+\subsubsection{Cluster Radioactivity}
+
+A scan for exotic cluster emission ($^{14}$C, $^{16}$O, $^{20}$Ne,
+$^{24}$Mg, $^{28}$Si) across the heavy and superheavy region identifies
+\textbf{1,198 energetically allowed candidates} ($Q > 0$). The most
+favorable emissions are $^{28}$Si clusters from californium isotopes
+($Q \approx 96$~MeV), consistent with the known preference for
+heavy-cluster emission near doubly-magic daughters.
+
+\subsubsection{Nuclear Statistical Equilibrium}
+
+At $T = 7$--10~GK (conditions in supernovae and neutron star mergers
+before the r-process begins), matter reaches nuclear statistical
+equilibrium (NSE). The dominant species is the Fe-group peak (Zn-60,
+Ni-58), transitioning to lighter nuclei at higher temperatures---the
+standard alpha-rich freeze-out pattern.
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=\columnwidth]{../desci-epistemic/fig7_nuclear_chart.pdf}
+\caption{Nuclear chart showing 11,799 predicted nuclei. Black dots:
+AME2020 measured. Color: prediction uncertainty (green = low, red = high).
+Dashed lines: magic numbers.}
+\label{fig:chart}
+\end{figure}
+
 % ═══════════════════════════════════════════════════════════════════════
 \section{Discussion}
 % ═══════════════════════════════════════════════════════════════════════
 
 \paragraph{On ``zero overfitting.''}
 The HDC-LTC-GLU's identical train/CV error (0.67~MeV) is more accurately
-described as \emph{successful non-degradation} of the physics baseline
-rather than exceptional ML performance. With only 8 training epochs and
-32,770 parameters on 2,535 samples, the correction layer has not converged
-far from zero. This is actually desirable: the model avoids harming the
-DZ10 extrapolation while providing a framework for future improvement with
-more training data or deeper architectures.
+described as \emph{successful non-degradation} of the physics baseline.
+Extended training to 50 epochs (6$\times$ longer) confirms this: the
+per-fold training RMS converges to 0.51~MeV by epoch 1 and remains flat
+through epoch 50, with no divergence or improvement. The correction layer
+is structurally incapable of degrading the DZ10 baseline at these learning
+rates---a desirable property that preserves physics-based extrapolation.
+Future work with higher learning rates or deeper architectures may unlock
+genuine corrections beyond DZ10.
 
 \paragraph{The peninsula, not island.}
 Our alpha-decay and fission-barrier analysis consistently places the
@@ -480,6 +511,16 @@ often predict stronger shell effects at $Z=114$---but it highlights that
 the ``island'' picture is sensitive to the treatment of deformation and
 shell structure. Experimental measurements at FRIB/FAIR in the
 $Z=104$--108, $N>170$ region will be decisive.
+
+\paragraph{Coulomb correction: local vs.\ global.}
+The $c = 24.2$~keV correction that eliminates the $Q_{\beta\beta}$ bias
+does \emph{not} improve global binding energies: a linear
+$Z(Z{-}1)/A^{1/3}$ post-hoc correction fitted on all AME2020 nuclei
+yields $c \approx 0$ with no RMS change. This means the RF has already
+captured the global Coulomb structure; the $Q_{\beta\beta}$ bias arises
+specifically from $\Delta Z = 2$ \emph{differences}, where correlated
+errors partially cancel in absolute BE but accumulate in energy
+differences.
 
 \paragraph{Medical isotope safety.}
 The At-210 toxicology lesson demonstrates that mass models alone are
@@ -544,10 +585,17 @@ are:
 \item Falsifiable FRIB predictions provided for Ca-57/60, Ni-74/78,
       Sn-136/140;
 \item Mirror nuclei Coulomb displacement energies match Nolen-Schiffer
-      to 5--19\%.
+      to 5--19\%;
+\item Fission recycling fills the rare-earth region ($A \approx 155$--170);
+\item 1,198 cluster radioactivity candidates identified ($^{28}$Si
+      emission from Cf most favorable);
+\item HDC-LTC correction converges by epoch~1 and remains flat to
+      epoch~50 (confirmed non-degradation);
+\item 11,799 nuclei mapped across the full nuclear chart
+      (Fig.~\ref{fig:chart}).
 \end{itemize}
 
-The complete system (8,340 lines of Rust, 101 tests) is open source at
+The complete system (19,300+ lines of Rust, 215+ tests) is open source at
 \url{https://github.com/Luminous-Dynamics/symthaea}.
 
 \paragraph{Acknowledgments.}

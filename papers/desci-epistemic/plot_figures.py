@@ -306,6 +306,154 @@ plot "{DATA_DIR}/rprocess_abundances.tsv" u 1:2 with linespoints pt 7 ps 0.5 lw 
         print(f"Gnuplot script: {gp}")
 
 
+# ═══════════════════════════════════════════════════════════════════════
+# Figure 6: Solar R-Process Comparison
+# ═══════════════════════════════════════════════════════════════════════
+
+def plot_solar_comparison():
+    header, data = load_tsv("solar_comparison.tsv")
+    A = data[:, 0].astype(int)
+    predicted = data[:, 1]
+    solar = data[:, 2]
+    ratio = data[:, 3]
+
+    if HAS_MPL:
+        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 9),
+                                        gridspec_kw={'height_ratios': [3, 1]},
+                                        sharex=True)
+
+        # ── Top panel: abundances ──
+        ax1.semilogy(A, predicted, 'b-o', linewidth=1.8, markersize=5,
+                     label='DZ10+RF predicted', zorder=3)
+        ax1.semilogy(A, solar, 'ro', markersize=8, markerfacecolor='none',
+                     markeredgewidth=1.8, label='Solar r-residuals (Arlandini 1999)',
+                     zorder=4)
+
+        # Peak regions
+        peak_spans = [(78, 92, 'A~80\n(N=50)'),
+                      (126, 138, 'A~130\n(N=82)'),
+                      (188, 200, 'A~195\n(N=126)')]
+        colors = ['#e74c3c', '#2ecc71', '#9b59b6']
+        for (lo, hi, label), color in zip(peak_spans, colors):
+            ax1.axvspan(lo, hi, alpha=0.12, color=color, zorder=0)
+            mid = (lo + hi) / 2
+            ax1.text(mid, ax1.get_ylim()[0] if ax1.get_ylim()[0] > 0 else 1e-4,
+                     label, ha='center', va='bottom', fontsize=9,
+                     color=color, fontweight='bold')
+
+        ax1.set_ylabel('Abundance (normalized)', fontsize=12)
+        ax1.set_title('R-Process Abundances vs Solar R-Residuals\n'
+                       '(Arlandini et al. 1999, normalized at A=130)',
+                       fontsize=13)
+        ax1.legend(loc='upper right', fontsize=10)
+        ax1.grid(alpha=0.3, which='both')
+        ax1.set_ylim(1e-4, 2)
+
+        # ── Bottom panel: ratio ──
+        mask = (predicted > 0) & (solar > 0)
+        ax2.plot(A[mask], ratio[mask], 'ks-', markersize=5, linewidth=1.2)
+        ax2.axhline(y=1.0, color='gray', linestyle='--', linewidth=1)
+        ax2.fill_between([A.min()-5, A.max()+5], 0.5, 2.0,
+                         alpha=0.08, color='green')
+        ax2.set_xlabel('Mass Number A', fontsize=12)
+        ax2.set_ylabel('Predicted / Solar', fontsize=12)
+        ax2.set_xlim(50, 245)
+        ax2.set_ylim(0, 3)
+        ax2.grid(alpha=0.3)
+
+        # Chi-squared annotation
+        valid = data[mask]
+        if len(valid) > 0:
+            chi2 = np.sum((valid[:, 1] - valid[:, 2])**2 / valid[:, 2])
+            log_ratios = np.log(valid[:, 1] / valid[:, 2])
+            rms_lr = np.sqrt(np.mean(log_ratios**2))
+            ax2.text(0.02, 0.92, f'$\\chi^2 = {chi2:.2f}$\nRMS(log ratio) = {rms_lr:.3f}',
+                     transform=ax2.transAxes, fontsize=10, verticalalignment='top',
+                     bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5))
+
+        plt.tight_layout()
+        out = os.path.join(OUT_DIR, "fig6_solar_comparison.pdf")
+        plt.savefig(out, dpi=300)
+        plt.savefig(out.replace('.pdf', '.png'), dpi=150)
+        print(f"Saved: {out}")
+    else:
+        gp = os.path.join(OUT_DIR, "fig6_solar_comparison.gp")
+        with open(gp, 'w') as f:
+            f.write(f"""set terminal pdfcairo size 10,8 font "Times,12"
+set output "{OUT_DIR}/fig6_solar_comparison.pdf"
+set multiplot layout 2,1
+set xlabel "Mass Number A"
+set logscale y
+set ylabel "Abundance"
+set datafile separator "\\t"
+set grid
+plot "{DATA_DIR}/solar_comparison.tsv" u 1:2 with linespoints pt 7 lw 1.5 title "Predicted", \\
+     "" u 1:3 with points pt 6 ps 1.2 lc rgb "red" title "Solar (Arlandini 1999)"
+unset logscale y
+set ylabel "Predicted / Solar"
+set yrange [0:3]
+plot "" u 1:4 with linespoints pt 5 lw 1.2 title "Ratio", 1 with lines dt 2 lc rgb "gray" notitle
+unset multiplot
+""")
+        print(f"Gnuplot script: {gp}")
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# Figure 7: Nuclear Chart (Segre chart with measured vs predicted)
+# ═══════════════════════════════════════════════════════════════════════
+
+def plot_nuclear_chart():
+    header, data = load_tsv("nuclear_chart.tsv")
+    Z = data[:, 0].astype(int)
+    N = data[:, 1].astype(int)
+    BE = data[:, 2]
+    unc = data[:, 3]
+    is_meas = data[:, 4].astype(int)
+    S_n = data[:, 5]
+
+    measured_mask = is_meas == 1
+    predicted_mask = is_meas == 0
+
+    if HAS_MPL:
+        fig, ax = plt.subplots(figsize=(12, 8))
+
+        # Predicted unmeasured: colored by uncertainty
+        sc = ax.scatter(N[predicted_mask], Z[predicted_mask],
+                        c=unc[predicted_mask], cmap='RdYlGn_r',
+                        s=2, marker='s', alpha=0.8,
+                        vmin=0, vmax=np.percentile(unc[predicted_mask], 95))
+        cbar = plt.colorbar(sc, ax=ax, label='Uncertainty (MeV)', shrink=0.8)
+
+        # Measured nuclei: black dots (small)
+        ax.scatter(N[measured_mask], Z[measured_mask],
+                   c='black', s=1, marker='.', alpha=0.6, label='Measured (AME2020)')
+
+        # Magic number lines
+        magic_N = [8, 20, 28, 50, 82, 126]
+        magic_Z = [8, 20, 28, 50, 82]
+        for mn in magic_N:
+            ax.axvline(x=mn, color='gray', linestyle='--', alpha=0.4, linewidth=0.8)
+            ax.text(mn + 0.5, 112, str(mn), fontsize=7, color='gray', va='top')
+        for mz in magic_Z:
+            ax.axhline(y=mz, color='gray', linestyle='--', alpha=0.4, linewidth=0.8)
+            ax.text(182, mz + 0.5, str(mz), fontsize=7, color='gray', ha='right')
+
+        ax.set_xlabel('Neutron Number N', fontsize=13)
+        ax.set_ylabel('Proton Number Z', fontsize=13)
+        ax.set_title('Nuclear Chart: 2,964 DZ10+RF Predictions', fontsize=14)
+        ax.legend(loc='upper left', fontsize=10, markerscale=5)
+        ax.set_xlim(0, 185)
+        ax.set_ylim(0, 115)
+
+        plt.tight_layout()
+        out = os.path.join(OUT_DIR, "fig7_nuclear_chart.pdf")
+        plt.savefig(out, dpi=300)
+        plt.savefig(out.replace('.pdf', '.png'), dpi=150)
+        print(f"Saved: {out}")
+    else:
+        print("matplotlib required for nuclear chart plot")
+
+
 if __name__ == '__main__':
     os.makedirs(OUT_DIR, exist_ok=True)
     print(f"Data dir: {DATA_DIR}")
@@ -316,4 +464,6 @@ if __name__ == '__main__':
     plot_validation()
     plot_wigner()
     plot_rprocess()
+    plot_solar_comparison()
+    plot_nuclear_chart()
     print("\nDone. Figures saved to:", OUT_DIR)
