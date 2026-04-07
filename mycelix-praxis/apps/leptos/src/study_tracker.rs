@@ -257,14 +257,9 @@ pub fn ExamCountdown() -> impl IntoView {
     let set_tracker = use_set_tracker();
 
     // Set exam date if not set (default: Oct 26, 2026 for Gr12)
-    Effect::new(move |_| {
-        let t = tracker.get();
-        if t.exam_date.is_none() {
-            set_tracker.update(|t| {
-                t.exam_date = Some("2026-10-26".to_string());
-            });
-        }
-    });
+    // Note: exam_date is user-set. Don't default to SA Matric date —
+    // users who selected University/Lifelong shouldn't see a countdown.
+    // The user can set their own exam date via the profile/settings.
 
     view! {
         {move || {
@@ -288,7 +283,7 @@ pub fn ExamCountdown() -> impl IntoView {
                     <div style="display: flex; align-items: center; gap: 1rem">
                         <div style="text-align: center">
                             <div style=format!("font-size: 2rem; font-weight: 700; color: {}", urgency_color)>{days}</div>
-                            <div style="font-size: 0.7rem; color: var(--text-tertiary)">"days to exams"</div>
+                            <div style="font-size: 0.7rem; color: var(--text-tertiary)">"days to goal"</div>
                         </div>
                         <div style="flex: 1; display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem">
                             <div style="padding: 0.4rem; background: var(--soil-rich); border-radius: 6px; text-align: center">

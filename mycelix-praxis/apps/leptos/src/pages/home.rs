@@ -297,7 +297,7 @@ fn MentorGreeting(
                 <a href="/pathways" class="intention-card intention-explore" style="text-decoration: none; color: var(--text)">
                     <span class="intention-icon">"\u{1F6E4}"</span>
                     <span class="intention-label">"Career pathways"</span>
-                    <span class="intention-hint">"Beyond matric — explore careers"</span>
+                    <span class="intention-hint">"Beyond school \u{2014} explore careers"</span>
                 </a>
             </div>
 

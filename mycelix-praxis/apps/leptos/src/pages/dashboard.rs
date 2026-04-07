@@ -1028,7 +1028,7 @@ fn CapsProgressCard() -> impl IntoView {
 
     view! {
         <div class="dash-card" style="grid-column: 1 / -1">
-            <h3>"CAPS Matric Progress"</h3>
+            <h3>"Your Learning Progress"</h3>
             <div class="caps-matric-grid">
                 // Overall
                 <div>
