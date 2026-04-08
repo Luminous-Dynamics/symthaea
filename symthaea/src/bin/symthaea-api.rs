@@ -5,6 +5,7 @@
 
 use std::env;
 use std::net::SocketAddr;
+use tracing::{info, warn};
 
 fn addr_is_loopback(addr: &str) -> bool {
     if addr.starts_with("localhost:") {
@@ -33,9 +34,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Secure-by-default: localhost only unless explicitly configured otherwise.
     let addr = env::var("SYMTHAEA_API_ADDR").unwrap_or_else(|_| "127.0.0.1:8080".to_string());
 
-    let bearer_token = env::var("SYMTHAEA_API_BEARER_TOKEN")
-        .ok()
-        .and_then(|t| if t.trim().is_empty() { None } else { Some(t) });
+    let bearer_token = env::var("SYMTHAEA_API_BEARER_TOKEN").ok().and_then(|t| {
+        if t.trim().is_empty() {
+            None
+        } else {
+            Some(t)
+        }
+    });
 
     // If the operator intentionally wants to run unauthenticated on a non-loopback bind, require
     // an explicit "insecure" opt-in so this can't happen by accident.
@@ -58,6 +63,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut config = symthaea::api::ApiConfig::default();
     config.bearer_token = bearer_token;
+    config.audit_log_path = env::var("SYMTHAEA_API_AUDIT_LOG_PATH").ok().and_then(|p| {
+        if p.trim().is_empty() {
+            None
+        } else {
+            Some(std::path::PathBuf::from(p))
+        }
+    });
+
+    if let Some(path) = config.audit_log_path.as_ref() {
+        info!("API audit log persistence enabled at {}", path.display());
+    } else {
+        warn!(
+            "API audit events are retained in memory only; set SYMTHAEA_API_AUDIT_LOG_PATH for JSONL persistence"
+        );
+    }
 
     if let Ok(origins) = env::var("SYMTHAEA_API_ALLOWED_ORIGINS") {
         config.allowed_origins = origins

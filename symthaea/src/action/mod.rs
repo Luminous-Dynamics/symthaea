@@ -615,6 +615,82 @@ impl DestructivenessLevel {
     }
 }
 
+/// Capability tier for remote command execution surfaces.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum RemoteCommandCapability {
+    /// Safe observational commands with no intended side effects.
+    ReadOnly,
+    /// Explicitly recognized mutating commands.
+    Mutating,
+}
+
+/// Classify a parsed command against the remote execution capability allowlist.
+///
+/// Unknown commands are rejected so network-facing execution surfaces do not silently expand.
+pub fn classify_remote_command_capability(
+    program: &str,
+    args: &[String],
+) -> Result<RemoteCommandCapability, String> {
+    let program = program.to_lowercase();
+    let arg0 = args.first().map(|s| s.to_lowercase());
+    let arg1 = args.get(1).map(|s| s.to_lowercase());
+
+    match program.as_str() {
+        "pwd" | "echo" | "true" | "false" | "date" | "whoami" | "id" | "uname" | "hostname"
+        | "printenv" | "env" | "ls" | "cat" | "head" | "tail" | "stat" | "which" | "rg"
+        | "grep" | "find" | "journalctl" | "ps" | "df" | "du" | "free" | "sleep" => {
+            Ok(RemoteCommandCapability::ReadOnly)
+        }
+        "git" => match arg0.as_deref() {
+            Some("status" | "diff" | "show" | "log" | "rev-parse" | "branch") => {
+                Ok(RemoteCommandCapability::ReadOnly)
+            }
+            Some(
+                "commit" | "push" | "apply" | "checkout" | "switch" | "merge" | "rebase" | "pull"
+                | "reset" | "clean",
+            ) => Ok(RemoteCommandCapability::Mutating),
+            Some(other) => Err(format!(
+                "git subcommand '{other}' is not allowed over remote execution"
+            )),
+            None => Err("git requires a subcommand".to_string()),
+        },
+        "nix" => match (arg0.as_deref(), arg1.as_deref()) {
+            (Some("search"), _)
+            | (Some("eval"), _)
+            | (Some("path-info"), _)
+            | (Some("flake"), Some("show" | "metadata")) => Ok(RemoteCommandCapability::ReadOnly),
+            (Some("profile"), Some("install" | "remove")) => Ok(RemoteCommandCapability::Mutating),
+            _ => Err("nix command is not in the remote execution allowlist".to_string()),
+        },
+        "nix-env" => match arg0.as_deref() {
+            Some("-q" | "--query") => Ok(RemoteCommandCapability::ReadOnly),
+            Some("-i" | "--install" | "-e" | "--uninstall") => {
+                Ok(RemoteCommandCapability::Mutating)
+            }
+            _ => Err("nix-env command is not in the remote execution allowlist".to_string()),
+        },
+        "systemctl" => match arg0.as_deref() {
+            Some("status" | "show" | "list-units" | "list-unit-files" | "is-active") => {
+                Ok(RemoteCommandCapability::ReadOnly)
+            }
+            Some("restart" | "start" | "stop" | "disable" | "enable") => {
+                Ok(RemoteCommandCapability::Mutating)
+            }
+            _ => Err("systemctl verb is not in the remote execution allowlist".to_string()),
+        },
+        "nixos-rebuild" => match arg0.as_deref() {
+            Some("dry-run" | "build") => Ok(RemoteCommandCapability::ReadOnly),
+            Some("test" | "switch" | "boot") => Ok(RemoteCommandCapability::Mutating),
+            _ => Err("nixos-rebuild verb is not in the remote execution allowlist".to_string()),
+        },
+        "mkdir" | "touch" | "cp" | "mv" | "chmod" | "chown" | "rm" | "dd" | "mkfs" | "fdisk"
+        | "parted" | "shred" | "wipefs" => Ok(RemoteCommandCapability::Mutating),
+        _ => Err(format!(
+            "program '{program}' is not in the remote execution capability allowlist"
+        )),
+    }
+}
+
 /// Validation errors.
 #[derive(Debug, Clone)]
 pub enum PolicyViolation {
@@ -1509,8 +1585,36 @@ pub fn classify_command_destructiveness(program: &str, args: &[String]) -> Destr
     if full_cmd.contains("sudo") || full_cmd.contains("doas") {
         DestructivenessLevel::NeedsConfirmation
     } else {
-        DestructivenessLevel::Reversible
+        DestructivenessLevel::NeedsConfirmation
     }
+}
+
+/// Parse a command line into a program and arguments without invoking a shell.
+///
+/// Shell control operators and expansion syntax are rejected up front so callers can safely
+/// execute the returned program/args pair with `std::process::Command`.
+pub fn parse_command_line(command: &str) -> Result<(String, Vec<String>), String> {
+    let trimmed = command.trim();
+    if trimmed.is_empty() {
+        return Err("command is empty".to_string());
+    }
+
+    const DISALLOWED_CHARS: [char; 10] = ['|', '&', ';', '<', '>', '$', '`', '(', ')', '\n'];
+    if trimmed.contains('\r') || trimmed.chars().any(|c| DISALLOWED_CHARS.contains(&c)) {
+        return Err("shell metacharacters are not allowed".to_string());
+    }
+
+    let mut lexer = shlex::Shlex::new(trimmed);
+    let parts: Vec<String> = lexer.by_ref().collect();
+    if lexer.had_error {
+        return Err("command contains invalid shell quoting".to_string());
+    }
+
+    let mut iter = parts.into_iter();
+    let program = iter.next().ok_or_else(|| "command is empty".to_string())?;
+    let args: Vec<String> = iter.collect();
+
+    Ok((program, args))
 }
 
 /// Get rollback hint for a command to display in the shell sidecar
@@ -1552,6 +1656,32 @@ pub fn get_rollback_hint(program: &str, args: &[String]) -> Option<String> {
     }
 
     None
+}
+
+#[cfg(test)]
+mod remote_command_capability_tests {
+    use super::{classify_remote_command_capability, RemoteCommandCapability};
+
+    #[test]
+    fn test_remote_command_capability_allows_read_only_git_status() {
+        let capability = classify_remote_command_capability("git", &["status".into()])
+            .expect("git status should be allowed");
+        assert_eq!(capability, RemoteCommandCapability::ReadOnly);
+    }
+
+    #[test]
+    fn test_remote_command_capability_marks_mutating_touch() {
+        let capability = classify_remote_command_capability("touch", &["/tmp/file".into()])
+            .expect("touch should be recognized");
+        assert_eq!(capability, RemoteCommandCapability::Mutating);
+    }
+
+    #[test]
+    fn test_remote_command_capability_rejects_unknown_program() {
+        let err = classify_remote_command_capability("python", &["-c".into(), "print(1)".into()])
+            .expect_err("python should not be allowlisted");
+        assert!(err.contains("allowlist"));
+    }
 }
 
 #[cfg(test)]

@@ -6,7 +6,7 @@ All features are opt-in (`default = []`). Enable them with `cargo build --featur
 
 | Feature | Description | Dependencies |
 |---------|-------------|--------------|
-| `service` | symthaea-service CLI binary | clap |
+| `service` | `symthaea` service daemon binary | clap |
 | `shell` | symthaea-shell TUI binary | crossterm, ratatui |
 | `gui` | symthaea-gui graphical binary | eframe, egui |
 | `demo` | Demo binaries with signal handling | clap, ctrlc |

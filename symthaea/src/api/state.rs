@@ -4,7 +4,9 @@
 //! API state management
 
 use crate::api::models::*;
+use crate::control_plane::{AuditEvent, AuditLog};
 use std::collections::HashMap;
+use std::path::{Path, PathBuf};
 use symthaea_core::hdc::{
     consciousness_topology_generators::ConsciousnessTopology,
     spectral_connectivity::ConnectivityCalculator, HDC_DIMENSION,
@@ -24,6 +26,8 @@ pub struct AppState {
     pub phi_calculator: ConnectivityCalculator,
     /// Concurrency limiter for request processing.
     pub request_semaphore: Semaphore,
+    /// Persistent and in-memory audit trail for control-plane events.
+    audit_log: AuditLog,
     /// Optional bearer token for authenticated endpoints
     bearer_token: Option<String>,
 }
@@ -75,6 +79,7 @@ impl AppState {
             baselines,
             phi_calculator,
             request_semaphore: Semaphore::new(32),
+            audit_log: AuditLog::new(None, 256),
             bearer_token: None,
         }
     }
@@ -84,12 +89,30 @@ impl AppState {
         let mut state = Self::new();
         state.bearer_token = config.bearer_token.clone();
         state.request_semaphore = Semaphore::new(config.max_in_flight_requests);
+        state.audit_log = AuditLog::new(config.audit_log_path.clone(), 256);
         state
     }
 
     /// Get the configured bearer token (if any)
     pub fn bearer_token(&self) -> Option<&str> {
         self.bearer_token.as_deref()
+    }
+
+    pub fn record_audit(
+        &self,
+        event: &str,
+        subject: &str,
+        detail: &str,
+    ) -> std::io::Result<AuditEvent> {
+        self.audit_log.record("api", event, subject, detail)
+    }
+
+    pub fn audit_events(&self, limit: usize) -> Vec<AuditEvent> {
+        self.audit_log.list(limit)
+    }
+
+    pub fn audit_log_path(&self) -> Option<&Path> {
+        self.audit_log.file_path()
     }
 
     /// Compute baseline topology Φ values
@@ -169,10 +192,23 @@ impl AppState {
 
     /// Get leaderboard entries (sorted by Φ)
     pub async fn get_leaderboard(&self, limit: usize, offset: usize) -> Vec<LeaderboardEntry> {
+        let submission_visibility: HashMap<Uuid, bool> = self
+            .submissions
+            .read()
+            .await
+            .iter()
+            .map(|(id, submission)| (*id, submission.request.public))
+            .collect();
         let results: Vec<EvaluationResult> = self.results.read().await.values().cloned().collect();
         let mut entries: Vec<_> = results
             .iter()
             .filter(|r| r.status == SubmissionStatus::Completed)
+            .filter(|r| {
+                submission_visibility
+                    .get(&r.submission_id)
+                    .copied()
+                    .unwrap_or(true)
+            })
             .map(|r| LeaderboardEntry {
                 rank: 0, // Will be set after sorting
                 model_name: r.model_name.clone(),

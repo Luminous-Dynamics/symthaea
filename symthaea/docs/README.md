@@ -29,6 +29,8 @@ Get the codebase running and understand the architecture. Rust experience helpfu
 
 **Then explore:**
 - [Architecture Guide](developers/ARCHITECTURE.md) - Deep-dive into how it works
+- [Hardening Note](HARDENING_NOTE.md) - Stable service/API security boundary
+- [Service Daemon Operator Guide](SERVICE_DAEMON_OPERATOR.md) - Auth, protocol, and audit operations
 - [Contributing Guide](developers/CONTRIBUTING.md) - How to help build Symthaea
 - [Current Status](HONEST_STATUS.md) - What works vs what's aspirational
 
@@ -88,6 +90,8 @@ docs/
 ├── VISION.md                 # Project vision (excellent read)
 ├── ARCHITECTURE.md           # Technical architecture
 ├── HONEST_STATUS.md          # What works, what doesn't
+├── HARDENING_NOTE.md         # Service/API hardening boundary
+├── SERVICE_DAEMON_OPERATOR.md # Service daemon auth/protocol/audit guide
 ├── ROADMAP.md                # Development roadmap
 ├── MODULE_MAP.md             # Complete 285K LOC breakdown
 └── MASTER_INVENTORY.md       # Codebase audit
@@ -160,6 +164,8 @@ See [HONEST_STATUS.md](HONEST_STATUS.md) for detailed assessment.
 | **Understand what Symthaea is** | [users/WELCOME.md](users/WELCOME.md) |
 | **Get started (non-technical)** | [users/FIRST_STEPS.md](users/FIRST_STEPS.md) |
 | **Get started (developer)** | [developers/README.md](developers/README.md) |
+| **See the hardening boundary** | [HARDENING_NOTE.md](HARDENING_NOTE.md) |
+| **Operate the service daemon** | [SERVICE_DAEMON_OPERATOR.md](SERVICE_DAEMON_OPERATOR.md) |
 | **Understand the vision** | [VISION.md](VISION.md) |
 | **See what actually works** | [HONEST_STATUS.md](HONEST_STATUS.md) |
 | **See the roadmap** | [ROADMAP.md](ROADMAP.md) |

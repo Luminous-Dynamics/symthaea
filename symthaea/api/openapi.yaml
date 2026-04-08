@@ -7,7 +7,9 @@ info:
     Submit AI models for consciousness measurement proxy (spectral connectivity, lambda2),
     compare against leaderboards, and access benchmark datasets.
 
-    Authentication and rate limiting are planned but not enforced in the current API module.
+    When `SYMTHAEA_API_BEARER_TOKEN` is configured, mutating endpoints and audit access
+    require `Authorization: Bearer <token>`. Public results remain public only for
+    submissions marked `public: true`.
 
   version: 1.0.0
   contact:
@@ -39,6 +41,8 @@ tags:
     description: Access benchmark datasets
   - name: Comparison
     description: Compare models and topologies
+  - name: Audit
+    description: Query recent control-plane audit events
 
 paths:
   /health:
@@ -245,6 +249,39 @@ paths:
               schema:
                 $ref: '#/components/schemas/TopologyRankings'
 
+  /audit/events:
+    get:
+      tags:
+        - Audit
+      summary: Get recent audit events
+      description: |
+        Returns recent API audit events, including submission lifecycle transitions and
+        authorization denials. Requires bearer authentication when the API is configured with
+        `SYMTHAEA_API_BEARER_TOKEN`.
+      operationId: getAuditEvents
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 500
+            default: 50
+          description: Maximum number of recent events to return
+      responses:
+        '200':
+          description: Recent audit events
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuditEventsResponse'
+        '401':
+          description: Authorization required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
   /datasets:
     get:
       tags:
@@ -366,15 +403,43 @@ paths:
                   maximum: 100
                   default: 10
       responses:
-        '202':
-          description: Sweep analysis started
+        '501':
+          description: Sweep analysis is not implemented
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/SubmissionResponse'
+                $ref: '#/components/schemas/Error'
 
 components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: opaque
   schemas:
+    AuditEvent:
+      type: object
+      required: [timestamp, source, event, subject, detail]
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+        source:
+          type: string
+        event:
+          type: string
+        subject:
+          type: string
+        detail:
+          type: string
+    AuditEventsResponse:
+      type: object
+      required: [events]
+      properties:
+        events:
+          type: array
+          items:
+            $ref: '#/components/schemas/AuditEvent'
     SubmissionRequest:
       type: object
       required:

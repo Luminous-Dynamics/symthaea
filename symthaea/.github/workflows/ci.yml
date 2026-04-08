@@ -170,6 +170,133 @@ jobs:
       - name: Run tests
         run: cargo test -p symthaea --lib
 
+  test-hardened-lib:
+    name: Hardened Lib Regressions
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.93.0
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-cargo-hardened-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-hardened-
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            pkg-config \
+            libssl-dev \
+            libasound2-dev \
+            libdbus-1-dev
+
+      - name: Run focused lib regressions
+        run: |
+          CARGO_TARGET_DIR=target/hardened-lib cargo test -p symthaea test_remote_command_capability --lib
+          CARGO_TARGET_DIR=target/hardened-lib cargo test -p symthaea test_shell_metacharacters_blocked --lib
+          CARGO_TARGET_DIR=target/hardened-lib cargo test -p symthaea test_execute_timeout --lib
+          CARGO_TARGET_DIR=target/hardened-lib cargo test -p symthaea test_real_execution_handles_large_stdout --lib
+
+  test-hardened-daemon:
+    name: Hardened Daemon Regressions
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.93.0
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-cargo-hardened-daemon-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-hardened-daemon-
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            pkg-config \
+            libssl-dev \
+            libasound2-dev \
+            libdbus-1-dev
+
+      - name: Run daemon protocol regressions
+        run: |
+          CARGO_TARGET_DIR=target/hardened-daemon cargo test -p symthaea --bin symthaea --features service protocol_tests -- --nocapture
+
+      - name: Run daemon binary regressions
+        run: |
+          CARGO_TARGET_DIR=target/hardened-daemon cargo test -p symthaea --test binary_service --features service -- --nocapture
+
+  test-hardened-api:
+    name: Hardened API Regressions
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.93.0
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-cargo-hardened-api-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-hardened-api-
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            pkg-config \
+            libssl-dev \
+            libasound2-dev \
+            libdbus-1-dev
+
+      - name: Run API route-policy regressions
+        run: |
+          CARGO_TARGET_DIR=target/hardened-api cargo test -p symthaea --lib route_policy_marks_public_get_routes --features api_module -- --nocapture
+          CARGO_TARGET_DIR=target/hardened-api cargo test -p symthaea --lib protected_routes_require_auth_when_configured --features api_module -- --nocapture
+          CARGO_TARGET_DIR=target/hardened-api cargo test -p symthaea --lib authenticated_submit_is_not_rejected_by_middleware --features api_module -- --nocapture
+
+      - name: Run API integration regressions
+        run: |
+          CARGO_TARGET_DIR=target/hardened-api cargo test -p symthaea --test api_integration --features api_module -- --nocapture
+
+  test-hardened-nix:
+    name: Hardened Nix Regressions
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@v14
+
+      - name: Run Nix evaluation checks
+        run: |
+          nix build .#checks.x86_64-linux.eval-api-security
+          nix build .#checks.x86_64-linux.eval-service-module
+
   test-integration:
     name: Integration Tests
     runs-on: ubuntu-latest

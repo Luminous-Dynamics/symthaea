@@ -35,9 +35,16 @@
 //!
 //! # Client example (netcat)
 //! echo '{"type":"query","content":"install nginx"}' | nc -U /tmp/symthaea.sock
+//!
+//! # Protocol discovery
+//! echo '{"type":"protocol"}' | nc 127.0.0.1 7777
+//!
+//! # Authenticated request envelope
+//! echo '{"protocol_version":1,"authorization":"Bearer ...","type":"status"}' | nc 127.0.0.1 7777
 //! ```
 
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
@@ -46,10 +53,15 @@ use clap::Parser;
 use serde::{Deserialize, Serialize};
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::net::{TcpListener, UnixListener};
-use tokio::sync::RwLock;
+use tokio::sync::Mutex;
 use tokio::time::interval;
 use tracing::{debug, error, info, warn};
+use wait_timeout::ChildExt;
 
+use symthaea::control_plane::{
+    parse_bearer_token, service_known_not_implemented_request_types, service_readonly_programs,
+    AuditEvent, AuditLog, MAX_REQUEST_LINE_BYTES, SERVICE_PROTOCOL_VERSION,
+};
 use symthaea::hdc::{HDC_DIMENSION, LTC_NEURONS};
 use symthaea::Symthaea;
 
@@ -164,6 +176,17 @@ enum Request {
     #[serde(rename = "ping")]
     Ping,
 
+    /// Describe the daemon protocol and security envelope
+    #[serde(rename = "protocol")]
+    Protocol,
+
+    /// Query recent audit events
+    #[serde(rename = "audit_events")]
+    AuditEvents {
+        #[serde(default = "default_audit_limit")]
+        limit: usize,
+    },
+
     /// Speak text via TTS
     #[serde(rename = "speak")]
     Speak { text: String },
@@ -269,6 +292,16 @@ enum Request {
     },
 }
 
+#[derive(Debug, Deserialize)]
+struct WireRequest {
+    #[serde(default)]
+    protocol_version: Option<u32>,
+    #[serde(default)]
+    authorization: Option<String>,
+    #[serde(flatten)]
+    request: Request,
+}
+
 // Default value helpers for serde
 fn default_phi_threshold() -> f32 {
     0.5
@@ -281,6 +314,35 @@ fn default_metrics_interval() -> u64 {
 }
 fn default_search_limit() -> usize {
     10
+}
+fn default_audit_limit() -> usize {
+    50
+}
+
+fn request_name(request: &Request) -> &'static str {
+    match request {
+        Request::Query { .. } => "query",
+        Request::Status => "status",
+        Request::Introspect => "introspect",
+        Request::Sleep => "sleep",
+        Request::Save { .. } => "save",
+        Request::Shutdown => "shutdown",
+        Request::Ping => "ping",
+        Request::Protocol => "protocol",
+        Request::AuditEvents { .. } => "audit_events",
+        Request::Speak { .. } => "speak",
+        Request::Listen => "listen",
+        Request::VoiceTurn => "voice_turn",
+        Request::VoiceStatus => "voice_status",
+        Request::IntelliSense { .. } => "intellisense",
+        Request::ValidateCommand { .. } => "validate_command",
+        Request::ExecuteGated { .. } => "execute_gated",
+        Request::StreamMetrics { .. } => "stream_metrics",
+        Request::GuiWidgetChange { .. } => "gui_widget_change",
+        Request::ParseNixConfig { .. } => "parse_nix_config",
+        Request::Partnership => "partnership",
+        Request::SemanticSearch { .. } => "semantic_search",
+    }
 }
 
 /// Response to client
@@ -349,19 +411,43 @@ enum Response {
     #[serde(rename = "pong")]
     Pong { timestamp: u64 },
 
+    /// Protocol metadata
+    #[serde(rename = "protocol_info")]
+    ProtocolInfo {
+        protocol_version: u32,
+        min_supported_version: u32,
+        auth_required: bool,
+        auth_scheme: Option<String>,
+        execute_gated_mode: String,
+        allowed_readonly_programs: Vec<String>,
+        known_not_implemented_requests: Vec<String>,
+        notes: Vec<String>,
+    },
+
+    /// Recent audit events
+    #[serde(rename = "audit_events")]
+    AuditEvents { events: Vec<AuditEvent> },
+
     /// Error response
     #[serde(rename = "error")]
     Error { message: String },
 
+    /// Request reached a known but unsupported feature surface
+    #[serde(rename = "not_implemented")]
+    NotImplemented { feature: String, message: String },
+
     /// Speech synthesized (TTS complete)
+    #[cfg(feature = "voice-tts")]
     #[serde(rename = "spoken")]
     Spoken { text: String, duration_ms: u64 },
 
     /// Speech transcribed (STT complete)
+    #[cfg(feature = "voice-tts")]
     #[serde(rename = "transcribed")]
     Transcribed { text: String, confidence: f32 },
 
     /// Voice conversation turn complete
+    #[cfg(feature = "voice-tts")]
     #[serde(rename = "voice_turn_response")]
     VoiceTurnResponse {
         user_said: String,
@@ -446,20 +532,6 @@ enum Response {
         safety_checks: u64,
         /// Timestamp in milliseconds
         timestamp_ms: u64,
-    },
-
-    // ========================================================================
-    // GUI BRIDGE RESPONSES (Phase 4 Protocol Extensions)
-    // ========================================================================
-    /// GUI synchronization response
-    #[serde(rename = "gui_sync")]
-    GuiSync {
-        /// Widget state updates
-        widget_updates: Vec<WidgetUpdate>,
-        /// Generated Nix diff (if applicable)
-        nix_diff: Option<String>,
-        /// Validation errors
-        validation_errors: Vec<ValidationError>,
     },
 
     /// Semantic search results
@@ -554,52 +626,6 @@ pub enum SafetyLevel {
     Dangerous,
 }
 
-// ============================================================================
-// SUPPORTING TYPES FOR GUI BRIDGE
-// ============================================================================
-
-/// Widget state update for GUI synchronization
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct WidgetUpdate {
-    /// Widget identifier
-    pub widget_id: String,
-    /// New value
-    pub value: serde_json::Value,
-    /// Source of the update
-    pub source: UpdateSource,
-}
-
-/// Source of a widget update
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum UpdateSource {
-    NixConfig,
-    UserInput,
-    Default,
-}
-
-/// Validation error for GUI
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ValidationError {
-    /// Widget or path that has the error
-    pub target: String,
-    /// Error message
-    pub message: String,
-    /// Severity
-    pub severity: ErrorSeverity,
-    /// Suggested fix
-    pub suggested_fix: Option<String>,
-}
-
-/// Error severity
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum ErrorSeverity {
-    Error,
-    Warning,
-    Info,
-}
-
 /// Search result for semantic search
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SearchResult {
@@ -617,19 +643,158 @@ pub struct SearchResult {
 
 /// Service state
 struct ServiceState {
-    symthaea: Symthaea,
+    symthaea: Mutex<Symthaea>,
+    audit_log: AuditLog,
     start_time: Instant,
-    requests_processed: u64,
-    sleep_cycles: u32,
+    requests_processed: AtomicU64,
+    sleep_cycles: AtomicU32,
+    auth_enabled: bool,
     state_file: Option<PathBuf>,
     #[cfg(feature = "voice-tts")]
-    voice: Option<VoiceConversation>,
+    voice: Mutex<Option<VoiceConversation>>,
     #[cfg(feature = "voice-tts")]
     voice_enabled: bool,
 }
 
+#[derive(Clone, Default)]
+struct ServiceSecurity {
+    bearer_token: Option<String>,
+}
+
+fn addr_is_loopback(addr: &str) -> bool {
+    if addr.starts_with("localhost:") {
+        return true;
+    }
+
+    if let Ok(sa) = addr.parse::<std::net::SocketAddr>() {
+        return sa.ip().is_loopback();
+    }
+
+    false
+}
+
+fn env_truthy(key: &str) -> bool {
+    std::env::var(key)
+        .ok()
+        .map(|v| matches!(v.to_lowercase().as_str(), "1" | "true" | "yes" | "on"))
+        .unwrap_or(false)
+}
+
+fn request_requires_auth(request: &Request) -> bool {
+    !matches!(request, Request::Ping | Request::Protocol)
+}
+
+fn service_auth_error_message() -> String {
+    "Authentication required: include top-level field `authorization` with value `Bearer <token>`"
+        .to_string()
+}
+
+fn run_structured_command(command: &str) -> Result<String, String> {
+    use std::io::Read;
+    use std::process::{Command, Stdio};
+    use std::thread;
+
+    let (program, args) = symthaea::action::parse_command_line(command)
+        .map_err(|e| format!("Invalid command: {e}"))?;
+
+    let mut child = Command::new(&program)
+        .args(&args)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .map_err(|e| format!("Failed to spawn '{program}': {e}"))?;
+
+    let stdout = child
+        .stdout
+        .take()
+        .ok_or_else(|| "Missing stdout pipe".to_string())?;
+    let stderr = child
+        .stderr
+        .take()
+        .ok_or_else(|| "Missing stderr pipe".to_string())?;
+
+    let stdout_handle = thread::spawn(move || {
+        let mut stdout = stdout;
+        let mut buf = Vec::new();
+        let _ = stdout.read_to_end(&mut buf);
+        buf
+    });
+    let stderr_handle = thread::spawn(move || {
+        let mut stderr = stderr;
+        let mut buf = Vec::new();
+        let _ = stderr.read_to_end(&mut buf);
+        buf
+    });
+
+    let timeout = Duration::from_secs(30);
+    let status = match child
+        .wait_timeout(timeout)
+        .map_err(|e| format!("Failed to wait for process: {e}"))?
+    {
+        Some(status) => status,
+        None => {
+            let _ = child.kill();
+            let _ = child.wait();
+            let _ = stdout_handle.join();
+            let _ = stderr_handle.join();
+            return Err("Command timed out after 30s".to_string());
+        }
+    };
+
+    let stdout = stdout_handle
+        .join()
+        .map_err(|_| "stdout reader thread panicked".to_string())?;
+    let stderr = stderr_handle
+        .join()
+        .map_err(|_| "stderr reader thread panicked".to_string())?;
+
+    let stdout = String::from_utf8_lossy(&stdout);
+    let stderr = String::from_utf8_lossy(&stderr);
+    let mut output = String::new();
+    if !stdout.is_empty() {
+        output.push_str(&stdout);
+    }
+    if !stderr.is_empty() {
+        if !output.is_empty() && !output.ends_with('\n') {
+            output.push('\n');
+        }
+        output.push_str(&stderr);
+    }
+    if output.is_empty() {
+        output = format!("Command exited with status {:?}", status.code());
+    }
+
+    if status.success() {
+        Ok(output)
+    } else {
+        Err(format!(
+            "Command exited with status {:?}\n{}",
+            status.code(),
+            output
+        ))
+    }
+}
+
+async fn write_response<W>(writer: &mut W, response: &Response) -> Result<()>
+where
+    W: tokio::io::AsyncWrite + Unpin,
+{
+    let json = serde_json::to_string(response)?;
+    writer.write_all(json.as_bytes()).await?;
+    writer.write_all(b"\n").await?;
+    writer.flush().await?;
+    Ok(())
+}
+
+struct ProcessedRequestOutcome {
+    response: Response,
+    shutdown: bool,
+}
+
 impl ServiceState {
     async fn new(
+        auth_enabled: bool,
+        audit_log_path: Option<PathBuf>,
         state_file: Option<PathBuf>,
         #[cfg(feature = "voice-tts")] voice_enabled: bool,
         #[cfg(feature = "voice-tts")] voice_id: u8,
@@ -677,20 +842,40 @@ impl ServiceState {
         };
 
         Ok(Self {
-            symthaea,
+            symthaea: Mutex::new(symthaea),
+            audit_log: AuditLog::new(audit_log_path, 256),
             start_time: Instant::now(),
-            requests_processed: 0,
-            sleep_cycles: 0,
+            requests_processed: AtomicU64::new(0),
+            sleep_cycles: AtomicU32::new(0),
+            auth_enabled,
             state_file,
             #[cfg(feature = "voice-tts")]
-            voice,
+            voice: Mutex::new(voice),
             #[cfg(feature = "voice-tts")]
             voice_enabled,
         })
     }
 
-    async fn handle_request(&mut self, request: Request) -> Response {
-        self.requests_processed += 1;
+    fn record_audit(&self, event: &str, subject: &str, detail: &str) {
+        match self.audit_log.record("service", event, subject, detail) {
+            Ok(entry) => info!(
+                target: "symthaea_service_audit",
+                event = %entry.event,
+                subject = %entry.subject,
+                detail = %entry.detail
+            ),
+            Err(err) => warn!(
+                target: "symthaea_service_audit",
+                event = %event,
+                subject = %subject,
+                detail = %detail,
+                error = %err
+            ),
+        }
+    }
+
+    async fn handle_request(&self, request: Request) -> Response {
+        self.requests_processed.fetch_add(1, Ordering::Relaxed);
 
         match request {
             Request::Query {
@@ -698,10 +883,11 @@ impl ServiceState {
                 context: _,
             } => {
                 let start = Instant::now();
-                match self.symthaea.process(&content).await {
+                let mut symthaea = self.symthaea.lock().await;
+                match symthaea.process(&content).await {
                     Ok(response) => {
-                        let intro = self.symthaea.introspect();
-                        let partnership = self.symthaea.partnership_state();
+                        let intro = symthaea.introspect();
+                        let partnership = symthaea.partnership_state();
                         Response::QueryResponse {
                             content: response.content,
                             confidence: response.confidence,
@@ -719,19 +905,25 @@ impl ServiceState {
             }
 
             Request::Status => {
-                let intro = self.symthaea.introspect();
+                let intro = {
+                    let symthaea = self.symthaea.lock().await;
+                    symthaea.introspect()
+                };
                 Response::Status {
                     uptime_seconds: self.start_time.elapsed().as_secs(),
-                    requests_processed: self.requests_processed,
+                    requests_processed: self.requests_processed.load(Ordering::Relaxed),
                     consciousness_level: intro.consciousness_level,
                     memory_count: intro.memory_stats.short_term_count
                         + intro.memory_stats.long_term_count,
-                    sleep_cycles: self.sleep_cycles,
+                    sleep_cycles: self.sleep_cycles.load(Ordering::Relaxed),
                 }
             }
 
             Request::Introspect => {
-                let intro = self.symthaea.introspect();
+                let intro = {
+                    let symthaea = self.symthaea.lock().await;
+                    symthaea.introspect()
+                };
                 // Derive consciousness metrics from available data
                 let phi = intro.consciousness_level as f64;
                 let is_conscious = intro.consciousness_level > 0.5;
@@ -757,20 +949,23 @@ impl ServiceState {
                 }
             }
 
-            Request::Sleep => match self.symthaea.sleep().await {
-                Ok(report) => {
-                    self.sleep_cycles += 1;
-                    Response::SleepReport {
-                        scaled: report.scaled,
-                        consolidated: report.consolidated,
-                        pruned: report.pruned,
-                        patterns_extracted: report.patterns_extracted,
+            Request::Sleep => {
+                let mut symthaea = self.symthaea.lock().await;
+                match symthaea.sleep().await {
+                    Ok(report) => {
+                        self.sleep_cycles.fetch_add(1, Ordering::Relaxed);
+                        Response::SleepReport {
+                            scaled: report.scaled,
+                            consolidated: report.consolidated,
+                            pruned: report.pruned,
+                            patterns_extracted: report.patterns_extracted,
+                        }
                     }
+                    Err(e) => Response::Error {
+                        message: format!("Sleep error: {}", e),
+                    },
                 }
-                Err(e) => Response::Error {
-                    message: format!("Sleep error: {}", e),
-                },
-            },
+            }
 
             Request::Save { path } => {
                 let save_path = path
@@ -779,7 +974,8 @@ impl ServiceState {
                     .unwrap_or_else(|| PathBuf::from("symthaea-state.bin"));
 
                 let path_str = save_path.to_string_lossy();
-                match self.symthaea.pause(&path_str) {
+                let mut symthaea = self.symthaea.lock().await;
+                match symthaea.pause(&path_str) {
                     Ok(()) => Response::Saved {
                         path: save_path.display().to_string(),
                     },
@@ -793,7 +989,8 @@ impl ServiceState {
                 // Save state before shutdown if configured
                 if let Some(ref path) = self.state_file {
                     let path_str = path.to_string_lossy();
-                    let _ = self.symthaea.pause(&path_str);
+                    let mut symthaea = self.symthaea.lock().await;
+                    let _ = symthaea.pause(&path_str);
                     info!("State saved to {:?}", path);
                 }
                 Response::ShutdownAck
@@ -806,11 +1003,47 @@ impl ServiceState {
                     .as_secs(),
             },
 
+            Request::Protocol => Response::ProtocolInfo {
+                protocol_version: SERVICE_PROTOCOL_VERSION,
+                min_supported_version: SERVICE_PROTOCOL_VERSION,
+                auth_required: self.auth_enabled,
+                auth_scheme: Some("authorization: \"Bearer <token>\"".to_string()),
+                execute_gated_mode: "read_only_allowlist".to_string(),
+                allowed_readonly_programs: service_readonly_programs(),
+                known_not_implemented_requests: service_known_not_implemented_request_types(),
+                notes: {
+                    let mut notes = vec![
+                        "The daemon accepts a JSON-line envelope with optional protocol_version and authorization fields."
+                            .to_string(),
+                        "Mutating commands are rejected over the daemon protocol.".to_string(),
+                        "gui_widget_change and parse_nix_config are reserved request types that currently return not_implemented."
+                            .to_string(),
+                    ];
+                    if let Some(path) = self.audit_log.file_path() {
+                        notes.push(format!(
+                            "Audit events are retained in memory and appended to JSONL at {}.",
+                            path.display()
+                        ));
+                    } else {
+                        notes.push(
+                            "Audit events are retained in memory only unless SYMTHAEA_SERVICE_AUDIT_LOG_PATH is configured."
+                                .to_string(),
+                        );
+                    }
+                    notes
+                },
+            },
+
+            Request::AuditEvents { limit } => Response::AuditEvents {
+                events: self.audit_log.list(limit.min(500)),
+            },
+
             // Voice requests
             Request::Speak { text } => {
                 #[cfg(feature = "voice-tts")]
                 {
-                    if let Some(ref mut voice) = self.voice {
+                    let mut voice = self.voice.lock().await;
+                    if let Some(ref mut voice) = *voice {
                         let start = Instant::now();
                         match voice.speak(&text) {
                             Ok(()) => Response::Spoken {
@@ -840,7 +1073,8 @@ impl ServiceState {
             Request::Listen => {
                 #[cfg(feature = "voice-tts")]
                 {
-                    if let Some(ref mut voice) = self.voice {
+                    let mut voice = self.voice.lock().await;
+                    if let Some(ref mut voice) = *voice {
                         match voice.listen() {
                             Ok(text) => Response::Transcribed {
                                 text,
@@ -868,23 +1102,30 @@ impl ServiceState {
             Request::VoiceTurn => {
                 #[cfg(feature = "voice-tts")]
                 {
-                    if let Some(ref mut voice) = self.voice {
-                        let start = Instant::now();
-
-                        // Listen for user speech
-                        let user_said = match voice.listen() {
-                            Ok(text) => text,
-                            Err(e) => {
-                                return Response::Error {
-                                    message: format!("Listen error: {}", e),
-                                };
+                    let user_said = {
+                        let mut voice = self.voice.lock().await;
+                        if let Some(ref mut voice) = *voice {
+                            match voice.listen() {
+                                Ok(text) => text,
+                                Err(e) => {
+                                    return Response::Error {
+                                        message: format!("Listen error: {}", e),
+                                    };
+                                }
                             }
-                        };
+                        } else {
+                            return Response::Error {
+                                message: "Voice not enabled".into(),
+                            };
+                        }
+                    };
 
-                        // Process through consciousness
-                        let (assistant_said, phi) = match self.symthaea.process(&user_said).await {
+                    let start = Instant::now();
+                    let (assistant_said, phi) = {
+                        let mut symthaea = self.symthaea.lock().await;
+                        match symthaea.process(&user_said).await {
                             Ok(response) => {
-                                let intro = self.symthaea.introspect();
+                                let intro = symthaea.introspect();
                                 (response.content, intro.consciousness_level)
                             }
                             Err(e) => {
@@ -892,23 +1133,23 @@ impl ServiceState {
                                     message: format!("Processing error: {}", e),
                                 };
                             }
-                        };
+                        }
+                    };
 
-                        // Speak response
-                        if let Err(e) = voice.speak(&assistant_said) {
-                            warn!("TTS error (continuing): {}", e);
+                    {
+                        let mut voice = self.voice.lock().await;
+                        if let Some(ref mut voice) = *voice {
+                            if let Err(e) = voice.speak(&assistant_said) {
+                                warn!("TTS error (continuing): {}", e);
+                            }
                         }
+                    }
 
-                        Response::VoiceTurnResponse {
-                            user_said,
-                            assistant_said,
-                            phi,
-                            processing_time_ms: start.elapsed().as_millis() as u64,
-                        }
-                    } else {
-                        Response::Error {
-                            message: "Voice not enabled".into(),
-                        }
+                    Response::VoiceTurnResponse {
+                        user_said,
+                        assistant_said,
+                        phi,
+                        processing_time_ms: start.elapsed().as_millis() as u64,
                     }
                 }
                 #[cfg(not(feature = "voice-tts"))]
@@ -923,11 +1164,12 @@ impl ServiceState {
             Request::VoiceStatus => {
                 #[cfg(feature = "voice-tts")]
                 {
+                    let voice = self.voice.lock().await;
                     Response::VoiceStatusResponse {
                         enabled: self.voice_enabled,
-                        stt_ready: self.voice.is_some(),
-                        tts_ready: self.voice.is_some(),
-                        voice_id: self.voice.as_ref().map(|_| 0).unwrap_or(0),
+                        stt_ready: voice.is_some(),
+                        tts_ready: voice.is_some(),
+                        voice_id: voice.as_ref().map(|_| 0).unwrap_or(0),
                     }
                 }
                 #[cfg(not(feature = "voice-tts"))]
@@ -942,7 +1184,10 @@ impl ServiceState {
             }
 
             Request::Partnership => {
-                let state = self.symthaea.partnership_state();
+                let state = {
+                    let symthaea = self.symthaea.lock().await;
+                    symthaea.partnership_state()
+                };
                 Response::Partnership {
                     stage: format!("{:?}", state.stage),
                     trust: state.trust,
@@ -962,7 +1207,10 @@ impl ServiceState {
                 cursor_position: _,
                 context: _,
             } => {
-                let intro = self.symthaea.introspect();
+                let intro = {
+                    let symthaea = self.symthaea.lock().await;
+                    symthaea.introspect()
+                };
 
                 // Generate completions based on partial input
                 // For now, provide basic NixOS-aware completions
@@ -990,22 +1238,32 @@ impl ServiceState {
                 dry_run: _,
             } => {
                 use symthaea::action::{
-                    classify_command_destructiveness, get_rollback_hint, DestructivenessLevel,
+                    classify_command_destructiveness, classify_remote_command_capability,
+                    get_rollback_hint, parse_command_line, DestructivenessLevel,
+                    RemoteCommandCapability,
                 };
 
-                let intro = self.symthaea.introspect();
+                let intro = {
+                    let symthaea = self.symthaea.lock().await;
+                    symthaea.introspect()
+                };
 
-                // Parse command into program and args
-                let parts: Vec<&str> = command.split_whitespace().collect();
-                let (program, args) = if parts.is_empty() {
-                    ("", vec![])
+                let (program, args, parse_error) = match parse_command_line(&command) {
+                    Ok((program, args)) => (program, args, None),
+                    Err(err) => ("".to_string(), Vec::new(), Some(err)),
+                };
+                let capability = if parse_error.is_none() {
+                    classify_remote_command_capability(&program, &args)
                 } else {
-                    (parts[0], parts[1..].iter().map(|s| s.to_string()).collect())
+                    Err("command could not be parsed".to_string())
                 };
+                let read_only_capable =
+                    matches!(&capability, Ok(RemoteCommandCapability::ReadOnly));
+                let mutating_capable = matches!(&capability, Ok(RemoteCommandCapability::Mutating));
 
                 // Classify destructiveness
-                let destructiveness = classify_command_destructiveness(program, &args);
-                let rollback_hint = get_rollback_hint(program, &args);
+                let destructiveness = classify_command_destructiveness(&program, &args);
+                let rollback_hint = get_rollback_hint(&program, &args);
 
                 // Determine safety level
                 let safety_level = match destructiveness {
@@ -1026,6 +1284,17 @@ impl ServiceState {
                 // Generate warnings
                 let current_phi = intro.consciousness_level as f64;
                 let mut warnings = Vec::new();
+                if let Some(err) = &parse_error {
+                    warnings.push(err.clone());
+                }
+                if let Err(err) = &capability {
+                    warnings.push(err.clone());
+                }
+                if mutating_capable {
+                    warnings.push(
+                        "Mutating commands are not executable over the daemon protocol".to_string(),
+                    );
+                }
                 if destructiveness.requires_confirmation() {
                     warnings.push(format!(
                         "This command requires confirmation: {}",
@@ -1040,7 +1309,7 @@ impl ServiceState {
                 }
 
                 Response::ValidationResult {
-                    valid: true,
+                    valid: read_only_capable,
                     safety_level,
                     destructiveness: format!("{:?}", destructiveness),
                     phi_required,
@@ -1055,21 +1324,64 @@ impl ServiceState {
                 phi_threshold,
                 require_confirmation,
             } => {
-                use symthaea::action::{classify_command_destructiveness, get_rollback_hint};
+                use symthaea::action::{
+                    classify_command_destructiveness, classify_remote_command_capability,
+                    get_rollback_hint, parse_command_line, RemoteCommandCapability,
+                };
 
-                let intro = self.symthaea.introspect();
+                let intro = {
+                    let symthaea = self.symthaea.lock().await;
+                    symthaea.introspect()
+                };
                 let current_phi = intro.consciousness_level; // Use consciousness_level as phi
 
                 // Parse command
-                let parts: Vec<&str> = command.split_whitespace().collect();
-                let (program, args) = if parts.is_empty() {
-                    ("", vec![])
-                } else {
-                    (parts[0], parts[1..].iter().map(|s| s.to_string()).collect())
+                let (program, args) = match parse_command_line(&command) {
+                    Ok(parsed) => parsed,
+                    Err(err) => {
+                        return Response::ExecutionResult {
+                            executed: false,
+                            output: None,
+                            phi_at_execution: current_phi,
+                            gate_reason: Some(err),
+                            requires_confirmation: false,
+                            destructiveness: "Invalid".to_string(),
+                            rollback_hint: None,
+                        };
+                    }
                 };
 
-                let destructiveness = classify_command_destructiveness(program, &args);
-                let rollback_hint = get_rollback_hint(program, &args);
+                let destructiveness = classify_command_destructiveness(&program, &args);
+                let rollback_hint = get_rollback_hint(&program, &args);
+                let capability = match classify_remote_command_capability(&program, &args) {
+                    Ok(capability) => capability,
+                    Err(err) => {
+                        self.record_audit("command_blocked", "execute_gated", &err);
+                        return Response::ExecutionResult {
+                            executed: false,
+                            output: None,
+                            phi_at_execution: current_phi,
+                            gate_reason: Some(err),
+                            requires_confirmation: false,
+                            destructiveness: format!("{:?}", destructiveness),
+                            rollback_hint,
+                        };
+                    }
+                };
+                if capability != RemoteCommandCapability::ReadOnly {
+                    let reason =
+                        "Mutating commands are not permitted over the daemon protocol".to_string();
+                    self.record_audit("command_blocked", "execute_gated", &reason);
+                    return Response::ExecutionResult {
+                        executed: false,
+                        output: None,
+                        phi_at_execution: current_phi,
+                        gate_reason: Some(reason),
+                        requires_confirmation: false,
+                        destructiveness: format!("{:?}", destructiveness),
+                        rollback_hint,
+                    };
+                }
                 let needs_confirmation =
                     require_confirmation && destructiveness.requires_confirmation();
 
@@ -1105,39 +1417,45 @@ impl ServiceState {
                     };
                 }
 
-                // Execute through consciousness pipeline
-                match self.symthaea.process(&command).await {
-                    Ok(response) => Response::ExecutionResult {
+                self.record_audit("command_execute_attempt", "execute_gated", &command);
+                match run_structured_command(&command) {
+                    Ok(output) => Response::ExecutionResult {
                         executed: true,
-                        output: Some(response.content),
+                        output: Some(output),
                         phi_at_execution: current_phi,
                         gate_reason: None,
                         requires_confirmation: false,
                         destructiveness: format!("{:?}", destructiveness),
                         rollback_hint,
                     },
-                    Err(e) => Response::ExecutionResult {
-                        executed: false,
-                        output: Some(format!("Error: {}", e)),
-                        phi_at_execution: current_phi,
-                        gate_reason: Some(e.to_string()),
-                        requires_confirmation: false,
-                        destructiveness: format!("{:?}", destructiveness),
-                        rollback_hint,
-                    },
+                    Err(e) => {
+                        self.record_audit("command_execute_failed", "execute_gated", &e);
+                        Response::ExecutionResult {
+                            executed: false,
+                            output: None,
+                            phi_at_execution: current_phi,
+                            gate_reason: Some(e),
+                            requires_confirmation: false,
+                            destructiveness: format!("{:?}", destructiveness),
+                            rollback_hint,
+                        }
+                    }
                 }
             }
 
             Request::StreamMetrics { interval_ms: _ } => {
                 // For now, return a single metrics snapshot
                 // Full streaming would require a different connection model
-                let intro = self.symthaea.introspect();
+                let intro = {
+                    let symthaea = self.symthaea.lock().await;
+                    symthaea.introspect()
+                };
 
                 Response::MetricsUpdate {
                     phi: intro.consciousness_level, // Use consciousness_level as phi approximation
                     coherence: intro.consciousness_level,
                     consciousness_level: intro.consciousness_level,
-                    safety_checks: self.requests_processed,
+                    safety_checks: self.requests_processed.load(Ordering::Relaxed),
                     timestamp_ms: std::time::SystemTime::now()
                         .duration_since(std::time::UNIX_EPOCH)
                         .unwrap_or_default()
@@ -1146,40 +1464,32 @@ impl ServiceState {
             }
 
             // ================================================================
-            // GUI BRIDGE HANDLERS (Phase 4 - Stub implementations)
+            // GUI BRIDGE HANDLERS (Phase 4 - currently not implemented)
             // ================================================================
-            Request::GuiWidgetChange {
-                widget_id,
-                new_value: _,
-                semantic_intent: _,
-            } => {
-                // Stub: Full implementation in Phase 4
-                Response::GuiSync {
-                    widget_updates: vec![],
-                    nix_diff: Some(format!("# Widget {} changed", widget_id)),
-                    validation_errors: vec![],
+            Request::GuiWidgetChange { .. } => {
+                self.record_audit(
+                    "not_implemented",
+                    "gui_widget_change",
+                    "GUI bridge handlers are not implemented in the service daemon",
+                );
+                Response::NotImplemented {
+                    feature: "gui_widget_change".to_string(),
+                    message: "GUI bridge handlers are not implemented in this daemon build"
+                        .to_string(),
                 }
             }
 
-            Request::ParseNixConfig {
-                nix_content,
-                source_file: _,
-            } => {
-                // Stub: Full implementation in Phase 4
-                let line_count = nix_content.lines().count();
-                Response::GuiSync {
-                    widget_updates: vec![],
-                    nix_diff: None,
-                    validation_errors: if line_count == 0 {
-                        vec![ValidationError {
-                            target: "config".to_string(),
-                            message: "Empty configuration".to_string(),
-                            severity: ErrorSeverity::Warning,
-                            suggested_fix: None,
-                        }]
-                    } else {
-                        vec![]
-                    },
+            Request::ParseNixConfig { .. } => {
+                self.record_audit(
+                    "not_implemented",
+                    "parse_nix_config",
+                    "Nix GUI synchronization parsing is not implemented in the service daemon",
+                );
+                Response::NotImplemented {
+                    feature: "parse_nix_config".to_string(),
+                    message:
+                        "Nix GUI synchronization parsing is not implemented in this daemon build"
+                            .to_string(),
                 }
             }
 
@@ -1500,8 +1810,119 @@ fn generate_search_results(
     results
 }
 
+async fn process_request_line(
+    line: &str,
+    state: Arc<ServiceState>,
+    security: ServiceSecurity,
+) -> Result<Option<ProcessedRequestOutcome>> {
+    let line = line.trim();
+    if line.is_empty() {
+        return Ok(None);
+    }
+
+    if line.as_bytes().len() > MAX_REQUEST_LINE_BYTES {
+        state.record_audit(
+            "request_too_large",
+            "unknown",
+            "request line exceeded service limit",
+        );
+        return Ok(Some(ProcessedRequestOutcome {
+            response: Response::Error {
+                message: format!(
+                    "Request exceeds maximum line length of {} bytes",
+                    MAX_REQUEST_LINE_BYTES
+                ),
+            },
+            shutdown: false,
+        }));
+    }
+
+    debug!("Received: {}", line);
+
+    let wire_request: WireRequest = match serde_json::from_str(line) {
+        Ok(r) => r,
+        Err(e) => {
+            state.record_audit("invalid_json", "unknown", &e.to_string());
+            return Ok(Some(ProcessedRequestOutcome {
+                response: Response::Error {
+                    message: format!("Invalid JSON: {}", e),
+                },
+                shutdown: false,
+            }));
+        }
+    };
+
+    if let Some(version) = wire_request.protocol_version {
+        if version != SERVICE_PROTOCOL_VERSION {
+            state.record_audit(
+                "protocol_version_rejected",
+                request_name(&wire_request.request),
+                &format!(
+                    "client sent protocol_version={}, supported={}",
+                    version, SERVICE_PROTOCOL_VERSION
+                ),
+            );
+            return Ok(Some(ProcessedRequestOutcome {
+                response: Response::Error {
+                    message: format!(
+                        "Unsupported protocol_version {} (supported: {})",
+                        version, SERVICE_PROTOCOL_VERSION
+                    ),
+                },
+                shutdown: false,
+            }));
+        }
+    }
+
+    if request_requires_auth(&wire_request.request) {
+        if let Some(expected_token) = security.bearer_token.as_deref() {
+            let provided_token = wire_request
+                .authorization
+                .as_deref()
+                .and_then(parse_bearer_token);
+            if provided_token != Some(expected_token) {
+                state.record_audit(
+                    "auth_failed",
+                    request_name(&wire_request.request),
+                    "missing or invalid bearer token",
+                );
+                return Ok(Some(ProcessedRequestOutcome {
+                    response: Response::Error {
+                        message: service_auth_error_message(),
+                    },
+                    shutdown: false,
+                }));
+            }
+        }
+    }
+
+    let request = wire_request.request;
+    state.record_audit(
+        "request_received",
+        request_name(&request),
+        "request accepted",
+    );
+
+    let shutdown = matches!(request, Request::Shutdown);
+    let response = state.handle_request(request).await;
+
+    if shutdown {
+        state.record_audit(
+            "shutdown_requested",
+            "shutdown",
+            "authenticated shutdown accepted",
+        );
+    }
+
+    Ok(Some(ProcessedRequestOutcome { response, shutdown }))
+}
+
 /// Handle a single connection
-async fn handle_connection<S>(mut stream: S, state: Arc<RwLock<ServiceState>>) -> Result<bool>
+async fn handle_connection<S>(
+    mut stream: S,
+    state: Arc<ServiceState>,
+    security: ServiceSecurity,
+) -> Result<bool>
 where
     S: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin,
 {
@@ -1514,61 +1935,306 @@ where
         let bytes_read = reader.read_line(&mut line).await?;
 
         if bytes_read == 0 {
-            // Connection closed
             break;
         }
 
-        let line = line.trim();
-        if line.is_empty() {
+        let Some(outcome) = process_request_line(&line, state.clone(), security.clone()).await?
+        else {
             continue;
-        }
-
-        debug!("Received: {}", line);
-
-        // Parse request
-        let request: Request = match serde_json::from_str(line) {
-            Ok(r) => r,
-            Err(e) => {
-                let response = Response::Error {
-                    message: format!("Invalid JSON: {}", e),
-                };
-                let json = serde_json::to_string(&response)?;
-                writer.write_all(json.as_bytes()).await?;
-                writer.write_all(b"\n").await?;
-                writer.flush().await?;
-                continue;
-            }
         };
 
-        // Check for shutdown
-        let is_shutdown = matches!(request, Request::Shutdown);
+        write_response(&mut writer, &outcome.response).await?;
 
-        // Handle request
-        let response = {
-            let mut state = state.write().await;
-            state.handle_request(request).await
-        };
-
-        // Send response
-        let json = serde_json::to_string(&response)?;
-        writer.write_all(json.as_bytes()).await?;
-        writer.write_all(b"\n").await?;
-        writer.flush().await?;
-
-        if is_shutdown {
-            return Ok(true); // Signal shutdown
+        if outcome.shutdown {
+            return Ok(true);
         }
     }
 
     Ok(false)
 }
 
+#[cfg(test)]
+mod protocol_tests {
+    use super::*;
+    use serde_json::json;
+
+    fn service_request_type_names() -> Vec<&'static str> {
+        vec![
+            "ping",
+            "protocol",
+            "status",
+            "introspect",
+            "sleep",
+            "save",
+            "shutdown",
+            "audit_events",
+            "query",
+            "speak",
+            "listen",
+            "voice_turn",
+            "voice_status",
+            "intellisense",
+            "validate_command",
+            "execute_gated",
+            "stream_metrics",
+            "gui_widget_change",
+            "parse_nix_config",
+            "semantic_search",
+            "partnership",
+        ]
+    }
+
+    async fn test_state(auth_enabled: bool) -> Arc<ServiceState> {
+        Arc::new(
+            ServiceState::new(
+                auth_enabled,
+                None,
+                None,
+                #[cfg(feature = "voice-tts")]
+                false,
+                #[cfg(feature = "voice-tts")]
+                0,
+            )
+            .await
+            .expect("service state"),
+        )
+    }
+
+    fn test_security(token: Option<&str>) -> ServiceSecurity {
+        ServiceSecurity {
+            bearer_token: token.map(str::to_string),
+        }
+    }
+
+    async fn process_json(
+        value: serde_json::Value,
+        state: Arc<ServiceState>,
+        security: ServiceSecurity,
+    ) -> Response {
+        let line = serde_json::to_string(&value).expect("request JSON");
+        process_request_line(&line, state, security)
+            .await
+            .expect("request outcome")
+            .expect("non-empty request")
+            .response
+    }
+
+    fn response_json(response: &Response) -> serde_json::Value {
+        serde_json::to_value(response).expect("response JSON")
+    }
+
+    #[tokio::test]
+    async fn protocol_request_reports_version_and_auth_scheme() {
+        let state = test_state(true).await;
+        let response = process_json(
+            json!({"type": "protocol"}),
+            state,
+            test_security(Some("secret-token")),
+        )
+        .await;
+
+        let json = response_json(&response);
+        assert_eq!(json["type"], "protocol_info");
+        assert_eq!(json["protocol_version"], SERVICE_PROTOCOL_VERSION);
+        assert_eq!(json["auth_required"], true);
+        assert!(json["auth_scheme"]
+            .as_str()
+            .expect("auth scheme")
+            .contains("Bearer"));
+        assert_eq!(
+            json["allowed_readonly_programs"]
+                .as_array()
+                .expect("allowed_readonly_programs")
+                .len(),
+            service_readonly_programs().len()
+        );
+        assert_eq!(
+            json["known_not_implemented_requests"]
+                .as_array()
+                .expect("known_not_implemented_requests")
+                .iter()
+                .filter_map(|value| value.as_str())
+                .collect::<Vec<_>>(),
+            service_known_not_implemented_request_types()
+                .iter()
+                .map(String::as_str)
+                .collect::<Vec<_>>()
+        );
+        assert!(json["notes"]
+            .as_array()
+            .expect("notes")
+            .iter()
+            .any(|note| note
+                .as_str()
+                .unwrap_or_default()
+                .contains("SYMTHAEA_SERVICE_AUDIT_LOG_PATH")));
+    }
+
+    #[test]
+    fn protocol_schema_covers_runtime_request_types() {
+        let schema: serde_json::Value = serde_json::from_str(include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/api/service-protocol-v1.schema.json"
+        )))
+        .expect("schema JSON");
+
+        let request_types = schema["properties"]["type"]["enum"]
+            .as_array()
+            .expect("type enum")
+            .iter()
+            .filter_map(|value| value.as_str())
+            .collect::<Vec<_>>();
+
+        for request_type in service_request_type_names() {
+            assert!(
+                request_types.contains(&request_type),
+                "schema is missing runtime request type {request_type}"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn protected_request_requires_bearer_auth() {
+        let state = test_state(true).await;
+        let response = process_json(
+            json!({"type": "status"}),
+            state,
+            test_security(Some("secret-token")),
+        )
+        .await;
+
+        let json = response_json(&response);
+        assert_eq!(json["type"], "error");
+        assert!(json["message"]
+            .as_str()
+            .expect("message")
+            .contains("Authentication required"));
+    }
+
+    #[tokio::test]
+    async fn audit_events_return_recorded_entries() {
+        let state = test_state(true).await;
+        let security = test_security(Some("secret-token"));
+
+        let _ = process_json(
+            json!({
+                "authorization": "Bearer secret-token",
+                "type": "status"
+            }),
+            state.clone(),
+            security.clone(),
+        )
+        .await;
+
+        let response = process_json(
+            json!({
+                "authorization": "Bearer secret-token",
+                "type": "audit_events",
+                "limit": 5
+            }),
+            state,
+            security,
+        )
+        .await;
+
+        let json = response_json(&response);
+        assert_eq!(json["type"], "audit_events");
+        let events = json["events"].as_array().expect("events");
+        assert!(!events.is_empty(), "expected at least one audit event");
+        assert!(events
+            .iter()
+            .any(|event| event["event"] == "request_received" && event["subject"] == "status"));
+    }
+
+    #[tokio::test]
+    async fn protocol_version_mismatch_is_rejected() {
+        let state = test_state(false).await;
+        let response = process_json(
+            json!({
+                "protocol_version": SERVICE_PROTOCOL_VERSION + 1,
+                "type": "ping"
+            }),
+            state,
+            test_security(None),
+        )
+        .await;
+
+        let json = response_json(&response);
+        assert_eq!(json["type"], "error");
+        assert!(json["message"]
+            .as_str()
+            .expect("message")
+            .contains("Unsupported protocol_version"));
+    }
+
+    #[tokio::test]
+    async fn oversized_request_is_rejected() {
+        let state = test_state(false).await;
+        let line = format!(
+            "{{\"type\":\"ping\",\"padding\":\"{}\"}}",
+            "a".repeat(MAX_REQUEST_LINE_BYTES)
+        );
+
+        let response = process_request_line(&line, state, test_security(None))
+            .await
+            .expect("request outcome")
+            .expect("response")
+            .response;
+
+        let json = response_json(&response);
+        assert_eq!(json["type"], "error");
+        assert!(json["message"]
+            .as_str()
+            .expect("message")
+            .contains("maximum line length"));
+    }
+
+    #[tokio::test]
+    async fn execute_gated_rejects_mutating_command() {
+        let state = test_state(true).await;
+        let response = process_json(
+            json!({
+                "authorization": "Bearer secret-token",
+                "type": "execute_gated",
+                "command": "touch /tmp/symthaea-should-not-exist"
+            }),
+            state,
+            test_security(Some("secret-token")),
+        )
+        .await;
+
+        let json = response_json(&response);
+        assert_eq!(json["type"], "execution_result");
+        assert_eq!(json["executed"], false);
+        assert!(json["gate_reason"]
+            .as_str()
+            .expect("gate_reason")
+            .contains("Mutating commands"));
+    }
+
+    #[tokio::test]
+    async fn gui_bridge_requests_return_not_implemented() {
+        let state = test_state(false).await;
+        let response = process_json(
+            json!({
+                "type": "gui_widget_change",
+                "widget_id": "sidebar",
+                "new_value": true,
+                "semantic_intent": "toggle"
+            }),
+            state,
+            test_security(None),
+        )
+        .await;
+
+        let json = response_json(&response);
+        assert_eq!(json["type"], "not_implemented");
+        assert_eq!(json["feature"], "gui_widget_change");
+    }
+}
+
 /// Background consciousness loop
-async fn consciousness_loop(
-    state: Arc<RwLock<ServiceState>>,
-    interval_ms: u64,
-    sleep_interval: u64,
-) {
+async fn consciousness_loop(state: Arc<ServiceState>, interval_ms: u64, sleep_interval: u64) {
     let mut ticker = interval(Duration::from_millis(interval_ms));
     let mut sleep_counter = 0u64;
 
@@ -1577,8 +2243,8 @@ async fn consciousness_loop(
 
         // Simple consciousness maintenance
         {
-            let state = state.read().await;
-            let intro = state.symthaea.introspect();
+            let symthaea = state.symthaea.lock().await;
+            let intro = symthaea.introspect();
             // Derive metrics from available data
             let phi = intro.consciousness_level as f64;
             let is_conscious = intro.consciousness_level > 0.5;
@@ -1597,9 +2263,9 @@ async fn consciousness_loop(
             if sleep_counter >= sleep_interval * 1000 {
                 sleep_counter = 0;
                 info!("Triggering automatic sleep cycle");
-                let mut state = state.write().await;
-                if let Ok(report) = state.symthaea.sleep().await {
-                    state.sleep_cycles += 1;
+                let mut symthaea = state.symthaea.lock().await;
+                if let Ok(report) = symthaea.sleep().await {
+                    state.sleep_cycles.fetch_add(1, Ordering::Relaxed);
                     info!(
                         "Sleep complete: consolidated={}, pruned={}",
                         report.consolidated, report.pruned
@@ -1627,13 +2293,57 @@ async fn main() -> Result<()> {
         anyhow::bail!("Must specify either --socket or --tcp");
     }
 
+    let service_bearer_token = std::env::var("SYMTHAEA_SERVICE_BEARER_TOKEN")
+        .ok()
+        .and_then(|t| if t.trim().is_empty() { None } else { Some(t) });
+    let service_audit_log_path = std::env::var("SYMTHAEA_SERVICE_AUDIT_LOG_PATH")
+        .ok()
+        .and_then(|p| {
+            if p.trim().is_empty() {
+                None
+            } else {
+                Some(PathBuf::from(p))
+            }
+        });
+    let insecure_allow_unauth = env_truthy("SYMTHAEA_SERVICE_INSECURE_ALLOW_UNAUTH");
+
+    if let Some(path) = service_audit_log_path.as_ref() {
+        info!(
+            "Service audit log persistence enabled at {}",
+            path.display()
+        );
+    } else {
+        warn!(
+            "Service audit events are retained in memory only; set SYMTHAEA_SERVICE_AUDIT_LOG_PATH for JSONL persistence"
+        );
+    }
+
+    if let Some(ref tcp_addr) = args.tcp {
+        if !addr_is_loopback(tcp_addr) && service_bearer_token.is_none() && !insecure_allow_unauth {
+            eprintln!("Refusing to bind Symthaea service to non-loopback address without auth.");
+            eprintln!("  addr: {}", tcp_addr);
+            eprintln!();
+            eprintln!("Set one of:");
+            eprintln!("  - SYMTHAEA_SERVICE_BEARER_TOKEN=...   (recommended)");
+            eprintln!("  - SYMTHAEA_SERVICE_INSECURE_ALLOW_UNAUTH=1   (NOT recommended)");
+            std::process::exit(2);
+        }
+
+        if !addr_is_loopback(tcp_addr) && service_bearer_token.is_none() && insecure_allow_unauth {
+            eprintln!("WARNING: Symthaea service is binding publicly without auth (insecure).");
+            eprintln!("  addr: {}", tcp_addr);
+        }
+    }
+
     println!("\n🌟 Symthaea Service Starting...");
     println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
 
     // Initialize state
     info!("Initializing consciousness...");
-    let state = Arc::new(RwLock::new(
+    let state = Arc::new(
         ServiceState::new(
+            service_bearer_token.is_some(),
+            service_audit_log_path,
             args.state_file.clone(),
             #[cfg(feature = "voice-tts")]
             args.voice,
@@ -1642,11 +2352,16 @@ async fn main() -> Result<()> {
         )
         .await
         .context("Failed to initialize service state")?,
-    ));
+    );
+    let security = ServiceSecurity {
+        bearer_token: service_bearer_token,
+    };
 
     {
-        let s = state.read().await;
-        let intro = s.symthaea.introspect();
+        let intro = {
+            let symthaea = state.symthaea.lock().await;
+            symthaea.introspect()
+        };
         // Derive consciousness metrics
         let phi = intro.consciousness_level as f64;
         let is_conscious = intro.consciousness_level > 0.5;
@@ -1672,8 +2387,9 @@ async fn main() -> Result<()> {
 
         #[cfg(feature = "voice-tts")]
         {
-            if s.voice_enabled {
-                if s.voice.is_some() {
+            if state.voice_enabled {
+                let voice = state.voice.lock().await;
+                if voice.is_some() {
                     println!("   • Voice: ✅ Enabled (STT + TTS ready)");
                 } else {
                     println!("   • Voice: ⚠️ Enabled but failed to initialize");
@@ -1712,9 +2428,10 @@ async fn main() -> Result<()> {
         loop {
             let (stream, _addr) = listener.accept().await?;
             let state = Arc::clone(&state);
+            let security = security.clone();
 
             tokio::spawn(async move {
-                match handle_connection(stream, state).await {
+                match handle_connection(stream, state, security).await {
                     Ok(shutdown) => {
                         if shutdown {
                             info!("Shutdown requested");
@@ -1740,9 +2457,10 @@ async fn main() -> Result<()> {
             let (stream, addr) = listener.accept().await?;
             info!("New connection from {}", addr);
             let state = Arc::clone(&state);
+            let security = security.clone();
 
             tokio::spawn(async move {
-                match handle_connection(stream, state).await {
+                match handle_connection(stream, state, security).await {
                     Ok(shutdown) => {
                         if shutdown {
                             info!("Shutdown requested");

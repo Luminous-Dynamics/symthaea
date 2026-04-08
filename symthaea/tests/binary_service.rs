@@ -17,6 +17,21 @@ use tempfile::TempDir;
 
 /// Get the path to the built binary
 fn binary_path() -> PathBuf {
+    if let Some(path) = option_env!("CARGO_BIN_EXE_symthaea") {
+        return PathBuf::from(path);
+    }
+
+    if let Ok(target_dir) = std::env::var("CARGO_TARGET_DIR") {
+        let mut path = PathBuf::from(target_dir);
+        path.push(if cfg!(debug_assertions) {
+            "debug"
+        } else {
+            "release"
+        });
+        path.push("symthaea");
+        return path;
+    }
+
     let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     path.push("target");
     path.push(if cfg!(debug_assertions) {
@@ -30,8 +45,14 @@ fn binary_path() -> PathBuf {
 
 /// Build the binary if needed
 fn ensure_binary_built() {
+    if option_env!("CARGO_BIN_EXE_symthaea").is_some() {
+        return;
+    }
+
     let status = Command::new("cargo")
         .args(["build", "--bin", "symthaea", "--features", "service"])
+        .env_remove("RUSTC_WRAPPER")
+        .env("SCCACHE_DISABLE", "1")
         .stdout(Stdio::null())
         .stderr(Stdio::null())
         .status()
@@ -221,6 +242,22 @@ mod startup_tests {
         } else {
             eprintln!("[Info] Could not connect (service may need more time or dependencies)");
         }
+    }
+
+    #[test]
+    fn test_public_tcp_requires_auth_or_explicit_insecure_opt_in() {
+        ensure_binary_built();
+
+        let output = Command::new(binary_path())
+            .arg("--tcp")
+            .arg("0.0.0.0:19998")
+            .output()
+            .expect("Failed to execute binary");
+
+        assert!(
+            !output.status.success(),
+            "service should refuse public TCP bind without auth"
+        );
     }
 
     #[test]

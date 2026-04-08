@@ -450,6 +450,7 @@ tree-sitter = { workspace = true }
 syn = { version = "2.0", features = ["full", "visit"] }  # Rust syntax parsing (self-analysis)
 ignore = "0.4"       # .gitignore-aware file walking
 urlencoding = "2.1"
+shlex = "1.3"
 
 # Week 12 Phase 2a: Voice Output (Larynx) - Kokoro TTS (optional)
 # Also used for Qwen3-Embedding and SigLIP vision models
@@ -511,7 +512,7 @@ turbo-quant = []  # PolarQuant HDC vector compression (hv_compression.rs, memory
 
 # ── Binary build gates ──────────────────────────────────────────────
 # These enable optional dependencies for specific binaries.
-service = ["clap"]                          # symthaea-service binary
+service = ["clap"]                          # symthaea service daemon binary
 shell = ["crossterm", "ratatui"]            # symthaea-shell TUI binary
 gui = ["eframe", "egui"]                    # symthaea-gui binary
 demo = ["clap", "ctrlc"]                    # Demo binaries (CLI args + signal handling)
@@ -806,6 +807,7 @@ symthaea-mycelix-conductor = { path = "crates/symthaea-mycelix-conductor" }
 symthaea-epistemic-types = { path = "crates/symthaea-epistemic-types" }
 mycelix-bridge-common = { path = "../crates/mycelix-bridge-common" }
 tempfile = "3.8"  # For perception tests
+tower = { version = "0.5", features = ["util"] }  # Router oneshot helpers in integration tests
 
 # Binaries
 # Note: Some binaries require specific features or external crates

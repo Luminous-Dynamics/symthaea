@@ -26,6 +26,7 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 
 use crate::consciousness::holon_receiver::{HolonResponse, SomaMessage};
+use crate::control_plane::parse_bearer_token;
 
 /// Shared state for the Holon HTTP handlers.
 ///
@@ -142,7 +143,7 @@ fn token_from_query(req: &Request) -> Option<String> {
 
 fn token_from_headers(headers: &HeaderMap) -> Option<String> {
     if let Some(value) = headers.get("authorization").and_then(|v| v.to_str().ok()) {
-        if let Some(token) = value.strip_prefix("Bearer ") {
+        if let Some(token) = parse_bearer_token(value) {
             let token = token.trim();
             if !token.is_empty() {
                 return Some(token.to_string());
@@ -338,11 +339,7 @@ async fn holon_telemetry(State(state): State<SharedHolonState>) -> impl IntoResp
         .lock()
         .map(|g| g.clone())
         .unwrap_or_else(|_| "{}".to_string());
-    (
-        StatusCode::OK,
-        [("content-type", "application/json")],
-        json,
-    )
+    (StatusCode::OK, [("content-type", "application/json")], json)
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -573,10 +570,7 @@ async fn holon_broca(
             task_type: "broca".to_string(),
             payload: req.prompt.clone(),
         };
-        state
-            .inbound_tx
-            .send((req.source.clone(), msg))
-            .is_ok()
+        state.inbound_tx.send((req.source.clone(), msg)).is_ok()
     } else {
         false
     };
@@ -646,10 +640,7 @@ async fn holon_converse(
             task_type: "converse".to_string(),
             payload: req.text.clone(),
         };
-        state
-            .inbound_tx
-            .send((req.source.clone(), msg))
-            .is_ok()
+        state.inbound_tx.send((req.source.clone(), msg)).is_ok()
     } else {
         false
     };
@@ -767,9 +758,11 @@ async fn holon_search(
                 .collect();
 
             // If local results have good epistemic quality, return without web fetch
-            let avg_sim: f32 =
-                local_results.iter().map(|r| r.query_similarity).sum::<f32>()
-                    / local_results.len() as f32;
+            let avg_sim: f32 = local_results
+                .iter()
+                .map(|r| r.query_similarity)
+                .sum::<f32>()
+                / local_results.len() as f32;
             if avg_sim > 0.3 {
                 return Json(SearchResponse {
                     claims,

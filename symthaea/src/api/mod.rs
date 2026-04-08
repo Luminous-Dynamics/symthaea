@@ -33,15 +33,17 @@ pub mod state;
 pub mod ws;
 
 use crate::api::state::AppState;
+use crate::control_plane::parse_bearer_token;
 use axum::{
     extract::DefaultBodyLimit,
-    extract::{ws::WebSocketUpgrade, Request},
+    extract::{ws::WebSocketUpgrade, Request, State},
     http::{HeaderMap, Method, StatusCode},
     middleware,
     response::Response,
     routing::{get, post},
     Router,
 };
+use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use tower_http::cors::CorsLayer;
@@ -58,6 +60,8 @@ pub struct ApiConfig {
     pub max_body_bytes: usize,
     /// Max number of in-flight requests before backpressure.
     pub max_in_flight_requests: usize,
+    /// Optional JSONL audit log path.
+    pub audit_log_path: Option<PathBuf>,
 }
 
 impl Default for ApiConfig {
@@ -70,23 +74,22 @@ impl Default for ApiConfig {
             bearer_token: None,
             max_body_bytes: 16 * 1024 * 1024,
             max_in_flight_requests: 32,
+            audit_log_path: None,
         }
     }
 }
 
-/// Authentication middleware that checks for Bearer token on mutating endpoints.
+/// Authentication middleware that checks for Bearer token on protected endpoints.
 ///
-/// Health and GET leaderboard/dataset endpoints are public.
-/// POST endpoints require authentication when a bearer token is configured.
+/// Health and read-only public catalog endpoints remain public.
+/// Audit access and mutating endpoints require authentication when a bearer token is configured.
 async fn auth_middleware(
+    State(state): State<Arc<AppState>>,
     headers: HeaderMap,
     request: Request,
     next: middleware::Next,
 ) -> Result<Response, StatusCode> {
-    let state = request.extensions().get::<Arc<AppState>>();
-
-    // Extract configured token from app state
-    let required_token = state.and_then(|s| s.bearer_token());
+    let required_token = state.bearer_token();
 
     // If no token is configured, allow everything (development mode)
     let Some(expected_token) = required_token else {
@@ -99,30 +102,30 @@ async fn auth_middleware(
         return Ok(next.run(request).await);
     }
 
-    // Allow public GET endpoints without auth
+    // Allow public catalog endpoints without auth. Results remain on the GET allowlist
+    // because the handler performs per-submission privacy checks.
     let method = request.method().clone();
-    if method == Method::GET
-        && (path.starts_with("/v1/leaderboard")
-            || path.starts_with("/v1/datasets")
-            || path.starts_with("/v1/results"))
-    {
+    if route_is_public_without_auth(&method, path) {
         return Ok(next.run(request).await);
     }
 
     // For all other endpoints, require Bearer token
-    let auth_header = headers.get("authorization").and_then(|v| v.to_str().ok());
+    let auth_header = headers
+        .get("authorization")
+        .and_then(|v| v.to_str().ok())
+        .and_then(parse_bearer_token);
 
     match auth_header {
-        Some(value) if value.starts_with("Bearer ") => {
-            let token = &value[7..];
-            if token == expected_token {
-                Ok(next.run(request).await)
-            } else {
-                Err(StatusCode::UNAUTHORIZED)
-            }
-        }
+        Some(token) if token == expected_token => Ok(next.run(request).await),
         _ => Err(StatusCode::UNAUTHORIZED),
     }
+}
+
+fn route_is_public_without_auth(method: &Method, path: &str) -> bool {
+    *method == Method::GET
+        && (path.starts_with("/v1/leaderboard")
+            || path.starts_with("/v1/datasets")
+            || path.starts_with("/v1/results"))
 }
 
 /// Build a CORS layer with restricted origins.
@@ -176,6 +179,7 @@ pub fn create_router_with_config(config: ApiConfig) -> Router {
         .route("/v1/datasets/:dataset_id", get(handlers::get_dataset))
         .route("/v1/compare", post(handlers::compare_models))
         .route("/v1/dimensional-sweep", post(handlers::dimensional_sweep))
+        .route("/v1/audit/events", get(handlers::get_audit_events))
         // Metrics endpoints
         .route("/metrics", get(handlers::metrics_prometheus)) // Prometheus scrape endpoint
         .route("/v1/metrics", get(handlers::metrics_json)) // JSON metrics
@@ -183,7 +187,10 @@ pub fn create_router_with_config(config: ApiConfig) -> Router {
         .route("/health", get(handlers::health_check))
         .route("/v1/health", get(handlers::health_check))
         // Security layers
-        .layer(middleware::from_fn(auth_middleware))
+        .layer(middleware::from_fn_with_state(
+            state.clone(),
+            auth_middleware,
+        ))
         .layer(cors)
         .layer(DefaultBodyLimit::max(config.max_body_bytes))
         // Add shared state
@@ -221,7 +228,9 @@ pub fn create_demo_router() -> Result<Router, Box<dyn std::error::Error>> {
 }
 
 /// Create a demo router with custom security configuration.
-pub fn create_demo_router_with_config(config: ApiConfig) -> Result<Router, Box<dyn std::error::Error>> {
+pub fn create_demo_router_with_config(
+    config: ApiConfig,
+) -> Result<Router, Box<dyn std::error::Error>> {
     let runner = demo_runner::DemoRunner::new()?;
     let runner = Arc::new(Mutex::new(runner));
     let state = Arc::new(AppState::new_with_config(&config));
@@ -243,6 +252,7 @@ pub fn create_demo_router_with_config(config: ApiConfig) -> Result<Router, Box<d
         .route("/v1/datasets/:dataset_id", get(handlers::get_dataset))
         .route("/v1/compare", post(handlers::compare_models))
         .route("/v1/dimensional-sweep", post(handlers::dimensional_sweep))
+        .route("/v1/audit/events", get(handlers::get_audit_events))
         // Metrics
         .route("/metrics", get(handlers::metrics_prometheus))
         .route("/v1/metrics", get(handlers::metrics_json))
@@ -268,7 +278,10 @@ pub fn create_demo_router_with_config(config: ApiConfig) -> Result<Router, Box<d
     };
 
     let app = app
-        .layer(middleware::from_fn(auth_middleware))
+        .layer(middleware::from_fn_with_state(
+            state.clone(),
+            auth_middleware,
+        ))
         .layer(cors)
         .layer(DefaultBodyLimit::max(config.max_body_bytes))
         .with_state(state);
@@ -293,4 +306,114 @@ pub async fn serve_demo_with_config(
     println!("  WebSocket endpoint: ws://{}/v1/ws/live", addr);
     axum::serve(listener, app).await?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use axum::body::Body;
+    use axum::http::Request;
+    use tower::util::ServiceExt;
+
+    fn authed_router() -> Router {
+        create_router_with_config(ApiConfig {
+            bearer_token: Some("test-token".to_string()),
+            ..ApiConfig::default()
+        })
+    }
+
+    #[test]
+    fn route_policy_marks_public_get_routes() {
+        assert!(route_is_public_without_auth(
+            &Method::GET,
+            "/v1/leaderboard"
+        ));
+        assert!(route_is_public_without_auth(&Method::GET, "/v1/datasets"));
+        assert!(route_is_public_without_auth(
+            &Method::GET,
+            "/v1/results/submission-1"
+        ));
+        assert!(!route_is_public_without_auth(
+            &Method::GET,
+            "/v1/audit/events"
+        ));
+        assert!(!route_is_public_without_auth(&Method::POST, "/v1/submit"));
+    }
+
+    #[tokio::test]
+    async fn public_routes_remain_accessible_without_auth() {
+        let app = authed_router();
+
+        for request in [
+            Request::builder()
+                .uri("/health")
+                .body(Body::empty())
+                .expect("health request"),
+            Request::builder()
+                .uri("/v1/leaderboard")
+                .body(Body::empty())
+                .expect("leaderboard request"),
+            Request::builder()
+                .uri("/v1/datasets")
+                .body(Body::empty())
+                .expect("datasets request"),
+            Request::builder()
+                .uri("/v1/results/non-existent")
+                .body(Body::empty())
+                .expect("results request"),
+        ] {
+            let response = app.clone().oneshot(request).await.expect("route response");
+            assert_ne!(response.status(), StatusCode::UNAUTHORIZED);
+        }
+    }
+
+    #[tokio::test]
+    async fn protected_routes_require_auth_when_configured() {
+        let app = authed_router();
+
+        for request in [
+            Request::builder()
+                .uri("/v1/audit/events")
+                .body(Body::empty())
+                .expect("audit request"),
+            Request::builder()
+                .method(Method::POST)
+                .uri("/v1/submit")
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    r#"{"model_name":"test-model","topology_type":"ring","n_nodes":8}"#,
+                ))
+                .expect("submit request"),
+            Request::builder()
+                .method(Method::POST)
+                .uri("/v1/compare")
+                .header("content-type", "application/json")
+                .body(Body::from(r#"{"model_a":"a","model_b":"b"}"#))
+                .expect("compare request"),
+        ] {
+            let response = app.clone().oneshot(request).await.expect("route response");
+            assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+        }
+    }
+
+    #[tokio::test]
+    async fn authenticated_submit_is_not_rejected_by_middleware() {
+        let app = authed_router();
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method(Method::POST)
+                    .uri("/v1/submit")
+                    .header("content-type", "application/json")
+                    .header("authorization", "Bearer test-token")
+                    .body(Body::from(
+                        r#"{"model_name":"auth-model","topology_type":"ring","n_nodes":8}"#,
+                    ))
+                    .expect("submit request"),
+            )
+            .await
+            .expect("route response");
+
+        assert_ne!(response.status(), StatusCode::UNAUTHORIZED);
+    }
 }
