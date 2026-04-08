@@ -71,6 +71,8 @@ export SYMTHAEA_SERVICE_AUDIT_LOG_PATH=/var/lib/symthaea/service-audit.jsonl
 - Rotate the JSONL file with your normal log rotation tooling; the daemon appends one JSON object per line.
 - The NixOS module defaults this to `${dataDir}/logs/service-audit.jsonl`.
 - The NixOS module also installs weekly log rotation with compression and eight retained archives for that file.
+- Keep the audit log readable only by trusted operators; it may contain request metadata, command validation details, and auth-failure context.
+- If you centralize logs, preserve JSONL line boundaries and do not drop rejected or denied events.
 
 ## Benchmark API
 
@@ -105,4 +107,8 @@ export SYMTHAEA_API_AUDIT_LOG_PATH=/var/lib/symthaea/api-audit.jsonl
 - Prefer Unix sockets for local automation.
 - If you expose TCP, require bearer auth and keep the bind on loopback unless there is a strong reason not to.
 - Treat the daemon and API audit logs as append-only operational records and rotate them outside the process.
+- Decide retention and access policy before exposing audit queries to other tooling. The default ring buffer is for short-term inspection; the JSONL path is the durable record.
 - Use the daemon `protocol` request and API OpenAPI spec as the source of truth for client generation.
+- For deployment changes, keep both Nix checks green:
+  - `eval-service-module`
+  - `service-module-smoke`

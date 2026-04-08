@@ -285,7 +285,7 @@ jobs:
   test-hardened-nix:
     name: Hardened Nix Regressions
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
 
@@ -296,6 +296,7 @@ jobs:
         run: |
           nix build .#checks.x86_64-linux.eval-api-security
           nix build .#checks.x86_64-linux.eval-service-module
+          nix build .#checks.x86_64-linux.service-module-smoke
 
   test-integration:
     name: Integration Tests

@@ -30,6 +30,16 @@ This note records the current hardening boundary for Symthaea's service and API 
 - The NixOS module sets `SYMTHAEA_SERVICE_AUDIT_LOG_PATH=${dataDir}/logs/service-audit.jsonl`.
 - The same module configures weekly compressed rotation with eight retained archives.
 - The service module is expected to preserve core hardening flags like `NoNewPrivileges`, `PrivateTmp`, and `RestrictAddressFamilies=AF_UNIX`.
+- The deployment test surface now includes both module evaluation and a VM-backed service smoke test.
+
+## Required CI gate
+
+- Changes touching the service daemon, API auth/privacy, shared control-plane code, or Nix deployment should keep these jobs green:
+  - `Hardened Lib Regressions`
+  - `Hardened Daemon Regressions`
+  - `Hardened API Regressions`
+  - `Hardened Nix Regressions`
+- Treat those jobs as the merge gate for control-plane changes even if broader CI is still green.
 
 ## Change discipline
 
@@ -40,3 +50,4 @@ This note records the current hardening boundary for Symthaea's service and API 
   - focused regression tests
 - Do not widen remote execution capability without explicit review.
 - Do not add more “recognized but not implemented” request types unless they are intentionally reserved and documented as such.
+- Prefer deployment smoke coverage or focused route/protocol tests over broad unstructured integration churn.

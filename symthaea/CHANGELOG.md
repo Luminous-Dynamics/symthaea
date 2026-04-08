@@ -5,6 +5,16 @@ All notable changes to Symthaea HLB will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Security
+- Hardened the service daemon and benchmark API control planes around bearer-authenticated access, private result handling, audit logging, and read-only remote execution policy.
+- Added split hardened CI coverage for lib, daemon, API, and Nix deployment paths.
+- Added Nix deployment checks for both service-module evaluation and VM-backed socket-activation smoke coverage.
+
+### Changed
+- Froze the current daemon protocol/auth surface as the default compatibility boundary and documented reserved-but-unimplemented daemon verbs explicitly.
+
 ## [0.5.0] - 2026-02-03
 
 ### Added

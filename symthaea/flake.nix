@@ -407,6 +407,7 @@
           installer-iso-security = import ./nix/tests/installer-iso-security.nix { inherit pkgs; };
           eval-api-security = import ./nix/tests/eval-api-security.nix { inherit pkgs; };
           eval-service-module = import ./nix/tests/eval-service-module.nix { inherit pkgs; };
+          service-module-smoke = import ./nix/tests/service-module-smoke.nix { inherit pkgs; };
         };
 
         formatter = pkgs.nixpkgs-fmt;
