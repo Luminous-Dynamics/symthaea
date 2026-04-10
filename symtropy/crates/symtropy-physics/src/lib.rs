@@ -16,6 +16,7 @@
 
 pub mod body;
 pub mod broadphase;
+pub mod ccd;
 pub mod contact;
 pub mod constraint;
 pub mod epa;

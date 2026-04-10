@@ -2,7 +2,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! HDC vs Scalar cooperation experiment.
 //!
-//! Compares two consciousness substrates under identical thermodynamic pressure:
+//! Requires: `cargo run --example hdc_cooperation --features consciousness-hdc`
+//!
+//! Compares two Φ-computation substrates under identical thermodynamic pressure:
 //! - SCALAR: MasterConsciousnessEquation → fixed Phi (current baseline)
 //! - HDC: 16,384D thought vectors via HdcLtcUnifiedNetwork → emergent Phi
 //!

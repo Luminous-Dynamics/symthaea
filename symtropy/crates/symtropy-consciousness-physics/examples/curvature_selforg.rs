@@ -1,6 +1,8 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-//! Curvature Self-Organization — do agents organize around consciousness wells?
+//! Curvature Self-Organization — do agents organize around Φ-curvature wells?
+//!
+//! Requires: `cargo run --example curvature_selforg --features consciousness-curvature`
 //!
 //! Places agents randomly, creates a consciousness curvature well at origin.
 //! Tests whether geodesic corrections cause agents to orbit, cluster,

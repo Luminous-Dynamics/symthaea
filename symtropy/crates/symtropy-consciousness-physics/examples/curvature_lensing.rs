@@ -1,6 +1,8 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-//! Curvature lensing experiment — does consciousness bend space?
+//! Curvature lensing experiment — does integrated information (Φ) bend space?
+//!
+//! Requires: `cargo run --example curvature_lensing --features consciousness-curvature`
 //!
 //! A test body is launched past a stationary consciousness source.
 //! If conformal curvature is active, the body's trajectory should bend
