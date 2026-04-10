@@ -2655,6 +2655,7 @@ impl MultiWorldSimulator {
                                 let trauma_from_deaths = (to_kill as f64 / survivors as f64).min(0.3);
                                 for agent in world.agents.iter_mut().filter(|a| a.is_alive()) {
                                     agent.trauma_level = (agent.trauma_level + trauma_from_deaths).min(1.0);
+                                    agent.wounds.push(wound_healing::WoundState::new(trauma_from_deaths.min(0.5), wound_healing::WoundOrigin::Disaster, self.current_tick));
                                 }
                             }
                         }
@@ -2783,6 +2784,7 @@ impl MultiWorldSimulator {
                     if trauma_inc > 0.001 {
                         for agent in world.agents.iter_mut().filter(|a| a.is_alive()) {
                             agent.trauma_level = (agent.trauma_level + trauma_inc).min(1.0);
+                            if trauma_inc > 0.05 { agent.wounds.push(wound_healing::WoundState::new(trauma_inc.min(0.5), wound_healing::WoundOrigin::Disaster, self.current_tick)); }
                         }
                     }
                 }
@@ -3206,6 +3208,10 @@ impl MultiWorldSimulator {
                         agent.consciousness.meta_awareness = (agent.consciousness.meta_awareness + 0.01).min(1.0);
                     }
                     agent.trauma_level = wound_healing::aggregate_trauma(&agent.wounds);
+                    // TEND cost for care services (wound healing requires community resources)
+                    if !agent.wounds.is_empty() && ctx.care_ratio > 0.01 {
+                        agent.tend_balance = (agent.tend_balance - 0.5).max(-40.0);
+                    }
                 }
             }
 
@@ -3215,14 +3221,43 @@ impl MultiWorldSimulator {
             // Phase 3: Psychological needs
             self.tick_psychological_needs();
 
+            // Metabolism: apply recovery multiplier to allostatic load
+            for world in &mut self.worlds {
+                let mult = phase_modifiers.get(&world.id).map(|m| m.recovery_mult).unwrap_or(1.0);
+                if (mult - 1.0).abs() > 0.01 {
+                    let boost = (mult - 1.0) * 0.002;
+                    for agent in world.agents.iter_mut().filter(|a| a.is_alive()) {
+                        agent.needs.allostatic_load = (agent.needs.allostatic_load - boost).max(0.0);
+                    }
+                }
+            }
             // Phase 3.5: Education (peer-to-peer learning, TEND rewards)
             self.tick_education();
 
             // Phase 4: Economy
             self.tick_economy();
 
+            // Metabolism: modulate production output
+            for world in &mut self.worlds {
+                let prod_mult = phase_modifiers.get(&world.id).map(|m| m.production_mult).unwrap_or(1.0);
+                if (prod_mult - 1.0).abs() > 0.01 {
+                    for output in &mut world.economy.sector_output {
+                        *output *= prod_mult;
+                    }
+                }
+            }
             // Phase 4.5: Currency — MYCEL/SAP/TEND tick
             for world in &mut self.worlds {
+                // SAP income: workers earn proportional to sector output
+                let total_output: f64 = world.economy.sector_output.iter().sum();
+                let living_workers = world.agents.iter().filter(|a| a.is_alive()).count();
+                if living_workers > 0 && total_output > 0.0 {
+                    let sap_per_worker = (total_output * 0.1) / living_workers as f64;
+                    for agent in world.agents.iter_mut().filter(|a| a.is_alive()) {
+                        agent.sap_balance += sap_per_worker;
+                    }
+                }
+
                 // TEND bounds enforcement
                 for agent in world.agents.iter_mut().filter(|a| a.is_alive()) {
                     agent.tend_balance = agent.tend_balance.clamp(-currency::TEND_LIMIT, currency::TEND_LIMIT);
@@ -3467,6 +3502,13 @@ impl MultiWorldSimulator {
             // Phase 6: Knowledge
             self.tick_knowledge();
 
+            // Metabolism: modulate innovation rate
+            for world in &mut self.worlds {
+                let innov_mult = phase_modifiers.get(&world.id).map(|m| m.innovation_mult).unwrap_or(1.0);
+                if (innov_mult - 1.0).abs() > 0.01 {
+                    world.knowledge.innovation_rate *= innov_mult;
+                }
+            }
             // Phase 7: Governance
             self.tick_governance();
 
@@ -3743,6 +3785,7 @@ impl MultiWorldSimulator {
                                 for agent in &mut world.agents {
                                     if agent.death_tick.is_none() {
                                         agent.trauma_level = (agent.trauma_level + 0.3 * population_loss_fraction).min(1.0);
+                                        agent.wounds.push(wound_healing::WoundState::new((0.3 * population_loss_fraction).min(0.5), wound_healing::WoundOrigin::Faction, self.current_tick));
                                     }
                                 }
                                 self.events.push(CivEvent::new(
