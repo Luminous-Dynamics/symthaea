@@ -384,8 +384,8 @@ mycelix-sdk = { path = "../mycelix-workspace/sdk-ts/../sdk", optional = true, de
 sha3 = { version = "0.10", optional = true }  # For gradient hashing
 
 # Prism epistemic search (local, offline, 16,384-bit BinaryHV)
-plexus-common = { path = "../plexus/plexus-common", optional = true }
-plexus-search = { path = "../plexus/plexus-search", optional = true }
+prism-common = { path = "../prism/prism-common", optional = true }
+prism-search = { path = "../prism/prism-search", optional = true }
 
 # Web Research & Epistemic Verification (Track 6)
 reqwest = { version = "0.13", features = ["json", "rustls"], default-features = false }
@@ -672,7 +672,7 @@ integration_module = []         # Integration module (cfg-gated in lib.rs)
 observability_module = ["dep:symthaea-observability"]  # Observability (cfg-gated in gwt_integration + lib.rs)
 support = ["dep:symthaea-support"]                     # IT support intelligence (triage, diagnostics, knowledge, privacy, actions, prediction)
 web_research_module = []        # Web research epistemic verification (cfg-gated in lib.rs)
-prism_search = ["dep:plexus-common", "dep:plexus-search"]  # Prism epistemic search (local, offline)
+prism_search = ["dep:prism-common", "dep:prism-search"]  # Prism epistemic search (local, offline)
 unstable-examples = []          # UNTESTED: quarantine gate for examples with stale APIs (never enabled by default, gates test files only)
 
 # ── Genesis Pipeline (DNA-to-Human species stewardship) ───────────

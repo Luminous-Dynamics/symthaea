@@ -20,12 +20,12 @@ use symthaea_spore::engine::{CycleResult, SporeEngine};
 use crate::broca_soma::BrocaSoma;
 #[cfg(feature = "litert")]
 use crate::litert_bridge::{LiteRTBackend, LiteRTBridge};
-#[cfg(feature = "prism-search")]
-use plexus_search::SearchEngine;
 #[cfg(feature = "screen-vision")]
 use crate::screen_vision::{ScreenPerception, ScreenVisionBridge, ScreenVisionConfig};
 #[cfg(feature = "screen-vision")]
 use crate::touch_body::{TouchBody, TouchBodyState, TouchEvent};
+#[cfg(feature = "prism-search")]
+use prism_search::SearchEngine;
 
 /// Configuration for the Soma mobile consciousness engine.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -718,11 +718,10 @@ impl SomaEngine {
     #[cfg(feature = "litert")]
     pub fn litert_generate(&self, prompt: &str, max_tokens: u32) -> Option<String> {
         let consciousness = self.spore.consciousness_level();
-        self.litert.as_ref()?.generate_consciousness_gated(
-            prompt,
-            max_tokens,
-            consciousness,
-        ).map(|r| r.text)
+        self.litert
+            .as_ref()?
+            .generate_consciousness_gated(prompt, max_tokens, consciousness)
+            .map(|r| r.text)
     }
 
     /// Generate with tool-use loop: LLM may invoke tools, results fed back.
@@ -730,11 +729,7 @@ impl SomaEngine {
     /// Tools: web_search (→ Prism/Holon), calculate, get_time, memory_recall.
     /// Max 3 rounds to prevent infinite loops.
     #[cfg(feature = "litert")]
-    pub fn litert_generate_with_tools(
-        &mut self,
-        prompt: &str,
-        max_tokens: u32,
-    ) -> Option<String> {
+    pub fn litert_generate_with_tools(&mut self, prompt: &str, max_tokens: u32) -> Option<String> {
         use crate::tool_use::{
             execute_calculate, execute_get_time, format_tool_results, parse_tool_calls,
             ToolRegistry, ToolResult,
@@ -767,9 +762,7 @@ impl SomaEngine {
             for call in &calls {
                 let result = match call.name.as_str() {
                     "calculate" => {
-                        let expr = call.arguments["expression"]
-                            .as_str()
-                            .unwrap_or_default();
+                        let expr = call.arguments["expression"].as_str().unwrap_or_default();
                         execute_calculate(expr)
                     }
                     "get_time" => execute_get_time(),
@@ -798,8 +791,9 @@ impl SomaEngine {
                                 ToolResult {
                                     name: "web_search".into(),
                                     success: true,
-                                    output: "Search request sent to desktop. No local results found."
-                                        .into(),
+                                    output:
+                                        "Search request sent to desktop. No local results found."
+                                            .into(),
                                 }
                             }
                         }
@@ -851,19 +845,38 @@ impl SomaEngine {
     // Prism epistemic search (offline-capable, sub-ms)
     // ======================================================================
 
-    /// Initialize the Prism epistemic search engine with pre-seeded claims.
+    /// Initialize the Prism epistemic search engine.
+    ///
+    /// Uses `with_core_claims()` for fast mobile startup (~200 claims, <100ms).
+    /// The full 10K+ Wikidata corpus can be loaded later via `prism_load_full()`.
     #[cfg(feature = "prism-search")]
     pub fn prism_init(&mut self) {
-        self.prism_search = Some(SearchEngine::with_seed_claims());
+        self.prism_search = Some(SearchEngine::with_core_claims());
         tracing::info!(
             claims = self.prism_search.as_ref().map_or(0, |s| s.claim_count()),
-            "Prism epistemic search initialized"
+            "Prism epistemic search initialized (core claims)"
         );
+    }
+
+    /// Load the full claim corpus (10K+ Wikidata) and merge into the search engine.
+    /// Call after `prism_init()` for expanded coverage.
+    #[cfg(feature = "prism-search")]
+    pub fn prism_load_full(&mut self) {
+        if let Some(engine) = &mut self.prism_search {
+            let full = SearchEngine::with_seed_claims();
+            let full_count = full.claim_count();
+            engine.merge(full);
+            tracing::info!(
+                total = engine.claim_count(),
+                added = full_count,
+                "Prism full corpus merged"
+            );
+        }
     }
 
     /// Search local epistemic claims via Prism's 16,384-bit BinaryHV engine.
     #[cfg(feature = "prism-search")]
-    pub fn prism_search(&self, query: &str, top_k: usize) -> Vec<plexus_common::SearchResult> {
+    pub fn prism_search(&self, query: &str, top_k: usize) -> Vec<prism_common::SearchResult> {
         self.prism_search
             .as_ref()
             .map(|s| s.search(query, top_k))

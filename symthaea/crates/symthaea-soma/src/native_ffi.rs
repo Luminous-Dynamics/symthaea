@@ -642,6 +642,16 @@ pub unsafe extern "C" fn soma_engine_prism_init(engine: *mut SomaEngine) {
     unsafe { &mut *engine }.prism_init();
 }
 
+/// Load the full Wikidata corpus (~10K claims) and merge into the search engine.
+/// Call after `soma_engine_prism_init()` on a background thread.
+///
+/// # Safety: `engine` must be valid.
+#[cfg(feature = "prism-search")]
+#[no_mangle]
+pub unsafe extern "C" fn soma_engine_prism_load_full(engine: *mut SomaEngine) {
+    unsafe { &mut *engine }.prism_load_full();
+}
+
 /// Search Prism epistemic claims. Returns JSON array of results.
 /// Caller must free with `soma_string_free()`.
 ///
@@ -682,7 +692,11 @@ pub unsafe extern "C" fn soma_engine_prism_search(
 #[cfg(feature = "prism-search")]
 #[no_mangle]
 pub unsafe extern "C" fn soma_engine_prism_available(engine: *const SomaEngine) -> u8 {
-    if unsafe { &*engine }.prism_available() { 1 } else { 0 }
+    if unsafe { &*engine }.prism_available() {
+        1
+    } else {
+        0
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════

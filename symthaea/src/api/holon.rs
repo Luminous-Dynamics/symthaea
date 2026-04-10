@@ -738,7 +738,7 @@ async fn holon_search(
     // Fast path: Prism local epistemic search (sub-ms, offline, no network)
     #[cfg(feature = "prism_search")]
     {
-        let engine = plexus_search::SearchEngine::with_seed_claims();
+        let engine = prism_search::SearchEngine::with_seed_claims();
         let local_results = engine.search(&req.query, req.max_results);
         if !local_results.is_empty() {
             let claims: Vec<SearchClaimSummary> = local_results
