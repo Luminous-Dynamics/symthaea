@@ -35,6 +35,7 @@
 //! no idea *how* you achieved that.
 
 pub mod compat;
+pub mod decay;
 pub mod i18n;
 pub mod weights;
 
