@@ -895,6 +895,33 @@ fn cache_credential(credential: &ConsciousnessCredential) -> ExternResult<()> {
 /// Get a consciousness credential for the specified DID.
 ///
 /// First checks the local cache (10-minute TTL). On cache miss, makes a
+/// Fetch a native 8D `SovereignCredential` from the identity bridge.
+#[hdk_extern]
+pub fn get_sovereign_credential(
+    did: String,
+) -> ExternResult<mycelix_bridge_common::sovereign_gate::SovereignCredential> {
+    enforce_rate_limit("identity:identity_bridge")?;
+
+    let response = call(
+        CallTargetCell::OtherRole(IDENTITY_ROLE.into()),
+        ZomeName::new("identity_bridge"),
+        FunctionName::new("issue_sovereign_credential"),
+        None,
+        did.clone(),
+    )?;
+
+    match response {
+        ZomeCallResponse::Ok(extern_io) => extern_io.decode().map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "Failed to decode sovereign credential: {:?}", e
+            )))
+        }),
+        other => Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Sovereign credential call failed for {}: {:?}", did, other
+        )))),
+    }
+}
+
 /// cross-cluster call to `identity_bridge.issue_consciousness_credential` to
 /// obtain identity, reputation, and community dimensions, then fills in the
 /// engagement dimension locally from this cluster's activity data.

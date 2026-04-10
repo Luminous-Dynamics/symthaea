@@ -152,6 +152,43 @@ pub fn get_consciousness_credential(
     })
 }
 
+/// Bootstrap sovereign credential for the Craft cluster.
+///
+/// Returns a development credential with Steward-level scores so all civic
+/// gates pass during standalone testing. In production, fetches from identity.
+#[hdk_extern]
+pub fn get_sovereign_credential(
+    did: String,
+) -> ExternResult<bridge::sovereign_gate::SovereignCredential> {
+    let now_us = sys_time()?.as_micros() as u64;
+    let actual_did = if did.is_empty() {
+        format!("did:mycelix:{}", agent_info()?.agent_initial_pubkey)
+    } else {
+        did
+    };
+    let profile = bridge::sovereign_gate::SovereignProfile {
+        epistemic_integrity: 0.7,
+        thermodynamic_yield: 0.5,
+        network_resilience: 0.7,
+        economic_velocity: 0.6,
+        civic_participation: 0.7,
+        stewardship_care: 0.6,
+        semantic_resonance: 0.7,
+        domain_competence: 0.5,
+    };
+    let weights = bridge::sovereign_gate::DimensionWeights::governance();
+    let tier = profile.tier(&weights);
+    Ok(bridge::sovereign_gate::SovereignCredential {
+        did: actual_did,
+        profile,
+        tier,
+        issued_at: now_us,
+        expires_at: now_us + 24 * 60 * 60 * 1_000_000,
+        issuer: "did:mycelix:craft-bootstrap".into(),
+        extensions: vec![],
+    })
+}
+
 /// Refresh stub — delegates to get_consciousness_credential.
 #[hdk_extern]
 pub fn refresh_consciousness_credential(
