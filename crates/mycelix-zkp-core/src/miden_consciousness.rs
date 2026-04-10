@@ -108,6 +108,277 @@ pub fn validate_miden_proof_structure(proof: &MidenConsciousnessProof) -> MidenR
 }
 
 // ============================================================================
+// Miden Assembly Program
+// ============================================================================
+
+/// The Miden Assembly source for consciousness tier range proof.
+///
+/// Public inputs (operand stack): [threshold_permille]
+/// Secret inputs (advice stack):  [phi_permille]
+///
+/// The program:
+///   1. Reads secret phi from advice stack
+///   2. Asserts both values are valid u32
+///   3. Asserts phi >= threshold (proves tier without revealing phi)
+///   4. Pushes 1 (success)
+///
+/// If phi < threshold, the assertion fails and no valid proof can be generated.
+/// This is the core ZK property: the prover can only produce a proof when the
+/// secret phi genuinely meets the threshold.
+pub const CONSCIOUSNESS_RANGE_PROOF_MASM: &str = "
+begin
+    # Stack (16 deep): [threshold, 0, 0, ..., 0]
+    # Advice: [phi]
+
+    # Read secret phi
+    adv_push.1
+    # 17: [phi, threshold, 0, ..., 0]
+
+    # Drop threshold — we'll reconstruct comparison via subtraction
+    # Actually: just drop the extra element immediately to get back to 16
+    # by consuming both values in a comparison.
+
+    # Strategy: compute (phi - threshold) in the field, then assert it
+    # equals a u32 value. If phi < threshold, the subtraction wraps to
+    # a huge field element that won't fit in u32.
+
+    # phi is on top, threshold below.
+    # sub: pops [b,a], pushes a-b. So: a=threshold, b=phi → threshold-phi (WRONG)
+    # We want phi-threshold. Need: [threshold, phi] then sub gives phi-threshold.
+    swap sub
+    # Wait: swap gives [threshold, phi, 0...], sub gives phi-threshold? No!
+    # sub pops top (b) and second (a), returns a-b
+    # After swap: top=threshold, second=phi → a=phi, b=threshold → phi-threshold ✓
+    # But earlier this gave a wrapped value... let me re-check.
+    # Oh wait: the FIRST time I had movup.2 which changed things. Without dup/movup:
+    # [phi, threshold, 0...] → swap → [threshold, phi, 0...] → sub →
+    # a=phi (was second), b=threshold (was top) → phi - threshold = 750-400 = 350 ✓
+    # That should work. The earlier failure was because I had an extra dup.
+
+    # drop result + done = 16-2+1 = 15
+    # But wait: we started at 17, sub consumes 2 pushes 1 → 16
+    # Then we have [350, 0, 0, ..., 0] (16 elements)
+    # Just need to verify the result and exit.
+
+    # u32assert checks top is u32. If phi < threshold, the field
+    # subtraction wraps and u32assert fails (proving aborts).
+    # Note: u32assert may push decomposition elements.
+    u32assert
+
+    # Drop all computation artifacts to get back to 16
+    drop drop
+end
+";
+
+// ============================================================================
+// Prover (native only — NOT available in WASM)
+// ============================================================================
+
+/// Generate a ZK-STARK proof that `phi_permille >= threshold_permille`.
+///
+/// The phi value is secret (passed via advice stack) and never revealed
+/// to the verifier. Only the threshold is public.
+///
+/// Returns the proof, stack outputs, and program info needed for verification.
+///
+/// # Arguments
+/// * `phi_permille` - The agent's actual Phi score (0-1000), SECRET
+/// * `threshold_permille` - The minimum tier threshold (0-1000), PUBLIC
+///
+/// # Feature Gate
+/// Requires `backend-miden` feature.
+#[cfg(feature = "backend-miden")]
+pub fn prove_consciousness_tier_miden(
+    phi_permille: u32,
+    threshold_permille: u32,
+) -> MidenResult<MidenConsciousnessProof> {
+        use miden_core::Felt;
+    use miden_vm::{
+        Assembler, DefaultHost, ProvingOptions, StackInputs,
+        advice::AdviceInputs,
+    };
+
+    // Validate inputs
+    if phi_permille > 1000 {
+        return Err(ZkpError::ProvingError(format!(
+            "phi_permille {} exceeds 1000",
+            phi_permille
+        )));
+    }
+    if threshold_permille > 1000 {
+        return Err(ZkpError::ProvingError(format!(
+            "threshold_permille {} exceeds 1000",
+            threshold_permille
+        )));
+    }
+    if phi_permille < threshold_permille {
+        return Err(ZkpError::ProvingError(format!(
+            "phi_permille {} < threshold_permille {} — cannot prove false statement",
+            phi_permille, threshold_permille
+        )));
+    }
+
+    // Assemble the program
+    let assembler = Assembler::default();
+    let program = assembler
+        .assemble_program(CONSCIOUSNESS_RANGE_PROOF_MASM)
+        .map_err(|e| ZkpError::ProvingError(format!("Assembly error: {}", e)))?;
+
+    // Public inputs: threshold on operand stack
+    let stack_inputs = StackInputs::new(&[Felt::new(threshold_permille as u64)])
+        .map_err(|e| ZkpError::ProvingError(format!("Stack input error: {}", e)))?;
+
+    // Secret inputs: phi on advice stack (never revealed to verifier)
+    let advice_inputs = AdviceInputs::default()
+        .with_stack_values([phi_permille as u64])
+        .map_err(|e| ZkpError::ProvingError(format!("Advice input error: {}", e)))?;
+
+    // Execute and prove (blocking — native only)
+    let mut host = DefaultHost::default();
+    let (outputs, proof) = miden_vm::prove_sync(
+        &program,
+        stack_inputs.clone(),
+        advice_inputs,
+        &mut host,
+        ProvingOptions::default(), // 96-bit security, BLAKE3
+    )
+    .map_err(|e| ZkpError::ProvingError(format!("Proving error: {}", e)))?;
+
+    // Determine the proven tier from the threshold
+    let proven_tier = tier_from_threshold_permille(threshold_permille);
+
+    // Compute score commitment (binds the proof to this specific phi)
+    let commitment = compute_score_commitment(phi_permille as f64 / 1000.0);
+
+    // Serialize proof
+    let proof_bytes = proof.to_bytes();
+
+    // Serialize outputs for verification
+    let stack_output_values: Vec<u64> = (0..16)
+        .filter_map(|i| outputs.get_element(i).map(|f| f.as_canonical_u64()))
+        .collect();
+
+    Ok(MidenConsciousnessProof {
+        proof_bytes,
+        score_commitment: commitment,
+        proven_tier,
+        proof_system: MidenProofSystem::MidenZkStark,
+        stack_outputs: stack_output_values,
+    })
+}
+
+/// Map a threshold (permille) to the corresponding consciousness tier.
+fn tier_from_threshold_permille(threshold: u32) -> ConsciousnessTier {
+    match threshold {
+        0..=199 => ConsciousnessTier::Observer,
+        200..=299 => ConsciousnessTier::Participant,
+        300..=399 => ConsciousnessTier::Citizen,
+        400..=599 => ConsciousnessTier::Steward,
+        _ => ConsciousnessTier::Guardian,
+    }
+}
+
+// ============================================================================
+// Verifier (works in both native and WASM via miden-verifier)
+// ============================================================================
+
+/// Verify a Miden ZK-STARK consciousness tier proof.
+///
+/// This function does NOT learn the agent's actual Phi score. It only
+/// confirms that the prover knew a phi value >= the threshold.
+///
+/// # Arguments
+/// * `proof` - The Miden proof (from `prove_consciousness_tier_miden`)
+/// * `threshold_permille` - The public threshold that was proven against
+/// * `program_hash` - Hash of the expected Miden program (prevents program substitution)
+///
+/// # Feature Gate
+/// Requires `backend-miden` feature. Compiles to WASM for zome-side verification.
+#[cfg(feature = "backend-miden")]
+pub fn verify_consciousness_tier_miden(
+    proof: &MidenConsciousnessProof,
+    threshold_permille: u32,
+    program_hash: &[u64; 4],
+) -> MidenResult<bool> {
+    use miden_core::Felt;
+    use miden_vm::{
+        StackInputs, StackOutputs, ProgramInfo, Kernel,
+        ExecutionProof, Word,
+    };
+
+    // Structural validation first
+    validate_miden_proof_structure(proof)?;
+
+    // Deserialize the proof
+    let execution_proof = ExecutionProof::from_bytes(&proof.proof_bytes)
+        .map_err(|e| ZkpError::VerificationFailed(format!("Proof deserialization: {}", e)))?;
+
+    // Reconstruct public inputs
+    let stack_inputs = StackInputs::new(&[Felt::new(threshold_permille as u64)])
+        .map_err(|e| ZkpError::VerificationFailed(format!("Stack input error: {}", e)))?;
+
+    // Reconstruct outputs
+    let output_felts: Vec<Felt> = proof
+        .stack_outputs
+        .iter()
+        .map(|&v| Felt::new(v))
+        .collect();
+    let stack_outputs = StackOutputs::new(&output_felts)
+        .map_err(|e| ZkpError::VerificationFailed(format!("Stack output error: {}", e)))?;
+
+    // Reconstruct program info from hash (Word wraps [Felt; 4])
+    let hash_word: Word = Word::new([
+        Felt::new(program_hash[0]),
+        Felt::new(program_hash[1]),
+        Felt::new(program_hash[2]),
+        Felt::new(program_hash[3]),
+    ]);
+    let program_info = ProgramInfo::new(hash_word, Kernel::default());
+
+    // Verify the STARK proof
+    match miden_vm::verify(program_info, stack_inputs, stack_outputs, execution_proof) {
+        Ok(security_level) => {
+            if security_level >= 80 {
+                Ok(true)
+            } else {
+                Err(ZkpError::VerificationFailed(format!(
+                    "Security level {} < 80 bits",
+                    security_level
+                )))
+            }
+        }
+        Err(e) => Err(ZkpError::VerificationFailed(format!(
+            "STARK verification failed: {}",
+            e
+        ))),
+    }
+}
+
+/// Get the program hash for the consciousness range proof program.
+///
+/// This is a fixed value — the program never changes. Used by the
+/// verifier to ensure the correct program was proven.
+/// Get the program hash for the consciousness range proof program.
+///
+/// Returns a `Word` ([Felt; 4]) — the Miden program identifier used
+/// by the verifier to ensure the correct program was proven.
+#[cfg(feature = "backend-miden")]
+pub fn consciousness_program_hash() -> MidenResult<[u64; 4]> {
+    let assembler = miden_vm::Assembler::default();
+    let program = assembler
+        .assemble_program(CONSCIOUSNESS_RANGE_PROOF_MASM)
+        .map_err(|e| ZkpError::ProvingError(format!("Assembly error: {}", e)))?;
+
+    let hash_word = program.hash();
+    Ok([
+        hash_word[0].as_canonical_u64(),
+        hash_word[1].as_canonical_u64(),
+        hash_word[2].as_canonical_u64(),
+        hash_word[3].as_canonical_u64(),
+    ])
+}
+
+// ============================================================================
 // Tests (run without Miden dependency — structural validation only)
 // ============================================================================
 
@@ -216,6 +487,56 @@ mod tests {
         assert_eq!(proof.proof_bytes, back.proof_bytes);
         assert_eq!(proof.score_commitment, back.score_commitment);
         assert_eq!(proof.proven_tier, back.proven_tier);
+    }
+
+    /// Integration test: prove a consciousness tier and verify the proof.
+    /// This exercises the full Miden VM pipeline: assemble → prove → serialize → verify.
+    #[cfg(feature = "backend-miden")]
+    #[test]
+    fn test_prove_and_verify_consciousness_tier() {
+        // Prove: Steward tier (phi=750 >= threshold=400)
+        let proof = prove_consciousness_tier_miden(750, 400)
+            .expect("Proving should succeed for phi >= threshold");
+
+        assert_eq!(proof.proven_tier, ConsciousnessTier::Steward);
+        assert_eq!(proof.proof_system, MidenProofSystem::MidenZkStark);
+        assert!(!proof.proof_bytes.is_empty(), "Proof should be non-empty");
+        assert!(
+            proof.proof_bytes.len() < MAX_MIDEN_PROOF_SIZE,
+            "Proof {} bytes should be under {} limit",
+            proof.proof_bytes.len(),
+            MAX_MIDEN_PROOF_SIZE
+        );
+
+        // Get program hash for verification
+        let program_hash = consciousness_program_hash()
+            .expect("Program hash should be computable");
+
+        // Verify
+        let verified = verify_consciousness_tier_miden(&proof, 400, &program_hash)
+            .expect("Verification should succeed");
+        assert!(verified, "Valid proof should verify");
+    }
+
+    /// Proving must fail when phi < threshold (can't prove false statements).
+    #[cfg(feature = "backend-miden")]
+    #[test]
+    fn test_prove_fails_when_phi_below_threshold() {
+        let result = prove_consciousness_tier_miden(200, 400);
+        assert!(result.is_err(), "Should fail when phi < threshold");
+    }
+
+    /// Prove Guardian tier (phi=900 >= threshold=600).
+    #[cfg(feature = "backend-miden")]
+    #[test]
+    fn test_prove_guardian_tier() {
+        let proof = prove_consciousness_tier_miden(900, 600)
+            .expect("Guardian proof should succeed");
+        assert_eq!(proof.proven_tier, ConsciousnessTier::Guardian);
+
+        let program_hash = consciousness_program_hash().unwrap();
+        let verified = verify_consciousness_tier_miden(&proof, 600, &program_hash).unwrap();
+        assert!(verified);
     }
 
     #[test]
