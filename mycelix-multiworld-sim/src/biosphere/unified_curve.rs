@@ -12,7 +12,7 @@
 //!
 //! The sim's Eight Harmonies scores extend the curve into the future (2026 → 2200+).
 
-use super::bridge::{blend_weights, CoherenceSource};
+use super::bridge::CoherenceSource;
 use super::temporal_bins::MaAge;
 use super::BiosphereCoherenceEngine;
 
@@ -70,6 +70,7 @@ fn ma_to_year(age_ma: MaAge) -> f64 {
 }
 
 /// Interpolate K(t) at a given year.
+#[allow(dead_code)]
 fn kt_at_year(year: f64) -> Option<f64> {
     if year < KT_SERIES[0].0 as f64 || year > KT_SERIES.last().unwrap().0 as f64 {
         return None;

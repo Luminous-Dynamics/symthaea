@@ -44,7 +44,7 @@ const VETO_OVERRIDE_THRESHOLD: f64 = 0.80;
 const VETO_COOLDOWN_TICKS: u32 = 7;
 
 /// Maximum consecutive emergency sessions before mandatory cooldown.
-const MAX_EMERGENCY_SESSIONS: u32 = 3;
+const _MAX_EMERGENCY_SESSIONS: u32 = 3;
 
 /// Council membership term in ticks (365 ticks ≈ 30 years at monthly resolution).
 /// Scaled down from real-world 365 days for simulation time compression.

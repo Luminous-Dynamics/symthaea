@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Luminous Dynamics — Civilizational Simulator</title>
+<style>
+  :root { --bg: #0a0a0f; --fg: #e0e0e8; --accent: #6a9fd8; --warn: #d89a6a; --danger: #d86a6a; --success: #6ad88a; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'IBM Plex Mono', 'Fira Code', monospace; background: var(--bg); color: var(--fg); padding: 20px; max-width: 1200px; margin: 0 auto; }
+  h1 { font-size: 1.4em; color: var(--accent); margin-bottom: 4px; }
+  h2 { font-size: 1.1em; color: var(--accent); margin: 16px 0 8px; border-bottom: 1px solid #222; padding-bottom: 4px; }
+  .subtitle { color: #888; font-size: 0.85em; margin-bottom: 16px; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .card { background: #12121a; border: 1px solid #222; border-radius: 8px; padding: 16px; }
+  .metric { display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid #1a1a24; }
+  .metric-label { color: #888; }
+  .metric-value { font-weight: bold; }
+  .good { color: var(--success); } .warn { color: var(--warn); } .bad { color: var(--danger); }
+  button { background: var(--accent); color: var(--bg); border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-family: inherit; font-size: 0.9em; margin: 4px; }
+  button:hover { opacity: 0.9; } button:disabled { opacity: 0.5; cursor: default; }
+  button.active { background: var(--success); }
+  input[type="range"] { width: 100%; accent-color: var(--accent); }
+  .slider-row { display: flex; align-items: center; gap: 8px; margin: 6px 0; }
+  .slider-label { min-width: 160px; color: #888; font-size: 0.85em; }
+  .slider-value { min-width: 50px; text-align: right; font-size: 0.85em; }
+  .honest { background: #1a1210; border-color: var(--warn); }
+  .honest h2 { color: var(--warn); }
+  .honest li { color: #c0a080; font-size: 0.82em; margin: 4px 0; list-style: none; }
+  .honest li::before { content: "⚠ "; }
+  #log { max-height: 200px; overflow-y: auto; font-size: 0.8em; color: #666; padding: 8px; background: #08080c; border-radius: 4px; }
+  .controls { display: flex; gap: 8px; flex-wrap: wrap; margin: 12px 0; }
+</style>
+</head>
+<body>
+
+<h1>Luminous Dynamics — Civilizational Simulator</h1>
+<p class="subtitle">Interactive multi-world civilization model. All results are exploratory, not predictive.</p>
+
+<div class="controls">
+  <button id="btn-run" onclick="runYear()">Run 1 Year</button>
+  <button id="btn-run10" onclick="runYears(10)">Run 10 Years</button>
+  <button id="btn-run50" onclick="runYears(50)">Run to End</button>
+  <button onclick="reset()">Reset</button>
+  <button id="btn-honest" onclick="toggleHonest()">Show Limitations</button>
+</div>
+
+<div class="grid">
+  <div class="card">
+    <h2>Civilization State</h2>
+    <div class="metric"><span class="metric-label">Year</span><span id="m-year" class="metric-value">0</span></div>
+    <div class="metric"><span class="metric-label">Population</span><span id="m-pop" class="metric-value">0</span></div>
+    <div class="metric"><span class="metric-label">Worlds</span><span id="m-worlds" class="metric-value">0</span></div>
+    <div class="metric"><span class="metric-label">Viability Violations</span><span id="m-viability" class="metric-value good">0</span></div>
+    <div class="metric"><span class="metric-label">Status</span><span id="m-status" class="metric-value">Ready</span></div>
+  </div>
+
+  <div class="card">
+    <h2>Policy Controls</h2>
+    <div class="slider-row">
+      <span class="slider-label">Trade Openness</span>
+      <input type="range" min="0" max="100" value="80" oninput="setParam('trade_openness', this.value/100)">
+      <span class="slider-value" id="v-trade">0.80</span>
+    </div>
+    <div class="slider-row">
+      <span class="slider-label">Defense Spending</span>
+      <input type="range" min="0" max="30" value="5" oninput="setParam('defense_spending', this.value/100)">
+      <span class="slider-value" id="v-defense">0.05</span>
+    </div>
+    <div class="slider-row">
+      <span class="slider-label">Exploration</span>
+      <input type="range" min="0" max="20" value="5" oninput="setParam('exploration_investment', this.value/100)">
+      <span class="slider-value" id="v-explore">0.05</span>
+    </div>
+    <div class="controls" style="margin-top:8px">
+      <button id="t-disasters" onclick="toggle('disasters_enabled')" class="active">Disasters</button>
+      <button id="t-consciousness" onclick="toggle('trust_weighted_governance')" class="active">Consciousness Gating</button>
+      <button id="t-turchin" onclick="toggle('turchin_cycles_enabled')" class="active">Turchin Cycles</button>
+    </div>
+  </div>
+</div>
+
+<div class="card honest" id="honest-panel" style="display:none; margin-top:16px;">
+  <h2>Honest Assessment — What This Simulator Cannot Do</h2>
+  <ul id="limitations"></ul>
+</div>
+
+<h2>Event Log</h2>
+<div id="log">Waiting for simulation to start...</div>
+
+<script type="module">
+  // WASM module will be loaded here
+  // For now, this is a scaffold — the actual WASM build requires:
+  //   cd wasm-demo && wasm-pack build --target web
+  //
+  // The JavaScript below works with the WasmSimulator API defined in lib.rs
+
+  let sim = null;
+  let toggleStates = { disasters_enabled: true, trust_weighted_governance: true, turchin_cycles_enabled: true };
+
+  window.runYear = function() { runYears(1); };
+
+  window.runYears = function(n) {
+    if (!sim) {
+      log("Simulator not loaded — build WASM first: cd wasm-demo && wasm-pack build --target web");
+      return;
+    }
+    for (let i = 0; i < n * 12; i++) {
+      const state = JSON.parse(sim.tick(1));
+      updateUI(state);
+      if (state.finished) break;
+    }
+  };
+
+  window.reset = function() {
+    if (typeof WasmSimulator !== 'undefined') {
+      sim = new WasmSimulator(BigInt(Date.now() % 100000));
+      updateUI(JSON.parse(sim.get_state()));
+      log("Simulation reset with new seed");
+    }
+  };
+
+  window.setParam = function(name, value) {
+    if (sim) sim.set_param(name, value);
+    const id = 'v-' + name.split('_')[0];
+    const el = document.getElementById(id);
+    if (el) el.textContent = value.toFixed(2);
+  };
+
+  window.toggle = function(name) {
+    if (sim) sim.toggle_policy(name);
+    toggleStates[name] = !toggleStates[name];
+    const btn = document.getElementById('t-' + name.split('_')[0]);
+    if (btn) btn.classList.toggle('active');
+  };
+
+  window.toggleHonest = function() {
+    const panel = document.getElementById('honest-panel');
+    panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+    if (sim && panel.style.display === 'block') {
+      const assessment = JSON.parse(sim.honest_assessment());
+      const ul = document.getElementById('limitations');
+      ul.innerHTML = '';
+      (assessment.limitations || []).forEach(l => {
+        const li = document.createElement('li');
+        li.textContent = l;
+        ul.appendChild(li);
+      });
+      (assessment.cannot_predict || []).forEach(l => {
+        const li = document.createElement('li');
+        li.textContent = "CANNOT PREDICT: " + l;
+        ul.appendChild(li);
+      });
+    }
+  };
+
+  function updateUI(state) {
+    document.getElementById('m-year').textContent = state.year.toFixed(1);
+    document.getElementById('m-pop').textContent = state.total_population.toLocaleString();
+    document.getElementById('m-worlds').textContent = state.worlds.length;
+    const vEl = document.getElementById('m-viability');
+    vEl.textContent = state.viability.violations;
+    vEl.className = 'metric-value ' + (state.viability.violations === 0 ? 'good' : 'bad');
+    document.getElementById('m-status').textContent = state.finished ? 'Complete' : 'Running';
+  }
+
+  function log(msg) {
+    const el = document.getElementById('log');
+    el.textContent = msg + '\n' + el.textContent;
+  }
+
+  // Auto-init when WASM is available
+  async function init() {
+    try {
+      const wasm = await import('./pkg/multiworld_sim_wasm.js');
+      await wasm.default();
+      sim = new wasm.WasmSimulator(BigInt(42));
+      updateUI(JSON.parse(sim.get_state()));
+      log("Simulator loaded. Click 'Run 1 Year' to start.");
+    } catch(e) {
+      log("WASM not built yet. Run: cd wasm-demo && wasm-pack build --target web");
+    }
+  }
+  init();
+</script>
+</body>
+</html>

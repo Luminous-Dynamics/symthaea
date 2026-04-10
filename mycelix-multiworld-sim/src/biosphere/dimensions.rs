@@ -12,7 +12,7 @@
 use serde::{Deserialize, Serialize};
 
 use super::deep_time_data::DeepTimeData;
-use super::mass_extinctions::{extinction_multiplier, MassExtinctionEvent};
+use super::mass_extinctions::MassExtinctionEvent;
 use super::temporal_bins::{MaAge, TemporalBin, TimeResolution};
 use super::uncertainty;
 
@@ -117,7 +117,7 @@ fn complexity_grade_at(age_ma: MaAge) -> f64 {
 ///
 /// CITATION: West, Brown & Enquist (1997) "A general model for the origin of
 ///           allometric scaling laws in biology."
-fn network_integration_at(age_ma: MaAge, o2_fraction: f64, complexity: f64, diversity_norm: f64) -> f64 {
+fn network_integration_at(_age_ma: MaAge, o2_fraction: f64, complexity: f64, diversity_norm: f64) -> f64 {
     // O2 factor: aerobic trophic webs require O2 > 0.02
     let o2_factor = if o2_fraction < 0.02 {
         o2_fraction / 0.02 * 0.1 // Anaerobic: minimal trophic complexity
@@ -176,7 +176,7 @@ fn energy_throughput_at(
 pub fn compute_raw_dimensions(
     bin: &TemporalBin,
     data: &DeepTimeData,
-    extinctions: &[MassExtinctionEvent],
+    _extinctions: &[MassExtinctionEvent],
 ) -> BiosphereDimensionsRaw {
     let age = bin.midpoint_ma;
 

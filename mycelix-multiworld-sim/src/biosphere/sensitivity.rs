@@ -15,7 +15,7 @@
 //! For each combination, we check: does the suppressed branch reach meta-cognition?
 
 use super::consciousness_emergence::{
-    compute_emergence_curve, SubstrateFromBiosphere, THRESHOLD_REFLECTIVE,
+    SubstrateFromBiosphere, THRESHOLD_REFLECTIVE,
 };
 use super::deep_time_data::DeepTimeData;
 use super::dimensions::{compute_raw_dimensions, BiosphereDimensionsNorm, BiosphereMaxima};

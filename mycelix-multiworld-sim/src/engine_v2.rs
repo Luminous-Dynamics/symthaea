@@ -375,6 +375,7 @@ pub fn run_event_loop(
     rng: &mut crate::stochastic::StochasticEngine,
     total_ticks: u32,
 ) -> EventLoopResult {
+    #[allow(unused_assignments)]
     let mut current_tick: u32 = 0;
     let mut events_by_type: std::collections::HashMap<String, u32> = std::collections::HashMap::new();
     let mut ticks_visited: std::collections::HashSet<u32> = std::collections::HashSet::new();
@@ -480,7 +481,7 @@ pub fn validate_v1_v2_equivalence(
             let mut counts: std::collections::HashMap<String, u32> = std::collections::HashMap::new();
             while let Some(event) = queue.pop() {
                 if event.tick > total_ticks { break; }
-                let type_name = format!("{:?}", event.event_type);
+                let _type_name = format!("{:?}", event.event_type);
                 // Find process name from event type
                 for process in &processes {
                     if std::mem::discriminant(&process.event_type) == std::mem::discriminant(&event.event_type) {

@@ -317,7 +317,7 @@ pub fn prioritize_projects(
     population: usize,
     power_deficit: f64,         // power_demand - power_generation (positive = need more)
     food_fraction: f64,         // food stock / capacity
-    max_population: usize,
+    _max_population: usize,
     pop_near_capacity: bool,    // population > 80% of max
     has_medical: bool,
     has_fabrication: bool,

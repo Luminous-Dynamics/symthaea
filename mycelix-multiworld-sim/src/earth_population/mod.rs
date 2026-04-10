@@ -92,7 +92,7 @@ impl EarthPopulationModel {
     pub fn tick(
         &mut self,
         regions: &[EarthRegion],
-        scaling: &[ScalingFactors],
+        _scaling: &[ScalingFactors],
         current_tick: u32,
         rng: &mut StochasticEngine,
     ) {

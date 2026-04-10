@@ -315,7 +315,7 @@ pub fn canonical_mass_extinctions() -> Vec<MassExtinctionEvent> {
 }
 
 /// Find the most recent extinction event before a given age.
-pub fn most_recent_extinction(age_ma: MaAge) -> Option<&'static MassExtinctionEvent> {
+pub fn most_recent_extinction(_age_ma: MaAge) -> Option<&'static MassExtinctionEvent> {
     // This is called frequently, so we use a lazy static approach.
     // For now, just search the canonical list.
     None // Computed dynamically via canonical_mass_extinctions()

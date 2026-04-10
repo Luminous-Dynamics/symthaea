@@ -21,7 +21,7 @@ use super::temporal_bins::MaAge;
 
 /// Global terrestrial Net Primary Productivity (NPP) in TW.
 /// CITATION: Bar-On et al. (2018) — total biosphere GPP ≈ 130 TW.
-const GLOBAL_NPP_TW: f64 = 130.0;
+const _GLOBAL_NPP_TW: f64 = 130.0;
 
 /// Human Appropriation of NPP (HANPP) as fraction, by era.
 /// CITATION: Haberl et al. (2007) — modern HANPP ≈ 24% of potential NPP.

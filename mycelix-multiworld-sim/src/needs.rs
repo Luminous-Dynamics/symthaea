@@ -109,7 +109,7 @@ const BIOHACK_EPIDEMIC_PROBABILITY: f64 = 0.001;
 
 /// Deep-space isolation multiplier for social decay (non-Earth, Epochs 2-3).
 /// Ref: NASA HI-SEAS — communication latency (3-24 min) amplifies loneliness.
-const DEEP_SPACE_SOCIAL_DECAY_MULT: f64 = 1.5;
+const _DEEP_SPACE_SOCIAL_DECAY_MULT: f64 = 1.5;
 
 /// Epoch range for deep-space isolation amplification (Branches through Canopy).
 const DEEP_SPACE_EPOCH_START: u8 = 2;

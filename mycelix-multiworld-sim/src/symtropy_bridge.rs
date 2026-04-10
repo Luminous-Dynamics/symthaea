@@ -112,7 +112,7 @@ pub fn generate_decisions(
 ) -> Vec<PlayerDecision> {
     let mut decisions = Vec::new();
     let tick = sim.current_tick;
-    let year = tick as f64 / 12.0;
+    let _year = tick as f64 / 12.0;
 
     for world in &sim.worlds {
         if world.population() == 0 { continue; }

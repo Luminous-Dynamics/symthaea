@@ -147,6 +147,7 @@ impl FactionEngine {
     }
 
     /// Check for faction emergence in each world (no stress boost).
+    #[allow(dead_code)]
     fn tick_emergence(
         &mut self,
         worlds: &[World],

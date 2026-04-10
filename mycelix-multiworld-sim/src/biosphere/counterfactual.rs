@@ -19,7 +19,7 @@
 use super::bridge::biosphere_energy_adjustment;
 use super::deep_time_data::DeepTimeData;
 use super::dimensions::{
-    compute_bt, compute_raw_dimensions, BiosphereDimensionsNorm, BiosphereMaxima,
+    compute_bt, compute_raw_dimensions, BiosphereMaxima,
 };
 use super::mass_extinctions::{
     canonical_mass_extinctions, extinction_multiplier, MassExtinctionEvent,

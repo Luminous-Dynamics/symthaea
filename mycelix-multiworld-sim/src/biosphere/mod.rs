@@ -220,7 +220,7 @@ impl SimulationModule for BiosphereCoherenceEngine {
 
     fn tick(
         &mut self,
-        tick: u32,
+        _tick: u32,
         feedback: &HashMap<String, f64>,
     ) -> Result<ModuleOutputs, String> {
         let mut outputs = ModuleOutputs::default();

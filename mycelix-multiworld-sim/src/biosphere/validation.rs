@@ -11,7 +11,7 @@
 //! CITATION: Sepkoski (1982) "A compendium of fossil marine animal genera"
 //!           Rohde & Muller (2005) "Cycles in fossil diversity" Nature 434.
 
-use super::deep_time_data::{DeepTimeData, ProxyPoint};
+use super::deep_time_data::DeepTimeData;
 use super::dimensions::{compute_raw_dimensions, BiosphereMaxima};
 use super::mass_extinctions::canonical_mass_extinctions;
 use super::temporal_bins::{build_deep_time_bins, MaAge};

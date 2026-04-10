@@ -101,7 +101,7 @@ const P_EUROPA_TIDAL_QUAKE: f64 = 0.03;
 /// Pappalardo et al. (1998), Nature.
 const P_EUROPA_ICE_INSTABILITY: f64 = 0.001;
 /// Europa solar flux: 3.7% of Earth's (50.3 / 1361 W/m²). Panels useless.
-const EUROPA_SOLAR_FLUX_FRACTION: f64 = 0.037;
+const _EUROPA_SOLAR_FLUX_FRACTION: f64 = 0.037;
 
 // ---------------------------------------------------------------------------
 // Outer System: Titan (cryogenic at 93.7 K, 1.467 bar N₂)
@@ -121,7 +121,7 @@ const P_TITAN_METHANE_STORM: f64 = 0.005;
 /// Estimated 0.5%/month bone loss interpolated from microgravity data.
 const TITAN_LOW_G_LOAD_PER_TICK: f64 = 0.002;
 /// Titan solar flux: 1.1% of Earth's at orbit, ~1 W/m² at surface after haze.
-const TITAN_SOLAR_FLUX_FRACTION: f64 = 0.011;
+const _TITAN_SOLAR_FLUX_FRACTION: f64 = 0.011;
 
 // ---------------------------------------------------------------------------
 // Earth geophysics

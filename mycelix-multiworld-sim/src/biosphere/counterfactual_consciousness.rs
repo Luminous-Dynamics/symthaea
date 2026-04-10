@@ -7,8 +7,8 @@
 //! Chicxulub asteroid necessary for meta-cognitive consciousness?
 
 use super::consciousness_emergence::{
-    compute_emergence_curve, ConsciousnessEmergencePoint, SubstrateFromBiosphere,
-    THRESHOLD_AWARE, THRESHOLD_MINIMAL, THRESHOLD_REFLECTIVE, THRESHOLD_SENTIENT,
+    compute_emergence_curve, ConsciousnessEmergencePoint,
+    THRESHOLD_AWARE, THRESHOLD_REFLECTIVE,
 };
 use super::counterfactual::CapRegime;
 use super::deep_time_data::DeepTimeData;

@@ -12,7 +12,7 @@
 use crate::agent::BiologicalSex;
 use crate::events::{CivEvent, CivEventType};
 use crate::stochastic::StochasticEngine;
-use crate::world::{CulturalProfile, World, WorldResources};
+use crate::world::{World, WorldResources};
 
 use serde::{Deserialize, Serialize};
 
@@ -35,7 +35,7 @@ const TRANSFER_MARS_JUPITER: u32 = 26;  // 2.16 years
 const TRANSFER_MARS_SATURN: u32 = 59;   // 4.9 years
 
 /// Emergency (off-window) transfer delta-v cost multiplier.
-const EMERGENCY_DV_MULTIPLIER: f64 = 2.5;
+const _EMERGENCY_DV_MULTIPLIER: f64 = 2.5;
 
 /// Migration probability per agent per tick when GDP disparity is >= 2x.
 const MIGRATION_PROB_PER_AGENT: f64 = 0.001;
@@ -682,7 +682,7 @@ impl InterWorldEngine {
     /// Returns (should_found_europa, should_found_titan).
     pub fn check_outer_system_fission(
         worlds: &[World],
-        current_tick: u32,
+        _current_tick: u32,
     ) -> (bool, bool) {
         let off_earth_pop: usize = worlds
             .iter()

@@ -19,9 +19,9 @@ use super::bridge::biosphere_energy_adjustment;
 use super::deep_time_data::{DeepTimeData, TaphonomicRegime};
 use super::dimensions::{compute_bt, compute_raw_dimensions, BiosphereMaxima};
 use super::mass_extinctions::{
-    canonical_mass_extinctions, MassExtinctionEvent, ShockRecoveryModel,
+    canonical_mass_extinctions, ShockRecoveryModel,
 };
-use super::temporal_bins::{build_deep_time_bins, MaAge, TemporalBin};
+use super::temporal_bins::{build_deep_time_bins, MaAge};
 
 /// Parameters that vary across ensemble members.
 #[derive(Debug, Clone)]
@@ -90,7 +90,7 @@ fn compute_bt_with_params(params: &EnsembleParams) -> Vec<f64> {
             let age = bin.midpoint_ma;
 
             // Compute raw dimensions (with parameterized taphonomic correction)
-            let raw_diversity = {
+            let _raw_diversity = {
                 let base = super::deep_time_data::DeepTimeData::interpolate_proxy(
                     &data.genus_diversity, age,
                 );

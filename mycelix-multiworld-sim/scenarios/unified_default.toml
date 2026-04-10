@@ -1,0 +1,141 @@
+# =============================================================================
+# LUMINOUS DYNAMICS UNIFIED SIMULATION CONFIG
+# Schema v1.0 | luminous-sim-core
+# =============================================================================
+#
+# HONEST WARNING: This simulator models civilizational dynamics using
+# statistical cohorts and ~50,000 agents across multiple worlds.
+# Results are EXPLORATORY, not PREDICTIVE. Do not make policy decisions
+# based on these outputs without understanding the Honest Assessment section
+# in the generated report.
+#
+# Every parameter below includes its source citation and known limitations.
+# Parameters marked [SPECULATIVE] have no peer-reviewed basis.
+# =============================================================================
+
+[meta]
+name = "Default Scenario — Brutally Honest"
+description = "300-year multi-world civilization with all feedback loops enabled"
+version = "1.0.0"
+citation = "See per-parameter citations below"
+
+# =============================================================================
+# SIMULATION TIMING
+# =============================================================================
+[simulation]
+years = 300
+seed = 42
+jsonl_telemetry = false
+snapshot_interval = 12  # Monthly snapshots
+
+# =============================================================================
+# POLICY TOGGLES
+# Each toggle enables/disables a major simulation mechanism.
+# Set to false for A/B comparison (control condition).
+# =============================================================================
+[policy]
+# Trust-weighted governance: voting power scales with 4D consciousness profile.
+# A/B tested: +6.9% CVS improvement over equal-weight voting.
+# LIMITATION: Trust profile is self-reported in simulation (no crypto verification).
+trust_weighted_governance = true
+
+# Turchin secular cycles: elite overproduction -> crisis -> civil war.
+# CITATION: Turchin (2003) "Historical Dynamics", Turchin & Nefedov (2009).
+# LIMITATION: Validated on agrarian societies. Space colony applicability is [SPECULATIVE].
+turchin_cycles_enabled = true
+
+# FEP-coupled immiseration: prediction error drives suffering thermodynamically.
+# CITATION: Friston (2010), McEwen (1998).
+# LIMITATION: Coupling constant is [SPECULATIVE].
+fep_immiseration_enabled = true
+
+# Sacred Stillness: rest as existential infrastructure (6x rebuild multiplier).
+# LIMITATION: The 6x multiplier is a philosophical claim, not empirical. [SPECULATIVE]
+sacred_stillness_enabled = true
+
+# Probabilistic disaster engine (7 categories, 40+ event types).
+# All probabilities from published sources (see disasters.toml).
+disasters_enabled = true
+
+# Sub-toggles (only matter when disasters_enabled = true)
+disasters_solar_enabled = true       # NOAA SWPC, Riley (2012)
+disasters_impact_enabled = true      # Gruen (1985), Ceplecha (1998)
+disasters_planetary_enabled = true   # Zurek & Martin (1993)
+disasters_eclss_enabled = true       # NASA TM-2005-214062
+disasters_psychological_enabled = true  # Palinkas & Suedfeld (2008)
+disasters_technology_enabled = true     # NASA Technology Roadmaps (2015)
+disasters_civilization_enabled = true   # Tainter (1988), Turchin (2003)
+
+# Hybrid Earth: 12-region cohort model with demographic transition + migration.
+hybrid_earth = true
+
+# Numeric knobs
+pair_bond_rate = 0.02       # Monthly probability of pair bond formation
+trade_openness = 0.8        # 0.0 = autarky, 1.0 = free trade
+defense_spending = 0.05     # Fraction of labor diverted to defense
+exploration_investment = 0.05
+
+birth_policy = "Natural"
+project_strategy = "Balanced"
+resource_priority = "Balanced"
+
+# =============================================================================
+# SIMULATION PARAMETERS (all cited)
+# =============================================================================
+[params]
+# --- Psychology ---
+# CITATION: Palinkas & Suedfeld (2008) Antarctic baseline stress.
+# SENSITIVITY: MEDIUM — ±50% changes equilibrium allostatic load by ~0.1.
+stress_baseline = 0.004
+
+# CITATION: McEwen (1998) chronic stress accumulation model.
+stress_isolation = 0.008
+stress_overwork = 0.006
+stress_decay = 0.010
+burnout_threshold = 0.8
+
+# --- Trauma ---
+# CITATION: Kessler (1995) PTSD recovery timelines.
+# Full trauma takes ~83 years to decay naturally.
+trauma_decay_base = 0.001
+# SENSITIVITY: HIGH — controls how much disasters affect long-term outcomes.
+trauma_disaster_scale = 0.3
+
+# --- Radiation ---
+# CITATION: Hassler et al. (2014) MSL/RAD surface measurements.
+# LIMITATION: Assumes constant shielding. Real habitats have variable protection.
+radiation_mars_sv_month = 0.020    # 20 mSv/month (Mars surface)
+# CITATION: Cucinotta (2014) lunar surface estimates.
+radiation_moon_sv_month = 0.015    # 15 mSv/month (Moon surface)
+# CITATION: NASA-STD-3001 Rev C (2022).
+radiation_career_limit_sv = 0.600  # 600 mSv career limit
+
+# --- Spoilage ---
+# CITATION: NASA ISS operational data (BVAD 2018).
+# LIMITATION: ISS data is for LEO. Mars surface storage is uncharacterized.
+spoilage_food = 0.03     # 3% per month in controlled environment
+spoilage_energy = 0.15   # 15% storage/transmission loss
+spoilage_water = 0.005   # 0.5% per month (closed-loop recycling)
+
+# =============================================================================
+# FEEDBACK LOOPS (Phase 1 fixes)
+# All enabled by default. Disable individual loops for A/B testing.
+# =============================================================================
+[feedback_loops]
+disaster_trauma = true          # DL#1: Disasters cause agent trauma
+collective_memory = true        # DL#2: Survived disasters reduce repeat severity 15%
+gcr_effects = true              # DL#4: Solar cycle modulates radiation dose
+harmony_policy = true           # DL#5: Low harmony triggers policy adaptation
+affect_behavior = true          # DL#6: Joy/sadness modulates labor output
+consciousness_governance = true # DL#7: Governance stability affects consciousness growth
+cultural_memory = true          # DL#8: Cultural memory reduces disaster damage up to 30%
+
+# =============================================================================
+# CONSCIOUSNESS THRESHOLDS
+# =============================================================================
+[consciousness]
+# LIMITATION: These thresholds are derived from simulation validation, not
+# real-world governance experiments. [SPECULATIVE]
+gate_basic = 0.2           # Minimum phi for basic participation
+gate_voting = 0.4          # Minimum phi for voting
+gate_constitutional = 0.6  # Minimum phi for constitutional amendments

@@ -22,7 +22,7 @@
 //! - Tononi, G. (2004). IIT — consciousness as integrated information.
 
 use crate::consciousness_epidemiology::{
-    ConsciousnessEpidemic, ConsciousnessTier, EpidemicReport, Intervention, TransmissionModel,
+    ConsciousnessEpidemic, EpidemicReport, Intervention, TransmissionModel,
 };
 use serde::{Deserialize, Serialize};
 

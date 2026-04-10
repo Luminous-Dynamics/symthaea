@@ -93,7 +93,6 @@ use stochastic::StochasticEngine;
 use world::World;
 
 use agent::{BiologicalSex, CivAgent, ConsciousnessState, SkillVector};
-use education::EducationEngine;
 use needs::{NeedsWorldSummary, PsychNeedsEngine, PsychologicalNeeds};
 use world::{CulturalProfile, WorldResources};
 
@@ -132,9 +131,9 @@ const EROI_GDP_DRAG_PER_POINT: f64 = 0.0004;
 /// GDP floor multiplier when EROI drag is applied.
 const EROI_GDP_FLOOR_MULT: f64 = 0.998;
 /// Consciousness bonus per tick from stable governance.
-const GOV_CONSCIOUSNESS_BONUS_STABLE: f64 = 0.001;
+const _GOV_CONSCIOUSNESS_BONUS_STABLE: f64 = 0.001;
 /// Consciousness penalty per tick from unstable governance.
-const GOV_CONSCIOUSNESS_PENALTY_UNSTABLE: f64 = 0.002;
+const _GOV_CONSCIOUSNESS_PENALTY_UNSTABLE: f64 = 0.002;
 
 /// Top-level multi-world civilization simulator.
 pub struct MultiWorldSimulator {
@@ -1118,7 +1117,7 @@ impl MultiWorldSimulator {
             || self.disaster_engine.tech_tree.is_achieved("Fusion Grid Scale");
         let leo_access = self.disaster_engine.orbital_debris.leo_access_multiplier;
         // Closed-Loop ECLSS halves resource consumption rates
-        let has_closed_eclss = self.disaster_engine.tech_tree.is_achieved("Closed-Loop ECLSS");
+        let _has_closed_eclss = self.disaster_engine.tech_tree.is_achieved("Closed-Loop ECLSS");
 
         if self.current_tick % 12 == 0 && self.worlds.len() >= 2 {
             // Calculate average self-sufficiency
@@ -1644,7 +1643,7 @@ impl MultiWorldSimulator {
             }
 
             // Robot labor offsets human maintenance requirements
-            let robot_maintenance_offset = robot_labor * 0.5; // Each robot-hour = 0.5 human maintenance hours
+            let _robot_maintenance_offset = robot_labor * 0.5; // Each robot-hour = 0.5 human maintenance hours
 
             // === B: AUTOMATION LEVEL ===
             // Grows with engineering + manufacturing tech. Reduces labor requirements.
@@ -1790,7 +1789,7 @@ impl MultiWorldSimulator {
                     "Titan" => 0.3,
                     _ => 0.6,
                 };
-                let colony_age = tick.saturating_sub(world.founded_tick) as f64 / 12.0;
+                let _colony_age = tick.saturating_sub(world.founded_tick) as f64 / 12.0;
                 // Funding decays over decades unless colony provides value
                 let value_to_earth = world.knowledge.mean_tech_level() * 0.1
                     + world.resources.self_sufficiency() * 0.2;
@@ -3110,11 +3109,11 @@ impl MultiWorldSimulator {
                 let gcr_mult = self.disaster_engine.gcr_multiplier();
                 let ambient_dose_sv = match world.location.as_str() {
                     "Earth" => 0.0002,            // Magnetosphere shields from GCR
-                    "Moon" => 0.015 * gcr_mult,   // No magnetosphere, exposed to GCR
-                    "Mars" => 0.020 * gcr_mult,   // Thin atmosphere, exposed to GCR
-                    "Europa" => 0.005,             // Under ice, GCR irrelevant
+                    "Moon" => self.params.radiation_moon_sv_month * gcr_mult,
+                    "Mars" => self.params.radiation_mars_sv_month * gcr_mult,
+                    "Europa" => self.params.radiation_europa_sv_month,
                     "Titan" => 0.00005,            // Thick N2 atmosphere shields
-                    _ => 0.005 * gcr_mult,
+                    _ => self.params.radiation_europa_sv_month * gcr_mult,
                 };
                 if world.habitat.modules.is_empty() {
                     // No habitat modules yet — flat dose for everyone

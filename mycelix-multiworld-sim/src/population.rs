@@ -12,7 +12,7 @@ use crate::world::World;
 use serde::{Deserialize, Serialize};
 
 /// Monthly pair-bonding probability for eligible adults.
-const PAIR_BOND_PROBABILITY: f64 = 0.02;
+const _PAIR_BOND_PROBABILITY: f64 = 0.02;
 
 /// Fix 2: Process consequences of a death on surviving agents.
 ///

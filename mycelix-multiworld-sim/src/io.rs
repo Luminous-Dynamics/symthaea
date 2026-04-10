@@ -15,7 +15,7 @@
 //! ```
 
 use serde::{Deserialize, Serialize};
-use crate::config::{PolicyConfig, SimulationConfig, BirthPolicy, ProjectStrategy, ResourcePriority};
+use crate::config::{SimulationConfig, BirthPolicy, ProjectStrategy, ResourcePriority};
 use crate::constants::SimulationParams;
 
 /// TOML-friendly scenario configuration.

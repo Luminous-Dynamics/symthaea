@@ -44,9 +44,9 @@ use serde::{Deserialize, Serialize};
 // ============================================================================
 
 /// Speed of light in km/s.
-const C_KM_S: f64 = 299_792.458;
+const _C_KM_S: f64 = 299_792.458;
 /// One light-year in km.
-const LY_KM: f64 = 9.461e12;
+const _LY_KM: f64 = 9.461e12;
 /// Ticks per year (12 monthly ticks).
 const TICKS_PER_YEAR: f64 = 12.0;
 /// Cosmic ray flux multiplier outside heliosphere.
