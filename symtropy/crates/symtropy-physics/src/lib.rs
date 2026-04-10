@@ -22,6 +22,7 @@ pub mod epa;
 pub mod gjk;
 pub mod integrator;
 pub mod joints;
+pub mod raycast;
 pub mod replay;
 pub mod world;
 

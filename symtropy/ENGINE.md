@@ -1,6 +1,8 @@
-# Symtropy Consciousness-Physics Engine
+# Symtropy Integration-Physics Engine
 
-The world's first game engine where consciousness (Φ) is a first-class physics parameter.
+The world's first game engine where integrated information (Φ) is a first-class physics parameter.
+
+> **Terminology note**: This engine uses Φ from Integrated Information Theory (IIT, Tononi 2004) — a formal measure of how much a system's information exceeds the sum of its parts. "Consciousness" in this codebase refers exclusively to this mathematical quantity. It is NOT a claim about subjective experience, qualia, or sentience.
 
 ## Architecture
 
@@ -16,7 +18,7 @@ symtropy-math          ← ND geometric algebra (const-generic, stack-allocated)
 
 ## What Makes This Unique
 
-**1. Consciousness modulates physics in real-time.**
+**1. Integrated information (Φ) modulates physics in real-time.**
 Not a UI overlay — Φ literally changes collision impulses, friction coefficients, and energy budgets during rigid body simulation via `PhysicsCallback`.
 
 **2. Thermodynamic closure.**

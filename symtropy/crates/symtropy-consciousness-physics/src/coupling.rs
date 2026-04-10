@@ -1,12 +1,16 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
-//! Integration field: the central coupling between Φ (integration metric) and physics.
-//! Uses "consciousness" in the IIT formal sense (Tononi 2004) — not a claim about experience.
+//! Integration field: the central coupling between Φ (integrated information) and physics.
 //!
-//! Each entity in the physics world can have an associated `EntityConsciousness`.
-//! The `ConsciousnessField` aggregates all entities and provides modulation
-//! functions that the physics engine calls during simulation.
+//! Φ is a formal measure from IIT (Tononi 2004) quantifying how much a system's
+//! information exceeds the sum of its parts. It is a mathematical property of
+//! causal structure — NOT a claim about subjective experience or sentience.
+//!
+//! Each entity has an [`EntityConsciousness`] (read: entity integration state) that
+//! computes Φ from sensory/behavioral inputs and gates physics via safety tiers.
+//! The [`ConsciousnessField`] (read: integration field) aggregates all entities
+//! and provides modulation functions called during physics simulation.
 
 use std::collections::BTreeMap;
 use std::collections::VecDeque;

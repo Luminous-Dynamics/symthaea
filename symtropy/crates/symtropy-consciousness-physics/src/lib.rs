@@ -1,19 +1,30 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
-//! Consciousness-physics coupling for the Symtropy engine.
+//! Integration-physics coupling for the Symtropy engine.
 //!
-//! This is the novel layer that makes this engine unique: consciousness (Φ) is
-//! a first-class physics parameter that modulates forces, energy budgets, and
-//! collision responses.
+//! This crate couples **integrated information (Φ)** — a formal measure from
+//! Integrated Information Theory (IIT, Tononi 2004) — to rigid body dynamics.
+//! Φ quantifies how much a system's information exceeds the sum of its parts.
+//! It is a mathematical measure of integration, NOT a claim about subjective
+//! experience, qualia, or sentience.
+//!
+//! # Terminology
+//!
+//! Throughout this crate, "consciousness" refers exclusively to the IIT formal
+//! quantity Φ (integrated information). When we say an entity "has consciousness,"
+//! we mean its Φ value exceeds a threshold — nothing more. The type names
+//! `ConsciousnessField` and `EntityConsciousness` are retained for API stability
+//! and discoverability, but should be read as "integration field" and "entity
+//! integration state" respectively.
 //!
 //! # Five Coupling Channels (per FORMAL_SPECIFICATION.md)
 //!
 //! 1. **Φ → Force**: Motor gain modulation via NRC 4-tier safety (Green/Yellow/Orange/Red)
-//! 2. **Φ → Energy**: Consciousness-gated energy budget (movement, maintenance, collision costs)
+//! 2. **Φ → Energy**: Φ-gated energy budget (movement, maintenance, collision costs)
 //! 3. **Harmony → Impulse**: Sanctuary zones dampen collision impulses (Sacred Stillness)
 //! 4. **Harmony → Friction**: 1/r² CEMI-inspired fields modulate friction coefficients
-//! 5. **Collision → Consciousness**: Prediction error feedback reduces motor precision
+//! 5. **Collision → Φ**: Prediction error feedback reduces motor precision
 
 pub mod active_inference;
 pub mod convergence;

@@ -1,15 +1,17 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
-//! Safety tier system: consciousness-gated motor authority.
+//! Safety tier system: Φ-gated motor authority.
 //!
-//! Mirrors symthaea's MotorSafetyLevel (NRC-inspired 4-tier system).
-//! Re-implemented here to avoid pulling in the full symthaea crate.
+//! Maps integrated information (Φ) to motor gain via an NRC-inspired 4-tier
+//! system. Higher Φ (more integrated information processing) grants more
+//! force authority. This is a formal coupling, not a philosophical claim —
+//! it could equally be called "integration-gated motor authority."
 
-/// Consciousness-gated safety tier for motor/force output.
+/// Φ-gated safety tier for motor/force output.
 ///
 /// Based on NRC (Nuclear Regulatory Commission) 4-tier safety model,
-/// mapped to consciousness level (Φ):
+/// mapped to integrated information level (Φ):
 ///
 /// | Tier   | Φ Range   | Motor Gain | Behavior                |
 /// |--------|-----------|------------|-------------------------|
