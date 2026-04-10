@@ -31,6 +31,8 @@
 pub mod backend;
 pub mod circuits;
 pub mod consciousness;
+#[cfg(feature = "backend-miden")]
+pub mod miden_consciousness;
 #[cfg(feature = "dilithium")]
 pub mod dilithium;
 pub mod domain;
@@ -41,17 +43,15 @@ pub mod types;
 
 // Re-exports
 pub use backend::ProofBackend;
+pub use consciousness::{ConsciousnessProofRequest, ConsciousnessProofResult, ConsciousnessTier};
 #[cfg(feature = "dilithium")]
 pub use dilithium::DilithiumKeypair;
 pub use domain::DomainTag;
 pub use error::{ZkpError, ZkpResult};
-pub use consciousness::{ConsciousnessProofRequest, ConsciousnessProofResult, ConsciousnessTier};
 pub use fixed_point::{FixedPoint, Q16_16_SCALE};
 pub use pogq::{simulate_pogq, DualBackendComparison, PoGQPublicInputs, PoGQResult, PoGQWitness};
-pub use types::{
-    AuthenticatedProof, ProofBytes, ProofMetadata, ProofResult, VerificationResult,
-};
+pub use types::{AuthenticatedProof, ProofBytes, ProofMetadata, ProofResult, VerificationResult};
 
 // Re-export shared ecosystem types
-pub use proofs_config::{ProofConfig, SecurityLevel, UseCase};
 pub use proofs_commitment::{CommitmentHash, CommitmentScheme, Sha3Commitment};
+pub use proofs_config::{ProofConfig, SecurityLevel, UseCase};
