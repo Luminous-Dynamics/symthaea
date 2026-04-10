@@ -140,7 +140,7 @@ pub fn GovernancePage() -> impl IntoView {
         let hc = hc.clone();
         async move {
             match hc
-                .call_zome::<(), Vec<ProposalView>>("dao", "list_active_proposals", &())
+                .call_zome_default::<(), Vec<ProposalView>>("dao", "list_active_proposals", &())
                 .await
             {
                 Ok(p) => p,

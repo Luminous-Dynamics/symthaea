@@ -56,7 +56,7 @@ pub fn CoursesPage() -> impl IntoView {
     let courses = LocalResource::new(move || {
         let hc = hc.clone();
         async move {
-            match hc.call_zome::<(), Vec<Course>>("learning", "list_courses", &()).await {
+            match hc.call_zome_default::<(), Vec<Course>>("learning", "list_courses", &()).await {
                 Ok(c) => c,
                 Err(_) => mock_courses(),
             }
