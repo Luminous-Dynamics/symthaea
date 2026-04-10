@@ -75,7 +75,7 @@ pub fn continuous_vote_weight(
         || !score.is_finite() || !threshold.is_finite()
         || !max_weight.is_finite() || max_weight < 0.0
     {
-        debug!("NaN/Inf fallback in continuous_vote_weight: score={}, threshold={}, temperature={}, max_weight={}", score, threshold, temperature, max_weight);
+        warn!("NaN/Inf fallback in continuous_vote_weight: score={}, threshold={}, temperature={}, max_weight={}", score, threshold, temperature, max_weight);
         return 0.0;
     }
     let exponent = -((score - threshold) / temperature);
@@ -146,16 +146,16 @@ impl ConsciousnessProfile {
         // Sanitize inputs first — prevents NaN from entering arithmetic.
         // Non-finite dimensions clamp to 0.0 (safest default: no contribution).
         let i = if self.identity.is_finite() { self.identity.clamp(0.0, 1.0) } else {
-            debug!("NaN/Inf in combined_score: identity={}", self.identity); 0.0
+            warn!("NaN/Inf in combined_score: identity={}", self.identity); 0.0
         };
         let r = if self.reputation.is_finite() { self.reputation.clamp(0.0, 1.0) } else {
-            debug!("NaN/Inf in combined_score: reputation={}", self.reputation); 0.0
+            warn!("NaN/Inf in combined_score: reputation={}", self.reputation); 0.0
         };
         let c = if self.community.is_finite() { self.community.clamp(0.0, 1.0) } else {
-            debug!("NaN/Inf in combined_score: community={}", self.community); 0.0
+            warn!("NaN/Inf in combined_score: community={}", self.community); 0.0
         };
         let e = if self.engagement.is_finite() { self.engagement.clamp(0.0, 1.0) } else {
-            debug!("NaN/Inf in combined_score: engagement={}", self.engagement); 0.0
+            warn!("NaN/Inf in combined_score: engagement={}", self.engagement); 0.0
         };
         (i * 0.25 + r * 0.25 + c * 0.30 + e * 0.20).clamp(0.0, 1.0)
     }
@@ -201,7 +201,7 @@ impl ConsciousnessProfile {
         if v.is_finite() {
             v.clamp(0.0, 1.0)
         } else {
-            debug!("NaN/Inf sanitized to 0.0: input={}", v);
+            warn!("NaN/Inf sanitized to 0.0: input={}", v);
             0.0
         }
     }
@@ -1243,6 +1243,13 @@ pub const REPUTATION_RESTORATION_INTERACTIONS: u32 = 100;
 /// Basis: Three-strikes principle with proportional response.
 pub const REPUTATION_MAX_SLASHES: u32 = 5;
 
+/// Cooldown period between slashes before the frequency penalty decays.
+/// 7 days in microseconds.
+pub const REPUTATION_SLASH_COOLDOWN_US: u64 = 7 * 24 * 3600 * 1_000_000;
+
+/// Maximum additional penalty for rapid re-slashing (0.0-1.0).
+pub const REPUTATION_SLASH_FREQUENCY_PENALTY: f64 = 0.5;
+
 /// Reputation state for an agent, tracking decay and sanctions.
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ReputationState {
@@ -1258,6 +1265,9 @@ pub struct ReputationState {
     pub blacklisted: bool,
     /// Timestamp at which blacklist was applied (for duration tracking).
     pub blacklisted_since_us: Option<u64>,
+    /// Timestamp of the most recent slash (for cooldown frequency penalty).
+    #[serde(default)]
+    pub last_slash_us: Option<u64>,
 }
 
 impl Default for ReputationState {
@@ -1269,6 +1279,7 @@ impl Default for ReputationState {
             total_slashes: 0,
             blacklisted: false,
             blacklisted_since_us: None,
+            last_slash_us: None,
         }
     }
 }
@@ -1279,7 +1290,7 @@ impl ReputationState {
         let sanitized = if initial_score.is_finite() {
             initial_score.clamp(0.0, 1.0)
         } else {
-            debug!("NaN/Inf in ReputationState::new: initial_score={}", initial_score);
+            warn!("NaN/Inf in ReputationState::new: initial_score={}", initial_score);
             0.0
         };
         Self {
@@ -1303,7 +1314,7 @@ impl ReputationState {
 
         if !elapsed_days.is_finite() || elapsed_days <= 0.0 {
             if !elapsed_days.is_finite() {
-                debug!("NaN/Inf in apply_decay: elapsed_days={}", elapsed_days);
+                warn!("NaN/Inf in apply_decay: elapsed_days={}", elapsed_days);
             }
             return;
         }
@@ -1312,7 +1323,7 @@ impl ReputationState {
         if decay_factor.is_finite() {
             self.score = (self.score * decay_factor).clamp(0.0, 1.0);
         } else {
-            debug!("NaN/Inf decay_factor in apply_decay: elapsed_days={}, decay_factor={}", elapsed_days, decay_factor);
+            warn!("NaN/Inf decay_factor in apply_decay: elapsed_days={}, decay_factor={}", elapsed_days, decay_factor);
             self.score = 0.0; // Extreme elapsed time -> full decay
         }
         self.last_updated_us = now_us;
@@ -1355,9 +1366,11 @@ impl ReputationState {
     pub fn slash(&mut self, now_us: u64) -> f64 {
         self.apply_decay(now_us);
         self.score *= 1.0 - REPUTATION_SLASH_FACTOR;
+        self.apply_frequency_penalty(now_us);
         self.score = self.score.clamp(0.0, 1.0);
         self.consecutive_good = 0;
         self.total_slashes = self.total_slashes.saturating_add(1);
+        self.last_slash_us = Some(now_us);
         self.check_blacklist(now_us);
         self.score
     }
@@ -1369,14 +1382,29 @@ impl ReputationState {
         self.apply_decay(now_us);
         let clamped_factor = factor.clamp(0.0, 1.0);
         self.score *= 1.0 - clamped_factor;
+        self.apply_frequency_penalty(now_us);
         self.score = self.score.clamp(0.0, 1.0);
         self.consecutive_good = 0;
         self.total_slashes = self.total_slashes.saturating_add(1);
+        self.last_slash_us = Some(now_us);
         self.check_blacklist(now_us);
         self.score
     }
 
     /// Check and update blacklist status.
+    /// Apply additional penalty if this slash occurs within the cooldown window.
+    fn apply_frequency_penalty(&mut self, now_us: u64) {
+        if let Some(last) = self.last_slash_us {
+            if now_us <= last + REPUTATION_SLASH_COOLDOWN_US {
+                let elapsed = now_us.saturating_sub(last) as f64;
+                let cooldown = REPUTATION_SLASH_COOLDOWN_US as f64;
+                let recency = 1.0 - (elapsed / cooldown).min(1.0);
+                let penalty = REPUTATION_SLASH_FREQUENCY_PENALTY * recency;
+                self.score *= 1.0 - penalty;
+            }
+        }
+    }
+
     fn check_blacklist(&mut self, now_us: u64) {
         if self.score < REPUTATION_BLACKLIST_THRESHOLD && !self.blacklisted {
             self.blacklisted = true;
@@ -1436,7 +1464,7 @@ pub fn apply_cartel_slash(
 pub fn decay_reputation(profile: &ConsciousnessProfile, elapsed_days: f64) -> ConsciousnessProfile {
     if !elapsed_days.is_finite() || elapsed_days <= 0.0 {
         if !elapsed_days.is_finite() {
-            debug!("NaN/Inf in decay_reputation: elapsed_days={}", elapsed_days);
+            warn!("NaN/Inf in decay_reputation: elapsed_days={}", elapsed_days);
         }
         return profile.clone();
     }
@@ -1444,7 +1472,7 @@ pub fn decay_reputation(profile: &ConsciousnessProfile, elapsed_days: f64) -> Co
     let decayed_rep = if decay_factor.is_finite() {
         (profile.reputation * decay_factor).clamp(0.0, 1.0)
     } else {
-        debug!("NaN/Inf decay_factor in decay_reputation: elapsed_days={}, decay_factor={}", elapsed_days, decay_factor);
+        warn!("NaN/Inf decay_factor in decay_reputation: elapsed_days={}, decay_factor={}", elapsed_days, decay_factor);
         0.0
     };
     ConsciousnessProfile {
@@ -3506,6 +3534,7 @@ mod tests {
             consecutive_good: 20,
             total_slashes: 2,
             last_updated_us: 0,
+            last_slash_us: None,
         };
         let requirement = GovernanceRequirement {
             min_tier: ConsciousnessTier::Participant,
@@ -3544,6 +3573,7 @@ mod tests {
             score: 0.8,
             blacklisted: false,
             blacklisted_since_us: None,
+            last_slash_us: None,
             consecutive_good: 50,
             total_slashes: 2, // 2 slashes -> 10% weight reduction
             last_updated_us: 0,
