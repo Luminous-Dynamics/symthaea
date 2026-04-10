@@ -19,9 +19,10 @@ except ImportError:
 fig_dir = os.path.dirname(os.path.abspath(__file__))
 
 # Fig 1: Ablation
+# Values from Table 1 in main.tex (re-verified with overhauled engine)
 names = ['FREE', 'ENERGY\nONLY', 'E+OFF', 'E+GRAD', 'E+OFF\n+RAND', 'FULL']
-clusters = [18.1, 18.1, 18.1, 1.8, 18.1, 3.3]
-collapses = [0, 0, 0, 71.7, 0, 56.7]
+clusters = [15.1, 15.1, 15.1, 1.8, 15.1, 13.5]
+collapses = [0, 0, 0, 72, 0, 45]
 colors = ['#aaa', '#aaa', '#aaa', '#e53935', '#aaa', '#1e88e5']
 
 fig, (a1, a2) = plt.subplots(1, 2, figsize=(9, 3.5))
@@ -55,11 +56,11 @@ a2.axhline(5.81, color='gray', ls='--', alpha=0.4)
 plt.tight_layout(); plt.savefig(f'{fig_dir}/fig3_dynamics.pdf', dpi=300); plt.close()
 print("fig3_dynamics.pdf")
 
-# Fig 4: Cooperation comparison
+# Fig 4: Cooperation comparison (Finding 9: well depletion, FULL vs FREE)
 fig, ax = plt.subplots(figsize=(4, 3.5))
-bars = ax.bar(['ENFORCED', 'FREE'], [3.7, 19.6], color=['#1e88e5', '#aaa'], width=0.5)
-ax.set_ylabel('Clustering (lower=tighter)'); ax.set_title('Cooperation Emergence\np<0.001, d=-1.94')
-for b, v in zip(bars, [3.7, 19.6]): ax.text(b.get_x()+b.get_width()/2, v+0.5, f'{v}', ha='center', fontweight='bold')
+bars = ax.bar(['FULL', 'FREE'], [8.15, 11.92], color=['#1e88e5', '#aaa'], width=0.5)
+ax.set_ylabel('Clustering (lower=tighter)'); ax.set_title('Cooperation Under Scarcity\np=0.0009, d=-1.94')
+for b, v in zip(bars, [8.15, 11.92]): ax.text(b.get_x()+b.get_width()/2, v+0.3, f'{v}', ha='center', fontweight='bold')
 plt.tight_layout(); plt.savefig(f'{fig_dir}/fig4_cooperation.pdf', dpi=300); plt.close()
 print("fig4_cooperation.pdf")
 

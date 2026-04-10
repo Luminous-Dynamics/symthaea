@@ -8,6 +8,7 @@
 \usepackage{booktabs}
 \usepackage{caption}
 \usepackage{amsmath}
+\usepackage{amssymb}
 \usepackage{hyperref}
 \usepackage{natbib}
 \usepackage{xcolor}
@@ -25,7 +26,7 @@ Luminous Dynamics\\
 \maketitle
 
 \begin{abstract}
-We present Symtropy, an open-source multi-agent simulation engine where a consciousness-inspired integration variable ($\Phi$) modulates rigid body dynamics through five coupling channels. Across 1,800+ simulation runs with 8 experimental conditions, we establish three findings: (1)~Thermodynamic enforcement combined with free energy gradient descent produces spatial clustering, with agents forming groups 35\% tighter than unconscious agents ($\Phi$=0). (2)~A six-condition ablation shows the FEP gradient is the clustering mechanism and epistemic offloading is the survival mechanism---neither alone is sufficient. (3)~Critically, the \emph{specific} consciousness metric is interchangeable: IIT-inspired $\Phi$, Shannon entropy, and constant scalars produce statistically identical clustering ($5.57 \pm 0.48$ vs $5.65 \pm 0.83$ vs $5.57 \pm 0.48$, 20 seeds). Only the $\Phi$=0 condition differs ($7.50 \pm 3.41$). This demonstrates that the conscious/unconscious distinction matters for social organization, but the choice between consciousness theories does not. Cooperation scales with population (55\% survival at $N$=12, 92\% at $N$=96), and a phase diagram shows population density, not energy cost, is the critical factor. Two emergent properties match published biological data without parameter fitting: per-capita energy scaling ($\beta = -0.178$ vs $-0.19$ in eusocial insects, Hou et al.\ 2010) and consciousness energy threshold (45\% vs 42\% of normal cortical metabolism, Stender et al.\ 2015). Post-hoc physics overhaul (LTC exponential damping, 2nd Law entropy, dimension-correct $1/r^{D-1}$ fields) reduced conservation error from 672\% to 5.1\%. A novel consciousness-sourced conformal curvature ($g_{ij} = e^{2\sigma}\delta_{ij}$) measurably deflects trajectories ($p = 0.009$, $d = -35.5$). A phase transition at 0.20~J/tick maintenance pressure separates cooperative and collapsed regimes, with bistable dynamics above threshold. The engine supports $N$-dimensional physics (2D--9D) with LBVH broadphase. Code: AGPL-3.0, 175+ tests.
+We present Symtropy, an open-source multi-agent simulation engine where a consciousness-inspired integration variable ($\Phi$) modulates rigid body dynamics through five coupling channels. Across 2,200+ simulation runs with 14 experimental conditions, we establish three findings: (1)~Thermodynamic enforcement combined with free energy gradient descent produces spatial clustering, with agents forming groups 35\% tighter than unconscious agents ($\Phi$=0). (2)~A six-condition ablation shows the FEP gradient is the clustering mechanism and epistemic offloading is the survival mechanism---neither alone is sufficient. (3)~Critically, the \emph{specific} consciousness metric is interchangeable: IIT-inspired $\Phi$, Shannon entropy, and constant scalars produce statistically identical clustering ($5.57 \pm 0.48$ vs $5.65 \pm 0.83$ vs $5.57 \pm 0.48$, 20 seeds). Only the $\Phi$=0 condition differs ($7.50 \pm 3.41$). This demonstrates that the conscious/unconscious distinction matters for social organization, but the choice between consciousness theories does not. Cooperation scales with population (55\% survival at $N$=12, 92\% at $N$=96), and a phase diagram shows population density, not energy cost, is the critical factor. Two emergent properties match published biological data without parameter fitting: per-capita energy scaling ($\beta = -0.178$ vs $-0.19$ in eusocial insects, Hou et al.\ 2010) and consciousness energy threshold (45\% vs 42\% of normal cortical metabolism, Stender et al.\ 2015). Post-hoc physics overhaul (LTC exponential damping, 2nd Law entropy, dimension-correct $1/r^{D-1}$ fields) reduced conservation error from 672\% to 5.1\%. A novel consciousness-sourced conformal curvature ($g_{ij} = e^{2\sigma}\delta_{ij}$) measurably deflects trajectories ($p = 0.009$, $d = -35.5$). A phase transition at 0.20~J/tick maintenance pressure separates cooperative and collapsed regimes, with bistable dynamics above threshold. The engine supports $N$-dimensional physics (2D--9D) with LBVH broadphase. Code: AGPL-3.0, 305+ tests.
 \end{abstract}
 
 \textbf{Keywords:} emergent cooperation, thermodynamic enforcement, consciousness metrics, free energy principle, multi-agent systems, ablation study
@@ -79,7 +80,7 @@ Energy is strictly conserved. Cooperation reduces costs through \textbf{epistemi
 
 Cooperation does NOT generate energy. It reduces expenditure. Solo survival: $\sim$4 minutes. With offloading: $\sim$6 minutes. Only energy wells provide indefinite survival.
 
-\section{Experiments (1,800+ Runs)}
+\section{Experiments (2,200+ Runs)}
 
 \subsection{Ablation Study}
 
@@ -104,7 +105,7 @@ FULL & \textbf{13.5} & 45\% & Sustainable \\
 \end{tabular}
 \endgroup
 
-\textbf{Finding 1:} The FEP gradient is the clustering mechanism (18.1$\to$1.8). Epistemic offloading is the survival mechanism (71.7\%$\to$56.7\% collapse). Neither alone is sufficient (Figure~\ref{fig:ablation_full}).
+\textbf{Finding 1:} The FEP gradient is the clustering mechanism (15.1$\to$1.8). Epistemic offloading is the survival mechanism (72\%$\to$45\% collapse). Neither alone is sufficient (Figure~\ref{fig:ablation_full}).
 
 \subsection{Metric Independence}
 
@@ -217,7 +218,7 @@ After the initial 1,800 runs, we identified conservation law violations in the e
 
 \textbf{Fix 1: LTC Damping.} Replaced multiplicative damping ($v \leftarrow v(1-d)$) with exponential decay from Liquid Time-Constant dynamics: $v(t+\Delta t) = v(t) \cdot e^{-\Delta t/\tau}$. Frame-rate independent, never reverses velocity, energy dissipation properly tracked. Conservation error dropped from 672\% to 5.1\%.
 
-\textbf{Fix 4: Dimension-Correct Fields.} Replaced hardcoded $1/r^2$ harmony field falloff with $1/r^{D-1}$ (Plummer-softened: $(r^2 + \epsilon^2)^{(D-1)/2}$), matching real field theory in $D$ spatial dimensions.
+\textbf{Fix 2: Dimension-Correct Fields.} Replaced hardcoded $1/r^2$ harmony field falloff with $1/r^{D-1}$ (Plummer-softened: $(r^2 + \epsilon^2)^{(D-1)/2}$), matching real field theory in $D$ spatial dimensions.
 
 \textbf{Fix 3: 2nd Law Entropy.} Added temperature, entropy, and Helmholtz free energy ($F = U - TS$) to entity energy budgets. Every consumption increases entropy monotonically.
 
@@ -263,7 +264,7 @@ With finite-capacity energy wells (3000~J each), the system no longer reaches tr
 
 We swept maintenance pressure from 0.05 to 1.00~J/tick (12 levels, 8 seeds each) to find the critical threshold where cooperation collapses.
 
-\textbf{Finding 10: Sharp phase transition at 0.20~J/tick.} Below this pressure, 100\% survival (cooperative phase). Above, a bistable regime: seeds either achieve 20/20 survival or 0/20 collapse depending on initial spatial configuration. The transition is sharp---there is no gradual decline. Low vs high pressure: Mann-Whitney $U = 12.0$, $p = 0.036$, Cohen's $d = 1.71$ (large).
+\textbf{Finding 10: Sharp phase transition at 0.20~J/tick (Figure~\ref{fig:phase_transition}).} Below this pressure, 100\% survival (cooperative phase). Above, a bistable regime: seeds either achieve 20/20 survival or 0/20 collapse depending on initial spatial configuration. The transition is sharp---there is no gradual decline. Low vs high pressure: Mann-Whitney $U = 12.0$, $p = 0.036$, Cohen's $d = 1.71$ (large).
 
 Counterintuitively, cooperation events \emph{increase} under stress: 378K events at 0.05~J/tick vs 1.31M at 1.00~J/tick---a 3.5$\times$ increase. Agents cooperate more frantically as survival becomes precarious. System temperature rises monotonically (311.5K to 330.6K), entropy production increases 8.6$\times$ (66.6 to 571.6~J/K), and Helmholtz free energy drops to zero above the critical pressure.
 
@@ -315,9 +316,16 @@ The Symtropy engine and all experiments are open-source. Results are reproducibl
 \end{minipage}\hfill
 \begin{minipage}{0.45\textwidth}
 \includegraphics[width=\textwidth]{fig4_cooperation.pdf}
-\caption{Cooperation emergence: 81\% tighter clustering ($p<0.001$, $d=-1.94$).}
+\caption{Cooperation under scarcity (well depletion): FULL clusters 31\% tighter than FREE ($p=0.0009$, $d=-1.94$).}
 \label{fig:coop_full}
 \end{minipage}
+\end{figure*}
+
+\begin{figure*}[t]
+\centering
+\includegraphics[width=0.55\textwidth]{fig5_phase_transition.pdf}
+\caption{Phase transition in cooperation at 0.20~J/tick maintenance pressure. Below threshold: 100\% survival. Above: bistable regime with sharp collapse ($p=0.036$, $d=1.71$).}
+\label{fig:phase_transition}
 \end{figure*}
 
 \bibliographystyle{apalike}
