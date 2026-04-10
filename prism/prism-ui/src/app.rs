@@ -121,7 +121,7 @@ pub fn App() -> impl IntoView {
             <p>"Loading epistemic index\u{2026}"</p>
         </div>
 
-        <div style:display=app_display>
+        <div class="app-root" style:display=app_display>
             <div class="chrome">
                 <div class="chrome-top">
                     <span class="brand-icon" inner_html=PRISM_ICON_MINI></span>

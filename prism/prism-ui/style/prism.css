@@ -8,6 +8,11 @@ html, body {
     overflow-x: hidden;
 }
 
+.app-root {
+    width: 100%;
+    min-height: 100vh;
+}
+
 /* Shared layout constants (not theme-dependent) */
 :root {
     --content-width: 680px;
@@ -451,6 +456,7 @@ body {
 .content-viewport {
     margin-top: 92px;
     min-height: calc(100vh - 92px);
+    width: 100%;
     background: var(--content-bg);
     transition: background 0.3s;
 }
