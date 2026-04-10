@@ -1,0 +1,32 @@
+[package]
+name = "craft-tests"
+version = "0.1.0"
+edition = "2021"
+description = "Integration tests for mycelix-craft cluster hApp"
+publish = false
+autotests = false
+
+[lib]
+path = "lib.rs"
+
+[dependencies]
+holochain = { version = "0.6", features = ["test_utils", "sweettest"] }
+holochain_types = "0.6"
+hdk = "0.6"
+hdi = "0.7"
+tokio = { version = "1", features = ["full", "test-util"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+rmp-serde = "1"
+
+[[test]]
+name = "sweettest_craft_graph"
+path = "sweettest_craft_graph.rs"
+
+[[test]]
+name = "sweettest_guild"
+path = "sweettest_guild.rs"
+
+[[test]]
+name = "sweettest_job_postings"
+path = "sweettest_job_postings.rs"
