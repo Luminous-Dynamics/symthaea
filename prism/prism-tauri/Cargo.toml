@@ -5,6 +5,10 @@ edition.workspace = true
 license.workspace = true
 description = "Prism — Tauri v2 desktop app (The Local Hub)"
 
+[[bin]]
+name = "mycelix-prism"
+path = "src/main.rs"
+
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 
