@@ -31,6 +31,8 @@ pub mod metabolism;
 pub mod wound_healing;
 pub mod currency;
 pub mod governance_hardening;
+pub mod sanctions;
+pub mod peer_recognition;
 pub mod scoring_bridge;
 pub mod biosphere;
 pub mod cascade;
@@ -3305,11 +3307,15 @@ impl MultiWorldSimulator {
                     }
                 }
 
-                // MYCEL computation
-                for agent in world.agents.iter_mut().filter(|a| a.is_alive()) {
+                // Peer recognition (Commons Charter: 10 recognitions/month, MYCEL-weighted)
+                let recognition = peer_recognition::tick_recognition(&world.agents, &mut self.rng);
+
+                // MYCEL computation (now with real peer recognition)
+                for (orig_idx, agent) in world.agents.iter_mut().enumerate() {
+                    if !agent.is_alive() { continue; }
                     let inputs = currency::MycelInputs {
                         participated: agent.needs.engagement > 0.3,
-                        recognition: agent.consciousness.care_activation * 0.5,
+                        recognition: recognition.score_for(orig_idx),  // Real agent-to-agent recognition
                         quality: agent.consciousness.coherence * agent.education_level,
                         years_active: agent.age_years(self.current_tick),
                     };
@@ -3534,6 +3540,18 @@ impl MultiWorldSimulator {
             }
             // Phase 7: Governance
             self.tick_governance();
+
+            // Phase 7.5: Graduated Sanctions (Ostrom Principle 5, Zosh et al. 2025)
+            for world in &mut self.worlds {
+                let oppression = world.governance.oppression_index;
+                if oppression > 0.1 {
+                    let _result = sanctions::apply_sanctions(
+                        &mut world.agents,
+                        oppression,
+                        self.current_tick,
+                    );
+                }
+            }
 
             // Phase 8: Consciousness
             self.tick_consciousness();

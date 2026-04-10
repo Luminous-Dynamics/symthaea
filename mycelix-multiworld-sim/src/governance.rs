@@ -853,7 +853,7 @@ mod tests {
         gov.evolve_authority(3, 100, 0.35, 0.5);
 
         for tick in 0..(150 * 12) {
-            let _ = gov.tick_governance_full(&world, tick, &mut rng, true, false);
+            let _ = gov.tick_governance_full(&world, tick, &mut rng, true, false, 0.0);
         }
 
         // In a healthy community, vetoes should be extremely rare (deterrence).
@@ -888,7 +888,7 @@ mod tests {
 
         // Run 50 years with hostile guardian
         for tick in 0..(50 * 12) {
-            let _ = gov.tick_governance_full(&world, tick, &mut rng, true, true);
+            let _ = gov.tick_governance_full(&world, tick, &mut rng, true, true, 0.0);
         }
 
         // Hostile guardian should have attempted vetoes
@@ -934,7 +934,7 @@ mod tests {
 
         // Run 100 ticks with hostile guardian
         for tick in 0..100 {
-            let _ = gov.tick_governance_full(&world, tick, &mut rng, true, true);
+            let _ = gov.tick_governance_full(&world, tick, &mut rng, true, true, 0.0);
         }
 
         // Rate limit: max 1 veto per 7 ticks = ~14 vetoes in 100 ticks
@@ -959,7 +959,7 @@ mod tests {
 
         // Run past the membership term
         for tick in 0..(MEMBERSHIP_TERM_TICKS + 10) {
-            let _ = gov.tick_governance_full(&world, tick, &mut rng, true, false);
+            let _ = gov.tick_governance_full(&world, tick, &mut rng, true, false, 0.0);
         }
 
         // Membership should have been processed (either renewed or failed)
@@ -1005,7 +1005,7 @@ mod tests {
             gov.evolve_authority(3, 100, 0.35, 0.5);
 
             for tick in 0..(100 * 12) {
-                let _ = gov.tick_governance_full(&world, tick, &mut rng, true, false);
+                let _ = gov.tick_governance_full(&world, tick, &mut rng, true, false, 0.0);
             }
 
             results.push((seed, gov.stability_score, gov.veto_count, gov.amendment_count));
