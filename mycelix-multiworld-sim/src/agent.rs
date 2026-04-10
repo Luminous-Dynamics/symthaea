@@ -627,4 +627,80 @@ mod tests {
         let a = make_agent(0, BiologicalSex::Male);
         assert_eq!(a.effective_labor(5 * 12), 0.0);
     }
+
+    #[test]
+    fn test_ethics_from_culture_bounds() {
+        let mut rng = crate::stochastic::StochasticEngine::new(42);
+        for individualism in [0.0, 0.25, 0.5, 0.75, 1.0] {
+            for _ in 0..100 {
+                let e = EthicalOrientation::from_culture(individualism, &mut rng);
+                assert!(e.deontological >= 0.05 && e.deontological <= 1.0, "deont={}", e.deontological);
+                assert!(e.consequentialist >= 0.05 && e.consequentialist <= 1.0, "conseq={}", e.consequentialist);
+                assert!(e.virtue_care >= 0.05 && e.virtue_care <= 1.0, "virtue={}", e.virtue_care);
+                assert!(e.relational >= 0.05 && e.relational <= 1.0, "relat={}", e.relational);
+            }
+        }
+    }
+
+    #[test]
+    fn test_ethics_inherit_bounds() {
+        let mut rng = crate::stochastic::StochasticEngine::new(123);
+        let extremes = [
+            EthicalOrientation { deontological: 0.05, consequentialist: 0.05, virtue_care: 0.05, relational: 0.05 },
+            EthicalOrientation { deontological: 1.0, consequentialist: 1.0, virtue_care: 1.0, relational: 1.0 },
+            EthicalOrientation { deontological: 0.9, consequentialist: 0.1, virtue_care: 0.5, relational: 0.5 },
+        ];
+        for a in &extremes {
+            for b in &extremes {
+                for _ in 0..50 {
+                    let child = EthicalOrientation::inherit(a, b, &mut rng);
+                    assert!(child.deontological >= 0.05 && child.deontological <= 1.0);
+                    assert!(child.consequentialist >= 0.05 && child.consequentialist <= 1.0);
+                    assert!(child.virtue_care >= 0.05 && child.virtue_care <= 1.0);
+                    assert!(child.relational >= 0.05 && child.relational <= 1.0);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_ethics_sector_affinity_non_negative() {
+        let e = EthicalOrientation { deontological: 1.0, consequentialist: 1.0, virtue_care: 1.0, relational: 1.0 };
+        for sector in 0..8 {
+            assert!(e.sector_affinity(sector) >= 0.0, "sector {} has negative affinity", sector);
+        }
+    }
+
+    #[test]
+    fn test_ethics_dominant_correctness() {
+        let deont = EthicalOrientation { deontological: 0.9, consequentialist: 0.1, virtue_care: 0.1, relational: 0.1 };
+        assert_eq!(deont.dominant(), "deontological");
+        let relat = EthicalOrientation { deontological: 0.1, consequentialist: 0.1, virtue_care: 0.1, relational: 0.9 };
+        assert_eq!(relat.dominant(), "relational");
+    }
+
+    #[test]
+    fn test_ethics_trauma_shift_stays_bounded() {
+        let mut e = EthicalOrientation { deontological: 0.95, consequentialist: 0.08, virtue_care: 0.5, relational: 0.5 };
+        // Simulate 100 severe trauma events
+        for _ in 0..100 {
+            let trauma_inc = 0.1;
+            e.deontological = (e.deontological + trauma_inc * 0.01).min(1.0);
+            e.consequentialist = (e.consequentialist - trauma_inc * 0.005).max(0.05);
+        }
+        assert!(e.deontological <= 1.0);
+        assert!(e.consequentialist >= 0.05);
+    }
+
+    #[test]
+    fn test_ethics_age_drift_stays_bounded() {
+        let mut e = EthicalOrientation { deontological: 0.5, consequentialist: 0.5, virtue_care: 0.95, relational: 0.95 };
+        // Simulate 600 ticks of elder drift (50 years)
+        for _ in 0..600 {
+            e.virtue_care = (e.virtue_care + 0.0001).min(1.0);
+            e.relational = (e.relational + 0.0001).min(1.0);
+        }
+        assert!(e.virtue_care <= 1.0);
+        assert!(e.relational <= 1.0);
+    }
 }

@@ -400,6 +400,9 @@ mod tests {
                 trauma_level: 0.0,
                 speciation_index: 0.0,
                 worlds: Vec::new(),
+                ethics_mean: [0.4; 4],
+                ethics_std: [0.1; 4],
+                ethics_diversity: 0.5,
             }],
             checkpoint_results: vec![
                 (60, "Base assembled".into(), true, vec![]),

@@ -107,6 +107,16 @@ pub struct EpochSnapshot {
     pub speciation_index: f64,
     /// Per-world breakdowns (populated for outer system visibility).
     pub worlds: Vec<WorldSnapshot>,
+    /// Mean ethical orientation across all agents (4D: deont, conseq, virtue, relat).
+    #[serde(default)]
+    pub ethics_mean: [f64; 4],
+    /// Standard deviation of ethics (diversity measure).
+    #[serde(default)]
+    pub ethics_std: [f64; 4],
+    /// Simpson diversity index of dominant ethical framework [0.0, 1.0].
+    /// 0.0 = monoculture, 0.75 = maximal diversity (4 equal frameworks).
+    #[serde(default)]
+    pub ethics_diversity: f64,
 }
 
 impl EpochSnapshot {
@@ -214,6 +224,39 @@ impl EpochSnapshot {
             }
         }).collect();
 
+        // Ethical composition telemetry (Phase 3: ethical pluralism)
+        let mut ethics_sums = [0.0f64; 4];
+        let mut ethics_sq_sums = [0.0f64; 4];
+        let mut dominant_counts = [0usize; 4]; // deont, conseq, virtue, relat
+        let ethics_n = agent_count.max(1) as f64;
+        for w in worlds {
+            for a in w.agents.iter().filter(|a| a.is_alive()) {
+                let v = a.ethics.as_vec();
+                for d in 0..4 {
+                    ethics_sums[d] += v[d];
+                    ethics_sq_sums[d] += v[d] * v[d];
+                }
+                // Count dominant framework for Simpson diversity
+                let max_idx = v.iter().enumerate()
+                    .max_by(|a, b| a.1.partial_cmp(b.1).unwrap_or(std::cmp::Ordering::Equal))
+                    .map(|(i, _)| i).unwrap_or(0);
+                dominant_counts[max_idx] += 1;
+            }
+        }
+        let ethics_mean = [
+            ethics_sums[0] / ethics_n, ethics_sums[1] / ethics_n,
+            ethics_sums[2] / ethics_n, ethics_sums[3] / ethics_n,
+        ];
+        let ethics_std = [0, 1, 2, 3].map(|d| {
+            let mean = ethics_mean[d];
+            ((ethics_sq_sums[d] / ethics_n) - mean * mean).max(0.0).sqrt()
+        });
+        // Simpson diversity: 1 - Σ(p_i²), range [0, 0.75] for 4 categories
+        let ethics_diversity = {
+            let total = dominant_counts.iter().sum::<usize>().max(1) as f64;
+            1.0 - dominant_counts.iter().map(|&c| (c as f64 / total).powi(2)).sum::<f64>()
+        };
+
         Self {
             epoch_id,
             tick,
@@ -241,6 +284,9 @@ impl EpochSnapshot {
             trauma_level: 0.0,
             speciation_index: 0.0,
             worlds: world_snapshots,
+            ethics_mean,
+            ethics_std,
+            ethics_diversity,
         }
     }
 }

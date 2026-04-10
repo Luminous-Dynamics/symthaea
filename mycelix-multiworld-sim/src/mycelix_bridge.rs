@@ -15,10 +15,32 @@ pub use mycelix_bridge_common::earth_colony_protocol::PlanetaryBody;
 pub use mycelix_bridge_common::consciousness_profile::{
     ConsciousnessProfile, ConsciousnessTier,
 };
-pub use mycelix_bridge_common::consciousness_sync::{
-    ConsciousnessSynchronizer, ConsciousnessMetricPacket,
-    SyncStrategy, SyncEvent, PlanetaryConsciousnessState,
-};
+// consciousness_sync is behind the "federated" feature gate in bridge-common.
+// Stub types for downstream compatibility until federated module is restored.
+#[derive(Debug, Clone, Default)]
+pub struct ConsciousnessSynchronizer;
+#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
+pub struct ConsciousnessMetricPacket {
+    pub source_world: String,
+    pub phi: f64,
+    pub coherence: f64,
+    pub timestamp: u32,
+}
+#[derive(Debug, Clone, Default)]
+pub struct SyncStrategy;
+#[derive(Debug, Clone)]
+pub struct SyncEvent {
+    pub source: String,
+    pub target: String,
+    pub delta_phi: f64,
+}
+#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
+pub struct PlanetaryConsciousnessState {
+    pub body: String,
+    pub collective_phi: f64,
+    pub population: usize,
+    pub coherence: f64,
+}
 pub use mycelix_bridge_common::planetary_governance::TendEquivalence;
 pub use mycelix_bridge_common::collective_phi::{
     CollectivePhiEngine, CollectivePhiResult, AgentConsciousnessVector,

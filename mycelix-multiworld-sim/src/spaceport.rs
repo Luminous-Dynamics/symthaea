@@ -259,7 +259,7 @@ pub fn instantiate_colonists(
             generation: 0,
             trauma_level: 0.0,
             cumulative_dose_sv: 0.0, adversarial: None, coordination_understanding: 0.0, mycel_score: 0.1, sap_balance: 100.0, is_biological: true, wounds: Vec::new(),
-            ethics: crate::agent::EthicalOrientation::default(),
+            ethics: crate::agent::EthicalOrientation::from_culture(source_region.cultural_profile.individualism, rng),
         };
         *next_agent_id += 1;
         agents.push(agent);

@@ -112,17 +112,45 @@ impl PopulationEngine {
             .map(|(i, a)| (a.id, i))
             .collect();
 
-        // Shuffle and pair probabilistically
-        let pairs = unpaired_males.len().min(unpaired_females.len());
-        for i in 0..pairs {
-            if rng.bernoulli(pair_bond_rate) {
-                let male_id = unpaired_males[i];
-                let female_id = unpaired_females[i];
+        // Assortative mating by ethical orientation (Schwartz 2012):
+        // Sort male candidates by ethical similarity to each female.
+        // This creates realistic ethical clustering without being deterministic —
+        // the pair_bond_rate still gates whether any bond forms.
+        // We use a greedy approach: for each female, find the most ethically
+        // similar unpaired male. O(n×m) but populations are small enough.
+        let mut paired_males: Vec<bool> = vec![false; unpaired_males.len()];
+        for &female_id in &unpaired_females {
+            let fi_opt = id_to_idx.get(&female_id).copied();
+            let female_ethics = fi_opt.map(|fi| world.agents[fi].ethics.as_vec());
 
+            if !rng.bernoulli(pair_bond_rate) {
+                continue;
+            }
+
+            // Find best unpaired male by ethical cosine similarity
+            let best_male_slot = if let Some(fe) = &female_ethics {
+                unpaired_males.iter().enumerate()
+                    .filter(|(j, _)| !paired_males[*j])
+                    .max_by(|(_, &mid_a), (_, &mid_b)| {
+                        let ea = id_to_idx.get(&mid_a).map(|&i| world.agents[i].ethics.as_vec()).unwrap_or([0.4; 4]);
+                        let eb = id_to_idx.get(&mid_b).map(|&i| world.agents[i].ethics.as_vec()).unwrap_or([0.4; 4]);
+                        let sim_a: f64 = fe.iter().zip(ea.iter()).map(|(a, b)| a * b).sum();
+                        let sim_b: f64 = fe.iter().zip(eb.iter()).map(|(a, b)| a * b).sum();
+                        sim_a.partial_cmp(&sim_b).unwrap_or(std::cmp::Ordering::Equal)
+                    })
+                    .map(|(j, _)| j)
+            } else {
+                // Fallback: first unpaired male
+                paired_males.iter().position(|&p| !p)
+            };
+
+            if let Some(j) = best_male_slot {
+                let male_id = unpaired_males[j];
+                paired_males[j] = true;
                 if let Some(&mi) = id_to_idx.get(&male_id) {
                     world.agents[mi].partner_id = Some(female_id);
                 }
-                if let Some(&fi) = id_to_idx.get(&female_id) {
+                if let Some(fi) = fi_opt {
                     world.agents[fi].partner_id = Some(male_id);
                 }
             }

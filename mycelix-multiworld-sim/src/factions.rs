@@ -209,12 +209,27 @@ impl FactionEngine {
             let id = self.next_faction_id;
             self.next_faction_id += 1;
 
-            let ideology = [
-                rng.next_f64(),
-                rng.next_f64(),
-                rng.next_f64(),
-                rng.next_f64(),
-            ];
+            // Faction ideology: blend of consciousness and ethical orientation
+            // from the world's living agents. Factions crystallize around existing
+            // ethical-consciousness clusters, not random noise.
+            let living: Vec<_> = worlds.iter()
+                .filter(|w| w.id == world.id)
+                .flat_map(|w| w.agents.iter())
+                .filter(|a| a.is_alive())
+                .collect();
+            let ideology = if living.len() > 5 {
+                // Sample a random agent's blended profile as the faction seed
+                let idx = (rng.next_u64() % living.len() as u64) as usize;
+                let a = living[idx];
+                [
+                    a.consciousness.level * 0.5 + a.ethics.deontological * 0.5,
+                    a.consciousness.meta_awareness * 0.5 + a.ethics.consequentialist * 0.5,
+                    a.consciousness.care_activation * 0.5 + a.ethics.virtue_care * 0.5,
+                    a.consciousness.harmonic_alignment * 0.5 + a.ethics.relational * 0.5,
+                ]
+            } else {
+                [rng.next_f64(), rng.next_f64(), rng.next_f64(), rng.next_f64()]
+            };
 
             let name = format!("Faction-{id}");
 
@@ -255,12 +270,13 @@ impl FactionEngine {
                     continue; // already affiliated
                 }
 
-                // Use consciousness dimensions as agent "ideology" proxy
+                // Blended ideology: 50% consciousness + 50% ethical orientation.
+                // Matches the faction ideology construction.
                 let agent_ideology = [
-                    agent.consciousness.level,
-                    agent.consciousness.meta_awareness,
-                    agent.consciousness.care_activation,
-                    agent.consciousness.harmonic_alignment,
+                    agent.consciousness.level * 0.5 + agent.ethics.deontological * 0.5,
+                    agent.consciousness.meta_awareness * 0.5 + agent.ethics.consequentialist * 0.5,
+                    agent.consciousness.care_activation * 0.5 + agent.ethics.virtue_care * 0.5,
+                    agent.consciousness.harmonic_alignment * 0.5 + agent.ethics.relational * 0.5,
                 ];
 
                 let dist = cosine_distance(&agent_ideology, &faction.ideology);
