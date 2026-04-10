@@ -1,9 +1,10 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-//! Domain context for Craft — mock-first pattern.
+//! Domain context for Craft — conductor-first pattern.
 //!
-//! Provides reactive signals populated from mock data on first render,
-//! then attempts to load real data from the Holochain conductor.
+//! Provides reactive signals that load real data from the Holochain
+//! conductor as soon as it connects. Falls back gracefully to empty
+//! state when no conductor is available.
 
 use leptos::prelude::*;
 use mycelix_leptos_core::holochain_provider::use_holochain;
@@ -68,7 +69,8 @@ pub fn use_craft() -> CraftCtx {
 
 /// Provide the Craft domain context. Call once at app root (inside HolochainProvider).
 ///
-/// Renders mock data immediately, then tries real conductor data after 4s.
+/// Loads real data from the conductor immediately when connected.
+/// Falls back to empty state when no conductor is available.
 pub fn provide_craft_context() {
     let ctx = CraftCtx {
         profile: RwSignal::new(None),
@@ -81,49 +83,52 @@ pub fn provide_craft_context() {
 
     provide_context(ctx.clone());
 
-    // After 4s, try to load real data from conductor
+    // Load data once conductor connects (reactive — triggers on status change)
     let hc = use_holochain();
-    wasm_bindgen_futures::spawn_local(async move {
-        gloo_timers::future::TimeoutFuture::new(4_000).await;
-
-        if hc.is_mock() {
-            return; // No conductor — keep mock data
+    Effect::new(move |_| {
+        let status = hc.status.get();
+        if status != mycelix_leptos_core::holochain_provider::ConnectionStatus::Connected {
+            return;
         }
 
-        ctx.loading.set(true);
+        let hc = hc.clone();
+        let ctx = ctx.clone();
+        wasm_bindgen_futures::spawn_local(async move {
+            ctx.loading.set(true);
 
-        // Try to load profile
-        if let Ok(profile) = hc
-            .call_zome_default::<(), Option<CraftProfile>>("craft_graph", "get_my_profile", &())
-            .await
-        {
-            ctx.profile.set(profile);
-        }
+            // Load profile
+            if let Ok(profile) = hc
+                .call_zome_default::<(), Option<CraftProfile>>("craft_graph", "get_my_profile", &())
+                .await
+            {
+                ctx.profile.set(profile);
+            }
 
-        // Try to load credentials
-        if let Ok(creds) = hc
-            .call_zome_default::<(), Vec<PublishedCredentialView>>(
-                "craft_graph",
-                "list_my_published_credentials",
-                &(),
-            )
-            .await
-        {
-            ctx.credentials.set(creds);
-        }
+            // Load credentials
+            if let Ok(creds) = hc
+                .call_zome_default::<(), Vec<PublishedCredentialView>>(
+                    "craft_graph",
+                    "list_my_published_credentials",
+                    &(),
+                )
+                .await
+            {
+                ctx.credentials.set(creds);
+            }
 
-        // Try to load guild memberships
-        if let Ok(guilds) = hc
-            .call_zome_default::<(), Vec<GuildMembershipView>>(
-                "guild_coordinator",
-                "get_my_guilds",
-                &(),
-            )
-            .await
-        {
-            ctx.guilds.set(guilds);
-        }
+            // Load guild memberships
+            if let Ok(guilds) = hc
+                .call_zome_default::<(), Vec<GuildMembershipView>>(
+                    "guild_coordinator",
+                    "get_my_guilds",
+                    &(),
+                )
+                .await
+            {
+                ctx.guilds.set(guilds);
+            }
 
-        ctx.loading.set(false);
+            ctx.loading.set(false);
+        });
     });
 }
