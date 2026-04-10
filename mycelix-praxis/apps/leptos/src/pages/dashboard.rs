@@ -665,7 +665,7 @@ fn XpLevelCard() -> impl IntoView {
     let stats = LocalResource::new(move || {
         let hc = hc.clone();
         async move {
-            match hc.call_zome::<(), LearnerStats>("gamification", "get_learner_stats", &()).await {
+            match hc.call_zome_default::<(), LearnerStats>("gamification", "get_learner_stats", &()).await {
                 Ok(s) => s,
                 Err(_) => { let p = crate::persistence::load::<crate::curriculum::ProgressStore>("praxis_progress").unwrap_or_default(); let t = crate::persistence::load::<crate::study_tracker::StudyTracker>("praxis_study_tracker").unwrap_or_default(); real_stats(&p, &t) },
             }
@@ -717,7 +717,7 @@ fn StreakCard() -> impl IntoView {
     let streak = LocalResource::new(move || {
         let hc = hc.clone();
         async move {
-            match hc.call_zome::<(), StreakInfo>("gamification", "get_streak", &()).await {
+            match hc.call_zome_default::<(), StreakInfo>("gamification", "get_streak", &()).await {
                 Ok(s) => s,
                 Err(_) => { let t = crate::persistence::load::<crate::study_tracker::StudyTracker>("praxis_study_tracker").unwrap_or_default(); real_streak(&t) },
             }
@@ -768,7 +768,7 @@ fn DueReviewsCard() -> impl IntoView {
     let reviews = LocalResource::new(move || {
         let hc = hc.clone();
         async move {
-            match hc.call_zome::<(), DueReviews>("srs", "get_due_summary", &()).await {
+            match hc.call_zome_default::<(), DueReviews>("srs", "get_due_summary", &()).await {
                 Ok(r) => r,
                 Err(_) => { let p = crate::persistence::load::<crate::curriculum::ProgressStore>("praxis_progress").unwrap_or_default(); real_due_reviews(&p) },
             }
@@ -811,7 +811,7 @@ fn SkillsCard() -> impl IntoView {
     let skills = LocalResource::new(move || {
         let hc = hc.clone();
         async move {
-            match hc.call_zome::<(), Vec<SkillMastery>>("adaptive", "get_top_skills", &()).await {
+            match hc.call_zome_default::<(), Vec<SkillMastery>>("adaptive", "get_top_skills", &()).await {
                 Ok(s) => s,
                 Err(_) => { let p = crate::persistence::load::<crate::curriculum::ProgressStore>("praxis_progress").unwrap_or_default(); real_skills(&p) },
             }
@@ -865,7 +865,7 @@ fn RecommendationsSection() -> impl IntoView {
         let hc = hc.clone();
         async move {
             match hc
-                .call_zome::<(), Vec<Recommendation>>(
+                .call_zome_default::<(), Vec<Recommendation>>(
                     "adaptive",
                     "get_recommendations",
                     &(),
@@ -917,7 +917,7 @@ fn RecentActivitySection() -> impl IntoView {
         let hc = hc.clone();
         async move {
             match hc
-                .call_zome::<(), Vec<ActivityEvent>>(
+                .call_zome_default::<(), Vec<ActivityEvent>>(
                     "gamification",
                     "get_recent_activity",
                     &(),

@@ -41,27 +41,36 @@ IIT axioms → PCG parameters: high Φ = complex interconnected spaces, low Φ =
 
 ## Performance
 
+Measured with criterion (NixOS, Rust stable, AMD Ryzen, single-threaded):
+
 | Operation | Time |
 |-----------|------|
-| GJK sphere×sphere 3D | 102 ns |
-| GJK box×box 3D | 193 ns |
-| GJK tesseract 4D | 231 ns |
-| Physics step (10 bodies) | 2.8 µs |
-| Physics step (100 bodies) | 193 µs |
+| GJK sphere-sphere 3D | 156 ns |
+| GJK capsule-capsule 3D | 173 ns |
+| GJK HyperBox-HyperBox 3D | 116 ns |
+| GJK HyperBox 4D | 101 ns |
+| GJK ConvexHull tesseract 4D | 359 ns |
+| EPA sphere-sphere 3D | 30 ns |
+| Raycast 100 bodies | 14 us |
+| Physics step (10 bodies) | 5.8 us |
+| Physics step (100 bodies) | 135 us |
+| Physics step (500 bodies) | 910 us |
 
-Zero heap allocation in physics hot path. Bivector uses `[f64; 6]` fixed array. GJK simplex uses `ArrayVec<SVector, 5>`.
+Zero heap allocation in physics hot path. Bivector uses `[f64; 36]` fixed array (supports up to 9D). GJK simplex uses `ArrayVec<SVector, 5>`. Contact manifold uses `ArrayVec<ContactPoint, 8>`.
+
+**Note**: HyperBox is 3.5x faster than ConvexHull for 4D shapes (O(D) vs O(2^D) support function).
 
 ## Crates
 
 | Crate | Tests | Description |
 |-------|-------|-------------|
-| `symtropy-math` | 55 | `Point<D>`, `Bivector<D>`, `Rotor<D>`, `Transform<D>`, `Shape<D>`, `Sphere<D>`, `Hyperplane<D>`, `ConvexHull<D>` |
-| `symtropy-physics` | 48 | `PhysicsWorld<D>`, GJK+EPA, Coulomb friction, body sleeping, `CollisionEvent`, `PhysicsCallback` trait |
-| `symtropy-consciousness-physics` | 58 | `ConsciousnessField<D>`, `SafetyTier`, `EnergyBudget`, `SanctuaryZone<D>`, `ThermodynamicLedger`, `HarmonyField<D>`, prediction error feedback |
+| `symtropy-math` | 84 | `Point<D>`, `Bivector<D>`, `Rotor<D>`, `Transform<D>`, `Shape<D>`, `Sphere<D>`, `Capsule<D>`, `HyperBox<D>`, `HalfSpace<D>`, `ConvexHull<D>` |
+| `symtropy-physics` | 98 | `PhysicsWorld<D>`, GJK+EPA(ND), CCD, raycasting, 3 joints, warm-starting, collision groups, sensors, NetId replay |
+| `symtropy-consciousness-physics` | 108 | `ConsciousnessField<D>`, 5-channel Phi coupling, Phi-gravity, temperature feedback, thermodynamic ledger, 63 experiments |
 | `symtropy-world` | 15 | `WorldBridge` (threaded sim), `TimeControl`, `SimSnapshot` interpolation |
-| `symtropy-render-bridge` | 13 | `Projector2D/3D/4D`, 4D cross-section, `PhysicsBody` Bevy component |
+| `symtropy-render-bridge` | 13 | `Projector2D/3D/4D`, 4D cross-section slicing, `sync_physics_2d/3d/4d` |
 | `symtropy-robotics-bridge` | 9 | `RoboticAgent`, `PlatformType` (6 platforms), `spawn_robot()` |
-| `symtropy-net` | 11 | `SpatialAuthority`, `PeerState`, `SyncableState` |
+| `symtropy-net` | 11 | `SpatialAuthority`, lockstep protocol, `PeerState`, `SyncableState` |
 
 ## Quick Start
 
