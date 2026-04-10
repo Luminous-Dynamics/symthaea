@@ -69,6 +69,16 @@ pub struct PolicyConfig {
     /// Default false for backward compatibility.
     pub hybrid_earth: bool,
 
+    // === CANONICAL GOVERNANCE SYSTEMS ===
+
+    /// Metabolism cycle configuration (4-phase governance rhythm).
+    #[serde(default)]
+    pub metabolism: crate::metabolism::MetabolismConfig,
+
+    /// Governance hardening (constitutional anti-tyranny invariants).
+    #[serde(default)]
+    pub governance_hardening: crate::governance_hardening::GovernanceHardeningConfig,
+
     // === REALISM TOGGLES — scientific instrument controls ===
 
     /// Turchin secular cycles: elite overproduction → crisis → civil war.
@@ -210,6 +220,8 @@ impl Default for PolicyConfig {
             hostile_guardian: false,
             disasters_enabled: true,
             hybrid_earth: false,
+            metabolism: crate::metabolism::MetabolismConfig::default(),
+            governance_hardening: crate::governance_hardening::GovernanceHardeningConfig::default(),
             turchin_cycles_enabled: true,
             fep_immiseration_enabled: true,
             sacred_stillness_enabled: true,

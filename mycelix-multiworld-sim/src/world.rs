@@ -546,6 +546,14 @@ pub struct World {
     #[serde(default)]
     pub governance: WorldGovernance,
 
+    /// Metabolism cycle state (4-phase governance rhythm).
+    #[serde(default)]
+    pub metabolism_state: crate::metabolism::MetabolismState,
+
+    /// Currency state (MYCEL/SAP/TEND aggregates).
+    #[serde(default)]
+    pub currency_state: crate::currency::WorldCurrencyState,
+
     // =================================================================
     // Structural realism systems (Top 10 from exhaustive audit)
     // =================================================================
@@ -689,7 +697,7 @@ impl World {
             knowledge: WorldKnowledge::new(),
             economy: WorldEconomy::new(),
             harmony: HarmonyTracker::new(),
-            governance: WorldGovernance::new(),
+            governance: WorldGovernance::new(), metabolism_state: crate::metabolism::MetabolismState::default(), currency_state: crate::currency::WorldCurrencyState::default(),
             power_generation_kw: 0.0,
             power_demand_kw: 0.0,
             narrative_identity: NarrativeIdentity::default(),
@@ -959,7 +967,7 @@ mod tests {
             knowledge: WorldKnowledge::new(),
             economy: WorldEconomy::new(),
             harmony: HarmonyTracker::new(),
-            governance: WorldGovernance::new(),
+            governance: WorldGovernance::new(), metabolism_state: crate::metabolism::MetabolismState::default(), currency_state: crate::currency::WorldCurrencyState::default(),
             power_generation_kw: 0.0,
             power_demand_kw: 0.0,
             narrative_identity: crate::world::NarrativeIdentity::default(),

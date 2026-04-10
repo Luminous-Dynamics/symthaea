@@ -3087,6 +3087,20 @@ impl MultiWorldSimulator {
                 // TODO: apply outputs.mutations to world state as modules are migrated
             }
 
+            // Phase 0.5: Metabolism — compute phase modifiers for this tick
+            let mut phase_modifiers: std::collections::HashMap<u32, metabolism::PhaseModifiers> =
+                std::collections::HashMap::new();
+            if self.config.policy.metabolism.enabled {
+                for world in &mut self.worlds {
+                    let mods = metabolism::compute_modifiers(
+                        &self.config.policy.metabolism,
+                        &mut world.metabolism_state,
+                        self.current_tick,
+                    );
+                    phase_modifiers.insert(world.id, mods);
+                }
+            }
+
             // Phase 1: Demographics (pair-bonding, births, deaths)
             let mut phase1_events = Vec::new();
             let world_count = self.worlds.len();
@@ -3170,6 +3184,31 @@ impl MultiWorldSimulator {
             self.track_milestones(&phase1_events);
             self.events.extend(phase1_events);
 
+            // Phase 1.5: Wound Healing — advance healing phases
+            for world in &mut self.worlds {
+                let healing_mult = phase_modifiers
+                    .get(&world.id)
+                    .map(|m| m.healing_mult)
+                    .unwrap_or(1.0);
+                let ctx = wound_healing::HealingContext {
+                    medicine: 0.5, // TODO: derive from world resources
+                    care_ratio: 0.3,
+                    collective_phi: world.mean_phi(),
+                    mediation_factor: world.governance.stability_score.min(1.0),
+                    metabolism_healing_mult: healing_mult,
+                };
+                for agent in world.agents.iter_mut().filter(|a| a.is_alive()) {
+                    agent.wounds.retain_mut(|w| {
+                        wound_healing::tick_wound(w, &ctx);
+                        !w.is_healed()
+                    });
+                    if wound_healing::attempt_kenosis(&mut agent.wounds, agent.consciousness.care_activation) {
+                        agent.consciousness.meta_awareness = (agent.consciousness.meta_awareness + 0.01).min(1.0);
+                    }
+                    agent.trauma_level = wound_healing::aggregate_trauma(&agent.wounds);
+                }
+            }
+
             // Phase 2: Genetics
             self.tick_genetics();
 
@@ -3181,6 +3220,70 @@ impl MultiWorldSimulator {
 
             // Phase 4: Economy
             self.tick_economy();
+
+            // Phase 4.5: Currency — MYCEL/SAP/TEND tick
+            for world in &mut self.worlds {
+                // TEND bounds enforcement
+                for agent in world.agents.iter_mut().filter(|a| a.is_alive()) {
+                    agent.tend_balance = agent.tend_balance.clamp(-currency::TEND_LIMIT, currency::TEND_LIMIT);
+                }
+
+                // SAP demurrage (per-agent)
+                let mut sap_balances: Vec<f64> = world.agents.iter()
+                    .filter(|a| a.is_alive())
+                    .map(|a| a.sap_balance)
+                    .collect();
+                let collected = currency::apply_sap_demurrage(&mut sap_balances);
+                let mut idx = 0;
+                for agent in world.agents.iter_mut().filter(|a| a.is_alive()) {
+                    if idx < sap_balances.len() {
+                        agent.sap_balance = sap_balances[idx];
+                        idx += 1;
+                    }
+                }
+                let (local, planetary, system) = currency::distribute_demurrage(collected);
+                world.currency_state.sap_commons_local += local;
+                world.currency_state.sap_commons_planetary += planetary;
+                world.currency_state.sap_commons_system += system;
+                world.currency_state.sap_demurrage_collected = collected;
+
+                // MYCEL computation
+                for agent in world.agents.iter_mut().filter(|a| a.is_alive()) {
+                    let inputs = currency::MycelInputs {
+                        participated: agent.needs.engagement > 0.3,
+                        recognition: agent.consciousness.care_activation * 0.5,
+                        quality: agent.consciousness.coherence * agent.education_level,
+                        years_active: agent.age_years(self.current_tick),
+                    };
+                    agent.mycel_score = currency::compute_mycel(agent.mycel_score, &inputs);
+                }
+
+                // Jubilee (every 48 ticks = 4 years)
+                if self.current_tick >= world.currency_state.next_jubilee_tick {
+                    let mut scores: Vec<f64> = world.agents.iter()
+                        .filter(|a| a.is_alive())
+                        .map(|a| a.mycel_score)
+                        .collect();
+                    currency::apply_jubilee(&mut scores);
+                    let mut idx = 0;
+                    for agent in world.agents.iter_mut().filter(|a| a.is_alive()) {
+                        if idx < scores.len() {
+                            agent.mycel_score = scores[idx];
+                            idx += 1;
+                        }
+                    }
+                    world.currency_state.next_jubilee_tick += currency::MYCEL_JUBILEE_TICKS;
+                }
+
+                // Update aggregates
+                let living_count = world.agents.iter().filter(|a| a.is_alive()).count();
+                if living_count > 0 {
+                    world.currency_state.mycel_mean = world.agents.iter()
+                        .filter(|a| a.is_alive())
+                        .map(|a| a.mycel_score)
+                        .sum::<f64>() / living_count as f64;
+                }
+            }
 
             // Phase 5: Inter-world
             self.tick_interworld();
@@ -4006,7 +4109,7 @@ impl Default for World {
             knowledge: knowledge::WorldKnowledge::new(),
             economy: economy::WorldEconomy::new(),
             harmony: harmony::HarmonyTracker::new(),
-            governance: governance::WorldGovernance::new(),
+            governance: governance::WorldGovernance::new(), metabolism_state: crate::metabolism::MetabolismState::default(), currency_state: crate::currency::WorldCurrencyState::default(),
             power_generation_kw: 0.0,
             power_demand_kw: 0.0,
             narrative_identity: crate::world::NarrativeIdentity::default(),
@@ -4336,17 +4439,21 @@ mod tests {
         let mut sim = MultiWorldSimulator::new(config);
         let report = sim.run();
 
-        // DL#1: Disasters should cause some trauma
+        // DL#1: Disasters should cause some trauma OR wounds
+        // With wound healing active, trauma_level may be 0.0 if all wounds healed.
+        // Check for either non-zero trauma OR non-empty wound history.
         let max_trauma: f64 = sim.worlds.iter()
             .flat_map(|w| w.agents.iter().filter(|a| a.is_alive()))
             .map(|a| a.trauma_level)
             .fold(0.0f64, f64::max);
-        // With 608 disasters in 150 years, 20 years should have ~80 disasters
-        // Even with low severity, some trauma should accumulate
+        let total_wounds: usize = sim.worlds.iter()
+            .flat_map(|w| w.agents.iter().filter(|a| a.is_alive()))
+            .map(|a| a.wounds.len())
+            .sum();
         if report.total_disasters > 10 {
-            assert!(max_trauma > 0.0,
-                "DL#1: With {} disasters, max trauma should be >0, got {}",
-                report.total_disasters, max_trauma);
+            assert!(max_trauma > 0.0 || total_wounds > 0,
+                "DL#1: With {} disasters, should have trauma or wounds, got trauma={}, wounds={}",
+                report.total_disasters, max_trauma, total_wounds);
         }
 
         // Bug#3: CVS should use real oppression index (not hardcoded 0.0)

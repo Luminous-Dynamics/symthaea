@@ -608,6 +608,7 @@ mod tests {
             economy: crate::economy::WorldEconomy::new(),
             harmony: crate::harmony::HarmonyTracker::new(),
             governance: crate::governance::WorldGovernance::new(),
+            metabolism_state: crate::metabolism::MetabolismState::default(), currency_state: crate::currency::WorldCurrencyState::default(),
             power_generation_kw: 0.0,
             power_demand_kw: 0.0,
             narrative_identity: crate::world::NarrativeIdentity::default(),
