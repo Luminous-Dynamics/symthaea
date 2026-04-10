@@ -50,6 +50,7 @@ pub mod embodiment;
 pub mod encoder;
 pub mod observation;
 pub mod safety;
+pub mod web_agent;
 
 pub use actions::{BrowserAction, ElementSelector};
 pub use cdp::CdpSession;
@@ -58,3 +59,4 @@ pub use embodiment::BrowserBridge;
 pub use encoder::BrowserHdcEncoder;
 pub use observation::{AccessibleElement, PageObservation};
 pub use safety::BrowserSafetyPolicy;
+pub use web_agent::{WebAgent, WebAgentResult, WebClaim};

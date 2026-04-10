@@ -36,7 +36,7 @@ web-sys = { workspace = true, features = [
     "Storage",
 ] }
 gloo-net = { workspace = true }
-gloo-timers = { workspace = true }
+gloo-timers = { version = "0.3", features = ["futures"] }
 
 # Utilities
 serde = { workspace = true }
