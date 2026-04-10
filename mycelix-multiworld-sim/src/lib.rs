@@ -2785,12 +2785,16 @@ impl MultiWorldSimulator {
                     // and psychological events still register trauma.
                     // Equilibrium: 1 disaster/month at 0.03 trauma, decay 0.002/tick
                     // → baseline ~0.15. Catastrophic (Carrington) → 0.3-0.5 spike.
-                    let trauma_inc = (effects.consciousness_shock * 0.3
-                        + effects.allostatic_load_increase * 0.2
-                        + effects.morale_impact.abs() * 0.1
-                        + effects.population_loss_fraction * 0.5) // witnessing death
-                        * cascade_mult * 0.3;
-                    if trauma_inc > 0.001 {
+                    // Trauma from disasters: scaled by effect severity and cascade.
+                    // Calibrated so a moderate ECLSS failure (~0.02 shock, ~0.05 load)
+                    // produces ~0.02 trauma/tick, which accumulates meaningfully
+                    // against the 0.001/tick decay rate.
+                    let trauma_inc = (effects.consciousness_shock * 0.5
+                        + effects.allostatic_load_increase * 0.3
+                        + effects.morale_impact.abs() * 0.2
+                        + effects.population_loss_fraction * 1.0) // witnessing death
+                        * cascade_mult;
+                    if trauma_inc > 0.0001 {
                         for agent in world.agents.iter_mut().filter(|a| a.is_alive()) {
                             agent.trauma_level = (agent.trauma_level + trauma_inc).min(1.0);
                             if trauma_inc > 0.05 { agent.wounds.push(wound_healing::WoundState::new(trauma_inc.min(0.5), wound_healing::WoundOrigin::Disaster, self.current_tick)); }
@@ -3216,7 +3220,10 @@ impl MultiWorldSimulator {
                     if wound_healing::attempt_kenosis(&mut agent.wounds, agent.consciousness.care_activation) {
                         agent.consciousness.meta_awareness = (agent.consciousness.meta_awareness + 0.01).min(1.0);
                     }
-                    agent.trauma_level = wound_healing::aggregate_trauma(&agent.wounds);
+                    // Trauma is the max of accumulated trauma (from disasters/deaths)
+                    // and wound-derived trauma. Don't overwrite — wounds are a subset.
+                    let wound_trauma = wound_healing::aggregate_trauma(&agent.wounds);
+                    agent.trauma_level = agent.trauma_level.max(wound_trauma);
                     // TEND cost for care services (wound healing requires community resources)
                     if !agent.wounds.is_empty() && ctx.care_ratio > 0.01 {
                         agent.tend_balance = (agent.tend_balance - 0.5).max(-40.0);
@@ -4001,7 +4008,10 @@ impl MultiWorldSimulator {
                 let care_ratio = world.agents.iter()
                     .filter(|a| a.is_alive() && a.skills.strongest() == "medicine")
                     .count() as f64 / world.population().max(1) as f64;
-                let decay = 0.001 + care_ratio * 0.003; // Care helps significantly
+                // Slower base decay: ~167 years to fully recover without care (was ~83yr).
+                // This ensures trauma accumulates meaningfully from repeated disasters
+                // and persists long enough to affect consciousness and governance.
+                let decay = 0.0005 + care_ratio * 0.002;
                 for agent in world.agents.iter_mut().filter(|a| a.is_alive()) {
                     agent.trauma_level = (agent.trauma_level - decay).max(0.0);
                 }
