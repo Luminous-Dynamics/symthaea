@@ -354,3 +354,97 @@ fn sovereign_credential_json_round_trip() {
     assert_eq!(deserialized.did, cred.did);
     assert_eq!(deserialized.tier, CivicTier::Citizen);
 }
+
+// ---------------------------------------------------------------------------
+// Full pipeline integration test
+// ---------------------------------------------------------------------------
+
+#[cfg(feature = "hdc")]
+#[test]
+fn full_pipeline_collect_normalize_decay_encode_tier() {
+    use crate::collectors::{CollectedDimensions, DimensionInput, normalize_all};
+    use crate::decay::{apply_decay, DecayConfig};
+    use crate::hdc::{encode_profile, tier_from_popcount, TierThresholds};
+
+    // Step 1: Simulate collected raw data from cluster sources
+    let mut collected = CollectedDimensions::default();
+    collected.epistemic_integrity = DimensionInput {
+        activity_count: 40,
+        baseline: 50,
+        quality: 0.9,
+        days_since_last: 5.0,
+        recency_half_life_days: 90.0,
+    };
+    collected.civic_participation = DimensionInput {
+        activity_count: 15,
+        baseline: 20,
+        quality: 0.85,
+        days_since_last: 2.0,
+        recency_half_life_days: 180.0,
+    };
+    collected.domain_competence = DimensionInput {
+        activity_count: 3,
+        baseline: 3,
+        quality: 0.95,
+        days_since_last: 30.0,
+        recency_half_life_days: 365.0,
+    };
+    collected.stewardship_care = DimensionInput {
+        activity_count: 25,
+        baseline: 30,
+        quality: 0.8,
+        days_since_last: 10.0,
+        recency_half_life_days: 60.0,
+    };
+
+    // Step 2: Normalize to [0,1] scores
+    let profile = normalize_all(&collected);
+    assert!(profile.epistemic_integrity > 0.5, "Epistemic should be high");
+    assert!(profile.civic_participation > 0.4, "Civic should be moderate");
+    assert!(profile.domain_competence > 0.5, "Competence should be high");
+    assert_eq!(profile.thermodynamic_yield, 0.0, "Thermo should be zero (no data)");
+
+    // Step 3: Apply decay (30 days since last interaction)
+    let decay_config = DecayConfig::default_governance();
+    let day_us: u64 = 86_400_000_000;
+    let now_us = 100 * day_us;
+    let last_interaction = 70 * day_us; // 30 days ago
+    let decayed = apply_decay(&profile, last_interaction, now_us, &decay_config);
+
+    // Verify decay reduced scores
+    assert!(decayed.epistemic_integrity < profile.epistemic_integrity,
+        "Decay should reduce epistemic: {} → {}", profile.epistemic_integrity, decayed.epistemic_integrity);
+
+    // Step 4: Derive scalar tier
+    let weights = DimensionWeights::governance();
+    let scalar_score = decayed.combined_score(&weights);
+    let scalar_tier = decayed.tier(&weights);
+
+    // Step 5: Encode to HDC BinaryHV
+    let hv = encode_profile(&decayed, &weights);
+    assert!(hv.popcount() > 0, "Encoded HV should have nonzero popcount");
+
+    // Step 6: Derive tier from popcount
+    let thresholds = TierThresholds::calibrate(&weights);
+    let hdc_tier = tier_from_popcount(&hv, &thresholds);
+
+    // Step 7: Verify popcount tier matches scalar tier
+    // (They should match for well-calibrated thresholds)
+    println!(
+        "Pipeline: score={:.3}, scalar_tier={:?}, hdc_tier={:?}, popcount={}",
+        scalar_score, scalar_tier, hdc_tier, hv.popcount()
+    );
+
+    // The tiers should be close (within 1 tier of each other due to
+    // threshold calibration imprecision). Exact match not guaranteed
+    // because HDC encoding has quantization effects.
+    let scalar_idx = [CivicTier::Observer, CivicTier::Participant, CivicTier::Citizen, CivicTier::Steward, CivicTier::Guardian]
+        .iter().position(|t| *t == scalar_tier).unwrap();
+    let hdc_idx = [CivicTier::Observer, CivicTier::Participant, CivicTier::Citizen, CivicTier::Steward, CivicTier::Guardian]
+        .iter().position(|t| *t == hdc_tier).unwrap();
+    assert!(
+        (scalar_idx as i32 - hdc_idx as i32).abs() <= 1,
+        "HDC tier {:?} should be within 1 of scalar tier {:?}",
+        hdc_tier, scalar_tier
+    );
+}

@@ -309,10 +309,10 @@ a:hover { color: var(--mycelix-green); text-decoration: underline; text-underlin
    11. CONSCIOUSNESS CHANNEL DEFAULTS
    ================================================================ */
 :root {
-    --consciousness-warmth: 0.5;
-    --consciousness-density: 1;
-    --consciousness-chrome-opacity: 1;
-    --consciousness-animation-speed: 1;
+    --civic-warmth: 0.5;
+    --civic-density: 1;
+    --civic-chrome-opacity: 1;
+    --civic-animation-speed: 1;
     --device-energy: 1;
     --torpor-level: 0;
     --homeostasis: 0;

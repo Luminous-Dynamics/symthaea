@@ -111,8 +111,9 @@ pub fn use_consciousness() -> ConsciousnessState {
 
 /// Attempt to refresh the sovereign profile from the conductor.
 ///
-/// Calls `identity_bridge.get_consciousness_profile` and maps to 8D.
-/// Falls back silently on error.
+/// Tries the new 8D `get_sovereign_credential` endpoint first. If that
+/// fails (identity bridge not yet upgraded), falls back to the legacy 4D
+/// `get_consciousness_profile` and maps to 8D via From conversion.
 pub fn refresh_consciousness_from_conductor(
     state: &ConsciousnessState,
     hc: &crate::holochain_provider::HolochainCtx,
@@ -121,21 +122,42 @@ pub fn refresh_consciousness_from_conductor(
     let hc = hc.clone();
 
     wasm_bindgen_futures::spawn_local(async move {
-        let result: Result<ProfileWire, String> = hc
-            .call_zome("identity", "identity_bridge", "get_consciousness_profile", &())
+        // Try 8D sovereign credential first
+        let result_8d: Result<ProfileWire, String> = hc
+            .call_zome("identity", "identity_bridge", "get_sovereign_credential", &())
             .await;
 
-        match result {
+        match result_8d {
             Ok(wire) => {
                 let profile = wire.to_sovereign();
                 let tier = civic_tier(&profile);
                 set_profile.set(profile);
                 web_sys::console::log_1(
-                    &format!("[Sovereign] Refreshed from conductor: tier={}", tier.label()).into()
+                    &format!("[Sovereign] 8D profile from conductor: tier={}", tier.label()).into()
+                );
+                return;
+            }
+            Err(_) => {
+                // 8D endpoint not available — try legacy 4D
+            }
+        }
+
+        // Fallback: legacy 4D consciousness profile → 8D mapping
+        let result_4d: Result<ProfileWire, String> = hc
+            .call_zome("identity", "identity_bridge", "get_consciousness_credential", &())
+            .await;
+
+        match result_4d {
+            Ok(wire) => {
+                let profile = wire.to_sovereign();
+                let tier = civic_tier(&profile);
+                set_profile.set(profile);
+                web_sys::console::log_1(
+                    &format!("[Sovereign] 4D fallback from conductor: tier={}", tier.label()).into()
                 );
             }
             Err(_) => {
-                // Silently fall back to defaults — conductor may not have identity cluster
+                // No conductor — keep defaults
             }
         }
     });

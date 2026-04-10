@@ -8,11 +8,11 @@
 //! coordinator imports these types and calls `dispatch_call_checked()`
 //! with its own allowlist.
 //!
-//! ## Consciousness Thresholds (always available)
+//! ## Civic Thresholds (always available)
 //!
-//! The `consciousness_thresholds` module is the canonical source of truth for all
-//! consciousness-related thresholds across the Mycelix ecosystem. It does not
-//! depend on HDK and can be used by any Rust crate.
+//! The `consciousness_thresholds` module (legacy name) contains the canonical
+//! threshold constants. The `sovereign_gate` module provides the 8D Sovereign
+//! Profile gating system that replaces the old 4D consciousness gating.
 
 pub mod constitutional_envelope;
 pub mod scoring_model;

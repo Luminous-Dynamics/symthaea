@@ -27,12 +27,12 @@ pub fn init_consciousness_ui() {
         let torpor = thermo.torpor_level.get();
 
         // Base consciousness values
-        set_css_var("--consciousness-warmth", &format!("{:.3}", warmth));
-        set_css_var("--consciousness-bond-glow", &format!("{:.3}", profile.semantic_resonance));
+        set_css_var("--civic-warmth", &format!("{:.3}", warmth));
+        set_css_var("--civic-bond-glow", &format!("{:.3}", profile.semantic_resonance));
 
         // Animation speed: consciousness drives intent, energy constrains capacity
         let anim_speed = (0.5 + warmth * 0.5) * energy * (1.0 - torpor * 0.8);
-        set_css_var("--consciousness-animation-speed", &format!("{:.3}", anim_speed.max(0.1)));
+        set_css_var("--civic-animation-speed", &format!("{:.3}", anim_speed.max(0.1)));
 
         // Primary color saturation dims with torpor
         let saturation = (1.0 - torpor * 0.7) * 100.0;
