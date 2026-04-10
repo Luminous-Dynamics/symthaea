@@ -503,7 +503,15 @@ body {
 
 /* ── Welcome Page ── */
 
-.welcome { text-align: center; padding-top: 80px; }
+.welcome { text-align: center; padding-top: 40px; }
+.welcome-hero {
+    max-width: 320px;
+    width: 80%;
+    height: auto;
+    margin-bottom: 16px;
+    border-radius: 12px;
+    opacity: 0.9;
+}
 .welcome h1 {
     font-size: 2.5em;
     background: var(--welcome-gradient);
@@ -1038,6 +1046,13 @@ body {
     height: 100vh;
     color: var(--chrome-text-bright);
     gap: 16px;
+}
+.loading-prism {
+    width: 200px;
+    height: auto;
+    border-radius: 12px;
+    opacity: 0.85;
+    margin-bottom: 8px;
 }
 .loading-screen .brand {
     font-size: 32px;

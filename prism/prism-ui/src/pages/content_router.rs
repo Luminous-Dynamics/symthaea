@@ -68,6 +68,7 @@ pub fn ContentRouter() -> impl IntoView {
 fn WelcomePage() -> impl IntoView {
     view! {
         <div class="reader-content welcome">
+            <img src="/static/prism-hero.jpg" alt="Mycelix Prism" class="welcome-hero" />
             <h1>"Mycelix Prism"</h1>
             <p class="tagline">"Consciousness-aware epistemic search. Pure Rust."</p>
 

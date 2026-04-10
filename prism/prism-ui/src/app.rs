@@ -111,6 +111,7 @@ pub fn App() -> impl IntoView {
             when=move || engine_ready.get()
             fallback=|| view! {
                 <div class="loading-screen">
+                    <img src="/static/prism-loading.jpg" alt="Prism" class="loading-prism" />
                     <span class="brand">"Prism"</span>
                     <p>"Loading epistemic index\u{2026}"</p>
                 </div>
