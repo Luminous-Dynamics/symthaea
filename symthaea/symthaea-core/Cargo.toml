@@ -2,9 +2,16 @@
 name = "symthaea-core"
 version = "0.5.0"
 edition = "2021"
-authors = ["Luminous Dynamics"]
-description = "Core primitives for Symthaea: HDC, Phi Engine, and basic Consciousness structures"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Core primitives for Symthaea: 16,384D hyperdimensional computing, Phi engine, LTC neural dynamics, and consciousness structures. The foundation for 85+ symthaea crates."
 license = "AGPL-3.0-or-later"
+repository = "https://github.com/luminous-dynamics/symthaea"
+keywords = ["hdc", "phi", "neuroscience", "simulation", "consciousness"]
+categories = ["science", "simulation", "algorithms"]
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
 
 [dependencies]
 ndarray = { workspace = true }
@@ -14,17 +21,16 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
 uuid = { workspace = true }
-# im removed: planned for immutable data structures but never imported
 bincode = { workspace = true }
 rayon = { workspace = true, optional = true }
 anyhow = { workspace = true }
 blake3 = { workspace = true }
-sha3 = "0.10"  # SHAKE-256 Keccak sponge for deterministic genesis
-ordered-float = "4.2"  # Orderable floats for heap-based top-k selection
+sha3 = "0.10"
+ordered-float = "4.2"
 parking_lot = { workspace = true }
 once_cell = { workspace = true }
 nalgebra = { workspace = true }
-bumpalo = "3.16"  # Arena allocation
+bumpalo = "3.16"
 chrono = { workspace = true }
 
 # Multi-Database Consciousness Architecture (optional dependencies)
