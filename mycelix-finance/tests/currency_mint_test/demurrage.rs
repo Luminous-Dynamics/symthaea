@@ -188,17 +188,17 @@ async fn test_demurrage_all_inner() {
                 },
             )
             .await;
-        assert_eq!(bob_dem.deduction, 0, "Negative balance exempt from demurrage");
+        assert_eq!(
+            bob_dem.deduction, 0,
+            "Negative balance exempt from demurrage"
+        );
         println!("  - Bob (debtor) demurrage: deduction=0 (exempt)");
 
         // Check compost balance
         let compost: CompostBalance = conductor
             .call(&zome_a, "get_compost_balance", def.id.clone())
             .await;
-        assert!(
-            compost.accumulated >= 0,
-            "Compost should be non-negative"
-        );
+        assert!(compost.accumulated >= 0, "Compost should be non-negative");
         println!("  - Compost balance: {}", compost.accumulated);
 
         // Get demurrage report
@@ -295,7 +295,9 @@ async fn test_demurrage_all_inner() {
             hours: 3.0,
             service_description: "Batch demurrage test exchange 1".into(),
         };
-        let _: MintedExchange = conductor.call(&zome_a, "record_minted_exchange", ex_input).await;
+        let _: MintedExchange = conductor
+            .call(&zome_a, "record_minted_exchange", ex_input)
+            .await;
 
         // Bob provides 1 hour to Alice → Bob +1, Alice -1 → net: Alice +2, Bob -2
         let ex_input2 = RecordMintedExchangeInput {
@@ -304,7 +306,9 @@ async fn test_demurrage_all_inner() {
             hours: 1.0,
             service_description: "Batch demurrage test exchange 2".into(),
         };
-        let _: MintedExchange = conductor.call(&zome_b, "record_minted_exchange", ex_input2).await;
+        let _: MintedExchange = conductor
+            .call(&zome_b, "record_minted_exchange", ex_input2)
+            .await;
         println!("  - Two exchanges: Alice +2, Bob -2");
 
         // Get demurrage report (read-only, no mutation)
@@ -321,16 +325,16 @@ async fn test_demurrage_all_inner() {
         let batch_results: Vec<DemurrageResult> = conductor
             .call(&zome_a, "apply_demurrage_all", def.id.clone())
             .await;
-        println!("  - Batch results: {} members affected", batch_results.len());
+        println!(
+            "  - Batch results: {} members affected",
+            batch_results.len()
+        );
 
         // Verify zero-sum still holds
         let stats: CurrencyStats = conductor
             .call(&zome_a, "get_currency_stats", def.id.clone())
             .await;
-        assert_eq!(
-            stats.net_sum, 0,
-            "Zero-sum preserved after batch demurrage"
-        );
+        assert_eq!(stats.net_sum, 0, "Zero-sum preserved after batch demurrage");
         println!("  - Zero-sum invariant: net_sum={}", stats.net_sum);
 
         println!("Scenario 18.1 PASSED");
@@ -385,7 +389,10 @@ async fn test_demurrage_all_inner() {
         let compost: CompostBalance = conductor
             .call(&zome_a, "get_compost_balance", def.id.clone())
             .await;
-        assert_eq!(compost.accumulated, 0, "No compost from zero-balance demurrage");
+        assert_eq!(
+            compost.accumulated, 0,
+            "No compost from zero-balance demurrage"
+        );
         println!("  - Compost: {}", compost.accumulated);
 
         println!("Scenario E7 PASSED");
@@ -558,7 +565,10 @@ async fn test_demurrage_all_inner() {
         let results2: Vec<DemurrageResult> = conductor
             .call(&zome_a, "apply_demurrage_all", def.id.clone())
             .await;
-        println!("  - Second batch: {} results (safe re-call)", results2.len());
+        println!(
+            "  - Second batch: {} results (safe re-call)",
+            results2.len()
+        );
 
         // Zero-sum preserved
         let stats: CurrencyStats = conductor

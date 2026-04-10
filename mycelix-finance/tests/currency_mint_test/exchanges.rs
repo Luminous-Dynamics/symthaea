@@ -196,9 +196,7 @@ async fn test_exchanges_all_inner() {
             params: test_params_with_confirmation("Confirm Coin", "CC"),
             governance_proposal_id: None,
         };
-        let def: CurrencyDefinition = conductor
-            .call(&zome_a, "create_currency", input)
-            .await;
+        let def: CurrencyDefinition = conductor.call(&zome_a, "create_currency", input).await;
         let _: CurrencyDefinition = conductor
             .call(
                 &zome_a,
@@ -289,9 +287,7 @@ async fn test_exchanges_all_inner() {
             params: test_params_with_confirmation("Suspendable", "SU"),
             governance_proposal_id: None,
         };
-        let def: CurrencyDefinition = conductor
-            .call(&zome_a, "create_currency", input)
-            .await;
+        let def: CurrencyDefinition = conductor.call(&zome_a, "create_currency", input).await;
         let _: CurrencyDefinition = conductor
             .call(
                 &zome_a,
@@ -1107,10 +1103,7 @@ async fn test_exchanges_all_inner() {
                 },
             )
             .await;
-        assert!(
-            result.is_err(),
-            "12 minutes should be rejected (min is 15)"
-        );
+        assert!(result.is_err(), "12 minutes should be rejected (min is 15)");
         println!("  - 0.2h (12 min) rejected");
 
         // 0.25 hours = 15 minutes → exactly at minimum → should succeed
@@ -1248,7 +1241,10 @@ async fn test_exchanges_all_inner() {
                 },
             )
             .await;
-        assert!(result.is_err(), "Positive infinity hours should be rejected");
+        assert!(
+            result.is_err(),
+            "Positive infinity hours should be rejected"
+        );
         println!("  - f32::INFINITY rejected");
 
         // Negative infinity — should be rejected

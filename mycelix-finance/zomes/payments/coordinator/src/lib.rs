@@ -1,9 +1,12 @@
 #![deny(unsafe_code)]
-
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Payments Coordinator Zome
+use finance_wire_types::{
+    ApplyDemurrageInput, DemurrageResult, GetPaymentHistoryInput, MintSapFromGovernanceInput,
+    SapBalanceResponse,
+};
 use hdk::prelude::*;
 use mycelix_finance_shared::{
     anchor_hash, follow_update_chain, links_to_records, rate_limit_anchor_key, validate_did_format,
@@ -72,17 +75,8 @@ pub fn get_sap_balance(member_did: String) -> ExternResult<SapBalanceResponse> {
         raw_balance: bal.balance,
         effective_balance: bal.balance.saturating_sub(deduction),
         pending_demurrage: deduction,
-        last_demurrage_at: bal.last_demurrage_at,
+        last_demurrage_at: bal.last_demurrage_at.as_micros(),
     })
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-pub struct SapBalanceResponse {
-    pub member_did: String,
-    pub raw_balance: u64,
-    pub effective_balance: u64,
-    pub pending_demurrage: u64,
-    pub last_demurrage_at: Timestamp,
 }
 
 /// Apply demurrage to a member's SAP balance and redistribute the deducted
@@ -166,25 +160,11 @@ pub fn apply_demurrage(input: ApplyDemurrageInput) -> ExternResult<DemurrageResu
     })
 }
 
-#[derive(Serialize, Deserialize, Debug)]
-pub struct ApplyDemurrageInput {
-    pub member_did: String,
-    pub local_commons_pool_id: Option<String>,
-    pub regional_commons_pool_id: Option<String>,
-    pub global_commons_pool_id: Option<String>,
-}
-
 #[derive(Serialize, Deserialize, Debug, Clone)]
 struct ReceiveCompostPayload {
     pub commons_pool_id: String,
     pub amount: u64,
     pub source_member_did: String,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-pub struct DemurrageResult {
-    pub deducted: u64,
-    pub redistributed: bool,
 }
 
 // ---------------------------------------------------------------------------
@@ -664,13 +644,6 @@ pub fn mint_sap_from_governance(input: MintSapFromGovernanceInput) -> ExternResu
     get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
         "Mint record not found".into()
     )))
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-pub struct MintSapFromGovernanceInput {
-    pub recipient_did: String,
-    pub amount: u64,
-    pub proposal_id: String,
 }
 
 #[derive(Serialize, Debug)]
@@ -1348,12 +1321,6 @@ pub struct ChannelTransferInput {
     pub channel_id: String,
     pub amount: u64,
     pub from_a: bool,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-pub struct GetPaymentHistoryInput {
-    pub did: String,
-    pub limit: Option<usize>,
 }
 
 /// Uses follow_update_chain because payments are mutable (status transitions).
@@ -2325,8 +2292,7 @@ pub fn verify_balance_proof(input: ZkBalanceProofInput) -> ExternResult<ZkBalanc
 
     // Domain-tagged proof verification
     // Full STARK verification will be wired once Winterfell AIR range circuit is ready.
-    let proof_valid = !input.proof_bytes.is_empty()
-        && input.balance_commitment.len() == 32;
+    let proof_valid = !input.proof_bytes.is_empty() && input.balance_commitment.len() == 32;
 
     Ok(ZkBalanceVerification {
         sufficient: proof_valid,

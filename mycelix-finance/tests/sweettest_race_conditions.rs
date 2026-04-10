@@ -234,7 +234,10 @@ where
 {
     let max_retries = 2;
     for attempt in 0..=max_retries {
-        match conductor.call_fallible(zome, fn_name, payload.clone()).await {
+        match conductor
+            .call_fallible(zome, fn_name, payload.clone())
+            .await
+        {
             Ok(result) => return result,
             Err(e) => {
                 let err_str = format!("{:?}", e);
@@ -362,8 +365,13 @@ async fn test_concurrent_balance_updates_inner() {
         hours: 1.0,
         service_description: "Baseline exchange to establish Alice balance".into(),
     };
-    let _baseline: MintedExchange =
-        call_with_retry(&conductor, &zome_a, "record_minted_exchange", baseline_input).await;
+    let _baseline: MintedExchange = call_with_retry(
+        &conductor,
+        &zome_a,
+        "record_minted_exchange",
+        baseline_input,
+    )
+    .await;
 
     // Verify Alice starts at +1.
     let alice_bal: MintedBalanceInfo = call_with_retry(
@@ -569,8 +577,13 @@ async fn test_double_confirm_idempotent_inner() {
         hours: 3.0,
         service_description: "Gardening help — requires confirmation".into(),
     };
-    let exchange: MintedExchange =
-        call_with_retry(&conductor, &zome_a, "record_minted_exchange", exchange_input).await;
+    let exchange: MintedExchange = call_with_retry(
+        &conductor,
+        &zome_a,
+        "record_minted_exchange",
+        exchange_input,
+    )
+    .await;
 
     assert!(
         !exchange.confirmed,
@@ -658,9 +671,7 @@ async fn test_double_confirm_idempotent_inner() {
         alice_post.raw_balance, expected_alice,
         "RC-19 REGRESSION: Alice balance should be {} (pre={} + 3 hours once). \
          Got {} — indicates double balance update from concurrent confirms.",
-        expected_alice,
-        alice_pre_balance,
-        alice_post.raw_balance
+        expected_alice, alice_pre_balance, alice_post.raw_balance
     );
 
     // Bob's balance should be exactly -3 from this exchange.

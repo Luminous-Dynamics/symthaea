@@ -14,6 +14,7 @@ holochain_serialized_bytes = { workspace = true }
 hdk = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
+finance-wire-types = { path = "../../../crates/finance-wire-types" }
 payments_integrity = { path = "../integrity" }
 mycelix_finance_shared = { path = "../../shared" }
 mycelix_finance_types = { path = "../../../types" }

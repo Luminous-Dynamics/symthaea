@@ -37,98 +37,13 @@
 //! cargo test --release --test sweettest_consciousness_gating -- --ignored --test-threads=2
 //! ```
 
+use finance_wire_types::{
+    AssetType, BalanceResponse, DepositCollateralInput, FeeTierResponse, FinanceBridgeHealth,
+    GetPaymentHistoryInput, MintSapFromGovernanceInput, ProcessPaymentInput,
+    RegisterCollateralInput,
+};
 use holochain::sweettest::*;
 use std::path::PathBuf;
-
-// ============================================================================
-// Mirror types — bridge
-// ============================================================================
-
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-pub struct FinanceBridgeHealth {
-    pub healthy: bool,
-    pub agent: String,
-    pub zomes: Vec<String>,
-}
-
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-pub struct ProcessPaymentInput {
-    pub source_happ: String,
-    pub from_did: String,
-    pub to_did: String,
-    pub amount: u64,
-    pub currency: String,
-    pub reference: String,
-}
-
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-pub struct DepositCollateralInput {
-    pub depositor_did: String,
-    pub collateral_type: String,
-    pub collateral_amount: u64,
-    pub oracle_rate: f64,
-}
-
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-pub struct RegisterCollateralInput {
-    pub owner_did: String,
-    pub source_happ: String,
-    pub asset_type: AssetType,
-    pub asset_id: String,
-    pub value_estimate: u64,
-    pub currency: String,
-}
-
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-pub enum AssetType {
-    RealEstate,
-    Vehicle,
-    Cryptocurrency,
-    EnergyAsset,
-    Equipment,
-    Other(String),
-}
-
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-pub struct GetPaymentHistoryInput {
-    pub did: String,
-    pub limit: Option<usize>,
-}
-
-// ============================================================================
-// Mirror types — payments
-// ============================================================================
-
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-pub struct MintSapFromGovernanceInput {
-    pub recipient_did: String,
-    pub amount: u64,
-    pub proposal_id: String,
-}
-
-// ============================================================================
-// Mirror types — fee tier
-// ============================================================================
-
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-pub struct FeeTierResponse {
-    pub member_did: String,
-    pub mycel_score: f64,
-    pub tier_name: String,
-    pub base_fee_rate: f64,
-}
-
-// ============================================================================
-// Mirror types — balance
-// ============================================================================
-
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-pub struct BalanceResponse {
-    pub member_did: String,
-    pub currency: String,
-    pub balance: u64,
-    pub available: bool,
-}
 
 // ============================================================================
 // DNA path helper
@@ -262,11 +177,7 @@ async fn test_register_collateral_requires_did_match() {
     };
 
     let result: Result<::holochain::prelude::Record, _> = conductor
-        .call_fallible(
-            &alice.zome("finance_bridge"),
-            "register_collateral",
-            input,
-        )
+        .call_fallible(&alice.zome("finance_bridge"), "register_collateral", input)
         .await;
 
     assert!(
@@ -307,7 +218,11 @@ async fn test_governance_mint_requires_authorization() {
 
     // First register Alice as a governance agent (bootstrap allows it)
     let _alice_key: ::holochain::prelude::ActionHash = conductor
-        .call(&alice.zome("tend"), "register_governance_agent", alice.agent_pubkey().clone())
+        .call(
+            &alice.zome("tend"),
+            "register_governance_agent",
+            alice.agent_pubkey().clone(),
+        )
         .await;
 
     // Now try to mint SAP with a spoofed recipient DID — the MYCEL tier
@@ -323,11 +238,7 @@ async fn test_governance_mint_requires_authorization() {
     // 2. MYCEL tier via bridge (Newcomer blocked from receiving minted SAP)
     // 3. constitutional caps
     let result: Result<::holochain::prelude::Record, _> = conductor
-        .call_fallible(
-            &alice.zome("payments"),
-            "mint_sap_from_governance",
-            input,
-        )
+        .call_fallible(&alice.zome("payments"), "mint_sap_from_governance", input)
         .await;
 
     // The mint should fail — Newcomer tier check blocks newcomers
@@ -654,11 +565,7 @@ async fn test_rejection_message_is_specific() {
     };
 
     let result: Result<::holochain::prelude::Record, _> = conductor
-        .call_fallible(
-            &alice.zome("finance_bridge"),
-            "register_collateral",
-            input,
-        )
+        .call_fallible(&alice.zome("finance_bridge"), "register_collateral", input)
         .await;
 
     assert!(result.is_err(), "register_collateral should be blocked");

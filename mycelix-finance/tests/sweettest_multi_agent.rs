@@ -30,20 +30,11 @@
 
 use holochain::sweettest::*;
 use std::path::PathBuf;
+use finance_wire_types::{AssetType, RegisterCollateralInput};
 
 // ============================================================================
 // Mirror types — collateral registration
 // ============================================================================
-
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-pub enum AssetType {
-    RealEstate,
-    Vehicle,
-    Cryptocurrency,
-    EnergyAsset,
-    Equipment,
-    Other(String),
-}
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub enum CollateralStatus {
@@ -51,16 +42,6 @@ pub enum CollateralStatus {
     Pledged,
     Frozen,
     Released,
-}
-
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-pub struct RegisterCollateralInput {
-    pub owner_did: String,
-    pub source_happ: String,
-    pub asset_type: AssetType,
-    pub asset_id: String,
-    pub value_estimate: u64,
-    pub currency: String,
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -375,11 +356,7 @@ async fn test_two_agent_oracle_consensus() {
     };
 
     let alice_result: Result<::holochain::prelude::Record, _> = conductor
-        .call_fallible(
-            &alice.zome("price_oracle"),
-            "report_price",
-            alice_report,
-        )
+        .call_fallible(&alice.zome("price_oracle"), "report_price", alice_report)
         .await;
 
     // Bob reports ETH_SAP = 2010
@@ -390,11 +367,7 @@ async fn test_two_agent_oracle_consensus() {
     };
 
     let bob_result: Result<::holochain::prelude::Record, _> = conductor
-        .call_fallible(
-            &bob.zome("price_oracle"),
-            "report_price",
-            bob_report,
-        )
+        .call_fallible(&bob.zome("price_oracle"), "report_price", bob_report)
         .await;
 
     // If both reports succeeded (both agents have Citizen+ tier), verify consensus
@@ -535,16 +508,16 @@ async fn test_concurrent_collateral_registration() {
         .await;
 
     // Verify both registrations succeeded with correct IDs
-    let alice_collateral_id = extract_entry_field(&alice_record, "id")
-        .expect("Alice's collateral should have 'id'");
+    let alice_collateral_id =
+        extract_entry_field(&alice_record, "id").expect("Alice's collateral should have 'id'");
     assert!(
         alice_collateral_id.starts_with("collateral:"),
         "Alice's collateral ID should have expected prefix, got: {}",
         alice_collateral_id,
     );
 
-    let bob_collateral_id = extract_entry_field(&bob_record, "id")
-        .expect("Bob's collateral should have 'id'");
+    let bob_collateral_id =
+        extract_entry_field(&bob_record, "id").expect("Bob's collateral should have 'id'");
     assert!(
         bob_collateral_id.starts_with("collateral:"),
         "Bob's collateral ID should have expected prefix, got: {}",
@@ -615,8 +588,8 @@ async fn test_cross_agent_status_tampering_blocked() {
         )
         .await;
 
-    let collateral_id = extract_entry_field(&collateral_record, "id")
-        .expect("Collateral should have 'id'");
+    let collateral_id =
+        extract_entry_field(&collateral_record, "id").expect("Collateral should have 'id'");
 
     // Bob attempts to release Alice's collateral — should fail on DID check
     // Bob claims Alice's DID but his agent key won't match
@@ -726,8 +699,8 @@ async fn test_dht_covenant_lifecycle_propagation() {
         )
         .await;
 
-    let collateral_id = extract_entry_field(&collateral_record, "id")
-        .expect("Collateral should have 'id'");
+    let collateral_id =
+        extract_entry_field(&collateral_record, "id").expect("Collateral should have 'id'");
 
     // Alice creates covenant
     let covenant_input = CreateCovenantInput {
@@ -745,8 +718,8 @@ async fn test_dht_covenant_lifecycle_propagation() {
         )
         .await;
 
-    let covenant_id = extract_entry_field(&covenant_record, "id")
-        .expect("Covenant should have 'id'");
+    let covenant_id =
+        extract_entry_field(&covenant_record, "id").expect("Covenant should have 'id'");
 
     // Allow DHT propagation
     tokio::time::sleep(std::time::Duration::from_millis(500)).await;
@@ -855,8 +828,8 @@ async fn test_covenant_bob_as_beneficiary() {
         )
         .await;
 
-    let collateral_id = extract_entry_field(&collateral_record, "id")
-        .expect("Collateral should have 'id'");
+    let collateral_id =
+        extract_entry_field(&collateral_record, "id").expect("Collateral should have 'id'");
 
     // Alice creates covenant with BOB as beneficiary
     let covenant_input = CreateCovenantInput {
@@ -874,8 +847,8 @@ async fn test_covenant_bob_as_beneficiary() {
         )
         .await;
 
-    let covenant_id = extract_entry_field(&covenant_record, "id")
-        .expect("Covenant should have 'id'");
+    let covenant_id =
+        extract_entry_field(&covenant_record, "id").expect("Covenant should have 'id'");
 
     // Alice tries to release Bob's covenant — should fail
     let alice_release_result: Result<::holochain::prelude::Record, _> = conductor

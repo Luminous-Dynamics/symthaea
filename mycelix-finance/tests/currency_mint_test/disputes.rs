@@ -255,8 +255,9 @@ async fn test_disputes_all_inner() {
         );
 
         // Verify via get_currency
-        let fetched: Option<CurrencyDefinition> =
-            conductor.call(&zome_a, "get_currency", def.id.clone()).await;
+        let fetched: Option<CurrencyDefinition> = conductor
+            .call(&zome_a, "get_currency", def.id.clone())
+            .await;
         let f = fetched.expect("Currency should exist");
         assert_eq!(f.params.credit_limit, 80);
         println!("  - get_currency confirms amended params");

@@ -2,6 +2,10 @@
 resolver = "2"
 members = [
     "types",
+    "contract-models",
+    "contract-tests",
+    "crates/finance-leptos-types",
+    "crates/finance-wire-types",
     "zomes/shared",
     "zomes/payments/integrity",
     "zomes/payments/coordinator",

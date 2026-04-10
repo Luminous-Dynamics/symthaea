@@ -1,9 +1,9 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+use crate::context::use_finance_context;
 use leptos::prelude::*;
 use mycelix_leptos_core::consciousness::use_consciousness;
-use crate::context::use_finance_context;
 
 #[component]
 pub fn ProfilePage() -> impl IntoView {

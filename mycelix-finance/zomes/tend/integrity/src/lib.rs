@@ -1,5 +1,4 @@
 #![deny(unsafe_code)]
-
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
@@ -570,6 +569,10 @@ pub enum LinkTypes {
     ReceiverToExchanges,
     /// Link from member DID to their balance
     MemberToBalance,
+    /// Reverse index from member DID to balances across DAOs
+    MemberToDaoBalances,
+    /// Reverse index from member DID to other DAO-scoped activity
+    MemberToDaoActivity,
     /// Link from DAO to all exchanges in that community
     DaoToExchanges,
     /// Link from DAO to service listings
@@ -738,6 +741,8 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
             LinkTypes::ProviderToExchanges => Ok(ValidateCallbackResult::Valid),
             LinkTypes::ReceiverToExchanges => Ok(ValidateCallbackResult::Valid),
             LinkTypes::MemberToBalance => Ok(ValidateCallbackResult::Valid),
+            LinkTypes::MemberToDaoBalances => Ok(ValidateCallbackResult::Valid),
+            LinkTypes::MemberToDaoActivity => Ok(ValidateCallbackResult::Valid),
             LinkTypes::DaoToExchanges => Ok(ValidateCallbackResult::Valid),
             LinkTypes::DaoToListings => Ok(ValidateCallbackResult::Valid),
             LinkTypes::DaoToRequests => Ok(ValidateCallbackResult::Valid),

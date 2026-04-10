@@ -17,8 +17,8 @@
 //! cargo test --test staking_test -- --ignored      # Full integration tests
 //! ```
 
-use holochain::sweettest::*;
 use holochain::prelude::*;
+use holochain::sweettest::*;
 use std::time::Duration;
 
 use staking_integrity::*;
@@ -49,7 +49,9 @@ mod stake_lifecycle {
         println!("Test 1.1: Create Stake with MYCEL Weighting");
 
         let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
-        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Load DNA");
+        let dna = SweetDnaFile::from_bundle(&dna_path)
+            .await
+            .expect("Load DNA");
         let mut conductor = SweetConductor::from_standard_config().await;
 
         let agents = SweetAgents::get(conductor.keystore(), 1).await;
@@ -70,11 +72,15 @@ mod stake_lifecycle {
         }
 
         let _: Record = conductor
-            .call(&alice_cell.zome("recognition"), "initialize_member", InitializeMemberInput {
-                member_did: alice_did.clone(),
-                is_apprentice: false,
-                mentor_did: None,
-            })
+            .call(
+                &alice_cell.zome("recognition"),
+                "initialize_member",
+                InitializeMemberInput {
+                    member_did: alice_did.clone(),
+                    is_apprentice: false,
+                    mentor_did: None,
+                },
+            )
             .await;
 
         #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -101,9 +107,14 @@ mod stake_lifecycle {
         assert_eq!(stake.staker_did, alice_did);
         assert_eq!(stake.sap_amount, 10_000);
         // MYCEL score is fetched from recognition; verify it's in valid range
-        assert!(stake.mycel_score >= 0.0 && stake.mycel_score <= 1.0, "MYCEL score in [0,1]");
-        assert!((stake.stake_weight - (1.0 + stake.mycel_score)).abs() < 0.001,
-            "Weight should be 1.0 + mycel_score");
+        assert!(
+            stake.mycel_score >= 0.0 && stake.mycel_score <= 1.0,
+            "MYCEL score in [0,1]"
+        );
+        assert!(
+            (stake.stake_weight - (1.0 + stake.mycel_score)).abs() < 0.001,
+            "Weight should be 1.0 + mycel_score"
+        );
         assert!(matches!(stake.status, StakeStatus::Active));
         assert_eq!(stake.pending_rewards, 0);
         assert!(stake.unbonding_until.is_none());
@@ -123,7 +134,9 @@ mod stake_lifecycle {
         println!("Test 1.2: Unbonding and Withdrawal Lifecycle");
 
         let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
-        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Load DNA");
+        let dna = SweetDnaFile::from_bundle(&dna_path)
+            .await
+            .expect("Load DNA");
         let mut conductor = SweetConductor::from_standard_config().await;
 
         let agents = SweetAgents::get(conductor.keystore(), 1).await;
@@ -163,7 +176,11 @@ mod stake_lifecycle {
 
         // Step 2: Begin unbonding
         let unbonding_result: Record = conductor
-            .call(&alice_cell.zome("staking"), "begin_unbonding", stake_id.clone())
+            .call(
+                &alice_cell.zome("staking"),
+                "begin_unbonding",
+                stake_id.clone(),
+            )
             .await;
 
         let unbonding_stake: CollateralStake = unbonding_result
@@ -173,7 +190,10 @@ mod stake_lifecycle {
             .expect("No entry");
 
         assert!(matches!(unbonding_stake.status, StakeStatus::Unbonding));
-        assert!(unbonding_stake.unbonding_until.is_some(), "Should have unbonding_until set");
+        assert!(
+            unbonding_stake.unbonding_until.is_some(),
+            "Should have unbonding_until set"
+        );
         println!("  - Status after unbonding: {:?}", unbonding_stake.status);
         println!("  - Unbonding until: {:?}", unbonding_stake.unbonding_until);
 
@@ -181,7 +201,11 @@ mod stake_lifecycle {
         // The 21-day unbonding period means we cannot withdraw immediately in a real
         // test. We verify the mechanism is in place by trying and expecting failure.
         let withdraw_result: Result<Record, _> = conductor
-            .call_fallible(&alice_cell.zome("staking"), "withdraw_stake", stake_id.clone())
+            .call_fallible(
+                &alice_cell.zome("staking"),
+                "withdraw_stake",
+                stake_id.clone(),
+            )
             .await;
 
         // Withdrawal should fail because unbonding period is not complete
@@ -201,7 +225,9 @@ mod stake_lifecycle {
         println!("Test 1.3: Cannot Withdraw During Unbonding");
 
         let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
-        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Load DNA");
+        let dna = SweetDnaFile::from_bundle(&dna_path)
+            .await
+            .expect("Load DNA");
         let mut conductor = SweetConductor::from_standard_config().await;
 
         let agents = SweetAgents::get(conductor.keystore(), 1).await;
@@ -239,12 +265,20 @@ mod stake_lifecycle {
 
         // Begin unbonding
         let _: Record = conductor
-            .call(&alice_cell.zome("staking"), "begin_unbonding", stake_id.clone())
+            .call(
+                &alice_cell.zome("staking"),
+                "begin_unbonding",
+                stake_id.clone(),
+            )
             .await;
 
         // Try to withdraw immediately (within 21-day window)
         let result: Result<Record, _> = conductor
-            .call_fallible(&alice_cell.zome("staking"), "withdraw_stake", stake_id.clone())
+            .call_fallible(
+                &alice_cell.zome("staking"),
+                "withdraw_stake",
+                stake_id.clone(),
+            )
             .await;
 
         match result {
@@ -273,7 +307,9 @@ mod stake_lifecycle {
         println!("Test 1.4: Update MYCEL Score (fetched from recognition)");
 
         let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
-        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Load DNA");
+        let dna = SweetDnaFile::from_bundle(&dna_path)
+            .await
+            .expect("Load DNA");
         let mut conductor = SweetConductor::from_standard_config().await;
 
         let agents = SweetAgents::get(conductor.keystore(), 1).await;
@@ -294,11 +330,15 @@ mod stake_lifecycle {
         }
 
         let _: Record = conductor
-            .call(&alice_cell.zome("recognition"), "initialize_member", InitializeMemberInput {
-                member_did: alice_did.clone(),
-                is_apprentice: false,
-                mentor_did: None,
-            })
+            .call(
+                &alice_cell.zome("recognition"),
+                "initialize_member",
+                InitializeMemberInput {
+                    member_did: alice_did.clone(),
+                    is_apprentice: false,
+                    mentor_did: None,
+                },
+            )
             .await;
 
         // Create stake — MYCEL fetched from recognition
@@ -324,7 +364,10 @@ mod stake_lifecycle {
             .expect("No entry");
 
         let initial_weight = stake.stake_weight;
-        println!("  - Initial MYCEL: {}, weight: {}", stake.mycel_score, stake.stake_weight);
+        println!(
+            "  - Initial MYCEL: {}, weight: {}",
+            stake.mycel_score, stake.stake_weight
+        );
 
         // Update stake — re-fetches MYCEL from recognition
         #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -337,7 +380,11 @@ mod stake_lifecycle {
         };
 
         let updated_result: Record = conductor
-            .call(&alice_cell.zome("staking"), "update_stake_mycel", update_input)
+            .call(
+                &alice_cell.zome("staking"),
+                "update_stake_mycel",
+                update_input,
+            )
             .await;
 
         let updated_stake: CollateralStake = updated_result
@@ -347,12 +394,23 @@ mod stake_lifecycle {
             .expect("No entry");
 
         // Verify weight = 1.0 + mycel_score (whatever recognition returns)
-        assert!((updated_stake.stake_weight - (1.0 + updated_stake.mycel_score)).abs() < 0.001,
-            "Weight should be 1.0 + mycel_score");
-        assert_eq!(updated_stake.sap_amount, 12_000, "SAP amount should be unchanged");
-        assert!(matches!(updated_stake.status, StakeStatus::Active), "Should still be Active");
+        assert!(
+            (updated_stake.stake_weight - (1.0 + updated_stake.mycel_score)).abs() < 0.001,
+            "Weight should be 1.0 + mycel_score"
+        );
+        assert_eq!(
+            updated_stake.sap_amount, 12_000,
+            "SAP amount should be unchanged"
+        );
+        assert!(
+            matches!(updated_stake.status, StakeStatus::Active),
+            "Should still be Active"
+        );
 
-        println!("  - Updated MYCEL: {}, weight: {}", updated_stake.mycel_score, updated_stake.stake_weight);
+        println!(
+            "  - Updated MYCEL: {}, weight: {}",
+            updated_stake.mycel_score, updated_stake.stake_weight
+        );
         println!("Test 1.4 PASSED: MYCEL score update re-fetches from recognition");
     }
 }
@@ -391,7 +449,9 @@ mod slashing_tests {
         println!("Test 2.1: Slash for Double Signing (100%, Jailed)");
 
         let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
-        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Load DNA");
+        let dna = SweetDnaFile::from_bundle(&dna_path)
+            .await
+            .expect("Load DNA");
         let mut conductor = SweetConductor::from_standard_config().await;
 
         let agents = SweetAgents::get(conductor.keystore(), 1).await;
@@ -426,7 +486,10 @@ mod slashing_tests {
             .expect("No entry");
 
         let stake_id = stake.id.clone();
-        println!("  - Created stake: {} with {} SAP", stake_id, stake.sap_amount);
+        println!(
+            "  - Created stake: {} with {} SAP",
+            stake_id, stake.sap_amount
+        );
 
         // Slash for double signing
         #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -442,7 +505,10 @@ mod slashing_tests {
             reason: SlashingReason::DoubleSigning,
             evidence: test_evidence(
                 EvidenceType::DoubleSignEvidence,
-                vec![format!("did:mycelix:{}", agents[0]), format!("did:mycelix:{}", agents[0])],
+                vec![
+                    format!("did:mycelix:{}", agents[0]),
+                    format!("did:mycelix:{}", agents[0]),
+                ],
             ),
             custom_slash_percentage: None, // Use default 100%
         };
@@ -457,17 +523,36 @@ mod slashing_tests {
             .expect("Deserialize failed")
             .expect("No entry");
 
-        assert_eq!(slashing_event.slash_percentage, 100, "DoubleSigning should slash 100%");
-        assert_eq!(slashing_event.sap_slashed, 20_000, "Should slash entire stake");
+        assert_eq!(
+            slashing_event.slash_percentage, 100,
+            "DoubleSigning should slash 100%"
+        );
+        assert_eq!(
+            slashing_event.sap_slashed, 20_000,
+            "Should slash entire stake"
+        );
         assert!(slashing_event.jailed, "DoubleSigning should result in jail");
-        assert!(slashing_event.jail_release.is_some(), "Should have jail release timestamp");
-        assert_eq!(slashing_event.evidence_hash.len(), 32, "Evidence hash should be 32 bytes");
-        assert!(matches!(slashing_event.reason, SlashingReason::DoubleSigning));
+        assert!(
+            slashing_event.jail_release.is_some(),
+            "Should have jail release timestamp"
+        );
+        assert_eq!(
+            slashing_event.evidence_hash.len(),
+            32,
+            "Evidence hash should be 32 bytes"
+        );
+        assert!(matches!(
+            slashing_event.reason,
+            SlashingReason::DoubleSigning
+        ));
 
         println!("  - Slash percentage: {}%", slashing_event.slash_percentage);
         println!("  - SAP slashed: {}", slashing_event.sap_slashed);
         println!("  - Jailed: {}", slashing_event.jailed);
-        println!("  - Evidence hash length: {} bytes", slashing_event.evidence_hash.len());
+        println!(
+            "  - Evidence hash length: {} bytes",
+            slashing_event.evidence_hash.len()
+        );
         println!("Test 2.1 PASSED: Double signing slash works correctly");
     }
 
@@ -478,7 +563,9 @@ mod slashing_tests {
         println!("Test 2.2: Slash for Downtime (5%, Not Jailed)");
 
         let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
-        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Load DNA");
+        let dna = SweetDnaFile::from_bundle(&dna_path)
+            .await
+            .expect("Load DNA");
         let mut conductor = SweetConductor::from_standard_config().await;
 
         let agents = SweetAgents::get(conductor.keystore(), 1).await;
@@ -543,15 +630,27 @@ mod slashing_tests {
             .expect("Deserialize failed")
             .expect("No entry");
 
-        assert_eq!(slashing_event.slash_percentage, 5, "Downtime should slash 5%");
+        assert_eq!(
+            slashing_event.slash_percentage, 5,
+            "Downtime should slash 5%"
+        );
         // 5% of 100_000 = 5_000
-        assert_eq!(slashing_event.sap_slashed, 5_000, "Should slash 5% of stake");
+        assert_eq!(
+            slashing_event.sap_slashed, 5_000,
+            "Should slash 5% of stake"
+        );
         assert!(!slashing_event.jailed, "Downtime should NOT result in jail");
-        assert!(slashing_event.jail_release.is_none(), "Should have no jail release");
+        assert!(
+            slashing_event.jail_release.is_none(),
+            "Should have no jail release"
+        );
         assert!(matches!(slashing_event.reason, SlashingReason::Downtime));
 
         println!("  - Slash percentage: {}%", slashing_event.slash_percentage);
-        println!("  - SAP slashed: {} (of {})", slashing_event.sap_slashed, stake.sap_amount);
+        println!(
+            "  - SAP slashed: {} (of {})",
+            slashing_event.sap_slashed, stake.sap_amount
+        );
         println!("  - Jailed: {}", slashing_event.jailed);
         println!("Test 2.2 PASSED: Downtime slash works correctly (5%, no jail)");
     }
@@ -563,7 +662,9 @@ mod slashing_tests {
         println!("Test 2.3: Slash with Custom Percentage Override");
 
         let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
-        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Load DNA");
+        let dna = SweetDnaFile::from_bundle(&dna_path)
+            .await
+            .expect("Load DNA");
         let mut conductor = SweetConductor::from_standard_config().await;
 
         let agents = SweetAgents::get(conductor.keystore(), 1).await;
@@ -630,12 +731,27 @@ mod slashing_tests {
 
         assert_eq!(slashing_event.slash_percentage, 25, "Should use custom 25%");
         // 25% of 50_000 = 12_500
-        assert_eq!(slashing_event.sap_slashed, 12_500, "Should slash 25% of stake");
-        assert!(!slashing_event.jailed, "InvalidGradient should NOT result in jail");
-        assert!(matches!(slashing_event.reason, SlashingReason::InvalidGradient));
+        assert_eq!(
+            slashing_event.sap_slashed, 12_500,
+            "Should slash 25% of stake"
+        );
+        assert!(
+            !slashing_event.jailed,
+            "InvalidGradient should NOT result in jail"
+        );
+        assert!(matches!(
+            slashing_event.reason,
+            SlashingReason::InvalidGradient
+        ));
 
-        println!("  - Reason: {:?} (default would be 10%)", slashing_event.reason);
-        println!("  - Custom slash percentage: {}%", slashing_event.slash_percentage);
+        println!(
+            "  - Reason: {:?} (default would be 10%)",
+            slashing_event.reason
+        );
+        println!(
+            "  - Custom slash percentage: {}%",
+            slashing_event.slash_percentage
+        );
         println!("  - SAP slashed: {}", slashing_event.sap_slashed);
         println!("Test 2.3 PASSED: Custom slash percentage overrides default");
     }
@@ -656,7 +772,9 @@ mod escrow_tests {
         println!("Test 3.1: Hash-Lock Escrow Lifecycle");
 
         let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
-        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Load DNA");
+        let dna = SweetDnaFile::from_bundle(&dna_path)
+            .await
+            .expect("Load DNA");
         let mut conductor = SweetConductor::from_standard_config().await;
 
         let agents = SweetAgents::get(conductor.keystore(), 1).await;
@@ -741,7 +859,11 @@ mod escrow_tests {
         };
 
         let reveal_result: Record = conductor
-            .call(&alice_cell.zome("staking"), "reveal_hash_preimage", reveal_input)
+            .call(
+                &alice_cell.zome("staking"),
+                "reveal_hash_preimage",
+                reveal_input,
+            )
             .await;
 
         let revealed_escrow: CryptoEscrow = reveal_result
@@ -754,12 +876,22 @@ mod escrow_tests {
             matches!(revealed_escrow.status, EscrowStatus::Releasable),
             "Escrow should be Releasable after hash-lock satisfied"
         );
-        assert!(!revealed_escrow.met_conditions.is_empty(), "Hash-lock condition should be met");
-        println!("  - After preimage reveal, status: {:?}", revealed_escrow.status);
+        assert!(
+            !revealed_escrow.met_conditions.is_empty(),
+            "Hash-lock condition should be met"
+        );
+        println!(
+            "  - After preimage reveal, status: {:?}",
+            revealed_escrow.status
+        );
 
         // Release escrow
         let release_result: Record = conductor
-            .call(&alice_cell.zome("staking"), "release_escrow", escrow_id.clone())
+            .call(
+                &alice_cell.zome("staking"),
+                "release_escrow",
+                escrow_id.clone(),
+            )
             .await;
 
         let released_escrow: CryptoEscrow = release_result
@@ -769,7 +901,10 @@ mod escrow_tests {
             .expect("No entry");
 
         assert!(matches!(released_escrow.status, EscrowStatus::Released));
-        assert!(released_escrow.released_at.is_some(), "Should have release timestamp");
+        assert!(
+            released_escrow.released_at.is_some(),
+            "Should have release timestamp"
+        );
         println!("  - After release, status: {:?}", released_escrow.status);
 
         println!("Test 3.1 PASSED: Hash-lock escrow lifecycle works end-to-end");
@@ -782,7 +917,9 @@ mod escrow_tests {
         println!("Test 3.2: Multi-Sig Escrow (2-of-3)");
 
         let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
-        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Load DNA");
+        let dna = SweetDnaFile::from_bundle(&dna_path)
+            .await
+            .expect("Load DNA");
         let mut conductor = SweetConductor::from_standard_config().await;
 
         let agents = SweetAgents::get(conductor.keystore(), 1).await;
@@ -859,7 +996,11 @@ mod escrow_tests {
         };
 
         let sig_1_result: Record = conductor
-            .call(&alice_cell.zome("staking"), "add_escrow_signature", sig_1_input)
+            .call(
+                &alice_cell.zome("staking"),
+                "add_escrow_signature",
+                sig_1_input,
+            )
             .await;
 
         let after_sig_1: CryptoEscrow = sig_1_result
@@ -868,13 +1009,20 @@ mod escrow_tests {
             .expect("Deserialize failed")
             .expect("No entry");
 
-        assert_eq!(after_sig_1.collected_signatures.len(), 1, "Should have 1 signature");
+        assert_eq!(
+            after_sig_1.collected_signatures.len(),
+            1,
+            "Should have 1 signature"
+        );
         // With only 1 of 2 required signatures, still Pending
         assert!(
             matches!(after_sig_1.status, EscrowStatus::Pending),
             "Should still be Pending with 1/2 sigs"
         );
-        println!("  - Signature 1 added (1/2 required), status: {:?}", after_sig_1.status);
+        println!(
+            "  - Signature 1 added (1/2 required), status: {:?}",
+            after_sig_1.status
+        );
 
         // Signer 2 signs (reaches threshold)
         let sig_2_input = AddSignatureInput {
@@ -884,7 +1032,11 @@ mod escrow_tests {
         };
 
         let sig_2_result: Record = conductor
-            .call(&alice_cell.zome("staking"), "add_escrow_signature", sig_2_input)
+            .call(
+                &alice_cell.zome("staking"),
+                "add_escrow_signature",
+                sig_2_input,
+            )
             .await;
 
         let after_sig_2: CryptoEscrow = sig_2_result
@@ -893,16 +1045,27 @@ mod escrow_tests {
             .expect("Deserialize failed")
             .expect("No entry");
 
-        assert_eq!(after_sig_2.collected_signatures.len(), 2, "Should have 2 signatures");
+        assert_eq!(
+            after_sig_2.collected_signatures.len(),
+            2,
+            "Should have 2 signatures"
+        );
         assert!(
             matches!(after_sig_2.status, EscrowStatus::Releasable),
             "Should be Releasable with 2/2 sigs met"
         );
-        println!("  - Signature 2 added (2/2 required), status: {:?}", after_sig_2.status);
+        println!(
+            "  - Signature 2 added (2/2 required), status: {:?}",
+            after_sig_2.status
+        );
 
         // Release escrow
         let release_result: Record = conductor
-            .call(&alice_cell.zome("staking"), "release_escrow", escrow_id.clone())
+            .call(
+                &alice_cell.zome("staking"),
+                "release_escrow",
+                escrow_id.clone(),
+            )
             .await;
 
         let released: CryptoEscrow = release_result
@@ -925,7 +1088,9 @@ mod escrow_tests {
         println!("Test 3.3: Unauthorized Signer Rejected");
 
         let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
-        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Load DNA");
+        let dna = SweetDnaFile::from_bundle(&dna_path)
+            .await
+            .expect("Load DNA");
         let mut conductor = SweetConductor::from_standard_config().await;
 
         let agents = SweetAgents::get(conductor.keystore(), 1).await;
@@ -1033,13 +1198,13 @@ mod unit_tests {
     #[test]
     fn test_stake_weight_calculation() {
         let test_cases: Vec<(f32, f32)> = vec![
-            (0.0, 1.0),   // Minimum MYCEL
+            (0.0, 1.0), // Minimum MYCEL
             (0.1, 1.1),
             (0.25, 1.25),
-            (0.5, 1.5),   // Midpoint
+            (0.5, 1.5), // Midpoint
             (0.7, 1.7),
             (0.9, 1.9),
-            (1.0, 2.0),   // Maximum MYCEL
+            (1.0, 2.0), // Maximum MYCEL
         ];
 
         for (mycel_score, expected_weight) in test_cases {
@@ -1057,7 +1222,12 @@ mod unit_tests {
         for i in 0..=100 {
             let mycel = i as f32 / 100.0;
             let w = 1.0 + mycel;
-            assert!(w >= 1.0 && w <= 2.0, "Weight {} out of range for MYCEL {}", w, mycel);
+            assert!(
+                w >= 1.0 && w <= 2.0,
+                "Weight {} out of range for MYCEL {}",
+                w,
+                mycel
+            );
         }
     }
 
@@ -1065,7 +1235,10 @@ mod unit_tests {
     #[test]
     fn test_slashing_reason_defaults() {
         // DoubleSigning: 100%, jail
-        assert_eq!(SlashingReason::DoubleSigning.default_slash_percentage(), 100);
+        assert_eq!(
+            SlashingReason::DoubleSigning.default_slash_percentage(),
+            100
+        );
         assert!(SlashingReason::DoubleSigning.results_in_jail());
 
         // Downtime: 5%, no jail
@@ -1073,19 +1246,31 @@ mod unit_tests {
         assert!(!SlashingReason::Downtime.results_in_jail());
 
         // ByzantineConsensus: 50%, no jail
-        assert_eq!(SlashingReason::ByzantineConsensus.default_slash_percentage(), 50);
+        assert_eq!(
+            SlashingReason::ByzantineConsensus.default_slash_percentage(),
+            50
+        );
         assert!(!SlashingReason::ByzantineConsensus.results_in_jail());
 
         // InvalidGradient: 10%, no jail
-        assert_eq!(SlashingReason::InvalidGradient.default_slash_percentage(), 10);
+        assert_eq!(
+            SlashingReason::InvalidGradient.default_slash_percentage(),
+            10
+        );
         assert!(!SlashingReason::InvalidGradient.results_in_jail());
 
         // CartelActivity: 75%, jail
-        assert_eq!(SlashingReason::CartelActivity.default_slash_percentage(), 75);
+        assert_eq!(
+            SlashingReason::CartelActivity.default_slash_percentage(),
+            75
+        );
         assert!(SlashingReason::CartelActivity.results_in_jail());
 
         // GovernanceManipulation: 50%, no jail
-        assert_eq!(SlashingReason::GovernanceManipulation.default_slash_percentage(), 50);
+        assert_eq!(
+            SlashingReason::GovernanceManipulation.default_slash_percentage(),
+            50
+        );
         assert!(!SlashingReason::GovernanceManipulation.results_in_jail());
 
         // Verify jail reasons are exactly DoubleSigning and CartelActivity
@@ -1098,11 +1283,12 @@ mod unit_tests {
             SlashingReason::GovernanceManipulation,
         ];
 
-        let jail_reasons: Vec<_> = all_reasons
-            .iter()
-            .filter(|r| r.results_in_jail())
-            .collect();
-        assert_eq!(jail_reasons.len(), 2, "Exactly 2 reasons should result in jail");
+        let jail_reasons: Vec<_> = all_reasons.iter().filter(|r| r.results_in_jail()).collect();
+        assert_eq!(
+            jail_reasons.len(),
+            2,
+            "Exactly 2 reasons should result in jail"
+        );
     }
 
     /// Test StakeStatus serialization round-trip
@@ -1120,7 +1306,11 @@ mod unit_tests {
             let json = serde_json::to_string(&status).expect("Serialize failed");
             let deserialized: StakeStatus =
                 serde_json::from_str(&json).expect("Deserialize failed");
-            assert_eq!(status, deserialized, "StakeStatus round-trip failed for {:?}", status);
+            assert_eq!(
+                status, deserialized,
+                "StakeStatus round-trip failed for {:?}",
+                status
+            );
         }
     }
 
@@ -1140,7 +1330,11 @@ mod unit_tests {
             let json = serde_json::to_string(&status).expect("Serialize failed");
             let deserialized: EscrowStatus =
                 serde_json::from_str(&json).expect("Deserialize failed");
-            assert_eq!(status, deserialized, "EscrowStatus round-trip failed for {:?}", status);
+            assert_eq!(
+                status, deserialized,
+                "EscrowStatus round-trip failed for {:?}",
+                status
+            );
         }
     }
 
@@ -1175,7 +1369,10 @@ mod unit_tests {
             .as_bytes()
             .to_vec();
 
-        assert_ne!(hash, hash_different, "Different inputs should produce different hashes");
+        assert_ne!(
+            hash, hash_different,
+            "Different inputs should produce different hashes"
+        );
 
         // Empty input still produces 32-byte hash
         let hash_empty = blake2b_simd::Params::new()
@@ -1184,7 +1381,11 @@ mod unit_tests {
             .as_bytes()
             .to_vec();
 
-        assert_eq!(hash_empty.len(), 32, "Empty input should still produce 32-byte hash");
+        assert_eq!(
+            hash_empty.len(),
+            32,
+            "Empty input should still produce 32-byte hash"
+        );
 
         // Verify the hash is not all zeros
         assert!(hash.iter().any(|&b| b != 0), "Hash should not be all zeros");
@@ -1211,10 +1412,18 @@ mod unit_tests {
 
         // Verify weight calculation with clamped values
         let clamped_negative = (-0.5_f32).clamp(0.0, 1.0);
-        assert_eq!(1.0 + clamped_negative, 1.0, "Negative MYCEL clamps to weight 1.0");
+        assert_eq!(
+            1.0 + clamped_negative,
+            1.0,
+            "Negative MYCEL clamps to weight 1.0"
+        );
 
         let clamped_over = 1.5_f32.clamp(0.0, 1.0);
-        assert_eq!(1.0 + clamped_over, 2.0, "Over-1.0 MYCEL clamps to weight 2.0");
+        assert_eq!(
+            1.0 + clamped_over,
+            2.0,
+            "Over-1.0 MYCEL clamps to weight 2.0"
+        );
     }
 
     /// Test SlashingReason serialization round-trip
@@ -1233,7 +1442,11 @@ mod unit_tests {
             let json = serde_json::to_string(&reason).expect("Serialize failed");
             let deserialized: SlashingReason =
                 serde_json::from_str(&json).expect("Deserialize failed");
-            assert_eq!(reason, deserialized, "SlashingReason round-trip failed for {:?}", reason);
+            assert_eq!(
+                reason, deserialized,
+                "SlashingReason round-trip failed for {:?}",
+                reason
+            );
         }
     }
 
@@ -1252,7 +1465,11 @@ mod unit_tests {
             let json = serde_json::to_string(&ev_type).expect("Serialize failed");
             let deserialized: EvidenceType =
                 serde_json::from_str(&json).expect("Deserialize failed");
-            assert_eq!(ev_type, deserialized, "EvidenceType round-trip failed for {:?}", ev_type);
+            assert_eq!(
+                ev_type, deserialized,
+                "EvidenceType round-trip failed for {:?}",
+                ev_type
+            );
         }
     }
 
@@ -1270,7 +1487,11 @@ mod unit_tests {
             let json = serde_json::to_string(&hash_type).expect("Serialize failed");
             let deserialized: EscrowHashType =
                 serde_json::from_str(&json).expect("Deserialize failed");
-            assert_eq!(hash_type, deserialized, "EscrowHashType round-trip failed for {:?}", hash_type);
+            assert_eq!(
+                hash_type, deserialized,
+                "EscrowHashType round-trip failed for {:?}",
+                hash_type
+            );
         }
     }
 
@@ -1278,7 +1499,9 @@ mod unit_tests {
     #[test]
     fn test_release_condition_serialization() {
         let conditions = vec![
-            ReleaseCondition::Timelock { release_time: 1_700_000_000 },
+            ReleaseCondition::Timelock {
+                release_time: 1_700_000_000,
+            },
             ReleaseCondition::HashLock {
                 hash: vec![0xab; 32],
                 hash_type: EscrowHashType::Blake2b,
@@ -1304,7 +1527,10 @@ mod unit_tests {
             let json = serde_json::to_string(&condition).expect("Serialize failed");
             let deserialized: ReleaseCondition =
                 serde_json::from_str(&json).expect("Deserialize failed");
-            assert_eq!(condition, deserialized, "ReleaseCondition round-trip failed");
+            assert_eq!(
+                condition, deserialized,
+                "ReleaseCondition round-trip failed"
+            );
         }
     }
 
@@ -1365,9 +1591,9 @@ mod unit_tests {
 
         // Multiple stakers
         let stakers: Vec<(u64, f32)> = vec![
-            (10_000, 1.5),  // 15_000
-            (20_000, 1.0),  // 20_000
-            (5_000, 2.0),   // 10_000
+            (10_000, 1.5), // 15_000
+            (20_000, 1.0), // 20_000
+            (5_000, 2.0),  // 10_000
         ];
 
         let total: f64 = stakers
@@ -1375,7 +1601,10 @@ mod unit_tests {
             .map(|(sap, weight)| *sap as f64 * *weight as f64)
             .sum();
 
-        assert!((total - 45_000.0).abs() < 0.01, "Total weighted stake should be 45_000");
+        assert!(
+            (total - 45_000.0).abs() < 0.01,
+            "Total weighted stake should be 45_000"
+        );
 
         // Edge: zero SAP with any weight = 0
         let zero_weighted = 0u64 as f64 * 2.0f64;

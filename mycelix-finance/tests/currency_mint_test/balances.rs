@@ -379,7 +379,10 @@ async fn test_balances_all_inner() {
             portfolio.len()
         );
 
-        let symbols: Vec<&str> = portfolio.iter().map(|p| p.currency_symbol.as_str()).collect();
+        let symbols: Vec<&str> = portfolio
+            .iter()
+            .map(|p| p.currency_symbol.as_str())
+            .collect();
         assert!(symbols.contains(&"AH"), "Portfolio should contain AH");
         assert!(symbols.contains(&"BC"), "Portfolio should contain BC");
         println!(
@@ -534,7 +537,10 @@ async fn test_balances_all_inner() {
                 "did:mycelix:dao:nonexistent".to_string(),
             )
             .await;
-        assert!(empty.is_empty(), "Non-existent DAO should have 0 currencies");
+        assert!(
+            empty.is_empty(),
+            "Non-existent DAO should have 0 currencies"
+        );
         println!("  - Non-existent DAO: 0 currencies");
 
         println!("Scenario E11 PASSED");

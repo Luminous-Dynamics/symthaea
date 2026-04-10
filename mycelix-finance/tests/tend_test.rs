@@ -21,8 +21,8 @@
 //! cargo test --test tend_test -- --ignored  # Full integration tests
 //! ```
 
-use holochain::sweettest::*;
 use holochain::prelude::*;
+use holochain::sweettest::*;
 use std::time::Duration;
 
 // Import zome types (tend re-exports tend_integrity::* via pub use)
@@ -61,7 +61,9 @@ mod balance_limits {
         println!("Test 1.1: Balance Limits (±40 TEND)");
 
         let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
-        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Load DNA");
+        let dna = SweetDnaFile::from_bundle(&dna_path)
+            .await
+            .expect("Load DNA");
         let mut conductor = SweetConductor::from_standard_config().await;
 
         let agents = SweetAgents::get(conductor.keystore(), 1).await;
@@ -101,7 +103,9 @@ mod balance_limits {
         println!("Test 1.2: Positive Limit Enforcement");
 
         let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
-        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Load DNA");
+        let dna = SweetDnaFile::from_bundle(&dna_path)
+            .await
+            .expect("Load DNA");
         let mut conductor = SweetConductor::from_standard_config().await;
 
         let agents = SweetAgents::get(conductor.keystore(), 2).await;
@@ -153,7 +157,9 @@ mod balance_limits {
         println!("Test 1.3: Negative Limit Enforcement");
 
         let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
-        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Load DNA");
+        let dna = SweetDnaFile::from_bundle(&dna_path)
+            .await
+            .expect("Load DNA");
         let mut conductor = SweetConductor::from_standard_config().await;
 
         let agents = SweetAgents::get(conductor.keystore(), 2).await;
@@ -184,13 +190,17 @@ mod balance_limits {
         // Check that the exchange is either accepted (within limit) or rejected (exceeds limit)
         match result {
             Ok(exchange) => {
-                println!("  - Exchange within limit accepted: OK (hours={})", exchange.hours);
+                println!(
+                    "  - Exchange within limit accepted: OK (hours={})",
+                    exchange.hours
+                );
             }
             Err(e) => {
                 let error_msg = format!("{:?}", e);
                 assert!(
                     error_msg.contains("would exceed") || error_msg.contains("limit"),
-                    "Should reject exchange exceeding limit, got: {}", error_msg
+                    "Should reject exchange exceeding limit, got: {}",
+                    error_msg
                 );
                 println!("  - Exchange exceeding -40 limit rejected: OK");
             }
@@ -215,7 +225,9 @@ mod exchange_recording {
         println!("Test 2.1: Basic Time Exchange");
 
         let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
-        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Load DNA");
+        let dna = SweetDnaFile::from_bundle(&dna_path)
+            .await
+            .expect("Load DNA");
         let mut conductor = SweetConductor::from_standard_config().await;
 
         let agents = SweetAgents::get(conductor.keystore(), 2).await;
@@ -244,7 +256,10 @@ mod exchange_recording {
 
         assert_eq!(exchange.hours, 2.0, "Hours mismatch");
         assert_eq!(exchange.receiver_did, bob_did, "Receiver mismatch");
-        assert!(matches!(exchange.status, ExchangeStatus::Proposed), "Should be Proposed status");
+        assert!(
+            matches!(exchange.status, ExchangeStatus::Proposed),
+            "Should be Proposed status"
+        );
 
         println!("  - Exchange recorded: {} hours", exchange.hours);
         println!("  - Provider: {}", exchange.provider_did);
@@ -260,7 +275,9 @@ mod exchange_recording {
         println!("Test 2.2: Exchange Confirmation (Zero-Sum)");
 
         let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
-        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Load DNA");
+        let dna = SweetDnaFile::from_bundle(&dna_path)
+            .await
+            .expect("Load DNA");
         let mut conductor = SweetConductor::from_standard_config().await;
 
         let agents = SweetAgents::get(conductor.keystore(), 2).await;
@@ -276,17 +293,25 @@ mod exchange_recording {
 
         // Get initial balances
         let alice_balance_before: BalanceInfo = conductor
-            .call(&alice_cell.zome("tend"), "get_balance", GetBalanceInput {
-                member_did: alice_did.clone(),
-                dao_did: TEST_DAO.to_string(),
-            })
+            .call(
+                &alice_cell.zome("tend"),
+                "get_balance",
+                GetBalanceInput {
+                    member_did: alice_did.clone(),
+                    dao_did: TEST_DAO.to_string(),
+                },
+            )
             .await;
 
         let bob_balance_before: BalanceInfo = conductor
-            .call(&bob_cell.zome("tend"), "get_balance", GetBalanceInput {
-                member_did: bob_did.clone(),
-                dao_did: TEST_DAO.to_string(),
-            })
+            .call(
+                &bob_cell.zome("tend"),
+                "get_balance",
+                GetBalanceInput {
+                    member_did: bob_did.clone(),
+                    dao_did: TEST_DAO.to_string(),
+                },
+            )
             .await;
 
         // Alice (caller/provider) provides 3 hours to Bob
@@ -306,24 +331,39 @@ mod exchange_recording {
 
         // Bob confirms the exchange (confirm_exchange takes just exchange_id: String)
         let confirmed: ExchangeRecord = conductor
-            .call(&bob_cell.zome("tend"), "confirm_exchange", exchange.id.clone())
+            .call(
+                &bob_cell.zome("tend"),
+                "confirm_exchange",
+                exchange.id.clone(),
+            )
             .await;
 
-        assert!(matches!(confirmed.status, ExchangeStatus::Confirmed), "Should be confirmed");
+        assert!(
+            matches!(confirmed.status, ExchangeStatus::Confirmed),
+            "Should be confirmed"
+        );
 
         // Check balances after
         let alice_balance_after: BalanceInfo = conductor
-            .call(&alice_cell.zome("tend"), "get_balance", GetBalanceInput {
-                member_did: alice_did.clone(),
-                dao_did: TEST_DAO.to_string(),
-            })
+            .call(
+                &alice_cell.zome("tend"),
+                "get_balance",
+                GetBalanceInput {
+                    member_did: alice_did.clone(),
+                    dao_did: TEST_DAO.to_string(),
+                },
+            )
             .await;
 
         let bob_balance_after: BalanceInfo = conductor
-            .call(&bob_cell.zome("tend"), "get_balance", GetBalanceInput {
-                member_did: bob_did.clone(),
-                dao_did: TEST_DAO.to_string(),
-            })
+            .call(
+                &bob_cell.zome("tend"),
+                "get_balance",
+                GetBalanceInput {
+                    member_did: bob_did.clone(),
+                    dao_did: TEST_DAO.to_string(),
+                },
+            )
             .await;
 
         // Verify zero-sum: Provider gains, receiver loses
@@ -336,7 +376,10 @@ mod exchange_recording {
 
         println!("  - Alice balance change: +{}", alice_change);
         println!("  - Bob balance change: {}", bob_change);
-        println!("  - Sum of changes: {} (zero-sum verified)", alice_change + bob_change);
+        println!(
+            "  - Sum of changes: {} (zero-sum verified)",
+            alice_change + bob_change
+        );
         println!("Test 2.2 PASSED: Exchange confirmation maintains zero-sum");
     }
 
@@ -347,7 +390,9 @@ mod exchange_recording {
         println!("Test 2.3: Self-Exchange Rejection");
 
         let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
-        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Load DNA");
+        let dna = SweetDnaFile::from_bundle(&dna_path)
+            .await
+            .expect("Load DNA");
         let mut conductor = SweetConductor::from_standard_config().await;
 
         let agents = SweetAgents::get(conductor.keystore(), 1).await;
@@ -382,7 +427,8 @@ mod exchange_recording {
                 let error_msg = format!("{:?}", e);
                 assert!(
                     error_msg.contains("Cannot exchange") || error_msg.contains("yourself"),
-                    "Should reject self-exchange, got: {}", error_msg
+                    "Should reject self-exchange, got: {}",
+                    error_msg
                 );
                 println!("  - Self-exchange rejected: OK");
             }
@@ -408,7 +454,9 @@ mod service_listings {
         println!("Test 3.1: Create Service Listing");
 
         let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
-        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Load DNA");
+        let dna = SweetDnaFile::from_bundle(&dna_path)
+            .await
+            .expect("Load DNA");
         let mut conductor = SweetConductor::from_standard_config().await;
 
         let agents = SweetAgents::get(conductor.keystore(), 1).await;
@@ -449,7 +497,9 @@ mod service_listings {
         println!("Test 3.2: Query DAO Listings");
 
         let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
-        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Load DNA");
+        let dna = SweetDnaFile::from_bundle(&dna_path)
+            .await
+            .expect("Load DNA");
         let mut conductor = SweetConductor::from_standard_config().await;
 
         let agents = SweetAgents::get(conductor.keystore(), 2).await;
@@ -463,25 +513,33 @@ mod service_listings {
 
         // Create listings in different categories
         let _: ServiceListing = conductor
-            .call(&alice_cell.zome("tend"), "create_listing", CreateListingInput {
-                dao_did: TEST_DAO.to_string(),
-                title: "Piano Lessons".to_string(),
-                description: "Music instruction".to_string(),
-                category: ServiceCategory::Creative,
-                estimated_hours: Some(1.0),
-                availability: None,
-            })
+            .call(
+                &alice_cell.zome("tend"),
+                "create_listing",
+                CreateListingInput {
+                    dao_did: TEST_DAO.to_string(),
+                    title: "Piano Lessons".to_string(),
+                    description: "Music instruction".to_string(),
+                    category: ServiceCategory::Creative,
+                    estimated_hours: Some(1.0),
+                    availability: None,
+                },
+            )
             .await;
 
         let _: ServiceListing = conductor
-            .call(&bob_cell.zome("tend"), "create_listing", CreateListingInput {
-                dao_did: TEST_DAO.to_string(),
-                title: "Web Development".to_string(),
-                description: "Build websites".to_string(),
-                category: ServiceCategory::TechSupport,
-                estimated_hours: Some(3.0),
-                availability: None,
-            })
+            .call(
+                &bob_cell.zome("tend"),
+                "create_listing",
+                CreateListingInput {
+                    dao_did: TEST_DAO.to_string(),
+                    title: "Web Development".to_string(),
+                    description: "Build websites".to_string(),
+                    category: ServiceCategory::TechSupport,
+                    estimated_hours: Some(3.0),
+                    availability: None,
+                },
+            )
             .await;
 
         // Wait for DHT
@@ -489,10 +547,14 @@ mod service_listings {
 
         // Query all DAO listings
         let listings: Vec<ServiceListing> = conductor
-            .call(&alice_cell.zome("tend"), "get_dao_listings", PaginatedDaoInput {
-                dao_did: TEST_DAO.to_string(),
-                limit: None,
-            })
+            .call(
+                &alice_cell.zome("tend"),
+                "get_dao_listings",
+                PaginatedDaoInput {
+                    dao_did: TEST_DAO.to_string(),
+                    limit: None,
+                },
+            )
             .await;
 
         assert!(!listings.is_empty(), "Should find listings");
@@ -516,7 +578,9 @@ mod dispute_tests {
         println!("Test 4.1: Dispute Exchange");
 
         let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
-        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Load DNA");
+        let dna = SweetDnaFile::from_bundle(&dna_path)
+            .await
+            .expect("Load DNA");
         let mut conductor = SweetConductor::from_standard_config().await;
 
         let agents = SweetAgents::get(conductor.keystore(), 2).await;
@@ -531,23 +595,34 @@ mod dispute_tests {
 
         // Alice records exchange
         let exchange: ExchangeRecord = conductor
-            .call(&alice_cell.zome("tend"), "record_exchange", RecordExchangeInput {
-                receiver_did: bob_did.clone(),
-                dao_did: TEST_DAO.to_string(),
-                hours: 2.0,
-                service_description: "Home repair".to_string(),
-                service_category: ServiceCategory::HomeServices,
-                cultural_alias: None,
-                service_date: None,
-            })
+            .call(
+                &alice_cell.zome("tend"),
+                "record_exchange",
+                RecordExchangeInput {
+                    receiver_did: bob_did.clone(),
+                    dao_did: TEST_DAO.to_string(),
+                    hours: 2.0,
+                    service_description: "Home repair".to_string(),
+                    service_category: ServiceCategory::HomeServices,
+                    cultural_alias: None,
+                    service_date: None,
+                },
+            )
             .await;
 
         // Bob disputes the exchange (dispute_exchange takes just exchange_id: String)
         let disputed: ExchangeRecord = conductor
-            .call(&bob_cell.zome("tend"), "dispute_exchange", exchange.id.clone())
+            .call(
+                &bob_cell.zome("tend"),
+                "dispute_exchange",
+                exchange.id.clone(),
+            )
             .await;
 
-        assert!(matches!(disputed.status, ExchangeStatus::Disputed), "Should be disputed");
+        assert!(
+            matches!(disputed.status, ExchangeStatus::Disputed),
+            "Should be disputed"
+        );
 
         println!("  - Exchange status: {:?}", disputed.status);
         println!("Test 4.1 PASSED: Dispute workflow works");
@@ -560,7 +635,9 @@ mod dispute_tests {
         println!("Test 4.2: Dispute Lifecycle (Open -> Escalate -> Resolve)");
 
         let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
-        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Load DNA");
+        let dna = SweetDnaFile::from_bundle(&dna_path)
+            .await
+            .expect("Load DNA");
         let mut conductor = SweetConductor::from_standard_config().await;
 
         let agents = SweetAgents::get(conductor.keystore(), 2).await;
@@ -575,15 +652,19 @@ mod dispute_tests {
 
         // Record an exchange
         let exchange: ExchangeRecord = conductor
-            .call(&alice_cell.zome("tend"), "record_exchange", RecordExchangeInput {
-                receiver_did: bob_did.clone(),
-                dao_did: TEST_DAO.to_string(),
-                hours: 3.0,
-                service_description: "Landscaping work".to_string(),
-                service_category: ServiceCategory::Gardening,
-                cultural_alias: None,
-                service_date: None,
-            })
+            .call(
+                &alice_cell.zome("tend"),
+                "record_exchange",
+                RecordExchangeInput {
+                    receiver_did: bob_did.clone(),
+                    dao_did: TEST_DAO.to_string(),
+                    hours: 3.0,
+                    service_description: "Landscaping work".to_string(),
+                    service_category: ServiceCategory::Gardening,
+                    cultural_alias: None,
+                    service_date: None,
+                },
+            )
             .await;
 
         // Step 1: Open dispute (creates DisputeCase at DirectNegotiation stage)
@@ -602,9 +683,14 @@ mod dispute_tests {
             .expect("Failed to deserialize")
             .expect("No entry found");
 
-        assert!(matches!(dispute_case.stage, DisputeStage::DirectNegotiation),
-            "New dispute should start at DirectNegotiation");
-        assert!(dispute_case.resolution.is_none(), "Should have no resolution yet");
+        assert!(
+            matches!(dispute_case.stage, DisputeStage::DirectNegotiation),
+            "New dispute should start at DirectNegotiation"
+        );
+        assert!(
+            dispute_case.resolution.is_none(),
+            "Should have no resolution yet"
+        );
         println!("  - Dispute opened at DirectNegotiation stage: OK");
 
         let dispute_id = dispute_case.id.clone();
@@ -634,9 +720,14 @@ mod dispute_tests {
             .expect("Failed to deserialize")
             .expect("No entry found");
 
-        assert!(matches!(escalated_case.stage, DisputeStage::MediationPanel),
-            "Should be escalated to MediationPanel");
-        assert!(escalated_case.escalated_at.is_some(), "Should have escalation timestamp");
+        assert!(
+            matches!(escalated_case.stage, DisputeStage::MediationPanel),
+            "Should be escalated to MediationPanel"
+        );
+        assert!(
+            escalated_case.escalated_at.is_some(),
+            "Should have escalation timestamp"
+        );
         println!("  - Dispute escalated to MediationPanel: OK");
 
         // Step 3: Resolve the dispute
@@ -655,8 +746,14 @@ mod dispute_tests {
             .expect("Failed to deserialize")
             .expect("No entry found");
 
-        assert!(resolved_case.resolution.is_some(), "Should have resolution text");
-        assert!(resolved_case.resolved_at.is_some(), "Should have resolution timestamp");
+        assert!(
+            resolved_case.resolution.is_some(),
+            "Should have resolution text"
+        );
+        assert!(
+            resolved_case.resolved_at.is_some(),
+            "Should have resolution timestamp"
+        );
         println!("  - Dispute resolved: OK");
         println!("  - Resolution: {}", resolved_case.resolution.unwrap());
 
@@ -679,7 +776,9 @@ mod quality_ratings {
         println!("Test 5.1: Rate Confirmed Exchange");
 
         let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
-        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Load DNA");
+        let dna = SweetDnaFile::from_bundle(&dna_path)
+            .await
+            .expect("Load DNA");
         let mut conductor = SweetConductor::from_standard_config().await;
 
         let agents = SweetAgents::get(conductor.keystore(), 2).await;
@@ -694,19 +793,27 @@ mod quality_ratings {
 
         // Alice records exchange, Bob confirms
         let exchange: ExchangeRecord = conductor
-            .call(&alice_cell.zome("tend"), "record_exchange", RecordExchangeInput {
-                receiver_did: bob_did.clone(),
-                dao_did: TEST_DAO.to_string(),
-                hours: 1.5,
-                service_description: "Cooking lesson".to_string(),
-                service_category: ServiceCategory::FoodServices,
-                cultural_alias: None,
-                service_date: None,
-            })
+            .call(
+                &alice_cell.zome("tend"),
+                "record_exchange",
+                RecordExchangeInput {
+                    receiver_did: bob_did.clone(),
+                    dao_did: TEST_DAO.to_string(),
+                    hours: 1.5,
+                    service_description: "Cooking lesson".to_string(),
+                    service_category: ServiceCategory::FoodServices,
+                    cultural_alias: None,
+                    service_date: None,
+                },
+            )
             .await;
 
         let _confirmed: ExchangeRecord = conductor
-            .call(&bob_cell.zome("tend"), "confirm_exchange", exchange.id.clone())
+            .call(
+                &bob_cell.zome("tend"),
+                "confirm_exchange",
+                exchange.id.clone(),
+            )
             .await;
 
         // Bob rates the exchange
@@ -727,8 +834,14 @@ mod quality_ratings {
             .expect("No entry found");
 
         assert_eq!(quality_rating.rating, 5, "Rating should be 5");
-        assert_eq!(quality_rating.exchange_id, exchange.id, "Exchange ID mismatch");
-        assert!(quality_rating.comment.is_some(), "Comment should be present");
+        assert_eq!(
+            quality_rating.exchange_id, exchange.id,
+            "Exchange ID mismatch"
+        );
+        assert!(
+            quality_rating.comment.is_some(),
+            "Comment should be present"
+        );
 
         println!("  - Rating submitted: {}/5", quality_rating.rating);
         println!("  - Comment: {}", quality_rating.comment.unwrap());
@@ -742,7 +855,9 @@ mod quality_ratings {
         println!("Test 5.2: Cannot Rate Unconfirmed Exchange");
 
         let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
-        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Load DNA");
+        let dna = SweetDnaFile::from_bundle(&dna_path)
+            .await
+            .expect("Load DNA");
         let mut conductor = SweetConductor::from_standard_config().await;
 
         let agents = SweetAgents::get(conductor.keystore(), 2).await;
@@ -757,15 +872,19 @@ mod quality_ratings {
 
         // Record exchange but do NOT confirm
         let exchange: ExchangeRecord = conductor
-            .call(&alice_cell.zome("tend"), "record_exchange", RecordExchangeInput {
-                receiver_did: bob_did.clone(),
-                dao_did: TEST_DAO.to_string(),
-                hours: 1.0,
-                service_description: "Wellness session".to_string(),
-                service_category: ServiceCategory::Wellness,
-                cultural_alias: None,
-                service_date: None,
-            })
+            .call(
+                &alice_cell.zome("tend"),
+                "record_exchange",
+                RecordExchangeInput {
+                    receiver_did: bob_did.clone(),
+                    dao_did: TEST_DAO.to_string(),
+                    hours: 1.0,
+                    service_description: "Wellness session".to_string(),
+                    service_category: ServiceCategory::Wellness,
+                    cultural_alias: None,
+                    service_date: None,
+                },
+            )
             .await;
 
         // Try to rate without confirming first
@@ -784,7 +903,8 @@ mod quality_ratings {
                 let error_msg = format!("{:?}", e);
                 assert!(
                     error_msg.contains("confirmed") || error_msg.contains("Confirmed"),
-                    "Should reject rating unconfirmed exchange, got: {}", error_msg
+                    "Should reject rating unconfirmed exchange, got: {}",
+                    error_msg
                 );
                 println!("  - Rating unconfirmed exchange rejected: OK");
             }
@@ -810,7 +930,9 @@ mod dynamic_limits {
         println!("Test 6.1: Dynamic TEND Limit Tiers");
 
         let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
-        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Load DNA");
+        let dna = SweetDnaFile::from_bundle(&dna_path)
+            .await
+            .expect("Load DNA");
         let mut conductor = SweetConductor::from_standard_config().await;
 
         let agents = SweetAgents::get(conductor.keystore(), 1).await;
@@ -823,25 +945,41 @@ mod dynamic_limits {
 
         // Test each tier via get_current_tend_limit
         let normal_limit: i32 = conductor
-            .call(&alice_cell.zome("tend"), "get_current_tend_limit", TendLimitTier::Normal)
+            .call(
+                &alice_cell.zome("tend"),
+                "get_current_tend_limit",
+                TendLimitTier::Normal,
+            )
             .await;
         assert_eq!(normal_limit, 40, "Normal tier should be 40");
         println!("  - Normal tier limit: {}", normal_limit);
 
         let elevated_limit: i32 = conductor
-            .call(&alice_cell.zome("tend"), "get_current_tend_limit", TendLimitTier::Elevated)
+            .call(
+                &alice_cell.zome("tend"),
+                "get_current_tend_limit",
+                TendLimitTier::Elevated,
+            )
             .await;
         assert_eq!(elevated_limit, 60, "Elevated tier should be 60");
         println!("  - Elevated tier limit: {}", elevated_limit);
 
         let high_limit: i32 = conductor
-            .call(&alice_cell.zome("tend"), "get_current_tend_limit", TendLimitTier::High)
+            .call(
+                &alice_cell.zome("tend"),
+                "get_current_tend_limit",
+                TendLimitTier::High,
+            )
             .await;
         assert_eq!(high_limit, 80, "High tier should be 80");
         println!("  - High tier limit: {}", high_limit);
 
         let emergency_limit: i32 = conductor
-            .call(&alice_cell.zome("tend"), "get_current_tend_limit", TendLimitTier::Emergency)
+            .call(
+                &alice_cell.zome("tend"),
+                "get_current_tend_limit",
+                TendLimitTier::Emergency,
+            )
             .await;
         assert_eq!(emergency_limit, 120, "Emergency tier should be 120");
         println!("  - Emergency tier limit: {}", emergency_limit);
@@ -882,15 +1020,24 @@ mod unit_tests {
 
     #[test]
     fn test_apprentice_balance_limit() {
-        assert_eq!(APPRENTICE_BALANCE_LIMIT, 10, "Apprentice limit should be 10");
-        assert!(APPRENTICE_BALANCE_LIMIT < BALANCE_LIMIT, "Apprentice limit must be less than standard");
+        assert_eq!(
+            APPRENTICE_BALANCE_LIMIT, 10,
+            "Apprentice limit should be 10"
+        );
+        assert!(
+            APPRENTICE_BALANCE_LIMIT < BALANCE_LIMIT,
+            "Apprentice limit must be less than standard"
+        );
     }
 
     #[test]
     fn test_dynamic_limit_constants() {
         assert_eq!(BALANCE_LIMIT_ELEVATED, 60, "Elevated limit should be 60");
         assert_eq!(BALANCE_LIMIT_HIGH, 80, "High limit should be 80");
-        assert_eq!(BALANCE_LIMIT_EMERGENCY, 120, "Emergency limit should be 120");
+        assert_eq!(
+            BALANCE_LIMIT_EMERGENCY, 120,
+            "Emergency limit should be 120"
+        );
     }
 
     #[test]
@@ -912,7 +1059,8 @@ mod unit_tests {
 
         for category in categories {
             let json = serde_json::to_string(&category).expect("Serialize failed");
-            let deserialized: ServiceCategory = serde_json::from_str(&json).expect("Deserialize failed");
+            let deserialized: ServiceCategory =
+                serde_json::from_str(&json).expect("Deserialize failed");
             assert_eq!(category, deserialized, "Category round-trip failed");
         }
     }
@@ -930,7 +1078,8 @@ mod unit_tests {
 
         for status in statuses {
             let json = serde_json::to_string(&status).expect("Serialize failed");
-            let deserialized: ExchangeStatus = serde_json::from_str(&json).expect("Deserialize failed");
+            let deserialized: ExchangeStatus =
+                serde_json::from_str(&json).expect("Deserialize failed");
             assert_eq!(status, deserialized, "Status round-trip failed");
         }
     }
@@ -945,7 +1094,8 @@ mod unit_tests {
 
         for stage in stages {
             let json = serde_json::to_string(&stage).expect("Serialize failed");
-            let deserialized: DisputeStage = serde_json::from_str(&json).expect("Deserialize failed");
+            let deserialized: DisputeStage =
+                serde_json::from_str(&json).expect("Deserialize failed");
             assert_eq!(stage, deserialized, "Dispute stage round-trip failed");
         }
     }
@@ -961,7 +1111,8 @@ mod unit_tests {
 
         for tier in tiers {
             let json = serde_json::to_string(&tier).expect("Serialize failed");
-            let deserialized: TendLimitTier = serde_json::from_str(&json).expect("Deserialize failed");
+            let deserialized: TendLimitTier =
+                serde_json::from_str(&json).expect("Deserialize failed");
             assert_eq!(tier, deserialized, "TendLimitTier round-trip failed");
         }
     }
@@ -976,7 +1127,8 @@ mod unit_tests {
 
         for status in statuses {
             let json = serde_json::to_string(&status).expect("Serialize failed");
-            let deserialized: SettlementStatus = serde_json::from_str(&json).expect("Deserialize failed");
+            let deserialized: SettlementStatus =
+                serde_json::from_str(&json).expect("Deserialize failed");
             assert_eq!(status, deserialized, "SettlementStatus round-trip failed");
         }
     }
@@ -1008,7 +1160,9 @@ mod oracle_management {
         println!("Test 7.1: Update Oracle State");
 
         let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
-        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Load DNA");
+        let dna = SweetDnaFile::from_bundle(&dna_path)
+            .await
+            .expect("Load DNA");
         let mut conductor = SweetConductor::from_standard_config().await;
 
         let agents = SweetAgents::get(conductor.keystore(), 1).await;
@@ -1025,12 +1179,22 @@ mod oracle_management {
             .await;
 
         assert_eq!(oracle_state.vitality, 30, "Vitality should be 30");
-        assert!(matches!(oracle_state.tier, TendLimitTier::Elevated),
-            "Vitality 30 should map to Elevated tier");
-        assert_eq!(oracle_state.tier.limit(), 60, "Elevated tier limit should be 60");
+        assert!(
+            matches!(oracle_state.tier, TendLimitTier::Elevated),
+            "Vitality 30 should map to Elevated tier"
+        );
+        assert_eq!(
+            oracle_state.tier.limit(),
+            60,
+            "Elevated tier limit should be 60"
+        );
 
         println!("  - Vitality: {}", oracle_state.vitality);
-        println!("  - Tier: {:?} (limit: {})", oracle_state.tier, oracle_state.tier.limit());
+        println!(
+            "  - Tier: {:?} (limit: {})",
+            oracle_state.tier,
+            oracle_state.tier.limit()
+        );
         println!("Test 7.1 PASSED: Oracle state update changes TEND limit tier");
     }
 
@@ -1041,7 +1205,9 @@ mod oracle_management {
         println!("Test 7.2: Dynamic Limit Tiers");
 
         let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
-        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Load DNA");
+        let dna = SweetDnaFile::from_bundle(&dna_path)
+            .await
+            .expect("Load DNA");
         let mut conductor = SweetConductor::from_standard_config().await;
 
         let agents = SweetAgents::get(conductor.keystore(), 1).await;
@@ -1058,7 +1224,11 @@ mod oracle_management {
             .await;
         assert!(matches!(state_emergency.tier, TendLimitTier::Emergency));
         assert_eq!(state_emergency.tier.limit(), 120);
-        println!("  - Vitality 5 -> {:?} (limit: {})", state_emergency.tier, state_emergency.tier.limit());
+        println!(
+            "  - Vitality 5 -> {:?} (limit: {})",
+            state_emergency.tier,
+            state_emergency.tier.limit()
+        );
 
         // Vitality 15 -> High (11-20 range) -> limit 80
         let state_high: OracleState = conductor
@@ -1066,7 +1236,11 @@ mod oracle_management {
             .await;
         assert!(matches!(state_high.tier, TendLimitTier::High));
         assert_eq!(state_high.tier.limit(), 80);
-        println!("  - Vitality 15 -> {:?} (limit: {})", state_high.tier, state_high.tier.limit());
+        println!(
+            "  - Vitality 15 -> {:?} (limit: {})",
+            state_high.tier,
+            state_high.tier.limit()
+        );
 
         // Vitality 50 -> Normal (41+ range) -> limit 40
         let state_normal: OracleState = conductor
@@ -1074,7 +1248,11 @@ mod oracle_management {
             .await;
         assert!(matches!(state_normal.tier, TendLimitTier::Normal));
         assert_eq!(state_normal.tier.limit(), 40);
-        println!("  - Vitality 50 -> {:?} (limit: {})", state_normal.tier, state_normal.tier.limit());
+        println!(
+            "  - Vitality 50 -> {:?} (limit: {})",
+            state_normal.tier,
+            state_normal.tier.limit()
+        );
 
         println!("Test 7.2 PASSED: Dynamic limit tiers map correctly from vitality");
     }
@@ -1095,7 +1273,9 @@ mod exchange_cancellation {
         println!("Test 8.1: Cancel Proposed Exchange");
 
         let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
-        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Load DNA");
+        let dna = SweetDnaFile::from_bundle(&dna_path)
+            .await
+            .expect("Load DNA");
         let mut conductor = SweetConductor::from_standard_config().await;
 
         let agents = SweetAgents::get(conductor.keystore(), 2).await;
@@ -1109,15 +1289,19 @@ mod exchange_cancellation {
 
         // Alice records exchange (Proposed status)
         let exchange: ExchangeRecord = conductor
-            .call(&alice_cell.zome("tend"), "record_exchange", RecordExchangeInput {
-                receiver_did: bob_did.clone(),
-                dao_did: TEST_DAO.to_string(),
-                hours: 2.0,
-                service_description: "Web design work".to_string(),
-                service_category: ServiceCategory::TechSupport,
-                cultural_alias: None,
-                service_date: None,
-            })
+            .call(
+                &alice_cell.zome("tend"),
+                "record_exchange",
+                RecordExchangeInput {
+                    receiver_did: bob_did.clone(),
+                    dao_did: TEST_DAO.to_string(),
+                    hours: 2.0,
+                    service_description: "Web design work".to_string(),
+                    service_category: ServiceCategory::TechSupport,
+                    cultural_alias: None,
+                    service_date: None,
+                },
+            )
             .await;
 
         assert!(matches!(exchange.status, ExchangeStatus::Proposed));
@@ -1125,11 +1309,17 @@ mod exchange_cancellation {
 
         // Alice (provider) cancels the exchange
         let cancelled: ExchangeRecord = conductor
-            .call(&alice_cell.zome("tend"), "cancel_exchange", exchange.id.clone())
+            .call(
+                &alice_cell.zome("tend"),
+                "cancel_exchange",
+                exchange.id.clone(),
+            )
             .await;
 
-        assert!(matches!(cancelled.status, ExchangeStatus::Cancelled),
-            "Cancelled exchange should have Cancelled status");
+        assert!(
+            matches!(cancelled.status, ExchangeStatus::Cancelled),
+            "Cancelled exchange should have Cancelled status"
+        );
         println!("  - Exchange cancelled: {:?}", cancelled.status);
         println!("Test 8.1 PASSED: Cancel proposed exchange works");
     }
@@ -1141,7 +1331,9 @@ mod exchange_cancellation {
         println!("Test 8.2: Cannot Cancel Confirmed Exchange");
 
         let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
-        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Load DNA");
+        let dna = SweetDnaFile::from_bundle(&dna_path)
+            .await
+            .expect("Load DNA");
         let mut conductor = SweetConductor::from_standard_config().await;
 
         let agents = SweetAgents::get(conductor.keystore(), 2).await;
@@ -1156,34 +1348,49 @@ mod exchange_cancellation {
 
         // Alice records, Bob confirms
         let exchange: ExchangeRecord = conductor
-            .call(&alice_cell.zome("tend"), "record_exchange", RecordExchangeInput {
-                receiver_did: bob_did.clone(),
-                dao_did: TEST_DAO.to_string(),
-                hours: 1.5,
-                service_description: "Photography session".to_string(),
-                service_category: ServiceCategory::Creative,
-                cultural_alias: None,
-                service_date: None,
-            })
+            .call(
+                &alice_cell.zome("tend"),
+                "record_exchange",
+                RecordExchangeInput {
+                    receiver_did: bob_did.clone(),
+                    dao_did: TEST_DAO.to_string(),
+                    hours: 1.5,
+                    service_description: "Photography session".to_string(),
+                    service_category: ServiceCategory::Creative,
+                    cultural_alias: None,
+                    service_date: None,
+                },
+            )
             .await;
 
         let _confirmed: ExchangeRecord = conductor
-            .call(&bob_cell.zome("tend"), "confirm_exchange", exchange.id.clone())
+            .call(
+                &bob_cell.zome("tend"),
+                "confirm_exchange",
+                exchange.id.clone(),
+            )
             .await;
 
         println!("  - Exchange confirmed");
 
         // Try to cancel confirmed exchange
         let result: Result<ExchangeRecord, _> = conductor
-            .call_fallible(&alice_cell.zome("tend"), "cancel_exchange", exchange.id.clone())
+            .call_fallible(
+                &alice_cell.zome("tend"),
+                "cancel_exchange",
+                exchange.id.clone(),
+            )
             .await;
 
         match result {
             Err(e) => {
                 let error_msg = format!("{:?}", e);
                 assert!(
-                    error_msg.contains("Proposed") || error_msg.contains("cancel") || error_msg.contains("status"),
-                    "Should reject cancelling confirmed exchange, got: {}", error_msg
+                    error_msg.contains("Proposed")
+                        || error_msg.contains("cancel")
+                        || error_msg.contains("status"),
+                    "Should reject cancelling confirmed exchange, got: {}",
+                    error_msg
                 );
                 println!("  - Cancel of confirmed exchange rejected: OK");
             }
@@ -1209,7 +1416,9 @@ mod cross_dao_clearing {
         println!("Test 9.1: Record Cross-DAO Exchange");
 
         let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
-        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Load DNA");
+        let dna = SweetDnaFile::from_bundle(&dna_path)
+            .await
+            .expect("Load DNA");
         let mut conductor = SweetConductor::from_standard_config().await;
 
         let agents = SweetAgents::get(conductor.keystore(), 1).await;
@@ -1240,8 +1449,14 @@ mod cross_dao_clearing {
             .call(&alice_cell.zome("tend"), "record_cross_dao_exchange", input)
             .await;
 
-        assert!(balance.total_exchanges >= 1, "Should have at least 1 exchange");
-        assert!(balance.net_balance != 0, "Net balance should be non-zero after exchange");
+        assert!(
+            balance.total_exchanges >= 1,
+            "Should have at least 1 exchange"
+        );
+        assert!(
+            balance.net_balance != 0,
+            "Net balance should be non-zero after exchange"
+        );
 
         println!("  - DAO A: {}", balance.dao_a_did);
         println!("  - DAO B: {}", balance.dao_b_did);
@@ -1257,7 +1472,9 @@ mod cross_dao_clearing {
         println!("Test 9.2: Bilateral Balance Canonical Order");
 
         let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
-        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Load DNA");
+        let dna = SweetDnaFile::from_bundle(&dna_path)
+            .await
+            .expect("Load DNA");
         let mut conductor = SweetConductor::from_standard_config().await;
 
         let agents = SweetAgents::get(conductor.keystore(), 1).await;
@@ -1291,9 +1508,12 @@ mod cross_dao_clearing {
             .await;
 
         // dao_a should always be the alphabetically first (alpha < beta)
-        assert!(balance.dao_a_did < balance.dao_b_did,
+        assert!(
+            balance.dao_a_did < balance.dao_b_did,
             "dao_a_did should be alphabetically before dao_b_did: {} vs {}",
-            balance.dao_a_did, balance.dao_b_did);
+            balance.dao_a_did,
+            balance.dao_b_did
+        );
 
         println!("  - dao_a: {} (alphabetically first)", balance.dao_a_did);
         println!("  - dao_b: {} (alphabetically second)", balance.dao_b_did);
@@ -1311,7 +1531,9 @@ mod cross_dao_clearing {
         println!("Test 9.3: Settle Bilateral Balance (Two-Phase Commit)");
 
         let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
-        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Load DNA");
+        let dna = SweetDnaFile::from_bundle(&dna_path)
+            .await
+            .expect("Load DNA");
         let mut conductor = SweetConductor::from_standard_config().await;
 
         let agents = SweetAgents::get(conductor.keystore(), 1).await;
@@ -1335,11 +1557,15 @@ mod cross_dao_clearing {
         // Record several exchanges
         for _ in 0..3 {
             let _: BilateralBalance = conductor
-                .call(&alice_cell.zome("tend"), "record_cross_dao_exchange", RecordCrossDAOExchangeInput {
-                    provider_dao_did: dao_a.clone(),
-                    receiver_dao_did: dao_b.clone(),
-                    hours: 2.0,
-                })
+                .call(
+                    &alice_cell.zome("tend"),
+                    "record_cross_dao_exchange",
+                    RecordCrossDAOExchangeInput {
+                        provider_dao_did: dao_a.clone(),
+                        receiver_dao_did: dao_b.clone(),
+                        hours: 2.0,
+                    },
+                )
                 .await;
         }
 
@@ -1359,10 +1585,14 @@ mod cross_dao_clearing {
 
         // Get pre-settlement balance
         let pre_balance: Option<BilateralBalance> = conductor
-            .call(&alice_cell.zome("tend"), "get_bilateral_balance", GetBilateralInput {
-                dao_a_did: dao_a.clone(),
-                dao_b_did: dao_b.clone(),
-            })
+            .call(
+                &alice_cell.zome("tend"),
+                "get_bilateral_balance",
+                GetBilateralInput {
+                    dao_a_did: dao_a.clone(),
+                    dao_b_did: dao_b.clone(),
+                },
+            )
             .await;
 
         let pre_net = pre_balance.as_ref().map(|b| b.net_balance).unwrap_or(0);
@@ -1393,14 +1623,21 @@ mod cross_dao_clearing {
                 println!("  - Settlement completed: {} TEND-hours", settlement.amount);
 
                 let post_balance: Option<BilateralBalance> = conductor
-                    .call(&alice_cell.zome("tend"), "get_bilateral_balance", GetBilateralInput {
-                        dao_a_did: dao_a.clone(),
-                        dao_b_did: dao_b.clone(),
-                    })
+                    .call(
+                        &alice_cell.zome("tend"),
+                        "get_bilateral_balance",
+                        GetBilateralInput {
+                            dao_a_did: dao_a.clone(),
+                            dao_b_did: dao_b.clone(),
+                        },
+                    )
                     .await;
 
                 if let Some(bal) = &post_balance {
-                    assert_eq!(bal.net_balance, 0, "Net balance should be 0 after settlement");
+                    assert_eq!(
+                        bal.net_balance, 0,
+                        "Net balance should be 0 after settlement"
+                    );
                     println!("  - Post-settlement net balance: {}", bal.net_balance);
                 }
             }
@@ -1409,21 +1646,31 @@ mod cross_dao_clearing {
                 let error_msg = format!("{:?}", e);
                 assert!(
                     error_msg.contains("Treasury") || error_msg.contains("Failed"),
-                    "Should indicate treasury failure, got: {}", error_msg
+                    "Should indicate treasury failure, got: {}",
+                    error_msg
                 );
                 println!("  - Settlement failed (no treasury zome): balance preserved");
 
                 let post_balance: Option<BilateralBalance> = conductor
-                    .call(&alice_cell.zome("tend"), "get_bilateral_balance", GetBilateralInput {
-                        dao_a_did: dao_a.clone(),
-                        dao_b_did: dao_b.clone(),
-                    })
+                    .call(
+                        &alice_cell.zome("tend"),
+                        "get_bilateral_balance",
+                        GetBilateralInput {
+                            dao_a_did: dao_a.clone(),
+                            dao_b_did: dao_b.clone(),
+                        },
+                    )
                     .await;
 
                 if let Some(bal) = &post_balance {
-                    assert_eq!(bal.net_balance, pre_net,
-                        "Balance should be unchanged after failed settlement");
-                    println!("  - Post-settlement net balance: {} (preserved)", bal.net_balance);
+                    assert_eq!(
+                        bal.net_balance, pre_net,
+                        "Balance should be unchanged after failed settlement"
+                    );
+                    println!(
+                        "  - Post-settlement net balance: {} (preserved)",
+                        bal.net_balance
+                    );
                 }
             }
         }
@@ -1447,7 +1694,9 @@ mod tend_forgiveness {
         println!("Test 10.1: Forgive Balance on Exit");
 
         let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
-        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Load DNA");
+        let dna = SweetDnaFile::from_bundle(&dna_path)
+            .await
+            .expect("Load DNA");
         let mut conductor = SweetConductor::from_standard_config().await;
 
         let agents = SweetAgents::get(conductor.keystore(), 2).await;
@@ -1463,39 +1712,58 @@ mod tend_forgiveness {
 
         // Create a TEND balance by recording and confirming an exchange
         let exchange: ExchangeRecord = conductor
-            .call(&alice_cell.zome("tend"), "record_exchange", RecordExchangeInput {
-                receiver_did: bob_did.clone(),
-                dao_did: TEST_DAO.to_string(),
-                hours: 5.0,
-                service_description: "Extensive tutoring".to_string(),
-                service_category: ServiceCategory::Education,
-                cultural_alias: None,
-                service_date: None,
-            })
+            .call(
+                &alice_cell.zome("tend"),
+                "record_exchange",
+                RecordExchangeInput {
+                    receiver_did: bob_did.clone(),
+                    dao_did: TEST_DAO.to_string(),
+                    hours: 5.0,
+                    service_description: "Extensive tutoring".to_string(),
+                    service_category: ServiceCategory::Education,
+                    cultural_alias: None,
+                    service_date: None,
+                },
+            )
             .await;
 
         let _: ExchangeRecord = conductor
-            .call(&bob_cell.zome("tend"), "confirm_exchange", exchange.id.clone())
+            .call(
+                &bob_cell.zome("tend"),
+                "confirm_exchange",
+                exchange.id.clone(),
+            )
             .await;
 
         println!("  - Exchange confirmed (5 hours)");
 
         // Forgive Alice's balance (as part of exit flow)
         let forgiven: Vec<(String, i32)> = conductor
-            .call(&alice_cell.zome("tend"), "forgive_balance", alice_did.clone())
+            .call(
+                &alice_cell.zome("tend"),
+                "forgive_balance",
+                alice_did.clone(),
+            )
             .await;
 
         println!("  - Forgiven balances: {:?}", forgiven);
 
         // Verify balance is zeroed
         let balance: BalanceInfo = conductor
-            .call(&alice_cell.zome("tend"), "get_balance", GetBalanceInput {
-                member_did: alice_did.clone(),
-                dao_did: TEST_DAO.to_string(),
-            })
+            .call(
+                &alice_cell.zome("tend"),
+                "get_balance",
+                GetBalanceInput {
+                    member_did: alice_did.clone(),
+                    dao_did: TEST_DAO.to_string(),
+                },
+            )
             .await;
 
-        assert_eq!(balance.balance, 0, "Balance should be zeroed after forgiveness");
+        assert_eq!(
+            balance.balance, 0,
+            "Balance should be zeroed after forgiveness"
+        );
         println!("  - Post-forgiveness balance: {}", balance.balance);
         println!("Test 10.1 PASSED: Balance forgiveness works on exit");
     }
@@ -1513,30 +1781,54 @@ mod tend_additional_unit_tests {
     /// Test TEND limit tier values
     #[test]
     fn test_tend_limit_tier_values() {
-        assert_eq!(TendLimitTier::Normal.limit(), 40, "Normal limit should be 40");
-        assert_eq!(TendLimitTier::Elevated.limit(), 60, "Elevated limit should be 60");
+        assert_eq!(
+            TendLimitTier::Normal.limit(),
+            40,
+            "Normal limit should be 40"
+        );
+        assert_eq!(
+            TendLimitTier::Elevated.limit(),
+            60,
+            "Elevated limit should be 60"
+        );
         assert_eq!(TendLimitTier::High.limit(), 80, "High limit should be 80");
-        assert_eq!(TendLimitTier::Emergency.limit(), 120, "Emergency limit should be 120");
+        assert_eq!(
+            TendLimitTier::Emergency.limit(),
+            120,
+            "Emergency limit should be 120"
+        );
     }
 
     /// Test TEND limit tier from vitality score mapping (from mycelix_finance_types)
     #[test]
     fn test_tend_limit_from_vitality() {
         // Vitality 5 (0-10) -> Emergency
-        assert_eq!(TendLimitTier::from_vitality(5), TendLimitTier::Emergency,
-            "Vitality 5 should map to Emergency");
+        assert_eq!(
+            TendLimitTier::from_vitality(5),
+            TendLimitTier::Emergency,
+            "Vitality 5 should map to Emergency"
+        );
 
         // Vitality 15 (11-20) -> High
-        assert_eq!(TendLimitTier::from_vitality(15), TendLimitTier::High,
-            "Vitality 15 should map to High");
+        assert_eq!(
+            TendLimitTier::from_vitality(15),
+            TendLimitTier::High,
+            "Vitality 15 should map to High"
+        );
 
         // Vitality 30 (21-40) -> Elevated
-        assert_eq!(TendLimitTier::from_vitality(30), TendLimitTier::Elevated,
-            "Vitality 30 should map to Elevated");
+        assert_eq!(
+            TendLimitTier::from_vitality(30),
+            TendLimitTier::Elevated,
+            "Vitality 30 should map to Elevated"
+        );
 
         // Vitality 50 (41+) -> Normal
-        assert_eq!(TendLimitTier::from_vitality(50), TendLimitTier::Normal,
-            "Vitality 50 should map to Normal");
+        assert_eq!(
+            TendLimitTier::from_vitality(50),
+            TendLimitTier::Normal,
+            "Vitality 50 should map to Normal"
+        );
     }
 }
 
@@ -1558,7 +1850,9 @@ mod tend_boundary_tests {
         println!("Test 12.1: MAX_SERVICE_HOURS Boundary (8h)");
 
         let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
-        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Load DNA");
+        let dna = SweetDnaFile::from_bundle(&dna_path)
+            .await
+            .expect("Load DNA");
         let mut conductor = SweetConductor::from_standard_config().await;
 
         let agents = SweetAgents::get(conductor.keystore(), 2).await;
@@ -1615,7 +1909,8 @@ mod tend_boundary_tests {
                     error_msg.contains("Maximum service duration")
                         || error_msg.contains("8 hours")
                         || error_msg.contains("MAX_SERVICE_HOURS"),
-                    "Should reject > 8h exchange, got: {}", error_msg
+                    "Should reject > 8h exchange, got: {}",
+                    error_msg
                 );
                 println!("  - 8.1 hours rejected: OK");
             }
@@ -1635,7 +1930,9 @@ mod tend_boundary_tests {
         println!("Test 12.2: MIN_SERVICE_MINUTES Boundary (15 min)");
 
         let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
-        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Load DNA");
+        let dna = SweetDnaFile::from_bundle(&dna_path)
+            .await
+            .expect("Load DNA");
         let mut conductor = SweetConductor::from_standard_config().await;
 
         let agents = SweetAgents::get(conductor.keystore(), 2).await;
@@ -1692,7 +1989,8 @@ mod tend_boundary_tests {
                     error_msg.contains("Minimum service duration")
                         || error_msg.contains("15 minutes")
                         || error_msg.contains("MIN_SERVICE_MINUTES"),
-                    "Should reject < 15min exchange, got: {}", error_msg
+                    "Should reject < 15min exchange, got: {}",
+                    error_msg
                 );
                 println!("  - 0.24 hours (14.4 min) rejected: OK");
             }
@@ -1713,7 +2011,9 @@ mod tend_boundary_tests {
         println!("Test 12.3: Self-Exchange Rejected");
 
         let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
-        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Load DNA");
+        let dna = SweetDnaFile::from_bundle(&dna_path)
+            .await
+            .expect("Load DNA");
         let mut conductor = SweetConductor::from_standard_config().await;
 
         let agents = SweetAgents::get(conductor.keystore(), 1).await;
@@ -1748,7 +2048,8 @@ mod tend_boundary_tests {
                 let error_msg = format!("{:?}", e);
                 assert!(
                     error_msg.contains("Cannot exchange") || error_msg.contains("yourself"),
-                    "Should reject self-exchange, got: {}", error_msg
+                    "Should reject self-exchange, got: {}",
+                    error_msg
                 );
                 println!("  - Self-exchange rejected: OK");
             }
@@ -1777,7 +2078,9 @@ mod tend_lifecycle_edge_cases {
         println!("Test 13.1: Confirm Disputed Exchange Rejected");
 
         let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
-        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Load DNA");
+        let dna = SweetDnaFile::from_bundle(&dna_path)
+            .await
+            .expect("Load DNA");
         let mut conductor = SweetConductor::from_standard_config().await;
 
         let agents = SweetAgents::get(conductor.keystore(), 2).await;
@@ -1792,15 +2095,19 @@ mod tend_lifecycle_edge_cases {
 
         // Alice records an exchange
         let exchange: ExchangeRecord = conductor
-            .call(&alice_cell.zome("tend"), "record_exchange", RecordExchangeInput {
-                receiver_did: bob_did.clone(),
-                dao_did: TEST_DAO.to_string(),
-                hours: 2.0,
-                service_description: "Gardening help".to_string(),
-                service_category: ServiceCategory::Gardening,
-                cultural_alias: None,
-                service_date: None,
-            })
+            .call(
+                &alice_cell.zome("tend"),
+                "record_exchange",
+                RecordExchangeInput {
+                    receiver_did: bob_did.clone(),
+                    dao_did: TEST_DAO.to_string(),
+                    hours: 2.0,
+                    service_description: "Gardening help".to_string(),
+                    service_category: ServiceCategory::Gardening,
+                    cultural_alias: None,
+                    service_date: None,
+                },
+            )
             .await;
 
         assert!(matches!(exchange.status, ExchangeStatus::Proposed));
@@ -1808,7 +2115,11 @@ mod tend_lifecycle_edge_cases {
 
         // Bob disputes the exchange
         let disputed: ExchangeRecord = conductor
-            .call(&bob_cell.zome("tend"), "dispute_exchange", exchange.id.clone())
+            .call(
+                &bob_cell.zome("tend"),
+                "dispute_exchange",
+                exchange.id.clone(),
+            )
             .await;
 
         assert!(matches!(disputed.status, ExchangeStatus::Disputed));
@@ -1816,7 +2127,11 @@ mod tend_lifecycle_edge_cases {
 
         // Bob tries to confirm the now-Disputed exchange -- should fail
         let result: Result<ExchangeRecord, _> = conductor
-            .call_fallible(&bob_cell.zome("tend"), "confirm_exchange", exchange.id.clone())
+            .call_fallible(
+                &bob_cell.zome("tend"),
+                "confirm_exchange",
+                exchange.id.clone(),
+            )
             .await;
 
         match result {
@@ -1826,7 +2141,8 @@ mod tend_lifecycle_edge_cases {
                     error_msg.contains("Proposed")
                         || error_msg.contains("not in Proposed")
                         || error_msg.contains("status"),
-                    "Should reject confirming a disputed exchange, got: {}", error_msg
+                    "Should reject confirming a disputed exchange, got: {}",
+                    error_msg
                 );
                 println!("  - Confirm of disputed exchange rejected: OK");
             }
@@ -1883,7 +2199,9 @@ mod bilateral_settlement_two_phase {
         println!("Test 14.1: Bilateral Settlement Two-Phase Commit");
 
         let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
-        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Load DNA");
+        let dna = SweetDnaFile::from_bundle(&dna_path)
+            .await
+            .expect("Load DNA");
         let mut conductor = SweetConductor::from_standard_config().await;
 
         let agents = SweetAgents::get(conductor.keystore(), 1).await;
@@ -1907,11 +2225,15 @@ mod bilateral_settlement_two_phase {
         // Record cross-DAO exchanges to build up a bilateral balance
         for _ in 0..3 {
             let _: BilateralBalance = conductor
-                .call(&alice_cell.zome("tend"), "record_cross_dao_exchange", RecordCrossDAOExchangeInput {
-                    provider_dao_did: dao_a.clone(),
-                    receiver_dao_did: dao_b.clone(),
-                    hours: 4.0,
-                })
+                .call(
+                    &alice_cell.zome("tend"),
+                    "record_cross_dao_exchange",
+                    RecordCrossDAOExchangeInput {
+                        provider_dao_did: dao_a.clone(),
+                        receiver_dao_did: dao_b.clone(),
+                        hours: 4.0,
+                    },
+                )
                 .await;
         }
 
@@ -1931,15 +2253,25 @@ mod bilateral_settlement_two_phase {
         }
 
         let pre_balance: Option<BilateralBalance> = conductor
-            .call(&alice_cell.zome("tend"), "get_bilateral_balance", GetBilateralInput {
-                dao_a_did: dao_a.clone(),
-                dao_b_did: dao_b.clone(),
-            })
+            .call(
+                &alice_cell.zome("tend"),
+                "get_bilateral_balance",
+                GetBilateralInput {
+                    dao_a_did: dao_a.clone(),
+                    dao_b_did: dao_b.clone(),
+                },
+            )
             .await;
 
-        assert!(pre_balance.is_some(), "Should have a bilateral balance before settlement");
+        assert!(
+            pre_balance.is_some(),
+            "Should have a bilateral balance before settlement"
+        );
         let pre_net = pre_balance.as_ref().unwrap().net_balance;
-        assert_ne!(pre_net, 0, "Net balance should be non-zero before settlement");
+        assert_ne!(
+            pre_net, 0,
+            "Net balance should be non-zero before settlement"
+        );
         println!("  - Pre-settlement net balance: {}", pre_net);
 
         // Attempt to settle the bilateral balance
@@ -1969,15 +2301,27 @@ mod bilateral_settlement_two_phase {
 
                 // Verify settlement record has required fields
                 assert!(!settlement.id.is_empty(), "Settlement should have an ID");
-                assert!(settlement.debtor_dao_did.starts_with("did:"),
-                    "Debtor DAO DID should be valid");
-                assert!(settlement.creditor_dao_did.starts_with("did:"),
-                    "Creditor DAO DID should be valid");
-                assert!(settlement.amount > 0, "Settlement amount should be positive");
-                assert_eq!(settlement.status, SettlementStatus::Completed,
-                    "Settlement should be Completed when treasury succeeds");
-                assert!(settlement.completed_at.is_some(),
-                    "Completed settlement should have completion timestamp");
+                assert!(
+                    settlement.debtor_dao_did.starts_with("did:"),
+                    "Debtor DAO DID should be valid"
+                );
+                assert!(
+                    settlement.creditor_dao_did.starts_with("did:"),
+                    "Creditor DAO DID should be valid"
+                );
+                assert!(
+                    settlement.amount > 0,
+                    "Settlement amount should be positive"
+                );
+                assert_eq!(
+                    settlement.status,
+                    SettlementStatus::Completed,
+                    "Settlement should be Completed when treasury succeeds"
+                );
+                assert!(
+                    settlement.completed_at.is_some(),
+                    "Completed settlement should have completion timestamp"
+                );
 
                 println!("  - Settlement ID: {}", settlement.id);
                 println!("  - Debtor: {}", settlement.debtor_dao_did);
@@ -1987,16 +2331,25 @@ mod bilateral_settlement_two_phase {
 
                 // Verify post-settlement balance is zeroed
                 let post_balance: Option<BilateralBalance> = conductor
-                    .call(&alice_cell.zome("tend"), "get_bilateral_balance", GetBilateralInput {
-                        dao_a_did: dao_a.clone(),
-                        dao_b_did: dao_b.clone(),
-                    })
+                    .call(
+                        &alice_cell.zome("tend"),
+                        "get_bilateral_balance",
+                        GetBilateralInput {
+                            dao_a_did: dao_a.clone(),
+                            dao_b_did: dao_b.clone(),
+                        },
+                    )
                     .await;
 
                 if let Some(bal) = &post_balance {
-                    assert_eq!(bal.net_balance, 0,
-                        "Net balance should be 0 after successful settlement");
-                    println!("  - Post-settlement net balance: {} (zeroed)", bal.net_balance);
+                    assert_eq!(
+                        bal.net_balance, 0,
+                        "Net balance should be 0 after successful settlement"
+                    );
+                    println!(
+                        "  - Post-settlement net balance: {} (zeroed)",
+                        bal.net_balance
+                    );
                 }
 
                 println!("Test 14.1 PASSED: Two-phase commit succeeded (treasury available)");
@@ -2008,24 +2361,33 @@ mod bilateral_settlement_two_phase {
                 assert!(
                     error_msg.contains("Treasury SAP transfer failed")
                         || error_msg.contains("Failed"),
-                    "Error should indicate treasury transfer failure, got: {}", error_msg
+                    "Error should indicate treasury transfer failure, got: {}",
+                    error_msg
                 );
                 println!("  - Treasury transfer failed (expected without treasury zome)");
 
                 // CRITICAL: Verify the bilateral balance was NOT zeroed
                 let post_balance: Option<BilateralBalance> = conductor
-                    .call(&alice_cell.zome("tend"), "get_bilateral_balance", GetBilateralInput {
-                        dao_a_did: dao_a.clone(),
-                        dao_b_did: dao_b.clone(),
-                    })
+                    .call(
+                        &alice_cell.zome("tend"),
+                        "get_bilateral_balance",
+                        GetBilateralInput {
+                            dao_a_did: dao_a.clone(),
+                            dao_b_did: dao_b.clone(),
+                        },
+                    )
                     .await;
 
                 if let Some(bal) = &post_balance {
-                    assert_eq!(bal.net_balance, pre_net,
+                    assert_eq!(
+                        bal.net_balance, pre_net,
                         "Net balance should be UNCHANGED after failed settlement \
-                         (two-phase commit protection)");
-                    println!("  - Post-settlement net balance: {} (unchanged, debt preserved)",
-                        bal.net_balance);
+                         (two-phase commit protection)"
+                    );
+                    println!(
+                        "  - Post-settlement net balance: {} (unchanged, debt preserved)",
+                        bal.net_balance
+                    );
                 }
 
                 println!("Test 14.1 PASSED: Two-phase commit protected bilateral balance");

@@ -1,5 +1,4 @@
 #![deny(unsafe_code)]
-
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
@@ -9,6 +8,11 @@
 //! and collateral bridge deposits across the Mycelix ecosystem.
 
 use finance_bridge_integrity::*;
+use finance_wire_types::{
+    BalanceResponse, DepositCollateralInput, FeeTierResponse, FinanceBridgeHealth,
+    FinanceRuntimeDiscovery, GetPaymentHistoryInput, ProcessPaymentInput, RegisterCollateralInput,
+    UpdateCollateralHealthInput,
+};
 use hdk::prelude::*;
 use mycelix_finance_shared::{
     anchor_hash, follow_update_chain, verify_caller_is_did, verify_citizen_tier,
@@ -103,16 +107,6 @@ pub fn process_payment(input: ProcessPaymentInput) -> ExternResult<Record> {
     )))
 }
 
-#[derive(Serialize, Deserialize, Debug)]
-pub struct ProcessPaymentInput {
-    pub source_happ: String,
-    pub from_did: String,
-    pub to_did: String,
-    pub amount: u64,
-    pub currency: String,
-    pub reference: String,
-}
-
 /// Register collateral from another hApp
 #[hdk_extern]
 pub fn register_collateral(input: RegisterCollateralInput) -> ExternResult<Record> {
@@ -128,7 +122,7 @@ pub fn register_collateral(input: RegisterCollateralInput) -> ExternResult<Recor
             now.as_micros()
         ),
         owner_did: input.owner_did.clone(),
-        asset_type: input.asset_type,
+        asset_type: map_wire_asset_type(input.asset_type),
         asset_id: input.asset_id,
         source_happ: input.source_happ,
         value_estimate: input.value_estimate,
@@ -149,16 +143,6 @@ pub fn register_collateral(input: RegisterCollateralInput) -> ExternResult<Recor
     get(hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
         "Collateral not found".into()
     )))
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-pub struct RegisterCollateralInput {
-    pub owner_did: String,
-    pub source_happ: String,
-    pub asset_type: AssetType,
-    pub asset_id: String,
-    pub value_estimate: u64,
-    pub currency: String,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -271,13 +255,6 @@ pub struct BroadcastFinanceEventInput {
     pub subject_did: String,
     pub amount: Option<u64>,
     pub payload: String,
-}
-
-/// Input for paginated payment history queries
-#[derive(Serialize, Deserialize, Debug)]
-pub struct GetPaymentHistoryInput {
-    pub did: String,
-    pub limit: Option<usize>,
 }
 
 /// Get payment history for a DID (paginated, default limit 100)
@@ -434,14 +411,6 @@ pub fn deposit_collateral(input: DepositCollateralInput) -> ExternResult<Record>
     get(hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
         "Deposit not found".into()
     )))
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-pub struct DepositCollateralInput {
-    pub depositor_did: String,
-    pub collateral_type: String, // "ETH" or "USDC"
-    pub collateral_amount: u64,
-    pub oracle_rate: f64,
 }
 
 /// Confirm a pending deposit after collateral has been verified.
@@ -634,14 +603,6 @@ pub fn get_member_fee_tier(member_did: String) -> ExternResult<FeeTierResponse> 
         tier_name: format!("{:?}", tier),
         base_fee_rate: tier.base_fee_rate(),
     })
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-pub struct FeeTierResponse {
-    pub member_did: String,
-    pub mycel_score: f64,
-    pub tier_name: String,
-    pub base_fee_rate: f64,
 }
 
 /// Get a member's effective TEND limit based on current network vitality.
@@ -981,19 +942,173 @@ pub fn query_tend_balance(member_did: String) -> ExternResult<TendBalanceRespons
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct BalanceResponse {
-    pub member_did: String,
-    pub currency: String,
-    pub balance: u64,
-    pub available: bool,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
 pub struct TendBalanceResponse {
     pub member_did: String,
     pub balance: i32,
     pub mycel_score: f64,
     pub available: bool,
+}
+
+/// Discover the local finance runtime context for the connected agent.
+///
+/// This gives the frontend a best-effort default DAO/treasury/commons context
+/// without relying on browser globals. Explicit frontend config may still
+/// override these values.
+#[hdk_extern]
+pub fn discover_runtime_context(_: ()) -> ExternResult<FinanceRuntimeDiscovery> {
+    let member_did = format!("did:mycelix:{}", agent_info()?.agent_initial_pubkey);
+
+    let dao_dids = match call(
+        CallTargetCell::Local,
+        ZomeName::from("tend"),
+        FunctionName::from("get_member_dao_contexts"),
+        None,
+        member_did.clone(),
+    ) {
+        Ok(ZomeCallResponse::Ok(result)) => result.decode::<Vec<String>>().unwrap_or_default(),
+        Ok(other) => {
+            debug!(
+                "discover_runtime_context: tend returned {:?} for {}, defaulting to empty DAO list",
+                other, member_did
+            );
+            Vec::new()
+        }
+        Err(err) => {
+            debug!(
+                "discover_runtime_context: tend unreachable for {}: {:?}",
+                member_did, err
+            );
+            Vec::new()
+        }
+    };
+
+    let default_dao_did = runtime_default_dao_did(&dao_dids);
+    let commons_pool_id = default_dao_did
+        .as_ref()
+        .and_then(|dao_did| discover_commons_pool_id(dao_did));
+    let treasury_id = discover_managed_treasury_id(&member_did);
+
+    Ok(build_runtime_discovery(
+        member_did,
+        dao_dids,
+        commons_pool_id,
+        treasury_id,
+    ))
+}
+
+fn runtime_default_dao_did(dao_dids: &[String]) -> Option<String> {
+    dao_dids.first().cloned()
+}
+
+fn build_runtime_discovery(
+    member_did: String,
+    dao_dids: Vec<String>,
+    commons_pool_id: Option<String>,
+    treasury_id: Option<String>,
+) -> FinanceRuntimeDiscovery {
+    FinanceRuntimeDiscovery {
+        member_did,
+        default_dao_did: runtime_default_dao_did(&dao_dids),
+        dao_dids,
+        commons_pool_id,
+        treasury_id,
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct TreasuryListInput {
+    id: String,
+    limit: Option<usize>,
+}
+
+#[derive(Deserialize)]
+struct MinimalTreasuryRecord {
+    id: String,
+}
+
+#[derive(Deserialize)]
+struct MinimalCommonsPoolRecord {
+    id: String,
+}
+
+fn discover_managed_treasury_id(member_did: &str) -> Option<String> {
+    match call(
+        CallTargetCell::Local,
+        ZomeName::from("treasury"),
+        FunctionName::from("get_manager_treasuries"),
+        None,
+        TreasuryListInput {
+            id: member_did.to_string(),
+            limit: Some(1),
+        },
+    ) {
+        Ok(ZomeCallResponse::Ok(result)) => {
+            result.decode::<Vec<Record>>().ok().and_then(|records| {
+                records.into_iter().find_map(|record| {
+                    decode_record_entry::<MinimalTreasuryRecord>(&record)
+                        .map(|treasury| treasury.id)
+                })
+            })
+        }
+        Ok(other) => {
+            debug!(
+                "discover_managed_treasury_id: treasury returned {:?} for {}",
+                other, member_did
+            );
+            None
+        }
+        Err(err) => {
+            debug!(
+                "discover_managed_treasury_id: treasury unreachable for {}: {:?}",
+                member_did, err
+            );
+            None
+        }
+    }
+}
+
+fn discover_commons_pool_id(dao_did: &str) -> Option<String> {
+    match call(
+        CallTargetCell::Local,
+        ZomeName::from("treasury"),
+        FunctionName::from("get_dao_commons_pool"),
+        None,
+        dao_did.to_string(),
+    ) {
+        Ok(ZomeCallResponse::Ok(result)) => result
+            .decode::<Option<Record>>()
+            .ok()
+            .flatten()
+            .and_then(|record| {
+                decode_record_entry::<MinimalCommonsPoolRecord>(&record).map(|pool| pool.id)
+            }),
+        Ok(other) => {
+            debug!(
+                "discover_commons_pool_id: treasury returned {:?} for {}",
+                other, dao_did
+            );
+            None
+        }
+        Err(err) => {
+            debug!(
+                "discover_commons_pool_id: treasury unreachable for {}: {:?}",
+                dao_did, err
+            );
+            None
+        }
+    }
+}
+
+fn decode_record_entry<T: serde::de::DeserializeOwned>(record: &Record) -> Option<T> {
+    match record.entry().as_option()? {
+        Entry::App(bytes) => {
+            let sb = SerializedBytes::from(bytes.to_owned());
+            rmp_serde::from_slice::<T>(sb.bytes())
+                .ok()
+                .or_else(|| serde_json::from_slice::<T>(sb.bytes()).ok())
+        }
+        _ => None,
+    }
 }
 
 /// Get a unified financial summary for a member across all currencies.
@@ -1049,13 +1164,6 @@ pub fn health_check(_: ()) -> ExternResult<FinanceBridgeHealth> {
             "currency_mint".into(),
         ],
     })
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-pub struct FinanceBridgeHealth {
-    pub healthy: bool,
-    pub agent: String,
-    pub zomes: Vec<String>,
 }
 
 // ---------------------------------------------------------------------------
@@ -1321,12 +1429,6 @@ fn enforce_no_active_covenants(collateral_id: &str) -> ExternResult<()> {
 // Phase 2b: LTV Monitoring
 // ---------------------------------------------------------------------------
 
-#[derive(Serialize, Deserialize, Debug)]
-pub struct UpdateCollateralHealthInput {
-    pub collateral_id: String,
-    pub obligation_amount: u64,
-}
-
 /// Compute and store the LTV health status for a collateral position.
 ///
 /// Fetches current value from the price oracle, computes the LTV ratio,
@@ -1393,6 +1495,17 @@ pub fn update_collateral_health(input: UpdateCollateralHealthInput) -> ExternRes
     get(hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
         "Health entry not found".into()
     )))
+}
+
+fn map_wire_asset_type(asset_type: finance_wire_types::AssetType) -> AssetType {
+    match asset_type {
+        finance_wire_types::AssetType::RealEstate => AssetType::RealEstate,
+        finance_wire_types::AssetType::Vehicle => AssetType::Vehicle,
+        finance_wire_types::AssetType::Cryptocurrency => AssetType::Cryptocurrency,
+        finance_wire_types::AssetType::EnergyAsset => AssetType::EnergyAsset,
+        finance_wire_types::AssetType::Equipment => AssetType::Equipment,
+        finance_wire_types::AssetType::Other(value) => AssetType::Other(value),
+    }
 }
 
 /// Fetch current value for a collateral position from the price oracle.
@@ -2100,13 +2213,25 @@ pub fn get_bridge_metrics(_: ()) -> ExternResult<String> {
 
 /// Receive a cross-cluster notification and store it locally.
 #[hdk_extern]
-pub fn receive_notification(notification: mycelix_bridge_entry_types::CrossClusterNotification) -> ExternResult<ActionHash> {
+pub fn receive_notification(
+    notification: mycelix_bridge_entry_types::CrossClusterNotification,
+) -> ExternResult<ActionHash> {
     let action_hash = create_entry(&EntryTypes::Notification(notification.clone()))?;
     let agent = agent_info()?.agent_initial_pubkey;
     let inbox_anchor = anchor_hash(&format!("notifications:{:?}", agent))?;
-    create_link(inbox_anchor, action_hash.clone(), LinkTypes::AgentToNotification, ())?;
+    create_link(
+        inbox_anchor,
+        action_hash.clone(),
+        LinkTypes::AgentToNotification,
+        (),
+    )?;
     let all_anchor = anchor_hash("all_notifications")?;
-    create_link(all_anchor, action_hash.clone(), LinkTypes::AllNotifications, ())?;
+    create_link(
+        all_anchor,
+        action_hash.clone(),
+        LinkTypes::AllNotifications,
+        (),
+    )?;
     let signal = mycelix_bridge_common::notifications::NotificationSignal {
         signal_type: "cross_cluster_notification".into(),
         source_cluster: notification.source_cluster,
@@ -2120,14 +2245,17 @@ pub fn receive_notification(notification: mycelix_bridge_entry_types::CrossClust
 
 /// Get notifications for the calling agent.
 #[hdk_extern]
-pub fn get_my_notifications(input: mycelix_bridge_common::notifications::NotificationQueryInput) -> ExternResult<Vec<Record>> {
+pub fn get_my_notifications(
+    input: mycelix_bridge_common::notifications::NotificationQueryInput,
+) -> ExternResult<Vec<Record>> {
     let agent = agent_info()?.agent_initial_pubkey;
     let inbox_anchor = anchor_hash(&format!("notifications:{:?}", agent))?;
     let links = get_links(
         LinkQuery::try_new(inbox_anchor, LinkTypes::AgentToNotification)?,
         GetStrategy::default(),
     )?;
-    let limit = input.limit
+    let limit = input
+        .limit
         .unwrap_or(mycelix_bridge_common::notifications::DEFAULT_NOTIFICATION_LIMIT)
         .min(mycelix_bridge_common::notifications::MAX_NOTIFICATIONS_PER_AGENT);
     let mut records = Vec::new();
@@ -2151,4 +2279,81 @@ pub fn get_unread_count(_: ()) -> ExternResult<u32> {
         GetStrategy::default(),
     )?;
     Ok(links.len() as u32)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn runtime_default_dao_did_uses_first_known_context() {
+        let dao_dids = vec![
+            "did:mycelix:dao-alpha".to_string(),
+            "did:mycelix:dao-beta".to_string(),
+        ];
+        assert_eq!(
+            runtime_default_dao_did(&dao_dids).as_deref(),
+            Some("did:mycelix:dao-alpha")
+        );
+    }
+
+    #[test]
+    fn build_runtime_discovery_keeps_empty_state_explicit() {
+        let discovery = build_runtime_discovery("did:mycelix:alice".into(), Vec::new(), None, None);
+
+        assert_eq!(discovery.member_did, "did:mycelix:alice");
+        assert!(discovery.dao_dids.is_empty());
+        assert!(discovery.default_dao_did.is_none());
+        assert!(discovery.commons_pool_id.is_none());
+        assert!(discovery.treasury_id.is_none());
+    }
+
+    #[test]
+    fn build_runtime_discovery_preserves_discovered_context() {
+        let discovery = build_runtime_discovery(
+            "did:mycelix:alice".into(),
+            vec![
+                "did:mycelix:dao-alpha".into(),
+                "did:mycelix:dao-beta".into(),
+            ],
+            Some("commons-alpha".into()),
+            Some("treasury-alpha".into()),
+        );
+
+        assert_eq!(
+            discovery.default_dao_did.as_deref(),
+            Some("did:mycelix:dao-alpha")
+        );
+        assert_eq!(discovery.commons_pool_id.as_deref(), Some("commons-alpha"));
+        assert_eq!(discovery.treasury_id.as_deref(), Some("treasury-alpha"));
+        assert_eq!(discovery.dao_dids.len(), 2);
+    }
+
+    #[test]
+    fn map_wire_asset_type_preserves_variants() {
+        assert_eq!(
+            map_wire_asset_type(finance_wire_types::AssetType::RealEstate),
+            AssetType::RealEstate
+        );
+        assert_eq!(
+            map_wire_asset_type(finance_wire_types::AssetType::Vehicle),
+            AssetType::Vehicle
+        );
+        assert_eq!(
+            map_wire_asset_type(finance_wire_types::AssetType::Cryptocurrency),
+            AssetType::Cryptocurrency
+        );
+        assert_eq!(
+            map_wire_asset_type(finance_wire_types::AssetType::EnergyAsset),
+            AssetType::EnergyAsset
+        );
+        assert_eq!(
+            map_wire_asset_type(finance_wire_types::AssetType::Equipment),
+            AssetType::Equipment
+        );
+        assert_eq!(
+            map_wire_asset_type(finance_wire_types::AssetType::Other("bamboo".into())),
+            AssetType::Other("bamboo".into())
+        );
+    }
 }

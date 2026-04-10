@@ -65,8 +65,9 @@ async fn test_lifecycle_all_inner() {
         assert_eq!(active.status, CurrencyStatus::Active);
         println!("  - Activated: {:?}", active.status);
 
-        let fetched: Option<CurrencyDefinition> =
-            conductor.call(&zome_a, "get_currency", def.id.clone()).await;
+        let fetched: Option<CurrencyDefinition> = conductor
+            .call(&zome_a, "get_currency", def.id.clone())
+            .await;
         assert!(fetched.is_some());
         println!("Scenario 1.1 PASSED");
     }
@@ -95,8 +96,9 @@ async fn test_lifecycle_all_inner() {
             .await;
         assert_eq!(active.status, CurrencyStatus::Active);
 
-        let suspended: CurrencyDefinition =
-            conductor.call(&zome_a, "suspend_currency", cid.clone()).await;
+        let suspended: CurrencyDefinition = conductor
+            .call(&zome_a, "suspend_currency", cid.clone())
+            .await;
         assert_eq!(suspended.status, CurrencyStatus::Suspended);
 
         let reactivated: CurrencyDefinition = conductor
@@ -104,8 +106,9 @@ async fn test_lifecycle_all_inner() {
             .await;
         assert_eq!(reactivated.status, CurrencyStatus::Active);
 
-        let retired: CurrencyDefinition =
-            conductor.call(&zome_a, "retire_currency", cid.clone()).await;
+        let retired: CurrencyDefinition = conductor
+            .call(&zome_a, "retire_currency", cid.clone())
+            .await;
         assert_eq!(retired.status, CurrencyStatus::Retired);
 
         println!("  - Draft → Active → Suspended → Active → Retired: all transitions verified");

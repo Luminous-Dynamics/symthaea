@@ -17,12 +17,12 @@
 //! cargo test --test recognition_test -- --ignored  # Full integration tests
 //! ```
 
-use holochain::sweettest::*;
 use holochain::prelude::*;
+use holochain::sweettest::*;
 use std::time::Duration;
 
-use recognition_integrity::*;
 use mycelix_finance_types::FeeTier;
+use recognition_integrity::*;
 
 // Mirror types for TEND zome types — avoids linking tend_integrity alongside
 // recognition_integrity (both HDI crates generate conflicting #[no_mangle] symbols).
@@ -115,7 +115,9 @@ mod apprentice_lifecycle {
         println!("Test 1.1: Onboard Apprentice");
 
         let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
-        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Load DNA");
+        let dna = SweetDnaFile::from_bundle(&dna_path)
+            .await
+            .expect("Load DNA");
         let mut conductor = SweetConductor::from_standard_config().await;
 
         let agents = SweetAgents::get(conductor.keystore(), 2).await;
@@ -144,7 +146,11 @@ mod apprentice_lifecycle {
         };
 
         let _: Record = conductor
-            .call(&mentor_cell.zome("recognition"), "initialize_member", init_mentor)
+            .call(
+                &mentor_cell.zome("recognition"),
+                "initialize_member",
+                init_mentor,
+            )
             .await;
 
         // Now onboard apprentice
@@ -160,7 +166,11 @@ mod apprentice_lifecycle {
         };
 
         let result: Record = conductor
-            .call(&mentor_cell.zome("recognition"), "onboard_apprentice", onboard_input)
+            .call(
+                &mentor_cell.zome("recognition"),
+                "onboard_apprentice",
+                onboard_input,
+            )
             .await;
 
         let state: MemberMycelState = result
@@ -185,7 +195,9 @@ mod apprentice_lifecycle {
         println!("Test 1.2: Cannot Onboard Without Sufficient MYCEL");
 
         let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
-        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Load DNA");
+        let dna = SweetDnaFile::from_bundle(&dna_path)
+            .await
+            .expect("Load DNA");
         let mut conductor = SweetConductor::from_standard_config().await;
 
         let agents = SweetAgents::get(conductor.keystore(), 2).await;
@@ -213,7 +225,11 @@ mod apprentice_lifecycle {
         };
 
         let _: Record = conductor
-            .call(&low_mycel_cell.zome("recognition"), "initialize_member", init)
+            .call(
+                &low_mycel_cell.zome("recognition"),
+                "initialize_member",
+                init,
+            )
             .await;
 
         // Try to onboard an apprentice (should fail - caller MYCEL too low)
@@ -237,7 +253,8 @@ mod apprentice_lifecycle {
                 let msg = format!("{:?}", e);
                 assert!(
                     msg.contains("MYCEL") || msg.contains("minimum") || msg.contains("0.3"),
-                    "Should mention insufficient MYCEL, got: {}", msg
+                    "Should mention insufficient MYCEL, got: {}",
+                    msg
                 );
                 println!("  - Insufficient MYCEL rejection: OK");
             }
@@ -254,7 +271,9 @@ mod apprentice_lifecycle {
         println!("Test 1.3: Graduate Apprentice");
 
         let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
-        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Load DNA");
+        let dna = SweetDnaFile::from_bundle(&dna_path)
+            .await
+            .expect("Load DNA");
         let mut conductor = SweetConductor::from_standard_config().await;
 
         let agents = SweetAgents::get(conductor.keystore(), 2).await;
@@ -279,11 +298,15 @@ mod apprentice_lifecycle {
         }
 
         let _: Record = conductor
-            .call(&mentor_cell.zome("recognition"), "initialize_member", InitializeMemberInput {
-                member_did: mentor_did.clone(),
-                is_apprentice: false,
-                mentor_did: None,
-            })
+            .call(
+                &mentor_cell.zome("recognition"),
+                "initialize_member",
+                InitializeMemberInput {
+                    member_did: mentor_did.clone(),
+                    is_apprentice: false,
+                    mentor_did: None,
+                },
+            )
             .await;
 
         // Initialize apprentice via onboarding
@@ -293,9 +316,13 @@ mod apprentice_lifecycle {
         }
 
         let _: Record = conductor
-            .call(&mentor_cell.zome("recognition"), "onboard_apprentice", OnboardApprenticeInput {
-                apprentice_did: apprentice_did.clone(),
-            })
+            .call(
+                &mentor_cell.zome("recognition"),
+                "onboard_apprentice",
+                OnboardApprenticeInput {
+                    apprentice_did: apprentice_did.clone(),
+                },
+            )
             .await;
 
         // Update apprentice's MYCEL to >= 0.3 by providing high component scores
@@ -317,19 +344,33 @@ mod apprentice_lifecycle {
         };
 
         let updated: MemberMycelState = conductor
-            .call(&apprentice_cell.zome("recognition"), "update_mycel_score", update)
+            .call(
+                &apprentice_cell.zome("recognition"),
+                "update_mycel_score",
+                update,
+            )
             .await;
 
         println!("  - Updated MYCEL: {:.2}", updated.mycel_score);
-        assert!(updated.mycel_score >= 0.3, "MYCEL should be >= 0.3 for graduation");
+        assert!(
+            updated.mycel_score >= 0.3,
+            "MYCEL should be >= 0.3 for graduation"
+        );
 
         // Graduate
         let graduated: MemberMycelState = conductor
-            .call(&apprentice_cell.zome("recognition"), "graduate_apprentice", apprentice_did.clone())
+            .call(
+                &apprentice_cell.zome("recognition"),
+                "graduate_apprentice",
+                apprentice_did.clone(),
+            )
             .await;
 
         assert!(!graduated.is_apprentice, "Should no longer be apprentice");
-        assert!(graduated.mentor_did.is_none(), "Mentor relationship should end");
+        assert!(
+            graduated.mentor_did.is_none(),
+            "Mentor relationship should end"
+        );
 
         println!("  - Graduated: is_apprentice = {}", graduated.is_apprentice);
         println!("  - MYCEL: {:.2}", graduated.mycel_score);
@@ -343,7 +384,9 @@ mod apprentice_lifecycle {
         println!("Test 1.4: Cannot Graduate Below 0.3 MYCEL");
 
         let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
-        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Load DNA");
+        let dna = SweetDnaFile::from_bundle(&dna_path)
+            .await
+            .expect("Load DNA");
         let mut conductor = SweetConductor::from_standard_config().await;
 
         let agents = SweetAgents::get(conductor.keystore(), 2).await;
@@ -368,11 +411,15 @@ mod apprentice_lifecycle {
         }
 
         let _: Record = conductor
-            .call(&mentor_cell.zome("recognition"), "initialize_member", InitializeMemberInput {
-                member_did: mentor_did.clone(),
-                is_apprentice: false,
-                mentor_did: None,
-            })
+            .call(
+                &mentor_cell.zome("recognition"),
+                "initialize_member",
+                InitializeMemberInput {
+                    member_did: mentor_did.clone(),
+                    is_apprentice: false,
+                    mentor_did: None,
+                },
+            )
             .await;
 
         #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -381,9 +428,13 @@ mod apprentice_lifecycle {
         }
 
         let _: Record = conductor
-            .call(&mentor_cell.zome("recognition"), "onboard_apprentice", OnboardApprenticeInput {
-                apprentice_did: apprentice_did.clone(),
-            })
+            .call(
+                &mentor_cell.zome("recognition"),
+                "onboard_apprentice",
+                OnboardApprenticeInput {
+                    apprentice_did: apprentice_did.clone(),
+                },
+            )
             .await;
 
         // Try to graduate without reaching 0.3 (starts at 0.1)
@@ -400,7 +451,8 @@ mod apprentice_lifecycle {
                 let msg = format!("{:?}", e);
                 assert!(
                     msg.contains("0.3") || msg.contains("graduate") || msg.contains("MYCEL"),
-                    "Should mention insufficient score, got: {}", msg
+                    "Should mention insufficient score, got: {}",
+                    msg
                 );
                 println!("  - Early graduation rejected: OK");
             }
@@ -432,7 +484,9 @@ mod quality_rating_integration {
         println!("Test 2.1: Quality Rating -> MYCEL Validation Flow");
 
         let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
-        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Load DNA");
+        let dna = SweetDnaFile::from_bundle(&dna_path)
+            .await
+            .expect("Load DNA");
         let mut conductor = SweetConductor::from_standard_config().await;
 
         let agents = SweetAgents::get(conductor.keystore(), 2).await;
@@ -457,19 +511,27 @@ mod quality_rating_integration {
         }
 
         let _: Record = conductor
-            .call(&alice_cell.zome("recognition"), "initialize_member", InitializeMemberInput {
-                member_did: alice_did.clone(),
-                is_apprentice: false,
-                mentor_did: None,
-            })
+            .call(
+                &alice_cell.zome("recognition"),
+                "initialize_member",
+                InitializeMemberInput {
+                    member_did: alice_did.clone(),
+                    is_apprentice: false,
+                    mentor_did: None,
+                },
+            )
             .await;
 
         let _: Record = conductor
-            .call(&bob_cell.zome("recognition"), "initialize_member", InitializeMemberInput {
-                member_did: bob_did.clone(),
-                is_apprentice: false,
-                mentor_did: None,
-            })
+            .call(
+                &bob_cell.zome("recognition"),
+                "initialize_member",
+                InitializeMemberInput {
+                    member_did: bob_did.clone(),
+                    is_apprentice: false,
+                    mentor_did: None,
+                },
+            )
             .await;
 
         let dao_did = "did:mycelix:dao:test_community".to_string();
@@ -481,29 +543,41 @@ mod quality_rating_integration {
         for i in 0..3 {
             // Alice records exchange with Bob
             let exchange: ExchangeRecord = conductor
-                .call(&alice_cell.zome("tend"), "record_exchange", RecordExchangeInput {
-                    receiver_did: bob_did.clone(),
-                    dao_did: dao_did.clone(),
-                    hours: 1.0,
-                    service_description: format!("Service {}", i),
-                    service_category: ServiceCategory::Education,
-                    cultural_alias: None,
-                    service_date: None,
-                })
+                .call(
+                    &alice_cell.zome("tend"),
+                    "record_exchange",
+                    RecordExchangeInput {
+                        receiver_did: bob_did.clone(),
+                        dao_did: dao_did.clone(),
+                        hours: 1.0,
+                        service_description: format!("Service {}", i),
+                        service_category: ServiceCategory::Education,
+                        cultural_alias: None,
+                        service_date: None,
+                    },
+                )
                 .await;
 
             // Bob confirms
             let _: ExchangeRecord = conductor
-                .call(&bob_cell.zome("tend"), "confirm_exchange", exchange.id.clone())
+                .call(
+                    &bob_cell.zome("tend"),
+                    "confirm_exchange",
+                    exchange.id.clone(),
+                )
                 .await;
 
             // Bob rates 5 stars
             let _: Record = conductor
-                .call(&bob_cell.zome("tend"), "rate_exchange", RateExchangeInput {
-                    exchange_id: exchange.id.clone(),
-                    rating: 5,
-                    comment: Some(format!("Excellent service {}", i)),
-                })
+                .call(
+                    &bob_cell.zome("tend"),
+                    "rate_exchange",
+                    RateExchangeInput {
+                        exchange_id: exchange.id.clone(),
+                        rating: 5,
+                        comment: Some(format!("Excellent service {}", i)),
+                    },
+                )
                 .await;
 
             tokio::time::sleep(Duration::from_millis(50)).await;
@@ -513,14 +587,22 @@ mod quality_rating_integration {
 
         // Step 2: Get Alice's validation score from TEND
         let validation_score: f64 = conductor
-            .call(&alice_cell.zome("tend"), "get_validation_score", GetValidationScoreInput {
-                member_did: alice_did.clone(),
-                limit: None,
-            })
+            .call(
+                &alice_cell.zome("tend"),
+                "get_validation_score",
+                GetValidationScoreInput {
+                    member_did: alice_did.clone(),
+                    limit: None,
+                },
+            )
             .await;
 
         // 5/5 average maps to (5-1)/4 = 1.0
-        assert!(validation_score > 0.9, "With all 5-star ratings, validation should be high, got: {}", validation_score);
+        assert!(
+            validation_score > 0.9,
+            "With all 5-star ratings, validation should be high, got: {}",
+            validation_score
+        );
         println!("  - TEND validation score: {:.2}", validation_score);
 
         // Step 3: Update Alice's MYCEL (validation auto-fetched from TEND)
@@ -534,20 +616,30 @@ mod quality_rating_integration {
         }
 
         let updated: MemberMycelState = conductor
-            .call(&alice_cell.zome("recognition"), "update_mycel_score", UpdateMycelInput {
-                member_did: alice_did.clone(),
-                participation: 0.5,
-                recognition: 0.5,
-                validation_override: None, // Auto-fetch from TEND!
-                active_months: 12,
-            })
+            .call(
+                &alice_cell.zome("recognition"),
+                "update_mycel_score",
+                UpdateMycelInput {
+                    member_did: alice_did.clone(),
+                    participation: 0.5,
+                    recognition: 0.5,
+                    validation_override: None, // Auto-fetch from TEND!
+                    active_months: 12,
+                },
+            )
             .await;
 
         // With validation auto-fetched: 0.5*0.4 + 0.5*0.2 + ~1.0*0.2 + 0.5*0.2
         // = 0.20 + 0.10 + 0.20 + 0.10 = 0.60
         println!("  - Updated MYCEL score: {:.2}", updated.mycel_score);
-        assert!(updated.mycel_score > 0.5, "MYCEL should reflect high validation");
-        assert!(updated.validation > 0.9, "Validation component should be high from ratings");
+        assert!(
+            updated.mycel_score > 0.5,
+            "MYCEL should reflect high validation"
+        );
+        assert!(
+            updated.validation > 0.9,
+            "Validation component should be high from ratings"
+        );
 
         println!("  - MYCEL validation component: {:.2}", updated.validation);
         println!("Test 2.1 PASSED: Quality ratings flow into MYCEL Validation");
@@ -560,7 +652,9 @@ mod quality_rating_integration {
         println!("Test 2.2: Low Ratings Reduce MYCEL Validation");
 
         let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
-        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Load DNA");
+        let dna = SweetDnaFile::from_bundle(&dna_path)
+            .await
+            .expect("Load DNA");
         let mut conductor = SweetConductor::from_standard_config().await;
 
         let agents = SweetAgents::get(conductor.keystore(), 2).await;
@@ -585,15 +679,27 @@ mod quality_rating_integration {
         }
 
         let _: Record = conductor
-            .call(&alice_cell.zome("recognition"), "initialize_member", InitializeMemberInput {
-                member_did: alice_did.clone(), is_apprentice: false, mentor_did: None,
-            })
+            .call(
+                &alice_cell.zome("recognition"),
+                "initialize_member",
+                InitializeMemberInput {
+                    member_did: alice_did.clone(),
+                    is_apprentice: false,
+                    mentor_did: None,
+                },
+            )
             .await;
 
         let _: Record = conductor
-            .call(&bob_cell.zome("recognition"), "initialize_member", InitializeMemberInput {
-                member_did: bob_did.clone(), is_apprentice: false, mentor_did: None,
-            })
+            .call(
+                &bob_cell.zome("recognition"),
+                "initialize_member",
+                InitializeMemberInput {
+                    member_did: bob_did.clone(),
+                    is_apprentice: false,
+                    mentor_did: None,
+                },
+            )
             .await;
 
         let dao_did = "did:mycelix:dao:test_community".to_string();
@@ -603,27 +709,39 @@ mod quality_rating_integration {
         // 3 exchanges, all rated 1/5 (poor quality)
         for i in 0..3 {
             let exchange: ExchangeRecord = conductor
-                .call(&alice_cell.zome("tend"), "record_exchange", RecordExchangeInput {
-                    receiver_did: bob_did.clone(),
-                    dao_did: dao_did.clone(),
-                    hours: 1.0,
-                    service_description: format!("Service {}", i),
-                    service_category: ServiceCategory::GeneralAssistance,
-                    cultural_alias: None,
-                    service_date: None,
-                })
+                .call(
+                    &alice_cell.zome("tend"),
+                    "record_exchange",
+                    RecordExchangeInput {
+                        receiver_did: bob_did.clone(),
+                        dao_did: dao_did.clone(),
+                        hours: 1.0,
+                        service_description: format!("Service {}", i),
+                        service_category: ServiceCategory::GeneralAssistance,
+                        cultural_alias: None,
+                        service_date: None,
+                    },
+                )
                 .await;
 
             let _: ExchangeRecord = conductor
-                .call(&bob_cell.zome("tend"), "confirm_exchange", exchange.id.clone())
+                .call(
+                    &bob_cell.zome("tend"),
+                    "confirm_exchange",
+                    exchange.id.clone(),
+                )
                 .await;
 
             let _: Record = conductor
-                .call(&bob_cell.zome("tend"), "rate_exchange", RateExchangeInput {
-                    exchange_id: exchange.id.clone(),
-                    rating: 1, // Low rating
-                    comment: Some("Poor service".to_string()),
-                })
+                .call(
+                    &bob_cell.zome("tend"),
+                    "rate_exchange",
+                    RateExchangeInput {
+                        exchange_id: exchange.id.clone(),
+                        rating: 1, // Low rating
+                        comment: Some("Poor service".to_string()),
+                    },
+                )
                 .await;
 
             tokio::time::sleep(Duration::from_millis(50)).await;
@@ -631,13 +749,21 @@ mod quality_rating_integration {
 
         // Get validation score -- 1/5 avg maps to (1-1)/4 = 0.0
         let validation_score: f64 = conductor
-            .call(&alice_cell.zome("tend"), "get_validation_score", GetValidationScoreInput {
-                member_did: alice_did.clone(),
-                limit: None,
-            })
+            .call(
+                &alice_cell.zome("tend"),
+                "get_validation_score",
+                GetValidationScoreInput {
+                    member_did: alice_did.clone(),
+                    limit: None,
+                },
+            )
             .await;
 
-        assert!(validation_score < 0.1, "With all 1-star ratings, validation should be near 0, got: {}", validation_score);
+        assert!(
+            validation_score < 0.1,
+            "With all 1-star ratings, validation should be near 0, got: {}",
+            validation_score
+        );
         println!("  - Validation with low ratings: {:.2}", validation_score);
         println!("Test 2.2 PASSED: Low ratings reduce validation score");
     }
@@ -745,7 +871,10 @@ mod jubilee_and_decay {
             let result: f64 = 0.3 + (input - 0.3) * 0.8;
             assert!(
                 (result - expected).abs() < 1e-6,
-                "Jubilee({}) = {}, expected {}", input, result, expected
+                "Jubilee({}) = {}, expected {}",
+                input,
+                result,
+                expected
             );
             println!("  - Jubilee({:.1}) = {:.3}", input, result);
         }
@@ -760,11 +889,19 @@ mod jubilee_and_decay {
 
         // After 1 year: 0.8 - 0.8 * 0.05 * 1.0 = 0.76
         let after_1yr: f64 = score - score * rate * 1.0;
-        assert!((after_1yr - 0.76_f64).abs() < 1e-6, "1yr decay: got {}", after_1yr);
+        assert!(
+            (after_1yr - 0.76_f64).abs() < 1e-6,
+            "1yr decay: got {}",
+            after_1yr
+        );
 
         // After 6 months: 0.8 - 0.8 * 0.05 * 0.5 = 0.78
         let after_6mo: f64 = score - score * rate * 0.5;
-        assert!((after_6mo - 0.78_f64).abs() < 1e-6, "6mo decay: got {}", after_6mo);
+        assert!(
+            (after_6mo - 0.78_f64).abs() < 1e-6,
+            "6mo decay: got {}",
+            after_6mo
+        );
 
         // After 0 time: no change
         let after_0: f64 = score - score * rate * 0.0;
@@ -780,20 +917,27 @@ mod jubilee_and_decay {
         let validation: f64 = 1.0;
         let longevity: f64 = 1.0;
 
-        let composite: f64 = participation * 0.40
-            + recognition * 0.20
-            + validation * 0.20
-            + longevity * 0.20;
+        let composite: f64 =
+            participation * 0.40 + recognition * 0.20 + validation * 0.20 + longevity * 0.20;
 
-        assert!((composite - 1.0_f64).abs() < 1e-6, "Max composite should be 1.0");
+        assert!(
+            (composite - 1.0_f64).abs() < 1e-6,
+            "Max composite should be 1.0"
+        );
 
         // All zeros -> 0.0
         let zero_composite: f64 = 0.0 * 0.40 + 0.0 * 0.20 + 0.0 * 0.20 + 0.0 * 0.20;
-        assert!((zero_composite - 0.0_f64).abs() < 1e-6, "Zero composite should be 0.0");
+        assert!(
+            (zero_composite - 0.0_f64).abs() < 1e-6,
+            "Zero composite should be 0.0"
+        );
 
         // Participation dominates
         let participation_only: f64 = 1.0 * 0.40 + 0.0 * 0.20 + 0.0 * 0.20 + 0.0 * 0.20;
-        assert!((participation_only - 0.40_f64).abs() < 1e-6, "Participation-only = 0.40");
+        assert!(
+            (participation_only - 0.40_f64).abs() < 1e-6,
+            "Participation-only = 0.40"
+        );
     }
 }
 
@@ -809,10 +953,22 @@ mod unit_tests {
     fn test_recognition_constants() {
         assert_eq!(MAX_RECOGNITIONS_PER_CYCLE, 10, "Max recognitions per cycle");
         assert_eq!(RECOGNITION_BASE_WEIGHT, 1.0, "Base recognition weight");
-        assert!((PASSIVE_DECAY_RATE - 0.05).abs() < 1e-6, "Passive decay rate");
-        assert!((JUBILEE_COMPRESSION - 0.8).abs() < 1e-6, "Jubilee compression factor");
-        assert!((MYCEL_APPRENTICE_MAX - 0.3).abs() < 1e-6, "Apprentice graduation threshold");
-        assert!((MIN_MYCEL_TO_GIVE - 0.3).abs() < 1e-6, "Min MYCEL to give recognition");
+        assert!(
+            (PASSIVE_DECAY_RATE - 0.05).abs() < 1e-6,
+            "Passive decay rate"
+        );
+        assert!(
+            (JUBILEE_COMPRESSION - 0.8).abs() < 1e-6,
+            "Jubilee compression factor"
+        );
+        assert!(
+            (MYCEL_APPRENTICE_MAX - 0.3).abs() < 1e-6,
+            "Apprentice graduation threshold"
+        );
+        assert!(
+            (MIN_MYCEL_TO_GIVE - 0.3).abs() < 1e-6,
+            "Min MYCEL to give recognition"
+        );
     }
 
     #[test]
@@ -879,7 +1035,9 @@ mod recognition_query_tests {
         println!("Test 5.1: Get Recognition Received");
 
         let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
-        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Load DNA");
+        let dna = SweetDnaFile::from_bundle(&dna_path)
+            .await
+            .expect("Load DNA");
         let mut conductor = SweetConductor::from_standard_config().await;
 
         let agents = SweetAgents::get(conductor.keystore(), 2).await;
@@ -904,19 +1062,27 @@ mod recognition_query_tests {
         }
 
         let _: Record = conductor
-            .call(&alice_cell.zome("recognition"), "initialize_member", InitializeMemberInput {
-                member_did: alice_did.clone(),
-                is_apprentice: false,
-                mentor_did: None,
-            })
+            .call(
+                &alice_cell.zome("recognition"),
+                "initialize_member",
+                InitializeMemberInput {
+                    member_did: alice_did.clone(),
+                    is_apprentice: false,
+                    mentor_did: None,
+                },
+            )
             .await;
 
         let _: Record = conductor
-            .call(&bob_cell.zome("recognition"), "initialize_member", InitializeMemberInput {
-                member_did: bob_did.clone(),
-                is_apprentice: false,
-                mentor_did: None,
-            })
+            .call(
+                &bob_cell.zome("recognition"),
+                "initialize_member",
+                InitializeMemberInput {
+                    member_did: bob_did.clone(),
+                    is_apprentice: false,
+                    mentor_did: None,
+                },
+            )
             .await;
 
         // Alice recognizes Bob 3 times with different contribution types
@@ -937,11 +1103,15 @@ mod recognition_query_tests {
 
         for ct in &contribution_types {
             let _: Record = conductor
-                .call(&alice_cell.zome("recognition"), "recognize_member", RecognizeMemberInput {
-                    recipient_did: bob_did.clone(),
-                    contribution_type: ct.clone(),
-                    cycle_id: "2026-02".to_string(),
-                })
+                .call(
+                    &alice_cell.zome("recognition"),
+                    "recognize_member",
+                    RecognizeMemberInput {
+                        recipient_did: bob_did.clone(),
+                        contribution_type: ct.clone(),
+                        cycle_id: "2026-02".to_string(),
+                    },
+                )
                 .await;
 
             tokio::time::sleep(Duration::from_millis(50)).await;
@@ -957,16 +1127,27 @@ mod recognition_query_tests {
         }
 
         let recognitions: Vec<RecognitionEvent> = conductor
-            .call(&bob_cell.zome("recognition"), "get_recognition_received", GetRecognitionsInput {
-                member_did: bob_did.clone(),
-                cycle_id: None,
-            })
+            .call(
+                &bob_cell.zome("recognition"),
+                "get_recognition_received",
+                GetRecognitionsInput {
+                    member_did: bob_did.clone(),
+                    cycle_id: None,
+                },
+            )
             .await;
 
-        assert_eq!(recognitions.len(), 3, "Bob should have received 3 recognitions");
+        assert_eq!(
+            recognitions.len(),
+            3,
+            "Bob should have received 3 recognitions"
+        );
 
         for (i, r) in recognitions.iter().enumerate() {
-            println!("  - Recognition {}: type={:?}, weight={:.2}", i, r.contribution_type, r.weight);
+            println!(
+                "  - Recognition {}: type={:?}, weight={:.2}",
+                i, r.contribution_type, r.weight
+            );
         }
 
         println!("Test 5.1 PASSED: Recognition query returns correct results");
@@ -988,7 +1169,9 @@ mod lifecycle_advanced {
         println!("Test 6.1: Jubilee Normalize Integration");
 
         let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
-        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Load DNA");
+        let dna = SweetDnaFile::from_bundle(&dna_path)
+            .await
+            .expect("Load DNA");
         let mut conductor = SweetConductor::from_standard_config().await;
 
         let agents = SweetAgents::get(conductor.keystore(), 1).await;
@@ -1010,11 +1193,15 @@ mod lifecycle_advanced {
         }
 
         let _: Record = conductor
-            .call(&alice_cell.zome("recognition"), "initialize_member", InitializeMemberInput {
-                member_did: alice_did.clone(),
-                is_apprentice: false,
-                mentor_did: None,
-            })
+            .call(
+                &alice_cell.zome("recognition"),
+                "initialize_member",
+                InitializeMemberInput {
+                    member_did: alice_did.clone(),
+                    is_apprentice: false,
+                    mentor_did: None,
+                },
+            )
             .await;
 
         // Set score to 0.8 via update
@@ -1028,29 +1215,43 @@ mod lifecycle_advanced {
         }
 
         let _: MemberMycelState = conductor
-            .call(&alice_cell.zome("recognition"), "update_mycel_score", UpdateMycelInput {
-                member_did: alice_did.clone(),
-                participation: 1.0,
-                recognition: 1.0,
-                validation_override: Some(1.0),
-                active_months: 24,
-            })
+            .call(
+                &alice_cell.zome("recognition"),
+                "update_mycel_score",
+                UpdateMycelInput {
+                    member_did: alice_did.clone(),
+                    participation: 1.0,
+                    recognition: 1.0,
+                    validation_override: Some(1.0),
+                    active_months: 24,
+                },
+            )
             .await;
 
         println!("  - MYCEL set to high value");
 
         // Apply jubilee normalization
         let jubileed: MemberMycelState = conductor
-            .call(&alice_cell.zome("recognition"), "jubilee_normalize", alice_did.clone())
+            .call(
+                &alice_cell.zome("recognition"),
+                "jubilee_normalize",
+                alice_did.clone(),
+            )
             .await;
 
         // Jubilee formula: new = 0.3 + (current - 0.3) * 0.8
         // For 0.8: 0.3 + (0.8 - 0.3) * 0.8 = 0.3 + 0.4 = 0.7
         // For ~1.0: 0.3 + (1.0 - 0.3) * 0.8 = 0.3 + 0.56 = 0.86
         println!("  - Post-jubilee MYCEL: {:.4}", jubileed.mycel_score);
-        assert!(jubileed.mycel_score < 1.0, "Jubilee should compress scores toward 0.3");
+        assert!(
+            jubileed.mycel_score < 1.0,
+            "Jubilee should compress scores toward 0.3"
+        );
         // The exact value depends on the pre-jubilee score; just verify compression happened
-        assert!(jubileed.mycel_score >= 0.3, "Post-jubilee score should be >= 0.3");
+        assert!(
+            jubileed.mycel_score >= 0.3,
+            "Post-jubilee score should be >= 0.3"
+        );
 
         println!("Test 6.1 PASSED: Jubilee normalization works in integration");
     }
@@ -1062,7 +1263,9 @@ mod lifecycle_advanced {
         println!("Test 6.2: Dissolve MYCEL");
 
         let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
-        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Load DNA");
+        let dna = SweetDnaFile::from_bundle(&dna_path)
+            .await
+            .expect("Load DNA");
         let mut conductor = SweetConductor::from_standard_config().await;
 
         let agents = SweetAgents::get(conductor.keystore(), 1).await;
@@ -1084,18 +1287,26 @@ mod lifecycle_advanced {
         }
 
         let _: Record = conductor
-            .call(&alice_cell.zome("recognition"), "initialize_member", InitializeMemberInput {
-                member_did: alice_did.clone(),
-                is_apprentice: false,
-                mentor_did: None,
-            })
+            .call(
+                &alice_cell.zome("recognition"),
+                "initialize_member",
+                InitializeMemberInput {
+                    member_did: alice_did.clone(),
+                    is_apprentice: false,
+                    mentor_did: None,
+                },
+            )
             .await;
 
         println!("  - Member initialized");
 
         // Dissolve MYCEL
         let _: () = conductor
-            .call(&alice_cell.zome("recognition"), "dissolve_mycel", alice_did.clone())
+            .call(
+                &alice_cell.zome("recognition"),
+                "dissolve_mycel",
+                alice_did.clone(),
+            )
             .await;
 
         println!("  - MYCEL dissolved");
@@ -1114,19 +1325,35 @@ mod lifecycle_advanced {
 
         // After dissolve, trying to update should start from 0
         let state: MemberMycelState = conductor
-            .call(&alice_cell.zome("recognition"), "update_mycel_score", UpdateMycelInput {
-                member_did: alice_did.clone(),
-                participation: 0.0,
-                recognition: 0.0,
-                validation_override: Some(0.0),
-                active_months: 0,
-            })
+            .call(
+                &alice_cell.zome("recognition"),
+                "update_mycel_score",
+                UpdateMycelInput {
+                    member_did: alice_did.clone(),
+                    participation: 0.0,
+                    recognition: 0.0,
+                    validation_override: Some(0.0),
+                    active_months: 0,
+                },
+            )
             .await;
 
-        assert!((state.mycel_score - 0.0).abs() < 1e-6, "MYCEL score should be 0 after dissolve");
-        assert!((state.participation - 0.0).abs() < 1e-6, "Participation should be 0");
-        assert!((state.recognition - 0.0).abs() < 1e-6, "Recognition should be 0");
-        assert!((state.validation - 0.0).abs() < 1e-6, "Validation should be 0");
+        assert!(
+            (state.mycel_score - 0.0).abs() < 1e-6,
+            "MYCEL score should be 0 after dissolve"
+        );
+        assert!(
+            (state.participation - 0.0).abs() < 1e-6,
+            "Participation should be 0"
+        );
+        assert!(
+            (state.recognition - 0.0).abs() < 1e-6,
+            "Recognition should be 0"
+        );
+        assert!(
+            (state.validation - 0.0).abs() < 1e-6,
+            "Validation should be 0"
+        );
 
         println!("  - All scores verified as 0");
         println!("Test 6.2 PASSED: Dissolve MYCEL zeroes all scores");
@@ -1139,7 +1366,9 @@ mod lifecycle_advanced {
         println!("Test 6.3: Passive Decay Integration");
 
         let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
-        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Load DNA");
+        let dna = SweetDnaFile::from_bundle(&dna_path)
+            .await
+            .expect("Load DNA");
         let mut conductor = SweetConductor::from_standard_config().await;
 
         let agents = SweetAgents::get(conductor.keystore(), 1).await;
@@ -1161,11 +1390,15 @@ mod lifecycle_advanced {
         }
 
         let _: Record = conductor
-            .call(&alice_cell.zome("recognition"), "initialize_member", InitializeMemberInput {
-                member_did: alice_did.clone(),
-                is_apprentice: false,
-                mentor_did: None,
-            })
+            .call(
+                &alice_cell.zome("recognition"),
+                "initialize_member",
+                InitializeMemberInput {
+                    member_did: alice_did.clone(),
+                    is_apprentice: false,
+                    mentor_did: None,
+                },
+            )
             .await;
 
         // Set initial MYCEL to 0.5
@@ -1179,13 +1412,17 @@ mod lifecycle_advanced {
         }
 
         let before: MemberMycelState = conductor
-            .call(&alice_cell.zome("recognition"), "update_mycel_score", UpdateMycelInput {
-                member_did: alice_did.clone(),
-                participation: 0.6,
-                recognition: 0.5,
-                validation_override: Some(0.5),
-                active_months: 6,
-            })
+            .call(
+                &alice_cell.zome("recognition"),
+                "update_mycel_score",
+                UpdateMycelInput {
+                    member_did: alice_did.clone(),
+                    participation: 0.6,
+                    recognition: 0.5,
+                    validation_override: Some(0.5),
+                    active_months: 6,
+                },
+            )
             .await;
 
         let score_before = before.mycel_score;
@@ -1193,16 +1430,23 @@ mod lifecycle_advanced {
 
         // Apply passive decay (simulates 1 year of inactivity)
         let after: MemberMycelState = conductor
-            .call(&alice_cell.zome("recognition"), "apply_passive_decay", alice_did.clone())
+            .call(
+                &alice_cell.zome("recognition"),
+                "apply_passive_decay",
+                alice_did.clone(),
+            )
             .await;
 
         println!("  - MYCEL after decay: {:.4}", after.mycel_score);
 
         // Decay should reduce the score (5% annual linear decay)
         // Exact amount depends on elapsed time since last update
-        assert!(after.mycel_score <= score_before,
+        assert!(
+            after.mycel_score <= score_before,
             "Score should decrease or stay the same after decay: before={}, after={}",
-            score_before, after.mycel_score);
+            score_before,
+            after.mycel_score
+        );
 
         println!("Test 6.3 PASSED: Passive decay reduces MYCEL score");
     }

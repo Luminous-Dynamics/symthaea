@@ -17,311 +17,18 @@
 //! cargo test --test sweettest_integration -- --ignored
 //! ```
 
-use holochain::sweettest::*;
+use finance_leptos_types::{ContributionType, ExchangeStatus, ServiceCategory};
+use finance_wire_types::{
+    self as wire, BalanceInfo, CollateralStake, CommonsPool, ContributeToCommonsInput,
+    CreateCommonsPoolInput, CreateListingInput, CreateStakeInput, ExchangeRecord, GetBalanceInput,
+    GetPaymentHistoryInput, GetValidationScoreInput, InitializeMemberInput, MemberMycelState,
+    PaginatedDaoInput, Payment, PaymentType, RecognitionEvent, RecognizeMemberInput,
+    RecordExchangeInput, RequestCommonsAllocationInput, SendPaymentInput, ServiceListing,
+    StakeStatus, TransferStatus, UpdateMycelInput,
+};
 use holochain::prelude::*;
+use holochain::sweettest::*;
 use std::path::PathBuf;
-
-// ============================================================================
-// Mirror types (avoids importing zome crates / duplicate symbols)
-// ============================================================================
-
-// --- Recognition Mirror Types ---
-
-#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
-pub enum ContributionType {
-    Technical,
-    Community,
-    Care,
-    Governance,
-    Creative,
-    Education,
-    General,
-}
-
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-pub struct RecognizeMemberInput {
-    pub recipient_did: String,
-    pub contribution_type: ContributionType,
-    pub cycle_id: String,
-}
-
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-pub struct InitializeMemberInput {
-    pub member_did: String,
-    pub is_apprentice: bool,
-    pub mentor_did: Option<String>,
-}
-
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-pub struct MemberMycelState {
-    pub member_did: String,
-    pub mycel_score: f64,
-    pub participation: f64,
-    pub recognition: f64,
-    pub validation: f64,
-    pub longevity: f64,
-    pub active_months: u32,
-    pub is_apprentice: bool,
-    pub mentor_did: Option<String>,
-    pub recognitions_given_this_cycle: u32,
-    pub current_cycle_id: String,
-    pub last_updated: Timestamp,
-}
-
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-pub struct RecognitionEvent {
-    pub recognizer_did: String,
-    pub recipient_did: String,
-    pub weight: f64,
-    pub contribution_type: ContributionType,
-    pub cycle_id: String,
-    pub recognizer_mycel: f64,
-    pub timestamp: Timestamp,
-}
-
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-pub struct GetRecognitionsInput {
-    pub member_did: String,
-    pub cycle_id: Option<String>,
-}
-
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-pub struct UpdateMycelInput {
-    pub member_did: String,
-    pub participation: f64,
-    pub recognition: f64,
-    pub validation_override: Option<f64>,
-    pub active_months: u32,
-}
-
-// --- Commons Pool Mirror Types ---
-
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-pub struct CreateCommonsPoolInput {
-    pub dao_did: String,
-}
-
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-pub struct ContributeToCommonsInput {
-    pub commons_pool_id: String,
-    pub contributor_did: String,
-    pub amount: u64,
-}
-
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-pub struct CommonsPool {
-    pub id: String,
-    pub dao_did: String,
-    pub inalienable_reserve: u64,
-    pub available_balance: u64,
-    pub demurrage_exempt: bool,
-    pub created_at: Timestamp,
-    pub last_activity: Timestamp,
-}
-
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-pub struct RequestCommonsAllocationInput {
-    pub commons_pool_id: String,
-    pub requester_did: String,
-    pub amount: u64,
-    pub purpose: String,
-}
-
-// --- Collateral Stake Mirror Types ---
-
-#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
-pub enum StakeStatus {
-    Active,
-    Unbonding,
-    Withdrawn,
-    Slashed,
-    Jailed,
-}
-
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-pub struct CollateralStake {
-    pub id: String,
-    pub staker_did: String,
-    pub sap_amount: u64,
-    pub mycel_score: f32,
-    pub stake_weight: f32,
-    pub staked_at: Timestamp,
-    pub unbonding_until: Option<Timestamp>,
-    pub status: StakeStatus,
-    pub pending_rewards: u64,
-    pub last_reward_claim: Timestamp,
-}
-
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-pub struct CreateStakeInput {
-    pub staker_did: String,
-    pub sap_amount: u64,
-}
-
-// --- Payments Mirror Types ---
-
-#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
-pub enum PaymentType {
-    Direct,
-    TreasuryContribution(String),
-    CommonsContribution(String),
-    Escrow(String),
-    Recurring(RecurringConfig),
-}
-
-#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
-pub struct RecurringConfig {
-    pub frequency_days: u32,
-    pub end_date: Option<Timestamp>,
-    pub remaining: Option<u32>,
-}
-
-#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
-pub enum TransferStatus {
-    Pending,
-    Processing,
-    Completed,
-    Failed(String),
-    Cancelled,
-    Refunded,
-}
-
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-pub struct Payment {
-    pub id: String,
-    pub from_did: String,
-    pub to_did: String,
-    pub amount: u64,
-    pub fee: u64,
-    pub currency: String,
-    pub payment_type: PaymentType,
-    pub status: TransferStatus,
-    pub memo: Option<String>,
-    pub created: Timestamp,
-    pub completed: Option<Timestamp>,
-}
-
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-pub struct SendPaymentInput {
-    pub from_did: String,
-    pub to_did: String,
-    pub amount: u64,
-    pub currency: String,
-    pub payment_type: PaymentType,
-    pub memo: Option<String>,
-}
-
-// --- Paginated API Input Types ---
-
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-pub struct PaginatedDaoInput {
-    pub dao_did: String,
-    pub limit: Option<usize>,
-}
-
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-pub struct GetPaymentHistoryInput {
-    pub did: String,
-    pub limit: Option<usize>,
-}
-
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-pub struct GetValidationScoreInput {
-    pub member_did: String,
-    pub limit: Option<usize>,
-}
-
-// --- TEND Mirror Types ---
-
-#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
-pub enum ServiceCategory {
-    CareWork,
-    HomeServices,
-    FoodServices,
-    Transportation,
-    Education,
-    GeneralAssistance,
-    Administrative,
-    Creative,
-    TechSupport,
-    Wellness,
-    Gardening,
-    Custom(String),
-}
-
-#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
-pub enum ExchangeStatus {
-    Proposed,
-    Confirmed,
-    Disputed,
-    Cancelled,
-    Resolved,
-}
-
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-pub struct RecordExchangeInput {
-    pub receiver_did: String,
-    pub hours: f32,
-    pub service_description: String,
-    pub service_category: ServiceCategory,
-    pub cultural_alias: Option<String>,
-    pub dao_did: String,
-    pub service_date: Option<Timestamp>,
-}
-
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-pub struct ExchangeRecord {
-    pub id: String,
-    pub provider_did: String,
-    pub receiver_did: String,
-    pub hours: f32,
-    pub service_description: String,
-    pub service_category: ServiceCategory,
-    pub status: ExchangeStatus,
-    pub timestamp: Timestamp,
-}
-
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-pub struct GetBalanceInput {
-    pub member_did: String,
-    pub dao_did: String,
-}
-
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-pub struct BalanceInfo {
-    pub member_did: String,
-    pub dao_did: String,
-    pub balance: i32,
-    pub can_provide: bool,
-    pub can_receive: bool,
-    pub total_provided: f32,
-    pub total_received: f32,
-    pub exchange_count: u32,
-}
-
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-pub struct CreateListingInput {
-    pub dao_did: String,
-    pub title: String,
-    pub description: String,
-    pub category: ServiceCategory,
-    pub estimated_hours: Option<f32>,
-    pub availability: Option<String>,
-}
-
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-pub struct ServiceListing {
-    pub id: String,
-    pub provider_did: String,
-    pub dao_did: String,
-    pub title: String,
-    pub description: String,
-    pub category: ServiceCategory,
-    pub estimated_hours: Option<f32>,
-    pub availability: Option<String>,
-    pub active: bool,
-    pub created: Timestamp,
-}
 
 // ============================================================================
 // Test Utilities
@@ -366,7 +73,10 @@ mod tend_tests {
         let mut conductor = SweetConductor::from_standard_config().await;
         let dna = load_dna().await;
 
-        let app1 = conductor.setup_app("provider-app", &[dna.clone()]).await.unwrap();
+        let app1 = conductor
+            .setup_app("provider-app", &[dna.clone()])
+            .await
+            .unwrap();
         let app2 = conductor.setup_app("receiver-app", &[dna]).await.unwrap();
         let cell1 = app1.cells()[0].clone();
         let agent2 = app2.agent().clone();
@@ -389,8 +99,16 @@ mod tend_tests {
 
         assert_eq!(exchange.receiver_did, receiver_did, "Receiver must match");
         assert_eq!(exchange.hours, 2.0, "Hours must match");
-        assert_eq!(exchange.status, ExchangeStatus::Proposed, "Status should be Proposed");
-        assert_eq!(exchange.service_category, ServiceCategory::Education, "Category must match");
+        assert_eq!(
+            exchange.status,
+            ExchangeStatus::Proposed,
+            "Status should be Proposed"
+        );
+        assert_eq!(
+            exchange.service_category,
+            ServiceCategory::Education,
+            "Category must match"
+        );
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -442,15 +160,23 @@ mod tend_tests {
             .await;
 
         assert_eq!(listing.title, "Web Development Help", "Title must match");
-        assert_eq!(listing.category, ServiceCategory::TechSupport, "Category must match");
+        assert_eq!(
+            listing.category,
+            ServiceCategory::TechSupport,
+            "Category must match"
+        );
         assert!(listing.active, "Listing should be active");
 
         // Get DAO listings
         let listings: Vec<ServiceListing> = conductor
-            .call(&cell.zome("tend"), "get_dao_listings", PaginatedDaoInput {
-                dao_did: "did:mycelix:dao-listing".to_string(),
-                limit: None,
-            })
+            .call(
+                &cell.zome("tend"),
+                "get_dao_listings",
+                PaginatedDaoInput {
+                    dao_did: "did:mycelix:dao-listing".to_string(),
+                    limit: None,
+                },
+            )
             .await;
 
         assert!(!listings.is_empty(), "Should have at least one listing");
@@ -462,7 +188,10 @@ mod tend_tests {
         let mut conductor = SweetConductor::from_standard_config().await;
         let dna = load_dna().await;
 
-        let app1 = conductor.setup_app("provider-app", &[dna.clone()]).await.unwrap();
+        let app1 = conductor
+            .setup_app("provider-app", &[dna.clone()])
+            .await
+            .unwrap();
         let app2 = conductor.setup_app("receiver-app", &[dna]).await.unwrap();
         let cell1 = app1.cells()[0].clone();
         let agent2 = app2.agent().clone();
@@ -484,7 +213,11 @@ mod tend_tests {
             .call(&cell1.zome("tend"), "record_exchange", input)
             .await;
 
-        assert_eq!(exchange.service_category, ServiceCategory::CareWork, "Category must be CareWork");
+        assert_eq!(
+            exchange.service_category,
+            ServiceCategory::CareWork,
+            "Category must be CareWork"
+        );
 
         // Test Gardening category
         let input_garden = RecordExchangeInput {
@@ -522,7 +255,10 @@ mod recognition_tests {
     async fn test_initialize_member() {
         let mut conductor = SweetConductor::from_standard_config().await;
         let dna = load_dna().await;
-        let app = conductor.setup_app("test-app", &[dna.clone()]).await.unwrap();
+        let app = conductor
+            .setup_app("test-app", &[dna.clone()])
+            .await
+            .unwrap();
         let cell = app.cells()[0].clone();
         let agent = app.agent().clone();
 
@@ -539,17 +275,29 @@ mod recognition_tests {
             .call(&cell.zome("recognition"), "initialize_member", input)
             .await;
 
-        let state: MemberMycelState = decode_entry(&record)
-            .expect("Failed to decode MemberMycelState");
+        let state: MemberMycelState =
+            decode_entry(&record).expect("Failed to decode MemberMycelState");
 
         assert_eq!(state.member_did, member_did, "Member DID must match");
-        assert_eq!(state.mycel_score, 0.3, "Full member initial MYCEL should be 0.3");
+        assert_eq!(
+            state.mycel_score, 0.3,
+            "Full member initial MYCEL should be 0.3"
+        );
         assert!(!state.is_apprentice, "Should not be an apprentice");
-        assert!(state.mentor_did.is_none(), "Full member should have no mentor");
-        assert_eq!(state.active_months, 0, "New member should have 0 active months");
+        assert!(
+            state.mentor_did.is_none(),
+            "Full member should have no mentor"
+        );
+        assert_eq!(
+            state.active_months, 0,
+            "New member should have 0 active months"
+        );
 
         // Initialize an apprentice
-        let app2 = conductor.setup_app("apprentice-app", &[dna.clone()]).await.unwrap();
+        let app2 = conductor
+            .setup_app("apprentice-app", &[dna.clone()])
+            .await
+            .unwrap();
         let cell2 = app2.cells()[0].clone();
         let agent2 = app2.agent().clone();
         let apprentice_did = format!("did:mycelix:{}", agent2);
@@ -561,14 +309,24 @@ mod recognition_tests {
         };
 
         let apprentice_record: Record = conductor
-            .call(&cell2.zome("recognition"), "initialize_member", apprentice_input)
+            .call(
+                &cell2.zome("recognition"),
+                "initialize_member",
+                apprentice_input,
+            )
             .await;
 
-        let apprentice_state: MemberMycelState = decode_entry(&apprentice_record)
-            .expect("Failed to decode apprentice MemberMycelState");
+        let apprentice_state: MemberMycelState =
+            decode_entry(&apprentice_record).expect("Failed to decode apprentice MemberMycelState");
 
-        assert_eq!(apprentice_state.member_did, apprentice_did, "Apprentice DID must match");
-        assert_eq!(apprentice_state.mycel_score, 0.1, "Apprentice initial MYCEL should be 0.1");
+        assert_eq!(
+            apprentice_state.member_did, apprentice_did,
+            "Apprentice DID must match"
+        );
+        assert_eq!(
+            apprentice_state.mycel_score, 0.1,
+            "Apprentice initial MYCEL should be 0.1"
+        );
         assert!(apprentice_state.is_apprentice, "Should be an apprentice");
         assert_eq!(
             apprentice_state.mentor_did,
@@ -584,7 +342,10 @@ mod recognition_tests {
         let dna = load_dna().await;
 
         // Set up two agents
-        let app1 = conductor.setup_app("recognizer-app", &[dna.clone()]).await.unwrap();
+        let app1 = conductor
+            .setup_app("recognizer-app", &[dna.clone()])
+            .await
+            .unwrap();
         let app2 = conductor.setup_app("recipient-app", &[dna]).await.unwrap();
         let cell1 = app1.cells()[0].clone();
         let agent1 = app1.agent().clone();
@@ -612,18 +373,35 @@ mod recognition_tests {
         };
 
         let recognition_record: Record = conductor
-            .call(&cell1.zome("recognition"), "recognize_member", recognize_input)
+            .call(
+                &cell1.zome("recognition"),
+                "recognize_member",
+                recognize_input,
+            )
             .await;
 
-        let event: RecognitionEvent = decode_entry(&recognition_record)
-            .expect("Failed to decode RecognitionEvent");
+        let event: RecognitionEvent =
+            decode_entry(&recognition_record).expect("Failed to decode RecognitionEvent");
 
-        assert_eq!(event.recognizer_did, recognizer_did, "Recognizer DID must match");
-        assert_eq!(event.recipient_did, recipient_did, "Recipient DID must match");
-        assert_eq!(event.contribution_type, ContributionType::Technical, "Type must be Technical");
+        assert_eq!(
+            event.recognizer_did, recognizer_did,
+            "Recognizer DID must match"
+        );
+        assert_eq!(
+            event.recipient_did, recipient_did,
+            "Recipient DID must match"
+        );
+        assert_eq!(
+            event.contribution_type,
+            ContributionType::Technical,
+            "Type must be Technical"
+        );
         assert_eq!(event.cycle_id, "2026-02", "Cycle ID must match");
         assert!(event.weight > 0.0, "Weight must be positive");
-        assert_eq!(event.recognizer_mycel, 0.3, "Recognizer MYCEL should be 0.3");
+        assert_eq!(
+            event.recognizer_mycel, 0.3,
+            "Recognizer MYCEL should be 0.3"
+        );
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -650,10 +428,17 @@ mod recognition_tests {
 
         // Get initial MYCEL state
         let initial_state: MemberMycelState = conductor
-            .call(&cell.zome("recognition"), "get_mycel_score", member_did.clone())
+            .call(
+                &cell.zome("recognition"),
+                "get_mycel_score",
+                member_did.clone(),
+            )
             .await;
 
-        assert_eq!(initial_state.mycel_score, 0.3, "Initial MYCEL should be 0.3");
+        assert_eq!(
+            initial_state.mycel_score, 0.3,
+            "Initial MYCEL should be 0.3"
+        );
 
         // Update MYCEL score with component values
         // Composite = participation(0.8) * 0.40 + recognition(0.6) * 0.20
@@ -668,7 +453,11 @@ mod recognition_tests {
         };
 
         let updated_state: MemberMycelState = conductor
-            .call(&cell.zome("recognition"), "update_mycel_score", update_input)
+            .call(
+                &cell.zome("recognition"),
+                "update_mycel_score",
+                update_input,
+            )
             .await;
 
         // Verify the composite calculation
@@ -679,9 +468,18 @@ mod recognition_tests {
             updated_state.mycel_score,
             expected
         );
-        assert_eq!(updated_state.participation, 0.8, "Participation component must match");
-        assert_eq!(updated_state.recognition, 0.6, "Recognition component must match");
-        assert_eq!(updated_state.validation, 0.5, "Validation component must match");
+        assert_eq!(
+            updated_state.participation, 0.8,
+            "Participation component must match"
+        );
+        assert_eq!(
+            updated_state.recognition, 0.6,
+            "Recognition component must match"
+        );
+        assert_eq!(
+            updated_state.validation, 0.5,
+            "Validation component must match"
+        );
         assert_eq!(updated_state.active_months, 12, "Active months must match");
     }
 }
@@ -710,13 +508,24 @@ mod commons_tests {
             .call(&cell.zome("treasury"), "create_commons_pool", input)
             .await;
 
-        let pool: CommonsPool = decode_entry(&pool_record)
-            .expect("Failed to decode CommonsPool");
+        let pool: CommonsPool = decode_entry(&pool_record).expect("Failed to decode CommonsPool");
 
-        assert_eq!(pool.dao_did, "did:mycelix:dao-commons-test", "DAO DID must match");
-        assert_eq!(pool.inalienable_reserve, 0, "New pool should have 0 inalienable reserve");
-        assert_eq!(pool.available_balance, 0, "New pool should have 0 available balance");
-        assert!(pool.demurrage_exempt, "Commons pool must be demurrage exempt");
+        assert_eq!(
+            pool.dao_did, "did:mycelix:dao-commons-test",
+            "DAO DID must match"
+        );
+        assert_eq!(
+            pool.inalienable_reserve, 0,
+            "New pool should have 0 inalienable reserve"
+        );
+        assert_eq!(
+            pool.available_balance, 0,
+            "New pool should have 0 available balance"
+        );
+        assert!(
+            pool.demurrage_exempt,
+            "Commons pool must be demurrage exempt"
+        );
         assert!(!pool.id.is_empty(), "Pool should have an ID");
     }
 
@@ -739,8 +548,7 @@ mod commons_tests {
             .call(&cell.zome("treasury"), "create_commons_pool", create_input)
             .await;
 
-        let pool: CommonsPool = decode_entry(&pool_record)
-            .expect("Failed to decode CommonsPool");
+        let pool: CommonsPool = decode_entry(&pool_record).expect("Failed to decode CommonsPool");
 
         // Contribute 1000 SAP to commons pool
         let contrib_input = ContributeToCommonsInput {
@@ -750,11 +558,15 @@ mod commons_tests {
         };
 
         let updated_record: Record = conductor
-            .call(&cell.zome("treasury"), "contribute_to_commons", contrib_input)
+            .call(
+                &cell.zome("treasury"),
+                "contribute_to_commons",
+                contrib_input,
+            )
             .await;
 
-        let updated_pool: CommonsPool = decode_entry(&updated_record)
-            .expect("Failed to decode updated CommonsPool");
+        let updated_pool: CommonsPool =
+            decode_entry(&updated_record).expect("Failed to decode updated CommonsPool");
 
         // Verify 25/75 split: 25% to inalienable reserve, 75% to available
         assert_eq!(
@@ -765,7 +577,10 @@ mod commons_tests {
             updated_pool.available_balance, 750,
             "Available balance should be 75% of 1000 = 750"
         );
-        assert!(updated_pool.demurrage_exempt, "Pool must remain demurrage exempt");
+        assert!(
+            updated_pool.demurrage_exempt,
+            "Pool must remain demurrage exempt"
+        );
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -787,8 +602,7 @@ mod commons_tests {
             .call(&cell.zome("treasury"), "create_commons_pool", create_input)
             .await;
 
-        let pool: CommonsPool = decode_entry(&pool_record)
-            .expect("Failed to decode CommonsPool");
+        let pool: CommonsPool = decode_entry(&pool_record).expect("Failed to decode CommonsPool");
 
         // Contribute 1000 SAP (250 reserve, 750 available)
         let contrib_input = ContributeToCommonsInput {
@@ -798,14 +612,24 @@ mod commons_tests {
         };
 
         let contrib_record: Record = conductor
-            .call(&cell.zome("treasury"), "contribute_to_commons", contrib_input)
+            .call(
+                &cell.zome("treasury"),
+                "contribute_to_commons",
+                contrib_input,
+            )
             .await;
 
         // Verify the returned record directly (doesn't depend on DHT propagation)
-        let funded_pool: CommonsPool = decode_entry(&contrib_record)
-            .expect("Failed to decode funded CommonsPool");
-        assert_eq!(funded_pool.inalienable_reserve, 250, "25% of 1000 = 250 to reserve");
-        assert_eq!(funded_pool.available_balance, 750, "75% of 1000 = 750 available");
+        let funded_pool: CommonsPool =
+            decode_entry(&contrib_record).expect("Failed to decode funded CommonsPool");
+        assert_eq!(
+            funded_pool.inalienable_reserve, 250,
+            "25% of 1000 = 250 to reserve"
+        );
+        assert_eq!(
+            funded_pool.available_balance, 750,
+            "75% of 1000 = 750 available"
+        );
 
         // Wait for DHT to propagate the contribution update so subsequent
         // reads via follow_update_chain see the funded pool, not the original.
@@ -826,8 +650,8 @@ mod commons_tests {
 
         match alloc_result {
             Ok(alloc_record) => {
-                let alloc_pool: CommonsPool = decode_entry(&alloc_record)
-                    .expect("Failed to decode allocation result");
+                let alloc_pool: CommonsPool =
+                    decode_entry(&alloc_record).expect("Failed to decode allocation result");
 
                 assert_eq!(
                     alloc_pool.inalienable_reserve, 250,
@@ -864,7 +688,11 @@ mod commons_tests {
         };
 
         let result: Result<Record, _> = conductor
-            .call_fallible(&cell.zome("treasury"), "request_allocation", invalid_request)
+            .call_fallible(
+                &cell.zome("treasury"),
+                "request_allocation",
+                invalid_request,
+            )
             .await;
 
         assert!(
@@ -888,7 +716,10 @@ mod three_currency_lifecycle {
         let mut conductor = SweetConductor::from_standard_config().await;
         let dna = load_dna().await;
 
-        let app1 = conductor.setup_app("agent1-app", &[dna.clone()]).await.unwrap();
+        let app1 = conductor
+            .setup_app("agent1-app", &[dna.clone()])
+            .await
+            .unwrap();
         let app2 = conductor.setup_app("agent2-app", &[dna]).await.unwrap();
         let cell1 = app1.cells()[0].clone();
         let agent1 = app1.agent().clone();
@@ -908,10 +739,13 @@ mod three_currency_lifecycle {
             .call(&cell1.zome("recognition"), "initialize_member", init_input)
             .await;
 
-        let mycel_state: MemberMycelState = decode_entry(&init_record)
-            .expect("Failed to decode MemberMycelState");
+        let mycel_state: MemberMycelState =
+            decode_entry(&init_record).expect("Failed to decode MemberMycelState");
 
-        assert_eq!(mycel_state.mycel_score, 0.3, "Initial MYCEL score should be 0.3");
+        assert_eq!(
+            mycel_state.mycel_score, 0.3,
+            "Initial MYCEL score should be 0.3"
+        );
         assert!(!mycel_state.is_apprentice, "Should be a full member");
 
         // ---- Step 2: Recognize another member (MYCEL-weighted) ----
@@ -922,11 +756,15 @@ mod three_currency_lifecycle {
         };
 
         let recognition_record: Record = conductor
-            .call(&cell1.zome("recognition"), "recognize_member", recognize_input)
+            .call(
+                &cell1.zome("recognition"),
+                "recognize_member",
+                recognize_input,
+            )
             .await;
 
-        let event: RecognitionEvent = decode_entry(&recognition_record)
-            .expect("Failed to decode RecognitionEvent");
+        let event: RecognitionEvent =
+            decode_entry(&recognition_record).expect("Failed to decode RecognitionEvent");
 
         assert_eq!(event.recognizer_did, did1, "Recognizer should be agent1");
         assert_eq!(event.recipient_did, did2, "Recipient should be agent2");
@@ -938,14 +776,20 @@ mod three_currency_lifecycle {
         };
 
         let pool_record: Record = conductor
-            .call(&cell1.zome("treasury"), "create_commons_pool", create_pool_input)
+            .call(
+                &cell1.zome("treasury"),
+                "create_commons_pool",
+                create_pool_input,
+            )
             .await;
 
-        let pool: CommonsPool = decode_entry(&pool_record)
-            .expect("Failed to decode CommonsPool");
+        let pool: CommonsPool = decode_entry(&pool_record).expect("Failed to decode CommonsPool");
 
         assert!(!pool.id.is_empty(), "Pool should have an ID");
-        assert!(pool.demurrage_exempt, "Commons pool must be demurrage exempt");
+        assert!(
+            pool.demurrage_exempt,
+            "Commons pool must be demurrage exempt"
+        );
 
         // Contribute SAP to the commons pool
         let contrib_input = ContributeToCommonsInput {
@@ -955,14 +799,24 @@ mod three_currency_lifecycle {
         };
 
         let contrib_record: Record = conductor
-            .call(&cell1.zome("treasury"), "contribute_to_commons", contrib_input)
+            .call(
+                &cell1.zome("treasury"),
+                "contribute_to_commons",
+                contrib_input,
+            )
             .await;
 
-        let funded_pool: CommonsPool = decode_entry(&contrib_record)
-            .expect("Failed to decode funded CommonsPool");
+        let funded_pool: CommonsPool =
+            decode_entry(&contrib_record).expect("Failed to decode funded CommonsPool");
 
-        assert_eq!(funded_pool.inalienable_reserve, 500, "25% of 2000 = 500 to reserve");
-        assert_eq!(funded_pool.available_balance, 1500, "75% of 2000 = 1500 available");
+        assert_eq!(
+            funded_pool.inalienable_reserve, 500,
+            "25% of 2000 = 500 to reserve"
+        );
+        assert_eq!(
+            funded_pool.available_balance, 1500,
+            "75% of 2000 = 1500 available"
+        );
 
         // ---- Step 4: Record a TEND time exchange ----
         let exchange_input = RecordExchangeInput {
@@ -979,7 +833,11 @@ mod three_currency_lifecycle {
             .call(&cell1.zome("tend"), "record_exchange", exchange_input)
             .await;
 
-        assert_eq!(exchange.status, ExchangeStatus::Proposed, "Exchange should be Proposed");
+        assert_eq!(
+            exchange.status,
+            ExchangeStatus::Proposed,
+            "Exchange should be Proposed"
+        );
         assert_eq!(exchange.hours, 1.5, "Hours must match");
         assert_eq!(
             exchange.service_category,
@@ -997,18 +855,29 @@ mod three_currency_lifecycle {
             .call(&cell1.zome("tend"), "get_balance", balance_input)
             .await;
 
-        assert_eq!(balance.balance, 0, "TEND balance should be 0 (exchange not yet confirmed)");
+        assert_eq!(
+            balance.balance, 0,
+            "TEND balance should be 0 (exchange not yet confirmed)"
+        );
         assert!(balance.can_provide, "Should be able to provide");
         assert!(balance.can_receive, "Should be able to receive");
 
         // ---- Initialize SAP balances for both agents (required before SAP transfer) ----
         let _: Record = conductor
-            .call(&cell1.zome("payments"), "initialize_sap_balance", did1.clone())
+            .call(
+                &cell1.zome("payments"),
+                "initialize_sap_balance",
+                did1.clone(),
+            )
             .await;
 
         let cell2 = app2.cells()[0].clone();
         let _: Record = conductor
-            .call(&cell2.zome("payments"), "initialize_sap_balance", did2.clone())
+            .call(
+                &cell2.zome("payments"),
+                "initialize_sap_balance",
+                did2.clone(),
+            )
             .await;
 
         // ---- Verify: SAP payment with insufficient balance is properly rejected ----

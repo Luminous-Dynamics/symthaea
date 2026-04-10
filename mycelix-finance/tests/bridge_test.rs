@@ -17,11 +17,15 @@
 //! cargo test --test bridge_test -- --ignored  # Full integration tests
 //! ```
 
-use holochain::sweettest::*;
 use holochain::prelude::*;
+use holochain::sweettest::*;
 use std::time::Duration;
 
 use finance_bridge_integrity::*;
+use finance_wire_types::{
+    AssetType as WireAssetType, DepositCollateralInput, GetPaymentHistoryInput,
+    ProcessPaymentInput, RegisterCollateralInput,
+};
 
 mod test_helpers {
     pub const TEST_DID_PREFIX: &str = "did:mycelix:test:";
@@ -32,13 +36,6 @@ mod test_helpers {
 }
 
 use test_helpers::*;
-
-/// Paginated input for get_payment_history
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-pub struct GetPaymentHistoryInput {
-    pub did: String,
-    pub limit: Option<usize>,
-}
 
 // ============================================================================
 // Section 1: Collateral Bridge Deposit Tests
@@ -55,7 +52,9 @@ mod bridge_deposits {
         println!("Test 1.1: ETH Deposit -> SAP Minting");
 
         let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
-        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Load DNA");
+        let dna = SweetDnaFile::from_bundle(&dna_path)
+            .await
+            .expect("Load DNA");
         let mut conductor = SweetConductor::from_standard_config().await;
 
         let agents = SweetAgents::get(conductor.keystore(), 1).await;
@@ -67,15 +66,6 @@ mod bridge_deposits {
         let alice_cell = &apps[0].cells()[0];
         let alice_did = format!("did:mycelix:{}", agents[0]);
 
-        // Deposit 1 ETH at rate 2000.0 SAP/ETH
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-        struct DepositCollateralInput {
-            pub depositor_did: String,
-            pub collateral_type: String,
-            pub collateral_amount: u64,
-            pub oracle_rate: f64,
-        }
-
         let input = DepositCollateralInput {
             depositor_did: alice_did.clone(),
             collateral_type: "ETH".to_string(),
@@ -84,7 +74,11 @@ mod bridge_deposits {
         };
 
         let result: Record = conductor
-            .call(&alice_cell.zome("finance_bridge"), "deposit_collateral", input)
+            .call(
+                &alice_cell.zome("finance_bridge"),
+                "deposit_collateral",
+                input,
+            )
             .await;
 
         let deposit: CollateralBridgeDeposit = result
@@ -99,7 +93,10 @@ mod bridge_deposits {
         assert_eq!(deposit.depositor_did, alice_did);
         assert!(matches!(deposit.status, BridgeDepositStatus::Pending));
 
-        println!("  - ETH deposited: {} micro-units", deposit.collateral_amount);
+        println!(
+            "  - ETH deposited: {} micro-units",
+            deposit.collateral_amount
+        );
         println!("  - SAP minted: {}", deposit.sap_minted);
         println!("Test 1.1 PASSED: ETH deposit mints correct SAP amount");
     }
@@ -111,7 +108,9 @@ mod bridge_deposits {
         println!("Test 1.2: USDC Deposit -> SAP Minting");
 
         let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
-        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Load DNA");
+        let dna = SweetDnaFile::from_bundle(&dna_path)
+            .await
+            .expect("Load DNA");
         let mut conductor = SweetConductor::from_standard_config().await;
 
         let agents = SweetAgents::get(conductor.keystore(), 1).await;
@@ -122,23 +121,19 @@ mod bridge_deposits {
 
         let alice_cell = &apps[0].cells()[0];
 
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-        struct DepositCollateralInput {
-            pub depositor_did: String,
-            pub collateral_type: String,
-            pub collateral_amount: u64,
-            pub oracle_rate: f64,
-        }
-
         let input = DepositCollateralInput {
             depositor_did: format!("did:mycelix:{}", agents[0]),
             collateral_type: "USDC".to_string(),
             collateral_amount: 500_000_000, // 500 USDC in micro-units
-            oracle_rate: 1.0, // 1:1 USDC:SAP
+            oracle_rate: 1.0,               // 1:1 USDC:SAP
         };
 
         let result: Record = conductor
-            .call(&alice_cell.zome("finance_bridge"), "deposit_collateral", input)
+            .call(
+                &alice_cell.zome("finance_bridge"),
+                "deposit_collateral",
+                input,
+            )
             .await;
 
         let deposit: CollateralBridgeDeposit = result
@@ -162,7 +157,9 @@ mod bridge_deposits {
         println!("Test 1.3: Invalid Collateral Type Rejected");
 
         let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
-        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Load DNA");
+        let dna = SweetDnaFile::from_bundle(&dna_path)
+            .await
+            .expect("Load DNA");
         let mut conductor = SweetConductor::from_standard_config().await;
 
         let agents = SweetAgents::get(conductor.keystore(), 1).await;
@@ -173,14 +170,6 @@ mod bridge_deposits {
 
         let alice_cell = &apps[0].cells()[0];
 
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-        struct DepositCollateralInput {
-            pub depositor_did: String,
-            pub collateral_type: String,
-            pub collateral_amount: u64,
-            pub oracle_rate: f64,
-        }
-
         let input = DepositCollateralInput {
             depositor_did: format!("did:mycelix:{}", agents[0]),
             collateral_type: "BTC".to_string(), // Invalid - only ETH and USDC
@@ -189,7 +178,11 @@ mod bridge_deposits {
         };
 
         let result: Result<Record, _> = conductor
-            .call_fallible(&alice_cell.zome("finance_bridge"), "deposit_collateral", input)
+            .call_fallible(
+                &alice_cell.zome("finance_bridge"),
+                "deposit_collateral",
+                input,
+            )
             .await;
 
         assert!(result.is_err(), "BTC collateral should be rejected");
@@ -204,7 +197,9 @@ mod bridge_deposits {
         println!("Test 1.4: Invalid Depositor DID Rejected");
 
         let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
-        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Load DNA");
+        let dna = SweetDnaFile::from_bundle(&dna_path)
+            .await
+            .expect("Load DNA");
         let mut conductor = SweetConductor::from_standard_config().await;
 
         let agents = SweetAgents::get(conductor.keystore(), 1).await;
@@ -215,14 +210,6 @@ mod bridge_deposits {
 
         let alice_cell = &apps[0].cells()[0];
 
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-        struct DepositCollateralInput {
-            pub depositor_did: String,
-            pub collateral_type: String,
-            pub collateral_amount: u64,
-            pub oracle_rate: f64,
-        }
-
         let input = DepositCollateralInput {
             depositor_did: "invalid_did".to_string(), // No "did:" prefix
             collateral_type: "ETH".to_string(),
@@ -231,7 +218,11 @@ mod bridge_deposits {
         };
 
         let result: Result<Record, _> = conductor
-            .call_fallible(&alice_cell.zome("finance_bridge"), "deposit_collateral", input)
+            .call_fallible(
+                &alice_cell.zome("finance_bridge"),
+                "deposit_collateral",
+                input,
+            )
             .await;
 
         assert!(result.is_err(), "Invalid DID should be rejected");
@@ -246,7 +237,9 @@ mod bridge_deposits {
         println!("Test 1.5: Zero Amount Rejected");
 
         let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
-        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Load DNA");
+        let dna = SweetDnaFile::from_bundle(&dna_path)
+            .await
+            .expect("Load DNA");
         let mut conductor = SweetConductor::from_standard_config().await;
 
         let agents = SweetAgents::get(conductor.keystore(), 1).await;
@@ -257,14 +250,6 @@ mod bridge_deposits {
 
         let alice_cell = &apps[0].cells()[0];
 
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-        struct DepositCollateralInput {
-            pub depositor_did: String,
-            pub collateral_type: String,
-            pub collateral_amount: u64,
-            pub oracle_rate: f64,
-        }
-
         let input = DepositCollateralInput {
             depositor_did: format!("did:mycelix:{}", agents[0]),
             collateral_type: "ETH".to_string(),
@@ -273,7 +258,11 @@ mod bridge_deposits {
         };
 
         let result: Result<Record, _> = conductor
-            .call_fallible(&alice_cell.zome("finance_bridge"), "deposit_collateral", input)
+            .call_fallible(
+                &alice_cell.zome("finance_bridge"),
+                "deposit_collateral",
+                input,
+            )
             .await;
 
         assert!(result.is_err(), "Zero amount should be rejected");
@@ -297,7 +286,9 @@ mod cross_happ_payments {
         println!("Test 2.1: Cross-hApp Payment");
 
         let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
-        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Load DNA");
+        let dna = SweetDnaFile::from_bundle(&dna_path)
+            .await
+            .expect("Load DNA");
         let mut conductor = SweetConductor::from_standard_config().await;
 
         let agents = SweetAgents::get(conductor.keystore(), 2).await;
@@ -307,16 +298,6 @@ mod cross_happ_payments {
             .expect("Failed to install app");
 
         let alice_cell = &apps[0].cells()[0];
-
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-        struct ProcessPaymentInput {
-            pub source_happ: String,
-            pub from_did: String,
-            pub to_did: String,
-            pub amount: u64,
-            pub currency: String,
-            pub reference: String,
-        }
 
         let input = ProcessPaymentInput {
             source_happ: "mycelix-property".to_string(),
@@ -353,7 +334,9 @@ mod cross_happ_payments {
         println!("Test 2.2: Non-SAP Cross-hApp Payment Rejected");
 
         let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
-        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Load DNA");
+        let dna = SweetDnaFile::from_bundle(&dna_path)
+            .await
+            .expect("Load DNA");
         let mut conductor = SweetConductor::from_standard_config().await;
 
         let agents = SweetAgents::get(conductor.keystore(), 1).await;
@@ -363,16 +346,6 @@ mod cross_happ_payments {
             .expect("Failed to install app");
 
         let alice_cell = &apps[0].cells()[0];
-
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-        struct ProcessPaymentInput {
-            pub source_happ: String,
-            pub from_did: String,
-            pub to_did: String,
-            pub amount: u64,
-            pub currency: String,
-            pub reference: String,
-        }
 
         let input = ProcessPaymentInput {
             source_happ: "mycelix-property".to_string(),
@@ -387,7 +360,10 @@ mod cross_happ_payments {
             .call_fallible(&alice_cell.zome("finance_bridge"), "process_payment", input)
             .await;
 
-        assert!(result.is_err(), "Non-SAP cross-hApp payment should be rejected");
+        assert!(
+            result.is_err(),
+            "Non-SAP cross-hApp payment should be rejected"
+        );
         println!("  - TEND cross-hApp payment rejected: OK");
         println!("Test 2.2 PASSED: Non-SAP currencies rejected for cross-hApp payments");
     }
@@ -408,7 +384,9 @@ mod finance_events {
         println!("Test 3.1: Broadcast Finance Event");
 
         let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
-        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Load DNA");
+        let dna = SweetDnaFile::from_bundle(&dna_path)
+            .await
+            .expect("Load DNA");
         let mut conductor = SweetConductor::from_standard_config().await;
 
         let agents = SweetAgents::get(conductor.keystore(), 1).await;
@@ -435,7 +413,11 @@ mod finance_events {
         };
 
         let result: Record = conductor
-            .call(&alice_cell.zome("finance_bridge"), "broadcast_finance_event", input)
+            .call(
+                &alice_cell.zome("finance_bridge"),
+                "broadcast_finance_event",
+                input,
+            )
             .await;
 
         let event: FinanceBridgeEvent = result
@@ -444,7 +426,10 @@ mod finance_events {
             .expect("Deserialize failed")
             .expect("No entry");
 
-        assert!(matches!(event.event_type, FinanceEventType::CommonsContributed));
+        assert!(matches!(
+            event.event_type,
+            FinanceEventType::CommonsContributed
+        ));
         assert_eq!(event.amount, Some(1000));
 
         println!("  - Event type: {:?}", event.event_type);
@@ -529,8 +514,7 @@ mod unit_tests {
 
         for asset_type in asset_types {
             let json = serde_json::to_string(&asset_type).expect("Serialize failed");
-            let deserialized: AssetType =
-                serde_json::from_str(&json).expect("Deserialize failed");
+            let deserialized: AssetType = serde_json::from_str(&json).expect("Deserialize failed");
             assert_eq!(asset_type, deserialized, "AssetType round-trip failed");
         }
     }
@@ -600,7 +584,9 @@ mod collateral_registration {
         println!("Test 4.1: Register Collateral");
 
         let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
-        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Load DNA");
+        let dna = SweetDnaFile::from_bundle(&dna_path)
+            .await
+            .expect("Load DNA");
         let mut conductor = SweetConductor::from_standard_config().await;
 
         let agents = SweetAgents::get(conductor.keystore(), 1).await;
@@ -612,27 +598,21 @@ mod collateral_registration {
         let alice_cell = &apps[0].cells()[0];
         let alice_did = format!("did:mycelix:{}", agents[0]);
 
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-        struct RegisterCollateralInput {
-            pub owner_did: String,
-            pub source_happ: String,
-            pub asset_type: AssetType,
-            pub asset_id: String,
-            pub value_estimate: u64,
-            pub currency: String,
-        }
-
         let input = RegisterCollateralInput {
             owner_did: alice_did.clone(),
             source_happ: "mycelix-property".to_string(),
-            asset_type: AssetType::RealEstate,
+            asset_type: WireAssetType::RealEstate,
             asset_id: "property:lot:42".to_string(),
             value_estimate: 500_000_000, // 500k SAP in micro-units
             currency: "SAP".to_string(),
         };
 
         let result: Record = conductor
-            .call(&alice_cell.zome("finance_bridge"), "register_collateral", input)
+            .call(
+                &alice_cell.zome("finance_bridge"),
+                "register_collateral",
+                input,
+            )
             .await;
 
         let collateral: CollateralRegistration = result
@@ -642,10 +622,19 @@ mod collateral_registration {
             .expect("No entry");
 
         assert_eq!(collateral.owner_did, alice_did, "Owner DID mismatch");
-        assert!(matches!(collateral.asset_type, AssetType::RealEstate), "Asset type should be RealEstate");
+        assert!(
+            matches!(collateral.asset_type, AssetType::RealEstate),
+            "Asset type should be RealEstate"
+        );
         assert_eq!(collateral.asset_id, "property:lot:42", "Asset ID mismatch");
-        assert_eq!(collateral.value_estimate, 500_000_000, "Value estimate mismatch");
-        assert!(matches!(collateral.status, CollateralStatus::Available), "Status should be Available");
+        assert_eq!(
+            collateral.value_estimate, 500_000_000,
+            "Value estimate mismatch"
+        );
+        assert!(
+            matches!(collateral.status, CollateralStatus::Available),
+            "Status should be Available"
+        );
 
         println!("  - Collateral registered: {}", collateral.id);
         println!("  - Asset type: {:?}", collateral.asset_type);
@@ -661,7 +650,9 @@ mod collateral_registration {
         println!("Test 4.2: Invalid Collateral Registration");
 
         let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
-        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Load DNA");
+        let dna = SweetDnaFile::from_bundle(&dna_path)
+            .await
+            .expect("Load DNA");
         let mut conductor = SweetConductor::from_standard_config().await;
 
         let agents = SweetAgents::get(conductor.keystore(), 1).await;
@@ -672,35 +663,33 @@ mod collateral_registration {
 
         let alice_cell = &apps[0].cells()[0];
 
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-        struct RegisterCollateralInput {
-            pub owner_did: String,
-            pub source_happ: String,
-            pub asset_type: AssetType,
-            pub asset_id: String,
-            pub value_estimate: u64,
-            pub currency: String,
-        }
-
         let input = RegisterCollateralInput {
             owner_did: format!("did:mycelix:{}", agents[0]),
             source_happ: "mycelix-property".to_string(),
-            asset_type: AssetType::RealEstate,
+            asset_type: WireAssetType::RealEstate,
             asset_id: "".to_string(), // Empty asset_id - should fail validation
             value_estimate: 100_000,
             currency: "SAP".to_string(),
         };
 
         let result: Result<Record, _> = conductor
-            .call_fallible(&alice_cell.zome("finance_bridge"), "register_collateral", input)
+            .call_fallible(
+                &alice_cell.zome("finance_bridge"),
+                "register_collateral",
+                input,
+            )
             .await;
 
         match result {
             Err(e) => {
                 let error_msg = format!("{:?}", e);
                 assert!(
-                    error_msg.contains("asset") || error_msg.contains("empty") || error_msg.contains("Invalid") || error_msg.contains("validation"),
-                    "Should reject empty asset_id, got: {}", error_msg
+                    error_msg.contains("asset")
+                        || error_msg.contains("empty")
+                        || error_msg.contains("Invalid")
+                        || error_msg.contains("validation"),
+                    "Should reject empty asset_id, got: {}",
+                    error_msg
                 );
                 println!("  - Empty asset_id rejected: OK");
             }
@@ -726,7 +715,9 @@ mod redemption_tests {
         println!("Test 5.1: Redeem Collateral");
 
         let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
-        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Load DNA");
+        let dna = SweetDnaFile::from_bundle(&dna_path)
+            .await
+            .expect("Load DNA");
         let mut conductor = SweetConductor::from_standard_config().await;
 
         let agents = SweetAgents::get(conductor.keystore(), 1).await;
@@ -738,15 +729,6 @@ mod redemption_tests {
         let alice_cell = &apps[0].cells()[0];
         let alice_did = format!("did:mycelix:{}", agents[0]);
 
-        // Deposit ETH collateral
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-        struct DepositCollateralInput {
-            pub depositor_did: String,
-            pub collateral_type: String,
-            pub collateral_amount: u64,
-            pub oracle_rate: f64,
-        }
-
         let deposit_input = DepositCollateralInput {
             depositor_did: alice_did.clone(),
             collateral_type: "ETH".to_string(),
@@ -755,7 +737,11 @@ mod redemption_tests {
         };
 
         let deposit_record: Record = conductor
-            .call(&alice_cell.zome("finance_bridge"), "deposit_collateral", deposit_input)
+            .call(
+                &alice_cell.zome("finance_bridge"),
+                "deposit_collateral",
+                deposit_input,
+            )
             .await;
 
         let deposit: CollateralBridgeDeposit = deposit_record
@@ -770,7 +756,11 @@ mod redemption_tests {
 
         // Redeem the collateral
         let redeemed_record: Record = conductor
-            .call(&alice_cell.zome("finance_bridge"), "redeem_collateral", deposit_id.clone())
+            .call(
+                &alice_cell.zome("finance_bridge"),
+                "redeem_collateral",
+                deposit_id.clone(),
+            )
             .await;
 
         let redeemed: CollateralBridgeDeposit = redeemed_record
@@ -779,8 +769,10 @@ mod redemption_tests {
             .expect("Deserialize failed")
             .expect("No entry");
 
-        assert!(matches!(redeemed.status, BridgeDepositStatus::Redeemed),
-            "Redeemed deposit should have Redeemed status");
+        assert!(
+            matches!(redeemed.status, BridgeDepositStatus::Redeemed),
+            "Redeemed deposit should have Redeemed status"
+        );
 
         println!("  - Redemption status: {:?}", redeemed.status);
         println!("Test 5.1 PASSED: Collateral redemption works");
@@ -796,7 +788,9 @@ mod redemption_tests {
         println!("Test 5.2: Deposit Rate Limit Enforcement");
 
         let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
-        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Load DNA");
+        let dna = SweetDnaFile::from_bundle(&dna_path)
+            .await
+            .expect("Load DNA");
         let mut conductor = SweetConductor::from_standard_config().await;
 
         let agents = SweetAgents::get(conductor.keystore(), 1).await;
@@ -808,14 +802,6 @@ mod redemption_tests {
         let alice_cell = &apps[0].cells()[0];
         let alice_did = format!("did:mycelix:{}", agents[0]);
 
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-        struct DepositCollateralInput {
-            pub depositor_did: String,
-            pub collateral_type: String,
-            pub collateral_amount: u64,
-            pub oracle_rate: f64,
-        }
-
         // First deposit: bootstraps the vault (empty vault bypasses rate limit)
         let input1 = DepositCollateralInput {
             depositor_did: alice_did.clone(),
@@ -825,7 +811,11 @@ mod redemption_tests {
         };
 
         let record1: Record = conductor
-            .call(&alice_cell.zome("finance_bridge"), "deposit_collateral", input1)
+            .call(
+                &alice_cell.zome("finance_bridge"),
+                "deposit_collateral",
+                input1,
+            )
             .await;
 
         let deposit1: CollateralBridgeDeposit = record1
@@ -833,11 +823,18 @@ mod redemption_tests {
             .to_app_option()
             .expect("Deserialize failed")
             .expect("No entry");
-        println!("  - First deposit (bootstrap): {} SAP minted", deposit1.sap_minted);
+        println!(
+            "  - First deposit (bootstrap): {} SAP minted",
+            deposit1.sap_minted
+        );
 
         // Confirm the first deposit so it counts toward vault total
         let _: Record = conductor
-            .call(&alice_cell.zome("finance_bridge"), "confirm_deposit", deposit1.id.clone())
+            .call(
+                &alice_cell.zome("finance_bridge"),
+                "confirm_deposit",
+                deposit1.id.clone(),
+            )
             .await;
         println!("  - First deposit confirmed (vault now has confirmed SAP)");
 
@@ -850,7 +847,11 @@ mod redemption_tests {
         };
 
         let _: Record = conductor
-            .call(&alice_cell.zome("finance_bridge"), "deposit_collateral", input2)
+            .call(
+                &alice_cell.zome("finance_bridge"),
+                "deposit_collateral",
+                input2,
+            )
             .await;
         println!("  - Second deposit succeeded (within daily limit)");
 
@@ -865,7 +866,11 @@ mod redemption_tests {
         };
 
         let result: Result<Record, _> = conductor
-            .call_fallible(&alice_cell.zome("finance_bridge"), "deposit_collateral", input3)
+            .call_fallible(
+                &alice_cell.zome("finance_bridge"),
+                "deposit_collateral",
+                input3,
+            )
             .await;
 
         match result {
@@ -873,7 +878,8 @@ mod redemption_tests {
                 let error_msg = format!("{:?}", e);
                 assert!(
                     error_msg.contains("Rate limit exceeded") || error_msg.contains("rate limit"),
-                    "Should fail with rate limit error, got: {}", error_msg
+                    "Should fail with rate limit error, got: {}",
+                    error_msg
                 );
                 println!("  - Third deposit rejected (rate limit exceeded): OK");
             }
@@ -893,7 +899,9 @@ mod redemption_tests {
         println!("Test 5.3: Confirm Deposit Lifecycle");
 
         let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
-        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Load DNA");
+        let dna = SweetDnaFile::from_bundle(&dna_path)
+            .await
+            .expect("Load DNA");
         let mut conductor = SweetConductor::from_standard_config().await;
 
         let agents = SweetAgents::get(conductor.keystore(), 1).await;
@@ -905,14 +913,6 @@ mod redemption_tests {
         let alice_cell = &apps[0].cells()[0];
         let alice_did = format!("did:mycelix:{}", agents[0]);
 
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-        struct DepositCollateralInput {
-            pub depositor_did: String,
-            pub collateral_type: String,
-            pub collateral_amount: u64,
-            pub oracle_rate: f64,
-        }
-
         // Create a deposit
         let input = DepositCollateralInput {
             depositor_did: alice_did.clone(),
@@ -922,7 +922,11 @@ mod redemption_tests {
         };
 
         let record: Record = conductor
-            .call(&alice_cell.zome("finance_bridge"), "deposit_collateral", input)
+            .call(
+                &alice_cell.zome("finance_bridge"),
+                "deposit_collateral",
+                input,
+            )
             .await;
 
         let deposit: CollateralBridgeDeposit = record
@@ -931,13 +935,19 @@ mod redemption_tests {
             .expect("Deserialize failed")
             .expect("No entry");
 
-        assert!(matches!(deposit.status, BridgeDepositStatus::Pending),
-            "New deposit should be Pending");
+        assert!(
+            matches!(deposit.status, BridgeDepositStatus::Pending),
+            "New deposit should be Pending"
+        );
         println!("  - Deposit created: {} (Pending)", deposit.id);
 
         // Confirm the deposit
         let confirmed_record: Record = conductor
-            .call(&alice_cell.zome("finance_bridge"), "confirm_deposit", deposit.id.clone())
+            .call(
+                &alice_cell.zome("finance_bridge"),
+                "confirm_deposit",
+                deposit.id.clone(),
+            )
             .await;
 
         let confirmed: CollateralBridgeDeposit = confirmed_record
@@ -946,14 +956,23 @@ mod redemption_tests {
             .expect("Deserialize failed")
             .expect("No entry");
 
-        assert!(matches!(confirmed.status, BridgeDepositStatus::Confirmed),
-            "Confirmed deposit should have Confirmed status");
-        assert!(confirmed.completed_at.is_some(), "Should have completion timestamp");
+        assert!(
+            matches!(confirmed.status, BridgeDepositStatus::Confirmed),
+            "Confirmed deposit should have Confirmed status"
+        );
+        assert!(
+            confirmed.completed_at.is_some(),
+            "Should have completion timestamp"
+        );
         println!("  - Deposit confirmed: {:?}", confirmed.status);
 
         // Try to confirm again -- should fail
         let result: Result<Record, _> = conductor
-            .call_fallible(&alice_cell.zome("finance_bridge"), "confirm_deposit", deposit.id.clone())
+            .call_fallible(
+                &alice_cell.zome("finance_bridge"),
+                "confirm_deposit",
+                deposit.id.clone(),
+            )
             .await;
 
         match result {
@@ -963,7 +982,8 @@ mod redemption_tests {
                     error_msg.contains("only Pending deposits can be confirmed")
                         || error_msg.contains("Confirmed")
                         || error_msg.contains("Pending"),
-                    "Should reject re-confirmation, got: {}", error_msg
+                    "Should reject re-confirmation, got: {}",
+                    error_msg
                 );
                 println!("  - Re-confirmation rejected: OK");
             }
@@ -983,7 +1003,9 @@ mod redemption_tests {
         println!("Test 5.4: Redeem Unconfirmed Deposit");
 
         let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
-        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Load DNA");
+        let dna = SweetDnaFile::from_bundle(&dna_path)
+            .await
+            .expect("Load DNA");
         let mut conductor = SweetConductor::from_standard_config().await;
 
         let agents = SweetAgents::get(conductor.keystore(), 1).await;
@@ -995,14 +1017,6 @@ mod redemption_tests {
         let alice_cell = &apps[0].cells()[0];
         let alice_did = format!("did:mycelix:{}", agents[0]);
 
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-        struct DepositCollateralInput {
-            pub depositor_did: String,
-            pub collateral_type: String,
-            pub collateral_amount: u64,
-            pub oracle_rate: f64,
-        }
-
         // Create a deposit (stays Pending -- do NOT confirm)
         let input = DepositCollateralInput {
             depositor_did: alice_did.clone(),
@@ -1012,7 +1026,11 @@ mod redemption_tests {
         };
 
         let record: Record = conductor
-            .call(&alice_cell.zome("finance_bridge"), "deposit_collateral", input)
+            .call(
+                &alice_cell.zome("finance_bridge"),
+                "deposit_collateral",
+                input,
+            )
             .await;
 
         let deposit: CollateralBridgeDeposit = record
@@ -1021,13 +1039,19 @@ mod redemption_tests {
             .expect("Deserialize failed")
             .expect("No entry");
 
-        assert!(matches!(deposit.status, BridgeDepositStatus::Pending),
-            "Deposit should be Pending");
+        assert!(
+            matches!(deposit.status, BridgeDepositStatus::Pending),
+            "Deposit should be Pending"
+        );
         println!("  - Deposit created: {} (Pending)", deposit.id);
 
         // Attempt to redeem the Pending deposit -- should fail
         let result: Result<Record, _> = conductor
-            .call_fallible(&alice_cell.zome("finance_bridge"), "redeem_collateral", deposit.id.clone())
+            .call_fallible(
+                &alice_cell.zome("finance_bridge"),
+                "redeem_collateral",
+                deposit.id.clone(),
+            )
             .await;
 
         match result {
@@ -1037,7 +1061,8 @@ mod redemption_tests {
                     error_msg.contains("Only confirmed deposits can be redeemed")
                         || error_msg.contains("confirmed")
                         || error_msg.contains("Confirmed"),
-                    "Should reject redeeming unconfirmed deposit, got: {}", error_msg
+                    "Should reject redeeming unconfirmed deposit, got: {}",
+                    error_msg
                 );
                 println!("  - Redeem of Pending deposit rejected: OK");
             }
@@ -1054,7 +1079,9 @@ mod redemption_tests {
         println!("Test 5.2: Payment History");
 
         let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
-        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Load DNA");
+        let dna = SweetDnaFile::from_bundle(&dna_path)
+            .await
+            .expect("Load DNA");
         let mut conductor = SweetConductor::from_standard_config().await;
 
         let agents = SweetAgents::get(conductor.keystore(), 2).await;
@@ -1066,16 +1093,6 @@ mod redemption_tests {
         let alice_cell = &apps[0].cells()[0];
         let alice_did = format!("did:mycelix:{}", agents[0]);
         let bob_did = format!("did:mycelix:{}", agents[1]);
-
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-        struct ProcessPaymentInput {
-            pub source_happ: String,
-            pub from_did: String,
-            pub to_did: String,
-            pub amount: u64,
-            pub currency: String,
-            pub reference: String,
-        }
 
         // Make 3 cross-hApp payments
         for i in 0..3 {
@@ -1102,10 +1119,14 @@ mod redemption_tests {
 
         // Query payment history for Alice
         let history: Vec<Record> = conductor
-            .call(&alice_cell.zome("finance_bridge"), "get_payment_history", GetPaymentHistoryInput {
-                did: alice_did.clone(),
-                limit: None,
-            })
+            .call(
+                &alice_cell.zome("finance_bridge"),
+                "get_payment_history",
+                GetPaymentHistoryInput {
+                    did: alice_did.clone(),
+                    limit: None,
+                },
+            )
             .await;
 
         assert_eq!(history.len(), 3, "Should have 3 payments in history");

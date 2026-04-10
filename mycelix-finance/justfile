@@ -1,3 +1,9 @@
+# Shared temp/build dirs so finance tests do not fight over /tmp or Cargo locks
+tmpdir := "/srv/luminous-dynamics/.tmp/cargo-tmp"
+contracts_target := "/srv/luminous-dynamics/.tmp/mycelix-contracts-target"
+contract_models_target := "/srv/luminous-dynamics/.tmp/finance-contract-models-target"
+smoke_target := "/srv/luminous-dynamics/.tmp/finance-smoke-target"
+
 # Build WASM zomes
 build:
     cargo build --workspace --target wasm32-unknown-unknown --release
@@ -5,6 +11,22 @@ build:
 # Run tests
 test:
     cargo test --workspace
+
+# Frontend contract smoke against a real conductor
+test-frontend-smoke:
+    TMPDIR={{tmpdir}} CARGO_TARGET_DIR={{smoke_target}} cargo test --manifest-path contract-tests/Cargo.toml --test frontend_contract_smoke -- --ignored --test-threads=1
+
+# Cheap contract-shape tests without a conductor
+contract-models:
+    TMPDIR={{tmpdir}} CARGO_TARGET_DIR={{contract_models_target}} cargo test --manifest-path contract-models/Cargo.toml --offline --test frontend_contract_models
+
+# Finance contract checks without a conductor
+contract-check:
+    TMPDIR={{tmpdir}} CARGO_TARGET_DIR={{contracts_target}} ../scripts/check-mycelix-contracts.sh
+
+# Frontend smoke compile only, using isolated artifacts
+contract-smoke-compile:
+    TMPDIR={{tmpdir}} CARGO_TARGET_DIR={{smoke_target}} cargo check --manifest-path contract-tests/Cargo.toml --offline --test frontend_contract_smoke
 
 # Check (fast)
 check:

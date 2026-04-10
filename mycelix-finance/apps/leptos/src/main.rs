@@ -4,8 +4,10 @@
 use leptos::prelude::*;
 
 mod actions;
+mod adapters;
 mod app;
 mod context;
+mod finance_config;
 mod pages;
 
 fn main() {

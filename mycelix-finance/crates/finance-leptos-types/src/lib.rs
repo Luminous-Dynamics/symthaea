@@ -141,10 +141,17 @@ impl ServiceCategory {
 
     pub fn all_standard() -> &'static [ServiceCategory] {
         &[
-            Self::CareWork, Self::HomeServices, Self::FoodServices,
-            Self::Transportation, Self::Education, Self::GeneralAssistance,
-            Self::Administrative, Self::Creative, Self::TechSupport,
-            Self::Wellness, Self::Gardening,
+            Self::CareWork,
+            Self::HomeServices,
+            Self::FoodServices,
+            Self::Transportation,
+            Self::Education,
+            Self::GeneralAssistance,
+            Self::Administrative,
+            Self::Creative,
+            Self::TechSupport,
+            Self::Wellness,
+            Self::Gardening,
         ]
     }
 }
@@ -277,11 +284,17 @@ impl MycelTier {
     }
 
     pub fn from_score(score: f64) -> Self {
-        if score >= 0.8 { Self::Elder }
-        else if score >= 0.6 { Self::Steward }
-        else if score >= 0.4 { Self::Member }
-        else if score >= 0.2 { Self::Apprentice }
-        else { Self::Newcomer }
+        if score >= 0.8 {
+            Self::Elder
+        } else if score >= 0.6 {
+            Self::Steward
+        } else if score >= 0.4 {
+            Self::Member
+        } else if score >= 0.2 {
+            Self::Apprentice
+        } else {
+            Self::Newcomer
+        }
     }
 
     pub fn css_class(&self) -> &'static str {
@@ -375,7 +388,9 @@ impl TreasuryView {
     }
 
     pub fn reserve_health(&self) -> f64 {
-        if self.balance == 0 { return 0.0; }
+        if self.balance == 0 {
+            return 0.0;
+        }
         self.inalienable_reserve as f64 / self.balance as f64
     }
 }

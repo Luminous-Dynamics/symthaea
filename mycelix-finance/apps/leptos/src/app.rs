@@ -2,19 +2,19 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 use leptos::prelude::*;
-use leptos_router::components::{Router, Routes, Route};
+use leptos_router::components::{Route, Router, Routes};
 use leptos_router::path;
 
 use mycelix_leptos_core::{
-    HolochainProviderAuto, HolochainProviderConfig,
-    provide_theme_context, provide_thermodynamic_context,
-    provide_consciousness_context, provide_toast_context,
-    provide_homeostasis_context, init_consciousness_ui,
-    AppShell, NavLink, ToastContainer, EmptyState,
+    init_consciousness_ui, provide_consciousness_context, provide_homeostasis_context,
+    provide_local_identity, provide_theme_context, provide_thermodynamic_context,
+    provide_toast_context, AppShell, EmptyState, HolochainProviderAuto, HolochainProviderConfig,
+    NavLink, ToastContainer,
 };
 use mycelix_leptos_i18n::provide_i18n;
 
 use crate::context::provide_finance_context;
+use crate::finance_config::provide_finance_runtime_config;
 use crate::pages;
 
 // ---------------------------------------------------------------------------
@@ -77,19 +77,53 @@ fn AppInner() -> impl IntoView {
     provide_consciousness_context();
     provide_toast_context();
     provide_homeostasis_context(2, "--homeostasis");
+    provide_local_identity();
+    provide_finance_runtime_config();
     provide_i18n("finance-lang");
     provide_finance_context();
     init_consciousness_ui();
 
     let nav_links = vec![
-        NavLink { href: "/", label: "Home", icon: None },
-        NavLink { href: "/tend", label: "TEND", icon: Some("🤝") },
-        NavLink { href: "/sap", label: "SAP", icon: Some("💧") },
-        NavLink { href: "/mycel", label: "MYCEL", icon: Some("🍄") },
-        NavLink { href: "/treasury", label: "Treasury", icon: Some("🏛") },
-        NavLink { href: "/staking", label: "Staking", icon: Some("🔒") },
-        NavLink { href: "/oracle", label: "Oracle", icon: Some("🔮") },
-        NavLink { href: "/profile", label: "Profile", icon: Some("👤") },
+        NavLink {
+            href: "/",
+            label: "Home",
+            icon: None,
+        },
+        NavLink {
+            href: "/tend",
+            label: "TEND",
+            icon: Some("🤝"),
+        },
+        NavLink {
+            href: "/sap",
+            label: "SAP",
+            icon: Some("💧"),
+        },
+        NavLink {
+            href: "/mycel",
+            label: "MYCEL",
+            icon: Some("🍄"),
+        },
+        NavLink {
+            href: "/treasury",
+            label: "Treasury",
+            icon: Some("🏛"),
+        },
+        NavLink {
+            href: "/staking",
+            label: "Staking",
+            icon: Some("🔒"),
+        },
+        NavLink {
+            href: "/oracle",
+            label: "Oracle",
+            icon: Some("🔮"),
+        },
+        NavLink {
+            href: "/profile",
+            label: "Profile",
+            icon: Some("👤"),
+        },
     ];
 
     view! {

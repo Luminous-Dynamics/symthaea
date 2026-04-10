@@ -1,5 +1,4 @@
 #![deny(unsafe_code)]
-
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
@@ -1301,6 +1300,22 @@ pub fn get_commons_pool(pool_id: String) -> ExternResult<Option<Record>> {
     validate_id(&pool_id, "pool_id")?;
     let links = get_links(
         LinkQuery::try_new(anchor_hash(&pool_id)?, LinkTypes::CommonsPoolIdToPool)?,
+        GetStrategy::default(),
+    )?;
+    if let Some(link) = links.first() {
+        let hash = ActionHash::try_from(link.target.clone())
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
+        return Ok(Some(follow_update_chain(hash)?));
+    }
+    Ok(None)
+}
+
+/// Get the commons pool for a DAO (O(1) link-based lookup).
+#[hdk_extern]
+pub fn get_dao_commons_pool(dao_did: String) -> ExternResult<Option<Record>> {
+    validate_id(&dao_did, "dao_did")?;
+    let links = get_links(
+        LinkQuery::try_new(anchor_hash(&dao_did)?, LinkTypes::DaoToCommonsPool)?,
         GetStrategy::default(),
     )?;
     if let Some(link) = links.first() {

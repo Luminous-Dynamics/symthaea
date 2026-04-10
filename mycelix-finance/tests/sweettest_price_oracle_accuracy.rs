@@ -56,7 +56,10 @@ pub struct ReporterAccuracyResult {
 
 fn dna_path() -> PathBuf {
     let manifest = std::env::var("CARGO_MANIFEST_DIR").unwrap();
-    PathBuf::from(manifest).parent().unwrap().join("dna/mycelix_finance.dna")
+    PathBuf::from(manifest)
+        .parent()
+        .unwrap()
+        .join("dna/mycelix_finance.dna")
 }
 
 // ============================================================================
@@ -239,8 +242,16 @@ async fn test_accuracy_divergence_over_rounds() {
         bob_acc.accuracy_score
     );
     // Report count may vary by ±1 due to DHT eventual consistency
-    assert!(alice_acc.report_count >= 2, "alice report count: {}", alice_acc.report_count);
-    assert!(bob_acc.report_count >= 2, "bob report count: {}", bob_acc.report_count);
+    assert!(
+        alice_acc.report_count >= 2,
+        "alice report count: {}",
+        alice_acc.report_count
+    );
+    assert!(
+        bob_acc.report_count >= 2,
+        "bob report count: {}",
+        bob_acc.report_count
+    );
 }
 
 /// Single reporter should fail — need at least 2 for consensus.
@@ -279,5 +290,8 @@ async fn test_single_reporter_fails() {
         )
         .await;
 
-    assert!(result.is_err(), "Consensus should fail with only 1 reporter");
+    assert!(
+        result.is_err(),
+        "Consensus should fail with only 1 reporter"
+    );
 }

@@ -81,8 +81,7 @@ async fn test_discovery_active_only_inner() {
         .await;
 
     // Both should appear in list
-    let active: Vec<CurrencyDefinition> =
-        conductor.call(&zome, "list_active_currencies", ()).await;
+    let active: Vec<CurrencyDefinition> = conductor.call(&zome, "list_active_currencies", ()).await;
     assert!(
         active.iter().any(|c| c.id == def_a.id),
         "AlphaCoin should be in active list"

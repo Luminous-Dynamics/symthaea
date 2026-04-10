@@ -30,15 +30,16 @@
 //! cargo test --test payments_test -- --ignored
 //! ```
 
-use holochain::sweettest::*;
 use holochain::prelude::*;
+use holochain::sweettest::*;
 use holochain_types::prelude::*;
 use std::time::Duration;
 
+use finance_wire_types::SapBalanceResponse;
 // Import zome types
-use payments_integrity::*;
-use payments::*;
 use mycelix_finance_types::compute_demurrage_deduction;
+use payments::*;
+use payments_integrity::*;
 
 // Test utilities
 mod test_helpers {
@@ -80,7 +81,9 @@ mod payment_creation {
 
         // Setup conductor with 2 agents
         let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
-        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Failed to load DNA");
+        let dna = SweetDnaFile::from_bundle(&dna_path)
+            .await
+            .expect("Failed to load DNA");
         let mut conductor = SweetConductor::from_standard_config().await;
 
         let agents = SweetAgents::get(conductor.keystore(), 2).await;
@@ -107,11 +110,7 @@ mod payment_creation {
 
         // Send payment
         let payment_record: Record = conductor
-            .call(
-                &alice_cell.zome("payments"),
-                "send_payment",
-                payment_input,
-            )
+            .call(&alice_cell.zome("payments"), "send_payment", payment_input)
             .await;
 
         println!("  - Payment created successfully");
@@ -123,12 +122,18 @@ mod payment_creation {
             .expect("Failed to deserialize")
             .expect("No entry found");
 
-        assert!(payment.id.starts_with("payment:"), "Payment ID should have correct prefix");
+        assert!(
+            payment.id.starts_with("payment:"),
+            "Payment ID should have correct prefix"
+        );
         assert_eq!(payment.from_did, alice_did, "From DID mismatch");
         assert_eq!(payment.to_did, bob_did, "To DID mismatch");
         assert_eq!(payment.amount, 100_000_000, "Amount mismatch");
         assert_eq!(payment.currency, TEST_CURRENCY, "Currency mismatch");
-        assert!(matches!(payment.status, TransferStatus::Completed), "Status should be Completed");
+        assert!(
+            matches!(payment.status, TransferStatus::Completed),
+            "Status should be Completed"
+        );
         assert!(payment.memo.is_some(), "Memo should be present");
 
         println!("  - Payment fields verified");
@@ -144,7 +149,9 @@ mod payment_creation {
         println!("Test 1.2: Payment Types");
 
         let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
-        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Failed to load DNA");
+        let dna = SweetDnaFile::from_bundle(&dna_path)
+            .await
+            .expect("Failed to load DNA");
         let mut conductor = SweetConductor::from_standard_config().await;
 
         let agents = SweetAgents::get(conductor.keystore(), 2).await;
@@ -161,8 +168,14 @@ mod payment_creation {
         // Test each valid payment type (LoanPayment and EnergyInvestment removed)
         let payment_types = vec![
             (PaymentType::Direct, "Direct"),
-            (PaymentType::TreasuryContribution("treasury:abc".to_string()), "TreasuryContribution"),
-            (PaymentType::CommonsContribution("commons:pool:1".to_string()), "CommonsContribution"),
+            (
+                PaymentType::TreasuryContribution("treasury:abc".to_string()),
+                "TreasuryContribution",
+            ),
+            (
+                PaymentType::CommonsContribution("commons:pool:1".to_string()),
+                "CommonsContribution",
+            ),
             (PaymentType::Escrow("escrow:456".to_string()), "Escrow"),
         ];
 
@@ -174,7 +187,7 @@ mod payment_creation {
                 currency: TEST_CURRENCY.to_string(),
                 payment_type: payment_type.clone(),
                 memo: Some(format!("Test {} payment", type_name)),
-                };
+            };
 
             let result: Record = conductor
                 .call(&alice_cell.zome("payments"), "send_payment", input)
@@ -186,7 +199,11 @@ mod payment_creation {
                 .expect("Deserialize failed")
                 .expect("No entry");
 
-            assert_eq!(payment.payment_type, payment_type, "{} type mismatch", type_name);
+            assert_eq!(
+                payment.payment_type, payment_type,
+                "{} type mismatch",
+                type_name
+            );
             println!("  - {} payment: OK", type_name);
         }
 
@@ -200,7 +217,9 @@ mod payment_creation {
         println!("Test 1.3: Recurring Payment Configuration");
 
         let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
-        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Failed to load DNA");
+        let dna = SweetDnaFile::from_bundle(&dna_path)
+            .await
+            .expect("Failed to load DNA");
         let mut conductor = SweetConductor::from_standard_config().await;
 
         let agents = SweetAgents::get(conductor.keystore(), 2).await;
@@ -243,8 +262,11 @@ mod payment_creation {
         if let PaymentType::Recurring(config) = payment.payment_type {
             assert_eq!(config.frequency_days, 30, "Frequency mismatch");
             assert_eq!(config.remaining, Some(12), "Remaining payments mismatch");
-            println!("  - Recurring config verified: {} days, {} remaining",
-                config.frequency_days, config.remaining.unwrap());
+            println!(
+                "  - Recurring config verified: {} days, {} remaining",
+                config.frequency_days,
+                config.remaining.unwrap()
+            );
         } else {
             panic!("Expected Recurring payment type");
         }
@@ -268,7 +290,9 @@ mod payment_validation {
         println!("Test 2.1: Invalid DID Validation");
 
         let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
-        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Failed to load DNA");
+        let dna = SweetDnaFile::from_bundle(&dna_path)
+            .await
+            .expect("Failed to load DNA");
         let mut conductor = SweetConductor::from_standard_config().await;
 
         let agents = SweetAgents::get(conductor.keystore(), 1).await;
@@ -290,16 +314,21 @@ mod payment_validation {
         };
 
         let result: Result<Record, _> = conductor
-            .call_fallible(&alice_cell.zome("payments"), "send_payment", invalid_sender_input)
+            .call_fallible(
+                &alice_cell.zome("payments"),
+                "send_payment",
+                invalid_sender_input,
+            )
             .await;
 
         match result {
             Err(e) => {
                 let error_msg = format!("{:?}", e);
                 assert!(
-                    error_msg.contains("Sender must be a valid DID") ||
-                    error_msg.contains("Invalid"),
-                    "Should reject invalid sender DID, got: {}", error_msg
+                    error_msg.contains("Sender must be a valid DID")
+                        || error_msg.contains("Invalid"),
+                    "Should reject invalid sender DID, got: {}",
+                    error_msg
                 );
                 println!("  - Invalid sender DID rejected: OK");
             }
@@ -317,16 +346,21 @@ mod payment_validation {
         };
 
         let result: Result<Record, _> = conductor
-            .call_fallible(&alice_cell.zome("payments"), "send_payment", invalid_receiver_input)
+            .call_fallible(
+                &alice_cell.zome("payments"),
+                "send_payment",
+                invalid_receiver_input,
+            )
             .await;
 
         match result {
             Err(e) => {
                 let error_msg = format!("{:?}", e);
                 assert!(
-                    error_msg.contains("Receiver must be a valid DID") ||
-                    error_msg.contains("Invalid"),
-                    "Should reject invalid receiver DID, got: {}", error_msg
+                    error_msg.contains("Receiver must be a valid DID")
+                        || error_msg.contains("Invalid"),
+                    "Should reject invalid receiver DID, got: {}",
+                    error_msg
                 );
                 println!("  - Invalid receiver DID rejected: OK");
             }
@@ -343,7 +377,9 @@ mod payment_validation {
         println!("Test 2.2: Invalid Amount Validation");
 
         let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
-        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Failed to load DNA");
+        let dna = SweetDnaFile::from_bundle(&dna_path)
+            .await
+            .expect("Failed to load DNA");
         let mut conductor = SweetConductor::from_standard_config().await;
 
         let agents = SweetAgents::get(conductor.keystore(), 1).await;
@@ -367,7 +403,11 @@ mod payment_validation {
         };
 
         let result: Result<Record, _> = conductor
-            .call_fallible(&alice_cell.zome("payments"), "send_payment", zero_amount_input)
+            .call_fallible(
+                &alice_cell.zome("payments"),
+                "send_payment",
+                zero_amount_input,
+            )
             .await;
 
         match result {
@@ -375,7 +415,8 @@ mod payment_validation {
                 let error_msg = format!("{:?}", e);
                 assert!(
                     error_msg.contains("Amount must be positive"),
-                    "Should reject zero amount, got: {}", error_msg
+                    "Should reject zero amount, got: {}",
+                    error_msg
                 );
                 println!("  - Zero amount rejected: OK");
             }
@@ -395,7 +436,9 @@ mod payment_validation {
         println!("Test 2.3: Self-Payment Validation");
 
         let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
-        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Failed to load DNA");
+        let dna = SweetDnaFile::from_bundle(&dna_path)
+            .await
+            .expect("Failed to load DNA");
         let mut conductor = SweetConductor::from_standard_config().await;
 
         let agents = SweetAgents::get(conductor.keystore(), 1).await;
@@ -418,7 +461,11 @@ mod payment_validation {
         };
 
         let result: Result<Record, _> = conductor
-            .call_fallible(&alice_cell.zome("payments"), "send_payment", self_payment_input)
+            .call_fallible(
+                &alice_cell.zome("payments"),
+                "send_payment",
+                self_payment_input,
+            )
             .await;
 
         match result {
@@ -426,7 +473,8 @@ mod payment_validation {
                 let error_msg = format!("{:?}", e);
                 assert!(
                     error_msg.contains("Cannot send payment to yourself"),
-                    "Should reject self-payment, got: {}", error_msg
+                    "Should reject self-payment, got: {}",
+                    error_msg
                 );
                 println!("  - Self-payment rejected: OK");
             }
@@ -443,7 +491,9 @@ mod payment_validation {
         println!("Test 2.4: Invalid Currency Validation");
 
         let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
-        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Failed to load DNA");
+        let dna = SweetDnaFile::from_bundle(&dna_path)
+            .await
+            .expect("Failed to load DNA");
         let mut conductor = SweetConductor::from_standard_config().await;
 
         let agents = SweetAgents::get(conductor.keystore(), 1).await;
@@ -467,7 +517,7 @@ mod payment_validation {
                 currency: currency.to_string(),
                 payment_type: PaymentType::Direct,
                 memo: None,
-                };
+            };
 
             let result: Result<Record, _> = conductor
                 .call_fallible(&alice_cell.zome("payments"), "send_payment", input)
@@ -477,8 +527,12 @@ mod payment_validation {
                 Err(e) => {
                     let error_msg = format!("{:?}", e);
                     assert!(
-                        error_msg.contains("Currency must be") || error_msg.contains("SAP") || error_msg.contains("TEND"),
-                        "Should reject {} currency, got: {}", currency, error_msg
+                        error_msg.contains("Currency must be")
+                            || error_msg.contains("SAP")
+                            || error_msg.contains("TEND"),
+                        "Should reject {} currency, got: {}",
+                        currency,
+                        error_msg
                     );
                     println!("  - {} currency rejected: OK", currency);
                 }
@@ -507,7 +561,9 @@ mod double_spend_prevention {
         println!("Test 3.1: Payment ID Uniqueness");
 
         let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
-        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Failed to load DNA");
+        let dna = SweetDnaFile::from_bundle(&dna_path)
+            .await
+            .expect("Failed to load DNA");
         let mut conductor = SweetConductor::from_standard_config().await;
 
         let agents = SweetAgents::get(conductor.keystore(), 2).await;
@@ -530,7 +586,7 @@ mod double_spend_prevention {
                 currency: TEST_CURRENCY.to_string(),
                 payment_type: PaymentType::Direct,
                 memo: Some(format!("Payment {}", i)),
-                };
+            };
 
             let result: Record = conductor
                 .call(&alice_cell.zome("payments"), "send_payment", input)
@@ -571,7 +627,9 @@ mod double_spend_prevention {
         println!("Test 3.2: Receipt Verification");
 
         let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
-        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Failed to load DNA");
+        let dna = SweetDnaFile::from_bundle(&dna_path)
+            .await
+            .expect("Failed to load DNA");
         let mut conductor = SweetConductor::from_standard_config().await;
 
         let agents = SweetAgents::get(conductor.keystore(), 2).await;
@@ -606,10 +664,14 @@ mod double_spend_prevention {
 
         // Get payment history and verify receipt link exists
         let history: Vec<Record> = conductor
-            .call(&alice_cell.zome("payments"), "get_payment_history", GetPaymentHistoryInput {
-                did: alice_did.clone(),
-                limit: None,
-            })
+            .call(
+                &alice_cell.zome("payments"),
+                "get_payment_history",
+                GetPaymentHistoryInput {
+                    did: alice_did.clone(),
+                    limit: None,
+                },
+            )
             .await;
 
         assert!(!history.is_empty(), "Payment history should not be empty");
@@ -631,7 +693,9 @@ mod double_spend_prevention {
         println!("Test 3.3: Channel Balance Consistency");
 
         let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
-        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Failed to load DNA");
+        let dna = SweetDnaFile::from_bundle(&dna_path)
+            .await
+            .expect("Failed to load DNA");
         let mut conductor = SweetConductor::from_standard_config().await;
 
         let agents = SweetAgents::get(conductor.keystore(), 2).await;
@@ -656,7 +720,11 @@ mod double_spend_prevention {
         };
 
         let channel_record: Record = conductor
-            .call(&alice_cell.zome("payments"), "open_payment_channel", channel_input)
+            .call(
+                &alice_cell.zome("payments"),
+                "open_payment_channel",
+                channel_input,
+            )
             .await;
 
         let channel: PaymentChannel = channel_record
@@ -667,7 +735,10 @@ mod double_spend_prevention {
 
         let channel_id = channel.id.clone();
         println!("  - Channel opened: {}", channel_id);
-        println!("  - Initial balances: A={}, B={}", channel.balance_a, channel.balance_b);
+        println!(
+            "  - Initial balances: A={}, B={}",
+            channel.balance_a, channel.balance_b
+        );
 
         // Verify initial state
         assert_eq!(channel.balance_a, 500_000_000, "Initial balance A mismatch");
@@ -681,7 +752,11 @@ mod double_spend_prevention {
         };
 
         let updated_channel: Record = conductor
-            .call(&alice_cell.zome("payments"), "channel_transfer", transfer_input)
+            .call(
+                &alice_cell.zome("payments"),
+                "channel_transfer",
+                transfer_input,
+            )
             .await;
 
         let channel_after: PaymentChannel = updated_channel
@@ -693,11 +768,23 @@ mod double_spend_prevention {
         // Verify conservation of total balance
         let total_before: u64 = 500_000_000 + 300_000_000;
         let total_after = channel_after.balance_a + channel_after.balance_b;
-        assert_eq!(total_before, total_after, "Total balance should be conserved");
-        assert_eq!(channel_after.balance_a, 400_000_000, "Balance A after transfer");
-        assert_eq!(channel_after.balance_b, 400_000_000, "Balance B after transfer");
+        assert_eq!(
+            total_before, total_after,
+            "Total balance should be conserved"
+        );
+        assert_eq!(
+            channel_after.balance_a, 400_000_000,
+            "Balance A after transfer"
+        );
+        assert_eq!(
+            channel_after.balance_b, 400_000_000,
+            "Balance B after transfer"
+        );
 
-        println!("  - After transfer: A={}, B={}", channel_after.balance_a, channel_after.balance_b);
+        println!(
+            "  - After transfer: A={}, B={}",
+            channel_after.balance_a, channel_after.balance_b
+        );
         println!("  - Total conserved: {}", total_after);
 
         println!("Test 3.3 PASSED: Channel balances are consistent");
@@ -710,7 +797,9 @@ mod double_spend_prevention {
         println!("Test 3.4: Channel Insufficient Balance Check");
 
         let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
-        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Failed to load DNA");
+        let dna = SweetDnaFile::from_bundle(&dna_path)
+            .await
+            .expect("Failed to load DNA");
         let mut conductor = SweetConductor::from_standard_config().await;
 
         let agents = SweetAgents::get(conductor.keystore(), 2).await;
@@ -734,7 +823,11 @@ mod double_spend_prevention {
         };
 
         let channel_record: Record = conductor
-            .call(&alice_cell.zome("payments"), "open_payment_channel", channel_input)
+            .call(
+                &alice_cell.zome("payments"),
+                "open_payment_channel",
+                channel_input,
+            )
             .await;
 
         let channel: PaymentChannel = channel_record
@@ -753,7 +846,11 @@ mod double_spend_prevention {
         };
 
         let result: Result<Record, _> = conductor
-            .call_fallible(&alice_cell.zome("payments"), "channel_transfer", transfer_input)
+            .call_fallible(
+                &alice_cell.zome("payments"),
+                "channel_transfer",
+                transfer_input,
+            )
             .await;
 
         match result {
@@ -761,7 +858,8 @@ mod double_spend_prevention {
                 let error_msg = format!("{:?}", e);
                 assert!(
                     error_msg.contains("Insufficient balance"),
-                    "Should reject insufficient balance, got: {}", error_msg
+                    "Should reject insufficient balance, got: {}",
+                    error_msg
                 );
                 println!("  - Insufficient balance transfer rejected: OK");
             }
@@ -787,7 +885,9 @@ mod transaction_confirmation {
         println!("Test 4.1: Payment Completion Status");
 
         let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
-        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Failed to load DNA");
+        let dna = SweetDnaFile::from_bundle(&dna_path)
+            .await
+            .expect("Failed to load DNA");
         let mut conductor = SweetConductor::from_standard_config().await;
 
         let agents = SweetAgents::get(conductor.keystore(), 2).await;
@@ -820,13 +920,21 @@ mod transaction_confirmation {
             .expect("No entry");
 
         // Verify completion status
-        assert!(matches!(payment.status, TransferStatus::Completed), "Status should be Completed");
-        assert!(payment.completed.is_some(), "Completion timestamp should be set");
+        assert!(
+            matches!(payment.status, TransferStatus::Completed),
+            "Status should be Completed"
+        );
+        assert!(
+            payment.completed.is_some(),
+            "Completion timestamp should be set"
+        );
 
         let created = payment.created;
         let completed = payment.completed.unwrap();
-        assert!(completed.as_micros() >= created.as_micros(),
-            "Completion should be at or after creation");
+        assert!(
+            completed.as_micros() >= created.as_micros(),
+            "Completion should be at or after creation"
+        );
 
         println!("  - Status: {:?}", payment.status);
         println!("  - Created: {:?}", created);
@@ -842,7 +950,9 @@ mod transaction_confirmation {
         println!("Test 4.2: Payment History Retrieval");
 
         let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
-        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Failed to load DNA");
+        let dna = SweetDnaFile::from_bundle(&dna_path)
+            .await
+            .expect("Failed to load DNA");
         let mut conductor = SweetConductor::from_standard_config().await;
 
         let agents = SweetAgents::get(conductor.keystore(), 3).await;
@@ -909,25 +1019,39 @@ mod transaction_confirmation {
 
         // Get Alice's payment history (should include sent and received)
         let alice_history: Vec<Record> = conductor
-            .call(&alice_cell.zome("payments"), "get_payment_history", GetPaymentHistoryInput {
-                did: alice_did.clone(),
-                limit: None,
-            })
+            .call(
+                &alice_cell.zome("payments"),
+                "get_payment_history",
+                GetPaymentHistoryInput {
+                    did: alice_did.clone(),
+                    limit: None,
+                },
+            )
             .await;
 
         println!("  - Alice's history: {} payments", alice_history.len());
-        assert!(alice_history.len() >= 2, "Alice should have at least 2 payments");
+        assert!(
+            alice_history.len() >= 2,
+            "Alice should have at least 2 payments"
+        );
 
         // Get Bob's payment history
         let bob_history: Vec<Record> = conductor
-            .call(&bob_cell.zome("payments"), "get_payment_history", GetPaymentHistoryInput {
-                did: bob_did.clone(),
-                limit: None,
-            })
+            .call(
+                &bob_cell.zome("payments"),
+                "get_payment_history",
+                GetPaymentHistoryInput {
+                    did: bob_did.clone(),
+                    limit: None,
+                },
+            )
             .await;
 
         println!("  - Bob's history: {} payments", bob_history.len());
-        assert!(!bob_history.is_empty(), "Bob should have at least 1 payment");
+        assert!(
+            !bob_history.is_empty(),
+            "Bob should have at least 1 payment"
+        );
 
         println!("Test 4.2 PASSED: Payment history retrieval works");
     }
@@ -948,7 +1072,9 @@ mod currency_tests {
         println!("Test 5.1: SAP Currency Payment");
 
         let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
-        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Failed to load DNA");
+        let dna = SweetDnaFile::from_bundle(&dna_path)
+            .await
+            .expect("Failed to load DNA");
         let mut conductor = SweetConductor::from_standard_config().await;
 
         let agents = SweetAgents::get(conductor.keystore(), 2).await;
@@ -981,7 +1107,10 @@ mod currency_tests {
             .expect("No entry");
 
         assert_eq!(payment.currency, "SAP", "Currency should be SAP");
-        assert_eq!(payment.amount, 100_000_000, "Full amount should be recorded");
+        assert_eq!(
+            payment.amount, 100_000_000,
+            "Full amount should be recorded"
+        );
         println!("  - SAP payment amount: {}", payment.amount);
         println!("  - Currency: {}", payment.currency);
         println!("Test 5.1 PASSED: SAP payment works");
@@ -994,7 +1123,9 @@ mod currency_tests {
         println!("Test 5.2: TEND Currency Payment");
 
         let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
-        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Failed to load DNA");
+        let dna = SweetDnaFile::from_bundle(&dna_path)
+            .await
+            .expect("Failed to load DNA");
         let mut conductor = SweetConductor::from_standard_config().await;
 
         let agents = SweetAgents::get(conductor.keystore(), 2).await;
@@ -1039,7 +1170,9 @@ mod currency_tests {
         println!("Test 5.3: Valid Currencies Only (SAP/TEND)");
 
         let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
-        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Failed to load DNA");
+        let dna = SweetDnaFile::from_bundle(&dna_path)
+            .await
+            .expect("Failed to load DNA");
         let mut conductor = SweetConductor::from_standard_config().await;
 
         let agents = SweetAgents::get(conductor.keystore(), 2).await;
@@ -1118,7 +1251,9 @@ mod failed_transaction_handling {
         println!("Test 6.1: Channel Not Found Error");
 
         let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
-        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Failed to load DNA");
+        let dna = SweetDnaFile::from_bundle(&dna_path)
+            .await
+            .expect("Failed to load DNA");
         let mut conductor = SweetConductor::from_standard_config().await;
 
         let agents = SweetAgents::get(conductor.keystore(), 1).await;
@@ -1137,7 +1272,11 @@ mod failed_transaction_handling {
         };
 
         let result: Result<Record, _> = conductor
-            .call_fallible(&alice_cell.zome("payments"), "channel_transfer", transfer_input)
+            .call_fallible(
+                &alice_cell.zome("payments"),
+                "channel_transfer",
+                transfer_input,
+            )
             .await;
 
         match result {
@@ -1145,7 +1284,8 @@ mod failed_transaction_handling {
                 let error_msg = format!("{:?}", e);
                 assert!(
                     error_msg.contains("Channel not found") || error_msg.contains("not found"),
-                    "Should report channel not found, got: {}", error_msg
+                    "Should report channel not found, got: {}",
+                    error_msg
                 );
                 println!("  - Channel not found error: OK");
             }
@@ -1162,7 +1302,9 @@ mod failed_transaction_handling {
         println!("Test 6.2: Empty Payment History");
 
         let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
-        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Failed to load DNA");
+        let dna = SweetDnaFile::from_bundle(&dna_path)
+            .await
+            .expect("Failed to load DNA");
         let mut conductor = SweetConductor::from_standard_config().await;
 
         let agents = SweetAgents::get(conductor.keystore(), 1).await;
@@ -1177,10 +1319,14 @@ mod failed_transaction_handling {
         let new_user_did = format!("did:mycelix:{}", agents[0]);
 
         let history: Vec<Record> = conductor
-            .call(&alice_cell.zome("payments"), "get_payment_history", GetPaymentHistoryInput {
-                did: new_user_did,
-                limit: None,
-            })
+            .call(
+                &alice_cell.zome("payments"),
+                "get_payment_history",
+                GetPaymentHistoryInput {
+                    did: new_user_did,
+                    limit: None,
+                },
+            )
             .await;
 
         assert!(history.is_empty(), "New user should have empty history");
@@ -1198,7 +1344,9 @@ mod failed_transaction_handling {
         println!("Test 6.3: Concurrent Channel Transfers");
 
         let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
-        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Failed to load DNA");
+        let dna = SweetDnaFile::from_bundle(&dna_path)
+            .await
+            .expect("Failed to load DNA");
         let mut conductor = SweetConductor::from_standard_config().await;
 
         let agents = SweetAgents::get(conductor.keystore(), 2).await;
@@ -1221,7 +1369,11 @@ mod failed_transaction_handling {
         };
 
         let channel_record: Record = conductor
-            .call(&alice_cell.zome("payments"), "open_payment_channel", channel_input)
+            .call(
+                &alice_cell.zome("payments"),
+                "open_payment_channel",
+                channel_input,
+            )
             .await;
 
         let channel: PaymentChannel = channel_record
@@ -1234,7 +1386,13 @@ mod failed_transaction_handling {
         println!("  - Channel opened with 1000/1000 balances");
 
         // Perform rapid sequential transfers
-        let transfer_amounts: Vec<u64> = vec![100_000_000, 150_000_000, 75_000_000, 200_000_000, 50_000_000];
+        let transfer_amounts: Vec<u64> = vec![
+            100_000_000,
+            150_000_000,
+            75_000_000,
+            200_000_000,
+            50_000_000,
+        ];
         let mut expected_balance_a: u64 = 1_000_000_000;
         let mut expected_balance_b: u64 = 1_000_000_000;
 
@@ -1248,7 +1406,11 @@ mod failed_transaction_handling {
             };
 
             let result: Record = conductor
-                .call(&alice_cell.zome("payments"), "channel_transfer", transfer_input)
+                .call(
+                    &alice_cell.zome("payments"),
+                    "channel_transfer",
+                    transfer_input,
+                )
                 .await;
 
             let updated_channel: PaymentChannel = result
@@ -1266,18 +1428,29 @@ mod failed_transaction_handling {
                 expected_balance_b -= amount;
             }
 
-            assert_eq!(updated_channel.balance_a, expected_balance_a,
-                "Balance A mismatch after transfer {}", i);
-            assert_eq!(updated_channel.balance_b, expected_balance_b,
-                "Balance B mismatch after transfer {}", i);
+            assert_eq!(
+                updated_channel.balance_a, expected_balance_a,
+                "Balance A mismatch after transfer {}",
+                i
+            );
+            assert_eq!(
+                updated_channel.balance_b, expected_balance_b,
+                "Balance B mismatch after transfer {}",
+                i
+            );
 
-            println!("  - Transfer {}: {} (from_a={}) -> A={}, B={}",
-                i, amount, from_a, updated_channel.balance_a, updated_channel.balance_b);
+            println!(
+                "  - Transfer {}: {} (from_a={}) -> A={}, B={}",
+                i, amount, from_a, updated_channel.balance_a, updated_channel.balance_b
+            );
         }
 
         // Verify final total
         let final_total = expected_balance_a + expected_balance_b;
-        assert_eq!(final_total, 2_000_000_000, "Total balance should be conserved");
+        assert_eq!(
+            final_total, 2_000_000_000,
+            "Total balance should be conserved"
+        );
         println!("  - Final total conserved: {}", final_total);
 
         println!("Test 6.3 PASSED: Concurrent transfers handled correctly");
@@ -1299,7 +1472,9 @@ mod payment_channels {
         println!("Test 7.1: Payment Channel Creation");
 
         let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
-        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Failed to load DNA");
+        let dna = SweetDnaFile::from_bundle(&dna_path)
+            .await
+            .expect("Failed to load DNA");
         let mut conductor = SweetConductor::from_standard_config().await;
 
         let agents = SweetAgents::get(conductor.keystore(), 2).await;
@@ -1321,7 +1496,11 @@ mod payment_channels {
         };
 
         let result: Record = conductor
-            .call(&alice_cell.zome("payments"), "open_payment_channel", channel_input)
+            .call(
+                &alice_cell.zome("payments"),
+                "open_payment_channel",
+                channel_input,
+            )
             .await;
 
         let channel: PaymentChannel = result
@@ -1339,8 +1518,14 @@ mod payment_channels {
         assert!(channel.closed.is_none(), "Channel should not be closed");
 
         println!("  - Channel ID: {}", channel.id);
-        println!("  - Party A: {}, Balance: {}", channel.party_a, channel.balance_a);
-        println!("  - Party B: {}, Balance: {}", channel.party_b, channel.balance_b);
+        println!(
+            "  - Party A: {}, Balance: {}",
+            channel.party_a, channel.balance_a
+        );
+        println!(
+            "  - Party B: {}, Balance: {}",
+            channel.party_b, channel.balance_b
+        );
 
         println!("Test 7.1 PASSED: Payment channel creation works");
     }
@@ -1352,7 +1537,9 @@ mod payment_channels {
         println!("Test 7.2: Bidirectional Channel Transfers");
 
         let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
-        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Failed to load DNA");
+        let dna = SweetDnaFile::from_bundle(&dna_path)
+            .await
+            .expect("Failed to load DNA");
         let mut conductor = SweetConductor::from_standard_config().await;
 
         let agents = SweetAgents::get(conductor.keystore(), 2).await;
@@ -1377,7 +1564,11 @@ mod payment_channels {
         };
 
         let channel_record: Record = conductor
-            .call(&alice_cell.zome("payments"), "open_payment_channel", channel_input)
+            .call(
+                &alice_cell.zome("payments"),
+                "open_payment_channel",
+                channel_input,
+            )
             .await;
 
         let channel: PaymentChannel = channel_record
@@ -1445,7 +1636,9 @@ mod payment_channels {
         println!("Test 7.3: Channel Invalid Parties Validation");
 
         let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
-        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Failed to load DNA");
+        let dna = SweetDnaFile::from_bundle(&dna_path)
+            .await
+            .expect("Failed to load DNA");
         let mut conductor = SweetConductor::from_standard_config().await;
 
         let agents = SweetAgents::get(conductor.keystore(), 1).await;
@@ -1466,16 +1659,21 @@ mod payment_channels {
         };
 
         let result: Result<Record, _> = conductor
-            .call_fallible(&alice_cell.zome("payments"), "open_payment_channel", invalid_input)
+            .call_fallible(
+                &alice_cell.zome("payments"),
+                "open_payment_channel",
+                invalid_input,
+            )
             .await;
 
         match result {
             Err(e) => {
                 let error_msg = format!("{:?}", e);
                 assert!(
-                    error_msg.contains("Parties must be valid DIDs") ||
-                    error_msg.contains("Invalid"),
-                    "Should reject invalid party DID, got: {}", error_msg
+                    error_msg.contains("Parties must be valid DIDs")
+                        || error_msg.contains("Invalid"),
+                    "Should reject invalid party DID, got: {}",
+                    error_msg
                 );
                 println!("  - Invalid party_a rejected: OK");
             }
@@ -1526,8 +1724,12 @@ mod unit_tests {
 
         for payment_type in types {
             let json = serde_json::to_string(&payment_type).expect("Serialize failed");
-            let deserialized: PaymentType = serde_json::from_str(&json).expect("Deserialize failed");
-            assert_eq!(payment_type, deserialized, "Round-trip serialization failed");
+            let deserialized: PaymentType =
+                serde_json::from_str(&json).expect("Deserialize failed");
+            assert_eq!(
+                payment_type, deserialized,
+                "Round-trip serialization failed"
+            );
         }
     }
 
@@ -1544,7 +1746,8 @@ mod unit_tests {
 
         for status in statuses {
             let json = serde_json::to_string(&status).expect("Serialize failed");
-            let deserialized: TransferStatus = serde_json::from_str(&json).expect("Deserialize failed");
+            let deserialized: TransferStatus =
+                serde_json::from_str(&json).expect("Deserialize failed");
             assert_eq!(status, deserialized, "Status round-trip failed");
         }
     }
@@ -1576,14 +1779,16 @@ mod unit_tests {
         for currency in &valid {
             assert!(
                 *currency == "SAP" || *currency == "TEND",
-                "{} should be valid", currency
+                "{} should be valid",
+                currency
             );
         }
 
         for currency in &invalid {
             assert!(
                 *currency != "SAP" && *currency != "TEND",
-                "{} should be invalid", currency
+                "{} should be invalid",
+                currency
             );
         }
     }
@@ -1604,7 +1809,9 @@ mod performance_benchmarks {
         println!("Benchmark: Payment Creation Latency");
 
         let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
-        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Failed to load DNA");
+        let dna = SweetDnaFile::from_bundle(&dna_path)
+            .await
+            .expect("Failed to load DNA");
         let mut conductor = SweetConductor::from_standard_config().await;
 
         let agents = SweetAgents::get(conductor.keystore(), 2).await;
@@ -1628,7 +1835,7 @@ mod performance_benchmarks {
                 currency: TEST_CURRENCY.to_string(),
                 payment_type: PaymentType::Direct,
                 memo: Some(format!("Benchmark payment {}", i)),
-                };
+            };
 
             let start = std::time::Instant::now();
 
@@ -1671,7 +1878,9 @@ mod sap_balance_management {
         println!("Test 8.1: Initialize SAP Balance");
 
         let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
-        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Failed to load DNA");
+        let dna = SweetDnaFile::from_bundle(&dna_path)
+            .await
+            .expect("Failed to load DNA");
         let mut conductor = SweetConductor::from_standard_config().await;
 
         let agents = SweetAgents::get(conductor.keystore(), 1).await;
@@ -1686,19 +1895,33 @@ mod sap_balance_management {
 
         // Initialize SAP balance
         let _: Record = conductor
-            .call(&alice_cell.zome("payments"), "initialize_sap_balance", alice_did.clone())
+            .call(
+                &alice_cell.zome("payments"),
+                "initialize_sap_balance",
+                alice_did.clone(),
+            )
             .await;
 
         println!("  - SAP balance initialized");
 
         // Get balance and verify zero
         let balance: SapBalanceResponse = conductor
-            .call(&alice_cell.zome("payments"), "get_sap_balance", alice_did.clone())
+            .call(
+                &alice_cell.zome("payments"),
+                "get_sap_balance",
+                alice_did.clone(),
+            )
             .await;
 
         assert_eq!(balance.raw_balance, 0, "Initial raw balance should be 0");
-        assert_eq!(balance.effective_balance, 0, "Initial effective balance should be 0");
-        assert_eq!(balance.pending_demurrage, 0, "Initial pending demurrage should be 0");
+        assert_eq!(
+            balance.effective_balance, 0,
+            "Initial effective balance should be 0"
+        );
+        assert_eq!(
+            balance.pending_demurrage, 0,
+            "Initial pending demurrage should be 0"
+        );
 
         println!("  - Raw balance: {}", balance.raw_balance);
         println!("  - Effective balance: {}", balance.effective_balance);
@@ -1713,7 +1936,9 @@ mod sap_balance_management {
         println!("Test 8.2: Credit and Debit SAP");
 
         let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
-        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Failed to load DNA");
+        let dna = SweetDnaFile::from_bundle(&dna_path)
+            .await
+            .expect("Failed to load DNA");
         let mut conductor = SweetConductor::from_standard_config().await;
 
         let agents = SweetAgents::get(conductor.keystore(), 1).await;
@@ -1728,7 +1953,11 @@ mod sap_balance_management {
 
         // Initialize
         let _: Record = conductor
-            .call(&alice_cell.zome("payments"), "initialize_sap_balance", alice_did.clone())
+            .call(
+                &alice_cell.zome("payments"),
+                "initialize_sap_balance",
+                alice_did.clone(),
+            )
             .await;
 
         // Credit 5000
@@ -1740,11 +1969,15 @@ mod sap_balance_management {
         }
 
         let _: Record = conductor
-            .call(&alice_cell.zome("payments"), "credit_sap", CreditSapInput {
-                member_did: alice_did.clone(),
-                amount: 5000,
-                reason: "Test credit".to_string(),
-            })
+            .call(
+                &alice_cell.zome("payments"),
+                "credit_sap",
+                CreditSapInput {
+                    member_did: alice_did.clone(),
+                    amount: 5000,
+                    reason: "Test credit".to_string(),
+                },
+            )
             .await;
 
         println!("  - Credited 5000 SAP");
@@ -1758,21 +1991,32 @@ mod sap_balance_management {
         }
 
         let _: Record = conductor
-            .call(&alice_cell.zome("payments"), "debit_sap", DebitSapInput {
-                member_did: alice_did.clone(),
-                amount: 2000,
-                reason: "Test debit".to_string(),
-            })
+            .call(
+                &alice_cell.zome("payments"),
+                "debit_sap",
+                DebitSapInput {
+                    member_did: alice_did.clone(),
+                    amount: 2000,
+                    reason: "Test debit".to_string(),
+                },
+            )
             .await;
 
         println!("  - Debited 2000 SAP");
 
         // Verify remaining balance is 3000
         let balance: SapBalanceResponse = conductor
-            .call(&alice_cell.zome("payments"), "get_sap_balance", alice_did.clone())
+            .call(
+                &alice_cell.zome("payments"),
+                "get_sap_balance",
+                alice_did.clone(),
+            )
             .await;
 
-        assert_eq!(balance.raw_balance, 3000, "Balance should be 3000 after credit 5000 and debit 2000");
+        assert_eq!(
+            balance.raw_balance, 3000,
+            "Balance should be 3000 after credit 5000 and debit 2000"
+        );
 
         println!("  - Remaining balance: {}", balance.raw_balance);
         println!("Test 8.2 PASSED: Credit and debit work correctly");
@@ -1785,7 +2029,9 @@ mod sap_balance_management {
         println!("Test 8.3: Debit Exceeds Balance");
 
         let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
-        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Failed to load DNA");
+        let dna = SweetDnaFile::from_bundle(&dna_path)
+            .await
+            .expect("Failed to load DNA");
         let mut conductor = SweetConductor::from_standard_config().await;
 
         let agents = SweetAgents::get(conductor.keystore(), 1).await;
@@ -1800,7 +2046,11 @@ mod sap_balance_management {
 
         // Initialize and credit 1000
         let _: Record = conductor
-            .call(&alice_cell.zome("payments"), "initialize_sap_balance", alice_did.clone())
+            .call(
+                &alice_cell.zome("payments"),
+                "initialize_sap_balance",
+                alice_did.clone(),
+            )
             .await;
 
         #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -1811,11 +2061,15 @@ mod sap_balance_management {
         }
 
         let _: Record = conductor
-            .call(&alice_cell.zome("payments"), "credit_sap", CreditSapInput {
-                member_did: alice_did.clone(),
-                amount: 1000,
-                reason: "Test credit".to_string(),
-            })
+            .call(
+                &alice_cell.zome("payments"),
+                "credit_sap",
+                CreditSapInput {
+                    member_did: alice_did.clone(),
+                    amount: 1000,
+                    reason: "Test credit".to_string(),
+                },
+            )
             .await;
 
         // Try to debit 2000 (exceeds 1000 balance)
@@ -1827,19 +2081,26 @@ mod sap_balance_management {
         }
 
         let result: Result<Record, _> = conductor
-            .call_fallible(&alice_cell.zome("payments"), "debit_sap", DebitSapInput {
-                member_did: alice_did.clone(),
-                amount: 2000,
-                reason: "Test overdraft".to_string(),
-            })
+            .call_fallible(
+                &alice_cell.zome("payments"),
+                "debit_sap",
+                DebitSapInput {
+                    member_did: alice_did.clone(),
+                    amount: 2000,
+                    reason: "Test overdraft".to_string(),
+                },
+            )
             .await;
 
         match result {
             Err(e) => {
                 let error_msg = format!("{:?}", e);
                 assert!(
-                    error_msg.contains("Insufficient") || error_msg.contains("insufficient") || error_msg.contains("balance"),
-                    "Should reject debit exceeding balance, got: {}", error_msg
+                    error_msg.contains("Insufficient")
+                        || error_msg.contains("insufficient")
+                        || error_msg.contains("balance"),
+                    "Should reject debit exceeding balance, got: {}",
+                    error_msg
                 );
                 println!("  - Overdraft rejected: OK");
             }
@@ -1856,7 +2117,9 @@ mod sap_balance_management {
         println!("Test 8.4: Demurrage Applied on Read");
 
         let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
-        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Failed to load DNA");
+        let dna = SweetDnaFile::from_bundle(&dna_path)
+            .await
+            .expect("Failed to load DNA");
         let mut conductor = SweetConductor::from_standard_config().await;
 
         let agents = SweetAgents::get(conductor.keystore(), 1).await;
@@ -1871,7 +2134,11 @@ mod sap_balance_management {
 
         // Initialize and credit a large balance (above exempt floor)
         let _: Record = conductor
-            .call(&alice_cell.zome("payments"), "initialize_sap_balance", alice_did.clone())
+            .call(
+                &alice_cell.zome("payments"),
+                "initialize_sap_balance",
+                alice_did.clone(),
+            )
             .await;
 
         #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -1882,11 +2149,15 @@ mod sap_balance_management {
         }
 
         let _: Record = conductor
-            .call(&alice_cell.zome("payments"), "credit_sap", CreditSapInput {
-                member_did: alice_did.clone(),
-                amount: 10_000_000_000, // 10B micro-SAP (well above exempt floor)
-                reason: "Test large credit".to_string(),
-            })
+            .call(
+                &alice_cell.zome("payments"),
+                "credit_sap",
+                CreditSapInput {
+                    member_did: alice_did.clone(),
+                    amount: 10_000_000_000, // 10B micro-SAP (well above exempt floor)
+                    reason: "Test large credit".to_string(),
+                },
+            )
             .await;
 
         // Wait to allow time to pass for demurrage calculation
@@ -1894,7 +2165,11 @@ mod sap_balance_management {
 
         // Read balance - pending_demurrage should be > 0 (time has elapsed)
         let balance: SapBalanceResponse = conductor
-            .call(&alice_cell.zome("payments"), "get_sap_balance", alice_did.clone())
+            .call(
+                &alice_cell.zome("payments"),
+                "get_sap_balance",
+                alice_did.clone(),
+            )
             .await;
 
         println!("  - Raw balance: {}", balance.raw_balance);
@@ -1903,7 +2178,10 @@ mod sap_balance_management {
 
         // With 10B micro-SAP and 2+ seconds elapsed, demurrage should be > 0
         // (depends on rate and exempt floor, but any non-trivial time produces some)
-        assert!(balance.pending_demurrage > 0, "Pending demurrage should be > 0 after time elapsed");
+        assert!(
+            balance.pending_demurrage > 0,
+            "Pending demurrage should be > 0 after time elapsed"
+        );
 
         println!("Test 8.4 PASSED: Demurrage is calculated on balance read");
     }
@@ -1924,7 +2202,9 @@ mod exit_protocol {
         println!("Test 9.1: Exit with Commons Succession");
 
         let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
-        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Failed to load DNA");
+        let dna = SweetDnaFile::from_bundle(&dna_path)
+            .await
+            .expect("Failed to load DNA");
         let mut conductor = SweetConductor::from_standard_config().await;
 
         let agents = SweetAgents::get(conductor.keystore(), 1).await;
@@ -1961,7 +2241,10 @@ mod exit_protocol {
             .expect("No entry");
 
         assert_eq!(exit.member_did, alice_did, "Member DID mismatch");
-        assert!(matches!(exit.succession_preference, SuccessionPreference::Commons));
+        assert!(matches!(
+            exit.succession_preference,
+            SuccessionPreference::Commons
+        ));
         assert_eq!(exit.sap_balance, 500_000_000, "SAP balance mismatch");
 
         println!("  - Exit initiated for: {}", exit.member_did);
@@ -1977,7 +2260,9 @@ mod exit_protocol {
         println!("Test 9.2: Exit with Designee");
 
         let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
-        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Failed to load DNA");
+        let dna = SweetDnaFile::from_bundle(&dna_path)
+            .await
+            .expect("Failed to load DNA");
         let mut conductor = SweetConductor::from_standard_config().await;
 
         let agents = SweetAgents::get(conductor.keystore(), 1).await;
@@ -2042,7 +2327,9 @@ mod escrow_tests {
         println!("Test 10.1: Create and Release Escrow");
 
         let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
-        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Failed to load DNA");
+        let dna = SweetDnaFile::from_bundle(&dna_path)
+            .await
+            .expect("Failed to load DNA");
         let mut conductor = SweetConductor::from_standard_config().await;
 
         let agents = SweetAgents::get(conductor.keystore(), 2).await;
@@ -2085,12 +2372,19 @@ mod escrow_tests {
             .expect("Deserialize failed")
             .expect("No entry");
 
-        assert!(matches!(escrow.status, TransferStatus::Pending), "Escrow should be Pending");
+        assert!(
+            matches!(escrow.status, TransferStatus::Pending),
+            "Escrow should be Pending"
+        );
         println!("  - Escrow created: {}", escrow.id);
 
         // Release escrow
         let released_record: Record = conductor
-            .call(&alice_cell.zome("payments"), "release_escrow", escrow.id.clone())
+            .call(
+                &alice_cell.zome("payments"),
+                "release_escrow",
+                escrow.id.clone(),
+            )
             .await;
 
         let released: Payment = released_record
@@ -2099,7 +2393,10 @@ mod escrow_tests {
             .expect("Deserialize failed")
             .expect("No entry");
 
-        assert!(matches!(released.status, TransferStatus::Completed), "Released escrow should be Completed");
+        assert!(
+            matches!(released.status, TransferStatus::Completed),
+            "Released escrow should be Completed"
+        );
         println!("  - Escrow released, status: {:?}", released.status);
         println!("Test 10.1 PASSED: Create and release escrow works");
     }
@@ -2111,7 +2408,9 @@ mod escrow_tests {
         println!("Test 10.2: Refund Payment");
 
         let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
-        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Failed to load DNA");
+        let dna = SweetDnaFile::from_bundle(&dna_path)
+            .await
+            .expect("Failed to load DNA");
         let mut conductor = SweetConductor::from_standard_config().await;
 
         let agents = SweetAgents::get(conductor.keystore(), 2).await;
@@ -2148,7 +2447,11 @@ mod escrow_tests {
 
         // Refund
         let refunded_record: Record = conductor
-            .call(&alice_cell.zome("payments"), "refund_payment", payment.id.clone())
+            .call(
+                &alice_cell.zome("payments"),
+                "refund_payment",
+                payment.id.clone(),
+            )
             .await;
 
         let refunded: Payment = refunded_record
@@ -2157,7 +2460,10 @@ mod escrow_tests {
             .expect("Deserialize failed")
             .expect("No entry");
 
-        assert!(matches!(refunded.status, TransferStatus::Refunded), "Refunded payment should have Refunded status");
+        assert!(
+            matches!(refunded.status, TransferStatus::Refunded),
+            "Refunded payment should have Refunded status"
+        );
         println!("  - Refunded status: {:?}", refunded.status);
         println!("Test 10.2 PASSED: Payment refund works");
     }
@@ -2169,7 +2475,9 @@ mod escrow_tests {
         println!("Test 10.3: Cannot Double Refund");
 
         let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
-        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Failed to load DNA");
+        let dna = SweetDnaFile::from_bundle(&dna_path)
+            .await
+            .expect("Failed to load DNA");
         let mut conductor = SweetConductor::from_standard_config().await;
 
         let agents = SweetAgents::get(conductor.keystore(), 2).await;
@@ -2204,22 +2512,33 @@ mod escrow_tests {
 
         // First refund - should succeed
         let _: Record = conductor
-            .call(&alice_cell.zome("payments"), "refund_payment", payment.id.clone())
+            .call(
+                &alice_cell.zome("payments"),
+                "refund_payment",
+                payment.id.clone(),
+            )
             .await;
 
         println!("  - First refund succeeded");
 
         // Second refund - should fail
         let result: Result<Record, _> = conductor
-            .call_fallible(&alice_cell.zome("payments"), "refund_payment", payment.id.clone())
+            .call_fallible(
+                &alice_cell.zome("payments"),
+                "refund_payment",
+                payment.id.clone(),
+            )
             .await;
 
         match result {
             Err(e) => {
                 let error_msg = format!("{:?}", e);
                 assert!(
-                    error_msg.contains("already") || error_msg.contains("Refunded") || error_msg.contains("refund"),
-                    "Should reject double refund, got: {}", error_msg
+                    error_msg.contains("already")
+                        || error_msg.contains("Refunded")
+                        || error_msg.contains("refund"),
+                    "Should reject double refund, got: {}",
+                    error_msg
                 );
                 println!("  - Double refund rejected: OK");
             }
@@ -2245,7 +2564,9 @@ mod channel_close_tests {
         println!("Test 11.1: Close Payment Channel");
 
         let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
-        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Failed to load DNA");
+        let dna = SweetDnaFile::from_bundle(&dna_path)
+            .await
+            .expect("Failed to load DNA");
         let mut conductor = SweetConductor::from_standard_config().await;
 
         let agents = SweetAgents::get(conductor.keystore(), 2).await;
@@ -2268,7 +2589,11 @@ mod channel_close_tests {
         };
 
         let channel_record: Record = conductor
-            .call(&alice_cell.zome("payments"), "open_payment_channel", channel_input)
+            .call(
+                &alice_cell.zome("payments"),
+                "open_payment_channel",
+                channel_input,
+            )
             .await;
 
         let channel: PaymentChannel = channel_record
@@ -2283,7 +2608,11 @@ mod channel_close_tests {
 
         // Close channel
         let closed_record: Record = conductor
-            .call(&alice_cell.zome("payments"), "close_payment_channel", channel_id.clone())
+            .call(
+                &alice_cell.zome("payments"),
+                "close_payment_channel",
+                channel_id.clone(),
+            )
             .await;
 
         let closed_channel: PaymentChannel = closed_record
@@ -2292,8 +2621,14 @@ mod channel_close_tests {
             .expect("Deserialize failed")
             .expect("No entry");
 
-        assert!(closed_channel.closed.is_some(), "Channel should have closed timestamp");
-        println!("  - Channel closed at: {:?}", closed_channel.closed.unwrap());
+        assert!(
+            closed_channel.closed.is_some(),
+            "Channel should have closed timestamp"
+        );
+        println!(
+            "  - Channel closed at: {:?}",
+            closed_channel.closed.unwrap()
+        );
         println!("Test 11.1 PASSED: Payment channel close works");
     }
 
@@ -2304,7 +2639,9 @@ mod channel_close_tests {
         println!("Test 11.2: Cannot Close Already Closed Channel");
 
         let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
-        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Failed to load DNA");
+        let dna = SweetDnaFile::from_bundle(&dna_path)
+            .await
+            .expect("Failed to load DNA");
         let mut conductor = SweetConductor::from_standard_config().await;
 
         let agents = SweetAgents::get(conductor.keystore(), 2).await;
@@ -2327,7 +2664,11 @@ mod channel_close_tests {
         };
 
         let channel_record: Record = conductor
-            .call(&alice_cell.zome("payments"), "open_payment_channel", channel_input)
+            .call(
+                &alice_cell.zome("payments"),
+                "open_payment_channel",
+                channel_input,
+            )
             .await;
 
         let channel: PaymentChannel = channel_record
@@ -2340,22 +2681,33 @@ mod channel_close_tests {
 
         // First close
         let _: Record = conductor
-            .call(&alice_cell.zome("payments"), "close_payment_channel", channel_id.clone())
+            .call(
+                &alice_cell.zome("payments"),
+                "close_payment_channel",
+                channel_id.clone(),
+            )
             .await;
 
         println!("  - First close succeeded");
 
         // Second close - should fail
         let result: Result<Record, _> = conductor
-            .call_fallible(&alice_cell.zome("payments"), "close_payment_channel", channel_id.clone())
+            .call_fallible(
+                &alice_cell.zome("payments"),
+                "close_payment_channel",
+                channel_id.clone(),
+            )
             .await;
 
         match result {
             Err(e) => {
                 let error_msg = format!("{:?}", e);
                 assert!(
-                    error_msg.contains("already closed") || error_msg.contains("closed") || error_msg.contains("Channel"),
-                    "Should reject closing already-closed channel, got: {}", error_msg
+                    error_msg.contains("already closed")
+                        || error_msg.contains("closed")
+                        || error_msg.contains("Channel"),
+                    "Should reject closing already-closed channel, got: {}",
+                    error_msg
                 );
                 println!("  - Double close rejected: OK");
             }
@@ -2391,8 +2743,16 @@ mod sap_balance_unit_tests {
         // Expected: ~178M (9B * (1 - e^(-0.02)))
         // e^(-0.02) ~ 0.980199, so 1 - 0.980199 ~ 0.019801
         // 9_000_000_000 * 0.019801 ~ 178_209_000
-        assert!(deduction > 170_000_000, "Deduction should be > 170M, got: {}", deduction);
-        assert!(deduction < 190_000_000, "Deduction should be < 190M, got: {}", deduction);
+        assert!(
+            deduction > 170_000_000,
+            "Deduction should be > 170M, got: {}",
+            deduction
+        );
+        assert!(
+            deduction < 190_000_000,
+            "Deduction should be < 190M, got: {}",
+            deduction
+        );
         println!("  - Demurrage deduction: {} (expected ~178M)", deduction);
     }
 
@@ -2406,7 +2766,10 @@ mod sap_balance_unit_tests {
             0.02,
             31_536_000,
         );
-        assert_eq!(deduction_eq, 0, "Balance == exempt floor should yield 0 deduction");
+        assert_eq!(
+            deduction_eq, 0,
+            "Balance == exempt floor should yield 0 deduction"
+        );
 
         // Balance below exempt floor
         let deduction_below = compute_demurrage_deduction(
@@ -2415,7 +2778,10 @@ mod sap_balance_unit_tests {
             0.02,
             31_536_000,
         );
-        assert_eq!(deduction_below, 0, "Balance < exempt floor should yield 0 deduction");
+        assert_eq!(
+            deduction_below, 0,
+            "Balance < exempt floor should yield 0 deduction"
+        );
     }
 
     /// Test fee computation: FeeTier::from_mycel(0.5) = Member, 1M * 0.0003 = 300
@@ -2424,15 +2790,24 @@ mod sap_balance_unit_tests {
         use mycelix_finance_types::FeeTier;
 
         let tier = FeeTier::from_mycel(0.5);
-        assert!(matches!(tier, FeeTier::Member), "MYCEL 0.5 should be Member tier");
+        assert!(
+            matches!(tier, FeeTier::Member),
+            "MYCEL 0.5 should be Member tier"
+        );
 
         let rate = tier.base_fee_rate();
-        assert!((rate - 0.0003).abs() < 1e-6, "Member base fee rate should be 0.0003");
+        assert!(
+            (rate - 0.0003).abs() < 1e-6,
+            "Member base fee rate should be 0.0003"
+        );
 
         let amount: u64 = 1_000_000;
         let fee = (amount as f64 * rate) as u64;
         assert_eq!(fee, 300, "1M * 0.0003 should equal 300");
-        println!("  - FeeTier::Member base_fee_rate = {}, fee on 1M = {}", rate, fee);
+        println!(
+            "  - FeeTier::Member base_fee_rate = {}, fee on 1M = {}",
+            rate, fee
+        );
     }
 }
 
@@ -2462,7 +2837,9 @@ mod fee_tier_tests {
         println!("Test 13.1: SAP Fee Tiers (Default Newcomer)");
 
         let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
-        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Failed to load DNA");
+        let dna = SweetDnaFile::from_bundle(&dna_path)
+            .await
+            .expect("Failed to load DNA");
         let mut conductor = SweetConductor::from_standard_config().await;
 
         let agents = SweetAgents::get(conductor.keystore(), 2).await;
@@ -2480,7 +2857,11 @@ mod fee_tier_tests {
 
         // Initialize Alice's SAP balance and credit 10M micro-SAP
         let _: Record = conductor
-            .call(&alice_cell.zome("payments"), "initialize_sap_balance", alice_did.clone())
+            .call(
+                &alice_cell.zome("payments"),
+                "initialize_sap_balance",
+                alice_did.clone(),
+            )
             .await;
 
         #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -2491,23 +2872,35 @@ mod fee_tier_tests {
         }
 
         let _: Record = conductor
-            .call(&alice_cell.zome("payments"), "credit_sap", CreditSapInput {
-                member_did: alice_did.clone(),
-                amount: 10_000_000, // 10M micro-SAP
-                reason: "Test credit for fee test".to_string(),
-            })
+            .call(
+                &alice_cell.zome("payments"),
+                "credit_sap",
+                CreditSapInput {
+                    member_did: alice_did.clone(),
+                    amount: 10_000_000, // 10M micro-SAP
+                    reason: "Test credit for fee test".to_string(),
+                },
+            )
             .await;
 
         // Initialize Bob's SAP balance (so credit_sap on receive works)
         let _: Record = conductor
-            .call(&bob_cell.zome("payments"), "initialize_sap_balance", bob_did.clone())
+            .call(
+                &bob_cell.zome("payments"),
+                "initialize_sap_balance",
+                bob_did.clone(),
+            )
             .await;
 
         println!("  - Alice funded with 10M micro-SAP");
 
         // Get Alice's balance before payment
         let balance_before: SapBalanceResponse = conductor
-            .call(&alice_cell.zome("payments"), "get_sap_balance", alice_did.clone())
+            .call(
+                &alice_cell.zome("payments"),
+                "get_sap_balance",
+                alice_did.clone(),
+            )
             .await;
 
         // Send 1.0 SAP (= 1_000_000 micro-SAP) from Alice to Bob
@@ -2535,29 +2928,50 @@ mod fee_tier_tests {
 
         // Check Alice's balance after -- should be reduced by amount + fee
         let balance_after: SapBalanceResponse = conductor
-            .call(&alice_cell.zome("payments"), "get_sap_balance", alice_did.clone())
+            .call(
+                &alice_cell.zome("payments"),
+                "get_sap_balance",
+                alice_did.clone(),
+            )
             .await;
 
         // Total debit = amount (1M) + fee (Newcomer 0.001 * 1M = 1000) = 1_001_000
         // Note: demurrage may also apply, so we check the balance decrease is >= amount + fee
-        let decrease = balance_before.effective_balance.saturating_sub(balance_after.effective_balance);
+        let decrease = balance_before
+            .effective_balance
+            .saturating_sub(balance_after.effective_balance);
         let micro_amount: u64 = 1_000_000;
         let newcomer_fee = (micro_amount as f64 * 0.001) as u64; // Newcomer tier: 0.10%
 
-        assert!(decrease >= micro_amount + newcomer_fee,
+        assert!(
+            decrease >= micro_amount + newcomer_fee,
             "Balance decrease ({}) should be >= amount ({}) + fee ({})",
-            decrease, micro_amount, newcomer_fee);
-        println!("  - Balance decrease: {} (amount {} + fee {} + any demurrage)",
-            decrease, micro_amount, newcomer_fee);
+            decrease,
+            micro_amount,
+            newcomer_fee
+        );
+        println!(
+            "  - Balance decrease: {} (amount {} + fee {} + any demurrage)",
+            decrease, micro_amount, newcomer_fee
+        );
 
         // Verify Bob received the amount (without fee)
         let bob_balance: SapBalanceResponse = conductor
-            .call(&bob_cell.zome("payments"), "get_sap_balance", bob_did.clone())
+            .call(
+                &bob_cell.zome("payments"),
+                "get_sap_balance",
+                bob_did.clone(),
+            )
             .await;
 
-        assert_eq!(bob_balance.raw_balance, micro_amount,
-            "Bob should receive exactly the payment amount (no fee)");
-        println!("  - Bob received: {} micro-SAP (fee-free)", bob_balance.raw_balance);
+        assert_eq!(
+            bob_balance.raw_balance, micro_amount,
+            "Bob should receive exactly the payment amount (no fee)"
+        );
+        println!(
+            "  - Bob received: {} micro-SAP (fee-free)",
+            bob_balance.raw_balance
+        );
 
         println!("Test 13.1 PASSED: SAP fee tiers applied correctly (Newcomer default)");
     }
@@ -2572,7 +2986,9 @@ mod fee_tier_tests {
         println!("Test 13.2: TEND Payment No Fee");
 
         let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
-        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Failed to load DNA");
+        let dna = SweetDnaFile::from_bundle(&dna_path)
+            .await
+            .expect("Failed to load DNA");
         let mut conductor = SweetConductor::from_standard_config().await;
 
         let agents = SweetAgents::get(conductor.keystore(), 2).await;
@@ -2611,7 +3027,10 @@ mod fee_tier_tests {
 
         // TEND payments do not go through debit_sap/credit_sap, so no fee is applied.
         // The coordinator code path for non-SAP currencies sets fee_amount = 0.
-        println!("  - TEND payment completed: {} TEND (fee-free)", payment.amount);
+        println!(
+            "  - TEND payment completed: {} TEND (fee-free)",
+            payment.amount
+        );
         println!("  - No SAP balance deduction for TEND payments");
 
         println!("Test 13.2 PASSED: TEND payments are fee-free");

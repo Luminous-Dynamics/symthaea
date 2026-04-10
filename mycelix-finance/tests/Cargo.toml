@@ -13,6 +13,8 @@ autotests = false
 [dependencies]
 # Shared types
 mycelix_finance_types = { path = "../types" }
+finance-wire-types = { path = "../crates/finance-wire-types" }
+finance-leptos-types = { path = "../crates/finance-leptos-types" }
 
 # Payments zome dependencies
 payments_integrity = { path = "../zomes/payments/integrity" }

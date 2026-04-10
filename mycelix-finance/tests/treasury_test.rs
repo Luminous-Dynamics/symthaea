@@ -18,8 +18,8 @@
 //! cargo test --test treasury_test -- --ignored     # Full integration tests
 //! ```
 
-use holochain::sweettest::*;
 use holochain::prelude::*;
+use holochain::sweettest::*;
 use std::time::Duration;
 
 use treasury_integrity::*;
@@ -50,7 +50,9 @@ mod treasury_lifecycle {
         println!("Test 1.1: Create Treasury with 2 managers");
 
         let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
-        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Load DNA");
+        let dna = SweetDnaFile::from_bundle(&dna_path)
+            .await
+            .expect("Load DNA");
         let mut conductor = SweetConductor::from_standard_config().await;
 
         let agents = SweetAgents::get(conductor.keystore(), 1).await;
@@ -113,7 +115,9 @@ mod treasury_lifecycle {
         println!("Test 1.2: Contribute SAP increases treasury balance");
 
         let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
-        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Load DNA");
+        let dna = SweetDnaFile::from_bundle(&dna_path)
+            .await
+            .expect("Load DNA");
         let mut conductor = SweetConductor::from_standard_config().await;
 
         let agents = SweetAgents::get(conductor.keystore(), 1).await;
@@ -144,7 +148,11 @@ mod treasury_lifecycle {
         };
 
         let create_result: Record = conductor
-            .call(&alice_cell.zome("treasury"), "create_treasury", create_input)
+            .call(
+                &alice_cell.zome("treasury"),
+                "create_treasury",
+                create_input,
+            )
             .await;
 
         let treasury: Treasury = create_result
@@ -186,11 +194,18 @@ mod treasury_lifecycle {
 
         assert_eq!(contribution.amount, 500_000_000);
         assert_eq!(contribution.currency, "SAP");
-        assert!(matches!(contribution.contribution_type, ContributionType::Deposit));
+        assert!(matches!(
+            contribution.contribution_type,
+            ContributionType::Deposit
+        ));
 
         // Step 3: Verify treasury balance updated
         let updated_treasury: Option<Record> = conductor
-            .call(&alice_cell.zome("treasury"), "get_treasury", treasury_id.clone())
+            .call(
+                &alice_cell.zome("treasury"),
+                "get_treasury",
+                treasury_id.clone(),
+            )
             .await;
 
         let updated: Treasury = updated_treasury
@@ -200,7 +215,10 @@ mod treasury_lifecycle {
             .expect("Deserialize failed")
             .expect("No entry");
 
-        assert_eq!(updated.balance, 500_000_000, "Balance should be 500M after contribution");
+        assert_eq!(
+            updated.balance, 500_000_000,
+            "Balance should be 500M after contribution"
+        );
 
         println!("  - Contribution: {} SAP", contribution.amount);
         println!("  - Updated balance: {}", updated.balance);
@@ -301,7 +319,9 @@ mod allocation_governance {
         println!("Test 2.1: Propose -> Approve (majority) -> Execute");
 
         let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
-        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Load DNA");
+        let dna = SweetDnaFile::from_bundle(&dna_path)
+            .await
+            .expect("Load DNA");
         let mut conductor = SweetConductor::from_standard_config().await;
 
         let agents = SweetAgents::get(conductor.keystore(), 1).await;
@@ -383,7 +403,11 @@ mod allocation_governance {
         // With 3 managers, majority is 2 -- first approval keeps it Proposed
         assert_eq!(after_first.approved_by.len(), 1);
         assert_eq!(after_first.status, AllocationStatus::Proposed);
-        println!("  - After 1st approval: status={:?}, approvals={}", after_first.status, after_first.approved_by.len());
+        println!(
+            "  - After 1st approval: status={:?}, approvals={}",
+            after_first.status,
+            after_first.approved_by.len()
+        );
 
         // Second approval (mgr_b) -- now majority reached
         let approve_2 = ApproveAllocationInput {
@@ -403,11 +427,19 @@ mod allocation_governance {
 
         assert_eq!(after_second.approved_by.len(), 2);
         assert_eq!(after_second.status, AllocationStatus::Approved);
-        println!("  - After 2nd approval: status={:?}, approvals={}", after_second.status, after_second.approved_by.len());
+        println!(
+            "  - After 2nd approval: status={:?}, approvals={}",
+            after_second.status,
+            after_second.approved_by.len()
+        );
 
         // Execute the approved allocation
         let exec_result: Record = conductor
-            .call(&cell.zome("treasury"), "execute_allocation", alloc_id.clone())
+            .call(
+                &cell.zome("treasury"),
+                "execute_allocation",
+                alloc_id.clone(),
+            )
             .await;
 
         let executed: Allocation = exec_result
@@ -417,7 +449,10 @@ mod allocation_governance {
             .expect("Entry");
 
         assert_eq!(executed.status, AllocationStatus::Executed);
-        assert!(executed.executed.is_some(), "Executed timestamp should be set");
+        assert!(
+            executed.executed.is_some(),
+            "Executed timestamp should be set"
+        );
 
         // Verify treasury balance decreased
         let updated_treasury: Option<Record> = conductor
@@ -431,7 +466,10 @@ mod allocation_governance {
             .expect("Deserialize")
             .expect("Entry");
 
-        assert_eq!(treasury_data.balance, 800_000_000, "Balance should be 1000M - 200M = 800M");
+        assert_eq!(
+            treasury_data.balance, 800_000_000,
+            "Balance should be 1000M - 200M = 800M"
+        );
         println!("  - Executed: balance now {}", treasury_data.balance);
         println!("Test 2.1 PASSED: Full propose -> approve -> execute lifecycle works");
     }
@@ -443,7 +481,9 @@ mod allocation_governance {
         println!("Test 2.2: Propose -> Reject");
 
         let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
-        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Load DNA");
+        let dna = SweetDnaFile::from_bundle(&dna_path)
+            .await
+            .expect("Load DNA");
         let mut conductor = SweetConductor::from_standard_config().await;
 
         let agents = SweetAgents::get(conductor.keystore(), 1).await;
@@ -502,7 +542,9 @@ mod allocation_governance {
         println!("Test 2.3: Propose -> Cancel");
 
         let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
-        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Load DNA");
+        let dna = SweetDnaFile::from_bundle(&dna_path)
+            .await
+            .expect("Load DNA");
         let mut conductor = SweetConductor::from_standard_config().await;
 
         let agents = SweetAgents::get(conductor.keystore(), 1).await;
@@ -561,7 +603,9 @@ mod allocation_governance {
         println!("Test 2.4: Non-manager cannot approve allocations");
 
         let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
-        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Load DNA");
+        let dna = SweetDnaFile::from_bundle(&dna_path)
+            .await
+            .expect("Load DNA");
         let mut conductor = SweetConductor::from_standard_config().await;
 
         let agents = SweetAgents::get(conductor.keystore(), 1).await;
@@ -652,7 +696,9 @@ mod commons_pool_tests {
         println!("Test 3.1: Create Commons Pool");
 
         let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
-        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Load DNA");
+        let dna = SweetDnaFile::from_bundle(&dna_path)
+            .await
+            .expect("Load DNA");
         let mut conductor = SweetConductor::from_standard_config().await;
 
         let agents = SweetAgents::get(conductor.keystore(), 1).await;
@@ -685,7 +731,10 @@ mod commons_pool_tests {
 
         assert_eq!(pool.inalienable_reserve, 0, "Initial reserve should be 0");
         assert_eq!(pool.available_balance, 0, "Initial available should be 0");
-        assert!(pool.demurrage_exempt, "Commons pool must be demurrage exempt (constitutional)");
+        assert!(
+            pool.demurrage_exempt,
+            "Commons pool must be demurrage exempt (constitutional)"
+        );
         assert_eq!(pool.dao_did, dao_did);
         assert!(pool.id.starts_with("commons:"));
 
@@ -702,7 +751,9 @@ mod commons_pool_tests {
         println!("Test 3.2: Contribution splits 25/75");
 
         let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
-        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Load DNA");
+        let dna = SweetDnaFile::from_bundle(&dna_path)
+            .await
+            .expect("Load DNA");
         let mut conductor = SweetConductor::from_standard_config().await;
 
         let agents = SweetAgents::get(conductor.keystore(), 1).await;
@@ -741,8 +792,14 @@ mod commons_pool_tests {
             .expect("Entry");
 
         // 1000 / 4 = 250 to reserve, 1000 - 250 = 750 to available
-        assert_eq!(pool.inalienable_reserve, 250, "25% of 1000 = 250 to reserve");
-        assert_eq!(pool.available_balance, 750, "75% of 1000 = 750 to available");
+        assert_eq!(
+            pool.inalienable_reserve, 250,
+            "25% of 1000 = 250 to reserve"
+        );
+        assert_eq!(
+            pool.available_balance, 750,
+            "75% of 1000 = 750 to available"
+        );
 
         let total = pool.inalienable_reserve + pool.available_balance;
         assert_eq!(total, 1000, "Total should equal contribution amount");
@@ -759,7 +816,9 @@ mod commons_pool_tests {
         println!("Test 3.3: Inalienable reserve is untouchable");
 
         let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
-        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Load DNA");
+        let dna = SweetDnaFile::from_bundle(&dna_path)
+            .await
+            .expect("Load DNA");
         let mut conductor = SweetConductor::from_standard_config().await;
 
         let agents = SweetAgents::get(conductor.keystore(), 1).await;
@@ -788,7 +847,11 @@ mod commons_pool_tests {
         };
 
         let _: Record = conductor
-            .call(&cell.zome("treasury"), "contribute_to_commons", contrib_input)
+            .call(
+                &cell.zome("treasury"),
+                "contribute_to_commons",
+                contrib_input,
+            )
             .await;
 
         // Attempt to allocate MORE than available (751 > 750)
@@ -811,7 +874,10 @@ mod commons_pool_tests {
             .call_fallible(&cell.zome("treasury"), "request_allocation", over_alloc)
             .await;
 
-        assert!(over_result.is_err(), "Allocating more than available should fail");
+        assert!(
+            over_result.is_err(),
+            "Allocating more than available should fail"
+        );
         println!("  - Over-allocation (751 > 750 available) rejected: OK");
 
         // Allocate exactly the available amount (750)
@@ -836,10 +902,19 @@ mod commons_pool_tests {
             .expect("Deserialize")
             .expect("Entry");
 
-        assert_eq!(pool_after.inalienable_reserve, 250, "Reserve must remain untouched");
-        assert_eq!(pool_after.available_balance, 0, "Available should be 0 after full allocation");
+        assert_eq!(
+            pool_after.inalienable_reserve, 250,
+            "Reserve must remain untouched"
+        );
+        assert_eq!(
+            pool_after.available_balance, 0,
+            "Available should be 0 after full allocation"
+        );
 
-        println!("  - Exact allocation (750): reserve={}, available={}", pool_after.inalienable_reserve, pool_after.available_balance);
+        println!(
+            "  - Exact allocation (750): reserve={}, available={}",
+            pool_after.inalienable_reserve, pool_after.available_balance
+        );
         println!("Test 3.3 PASSED: Inalienable reserve is protected");
     }
 
@@ -850,7 +925,9 @@ mod commons_pool_tests {
         println!("Test 3.4: Compost goes to available balance");
 
         let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
-        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Load DNA");
+        let dna = SweetDnaFile::from_bundle(&dna_path)
+            .await
+            .expect("Load DNA");
         let mut conductor = SweetConductor::from_standard_config().await;
 
         let agents = SweetAgents::get(conductor.keystore(), 1).await;
@@ -879,7 +956,11 @@ mod commons_pool_tests {
         };
 
         let _: Record = conductor
-            .call(&cell.zome("treasury"), "contribute_to_commons", contrib_input)
+            .call(
+                &cell.zome("treasury"),
+                "contribute_to_commons",
+                contrib_input,
+            )
             .await;
 
         // Now receive compost (demurrage redistribution) of 200
@@ -907,12 +988,24 @@ mod commons_pool_tests {
             .expect("Entry");
 
         // Reserve should remain 100 (untouched by compost)
-        assert_eq!(pool.inalienable_reserve, 100, "Compost must not affect reserve");
+        assert_eq!(
+            pool.inalienable_reserve, 100,
+            "Compost must not affect reserve"
+        );
         // Available should be 300 + 200 = 500
-        assert_eq!(pool.available_balance, 500, "Compost should add to available balance");
+        assert_eq!(
+            pool.available_balance, 500,
+            "Compost should add to available balance"
+        );
 
-        println!("  - Reserve after compost: {} (unchanged)", pool.inalienable_reserve);
-        println!("  - Available after compost: {} (300 + 200)", pool.available_balance);
+        println!(
+            "  - Reserve after compost: {} (unchanged)",
+            pool.inalienable_reserve
+        );
+        println!(
+            "  - Available after compost: {} (300 + 200)",
+            pool.available_balance
+        );
         println!("Test 3.4 PASSED: Compost goes to available, not reserve");
     }
 
@@ -923,7 +1016,9 @@ mod commons_pool_tests {
         println!("Test 3.5: Reserve ratio maintained >= 25%");
 
         let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
-        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Load DNA");
+        let dna = SweetDnaFile::from_bundle(&dna_path)
+            .await
+            .expect("Load DNA");
         let mut conductor = SweetConductor::from_standard_config().await;
 
         let agents = SweetAgents::get(conductor.keystore(), 1).await;
@@ -952,7 +1047,11 @@ mod commons_pool_tests {
         };
 
         let _: Record = conductor
-            .call(&cell.zome("treasury"), "contribute_to_commons", contrib_input)
+            .call(
+                &cell.zome("treasury"),
+                "contribute_to_commons",
+                contrib_input,
+            )
             .await;
 
         // Allocate 400 from available -- should succeed
@@ -985,12 +1084,18 @@ mod commons_pool_tests {
         let total = pool_after.inalienable_reserve + pool_after.available_balance;
         let ratio = pool_after.inalienable_reserve as f64 / total as f64;
 
-        assert!(ratio >= 0.25, "Reserve ratio should be >= 25%, got {:.4}", ratio);
+        assert!(
+            ratio >= 0.25,
+            "Reserve ratio should be >= 25%, got {:.4}",
+            ratio
+        );
         assert_eq!(pool_after.inalienable_reserve, 250);
         assert_eq!(pool_after.available_balance, 350);
 
-        println!("  - After allocating 400: reserve={}, available={}, ratio={:.4}",
-            pool_after.inalienable_reserve, pool_after.available_balance, ratio);
+        println!(
+            "  - After allocating 400: reserve={}, available={}, ratio={:.4}",
+            pool_after.inalienable_reserve, pool_after.available_balance, ratio
+        );
 
         // Now try to allocate too much (350 would drop ratio below 25%)
         // After hypothetical: reserve=250, available=0, total=250, ratio=250/250=1.0
@@ -1050,9 +1155,15 @@ mod commons_pool_tests {
         let current_total = current.inalienable_reserve + current.available_balance;
         let current_ratio = current.inalienable_reserve as f64 / current_total as f64;
 
-        assert!(current_ratio >= 0.25, "Reserve ratio after compost should be >= 25%, got {:.4}", current_ratio);
-        println!("  - After compost: reserve={}, available={}, ratio={:.4}",
-            current.inalienable_reserve, current.available_balance, current_ratio);
+        assert!(
+            current_ratio >= 0.25,
+            "Reserve ratio after compost should be >= 25%, got {:.4}",
+            current_ratio
+        );
+        println!(
+            "  - After compost: reserve={}, available={}, ratio={:.4}",
+            current.inalienable_reserve, current.available_balance, current_ratio
+        );
         println!("Test 3.5 PASSED: Reserve ratio maintained >= 25%");
     }
 }
@@ -1072,7 +1183,9 @@ mod savings_pool_tests {
         println!("Test 4.1: Create and Join Savings Pool");
 
         let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
-        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Load DNA");
+        let dna = SweetDnaFile::from_bundle(&dna_path)
+            .await
+            .expect("Load DNA");
         let mut conductor = SweetConductor::from_standard_config().await;
 
         let agents = SweetAgents::get(conductor.keystore(), 1).await;
@@ -1193,7 +1306,9 @@ mod savings_pool_tests {
         println!("Test 4.2: Contribute to Savings Pool");
 
         let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
-        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Load DNA");
+        let dna = SweetDnaFile::from_bundle(&dna_path)
+            .await
+            .expect("Load DNA");
         let mut conductor = SweetConductor::from_standard_config().await;
 
         let agents = SweetAgents::get(conductor.keystore(), 1).await;
@@ -1290,7 +1405,10 @@ mod savings_pool_tests {
             .expect("Deserialize")
             .expect("Entry");
 
-        assert_eq!(updated.current_amount, 300_000_000, "Pool amount should be 300M after contribution");
+        assert_eq!(
+            updated.current_amount, 300_000_000,
+            "Pool amount should be 300M after contribution"
+        );
 
         // Contribute another 200 SAP
         let contrib_2 = PoolContributionInput {
@@ -1309,10 +1427,16 @@ mod savings_pool_tests {
             .expect("Deserialize")
             .expect("Entry");
 
-        assert_eq!(final_pool.current_amount, 500_000_000, "Pool amount should be 500M after second contribution");
+        assert_eq!(
+            final_pool.current_amount, 500_000_000,
+            "Pool amount should be 500M after second contribution"
+        );
 
         println!("  - After 1st contribution (300M): {}", 300_000_000);
-        println!("  - After 2nd contribution (200): {}", final_pool.current_amount);
+        println!(
+            "  - After 2nd contribution (200): {}",
+            final_pool.current_amount
+        );
         println!("Test 4.2 PASSED: Pool contributions accumulate correctly");
     }
 }
@@ -1368,7 +1492,9 @@ mod manager_operations {
         println!("Test 5.1: Add Manager");
 
         let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
-        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Load DNA");
+        let dna = SweetDnaFile::from_bundle(&dna_path)
+            .await
+            .expect("Load DNA");
         let mut conductor = SweetConductor::from_standard_config().await;
 
         let agents = SweetAgents::get(conductor.keystore(), 1).await;
@@ -1422,7 +1548,9 @@ mod manager_operations {
         println!("Test 5.2: Remove Manager");
 
         let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
-        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Load DNA");
+        let dna = SweetDnaFile::from_bundle(&dna_path)
+            .await
+            .expect("Load DNA");
         let mut conductor = SweetConductor::from_standard_config().await;
 
         let agents = SweetAgents::get(conductor.keystore(), 1).await;
@@ -1436,12 +1564,8 @@ mod manager_operations {
         let mgr_a = format!("did:mycelix:{}", agents[0]);
         let mgr_b = format!("did:mycelix:{}", agents[0]);
 
-        let treasury_id = create_test_treasury(
-            &conductor,
-            cell,
-            vec![mgr_a.clone(), mgr_b.clone()],
-        )
-        .await;
+        let treasury_id =
+            create_test_treasury(&conductor, cell, vec![mgr_a.clone(), mgr_b.clone()]).await;
 
         #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
         struct RemoveManagerInput {
@@ -1468,7 +1592,10 @@ mod manager_operations {
 
         assert_eq!(updated.managers.len(), 1);
         assert!(updated.managers.contains(&mgr_a));
-        assert!(!updated.managers.contains(&mgr_b), "Removed manager should no longer be listed");
+        assert!(
+            !updated.managers.contains(&mgr_b),
+            "Removed manager should no longer be listed"
+        );
 
         println!("  - Managers after removal: {:?}", updated.managers);
         println!("Test 5.2 PASSED: Manager removed successfully");
@@ -1481,7 +1608,9 @@ mod manager_operations {
         println!("Test 5.3: Cannot Remove Last Manager");
 
         let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
-        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Load DNA");
+        let dna = SweetDnaFile::from_bundle(&dna_path)
+            .await
+            .expect("Load DNA");
         let mut conductor = SweetConductor::from_standard_config().await;
 
         let agents = SweetAgents::get(conductor.keystore(), 1).await;
@@ -1541,7 +1670,11 @@ mod unit_tests {
             let json = serde_json::to_string(&status).expect("Serialize failed");
             let deserialized: AllocationStatus =
                 serde_json::from_str(&json).expect("Deserialize failed");
-            assert_eq!(status, deserialized, "AllocationStatus round-trip failed for {:?}", status);
+            assert_eq!(
+                status, deserialized,
+                "AllocationStatus round-trip failed for {:?}",
+                status
+            );
             println!("  AllocationStatus::{:?} -> {} -> OK", status, json);
         }
     }
@@ -1560,7 +1693,11 @@ mod unit_tests {
             let json = serde_json::to_string(&ct).expect("Serialize failed");
             let deserialized: ContributionType =
                 serde_json::from_str(&json).expect("Deserialize failed");
-            assert_eq!(ct, deserialized, "ContributionType round-trip failed for {:?}", ct);
+            assert_eq!(
+                ct, deserialized,
+                "ContributionType round-trip failed for {:?}",
+                ct
+            );
             println!("  ContributionType::{:?} -> {} -> OK", ct, json);
         }
     }
@@ -1588,7 +1725,7 @@ mod unit_tests {
 
         // Integer math used in validation: reserve * 100 >= total * 25
         let reserve_pct = to_reserve as u128 * 100; // 25000
-        let threshold = total as u128 * 25;          // 25000
+        let threshold = total as u128 * 25; // 25000
         assert!(
             reserve_pct >= threshold,
             "Integer math check: {} >= {} should hold",
@@ -1596,9 +1733,17 @@ mod unit_tests {
             threshold
         );
 
-        println!("  reserve={}, available={}, total={}", to_reserve, to_available, total);
+        println!(
+            "  reserve={}, available={}, total={}",
+            to_reserve, to_available, total
+        );
         println!("  ratio = {} / {} = {:.4}", to_reserve, total, ratio);
-        println!("  integer check: {} >= {} = {}", reserve_pct, threshold, reserve_pct >= threshold);
+        println!(
+            "  integer check: {} >= {} = {}",
+            reserve_pct,
+            threshold,
+            reserve_pct >= threshold
+        );
     }
 
     #[test]
@@ -1621,10 +1766,19 @@ mod unit_tests {
 
         // Verify the integer division approach matches the f64 approach
         let to_reserve_int = amount / 4;
-        assert_eq!(to_reserve, to_reserve_int, "f64 and integer division should match for round amounts");
+        assert_eq!(
+            to_reserve, to_reserve_int,
+            "f64 and integer division should match for round amounts"
+        );
 
-        println!("  INALIENABLE_RESERVE_RATIO = {}", INALIENABLE_RESERVE_RATIO);
-        println!("  2000 * 0.25 = {} (reserve), {} (available)", to_reserve, to_available);
+        println!(
+            "  INALIENABLE_RESERVE_RATIO = {}",
+            INALIENABLE_RESERVE_RATIO
+        );
+        println!(
+            "  2000 * 0.25 = {} (reserve), {} (available)",
+            to_reserve, to_available
+        );
     }
 
     #[test]
@@ -1663,14 +1817,23 @@ mod unit_tests {
         let compost_available: u64 = 1250;
         let compost_total = compost_reserve + compost_available;
         let compost_ratio = compost_reserve as f64 / compost_total as f64;
-        assert!(compost_ratio < 0.25, "Compost can theoretically shift ratio below 25%");
+        assert!(
+            compost_ratio < 0.25,
+            "Compost can theoretically shift ratio below 25%"
+        );
         // But the coordinator code does not split compost -- it adds directly
         // to available. The validation on update_commons_pool checks the ratio.
 
         println!("  Boundary cases verified:");
         println!("    Empty pool: OK");
-        println!("    Min split (4): reserve={}, available={}, ratio={}", small_reserve, small_available, small_ratio);
-        println!("    Tiny (1): reserve={}, available={}", tiny_reserve, tiny_available);
+        println!(
+            "    Min split (4): reserve={}, available={}, ratio={}",
+            small_reserve, small_available, small_ratio
+        );
+        println!(
+            "    Tiny (1): reserve={}, available={}",
+            tiny_reserve, tiny_available
+        );
         println!("    Compost-shifted ratio: {:.4} < 0.25", compost_ratio);
     }
 
@@ -1714,25 +1877,43 @@ mod unit_tests {
         let new_avail_1 = available - alloc_1;
         let new_total_1 = reserve + new_avail_1;
         let ratio_1 = reserve as f64 / new_total_1 as f64;
-        assert!(ratio_1 >= 0.25, "After allocating 500: ratio {:.4} >= 0.25", ratio_1);
+        assert!(
+            ratio_1 >= 0.25,
+            "After allocating 500: ratio {:.4} >= 0.25",
+            ratio_1
+        );
 
         // Allocate 1000: new_available=500, total=1000, ratio=500/1000=0.5
         let alloc_2 = 1000u64;
         let new_avail_2 = available - alloc_2;
         let new_total_2 = reserve + new_avail_2;
         let ratio_2 = reserve as f64 / new_total_2 as f64;
-        assert!(ratio_2 >= 0.25, "After allocating 1000: ratio {:.4} >= 0.25", ratio_2);
+        assert!(
+            ratio_2 >= 0.25,
+            "After allocating 1000: ratio {:.4} >= 0.25",
+            ratio_2
+        );
 
         // Allocate all available (1500): new_available=0, total=500, ratio=500/500=1.0
         let alloc_3 = 1500u64;
         let new_avail_3 = available - alloc_3;
         let new_total_3 = reserve + new_avail_3;
         let ratio_3 = reserve as f64 / new_total_3 as f64;
-        assert!(ratio_3 >= 0.25, "After allocating all: ratio {:.4} >= 0.25", ratio_3);
-        assert_eq!(ratio_3, 1.0, "Allocating all available gives 100% reserve ratio");
+        assert!(
+            ratio_3 >= 0.25,
+            "After allocating all: ratio {:.4} >= 0.25",
+            ratio_3
+        );
+        assert_eq!(
+            ratio_3, 1.0,
+            "Allocating all available gives 100% reserve ratio"
+        );
 
         println!("  Allocation math verified:");
-        println!("    Contribute 2000 -> reserve={}, available={}", reserve, available);
+        println!(
+            "    Contribute 2000 -> reserve={}, available={}",
+            reserve, available
+        );
         println!("    Allocate 500  -> ratio={:.4}", ratio_1);
         println!("    Allocate 1000 -> ratio={:.4}", ratio_2);
         println!("    Allocate 1500 -> ratio={:.4}", ratio_3);

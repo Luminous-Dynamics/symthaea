@@ -1,5 +1,4 @@
 #![deny(unsafe_code)]
-
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
@@ -895,6 +894,18 @@ pub fn record_exchange(input: RecordExchangeInput) -> ExternResult<ExchangeRecor
         LinkTypes::DaoToExchanges,
         (),
     )?;
+    create_link(
+        anchor_hash(&format!("member-daos:{}", provider_did))?,
+        exchange_hash.clone(),
+        LinkTypes::MemberToDaoActivity,
+        (),
+    )?;
+    create_link(
+        anchor_hash(&format!("member-daos:{}", input.receiver_did))?,
+        exchange_hash.clone(),
+        LinkTypes::MemberToDaoActivity,
+        (),
+    )?;
 
     // Create index link for lookup by exchange ID
     create_link(
@@ -1769,6 +1780,12 @@ fn get_or_create_balance(member_did: String, dao_did: String) -> ExternResult<Ba
         LinkTypes::MemberToBalance,
         (),
     )?;
+    let _ = create_link(
+        anchor_hash(&format!("member-daos:{}", member_did))?,
+        action_hash.clone(),
+        LinkTypes::MemberToDaoBalances,
+        (),
+    )?;
 
     // RC-13: Race condition guard — re-read links to detect concurrent creators.
     // If multiple links exist, deterministically pick the one with the lowest
@@ -1825,6 +1842,136 @@ pub fn get_balance(input: GetBalanceInput) -> ExternResult<BalanceInfo> {
         )));
     }
     get_or_create_balance(input.member_did, input.dao_did)
+}
+
+/// Discover DAO contexts that already contain local TEND state for a member.
+///
+/// This is a reverse index over known balances. It is primarily used by the
+/// Finance frontend to find a default DAO context without requiring runtime
+/// globals.
+#[hdk_extern]
+pub fn get_member_dao_contexts(member_did: String) -> ExternResult<Vec<String>> {
+    if member_did.is_empty() || member_did.len() > 256 {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Member DID must be 1-256 characters".into()
+        )));
+    }
+
+    let mut balance_dao_dids = Vec::new();
+    let reverse_links = get_links(
+        LinkQuery::try_new(
+            anchor_hash(&format!("member-daos:{}", member_did))?,
+            LinkTypes::MemberToDaoBalances,
+        )?,
+        GetStrategy::default(),
+    )?;
+
+    for link in reverse_links {
+        let Some(action_hash) = link.target.into_action_hash() else {
+            continue;
+        };
+        let record = follow_update_chain(action_hash)?;
+        if let Some(balance) = record.entry().to_app_option::<TendBalance>().map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "TendBalance deserialization error: {:?}",
+                e
+            )))
+        })? {
+            balance_dao_dids.push(balance.dao_did);
+        }
+    }
+
+    let mut activity_dao_dids = Vec::new();
+    let activity_links = get_links(
+        LinkQuery::try_new(
+            anchor_hash(&format!("member-daos:{}", member_did))?,
+            LinkTypes::MemberToDaoActivity,
+        )?,
+        GetStrategy::default(),
+    )?;
+    for link in activity_links {
+        let Some(action_hash) = link.target.into_action_hash() else {
+            continue;
+        };
+        let record = follow_update_chain(action_hash)?;
+        if let Some(dao_did) = extract_activity_dao_did(&record)? {
+            activity_dao_dids.push(dao_did);
+        }
+    }
+
+    Ok(merge_member_dao_contexts(
+        balance_dao_dids,
+        activity_dao_dids,
+    ))
+}
+
+fn extract_activity_dao_did(record: &Record) -> ExternResult<Option<String>> {
+    if let Some(exchange) = record
+        .entry()
+        .to_app_option::<TendExchange>()
+        .map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "TendExchange deserialization error: {:?}",
+                e
+            )))
+        })?
+    {
+        return Ok(Some(activity_dao_did(&ActivityDaoEntry::Exchange(
+            exchange,
+        ))));
+    }
+
+    if let Some(listing) = record
+        .entry()
+        .to_app_option::<ServiceListing>()
+        .map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "ServiceListing deserialization error: {:?}",
+                e
+            )))
+        })?
+    {
+        return Ok(Some(activity_dao_did(&ActivityDaoEntry::Listing(listing))));
+    }
+
+    if let Some(request) = record
+        .entry()
+        .to_app_option::<ServiceRequest>()
+        .map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "ServiceRequest deserialization error: {:?}",
+                e
+            )))
+        })?
+    {
+        return Ok(Some(activity_dao_did(&ActivityDaoEntry::Request(request))));
+    }
+
+    Ok(None)
+}
+
+enum ActivityDaoEntry {
+    Exchange(TendExchange),
+    Listing(ServiceListing),
+    Request(ServiceRequest),
+}
+
+fn activity_dao_did(entry: &ActivityDaoEntry) -> String {
+    match entry {
+        ActivityDaoEntry::Exchange(exchange) => exchange.dao_did.clone(),
+        ActivityDaoEntry::Listing(listing) => listing.dao_did.clone(),
+        ActivityDaoEntry::Request(request) => request.dao_did.clone(),
+    }
+}
+
+fn merge_member_dao_contexts(
+    balance_dao_dids: impl IntoIterator<Item = String>,
+    activity_dao_dids: impl IntoIterator<Item = String>,
+) -> Vec<String> {
+    let mut dao_dids = std::collections::BTreeSet::new();
+    dao_dids.extend(balance_dao_dids);
+    dao_dids.extend(activity_dao_dids);
+    dao_dids.into_iter().collect()
 }
 
 /// Get all exchanges for a member in a DAO (paginated, default limit 100)
@@ -1981,6 +2128,12 @@ pub fn create_listing(input: CreateListingInput) -> ExternResult<ServiceListing>
         LinkTypes::ProviderToListings,
         (),
     )?;
+    create_link(
+        anchor_hash(&format!("member-daos:{}", provider_did))?,
+        listing_hash.clone(),
+        LinkTypes::MemberToDaoActivity,
+        (),
+    )?;
 
     // Link to category
     create_link(
@@ -2079,7 +2232,7 @@ pub fn create_request(input: CreateRequestInput) -> ExternResult<ServiceRequest>
     let request_id = format!("request:{}:{}", requester_did, now.as_micros());
     let request = ServiceRequest {
         id: request_id,
-        requester_did,
+        requester_did: requester_did.clone(),
         dao_did: input.dao_did.clone(),
         title: input.title,
         description: input.description,
@@ -2095,8 +2248,14 @@ pub fn create_request(input: CreateRequestInput) -> ExternResult<ServiceRequest>
     // Link to DAO
     create_link(
         anchor_hash(&format!("requests:{}", input.dao_did))?,
-        request_hash,
+        request_hash.clone(),
         LinkTypes::DaoToRequests,
+        (),
+    )?;
+    create_link(
+        anchor_hash(&format!("member-daos:{}", requester_did))?,
+        request_hash.clone(),
+        LinkTypes::MemberToDaoActivity,
         (),
     )?;
 
@@ -3016,4 +3175,81 @@ pub fn recover_pending_adjustments(currency_id: String) -> ExternResult<u32> {
     }
 
     Ok(recovered)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn ts() -> Timestamp {
+        Timestamp::from_micros(0)
+    }
+
+    #[test]
+    fn merge_member_dao_contexts_dedupes_and_sorts_sources() {
+        let merged = merge_member_dao_contexts(
+            vec![
+                "did:mycelix:dao-b".to_string(),
+                "did:mycelix:dao-a".to_string(),
+            ],
+            vec![
+                "did:mycelix:dao-b".to_string(),
+                "did:mycelix:dao-c".to_string(),
+            ],
+        );
+
+        assert_eq!(
+            merged,
+            vec![
+                "did:mycelix:dao-a".to_string(),
+                "did:mycelix:dao-b".to_string(),
+                "did:mycelix:dao-c".to_string(),
+            ]
+        );
+    }
+
+    #[test]
+    fn activity_dao_did_supports_all_discovery_entry_types() {
+        let exchange = ActivityDaoEntry::Exchange(TendExchange {
+            id: "exchange-1".into(),
+            provider_did: "did:mycelix:provider".into(),
+            receiver_did: "did:mycelix:receiver".into(),
+            hours: 1.0,
+            service_description: "exchange".into(),
+            service_category: ServiceCategory::GeneralAssistance,
+            cultural_alias: None,
+            dao_did: "did:mycelix:dao-exchange".into(),
+            timestamp: ts(),
+            status: ExchangeStatus::Proposed,
+            service_date: None,
+        });
+        let listing = ActivityDaoEntry::Listing(ServiceListing {
+            id: "listing-1".into(),
+            provider_did: "did:mycelix:provider".into(),
+            dao_did: "did:mycelix:dao-listing".into(),
+            title: "listing".into(),
+            description: "listing".into(),
+            category: ServiceCategory::TechSupport,
+            estimated_hours: Some(2.0),
+            availability: Some("weekdays".into()),
+            active: true,
+            created: ts(),
+        });
+        let request = ActivityDaoEntry::Request(ServiceRequest {
+            id: "request-1".into(),
+            requester_did: "did:mycelix:requester".into(),
+            dao_did: "did:mycelix:dao-request".into(),
+            title: "request".into(),
+            description: "request".into(),
+            category: ServiceCategory::CareWork,
+            estimated_hours: Some(3.0),
+            urgency: Urgency::Normal,
+            open: true,
+            created: ts(),
+        });
+
+        assert_eq!(activity_dao_did(&exchange), "did:mycelix:dao-exchange");
+        assert_eq!(activity_dao_did(&listing), "did:mycelix:dao-listing");
+        assert_eq!(activity_dao_did(&request), "did:mycelix:dao-request");
+    }
 }

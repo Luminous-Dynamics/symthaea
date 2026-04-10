@@ -24,6 +24,8 @@ Quick lookup of all anchor key patterns used across zomes.
 | `"provider:{dao_did}:{provider_did}"` | tend | ProviderToExchanges | Provider's exchanges in a DAO |
 | `"receiver:{dao_did}:{receiver_did}"` | tend | ReceiverToExchanges | Receiver's exchanges in a DAO |
 | `"balance:{dao_did}:{member_did}"` | tend | MemberToBalance | Member's TEND balance in a DAO |
+| `"member-daos:{member_did}"` | tend | MemberToDaoBalances | Reverse index of a member's DAO balance contexts |
+| `"member-daos:{member_did}"` | tend | MemberToDaoActivity | Reverse index of a member's DAO-scoped exchanges/listings/requests |
 | `"dao:{dao_did}"` | tend | DaoToExchanges | All exchanges in a DAO |
 | `"exchange:{exchange_id}"` | tend | ExchangeIdToExchange | Exchange by ID |
 | `"listings:{dao_did}"` | tend | DaoToListings | Service listings in a DAO |
@@ -261,6 +263,8 @@ Quick lookup of all anchor key patterns used across zomes.
 | ProviderToExchanges | `"provider:{dao_did}:{provider_did}"` | Anchor → TendExchange | `record_exchange` | `get_my_exchanges` |
 | ReceiverToExchanges | `"receiver:{dao_did}:{receiver_did}"` | Anchor → TendExchange | `record_exchange` | `get_my_exchanges` |
 | MemberToBalance | `"balance:{dao_did}:{member_did}"` | Anchor → TendBalance | `get_or_create_balance` (internal) | `find_balance`, `update_balance_after_exchange`, `get_balance` |
+| MemberToDaoBalances | `"member-daos:{member_did}"` | Anchor → TendBalance | `get_or_create_balance` (internal) | `get_member_dao_contexts` |
+| MemberToDaoActivity | `"member-daos:{member_did}"` | Anchor → TendExchange / ServiceListing / ServiceRequest | `record_exchange`, `create_listing`, `create_request` | `get_member_dao_contexts` |
 | DaoToExchanges | `"dao:{dao_did}"` | Anchor → TendExchange | `record_exchange` | — |
 | DaoToListings | `"listings:{dao_did}"` | Anchor → ServiceListing | `create_listing` | `get_dao_listings` |
 | DaoToRequests | `"requests:{dao_did}"` | Anchor → ServiceRequest | `create_request` | `get_dao_requests` |
