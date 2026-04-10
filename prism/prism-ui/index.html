@@ -35,6 +35,12 @@
             if (input) { input.focus(); input.select(); }
         }
     });
+    // Register service worker for offline-first
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('/static/sw.js')
+            .then(function() { console.log('[Prism] Service worker registered'); })
+            .catch(function(e) { console.log('[Prism] SW registration failed:', e); });
+    }
     </script>
 </head>
 <body>
