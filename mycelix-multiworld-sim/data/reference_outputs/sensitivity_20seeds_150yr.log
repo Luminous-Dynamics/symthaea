@@ -1,0 +1,114 @@
+    Blocking waiting for file lock on artifact directory
+warning: unexpected `cfg` condition name: `kani`
+  --> /srv/luminous-dynamics/crates/mycelix-bridge-common/src/lib.rs:97:7
+   |
+97 | #[cfg(kani)]
+   |       ^^^^
+   |
+   = help: expected names are: `docsrs`, `feature`, and `test` and 31 more
+   = help: consider using a Cargo feature instead
+   = help: or consider adding in `Cargo.toml` the `check-cfg` lint config for the lint:
+            [lints.rust]
+            unexpected_cfgs = { level = "warn", check-cfg = ['cfg(kani)'] }
+   = help: or consider adding `println!("cargo::rustc-check-cfg=cfg(kani)");` to the top of the `build.rs`
+   = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+   = note: `#[warn(unexpected_cfgs)]` on by default
+
+warning: unused imports: `LAMBDA_MAX` and `LAMBDA_MIN`
+  --> /srv/luminous-dynamics/crates/mycelix-bridge-common/src/scoring_model.rs:29:52
+   |
+29 |     self, sanitize_score, ConstitutionalViolation, LAMBDA_MAX, LAMBDA_MIN,
+   |                                                    ^^^^^^^^^^  ^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused imports: `ConstitutionalViolation` and `self`
+  --> /srv/luminous-dynamics/crates/mycelix-bridge-common/src/model_governance.rs:23:38
+   |
+23 | use crate::constitutional_envelope::{self, sanitize_score, ConstitutionalViolation};
+   |                                      ^^^^                  ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused macro definition: `debug`
+  --> /srv/luminous-dynamics/crates/mycelix-bridge-common/src/consciousness_profile.rs:29:14
+   |
+29 | macro_rules! debug {
+   |              ^^^^^
+   |
+   = note: `#[warn(unused_macros)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `GovernanceEligibility`
+  --> /srv/luminous-dynamics/crates/mycelix-bridge-common/src/sovereign_gate.rs:26:49
+   |
+26 |     ConsciousnessCredential, ConsciousnessTier, GovernanceEligibility, GovernanceRequirement,
+   |                                                 ^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `validate_dispatch_sizes` is never used
+   --> /srv/luminous-dynamics/crates/mycelix-bridge-common/src/lib.rs:256:4
+    |
+256 | fn validate_dispatch_sizes(
+    |    ^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: module `ExtensionKey` should have a snake case name
+   --> /srv/luminous-dynamics/crates/mycelix-bridge-common/src/consciousness_profile.rs:349:9
+    |
+349 | pub mod ExtensionKey {
+    |         ^^^^^^^^^^^^ help: convert the identifier to snake case: `extension_key`
+    |
+    = note: `#[warn(non_snake_case)]` (part of `#[warn(nonstandard_style)]`) on by default
+
+warning: `mycelix-bridge-common` (lib) generated 7 warnings (run `cargo fix --lib -p mycelix-bridge-common` to apply 3 suggestions)
+warning: unused import: `extinction_multiplier`
+  --> src/biosphere/dimensions.rs:15:31
+   |
+15 | use super::mass_extinctions::{extinction_multiplier, MassExtinctionEvent};
+   |                               ^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `CulturalProfile`
+  --> src/interworld.rs:15:20
+   |
+15 | use crate::world::{CulturalProfile, World, WorldResources};
+   |                    ^^^^^^^^^^^^^^^
+
+warning: `mycelix-multiworld-sim` (lib) generated 2 warnings (run `cargo fix --lib -p mycelix-multiworld-sim` to apply 2 suggestions)
+   Compiling mycelix-multiworld-sim v0.1.0 (/srv/luminous-dynamics/mycelix-multiworld-sim)
+warning: field `unit` is never read
+  --> src/bin/sensitivity_tornado.rs:31:5
+   |
+29 | struct Parameter {
+   |        --------- field in this struct
+30 |     name: &'static str,
+31 |     unit: &'static str,
+   |     ^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `mycelix-multiworld-sim` (bin "sensitivity_tornado") generated 1 warning
+    Finished `release` profile [optimized] target(s) in 42.73s
+     Running `target/release/sensitivity_tornado --seeds 20 --ticks 1800`
+=== SENSITIVITY TORNADO ===
+Seeds: 20, Ticks: 1800 (150 years), Perturbation: ±20%
+
+Running baseline (20 seeds)...
+Baseline CVS: 0.6978
+
+Testing pair_bond_rate (0.0200 → [0.0160, 0.0240])... range=0.0017 (low +0.0029, high +0.0046)
+Testing care_effectiveness (1.0000 → [0.8000, 1.2000])... range=0.0010 (low +0.0039, high +0.0029)
+Testing trade_openness (0.8000 → [0.6400, 0.9600])... range=0.0000 (low +0.0000, high +0.0000)
+Skipping consciousness_boost (default=0)
+Testing spoilage_food (0.0300 → [0.0240, 0.0360])... range=0.0004 (low +0.0033, high +0.0037)
+Testing radiation_mars (0.0200 → [0.0160, 0.0240])... range=0.0000 (low +0.0001, high +0.0001)
+Testing spoilage_energy (0.1500 → [0.1200, 0.1800])... range=0.0007 (low +0.0026, high +0.0033)
+
+=== TORNADO RANKING (by sensitivity range) ===
+Parameter                  Δ at -20%  Δ at +20%      Range
+------------------------------------------------------------
+pair_bond_rate               +0.0029    +0.0046     0.0017 ██████████████████████████████
+care_effectiveness           +0.0039    +0.0029     0.0010 ██████████████████
+spoilage_energy              +0.0026    +0.0033     0.0007 █████████████
+spoilage_food                +0.0033    +0.0037     0.0004 ███████
+radiation_mars               +0.0001    +0.0001     0.0000 █
+trade_openness               +0.0000    +0.0000     0.0000 █

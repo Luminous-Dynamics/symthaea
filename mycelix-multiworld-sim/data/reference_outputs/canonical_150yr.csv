@@ -1,0 +1,105 @@
+    Blocking waiting for file lock on artifact directory
+warning: unexpected `cfg` condition name: `kani`
+  --> /srv/luminous-dynamics/crates/mycelix-bridge-common/src/lib.rs:97:7
+   |
+97 | #[cfg(kani)]
+   |       ^^^^
+   |
+   = help: expected names are: `docsrs`, `feature`, and `test` and 31 more
+   = help: consider using a Cargo feature instead
+   = help: or consider adding in `Cargo.toml` the `check-cfg` lint config for the lint:
+            [lints.rust]
+            unexpected_cfgs = { level = "warn", check-cfg = ['cfg(kani)'] }
+   = help: or consider adding `println!("cargo::rustc-check-cfg=cfg(kani)");` to the top of the `build.rs`
+   = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+   = note: `#[warn(unexpected_cfgs)]` on by default
+
+warning: unused imports: `LAMBDA_MAX` and `LAMBDA_MIN`
+  --> /srv/luminous-dynamics/crates/mycelix-bridge-common/src/scoring_model.rs:29:52
+   |
+29 |     self, sanitize_score, ConstitutionalViolation, LAMBDA_MAX, LAMBDA_MIN,
+   |                                                    ^^^^^^^^^^  ^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused imports: `ConstitutionalViolation` and `self`
+  --> /srv/luminous-dynamics/crates/mycelix-bridge-common/src/model_governance.rs:23:38
+   |
+23 | use crate::constitutional_envelope::{self, sanitize_score, ConstitutionalViolation};
+   |                                      ^^^^                  ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused macro definition: `debug`
+  --> /srv/luminous-dynamics/crates/mycelix-bridge-common/src/consciousness_profile.rs:29:14
+   |
+29 | macro_rules! debug {
+   |              ^^^^^
+   |
+   = note: `#[warn(unused_macros)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `GovernanceEligibility`
+  --> /srv/luminous-dynamics/crates/mycelix-bridge-common/src/sovereign_gate.rs:26:49
+   |
+26 |     ConsciousnessCredential, ConsciousnessTier, GovernanceEligibility, GovernanceRequirement,
+   |                                                 ^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `validate_dispatch_sizes` is never used
+   --> /srv/luminous-dynamics/crates/mycelix-bridge-common/src/lib.rs:256:4
+    |
+256 | fn validate_dispatch_sizes(
+    |    ^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: module `ExtensionKey` should have a snake case name
+   --> /srv/luminous-dynamics/crates/mycelix-bridge-common/src/consciousness_profile.rs:349:9
+    |
+349 | pub mod ExtensionKey {
+    |         ^^^^^^^^^^^^ help: convert the identifier to snake case: `extension_key`
+    |
+    = note: `#[warn(non_snake_case)]` (part of `#[warn(nonstandard_style)]`) on by default
+
+warning: `mycelix-bridge-common` (lib) generated 7 warnings (run `cargo fix --lib -p mycelix-bridge-common` to apply 3 suggestions)
+warning: unused import: `extinction_multiplier`
+  --> src/biosphere/dimensions.rs:15:31
+   |
+15 | use super::mass_extinctions::{extinction_multiplier, MassExtinctionEvent};
+   |                               ^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `CulturalProfile`
+  --> src/interworld.rs:15:20
+   |
+15 | use crate::world::{CulturalProfile, World, WorldResources};
+   |                    ^^^^^^^^^^^^^^^
+
+warning: `mycelix-multiworld-sim` (lib) generated 2 warnings (run `cargo fix --lib -p mycelix-multiworld-sim` to apply 2 suggestions)
+   Compiling mycelix-multiworld-sim v0.1.0 (/srv/luminous-dynamics/mycelix-multiworld-sim)
+    Finished `release` profile [optimized] target(s) in 43.03s
+     Running `target/release/generate_reference --ticks 1800`
+=== REFERENCE OUTPUT GENERATION ===
+Seeds: 10, Ticks: 1800 (150 years)
+
+seed,ticks,years,final_population,final_cvs,survived,total_disasters,worlds_count,mean_phi,max_phi,mean_gini,governance_authority
+Seed 42...42,1800,150.0,7990,0.7031,true,579,3,0.0878,0.1641,0.9340,LocalSovereign
+ pop=7990 cvs=0.7031 phi=0.0878 gov=LocalSovereign
+Seed 123...123,1800,150.0,10073,0.7222,true,566,3,0.1442,0.1897,0.8155,LocalSovereign
+ pop=10073 cvs=0.7222 phi=0.1442 gov=LocalSovereign
+Seed 789...789,1800,150.0,7027,0.7082,true,619,3,0.1144,0.2108,0.9164,LocalSovereign
+ pop=7027 cvs=0.7082 phi=0.1144 gov=LocalSovereign
+Seed 1337...1337,1800,150.0,13960,0.7150,true,617,3,0.1224,0.1851,0.9246,LocalSovereign
+ pop=13960 cvs=0.7150 phi=0.1224 gov=LocalSovereign
+Seed 2718...2718,1800,150.0,11277,0.7172,true,597,3,0.1301,0.1830,0.9342,LocalSovereign
+ pop=11277 cvs=0.7172 phi=0.1301 gov=LocalSovereign
+Seed 3141...3141,1800,150.0,11451,0.7173,true,531,3,0.1389,0.1973,0.9248,LocalSovereign
+ pop=11451 cvs=0.7173 phi=0.1389 gov=LocalSovereign
+Seed 4242...4242,1800,150.0,8965,0.7192,true,567,3,0.1405,0.1866,0.9241,LocalSovereign
+ pop=8965 cvs=0.7192 phi=0.1405 gov=LocalSovereign
+Seed 5555...5555,1800,150.0,8306,0.7039,true,627,3,0.0855,0.1564,0.9364,LocalSovereign
+ pop=8306 cvs=0.7039 phi=0.0855 gov=LocalSovereign
+Seed 7777...7777,1800,150.0,8875,0.7119,true,578,3,0.1045,0.1391,0.9349,LocalSovereign
+ pop=8875 cvs=0.7119 phi=0.1045 gov=LocalSovereign
+Seed 9999...9999,1800,150.0,14775,0.7169,true,618,3,0.1406,0.2017,0.9154,LocalSovereign
+ pop=14775 cvs=0.7169 phi=0.1406 gov=LocalSovereign
+
+Done. Pipe stdout to CSV for reference storage.
