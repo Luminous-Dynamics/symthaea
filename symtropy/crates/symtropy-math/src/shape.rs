@@ -15,4 +15,10 @@ pub trait Shape<const D: usize>: Send + Sync {
 
     /// Bounding sphere: (center, radius).
     fn bounding_sphere(&self) -> (Point<D>, f64);
+
+    /// Downcast to concrete type for specialized collision dispatch.
+    ///
+    /// Used by the narrowphase to dispatch to analytical contacts when
+    /// one shape is a HalfSpace (bypassing GJK+EPA for a dot product).
+    fn as_any(&self) -> &dyn std::any::Any;
 }

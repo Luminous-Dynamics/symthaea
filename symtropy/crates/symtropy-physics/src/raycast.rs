@@ -164,7 +164,7 @@ fn ray_sphere_intersection<const D: usize>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use symtropy_math::Sphere;
+    use symtropy_math::{Point, Sphere};
 
     #[test]
     fn ray_hits_sphere() {

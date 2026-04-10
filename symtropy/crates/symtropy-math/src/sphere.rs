@@ -47,6 +47,8 @@ impl<const D: usize> Shape<D> for Sphere<D> {
     fn bounding_sphere(&self) -> (Point<D>, f64) {
         (self.center, self.radius)
     }
+
+    fn as_any(&self) -> &dyn std::any::Any { self }
 }
 
 #[cfg(test)]

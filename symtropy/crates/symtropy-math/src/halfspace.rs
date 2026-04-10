@@ -179,6 +179,8 @@ impl<const D: usize> Shape<D> for HalfSpace<D> {
     fn bounding_sphere(&self) -> (Point<D>, f64) {
         (Point::origin(), HALFSPACE_EXTENT)
     }
+
+    fn as_any(&self) -> &dyn std::any::Any { self }
 }
 
 #[cfg(test)]

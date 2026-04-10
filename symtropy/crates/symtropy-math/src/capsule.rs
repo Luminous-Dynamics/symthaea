@@ -84,6 +84,8 @@ impl<const D: usize> Shape<D> for Capsule<D> {
     fn bounding_sphere(&self) -> (Point<D>, f64) {
         (Point::origin(), self.half_height + self.radius)
     }
+
+    fn as_any(&self) -> &dyn std::any::Any { self }
 }
 
 #[cfg(test)]

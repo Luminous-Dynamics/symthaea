@@ -68,6 +68,8 @@ impl<const D: usize> Shape<D> for HyperBox<D> {
             .sqrt();
         (Point::origin(), radius)
     }
+
+    fn as_any(&self) -> &dyn std::any::Any { self }
 }
 
 #[cfg(test)]

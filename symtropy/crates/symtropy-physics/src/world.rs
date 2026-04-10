@@ -223,6 +223,21 @@ impl<const D: usize> PhysicsWorld<D> {
                 let pos_a = self.bodies[a].transform.translation.0;
                 let pos_b = self.bodies[b].transform.translation.0;
 
+                // Fast path: analytical HalfSpace contacts (bypass GJK+EPA)
+                if let Some(manifold) = self.try_halfspace_contact(a, b, pair.0, pair.1) {
+                    if self.bodies[a].is_sensor || self.bodies[b].is_sensor {
+                        let (sensor, other) = if self.bodies[a].is_sensor {
+                            (pair.0, pair.1)
+                        } else {
+                            (pair.1, pair.0)
+                        };
+                        self.sensor_events.push(crate::contact::SensorEvent { sensor, other });
+                        continue;
+                    }
+                    self.contacts.push(manifold);
+                    continue;
+                }
+
                 let result = gjk::intersects(
                     self.bodies[a].collider.as_ref(),
                     &pos_a,
@@ -420,6 +435,43 @@ impl<const D: usize> PhysicsWorld<D> {
             self.bodies[a].wake();
             self.bodies[b].wake();
         }
+    }
+
+    /// Try analytical HalfSpace contact. Returns None if neither body is a HalfSpace.
+    fn try_halfspace_contact(
+        &self,
+        idx_a: usize,
+        idx_b: usize,
+        handle_a: BodyHandle,
+        handle_b: BodyHandle,
+    ) -> Option<ContactManifold<D>> {
+        use symtropy_math::HalfSpace;
+
+        // Check if body A is a HalfSpace
+        if let Some(hs) = self.bodies[idx_a].collider.as_any().downcast_ref::<HalfSpace<D>>() {
+            let (center_b, radius_b) = self.bodies[idx_b].collider.bounding_sphere();
+            let world_center_b = self.bodies[idx_b].transform.transform_point(&center_b).0;
+            if let Some((contact_pt, depth)) = hs.contact_sphere(&world_center_b, radius_b) {
+                return Some(ContactManifold::single(
+                    handle_a, handle_b, hs.normal, contact_pt, depth,
+                ));
+            }
+            return None;
+        }
+
+        // Check if body B is a HalfSpace
+        if let Some(hs) = self.bodies[idx_b].collider.as_any().downcast_ref::<HalfSpace<D>>() {
+            let (center_a, radius_a) = self.bodies[idx_a].collider.bounding_sphere();
+            let world_center_a = self.bodies[idx_a].transform.transform_point(&center_a).0;
+            if let Some((contact_pt, depth)) = hs.contact_sphere(&world_center_a, radius_a) {
+                return Some(ContactManifold::single(
+                    handle_a, handle_b, -hs.normal, contact_pt, depth,
+                ));
+            }
+            return None;
+        }
+
+        None // Neither body is a HalfSpace
     }
 
     fn find_body_indices(&self, a: BodyHandle, b: BodyHandle) -> (Option<usize>, Option<usize>) {
