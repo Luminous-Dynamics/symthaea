@@ -89,3 +89,15 @@ console_error_panic_hook = "0.1"
 
 # --- Optional JS engine (pure Rust) ---
 boa_engine = "0.21"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+opt-level = "z"
+strip = true
+
+[profile.release.package.prism-serve]
+opt-level = 3
+
+[profile.release.package.prism-proxy]
+opt-level = 3
