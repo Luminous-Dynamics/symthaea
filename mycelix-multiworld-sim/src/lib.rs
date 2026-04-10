@@ -27,6 +27,7 @@
 
 pub mod agent;
 pub mod civic_dimensions;
+pub mod scoring_bridge;
 pub mod biosphere;
 pub mod cascade;
 pub mod config;
