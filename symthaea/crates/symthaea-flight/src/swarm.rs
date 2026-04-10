@@ -160,7 +160,8 @@ pub fn train_swarm(config: &SwarmConfig) -> SwarmResult {
         .into_par_iter()
         .map(|drone_id| {
             // Each drone gets its own MuJoCo instance
-            let mut sim = MuJoCoSimulator::from_primitive();
+            let mut sim = MuJoCoSimulator::from_primitive()
+                .expect("Failed to load MuJoCo primitive model for swarm drone");
 
             // Deterministic RNG per drone
             let mut rng_state = (drone_id as u64).wrapping_mul(2654435761).wrapping_add(42);

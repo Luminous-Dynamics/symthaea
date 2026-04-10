@@ -349,7 +349,6 @@ struct TrainingPostResult {
     school_predicted_phi_gain: f32,
 }
 
-
 impl CognitiveLoopService {
     /// Core dynamics phase: CycleSnapshot, subsystem managers, self-model tracking,
     /// resonator recall, semantic memory, CfC step, prediction, world model,
@@ -584,10 +583,8 @@ impl CognitiveLoopService {
                     } else {
                         1.0
                     };
-                    self.muse_manager.inject_substrate(
-                        self.substrate_manager.feasibility,
-                        energy_ratio,
-                    );
+                    self.muse_manager
+                        .inject_substrate(self.substrate_manager.feasibility, energy_ratio);
                     let safety_u8 = if snapshot.unified_psi > 0.6 {
                         0
                     } else if snapshot.unified_psi > 0.3 {
@@ -633,8 +630,10 @@ impl CognitiveLoopService {
                     }
                     let processed = self.holon_receiver.process_inbound(cycle_num as u64);
                     if processed > 0 {
-                        // Collect peer data into local vec (avoid borrow conflict with swarm_manager)
-                        let peer_updates: Vec<_> = self
+                        use super::managers::swarm_manager::SwarmEvent;
+
+                        // Collect peer data into local vecs (avoid borrow conflicts with downstream managers)
+                        let consciousness_updates: Vec<_> = self
                             .holon_receiver
                             .peers()
                             .map(|p| {
@@ -646,8 +645,19 @@ impl CognitiveLoopService {
                                 )
                             })
                             .collect();
-                        for (peer_id, phi, valence, arousal) in peer_updates {
-                            use super::managers::swarm_manager::SwarmEvent;
+                        let navigation_updates: Vec<_> = self
+                            .holon_receiver
+                            .peers()
+                            .filter_map(|p| {
+                                Some((
+                                    p.device_id.clone(),
+                                    p.last_position_m?,
+                                    p.last_position_sigma_m?,
+                                    p.navigation_confidence.map(f64::from),
+                                ))
+                            })
+                            .collect();
+                        for (peer_id, phi, valence, arousal) in consciousness_updates {
                             self.swarm_manager
                                 .inject_event(SwarmEvent::ConsciousnessUpdate {
                                     peer_id,
@@ -655,6 +665,28 @@ impl CognitiveLoopService {
                                     valence,
                                     arousal,
                                 });
+                        }
+                        for (peer_id, position_m, position_sigma_m, confidence) in
+                            navigation_updates
+                        {
+                            if self.network_service().is_some() {
+                                self.receive_peer_navigation_estimate(
+                                    &peer_id,
+                                    positioning::GaussianEstimate3D::from_diagonal_sigma(
+                                        position_m,
+                                        position_sigma_m as f64,
+                                    ),
+                                    confidence,
+                                );
+                            } else {
+                                self.swarm_manager
+                                    .inject_event(SwarmEvent::PeerNavigationUpdate {
+                                        peer_id,
+                                        position_m,
+                                        position_sigma_m: position_sigma_m as f64,
+                                        confidence,
+                                    });
+                            }
                         }
                     }
                     self.holon_receiver.evict_stale(cycle_num as u64, 500);
@@ -700,8 +732,7 @@ impl CognitiveLoopService {
                     // Drain up to 5 buffered experiences per cycle to spread
                     // consolidation cost and avoid multi-second latency spikes.
                     if self.store_and_forward.needs_consolidation() {
-                        let wisdom =
-                            self.store_and_forward.consolidate_batch(cycle_num, 5);
+                        let wisdom = self.store_and_forward.consolidate_batch(cycle_num, 5);
                         if wisdom.experiences_consolidated > 0 {
                             tracing::info!(
                                 experiences = wisdom.experiences_consolidated,
@@ -975,7 +1006,11 @@ impl CognitiveLoopService {
 
                 #[cfg(feature = "social-fabric")]
                 if self.social_fabric_manager.should_run(cycle_num, urgency_u8) {
-                    run_subsystem!(self.social_fabric_manager, "social_fabric_manager", snapshot);
+                    run_subsystem!(
+                        self.social_fabric_manager,
+                        "social_fabric_manager",
+                        snapshot
+                    );
                 }
 
                 #[cfg(feature = "survival")]
@@ -1132,180 +1167,9 @@ impl CognitiveLoopService {
         #[cfg(feature = "reasoning_engine")]
         self.cross_couple_reasoning_exploration();
 
-        // ── Phase 17: Self-model accuracy tracking ───────────────────────
-        let self_model_accuracy = self.carryover.learning.self_model_accuracy;
-        if let Some((made_at, pred_confidence, pred_urgency)) =
-            self.carryover.history.self_model_prediction.take()
-        {
-            if self.stats.total_cycles >= made_at + 5 {
-                let confidence_error = (self.prediction_confidence - pred_confidence).abs() as f32;
-                let urgency_match = if urgency == pred_urgency { 1.0f32 } else { 0.0 };
-                let accuracy = (1.0 - confidence_error) * SELF_MODEL_CONFIDENCE_WEIGHT
-                    + urgency_match * SELF_MODEL_URGENCY_WEIGHT;
-                self.carryover.learning.self_model_accuracy =
-                    self.carryover.learning.self_model_accuracy * SELF_MODEL_ACCURACY_EMA
-                        + accuracy * (1.0 - SELF_MODEL_ACCURACY_EMA);
-                self.stats.self_model_predictions_validated += 1;
-                self.stats.avg_self_model_accuracy = self.stats.avg_self_model_accuracy
-                    * SELF_MODEL_ACCURACY_EMA
-                    + accuracy * (1.0 - SELF_MODEL_ACCURACY_EMA);
-
-                if self.carryover.learning.self_model_accuracy > SELF_MODEL_HIGH_THRESHOLD {
-                    let trust_boost = (self.carryover.learning.self_model_accuracy
-                        - SELF_MODEL_HIGH_THRESHOLD)
-                        * SELF_MODEL_HIGH_TRUST_BOOST;
-                    self.adjust_confidence("self_model_trust", trust_boost);
-                }
-                if self.carryover.learning.self_model_accuracy < SELF_MODEL_LOW_THRESHOLD {
-                    self.scale_confidence("self_model_low_acc", SELF_MODEL_LOW_CONFIDENCE_SCALE);
-                }
-            } else {
-                self.carryover.history.self_model_prediction =
-                    Some((made_at, pred_confidence, pred_urgency));
-            }
-        }
-        if self.stats.total_cycles % super::thresholds::SELF_MODEL_PREDICTION_INTERVAL == 0
-            && self.carryover.history.self_model_prediction.is_none()
-        {
-            self.carryover.history.self_model_prediction =
-                Some((self.stats.total_cycles, self.prediction_confidence, urgency));
-            self.stats.self_model_predictions_made += 1;
-        }
-
-        // Session 10 Item 2: Self-model accuracy → proposal weighting.
-        // Accurate self-model → boost self-model confidence proposals; inaccurate → dampen.
-        // Science: Friston (2010) — interoceptive accuracy modulates self-model trust.
-        if self_model_accuracy > self.threshold_overrides.self_model_weight_high() {
-            self.scale_confidence(
-                "self_model_weight_hi",
-                (1.0 + SELF_MODEL_WEIGHT_BONUS) as f32,
-            );
-        } else if self_model_accuracy < SELF_MODEL_WEIGHT_LOW_THRESHOLD {
-            self.scale_confidence("self_model_weight_lo", SELF_MODEL_WEIGHT_PENALTY as f32);
-        }
-
-        // Session 10 Item 1: Confidence crash detector → emergency stabilization.
-        // >30% confidence drop in 1 cycle → freeze LR for 3 cycles, boost exploration.
-        // Science: Cools et al. (2008) — rapid confidence collapse triggers serotonergic dip.
-        // Session 11 Fix: Use Set proposal to pin LR at cycle-start value during freeze.
-        let confidence_crash_detected;
-        let lr_frozen;
-        {
-            let prev_conf = self.carryover.quality.prev_confidence_for_crash;
-            let current_conf = self.prediction_confidence;
-            let drop = prev_conf - current_conf;
-            // Session 11 Item 4: Flow state raises crash threshold (×1.5).
-            // Flow = committed mode, transient dips are normal.
-            // Science: Csikszentmihalyi (1990) — flow tolerates transient perturbation.
-            let effective_crash_threshold = if self.behavior.flow_state.in_flow {
-                self.threshold_overrides.confidence_crash_threshold() * CONFIDENCE_CRASH_FLOW_MULTIPLIER
-            } else {
-                self.threshold_overrides.confidence_crash_threshold()
-            };
-            confidence_crash_detected = drop > prev_conf * effective_crash_threshold
-                && prev_conf > super::thresholds::CONFIDENCE_CRASH_MIN_PRIOR
-                && self.stats.total_cycles > DYNAMICS_STARTUP_WARMUP_CYCLES;
-            if confidence_crash_detected {
-                // Session 11 Item 5: Grace period — lighter freeze after recent mode transition.
-                // Post-transition confidence drops are expected, not emergencies.
-                let freeze_duration = if self.carryover.urgency.mode_stability_counter
-                    < super::thresholds::MODE_STABILITY_GRACE_THRESHOLD
-                {
-                    super::thresholds::CONFIDENCE_CRASH_LIGHT_FREEZE_CYCLES // Light freeze: mode just changed, drop is expected
-                } else {
-                    CONFIDENCE_CRASH_FREEZE_CYCLES // Full freeze
-                };
-                self.carryover.quality.crash_freeze_remaining = freeze_duration;
-                self.adjust_exploration_pri(
-                    "confidence_crash",
-                    CONFIDENCE_CRASH_EXPLORATION_BOOST,
-                    Priority::Safety,
-                );
-                tracing::debug!(
-                    "Confidence crash detected: {prev_conf:.3} → {current_conf:.3} (drop={drop:.3}), \
-                     freezing LR for {freeze_duration} cycles"
-                );
-            }
-            // Session 11 Fix: Pin LR to cycle-start value with Set (overrides all other proposals).
-            lr_frozen = self.carryover.quality.crash_freeze_remaining > 0;
-            if lr_frozen {
-                let frozen_lr = self.feedback_state.cycle_start_lr() as f32;
-                self.set_lr("crash_freeze", frozen_lr);
-                self.carryover.quality.crash_freeze_remaining -= 1;
-            }
-            // Session 15 Item 4: Confidence crash → relax binding threshold.
-            // During crash recovery, binding requirements should be lenient — the system
-            // needs to re-integrate, not reject fragmented inputs.
-            // Science: Dehaene (2014) — post-disruption GWT lowers ignition threshold.
-            if self.carryover.quality.crash_freeze_remaining > 0 {
-                self.scale_threshold("crash_binding_relax", 0.95);
-            }
-        }
-
-        // Session 9 Item 1: PE variance → confidence modulation.
-        // High error variance (unstable PE) should dampen confidence more than steady errors.
-        // Yu & Dayan (2005): expected vs unexpected uncertainty differentially modulate ACh/NE.
-        let pe_variance = self.stats.avg_prediction_error_sq
-            - self.stats.avg_prediction_error * self.stats.avg_prediction_error;
-        let pe_variance = pe_variance.max(0.0); // Clamp numerical noise
-        if pe_variance > PE_VARIANCE_THRESHOLD
-            && self.stats.total_cycles > DYNAMICS_POST_BOOT_CYCLES
-        {
-            // High variance = unstable errors → dampen confidence proportionally
-            let variance_dampen = 1.0
-                - (pe_variance - PE_VARIANCE_THRESHOLD).min(PE_VARIANCE_MAX_EFFECT)
-                    * PE_VARIANCE_DAMPEN_SCALE; // 0.90–1.0
-            self.scale_confidence_pri("pe_variance", variance_dampen, Priority::Homeostatic);
-        }
-
-        // FEEDBACK: Quantum coherence boosts exploration (prev cycle)
-        if self.carryover.consciousness.quantum_coherence > QUANTUM_COHERENCE_THRESHOLD {
-            let coherence_boost = (self.carryover.consciousness.quantum_coherence
-                - QUANTUM_COHERENCE_THRESHOLD) as f32
-                * QUANTUM_COHERENCE_BOOST_SCALE;
-            self.adjust_exploration_pri(
-                "quantum_coherence",
-                coherence_boost,
-                Priority::Homeostatic,
-            );
-        }
-
-        // ── Foveation → dynamics coupling ────────────────────────────────
-        // Corbetta & Shulman (2002): recognized objects reduce attentional vigilance;
-        // novel objects boost learning.
-        #[cfg(feature = "foveation")]
-        {
-            use super::thresholds::{
-                FOVEATION_CONFIDENCE_BOOST, FOVEATION_FAMILIAR_EXPLORATION_DAMPEN,
-                FOVEATION_FAMILIAR_RECOGNITION_COUNT, FOVEATION_HIGH_CONFIDENCE_THRESHOLD,
-                FOVEATION_NOVEL_LR_BOOST,
-            };
-            let fov_count = perception.foveation_recognition_count;
-            let fov_conf = perception.foveation_top_confidence;
-
-            if fov_count >= FOVEATION_FAMILIAR_RECOGNITION_COUNT
-                && fov_conf > FOVEATION_HIGH_CONFIDENCE_THRESHOLD
-            {
-                // Familiar scene: dampen exploration, boost confidence
-                self.scale_exploration_pri(
-                    "foveation_familiar",
-                    FOVEATION_FAMILIAR_EXPLORATION_DAMPEN,
-                    Priority::Homeostatic,
-                );
-                self.scale_confidence_pri(
-                    "foveation_familiar",
-                    FOVEATION_CONFIDENCE_BOOST,
-                    Priority::Homeostatic,
-                );
-            } else if fov_count > 0 && fov_conf < FOVEATION_HIGH_CONFIDENCE_THRESHOLD {
-                // Novel objects: boost learning rate
-                self.scale_lr_pri(
-                    "foveation_novel",
-                    FOVEATION_NOVEL_LR_BOOST,
-                    Priority::Homeostatic,
-                );
-            }
-        }
+        // ── Self-model tracking, crash detection, PE variance, foveation ──
+        let (confidence_crash_detected, lr_frozen) =
+            self.track_self_model_and_detect_crash(urgency, &perception);
 
         // ── Vision surprise → exploration: delegated to VisionManager (interval 17) ──
 
@@ -1387,7 +1251,8 @@ impl CognitiveLoopService {
         // Sustained overshoot (>1.15) → system is overcorrecting → dampen LR.
         // Sustained undershoot (<0.85) → system is sluggish → boost LR.
         // Science: Turrigiano (2008) — homeostatic failure triggers synaptic recalibration.
-        if eff > self.threshold_overrides.homeostasis_recalibrate_high() && self.stats.total_cycles > DYNAMICS_POST_BOOT_CYCLES
+        if eff > self.threshold_overrides.homeostasis_recalibrate_high()
+            && self.stats.total_cycles > DYNAMICS_POST_BOOT_CYCLES
         {
             self.scale_lr_pri(
                 "homeostasis_overcorrect",
@@ -2191,9 +2056,13 @@ impl CognitiveLoopService {
                 oxytocin: self.neuromod.bath.oxytocin.effective() as f64,
                 threat_level: {
                     #[cfg(feature = "sentinel")]
-                    { self.sentinel_manager.threat_level() as f64 }
+                    {
+                        self.sentinel_manager.threat_level() as f64
+                    }
                     #[cfg(not(feature = "sentinel"))]
-                    { 0.0 }
+                    {
+                        0.0
+                    }
                 },
                 peer_trust: self.swarm_manager.telemetry().connectivity_ema,
                 flow_state: self.behavior.flow_state.intensity as f64,
@@ -2273,8 +2142,7 @@ impl CognitiveLoopService {
                 // Blend: 80% original signal + 20% JEPA latent PE
                 // This preserves the FEP bridge's existing precision weighting
                 // while adding the latent prediction error contribution.
-                self.fep.learning_signal =
-                    0.8 * self.fep.learning_signal + 0.2 * jepa_pe;
+                self.fep.learning_signal = 0.8 * self.fep.learning_signal + 0.2 * jepa_pe;
             }
 
             Some(r)
@@ -2409,12 +2277,14 @@ impl CognitiveLoopService {
                             .parameters
                             .first()
                             .and_then(|&v| super::motor_output_bridge::ActionType::from_param(v))
-                            .map_or(false, |at| matches!(
-                                at,
-                                super::motor_output_bridge::ActionType::Read
-                                | super::motor_output_bridge::ActionType::List
-                                | super::motor_output_bridge::ActionType::Parse
-                            ));
+                            .map_or(false, |at| {
+                                matches!(
+                                    at,
+                                    super::motor_output_bridge::ActionType::Read
+                                        | super::motor_output_bridge::ActionType::List
+                                        | super::motor_output_bridge::ActionType::Parse
+                                )
+                            });
                         if is_readonly {
                             // Read-only action: permitted at Orange level
                             if let Some(ref mut bridge) =
@@ -2426,12 +2296,12 @@ impl CognitiveLoopService {
                                     .pending_request
                                     .take()
                                     .unwrap_or_default();
-                                let motor_phi =
-                                    if self.carryover.history.consciousness_level > 0.0 {
-                                        self.carryover.history.consciousness_level
-                                    } else {
-                                        coherence as f64
-                                    };
+                                let motor_phi = if self.carryover.history.consciousness_level > 0.0
+                                {
+                                    self.carryover.history.consciousness_level
+                                } else {
+                                    coherence as f64
+                                };
                                 let result = bridge.execute(
                                     &enhanced_result.motor_command.parameters,
                                     enhanced_result.motor_command.confidence,
@@ -2571,153 +2441,9 @@ impl CognitiveLoopService {
         // Unified Psi + Experience Bus + Guiding Question computed by
         // run_neuromodulator_and_psi_phase() above — values already in neuromod_result.
 
-        // ── Phase 15: Attention budget check ─────────────────────────────────
-        let neuromod_attention_alloc = self.neuromod.bath.attention_budget_allocation();
-        // Thalamic depth → attention budget scaling
-        // Science: Kahneman (1973) — deliberation allocates more attentional resources
-        let depth_budget_scale = match self.cognitive_depth {
-            super::CognitiveDepth::DeepThought => THALAMIC_DEEP_BUDGET_SCALE,
-            super::CognitiveDepth::Cortical => 1.0,
-            super::CognitiveDepth::Reflex => THALAMIC_REFLEX_BUDGET_SCALE,
-        };
-        // Epistemic uncertainty → attention budget expansion.
-        // Science: Gottlieb et al. (2013) — uncertain environments demand more attentional resources.
-        // High epistemic (>0.4) scales budget up to 1.3×; low (<0.2) contracts to 0.9×.
-        let epistemic_budget_scale = if epistemic_uncertainty > EPISTEMIC_BUDGET_EXPAND_THRESHOLD {
-            1.0 + (epistemic_uncertainty - EPISTEMIC_BUDGET_EXPAND_THRESHOLD)
-                .min(EPISTEMIC_BUDGET_EXPAND_CAP)
-        } else if epistemic_uncertainty < EPISTEMIC_BUDGET_CONTRACT_THRESHOLD {
-            EPISTEMIC_BUDGET_CONTRACT_BASE + epistemic_uncertainty * EPISTEMIC_BUDGET_CONTRACT_RAMP
-        } else {
-            1.0
-        };
-        // Sacred Stillness → attention budget contraction: when the dominant
-        // harmony is rest/stillness, reduce computation budget (genuine rest).
-        // Science: Raichle (2010) — default mode network reduces task-positive
-        // resource allocation during rest states.
-        let stillness_budget_scale = {
-            let ss_coord =
-                self.ethics_engine.last_harmony_coordinates()[HARMONY_INDEX_SACRED_STILLNESS]; // SacredStillness
-            if ss_coord > STILLNESS_BUDGET_THRESHOLD {
-                // High stillness activation → contract budget by up to 30%
-                1.0 - (ss_coord - STILLNESS_BUDGET_THRESHOLD).min(STILLNESS_BUDGET_CONTRACT_CAP)
-            } else {
-                1.0
-            }
-        };
-        // Coherence velocity → attention budget allocation.
-        // Dropping coherence → preserve budget (system losing grip);
-        // rising coherence → expand budget (model confidence growing).
-        // Science: Bar (2009) — coherence collapse demands attention reallocation.
-        let coherence_velocity_budget_scale = {
-            let cv = self.carryover.quality.coherence_velocity;
-            if cv < -COHERENCE_VELOCITY_BUDGET_THRESHOLD {
-                COHERENCE_VELOCITY_BUDGET_CONTRACT
-            } else if cv > COHERENCE_VELOCITY_BUDGET_THRESHOLD {
-                COHERENCE_VELOCITY_BUDGET_EXPAND
-            } else {
-                1.0
-            }
-        };
-        let attention_budget_us = (ATTENTION_BUDGET_US as f64
-            * neuromod_attention_alloc as f64
-            * depth_budget_scale
-            * epistemic_budget_scale as f64
-            * stillness_budget_scale
-            * coherence_velocity_budget_scale) as u64;
-
-        // Active Rest Mode: track Sacred Stillness dominance streak
-        {
-            let ss_coord =
-                self.ethics_engine.last_harmony_coordinates()[HARMONY_INDEX_SACRED_STILLNESS];
-            let dominant_idx = self
-                .ethics_engine
-                .last_harmony_coordinates()
-                .iter()
-                .enumerate()
-                .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
-                .map(|(i, _)| i)
-                .unwrap_or(0);
-            if dominant_idx == 7 && ss_coord > 0.3 {
-                self.stats.stillness_dominance_streak += 1;
-            } else {
-                self.stats.stillness_dominance_streak = 0;
-                self.stats.in_active_rest = false;
-            }
-            if self.stats.stillness_dominance_streak >= super::thresholds::ACTIVE_REST_THRESHOLD {
-                if !self.stats.in_active_rest {
-                    tracing::info!(
-                        streak = self.stats.stillness_dominance_streak,
-                        "Entering active rest mode — redirecting computation to consolidation"
-                    );
-                    self.stats.in_active_rest = true;
-                }
-                // Active rest: trigger dream consolidation and memory defragmentation
-                if let Some(ref mut dream) = self.dream_engine {
-                    if let Ok(result) = dream.dream() {
-                        if result.insights > 0 {
-                            tracing::debug!(
-                                insights = result.insights,
-                                "Active rest dream consolidation"
-                            );
-                        }
-                    }
-                }
-                // Active rest: boost episodic memory consolidation priority.
-                // Rest states are when the brain consolidates recent experiences
-                // (Diekelmann & Born 2010 — memory consolidation during rest).
-                if let Some(ref mut replay) = self.memory.episodic_persistence.replay {
-                    replay.boost_recent_consolidation(0.15);
-                }
-            }
-        }
-
-        // Moral attractor dampening: on the rising edge of attractor detection,
-        // reduce exploration rate by 20% — the system has settled on an ethical stance.
-        // Only fires once per attractor entry to prevent exponential decay to floor.
-        {
-            let attractor_now = self
-                .ethics_engine
-                .moral_topology()
-                .last_summary()
-                .attractor_detected;
-            if attractor_now && !self.stats.prev_moral_attractor {
-                let rate = self.fep.closed_learning_loop.exploration_rate();
-                self.fep
-                    .closed_learning_loop
-                    .set_exploration_rate(rate * 0.8);
-            }
-            self.stats.prev_moral_attractor = attractor_now;
-        }
-
-        let attention_budget_elapsed_us = cycle_start.elapsed().as_micros() as u64;
-        let attention_budget_exceeded = attention_budget_elapsed_us > attention_budget_us;
-        if attention_budget_exceeded {
-            self.stats.attention_budget_exceeded_count += 1;
-            // Session 13 Item 7: Budget exceeded → raise threshold (be more selective).
-            // Overloaded system should require stronger signals before full processing.
-            // Science: Lavie (2005) — perceptual load theory: high load raises selection threshold.
-            if self.stats.attention_budget_exceeded_count > 1 {
-                self.scale_threshold("attention_overload", 1.1);
-            }
-            if self.stats.attention_budget_exceeded_count > 3 {
-                tracing::warn!(
-                    elapsed_us = attention_budget_elapsed_us,
-                    consecutive = self.stats.attention_budget_exceeded_count,
-                    "Cycle budget exceeded for {} consecutive cycles",
-                    self.stats.attention_budget_exceeded_count,
-                );
-            }
-        } else {
-            self.stats.attention_budget_exceeded_count = 0;
-        }
-
-        let predictive_budget_gated = attention_budget_elapsed_us
-            > (attention_budget_us as f64 * PREDICTIVE_BUDGET_GATING_RATIO) as u64
-            && !attention_budget_exceeded;
-        if predictive_budget_gated {
-            self.stats.predictive_budget_gated_count += 1;
-        }
+        // ── Attention budget check, active rest, moral attractor ──────────
+        let (attention_budget_exceeded, predictive_budget_gated, epistemic_budget_scale) =
+            self.compute_attention_budget(cycle_start, epistemic_uncertainty);
 
         // ═══════════════════════════════════════════════════════════════════════
         // 10h.0 PsiAttestation record (every 10 cycles to reduce overhead)
@@ -3056,8 +2782,7 @@ impl CognitiveLoopService {
                         + (-(phi - super::thresholds::PHI_TAU_REFERENCE as f64)
                             * super::thresholds::PHI_TAU_SIGMOID_STEEPNESS as f64)
                             .exp());
-                let dampen = (normalized as f32
-                    * super::thresholds::PHI_LR_STABILIZATION_SCALE)
+                let dampen = (normalized as f32 * super::thresholds::PHI_LR_STABILIZATION_SCALE)
                     .min(super::thresholds::PHI_LR_STABILIZATION_MAX);
                 effective_lr * (1.0 - dampen)
             } else {
@@ -3137,7 +2862,7 @@ impl CognitiveLoopService {
                 effective_lr,
                 cycle_reward,
                 prediction_coherence,
-                self_model_accuracy,
+                self_model_accuracy: self.carryover.learning.self_model_accuracy,
             },
             fep: DynFep {
                 fep_action_idx,
@@ -3179,7 +2904,7 @@ impl CognitiveLoopService {
             },
             attention: DynAttention {
                 attention_budget_exceeded,
-                attention_budget_elapsed_us,
+                attention_budget_elapsed_us: cycle_start.elapsed().as_micros() as u64,
                 predictive_budget_gated,
             },
             resonator: DynResonator {
@@ -3206,7 +2931,7 @@ impl CognitiveLoopService {
             },
             math: math_result,
             neuromod: DynNeuromod {
-                neuromod_attention_alloc,
+                neuromod_attention_alloc: self.neuromod.bath.attention_budget_allocation(),
                 ne_reorienting_boost,
                 ne_arousal_feedback,
                 confidence_velocity,
@@ -3241,6 +2966,309 @@ impl CognitiveLoopService {
             lr_frozen,
             semantic_evictions: if had_semantic_eviction { 1 } else { 0 },
         }
+    }
+
+    /// Attention budget computation, active rest mode, and moral attractor dampening.
+    ///
+    /// Returns `(attention_budget_exceeded, predictive_budget_gated, epistemic_budget_scale)`.
+    fn compute_attention_budget(
+        &mut self,
+        cycle_start: std::time::Instant,
+        epistemic_uncertainty: f32,
+    ) -> (bool, bool, f32) {
+        let neuromod_attention_alloc = self.neuromod.bath.attention_budget_allocation();
+        let depth_budget_scale = match self.cognitive_depth {
+            super::CognitiveDepth::DeepThought => THALAMIC_DEEP_BUDGET_SCALE,
+            super::CognitiveDepth::Cortical => 1.0,
+            super::CognitiveDepth::Reflex => THALAMIC_REFLEX_BUDGET_SCALE,
+        };
+        let epistemic_budget_scale = if epistemic_uncertainty > EPISTEMIC_BUDGET_EXPAND_THRESHOLD {
+            1.0 + (epistemic_uncertainty - EPISTEMIC_BUDGET_EXPAND_THRESHOLD)
+                .min(EPISTEMIC_BUDGET_EXPAND_CAP)
+        } else if epistemic_uncertainty < EPISTEMIC_BUDGET_CONTRACT_THRESHOLD {
+            EPISTEMIC_BUDGET_CONTRACT_BASE + epistemic_uncertainty * EPISTEMIC_BUDGET_CONTRACT_RAMP
+        } else {
+            1.0
+        };
+        let stillness_budget_scale = {
+            let ss_coord =
+                self.ethics_engine.last_harmony_coordinates()[HARMONY_INDEX_SACRED_STILLNESS];
+            if ss_coord > STILLNESS_BUDGET_THRESHOLD {
+                1.0 - (ss_coord - STILLNESS_BUDGET_THRESHOLD).min(STILLNESS_BUDGET_CONTRACT_CAP)
+            } else {
+                1.0
+            }
+        };
+        let coherence_velocity_budget_scale = {
+            let cv = self.carryover.quality.coherence_velocity;
+            if cv < -COHERENCE_VELOCITY_BUDGET_THRESHOLD {
+                COHERENCE_VELOCITY_BUDGET_CONTRACT
+            } else if cv > COHERENCE_VELOCITY_BUDGET_THRESHOLD {
+                COHERENCE_VELOCITY_BUDGET_EXPAND
+            } else {
+                1.0
+            }
+        };
+        let attention_budget_us = (ATTENTION_BUDGET_US as f64
+            * neuromod_attention_alloc as f64
+            * depth_budget_scale
+            * epistemic_budget_scale as f64
+            * stillness_budget_scale
+            * coherence_velocity_budget_scale) as u64;
+
+        // Active Rest Mode
+        {
+            let ss_coord =
+                self.ethics_engine.last_harmony_coordinates()[HARMONY_INDEX_SACRED_STILLNESS];
+            let dominant_idx = self
+                .ethics_engine
+                .last_harmony_coordinates()
+                .iter()
+                .enumerate()
+                .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
+                .map(|(i, _)| i)
+                .unwrap_or(0);
+            if dominant_idx == 7 && ss_coord > 0.3 {
+                self.stats.stillness_dominance_streak += 1;
+            } else {
+                self.stats.stillness_dominance_streak = 0;
+                self.stats.in_active_rest = false;
+            }
+            if self.stats.stillness_dominance_streak >= super::thresholds::ACTIVE_REST_THRESHOLD {
+                if !self.stats.in_active_rest {
+                    tracing::info!(
+                        streak = self.stats.stillness_dominance_streak,
+                        "Entering active rest mode — redirecting computation to consolidation"
+                    );
+                    self.stats.in_active_rest = true;
+                }
+                if let Some(ref mut dream) = self.dream_engine {
+                    if let Ok(result) = dream.dream() {
+                        if result.insights > 0 {
+                            tracing::debug!(
+                                insights = result.insights,
+                                "Active rest dream consolidation"
+                            );
+                        }
+                    }
+                }
+                if let Some(ref mut replay) = self.memory.episodic_persistence.replay {
+                    replay.boost_recent_consolidation(0.15);
+                }
+            }
+        }
+
+        // Moral attractor dampening
+        {
+            let attractor_now = self
+                .ethics_engine
+                .moral_topology()
+                .last_summary()
+                .attractor_detected;
+            if attractor_now && !self.stats.prev_moral_attractor {
+                let rate = self.fep.closed_learning_loop.exploration_rate();
+                self.fep
+                    .closed_learning_loop
+                    .set_exploration_rate(rate * 0.8);
+            }
+            self.stats.prev_moral_attractor = attractor_now;
+        }
+
+        let attention_budget_elapsed_us = cycle_start.elapsed().as_micros() as u64;
+        let attention_budget_exceeded = attention_budget_elapsed_us > attention_budget_us;
+        if attention_budget_exceeded {
+            self.stats.attention_budget_exceeded_count += 1;
+            if self.stats.attention_budget_exceeded_count > 1 {
+                self.scale_threshold("attention_overload", 1.1);
+            }
+            if self.stats.attention_budget_exceeded_count > 3 {
+                tracing::warn!(
+                    elapsed_us = attention_budget_elapsed_us,
+                    consecutive = self.stats.attention_budget_exceeded_count,
+                    "Cycle budget exceeded for {} consecutive cycles",
+                    self.stats.attention_budget_exceeded_count,
+                );
+            }
+        } else {
+            self.stats.attention_budget_exceeded_count = 0;
+        }
+
+        let predictive_budget_gated = attention_budget_elapsed_us
+            > (attention_budget_us as f64 * PREDICTIVE_BUDGET_GATING_RATIO) as u64
+            && !attention_budget_exceeded;
+        if predictive_budget_gated {
+            self.stats.predictive_budget_gated_count += 1;
+        }
+
+        (attention_budget_exceeded, predictive_budget_gated, epistemic_budget_scale)
+    }
+
+    /// Self-model accuracy tracking, confidence crash detection, PE variance modulation,
+    /// quantum coherence feedback, and foveation coupling.
+    ///
+    /// Returns `(confidence_crash_detected, lr_frozen)` for result assembly.
+    fn track_self_model_and_detect_crash(
+        &mut self,
+        urgency: super::CycleUrgency,
+        perception: &PerceptionPhaseResult,
+    ) -> (bool, bool) {
+        // ── Phase 17: Self-model accuracy tracking ───────────────────────
+        let self_model_accuracy = self.carryover.learning.self_model_accuracy;
+        if let Some((made_at, pred_confidence, pred_urgency)) =
+            self.carryover.history.self_model_prediction.take()
+        {
+            if self.stats.total_cycles >= made_at + 5 {
+                let confidence_error = (self.prediction_confidence - pred_confidence).abs() as f32;
+                let urgency_match = if urgency == pred_urgency { 1.0f32 } else { 0.0 };
+                let accuracy = (1.0 - confidence_error) * SELF_MODEL_CONFIDENCE_WEIGHT
+                    + urgency_match * SELF_MODEL_URGENCY_WEIGHT;
+                self.carryover.learning.self_model_accuracy =
+                    self.carryover.learning.self_model_accuracy * SELF_MODEL_ACCURACY_EMA
+                        + accuracy * (1.0 - SELF_MODEL_ACCURACY_EMA);
+                self.stats.self_model_predictions_validated += 1;
+                self.stats.avg_self_model_accuracy = self.stats.avg_self_model_accuracy
+                    * SELF_MODEL_ACCURACY_EMA
+                    + accuracy * (1.0 - SELF_MODEL_ACCURACY_EMA);
+
+                if self.carryover.learning.self_model_accuracy > SELF_MODEL_HIGH_THRESHOLD {
+                    let trust_boost = (self.carryover.learning.self_model_accuracy
+                        - SELF_MODEL_HIGH_THRESHOLD)
+                        * SELF_MODEL_HIGH_TRUST_BOOST;
+                    self.adjust_confidence("self_model_trust", trust_boost);
+                }
+                if self.carryover.learning.self_model_accuracy < SELF_MODEL_LOW_THRESHOLD {
+                    self.scale_confidence("self_model_low_acc", SELF_MODEL_LOW_CONFIDENCE_SCALE);
+                }
+            } else {
+                self.carryover.history.self_model_prediction =
+                    Some((made_at, pred_confidence, pred_urgency));
+            }
+        }
+        if self.stats.total_cycles % super::thresholds::SELF_MODEL_PREDICTION_INTERVAL == 0
+            && self.carryover.history.self_model_prediction.is_none()
+        {
+            self.carryover.history.self_model_prediction =
+                Some((self.stats.total_cycles, self.prediction_confidence, urgency));
+            self.stats.self_model_predictions_made += 1;
+        }
+
+        // Self-model accuracy → proposal weighting (Friston 2010).
+        if self_model_accuracy > self.threshold_overrides.self_model_weight_high() {
+            self.scale_confidence(
+                "self_model_weight_hi",
+                (1.0 + SELF_MODEL_WEIGHT_BONUS) as f32,
+            );
+        } else if self_model_accuracy < SELF_MODEL_WEIGHT_LOW_THRESHOLD {
+            self.scale_confidence("self_model_weight_lo", SELF_MODEL_WEIGHT_PENALTY as f32);
+        }
+
+        // Confidence crash detector → emergency stabilization (Cools et al. 2008).
+        let confidence_crash_detected;
+        let lr_frozen;
+        {
+            let prev_conf = self.carryover.quality.prev_confidence_for_crash;
+            let current_conf = self.prediction_confidence;
+            let drop = prev_conf - current_conf;
+            let effective_crash_threshold = if self.behavior.flow_state.in_flow {
+                self.threshold_overrides.confidence_crash_threshold()
+                    * CONFIDENCE_CRASH_FLOW_MULTIPLIER
+            } else {
+                self.threshold_overrides.confidence_crash_threshold()
+            };
+            confidence_crash_detected = drop > prev_conf * effective_crash_threshold
+                && prev_conf > super::thresholds::CONFIDENCE_CRASH_MIN_PRIOR
+                && self.stats.total_cycles > DYNAMICS_STARTUP_WARMUP_CYCLES;
+            if confidence_crash_detected {
+                let freeze_duration = if self.carryover.urgency.mode_stability_counter
+                    < super::thresholds::MODE_STABILITY_GRACE_THRESHOLD
+                {
+                    super::thresholds::CONFIDENCE_CRASH_LIGHT_FREEZE_CYCLES
+                } else {
+                    CONFIDENCE_CRASH_FREEZE_CYCLES
+                };
+                self.carryover.quality.crash_freeze_remaining = freeze_duration;
+                self.adjust_exploration_pri(
+                    "confidence_crash",
+                    CONFIDENCE_CRASH_EXPLORATION_BOOST,
+                    Priority::Safety,
+                );
+                tracing::debug!(
+                    "Confidence crash detected: {prev_conf:.3} → {current_conf:.3} (drop={drop:.3}), \
+                     freezing LR for {freeze_duration} cycles"
+                );
+            }
+            lr_frozen = self.carryover.quality.crash_freeze_remaining > 0;
+            if lr_frozen {
+                let frozen_lr = self.feedback_state.cycle_start_lr() as f32;
+                self.set_lr("crash_freeze", frozen_lr);
+                self.carryover.quality.crash_freeze_remaining -= 1;
+            }
+            if self.carryover.quality.crash_freeze_remaining > 0 {
+                self.scale_threshold("crash_binding_relax", 0.95);
+            }
+        }
+
+        // PE variance → confidence modulation (Yu & Dayan 2005).
+        let pe_variance = self.stats.avg_prediction_error_sq
+            - self.stats.avg_prediction_error * self.stats.avg_prediction_error;
+        let pe_variance = pe_variance.max(0.0);
+        if pe_variance > PE_VARIANCE_THRESHOLD
+            && self.stats.total_cycles > DYNAMICS_POST_BOOT_CYCLES
+        {
+            let variance_dampen = 1.0
+                - (pe_variance - PE_VARIANCE_THRESHOLD).min(PE_VARIANCE_MAX_EFFECT)
+                    * PE_VARIANCE_DAMPEN_SCALE;
+            self.scale_confidence_pri("pe_variance", variance_dampen, Priority::Homeostatic);
+        }
+
+        // Quantum coherence → exploration boost.
+        if self.carryover.consciousness.quantum_coherence > QUANTUM_COHERENCE_THRESHOLD {
+            let coherence_boost = (self.carryover.consciousness.quantum_coherence
+                - QUANTUM_COHERENCE_THRESHOLD) as f32
+                * QUANTUM_COHERENCE_BOOST_SCALE;
+            self.adjust_exploration_pri(
+                "quantum_coherence",
+                coherence_boost,
+                Priority::Homeostatic,
+            );
+        }
+
+        // Foveation → dynamics coupling (Corbetta & Shulman 2002).
+        #[cfg(feature = "foveation")]
+        {
+            use super::thresholds::{
+                FOVEATION_CONFIDENCE_BOOST, FOVEATION_FAMILIAR_EXPLORATION_DAMPEN,
+                FOVEATION_FAMILIAR_RECOGNITION_COUNT, FOVEATION_HIGH_CONFIDENCE_THRESHOLD,
+                FOVEATION_NOVEL_LR_BOOST,
+            };
+            let fov_count = perception.foveation_recognition_count;
+            let fov_conf = perception.foveation_top_confidence;
+
+            if fov_count >= FOVEATION_FAMILIAR_RECOGNITION_COUNT
+                && fov_conf > FOVEATION_HIGH_CONFIDENCE_THRESHOLD
+            {
+                self.scale_exploration_pri(
+                    "foveation_familiar",
+                    FOVEATION_FAMILIAR_EXPLORATION_DAMPEN,
+                    Priority::Homeostatic,
+                );
+                self.scale_confidence_pri(
+                    "foveation_familiar",
+                    FOVEATION_CONFIDENCE_BOOST,
+                    Priority::Homeostatic,
+                );
+            } else if fov_count > 0 && fov_conf < FOVEATION_HIGH_CONFIDENCE_THRESHOLD {
+                self.scale_lr_pri(
+                    "foveation_novel",
+                    FOVEATION_NOVEL_LR_BOOST,
+                    Priority::Homeostatic,
+                );
+            }
+        }
+        #[cfg(not(feature = "foveation"))]
+        let _ = perception; // suppress unused warning
+
+        (confidence_crash_detected, lr_frozen)
     }
 
     /// Apply emotional homeostasis: pull valence toward neutral, arousal toward target.

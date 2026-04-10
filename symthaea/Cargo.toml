@@ -196,6 +196,9 @@ symthaea-causal-reasoning = { path = "crates/symthaea-causal-reasoning", default
 # Symthaea FEP - Free Energy Principle active inference (always enabled)
 symthaea-fep = { path = "crates/symthaea-fep" }
 
+# Shared positioning and peer-fusion primitives
+positioning = { path = "../mycelix-position/lib/positioning" }
+
 # Symthaea Dream - Counterfactual Dream Engine (always enabled)
 symthaea-dream = { path = "crates/symthaea-dream" }
 
@@ -362,7 +365,7 @@ candle-transformers = { version = "0.8", optional = true }
 # REMOVED: libp2p (declared but never used - 0 integration lines)
 # Architecture: Cortex (Holochain) for trust + Synapse (Iroh) for real-time
 # Iroh 0.95+ has unified the crates - iroh-net is deprecated
-iroh = { version = "0.96", optional = true }
+iroh = { version = "0.97", optional = true }
 
 # LanceDB: Columnar vector storage backend (optional)
 # Implementation: src/databases/lance_client.rs
@@ -435,7 +438,7 @@ ed25519-dalek = { version = "2.1", features = ["serde", "rand_core"], optional =
 sha2 = { version = "0.10", optional = true }   # MFDI credential hashing
 chrono = { workspace = true }
 regex = { workspace = true }
-wasmtime = { version = "25.0", optional = true }
+wasmtime = { version = "29.0", optional = true }
 
 # bumpalo removed from main crate: only used in symthaea-core
 
@@ -454,7 +457,7 @@ shlex = "1.3"
 
 # Week 12 Phase 2a: Voice Output (Larynx) - Kokoro TTS (optional)
 # Also used for Qwen3-Embedding and SigLIP vision models
-ort = { version = "2.0.0-rc.10", features = ["half", "load-dynamic", "ndarray"], optional = true }  # ONNX Runtime
+ort = { version = "=2.0.0-rc.10", features = ["half", "load-dynamic", "ndarray"], optional = true }  # ONNX Runtime (pinned RC; upgrade to 2.0.0 stable when released)
 # futures removed: voice-tts-async feature never implemented in source
 rodio = { version = "0.19", default-features = false, optional = true }  # Audio playback (no backends by default)
 cpal = { version = "0.17", optional = true }      # Low-level audio I/O (live-voice)
@@ -681,24 +684,26 @@ population = ["dep:symthaea-population"]                # Population genetics, b
 genesis = ["genomics", "cell-foundry", "ectogenesis", "nurture", "population"]  # Full DNA-to-human pipeline
 
 # ── Genesis Mission Challenges (DOE 2026) ─────────────────────────
-fusion-twin = ["physics"]
+# Safety-agents is required for all mission features to ensure safety checks
+# are never silently compiled away (see src/safety/mod.rs cfg gates).
+fusion-twin = ["physics", "safety-agents"]
 safety-agents = []
-materials = ["dep:symthaea-materials"]
-nuclear = ["dep:symthaea-nuclear"]                      # Computational nuclear structure: mass formula, shell model, island of stability
-nuclear-forensics = ["dep:symthaea-nuclear-forensics"]
-water-prediction = ["cell-foundry"]
+materials = ["dep:symthaea-materials", "safety-agents"]
+nuclear = ["dep:symthaea-nuclear", "safety-agents"]     # Computational nuclear structure: mass formula, shell model, island of stability
+nuclear-forensics = ["dep:symthaea-nuclear-forensics", "safety-agents"]
+water-prediction = ["cell-foundry", "safety-agents"]
 physics-bridge = ["physics", "dep:symthaea-physics-bridge"]  # HDC semantic physics bridge + guided design exploration
 analogy-engine = []   # Cross-domain analogy detection in cognitive loop (AnalogyEngine from symthaea-core)
 ucl-frames = []       # UCL cross-domain semantic frame detection in cognitive loop
-grid-scaling = ["physics"]
-fission-reactor = ["physics"]
-accelerator = ["physics"]
-threat-assessment = ["physics"]
-datacenter = ["physics"]
-experiment-planner = ["cell-foundry"]
+grid-scaling = ["physics", "safety-agents"]
+fission-reactor = ["physics", "safety-agents"]
+accelerator = ["physics", "safety-agents"]
+threat-assessment = ["physics", "safety-agents"]
+datacenter = ["physics", "safety-agents"]
+experiment-planner = ["cell-foundry", "safety-agents"]
 strategic-materials = ["materials"]
 critical-minerals = ["materials"]
-advanced-manufacturing = ["dep:symthaea-fabrication-kernel"]
+advanced-manufacturing = ["dep:symthaea-fabrication-kernel", "safety-agents"]
 proliferation-safeguards = ["nuclear-forensics"]
 
 

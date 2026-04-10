@@ -100,10 +100,10 @@ fn create_simulator(backend: &PhysicsBackend) -> Box<dyn PhysicsSimulator> {
     match backend {
         PhysicsBackend::Simple => Box::new(SimplePhysicsSimulator::new()),
         #[cfg(feature = "mujoco")]
-        PhysicsBackend::MuJoCo => Box::new(crate::mujoco_sim::MuJoCoSimulator::from_primitive()),
+        PhysicsBackend::MuJoCo => Box::new(crate::mujoco_sim::MuJoCoSimulator::from_primitive().unwrap()),
         #[cfg(feature = "mujoco")]
         PhysicsBackend::MuJoCoNoisy(noise_config) => {
-            let mut sim = crate::mujoco_sim::MuJoCoSimulator::from_primitive();
+            let mut sim = crate::mujoco_sim::MuJoCoSimulator::from_primitive().unwrap();
             sim.enable_sensory_filter(noise_config.clone());
             Box::new(sim)
         }
@@ -293,7 +293,7 @@ pub fn run_perturbation_benchmark(
     let pd_gains = PdGains::default();
     let cognitive_interval = config.cognitive_interval();
 
-    let mut sim = crate::mujoco_sim::MuJoCoSimulator::from_primitive();
+    let mut sim = crate::mujoco_sim::MuJoCoSimulator::from_primitive().unwrap();
     sim.reset(0.1);
 
     // Auto-calibrate hover thrust from MuJoCo model mass.
@@ -461,7 +461,7 @@ pub fn run_perturbation_comparison(
 
     // Helper: run one episode with optional FEP
     let run_episode = |enable_fep: bool| -> PerturbationBenchmarkResult {
-        let mut sim = crate::mujoco_sim::MuJoCoSimulator::from_primitive();
+        let mut sim = crate::mujoco_sim::MuJoCoSimulator::from_primitive().unwrap();
         sim.reset(0.1);
 
         let hover_thrust_offset = (sim.body_mass() * 9.81) as f32 - QuadrotorCommand::HOVER_THRUST;

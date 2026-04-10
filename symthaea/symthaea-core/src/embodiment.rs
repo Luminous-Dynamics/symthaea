@@ -136,6 +136,32 @@ pub enum EmbodimentPlatform {
     Browser,
 }
 
+// ── Agent Identity ────────────────────────────────────────────────────────
+
+/// Platform-agnostic agent identity for embodied components.
+///
+/// In Holochain contexts this maps to a uhCAk... Ed25519 public key.
+/// In standalone Symthaea it is a blake3 hash of the genesis seed.
+/// This keeps `symthaea-core` free of Holochain dependencies.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct AgentIdentity(pub String);
+
+impl AgentIdentity {
+    pub fn new(id: impl Into<String>) -> Self {
+        Self(id.into())
+    }
+
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl std::fmt::Display for AgentIdentity {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.0)
+    }
+}
+
 // ── Embodiment Bridge Trait ────────────────────────────────────────────────
 
 /// Platform-agnostic embodiment bridge trait.
@@ -173,6 +199,22 @@ pub trait EmbodimentBridge: Send + Sync {
 
     /// Get telemetry for CycleMetadata.
     fn telemetry(&self) -> EmbodimentTelemetry;
+
+    /// Platform-agnostic agent identity for trust and coordination.
+    ///
+    /// Default returns a placeholder; platform crates should override with
+    /// a deterministic identity derived from their genesis seed.
+    fn agent_identity(&self) -> AgentIdentity {
+        AgentIdentity::new("unset")
+    }
+
+    /// Physical reliability score (0.0–1.0) for reputation/trust gating.
+    ///
+    /// 1.0 = fully reliable sensor/actuator chain. Platforms with degraded
+    /// hardware should report lower values.
+    fn physical_reliability(&self) -> f64 {
+        1.0
+    }
 }
 
 #[cfg(test)]

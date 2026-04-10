@@ -550,23 +550,8 @@ pub const SLEEP_PRESSURE_PASSIVE_DECAY: f32 = 0.999;
 /// LR dampening during consolidation mode.
 pub const SLEEP_PRESSURE_LR_SCALE: f32 = 0.9;
 
-/// Window for gradient sign consistency tracking.
-/// Basis: Schaul et al. (2013) — sign-based learning rate adaptation.
-pub const GRADIENT_SIGN_WINDOW: usize = 10;
-/// Fraction of sign flips above which = oscillating.
-pub const GRADIENT_SIGN_FLIP_THRESHOLD: f32 = 0.6;
-/// LR dampening when gradient is oscillating.
-pub const GRADIENT_SIGN_FLIP_LR_SCALE: f32 = 0.95;
-
-/// Exploration-exploitation balance window.
-/// Basis: Cohen et al. (2007) — tonic dopamine sets explore/exploit balance.
-pub const EXPLORE_EXPLOIT_WINDOW: usize = 50;
-/// Acceptable imbalance range (0.3–0.7 = balanced).
-pub const EXPLORE_EXPLOIT_LOW_BOUND: f32 = 0.3;
-/// Upper bound of acceptable balance.
-pub const EXPLORE_EXPLOIT_HIGH_BOUND: f32 = 0.7;
-/// Homeostatic correction strength.
-pub const EXPLORE_EXPLOIT_CORRECTION: f32 = 0.01;
+// gradient_sign and explore_exploit constants removed: corresponding
+// VecDeque fields in QualityMetrics were never populated or read.
 
 /// Proposal conflict: max conflict_ratio before cancellation.
 /// Basis: Botvinick et al. (2001) — ACC detects response conflict → pause.

@@ -151,9 +151,9 @@ impl IrohNode {
     /// - .id() returns our EndpointId
     #[cfg(feature = "swarm")]
     pub async fn new(config: SwarmConfig) -> SwarmResult<Self> {
-        // Build the endpoint using Iroh 0.95 API
+        // Build the endpoint using Iroh 0.97 API (preset required since 0.97)
         // Use alpns() to set the protocol we accept connections for
-        let endpoint = iroh::Endpoint::builder()
+        let endpoint = iroh::Endpoint::builder(iroh::endpoint::presets::N0)
             .alpns(vec![b"symthaea/1".to_vec()])
             .bind()
             .await

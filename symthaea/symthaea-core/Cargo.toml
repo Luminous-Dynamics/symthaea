@@ -43,7 +43,7 @@ duckdb = { version = "1.1", features = ["bundled"], optional = true }
 tokio = { version = "1.35", features = ["rt", "sync", "time"], optional = true }
 
 # ONNX Runtime for semantic encoder (requires `embeddings` feature)
-ort = { version = "2.0.0-rc.10", features = ["half", "load-dynamic", "ndarray"], optional = true }
+ort = { version = "=2.0.0-rc.10", features = ["half", "load-dynamic", "ndarray"], optional = true }  # Pinned RC; upgrade to 2.0.0 stable when released
 tokenizers = { version = "0.21", optional = true }
 hf-hub = { version = "0.4", optional = true }
 

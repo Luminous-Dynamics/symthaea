@@ -288,10 +288,6 @@ pub struct QualityMetrics {
     pub(crate) sleep_pressure: f32,
     /// Whether currently in consolidation mode.
     pub(crate) in_consolidation: bool,
-    /// Ring buffer of recent consciousness gradient signs (true = positive).
-    pub(crate) gradient_sign_history: std::collections::VecDeque<bool>,
-    /// Ring buffer of recent explore vs exploit decisions (true = explore-biased).
-    pub(crate) explore_exploit_history: std::collections::VecDeque<bool>,
     // ── Session 19: Embodied Cognition & Environmental Coupling ─────────
     /// Last computed readiness score (0.3–1.0), for telemetry.
     pub(crate) last_readiness_score: f32,
@@ -301,15 +297,10 @@ pub struct QualityMetrics {
     pub(crate) fatigue: f32,
     /// Consecutive low-effort stable cycles (for recovery detection).
     pub(crate) consecutive_recovery_cycles: u32,
-    /// Ring buffer of recent prediction successes (true = accurate).
-    pub(crate) prediction_success_history: std::collections::VecDeque<bool>,
     /// Consecutive cycles with high cross-module agreement (for flow detection).
     pub(crate) consecutive_high_agreement: u32,
     /// Whether currently in flow/resonance state.
     pub(crate) in_flow_state: bool,
-    // ── Session 20: Measurement & Consolidation ─────────────────────────
-    /// Cumulative activation counts for each named mechanism (lifetime, not per-cycle).
-    pub(crate) mechanism_activations: std::collections::HashMap<&'static str, u32>,
     // ── Knowledge Engine: Working Memory Injection ─────────────────────
     /// Grounding quality of knowledge facts injected into working memory (Baddeley 2000).
     pub(crate) wm_knowledge_grounding: f64,
@@ -381,16 +372,12 @@ impl Default for QualityMetrics {
             prev_metacognitive_prediction: 0.0,
             sleep_pressure: 0.0,
             in_consolidation: false,
-            gradient_sign_history: std::collections::VecDeque::new(),
-            explore_exploit_history: std::collections::VecDeque::new(),
             last_readiness_score: 1.0,
             novelty_ema: 0.5,
             fatigue: 0.0,
             consecutive_recovery_cycles: 0,
-            prediction_success_history: std::collections::VecDeque::new(),
             consecutive_high_agreement: 0,
             in_flow_state: false,
-            mechanism_activations: std::collections::HashMap::new(),
             wm_knowledge_grounding: 0.0,
             wm_knowledge_injection_count: 0,
             last_cube_e_tier: None,
@@ -414,7 +401,7 @@ pub struct CycleHistory {
     /// Last MCE consciousness level for learning gating
     pub(crate) consciousness_level: f64,
     /// Recent BinaryHV ring buffer for multi-component consciousness profile.
-    /// Capacity bound: 4 elements (evict-before-push via pop_front).
+    /// Bounded: capacity 4, evict-before-push via pop_front (cycle_consciousness.rs).
     pub(crate) recent_hvs: std::collections::VecDeque<crate::hdc::BinaryHV>,
     /// Cached causal relations count (avoids calling summarize_understanding every cycle).
     pub(crate) last_causal_relations: usize,
@@ -435,7 +422,8 @@ pub struct CycleHistory {
     /// Previous cycle's emotion_contagion arousal (for homeostasis return-to-baseline).
     pub(crate) last_emotion_arousal: f32,
     // ── Phase 17: Predictive Self-Tuning ──────────────────────────────
-    /// Rolling window of recent prediction errors (last 16 cycles).
+    /// Rolling window of recent prediction errors.
+    /// Bounded: capacity 16, evict via while-loop pop_front (cycle_phases_urgency.rs).
     pub(crate) error_history: std::collections::VecDeque<f32>,
     /// Self-model prediction: (cycle_made, predicted_confidence, predicted_urgency)
     pub(crate) self_model_prediction: Option<(usize, f64, CycleUrgency)>,
@@ -495,6 +483,5 @@ pub struct CycleCarryover {
     pub gwt_coalition_size: u32,
     /// Injected code reasoning context from CodingAgent (one-shot: consumed by cycle).
     #[cfg(feature = "reasoning_engine")]
-    pub injected_code_context:
-        Option<crate::consciousness::reasoning_engine::CodeReasoningContext>,
+    pub injected_code_context: Option<crate::consciousness::reasoning_engine::CodeReasoningContext>,
 }
