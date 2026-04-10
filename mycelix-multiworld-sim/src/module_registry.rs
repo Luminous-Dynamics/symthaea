@@ -209,8 +209,8 @@ mod tests {
 
         let modules = registry.list_modules();
         assert_eq!(modules[0].2, TickPhase::Viability);
-        assert_eq!(modules[1].2, TickPhase::Economy);
-        assert_eq!(modules[2].2, TickPhase::Disasters);
+        assert_eq!(modules[1].2, TickPhase::Disasters);
+        assert_eq!(modules[2].2, TickPhase::Economy);
     }
 
     #[test]
