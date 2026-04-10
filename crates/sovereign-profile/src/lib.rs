@@ -34,6 +34,7 @@
 //! dimensions. The network knows you are a net-positive citizen but has
 //! no idea *how* you achieved that.
 
+pub mod collectors;
 pub mod compat;
 pub mod decay;
 #[cfg(feature = "hdc")]
