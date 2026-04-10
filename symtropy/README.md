@@ -1,14 +1,10 @@
 # Symtropy
 
-The first open-source physics engine where **integrated information** (Phi) is a first-class physical parameter. N-dimensional (2D/3D/4D), stack-allocated, deterministic, Rust-native.
+State-coupled N-dimensional physics engine. Any metric you define modulates forces, friction, and energy budgets in real-time through a thermodynamically-closed system.
 
-> **Terminology**: This engine uses Phi from Integrated Information Theory (IIT, Tononi 2004) -- a formal measure of how much a system's causal structure exceeds the sum of its parts. It is a mathematical quantity, not a claim about subjective experience or sentience.
+Ships with Phi (integrated information) as the default metric and 63 research experiments. But the coupling framework is generic — plug in health, wealth, trust, skill, or any [0,1] value per body.
 
-## Why Symtropy?
-
-No other physics engine treats Phi as a real-time modulator of rigid body dynamics. Symtropy couples integrated information to forces, friction, energy budgets, and collision responses through a thermodynamically-closed system with a Landauer-bounded energy floor.
-
-**312 tests | 4 shapes | 3 joints | CCD | raycasting | warm-starting | 63 research experiments**
+**321 tests | 5 shapes | 5 joints | CCD | raycasting | warm-starting | island sleeping | 8 crates on crates.io**
 
 ## Architecture
 
@@ -24,46 +20,53 @@ symtropy-math                  N-dimensional geometric algebra (const-generic, s
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for the full crate guide.
 
-## Quick Start
+## Quick Start: Generic State-Coupling
 
 ```rust
 use symtropy_physics::PhysicsWorld;
-use symtropy_consciousness_physics::{ConsciousnessField, EntityConsciousness};
-use symtropy_math::{Point, Sphere};
+use symtropy_consciousness_physics::SimpleCoupledField;
+use symtropy_math::Point;
 use nalgebra::SVector;
 
-// 1. Create a 3D physics world with gravity
-let mut world = PhysicsWorld::<3>::new(SVector::from([0.0, -9.81, 0.0]));
+// 1. Create a 2D physics world
+let mut world = PhysicsWorld::<2>::new(SVector::from([0.0, -9.81]));
 
 // 2. Add bodies
-let sphere_a = world.add_sphere(Point::new([0.0, 10.0, 0.0]), 1.0, 1.0);
-let sphere_b = world.add_sphere(Point::new([3.0, 10.0, 0.0]), 1.0, 1.0);
+let agent = world.add_sphere(Point::new([0.0, 10.0]), 1.0, 1.0);
 
-// 3. Create the Phi-physics coupling field
+// 3. Create a state-coupled field (works with ANY metric)
+let mut field = SimpleCoupledField::<2>::new();
+field.register(agent, 100.0, 10.0);
+field.set_metric(agent, 0.8);  // your metric: health, trust, skill, wealth...
+
+// 4. Step — forces and friction are modulated by your metric
+world.step_with_callback(0.016, &mut field);
+```
+
+For Phi-specific research (IIT, Master Consciousness Equation, 7-theory synthesis), use `ConsciousnessField` instead:
+
+```rust
+use symtropy_consciousness_physics::ConsciousnessField;
+
 let mut phi_field = ConsciousnessField::<3>::new();
-phi_field.register(sphere_a, 100.0, 10.0);  // max_energy, sanctuary_radius
-phi_field.register(sphere_b, 100.0, 10.0);
-
-// 4. Step with Phi coupling -- forces, friction, and impulses are modulated by Phi
+phi_field.register(handle, 100.0, 10.0);
+// Phi computed from ConsciousnessInputs via the Master Equation
 world.step_with_callback(0.016, &mut phi_field);
-
-// 5. Query results
-let phi_a = phi_field.phi(sphere_a);
-let energy_a = phi_field.has_energy(sphere_a);
-let safety = phi_field.safety_tier(sphere_a); // Green/Yellow/Orange/Red
 ```
 
 ## Five Coupling Channels
 
+Any metric (Phi, health, trust, wealth) couples to physics through 5 channels:
+
 | Channel | Direction | Mechanism |
 |---------|-----------|-----------|
-| 1. Phi -> Force | NRC 4-tier safety system gates motor authority |
-| 2. Phi -> Energy | Phi-dependent energy budget (movement, maintenance, collision costs) |
+| 1. Metric -> Force | NRC 4-tier safety system gates motor authority |
+| 2. Metric -> Energy | Metric-dependent energy budget (higher metric = higher maintenance cost) |
 | 3. Harmony -> Impulse | Sanctuary zones dampen collision impulses |
-| 4. Harmony -> Friction | CEMI-inspired 1/r^(D-1) fields modulate friction coefficients |
-| 5. Collision -> Phi | Prediction error from unexpected collisions reduces motor precision |
+| 4. Harmony -> Friction | 1/r^(D-1) spatial fields modulate friction coefficients |
+| 5. Collision -> Metric | Prediction error from unexpected collisions reduces motor precision |
 
-See [FORMAL_SPECIFICATION.md](FORMAL_SPECIFICATION.md) for the mathematical details.
+See [FORMAL_SPECIFICATION.md](FORMAL_SPECIFICATION.md) for the mathematical details (written in terms of Phi).
 
 ## Performance
 

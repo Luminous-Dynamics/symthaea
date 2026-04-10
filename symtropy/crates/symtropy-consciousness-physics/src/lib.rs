@@ -40,10 +40,12 @@ pub mod hdc_context;
 pub mod prey;
 pub mod safety;
 pub mod sanctuary;
+pub mod simple_field;
 pub mod spatial_hash;
 pub mod thermodynamics;
 
 pub use coupling::{ConsciousnessField, EntityConsciousness};
+pub use simple_field::{SimpleCoupledField, SimpleEntity};
 pub use energy::EnergyBudget;
 pub use harmony_field::HarmonyField;
 pub use safety::SafetyTier;
