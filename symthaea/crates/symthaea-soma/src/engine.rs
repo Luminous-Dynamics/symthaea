@@ -768,47 +768,36 @@ impl SomaEngine {
                     "get_time" => execute_get_time(),
                     "web_search" => {
                         let query = call.arguments["query"].as_str().unwrap_or_default();
-                        // Try Prism local search first
+                        // Try Prism local search first (offline, sub-ms)
                         #[cfg(feature = "prism-search")]
                         {
                             let prism_results = self.prism_search(query, 3);
                             if !prism_results.is_empty() {
-                                let claims: Vec<String> =
-                                    prism_results.iter().map(|r| r.content.clone()).collect();
+                                let claims: Vec<String> = prism_results.iter()
+                                    .map(|r| format!("[E{}] {}", r.empirical_level.as_f32() as u8, r.content))
+                                    .collect();
                                 ToolResult {
                                     name: "web_search".into(),
                                     success: true,
                                     output: claims.join("\n"),
                                 }
                             } else {
-                                // Enqueue for Holon web search (async)
-                                self.holon_bridge.enqueue_outbound(
-                                    crate::holon_bridge::HolonOutbound::SearchRequest {
-                                        query: query.to_string(),
-                                        max_results: 3,
-                                    },
-                                );
+                                // No local results — delegate to desktop via Holon
+                                self.holon_bridge.request_search(query, 3);
                                 ToolResult {
                                     name: "web_search".into(),
                                     success: true,
-                                    output:
-                                        "Search request sent to desktop. No local results found."
-                                            .into(),
+                                    output: "No local claims found. Search delegated to desktop WebAgent.".into(),
                                 }
                             }
                         }
                         #[cfg(not(feature = "prism-search"))]
                         {
-                            self.holon_bridge.enqueue_outbound(
-                                crate::holon_bridge::HolonOutbound::SearchRequest {
-                                    query: query.to_string(),
-                                    max_results: 3,
-                                },
-                            );
+                            self.holon_bridge.request_search(query, 3);
                             ToolResult {
                                 name: "web_search".into(),
                                 success: true,
-                                output: "Search request sent to desktop.".into(),
+                                output: "Search delegated to desktop WebAgent.".into(),
                             }
                         }
                     }

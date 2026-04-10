@@ -54,6 +54,12 @@ pub enum HolonOutbound {
         query: String,
         max_results: u8,
     },
+    /// Share a local navigation estimate with the desktop Holon.
+    NavigationEstimate {
+        position_m: [f64; 3],
+        position_sigma_m: f32,
+        confidence: Option<f32>,
+    },
 }
 
 /// Inbound message types from the Holon.
@@ -195,6 +201,25 @@ impl HolonBridge {
         });
     }
 
+    /// Request web search via the desktop Holon's WebAgent.
+    ///
+    /// The desktop will run WebAgent.research() and send back
+    /// a SearchResult with verified claims.
+    pub fn request_search(&mut self, query: &str, max_results: u8) {
+        if self.mode == HolonSyncMode::Off {
+            return;
+        }
+        self.enqueue_outbound(HolonOutbound::SearchRequest {
+            query: query.to_string(),
+            max_results,
+        });
+    }
+
+    /// Check if there are pending search results in the language buffer.
+    pub fn has_search_results(&self) -> bool {
+        !self.language_buffer.is_empty()
+    }
+
     /// Offer knowledge to the Holon (FullSync only).
     pub fn offer_knowledge(&mut self, topic: &str, embedding: Vec<f32>) {
         if self.mode != HolonSyncMode::FullSync {
@@ -203,6 +228,23 @@ impl HolonBridge {
         self.enqueue_outbound(HolonOutbound::KnowledgeOffer {
             topic: topic.to_string(),
             embedding,
+        });
+    }
+
+    /// Share a local navigation estimate with the Holon.
+    pub fn offer_navigation_estimate(
+        &mut self,
+        position_m: [f64; 3],
+        position_sigma_m: f32,
+        confidence: Option<f32>,
+    ) {
+        if self.mode == HolonSyncMode::Off {
+            return;
+        }
+        self.enqueue_outbound(HolonOutbound::NavigationEstimate {
+            position_m,
+            position_sigma_m,
+            confidence,
         });
     }
 
@@ -367,6 +409,58 @@ mod tests {
         let json = bridge.drain_outbound_json();
         assert!(json.contains("TaskRequest"));
         assert_eq!(bridge.outbound_count(), 0);
+    }
+
+    #[test]
+    fn test_navigation_estimate_available_outside_fullsync() {
+        let mut bridge = HolonBridge::new(HolonSyncMode::PresenceOnly);
+        bridge.offer_navigation_estimate([1.0, 2.0, 3.0], 4.5, Some(0.8));
+
+        let outbound = bridge.drain_outbound();
+        assert_eq!(outbound.len(), 1);
+        match &outbound[0] {
+            HolonOutbound::NavigationEstimate {
+                position_m,
+                position_sigma_m,
+                confidence,
+            } => {
+                assert_eq!(*position_m, [1.0, 2.0, 3.0]);
+                assert!((*position_sigma_m - 4.5).abs() < f32::EPSILON);
+                assert_eq!(*confidence, Some(0.8));
+            }
+            other => panic!("expected NavigationEstimate, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_request_search() {
+        let mut bridge = HolonBridge::new(HolonSyncMode::PresenceOnly);
+        bridge.request_search("ocean acidification", 3);
+        let outbound = bridge.drain_outbound();
+        assert_eq!(outbound.len(), 1);
+        match &outbound[0] {
+            HolonOutbound::SearchRequest { query, max_results } => {
+                assert_eq!(query, "ocean acidification");
+                assert_eq!(*max_results, 3);
+            }
+            other => panic!("expected SearchRequest, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_search_result_to_language_buffer() {
+        let mut bridge = HolonBridge::new(HolonSyncMode::PresenceOnly);
+        bridge.receive(HolonInbound::SearchResult {
+            claims: vec![
+                "Ocean acidification lowers pH".to_string(),
+                "CO2 absorption causes acidification".to_string(),
+            ],
+            sources: vec!["https://noaa.gov".to_string()],
+        });
+        assert!(bridge.has_search_results());
+        assert_eq!(bridge.take_language_output(), Some("Ocean acidification lowers pH".to_string()));
+        assert_eq!(bridge.take_language_output(), Some("CO2 absorption causes acidification".to_string()));
+        assert_eq!(bridge.take_language_output(), None);
     }
 
     #[test]
