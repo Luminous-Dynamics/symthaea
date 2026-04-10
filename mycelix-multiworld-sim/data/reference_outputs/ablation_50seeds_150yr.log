@@ -1,0 +1,110 @@
+   Compiling sovereign-profile v0.1.0 (/srv/luminous-dynamics/crates/sovereign-profile)
+   Compiling mycelix-bridge-common v0.1.0 (/srv/luminous-dynamics/crates/mycelix-bridge-common)
+warning: unexpected `cfg` condition name: `kani`
+  --> /srv/luminous-dynamics/crates/mycelix-bridge-common/src/lib.rs:97:7
+   |
+97 | #[cfg(kani)]
+   |       ^^^^
+   |
+   = help: expected names are: `docsrs`, `feature`, and `test` and 31 more
+   = help: consider using a Cargo feature instead
+   = help: or consider adding in `Cargo.toml` the `check-cfg` lint config for the lint:
+            [lints.rust]
+            unexpected_cfgs = { level = "warn", check-cfg = ['cfg(kani)'] }
+   = help: or consider adding `println!("cargo::rustc-check-cfg=cfg(kani)");` to the top of the `build.rs`
+   = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+   = note: `#[warn(unexpected_cfgs)]` on by default
+
+warning: unused imports: `LAMBDA_MAX` and `LAMBDA_MIN`
+  --> /srv/luminous-dynamics/crates/mycelix-bridge-common/src/scoring_model.rs:29:52
+   |
+29 |     self, sanitize_score, ConstitutionalViolation, LAMBDA_MAX, LAMBDA_MIN,
+   |                                                    ^^^^^^^^^^  ^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused imports: `ConstitutionalViolation` and `self`
+  --> /srv/luminous-dynamics/crates/mycelix-bridge-common/src/model_governance.rs:23:38
+   |
+23 | use crate::constitutional_envelope::{self, sanitize_score, ConstitutionalViolation};
+   |                                      ^^^^                  ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused macro definition: `debug`
+  --> /srv/luminous-dynamics/crates/mycelix-bridge-common/src/consciousness_profile.rs:29:14
+   |
+29 | macro_rules! debug {
+   |              ^^^^^
+   |
+   = note: `#[warn(unused_macros)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `GovernanceEligibility`
+  --> /srv/luminous-dynamics/crates/mycelix-bridge-common/src/sovereign_gate.rs:26:49
+   |
+26 |     ConsciousnessCredential, ConsciousnessTier, GovernanceEligibility, GovernanceRequirement,
+   |                                                 ^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `validate_dispatch_sizes` is never used
+   --> /srv/luminous-dynamics/crates/mycelix-bridge-common/src/lib.rs:256:4
+    |
+256 | fn validate_dispatch_sizes(
+    |    ^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: module `ExtensionKey` should have a snake case name
+   --> /srv/luminous-dynamics/crates/mycelix-bridge-common/src/consciousness_profile.rs:349:9
+    |
+349 | pub mod ExtensionKey {
+    |         ^^^^^^^^^^^^ help: convert the identifier to snake case: `extension_key`
+    |
+    = note: `#[warn(non_snake_case)]` (part of `#[warn(nonstandard_style)]`) on by default
+
+   Compiling mycelix-multiworld-sim v0.1.0 (/srv/luminous-dynamics/mycelix-multiworld-sim)
+warning: `mycelix-bridge-common` (lib) generated 7 warnings (run `cargo fix --lib -p mycelix-bridge-common` to apply 3 suggestions)
+warning: unused import: `extinction_multiplier`
+  --> src/biosphere/dimensions.rs:15:31
+   |
+15 | use super::mass_extinctions::{extinction_multiplier, MassExtinctionEvent};
+   |                               ^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `CulturalProfile`
+  --> src/interworld.rs:15:20
+   |
+15 | use crate::world::{CulturalProfile, World, WorldResources};
+   |                    ^^^^^^^^^^^^^^^
+
+warning: `mycelix-multiworld-sim` (lib) generated 2 warnings (run `cargo fix --lib -p mycelix-multiworld-sim` to apply 2 suggestions)
+    Finished `release` profile [optimized] target(s) in 43.49s
+     Running `target/release/ablation_study --seeds 50 --ticks 1800`
+=== ABLATION STUDY ===
+Seeds: 50, Ticks: 1800 (150 years)
+
+Running baseline (50 seeds)...
+Baseline CVS: 0.6976 [0.6958, 0.6997]
+
+Ablating disasters... ΔCVS=-0.0032 d=-0.60 p=0.0027 ***
+Ablating turchin_cycles... ΔCVS=-0.0042 d=-0.66 p=0.0032 ***
+Ablating fep_immiseration... ΔCVS=-0.0027 d=-0.39 p=0.0002 ***
+Ablating trust_weighted_gov... ΔCVS=+0.0075 d=1.12 p=0.0000 ***
+Ablating education... ΔCVS=-0.0250 d=-2.90 p=0.0000 ***
+Ablating factions... ΔCVS=-0.0019 d=-0.29 p=0.1867 
+Ablating migration... ΔCVS=+0.2121 d=36.00 p=0.0000 ***
+Ablating amendments... ΔCVS=-0.0024 d=-0.35 p=0.0922 *
+Ablating sacred_stillness... ΔCVS=+0.0000 d=0.00 p=1.0000 
+
+=== MECHANISM IMPORTANCE RANKING (by |ΔCVS|) ===
+Mechanism                       ΔCVS  Cohen's d    p-value   Sig
+-----------------------------------------------------------------
+migration                    +0.2121     36.002     0.0000   ***
+education                    -0.0250     -2.895     0.0000   ***
+trust_weighted_gov           +0.0075      1.116     0.0000   ***
+turchin_cycles               -0.0042     -0.656     0.0032   ***
+disasters                    -0.0032     -0.597     0.0027   ***
+fep_immiseration             -0.0027     -0.392     0.0002   ***
+amendments                   -0.0024     -0.350     0.0922     *
+factions                     -0.0019     -0.288     0.1867  n.s.
+sacred_stillness             +0.0000      0.000     1.0000  n.s.
+
+Significance: *** p<0.01, ** p<0.05, * p<0.1, n.s. = not significant
