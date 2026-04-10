@@ -7,6 +7,13 @@
 
 set -euo pipefail
 
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd -- "$SCRIPT_DIR/.." && pwd)"
+export TMPDIR="${TMPDIR:-$REPO_ROOT/.tmp/cargo-tmp}"
+mkdir -p "$TMPDIR"
+export RUSTC_WRAPPER="${RUSTC_WRAPPER:-}"
+export SCCACHE_DISABLE="${SCCACHE_DISABLE:-1}"
+
 CRATE="mycelix-bridge-common"
 PASS=0
 FAIL=0

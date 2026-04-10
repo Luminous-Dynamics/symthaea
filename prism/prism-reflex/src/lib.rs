@@ -247,8 +247,7 @@ impl ReflexArc {
 
         // Determine whether to escalate to Spore
         let escalate = safety_level >= SafetyLevel::Orange
-            || threats.len() >= 3
-            || (zone == ContentZone::Local && threats.is_empty() && text.len() > 1000);
+            || threats.len() >= 3;
 
         let reason = if threats.is_empty() {
             "Clean".to_string()

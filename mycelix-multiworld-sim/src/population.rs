@@ -279,6 +279,8 @@ impl PopulationEngine {
                 father_skills: [f64; 8],
                 mother_health: f64,
                 father_health: f64,
+                mother_ethics: crate::agent::EthicalOrientation,
+                father_ethics: crate::agent::EthicalOrientation,
             }
             let mut births: Vec<BirthRecord> = Vec::new();
 
@@ -298,11 +300,12 @@ impl PopulationEngine {
                         let trauma = (fem.trauma_level * 0.5).min(1.0);
                         let mother_skills = fem.skills.as_slice();
                         let mother_health = fem.health;
-                        // Look up father skills if partner exists
-                        let (father_skills, father_health) = fem.partner_id
+                        // Look up father skills/health/ethics if partner exists
+                        let mother_ethics = fem.ethics.clone();
+                        let (father_skills, father_health, father_ethics) = fem.partner_id
                             .and_then(|pid| id_map.get(&pid))
-                            .map(|&fi| (world.agents[fi].skills.as_slice(), world.agents[fi].health))
-                            .unwrap_or(([0.1; 8], 0.9));
+                            .map(|&fi| (world.agents[fi].skills.as_slice(), world.agents[fi].health, world.agents[fi].ethics.clone()))
+                            .unwrap_or(([0.1; 8], 0.9, crate::agent::EthicalOrientation::default()));
 
                         births.push(BirthRecord {
                             child_sex,
@@ -314,6 +317,8 @@ impl PopulationEngine {
                             father_skills,
                             mother_health,
                             father_health,
+                            mother_ethics,
+                            father_ethics,
                         });
                     }
                 }
@@ -372,7 +377,9 @@ impl PopulationEngine {
                     faction_id: None,
                     generation: birth.generation,
                     trauma_level: birth.trauma,
-                    cumulative_dose_sv: 0.0, adversarial: None, coordination_understanding: 0.0, mycel_score: 0.1, sap_balance: 100.0, is_biological: true, wounds: Vec::new(), ethics: crate::agent::EthicalOrientation::default(),
+                    cumulative_dose_sv: 0.0, adversarial: None, coordination_understanding: 0.0, mycel_score: 0.1, sap_balance: 100.0, is_biological: true, wounds: Vec::new(),
+                    // Phase 3c: children inherit parents' ethical orientation with noise
+                    ethics: crate::agent::EthicalOrientation::inherit(&birth.mother_ethics, &birth.father_ethics, rng),
                 };
 
                 events.push(CivEvent::new(

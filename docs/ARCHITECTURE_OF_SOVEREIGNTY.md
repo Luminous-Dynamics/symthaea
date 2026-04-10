@@ -221,6 +221,11 @@ Communities may create custom mutual credit currencies with their own parameters
 Cultural naming is sovereign — what one community calls TEND, another may call
 CARE or HOURS, while the protocol remains interoperable.
 
+The canonical live finance semantics for SAP, TEND, and MYCEL are maintained in
+[`docs/MYCELIX_FINANCE_ECONOMICS.md`](./MYCELIX_FINANCE_ECONOMICS.md). Papers
+and secondary docs should align with that file when describing current runtime
+behavior.
+
 ---
 
 ### Metabolic Oracle

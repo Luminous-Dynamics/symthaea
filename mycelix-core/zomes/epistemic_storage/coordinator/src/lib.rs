@@ -547,7 +547,7 @@ fn anchor(_link_type: LinkTypes, anchor_text: String) -> ExternResult<EntryHash>
     let anchor_hash = hash_entry(&anchor_entry)?;
 
     // Create the anchor if it doesn't exist (idempotent)
-    let _ = create_entry(EntryTypes::KeyAnchor(anchor_entry));
+    if let Err(e) = create_entry(EntryTypes::KeyAnchor(anchor_entry)) { debug!("Anchor creation warning: {:?}", e); }
 
     Ok(anchor_hash)
 }

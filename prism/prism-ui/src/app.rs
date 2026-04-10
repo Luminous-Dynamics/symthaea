@@ -121,7 +121,7 @@ pub fn App() -> impl IntoView {
 
     view! {
         <div class="loading-screen" style:display=loading_display>
-            <img src="/static/prism-loading.jpg" alt="Prism" class="loading-prism" />
+            <img src="/static/prism-loading.jpg" alt="Prism" class="loading-prism" width="400" height="218" />
             <span class="brand">"Prism"</span>
             <p>"Loading epistemic index\u{2026}"</p>
         </div>
@@ -133,44 +133,51 @@ pub fn App() -> impl IntoView {
                     <span class="brand">"Prism"</span>
 
                     // Navigation buttons
-                    <div class="nav-buttons">
-                        <button class="nav-btn" title="Back"
-                            on:click=move |_| {
-                                // Navigate to welcome (simple history for now)
-                                use leptos::prelude::Set;
-                                let s = expect_context::<BrowserState>();
-                                s.set_view.set(PageView::Welcome);
-                                s.set_current_url.set("prism://welcome".to_string());
-                                s.set_page_title.set("Prism".to_string());
-                            }
-                            inner_html=NAV_BACK
-                        />
-                        <button class="nav-btn" title="Forward" inner_html=NAV_FORWARD />
-                        <button class="nav-btn" title="Refresh"
-                            on:click=move |_| {
-                                // Reload the current page by re-triggering the current URL
-                                if let Some(window) = web_sys::window() {
-                                    let _ = window.location().reload();
-                                }
-                            }
-                            inner_html=NAV_REFRESH
-                        />
-                        <button class="nav-btn" title="Home"
-                            on:click=move |_| {
-                                use leptos::prelude::Set;
-                                let s = expect_context::<BrowserState>();
-                                s.set_view.set(PageView::Welcome);
-                                s.set_current_url.set("prism://welcome".to_string());
-                                s.set_page_title.set("Prism".to_string());
-                            }
-                            inner_html=NAV_HOME
-                        />
-                    </div>
+                    {
+                        let s_back_cls = state.clone();
+                        let s_back_click = state.clone();
+                        let s_fwd_cls = state.clone();
+                        let s_fwd_click = state.clone();
+                        let s_home = state.clone();
+                        view! {
+                            <div class="nav-buttons">
+                                <button
+                                    class=move || if s_back_cls.can_go_back() { "nav-btn" } else { "nav-btn disabled" }
+                                    title="Back" attr:aria-label="Back"
+                                    on:click=move |_| { s_back_click.go_back(); }
+                                    inner_html=NAV_BACK
+                                />
+                                <button
+                                    class=move || if s_fwd_cls.can_go_forward() { "nav-btn" } else { "nav-btn disabled" }
+                                    title="Forward" attr:aria-label="Forward"
+                                    on:click=move |_| { s_fwd_click.go_forward(); }
+                                    inner_html=NAV_FORWARD
+                                />
+                                <button class="nav-btn" title="Refresh" attr:aria-label="Refresh page"
+                                    on:click=move |_| {
+                                        if let Some(window) = web_sys::window() {
+                                            let _ = window.location().reload();
+                                        }
+                                    }
+                                    inner_html=NAV_REFRESH
+                                />
+                                <button class="nav-btn" title="Home" attr:aria-label="Home"
+                                    on:click=move |_| {
+                                        s_home.set_view.set(PageView::Welcome);
+                                        s_home.set_current_url.set("prism://welcome".to_string());
+                                        s_home.set_page_title.set("Prism".to_string());
+                                        s_home.push_history("prism://welcome", "Prism", &PageView::Welcome);
+                                    }
+                                    inner_html=NAV_HOME
+                                />
+                            </div>
+                        }
+                    }
 
                     <div style="flex:1"></div>
                     <DhtStatusBadge />
                     <ThemeSwitcher />
-                    <div class="gear-btn" on:click=open_settings title="Settings" inner_html=GEAR_ICON></div>
+                    <button class="gear-btn" on:click=open_settings title="Settings" attr:aria-label="Settings" inner_html=GEAR_ICON></button>
                     <SecurityBadge />
                 </div>
                 <div class="search-row">

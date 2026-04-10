@@ -185,6 +185,7 @@ pub fn SearchBar() -> impl IntoView {
         </form>
         <button
             class="mode-toggle"
+            attr:aria-label=move || format!("Search mode: {}", state.search_mode.get().label())
             on:click=move |_| {
                 use crate::state::SearchMode;
                 let current = state.search_mode.get();
@@ -194,6 +195,7 @@ pub fn SearchBar() -> impl IntoView {
                     SearchMode::Paradigm => SearchMode::Basic,
                 };
                 state.set_search_mode.set(next);
+                crate::persistence::save("search-mode", &next.label().to_string());
             }
             title=move || state.search_mode.get().description()
         >
@@ -203,8 +205,9 @@ pub fn SearchBar() -> impl IntoView {
             class=move || if compare_mode.get() { "compare-toggle active" } else { "compare-toggle" }
             on:click=move |_| set_compare_mode.set(!compare_mode.get())
             title="Compare across multiple search engines"
+            attr:aria-label="Toggle compare mode"
         >
-            {move || if compare_mode.get() { "Compare ✓" } else { "Compare" }}
+            {move || if compare_mode.get() { "Compare \u{2713}" } else { "Compare" }}
         </button>
     }
 }

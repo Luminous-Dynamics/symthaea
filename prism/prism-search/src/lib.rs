@@ -48,8 +48,15 @@ impl SearchEngine {
     }
 
     /// Load a pre-computed index from bytes (bincode format).
+    /// Falls back to an empty engine if deserialization fails.
     pub fn from_precomputed(bytes: &[u8]) -> Self {
-        bincode::deserialize(bytes).expect("Failed to deserialize precomputed index")
+        match bincode::deserialize(bytes) {
+            Ok(engine) => engine,
+            Err(e) => {
+                log::error!("Failed to deserialize precomputed index: {}", e);
+                Self::new()
+            }
+        }
     }
 
     /// Create a search engine pre-loaded with claims from prism-ingest.
@@ -186,6 +193,7 @@ impl SearchEngine {
     ///    of 64 bytes each. Hash each band. Candidates share at least one band hash.
     /// 2. Exact Hamming similarity only on LSH candidates.
     pub fn search(&self, query: &str, top_k: usize) -> Vec<SearchResult> {
+        let top_k = top_k.min(100);
         if self.vectors.is_empty() || query.trim().is_empty() {
             return Vec::new();
         }

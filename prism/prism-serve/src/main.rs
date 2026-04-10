@@ -10,7 +10,9 @@
 //! - Cache headers for immutable hashed assets
 
 use axum::Router;
+use axum::http::header::HeaderValue;
 use tower_http::compression::CompressionLayer;
+use tower_http::set_header::SetResponseHeaderLayer;
 use tower_http::services::{ServeDir, ServeFile};
 
 #[tokio::main]
@@ -27,13 +29,29 @@ async fn main() {
             ServeDir::new(&dist_path)
                 .not_found_service(fallback)
         )
-        .layer(CompressionLayer::new());
+        .layer(CompressionLayer::new())
+        .layer(SetResponseHeaderLayer::overriding(
+            axum::http::header::X_CONTENT_TYPE_OPTIONS,
+            HeaderValue::from_static("nosniff"),
+        ))
+        .layer(SetResponseHeaderLayer::overriding(
+            axum::http::header::X_FRAME_OPTIONS,
+            HeaderValue::from_static("DENY"),
+        ))
+        .layer(SetResponseHeaderLayer::overriding(
+            axum::http::header::REFERRER_POLICY,
+            HeaderValue::from_static("strict-origin-when-cross-origin"),
+        ));
 
     let addr = std::env::var("PRISM_ADDR").unwrap_or_else(|_| "0.0.0.0:8130".to_string());
 
     log::info!("Prism serving {} on {}", dist_path, addr);
     println!("Prism serving on http://{}", addr);
 
-    let listener = tokio::net::TcpListener::bind(&addr).await.unwrap();
-    axum::serve(listener, app).await.unwrap();
+    let listener = tokio::net::TcpListener::bind(&addr)
+        .await
+        .expect("Failed to bind Prism server address");
+    axum::serve(listener, app)
+        .await
+        .expect("Prism server error");
 }

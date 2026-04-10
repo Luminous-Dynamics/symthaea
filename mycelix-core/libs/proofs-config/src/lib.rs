@@ -260,7 +260,7 @@ impl ProofConfig {
         Self {
             security_level: SecurityLevel::Standard,
             strict_mode: true,
-            max_proof_size: 1024 * 1024, // 1MB max
+            max_proof_size: 1024 * 1024,  // 1MB max
             validity_duration_secs: 3600, // 1 hour
         }
     }
@@ -271,7 +271,7 @@ impl ProofConfig {
             security_level: SecurityLevel::High,
             strict_mode: true,
             max_proof_size: 2 * 1024 * 1024, // 2MB max (larger proofs)
-            validity_duration_secs: 1800,     // 30 minutes (shorter validity)
+            validity_duration_secs: 1800,    // 30 minutes (shorter validity)
         }
     }
 
@@ -389,36 +389,36 @@ pub mod winterfell_options {
     pub fn proof_options_for_level(level: SecurityLevel) -> ProofOptions {
         match level {
             SecurityLevel::Fast => ProofOptions::new(
-                28,   // num_queries
-                8,    // blowup_factor
-                0,    // grinding_factor
+                28, // num_queries
+                8,  // blowup_factor
+                0,  // grinding_factor
                 winterfell::FieldExtension::None,
-                4,    // fri_folding_factor
-                31,   // fri_remainder_max_degree
+                4,  // fri_folding_factor
+                31, // fri_remainder_max_degree
             ),
             SecurityLevel::Optimized => ProofOptions::new(
-                40,   // num_queries
-                8,    // blowup_factor
-                16,   // grinding_factor
+                40, // num_queries
+                8,  // blowup_factor
+                16, // grinding_factor
                 winterfell::FieldExtension::None,
-                4,    // fri_folding_factor
-                31,   // fri_remainder_max_degree
+                4,  // fri_folding_factor
+                31, // fri_remainder_max_degree
             ),
             SecurityLevel::Standard => ProofOptions::new(
-                50,   // num_queries
-                8,    // blowup_factor
-                20,   // grinding_factor
+                50, // num_queries
+                8,  // blowup_factor
+                20, // grinding_factor
                 winterfell::FieldExtension::None,
-                8,    // fri_folding_factor
-                127,  // fri_remainder_max_degree
+                8,   // fri_folding_factor
+                127, // fri_remainder_max_degree
             ),
             SecurityLevel::High => ProofOptions::new(
-                100,  // num_queries
-                16,   // blowup_factor
-                24,   // grinding_factor
+                100, // num_queries
+                16,  // blowup_factor
+                24,  // grinding_factor
                 winterfell::FieldExtension::Quadratic,
-                8,    // fri_folding_factor
-                255,  // fri_remainder_max_degree
+                8,   // fri_folding_factor
+                255, // fri_remainder_max_degree
             ),
         }
     }

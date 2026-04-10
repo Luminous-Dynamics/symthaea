@@ -267,7 +267,13 @@ impl FactionEngine {
                 // Coordination-literate agents have a higher bar for joining factions.
                 // They recognize that factional polarization is a negative-sum dynamic
                 // and only join factions with very strong ideological alignment.
-                let threshold = 0.3 * (1.0 - agent.coordination_understanding * 0.5);
+                let base_threshold = 0.3 * (1.0 - agent.coordination_understanding * 0.5);
+                // Ethical orientation modulates faction joining (Phase 2c):
+                // Relational agents join more readily (community-oriented, Ubuntu).
+                // Deontological agents resist (principled independence).
+                let ethics_adjustment = agent.ethics.relational * 0.06
+                    - agent.ethics.deontological * 0.04;
+                let threshold = (base_threshold + ethics_adjustment).clamp(0.05, 0.5);
                 if dist < threshold {
                     agent.faction_id = Some(faction.id);
                 }
@@ -698,6 +704,7 @@ mod tests {
                 generation: 0,
                 trauma_level: 0.0,
                     cumulative_dose_sv: 0.0, adversarial: None, coordination_understanding: 0.0, mycel_score: 0.1, sap_balance: 100.0, is_biological: true, wounds: Vec::new(),
+                    ethics: crate::agent::EthicalOrientation::default(),
             };
             world.agents.push(agent);
             world.next_agent_id += 1;
@@ -941,6 +948,7 @@ mod tests {
                 tend_balance: 0.0, parent_ids: None,
                 faction_id: if i < 60 { Some(1) } else if i < 90 { Some(2) } else { None },
                 generation: 0, trauma_level: 0.0, cumulative_dose_sv: 0.0, adversarial: None, coordination_understanding: 0.0, mycel_score: 0.1, sap_balance: 100.0, is_biological: true, wounds: Vec::new(),
+                ethics: crate::agent::EthicalOrientation::default(),
             }
         }).collect();
 

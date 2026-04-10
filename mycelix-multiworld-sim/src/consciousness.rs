@@ -117,6 +117,15 @@ impl ConsciousnessEngine {
                     (agent.consciousness.meta_awareness + 0.0005).min(1.0);
             }
 
+            // Ethical age drift (Phase 3c): elders shift toward virtue/care and
+            // relational orientations (Kohlberg 1981 stage theory, Tornstam 1989
+            // gerotranscendence). Lifetime experience grows compassion and
+            // community-orientation. Rate: 0.0001/tick ≈ 0.012/year after 50.
+            if age_years > 50.0 {
+                agent.ethics.virtue_care = (agent.ethics.virtue_care + 0.0001).min(1.0);
+                agent.ethics.relational = (agent.ethics.relational + 0.0001).min(1.0);
+            }
+
             // Coherence: emergent from education, trauma, experience, and cultural alignment.
             // Previously a static cultural-weight lookup; now multi-factor so coherence
             // is genuinely earned through education and resilience, not assigned.
@@ -554,6 +563,7 @@ mod tests {
                     generation: 0,
                     trauma_level: 0.0,
                     cumulative_dose_sv: 0.0, adversarial: None, coordination_understanding: 0.0, mycel_score: 0.1, sap_balance: 100.0, is_biological: true, wounds: Vec::new(),
+                    ethics: crate::agent::EthicalOrientation::default(),
         }
     }
 

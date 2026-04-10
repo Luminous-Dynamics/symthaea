@@ -204,13 +204,15 @@ pub async fn query_ollama(query: &str) -> ExternalResult {
         "stream": false,
     });
 
-    match gloo_net::http::Request::post(url)
+    let request = match gloo_net::http::Request::post(url)
         .header("Content-Type", "application/json")
         .body(body.to_string())
-        .unwrap()
-        .send()
-        .await
     {
+        Ok(r) => r,
+        Err(e) => return ExternalResult::error("Ollama", &format!("Request build error: {}", e)),
+    };
+
+    match request.send().await {
         Ok(resp) => match resp.json::<OllamaResponse>().await {
             Ok(data) => {
                 let model = data.model.unwrap_or_else(|| "unknown".to_string());
@@ -353,14 +355,16 @@ pub async fn query_perplexity(query: &str) -> ExternalResult {
         ]
     });
 
-    match gloo_net::http::Request::post(&url)
+    let request = match gloo_net::http::Request::post(&url)
         .header("Content-Type", "application/json")
         .header("X-Perplexity-Key", &api_key)
         .body(body.to_string())
-        .unwrap()
-        .send()
-        .await
     {
+        Ok(r) => r,
+        Err(e) => return ExternalResult::error("Perplexity", &format!("Request build error: {}", e)),
+    };
+
+    match request.send().await {
         Ok(resp) => match resp.json::<PerplexityResponse>().await {
             Ok(data) => {
                 let model = data.model.unwrap_or_else(|| "sonar".to_string());

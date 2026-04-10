@@ -9,8 +9,8 @@
 
 use sha3::{Digest, Sha3_256};
 
-use crate::{CommitmentError, CommitmentHash, CommitmentResult};
 use crate::scheme::constant_time_eq;
+use crate::{CommitmentError, CommitmentHash, CommitmentResult};
 
 /// Standard K-Vector scale factor (4 decimal places)
 pub const KVECTOR_SCALE_FACTOR: u64 = 10_000;
@@ -197,7 +197,10 @@ impl FixedPointCommitment {
     }
 
     /// Scale values with strict validation
-    pub fn prepare_for_proof_strict(&self, values: &[f32]) -> CommitmentResult<(Vec<u64>, CommitmentHash)> {
+    pub fn prepare_for_proof_strict(
+        &self,
+        values: &[f32],
+    ) -> CommitmentResult<(Vec<u64>, CommitmentHash)> {
         let scaled: Result<Vec<u64>, _> = values
             .iter()
             .map(|&v| self.config.scale_strict(v))

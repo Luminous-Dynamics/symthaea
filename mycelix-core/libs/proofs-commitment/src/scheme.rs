@@ -177,7 +177,10 @@ mod tests {
             .field(b"bcd")
             .finalize();
 
-        assert_ne!(hash1, hash2, "Length prefix should prevent concatenation attacks");
+        assert_ne!(
+            hash1, hash2,
+            "Length prefix should prevent concatenation attacks"
+        );
     }
 
     #[test]

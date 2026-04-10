@@ -48,6 +48,14 @@ pub enum PageView {
     Error { message: String },
 }
 
+/// A snapshot of a visited page for the history stack.
+#[derive(Clone, Debug)]
+pub struct HistoryEntry {
+    pub url: String,
+    pub title: String,
+    pub view: PageView,
+}
+
 /// Global browser state, provided at the App root.
 /// Uses ReadSignal/WriteSignal pairs (standard Leptos 0.8 CSR pattern).
 #[derive(Clone)]
@@ -68,6 +76,12 @@ pub struct BrowserState {
     pub set_loading: WriteSignal<bool>,
     pub search_mode: ReadSignal<SearchMode>,
     pub set_search_mode: WriteSignal<SearchMode>,
+    /// History stack and cursor for back/forward navigation.
+    history: StoredValue<Vec<HistoryEntry>>,
+    history_cursor: ReadSignal<usize>,
+    set_history_cursor: WriteSignal<usize>,
+    /// True while navigating via back/forward (suppresses push).
+    navigating_history: StoredValue<bool>,
 }
 
 impl BrowserState {
@@ -79,7 +93,25 @@ impl BrowserState {
         let (safety, set_safety) = signal(SafetyLevel::Green);
         let (threat_count, set_threat_count) = signal(0usize);
         let (loading, set_loading) = signal(false);
-        let (search_mode, set_search_mode) = signal(SearchMode::Advanced);
+
+        let initial_mode = crate::persistence::load::<String>("search-mode")
+            .and_then(|s| match s.as_str() {
+                "Basic" => Some(SearchMode::Basic),
+                "Advanced" => Some(SearchMode::Advanced),
+                "Paradigm" => Some(SearchMode::Paradigm),
+                _ => None,
+            })
+            .unwrap_or(SearchMode::Advanced);
+        let (search_mode, set_search_mode) = signal(initial_mode);
+
+        let initial_entry = HistoryEntry {
+            url: "prism://welcome".to_string(),
+            title: "Prism".to_string(),
+            view: PageView::Welcome,
+        };
+        let history = StoredValue::new(vec![initial_entry]);
+        let (history_cursor, set_history_cursor) = signal(0usize);
+        let navigating_history = StoredValue::new(false);
 
         Self {
             current_url, set_current_url,
@@ -90,6 +122,74 @@ impl BrowserState {
             threat_count, set_threat_count,
             loading, set_loading,
             search_mode, set_search_mode,
+            history, history_cursor, set_history_cursor,
+            navigating_history,
         }
+    }
+
+    /// Push a new page onto the history stack (called on every navigation).
+    /// Truncates forward history if we navigated back then went somewhere new.
+    pub fn push_history(&self, url: &str, title: &str, view: &PageView) {
+        if self.navigating_history.get_value() {
+            return;
+        }
+        self.history.update_value(|h| {
+            let cursor = self.history_cursor.get_untracked();
+            // Truncate any forward entries
+            h.truncate(cursor + 1);
+            h.push(HistoryEntry {
+                url: url.to_string(),
+                title: title.to_string(),
+                view: view.clone(),
+            });
+            // Cap at 50 entries
+            if h.len() > 50 {
+                h.remove(0);
+            }
+            let new_cursor = h.len() - 1;
+            self.set_history_cursor.set(new_cursor);
+        });
+    }
+
+    /// Navigate back in history. Returns true if navigation happened.
+    pub fn go_back(&self) -> bool {
+        let cursor = self.history_cursor.get_untracked();
+        if cursor == 0 {
+            return false;
+        }
+        let new_cursor = cursor - 1;
+        self.navigate_to_history(new_cursor);
+        true
+    }
+
+    /// Navigate forward in history. Returns true if navigation happened.
+    pub fn go_forward(&self) -> bool {
+        let cursor = self.history_cursor.get_untracked();
+        let can = self.history.with_value(|h| cursor + 1 < h.len());
+        if !can {
+            return false;
+        }
+        self.navigate_to_history(cursor + 1);
+        true
+    }
+
+    fn navigate_to_history(&self, idx: usize) {
+        self.navigating_history.set_value(true);
+        if let Some(entry) = self.history.with_value(|h| h.get(idx).cloned()) {
+            self.set_history_cursor.set(idx);
+            self.set_current_url.set(entry.url);
+            self.set_page_title.set(entry.title);
+            self.set_view.set(entry.view);
+        }
+        self.navigating_history.set_value(false);
+    }
+
+    pub fn can_go_back(&self) -> bool {
+        self.history_cursor.get() > 0
+    }
+
+    pub fn can_go_forward(&self) -> bool {
+        let cursor = self.history_cursor.get();
+        self.history.with_value(|h| cursor + 1 < h.len())
     }
 }

@@ -93,17 +93,18 @@ fn build_client(user_agent: &str, timeout_secs: u64) -> reqwest::Client {
         .expect("HTTP client TLS init failed")
 }
 
+fn internal_error_response() -> axum::response::Response<axum::body::Body> {
+    let mut resp = axum::response::Response::new(axum::body::Body::from("Internal error"));
+    *resp.status_mut() = StatusCode::INTERNAL_SERVER_ERROR;
+    resp
+}
+
 fn json_response(status: u16, body: axum::body::Bytes) -> axum::response::Response<axum::body::Body> {
     axum::response::Response::builder()
         .status(status)
         .header("content-type", "application/json")
         .body(axum::body::Body::from(body))
-        .unwrap_or_else(|_| {
-            axum::response::Response::builder()
-                .status(500)
-                .body(axum::body::Body::from("Internal error"))
-                .unwrap()
-        })
+        .unwrap_or_else(|_| internal_error_response())
 }
 
 #[derive(serde::Deserialize)]
@@ -148,12 +149,7 @@ async fn proxy_handler(Query(params): Query<ProxyParams>) -> impl IntoResponse {
                         .header("content-type", content_type)
                         .header("x-prism-proxied", "true")
                         .body(axum::body::Body::from(body))
-                        .unwrap_or_else(|_| {
-                            axum::response::Response::builder()
-                                .status(500)
-                                .body(axum::body::Body::from("Internal error"))
-                                .unwrap()
-                        })
+                        .unwrap_or_else(|_| internal_error_response())
                         .into_response()
                 }
                 Err(e) => (

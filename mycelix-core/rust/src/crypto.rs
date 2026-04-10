@@ -7,48 +7,39 @@
 
 use std::fmt;
 
-/// A cryptographic key pair
-pub struct KeyPair {
+use kyber::kyber768;
+use x25519_dalek::{StaticSecret, PublicKey};
+use sha2::{Sha256, Digest};
+use rand_core::OsRng;
+
+pub struct HybridKeyPair {
     pub public_key: Vec<u8>,
     secret_key: Vec<u8>,
 }
 
-impl fmt::Debug for KeyPair {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("KeyPair")
-            .field("public_key", &hex::encode(&self.public_key))
-            .field("secret_key", &"[REDACTED]")
-            .finish()
-    }
-}
+pub fn generate_keypair() -> HybridKeyPair {
+    let mut rng = OsRng;
+    let x25519_secret = StaticSecret::random_from_rng(&mut rng);
+    let x25519_public = PublicKey::from(&x25519_secret);
 
-/// Generate a new key pair for secure communication
-pub fn generate_keypair() -> KeyPair {
-    // Placeholder implementation
-    // In production, use proper X25519 key generation
-    let mut secret = vec![0u8; 32];
-    let mut public = vec![0u8; 32];
+    let (kyber_pk, kyber_sk) = kyber::keypair(&mut rng);
+    
+    let mut public = x25519_public.as_bytes().to_vec();
+    public.extend_from_slice(&kyber_pk);
 
-    // Simple placeholder - would use ring or x25519-dalek in production
-    for i in 0..32 {
-        secret[i] = (i as u8).wrapping_mul(7);
-        public[i] = secret[i].wrapping_add(1);
-    }
+    let mut secret = x25519_secret.to_bytes().to_vec();
+    secret.extend_from_slice(&kyber_sk);
 
-    KeyPair {
+    HybridKeyPair {
         public_key: public,
         secret_key: secret,
     }
 }
 
-/// Hash data using SHA-256
 pub fn hash_sha256(data: &[u8]) -> Vec<u8> {
-    // Placeholder - would use ring::digest in production
-    let mut result = vec![0u8; 32];
-    for (i, &byte) in data.iter().enumerate() {
-        result[i % 32] ^= byte;
-    }
-    result
+    let mut hasher = Sha256::new();
+    hasher.update(data);
+    hasher.finalize().to_vec()
 }
 
 /// Sign data with a secret key

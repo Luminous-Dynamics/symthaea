@@ -63,12 +63,13 @@ pub fn ThemeSwitcher() -> impl IntoView {
                 let id_click = id.clone();
                 let id_class = id.clone();
                 view! {
-                    <div
+                    <button
                         class=move || if active.get() == id_class { "theme-btn active" } else { "theme-btn" }
                         style:background=color.clone()
                         on:click=move |_| switch(&id_click)
                         title=name.clone()
-                    ></div>
+                        attr:aria-label=format!("Theme: {}", name)
+                    ></button>
                 }
             }).collect_view()}
         </div>

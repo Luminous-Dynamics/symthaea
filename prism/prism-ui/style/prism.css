@@ -47,6 +47,7 @@ html, body {
     --prism-accent-dim: #2ba898;
     --chrome-text: #8a9ba8;
     --chrome-text-bright: #c8dae5;
+    --chrome-text-dim: #5a6a75;
     --content-bg: #0b1218;
     --content-text: #c0cdd6;
     --content-text-secondary: #7a8f9e;
@@ -72,6 +73,7 @@ html, body {
     --prism-accent-dim: #6a9a6a;
     --chrome-text: #c8d4c2;
     --chrome-text-bright: #e8f0e4;
+    --chrome-text-dim: #8a9a85;
     --content-bg: #f5f0e8;
     --content-text: #2c2418;
     --content-text-secondary: #5a4e3e;
@@ -97,6 +99,7 @@ html, body {
     --prism-accent-dim: #7c5cbf;
     --chrome-text: #9e95b8;
     --chrome-text-bright: #d4cce8;
+    --chrome-text-dim: #6a6380;
     --content-bg: #0f0b1c;
     --content-text: #c4bcd8;
     --content-text-secondary: #8878a8;
@@ -122,6 +125,7 @@ html, body {
     --prism-accent-dim: #b8780a;
     --chrome-text: #b8a88a;
     --chrome-text-bright: #e8d8c0;
+    --chrome-text-dim: #7a705a;
     --content-bg: #141008;
     --content-text: #d4c4a8;
     --content-text-secondary: #9a8a6e;
@@ -147,6 +151,7 @@ html, body {
     --prism-accent-dim: #16a34a;
     --chrome-text: #8aaa8e;
     --chrome-text-bright: #c0e0c4;
+    --chrome-text-dim: #5a7a5e;
     --content-bg: #0c180e;
     --content-text: #b8d4ba;
     --content-text-secondary: #7a9a7e;
@@ -172,6 +177,7 @@ html, body {
     --prism-accent-dim: #0ea5e9;
     --chrome-text: #8aaabe;
     --chrome-text-bright: #c0dce8;
+    --chrome-text-dim: #5a7a90;
     --content-bg: #0c1420;
     --content-text: #b8ccd8;
     --content-text-secondary: #7a94a8;
@@ -197,6 +203,7 @@ html, body {
     --prism-accent-dim: #b91c1c;
     --chrome-text: #a0a0a0;
     --chrome-text-bright: #d4d4d4;
+    --chrome-text-dim: #686868;
     --content-bg: #141414;
     --content-text: #c8c8c8;
     --content-text-secondary: #888;
@@ -222,6 +229,7 @@ html, body {
     --prism-accent-dim: #9333ea;
     --chrome-text: #a898b8;
     --chrome-text-bright: #d8cce8;
+    --chrome-text-dim: #706480;
     --content-bg: #181320;
     --content-text: #c8bed8;
     --content-text-secondary: #8a7ea8;
@@ -307,7 +315,65 @@ body {
     color: var(--chrome-text-bright);
 }
 .nav-btn:active { opacity: 0.7; }
+.nav-btn.disabled {
+    opacity: 0.3;
+    pointer-events: none;
+    cursor: default;
+}
 .nav-btn svg { width: 16px; height: 16px; }
+
+/* Focus-visible for keyboard navigation (WCAG 2.4.7) */
+.nav-btn:focus-visible,
+.gear-btn:focus-visible,
+.mode-toggle:focus-visible,
+.compare-toggle:focus-visible,
+.example-query:focus-visible,
+.link-button:focus-visible {
+    outline: 2px solid var(--prism-accent);
+    outline-offset: 2px;
+}
+
+/* Semantic button styled as link */
+.link-button {
+    background: none;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    font: inherit;
+    color: var(--prism-accent);
+    font-size: 14px;
+    text-decoration: none;
+}
+.link-button:hover {
+    text-decoration: underline;
+}
+
+/* Loading spinner for web search */
+.search-loading-banner {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 16px;
+    margin: 8px 0;
+    background: var(--chrome-surface, #1a2a34);
+    border-radius: 6px;
+    font-size: 13px;
+    color: var(--prism-accent, #2DD4BF);
+    border: 1px solid var(--prism-accent, #2DD4BF);
+    opacity: 0.85;
+}
+.spinner {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    border: 2px solid currentColor;
+    border-top-color: transparent;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
 
 .brand-icon {
     flex-shrink: 0;

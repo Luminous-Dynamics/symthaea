@@ -128,7 +128,10 @@ impl WorldEconomy {
         // even if it's not their strongest skill. This models the capacity to
         // see the system as a whole rather than just optimizing individually.
         let mut worker_count = 0usize;
-        // First pass: count natural assignments to detect bottlenecks
+        // First pass: count natural assignments to detect bottlenecks.
+        // Ethics-aware: sector attractiveness = skill + ethical affinity.
+        // Virtue/care agents gravitate toward medicine/education even if their
+        // raw skill is slightly weaker there (Gilligan 1982; vocation as calling).
         let mut natural_assignment = Vec::new();
         for agent in agents.iter().filter(|a| a.is_alive()) {
             let stage = agent.life_stage(current_tick);
@@ -140,7 +143,8 @@ impl WorldEconomy {
             let best_sector = skills
                 .iter()
                 .enumerate()
-                .max_by(|a, b| a.1.partial_cmp(b.1).unwrap_or(std::cmp::Ordering::Equal))
+                .map(|(i, &s)| (i, s + agent.ethics.sector_affinity(i)))
+                .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal))
                 .map(|(i, _)| i)
                 .unwrap_or(0);
             natural_assignment.push((best_sector, agent.coordination_understanding));
@@ -435,6 +439,7 @@ mod tests {
                     generation: 0,
                     trauma_level: 0.0,
                     cumulative_dose_sv: 0.0, adversarial: None, coordination_understanding: 0.0, mycel_score: 0.1, sap_balance: 100.0, is_biological: true, wounds: Vec::new(),
+                    ethics: crate::agent::EthicalOrientation::default(),
         }
     }
 
@@ -542,6 +547,7 @@ mod tests {
                     generation: 0,
                     trauma_level: 0.0,
                     cumulative_dose_sv: 0.0, adversarial: None, coordination_understanding: 0.0, mycel_score: 0.1, sap_balance: 100.0, is_biological: true, wounds: Vec::new(),
+                    ethics: crate::agent::EthicalOrientation::default(),
             };
             diverse_agents.push(a);
         }

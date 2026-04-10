@@ -288,6 +288,50 @@ impl EthicalOrientation {
             .unwrap_or(0);
         names[max_idx]
     }
+
+    /// Ethical affinity for a sector (0..7).
+    /// Sectors: 0=engineering, 1=agriculture, 2=medicine, 3=governance,
+    ///          4=science, 5=education, 6=art_culture, 7=logistics
+    ///
+    /// Virtue/care agents are drawn to medicine (2) and education (5).
+    /// Deontological agents are drawn to governance (3).
+    /// Relational agents prefer art/culture (6) and agriculture (1).
+    /// Consequentialist agents are sector-agnostic (outcome-focused).
+    pub fn sector_affinity(&self, sector: usize) -> f64 {
+        match sector {
+            2 => self.virtue_care * 0.15,       // medicine
+            5 => self.virtue_care * 0.12,       // education
+            3 => self.deontological * 0.10,     // governance (duty)
+            6 => self.relational * 0.08,        // art/culture (community)
+            1 => self.relational * 0.06,        // agriculture (sustenance)
+            _ => 0.0,
+        }
+    }
+
+    /// As a 4D vector for distance/similarity computations.
+    pub fn as_vec(&self) -> [f64; 4] {
+        [self.deontological, self.consequentialist, self.virtue_care, self.relational]
+    }
+
+    /// Inherit from two parents with Gaussian noise (intergenerational transmission).
+    /// Children's ethics are the midpoint of parents + noise, modeling both
+    /// cultural inheritance and individual variation (Harris 1998).
+    pub fn inherit(
+        parent_a: &EthicalOrientation,
+        parent_b: &EthicalOrientation,
+        rng: &mut crate::stochastic::StochasticEngine,
+    ) -> Self {
+        Self {
+            deontological: ((parent_a.deontological + parent_b.deontological) * 0.5
+                + rng.next_gaussian(0.0, 0.08)).clamp(0.05, 1.0),
+            consequentialist: ((parent_a.consequentialist + parent_b.consequentialist) * 0.5
+                + rng.next_gaussian(0.0, 0.08)).clamp(0.05, 1.0),
+            virtue_care: ((parent_a.virtue_care + parent_b.virtue_care) * 0.5
+                + rng.next_gaussian(0.0, 0.08)).clamp(0.05, 1.0),
+            relational: ((parent_a.relational + parent_b.relational) * 0.5
+                + rng.next_gaussian(0.0, 0.08)).clamp(0.05, 1.0),
+        }
+    }
 }
 
 /// A single agent in the civilization simulation.
@@ -488,6 +532,7 @@ mod tests {
             generation: 0,
             trauma_level: 0.0,
                     cumulative_dose_sv: 0.0, adversarial: None, coordination_understanding: 0.0, mycel_score: 0.1, sap_balance: 100.0, is_biological: true, wounds: Vec::new(),
+                    ethics: EthicalOrientation::default(),
         }
     }
 

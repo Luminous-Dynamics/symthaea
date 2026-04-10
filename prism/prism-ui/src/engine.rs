@@ -119,32 +119,38 @@ pub fn process_input(
     }
 
     if input == "prism://settings" {
+        let view = PageView::Settings;
         state.set_current_url.set("prism://settings".to_string());
         state.set_page_title.set("Settings".to_string());
-        state.set_view.set(PageView::Settings);
+        state.set_view.set(view.clone());
         state.set_zone.set(ContentZone::Local);
         state.set_safety.set(SafetyLevel::Green);
         state.set_threat_count.set(0);
+        state.push_history("prism://settings", "Settings", &view);
         return;
     }
 
     if input == "prism://submit" {
+        let view = PageView::SubmitClaim;
         state.set_current_url.set("prism://submit".to_string());
         state.set_page_title.set("Submit Claim".to_string());
-        state.set_view.set(PageView::SubmitClaim);
+        state.set_view.set(view.clone());
         state.set_zone.set(ContentZone::Local);
         state.set_safety.set(SafetyLevel::Green);
         state.set_threat_count.set(0);
+        state.push_history("prism://submit", "Submit Claim", &view);
         return;
     }
 
     if input == "prism://welcome" || input.starts_with("prism://") && !input.contains("search") {
+        let view = PageView::Welcome;
         state.set_current_url.set(input.to_string());
         state.set_page_title.set("Prism".to_string());
-        state.set_view.set(PageView::Welcome);
+        state.set_view.set(view.clone());
         state.set_zone.set(ContentZone::Local);
         state.set_safety.set(SafetyLevel::Green);
         state.set_threat_count.set(0);
+        state.push_history(input, "Prism", &view);
         return;
     }
 
@@ -160,16 +166,26 @@ fn search_query(query: &str, state: &BrowserState, engine: &SearchEngine) {
     let mode = state.search_mode.get_untracked();
     let local_results = engine.search(query, 10);
 
-    // Show local results immediately
-    state.set_current_url.set(format!("prism://search?q={}", query));
-    state.set_page_title.set(format!("Search: {}", query));
-    state.set_view.set(PageView::Search {
+    let url = format!("prism://search?q={}", query);
+    let title = format!("Search: {}", query);
+    let view = PageView::Search {
         query: query.to_string(),
         results: local_results.clone(),
-    });
+    };
+
+    // Show local results immediately
+    state.set_current_url.set(url.clone());
+    state.set_page_title.set(title.clone());
+    state.set_view.set(view.clone());
     state.set_zone.set(ContentZone::Local);
     state.set_safety.set(SafetyLevel::Green);
     state.set_threat_count.set(0);
+    state.push_history(&url, &title, &view);
+
+    // Signal loading for web-augmented modes
+    if mode != SearchMode::Basic {
+        state.set_loading.set(true);
+    }
 
     // Advanced/Paradigm: augment with web sources in background
     if mode == SearchMode::Basic {
@@ -178,19 +194,27 @@ fn search_query(query: &str, state: &BrowserState, engine: &SearchEngine) {
 
     let query_owned = query.to_string();
     let set_view = state.set_view;
+    let set_loading = state.set_loading;
     let local = local_results;
 
     wasm_bindgen_futures::spawn_local(async move {
         let mut merged = local;
+        let mut failed_sources: Vec<String> = Vec::new();
 
         // Wikipedia (direct CORS, most reliable)
         let wiki = crate::external_search::search_wikipedia(&query_owned).await;
+        if matches!(wiki.status, crate::external_search::SearchStatus::Error(_)) {
+            failed_sources.push("Wikipedia".into());
+        }
         for hit in wiki.hits {
             merged.push(external_hit_to_result(&hit, "Wikipedia", EmpiricalLevel::E3));
         }
 
         // DuckDuckGo (via proxy)
         let ddg = crate::external_search::search_duckduckgo(&query_owned).await;
+        if matches!(ddg.status, crate::external_search::SearchStatus::Error(_)) {
+            failed_sources.push("DuckDuckGo".into());
+        }
         for hit in ddg.hits {
             merged.push(external_hit_to_result(&hit, "DuckDuckGo", EmpiricalLevel::E2));
         }
@@ -201,9 +225,16 @@ fn search_query(query: &str, state: &BrowserState, engine: &SearchEngine) {
             merged.extend(dht);
 
             let ollama = crate::external_search::query_ollama(&query_owned).await;
+            if matches!(ollama.status, crate::external_search::SearchStatus::Error(_)) {
+                failed_sources.push("Ollama".into());
+            }
             for hit in ollama.hits {
                 merged.push(external_hit_to_result(&hit, "Ollama", EmpiricalLevel::E1));
             }
+        }
+
+        if !failed_sources.is_empty() {
+            log::warn!("External sources failed: {}", failed_sources.join(", "));
         }
 
         // Deduplicate by content prefix
@@ -223,6 +254,7 @@ fn search_query(query: &str, state: &BrowserState, engine: &SearchEngine) {
             query: query_owned,
             results: merged,
         });
+        set_loading.set(false);
     });
 }
 
@@ -271,6 +303,7 @@ fn navigate_url(url_str: &str, state: &BrowserState, reflex: &ReflexArc) {
     let pre = reflex.pre_fetch(&url, false, false);
     let url_string = url_str.to_string();
     let state_clone = state.clone();
+    let state_history = state.clone();
 
     state.set_loading.set(true);
     state.set_current_url.set(url_str.to_string());
@@ -319,12 +352,14 @@ fn navigate_url(url_str: &str, state: &BrowserState, reflex: &ReflexArc) {
                         );
                         let title = dom.title().unwrap_or_else(|| "Untitled".to_string());
 
-                        state_clone.set_page_title.set(title);
+                        let view = PageView::Page { html: clean };
+                        state_clone.set_page_title.set(title.clone());
                         state_clone.set_zone.set(zone);
                         state_clone.set_safety.set(post.safety_level);
                         state_clone.set_threat_count.set(post.threats.len());
-                        state_clone.set_view.set(PageView::Page { html: clean });
+                        state_clone.set_view.set(view.clone());
                         state_clone.set_loading.set(false);
+                        state_history.push_history(&url_string, &title, &view);
                     }
                     Err(e) => {
                         state_clone.set_view.set(PageView::Error {

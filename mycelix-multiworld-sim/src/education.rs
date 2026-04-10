@@ -333,6 +333,17 @@ impl EducationEngine {
             // TEND reward
             world.agents[m.teacher_idx].tend_balance += TEACHING_TEND_REWARD;
 
+            // Ethical transmission (Phase 3a): teacher→student orientation blending.
+            // Mentorship subtly shapes ethical worldview (Kohlberg 1981; Bandura 1977).
+            // Rate 0.03/tick — slow enough that it takes ~33 teaching interactions
+            // to shift a dimension by one full unit. Students aren't blank slates.
+            let teacher_ethics = world.agents[m.teacher_idx].ethics.clone();
+            let student = &mut world.agents[m.learner_idx];
+            student.ethics.deontological += (teacher_ethics.deontological - student.ethics.deontological) * 0.03;
+            student.ethics.consequentialist += (teacher_ethics.consequentialist - student.ethics.consequentialist) * 0.03;
+            student.ethics.virtue_care += (teacher_ethics.virtue_care - student.ethics.virtue_care) * 0.03;
+            student.ethics.relational += (teacher_ethics.relational - student.ethics.relational) * 0.03;
+
             summary.teaching_interactions += 1;
             summary.tend_distributed += TEACHING_TEND_REWARD;
         }
@@ -477,6 +488,7 @@ mod tests {
             generation: 0,
             trauma_level: 0.0,
                     cumulative_dose_sv: 0.0, adversarial: None, coordination_understanding: 0.0, mycel_score: 0.1, sap_balance: 100.0, is_biological: true, wounds: Vec::new(),
+                    ethics: crate::agent::EthicalOrientation::default(),
         }
     }
 

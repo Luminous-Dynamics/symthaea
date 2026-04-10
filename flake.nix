@@ -141,6 +141,11 @@
                 marvosym
                 cm-super
                 booktabs
+                enumitem
+                titlesec
+                epigraph
+                nextpage
+                csquotes
                 natbib
                 hyperref
                 ;

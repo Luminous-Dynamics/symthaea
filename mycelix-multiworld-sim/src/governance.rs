@@ -322,10 +322,28 @@ impl WorldGovernance {
             self.constitutional_crisis = false;
         }
 
-        // --- Emergency powers ---
+        // --- Emergency powers (ethics-modulated duration) ---
+        // Deontological agents resist emergency power concentration (Kant: rights
+        // are not negotiable). Consequentialist agents accept emergency powers if
+        // the crisis is severe enough (Mill: greatest good under duress).
+        // The population's mean ethical orientation modulates how quickly
+        // emergency powers expire: deontological populations shorten them,
+        // consequentialist populations tolerate them longer.
         if self.emergency_powers_active {
+            let living: Vec<_> = world.agents.iter().filter(|a| a.is_alive()).collect();
+            let n = living.len().max(1) as f64;
+            let mean_deont: f64 = living.iter().map(|a| a.ethics.deontological).sum::<f64>() / n;
+            let mean_conseq: f64 = living.iter().map(|a| a.ethics.consequentialist).sum::<f64>() / n;
+            // Net pressure: deontological shortens, consequentialist extends
+            // Range: −0.15 (strong deont) to +0.15 (strong conseq)
+            let ethics_pressure = (mean_conseq - mean_deont) * 0.15;
+            // Effective decay: base 1 tick/tick, modulated by ethics
+            let effective_decay = (1.0 - ethics_pressure).clamp(0.5, 1.5);
+
             if self.emergency_ticks_remaining > 0 {
-                self.emergency_ticks_remaining -= 1;
+                // Deontological populations erode emergency powers faster
+                self.emergency_ticks_remaining =
+                    self.emergency_ticks_remaining.saturating_sub(effective_decay.round() as u32);
             }
             if self.emergency_ticks_remaining == 0 {
                 self.emergency_powers_active = false;
@@ -632,6 +650,7 @@ mod tests {
                     generation: 0,
                     trauma_level: 0.0,
                     cumulative_dose_sv: 0.0, adversarial: None, coordination_understanding: 0.0, mycel_score: 0.1, sap_balance: 100.0, is_biological: true, wounds: Vec::new(),
+                    ethics: crate::agent::EthicalOrientation::default(),
                 };
                 agents.push(agent);
                 id += 1;

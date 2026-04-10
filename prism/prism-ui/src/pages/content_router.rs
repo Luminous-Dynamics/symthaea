@@ -29,13 +29,18 @@ pub fn ContentRouter() -> impl IntoView {
                 view! { <SearchResultsPage query=query.clone() results=results.clone() /> }.into_any()
             }
             PageView::Page { html } => {
-                // Apply the Sentient Overlay — annotate page content with epistemic claims
-                let annotated = search_engine.with_value(|e| {
-                    match e {
-                        Some(eng) => sentient_overlay::annotate_html(&html, eng),
-                        None => html.clone(),
-                    }
-                });
+                // Apply the Sentient Overlay if enabled in settings
+                let overlay_enabled = crate::persistence::load::<bool>("overlay").unwrap_or(true);
+                let annotated = if overlay_enabled {
+                    search_engine.with_value(|e| {
+                        match e {
+                            Some(eng) => sentient_overlay::annotate_html(&html, eng),
+                            None => html.clone(),
+                        }
+                    })
+                } else {
+                    html.clone()
+                };
                 view! {
                     <div class="reader-content" inner_html=annotated></div>
                 }.into_any()
@@ -68,7 +73,7 @@ pub fn ContentRouter() -> impl IntoView {
 fn WelcomePage() -> impl IntoView {
     view! {
         <div class="reader-content welcome">
-            <img src="/static/prism-hero.jpg" alt="Mycelix Prism" class="welcome-hero" />
+            <img src="/static/prism-hero.jpg" alt="Mycelix Prism" class="welcome-hero" width="800" height="436" />
             <h1>"Mycelix Prism"</h1>
             <p class="tagline">"Consciousness-aware epistemic search. Pure Rust."</p>
 
@@ -112,15 +117,17 @@ fn WelcomePage() -> impl IntoView {
                     "The browser is the distribution mechanism. The knowledge engine is the value."
                 </p>
                 <p style="text-align: center; margin-top: 8px;">
-                    <a href="javascript:void(0)" style="color: var(--prism-accent); font-size: 14px;"
+                    <button class="link-button"
                        on:click=move |_| {
                            use leptos::prelude::Set;
                            let state = expect_context::<BrowserState>();
-                           state.set_view.set(PageView::SubmitClaim);
+                           let view = PageView::SubmitClaim;
+                           state.set_view.set(view.clone());
                            state.set_current_url.set("prism://submit".to_string());
                            state.set_page_title.set("Submit Claim".to_string());
+                           state.push_history("prism://submit", "Submit Claim", &view);
                        }
-                    >"Submit your own claim →"</a>
+                    >"Submit your own claim \u{2192}"</button>
                 </p>
             </div>
         </div>
@@ -129,6 +136,7 @@ fn WelcomePage() -> impl IntoView {
 
 #[component]
 fn SearchResultsPage(query: String, results: Vec<SearchResult>) -> impl IntoView {
+    let state = expect_context::<BrowserState>();
     let count = results.len();
     let search_engine = expect_context::<StoredValue<Option<SearchEngine>>>();
     let total_claims = search_engine.with_value(|e| e.as_ref().map(|s| s.claim_count()).unwrap_or(0));
@@ -144,6 +152,14 @@ fn SearchResultsPage(query: String, results: Vec<SearchResult>) -> impl IntoView
                     {total_claims}" claims indexed"
                 </span>
             </div>
+
+            // Loading indicator for web-augmented search
+            <Show when=move || state.loading.get()>
+                <div class="search-loading-banner">
+                    <span class="spinner"></span>
+                    " Searching external sources\u{2026}"
+                </div>
+            </Show>
 
             {if weak_results {
                 view! {

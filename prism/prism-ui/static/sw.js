@@ -4,10 +4,13 @@
 // Mycelix Prism — Service Worker for offline-first PWA
 // Caches core assets on install, serves from cache with network fallback.
 
-const CACHE_NAME = 'prism-v1';
+const CACHE_NAME = 'prism-v2';
+
+// Only cache assets with stable filenames.
+// CSS, JS, and WASM have content-hashed names (e.g. prism-abc123.css)
+// and are cached on first fetch via the fetch handler below.
 const CORE_ASSETS = [
   '/',
-  '/static/prism.css',
   '/static/prism-loading.jpg',
   '/static/prism-hero.jpg',
   '/static/prism-icon-192.png',
@@ -15,7 +18,7 @@ const CORE_ASSETS = [
   '/static/prism-index-core.bin',
 ];
 
-// Install: cache core assets
+// Install: cache only stable-filename assets
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {

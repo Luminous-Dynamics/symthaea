@@ -4677,6 +4677,7 @@ harmony_policy = true
             tend_balance: 0.0, parent_ids: None,
             faction_id: None, generation: 0,
             trauma_level: 0.0, cumulative_dose_sv: 0.0, adversarial: None, coordination_understanding: 0.0, mycel_score: 0.1, sap_balance: 100.0, is_biological: true, wounds: Vec::new(),
+            ethics: crate::agent::EthicalOrientation::default(),
         };
         happy.skills.learn(0, 0.5);
         happy.needs.engagement = 0.8;

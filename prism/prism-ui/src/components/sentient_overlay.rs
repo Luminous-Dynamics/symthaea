@@ -13,6 +13,9 @@ use leptos::prelude::*;
 use prism_common::{EmpiricalLevel, SearchResult};
 use prism_search::SearchEngine;
 
+const MAX_SEARCH_CALLS: usize = 50;
+const MAX_ANNOTATIONS: usize = 10;
+
 /// Scan page text for sentences that match known claims.
 /// Returns the HTML with epistemic annotations injected.
 pub fn annotate_html(html: &str, engine: &SearchEngine) -> String {
@@ -27,28 +30,29 @@ pub fn annotate_html(html: &str, engine: &SearchEngine) -> String {
     // Split text into sentences
     let sentences = split_sentences(&text);
 
-    // Find matching claims for each sentence
+    // Find matching claims for each sentence (capped for performance)
     let mut annotations: Vec<(String, Option<SearchResult>)> = Vec::new();
+    let mut search_calls = 0;
+    let mut match_count = 0;
     for sentence in &sentences {
-        if sentence.len() < 20 {
-            annotations.push((sentence.clone(), None));
+        if sentence.len() < 30 {
             continue;
         }
+        if search_calls >= MAX_SEARCH_CALLS || match_count >= MAX_ANNOTATIONS {
+            break;
+        }
+        search_calls += 1;
         let results = engine.search(sentence, 1);
         if let Some(top) = results.first() {
-            // Only annotate if similarity is strong enough
             if top.query_similarity > 0.15 {
                 annotations.push((sentence.clone(), Some(top.clone())));
-            } else {
-                annotations.push((sentence.clone(), None));
+                match_count += 1;
             }
-        } else {
-            annotations.push((sentence.clone(), None));
         }
     }
 
     // If no annotations found, return original
-    if annotations.iter().all(|(_, a)| a.is_none()) {
+    if annotations.is_empty() {
         return html.to_string();
     }
 
