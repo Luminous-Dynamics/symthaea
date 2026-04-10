@@ -184,6 +184,22 @@ pub fn SearchBar() -> impl IntoView {
             </Show>
         </form>
         <button
+            class="mode-toggle"
+            on:click=move |_| {
+                use crate::state::SearchMode;
+                let current = state.search_mode.get();
+                let next = match current {
+                    SearchMode::Basic => SearchMode::Advanced,
+                    SearchMode::Advanced => SearchMode::Paradigm,
+                    SearchMode::Paradigm => SearchMode::Basic,
+                };
+                state.set_search_mode.set(next);
+            }
+            title=move || state.search_mode.get().description()
+        >
+            {move || state.search_mode.get().label()}
+        </button>
+        <button
             class=move || if compare_mode.get() { "compare-toggle active" } else { "compare-toggle" }
             on:click=move |_| set_compare_mode.set(!compare_mode.get())
             title="Compare across multiple search engines"

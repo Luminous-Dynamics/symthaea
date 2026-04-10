@@ -6,6 +6,35 @@
 use leptos::prelude::*;
 use prism_common::{ContentZone, SafetyLevel, SearchResult};
 
+/// Search depth mode — controls how far Prism looks for answers.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SearchMode {
+    /// Local claims only (offline, instant, 208+ curated claims)
+    Basic,
+    /// Local + Wikipedia + DuckDuckGo (web-augmented, ~2s)
+    Advanced,
+    /// Local + web + DHT + AI reasoning (full epistemic pipeline)
+    Paradigm,
+}
+
+impl SearchMode {
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Basic => "Basic",
+            Self::Advanced => "Advanced",
+            Self::Paradigm => "Paradigm",
+        }
+    }
+
+    pub fn description(self) -> &'static str {
+        match self {
+            Self::Basic => "Local claims only",
+            Self::Advanced => "Local + web sources",
+            Self::Paradigm => "Full epistemic pipeline",
+        }
+    }
+}
+
 /// Represents the current page being displayed.
 #[derive(Clone, Debug)]
 pub enum PageView {
@@ -37,6 +66,8 @@ pub struct BrowserState {
     pub set_threat_count: WriteSignal<usize>,
     pub loading: ReadSignal<bool>,
     pub set_loading: WriteSignal<bool>,
+    pub search_mode: ReadSignal<SearchMode>,
+    pub set_search_mode: WriteSignal<SearchMode>,
 }
 
 impl BrowserState {
@@ -48,6 +79,7 @@ impl BrowserState {
         let (safety, set_safety) = signal(SafetyLevel::Green);
         let (threat_count, set_threat_count) = signal(0usize);
         let (loading, set_loading) = signal(false);
+        let (search_mode, set_search_mode) = signal(SearchMode::Advanced);
 
         Self {
             current_url, set_current_url,
@@ -57,6 +89,7 @@ impl BrowserState {
             safety, set_safety,
             threat_count, set_threat_count,
             loading, set_loading,
+            search_mode, set_search_mode,
         }
     }
 }

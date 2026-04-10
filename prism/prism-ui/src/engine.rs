@@ -9,7 +9,8 @@ use prism_privacy::ConsentStore;
 use prism_reflex::ReflexArc;
 use prism_search::SearchEngine;
 
-use crate::state::{BrowserState, PageView};
+use crate::state::{BrowserState, PageView, SearchMode};
+use prism_common::{EmpiricalLevel, NormativeLevel, MaterialityLevel, SearchResult};
 
 /// Trigger a search from outside the search bar (e.g., clicking an example query).
 pub fn trigger_search(query: &str) {
@@ -156,6 +157,7 @@ pub fn process_input(
 }
 
 fn search_query(query: &str, state: &BrowserState, engine: &SearchEngine) {
+    let mode = state.search_mode.get_untracked();
     let local_results = engine.search(query, 10);
 
     // Show local results immediately
@@ -169,20 +171,89 @@ fn search_query(query: &str, state: &BrowserState, engine: &SearchEngine) {
     state.set_safety.set(SafetyLevel::Green);
     state.set_threat_count.set(0);
 
-    // If local results are sparse, try Knowledge DHT in background
-    if local_results.len() < 3 {
-        let query_owned = query.to_string();
-        let set_view = state.set_view;
-        let local = local_results;
-        wasm_bindgen_futures::spawn_local(async move {
-            let merged = prism_knowledge_bridge::unified_search(local, &query_owned).await;
-            if !merged.is_empty() {
-                set_view.set(PageView::Search {
-                    query: query_owned,
-                    results: merged,
-                });
+    // Advanced/Paradigm: augment with web sources in background
+    if mode == SearchMode::Basic {
+        return;
+    }
+
+    let query_owned = query.to_string();
+    let set_view = state.set_view;
+    let local = local_results;
+
+    wasm_bindgen_futures::spawn_local(async move {
+        let mut merged = local;
+
+        // Wikipedia (direct CORS, most reliable)
+        let wiki = crate::external_search::search_wikipedia(&query_owned).await;
+        for hit in wiki.hits {
+            merged.push(external_hit_to_result(&hit, "Wikipedia", EmpiricalLevel::E3));
+        }
+
+        // DuckDuckGo (via proxy)
+        let ddg = crate::external_search::search_duckduckgo(&query_owned).await;
+        for hit in ddg.hits {
+            merged.push(external_hit_to_result(&hit, "DuckDuckGo", EmpiricalLevel::E2));
+        }
+
+        // Paradigm mode: also try Knowledge DHT + Ollama
+        if mode == SearchMode::Paradigm {
+            let dht = prism_knowledge_bridge::unified_search(vec![], &query_owned).await;
+            merged.extend(dht);
+
+            let ollama = crate::external_search::query_ollama(&query_owned).await;
+            for hit in ollama.hits {
+                merged.push(external_hit_to_result(&hit, "Ollama", EmpiricalLevel::E1));
             }
+        }
+
+        // Deduplicate by content prefix
+        let mut seen = std::collections::HashSet::new();
+        merged.retain(|r| {
+            let key: String = r.content.chars().take(60).collect::<String>().to_lowercase();
+            seen.insert(key)
         });
+
+        // Re-rank by composite score
+        merged.sort_by(|a, b| b.rank_score().partial_cmp(&a.rank_score()).unwrap_or(std::cmp::Ordering::Equal));
+
+        // Limit to top 20
+        merged.truncate(20);
+
+        set_view.set(PageView::Search {
+            query: query_owned,
+            results: merged,
+        });
+    });
+}
+
+/// Convert an external search hit into a Prism SearchResult with epistemic annotation.
+fn external_hit_to_result(
+    hit: &crate::external_search::ExternalHit,
+    source_name: &str,
+    base_level: EmpiricalLevel,
+) -> SearchResult {
+    let content = if hit.snippet.is_empty() {
+        hit.title.clone()
+    } else {
+        hit.snippet.clone()
+    };
+    let source = hit.url.clone().unwrap_or_else(|| source_name.to_string());
+
+    SearchResult {
+        content,
+        sources: vec![source],
+        empirical_level: base_level,
+        normative_level: NormativeLevel::N1,
+        materiality_level: MaterialityLevel::M2,
+        query_similarity: 0.4, // Web results get moderate base relevance
+        author_reputation: match source_name {
+            "Wikipedia" => 0.85,
+            "DuckDuckGo" => 0.60,
+            "Ollama" => 0.50,
+            _ => 0.70,
+        },
+        age_days: 7,
+        tags: vec![source_name.to_lowercase()],
     }
 }
 

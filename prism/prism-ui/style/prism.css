@@ -280,6 +280,33 @@ body {
     gap: 12px;
 }
 
+.nav-buttons {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    margin-left: 8px;
+}
+.nav-btn {
+    width: 30px;
+    height: 30px;
+    padding: 5px;
+    border: none;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--chrome-text-dim);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s;
+}
+.nav-btn:hover {
+    background: var(--chrome-surface);
+    color: var(--chrome-text-bright);
+}
+.nav-btn:active { opacity: 0.7; }
+.nav-btn svg { width: 16px; height: 16px; }
+
 .brand-icon {
     flex-shrink: 0;
     display: flex;
@@ -1027,6 +1054,22 @@ button.example-query:active { opacity: 0.6; }
     background: transparent; color: var(--chrome-text); font-size: 12px;
     cursor: pointer; transition: all 0.15s;
 }
+.mode-toggle {
+    flex-shrink: 0;
+    padding: 4px 10px;
+    border: 1px solid var(--chrome-border);
+    border-radius: 4px;
+    background: transparent;
+    color: var(--prism-accent);
+    font-size: 11px;
+    font-weight: 700;
+    cursor: pointer;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    transition: all 0.15s;
+}
+.mode-toggle:hover { background: var(--chrome-surface); }
+
 .compare-toggle:hover { border-color: var(--prism-accent); color: var(--prism-accent); }
 .compare-toggle.active { background: var(--prism-accent); color: var(--chrome-bg); border-color: var(--prism-accent); }
 
