@@ -22,6 +22,7 @@ pub mod constraint;
 pub mod epa;
 pub mod gjk;
 pub mod integrator;
+pub mod island;
 pub mod joints;
 pub mod raycast;
 pub mod replay;

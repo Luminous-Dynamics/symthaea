@@ -280,21 +280,40 @@ impl<const D: usize> PhysicsWorld<D> {
             }
         }
 
-        // 4. Resolve collisions (with consciousness modulation if callback present)
+        // 4. Build islands and skip sleeping ones
+        let islands = crate::island::build_islands(
+            &self.bodies,
+            &self.contacts,
+            &self.constraints,
+            &self.handle_to_index,
+        );
+        let active_contact_indices: Vec<usize> = islands.iter()
+            .filter(|island| !island.sleeping)
+            .flat_map(|island| island.contact_indices.iter().copied())
+            .collect();
+
+        // 5. Resolve collisions for active islands only
         for _ in 0..self.solver_iterations {
-            let contacts: Vec<_> = self.contacts.clone();
-            for contact in contacts {
-                self.resolve_contact(contact, dt, &mut callback);
+            for &ci in &active_contact_indices {
+                if ci < self.contacts.len() {
+                    let contact = self.contacts[ci].clone();
+                    self.resolve_contact(contact, dt, &mut callback);
+                }
             }
         }
 
-        // 5. Solve constraints
+        // 6. Solve constraints (active islands only)
+        let active_constraint_indices: Vec<usize> = islands.iter()
+            .filter(|island| !island.sleeping)
+            .flat_map(|island| island.constraint_indices.iter().copied())
+            .collect();
+
         for _ in 0..self.solver_iterations {
-            for ci in 0..self.constraints.len() {
+            for &ci in &active_constraint_indices {
+                if ci >= self.constraints.len() { continue; }
                 let (ha, hb) = self.constraints[ci].bodies();
                 let (idx_a, idx_b) = self.find_body_indices(ha, hb);
                 if let (Some(a), Some(b)) = (idx_a, idx_b) {
-                    // Safety: we know a != b (different handles)
                     if a < b {
                         let (left, right) = self.bodies.split_at_mut(b);
                         self.constraints[ci].solve(&mut left[a], &mut right[0], dt);
@@ -306,9 +325,10 @@ impl<const D: usize> PhysicsWorld<D> {
             }
         }
 
-        // 5b. Velocity-level constraint solve (impulse-based, Fix 7)
+        // 6b. Velocity-level constraint solve (active islands only)
         for _ in 0..self.solver_iterations {
-            for ci in 0..self.constraints.len() {
+            for &ci in &active_constraint_indices {
+                if ci >= self.constraints.len() { continue; }
                 let (ha, hb) = self.constraints[ci].bodies();
                 let (idx_a, idx_b) = self.find_body_indices(ha, hb);
                 if let (Some(a), Some(b)) = (idx_a, idx_b) {
@@ -323,7 +343,7 @@ impl<const D: usize> PhysicsWorld<D> {
             }
         }
 
-        // 6. Body sleeping: deactivate near-stationary bodies
+        // 7. Body sleeping: deactivate near-stationary bodies
         let threshold = self.sleep_threshold;
         let ticks = self.sleep_ticks;
         for body in &mut self.bodies {
