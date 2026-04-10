@@ -74,6 +74,7 @@ members = [
     "crates/symtropy-consciousness-physics",
     "crates/symtropy-render-bridge",
     "crates/symtropy-robotics-bridge",
+    "crates/symtropy-bevy",
 ]
 # Excluded: depend on Mycelix, Holochain, Lightyear, or require Bevy runtime
 exclude = [
