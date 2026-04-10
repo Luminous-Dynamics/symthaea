@@ -1,5 +1,13 @@
 /* Prism — 8 Harmony Themes + Spectral Vector Visualizer */
 
+/* Reset: ensure full-width in all webview contexts (Tauri, PWA, browser) */
+html, body {
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    overflow-x: hidden;
+}
+
 /* Shared layout constants (not theme-dependent) */
 :root {
     --content-width: 680px;
@@ -521,7 +529,8 @@ body {
     margin-bottom: 8px;
 }
 .welcome .tagline { color: var(--content-text-secondary); font-size: 1.1em; margin-bottom: 32px; }
-.welcome .try-section { text-align: left; max-width: 500px; margin: 0 auto; }
+.welcome .try-section { text-align: left; max-width: 500px; margin: 0 auto; width: 100%; box-sizing: border-box; padding: 0 16px; }
+.welcome .try-section li { margin: 8px 0; line-height: 1.5; }
 button.example-query {
     background: none;
     border: none;
