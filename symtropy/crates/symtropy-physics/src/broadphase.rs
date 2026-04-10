@@ -112,7 +112,7 @@ impl<const D: usize> Lbvh<D> {
         for i in 0..D {
             if world_max[i] - world_min[i] < 1e-6 { world_min[i] -= 1.0; world_max[i] += 1.0; }
         }
-        let mut morton_codes: Vec<u64> = aabbs.iter()
+        let morton_codes: Vec<u64> = aabbs.iter()
             .map(|a| { let c = (a.min + a.max) * 0.5; morton_encode::<D>(&c, &world_min, &world_max) })
             .collect();
         let mut sorted_indices: Vec<usize> = (0..n).collect();

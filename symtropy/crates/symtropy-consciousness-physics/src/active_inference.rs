@@ -220,7 +220,7 @@ impl ActiveInferenceAgent {
     /// Updates well beliefs from observations and decays old beliefs.
     pub fn update_beliefs(
         &mut self,
-        pos: &SVector<f64, 2>,
+        _pos: &SVector<f64, 2>,
         energy_fraction: f64,
         discovered_wells: &[SVector<f64, 2>],
         nearby_partners: &[(u64, f64)], // (handle_bits, resonance)

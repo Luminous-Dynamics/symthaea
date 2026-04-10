@@ -14,7 +14,8 @@ use std::collections::HashMap;
 /// Each cell is `cell_size` wide. Neighbors within `cell_size` distance
 /// are guaranteed to be in the same cell or an adjacent cell (3^D total).
 pub struct SpatialHash<const D: usize> {
-    cell_size: f64,
+    /// Cell width (used for external queries).
+    pub cell_size: f64,
     inv_cell_size: f64,
     cells: HashMap<[i64; D], Vec<usize>>,
 }

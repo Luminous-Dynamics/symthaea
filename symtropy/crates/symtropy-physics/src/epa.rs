@@ -62,8 +62,8 @@ fn mink_support<const D: usize>(
 
 /// 2D EPA edge.
 struct Edge2D<const D: usize> {
-    a: SVector<f64, D>,
-    b: SVector<f64, D>,
+    _a: SVector<f64, D>,
+    _b: SVector<f64, D>,
     normal: SVector<f64, D>,
     distance: f64,
 }
@@ -162,8 +162,8 @@ fn find_closest_edge_2d<const D: usize>(
     Some((
         best_idx,
         Edge2D {
-            a: best_a,
-            b: best_b,
+            _a: best_a,
+            _b: best_b,
             normal: best_normal,
             distance: best_dist,
         },

@@ -16,9 +16,8 @@
 //! ```
 
 use nalgebra::SVector;
-use symtropy_math::Point;
 
-use crate::body::{BodyHandle, RigidBody};
+use crate::body::BodyHandle;
 use crate::world::PhysicsWorld;
 
 /// Result of a ray cast against the physics world.
