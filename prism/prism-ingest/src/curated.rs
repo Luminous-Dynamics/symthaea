@@ -116,4 +116,54 @@ const RAW: &[(&str, prism_common::EmpiricalLevel, &[&str], &[&str])] = &[
     ("The printing press was invented by Johannes Gutenberg around 1440", E4, &["Historical records"], &["history", "technology"]),
     ("The internet originated from ARPANET first connected in 1969", E4, &["DARPA"], &["history", "internet"]),
     ("The Universal Declaration of Human Rights was adopted by the United Nations in 1948", E4, &["UN"], &["history", "rights"]),
+
+    // ── Medicine ──
+    ("Penicillin was discovered by Alexander Fleming in 1928 from the mold Penicillium notatum", E4, &["Fleming 1929"], &["medicine", "history"]),
+    ("The human heart beats approximately 100000 times per day pumping about 2000 gallons of blood", E4, &["AHA"], &["medicine", "anatomy"]),
+    ("mRNA vaccines work by instructing cells to produce a protein that triggers an immune response", E4, &["NIH"], &["medicine", "vaccines"]),
+    ("Antibiotic resistance is accelerated by overuse and misuse of antibiotics in humans and agriculture", E4, &["WHO"], &["medicine", "antimicrobial"]),
+    ("The placebo effect can produce measurable physiological changes through expectation alone", E3, &["Benedetti 2005"], &["medicine", "neuroscience"]),
+
+    // ── Computer Science ──
+    ("P versus NP asks whether every problem whose solution can be verified quickly can also be solved quickly", E4, &["Cook 1971"], &["computer-science", "complexity"]),
+    ("Machine learning models learn patterns from data rather than being explicitly programmed with rules", E4, &["Computer Science"], &["computer-science", "machine-learning"]),
+    ("The halting problem proves that no general algorithm can determine if an arbitrary program will terminate", E4, &["Turing 1936"], &["computer-science", "computability"]),
+    ("SHA-256 is a cryptographic hash function that produces a fixed 256-bit output from arbitrary input", E4, &["NIST"], &["computer-science", "cryptography"]),
+    ("Distributed consensus algorithms like Raft and Paxos enable agreement among networked nodes despite failures", E4, &["Lamport 1998"], &["computer-science", "distributed"]),
+
+    // ── Astronomy ──
+    ("The Sun is approximately 4.6 billion years old and is classified as a G-type main-sequence star", E4, &["NASA"], &["astronomy", "sun"]),
+    ("A black hole is a region of spacetime where gravity is so strong that nothing can escape from it", E4, &["Penrose 1965"], &["astronomy", "black-holes"]),
+    ("The cosmic microwave background radiation is the oldest light in the universe originating 380000 years after the Big Bang", E4, &["Penzias Wilson 1965"], &["astronomy", "cosmology"]),
+    ("Gravitational waves were first directly detected by LIGO on September 14 2015", E4, &["LIGO 2016"], &["astronomy", "gravitational-waves"]),
+    ("Mars has the largest volcano in the solar system Olympus Mons standing about 72000 feet tall", E4, &["NASA"], &["astronomy", "mars"]),
+
+    // ── Psychology ──
+    ("Working memory has a limited capacity of approximately 4 chunks of information", E3, &["Cowan 2010"], &["psychology", "cognition"]),
+    ("The Dunning-Kruger effect describes how people with limited competence tend to overestimate their ability", E3, &["Dunning Kruger 1999"], &["psychology", "cognition"]),
+    ("Cognitive behavioral therapy is one of the most empirically supported treatments for depression and anxiety", E4, &["APA"], &["psychology", "therapy"]),
+    ("Sleep deprivation impairs attention memory and decision-making within 24 hours", E4, &["Walker 2017"], &["psychology", "sleep"]),
+
+    // ── Economics ──
+    ("Gross Domestic Product measures the total value of goods and services produced within a country in a given period", E4, &["Economics"], &["economics", "gdp"]),
+    ("The tragedy of the commons describes how individual self-interest can deplete shared resources", E4, &["Hardin 1968"], &["economics", "commons"]),
+    ("Inflation is the rate at which the general level of prices for goods and services rises over time", E4, &["Economics"], &["economics", "inflation"]),
+
+    // ── Materials Science ──
+    ("Graphene is a single layer of carbon atoms arranged in a hexagonal lattice with extraordinary strength and conductivity", E4, &["Novoselov Geim 2004"], &["materials", "graphene"]),
+    ("Superconductors carry electrical current with zero resistance below a critical temperature", E4, &["Physics"], &["materials", "superconductivity"]),
+
+    // ── Agriculture ──
+    ("The Green Revolution increased global food production through high-yield crop varieties and modern agriculture", E4, &["FAO"], &["agriculture", "food"]),
+    ("Approximately one third of all food produced globally is lost or wasted each year", E4, &["FAO"], &["agriculture", "food-waste"]),
+    ("Soil degradation affects approximately 33 percent of global soils threatening food security", E3, &["FAO"], &["agriculture", "soil"]),
+
+    // ── Philosophy ──
+    ("The Trolley Problem illustrates the tension between utilitarian and deontological ethical reasoning", E4, &["Foot 1967"], &["philosophy", "ethics"]),
+    ("Epistemology is the branch of philosophy concerned with the nature scope and limits of knowledge", E4, &["Philosophy"], &["philosophy", "epistemology"]),
+    ("The ship of Theseus paradox questions whether an object remains the same after all its parts are replaced", E4, &["Plutarch"], &["philosophy", "identity"]),
+
+    // ── Oceanography ──
+    ("The thermohaline circulation is a global ocean current system driven by differences in water density temperature and salinity", E4, &["Physical Oceanography"], &["oceanography", "currents"]),
+    ("Coral reefs support approximately 25 percent of all marine species despite covering less than 1 percent of the ocean floor", E4, &["NOAA"], &["oceanography", "ecology"]),
 ];
