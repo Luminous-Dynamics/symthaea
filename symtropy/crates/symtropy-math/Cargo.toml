@@ -9,6 +9,10 @@ keywords = ["physics", "n-dimensional", "geometric-algebra", "collision", "bivec
 categories = ["mathematics", "game-engines", "simulation", "science"]
 readme = "README.md"
 
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
+
 [dependencies]
 nalgebra = "0.34"
 
