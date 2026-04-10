@@ -369,4 +369,68 @@ mod tests {
             assert_eq!(validate_job_posting(&p).unwrap(), ValidateCallbackResult::Valid);
         }
     }
+
+    // ---- Supplementary tests ----
+
+    #[test]
+    fn test_description_too_long() {
+        let mut p = valid_posting();
+        p.description = "x".repeat(10_001);
+        assert!(matches!(validate_job_posting(&p).unwrap(), ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_salary_range_equal_valid() {
+        let mut p = valid_posting();
+        p.salary_range = Some(SalaryRange { min_usd: 60_000, max_usd: 60_000 });
+        assert_eq!(validate_job_posting(&p).unwrap(), ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_skill_normalization_idempotent() {
+        let skill = "RUST".to_string();
+        let normalized = skill.to_lowercase();
+        assert_eq!(normalized.to_lowercase(), normalized);
+    }
+
+    #[test]
+    fn test_serde_roundtrip_posting_status() {
+        for s in [JobPostingStatus::Open, JobPostingStatus::Closed, JobPostingStatus::Filled] {
+            let json = serde_json::to_string(&s).unwrap();
+            let back: JobPostingStatus = serde_json::from_str(&json).unwrap();
+            assert_eq!(s, back);
+        }
+    }
+
+    #[test]
+    fn test_serde_roundtrip_stake_status() {
+        for s in [StakeStatus::Active, StakeStatus::Full, StakeStatus::Closed] {
+            let json = serde_json::to_string(&s).unwrap();
+            let back: StakeStatus = serde_json::from_str(&json).unwrap();
+            assert_eq!(s, back);
+        }
+    }
+
+    #[test]
+    fn test_serde_roundtrip_salary_range() {
+        let range = SalaryRange { min_usd: 50_000, max_usd: 120_000 };
+        let json = serde_json::to_string(&range).unwrap();
+        let back: SalaryRange = serde_json::from_str(&json).unwrap();
+        assert_eq!(range, back);
+    }
+
+    #[test]
+    fn test_preferred_skills_can_be_empty() {
+        let mut p = valid_posting();
+        p.preferred_skills = vec![];
+        assert_eq!(validate_job_posting(&p).unwrap(), ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_remote_ok_with_location() {
+        let mut p = valid_posting();
+        p.remote_ok = true;
+        p.location = Some("Cape Town".to_string());
+        assert_eq!(validate_job_posting(&p).unwrap(), ValidateCallbackResult::Valid);
+    }
 }

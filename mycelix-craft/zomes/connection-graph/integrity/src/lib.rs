@@ -252,4 +252,91 @@ mod tests {
         };
         assert_eq!(validate_recommendation(&rec).unwrap(), ValidateCallbackResult::Valid);
     }
+
+    // ---- Supplementary tests ----
+
+    #[test]
+    fn test_connection_status_serde_roundtrip() {
+        for s in [ConnectionStatus::Pending, ConnectionStatus::Accepted, ConnectionStatus::Declined] {
+            let json = serde_json::to_string(&s).unwrap();
+            let back: ConnectionStatus = serde_json::from_str(&json).unwrap();
+            assert_eq!(s, back);
+        }
+    }
+
+    #[test]
+    fn test_no_message_valid() {
+        let a = test_agent(0);
+        let b = test_agent(1);
+        let req = ConnectionRequest {
+            sender: a,
+            target: b,
+            message: None,
+            created_at: Timestamp::from_micros(0),
+            status: ConnectionStatus::Pending,
+        };
+        assert_eq!(validate_connection_request(&req).unwrap(), ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_message_at_limit_valid() {
+        let a = test_agent(0);
+        let b = test_agent(1);
+        let req = ConnectionRequest {
+            sender: a,
+            target: b,
+            message: Some("x".repeat(500)), // exactly at limit
+            created_at: Timestamp::from_micros(0),
+            status: ConnectionStatus::Pending,
+        };
+        assert_eq!(validate_connection_request(&req).unwrap(), ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_recommendation_text_too_long() {
+        let a = test_agent(0);
+        let b = test_agent(1);
+        let rec = Recommendation {
+            recommender: a,
+            recommended_agent: b,
+            relationship: "colleague".to_string(),
+            text: "x".repeat(2001),
+            created_at: Timestamp::from_micros(0),
+            staked_sap: None,
+            stake_id: None,
+        };
+        assert!(matches!(validate_recommendation(&rec).unwrap(), ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_empty_relationship_rejected() {
+        let a = test_agent(0);
+        let b = test_agent(1);
+        let rec = Recommendation {
+            recommender: a,
+            recommended_agent: b,
+            relationship: "".to_string(),
+            text: "Good collaborator".to_string(),
+            created_at: Timestamp::from_micros(0),
+            staked_sap: None,
+            stake_id: None,
+        };
+        assert!(matches!(validate_recommendation(&rec).unwrap(), ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_recommendation_with_staked_sap() {
+        let a = test_agent(0);
+        let b = test_agent(1);
+        let rec = Recommendation {
+            recommender: a,
+            recommended_agent: b,
+            relationship: "manager".to_string(),
+            text: "Excellent team lead".to_string(),
+            created_at: Timestamp::from_micros(0),
+            staked_sap: Some(100),
+            stake_id: None,
+        };
+        assert_eq!(validate_recommendation(&rec).unwrap(), ValidateCallbackResult::Valid);
+    }
 }

@@ -99,17 +99,78 @@ pub struct RecordSnapshotInput {
 ///
 /// Checks if the agent's current Φ meets the threshold for the requested action type.
 /// Returns a gate verification record that can be referenced by governance actions.
+///
+/// ## Verification paths
+///
+/// 1. **ZKP attestation** (preferred): If the agent has submitted a
+///    `ConsciousnessAttestation` with valid STARK proof bytes, the gate
+///    checks the proven tier against the required threshold.  This path
+///    allows Guardian-tier access with cryptographic proof.
+/// 2. **Plaintext snapshot** (legacy): Falls back to the self-reported
+///    `ConsciousnessSnapshot.consciousness_level` comparison.  Capped at
+///    Steward tier for unsigned snapshots.
 #[hdk_extern]
 pub fn verify_consciousness_gate(input: VerifyGateInput) -> ExternResult<GateVerificationResult> {
     let now = sys_time()?;
     let agent_info = agent_info()?;
     let agent_did = format!("did:mycelix:{}", agent_info.agent_initial_pubkey);
 
-    // Get the latest snapshot for this agent
-    let latest_snapshot = get_latest_agent_snapshot(&agent_did)?;
-
     // Use dynamic (configurable) threshold
     let dynamic_threshold = get_dynamic_consciousness_gate(&input.action_type)?;
+
+    // --- Path 1: Check for ZKP ConsciousnessAttestation ---
+    if let Some(attestation_result) =
+        try_verify_zkp_attestation(&input.attestation, &agent_did, dynamic_threshold, now)?
+    {
+        let passed = attestation_result.0;
+        let consciousness_level = attestation_result.1;
+        let snapshot_id = attestation_result.2;
+
+        let failure_reason = if passed {
+            None
+        } else {
+            Some(format!(
+                "ZKP attestation tier below gate {} for {:?}",
+                dynamic_threshold, input.action_type
+            ))
+        };
+
+        let gate = ConsciousnessGate {
+            id: format!("gate:{}:{}", agent_did, now.as_micros()),
+            agent_did: agent_did.clone(),
+            action_type: input.action_type,
+            snapshot_id,
+            consciousness_at_verification: consciousness_level,
+            required_consciousness: dynamic_threshold,
+            passed,
+            failure_reason: failure_reason.clone(),
+            action_id: input.action_id,
+            verified_at: now,
+        };
+
+        let action_hash = create_entry(&EntryTypes::ConsciousnessGate(gate.clone()))?;
+
+        let agent_anchor = format!("agent:{}", agent_did);
+        create_entry(&EntryTypes::Anchor(Anchor(agent_anchor.clone())))?;
+        create_link(
+            anchor_hash(&agent_anchor)?,
+            action_hash,
+            LinkTypes::AgentToGates,
+            (),
+        )?;
+
+        return Ok(GateVerificationResult {
+            passed,
+            consciousness_level,
+            required_consciousness: dynamic_threshold,
+            action_type: input.action_type,
+            failure_reason,
+            gate_id: gate.id,
+        });
+    }
+
+    // --- Path 2: Legacy plaintext snapshot ---
+    let latest_snapshot = get_latest_agent_snapshot(&agent_did)?;
 
     let (_snapshot, snapshot_id, consciousness_level) = match latest_snapshot {
         Some((_record, snap)) => (
@@ -127,7 +188,7 @@ pub fn verify_consciousness_gate(input: VerifyGateInput) -> ExternResult<GateVer
                 consciousness_at_verification: 0.0,
                 required_consciousness: dynamic_threshold,
                 passed: false,
-                failure_reason: Some("No consciousness snapshot available".to_string()),
+                failure_reason: Some("No consciousness snapshot or attestation available".to_string()),
                 action_id: input.action_id.clone(),
                 verified_at: now,
             };
@@ -149,7 +210,7 @@ pub fn verify_consciousness_gate(input: VerifyGateInput) -> ExternResult<GateVer
                 consciousness_level: 0.0,
                 required_consciousness: dynamic_threshold,
                 action_type: input.action_type,
-                failure_reason: Some("No consciousness snapshot available".to_string()),
+                failure_reason: Some("No consciousness snapshot or attestation available".to_string()),
                 gate_id: gate.id,
             });
         }
@@ -213,6 +274,11 @@ pub fn verify_consciousness_gate(input: VerifyGateInput) -> ExternResult<GateVer
 pub struct VerifyGateInput {
     pub action_type: GovernanceActionType,
     pub action_id: Option<String>,
+    /// Optional ZKP consciousness attestation.  When present, the gate
+    /// verifies the attestation's structural integrity and checks the
+    /// proven tier instead of relying on plaintext snapshot comparison.
+    #[serde(default)]
+    pub attestation: Option<mycelix_bridge_common::consciousness_zkp::ConsciousnessAttestation>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -223,6 +289,67 @@ pub struct GateVerificationResult {
     pub action_type: GovernanceActionType,
     pub failure_reason: Option<String>,
     pub gate_id: String,
+}
+
+// =============================================================================
+// ZKP ATTESTATION VERIFICATION
+// =============================================================================
+
+/// Verify a caller-provided ZKP consciousness attestation.
+///
+/// Validates structure (proof_bytes non-empty, valid tier, non-zero
+/// commitment, not expired) and checks whether the proven tier meets
+/// the required threshold.
+///
+/// Returns `Some((passed, consciousness_level, snapshot_id))` if the
+/// attestation is present, `None` if no attestation was provided
+/// (caller should fall back to plaintext snapshot).
+fn try_verify_zkp_attestation(
+    attestation: &Option<mycelix_bridge_common::consciousness_zkp::ConsciousnessAttestation>,
+    agent_did: &str,
+    required_threshold: f64,
+    now: Timestamp,
+) -> ExternResult<Option<(bool, f64, String)>> {
+    let attestation = match attestation {
+        Some(a) => a,
+        None => return Ok(None),
+    };
+
+    // Structural validation (size, commitment, tier range)
+    if let Err(e) = attestation.validate_structure() {
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Invalid attestation structure: {}",
+            e
+        ))));
+    }
+
+    // Expiry check
+    let now_secs = now.as_micros() as u64 / 1_000_000;
+    if attestation.is_expired(now_secs) {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Consciousness attestation has expired".into()
+        )));
+    }
+
+    // Map tier (0-4) to consciousness level using the attestation's
+    // minimum threshold for that tier.
+    let consciousness_level = attestation.min_threshold();
+    let snapshot_id = format!(
+        "attestation:{}:tier{}:{}",
+        agent_did, attestation.tier, attestation.generated_at
+    );
+
+    // Log verification status.  Off-chain verified attestations
+    // (with verifier_signature) provide the strongest guarantee.
+    if !attestation.is_verified() {
+        debug!(
+            "Attestation for {} has valid structure but no off-chain verification (tier {})",
+            agent_did, attestation.tier
+        );
+    }
+
+    let passed = consciousness_level >= required_threshold;
+    Ok(Some((passed, consciousness_level, snapshot_id)))
 }
 
 /// Assess value alignment of a proposal

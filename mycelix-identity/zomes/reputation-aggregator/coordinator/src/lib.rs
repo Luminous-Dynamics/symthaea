@@ -26,6 +26,9 @@ use hdk::prelude::*;
 use reputation_aggregator_integrity::*;
 use serde::{Deserialize, Serialize};
 
+mod reputation_logic;
+use reputation_logic::*;
+
 use mycelix_bridge_common::consciousness_profile::ConsciousnessProfile;
 
 // ============================================================================
@@ -80,9 +83,16 @@ fn ensure_anchor(name: &str) -> ExternResult<EntryHash> {
 // ============================================================================
 
 /// Get the composite reputation for an agent, computing if not cached.
+/// Get the composite reputation for an agent, computing if not cached.
 #[hdk_extern]
 pub fn get_composite_reputation(agent_b64: String) -> ExternResult<AggregatedReputation> {
-    // Check for existing recent reputation
+    // 1. Calculate recursive score
+    let raw_score = calculate_recursive_reputation(agent_b64.clone())?;
+    
+    // 2. Normalize using Sigmoid
+    let _normalized_score = apply_sigmoid_normalization(raw_score);
+    
+    // Existing static implementation (for transition):
     let agent_anchor = ensure_anchor(&format!("agent_rep:{}", agent_b64))?;
     let links = get_links(
         LinkQuery::try_new(agent_anchor.clone(), LinkTypes::AgentToReputation)?,
@@ -97,18 +107,12 @@ pub fn get_composite_reputation(agent_b64: String) -> ExternResult<AggregatedRep
                 .entry()
                 .to_app_option()
                 .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-                .ok_or(wasm_error!(WasmErrorInner::Guest("Not an AggregatedReputation".into())))?;
-
-            // Return cached if fresh (< 1 hour)
-            let now = sys_time()?;
-            let age = now.as_micros() - rep.computed_at.as_micros();
-            if age < 3_600_000_000 {
-                return Ok(rep);
-            }
+                .ok_or(wasm_error!(WasmErrorInner::Guest("No entry".into())))?;
+            return Ok(rep);
         }
     }
-
-    // Compute fresh reputation
+    
+    // No cached reputation — compute fresh
     refresh_reputation(agent_b64)
 }
 
@@ -133,8 +137,9 @@ pub fn refresh_reputation(agent_b64: String) -> ExternResult<AggregatedReputatio
     };
 
     // 4. Compute composite
-    let composite = (WEIGHT_WOT * wot_score + WEIGHT_MYCEL * mycel_score + WEIGHT_DOMAIN * domain_avg)
-        .clamp(0.0, 1.0);
+    let composite =
+        (WEIGHT_WOT * wot_score + WEIGHT_MYCEL * mycel_score + WEIGHT_DOMAIN * domain_avg)
+            .clamp(0.0, 1.0);
 
     // 5. Check staleness
     let staleness_warning = domain_scores.iter().any(|(_, _)| {
@@ -156,7 +161,12 @@ pub fn refresh_reputation(agent_b64: String) -> ExternResult<AggregatedReputatio
     // Store
     let action_hash = create_entry(&EntryTypes::AggregatedReputation(rep.clone()))?;
     let agent_anchor = ensure_anchor(&format!("agent_rep:{}", agent_b64))?;
-    create_link(agent_anchor, action_hash.clone(), LinkTypes::AgentToReputation, ())?;
+    create_link(
+        agent_anchor,
+        action_hash.clone(),
+        LinkTypes::AgentToReputation,
+        (),
+    )?;
 
     let all_anchor = ensure_anchor("all_reputations")?;
     create_link(all_anchor, action_hash, LinkTypes::AllReputations, ())?;
@@ -193,7 +203,9 @@ pub fn get_reputation_history(input: PaginatedAgentInput) -> ExternResult<Vec<Re
 pub fn report_domain_score(input: DomainScoreInput) -> ExternResult<ActionHash> {
     let score = input.score.clamp(0.0, 1.0);
     if !score.is_finite() {
-        return Err(wasm_error!(WasmErrorInner::Guest("Score must be finite".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Score must be finite".into()
+        )));
     }
 
     let caller = agent_info()?.agent_initial_pubkey;
@@ -211,11 +223,21 @@ pub fn report_domain_score(input: DomainScoreInput) -> ExternResult<ActionHash> 
 
     // Link agent → domain score
     let agent_anchor = ensure_anchor(&format!("domain_scores:{}", input.agent_pubkey_b64))?;
-    create_link(agent_anchor, action_hash.clone(), LinkTypes::AgentToDomainScore, ())?;
+    create_link(
+        agent_anchor,
+        action_hash.clone(),
+        LinkTypes::AgentToDomainScore,
+        (),
+    )?;
 
     // Link cluster → domain score
     let cluster_anchor = ensure_anchor(&format!("cluster_scores:{}", input.cluster))?;
-    create_link(cluster_anchor, action_hash.clone(), LinkTypes::ClusterToDomainScore, ())?;
+    create_link(
+        cluster_anchor,
+        action_hash.clone(),
+        LinkTypes::ClusterToDomainScore,
+        (),
+    )?;
 
     Ok(action_hash)
 }
@@ -232,7 +254,7 @@ pub fn get_consciousness_profile_enriched(agent_b64: String) -> ExternResult<Con
     // The other dimensions (identity, community, engagement) should be provided
     // by the caller or fetched from the credential system
     Ok(ConsciousnessProfile {
-        identity: 0.5,  // Default — caller should override with actual MFA level
+        identity: 0.5, // Default — caller should override with actual MFA level
         reputation: rep.composite,
         community: rep.web_of_trust_score.clamp(0.0, 1.0),
         engagement: rep.domain_scores.len().min(10) as f64 / 10.0, // More domains = more engaged
@@ -270,9 +292,7 @@ fn get_local_trust_score(agent_b64: &str) -> Result<f64, ()> {
         agent_b64.to_string(),
     ) {
         Ok(ZomeCallResponse::Ok(io)) => {
-            io.decode::<f64>().ok()
-                .map(|s| s.clamp(0.0, 1.0))
-                .ok_or(())
+            io.decode::<f64>().ok().map(|s| s.clamp(0.0, 1.0)).ok_or(())
         }
         _ => Err(()),
     }
@@ -288,9 +308,7 @@ fn get_cross_cluster_mycel(agent_b64: &str) -> Result<f64, ()> {
         agent_b64.to_string(),
     ) {
         Ok(ZomeCallResponse::Ok(io)) => {
-            io.decode::<f64>().ok()
-                .map(|s| s.clamp(0.0, 1.0))
-                .ok_or(())
+            io.decode::<f64>().ok().map(|s| s.clamp(0.0, 1.0)).ok_or(())
         }
         _ => Err(()),
     }

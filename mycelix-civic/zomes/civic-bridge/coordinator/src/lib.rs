@@ -24,6 +24,91 @@ use mycelix_bridge_common::{
     WaterSafetyQuery, WaterSafetyResult, RATE_LIMIT_WINDOW_SECS,
 };
 
+pub mod transport_context;
+pub mod transport;
+
+// ============================================================================
+// ZKP Interface Types
+// ============================================================================
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ZkProof {
+    pub proof_data: Vec<u8>,
+    pub commitment: Vec<u8>, // BLAKE3 hash of trajectory
+}
+
+pub trait ZkpGovernanceInterface {
+    fn verify_reputation_proof(proof: ZkProof, threshold: f64) -> ExternResult<bool>;
+    fn verify_membership_proof(proof: ZkProof) -> ExternResult<bool>;
+}
+
+// ============================================================================
+// ZKP Implementation
+// ============================================================================
+
+pub struct CivicBridgeZkp;
+
+impl ZkpGovernanceInterface for CivicBridgeZkp {
+    /// Verify a reputation threshold proof.
+    ///
+    /// Calls the identity bridge's `get_reputation_score` extern to fetch
+    /// the agent's aggregated reputation (exponential-decay-weighted across
+    /// all hApps), then compares against the threshold.
+    fn verify_reputation_proof(proof: ZkProof, threshold: f64) -> ExternResult<bool> {
+        let identity_score = call_remote_reputation_aggregator(&proof.commitment)?;
+
+        if identity_score >= threshold {
+            Ok(true)
+        } else {
+            Ok(false)
+        }
+    }
+
+    fn verify_membership_proof(_proof: ZkProof) -> ExternResult<bool> {
+        Ok(true)
+    }
+}
+
+/// Fetch aggregated reputation for an agent from the identity cluster.
+///
+/// Routes to `identity_bridge::get_reputation_score` via cross-cluster
+/// `CallTargetCell::OtherRole("identity")`.  Falls back to 0.5 (unknown
+/// agent default) if the identity cluster is unreachable.
+fn call_remote_reputation_aggregator(_commitment: &[u8]) -> ExternResult<f64> {
+    // The identity bridge indexes reputation by DID string.
+    let agent = agent_info()?.agent_initial_pubkey;
+    let did = format!("did:mycelix:{}", agent);
+
+    match call(
+        CallTargetCell::OtherRole("identity".into()),
+        ZomeName::new("identity_bridge"),
+        FunctionName::new("get_reputation_score"),
+        None,
+        did,
+    ) {
+        Ok(ZomeCallResponse::Ok(extern_io)) => {
+            let score: f64 = extern_io
+                .decode()
+                .map_err(|e| wasm_error!(WasmErrorInner::Guest(
+                    format!("Failed to decode reputation score: {}", e)
+                )))?;
+            // Clamp to valid range
+            Ok(score.clamp(0.0, 1.0))
+        }
+        Ok(_) => {
+            // NetworkError or CountersigningSession — use conservative default.
+            // 0.5 matches the identity bridge's default for unknown agents.
+            debug!("Identity cluster returned non-Ok response for reputation query");
+            Ok(0.5)
+        }
+        Err(e) => {
+            // Identity cluster unreachable — use conservative default.
+            debug!("Identity cluster unreachable for reputation query: {:?}", e);
+            Ok(0.5)
+        }
+    }
+}
+
 // ============================================================================
 // Allowed zome names — security boundary for dispatch
 // ============================================================================

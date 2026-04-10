@@ -2,6 +2,12 @@
 target = "index.html"
 dist = "dist"
 
+# Optimize WASM binary size after build
+[[hooks]]
+stage = "post_build"
+command = "sh"
+command_arguments = ["-c", "for f in dist/*.wasm; do wasm-opt -Oz --zero-filled-memory --enable-bulk-memory \"$f\" -o \"$f\" 2>/dev/null || true; done"]
+
 [watch]
 watch = ["crates", "style", "index.html"]
 

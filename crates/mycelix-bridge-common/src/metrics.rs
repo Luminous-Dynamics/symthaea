@@ -44,6 +44,12 @@ const MAX_LATENCY_SAMPLES: usize = 256;
 /// limit is reached, new call keys are tracked under a catch-all `"_overflow"` key.
 const MAX_CALL_KEYS: usize = 128;
 
+/// Maximum number of distinct error codes tracked.
+///
+/// Prevents unbounded memory growth from diverse error patterns. Once the
+/// limit is reached, new error codes are tracked under a catch-all `"_overflow"` key.
+const MAX_ERROR_KEYS: usize = 128;
+
 // ============================================================================
 // Internal counters
 // ============================================================================
@@ -217,8 +223,19 @@ impl BridgeMetrics {
             return &mut self.error_counters[idx];
         }
 
+        let effective_code = if self.error_counters.len() >= MAX_ERROR_KEYS {
+            "_overflow"
+        } else {
+            error_code
+        };
+
+        let pos = self.error_counters.iter().position(|c| c.code == effective_code);
+        if let Some(idx) = pos {
+            return &mut self.error_counters[idx];
+        }
+
         self.error_counters.push(ErrorCounter {
-            code: error_code.to_string(),
+            code: effective_code.to_string(),
             count: 0,
         });
         let len = self.error_counters.len();
@@ -636,6 +653,33 @@ mod tests {
             .find(|c| c.key == "_overflow::_overflow")
             .unwrap();
         assert_eq!(overflow.success_count, 1);
+    }
+
+    #[test]
+    fn error_overflow_key_used_when_limit_reached() {
+        let mut m = fresh_metrics();
+        for i in 0..MAX_ERROR_KEYS {
+            m.record_error("z", "f", &format!("ERR-{:04}", i));
+        }
+        assert_eq!(m.error_counters.len(), MAX_ERROR_KEYS);
+
+        m.record_error("z", "f", "ERR-NEW");
+        assert_eq!(m.error_counters.len(), MAX_ERROR_KEYS + 1);
+        let overflow = m
+            .error_counters
+            .iter()
+            .find(|c| c.code == "_overflow")
+            .unwrap();
+        assert_eq!(overflow.count, 1);
+
+        m.record_error("z", "f", "ERR-ANOTHER");
+        let overflow = m
+            .error_counters
+            .iter()
+            .find(|c| c.code == "_overflow")
+            .unwrap();
+        assert_eq!(overflow.count, 2);
+        assert_eq!(m.error_counters.len(), MAX_ERROR_KEYS + 1);
     }
 
     #[test]

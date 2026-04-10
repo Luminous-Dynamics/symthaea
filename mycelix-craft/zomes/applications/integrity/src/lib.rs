@@ -346,4 +346,114 @@ mod tests {
         };
         assert!(matches!(validate_application(&app).unwrap(), ValidateCallbackResult::Invalid(_)));
     }
+
+    // ---- Supplementary exhaustive tests ----
+
+    #[test]
+    fn test_no_self_transitions() {
+        let all = [
+            ApplicationStatus::Draft,
+            ApplicationStatus::Submitted,
+            ApplicationStatus::UnderReview,
+            ApplicationStatus::Interview,
+            ApplicationStatus::Offered,
+            ApplicationStatus::Accepted,
+            ApplicationStatus::Rejected,
+            ApplicationStatus::Withdrawn,
+        ];
+        for s in all {
+            assert!(!s.can_transition_to(&s), "{:?} must not self-transition", s);
+        }
+    }
+
+    #[test]
+    fn test_exactly_three_terminal_states() {
+        let all = [
+            ApplicationStatus::Draft,
+            ApplicationStatus::Submitted,
+            ApplicationStatus::UnderReview,
+            ApplicationStatus::Interview,
+            ApplicationStatus::Offered,
+            ApplicationStatus::Accepted,
+            ApplicationStatus::Rejected,
+            ApplicationStatus::Withdrawn,
+        ];
+        let terminal_count = all.iter().filter(|s| s.is_terminal()).count();
+        assert_eq!(terminal_count, 3);
+    }
+
+    #[test]
+    fn test_transition_count_per_state() {
+        assert_eq!(ApplicationStatus::Draft.valid_transitions().len(), 2);
+        assert_eq!(ApplicationStatus::Submitted.valid_transitions().len(), 2);
+        assert_eq!(ApplicationStatus::UnderReview.valid_transitions().len(), 3);
+        assert_eq!(ApplicationStatus::Interview.valid_transitions().len(), 3);
+        assert_eq!(ApplicationStatus::Offered.valid_transitions().len(), 3);
+        assert_eq!(ApplicationStatus::Accepted.valid_transitions().len(), 0);
+        assert_eq!(ApplicationStatus::Rejected.valid_transitions().len(), 0);
+        assert_eq!(ApplicationStatus::Withdrawn.valid_transitions().len(), 0);
+    }
+
+    #[test]
+    fn test_rejection_only_from_review_interview_offered() {
+        assert!(!ApplicationStatus::Draft.can_transition_to(&ApplicationStatus::Rejected));
+        assert!(!ApplicationStatus::Submitted.can_transition_to(&ApplicationStatus::Rejected));
+        assert!(ApplicationStatus::UnderReview.can_transition_to(&ApplicationStatus::Rejected));
+        assert!(ApplicationStatus::Interview.can_transition_to(&ApplicationStatus::Rejected));
+        assert!(ApplicationStatus::Offered.can_transition_to(&ApplicationStatus::Rejected));
+    }
+
+    #[test]
+    fn test_draft_cannot_skip_to_accepted() {
+        assert!(!ApplicationStatus::Draft.can_transition_to(&ApplicationStatus::Accepted));
+        assert!(!ApplicationStatus::Draft.can_transition_to(&ApplicationStatus::Interview));
+        assert!(!ApplicationStatus::Draft.can_transition_to(&ApplicationStatus::Offered));
+    }
+
+    #[test]
+    fn test_valid_application_at_limit() {
+        let app = JobApplication {
+            job_posting_hash: test_action_hash(),
+            applicant: test_agent(),
+            cover_message: Some("x".repeat(5000)), // exactly at limit
+            resume_credential_hashes: (0..20).map(|_| test_action_hash()).collect(), // exactly at limit
+            status: ApplicationStatus::Draft,
+            submitted_at: Timestamp::from_micros(0),
+            updated_at: Timestamp::from_micros(0),
+        };
+        assert_eq!(validate_application(&app).unwrap(), ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_no_cover_message_valid() {
+        let app = JobApplication {
+            job_posting_hash: test_action_hash(),
+            applicant: test_agent(),
+            cover_message: None,
+            resume_credential_hashes: vec![],
+            status: ApplicationStatus::Draft,
+            submitted_at: Timestamp::from_micros(0),
+            updated_at: Timestamp::from_micros(0),
+        };
+        assert_eq!(validate_application(&app).unwrap(), ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_serde_roundtrip_all_statuses() {
+        let all = [
+            ApplicationStatus::Draft,
+            ApplicationStatus::Submitted,
+            ApplicationStatus::UnderReview,
+            ApplicationStatus::Interview,
+            ApplicationStatus::Offered,
+            ApplicationStatus::Accepted,
+            ApplicationStatus::Rejected,
+            ApplicationStatus::Withdrawn,
+        ];
+        for s in all {
+            let json = serde_json::to_string(&s).unwrap();
+            let back: ApplicationStatus = serde_json::from_str(&json).unwrap();
+            assert_eq!(s, back, "Serde roundtrip failed for {:?}", s);
+        }
+    }
 }
