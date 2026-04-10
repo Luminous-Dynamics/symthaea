@@ -13,7 +13,7 @@
 use hdk::prelude::*;
 use trust_integrity::*;
 use mycelix_bridge_common::{
-    gate_civic, requirement_for_basic, requirement_for_voting, GovernanceRequirement,
+    gate_civic, civic_requirement_basic, civic_requirement_voting, GovernanceRequirement,
 };
 
 fn require_consciousness(

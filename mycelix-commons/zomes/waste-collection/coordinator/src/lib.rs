@@ -5,7 +5,7 @@
 //! Business logic for collection requests, vehicle matching, and collection run planning
 
 use hdk::prelude::*;
-use mycelix_bridge_common::requirement_for_basic;
+use mycelix_bridge_common::civic_requirement_basic;
 use mycelix_zome_helpers::records_from_links;
 use waste_collection_integrity::*;
 
@@ -15,10 +15,10 @@ fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
 }
 
 fn require_consciousness(
-    requirement: &mycelix_bridge_common::GovernanceRequirement,
+    requirement: &mycelix_bridge_common::CivicRequirement,
     action_name: &str,
 ) -> ExternResult<mycelix_bridge_common::GovernanceEligibility> {
-    mycelix_zome_helpers::require_consciousness("commons_bridge", requirement, action_name)
+    { let legacy = mycelix_bridge_common::sovereign_gate::governance_requirement_from_civic(requirement); mycelix_zome_helpers::require_consciousness("commons_bridge", &legacy, action_name) }
 }
 
 // ============================================================================

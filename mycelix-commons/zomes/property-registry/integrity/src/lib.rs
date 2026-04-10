@@ -124,6 +124,10 @@ pub enum LinkTypes {
     LocationToProperty,
     PropertyToEncumbrances,
     GeoIndex,
+    /// O(1) lookup: anchor("property:{id}") → property ActionHash
+    PropertyIdIndex,
+    /// O(1) lookup: anchor("deed:{property_id}") → deed ActionHash
+    DeedIdIndex,
 }
 
 /// Genesis self-check
@@ -199,6 +203,9 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                     Ok(ValidateCallbackResult::Valid)
                 }
                 LinkTypes::GeoIndex => Ok(ValidateCallbackResult::Valid),
+                LinkTypes::PropertyIdIndex | LinkTypes::DeedIdIndex => {
+                    Ok(ValidateCallbackResult::Valid)
+                }
             }
         }
         FlatOp::RegisterDeleteLink {
@@ -252,6 +259,9 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                     Ok(ValidateCallbackResult::Valid)
                 }
                 LinkTypes::GeoIndex => Ok(ValidateCallbackResult::Valid),
+                LinkTypes::PropertyIdIndex | LinkTypes::DeedIdIndex => {
+                    Ok(ValidateCallbackResult::Valid)
+                }
             }
         }
         FlatOp::StoreRecord(_) => Ok(ValidateCallbackResult::Valid),

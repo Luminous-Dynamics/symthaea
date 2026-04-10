@@ -4,12 +4,12 @@
 use hdk::prelude::*;
 use resource_mesh_integrity::*;
 use mycelix_bridge_common::{
-    gate_civic, requirement_for_basic, requirement_for_voting,
+    gate_civic, civic_requirement_basic, civic_requirement_voting,
     GovernanceEligibility, GovernanceRequirement,
 };
 
 fn require_consciousness(
-    requirement: &GovernanceRequirement,
+    requirement: &mycelix_bridge_common::CivicRequirement,
     action_name: &str,
 ) -> ExternResult<GovernanceEligibility> {
     gate_civic("commons_bridge", requirement, action_name)

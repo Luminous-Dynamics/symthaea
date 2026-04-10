@@ -23,7 +23,7 @@
 use hdk::prelude::*;
 use mycelix_bridge_common::{
     consciousness_profile::require_consciousness,
-    validation::{requirement_for_basic, requirement_for_proposal},
+    validation::{civic_requirement_basic, civic_requirement_proposal},
 };
 
 use robotics_dispatch_integrity::*;

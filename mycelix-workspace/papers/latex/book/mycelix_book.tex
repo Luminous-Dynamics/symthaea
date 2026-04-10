@@ -9,10 +9,12 @@
 \usepackage{booktabs}
 \usepackage{longtable}
 \usepackage{enumitem}
+\usepackage{float}
 \usepackage{fancyhdr}
 \usepackage{titlesec}
 \usepackage{epigraph}
 \usepackage{csquotes}
+\setlength{\headheight}{14.5pt}
 
 \hypersetup{
   colorlinks=true,
@@ -1137,10 +1139,13 @@ different economic functions:
 \begin{description}
   \item[SAP (Sapience)] A stable unit of account pegged to a basket of real
     goods and services. Used for pricing, contracts, and accounting. Cannot be
-    created ex nihilo---minted only through verified economic activity.
+    created ex nihilo---minted only through verified economic activity. Subject
+    to demurrage, with compost redistributed to commons pools as a maintenance
+    flow rather than a hoarding subsidy.
   \item[TEND (Tenderness)] A mutual credit currency for care work, community
-    service, and non-market contributions. Implements demurrage (gradual value
-    decay) to encourage circulation rather than hoarding.
+    service, and non-market contributions. Zero-sum by construction: every
+    positive balance is matched by an equal negative balance elsewhere in the
+    network. TEND does not implement demurrage.
   \item[MYCEL (Mycelium)] A commons currency representing collective
     stewardship. Used for treasury operations, public goods funding, and
     inter-community exchange.
@@ -1172,16 +1177,21 @@ Treasury operations are gated by governance tier:
 
 \section{Demurrage and Composting}
 
-TEND implements demurrage---a periodic reduction in balance that encourages
-spending rather than saving. This is inspired by Silvio Gesell's Freigeld
-(``free money'') concept and implemented as:
+SAP implements demurrage---a periodic reduction in idle balance that reflects
+the carrying cost of the real basket backing the currency and discourages
+passive hoarding. This is inspired by Silvio Gesell's Freigeld (``free money'')
+concept and implemented as:
 
 \begin{equation}
   B(t) = B(t_0) \cdot e^{-\lambda (t - t_0)}
 \end{equation}
 
 where $\lambda$ is the demurrage rate. The ``composted'' value (the amount lost
-to demurrage) is returned to the commons treasury, completing the metabolic cycle.
+to demurrage) is routed to commons pools, completing the metabolic cycle.
+
+TEND, by contrast, is mutual credit rather than a composting currency. Its
+stability comes from bounded credit lines, reciprocity, and zero-sum settlement,
+not from timed balance decay.
 
 Currency composting is the explicit mechanism by which retired or excess currency
 units are removed from circulation. It is idempotent: composting an already-composted
@@ -1191,8 +1201,11 @@ circulating).
 \section{Oracle and Price Discovery}
 
 The price-oracle zome implements decentralized price feeds for the SAP basket.
-Multiple oracle agents submit price attestations, and the median is used as the
-canonical price. Oracle submissions require Citizen tier minimum, and the oracle
+Multiple oracle agents submit price attestations, and an accuracy-weighted
+trimmed median is used as the canonical price. Oracle submissions require
+Citizen tier minimum, and when there is a prior consensus the oracle compares
+new consensus against the previous stored median to detect volatility and
+trigger counter-cyclical TEND limit expansion.
 contract includes protections against:
 
 \begin{itemize}

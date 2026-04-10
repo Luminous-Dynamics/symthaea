@@ -14,6 +14,10 @@ use hdi::prelude::*;
 pub struct Anchor(pub String);
 
 /// A governance proposal (MIP - Mycelix Improvement Proposal)
+///
+/// SYNC-MIRROR: field changes here must be mirrored in
+/// voting/coordinator/src/lib.rs::ProposalMirror (same field order).
+/// Run `cargo test -p voting` to verify the mirror stays in sync.
 #[hdk_entry_helper]
 #[derive(Clone, PartialEq)]
 pub struct Proposal {

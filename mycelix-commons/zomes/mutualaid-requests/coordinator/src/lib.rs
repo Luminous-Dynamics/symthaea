@@ -12,7 +12,7 @@ use mutualaid_requests_integrity::{
     RequestStatus, RequestType, Urgency,
 };
 use mycelix_bridge_common::{
-    gate_civic, requirement_for_basic, requirement_for_proposal, GovernanceEligibility,
+    gate_civic, civic_requirement_basic, civic_requirement_proposal, GovernanceEligibility,
     GovernanceRequirement,
 };
 
@@ -161,7 +161,7 @@ fn get_offerer_anchor(did: &str) -> ExternResult<EntryHash> {
 }
 
 fn require_consciousness(
-    requirement: &GovernanceRequirement,
+    requirement: &mycelix_bridge_common::CivicRequirement,
     action_name: &str,
 ) -> ExternResult<GovernanceEligibility> {
     gate_civic("commons_bridge", requirement, action_name)

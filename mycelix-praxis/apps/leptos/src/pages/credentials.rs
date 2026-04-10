@@ -174,7 +174,7 @@ pub fn CredentialsPage() -> impl IntoView {
         let hc = hc.clone();
         async move {
             match hc
-                .call_zome::<(), Vec<CredentialView>>(
+                .call_zome_default::<(), Vec<CredentialView>>(
                     "credential",
                     "get_my_credentials",
                     &(),

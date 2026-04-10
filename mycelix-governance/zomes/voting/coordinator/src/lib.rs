@@ -2699,6 +2699,18 @@ pub fn cast_verified_vote(input: CastVerifiedVoteInput) -> ExternResult<Record> 
         )));
     }
 
+    // Validate consciousness attestation freshness if provided (replay prevention)
+    if let Some(ref att_json) = input.consciousness_attestation_json {
+        if let Ok(att) = serde_json::from_str::<mycelix_bridge_common::consciousness_zkp::ConsciousnessAttestation>(att_json) {
+            let epoch = (now.as_micros() / 1_000_000) as u64;
+            if let Err(e) = att.validate_with_freshness(epoch) {
+                return Err(wasm_error!(WasmErrorInner::Guest(format!("Attestation freshness failed: {}", e))));
+            }
+        } else {
+            return Err(wasm_error!(WasmErrorInner::Guest("Invalid attestation JSON".into())));
+        }
+    }
+
     // Check proof is valid for this proposal tier
     if !proof.is_valid_for_tier(&input.tier) {
         return Err(wasm_error!(WasmErrorInner::Guest(format!(
@@ -3218,6 +3230,18 @@ pub fn cast_attested_vote(input: CastAttestedVoteInput) -> ExternResult<Record> 
         return Err(wasm_error!(WasmErrorInner::Guest(
             "Eligibility proof has expired - generate a new proof".into()
         )));
+    }
+
+    // Validate consciousness attestation freshness if provided (replay prevention)
+    if let Some(ref att_json) = input.consciousness_attestation_json {
+        if let Ok(att) = serde_json::from_str::<mycelix_bridge_common::consciousness_zkp::ConsciousnessAttestation>(att_json) {
+            let epoch = (now.as_micros() / 1_000_000) as u64;
+            if let Err(e) = att.validate_with_freshness(epoch) {
+                return Err(wasm_error!(WasmErrorInner::Guest(format!("Attestation freshness failed: {}", e))));
+            }
+        } else {
+            return Err(wasm_error!(WasmErrorInner::Guest("Invalid attestation JSON".into())));
+        }
     }
 
     // Check proof is valid for this proposal tier

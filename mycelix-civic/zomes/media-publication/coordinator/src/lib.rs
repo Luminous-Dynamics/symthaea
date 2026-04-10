@@ -5,21 +5,21 @@
 use hdk::prelude::*;
 use media_publication_integrity::*;
 use mycelix_bridge_common::{
-    requirement_for_basic, requirement_for_proposal, GovernanceEligibility, GovernanceRequirement,
+    civic_requirement_basic, civic_requirement_proposal, GovernanceEligibility, GovernanceRequirement,
 };
 use mycelix_zome_helpers::get_latest_record;
 
 fn require_consciousness(
-    requirement: &GovernanceRequirement,
+    requirement: &mycelix_bridge_common::CivicRequirement,
     action_name: &str,
 ) -> ExternResult<GovernanceEligibility> {
-    mycelix_zome_helpers::require_consciousness("civic_bridge", requirement, action_name)
+    { let legacy = mycelix_bridge_common::sovereign_gate::governance_requirement_from_civic(requirement); mycelix_zome_helpers::require_consciousness("civic_bridge", &legacy, action_name) }
 }
 
 /// Helper function to create an anchor entry and return its hash
 fn anchor_hash(anchor_string: &str) -> ExternResult<EntryHash> {
     let anchor = Anchor(anchor_string.to_string());
-    let _ = create_entry(&EntryTypes::Anchor(anchor.clone()));
+    if let Err(e) = create_entry(&EntryTypes::Anchor(anchor.clone())) { debug!("Anchor creation warning: {:?}", e); }
     hash_entry(&anchor)
 }
 

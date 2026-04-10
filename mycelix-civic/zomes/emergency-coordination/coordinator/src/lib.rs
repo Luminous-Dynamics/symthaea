@@ -7,7 +7,7 @@
 use emergency_coordination_integrity::*;
 use hdk::prelude::*;
 use mycelix_bridge_common::{
-    requirement_for_basic, requirement_for_proposal, GovernanceEligibility,
+    civic_requirement_basic, civic_requirement_proposal, GovernanceEligibility,
     GovernanceRequirement,
 };
 use mycelix_zome_helpers::{get_latest_record};
@@ -37,10 +37,10 @@ fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
 }
 
 fn require_consciousness(
-    requirement: &GovernanceRequirement,
+    requirement: &mycelix_bridge_common::CivicRequirement,
     action_name: &str,
 ) -> ExternResult<GovernanceEligibility> {
-    mycelix_zome_helpers::require_consciousness("civic_bridge", requirement, action_name)
+    { let legacy = mycelix_bridge_common::sovereign_gate::governance_requirement_from_civic(requirement); mycelix_zome_helpers::require_consciousness("civic_bridge", &legacy, action_name) }
 }
 
 /// Form a new response team

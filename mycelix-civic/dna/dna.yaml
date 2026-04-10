@@ -1,4 +1,3 @@
----
 # Mycelix Civic DNA
 # Civic Operations Platform: justice + emergency + media + resonance-feed
 # 17 domain zomes + 1 unified bridge = 18 zomes
@@ -51,6 +50,20 @@ integrity:
     # Resonance-Feed domain
     - name: resonance_feed_integrity
       path: ../target/wasm32-unknown-unknown/release/resonance_feed_integrity.wasm
+    - name: civic_sortition_integrity
+      path: ../target/wasm32-unknown-unknown/release/civic_sortition_integrity.wasm
+    - name: epistemic_staking_integrity
+      path: ../target/wasm32-unknown-unknown/release/epistemic_staking_integrity.wasm
+    - name: governance_controller_integrity
+      path: ../target/wasm32-unknown-unknown/release/governance_controller_integrity.wasm
+    - name: district_bundler_integrity
+      path: ../target/wasm32-unknown-unknown/release/district_bundler_integrity.wasm
+    - name: infrastructure_identity_integrity
+      path: ../target/wasm32-unknown-unknown/release/infrastructure_identity_integrity.wasm
+    - name: resonance_bridge_integrity
+      path: ../target/wasm32-unknown-unknown/release/resonance_bridge_integrity.wasm
+    - name: resonance_channel_integrity
+      path: ../target/wasm32-unknown-unknown/release/resonance_channel_integrity.wasm
 
     # Unified bridge
     - name: civic_bridge_integrity
@@ -129,6 +142,34 @@ coordinator:
       path: ../target/wasm32-unknown-unknown/release/resonance_feed.wasm
       dependencies:
         - name: resonance_feed_integrity
+    - name: civic_sortition
+      path: ../target/wasm32-unknown-unknown/release/civic_sortition.wasm
+      dependencies:
+        - name: civic_sortition_integrity
+    - name: epistemic_staking
+      path: ../target/wasm32-unknown-unknown/release/epistemic_staking.wasm
+      dependencies:
+        - name: epistemic_staking_integrity
+    - name: governance_controller
+      path: ../target/wasm32-unknown-unknown/release/governance_controller.wasm
+      dependencies:
+        - name: governance_controller_integrity
+    - name: district_bundler
+      path: ../target/wasm32-unknown-unknown/release/district_bundler.wasm
+      dependencies:
+        - name: district_bundler_integrity
+    - name: infrastructure_identity
+      path: ../target/wasm32-unknown-unknown/release/infrastructure_identity.wasm
+      dependencies:
+        - name: infrastructure_identity_integrity
+    - name: resonance_bridge
+      path: ../target/wasm32-unknown-unknown/release/resonance_bridge.wasm
+      dependencies:
+        - name: resonance_bridge_integrity
+    - name: resonance_channel
+      path: ../target/wasm32-unknown-unknown/release/resonance_channel.wasm
+      dependencies:
+        - name: resonance_channel_integrity
 
     # Unified bridge
     - name: civic_bridge

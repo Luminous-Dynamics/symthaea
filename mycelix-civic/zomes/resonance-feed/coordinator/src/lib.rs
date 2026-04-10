@@ -4,15 +4,15 @@
 use hdk::prelude::*;
 use resonance_feed_integrity::*;
 use mycelix_bridge_common::{
-    requirement_for_basic,
+    civic_requirement_basic,
     GovernanceEligibility, GovernanceRequirement,
 };
 
 fn require_consciousness(
-    requirement: &GovernanceRequirement,
+    requirement: &mycelix_bridge_common::CivicRequirement,
     action_name: &str,
 ) -> ExternResult<GovernanceEligibility> {
-    mycelix_zome_helpers::require_consciousness("civic_bridge", requirement, action_name)
+    { let legacy = mycelix_bridge_common::sovereign_gate::governance_requirement_from_civic(requirement); mycelix_zome_helpers::require_consciousness("civic_bridge", &legacy, action_name) }
 }
 
 /// Helper to get an anchor entry hash

@@ -14,8 +14,8 @@ use hearth_coordinator_common::{
 };
 use hearth_types::*;
 use mycelix_bridge_common::{
-    requirement_for_basic, requirement_for_constitutional,
-    requirement_for_voting, GovernanceEligibility, GovernanceRequirement,
+    civic_requirement_basic, civic_requirement_constitutional,
+    civic_requirement_voting, GovernanceEligibility, GovernanceRequirement,
 };
 
 // ============================================================================
@@ -99,10 +99,10 @@ fn is_capability_granted(cap: &str, capabilities: &[String], restrictions: &[Str
 }
 
 fn require_consciousness(
-    requirement: &GovernanceRequirement,
+    requirement: &mycelix_bridge_common::CivicRequirement,
     action_name: &str,
 ) -> ExternResult<GovernanceEligibility> {
-    mycelix_zome_helpers::require_consciousness("hearth_bridge", requirement, action_name)
+    { let legacy = mycelix_bridge_common::sovereign_gate::governance_requirement_from_civic(requirement); mycelix_zome_helpers::require_consciousness("hearth_bridge", &legacy, action_name) }
 }
 
 // ============================================================================

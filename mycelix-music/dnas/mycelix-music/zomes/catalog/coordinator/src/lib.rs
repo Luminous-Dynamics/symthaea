@@ -10,7 +10,7 @@
 use catalog_integrity::*;
 use hdk::prelude::*;
 use mycelix_bridge_common::{
-    gate_civic, requirement_for_proposal, GovernanceRequirement,
+    gate_civic, civic_requirement_proposal, GovernanceRequirement,
 };
 
 /// Consciousness gate: requires at least Participant tier for write operations.

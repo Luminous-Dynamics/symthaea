@@ -421,7 +421,7 @@ pub fn semantic_search(input: SemanticSearchInput) -> ExternResult<Vec<SearchRes
                                 matched_bindings: matched.clone(),
                                 searched_at: Timestamp::from_micros(now.as_micros() as i64),
                             };
-                            let _ = create_entry(EntryTypes::SemanticMatch(match_entry));
+                            if let Err(e) = create_entry(EntryTypes::SemanticMatch(match_entry)) { debug!("Anchor creation warning: {:?}", e); }
                         }
 
                         results.push(SearchResult {
@@ -486,7 +486,7 @@ pub fn semantic_search_by_category(input: SemanticSearchInput) -> ExternResult<V
                                 matched_bindings: matched.clone(),
                                 searched_at: Timestamp::from_micros(now.as_micros() as i64),
                             };
-                            let _ = create_entry(EntryTypes::SemanticMatch(match_entry));
+                            if let Err(e) = create_entry(EntryTypes::SemanticMatch(match_entry)) { debug!("Anchor creation warning: {:?}", e); }
                         }
                         results.push(SearchResult {
                             design_hash: hash,

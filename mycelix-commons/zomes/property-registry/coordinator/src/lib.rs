@@ -4,21 +4,30 @@
 //! Property Registry Coordinator Zome
 use commons_types::batch::links_to_records;
 use hdk::prelude::*;
-use mycelix_bridge_common::{requirement_for_constitutional, requirement_for_proposal, requirement_for_voting};
+use mycelix_bridge_common::{
+    civic_requirement_constitutional, civic_requirement_proposal, civic_requirement_voting,
+    sovereign_gate::governance_requirement_from_civic, CivicRequirement,
+};
 use mycelix_zome_helpers::get_latest_record;
 use property_registry_integrity::*;
 
 fn require_consciousness(
-    requirement: &mycelix_bridge_common::GovernanceRequirement,
+    requirement: &CivicRequirement,
     action_name: &str,
 ) -> ExternResult<mycelix_bridge_common::GovernanceEligibility> {
-    mycelix_zome_helpers::require_consciousness("commons_bridge", requirement, action_name)
+    let legacy = governance_requirement_from_civic(requirement);
+    mycelix_zome_helpers::require_consciousness("commons_bridge", &legacy, action_name)
 }
 
-/// Get or create an anchor entry and return its EntryHash for use as link base
+/// Get or create an anchor entry and return its EntryHash for use as link base.
+///
+/// Anchor creation is idempotent — duplicates are expected and harmless.
+/// Non-duplicate errors are logged for debugging but don't fail the operation.
 fn anchor_hash(anchor_string: &str) -> ExternResult<EntryHash> {
     let anchor = Anchor(anchor_string.to_string());
-    let _ = create_entry(&EntryTypes::Anchor(anchor.clone()));
+    if let Err(e) = create_entry(&EntryTypes::Anchor(anchor.clone())) {
+        debug!("Anchor creation returned error (may be duplicate): {:?}", e);
+    }
     hash_entry(&anchor)
 }
 
@@ -45,6 +54,14 @@ pub fn register_property(input: RegisterPropertyInput) -> ExternResult<Record> {
         anchor_hash(&input.owner_did)?,
         action_hash.clone(),
         LinkTypes::OwnerToProperties,
+        (),
+    )?;
+
+    // O(1) property ID index for direct lookup
+    create_link(
+        anchor_hash(&format!("property:{}", property.id))?,
+        action_hash.clone(),
+        LinkTypes::PropertyIdIndex,
         (),
     )?;
 
@@ -78,11 +95,18 @@ pub fn register_property(input: RegisterPropertyInput) -> ExternResult<Record> {
         previous_deed_id: None,
         encumbrances: Vec::new(),
     };
-    let deed_hash = create_entry(&EntryTypes::TitleDeed(deed))?;
+    let deed_hash = create_entry(&EntryTypes::TitleDeed(deed.clone()))?;
     create_link(
         action_hash.clone(),
-        deed_hash,
+        deed_hash.clone(),
         LinkTypes::PropertyToDeeds,
+        (),
+    )?;
+    // O(1) deed lookup by property ID
+    create_link(
+        anchor_hash(&format!("deed:{}", deed.property_id))?,
+        deed_hash,
+        LinkTypes::DeedIdIndex,
         (),
     )?;
 
@@ -101,8 +125,26 @@ pub struct RegisterPropertyInput {
     pub metadata: PropertyMetadata,
 }
 
+/// Get a property by ID via O(1) link-based index.
+///
+/// Falls back to chain scan for properties created before the index existed.
 #[hdk_extern]
 pub fn get_property(property_id: String) -> ExternResult<Option<Record>> {
+    // O(1) path: PropertyIdIndex anchor → link → record
+    let links = get_links(
+        LinkQuery::try_new(
+            anchor_hash(&format!("property:{}", property_id))?,
+            LinkTypes::PropertyIdIndex,
+        )?,
+        GetStrategy::default(),
+    )?;
+    if let Some(link) = links.first() {
+        let action_hash = ActionHash::try_from(link.target.clone())
+            .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Invalid link target: {:?}", e))))?;
+        return get_latest_record(action_hash);
+    }
+
+    // Fallback: chain scan for pre-index properties
     let filter = ChainQueryFilter::new()
         .entry_type(EntryType::App(AppEntryDef::try_from(
             UnitEntryTypes::Property,

@@ -73,7 +73,7 @@ pub struct RegisterTerraLuminaInput {
 
 fn anchor_hash(anchor_string: &str) -> ExternResult<EntryHash> {
     let anchor = Anchor(anchor_string.to_string());
-    let _ = create_entry(&EntryTypes::Anchor(anchor.clone()));
+    if let Err(e) = create_entry(&EntryTypes::Anchor(anchor.clone())) { debug!("Anchor creation warning: {:?}", e); }
     hash_entry(&anchor)
 }
 

@@ -21,13 +21,13 @@ pub fn emit_bridge_event(input: EmitEventInput) -> ExternResult<Record> {
 
     // Index by type
     let anchor = Anchor(format!("event_type:{}", input.event_type));
-    let _ = create_entry(&EntryTypes::Anchor(anchor.clone()));
+    if let Err(e) = create_entry(&EntryTypes::Anchor(anchor.clone())) { debug!("Anchor creation warning: {:?}", e); }
     let anchor_hash = hash_entry(&anchor)?;
     create_link(anchor_hash, hash.clone(), LinkTypes::EventTypeToEvents, ())?;
 
     // Index all events
     let all_anchor = Anchor("all_bridge_events".to_string());
-    let _ = create_entry(&EntryTypes::Anchor(all_anchor.clone()));
+    if let Err(e) = create_entry(&EntryTypes::Anchor(all_anchor.clone())) { debug!("Anchor creation warning: {:?}", e); }
     let all_hash = hash_entry(&all_anchor)?;
     create_link(all_hash, hash.clone(), LinkTypes::AllEvents, ())?;
 
@@ -38,7 +38,7 @@ pub fn emit_bridge_event(input: EmitEventInput) -> ExternResult<Record> {
 #[hdk_extern]
 pub fn list_bridge_events(_: ()) -> ExternResult<Vec<Record>> {
     let all_anchor = Anchor("all_bridge_events".to_string());
-    let _ = create_entry(&EntryTypes::Anchor(all_anchor.clone()));
+    if let Err(e) = create_entry(&EntryTypes::Anchor(all_anchor.clone())) { debug!("Anchor creation warning: {:?}", e); }
     let all_hash = hash_entry(&all_anchor)?;
 
     let links = get_links(

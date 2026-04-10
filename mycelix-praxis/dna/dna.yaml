@@ -32,6 +32,8 @@ integrity:
       path: ../target/wasm32-unknown-unknown/release/mentorship_integrity.wasm
     - name: translation_integrity
       path: ../target/wasm32-unknown-unknown/release/translation_integrity.wasm
+    - name: praxis_bridge_integrity
+      path: ../target/wasm32-unknown-unknown/release/praxis_bridge_integrity.wasm
 
 coordinator:
   zomes:
@@ -93,3 +95,7 @@ coordinator:
       path: ../target/wasm32-unknown-unknown/release/translation_coordinator.wasm
       dependencies:
         - name: translation_integrity
+    - name: praxis_bridge
+      path: ../target/wasm32-unknown-unknown/release/praxis_bridge.wasm
+      dependencies:
+        - name: praxis_bridge_integrity

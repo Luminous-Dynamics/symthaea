@@ -11,7 +11,7 @@ use hearth_coordinator_common::{decode_zome_response, get_latest_record};
 use hearth_resources_integrity::*;
 use hearth_types::*;
 use mycelix_bridge_common::{
-    requirement_for_basic, requirement_for_proposal, GovernanceEligibility,
+    civic_requirement_basic, civic_requirement_proposal, GovernanceEligibility,
     GovernanceRequirement,
 };
 
@@ -20,10 +20,10 @@ use mycelix_bridge_common::{
 // ============================================================================
 
 fn require_consciousness(
-    requirement: &GovernanceRequirement,
+    requirement: &mycelix_bridge_common::CivicRequirement,
     action_name: &str,
 ) -> ExternResult<GovernanceEligibility> {
-    mycelix_zome_helpers::require_consciousness("hearth_bridge", requirement, action_name)
+    { let legacy = mycelix_bridge_common::sovereign_gate::governance_requirement_from_civic(requirement); mycelix_zome_helpers::require_consciousness("hearth_bridge", &legacy, action_name) }
 }
 
 // ============================================================================

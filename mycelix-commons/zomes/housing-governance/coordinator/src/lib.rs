@@ -6,7 +6,7 @@
 
 use hdk::prelude::*;
 use housing_governance_integrity::*;
-use mycelix_bridge_common::{requirement_for_constitutional, requirement_for_proposal, requirement_for_voting};
+use mycelix_bridge_common::{civic_requirement_constitutional, civic_requirement_proposal, civic_requirement_voting};
 use mycelix_zome_helpers::get_latest_record;
 use std::collections::HashMap;
 
@@ -16,10 +16,10 @@ fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
 }
 
 fn require_consciousness(
-    requirement: &mycelix_bridge_common::GovernanceRequirement,
+    requirement: &mycelix_bridge_common::CivicRequirement,
     action_name: &str,
 ) -> ExternResult<mycelix_bridge_common::GovernanceEligibility> {
-    mycelix_zome_helpers::require_consciousness("commons_bridge", requirement, action_name)
+    { let legacy = mycelix_bridge_common::sovereign_gate::governance_requirement_from_civic(requirement); mycelix_zome_helpers::require_consciousness("commons_bridge", &legacy, action_name) }
 }
 
 /// Schedule a board meeting

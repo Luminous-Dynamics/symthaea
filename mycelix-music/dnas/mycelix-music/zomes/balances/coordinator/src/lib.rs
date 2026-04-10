@@ -10,7 +10,7 @@
 use balances_integrity::*;
 use hdk::prelude::*;
 use mycelix_bridge_common::{
-    gate_civic, requirement_for_proposal, requirement_for_voting, GovernanceRequirement,
+    gate_civic, civic_requirement_proposal, civic_requirement_voting, GovernanceRequirement,
 };
 
 fn require_consciousness(

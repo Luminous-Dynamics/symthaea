@@ -16,7 +16,7 @@
 
 use hdk::prelude::*;
 use plays_integrity::*;
-use mycelix_bridge_common::{gate_civic, requirement_for_voting, GovernanceRequirement};
+use mycelix_bridge_common::{gate_civic, civic_requirement_voting, GovernanceRequirement};
 
 fn require_consciousness(
     requirement: &GovernanceRequirement,

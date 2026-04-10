@@ -3,22 +3,22 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Property Disputes Coordinator Zome
 use hdk::prelude::*;
-use mycelix_bridge_common::{requirement_for_proposal, requirement_for_voting};
+use mycelix_bridge_common::{civic_requirement_proposal, civic_requirement_voting};
 use mycelix_zome_helpers::get_latest_record;
 use property_disputes_integrity::*;
 
 fn require_consciousness(
-    requirement: &mycelix_bridge_common::GovernanceRequirement,
+    requirement: &mycelix_bridge_common::CivicRequirement,
     action_name: &str,
 ) -> ExternResult<mycelix_bridge_common::GovernanceEligibility> {
-    mycelix_zome_helpers::require_consciousness("commons_bridge", requirement, action_name)
+    { let legacy = mycelix_bridge_common::sovereign_gate::governance_requirement_from_civic(requirement); mycelix_zome_helpers::require_consciousness("commons_bridge", &legacy, action_name) }
 }
 
 /// Get or create an anchor entry and return its EntryHash for use as link base
 fn anchor_hash(anchor_string: &str) -> ExternResult<EntryHash> {
     let anchor = Anchor(anchor_string.to_string());
     // Create the anchor entry - if it already exists, this is idempotent
-    let _ = create_entry(&EntryTypes::Anchor(anchor.clone()));
+    if let Err(e) = create_entry(&EntryTypes::Anchor(anchor.clone())) { debug!("Anchor creation warning: {:?}", e); }
     // Return the deterministic entry hash
     hash_entry(&anchor)
 }

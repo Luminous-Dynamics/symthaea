@@ -11,6 +11,14 @@
 
 \hypersetup{colorlinks=true,linkcolor=blue!60!black,citecolor=green!40!black,urlcolor=blue!60!black}
 
+\lstdefinelanguage{Rust}{
+  morekeywords={fn,let,mut,pub,struct,enum,impl,trait,use,mod,match,if,else,for,while,loop,return,Self,self,async,await,move,const,static,where,crate,super,ref},
+  sensitive=true,
+  morecomment=[l]{//},
+  morecomment=[s]{/*}{*/},
+  morestring=[b]"
+}
+
 \lstset{
   language=Rust,
   basicstyle=\ttfamily\scriptsize,
@@ -41,7 +49,7 @@ We present a three-currency economic system implemented on Holochain's agent-cen
 architecture with 8 coordinator zomes. The system distinguishes three economic
 functions---stable accounting (SAP), care-oriented mutual credit (TEND), and commons
 stewardship (MYCEL)---each with distinct monetary properties: SAP is commodity-backed
-and non-inflationary; TEND implements Gesellian demurrage to encourage circulation;
+and demurrage-bearing; TEND is bounded zero-sum mutual credit without demurrage;
 MYCEL represents collective stewardship and funds public goods. Treasury operations
 are consciousness-gated, requiring progressive governance tiers for increasing levels
 of financial authority. We describe the implementation of four critical financial
@@ -150,7 +158,7 @@ SAP cannot be created ex nihilo. Minting occurs only when:
 This makes SAP supply a function of real economic activity rather than
 arbitrary monetary policy.
 
-\section{TEND: Mutual Credit with Demurrage}
+\section{TEND: Mutual Credit Without Demurrage}
 
 \subsection{Mutual Credit}
 
@@ -166,27 +174,22 @@ This property is enforced by the integrity zome: the validation rule
 verifies that each TEND transaction creates equal and opposite entries
 on the sender's and receiver's source chains.
 
-\subsection{Demurrage}
+\subsection{Balance Discipline}
 
-TEND implements Gesellian demurrage~\cite{gesell1916}: balances decay
-over time to encourage circulation:
+TEND does not decay over time. Instead, circulation discipline is enforced by
+reciprocal accounting and bounded credit lines. Each member's positive or
+negative position is constrained by consciousness-gated limits, and the entire
+system remains zero-sum:
 
 \begin{equation}
-  B(t) = B(t_0) \cdot e^{-\lambda(t - t_0)}
+  \sum_{i} B_i^{\text{TEND}}(t) = 0 \quad \forall t
 \end{equation}
 
-where $\lambda$ is the demurrage rate. The ``composted'' value (the decay)
-returns to the commons treasury:
-
+\begin{proposition}[TEND zero-sum invariant]
+For every confirmed exchange, the provider's positive balance increase exactly
+matches the receiver's negative balance increase:
 \begin{equation}
-  D(t_0, t) = B(t_0) - B(t) = B(t_0)(1 - e^{-\lambda(t - t_0)})
-\end{equation}
-
-\begin{proposition}[Demurrage zero-sum invariant]
-With demurrage, the total TEND supply (positive + negative balances +
-composted treasury) remains zero:
-\begin{equation}
-  \sum_{i} B_i(t) + T_{\text{compost}}(t) = 0
+  \Delta B_{\text{provider}} + \Delta B_{\text{receiver}} = 0
 \end{equation}
 \end{proposition}
 
@@ -325,8 +328,10 @@ Currencies have a lifecycle: minting $\to$ circulation $\to$ composting.
 Composting is the explicit removal of currency units from circulation:
 
 \begin{itemize}[nosep]
-  \item TEND: Demurrage automatically composts value over time
-  \item SAP: Manual composting when backing goods are consumed
+  \item SAP: Demurrage and explicit compost routing remove idle value from
+    circulation and fund commons maintenance
+  \item TEND: No demurrage; circulation is governed through zero-sum credit
+    limits rather than timed decay
   \item MYCEL: Governance-authorized composting of excess supply
 \end{itemize}
 
