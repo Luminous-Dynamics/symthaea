@@ -29,7 +29,6 @@
 //! - Bahrick, H.P. (1984). Semantic memory: 50 years of memory for Spanish.
 
 use crate::agent::{CivAgent, LifeStage};
-use serde::{Deserialize, Serialize};
 
 /// Skill atrophy rate per tick for unpracticed skills.
 const ATROPHY_RATE: f64 = 0.005;

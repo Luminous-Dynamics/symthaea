@@ -162,6 +162,13 @@ const KESSLER_COLLAPSE_DURATION: u32 = 60;
 /// Probability of cascade initiation once conditions met.
 const P_KESSLER_INITIATION: f64 = 0.05;
 
+/// Maximum concurrent new disasters generated per world per tick.
+/// Prevents unrealistic event stacking (5+ simultaneous disasters) that can
+/// kill colonies through pure RNG rather than systemic failure.
+/// The cascade amplification mechanic (1.0 + 0.5 * (count - 2)) still applies
+/// to the disasters that do fire.
+const MAX_NEW_DISASTERS_PER_WORLD_PER_TICK: usize = 4;
+
 // Psychological Events — per-tick probabilities for confined crews
 // Calibrated from `crate::empirical` psychological isolation data.
 /// Winter-over syndrome: ~40% prevalence/year in confined crews (Palinkas 2008).
@@ -1172,6 +1179,21 @@ impl DisasterEngine {
         self.last_failure_ticks
             .retain(|&t| current_tick.saturating_sub(t) < CASCADE_WINDOW_TICKS);
         self.cascade_failure_count = self.last_failure_ticks.len() as u32;
+
+        // Cap new disasters per world per tick to prevent unrealistic stacking.
+        // Count how many results target each world and drop excess.
+        {
+            let mut per_world_count: std::collections::HashMap<u32, usize> = std::collections::HashMap::new();
+            results.retain(|(_, world_id, _)| {
+                if let Some(wid) = world_id {
+                    let count = per_world_count.entry(*wid).or_insert(0);
+                    *count += 1;
+                    *count <= MAX_NEW_DISASTERS_PER_WORLD_PER_TICK
+                } else {
+                    true // Global disasters (no world_id) are never capped
+                }
+            });
+        }
 
         // Dead Loop #2 fix: Apply collective memory inoculation to ALL disaster
         // effects. Civilizations that have survived a disaster type before take

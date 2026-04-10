@@ -73,6 +73,16 @@ pub mod validation;
 pub mod viability;
 pub mod earth_population;
 pub mod world;
+pub mod maglev_network;
+pub mod generation_ship;
+pub mod fusion_bridge;
+pub mod cliodynamics;
+pub mod live_metrics;
+pub mod config_loader;
+pub mod stoichiometry;
+pub mod relativistic_dht;
+pub mod epistemic_decay;
+pub mod skill_integrity;
 
 use config::{EpochId, SimulationConfig};
 use epoch::{EpochManager, EpochSnapshot};
@@ -95,6 +105,36 @@ const MARS_FISSION_MIN_POP: usize = 200;
 const MARS_FISSION_MIN_SS: f64 = 0.6;
 /// Number of settlers sent to Mars colony.
 const MARS_FISSION_SETTLERS: usize = 50;
+
+// ─── Structural constants for run() and phase tick methods ───────────────────
+
+/// Work hours per worker per tick (month). Standard: 160h/month.
+const WORK_HOURS_PER_MONTH: f64 = 160.0;
+/// Fraction of labor hours allocated to colony projects.
+const PROJECT_LABOR_FRACTION: f64 = 0.2;
+/// Fraction of materials stock available for colony projects per tick.
+const PROJECT_MATERIALS_FRACTION: f64 = 0.1;
+/// Infrastructure natural improvement rate per tick.
+const INFRASTRUCTURE_IMPROVEMENT_RATE: f64 = 0.001;
+/// Infrastructure entropy degradation rate per tick (~0.36%/year).
+/// Garner & Hamilton (2005): steel half-life ~150yr in radiation.
+const INFRASTRUCTURE_DEGRADATION_RATE: f64 = 0.0003;
+/// Resource waste rate per tick when trust-weighted governance is disabled.
+const RESOURCE_WASTE_RATE: f64 = 0.002;
+/// Earth R&D workforce fraction (~5% of workforce in research).
+const EARTH_RD_WORKFORCE_FRACTION: f64 = 0.05;
+/// Earth institutional investment fraction.
+const EARTH_INSTITUTIONAL_INVEST_FRACTION: f64 = 0.1;
+/// Moderate environmental policy baseline.
+const EARTH_ENVIRO_POLICY_BASELINE: f64 = 0.3;
+/// EROI-to-GDP drag coefficient per point below threshold.
+const EROI_GDP_DRAG_PER_POINT: f64 = 0.0004;
+/// GDP floor multiplier when EROI drag is applied.
+const EROI_GDP_FLOOR_MULT: f64 = 0.998;
+/// Consciousness bonus per tick from stable governance.
+const GOV_CONSCIOUSNESS_BONUS_STABLE: f64 = 0.001;
+/// Consciousness penalty per tick from unstable governance.
+const GOV_CONSCIOUSNESS_PENALTY_UNSTABLE: f64 = 0.002;
 
 /// Top-level multi-world civilization simulator.
 pub struct MultiWorldSimulator {
@@ -293,76 +333,31 @@ impl MultiWorldSimulator {
             .collect();
 
         for (idx, seed) in seeds.iter().enumerate() {
+            let is_earth = seed.location == "Earth";
             let resources = match seed.location.as_str() {
                 "Earth" => WorldResources::earth_default(),
                 "Europa" => WorldResources::europa_default(),
                 "Titan" => WorldResources::titan_default(),
                 _ => WorldResources::lunar_default(),
             };
-            let culture = match seed.location.as_str() {
-                "Earth" => CulturalProfile::earth_default(),
-                _ => CulturalProfile::pioneer_default(),
+            let culture = if is_earth {
+                CulturalProfile::earth_default()
+            } else {
+                CulturalProfile::pioneer_default()
             };
 
-            let mut world = World {
+            let mut world = World::new_colony(world::ColonyParams {
                 id: idx as u32,
                 name: seed.name.clone(),
                 location: seed.location.clone(),
                 founded_tick: 0,
-                parent_world_id: if seed.location == "Earth" {
-                    None
-                } else {
-                    Some(0)
-                },
-                agents: Vec::new(),
-                next_agent_id: 0,
+                parent_world_id: if is_earth { None } else { Some(0) },
                 resources,
                 culture,
-                infrastructure_level: if seed.location == "Earth" {
-                    0.9
-                } else {
-                    0.2
-                },
-                max_population: if seed.location == "Earth" {
-                    2_000 // Representative sample cap — Earth is supply depot
-                } else {
-                    10_000
-                },
-                habitable_area_m2: if seed.location == "Earth" {
-                    1e12
-                } else {
-                    50_000.0
-                },
-                founding_harmony_emphasis: [0.125; 8],
-                epidemics: Vec::new(),
-                knowledge: knowledge::WorldKnowledge::new(),
-                economy: economy::WorldEconomy::new(),
-                harmony: harmony::HarmonyTracker::new(),
-                governance: governance::WorldGovernance::new(),
-            power_generation_kw: 0.0,
-            power_demand_kw: 0.0,
-            narrative_identity: crate::world::NarrativeIdentity::default(),
-            maintenance_hours_required: 0.0,
-            maintenance_hours_available: 0.0,
-            bus_factor_critical: 0,
-            pathogen_pressure: 0.0,
-            civilizational_phi: 0.0,
-            trust_level: 0.7,
-            earth_funding: 1.0,
-            mortality_alpha_mult: 1.0,
-            mortality_beta_mult: 1.0,
-            mortality_lambda_mult: 1.0,
-            reproduction_viable: true,
-            ecosystem_balance: 1.0,
-            fertility_multiplier: 1.0,
-            automation_level: 0.0,
-            explorations_completed: 0,
-            project_manager: crate::projects::ProjectManager::new(),
-            habitat: habitat::HabitatComplex::default_surface_colony(&seed.location),
-            fleet: crate::robotics::RoboticFleet::default(),
-            diplomatic_relations: std::collections::HashMap::new(),
-            zones: Vec::new(),
-            };
+                infrastructure_level: if is_earth { 0.9 } else { 0.2 },
+                max_population: if is_earth { 2_000 } else { 10_000 },
+                habitable_area_m2: if is_earth { 1e12 } else { 50_000.0 },
+            });
 
             // Hybrid Earth: skip individual agent creation for Earth;
             // aggregate demographics are handled by earth_regions.
@@ -477,49 +472,18 @@ impl MultiWorldSimulator {
             _ => WorldResources::lunar_default(),
         };
 
-        let mut world = World {
+        let mut world = World::new_colony(world::ColonyParams {
             id: world_id,
             name: name.into(),
             location: location.into(),
             founded_tick: self.current_tick,
             parent_world_id: Some(0),
-            agents: Vec::new(),
-            next_agent_id: 0,
             resources,
             culture: CulturalProfile::pioneer_default(),
             infrastructure_level: 0.1,
             max_population: 5_000,
             habitable_area_m2: 30_000.0,
-            founding_harmony_emphasis: [0.125; 8],
-            epidemics: Vec::new(),
-            knowledge: knowledge::WorldKnowledge::new(),
-            economy: economy::WorldEconomy::new(),
-            harmony: harmony::HarmonyTracker::new(),
-            governance: governance::WorldGovernance::new(),
-            power_generation_kw: 0.0,
-            power_demand_kw: 0.0,
-            narrative_identity: crate::world::NarrativeIdentity::default(),
-            maintenance_hours_required: 0.0,
-            maintenance_hours_available: 0.0,
-            bus_factor_critical: 0,
-            pathogen_pressure: 0.0,
-            civilizational_phi: 0.0,
-            trust_level: 0.7,
-            earth_funding: 1.0,
-            mortality_alpha_mult: 1.0,
-            mortality_beta_mult: 1.0,
-            mortality_lambda_mult: 1.0,
-            reproduction_viable: true,
-            fertility_multiplier: 1.0,
-            ecosystem_balance: 1.0,
-            automation_level: 0.0,
-            explorations_completed: 0,
-            project_manager: crate::projects::ProjectManager::new(),
-            habitat: habitat::HabitatComplex::default_surface_colony(&location),
-            fleet: crate::robotics::RoboticFleet::default(),
-            diplomatic_relations: std::collections::HashMap::new(),
-            zones: Vec::new(),
-        };
+        });
 
         for _ in 0..population {
             let sex = if self.rng.bernoulli(0.5) {
@@ -606,6 +570,165 @@ impl MultiWorldSimulator {
                 self.found_colony("Ares Colony (Fission)", "Mars", MARS_FISSION_SETTLERS, 0.2);
             }
             self.mars_fission_done = true;
+        }
+    }
+
+    /// Tick generation ship: launch if scheduled, evolve in-flight, handle disasters.
+    fn tick_generation_ship(&mut self) {
+        if self.generation_ship_launch_tick > 0
+            && self.current_tick >= self.generation_ship_launch_tick
+            && !self.generation_ship_launched
+        {
+            let ship = generation_ship::GenerationShip::new(
+                99,
+                generation_ship::InterstellarDestination::ProximaCentauri,
+                0.05,
+                self.current_tick,
+                500,
+            );
+            self.events.push(CivEvent::new(
+                self.current_tick, None, CivEventType::EmergencyDeclared,
+                format!("GENERATION SHIP LAUNCHED → {} ({:.2} ly at {:.1}%c, {} passengers)",
+                    ship.destination.name(), ship.distance_ly, ship.cruise_velocity_c * 100.0, 500),
+            ));
+            self.generation_ship = Some(ship);
+            self.generation_ship_launched = true;
+        }
+        if let Some(ref mut ship) = self.generation_ship {
+            let disasters = ship.tick(&mut self.rng);
+            for d in &disasters {
+                let desc = match d {
+                    generation_ship::InterstellarDisaster::CosmicRayBurst { severity } =>
+                        format!("Cosmic ray burst (severity {:.2}) on generation ship", severity),
+                    generation_ship::InterstellarDisaster::MicrometeoiteImpact { hull_damage } =>
+                        format!("Micrometeorite impact (hull damage {:.3}) on generation ship", hull_damage),
+                    generation_ship::InterstellarDisaster::NavigationDrift { correction_fuel_fraction } =>
+                        format!("Navigation drift (fuel cost {:.3}) on generation ship", correction_fuel_fraction),
+                    generation_ship::InterstellarDisaster::KnowledgeAttrition { skill_loss_fraction } =>
+                        format!("Knowledge attrition ({:.1}% skill loss) on generation ship", skill_loss_fraction * 100.0),
+                    generation_ship::InterstellarDisaster::SocialFracture { cohesion_loss } =>
+                        format!("Social fracture ({:.1}% cohesion loss) on generation ship", cohesion_loss * 100.0),
+                };
+                self.events.push(CivEvent::new(
+                    self.current_tick, None, CivEventType::EmergencyDeclared, desc,
+                ));
+            }
+            if ship.phase == generation_ship::ShipPhase::Arrived {
+                self.events.push(CivEvent::new(
+                    self.current_tick, None, CivEventType::TradeEstablished,
+                    format!("GENERATION SHIP ARRIVED at {} — new human culture founded",
+                        ship.destination.name()),
+                ));
+            }
+        }
+    }
+
+    /// Tick Earth hybrid model: aggregate demographics, civilizational primitives,
+    /// resource depletion feedback, ecosystem tipping points, and spaceport/Kessler.
+    fn tick_earth_hybrid(&mut self) {
+        if self.earth_regions.is_empty() {
+            return;
+        }
+        if let Some(ref mut pop_model) = self.earth_pop_model {
+            let scaling: Vec<_> = self.earth_regions.iter()
+                .map(|r| viability::ScalingFactors::compute(r.population * 1_000_000.0))
+                .collect();
+            pop_model.tick(&self.earth_regions, &scaling, self.current_tick, &mut self.rng);
+            pop_model.sync_to_regions(&mut self.earth_regions);
+
+            if let Some(ref mut prims) = self.earth_primitives {
+                let total_pop: f64 = self.earth_regions.iter().map(|r| r.population).sum();
+                let mean_urban: f64 = self.earth_regions.iter()
+                    .map(|r| r.urbanization * r.population).sum::<f64>() / total_pop.max(1.0);
+                let mean_gdp: f64 = self.earth_regions.iter()
+                    .map(|r| r.gdp_per_capita * r.population).sum::<f64>() / total_pop.max(1.0);
+                prims.tick(
+                    total_pop, mean_urban, mean_gdp,
+                    EARTH_RD_WORKFORCE_FRACTION,
+                    EARTH_ENVIRO_POLICY_BASELINE,
+                    EARTH_INSTITUTIONAL_INVEST_FRACTION,
+                );
+
+                // 1. Resource depletion → EROI → GDP drag
+                if let Some(oil) = prims.resources.iter().find(|r| r.name == "Oil") {
+                    let eroi = oil.current_eroi();
+                    if eroi < 8.0 {
+                        let monthly_drag = 1.0 - (8.0 - eroi) * EROI_GDP_DRAG_PER_POINT;
+                        for region in &mut self.earth_regions {
+                            region.gdp_per_capita *= monthly_drag.max(EROI_GDP_FLOOR_MULT);
+                        }
+                    }
+                }
+                // 2. Ecosystem → agriculture → GDP
+                let ag_modifier = prims.ecosystem.agriculture_modifier();
+                if ag_modifier < 0.95 {
+                    for region in &mut self.earth_regions {
+                        region.gdp_per_capita *= 1.0 - (1.0 - ag_modifier) * 0.01;
+                    }
+                }
+                // 3. Knowledge network → innovation rate
+                let knowledge_mult = prims.knowledge.growth_rate().min(3.0);
+                for region in &mut self.earth_regions {
+                    region.education_index = (region.education_index
+                        + 0.00005 * knowledge_mult).min(0.98);
+                }
+                // 5. Ecosystem tipping points → disaster events
+                let tips = prims.ecosystem.tipping_points();
+                for tip in &tips {
+                    self.events.push(CivEvent::new(
+                        self.current_tick, None, CivEventType::EmergencyDeclared,
+                        format!("ECOSYSTEM TIPPING POINT: {}", tip),
+                    ));
+                }
+            }
+        } else {
+            for region in &mut self.earth_regions {
+                earth_regions::tick_region(region, self.current_tick, &mut self.rng);
+            }
+        }
+        // Spaceport + Kessler sync
+        if let Some(ref mut sp) = self.spaceport {
+            sp.tick(self.current_tick);
+            if self.disaster_engine.orbital_debris.cascade_active && !sp.leo_blocked {
+                let duration = spaceport::kessler_duration(&mut self.rng);
+                sp.activate_kessler(duration);
+                self.events.push(CivEvent::new(
+                    self.current_tick, None, CivEventType::EmergencyDeclared,
+                    "Kessler syndrome blocks spaceport — colonist launches suspended".to_string(),
+                ));
+            }
+        }
+    }
+
+    /// Check if inter-world trade milestone should be granted.
+    fn check_trade_milestone(&mut self) {
+        if self.trade_granted {
+            return;
+        }
+        let viable_worlds: Vec<&World> = self
+            .worlds
+            .iter()
+            .filter(|w| {
+                w.location != "Earth"
+                    && w.population() > 0
+                    && w.resources.self_sufficiency() > 0.3
+            })
+            .collect();
+        let has_established_colony = viable_worlds.iter().any(|w| {
+            self.current_tick.saturating_sub(w.founded_tick) >= 12
+        });
+        if viable_worlds.len() >= 2
+            || (viable_worlds.len() >= 1 && has_established_colony && self.worlds.len() >= 3)
+        {
+            self.epoch_manager
+                .record_milestone("trade", self.current_tick);
+            self.trade_granted = true;
+            self.events.push(CivEvent::new(
+                self.current_tick,
+                None,
+                CivEventType::TradeEstablished,
+                "Inter-world trade route established",
+            ));
         }
     }
 
@@ -715,28 +838,15 @@ impl MultiWorldSimulator {
         if !self.config.policy.education_enabled {
             return; // A/B comparison: skip education tick entirely
         }
-        let world_count = self.worlds.len();
-        for i in 0..world_count {
-            let mut world = std::mem::take(&mut self.worlds[i]);
-            let (events, _summary) =
-                EducationEngine::tick(&mut world, self.current_tick, &mut self.rng);
-            self.events.extend(events);
-            self.worlds[i] = world;
-        }
+        let events = education::tick_education_all_worlds(
+            &mut self.worlds, self.current_tick, &mut self.rng,
+        );
+        self.events.extend(events);
     }
 
     fn tick_genetics(&mut self) {
-        for world in &self.worlds {
-            let div = PopulationEngine::genetic_diversity_index(world, self.current_tick);
-            if div < 0.5 {
-                self.events.push(CivEvent::new(
-                    self.current_tick,
-                    Some(world.id),
-                    CivEventType::GeneticAlert,
-                    format!("{}: genetic diversity critical ({div:.3})", world.name),
-                ));
-            }
-        }
+        let events = population::check_genetic_diversity(&self.worlds, self.current_tick);
+        self.events.extend(events);
     }
 
     fn tick_economy(&mut self) {
@@ -860,6 +970,22 @@ impl MultiWorldSimulator {
             let scaling = self.viability_engine.scaling.get(&world.id);
             let energy_avail = world.resources.stock_level("energy");
             world.economy.tick_production_extended(scaling, energy_avail);
+
+            // Hard energy constraint: when energy stock is depleted, only essential
+            // sectors (agriculture=1, medicine=2) continue at full capacity.
+            // All other sectors drop to 10%. This makes outer-system energy gates
+            // (fission/fusion tech) genuinely consequential.
+            let net_energy = world.resources.stock_level("energy").unwrap_or(0.0);
+            if net_energy <= 0.0 {
+                for sector in 0..economy::NUM_SECTORS {
+                    if sector != 1 && sector != 2 { // agriculture=1, medicine=2
+                        world.economy.sector_output[sector] *= 0.1;
+                    }
+                }
+            }
+
+            let total_workers: usize = world.economy.sector_workers.iter().sum();
+            world.economy.tick_prices(total_workers);
             world.economy.tick_demurrage();
             world.economy.compute_gini(&world.agents);
             world.economy.self_sufficiency = world.resources.self_sufficiency();
@@ -934,7 +1060,7 @@ impl MultiWorldSimulator {
                 0.0
             };
             world.infrastructure_level =
-                (world.infrastructure_level - 0.0003 - materials_aging).max(0.0);
+                (world.infrastructure_level - INFRASTRUCTURE_DEGRADATION_RATE - materials_aging).max(0.0);
 
             // Mechanism 7 continued: if infrastructure drops below 0.3, ECLSS failure
             // rates double. This is handled by the disaster engine's mtbf_factor which
@@ -947,12 +1073,12 @@ impl MultiWorldSimulator {
             if !self.config.policy.trust_weighted_governance {
                 for name in &["food", "water", "energy"] {
                     if let Some(stock) = world.resources.get_mut(name) {
-                        stock.current *= 0.998; // 0.2% waste per tick = ~2.4% annual
+                        stock.current *= 1.0 - RESOURCE_WASTE_RATE; // ~2.4% annual
                     }
                 }
             }
             world.infrastructure_level =
-                (world.infrastructure_level + 0.001).min(1.0);
+                (world.infrastructure_level + INFRASTRUCTURE_IMPROVEMENT_RATE).min(1.0);
         }
     }
 
@@ -2111,7 +2237,9 @@ impl MultiWorldSimulator {
                     continue;
                 }
                 let pop = world.population();
-                world.governance.evolve_authority(epoch, pop);
+                let mean_phi = world.mean_phi();
+                let stability = world.governance.stability_score;
+                world.governance.evolve_authority(epoch, pop, mean_phi, stability);
                 let mut gov = std::mem::take(&mut world.governance);
                 let gov_events = gov.tick_governance_full(
                     world, tick, rng, amendment_enabled, hostile_guardian,
@@ -2124,148 +2252,12 @@ impl MultiWorldSimulator {
     }
 
     fn tick_consciousness(&mut self) {
-        // Red team: maintain adversarial population at ~5% if any adversaries exist.
-        // New agents (births) don't inherit adversarial status, so we recruit
-        // replacements to maintain persistent adversarial pressure.
-        for world in &mut self.worlds {
-            let has_adversaries = world.agents.iter().any(|a| a.adversarial.is_some());
-            if has_adversaries {
-                let living = world.agents.iter().filter(|a| a.is_alive()).count();
-                let adv_count = world.agents.iter()
-                    .filter(|a| a.is_alive() && a.adversarial.is_some()).count();
-                let target = (living as f64 * 0.05).ceil() as usize; // maintain 5%
-                if adv_count < target {
-                    let deficit = target - adv_count;
-                    let mut recruited = 0;
-                    for agent in world.agents.iter_mut()
-                        .filter(|a| a.is_alive() && a.adversarial.is_none())
-                    {
-                        if recruited >= deficit { break; }
-                        agent.adversarial = Some(red_team::AdversarialStrategy::ProfileMaximizer);
-                        recruited += 1;
-                    }
-                }
-            }
-        }
-
-        // Phase 7: Gradual consciousness growth for agents.
-        let tick = self.current_tick;
-        for world in &mut self.worlds {
-            let mean_edu: f64 = {
-                let living: Vec<f64> = world
-                    .agents
-                    .iter()
-                    .filter(|a| a.is_alive())
-                    .map(|a| a.education_level)
-                    .collect();
-                if living.is_empty() {
-                    0.0
-                } else {
-                    living.iter().sum::<f64>() / living.len() as f64
-                }
-            };
-
-            for agent in world.agents.iter_mut().filter(|a| a.is_alive()) {
-                let stage = agent.life_stage(tick);
-                let growth_rate = match stage {
-                    agent::LifeStage::Child => 0.001,
-                    agent::LifeStage::Youth => 0.003,
-                    agent::LifeStage::Adult => 0.002,
-                    agent::LifeStage::Elder => 0.001,
-                };
-
-                // Consciousness decay — earned, not permanent.
-                // Children and youth are still developing, so no decay for them.
-                // Allostatic load amplifies decay: stressed agents lose consciousness faster.
-                let base_decay = if stage == agent::LifeStage::Adult || stage == agent::LifeStage::Elder {
-                    0.0015
-                } else {
-                    0.0
-                };
-                let decay = base_decay * (1.0 + agent.needs.allostatic_load);
-                let c = &mut agent.consciousness;
-                c.level = (c.level - decay).max(0.0);
-                c.meta_awareness = (c.meta_awareness - decay).max(0.0);
-                c.coherence = (c.coherence - decay).max(0.0);
-                c.care_activation = (c.care_activation - decay).max(0.0);
-                c.harmonic_alignment = (c.harmonic_alignment - decay).max(0.0);
-                c.epistemic_confidence = (c.epistemic_confidence - decay).max(0.0);
-
-                // Education, community, and pharmaceutical therapeutics amplify consciousness.
-                // Psychedelic therapeutics (psilocybin sessions) boost neuroplasticity,
-                // increasing care_activation and meta_awareness growth by ~30%.
-                // This models the "consciousness maintenance" effect described in
-                // the astropharmacy resource catalog.
-                let pharma_boost = if world.infrastructure_level > 0.3 {
-                    self.config.policy.pharma_boost
-                } else {
-                    0.0
-                };
-                // Governance model determines how much institutional incentive exists
-                // for consciousness development.
-                // DIAGNOSTIC FIX: The original sigmoid gating created a poverty trap —
-                // agents with low phi got suppressed growth, keeping them low forever.
-                // Fix: floor at 0.5 (equal-weight baseline) + bonus for high phi.
-                // This means CG is ALWAYS at least as good as EW, plus a bonus.
-                let gating_factor = if self.config.policy.trust_weighted_governance {
-                    let phi = c.phi();
-                    // Floor at 0.5 (matches EW), bonus up to 1.0 for high phi
-                    let bonus = 0.5 / (1.0 + (-10.0 * (phi - 0.3)).exp());
-                    0.5 + bonus // range: [0.5, 1.0]
-                } else {
-                    0.5
-                };
-                let amplifier = (1.0 + mean_edu * 0.5 + pharma_boost) * gating_factor;
-                // Burnout caps consciousness growth (symthaea-psych-bench pattern).
-                let burnout_penalty = if agent.needs.is_burnout() { 0.35 } else { 1.0 };
-                let amplifier = amplifier * burnout_penalty;
-
-                // Red team: adversarial agents get modified consciousness growth rates.
-                // ProfileMaximizers grow 5× faster (gaming the system).
-                // Adversarial status persists: if agent was marked, apply modifier.
-                // Also: recruit new adversaries — 0.5% of unmarked agents per tick
-                // become adversarial (models persistent social pressure / bad actors entering).
-                let amplifier = if let Some(strategy) = &agent.adversarial {
-                    let modifier = red_team::AdversarialModifier::for_strategy(*strategy, 0.01);
-                    amplifier * modifier.phi_growth_mult
-                } else {
-                    amplifier
-                };
-
-                // Social satiation boosts care_activation growth.
-                if agent.needs.social_satiation > 0.5 {
-                    c.care_activation = (c.care_activation + 0.0005).min(1.0);
-                }
-                // Diminishing returns: growth slows as dimension approaches cap.
-                // effective_growth = growth_rate * (1 - dim/cap) to prevent saturation.
-                let cap = 0.85;
-                let dr = |dim: f64, rate: f64| -> f64 {
-                    let headroom = (1.0 - dim / cap).max(0.0);
-                    rate * amplifier * headroom
-                };
-                c.level = (c.level + dr(c.level, growth_rate)).min(cap);
-                c.meta_awareness = (c.meta_awareness + dr(c.meta_awareness, growth_rate * 0.8)).min(cap);
-                c.coherence = (c.coherence + dr(c.coherence, growth_rate * 0.6)).min(cap);
-                c.care_activation = (c.care_activation + dr(c.care_activation, growth_rate * 0.7)).min(cap);
-                c.harmonic_alignment =
-                    (c.harmonic_alignment + dr(c.harmonic_alignment, growth_rate * 0.5)).min(cap);
-                c.epistemic_confidence =
-                    (c.epistemic_confidence + dr(c.epistemic_confidence, growth_rate * 0.4)).min(cap);
-
-                // Overall phi ceiling: moral humility (no agent achieves perfection)
-                // If phi exceeds 0.95, attenuate all dimensions proportionally.
-                let phi = c.phi();
-                if phi > 0.95 {
-                    let scale = 0.95 / phi;
-                    c.level *= scale;
-                    c.meta_awareness *= scale;
-                    c.coherence *= scale;
-                    c.care_activation *= scale;
-                    c.harmonic_alignment *= scale;
-                    c.epistemic_confidence *= scale;
-                }
-            }
-        }
+        consciousness::tick_consciousness_all_worlds(
+            &mut self.worlds,
+            self.current_tick,
+            self.config.policy.pharma_boost,
+            self.config.policy.trust_weighted_governance,
+        );
     }
 
     fn tick_harmony_scoring(&mut self) {
@@ -3039,177 +3031,11 @@ impl MultiWorldSimulator {
             // Check for Mars fission (dynamic world founding)
             self.check_mars_fission();
 
-            // Grant trade milestone when 2+ non-Earth worlds with population exist
-            // and both have self_sufficiency > 0.3. Trade between Earth and a tiny
-            // colony is trivial — real trade requires established colonies.
-            if !self.trade_granted {
-                let viable_worlds: Vec<&World> = self
-                    .worlds
-                    .iter()
-                    .filter(|w| {
-                        w.location != "Earth"
-                            && w.population() > 0
-                            && w.resources.self_sufficiency() > 0.3
-                    })
-                    .collect();
-                // Need at least 2 off-Earth colonies, OR 1 off-Earth with SS>0.3
-                // plus Earth, but only after colony is established (12+ ticks old)
-                let has_established_colony = viable_worlds.iter().any(|w| {
-                    self.current_tick.saturating_sub(w.founded_tick) >= 12
-                });
-                if viable_worlds.len() >= 2
-                    || (viable_worlds.len() >= 1 && has_established_colony && self.worlds.len() >= 3)
-                {
-                    self.epoch_manager
-                        .record_milestone("trade", self.current_tick);
-                    self.trade_granted = true;
-                    self.events.push(CivEvent::new(
-                        self.current_tick,
-                        None,
-                        CivEventType::TradeEstablished,
-                        "Inter-world trade route established",
-                    ));
-                }
-            }
+            self.check_trade_milestone();
 
-            // Phase 0.5: Earth aggregate demographics (hybrid model)
-            if !self.earth_regions.is_empty() {
-                // Phase 2: Tick cohort-based Earth population model (if initialized)
-                if let Some(ref mut pop_model) = self.earth_pop_model {
-                    let scaling: Vec<_> = self.earth_regions.iter()
-                        .map(|r| viability::ScalingFactors::compute(r.population * 1_000_000.0))
-                        .collect();
-                    pop_model.tick(&self.earth_regions, &scaling, self.current_tick, &mut self.rng);
-                    pop_model.sync_to_regions(&mut self.earth_regions);
+            self.tick_earth_hybrid();
 
-                    // Tick civilizational primitives with Earth aggregate state
-                    if let Some(ref mut prims) = self.earth_primitives {
-                        let total_pop: f64 = self.earth_regions.iter().map(|r| r.population).sum();
-                        let mean_urban: f64 = self.earth_regions.iter()
-                            .map(|r| r.urbanization * r.population).sum::<f64>() / total_pop.max(1.0);
-                        let mean_gdp: f64 = self.earth_regions.iter()
-                            .map(|r| r.gdp_per_capita * r.population).sum::<f64>() / total_pop.max(1.0);
-                        let research_frac = 0.05; // ~5% of workforce in R&D
-                        let policy_protection = 0.3; // moderate environmental policy
-                        let invest_frac = 0.1; // institutional investment
-
-                        prims.tick(total_pop, mean_urban, mean_gdp, research_frac, policy_protection, invest_frac);
-
-                        // Primitives feed back into the simulation:
-                        // 1. Resource depletion → EROI affects energy costs → GDP drag
-                        if let Some(oil) = prims.resources.iter().find(|r| r.name == "Oil") {
-                            let eroi = oil.current_eroi();
-                            if eroi < 8.0 {
-                                let monthly_drag = 1.0 - (8.0 - eroi) * 0.0004;
-                                for region in &mut self.earth_regions {
-                                    region.gdp_per_capita *= monthly_drag.max(0.998);
-                                }
-                            }
-                        }
-
-                        // 2. Ecosystem → agriculture → GDP (only when degraded)
-                        let ag_modifier = prims.ecosystem.agriculture_modifier();
-                        if ag_modifier < 0.95 {
-                            for region in &mut self.earth_regions {
-                                region.gdp_per_capita *= 1.0 - (1.0 - ag_modifier) * 0.01;
-                            }
-                        }
-
-                        // 3. Knowledge network → innovation rate boost
-                        let knowledge_mult = prims.knowledge.growth_rate().min(3.0);
-                        // Higher knowledge growth → faster tech advancement (wired via education improvement)
-                        for region in &mut self.earth_regions {
-                            region.education_index = (region.education_index
-                                + 0.00005 * knowledge_mult).min(0.98);
-                        }
-
-                        // 4. Network topology → disease/ideology spread rate (stored for other modules)
-                        // Available via self.earth_primitives.network.disease_transmission_mult()
-
-                        // 5. Ecosystem tipping points → disaster events
-                        let tips = prims.ecosystem.tipping_points();
-                        for tip in &tips {
-                            self.events.push(CivEvent::new(
-                                self.current_tick, None, CivEventType::EmergencyDeclared,
-                                format!("ECOSYSTEM TIPPING POINT: {}", tip),
-                            ));
-                        }
-                    }
-                } else {
-                    // Legacy path: simple aggregate tick
-                    for region in &mut self.earth_regions {
-                        earth_regions::tick_region(region, self.current_tick, &mut self.rng);
-                    }
-                }
-                // Tick the spaceport (construction + Kessler countdown)
-                if let Some(ref mut sp) = self.spaceport {
-                    sp.tick(self.current_tick);
-                    // Sync Kessler state from disaster engine → spaceport.
-                    // If the disaster engine has an active Kessler cascade and the
-                    // spaceport isn't already blocked, activate the blockade.
-                    if self.disaster_engine.orbital_debris.cascade_active && !sp.leo_blocked {
-                        let duration = spaceport::kessler_duration(&mut self.rng);
-                        sp.activate_kessler(duration);
-                        self.events.push(CivEvent::new(
-                            self.current_tick,
-                            None,
-                            CivEventType::EmergencyDeclared,
-                            "Kessler syndrome blocks spaceport — colonist launches suspended".to_string(),
-                        ));
-                    }
-                }
-            }
-
-            // Phase 0.7: Generation ship launch + tick
-            if self.generation_ship_launch_tick > 0
-                && self.current_tick >= self.generation_ship_launch_tick
-                && !self.generation_ship_launched
-            {
-                // Launch the generation ship with 500 colonists to Proxima
-                let ship = generation_ship::GenerationShip::new(
-                    99,
-                    generation_ship::InterstellarDestination::ProximaCentauri,
-                    0.05,
-                    self.current_tick,
-                    500,
-                );
-                self.events.push(CivEvent::new(
-                    self.current_tick,
-                    None,
-                    CivEventType::EmergencyDeclared,
-                    format!("GENERATION SHIP LAUNCHED → {} ({:.2} ly at {:.1}%c, {} passengers)",
-                        ship.destination.name(), ship.distance_ly, ship.cruise_velocity_c * 100.0, 500),
-                ));
-                self.generation_ship = Some(ship);
-                self.generation_ship_launched = true;
-            }
-            if let Some(ref mut ship) = self.generation_ship {
-                let disasters = ship.tick(&mut self.rng);
-                for d in &disasters {
-                    let desc = match d {
-                        generation_ship::InterstellarDisaster::CosmicRayBurst { severity } =>
-                            format!("Cosmic ray burst (severity {:.2}) on generation ship", severity),
-                        generation_ship::InterstellarDisaster::MicrometeoiteImpact { hull_damage } =>
-                            format!("Micrometeorite impact (hull damage {:.3}) on generation ship", hull_damage),
-                        generation_ship::InterstellarDisaster::NavigationDrift { correction_fuel_fraction } =>
-                            format!("Navigation drift (fuel cost {:.3}) on generation ship", correction_fuel_fraction),
-                        generation_ship::InterstellarDisaster::KnowledgeAttrition { skill_loss_fraction } =>
-                            format!("Knowledge attrition ({:.1}% skill loss) on generation ship", skill_loss_fraction * 100.0),
-                        generation_ship::InterstellarDisaster::SocialFracture { cohesion_loss } =>
-                            format!("Social fracture ({:.1}% cohesion loss) on generation ship", cohesion_loss * 100.0),
-                    };
-                    self.events.push(CivEvent::new(
-                        self.current_tick, None, CivEventType::EmergencyDeclared, desc,
-                    ));
-                }
-                if ship.phase == generation_ship::ShipPhase::Arrived {
-                    self.events.push(CivEvent::new(
-                        self.current_tick, None, CivEventType::TradeEstablished,
-                        format!("GENERATION SHIP ARRIVED at {} — new human culture founded",
-                            ship.destination.name()),
-                    ));
-                }
-            }
+            self.tick_generation_ship();
 
             // Phase 0.9: Viability Engine — thermodynamic axioms, EROI, scaling laws.
             // Must run BEFORE economy so scaling factors and energy budgets are available.
@@ -3390,9 +3216,9 @@ impl MultiWorldSimulator {
                 let workers = world.agents.iter()
                     .filter(|a| a.is_alive() && a.life_stage(self.current_tick).can_work())
                     .count() as f64;
-                let available_labor = workers * 160.0 * 0.2;
+                let available_labor = workers * WORK_HOURS_PER_MONTH * PROJECT_LABOR_FRACTION;
                 let available_materials = world.resources.get("materials")
-                    .map(|s| s.current * 0.1).unwrap_or(0.0);
+                    .map(|s| s.current * PROJECT_MATERIALS_FRACTION).unwrap_or(0.0);
 
                 let (completed, _labor, mat_used) =
                     world.project_manager.tick(available_labor, available_materials);
@@ -4579,13 +4405,3 @@ harmony_policy = true
             "DL#6: Effect should be >30% difference: {} vs {}", happy_labor, sad_labor);
     }
 }
-pub mod maglev_network;
-pub mod generation_ship;
-pub mod fusion_bridge;
-pub mod cliodynamics;
-pub mod live_metrics;
-pub mod config_loader;
-pub mod stoichiometry;
-pub mod relativistic_dht;
-pub mod epistemic_decay;
-pub mod skill_integrity;

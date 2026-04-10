@@ -884,3 +884,25 @@ mod tests {
         let _ = child_found; // acceptable if no child born in this seed
     }
 }
+
+/// Check genetic diversity across all worlds and emit alerts for critical levels.
+///
+/// Extracted from `MultiWorldSimulator::tick_genetics()` — pure read of worlds.
+pub fn check_genetic_diversity(
+    worlds: &[World],
+    current_tick: u32,
+) -> Vec<CivEvent> {
+    let mut events = Vec::new();
+    for world in worlds {
+        let div = PopulationEngine::genetic_diversity_index(world, current_tick);
+        if div < 0.5 {
+            events.push(CivEvent::new(
+                current_tick,
+                Some(world.id),
+                CivEventType::GeneticAlert,
+                format!("{}: genetic diversity critical ({div:.3})", world.name),
+            ));
+        }
+    }
+    events
+}

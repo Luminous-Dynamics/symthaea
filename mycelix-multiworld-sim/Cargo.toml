@@ -12,6 +12,7 @@ toml = "0.8"
 tracing = "0.1"
 petgraph = { version = "0.7", features = ["serde-1"] }
 mycelix-bridge-common = { path = "../crates/mycelix-bridge-common", default-features = false }
+luminous-sim-core = { path = "../crates/luminous-sim-core" }
 
 [dev-dependencies]
 proptest = "1"

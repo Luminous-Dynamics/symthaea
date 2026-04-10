@@ -649,6 +649,74 @@ fn default_funding() -> f64 { 1.0 }
 fn default_one() -> f64 { 1.0 }
 fn default_true() -> bool { true }
 
+/// Parameters for creating a new colony world.
+/// Captures the fields that vary between `initialize_worlds()` and `found_colony()`.
+pub struct ColonyParams {
+    pub id: u32,
+    pub name: String,
+    pub location: String,
+    pub founded_tick: u32,
+    pub parent_world_id: Option<u32>,
+    pub resources: WorldResources,
+    pub culture: CulturalProfile,
+    pub infrastructure_level: f64,
+    pub max_population: usize,
+    pub habitable_area_m2: f64,
+}
+
+impl World {
+    /// Create a new colony world from parameters.
+    ///
+    /// All fields not covered by `ColonyParams` get sensible defaults matching
+    /// the existing inline initializers. This eliminates the duplicate 35-field
+    /// struct construction in `initialize_worlds()` and `found_colony()`.
+    pub fn new_colony(params: ColonyParams) -> Self {
+        Self {
+            id: params.id,
+            name: params.name,
+            location: params.location.clone(),
+            founded_tick: params.founded_tick,
+            parent_world_id: params.parent_world_id,
+            agents: Vec::new(),
+            next_agent_id: 0,
+            resources: params.resources,
+            culture: params.culture,
+            infrastructure_level: params.infrastructure_level,
+            max_population: params.max_population,
+            habitable_area_m2: params.habitable_area_m2,
+            founding_harmony_emphasis: [0.125; 8],
+            epidemics: Vec::new(),
+            knowledge: WorldKnowledge::new(),
+            economy: WorldEconomy::new(),
+            harmony: HarmonyTracker::new(),
+            governance: WorldGovernance::new(),
+            power_generation_kw: 0.0,
+            power_demand_kw: 0.0,
+            narrative_identity: NarrativeIdentity::default(),
+            maintenance_hours_required: 0.0,
+            maintenance_hours_available: 0.0,
+            bus_factor_critical: 0,
+            pathogen_pressure: 0.0,
+            civilizational_phi: 0.0,
+            trust_level: 0.7,
+            earth_funding: 1.0,
+            mortality_alpha_mult: 1.0,
+            mortality_beta_mult: 1.0,
+            mortality_lambda_mult: 1.0,
+            reproduction_viable: true,
+            ecosystem_balance: 1.0,
+            fertility_multiplier: 1.0,
+            automation_level: 0.0,
+            explorations_completed: 0,
+            project_manager: crate::projects::ProjectManager::new(),
+            habitat: crate::habitat::HabitatComplex::default_surface_colony(&params.location),
+            fleet: crate::robotics::RoboticFleet::default(),
+            diplomatic_relations: HashMap::new(),
+            zones: Vec::new(),
+        }
+    }
+}
+
 /// #2: Narrative Identity — the shared story of "who we are" and "why we're here."
 ///
 /// Determines: psychological resilience under disaster, adaptation capacity

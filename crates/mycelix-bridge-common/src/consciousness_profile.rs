@@ -24,9 +24,13 @@
 use hdk::prelude::*;
 use serde::{Deserialize, Serialize};
 
-// When HDK is not available, provide a no-op debug!() macro
+// When HDK is not available, provide no-op logging macros
 #[cfg(not(feature = "hdk"))]
 macro_rules! debug {
+    ($($arg:tt)*) => {};
+}
+#[cfg(not(feature = "hdk"))]
+macro_rules! warn {
     ($($arg:tt)*) => {};
 }
 

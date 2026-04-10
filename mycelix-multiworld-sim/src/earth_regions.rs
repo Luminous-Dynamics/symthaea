@@ -83,6 +83,8 @@ pub struct EarthRegion {
     pub climate_vulnerability: f64,
     /// Cultural profile (reuses existing type).
     pub cultural_profile: CulturalProfile,
+    /// Urbanization fraction [0, 1]. CITATION: UN DESA World Urbanization Prospects (2024).
+    pub urbanization: f64,
     /// Whether this region has spaceport access (equatorial launch sites).
     pub spaceport_access: bool,
 }
@@ -133,6 +135,7 @@ pub fn build_earth_regions() -> Vec<EarthRegion> {
                 ritual_count: 50,
                 founding_mythology: String::new(),
             },
+            urbanization: 0.64, // UN DESA 2024: East Asia ~64%
             spaceport_access: true, // Hainan, Tanegashima
         },
         EarthRegion {
@@ -156,6 +159,7 @@ pub fn build_earth_regions() -> Vec<EarthRegion> {
                 ritual_count: 50,
                 founding_mythology: String::new(),
             },
+            urbanization: 0.36, // UN DESA 2024: South Asia ~36%
             spaceport_access: true, // Sriharikota, Thumba
         },
         EarthRegion {
@@ -179,6 +183,7 @@ pub fn build_earth_regions() -> Vec<EarthRegion> {
                 ritual_count: 50,
                 founding_mythology: String::new(),
             },
+            urbanization: 0.51, // UN DESA 2024: Southeast Asia ~51%
             spaceport_access: false,
         },
         EarthRegion {
@@ -202,6 +207,7 @@ pub fn build_earth_regions() -> Vec<EarthRegion> {
                 ritual_count: 50,
                 founding_mythology: String::new(),
             },
+            urbanization: 0.44, // UN DESA 2024: Sub-Saharan Africa ~44%
             spaceport_access: false,
         },
         EarthRegion {
@@ -225,6 +231,7 @@ pub fn build_earth_regions() -> Vec<EarthRegion> {
                 ritual_count: 50,
                 founding_mythology: String::new(),
             },
+            urbanization: 0.65, // UN DESA 2024: MENA ~65%
             spaceport_access: false,
         },
         EarthRegion {
@@ -248,6 +255,7 @@ pub fn build_earth_regions() -> Vec<EarthRegion> {
                 ritual_count: 50,
                 founding_mythology: String::new(),
             },
+            urbanization: 0.75, // UN DESA 2024: Europe ~75%
             spaceport_access: true, // Kourou (ESA)
         },
         EarthRegion {
@@ -271,6 +279,7 @@ pub fn build_earth_regions() -> Vec<EarthRegion> {
                 ritual_count: 50,
                 founding_mythology: String::new(),
             },
+            urbanization: 0.83, // UN DESA 2024: North America ~83%
             spaceport_access: true, // KSC, Vandenberg, Boca Chica
         },
         EarthRegion {
@@ -294,6 +303,7 @@ pub fn build_earth_regions() -> Vec<EarthRegion> {
                 ritual_count: 50,
                 founding_mythology: String::new(),
             },
+            urbanization: 0.82, // UN DESA 2024: Latin America ~82%
             spaceport_access: true, // Alcantara (Brazil), Guiana Space Centre proximity
         },
         EarthRegion {
@@ -317,6 +327,7 @@ pub fn build_earth_regions() -> Vec<EarthRegion> {
                 ritual_count: 50,
                 founding_mythology: String::new(),
             },
+            urbanization: 0.48, // UN DESA 2024: Central Asia ~48%
             spaceport_access: true, // Baikonur
         },
         EarthRegion {
@@ -340,6 +351,7 @@ pub fn build_earth_regions() -> Vec<EarthRegion> {
                 ritual_count: 50,
                 founding_mythology: String::new(),
             },
+            urbanization: 0.68, // UN DESA 2024: Oceania ~68%
             spaceport_access: false,
         },
         EarthRegion {
@@ -363,6 +375,7 @@ pub fn build_earth_regions() -> Vec<EarthRegion> {
                 ritual_count: 50,
                 founding_mythology: String::new(),
             },
+            urbanization: 0.75, // UN DESA 2024: Russia/CIS ~75%
             spaceport_access: true, // Vostochny, Plesetsk
         },
         EarthRegion {
@@ -386,6 +399,7 @@ pub fn build_earth_regions() -> Vec<EarthRegion> {
                 ritual_count: 50,
                 founding_mythology: String::new(),
             },
+            urbanization: 0.55, // UN DESA 2024: Caribbean/Islands ~55%
             spaceport_access: false,
         },
     ]

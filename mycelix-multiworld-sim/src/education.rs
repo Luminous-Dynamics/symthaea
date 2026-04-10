@@ -408,6 +408,23 @@ impl EducationEngine {
     }
 }
 
+/// Run education tick across all worlds, collecting events.
+///
+/// Extracted from `MultiWorldSimulator::tick_education()`.
+/// Takes `&mut` of each world independently — no `std::mem::take` needed.
+pub fn tick_education_all_worlds(
+    worlds: &mut [World],
+    current_tick: u32,
+    rng: &mut StochasticEngine,
+) -> Vec<CivEvent> {
+    let mut all_events = Vec::new();
+    for world in worlds.iter_mut() {
+        let (events, _summary) = EducationEngine::tick(world, current_tick, rng);
+        all_events.extend(events);
+    }
+    all_events
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

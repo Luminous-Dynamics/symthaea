@@ -482,12 +482,28 @@ impl WorldGovernance {
     /// Evolve authority level based on epoch and population.
     ///
     /// Authority can only advance, never regress.
-    pub fn evolve_authority(&mut self, epoch: u32, population: usize) {
-        let new_authority = match (epoch, population) {
-            (7.., _) => GovernanceAuthority::Confederation,
-            (4.., _) => GovernanceAuthority::Federation,
-            (3.., _) | (_, 5000..) => GovernanceAuthority::LocalSovereign,
-            (2.., _) | (_, 500..) => GovernanceAuthority::LocalWithEarthVeto,
+    /// Evolve governance authority based on consciousness, stability, and population.
+    ///
+    /// Transitions are now consciousness-gated rather than epoch-scripted:
+    /// - Confederation: collective phi > 0.7 AND stability > 0.6
+    /// - Federation: collective phi > 0.5 AND stability > 0.5
+    /// - LocalSovereign: collective phi > 0.3 OR population >= 5000
+    /// - LocalWithEarthVeto: population >= 500
+    /// - MissionControl: default
+    ///
+    /// Authority only advances, never regresses (ratchet behavior).
+    pub fn evolve_authority(
+        &mut self,
+        _epoch: u32,
+        population: usize,
+        mean_phi: f64,
+        stability: f64,
+    ) {
+        let new_authority = match (mean_phi, stability, population) {
+            (p, s, _) if p > 0.7 && s > 0.6 => GovernanceAuthority::Confederation,
+            (p, s, _) if p > 0.5 && s > 0.5 => GovernanceAuthority::Federation,
+            (p, _, pop) if p > 0.3 || pop >= 5000 => GovernanceAuthority::LocalSovereign,
+            (_, _, pop) if pop >= 500 => GovernanceAuthority::LocalWithEarthVeto,
             _ => GovernanceAuthority::MissionControl,
         };
 
@@ -712,17 +728,17 @@ mod tests {
         let mut gov = WorldGovernance::new();
         assert_eq!(gov.authority_level, GovernanceAuthority::MissionControl);
 
-        gov.evolve_authority(2, 100);
+        gov.evolve_authority(2, 500, 0.1, 0.3);
         assert_eq!(gov.authority_level, GovernanceAuthority::LocalWithEarthVeto);
 
-        gov.evolve_authority(3, 1000);
+        gov.evolve_authority(3, 1000, 0.35, 0.5);
         assert_eq!(gov.authority_level, GovernanceAuthority::LocalSovereign);
 
-        gov.evolve_authority(4, 10000);
+        gov.evolve_authority(4, 10000, 0.55, 0.55);
         assert_eq!(gov.authority_level, GovernanceAuthority::Federation);
 
         // Should not regress
-        gov.evolve_authority(1, 10);
+        gov.evolve_authority(1, 10, 0.0, 0.0);
         assert_eq!(gov.authority_level, GovernanceAuthority::Federation);
     }
 
@@ -818,7 +834,7 @@ mod tests {
         let mut rng = StochasticEngine::new(42);
 
         // Advance to LocalSovereign authority (required for vetoes)
-        gov.evolve_authority(3, 100);
+        gov.evolve_authority(3, 100, 0.35, 0.5);
 
         for tick in 0..(150 * 12) {
             let _ = gov.tick_governance_full(&world, tick, &mut rng, true, false);
@@ -852,7 +868,7 @@ mod tests {
         let mut rng = StochasticEngine::new(42);
 
         // Advance to LocalSovereign
-        gov.evolve_authority(3, 100);
+        gov.evolve_authority(3, 100, 0.35, 0.5);
 
         // Run 50 years with hostile guardian
         for tick in 0..(50 * 12) {
@@ -898,7 +914,7 @@ mod tests {
         let mut gov = WorldGovernance::new();
         let world = make_world_with_tiers([5, 10, 30, 35, 20]);
         let mut rng = StochasticEngine::new(42);
-        gov.evolve_authority(3, 100);
+        gov.evolve_authority(3, 100, 0.35, 0.5);
 
         // Run 100 ticks with hostile guardian
         for tick in 0..100 {
@@ -921,7 +937,7 @@ mod tests {
         let mut gov = WorldGovernance::new();
         let world = make_world_with_tiers([10, 20, 30, 25, 15]);
         let mut rng = StochasticEngine::new(42);
-        gov.evolve_authority(3, 100);
+        gov.evolve_authority(3, 100, 0.35, 0.5);
 
         assert!(!gov.membership_renewal_due);
 
@@ -970,7 +986,7 @@ mod tests {
             let mut gov = WorldGovernance::new();
             let world = make_world_with_tiers([10, 15, 25, 30, 20]);
             let mut rng = StochasticEngine::new(seed);
-            gov.evolve_authority(3, 100);
+            gov.evolve_authority(3, 100, 0.35, 0.5);
 
             for tick in 0..(100 * 12) {
                 let _ = gov.tick_governance_full(&world, tick, &mut rng, true, false);

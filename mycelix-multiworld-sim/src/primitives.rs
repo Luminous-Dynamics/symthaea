@@ -14,7 +14,6 @@
 //! 6. Knowledge network effects — combinatorial adjacent possible
 
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 
 // ═══════════════════════════════════════════════════════════════════════════
 // PRIMITIVE 1: Network Topology
@@ -312,11 +311,11 @@ impl EcosystemHealth {
     /// Aggregate ecosystem service value [0, 1].
     /// Below 0.5 = degraded, below 0.3 = critical (tipping points).
     pub fn service_index(&self) -> f64 {
-        (self.biodiversity * 0.3
+        self.biodiversity * 0.3
             + self.forest_cover * 0.2
             + self.soil_health * 0.2
             + self.ocean_health * 0.15
-            + self.freshwater * 0.15)
+            + self.freshwater * 0.15
     }
 
     /// Agriculture productivity modifier from ecosystem services.

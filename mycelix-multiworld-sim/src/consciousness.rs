@@ -117,7 +117,9 @@ impl ConsciousnessEngine {
                     (agent.consciousness.meta_awareness + 0.0005).min(1.0);
             }
 
-            // Coherence: alignment between strongest skill sector and cultural emphasis
+            // Coherence: emergent from education, trauma, experience, and cultural alignment.
+            // Previously a static cultural-weight lookup; now multi-factor so coherence
+            // is genuinely earned through education and resilience, not assigned.
             let skill_slice = agent.skills.as_slice();
             let strongest_idx = skill_slice
                 .iter()
@@ -125,8 +127,16 @@ impl ConsciousnessEngine {
                 .max_by(|a, b| a.1.partial_cmp(b.1).unwrap_or(std::cmp::Ordering::Equal))
                 .map(|(i, _)| i)
                 .unwrap_or(0);
-            agent.consciousness.coherence =
-                culture.harmony_weights[strongest_idx].min(1.0);
+            let edu_factor = agent.education_level;
+            let trauma_factor = 1.0 - agent.trauma_level;
+            let experience_factor = (agent.age_years(current_tick) / 80.0).min(1.0);
+            let cultural_factor = culture.harmony_weights[strongest_idx].min(1.0);
+            agent.consciousness.coherence = (
+                edu_factor * 0.4
+                + trauma_factor * 0.2
+                + experience_factor * 0.2
+                + cultural_factor * 0.2
+            ).clamp(0.0, 1.0);
 
             // Care activation: grows if agent has children or works in medicine/education
             if !agent.children_ids.is_empty() {
@@ -393,6 +403,129 @@ fn linear_slope(values: &[f64]) -> f64 {
     (nf * sum_xy - sum_x * sum_y) / denom
 }
 
+/// Tick consciousness growth across all worlds.
+///
+/// Extracted from `MultiWorldSimulator::tick_consciousness()`. Handles:
+/// - Red team adversarial recruitment (maintain ~5% adversarial population)
+/// - Per-agent consciousness decay (earned, not permanent; load-amplified)
+/// - Growth with diminishing returns, burnout penalty, pharma boost
+/// - Trust-weighted governance gating
+/// - Phi ceiling (moral humility at 0.95)
+pub fn tick_consciousness_all_worlds(
+    worlds: &mut [crate::world::World],
+    current_tick: u32,
+    pharma_boost: f64,
+    trust_weighted_governance: bool,
+) {
+    use crate::agent;
+    use crate::red_team;
+
+    // Red team: maintain adversarial population at ~5% if any adversaries exist.
+    for world in worlds.iter_mut() {
+        let has_adversaries = world.agents.iter().any(|a| a.adversarial.is_some());
+        if has_adversaries {
+            let living = world.agents.iter().filter(|a| a.is_alive()).count();
+            let adv_count = world.agents.iter()
+                .filter(|a| a.is_alive() && a.adversarial.is_some()).count();
+            let target = (living as f64 * 0.05).ceil() as usize;
+            if adv_count < target {
+                let deficit = target - adv_count;
+                let mut recruited = 0;
+                for agent in world.agents.iter_mut()
+                    .filter(|a| a.is_alive() && a.adversarial.is_none())
+                {
+                    if recruited >= deficit { break; }
+                    agent.adversarial = Some(red_team::AdversarialStrategy::ProfileMaximizer);
+                    recruited += 1;
+                }
+            }
+        }
+    }
+
+    // Phase 7: Gradual consciousness growth for agents.
+    for world in worlds.iter_mut() {
+        let mean_edu: f64 = {
+            let living: Vec<f64> = world.agents.iter()
+                .filter(|a| a.is_alive())
+                .map(|a| a.education_level)
+                .collect();
+            if living.is_empty() { 0.0 }
+            else { living.iter().sum::<f64>() / living.len() as f64 }
+        };
+
+        for agent in world.agents.iter_mut().filter(|a| a.is_alive()) {
+            let stage = agent.life_stage(current_tick);
+            let growth_rate = match stage {
+                agent::LifeStage::Child => 0.001,
+                agent::LifeStage::Youth => 0.003,
+                agent::LifeStage::Adult => 0.002,
+                agent::LifeStage::Elder => 0.001,
+            };
+
+            let base_decay = if stage == agent::LifeStage::Adult || stage == agent::LifeStage::Elder {
+                0.0015
+            } else {
+                0.0
+            };
+            let decay = base_decay * (1.0 + agent.needs.allostatic_load);
+            let c = &mut agent.consciousness;
+            c.level = (c.level - decay).max(0.0);
+            c.meta_awareness = (c.meta_awareness - decay).max(0.0);
+            c.coherence = (c.coherence - decay).max(0.0);
+            c.care_activation = (c.care_activation - decay).max(0.0);
+            c.harmonic_alignment = (c.harmonic_alignment - decay).max(0.0);
+            c.epistemic_confidence = (c.epistemic_confidence - decay).max(0.0);
+
+            let pharma = if world.infrastructure_level > 0.3 { pharma_boost } else { 0.0 };
+            let gating_factor = if trust_weighted_governance {
+                let phi = c.phi();
+                let bonus = 0.5 / (1.0 + (-10.0 * (phi - 0.3)).exp());
+                0.5 + bonus
+            } else {
+                0.5
+            };
+            let amplifier = (1.0 + mean_edu * 0.5 + pharma) * gating_factor;
+            let burnout_penalty = if agent.needs.is_burnout() { 0.35 } else { 1.0 };
+            let amplifier = amplifier * burnout_penalty;
+
+            let amplifier = if let Some(strategy) = &agent.adversarial {
+                let modifier = red_team::AdversarialModifier::for_strategy(*strategy, 0.01);
+                amplifier * modifier.phi_growth_mult
+            } else {
+                amplifier
+            };
+
+            if agent.needs.social_satiation > 0.5 {
+                c.care_activation = (c.care_activation + 0.0005).min(1.0);
+            }
+            let cap = 0.85;
+            let dr = |dim: f64, rate: f64| -> f64 {
+                let headroom = (1.0 - dim / cap).max(0.0);
+                rate * amplifier * headroom
+            };
+            c.level = (c.level + dr(c.level, growth_rate)).min(cap);
+            c.meta_awareness = (c.meta_awareness + dr(c.meta_awareness, growth_rate * 0.8)).min(cap);
+            c.coherence = (c.coherence + dr(c.coherence, growth_rate * 0.6)).min(cap);
+            c.care_activation = (c.care_activation + dr(c.care_activation, growth_rate * 0.7)).min(cap);
+            c.harmonic_alignment =
+                (c.harmonic_alignment + dr(c.harmonic_alignment, growth_rate * 0.5)).min(cap);
+            c.epistemic_confidence =
+                (c.epistemic_confidence + dr(c.epistemic_confidence, growth_rate * 0.4)).min(cap);
+
+            let phi = c.phi();
+            if phi > 0.95 {
+                let scale = 0.95 / phi;
+                c.level *= scale;
+                c.meta_awareness *= scale;
+                c.coherence *= scale;
+                c.care_activation *= scale;
+                c.harmonic_alignment *= scale;
+                c.epistemic_confidence *= scale;
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -495,10 +628,12 @@ mod tests {
         let mut rng = StochasticEngine::new(42);
         let culture = CulturalProfile::earth_default();
 
-        // All agents at tier 0 (nascent) with low phi — classic fragile consensus
+        // All agents at tier 0 (nascent) with low phi — classic fragile consensus.
+        // Low education ensures emergent coherence stays low (phi < 0.3).
         let mut agents: Vec<CivAgent> = (0..30).map(|i| {
             let mut a = make_agent(i, 0);
             a.consciousness = ConsciousnessState::nascent();
+            a.education_level = 0.05;
             a
         }).collect();
 
