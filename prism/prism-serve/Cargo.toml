@@ -3,7 +3,7 @@ name = "prism-serve"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "Static file server for Symthaea Prism (production deployment)"
+description = "Static file server for Prism (production deployment)"
 
 [dependencies]
 axum = "0.8"

@@ -3,7 +3,7 @@ name = "prism-shell"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "Symthaea Prism — main executable with GPU rendering, navigation, and search"
+description = "Prism — main executable with GPU rendering, navigation, and search"
 
 [dependencies]
 prism-common = { path = "../prism-common" }

@@ -1,7 +1,7 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
-//! CORS proxy for Symthaea Prism.
+//! CORS proxy for Prism.
 //!
 //! Fetches external URLs on behalf of the WASM app and returns
 //! responses with permissive CORS headers.
@@ -122,7 +122,7 @@ async fn proxy_handler(Query(params): Query<ProxyParams>) -> impl IntoResponse {
 
     log::info!("Proxying: {}", validated);
 
-    let client = build_client("SymthaePrism/0.1 (proxy; +https://luminousdynamics.org)", 15);
+    let client = build_client("Prism/0.1 (proxy; +https://luminousdynamics.org)", 15);
 
     match client.get(validated.as_str()).send().await {
         Ok(resp) => {
@@ -180,7 +180,7 @@ async fn ddg_handler(Query(params): Query<DdgParams>) -> impl IntoResponse {
     );
     log::info!("DDG proxy: {}", params.q);
 
-    let client = build_client("SymthaePrism/0.2 (ddg-proxy)", 10);
+    let client = build_client("Prism/0.2 (ddg-proxy)", 10);
 
     match client.get(&url).send().await {
         Ok(resp) => {
@@ -216,7 +216,7 @@ async fn brave_handler(
     );
     log::info!("Brave proxy: {}", params.q);
 
-    let client = build_client("SymthaePrism/0.2 (brave-proxy)", 15);
+    let client = build_client("Prism/0.2 (brave-proxy)", 15);
 
     match client
         .get(&url)
@@ -254,7 +254,7 @@ async fn perplexity_handler(
 
     log::info!("Perplexity proxy request");
 
-    let client = build_client("SymthaePrism/0.2 (perplexity-proxy)", 30);
+    let client = build_client("Prism/0.2 (perplexity-proxy)", 30);
 
     match client
         .post("https://api.perplexity.ai/chat/completions")
@@ -278,7 +278,7 @@ async fn perplexity_handler(
 }
 
 async fn health() -> &'static str {
-    "Symthaea Prism proxy OK"
+    "Prism proxy OK"
 }
 
 #[tokio::main]
@@ -308,7 +308,7 @@ async fn main() {
 
     let addr = "127.0.0.1:8131";
     log::info!("Prism proxy listening on http://{}", addr);
-    println!("Symthaea Prism CORS proxy on http://{}", addr);
+    println!("Prism CORS proxy on http://{}", addr);
 
     let listener = tokio::net::TcpListener::bind(addr)
         .await

@@ -1,7 +1,7 @@
 # Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 # SPDX-License-Identifier: AGPL-3.0-or-later
 # Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
-# Symthaea Prism — NixOS production services
+# Prism — NixOS production services
 #
 # Deployment:
 #   1. Build: cd /srv/luminous-dynamics/prism && cargo build -p prism-serve -p prism-proxy --release
@@ -11,8 +11,8 @@
 #   4. sudo nixos-rebuild switch
 #
 # Services:
-#   - symthaea-prism: static file server for the WASM app (port 8130)
-#   - symthaea-prism-proxy: CORS proxy for URL fetching (port 8131)
+#   - prism: static file server for the WASM app (port 8130)
+#   - prism-proxy: CORS proxy for URL fetching (port 8131)
 
 { config, pkgs, ... }:
 
@@ -24,8 +24,8 @@ let
 in
 {
   # ── Static file server (serves the WASM app) ──
-  systemd.services.symthaea-prism = {
-    description = "Symthaea Prism — Epistemic Search Browser";
+  systemd.services.prism = {
+    description = "Prism — Epistemic Search Browser";
     wantedBy = [ "multi-user.target" ];
     after = [ "network.target" ];
 
@@ -54,8 +54,8 @@ in
   };
 
   # ── CORS proxy (enables URL fetching from WASM) ──
-  systemd.services.symthaea-prism-proxy = {
-    description = "Symthaea Prism CORS Proxy";
+  systemd.services.prism-proxy = {
+    description = "Prism CORS Proxy";
     wantedBy = [ "multi-user.target" ];
     after = [ "network.target" ];
 

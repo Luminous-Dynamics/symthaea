@@ -1,7 +1,7 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
-//! HTTP networking for Symthaea Prism.
+//! HTTP networking for Prism.
 //!
 //! Fetches web pages via `reqwest`, handles decompression, and parses them
 //! into `DomTree` via `prism-dom`.
@@ -11,7 +11,7 @@ use reqwest::header::HeaderMap;
 use thiserror::Error;
 use url::Url;
 
-const PRISM_USER_AGENT: &str = "SymthaePrism/0.1 (pure Rust; +https://luminousdynamics.org)";
+const PRISM_USER_AGENT: &str = "Prism/0.1 (pure Rust; +https://luminousdynamics.org)";
 
 #[derive(Error, Debug)]
 pub enum FetchError {
@@ -51,7 +51,7 @@ pub struct FetchedPage {
     pub metadata: FetchMetadata,
 }
 
-/// HTTP client for Symthaea Prism (networking layer).
+/// HTTP client for Prism (networking layer).
 pub struct PrismClient {
     client: reqwest::Client,
     max_body_size: u64,

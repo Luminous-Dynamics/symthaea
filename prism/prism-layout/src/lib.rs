@@ -1,7 +1,7 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
-//! Layout engine for Symthaea Prism.
+//! Layout engine for Prism.
 //!
 //! Features (A-F improvements):
 //! - C: Proper text wrapping with word-boundary line breaking

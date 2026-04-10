@@ -1,7 +1,7 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
-//! Production static file server for Symthaea Prism.
+//! Production static file server for Prism.
 //!
 //! Serves the pre-built WASM app from prism-ui/dist/ with:
 //! - Gzip compression
@@ -31,8 +31,8 @@ async fn main() {
 
     let addr = std::env::var("PRISM_ADDR").unwrap_or_else(|_| "0.0.0.0:8130".to_string());
 
-    log::info!("Symthaea Prism serving {} on {}", dist_path, addr);
-    println!("Symthaea Prism serving on http://{}", addr);
+    log::info!("Prism serving {} on {}", dist_path, addr);
+    println!("Prism serving on http://{}", addr);
 
     let listener = tokio::net::TcpListener::bind(&addr).await.unwrap();
     axum::serve(listener, app).await.unwrap();

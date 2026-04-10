@@ -65,7 +65,7 @@ pub fn App() -> impl IntoView {
             <div class="chrome-top">
                 <span class="brand-icon" inner_html=PRISM_ICON_MINI></span>
                 <span class="brand">"Prism"</span>
-                <span class="brand-sub">"by Symthaea"</span>
+                <span class="brand-sub">"by Mycelix"</span>
                 <div style="flex:1"></div>
                 <DhtStatusBadge />
                 <ThemeSwitcher />

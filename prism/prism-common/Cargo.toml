@@ -3,7 +3,7 @@ name = "prism-common"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "Shared types for Symthaea Prism"
+description = "Shared types for Prism"
 
 [dependencies]
 serde = { workspace = true }

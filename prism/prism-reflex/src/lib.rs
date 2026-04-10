@@ -1,7 +1,7 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
-//! In-process reflex arc immune system for Symthaea Prism.
+//! In-process reflex arc immune system for Prism.
 //!
 //! Two-stage content classification:
 //! 1. **Pre-fetch** (URL + headers): Fast domain/header classification before HTTP request

@@ -3,7 +3,7 @@ name = "prism-privacy"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "Three-zone privacy enforcement for Symthaea Prism"
+description = "Three-zone privacy enforcement for Prism"
 
 [dependencies]
 prism-common = { path = "../prism-common" }

@@ -1,7 +1,7 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
-//! Epistemic knowledge search engine for Symthaea Prism.
+//! Epistemic knowledge search engine for Prism.
 //!
 //! Uses Symthaea's 16,384-bit BinaryHV for semantic encoding and
 //! batch similarity search over a pre-seeded claim index.

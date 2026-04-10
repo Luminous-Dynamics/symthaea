@@ -126,7 +126,7 @@ pub fn process_input(
 
     if input == "prism://welcome" || input.starts_with("prism://") && !input.contains("search") {
         state.set_current_url.set(input.to_string());
-        state.set_page_title.set("Symthaea Prism".to_string());
+        state.set_page_title.set("Prism".to_string());
         state.set_view.set(PageView::Welcome);
         state.set_zone.set(ContentZone::Local);
         state.set_safety.set(SafetyLevel::Green);

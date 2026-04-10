@@ -1,4 +1,4 @@
-# Symthaea Prism — Feature Parity Comparison
+# Prism — Feature Parity Comparison
 
 Compared against Brave 1.76, Chrome 134, Firefox 137, Safari 18.
 

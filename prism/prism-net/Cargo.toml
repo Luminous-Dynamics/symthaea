@@ -3,7 +3,7 @@ name = "prism-net"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "HTTP networking for Symthaea Prism"
+description = "HTTP networking for Prism"
 
 [dependencies]
 prism-common = { path = "../prism-common" }

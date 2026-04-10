@@ -1,7 +1,7 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
-//! Feature parity comparison: Symthaea Prism vs Brave/Chrome/Firefox/Safari.
+//! Feature parity comparison: Prism vs Brave/Chrome/Firefox/Safari.
 //!
 //! Tests every major browser feature category and documents Prism's
 //! status against the industry standard. This is both a test suite

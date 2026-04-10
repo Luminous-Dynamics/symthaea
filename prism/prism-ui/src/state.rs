@@ -42,7 +42,7 @@ pub struct BrowserState {
 impl BrowserState {
     pub fn new() -> Self {
         let (current_url, set_current_url) = signal("prism://welcome".to_string());
-        let (page_title, set_page_title) = signal("Symthaea Prism".to_string());
+        let (page_title, set_page_title) = signal("Prism".to_string());
         let (view, set_view) = signal(PageView::Welcome);
         let (zone, set_zone) = signal(ContentZone::Local);
         let (safety, set_safety) = signal(SafetyLevel::Green);

@@ -1,7 +1,7 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
-//! Symthaea Prism — Tauri v2 desktop app.
+//! Prism — Tauri v2 desktop app.
 //!
 //! The Local Hub: direct URL fetching (no CORS), bundled search engine,
 //! native filesystem access for persistent storage.
@@ -123,14 +123,14 @@ fn main() {
         search: SearchEngine::with_seed_claims(),
         reflex: ReflexArc::new(),
         client: reqwest::Client::builder()
-            .user_agent("SymthaePrism/0.2 (Tauri; +https://mycelix.net)")
+            .user_agent("Prism/0.2 (Tauri; +https://mycelix.net)")
             .redirect(reqwest::redirect::Policy::limited(10))
             .timeout(std::time::Duration::from_secs(30))
             .build()
             .expect("HTTP client"),
     };
 
-    log::info!("Symthaea Prism desktop starting ({} claims indexed)", prism_state.search.claim_count());
+    log::info!("Prism desktop starting ({} claims indexed)", prism_state.search.claim_count());
 
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
@@ -141,5 +141,5 @@ fn main() {
             claim_count,
         ])
         .run(tauri::generate_context!())
-        .expect("error running Symthaea Prism");
+        .expect("error running Prism");
 }

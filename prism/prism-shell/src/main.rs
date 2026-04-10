@@ -1,7 +1,7 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
-//! Symthaea Prism — consciousness-aware pure Rust browser.
+//! Prism — consciousness-aware pure Rust browser.
 //!
 //! Features:
 //! 1. Live navigation (type URL → fetch → render)
@@ -296,7 +296,7 @@ impl ApplicationHandler for PrismApp {
             event_loop.create_window(
                 Window::default_attributes()
                     .with_inner_size(LogicalSize::new(1024, 768))
-                    .with_title("Symthaea Prism"),
+                    .with_title("Prism"),
             ).expect("window"),
         );
 

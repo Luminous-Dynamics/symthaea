@@ -3,7 +3,7 @@ name = "prism-ui"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "Symthaea Prism — Leptos 0.8 CSR frontend with epistemic search"
+description = "Prism — Leptos 0.8 CSR frontend with epistemic search"
 
 [dependencies]
 # Prism engine crates

@@ -1,7 +1,7 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
-//! Three-zone privacy enforcement for Symthaea Prism.
+//! Three-zone privacy enforcement for Prism.
 //!
 //! The encoding gate is the ONLY path to the HDC encoder and DHT.
 //! No code path can write to DHT without passing through this gate.

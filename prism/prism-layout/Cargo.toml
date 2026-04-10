@@ -3,7 +3,7 @@ name = "prism-layout"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "Layout engine for Symthaea Prism — text wrapping, inline elements, reader mode"
+description = "Layout engine for Prism — text wrapping, inline elements, reader mode"
 
 [dependencies]
 prism-common = { path = "../prism-common" }

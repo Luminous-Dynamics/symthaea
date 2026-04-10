@@ -1,7 +1,7 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
-//! Symthaea Prism — Leptos 0.8 CSR frontend.
+//! Prism — Leptos 0.8 CSR frontend.
 //!
 //! Consciousness-aware epistemic search browser.
 //! Pure Rust. Zero C++. Powered by Symthaea.

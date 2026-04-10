@@ -65,8 +65,8 @@ pub fn ContentRouter() -> impl IntoView {
 fn WelcomePage() -> impl IntoView {
     view! {
         <div class="reader-content welcome">
-            <h1>"Symthaea Prism"</h1>
-            <p class="tagline">"Consciousness-aware epistemic search. Pure Rust. Powered by Symthaea."</p>
+            <h1>"Mycelix Prism"</h1>
+            <p class="tagline">"Consciousness-aware epistemic search. Pure Rust."</p>
 
             <div class="try-section">
                 <h2>"Try Searching"</h2>

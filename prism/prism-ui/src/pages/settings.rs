@@ -1,7 +1,7 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
-//! Settings page for Symthaea Prism.
+//! Settings page for Prism.
 
 use leptos::prelude::*;
 use wasm_bindgen::JsCast;
@@ -259,13 +259,13 @@ pub fn SettingsPage() -> impl IntoView {
                     <div class="about-item"><strong>"Engine"</strong><span>"BinaryHV 16,384-bit"</span></div>
                     <div class="about-item"><strong>"Claims Indexed"</strong><span>{claim_count.to_string()}</span></div>
                     <div class="about-item"><strong>"Crates"</strong><span>"13"</span></div>
-                    <div class="about-item"><strong>"Tests"</strong><span>"168 passing"</span></div>
+                    <div class="about-item"><strong>"Tests"</strong><span>"176 passing"</span></div>
                     <div class="about-item"><strong>"Language"</strong><span>"Pure Rust"</span></div>
                     <div class="about-item"><strong>"C++ Dependencies"</strong><span>"Zero"</span></div>
                     <div class="about-item"><strong>"JavaScript"</strong><span>"None"</span></div>
                 </div>
                 <p style="margin-top: 16px; font-size: 13px; color: var(--content-text-secondary);">
-                    "Symthaea Prism is part of the Mycelix ecosystem. "
+                    "Prism is part of the Mycelix ecosystem. "
                     <a href="https://mycelix.net">"mycelix.net"</a>
                 </p>
             </section>

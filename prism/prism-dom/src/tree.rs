@@ -295,9 +295,9 @@ mod tests {
 
         let title = make_element(&mut tree, "title");
         tree.append_child(head, title);
-        let text = make_text(&mut tree, "  Symthaea Prism  ");
+        let text = make_text(&mut tree, "  Prism  ");
         tree.append_child(title, text);
 
-        assert_eq!(tree.title().unwrap(), "Symthaea Prism");
+        assert_eq!(tree.title().unwrap(), "Prism");
     }
 }

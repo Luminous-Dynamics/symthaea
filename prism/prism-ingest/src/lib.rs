@@ -1,7 +1,7 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
-//! Pure Rust data ingestion for Symthaea Prism.
+//! Pure Rust data ingestion for Prism.
 //!
 //! Loads claims from curated sources, mycelix-knowledge JSON,
 //! and Wikidata SPARQL results. Deduplicates and quality-filters.
