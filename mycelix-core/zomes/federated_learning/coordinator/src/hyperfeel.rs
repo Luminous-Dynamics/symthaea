@@ -422,3 +422,48 @@ pub fn aggregate_round_hypervectors(round: u32) -> ExternResult<Vec<u8>> {
 
     Ok(result)
 }
+
+/// Get per-agent semantic resonance score [0.0, 1.0].
+///
+/// Computes Hamming similarity between the agent's latest submitted
+/// hypervector and the aggregated community hypervector for the most
+/// recent round. High similarity = strong alignment with community consensus.
+///
+/// Used by the 8D Sovereign Profile (D6: Semantic Resonance).
+#[hdk_extern]
+pub fn get_agent_semantic_resonance(round: u32) -> ExternResult<f64> {
+    let agent = agent_info()?.agent_initial_pubkey;
+    let agent_id = agent.to_string();
+
+    // Get all HVs for this round
+    let all_hvs = get_round_hypervectors(round)?;
+    if all_hvs.len() < 2 {
+        return Ok(0.0); // Need at least 2 participants for resonance
+    }
+
+    // Find the agent's HV
+    let agent_hv = all_hvs.iter()
+        .find(|(id, _)| id == &agent_id)
+        .map(|(_, hv)| hv.clone());
+
+    let agent_hv = match agent_hv {
+        Some(hv) => hv,
+        None => return Ok(0.0), // Agent didn't participate
+    };
+
+    // Aggregate community HV (majority vote of all participants)
+    let community_hv = aggregate_round_hypervectors(round)?;
+
+    // Hamming similarity: matching bits / total bits
+    let total_bits = (HV16_BYTES * 8) as f64;
+    let matching_bits: u32 = agent_hv.iter()
+        .zip(community_hv.iter())
+        .map(|(a, b)| (!(a ^ b)).count_ones())
+        .sum();
+
+    let similarity = matching_bits as f64 / total_bits;
+
+    // Map from [0.5, 1.0] range to [0.0, 1.0] (random = 0.5 → 0.0 score)
+    let normalized = ((similarity - 0.5) * 2.0).clamp(0.0, 1.0);
+    Ok(normalized)
+}

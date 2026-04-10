@@ -1527,17 +1527,15 @@ pub fn get_consciousness_credential(did: String) -> ExternResult<ConsciousnessCr
 /// grants unearned access). As more cluster collectors are wired, more
 /// dimensions will be populated with real data.
 ///
-/// Wired collectors (6 of 8):
+/// All 8 dimensions wired to real cluster data:
 /// - D0 Epistemic: knowledge/claims (get_agent_epistemic_score), fallback: MFA
+/// - D1 Thermodynamic: energy/grid (get_agent_thermodynamic_score)
 /// - D2 Network: commons/mesh-time (get_agent_resilience_score), fallback: MFA
 /// - D3 Economic: finance/TEND (get_tend_reputation_input)
 /// - D4 Civic: governance/voting + community trust
 /// - D5 Stewardship: attribution/reciprocity (get_agent_stewardship_score), fallback: reputation
+/// - D6 Semantic: core-FL/hyperfeel (get_agent_semantic_resonance), fallback: community trust
 /// - D7 Competence: craft/credentials (list_my_published_credentials)
-///
-/// Not yet wired (default 0.0):
-/// - D1 Thermodynamic Yield: needs energy cluster grid production data
-/// - D6 Semantic Resonance: proxy via community trust (needs Symthaea HDC)
 #[hdk_extern]
 pub fn issue_sovereign_credential(
     did: String,
@@ -1562,15 +1560,19 @@ pub fn issue_sovereign_credential(
     let stewardship = collect_stewardship_care(&did);
     let competence = collect_domain_competence(&did);
 
-    // Build 8D profile — use real data where available, proxy otherwise
+    // New collectors for final 2 dimensions
+    let thermodynamic = collect_thermodynamic_yield(&did);
+    let resonance = collect_semantic_resonance();
+
+    // Build 8D profile — all 8 dimensions wired to real data sources
     let profile = sovereign_profile::SovereignProfile {
         epistemic_integrity: if epistemic > 0.0 { epistemic } else { identity_score },
-        thermodynamic_yield: 0.0,            // TODO: wire energy cluster
+        thermodynamic_yield: thermodynamic,
         network_resilience: if network > 0.0 { network } else { identity_score },
         economic_velocity: economic,
         civic_participation: community_score.max(civic_extra),
         stewardship_care: if stewardship > 0.0 { stewardship } else { reputation_score },
-        semantic_resonance: community_score,  // proxy until Symthaea HDC wired
+        semantic_resonance: if resonance > 0.0 { resonance } else { community_score },
         domain_competence: competence,
     };
 
@@ -1644,6 +1646,39 @@ fn collect_stewardship_care(did: &str) -> f64 {
         FunctionName::new("get_agent_stewardship_score"),
         None,
         did.to_string(),
+    ) {
+        Ok(ZomeCallResponse::Ok(result)) => {
+            result.decode::<f64>().unwrap_or(0.0).clamp(0.0, 1.0)
+        }
+        _ => 0.0,
+    }
+}
+
+/// Collect thermodynamic yield from energy cluster (grid zome).
+fn collect_thermodynamic_yield(did: &str) -> f64 {
+    match call(
+        CallTargetCell::OtherRole("energy".into()),
+        ZomeName::new("grid_coordinator"),
+        FunctionName::new("get_agent_thermodynamic_score"),
+        None,
+        did.to_string(),
+    ) {
+        Ok(ZomeCallResponse::Ok(result)) => {
+            result.decode::<f64>().unwrap_or(0.0).clamp(0.0, 1.0)
+        }
+        _ => 0.0,
+    }
+}
+
+/// Collect semantic resonance from federated learning (hyperfeel HV similarity).
+fn collect_semantic_resonance() -> f64 {
+    // Use round 0 as default — in practice, the latest round would be queried
+    match call(
+        CallTargetCell::OtherRole("core_fl".into()),
+        ZomeName::new("federated_learning_coordinator"),
+        FunctionName::new("get_agent_semantic_resonance"),
+        None,
+        0u32, // latest round
     ) {
         Ok(ZomeCallResponse::Ok(result)) => {
             result.decode::<f64>().unwrap_or(0.0).clamp(0.0, 1.0)

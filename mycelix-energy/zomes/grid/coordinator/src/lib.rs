@@ -348,6 +348,27 @@ pub struct ProducerStats {
     pub record_count: u32,
 }
 
+/// Get per-agent thermodynamic yield score [0.0, 1.0].
+///
+/// Normalizes verified energy production: 30+ verified records = saturation.
+/// Quality = verified_kwh / total_kwh (higher = more trustworthy production).
+///
+/// Used by the 8D Sovereign Profile (D1: Thermodynamic Yield).
+#[hdk_extern]
+pub fn get_agent_thermodynamic_score(producer_did: String) -> ExternResult<f64> {
+    let stats = get_producer_total_production(producer_did)?;
+    if stats.record_count == 0 {
+        return Ok(0.0);
+    }
+    let saturation = (stats.record_count as f64 / 30.0).min(1.0);
+    let quality = if stats.total_kwh > 0.0 {
+        (stats.verified_kwh / stats.total_kwh).clamp(0.0, 1.0)
+    } else {
+        0.0
+    };
+    Ok((saturation * quality).clamp(0.0, 1.0))
+}
+
 /// Update offer price (seller only)
 #[hdk_extern]
 pub fn update_offer_price(input: UpdateOfferPriceInput) -> ExternResult<Record> {
