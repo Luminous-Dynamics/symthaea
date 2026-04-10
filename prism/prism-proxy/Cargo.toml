@@ -9,7 +9,9 @@ description = "CORS proxy for Symthaea Prism — enables WASM to fetch external 
 axum = "0.8"
 reqwest = { workspace = true }
 tokio = { workspace = true }
+tower = { version = "0.5", features = ["limit"] }
 tower-http = { version = "0.6", features = ["cors"] }
 serde = { workspace = true }
+url = { workspace = true }
 log = { workspace = true }
 env_logger = { workspace = true }

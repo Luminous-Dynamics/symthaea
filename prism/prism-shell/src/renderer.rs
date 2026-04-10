@@ -22,8 +22,8 @@ use winit::window::Window;
 use prism_common::{ContentZone, SafetyLevel};
 use prism_layout::{PaintContent, PaintRect};
 
-const FONT_REGULAR: &[u8] = include_bytes!("../fonts/DejaVuSans.ttf");
-const FONT_BOLD: &[u8] = include_bytes!("../fonts/DejaVuSans-Bold.ttf");
+const FONT_REGULAR: &[u8] = include_bytes!("/nix/store/9v9i2f647ihw56z8cr5p5x7sf9adrrak-dejavu-fonts-2.37/share/fonts/truetype/DejaVuSans.ttf");
+const FONT_BOLD: &[u8] = include_bytes!("/nix/store/9v9i2f647ihw56z8cr5p5x7sf9adrrak-dejavu-fonts-2.37/share/fonts/truetype/DejaVuSans-Bold.ttf");
 
 /// Chrome bar height in pixels.
 const CHROME_HEIGHT: f64 = 48.0;

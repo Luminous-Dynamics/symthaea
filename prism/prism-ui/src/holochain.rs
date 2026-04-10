@@ -4,16 +4,20 @@
 //! Holochain conductor bridge for Symthaea Prism.
 //!
 //! Connects to the shared Mycelix conductor on ws://localhost:8888
-//! to publish verified claims to the knowledge DHT.
+//! to publish verified claims to the Knowledge DHT.
 //!
-//! Connection lifecycle:
+//! Bridge lifecycle:
 //! 1. App startup → check_conductor() probes the WebSocket
 //! 2. If connected → "Share to DHT" buttons become active
-//! 3. Clicking "Share" → publish_claim() sends via WebSocket
+//! 3. Clicking "Share" → publish_claim() sends via BrowserWsTransport
 //! 4. If disconnected → claims saved locally, queued for later sync
 
 use leptos::prelude::*;
 use serde::{Deserialize, Serialize};
+use mycelix_claim_types::{EmpiricalLevel, NormativeLevel, MaterialityLevel};
+
+const CONDUCTOR_URL: &str = "ws://localhost:8888";
+const APP_ID: &str = "mycelix-knowledge";
 
 /// Connection status to the Holochain conductor.
 #[derive(Clone, Debug, PartialEq)]
@@ -28,7 +32,6 @@ impl ConductorStatus {
     pub fn is_connected(&self) -> bool {
         matches!(self, Self::Connected)
     }
-
     pub fn label(&self) -> &str {
         match self {
             Self::Disconnected => "DHT Offline",
@@ -37,7 +40,6 @@ impl ConductorStatus {
             Self::Error(_) => "DHT Error",
         }
     }
-
     pub fn css_class(&self) -> &str {
         match self {
             Self::Disconnected => "dht-status offline",
@@ -48,34 +50,27 @@ impl ConductorStatus {
     }
 }
 
-/// A claim to be published to the Mycelix knowledge DHT.
+/// A claim to be published to the Mycelix Knowledge DHT.
+/// Uses unified E/N/M types from mycelix-claim-types.
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct DhtClaim {
     pub content: String,
-    pub classification: DhtClassification,
+    pub empirical: EmpiricalLevel,
+    pub normative: NormativeLevel,
+    pub materiality: MaterialityLevel,
     pub sources: Vec<String>,
     pub tags: Vec<String>,
     pub claim_type: String,
-    pub confidence: f32,
+    pub confidence: f64,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct DhtClassification {
-    pub empirical: f32,
-    pub normative: f32,
-    pub mythic: f32,
-}
-
-/// Check if the Holochain conductor is reachable via WebSocket probe.
+/// Check if the Holochain conductor is reachable.
 pub async fn check_conductor() -> ConductorStatus {
-    // Probe the conductor by attempting an HTTP request to the app port
-    // (WebSocket upgrade happens on connection, but HTTP probe tells us if port is open)
     match gloo_net::http::Request::get("http://localhost:8888")
         .send()
         .await
     {
         Ok(resp) => {
-            // Holochain conductor responds (even with an error) = it's running
             log::info!("Holochain conductor detected on :8888 (status {})", resp.status());
             ConductorStatus::Connected
         }
@@ -86,100 +81,129 @@ pub async fn check_conductor() -> ConductorStatus {
     }
 }
 
-/// Publish a verified claim to the knowledge DHT.
+/// Publish a verified claim to the Knowledge DHT via WebSocket zome call.
 pub async fn publish_claim(claim: &DhtClaim) -> Result<String, String> {
     log::info!("Publishing claim to DHT: {}", &claim.content[..claim.content.len().min(60)]);
 
-    // Check conductor reachability first
     let status = check_conductor().await;
     if !status.is_connected() {
-        // Save locally for later sync
         save_claim_locally(claim);
         return Err("Conductor offline — claim saved locally for later sync".to_string());
     }
 
-    // Send claim to conductor via HTTP-based zome call
-    // Holochain's app WebSocket at :8888 accepts JSON-RPC style messages.
-    // We use gloo-net HTTP POST as a simpler bridge that works with
-    // Holochain's WebSocket-to-HTTP proxy patterns.
-    let payload = serde_json::json!({
-        "type": "call_zome",
-        "data": {
-            "role_name": "knowledge",
-            "zome_name": "claims",
-            "fn_name": "submit_claim",
-            "payload": claim,
-        }
-    });
+    // Build zome call payload matching Knowledge's submit_claim input
+    #[derive(Serialize)]
+    struct SubmitClaimInput {
+        id: String,
+        content: String,
+        classification: SubmitClassification,
+        author: String,
+        sources: Vec<String>,
+        tags: Vec<String>,
+        claim_type: String,
+        confidence: f64,
+    }
 
-    match gloo_net::http::Request::post("http://localhost:8888/api/v1/call_zome")
-        .header("Content-Type", "application/json")
-        .body(serde_json::to_string(&payload).map_err(|e| e.to_string())?)
-        .map_err(|e| format!("Request build error: {}", e))?
-        .send()
-        .await
-    {
-        Ok(resp) if resp.ok() => {
-            let body = resp.text().await.unwrap_or_default();
-            log::info!("Claim published to DHT: {}", &body[..body.len().min(80)]);
-            Ok(body)
-        }
-        Ok(resp) => {
-            // Conductor reachable but zome call failed — save locally
-            let err = format!("Zome call failed (status {})", resp.status());
-            log::warn!("{} — saving claim locally", err);
-            save_claim_locally(claim);
-            Err(err)
+    #[derive(Serialize)]
+    struct SubmitClassification {
+        empirical: f64,
+        normative: f64,
+        mythic: f64,
+    }
+
+    let input = SubmitClaimInput {
+        id: format!("prism-{}", js_sys::Date::now() as u64),
+        content: claim.content.clone(),
+        classification: SubmitClassification {
+            empirical: claim.empirical.as_f32() as f64,
+            normative: claim.normative.as_f32() as f64,
+            mythic: claim.materiality.as_f32() as f64,
+        },
+        author: "did:mycelix:prism-browser".to_string(),
+        sources: claim.sources.clone(),
+        tags: claim.tags.clone(),
+        claim_type: claim.claim_type.clone(),
+        confidence: claim.confidence,
+    };
+
+    // Connect via BrowserWsTransport and call the zome
+    let transport = mycelix_leptos_client::BrowserWsTransport::new();
+    let client = mycelix_leptos_client::HolochainClient::new(transport, APP_ID, "knowledge");
+
+    match client.connect(CONDUCTOR_URL, None).await {
+        Ok(()) => {
+            match client.call_zome::<SubmitClaimInput, serde_json::Value>(
+                "claims", "submit_claim", &input,
+            ).await {
+                Ok(response) => {
+                    log::info!("Claim published to DHT successfully");
+                    Ok(format!("Published: {:?}", response))
+                }
+                Err(e) => {
+                    log::warn!("DHT zome call failed: {e} — saving locally");
+                    save_claim_locally(claim);
+                    Err(format!("Zome call failed: {e} — saved locally"))
+                }
+            }
         }
         Err(e) => {
-            // Network error — save locally for later sync
-            log::warn!("Conductor unreachable: {} — saving locally", e);
+            log::warn!("WebSocket connection failed: {e} — saving locally");
             save_claim_locally(claim);
-            Err(format!("Network error: {} — claim saved locally", e))
+            Err(format!("Connection failed: {e} — saved locally"))
         }
     }
 }
 
-/// Save a claim to localStorage for offline-first operation.
+/// Sync all locally queued claims to the DHT.
+pub async fn sync_pending_claims() -> usize {
+    let claims = load_local_queue();
+    if claims.is_empty() { return 0; }
+
+    let status = check_conductor().await;
+    if !status.is_connected() { return 0; }
+
+    let mut synced = 0;
+    for claim in &claims {
+        if publish_claim(claim).await.is_ok() {
+            synced += 1;
+        }
+    }
+
+    if synced > 0 {
+        let remaining: Vec<DhtClaim> = claims.into_iter().skip(synced).collect();
+        save_queue(&remaining);
+    }
+    synced
+}
+
+// --- localStorage queue ---
+
 fn save_claim_locally(claim: &DhtClaim) {
-    if let Some(storage) = web_sys::window()
-        .and_then(|w| w.local_storage().ok())
-        .flatten()
-    {
-        // Load existing queue
-        let key = "prism-claim-queue";
-        let mut queue: Vec<DhtClaim> = storage
-            .get_item(key)
-            .ok()
-            .flatten()
-            .and_then(|json| serde_json::from_str(&json).ok())
-            .unwrap_or_default();
+    let mut queue = load_local_queue();
+    queue.push(claim.clone());
+    if queue.len() > 100 { queue = queue.split_off(queue.len() - 100); }
+    save_queue(&queue);
+    log::info!("Claim queued locally ({} pending)", queue.len());
+}
 
-        queue.push(claim.clone());
+fn load_local_queue() -> Vec<DhtClaim> {
+    web_sys::window()
+        .and_then(|w| w.local_storage().ok().flatten())
+        .and_then(|s| s.get_item("prism-claim-queue").ok().flatten())
+        .and_then(|json| serde_json::from_str(&json).ok())
+        .unwrap_or_default()
+}
 
-        // Cap queue at 100 claims
-        if queue.len() > 100 {
-            queue = queue.split_off(queue.len() - 100);
+fn save_queue(queue: &[DhtClaim]) {
+    if let Some(storage) = web_sys::window().and_then(|w| w.local_storage().ok().flatten()) {
+        if let Ok(json) = serde_json::to_string(queue) {
+            let _ = storage.set_item("prism-claim-queue", &json);
         }
-
-        if let Ok(json) = serde_json::to_string(&queue) {
-            let _ = storage.set_item(key, &json);
-        }
-
-        log::info!("Claim queued locally ({} pending)", queue.len());
     }
 }
 
-/// Get the count of locally queued claims waiting for DHT sync.
 pub fn pending_claim_count() -> usize {
-    web_sys::window()
-        .and_then(|w| w.local_storage().ok())
-        .flatten()
-        .and_then(|s| s.get_item("prism-claim-queue").ok())
-        .flatten()
-        .and_then(|json| serde_json::from_str::<Vec<DhtClaim>>(&json).ok())
-        .map(|q| q.len())
-        .unwrap_or(0)
+    load_local_queue().len()
 }
 
 /// DHT status indicator component for the chrome bar.
@@ -188,13 +212,21 @@ pub fn DhtStatusBadge() -> impl IntoView {
     let (status, set_status) = signal(ConductorStatus::Disconnected);
     let (pending, set_pending) = signal(0usize);
 
-    // Check conductor on mount
     Effect::new(move |_| {
         wasm_bindgen_futures::spawn_local(async move {
             set_status.set(ConductorStatus::Connecting);
             let s = check_conductor().await;
-            set_status.set(s);
+            set_status.set(s.clone());
             set_pending.set(pending_claim_count());
+
+            // Auto-sync pending claims if connected
+            if s.is_connected() {
+                let synced = sync_pending_claims().await;
+                if synced > 0 {
+                    log::info!("Auto-synced {synced} pending claims to DHT");
+                    set_pending.set(pending_claim_count());
+                }
+            }
         });
     });
 

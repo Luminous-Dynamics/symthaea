@@ -69,8 +69,8 @@ pub fn generate_similarity_proof(
     // Commitment: binds similarity to the specific query-claim pair
     let commitment = {
         let mut hasher = Sha256::new();
-        hasher.update(&query_hash);
-        hasher.update(&claim_hash);
+        hasher.update(query_hash);
+        hasher.update(claim_hash);
         hasher.update(similarity.to_le_bytes());
         let result = hasher.finalize();
         let mut c = [0u8; 32];
@@ -94,8 +94,8 @@ pub fn verify_similarity_proof(proof: &SimilarityProof) -> Result<(), String> {
     // Recompute commitment
     let expected = {
         let mut hasher = Sha256::new();
-        hasher.update(&proof.query_hash);
-        hasher.update(&proof.claim_hash);
+        hasher.update(proof.query_hash);
+        hasher.update(proof.claim_hash);
         hasher.update(proof.similarity.to_le_bytes());
         let result = hasher.finalize();
         let mut c = [0u8; 32];

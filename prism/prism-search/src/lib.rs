@@ -9,11 +9,17 @@
 //! Encoding: word-level random indexing (each word → deterministic BinaryHV,
 //! bound with position vector, bundled into document vector).
 
-use prism_common::{EmpiricalLevel, SearchResult};
-mod binary_hv;
+// HDC byte-level operations use explicit indexing for clarity and performance.
+#![allow(clippy::needless_range_loop)]
+
+use prism_common::{EmpiricalLevel, NormativeLevel, MaterialityLevel, SearchResult};
+use serde::{Serialize, Deserialize};
+
+pub mod binary_hv;
 use binary_hv::BinaryHV;
 
 /// Epistemic knowledge search engine.
+#[derive(Serialize, Deserialize)]
 pub struct SearchEngine {
     claims: Vec<ClaimEntry>,
     vectors: Vec<BinaryHV>,
@@ -21,10 +27,13 @@ pub struct SearchEngine {
     word_df: std::collections::HashMap<String, usize>,
 }
 
+#[derive(Serialize, Deserialize)]
 struct ClaimEntry {
     content: String,
     sources: Vec<String>,
     empirical_level: EmpiricalLevel,
+    normative_level: NormativeLevel,
+    materiality_level: MaterialityLevel,
     tags: Vec<String>,
 }
 
@@ -38,8 +47,29 @@ impl SearchEngine {
         }
     }
 
+    /// Load a pre-computed index from bytes (bincode format).
+    pub fn from_precomputed(bytes: &[u8]) -> Self {
+        bincode::deserialize(bytes).expect("Failed to deserialize precomputed index")
+    }
+
     /// Create a search engine pre-loaded with claims from prism-ingest.
+    ///
+    /// If the `precomputed-index` feature is enabled and `prism-index.bin` exists,
+    /// deserializes the pre-built index instead of computing from scratch.
     pub fn with_seed_claims() -> Self {
+        #[cfg(feature = "precomputed-index")]
+        {
+            let bytes = include_bytes!("../prism-index.bin");
+            log::info!("Loading precomputed index ({} bytes)", bytes.len());
+            return Self::from_precomputed(bytes);
+        }
+
+        #[cfg(not(feature = "precomputed-index"))]
+        Self::with_seed_claims_compute()
+    }
+
+    /// Compute the search index from scratch (used when no precomputed index is available).
+    fn with_seed_claims_compute() -> Self {
         let mut engine = Self::new();
         let all_claims = prism_ingest::load_all_claims();
 
@@ -63,6 +93,8 @@ impl SearchEngine {
                 content: claim.content.clone(),
                 sources: claim.sources.clone(),
                 empirical_level: claim.empirical_level,
+                normative_level: claim.normative_level,
+                materiality_level: claim.materiality_level,
                 tags: claim.tags.clone(),
             });
             engine.vectors.push(hv);
@@ -80,11 +112,13 @@ impl SearchEngine {
         sources: &[&str],
         tags: &[&str],
     ) {
-        let hv = encode_text(content); // Fallback to non-IDF for dynamic adds
+        let hv = encode_text(content);
         self.claims.push(ClaimEntry {
             content: content.to_string(),
             sources: sources.iter().map(|s| s.to_string()).collect(),
             empirical_level,
+            normative_level: NormativeLevel::N2, // Default for dynamic adds
+            materiality_level: MaterialityLevel::M2,
             tags: tags.iter().map(|s| s.to_string()).collect(),
         });
         self.vectors.push(hv);
@@ -151,6 +185,8 @@ impl SearchEngine {
                     content: claim.content.clone(),
                     sources: claim.sources.clone(),
                     empirical_level: claim.empirical_level,
+                    normative_level: claim.normative_level,
+                    materiality_level: claim.materiality_level,
                     query_similarity: norm_sim,
                     author_reputation: 0.9,
                     age_days: 1,

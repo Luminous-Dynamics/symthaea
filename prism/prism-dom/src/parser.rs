@@ -126,14 +126,13 @@ impl TreeSink for PrismSink {
                     .filter(|(_, is_text)| *is_text)
                     .map(|(id, _)| id);
 
-                if let Some(last_id) = should_merge {
-                    if let NodeData::Text(ref mut existing) =
+                if let Some(last_id) = should_merge
+                    && let NodeData::Text(ref mut existing) =
                         tree.get_mut(last_id).unwrap().data
                     {
                         existing.push_str(&text);
                         return;
                     }
-                }
                 let text_id = tree.new_node(NodeData::Text(text.to_string()));
                 tree.append_child(*parent, text_id);
             }
@@ -197,15 +196,14 @@ impl TreeSink for PrismSink {
 
     fn add_attrs_if_missing(&self, target: &NodeId, attrs: Vec<Attribute>) {
         let mut tree = self.tree.borrow_mut();
-        if let Some(node) = tree.get_mut(*target) {
-            if let NodeData::Element(ref mut el) = node.data {
+        if let Some(node) = tree.get_mut(*target)
+            && let NodeData::Element(ref mut el) = node.data {
                 for attr in attrs {
                     el.attributes
                         .entry(attr.name.local.to_string())
                         .or_insert_with(|| attr.value.to_string());
                 }
             }
-        }
     }
 
     fn remove_from_parent(&self, target: &NodeId) {

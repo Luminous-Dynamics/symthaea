@@ -9,7 +9,7 @@
 
 use leptos::prelude::*;
 use prism_common::SearchResult;
-use crate::holochain::{DhtClaim, DhtClassification};
+use crate::holochain::DhtClaim;
 
 #[component]
 pub fn ClaimActions(result: SearchResult) -> impl IntoView {
@@ -18,6 +18,8 @@ pub fn ClaimActions(result: SearchResult) -> impl IntoView {
 
     let content = result.content.clone();
     let e_level = result.empirical_level;
+    let n_level = result.normative_level;
+    let m_level = result.materiality_level;
     let sources = result.sources.clone();
     let tags = result.tags.clone();
 
@@ -33,11 +35,9 @@ pub fn ClaimActions(result: SearchResult) -> impl IntoView {
     let on_share = move |_| {
         let claim = DhtClaim {
             content: content_share.clone(),
-            classification: DhtClassification {
-                empirical: e_level.as_f32(),
-                normative: 0.0,
-                mythic: 0.5,
-            },
+            empirical: e_level,
+            normative: n_level,
+            materiality: m_level,
             sources: sources_share.clone(),
             tags: tags_share.clone(),
             claim_type: "Fact".to_string(),

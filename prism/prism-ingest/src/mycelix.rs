@@ -4,7 +4,7 @@
 //! Load claims from mycelix-knowledge seed data (embedded at compile time).
 
 use crate::RawClaim;
-use prism_common::EmpiricalLevel;
+use prism_common::{EmpiricalLevel, NormativeLevel, MaterialityLevel};
 use serde::Deserialize;
 
 // Embed JSON files at compile time — no filesystem access needed in WASM
@@ -25,6 +25,9 @@ struct MycelixClaim {
 #[derive(Deserialize)]
 struct Classification {
     empirical: Option<f64>,
+    normative: Option<f64>,
+    #[serde(alias = "mythic")]
+    materiality: Option<f64>,
 }
 
 /// Load and parse all mycelix-knowledge seed claims.
@@ -95,9 +98,23 @@ pub fn load_mycelix_claims() -> Vec<RawClaim> {
                 .take(3)
                 .collect();
 
+            let n_val = c.classification.as_ref().and_then(|cl| cl.normative).unwrap_or(0.5);
+            let n_level = if n_val >= 0.75 { NormativeLevel::N3 }
+                else if n_val >= 0.5 { NormativeLevel::N2 }
+                else if n_val >= 0.25 { NormativeLevel::N1 }
+                else { NormativeLevel::N0 };
+
+            let m_val = c.classification.as_ref().and_then(|cl| cl.materiality).unwrap_or(0.5);
+            let m_level = if m_val >= 0.75 { MaterialityLevel::M3 }
+                else if m_val >= 0.5 { MaterialityLevel::M2 }
+                else if m_val >= 0.25 { MaterialityLevel::M1 }
+                else { MaterialityLevel::M0 };
+
             claims.push(RawClaim {
                 content,
                 empirical_level: e_level,
+                normative_level: n_level,
+                materiality_level: m_level,
                 sources,
                 tags,
             });

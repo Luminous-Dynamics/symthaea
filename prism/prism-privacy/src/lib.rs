@@ -191,4 +191,38 @@ mod tests {
         assert!(!store.is_approved("site.com"));
         assert!(store.is_denied("site.com"));
     }
+
+    #[test]
+    fn subdomain_independence() {
+        let mut store = ConsentStore::new();
+        store.approve_domain("example.com".to_string());
+        // Subdomain is independent — not automatically approved
+        assert!(!store.is_approved("sub.example.com"));
+        assert_eq!(
+            store.resolve_zone(ContentZone::Local, "sub.example.com"),
+            ContentZone::Local
+        );
+    }
+
+    #[test]
+    fn serialize_roundtrip() {
+        let mut store = ConsentStore::new();
+        store.approve_domain("wiki.org".to_string());
+        store.deny_domain("evil.com".to_string());
+        let json = serde_json::to_string(&store).unwrap();
+        let restored: ConsentStore = serde_json::from_str(&json).unwrap();
+        assert!(restored.is_approved("wiki.org"));
+        assert!(restored.is_denied("evil.com"));
+        assert_eq!(restored.approved_count(), 1);
+        assert_eq!(restored.denied_count(), 1);
+    }
+
+    #[test]
+    fn empty_domain_handled() {
+        let mut store = ConsentStore::new();
+        store.approve_domain(String::new());
+        // Should not panic or corrupt state
+        assert!(store.is_approved(""));
+        assert!(!store.is_approved("example.com"));
+    }
 }

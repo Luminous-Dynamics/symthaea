@@ -285,7 +285,7 @@ fn flush_paragraph(runs: &mut Vec<TextRun>, blocks: &mut Vec<Block>, mt: f32, mb
     if runs.is_empty() {
         return;
     }
-    let drained: Vec<TextRun> = runs.drain(..).collect();
+    let drained: Vec<TextRun> = std::mem::take(runs);
     // Skip paragraphs that are only whitespace
     let has_content = drained.iter().any(|r| !r.text.trim().is_empty());
     if has_content {
@@ -363,13 +363,10 @@ pub fn layout_dom_with_config(
                     full_text.push_str(&run.text);
                 }
 
-                let effective_width = if para_style.is_code {
-                    usable_width
-                } else {
-                    usable_width
-                };
-
-                let indent = if para_style.list_marker.is_some() { 0.0 } else { 0.0 };
+                let effective_width = usable_width;
+                let indent = 0.0;
+                let _ = para_style.is_code; // future: narrower width for code blocks
+                let _ = para_style.list_marker; // future: indent for list items
                 let wrap_width = effective_width - indent;
 
                 let lines = wrap_text(&full_text, para_style.font_size, wrap_width, config.char_width_ratio);

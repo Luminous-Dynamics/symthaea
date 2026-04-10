@@ -48,6 +48,12 @@ pub struct PostParseVerdict {
     pub reason: String,
 }
 
+/// Match a host against a domain pattern with boundary checks.
+/// "chase.com" matches "chase.com" and "www.chase.com" but NOT "notchase.com".
+fn domain_matches(host: &str, pattern: &str) -> bool {
+    host == pattern || host.ends_with(&format!(".{}", pattern))
+}
+
 /// The reflex arc — fast, in-process immune scanner.
 pub struct ReflexArc {
     /// Aho-Corasick automaton for threat keyword matching.
@@ -86,7 +92,7 @@ impl ReflexArc {
 
         // Check if domain is known-private (banks, email, etc.)
         for pattern in self.private_domains {
-            if host.contains(pattern) {
+            if domain_matches(host, pattern) {
                 return PreFetchVerdict {
                     zone: ContentZone::Private,
                     blocked: false,
@@ -118,7 +124,7 @@ impl ReflexArc {
 
         // Check if domain is known-safe (encyclopedias, documentation, etc.)
         for domain in self.safe_domains {
-            if host.ends_with(domain) {
+            if domain_matches(host, domain) {
                 return PreFetchVerdict {
                     zone: ContentZone::Public,
                     blocked: false,
@@ -439,5 +445,55 @@ mod tests {
         );
         let v = arc().assess(&url("https://www.chase.com/login"), &dom, false, true);
         assert_eq!(v.zone, ContentZone::Private);
+    }
+
+    #[test]
+    fn domain_no_false_positives() {
+        let a = arc();
+        // "notchase.com" must NOT match the "chase.com" private domain
+        let v = a.pre_fetch(&url("https://notchase.com"), false, false);
+        assert_eq!(v.zone, ContentZone::Local, "notchase.com should not match chase.com");
+
+        // "evilwikipedia.org" must NOT match "wikipedia.org" safe domain
+        let v = a.pre_fetch(&url("https://evilwikipedia.org"), false, false);
+        assert_eq!(v.zone, ContentZone::Local, "evilwikipedia.org should not match wikipedia.org");
+    }
+
+    #[test]
+    fn subdomain_matches_parent() {
+        let a = arc();
+        // "www.chase.com" SHOULD match "chase.com"
+        let v = a.pre_fetch(&url("https://www.chase.com"), false, false);
+        assert_eq!(v.zone, ContentZone::Private);
+
+        // "en.wikipedia.org" SHOULD match "wikipedia.org"
+        let v = a.pre_fetch(&url("https://en.wikipedia.org/wiki/Rust"), false, false);
+        assert_eq!(v.zone, ContentZone::Public);
+    }
+
+    #[test]
+    fn overload_threshold_boundary() {
+        let a = arc();
+        let local_verdict = PreFetchVerdict {
+            zone: ContentZone::Local,
+            blocked: false,
+            reason: "test",
+        };
+
+        // Just under 500KB — should NOT trigger Overload
+        let text_under = "a".repeat(499_999);
+        let html_under = format!("<html><body><p>{}</p></body></html>", text_under);
+        let dom_under = prism_dom::parse_html(&html_under);
+        let v = a.post_parse(&dom_under, &local_verdict);
+        let has_overload = v.threats.iter().any(|t| t.threat_type == ThreatType::Overload);
+        assert!(!has_overload, "499KB should not trigger overload");
+
+        // At 500KB — should trigger Overload
+        let text_over = "a".repeat(500_001);
+        let html_over = format!("<html><body><p>{}</p></body></html>", text_over);
+        let dom_over = prism_dom::parse_html(&html_over);
+        let v = a.post_parse(&dom_over, &local_verdict);
+        let has_overload = v.threats.iter().any(|t| t.threat_type == ThreatType::Overload);
+        assert!(has_overload, "500KB+ should trigger overload");
     }
 }

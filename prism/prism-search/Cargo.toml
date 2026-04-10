@@ -9,7 +9,19 @@ description = "Epistemic knowledge search engine for Symthaea Prism"
 prism-common = { path = "../prism-common" }
 prism-ingest = { path = "../prism-ingest" }
 serde = { workspace = true }
+bincode = { workspace = true }
 log = { workspace = true }
+
+[features]
+precomputed-index = []
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 getrandom = { workspace = true }
+
+[dev-dependencies]
+proptest = "1"
+criterion = { version = "0.5", features = ["html_reports"] }
+
+[[bench]]
+name = "search_bench"
+harness = false

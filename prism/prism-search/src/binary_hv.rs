@@ -34,7 +34,7 @@ thread_local! {
 ///
 /// # Examples
 /// ```
-/// # use symthaea_core::hdc::binary_hv::BinaryHV;
+/// # use prism_search::binary_hv::BinaryHV;
 ///
 /// let a = BinaryHV::random(42);  // Deterministic from seed
 /// let b = BinaryHV::random(43);
@@ -74,7 +74,7 @@ impl BinaryHV {
     ///
     /// # Example
     /// ```
-    /// # use symthaea_core::hdc::binary_hv::BinaryHV;
+    /// # use prism_search::binary_hv::BinaryHV;
     /// let v1 = BinaryHV::random(42);
     /// let v2 = BinaryHV::random(42);
     /// assert_eq!(v1, v2);  // Same seed = same vector
@@ -103,7 +103,7 @@ impl BinaryHV {
     ///
     /// # Example
     /// ```
-    /// # use symthaea_core::hdc::binary_hv::BinaryHV;
+    /// # use prism_search::binary_hv::BinaryHV;
     /// let node0 = BinaryHV::basis(0);
     /// let node1 = BinaryHV::basis(1);
     /// assert!(node0.similarity(&node1) < 0.6);  // Different nodes
@@ -120,7 +120,7 @@ impl BinaryHV {
     ///
     /// # Example
     /// ```
-    /// # use symthaea_core::hdc::binary_hv::BinaryHV;
+    /// # use prism_search::binary_hv::BinaryHV;
     /// let bits = vec![0u64; 256];
     /// let hv = BinaryHV::from_bits(&bits);
     /// assert_eq!(hv.density(), 0.0);  // All zeros
@@ -156,7 +156,7 @@ impl BinaryHV {
     ///
     /// # Example
     /// ```
-    /// # use symthaea_core::hdc::binary_hv::BinaryHV;
+    /// # use prism_search::binary_hv::BinaryHV;
     /// let cat = BinaryHV::random(1);
     /// let orange = BinaryHV::random(2);
     /// let orange_cat = cat.bind(&orange);
@@ -204,7 +204,7 @@ impl BinaryHV {
     ///
     /// # Example
     /// ```
-    /// # use symthaea_core::hdc::binary_hv::BinaryHV;
+    /// # use prism_search::binary_hv::BinaryHV;
     /// let cat1 = BinaryHV::random(1);
     /// let cat2 = BinaryHV::random(2);
     /// let cat3 = BinaryHV::random(3);
@@ -258,7 +258,7 @@ impl BinaryHV {
     ///
     /// # Example
     /// ```
-    /// # use symthaea_core::hdc::binary_hv::BinaryHV;
+    /// # use prism_search::binary_hv::BinaryHV;
     /// let vectors: Vec<BinaryHV> = (0..1000).map(|i| BinaryHV::random(i)).collect();
     /// let result = BinaryHV::bundle_safe(&vectors);  // Won't overflow stack
     /// ```
@@ -314,7 +314,7 @@ impl BinaryHV {
     ///
     /// # Example
     /// ```
-    /// # use symthaea_core::hdc::binary_hv::BinaryHV;
+    /// # use prism_search::binary_hv::BinaryHV;
     /// let a = BinaryHV::random(1);
     /// let b = BinaryHV::random(2);
     /// let result = BinaryHV::weighted_bundle(&[a, b], &[3.0, 1.0]);
@@ -392,7 +392,7 @@ impl BinaryHV {
     ///
     /// # Example
     /// ```
-    /// # use symthaea_core::hdc::binary_hv::BinaryHV;
+    /// # use prism_search::binary_hv::BinaryHV;
     /// let vectors: Vec<BinaryHV> = (0..100).map(|i| BinaryHV::random(i)).collect();
     /// let weights: Vec<f32> = (0..100).map(|i| i as f32).collect();
     /// let result = BinaryHV::weighted_bundle_safe(&vectors, &weights);
@@ -473,7 +473,7 @@ impl BinaryHV {
     ///
     /// # Example
     /// ```
-    /// # use symthaea_core::hdc::binary_hv::BinaryHV;
+    /// # use prism_search::binary_hv::BinaryHV;
     /// let random = BinaryHV::random(42);
     /// let density = random.density();
     /// assert!(density > 0.45 && density < 0.55);  // ~0.5 for random
@@ -504,7 +504,7 @@ impl BinaryHV {
     ///
     /// # Example
     /// ```
-    /// # use symthaea_core::hdc::binary_hv::BinaryHV;
+    /// # use prism_search::binary_hv::BinaryHV;
     /// let saturated = BinaryHV::ones();  // 100% density
     /// let balanced = saturated.ensure_density(0.4, 0.6);
     /// assert!(balanced.density() >= 0.4 && balanced.density() <= 0.6);
@@ -575,7 +575,7 @@ impl BinaryHV {
     ///
     /// # Example
     /// ```
-    /// # use symthaea_core::hdc::binary_hv::BinaryHV;
+    /// # use prism_search::binary_hv::BinaryHV;
     /// // Even with biased inputs, result stays balanced
     /// let biased: Vec<BinaryHV> = (0..10).map(|_| BinaryHV::ones()).collect();
     /// let result = BinaryHV::bundle_normalized(&biased);
@@ -593,7 +593,7 @@ impl BinaryHV {
     ///
     /// # Example
     /// ```
-    /// # use symthaea_core::hdc::binary_hv::BinaryHV;
+    /// # use prism_search::binary_hv::BinaryHV;
     /// let cat = BinaryHV::random(1);
     /// let dog = BinaryHV::random(2);
     ///
@@ -704,7 +704,7 @@ impl BinaryHV {
     ///
     /// # Example
     /// ```
-    /// # use symthaea_core::hdc::binary_hv::BinaryHV;
+    /// # use prism_search::binary_hv::BinaryHV;
     /// let a = BinaryHV::random(1);
     /// let b = BinaryHV::random(2);
     /// let c = BinaryHV::random(3);
@@ -745,7 +745,7 @@ impl BinaryHV {
     ///
     /// # Example
     /// ```
-    /// # use symthaea_core::hdc::binary_hv::BinaryHV;
+    /// # use prism_search::binary_hv::BinaryHV;
     /// let base = BinaryHV::random(1);
     /// let half = base.fractional_power(0.5, 99);
     /// assert!(base.similarity(&half) > 0.2 && base.similarity(&half) < 0.8);
@@ -796,7 +796,7 @@ impl BinaryHV {
     ///
     /// # Example
     /// ```
-    /// # use symthaea_core::hdc::binary_hv::BinaryHV;
+    /// # use prism_search::binary_hv::BinaryHV;
     /// let sims = vec![(0, 0.9), (1, 0.3), (2, 0.7), (3, 0.5)];
     /// let top2 = BinaryHV::k_winners(&sims, 2);
     /// assert_eq!(top2[0].0, 0);  // highest similarity
@@ -837,7 +837,7 @@ impl BinaryHV {
     ///
     /// # Example
     /// ```
-    /// # use symthaea_core::hdc::binary_hv::BinaryHV;
+    /// # use prism_search::binary_hv::BinaryHV;
     /// let a = BinaryHV::random(42);
     /// assert_eq!(a.similarity(&a), 1.0);
     ///
@@ -875,7 +875,7 @@ impl BinaryHV {
     ///
     /// # Example
     /// ```
-    /// # use symthaea_core::hdc::binary_hv::BinaryHV;
+    /// # use prism_search::binary_hv::BinaryHV;
     /// let a = BinaryHV::random(42);
     /// assert_eq!(a.cosine_similarity(&a), 1.0);
     ///
@@ -898,7 +898,7 @@ impl BinaryHV {
     ///
     /// # Example
     /// ```
-    /// # use symthaea_core::hdc::binary_hv::BinaryHV;
+    /// # use prism_search::binary_hv::BinaryHV;
     /// let a = BinaryHV::random(42);
     /// let b = a.permute(1);  // Cyclic shift — roughly half the bits differ
     ///
@@ -929,7 +929,7 @@ impl BinaryHV {
     ///
     /// # Example
     /// ```
-    /// # use symthaea_core::hdc::binary_hv::BinaryHV;
+    /// # use prism_search::binary_hv::BinaryHV;
     /// let a = BinaryHV::random(42);
     /// let inv = a.invert();
     ///
@@ -959,7 +959,7 @@ impl BinaryHV {
     ///
     /// # Example
     /// ```
-    /// # use symthaea_core::hdc::binary_hv::BinaryHV;
+    /// # use prism_search::binary_hv::BinaryHV;
     /// let a = BinaryHV::random(1);
     /// let b = BinaryHV::random(2);
     /// let inter = a.intersection(&b);
@@ -982,7 +982,7 @@ impl BinaryHV {
     ///
     /// # Example
     /// ```
-    /// # use symthaea_core::hdc::binary_hv::BinaryHV;
+    /// # use prism_search::binary_hv::BinaryHV;
     /// let a = BinaryHV::random(1);
     /// let b = BinaryHV::random(2);
     /// let uni = a.union(&b);
@@ -1091,7 +1091,7 @@ impl BinaryHV {
     ///
     /// # Example
     /// ```
-    /// # use symthaea_core::hdc::binary_hv::BinaryHV;
+    /// # use prism_search::binary_hv::BinaryHV;
     /// let original = BinaryHV::random(42);
     /// let noisy = original.add_noise(0.1, 123);  // Flip 10% of bits
     ///
@@ -1130,7 +1130,7 @@ impl BinaryHV {
     ///
     /// # Example
     /// ```
-    /// # use symthaea_core::hdc::binary_hv::BinaryHV;
+    /// # use prism_search::binary_hv::BinaryHV;
     /// let dense = BinaryHV::random(42);
     /// let sparse = dense.thin(0.1, 99);
     /// assert!(sparse.density() < 0.15);  // Close to target 10%
@@ -1172,7 +1172,7 @@ impl BinaryHV {
     ///
     /// # Example
     /// ```
-    /// # use symthaea_core::hdc::binary_hv::BinaryHV;
+    /// # use prism_search::binary_hv::BinaryHV;
     /// let mut a = BinaryHV::random(1);
     /// let b = BinaryHV::random(2);
     /// let expected = a.bind(&b);
@@ -1192,7 +1192,7 @@ impl BinaryHV {
     ///
     /// # Example
     /// ```
-    /// # use symthaea_core::hdc::binary_hv::BinaryHV;
+    /// # use prism_search::binary_hv::BinaryHV;
     /// let query = BinaryHV::random(0);
     /// let targets: Vec<BinaryHV> = (1..10).map(|i| BinaryHV::random(i)).collect();
     /// let sims = BinaryHV::batch_similarity(&query, &targets);
@@ -1202,8 +1202,6 @@ impl BinaryHV {
         targets.iter().map(|t| query.similarity(t)).collect()
     }
 
-    /// Parallel batch similarity using rayon
-    ///
     // batch_similarity_parallel removed — rayon not available in WASM.
     // Use batch_similarity() instead (single-threaded).
 
@@ -1213,7 +1211,7 @@ impl BinaryHV {
     ///
     /// # Example
     /// ```
-    /// # use symthaea_core::hdc::binary_hv::BinaryHV;
+    /// # use prism_search::binary_hv::BinaryHV;
     /// let query = BinaryHV::random(0);
     /// let mut targets: Vec<BinaryHV> = (1..50).map(|i| BinaryHV::random(i)).collect();
     /// targets.push(query);  // Add exact match
@@ -1242,7 +1240,7 @@ impl BinaryHV {
     ///
     /// # Example
     /// ```
-    /// # use symthaea_core::hdc::binary_hv::BinaryHV;
+    /// # use prism_search::binary_hv::BinaryHV;
     /// let query = BinaryHV::random(0);
     /// let targets: Vec<BinaryHV> = (1..100).map(|i| BinaryHV::random(i)).collect();
     /// let top5 = BinaryHV::top_k_similar_in(&query, &targets, 5);
@@ -1273,7 +1271,7 @@ impl BinaryHV {
     ///
     /// # Example
     /// ```
-    /// # use symthaea_core::hdc::binary_hv::BinaryHV;
+    /// # use prism_search::binary_hv::BinaryHV;
     /// let vectors: Vec<BinaryHV> = (0..10).map(|i| BinaryHV::random(i)).collect();
     /// let operand = BinaryHV::random(99);
     /// let bound = BinaryHV::batch_bind(&vectors, &operand);
@@ -2982,5 +2980,47 @@ mod tests {
             BinaryHV::zero(),
             "Bundle of empty slice should be zero"
         );
+    }
+}
+
+#[cfg(test)]
+mod property_tests {
+    use super::*;
+    use proptest::prelude::*;
+
+    proptest! {
+        #[test]
+        fn bind_is_self_inverse(seed1 in 1u64..u64::MAX, seed2 in 1u64..u64::MAX) {
+            let a = BinaryHV::random(seed1);
+            let b = BinaryHV::random(seed2);
+            let bound = a.bind(&b);
+            let recovered = bound.bind(&a);
+            prop_assert!(recovered.similarity(&b) > 0.99,
+                "bind(a, bind(a, b)) should recover b, got sim={}", recovered.similarity(&b));
+        }
+
+        #[test]
+        fn similarity_always_bounded(seed1 in 1u64..u64::MAX, seed2 in 1u64..u64::MAX) {
+            let a = BinaryHV::random(seed1);
+            let b = BinaryHV::random(seed2);
+            let sim = a.similarity(&b);
+            prop_assert!(sim >= 0.0 && sim <= 1.0,
+                "similarity must be in [0, 1], got {}", sim);
+        }
+
+        #[test]
+        fn hamming_distance_symmetric(seed1 in 1u64..u64::MAX, seed2 in 1u64..u64::MAX) {
+            let a = BinaryHV::random(seed1);
+            let b = BinaryHV::random(seed2);
+            prop_assert_eq!(a.hamming_distance(&b), b.hamming_distance(&a));
+        }
+
+        #[test]
+        fn self_similarity_is_one(seed in 1u64..u64::MAX) {
+            let v = BinaryHV::random(seed);
+            let sim = v.similarity(&v);
+            prop_assert!((sim - 1.0).abs() < 0.001,
+                "self-similarity should be 1.0, got {}", sim);
+        }
     }
 }

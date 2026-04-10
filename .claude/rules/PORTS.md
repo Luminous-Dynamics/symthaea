@@ -77,7 +77,9 @@ Alphabetical by cluster short name. Port = 81XX.
 | 8127 | mycelix-supplychain | supplychain.mycelix.net | Reserved |
 | 8128 | mycelix-workspace | workspace.mycelix.net | Reserved |
 | 8129 | **mycelix-craft** | **craft.mycelix.net** | **Built** |
-| 8130-8139 | (spare) | Future clusters | Reserved |
+| 8130 | **symthaea-prism** | **prism.mycelix.net** | **LIVE** |
+| 8131 | symthaea-prism-proxy | (internal CORS proxy) | **LIVE** |
+| 8132-8139 | (spare) | Future clusters | Reserved |
 | 8140 | **infin-love** | **infin.love** | **LIVE** |
 | 8141-8149 | (spare) | Future clusters | Reserved |
 

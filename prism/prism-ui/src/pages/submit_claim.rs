@@ -7,8 +7,8 @@
 //! they contribute it with evidence levels and sources.
 
 use leptos::prelude::*;
-use prism_common::EmpiricalLevel;
-use crate::holochain::{DhtClaim, DhtClassification};
+use prism_common::{EmpiricalLevel, NormativeLevel, MaterialityLevel};
+use crate::holochain::DhtClaim;
 
 #[component]
 pub fn SubmitClaimPage() -> impl IntoView {
@@ -27,20 +27,18 @@ pub fn SubmitClaimPage() -> impl IntoView {
         set_submitting.set(true);
 
         let e = match e_level.get().as_str() {
-            "E4" => 1.0,
-            "E3" => 0.75,
-            "E2" => 0.5,
-            "E1" => 0.25,
-            _ => 0.0,
+            "E4" => EmpiricalLevel::E4,
+            "E3" => EmpiricalLevel::E3,
+            "E2" => EmpiricalLevel::E2,
+            "E1" => EmpiricalLevel::E1,
+            _ => EmpiricalLevel::E0,
         };
 
         let claim = DhtClaim {
             content: claim_text.clone(),
-            classification: DhtClassification {
-                empirical: e,
-                normative: 0.0,
-                mythic: 0.5,
-            },
+            empirical: e,
+            normative: NormativeLevel::N2,
+            materiality: MaterialityLevel::M2,
             sources: source.get().split(',').map(|s| s.trim().to_string()).filter(|s| !s.is_empty()).collect(),
             tags: tags.get().split(',').map(|s| s.trim().to_string()).filter(|s| !s.is_empty()).collect(),
             claim_type: "Fact".to_string(),

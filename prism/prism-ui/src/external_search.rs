@@ -267,13 +267,16 @@ pub async fn search_brave(query: &str) -> ExternalResult {
 
     let proxy_base = get_proxy_base();
     let url = format!(
-        "{}/api/brave?q={}&key={}",
+        "{}/api/brave?q={}",
         proxy_base,
         urlencoding(query),
-        urlencoding(&api_key),
     );
 
-    match gloo_net::http::Request::get(&url).send().await {
+    match gloo_net::http::Request::get(&url)
+        .header("X-Brave-Key", &api_key)
+        .send()
+        .await
+    {
         Ok(resp) => match resp.json::<BraveResponse>().await {
             Ok(data) => {
                 let hits: Vec<ExternalHit> = data

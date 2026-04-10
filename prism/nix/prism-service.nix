@@ -4,10 +4,10 @@
 # Symthaea Prism — NixOS production services
 #
 # Deployment:
-#   1. Build: cd /srv/luminous-dynamics/plexus && cargo build -p plexus-serve -p plexus-proxy --release
-#   2. Build UI: cd plexus-ui && trunk build --release
+#   1. Build: cd /srv/luminous-dynamics/prism && cargo build -p prism-serve -p prism-proxy --release
+#   2. Build UI: cd prism-ui && trunk build --release
 #   3. Add to imports in /etc/nixos/configuration.nix:
-#        imports = [ /srv/luminous-dynamics/plexus/nix/prism-service.nix ];
+#        imports = [ /srv/luminous-dynamics/prism/nix/prism-service.nix ];
 #   4. sudo nixos-rebuild switch
 #
 # Services:
@@ -17,10 +17,10 @@
 { config, pkgs, ... }:
 
 let
-  prismDir = "/srv/luminous-dynamics/plexus";
-  distDir = "${prismDir}/plexus-ui/dist";
-  serveBin = "${prismDir}/target/release/plexus-serve";
-  proxyBin = "${prismDir}/target/release/plexus-proxy";
+  prismDir = "/srv/luminous-dynamics/prism";
+  distDir = "${prismDir}/prism-ui/dist";
+  serveBin = "${prismDir}/target/release/prism-serve";
+  proxyBin = "${prismDir}/target/release/prism-proxy";
 in
 {
   # ── Static file server (serves the WASM app) ──

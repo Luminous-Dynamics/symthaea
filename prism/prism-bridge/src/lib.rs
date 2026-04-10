@@ -207,7 +207,7 @@ mod tests {
 
     #[test]
     fn roundtrip_search_results() {
-        use prism_common::EmpiricalLevel;
+        use prism_common::{EmpiricalLevel, NormativeLevel, MaterialityLevel};
 
         let msg = SporeToRenderer::SearchResults {
             query_id: 99,
@@ -215,6 +215,8 @@ mod tests {
                 content: "Ocean acidification is caused by CO2 absorption.".to_string(),
                 sources: vec!["https://noaa.gov".to_string()],
                 empirical_level: EmpiricalLevel::E4,
+                normative_level: NormativeLevel::N2,
+                materiality_level: MaterialityLevel::M2,
                 query_similarity: 0.92,
                 author_reputation: 0.95,
                 age_days: 30,

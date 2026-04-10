@@ -13,6 +13,8 @@ pub fn wikidata_claims() -> Vec<RawClaim> {
     RAW.iter().map(|(content, e, sources, tags)| RawClaim {
         content: content.to_string(),
         empirical_level: *e,
+        normative_level: prism_common::NormativeLevel::N3, // Wikidata = endorsed
+        materiality_level: prism_common::MaterialityLevel::M2, // default applicable
         sources: sources.iter().map(|s| s.to_string()).collect(),
         tags: tags.iter().map(|s| s.to_string()).collect(),
     }).collect()

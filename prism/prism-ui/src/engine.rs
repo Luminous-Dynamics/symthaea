@@ -143,16 +143,34 @@ pub fn process_input(
 }
 
 fn search_query(query: &str, state: &BrowserState, engine: &SearchEngine) {
-    let results = engine.search(query, 10);
+    let local_results = engine.search(query, 10);
+
+    // Show local results immediately
     state.set_current_url.set(format!("prism://search?q={}", query));
     state.set_page_title.set(format!("Search: {}", query));
     state.set_view.set(PageView::Search {
         query: query.to_string(),
-        results,
+        results: local_results.clone(),
     });
     state.set_zone.set(ContentZone::Local);
     state.set_safety.set(SafetyLevel::Green);
     state.set_threat_count.set(0);
+
+    // If local results are sparse, try Knowledge DHT in background
+    if local_results.len() < 3 {
+        let query_owned = query.to_string();
+        let set_view = state.set_view;
+        let local = local_results;
+        wasm_bindgen_futures::spawn_local(async move {
+            let merged = prism_knowledge_bridge::unified_search(local, &query_owned).await;
+            if !merged.is_empty() {
+                set_view.set(PageView::Search {
+                    query: query_owned,
+                    results: merged,
+                });
+            }
+        });
+    }
 }
 
 fn navigate_url(url_str: &str, state: &BrowserState, reflex: &ReflexArc) {

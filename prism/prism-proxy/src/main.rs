@@ -11,10 +11,100 @@
 //!
 //! WASM app requests: GET /proxy?url=https://example.com
 
-use axum::{extract::Query, http::StatusCode, response::IntoResponse, routing::get, Router};
-use tower_http::cors::CorsLayer;
+use axum::{Router, extract::Query, http::StatusCode, response::IntoResponse, routing::get};
+use tower_http::cors::{AllowOrigin, CorsLayer};
 
 const MAX_RESPONSE_SIZE: usize = 10 * 1024 * 1024; // 10MB
+
+/// Check if an IPv4 address is private/reserved.
+fn is_private_ipv4(ip: &std::net::Ipv4Addr) -> bool {
+    ip.is_loopback()
+        || ip.is_private()
+        || ip.is_link_local()
+        || ip.is_broadcast()
+        || ip.is_unspecified()
+        || (ip.octets()[0] == 169 && ip.octets()[1] == 254)
+}
+
+/// Validate that a URL is safe to proxy — reject private/reserved addresses and non-HTTP schemes.
+fn validate_proxy_url(raw: &str) -> Result<url::Url, &'static str> {
+    let parsed = url::Url::parse(raw).map_err(|_| "Invalid URL")?;
+
+    match parsed.scheme() {
+        "http" | "https" => {}
+        _ => return Err("Only http and https URLs are allowed"),
+    }
+
+    let host_str = parsed.host_str().unwrap_or("");
+
+    if host_str == "localhost" || host_str == "metadata.google.internal" {
+        return Err("Access to internal addresses is forbidden");
+    }
+
+    // Use url::Host for proper IPv4/IPv6 discrimination
+    match parsed.host() {
+        Some(url::Host::Ipv4(ip)) => {
+            if is_private_ipv4(&ip) {
+                return Err("Access to private/reserved IP addresses is forbidden");
+            }
+        }
+        Some(url::Host::Ipv6(ip)) => {
+            if ip.is_loopback() || ip.is_unspecified() {
+                return Err("Access to private/reserved IP addresses is forbidden");
+            }
+
+            let seg = ip.segments();
+
+            // IPv4-mapped IPv6 (::ffff:x.x.x.x)
+            if seg[0] == 0 && seg[1] == 0 && seg[2] == 0 && seg[3] == 0
+                && seg[4] == 0 && seg[5] == 0xffff
+            {
+                let mapped = std::net::Ipv4Addr::new(
+                    (seg[6] >> 8) as u8, seg[6] as u8,
+                    (seg[7] >> 8) as u8, seg[7] as u8,
+                );
+                if is_private_ipv4(&mapped) {
+                    return Err("Access to private/reserved IP addresses is forbidden");
+                }
+            }
+
+            // IPv6 link-local (fe80::/10)
+            if (seg[0] & 0xffc0) == 0xfe80 {
+                return Err("Access to private/reserved IP addresses is forbidden");
+            }
+
+            // IPv6 unique-local (fc00::/7)
+            if (seg[0] & 0xfe00) == 0xfc00 {
+                return Err("Access to private/reserved IP addresses is forbidden");
+            }
+        }
+        _ => {} // Domain names pass through (validated by DNS at fetch time)
+    }
+
+    Ok(parsed)
+}
+
+fn build_client(user_agent: &str, timeout_secs: u64) -> reqwest::Client {
+    reqwest::Client::builder()
+        .user_agent(user_agent)
+        .redirect(reqwest::redirect::Policy::limited(5))
+        .timeout(std::time::Duration::from_secs(timeout_secs))
+        .build()
+        .expect("HTTP client TLS init failed")
+}
+
+fn json_response(status: u16, body: axum::body::Bytes) -> axum::response::Response<axum::body::Body> {
+    axum::response::Response::builder()
+        .status(status)
+        .header("content-type", "application/json")
+        .body(axum::body::Body::from(body))
+        .unwrap_or_else(|_| {
+            axum::response::Response::builder()
+                .status(500)
+                .body(axum::body::Body::from("Internal error"))
+                .unwrap()
+        })
+}
 
 #[derive(serde::Deserialize)]
 struct ProxyParams {
@@ -22,17 +112,19 @@ struct ProxyParams {
 }
 
 async fn proxy_handler(Query(params): Query<ProxyParams>) -> impl IntoResponse {
-    let url = &params.url;
-    log::info!("Proxying: {}", url);
+    let validated = match validate_proxy_url(&params.url) {
+        Ok(u) => u,
+        Err(reason) => {
+            log::warn!("Blocked proxy request to {}: {}", params.url, reason);
+            return (StatusCode::FORBIDDEN, reason.to_string()).into_response();
+        }
+    };
 
-    let client = reqwest::Client::builder()
-        .user_agent("SymthaePrism/0.1 (proxy; +https://luminousdynamics.org)")
-        .redirect(reqwest::redirect::Policy::limited(5))
-        .timeout(std::time::Duration::from_secs(15))
-        .build()
-        .unwrap();
+    log::info!("Proxying: {}", validated);
 
-    match client.get(url).send().await {
+    let client = build_client("SymthaePrism/0.1 (proxy; +https://luminousdynamics.org)", 15);
+
+    match client.get(validated.as_str()).send().await {
         Ok(resp) => {
             let status = resp.status().as_u16();
             let content_type = resp
@@ -51,13 +143,18 @@ async fn proxy_handler(Query(params): Query<ProxyParams>) -> impl IntoResponse {
                         )
                             .into_response();
                     }
-                    let response = axum::response::Response::builder()
+                    axum::response::Response::builder()
                         .status(status)
                         .header("content-type", content_type)
                         .header("x-prism-proxied", "true")
                         .body(axum::body::Body::from(body))
-                        .unwrap();
-                    response.into_response()
+                        .unwrap_or_else(|_| {
+                            axum::response::Response::builder()
+                                .status(500)
+                                .body(axum::body::Body::from("Internal error"))
+                                .unwrap()
+                        })
+                        .into_response()
                 }
                 Err(e) => (
                     StatusCode::BAD_GATEWAY,
@@ -66,11 +163,7 @@ async fn proxy_handler(Query(params): Query<ProxyParams>) -> impl IntoResponse {
                     .into_response(),
             }
         }
-        Err(e) => (
-            StatusCode::BAD_GATEWAY,
-            format!("Fetch failed: {}", e),
-        )
-            .into_response(),
+        Err(e) => (StatusCode::BAD_GATEWAY, format!("Fetch failed: {}", e)).into_response(),
     }
 }
 
@@ -87,52 +180,47 @@ async fn ddg_handler(Query(params): Query<DdgParams>) -> impl IntoResponse {
     );
     log::info!("DDG proxy: {}", params.q);
 
-    let client = reqwest::Client::builder()
-        .user_agent("SymthaePrism/0.2 (ddg-proxy)")
-        .timeout(std::time::Duration::from_secs(10))
-        .build()
-        .unwrap();
+    let client = build_client("SymthaePrism/0.2 (ddg-proxy)", 10);
 
     match client.get(&url).send().await {
         Ok(resp) => {
             let body = resp.bytes().await.unwrap_or_default();
-            axum::response::Response::builder()
-                .status(200)
-                .header("content-type", "application/json")
-                .body(axum::body::Body::from(body))
-                .unwrap()
-                .into_response()
+            json_response(200, body).into_response()
         }
-        Err(e) => (
-            StatusCode::BAD_GATEWAY,
-            format!("DDG fetch failed: {}", e),
-        ).into_response(),
+        Err(e) => (StatusCode::BAD_GATEWAY, format!("DDG fetch failed: {}", e)).into_response(),
     }
 }
 
-/// Brave Search proxy — forwards API key from query param as auth header.
+/// Brave Search proxy — reads API key from X-Brave-Key header, forwards as auth.
 #[derive(serde::Deserialize)]
 struct BraveParams {
     q: String,
-    key: String,
 }
 
-async fn brave_handler(Query(params): Query<BraveParams>) -> impl IntoResponse {
+async fn brave_handler(
+    headers: axum::http::HeaderMap,
+    Query(params): Query<BraveParams>,
+) -> impl IntoResponse {
+    let api_key = headers
+        .get("X-Brave-Key")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("");
+
+    if api_key.is_empty() {
+        return (StatusCode::UNAUTHORIZED, "Missing X-Brave-Key header").into_response();
+    }
+
     let url = format!(
         "https://api.search.brave.com/res/v1/web/search?q={}",
         params.q.replace(' ', "+")
     );
     log::info!("Brave proxy: {}", params.q);
 
-    let client = reqwest::Client::builder()
-        .user_agent("SymthaePrism/0.2 (brave-proxy)")
-        .timeout(std::time::Duration::from_secs(15))
-        .build()
-        .unwrap();
+    let client = build_client("SymthaePrism/0.2 (brave-proxy)", 15);
 
     match client
         .get(&url)
-        .header("X-Subscription-Token", &params.key)
+        .header("X-Subscription-Token", api_key)
         .header("Accept", "application/json")
         .send()
         .await
@@ -140,17 +228,13 @@ async fn brave_handler(Query(params): Query<BraveParams>) -> impl IntoResponse {
         Ok(resp) => {
             let status = resp.status().as_u16();
             let body = resp.bytes().await.unwrap_or_default();
-            axum::response::Response::builder()
-                .status(status)
-                .header("content-type", "application/json")
-                .body(axum::body::Body::from(body))
-                .unwrap()
-                .into_response()
+            json_response(status, body).into_response()
         }
         Err(e) => (
             StatusCode::BAD_GATEWAY,
             format!("Brave fetch failed: {}", e),
-        ).into_response(),
+        )
+            .into_response(),
     }
 }
 
@@ -170,11 +254,7 @@ async fn perplexity_handler(
 
     log::info!("Perplexity proxy request");
 
-    let client = reqwest::Client::builder()
-        .user_agent("SymthaePrism/0.2 (perplexity-proxy)")
-        .timeout(std::time::Duration::from_secs(30))
-        .build()
-        .unwrap();
+    let client = build_client("SymthaePrism/0.2 (perplexity-proxy)", 30);
 
     match client
         .post("https://api.perplexity.ai/chat/completions")
@@ -187,17 +267,13 @@ async fn perplexity_handler(
         Ok(resp) => {
             let status = resp.status().as_u16();
             let body = resp.bytes().await.unwrap_or_default();
-            axum::response::Response::builder()
-                .status(status)
-                .header("content-type", "application/json")
-                .body(axum::body::Body::from(body))
-                .unwrap()
-                .into_response()
+            json_response(status, body).into_response()
         }
         Err(e) => (
             StatusCode::BAD_GATEWAY,
             format!("Perplexity fetch failed: {}", e),
-        ).into_response(),
+        )
+            .into_response(),
     }
 }
 
@@ -209,7 +285,17 @@ async fn health() -> &'static str {
 async fn main() {
     env_logger::init();
 
-    let cors = CorsLayer::permissive();
+    let allowed_origins = AllowOrigin::list([
+        "http://localhost:8130".parse().unwrap(),
+        "https://prism.mycelix.net".parse().unwrap(),
+        "https://prism.luminousdynamics.io".parse().unwrap(),
+        "https://app.mycelix.net".parse().unwrap(),
+    ]);
+
+    let cors = CorsLayer::new()
+        .allow_origin(allowed_origins)
+        .allow_methods([axum::http::Method::GET, axum::http::Method::POST])
+        .allow_headers(tower_http::cors::Any);
 
     let app = Router::new()
         .route("/proxy", get(proxy_handler))
@@ -217,12 +303,79 @@ async fn main() {
         .route("/api/brave", get(brave_handler))
         .route("/api/perplexity", axum::routing::post(perplexity_handler))
         .route("/health", get(health))
-        .layer(cors);
+        .layer(cors)
+        .layer(tower::limit::ConcurrencyLimitLayer::new(50));
 
     let addr = "127.0.0.1:8131";
     log::info!("Prism proxy listening on http://{}", addr);
     println!("Symthaea Prism CORS proxy on http://{}", addr);
 
-    let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
-    axum::serve(listener, app).await.unwrap();
+    let listener = tokio::net::TcpListener::bind(addr)
+        .await
+        .expect("Failed to bind port 8131");
+    axum::serve(listener, app)
+        .await
+        .expect("Server error");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn rejects_localhost() {
+        assert!(validate_proxy_url("http://localhost:8080").is_err());
+        assert!(validate_proxy_url("http://127.0.0.1:5432").is_err());
+        assert!(validate_proxy_url("http://[::1]:80").is_err());
+        assert!(validate_proxy_url("http://0.0.0.0").is_err());
+    }
+
+    #[test]
+    fn rejects_private_ips() {
+        assert!(validate_proxy_url("http://10.0.0.1").is_err());
+        assert!(validate_proxy_url("http://172.16.0.1").is_err());
+        assert!(validate_proxy_url("http://192.168.1.1").is_err());
+    }
+
+    #[test]
+    fn rejects_cloud_metadata() {
+        assert!(validate_proxy_url("http://169.254.169.254/latest/meta-data/").is_err());
+        assert!(validate_proxy_url("http://metadata.google.internal").is_err());
+    }
+
+    #[test]
+    fn rejects_non_http_schemes() {
+        assert!(validate_proxy_url("file:///etc/passwd").is_err());
+        assert!(validate_proxy_url("ftp://example.com").is_err());
+        assert!(validate_proxy_url("gopher://evil.com").is_err());
+    }
+
+    #[test]
+    fn rejects_ipv4_mapped_ipv6() {
+        // ::ffff:127.0.0.1 — loopback disguised as IPv6
+        assert!(validate_proxy_url("http://[::ffff:127.0.0.1]").is_err());
+        // ::ffff:192.168.1.1 — private IP disguised as IPv6
+        assert!(validate_proxy_url("http://[::ffff:192.168.1.1]").is_err());
+        // ::ffff:169.254.169.254 — cloud metadata disguised as IPv6
+        assert!(validate_proxy_url("http://[::ffff:169.254.169.254]").is_err());
+        // ::ffff:10.0.0.1 — private range disguised as IPv6
+        assert!(validate_proxy_url("http://[::ffff:10.0.0.1]").is_err());
+    }
+
+    #[test]
+    fn rejects_ipv6_link_local_and_ula() {
+        // fe80:: — link-local
+        assert!(validate_proxy_url("http://[fe80::1]").is_err());
+        // fc00:: — unique-local address
+        assert!(validate_proxy_url("http://[fc00::1]").is_err());
+        // fd00:: — also unique-local
+        assert!(validate_proxy_url("http://[fd12::1]").is_err());
+    }
+
+    #[test]
+    fn allows_valid_external_urls() {
+        assert!(validate_proxy_url("https://example.com").is_ok());
+        assert!(validate_proxy_url("https://api.duckduckgo.com/?q=test").is_ok());
+        assert!(validate_proxy_url("http://en.wikipedia.org/wiki/Rust").is_ok());
+    }
 }

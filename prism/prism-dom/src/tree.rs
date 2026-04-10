@@ -142,11 +142,10 @@ impl DomTree {
 
     fn find_by_tag_recursive(&self, node_id: NodeId, tag: &str, results: &mut Vec<NodeId>) {
         let node = &self.nodes[node_id.0];
-        if let NodeData::Element(el) = &node.data {
-            if el.tag == tag {
+        if let NodeData::Element(el) = &node.data
+            && el.tag == tag {
                 results.push(node_id);
             }
-        }
         for &child_id in &node.children {
             self.find_by_tag_recursive(child_id, tag, results);
         }
