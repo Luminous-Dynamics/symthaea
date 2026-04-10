@@ -381,6 +381,7 @@ impl MultiWorldSimulator {
             } else {
                 CulturalProfile::pioneer_default()
             };
+            let culture_individualism = culture.individualism;
 
             let mut world = World::new_colony(world::ColonyParams {
                 id: idx as u32,
@@ -449,6 +450,7 @@ impl MultiWorldSimulator {
                     trauma_level: 0.0,
                     cumulative_dose_sv: 0.0, adversarial: None,
                     coordination_understanding: self.config.policy.coordination_understanding_initial, mycel_score: 0.1, sap_balance: 100.0, is_biological: true, wounds: Vec::new(),
+                    ethics: agent::EthicalOrientation::from_culture(culture_individualism, &mut self.rng),
                 };
                 world.next_agent_id += 1;
                 world.agents.push(agent);
@@ -556,6 +558,7 @@ impl MultiWorldSimulator {
                 trauma_level: 0.0,
                 cumulative_dose_sv: 0.0, adversarial: None,
                 coordination_understanding: self.config.policy.coordination_understanding_initial, mycel_score: 0.1, sap_balance: 100.0, is_biological: true, wounds: Vec::new(),
+                ethics: agent::EthicalOrientation::default(),
             };
             world.next_agent_id += 1;
             world.agents.push(agent);

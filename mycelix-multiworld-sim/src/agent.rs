@@ -222,6 +222,74 @@ impl ConsciousnessState {
     }
 }
 
+/// An agent's ethical framework — how they weigh moral considerations.
+///
+/// Each value [0,1] represents emphasis on that ethical tradition. Values don't
+/// need to sum to 1 — agents can be pluralistic (high on multiple frameworks).
+/// Initialized from cultural profile + random variation, evolves through
+/// education, trauma, care work, and aging.
+///
+/// # References
+/// - Kant (1785) *Groundwork* — deontological duty
+/// - Mill (1863) *Utilitarianism* — consequentialist welfare
+/// - Aristotle *Nicomachean Ethics*, Gilligan (1982) *In a Different Voice* — virtue/care
+/// - Tutu (1999) *No Future Without Forgiveness*, Metz (2007) — Ubuntu/relational
+/// - Kohlberg (1981) *Essays on Moral Development* — stage theory (evolution over lifespan)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EthicalOrientation {
+    /// Deontological: duty, rules, rights. "What is my obligation?"
+    pub deontological: f64,
+    /// Consequentialist: outcomes, welfare, utility. "What produces the best result?"
+    pub consequentialist: f64,
+    /// Virtue/Care: character, relationships, compassion. "What would a good person do?"
+    pub virtue_care: f64,
+    /// Relational/Ubuntu: community, reciprocity, interconnection. "I am because we are."
+    pub relational: f64,
+}
+
+impl Default for EthicalOrientation {
+    fn default() -> Self {
+        Self {
+            deontological: 0.4,
+            consequentialist: 0.4,
+            virtue_care: 0.4,
+            relational: 0.4,
+        }
+    }
+}
+
+impl EthicalOrientation {
+    /// Initialize from cultural profile with random variation.
+    /// Individualist cultures lean deontological/consequentialist.
+    /// Collectivist cultures lean relational/virtue_care.
+    pub fn from_culture(
+        individualism: f64,
+        rng: &mut crate::stochastic::StochasticEngine,
+    ) -> Self {
+        Self {
+            deontological: (0.3 + individualism * 0.4
+                + rng.next_gaussian(0.0, 0.1)).clamp(0.05, 1.0),
+            consequentialist: (0.3 + individualism * 0.3
+                + rng.next_gaussian(0.0, 0.1)).clamp(0.05, 1.0),
+            virtue_care: (0.3 + (1.0 - individualism) * 0.3
+                + rng.next_gaussian(0.0, 0.1)).clamp(0.05, 1.0),
+            relational: (0.3 + (1.0 - individualism) * 0.4
+                + rng.next_gaussian(0.0, 0.1)).clamp(0.05, 1.0),
+        }
+    }
+
+    /// Dominant ethical framework (highest weight).
+    pub fn dominant(&self) -> &'static str {
+        let vals = [self.deontological, self.consequentialist, self.virtue_care, self.relational];
+        let names = ["deontological", "consequentialist", "virtue_care", "relational"];
+        let max_idx = vals.iter().enumerate()
+            .max_by(|a, b| a.1.partial_cmp(b.1).unwrap_or(std::cmp::Ordering::Equal))
+            .map(|(i, _)| i)
+            .unwrap_or(0);
+        names[max_idx]
+    }
+}
+
 /// A single agent in the civilization simulation.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CivAgent {
@@ -278,6 +346,10 @@ pub struct CivAgent {
     /// Active wounds (compartmental healing model).
     #[serde(default)]
     pub wounds: Vec<crate::wound_healing::WoundState>,
+    /// Ethical orientation: how this agent weighs moral considerations.
+    /// Influences governance voting, sector preference, faction joining, migration.
+    #[serde(default)]
+    pub ethics: EthicalOrientation,
 }
 
 fn default_mycel() -> f64 { 0.1 }
