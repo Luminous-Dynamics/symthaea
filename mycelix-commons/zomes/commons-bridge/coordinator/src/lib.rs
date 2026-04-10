@@ -1300,6 +1300,42 @@ pub fn get_consciousness_credential(did: String) -> ExternResult<ConsciousnessCr
     Ok(credential)
 }
 
+/// Fetch a native 8D `SovereignCredential` from the identity bridge.
+///
+/// Called by `gate_civic()` when the bridge supports native 8D credentials.
+/// Dispatches to the identity cluster's `issue_sovereign_credential` extern.
+/// Falls back to an error if the identity cluster is unreachable — callers
+/// should fall back to the legacy `get_consciousness_credential` path.
+#[hdk_extern]
+pub fn get_sovereign_credential(
+    did: String,
+) -> ExternResult<mycelix_bridge_common::sovereign_gate::SovereignCredential> {
+    enforce_rate_limit("identity:identity_bridge")?;
+
+    let response = call(
+        CallTargetCell::OtherRole(IDENTITY_ROLE.into()),
+        ZomeName::new("identity_bridge"),
+        FunctionName::new("issue_sovereign_credential"),
+        None,
+        did.clone(),
+    )?;
+
+    match response {
+        ZomeCallResponse::Ok(extern_io) => {
+            extern_io.decode().map_err(|e| {
+                wasm_error!(WasmErrorInner::Guest(format!(
+                    "Failed to decode sovereign credential: {:?}",
+                    e
+                )))
+            })
+        }
+        other => Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Sovereign credential call failed for {}: {:?}",
+            did, other
+        )))),
+    }
+}
+
 /// Refresh a consciousness credential by re-fetching from the identity cluster.
 ///
 /// Called by `gate_civic()` when a credential is nearing expiry (within

@@ -4,14 +4,12 @@
 //! Sovereign civic gating — 8D replacement for consciousness gating.
 //!
 //! `gate_civic()` is a drop-in replacement for `gate_consciousness()`.
-//! During the transition period, it:
-//! 1. Fetches the existing `ConsciousnessCredential` (unchanged bridge extern)
-//! 2. Converts to `SovereignProfile` via the backward-compatible `From` impl
-//! 3. Evaluates against `CivicRequirement` using the sovereign-profile crate
-//! 4. Returns the same `GovernanceEligibility` for backward compatibility
+//! It attempts to fetch a native `SovereignCredential` (8D) first. If the
+//! local bridge supports it, evaluation uses the full 8-dimensional profile.
+//! Otherwise, it falls back to the legacy `ConsciousnessCredential` (4D)
+//! with automatic conversion to the 8D space.
 //!
-//! Once the identity bridge issues native `SovereignCredential`s, this module
-//! will switch to fetching those directly.
+//! Returns the same `GovernanceEligibility` for backward compatibility.
 
 pub use sovereign_profile::{
     civic_requirement_basic, civic_requirement_constitutional, civic_requirement_guardian,
@@ -90,21 +88,131 @@ pub fn governance_requirement_from_civic(civic: &CivicRequirement) -> Governance
 // gate_civic — the main entry point
 // ---------------------------------------------------------------------------
 
+/// Map `CivicTier` to legacy `ConsciousnessTier` (1:1, same names).
+fn civic_to_consciousness_tier(tier: CivicTier) -> ConsciousnessTier {
+    match tier {
+        CivicTier::Observer => ConsciousnessTier::Observer,
+        CivicTier::Participant => ConsciousnessTier::Participant,
+        CivicTier::Citizen => ConsciousnessTier::Citizen,
+        CivicTier::Steward => ConsciousnessTier::Steward,
+        CivicTier::Guardian => ConsciousnessTier::Guardian,
+    }
+}
+
+/// Evaluate a `SovereignCredential` against a `CivicRequirement`.
+///
+/// Produces a `GovernanceEligibility` for backward compatibility.
+fn evaluate_sovereign(
+    cred: &SovereignCredential,
+    requirement: &CivicRequirement,
+    now_us: u64,
+) -> GovernanceEligibility {
+    if cred.expires_at <= now_us {
+        return GovernanceEligibility {
+            eligible: false,
+            weight_bp: 0,
+            tier: ConsciousnessTier::Observer,
+            profile: sovereign_to_legacy_profile(&cred.profile),
+            reasons: vec!["Sovereign credential expired".into()],
+            restoration_progress: 1.0,
+        };
+    }
+
+    let weights = DimensionWeights::governance();
+    let tier = cred.profile.tier(&weights);
+    let eligible = cred.profile.meets_requirement(requirement, &weights);
+    let consciousness_tier = civic_to_consciousness_tier(tier);
+    let weight_bp = consciousness_tier.vote_weight_bp();
+
+    let reasons = if eligible {
+        vec![]
+    } else {
+        let mut r = Vec::new();
+        if tier < requirement.min_tier {
+            r.push(format!(
+                "CivicTier {:?} below required {:?}",
+                tier, requirement.min_tier
+            ));
+        }
+        for &(dim, min_val) in &requirement.min_dimensions {
+            let actual = cred.profile.get(dim);
+            if actual < min_val {
+                r.push(format!(
+                    "{:?} {:.3} below required {:.3}",
+                    dim, actual, min_val
+                ));
+            }
+        }
+        r
+    };
+
+    GovernanceEligibility {
+        eligible,
+        weight_bp,
+        tier: consciousness_tier,
+        profile: sovereign_to_legacy_profile(&cred.profile),
+        reasons,
+        restoration_progress: 1.0,
+    }
+}
+
+/// Convert `SovereignProfile` to legacy `ConsciousnessProfile` for backward compat.
+fn sovereign_to_legacy_profile(
+    profile: &SovereignProfile,
+) -> crate::consciousness_profile::ConsciousnessProfile {
+    let legacy = LegacyProfile::from(profile.clone());
+    crate::consciousness_profile::ConsciousnessProfile {
+        identity: legacy.identity,
+        reputation: legacy.reputation,
+        community: legacy.community,
+        engagement: legacy.engagement,
+    }
+}
+
 /// Gate a governance action using the 8D Sovereign Profile.
 ///
-/// Drop-in replacement for `gate_consciousness()`. During the transition,
-/// fetches the existing `ConsciousnessCredential` and converts it to an
-/// 8D `SovereignProfile` for evaluation.
+/// Drop-in replacement for `gate_consciousness()`. Tries to fetch a native
+/// `SovereignCredential` from the local bridge first. Falls back to the legacy
+/// `ConsciousnessCredential` path if the bridge doesn't support it yet.
 ///
-/// Returns `Ok(GovernanceEligibility)` if the agent meets the requirement,
-/// or `Err` with a descriptive message if not.
+/// Returns `Ok(GovernanceEligibility)` — eligible or ineligible with reasons.
 #[cfg(feature = "hdk")]
 pub fn gate_civic(
     bridge_zome: &str,
     requirement: &CivicRequirement,
     action_name: &str,
 ) -> hdk::prelude::ExternResult<GovernanceEligibility> {
-    // During transition: delegate to gate_consciousness with converted requirement
+    use hdk::prelude::*;
+
+    let agent = agent_info()?.agent_initial_pubkey;
+    let did = format!("did:mycelix:{}", agent);
+
+    // --- Try native SovereignCredential path ---
+    if let Ok(ZomeCallResponse::Ok(extern_io)) = call(
+        CallTargetCell::Local,
+        ZomeName::new(bridge_zome),
+        FunctionName::new("get_sovereign_credential"),
+        None,
+        did.clone(),
+    ) {
+        if let Ok(cred) = extern_io.decode::<SovereignCredential>() {
+            let now_us = sys_time()?.as_micros() as u64;
+            let result = evaluate_sovereign(&cred, requirement, now_us);
+
+            let tier_index = match result.tier {
+                ConsciousnessTier::Observer => 0,
+                ConsciousnessTier::Participant => 1,
+                ConsciousnessTier::Citizen => 2,
+                ConsciousnessTier::Steward => 3,
+                ConsciousnessTier::Guardian => 4,
+            };
+            crate::metrics::record_gate_check(result.eligible, tier_index, 0);
+
+            return Ok(result);
+        }
+    }
+
+    // --- Fallback: legacy ConsciousnessCredential path ---
     let legacy_req = governance_requirement_from_civic(requirement);
     crate::consciousness_profile::gate_consciousness(bridge_zome, &legacy_req, action_name)
 }
