@@ -1610,7 +1610,7 @@ pub fn get_sovereign_credential(
 fn collect_epistemic_integrity(did: &str) -> f64 {
     match call(
         CallTargetCell::OtherRole("knowledge".into()),
-        ZomeName::new("claims_coordinator"),
+        ZomeName::new("claims"),
         FunctionName::new("get_agent_epistemic_score"),
         None,
         did.to_string(),
@@ -1626,7 +1626,7 @@ fn collect_epistemic_integrity(did: &str) -> f64 {
 fn collect_network_resilience() -> f64 {
     match call(
         CallTargetCell::OtherRole("commons_land".into()),
-        ZomeName::new("mesh_time_coordinator"),
+        ZomeName::new("mesh_time"),
         FunctionName::new("get_agent_resilience_score"),
         None,
         (),
@@ -1642,7 +1642,7 @@ fn collect_network_resilience() -> f64 {
 fn collect_stewardship_care(did: &str) -> f64 {
     match call(
         CallTargetCell::OtherRole("attribution".into()),
-        ZomeName::new("reciprocity_coordinator"),
+        ZomeName::new("reciprocity"),
         FunctionName::new("get_agent_stewardship_score"),
         None,
         did.to_string(),
@@ -1658,7 +1658,7 @@ fn collect_stewardship_care(did: &str) -> f64 {
 fn collect_thermodynamic_yield(did: &str) -> f64 {
     match call(
         CallTargetCell::OtherRole("energy".into()),
-        ZomeName::new("grid_coordinator"),
+        ZomeName::new("grid"),
         FunctionName::new("get_agent_thermodynamic_score"),
         None,
         did.to_string(),
@@ -1671,20 +1671,14 @@ fn collect_thermodynamic_yield(did: &str) -> f64 {
 }
 
 /// Collect semantic resonance from federated learning (hyperfeel HV similarity).
+/// Collect semantic resonance from federated learning (hyperfeel HV similarity).
+///
+/// NOTE: mycelix-core FL DNA is NOT yet a role in the unified hApp.
+/// Returns 0.0 — identity bridge falls back to community_score as proxy.
 fn collect_semantic_resonance() -> f64 {
-    // Use round 0 as default — in practice, the latest round would be queried
-    match call(
-        CallTargetCell::OtherRole("core_fl".into()),
-        ZomeName::new("federated_learning_coordinator"),
-        FunctionName::new("get_agent_semantic_resonance"),
-        None,
-        0u32, // latest round
-    ) {
-        Ok(ZomeCallResponse::Ok(result)) => {
-            result.decode::<f64>().unwrap_or(0.0).clamp(0.0, 1.0)
-        }
-        _ => 0.0,
-    }
+    // core_fl role needs to be added to mycelix-unified-happ.yaml before this works.
+    // The h_fl zome has get_agent_semantic_resonance() ready.
+    0.0
 }
 
 /// Collect economic velocity from finance cluster (TEND zome).
@@ -1692,7 +1686,7 @@ fn collect_economic_velocity(did: &str) -> f64 {
     // Try cross-cluster call to finance
     match call(
         CallTargetCell::OtherRole("finance".into()),
-        ZomeName::new("tend_coordinator"),
+        ZomeName::new("tend"),
         FunctionName::new("get_tend_reputation_input"),
         None,
         did.to_string(),
@@ -1734,7 +1728,7 @@ fn collect_civic_participation(_did: &str) -> f64 {
     // Try cross-cluster call to governance for voice credits
     match call(
         CallTargetCell::OtherRole("governance".into()),
-        ZomeName::new("voting_coordinator"),
+        ZomeName::new("voting"),
         FunctionName::new("get_agent_vote_count"),
         None,
         (),
