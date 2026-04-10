@@ -15,6 +15,7 @@
 //! depend on HDK and can be used by any Rust crate.
 
 pub mod constitutional_envelope;
+pub mod scoring_model;
 pub mod consciousness_thresholds;
 pub mod consciousness_zkp;
 pub mod membership_zkp;
