@@ -27,10 +27,10 @@ pub mod replay;
 pub mod world;
 
 pub use body::{BodyHandle, BodyType, NetId, RigidBody};
-pub use contact::{CollisionEvent, ContactManifold, SensorEvent};
+pub use contact::{CollisionEvent, ContactCache, ContactManifold, SensorEvent};
 pub use constraint::Constraint;
 pub use epa::EpaResult;
 pub use broadphase::{Aabb, Lbvh, morton_encode, morton_prefix};
-pub use joints::{BallJoint, FixedJoint};
+pub use joints::{BallJoint, FixedJoint, HingeJoint};
 pub use replay::{apply_commands, ReplayTape, WorldCommand, WorldSnapshot};
 pub use world::{NoOpCallback, PhysicsCallback, PhysicsWorld};

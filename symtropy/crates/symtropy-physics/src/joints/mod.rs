@@ -9,6 +9,8 @@
 
 pub mod ball;
 pub mod fixed;
+pub mod hinge;
 
 pub use ball::BallJoint;
 pub use fixed::FixedJoint;
+pub use hinge::HingeJoint;

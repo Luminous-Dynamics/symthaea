@@ -11,7 +11,7 @@ use symtropy_math::Point;
 
 use crate::body::{BodyHandle, NetId, RigidBody};
 use crate::broadphase;
-use crate::contact::{CollisionEvent, ContactManifold};
+use crate::contact::{CollisionEvent, ContactCache, ContactManifold};
 use crate::constraint::Constraint;
 use crate::gjk;
 use crate::integrator;
@@ -63,6 +63,10 @@ pub struct PhysicsWorld<const D: usize> {
     pub collision_events: Vec<CollisionEvent<D>>,
     /// Sensor overlap events from the last step.
     pub sensor_events: Vec<crate::contact::SensorEvent>,
+    /// Contact cache for warm-starting (previous frame's impulses).
+    contact_cache: ContactCache<D>,
+    /// Warm-starting from the previous frame (swapped at frame boundaries).
+    prev_cache: ContactCache<D>,
     /// Position correction iterations per step.
     pub solver_iterations: usize,
     /// Sleep velocity threshold.
@@ -90,6 +94,8 @@ impl<const D: usize> PhysicsWorld<D> {
             contacts: Vec::new(),
             collision_events: Vec::new(),
             sensor_events: Vec::new(),
+            contact_cache: ContactCache::new(),
+            prev_cache: ContactCache::new(),
             solver_iterations: 4,
             slop: 0.01,
             baumgarte: 0.2,
@@ -195,6 +201,9 @@ impl<const D: usize> PhysicsWorld<D> {
         // 0. Clear events from previous step
         self.collision_events.clear();
         self.sensor_events.clear();
+        // Warm-starting: swap caches so prev_cache has last frame's impulses
+        std::mem::swap(&mut self.contact_cache, &mut self.prev_cache);
+        self.contact_cache.begin_frame();
 
         // 1. Integrate all bodies (skip sleeping)
         for body in &mut self.bodies {
@@ -243,13 +252,13 @@ impl<const D: usize> PhysicsWorld<D> {
                     ) {
                         if epa_result.depth > 0.0 {
                             let (_, ra) = self.bodies[a].collider.bounding_sphere();
-                            self.contacts.push(ContactManifold {
-                                body_a: pair.0,
-                                body_b: pair.1,
-                                normal: epa_result.normal,
-                                depth: epa_result.depth,
-                                point: pos_a + epa_result.normal * ra,
-                            });
+                            self.contacts.push(ContactManifold::single(
+                                pair.0,
+                                pair.1,
+                                epa_result.normal,
+                                pos_a + epa_result.normal * ra,
+                                epa_result.depth,
+                            ));
                         }
                     }
                 }
@@ -327,7 +336,7 @@ impl<const D: usize> PhysicsWorld<D> {
         }
 
         // Position correction (Baumgarte stabilization)
-        let correction_mag = (contact.depth - self.slop).max(0.0) * self.baumgarte;
+        let correction_mag = (contact.depth() - self.slop).max(0.0) * self.baumgarte;
         let correction = contact.normal * correction_mag;
 
         if self.bodies[a].is_dynamic() {
@@ -335,6 +344,14 @@ impl<const D: usize> PhysicsWorld<D> {
         }
         if self.bodies[b].is_dynamic() {
             integrator::separate(&mut self.bodies[b], &(correction * (inv_mass_b / total_inv_mass)));
+        }
+
+        // Warm-starting: apply cached impulse from previous frame as initial guess
+        let contact_pt = contact.point();
+        if let Some(cached) = self.prev_cache.lookup(contact.body_a, contact.body_b, &contact_pt) {
+            let warm_impulse = contact.normal * (cached.normal_impulse * 0.8); // 80% damped
+            integrator::apply_impulse(&mut self.bodies[a], &(-warm_impulse));
+            integrator::apply_impulse(&mut self.bodies[b], &warm_impulse);
         }
 
         // Normal velocity resolution
@@ -346,7 +363,7 @@ impl<const D: usize> PhysicsWorld<D> {
         // ═══ CONSCIOUSNESS MODULATION ═══
         // Modulate impulse via sanctuary zones and harmony fields
         if let Some(ref cb) = callback {
-            j = cb.modulate_impulse(j, &contact.point);
+            j = cb.modulate_impulse(j, &contact.point());
         }
 
         if j > 0.0 {
@@ -365,7 +382,7 @@ impl<const D: usize> PhysicsWorld<D> {
 
                 // ═══ HARMONY FIELD FRICTION MODULATION ═══
                 if let Some(ref cb) = callback {
-                    mu *= cb.friction_multiplier(&contact.point, contact.body_a);
+                    mu *= cb.friction_multiplier(&contact.point(), contact.body_a);
                 }
 
                 let j_t_desired = -v_t_mag / total_inv_mass;
@@ -386,7 +403,7 @@ impl<const D: usize> PhysicsWorld<D> {
                 body_b: contact.body_b,
                 impulse: j,
                 normal: contact.normal,
-                depth: contact.depth,
+                depth: contact.depth(),
             };
 
             // ═══ CONSCIOUSNESS FEEDBACK: collision → prediction error ═══
@@ -395,6 +412,9 @@ impl<const D: usize> PhysicsWorld<D> {
             }
 
             self.collision_events.push(event);
+
+            // Cache impulse for warm-starting next frame
+            self.contact_cache.store(contact.body_a, contact.body_b, contact_pt, j, 0.0);
 
             // Wake both bodies on collision
             self.bodies[a].wake();
