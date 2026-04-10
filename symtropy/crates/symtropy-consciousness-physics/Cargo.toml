@@ -5,14 +5,18 @@ edition = "2021"
 license = "AGPL-3.0-or-later"
 description = "Integrated information (Phi) as a first-class physics parameter: 5-channel coupling, thermodynamic closure with Landauer bound, CEMI-inspired harmony fields, and 63 research experiments."
 repository = "https://github.com/luminous-dynamics/symtropy"
-keywords = ["physics", "consciousness", "integrated-information", "thermodynamics", "simulation"]
+keywords = ["physics", "consciousness", "thermodynamics", "simulation", "phi"]
 categories = ["simulation", "science", "game-engines"]
 readme = "README.md"
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
 
 [dependencies]
 symtropy-math = { version = "0.1.0", path = "../symtropy-math" }
 symtropy-physics = { version = "0.1.0", path = "../symtropy-physics" }
-symthaea-consciousness-equation = { path = "../../../symthaea/crates/symthaea-consciousness-equation" }
+symthaea-consciousness-equation = { version = "0.1.0", path = "../../../symthaea/crates/symthaea-consciousness-equation" }
 symthaea-core = { path = "../../../symthaea/symthaea-core", optional = true }
 nalgebra = "0.34"
 

@@ -3,7 +3,10 @@ name = "sovereign-profile"
 version = "0.1.0"
 edition = "2021"
 license = "AGPL-3.0-or-later"
-description = "8-dimensional Sovereign Profile — anti-tyranny civic identity for Mycelix governance"
+description = "8-dimensional Sovereign Profile — anti-tyranny civic identity for decentralized governance. Scores autonomy, dignity, participation, equity, transparency, sustainability, knowledge, and solidarity."
+repository = "https://github.com/luminous-dynamics/mycelix"
+keywords = ["governance", "identity", "civic", "sovereignty", "profile"]
+categories = ["data-structures", "science"]
 
 [features]
 default = ["serde"]
