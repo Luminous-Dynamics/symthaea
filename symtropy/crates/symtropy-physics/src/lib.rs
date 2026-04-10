@@ -32,6 +32,6 @@ pub use contact::{CollisionEvent, ContactCache, ContactManifold, SensorEvent};
 pub use constraint::Constraint;
 pub use epa::EpaResult;
 pub use broadphase::{Aabb, Lbvh, morton_encode, morton_prefix};
-pub use joints::{BallJoint, FixedJoint, HingeJoint};
+pub use joints::{BallJoint, FixedJoint, HingeJoint, MotorDrive, PrismaticJoint};
 pub use replay::{apply_commands, ReplayTape, WorldCommand, WorldSnapshot};
 pub use world::{NoOpCallback, PhysicsCallback, PhysicsWorld};

@@ -9,6 +9,30 @@
 BWS requires `BWS_ACCESS_TOKEN` env var (set in ~/.zshrc). Fallback: `bw` CLI (needs `BW_SESSION`).
 Full details: @.claude/rules/CREDENTIALS.md
 
+### Crates.io
+```bash
+# Token stored in BWS (secret ID: 736da236-a95f-4dd2-8efc-b42800c9106a)
+~/.cargo/bin/bws secret get 736da236-a95f-4dd2-8efc-b42800c9106a
+cargo login <token>   # Already configured in ~/.cargo/credentials.toml
+```
+
+**Published crates (April 2026):**
+
+| Crate | Version | Registry |
+|-------|---------|----------|
+| `symtropy-math` | 0.1.0 | [crates.io](https://crates.io/crates/symtropy-math) |
+| `symtropy-physics` | 0.1.0 | [crates.io](https://crates.io/crates/symtropy-physics) |
+| `symtropy-consciousness-physics` | 0.1.0 | [crates.io](https://crates.io/crates/symtropy-consciousness-physics) |
+| `symtropy-bevy` | 0.1.0 | [crates.io](https://crates.io/crates/symtropy-bevy) |
+| `symthaea-core` | 0.5.0 | [crates.io](https://crates.io/crates/symthaea-core) |
+| `symthaea-consciousness-equation` | 0.1.0 | [crates.io](https://crates.io/crates/symthaea-consciousness-equation) |
+| `symthaea-fep` | 0.1.0 | [crates.io](https://crates.io/crates/symthaea-fep) |
+| `sovereign-profile` | 0.1.0 | [crates.io](https://crates.io/crates/sovereign-profile) |
+
+**Publishing workflow:** Use `cargo-workspaces` for batch publishing (`cargo ws publish`). Rate limit: ~1 new crate per 10 minutes. Use `--publish-interval 600` for automated batches.
+
+**Next to publish:** 48 symthaea crates (unblocked by symthaea-core). See `symtropy/ROADMAP.md` for full plan.
+
 ### Ports
 
 **Ranges**: Platform (8090-8099), Frontends (8100-8149), Conductors (82XX/83XX), Dev/Test (8400-8409)
@@ -28,6 +52,7 @@ Full details: @.claude/rules/CREDENTIALS.md
 | 8110 | Civic UI (Governance+Finance) | governance.luminousdynamics.io |
 | 8111 | Health UI | health.luminousdynamics.io |
 | 8112 | Hearth UI | hearth.luminousdynamics.io |
+| 8117 | Pulse (Decentralized Email) | mail.mycelix.net |
 | 8121 | Music UI | music.luminousdynamics.io |
 | 8124 | Portal UI | portal.mycelix.net |
 | 8129 | Craft UI | craft.mycelix.net |

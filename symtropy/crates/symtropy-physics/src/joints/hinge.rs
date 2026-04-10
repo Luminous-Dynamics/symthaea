@@ -34,6 +34,8 @@ pub struct HingeJoint<const D: usize> {
     pub stiffness: f64,
     /// Optional angle limits (min, max) in radians. `None` = unlimited.
     pub angle_limits: Option<(f64, f64)>,
+    /// Optional motor drive for actuated hinge joints.
+    pub motor: Option<super::MotorDrive>,
 }
 
 impl<const D: usize> HingeJoint<D> {
@@ -58,7 +60,14 @@ impl<const D: usize> HingeJoint<D> {
             plane_axis_b,
             stiffness: 1.0,
             angle_limits: None,
+            motor: None,
         }
+    }
+
+    /// Add a motor drive.
+    pub fn with_motor(mut self, motor: super::MotorDrive) -> Self {
+        self.motor = Some(motor);
+        self
     }
 
     /// Create with specific anchors.
@@ -79,6 +88,7 @@ impl<const D: usize> HingeJoint<D> {
             plane_axis_b,
             stiffness: 1.0,
             angle_limits: None,
+            motor: None,
         }
     }
 
@@ -195,6 +205,21 @@ impl<const D: usize> Constraint<D> for HingeJoint<D> {
                         body_b.angular_velocity.get(i, j) - correction,
                     );
                 }
+            }
+        }
+
+        // Motor drive on the hinge rotation axis
+        if let Some(ref motor) = self.motor {
+            let current_angular = body_b.angular_velocity.get(pa, pb) - body_a.angular_velocity.get(pa, pb);
+            let error = motor.target - current_angular;
+            let torque = (error * motor.max_force - current_angular * motor.damping)
+                .clamp(-motor.max_force, motor.max_force);
+            let impulse = torque * _dt;
+            if body_a.is_dynamic() {
+                body_a.angular_velocity.set(pa, pb, body_a.angular_velocity.get(pa, pb) - impulse * 0.5);
+            }
+            if body_b.is_dynamic() {
+                body_b.angular_velocity.set(pa, pb, body_b.angular_velocity.get(pa, pb) + impulse * 0.5);
             }
         }
     }
