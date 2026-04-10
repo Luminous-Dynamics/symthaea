@@ -1527,17 +1527,17 @@ pub fn get_consciousness_credential(did: String) -> ExternResult<ConsciousnessCr
 /// grants unearned access). As more cluster collectors are wired, more
 /// dimensions will be populated with real data.
 ///
-/// Currently populated:
-/// - D0 Epistemic Integrity: from MFA assurance level (identity proxy)
-/// - D2 Network Resilience: from MFA assurance level (identity proxy)
-/// - D4 Civic Participation: from community trust score
-/// - D5 Stewardship & Care: from aggregated reputation
-/// - D6 Semantic Resonance: from community trust score
+/// Wired collectors (6 of 8):
+/// - D0 Epistemic: knowledge/claims (get_agent_epistemic_score), fallback: MFA
+/// - D2 Network: commons/mesh-time (get_agent_resilience_score), fallback: MFA
+/// - D3 Economic: finance/TEND (get_tend_reputation_input)
+/// - D4 Civic: governance/voting + community trust
+/// - D5 Stewardship: attribution/reciprocity (get_agent_stewardship_score), fallback: reputation
+/// - D7 Competence: craft/credentials (list_my_published_credentials)
 ///
 /// Not yet wired (default 0.0):
-/// - D1 Thermodynamic Yield: needs energy cluster
-/// - D3 Economic Velocity: needs finance cluster (TEND)
-/// - D7 Domain Competence: needs craft cluster
+/// - D1 Thermodynamic Yield: needs energy cluster grid production data
+/// - D6 Semantic Resonance: proxy via community trust (needs Symthaea HDC)
 #[hdk_extern]
 pub fn issue_sovereign_credential(
     did: String,
@@ -1555,20 +1555,23 @@ pub fn issue_sovereign_credential(
     let community_score = get_community_trust_score(&did)?;
 
     // Cross-cluster collectors (each falls back to 0.0 if unavailable)
-    let economic_velocity = collect_economic_velocity(&did);
-    let domain_competence = collect_domain_competence(&did);
-    let civic_participation_extra = collect_civic_participation(&did);
+    let epistemic = collect_epistemic_integrity(&did);
+    let network = collect_network_resilience();
+    let economic = collect_economic_velocity(&did);
+    let civic_extra = collect_civic_participation(&did);
+    let stewardship = collect_stewardship_care(&did);
+    let competence = collect_domain_competence(&did);
 
-    // Build 8D profile
+    // Build 8D profile — use real data where available, proxy otherwise
     let profile = sovereign_profile::SovereignProfile {
-        epistemic_integrity: identity_score, // proxy: identity verification quality
+        epistemic_integrity: if epistemic > 0.0 { epistemic } else { identity_score },
         thermodynamic_yield: 0.0,            // TODO: wire energy cluster
-        network_resilience: identity_score,   // proxy: verified identity ≈ stable node
-        economic_velocity,
-        civic_participation: community_score.max(civic_participation_extra),
-        stewardship_care: reputation_score,
-        semantic_resonance: community_score,  // proxy: peer trust ≈ community alignment
-        domain_competence,
+        network_resilience: if network > 0.0 { network } else { identity_score },
+        economic_velocity: economic,
+        civic_participation: community_score.max(civic_extra),
+        stewardship_care: if stewardship > 0.0 { stewardship } else { reputation_score },
+        semantic_resonance: community_score,  // proxy until Symthaea HDC wired
+        domain_competence: competence,
     };
 
     let weights = sovereign_profile::weights::DimensionWeights::governance();
@@ -1600,6 +1603,54 @@ pub fn get_sovereign_credential(
 // ---------------------------------------------------------------------------
 // Cross-cluster dimension collectors (best-effort, fallback to 0.0)
 // ---------------------------------------------------------------------------
+
+/// Collect epistemic integrity from knowledge cluster (claims zome).
+fn collect_epistemic_integrity(did: &str) -> f64 {
+    match call(
+        CallTargetCell::OtherRole("knowledge".into()),
+        ZomeName::new("claims_coordinator"),
+        FunctionName::new("get_agent_epistemic_score"),
+        None,
+        did.to_string(),
+    ) {
+        Ok(ZomeCallResponse::Ok(result)) => {
+            result.decode::<f64>().unwrap_or(0.0).clamp(0.0, 1.0)
+        }
+        _ => 0.0,
+    }
+}
+
+/// Collect network resilience from commons cluster (mesh-time zome).
+fn collect_network_resilience() -> f64 {
+    match call(
+        CallTargetCell::OtherRole("commons_land".into()),
+        ZomeName::new("mesh_time_coordinator"),
+        FunctionName::new("get_agent_resilience_score"),
+        None,
+        (),
+    ) {
+        Ok(ZomeCallResponse::Ok(result)) => {
+            result.decode::<f64>().unwrap_or(0.0).clamp(0.0, 1.0)
+        }
+        _ => 0.0,
+    }
+}
+
+/// Collect stewardship score from attribution cluster (reciprocity zome).
+fn collect_stewardship_care(did: &str) -> f64 {
+    match call(
+        CallTargetCell::OtherRole("attribution".into()),
+        ZomeName::new("reciprocity_coordinator"),
+        FunctionName::new("get_agent_stewardship_score"),
+        None,
+        did.to_string(),
+    ) {
+        Ok(ZomeCallResponse::Ok(result)) => {
+            result.decode::<f64>().unwrap_or(0.0).clamp(0.0, 1.0)
+        }
+        _ => 0.0,
+    }
+}
 
 /// Collect economic velocity from finance cluster (TEND zome).
 fn collect_economic_velocity(did: &str) -> f64 {

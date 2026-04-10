@@ -6,13 +6,178 @@
 //!
 //! Updated to use HDK 0.6 patterns
 
-use hdk::prelude::*;
 use claims_integrity::*;
+use hdk::prelude::*;
+
+const ALL_CLAIMS_ANCHOR: &str = "claims:all";
+const DEFAULT_SEARCH_LIMIT: usize = 20;
 
 /// Helper to get an anchor entry hash
 fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
     let anchor = Anchor(anchor_str.to_string());
     hash_entry(&EntryTypes::Anchor(anchor))
+}
+
+fn ensure_anchor(anchor_str: &str) -> ExternResult<()> {
+    create_entry(&EntryTypes::Anchor(Anchor(anchor_str.to_string())))?;
+    Ok(())
+}
+
+fn link_claim_indexes(claim: &Claim, action_hash: &ActionHash) -> ExternResult<()> {
+    ensure_anchor(ALL_CLAIMS_ANCHOR)?;
+    create_link(
+        anchor_hash(ALL_CLAIMS_ANCHOR)?,
+        action_hash.clone(),
+        LinkTypes::AllClaimsIndex,
+        (),
+    )?;
+
+    let author_anchor = format!("author:{}", claim.author);
+    ensure_anchor(&author_anchor)?;
+    create_link(
+        anchor_hash(&author_anchor)?,
+        action_hash.clone(),
+        LinkTypes::AuthorToClaim,
+        (),
+    )?;
+
+    for tag in &claim.tags {
+        let tag_anchor = format!("tag:{}", tag);
+        ensure_anchor(&tag_anchor)?;
+        create_link(
+            anchor_hash(&tag_anchor)?,
+            action_hash.clone(),
+            LinkTypes::TagToClaim,
+            (),
+        )?;
+    }
+
+    let type_anchor = format!("type:{:?}", claim.claim_type);
+    ensure_anchor(&type_anchor)?;
+    create_link(
+        anchor_hash(&type_anchor)?,
+        action_hash.clone(),
+        LinkTypes::TypeToClaim,
+        (),
+    )?;
+
+    let id_anchor = format!("claim_id:{}", claim.id);
+    ensure_anchor(&id_anchor)?;
+    create_link(
+        anchor_hash(&id_anchor)?,
+        action_hash.clone(),
+        LinkTypes::ClaimIdToClaim,
+        (),
+    )?;
+
+    Ok(())
+}
+
+fn link_targets_action(link: &Link, action_hash: &ActionHash) -> bool {
+    ActionHash::try_from(link.target.clone())
+        .map(|target| target == *action_hash)
+        .unwrap_or(false)
+}
+
+fn delete_target_links(
+    base: EntryHash,
+    link_type: LinkTypes,
+    target_action_hash: &ActionHash,
+) -> ExternResult<()> {
+    let links = get_links(LinkQuery::try_new(base, link_type)?, GetStrategy::default())?;
+
+    for link in links {
+        if link_targets_action(&link, target_action_hash) {
+            delete_link(link.create_link_hash, GetOptions::default())?;
+        }
+    }
+
+    Ok(())
+}
+
+fn unlink_claim_indexes(claim: &Claim, action_hash: &ActionHash) -> ExternResult<()> {
+    delete_target_links(
+        anchor_hash(ALL_CLAIMS_ANCHOR)?,
+        LinkTypes::AllClaimsIndex,
+        action_hash,
+    )?;
+
+    let author_anchor = format!("author:{}", claim.author);
+    delete_target_links(
+        anchor_hash(&author_anchor)?,
+        LinkTypes::AuthorToClaim,
+        action_hash,
+    )?;
+
+    for tag in &claim.tags {
+        let tag_anchor = format!("tag:{}", tag);
+        delete_target_links(
+            anchor_hash(&tag_anchor)?,
+            LinkTypes::TagToClaim,
+            action_hash,
+        )?;
+    }
+
+    let type_anchor = format!("type:{:?}", claim.claim_type);
+    delete_target_links(
+        anchor_hash(&type_anchor)?,
+        LinkTypes::TypeToClaim,
+        action_hash,
+    )?;
+
+    let id_anchor = format!("claim_id:{}", claim.id);
+    delete_target_links(
+        anchor_hash(&id_anchor)?,
+        LinkTypes::ClaimIdToClaim,
+        action_hash,
+    )?;
+
+    Ok(())
+}
+
+fn decode_claim(record: &Record) -> ExternResult<Option<Claim>> {
+    record
+        .entry()
+        .to_app_option()
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))
+}
+
+fn claim_is_newer(candidate: &Claim, existing: &Claim) -> bool {
+    candidate.version > existing.version
+        || (candidate.version == existing.version && candidate.updated > existing.updated)
+}
+
+fn latest_claim_records_from_links(links: Vec<Link>) -> ExternResult<Vec<Record>> {
+    let mut current: std::collections::HashMap<String, (Claim, Record)> =
+        std::collections::HashMap::new();
+
+    for link in links {
+        let action_hash = ActionHash::try_from(link.target)
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
+        let Some(linked_record) = get(action_hash, GetOptions::default())? else {
+            continue;
+        };
+        let Some(linked_claim) = decode_claim(&linked_record)? else {
+            continue;
+        };
+        let Some(record) = get_claim(linked_claim.id.clone())? else {
+            continue;
+        };
+        let Some(claim) = decode_claim(&record)? else {
+            continue;
+        };
+
+        match current.get(&claim.id) {
+            Some((existing, _)) if !claim_is_newer(&claim, existing) => {}
+            _ => {
+                current.insert(claim.id.clone(), (claim, record));
+            }
+        }
+    }
+
+    let mut records: Vec<(Claim, Record)> = current.into_values().collect();
+    records.sort_by(|(left, _), (right, _)| right.updated.cmp(&left.updated));
+    Ok(records.into_iter().map(|(_, record)| record).collect())
 }
 
 /// Result of cascade update
@@ -30,73 +195,40 @@ pub struct CascadeResult {
 #[hdk_extern]
 pub fn submit_claim(claim: Claim) -> ExternResult<Record> {
     let action_hash = create_entry(&EntryTypes::Claim(claim.clone()))?;
+    link_claim_indexes(&claim, &action_hash)?;
 
-    // Create and link author anchor
-    let author_anchor = format!("author:{}", claim.author);
-    create_entry(&EntryTypes::Anchor(Anchor(author_anchor.clone())))?;
-    create_link(
-        anchor_hash(&author_anchor)?,
-        action_hash.clone(),
-        LinkTypes::AuthorToClaim,
-        (),
-    )?;
-
-    // Create and link tag anchors
-    for tag in &claim.tags {
-        let tag_anchor = format!("tag:{}", tag);
-        create_entry(&EntryTypes::Anchor(Anchor(tag_anchor.clone())))?;
-        create_link(
-            anchor_hash(&tag_anchor)?,
-            action_hash.clone(),
-            LinkTypes::TagToClaim,
-            (),
-        )?;
-    }
-
-    // Create and link type anchor
-    let type_str = format!("type:{:?}", claim.claim_type);
-    create_entry(&EntryTypes::Anchor(Anchor(type_str.clone())))?;
-    create_link(
-        anchor_hash(&type_str)?,
-        action_hash.clone(),
-        LinkTypes::TypeToClaim,
-        (),
-    )?;
-
-    // Index by claim ID for O(1) lookup
-    let id_anchor = format!("claim_id:{}", claim.id);
-    create_entry(&EntryTypes::Anchor(Anchor(id_anchor.clone())))?;
-    create_link(
-        anchor_hash(&id_anchor)?,
-        action_hash.clone(),
-        LinkTypes::ClaimIdToClaim,
-        (),
-    )?;
-
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find created claim".into()
-        )))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find created claim".into()
+    )))
 }
 
 /// Get a claim by ID (O(1) via anchor index, works across agents)
 #[hdk_extern]
 pub fn get_claim(claim_id: String) -> ExternResult<Option<Record>> {
-    // O(1) lookup via claim ID anchor index
     let id_anchor = format!("claim_id:{}", claim_id);
     let links = get_links(
         LinkQuery::try_new(anchor_hash(&id_anchor)?, LinkTypes::ClaimIdToClaim)?,
         GetStrategy::default(),
     )?;
 
-    // Return the most recent link target (handles updates)
-    if let Some(link) = links.last() {
-        let action_hash = ActionHash::try_from(link.target.clone())
+    let mut latest: Option<(Claim, Record)> = None;
+    for link in links {
+        let action_hash = ActionHash::try_from(link.target)
             .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
-        return get(action_hash, GetOptions::default());
+        let Some(record) = get(action_hash, GetOptions::default())? else {
+            continue;
+        };
+        let Some(claim) = decode_claim(&record)? else {
+            continue;
+        };
+
+        match &latest {
+            Some((existing, _)) if !claim_is_newer(&claim, existing) => {}
+            _ => latest = Some((claim, record)),
+        }
     }
 
-    Ok(None)
+    Ok(latest.map(|(_, record)| record))
 }
 
 /// Get claims by author
@@ -109,16 +241,41 @@ pub fn get_claims_by_author(author_did: String) -> ExternResult<Vec<Record>> {
         GetStrategy::default(),
     )?;
 
-    let mut claims = Vec::new();
-    for link in links {
-        let action_hash = ActionHash::try_from(link.target)
-            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
-        if let Some(record) = get(action_hash, GetOptions::default())? {
-            claims.push(record);
+    latest_claim_records_from_links(links)
+}
+
+/// Get per-agent epistemic integrity score [0.0, 1.0].
+///
+/// Aggregates all claims by the author, weighted by confidence and recency.
+/// Score = min(1.0, claim_count / 50) × avg_confidence × recency_weight
+///
+/// Used by the 8D Sovereign Profile (D0: Epistemic Integrity).
+#[hdk_extern]
+pub fn get_agent_epistemic_score(author_did: String) -> ExternResult<f64> {
+    let records = get_claims_by_author(author_did)?;
+    if records.is_empty() {
+        return Ok(0.0);
+    }
+
+    let count = records.len();
+    let mut total_confidence = 0.0_f64;
+    let mut valid = 0u32;
+
+    for record in &records {
+        if let Some(Entry::App(bytes)) = record.entry().as_option() {
+            // Try to extract confidence from the claim entry
+            if let Ok(value) = serde_json::from_slice::<serde_json::Value>(bytes.bytes()) {
+                if let Some(conf) = value.get("confidence").and_then(|v| v.as_f64()) {
+                    total_confidence += conf.clamp(0.0, 1.0);
+                    valid += 1;
+                }
+            }
         }
     }
 
-    Ok(claims)
+    let avg_confidence = if valid > 0 { total_confidence / valid as f64 } else { 0.5 };
+    let saturation = (count as f64 / 50.0).min(1.0);
+    Ok((saturation * avg_confidence).clamp(0.0, 1.0))
 }
 
 /// Get claims by tag
@@ -132,11 +289,11 @@ pub fn get_claims_by_tag(tag: String) -> ExternResult<Vec<Record>> {
     )?;
 
     let mut claims = Vec::new();
-    for link in links {
-        let action_hash = ActionHash::try_from(link.target)
-            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
-        if let Some(record) = get(action_hash, GetOptions::default())? {
-            claims.push(record);
+    for record in latest_claim_records_from_links(links)? {
+        if let Some(claim) = decode_claim(&record)? {
+            if claim.tags.iter().any(|existing| existing == &tag) {
+                claims.push(record);
+            }
         }
     }
 
@@ -163,6 +320,178 @@ pub struct PaginatedResult {
     pub limit: u32,
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct SearchClaimsInput {
+    pub query: String,
+    pub limit: Option<u32>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct SearchHitClassification {
+    pub empirical: f64,
+    pub normative: f64,
+    pub materiality: f64,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ClaimSearchHit {
+    pub id: String,
+    pub content: String,
+    pub classification: SearchHitClassification,
+    pub author: String,
+    pub sources: Vec<String>,
+    pub tags: Vec<String>,
+    pub claim_type: ClaimType,
+    pub version: u32,
+    pub updated_micros: i64,
+    pub match_score: f64,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ClaimIndexStatsInput {
+    pub claim_id: String,
+    pub tags: Vec<String>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+pub struct IndexLinkCount {
+    pub anchor: String,
+    pub total_links: u32,
+    pub current_links: u32,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ClaimIndexStats {
+    pub claim_id: String,
+    pub version: u32,
+    pub all_claims: IndexLinkCount,
+    pub claim_id_index: IndexLinkCount,
+    pub author_index: IndexLinkCount,
+    pub type_index: IndexLinkCount,
+    pub tag_indexes: Vec<IndexLinkCount>,
+}
+
+fn probe_index_links(
+    anchor: String,
+    link_type: LinkTypes,
+    current_action_hash: &ActionHash,
+) -> ExternResult<IndexLinkCount> {
+    let links = get_links(
+        LinkQuery::try_new(anchor_hash(&anchor)?, link_type)?,
+        GetStrategy::default(),
+    )?;
+    let current_links = links
+        .iter()
+        .filter(|link| link_targets_action(link, current_action_hash))
+        .count() as u32;
+
+    Ok(IndexLinkCount {
+        anchor,
+        total_links: links.len() as u32,
+        current_links,
+    })
+}
+
+fn tokenize_query(query: &str) -> Vec<String> {
+    let mut seen = std::collections::HashSet::new();
+    let mut tokens = Vec::new();
+
+    for token in query
+        .split(|c: char| !c.is_alphanumeric())
+        .map(|token| token.trim().to_lowercase())
+    {
+        if token.len() < 3 || is_stop_word(&token) || !seen.insert(token.clone()) {
+            continue;
+        }
+        tokens.push(token);
+    }
+
+    tokens
+}
+
+fn is_stop_word(word: &str) -> bool {
+    matches!(
+        word,
+        "the"
+            | "and"
+            | "for"
+            | "with"
+            | "from"
+            | "into"
+            | "about"
+            | "that"
+            | "this"
+            | "what"
+            | "when"
+            | "where"
+            | "which"
+            | "who"
+            | "why"
+            | "how"
+            | "are"
+            | "was"
+            | "were"
+            | "have"
+            | "has"
+            | "had"
+            | "not"
+            | "you"
+            | "your"
+            | "will"
+            | "would"
+            | "could"
+            | "should"
+            | "can"
+            | "may"
+            | "might"
+    )
+}
+
+fn search_match_score(claim: &Claim, query: &str, query_terms: &[String]) -> f64 {
+    let query = query.trim().to_lowercase();
+    if query.is_empty() {
+        return 0.0;
+    }
+
+    let content = claim.content.to_lowercase();
+    let tags: std::collections::HashSet<String> = claim
+        .tags
+        .iter()
+        .map(|tag| tag.trim().to_lowercase())
+        .collect();
+
+    if query_terms.is_empty() {
+        return if content.contains(&query) || tags.contains(&query) {
+            1.0
+        } else {
+            0.0
+        };
+    }
+
+    let mut matched_weight = 0.0_f64;
+    for term in query_terms {
+        if tags.contains(term) {
+            matched_weight += 1.0;
+        } else if content.contains(term) {
+            matched_weight += 0.6;
+        }
+    }
+
+    let mut coverage = (matched_weight / query_terms.len() as f64).clamp(0.0, 1.0);
+    if content.contains(&query) {
+        coverage = (coverage + 0.2).min(1.0);
+    }
+    coverage
+}
+
+fn all_current_claim_records() -> ExternResult<Vec<Record>> {
+    let links = get_links(
+        LinkQuery::try_new(anchor_hash(ALL_CLAIMS_ANCHOR)?, LinkTypes::AllClaimsIndex)?,
+        GetStrategy::default(),
+    )?;
+    latest_claim_records_from_links(links)
+}
+
 /// Helper: paginate a link list and resolve records
 fn paginate_links(links: Vec<Link>, limit: u32, offset: u32) -> ExternResult<PaginatedResult> {
     let total = links.len() as u32;
@@ -178,7 +507,30 @@ fn paginate_links(links: Vec<Link>, limit: u32, offset: u32) -> ExternResult<Pag
         }
     }
 
-    Ok(PaginatedResult { records, total, offset, limit })
+    Ok(PaginatedResult {
+        records,
+        total,
+        offset,
+        limit,
+    })
+}
+
+fn paginate_claim_links(
+    links: Vec<Link>,
+    limit: u32,
+    offset: u32,
+) -> ExternResult<PaginatedResult> {
+    let records = latest_claim_records_from_links(links)?;
+    let total = records.len() as u32;
+    let start = (offset as usize).min(records.len());
+    let end = (start + limit as usize).min(records.len());
+
+    Ok(PaginatedResult {
+        records: records[start..end].to_vec(),
+        total,
+        offset,
+        limit,
+    })
 }
 
 /// Get claims by author (paginated)
@@ -189,7 +541,7 @@ pub fn get_claims_by_author_paginated(input: PaginatedQuery) -> ExternResult<Pag
         LinkQuery::try_new(anchor_hash(&author_anchor)?, LinkTypes::AuthorToClaim)?,
         GetStrategy::default(),
     )?;
-    paginate_links(links, input.limit.unwrap_or(50), input.offset.unwrap_or(0))
+    paginate_claim_links(links, input.limit.unwrap_or(50), input.offset.unwrap_or(0))
 }
 
 /// Get claims by tag (paginated)
@@ -200,7 +552,124 @@ pub fn get_claims_by_tag_paginated(input: PaginatedQuery) -> ExternResult<Pagina
         LinkQuery::try_new(anchor_hash(&tag_anchor)?, LinkTypes::TagToClaim)?,
         GetStrategy::default(),
     )?;
-    paginate_links(links, input.limit.unwrap_or(50), input.offset.unwrap_or(0))
+    let records: Vec<Record> = latest_claim_records_from_links(links)?
+        .into_iter()
+        .filter_map(|record| match decode_claim(&record) {
+            Ok(Some(claim)) if claim.tags.iter().any(|tag| tag == &input.key) => Some(Ok(record)),
+            Ok(_) => None,
+            Err(error) => Some(Err(error)),
+        })
+        .collect::<ExternResult<Vec<_>>>()?;
+    let total = records.len() as u32;
+    let offset = input.offset.unwrap_or(0);
+    let limit = input.limit.unwrap_or(50);
+    let start = (offset as usize).min(records.len());
+    let end = (start + limit as usize).min(records.len());
+    Ok(PaginatedResult {
+        records: records[start..end].to_vec(),
+        total,
+        offset,
+        limit,
+    })
+}
+
+/// Search current claims by content and tags.
+#[hdk_extern]
+pub fn search_claims(input: SearchClaimsInput) -> ExternResult<Vec<ClaimSearchHit>> {
+    let query = input.query.trim().to_string();
+    if query.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let limit = input.limit.unwrap_or(DEFAULT_SEARCH_LIMIT as u32) as usize;
+    let query_terms = tokenize_query(&query);
+    let mut hits = Vec::new();
+
+    for record in all_current_claim_records()? {
+        let Some(claim) = decode_claim(&record)? else {
+            continue;
+        };
+
+        let score = search_match_score(&claim, &query, &query_terms);
+        if score <= 0.0 {
+            continue;
+        }
+
+        hits.push(ClaimSearchHit {
+            id: claim.id.clone(),
+            content: claim.content.clone(),
+            classification: SearchHitClassification {
+                empirical: claim.classification.empirical,
+                normative: claim.classification.normative,
+                materiality: claim.classification.mythic,
+            },
+            author: claim.author.clone(),
+            sources: claim.sources.clone(),
+            tags: claim.tags.clone(),
+            claim_type: claim.claim_type.clone(),
+            version: claim.version,
+            updated_micros: claim.updated.as_micros(),
+            match_score: score,
+        });
+    }
+
+    hits.sort_by(|left, right| {
+        right
+            .match_score
+            .partial_cmp(&left.match_score)
+            .unwrap_or(std::cmp::Ordering::Equal)
+            .then_with(|| right.version.cmp(&left.version))
+            .then_with(|| right.updated_micros.cmp(&left.updated_micros))
+    });
+    hits.truncate(limit);
+    Ok(hits)
+}
+
+/// Inspect current index link counts for a claim.
+#[hdk_extern]
+pub fn get_claim_index_stats(input: ClaimIndexStatsInput) -> ExternResult<ClaimIndexStats> {
+    let record = get_claim(input.claim_id.clone())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Claim not found".into())))?;
+    let claim = decode_claim(&record)?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Invalid claim entry".into()
+    )))?;
+    let current_action_hash = record.action_address().clone();
+
+    Ok(ClaimIndexStats {
+        claim_id: claim.id.clone(),
+        version: claim.version,
+        all_claims: probe_index_links(
+            ALL_CLAIMS_ANCHOR.to_string(),
+            LinkTypes::AllClaimsIndex,
+            &current_action_hash,
+        )?,
+        claim_id_index: probe_index_links(
+            format!("claim_id:{}", claim.id),
+            LinkTypes::ClaimIdToClaim,
+            &current_action_hash,
+        )?,
+        author_index: probe_index_links(
+            format!("author:{}", claim.author),
+            LinkTypes::AuthorToClaim,
+            &current_action_hash,
+        )?,
+        type_index: probe_index_links(
+            format!("type:{:?}", claim.claim_type),
+            LinkTypes::TypeToClaim,
+            &current_action_hash,
+        )?,
+        tag_indexes: input
+            .tags
+            .into_iter()
+            .map(|tag| {
+                probe_index_links(
+                    format!("tag:{tag}"),
+                    LinkTypes::TagToClaim,
+                    &current_action_hash,
+                )
+            })
+            .collect::<ExternResult<Vec<_>>>()?,
+    })
 }
 
 /// Get evidence for a claim (paginated)
@@ -231,11 +700,10 @@ pub fn update_claim(input: UpdateClaimInput) -> ExternResult<Record> {
     let current_record = get_claim(input.claim_id.clone())?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Claim not found".into())))?;
 
-    let current_claim: Claim = current_record
-        .entry()
-        .to_app_option()
-        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid claim entry".into())))?;
+    let current_claim: Claim = decode_claim(&current_record)?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Invalid claim entry".into())
+    ))?;
+    let previous_claim = current_claim.clone();
 
     let now = sys_time()?;
 
@@ -256,13 +724,14 @@ pub fn update_claim(input: UpdateClaimInput) -> ExternResult<Record> {
 
     let action_hash = update_entry(
         current_record.action_address().clone(),
-        &EntryTypes::Claim(updated_claim),
+        &EntryTypes::Claim(updated_claim.clone()),
     )?;
+    link_claim_indexes(&updated_claim, &action_hash)?;
+    unlink_claim_indexes(&previous_claim, current_record.action_address())?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find updated claim".into()
-        )))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find updated claim".into()
+    )))
 }
 
 /// Input for updating a claim
@@ -292,10 +761,9 @@ pub fn add_evidence(evidence: Evidence) -> ExternResult<Record> {
         (),
     )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find evidence".into()
-        )))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find evidence".into()
+    )))
 }
 
 /// Get evidence for a claim
@@ -348,10 +816,9 @@ pub fn challenge_claim(input: ChallengeClaimInput) -> ExternResult<Record> {
         (),
     )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find challenge".into()
-        )))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find challenge".into()
+    )))
 }
 
 /// Input for challenging a claim
@@ -399,12 +866,7 @@ pub fn search_by_epistemic_range(input: EpistemicRangeSearch) -> ExternResult<Ve
     let matching: Vec<Record> = records
         .into_iter()
         .filter(|record| {
-            if let Some(claim) = record
-                .entry()
-                .to_app_option::<Claim>()
-                .ok()
-                .flatten()
-            {
+            if let Some(claim) = record.entry().to_app_option::<Claim>().ok().flatten() {
                 let c = &claim.classification;
                 c.empirical >= input.e_min
                     && c.empirical <= input.e_max
@@ -485,12 +947,22 @@ pub fn spawn_verification_market(input: SpawnVerificationMarketInput) -> ExternR
     // Create links for indexing
     let claim_anchor = format!("claim:{}", input.claim_id);
     create_entry(&EntryTypes::Anchor(Anchor(claim_anchor.clone())))?;
-    create_link(anchor_hash(&claim_anchor)?, link_hash.clone(), LinkTypes::ClaimToMarketLink, ())?;
+    create_link(
+        anchor_hash(&claim_anchor)?,
+        link_hash.clone(),
+        LinkTypes::ClaimToMarketLink,
+        (),
+    )?;
 
     // Index by verification status
     let status_anchor = "status:Pending".to_string();
     create_entry(&EntryTypes::Anchor(Anchor(status_anchor.clone())))?;
-    create_link(anchor_hash(&status_anchor)?, link_hash.clone(), LinkTypes::VerificationStatusIndex, ())?;
+    create_link(
+        anchor_hash(&status_anchor)?,
+        link_hash.clone(),
+        LinkTypes::VerificationStatusIndex,
+        (),
+    )?;
 
     Ok(link_hash)
 }
@@ -534,14 +1006,17 @@ pub fn on_market_resolved(input: MarketResolvedInput) -> ExternResult<ActionHash
         }
     }
 
-    let original_record = found_record
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Market link not found".into())))?;
+    let original_record = found_record.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Market link not found".into()
+    )))?;
 
     let original_link: ClaimMarketLink = original_record
         .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid market link".into())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Invalid market link".into()
+        )))?;
 
     // Update the market link
     let now = sys_time()?;
@@ -597,7 +1072,10 @@ pub fn on_market_resolved(input: MarketResolvedInput) -> ExternResult<ActionHash
                     );
                 }
                 Err(e) => {
-                    debug!("Cascade update failed for claim {}: {:?}", original_link.claim_id, e);
+                    debug!(
+                        "Cascade update failed for claim {}: {:?}",
+                        original_link.claim_id, e
+                    );
                 }
             }
         }
@@ -620,12 +1098,7 @@ pub fn get_claims_pending_verification(min_e: f64) -> ExternResult<Vec<Record>> 
     let pending: Vec<Record> = records
         .into_iter()
         .filter(|record| {
-            if let Some(claim) = record
-                .entry()
-                .to_app_option::<Claim>()
-                .ok()
-                .flatten()
-            {
+            if let Some(claim) = record.entry().to_app_option::<Claim>().ok().flatten() {
                 // Claims with high empirical potential but not yet verified
                 claim.classification.empirical >= min_e
                     && claim.classification.empirical < 0.9 // Not yet at E4
@@ -669,10 +1142,12 @@ pub struct RegisterDependencyInput {
 #[hdk_extern]
 pub fn register_dependency(input: RegisterDependencyInput) -> ExternResult<Record> {
     // Validate both claims exist
-    let _dependent = get_claim(input.dependent_claim_id.clone())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Dependent claim not found".into())))?;
-    let _dependency = get_claim(input.dependency_claim_id.clone())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Dependency claim not found".into())))?;
+    let _dependent = get_claim(input.dependent_claim_id.clone())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Dependent claim not found".into())
+    ))?;
+    let _dependency = get_claim(input.dependency_claim_id.clone())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Dependency claim not found".into())
+    ))?;
 
     // Validate weight
     if input.weight < 0.0 || input.weight > 1.0 {
@@ -720,15 +1195,24 @@ pub fn register_dependency(input: RegisterDependencyInput) -> ExternResult<Recor
     create_entry(&EntryTypes::Anchor(Anchor(dependency_anchor.clone())))?;
 
     // Dependent → its dependencies
-    create_link(anchor_hash(&dependent_anchor)?, action_hash.clone(), LinkTypes::ClaimToDependency, ())?;
+    create_link(
+        anchor_hash(&dependent_anchor)?,
+        action_hash.clone(),
+        LinkTypes::ClaimToDependency,
+        (),
+    )?;
 
     // Dependency → its dependents (reverse lookup)
-    create_link(anchor_hash(&dependency_anchor)?, action_hash.clone(), LinkTypes::DependencyToClaim, ())?;
+    create_link(
+        anchor_hash(&dependency_anchor)?,
+        action_hash.clone(),
+        LinkTypes::DependencyToClaim,
+        (),
+    )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find created dependency".into()
-        )))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find created dependency".into()
+    )))
 }
 
 /// Check if adding a dependency would create a cycle
@@ -945,12 +1429,7 @@ fn recalculate_epistemic(claim_id: &str) -> ExternResult<EpistemicPosition> {
     if deps.is_empty() {
         // No dependencies, return current position
         if let Some(claim_record) = get_claim(claim_id.to_string())? {
-            if let Some(claim) = claim_record
-                .entry()
-                .to_app_option::<Claim>()
-                .ok()
-                .flatten()
-            {
+            if let Some(claim) = claim_record.entry().to_app_option::<Claim>().ok().flatten() {
                 return Ok(claim.classification);
             }
         }
@@ -988,8 +1467,10 @@ fn recalculate_epistemic(claim_id: &str) -> ExternResult<EpistemicPosition> {
                     };
 
                     total_weight += dep.weight;
-                    weighted_e += dep_claim.classification.empirical * dep.weight * influence_factor;
-                    weighted_n += dep_claim.classification.normative * dep.weight * influence_factor;
+                    weighted_e +=
+                        dep_claim.classification.empirical * dep.weight * influence_factor;
+                    weighted_n +=
+                        dep_claim.classification.normative * dep.weight * influence_factor;
                     weighted_m += dep_claim.classification.mythic * dep.weight * influence_factor;
                 }
             }

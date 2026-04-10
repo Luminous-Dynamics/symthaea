@@ -301,6 +301,38 @@ pub fn get_contributor_pledges(did: String) -> ExternResult<Vec<Record>> {
     resolve_links(anchor_hash(&contrib_tag)?, LinkTypes::ContributorToPledges)
 }
 
+/// Get per-agent stewardship score [0.0, 1.0].
+///
+/// Aggregates all pledges by the contributor, normalized by pledge count
+/// and acknowledgement status.
+/// Score = min(1.0, pledge_count / 30) × acknowledged_ratio
+///
+/// Used by the 8D Sovereign Profile (D5: Stewardship & Care).
+#[hdk_extern]
+pub fn get_agent_stewardship_score(did: String) -> ExternResult<f64> {
+    let records = get_contributor_pledges(did)?;
+    if records.is_empty() {
+        return Ok(0.0);
+    }
+
+    let count = records.len();
+    let mut acknowledged = 0u32;
+
+    for record in &records {
+        if let Some(Entry::App(bytes)) = record.entry().as_option() {
+            if let Ok(value) = serde_json::from_slice::<serde_json::Value>(bytes.bytes()) {
+                if value.get("acknowledged").and_then(|v| v.as_bool()).unwrap_or(false) {
+                    acknowledged += 1;
+                }
+            }
+        }
+    }
+
+    let saturation = (count as f64 / 30.0).min(1.0);
+    let quality = if count > 0 { acknowledged as f64 / count as f64 } else { 0.0 };
+    Ok((saturation * quality.max(0.3)).clamp(0.0, 1.0)) // min 0.3 quality for any pledge
+}
+
 #[hdk_extern]
 pub fn compute_stewardship_score(dep_id: String) -> ExternResult<StewardshipScore> {
     // Fetch all pledge records (not just count)

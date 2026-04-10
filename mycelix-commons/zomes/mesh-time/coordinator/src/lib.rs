@@ -4,11 +4,11 @@
 use hdk::prelude::*;
 use mesh_time_integrity::*;
 use mycelix_bridge_common::{
-    gate_civic, requirement_for_basic, GovernanceEligibility, GovernanceRequirement,
+    gate_civic, civic_requirement_basic, GovernanceEligibility, GovernanceRequirement,
 };
 
 fn require_consciousness(
-    requirement: &GovernanceRequirement,
+    requirement: &mycelix_bridge_common::CivicRequirement,
     action_name: &str,
 ) -> ExternResult<GovernanceEligibility> {
     gate_civic("commons_bridge", requirement, action_name)
@@ -74,6 +74,47 @@ pub fn get_mesh_time(_: ()) -> ExternResult<Vec<TimeAnchor>> {
         }
     }
     Ok(anchors)
+}
+
+/// Get per-agent network resilience score [0.0, 1.0].
+///
+/// Counts the agent's time anchors and weights by stratum quality.
+/// Score = min(1.0, anchor_count / 720) × avg_stratum_quality
+/// where stratum_quality = (16 - stratum) / 16.
+///
+/// Used by the 8D Sovereign Profile (D2: Network Resilience).
+#[hdk_extern]
+pub fn get_agent_resilience_score(_: ()) -> ExternResult<f64> {
+    let agent = agent_info()?.agent_initial_pubkey;
+    let links = get_links(
+        LinkQuery::try_new(agent, LinkTypes::AgentToAnchors)?,
+        GetStrategy::Local,
+    )?;
+
+    if links.is_empty() {
+        return Ok(0.0);
+    }
+
+    let count = links.len();
+    let mut total_quality = 0.0_f64;
+    let mut valid = 0u32;
+
+    for link in links.into_iter().rev().take(100) {
+        if let Some(target) = link.target.into_action_hash() {
+            if let Some(record) = get(target, GetOptions::default())? {
+                if let Some(anchor) = record.entry().to_app_option::<TimeAnchor>().ok().flatten() {
+                    // Lower stratum = more reliable. Stratum 0 = reference clock.
+                    let quality = (16.0 - anchor.stratum as f64) / 16.0;
+                    total_quality += quality.clamp(0.0, 1.0);
+                    valid += 1;
+                }
+            }
+        }
+    }
+
+    let avg_quality = if valid > 0 { total_quality / valid as f64 } else { 0.5 };
+    let saturation = (count as f64 / 720.0).min(1.0); // 720 anchors ≈ 30 days of hourly
+    Ok((saturation * avg_quality).clamp(0.0, 1.0))
 }
 
 /// Dispute a skewed time anchor (Participant+).
