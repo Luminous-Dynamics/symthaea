@@ -30,6 +30,7 @@ pub mod civic_dimensions;
 pub mod metabolism;
 pub mod wound_healing;
 pub mod currency;
+pub mod governance_hardening;
 pub mod scoring_bridge;
 pub mod biosphere;
 pub mod cascade;
