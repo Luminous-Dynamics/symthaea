@@ -35,9 +35,10 @@ const MAX_AMENDMENTS_PER_PERIOD: u32 = 3;
 // ANTI-TYRANNY INVARIANTS (mirrors mycelix-governance hardening)
 // ============================================================================
 
-/// Veto override threshold: 80% supermajority to reverse a Guardian veto.
+/// Veto override threshold: ⅔ (67%) supermajority to reverse a Guardian veto.
+/// Constitutional requirement (Article III, Section 3): two-thirds majority.
 /// Hardcoded — not configurable by governance.
-const VETO_OVERRIDE_THRESHOLD: f64 = 0.80;
+const VETO_OVERRIDE_THRESHOLD: f64 = 0.67;
 
 /// Veto cooldown per Guardian: 7 ticks (≈7 months at monthly resolution).
 /// Prevents serial veto DoS.
