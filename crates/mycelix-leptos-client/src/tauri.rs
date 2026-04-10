@@ -181,13 +181,11 @@ impl HolochainTransport for TauriIpcTransport {
                 .map_err(|e| ClientError::SerializationError(e.to_string()))?;
 
             // Invoke the Tauri backend command
-            let result = tauri_invoke("call_zome", args_js)
-                .await
-                .map_err(|e| {
-                    let msg = js_value_to_string(&e);
-                    *status.borrow_mut() = ConnectionStatus::Error(msg.clone());
-                    ClientError::ZomeCallFailed(msg)
-                })?;
+            let result = tauri_invoke("call_zome", args_js).await.map_err(|e| {
+                let msg = js_value_to_string(&e);
+                *status.borrow_mut() = ConnectionStatus::Error(msg.clone());
+                ClientError::ZomeCallFailed(msg)
+            })?;
 
             // Deserialize the response
             let response: CallZomeResponse = serde_wasm_bindgen::from_value(result)

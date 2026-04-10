@@ -15,8 +15,12 @@
 //! Profile gating system that replaces the old 4D consciousness gating.
 
 pub mod constitutional_envelope;
+// ── Model governance extensions (feature-gated) ──────────────────────────
+#[cfg(feature = "model-governance")]
 pub mod scoring_model;
+#[cfg(feature = "model-governance")]
 pub mod model_governance;
+#[cfg(feature = "model-governance")]
 pub mod shadow_evaluation;
 pub mod consciousness_thresholds;
 pub mod consciousness_zkp;
@@ -55,15 +59,24 @@ pub use sovereign_gate::gate_civic;
 pub mod offline_credential;
 pub mod sub_passport;
 
+// ── Interplanetary extensions (feature-gated) ────────────────────────────
+#[cfg(feature = "interplanetary")]
 pub mod earth_colony_protocol;
-pub mod terrain_fl;
-
+#[cfg(feature = "interplanetary")]
 pub mod interplanetary_bridge;
-#[cfg(feature = "hdk")]
+#[cfg(all(feature = "interplanetary", feature = "hdk"))]
 pub mod mars_isru;
+#[cfg(feature = "interplanetary")]
 pub mod planetary_governance;
+#[cfg(feature = "interplanetary")]
 pub mod cross_planetary_fl;
+
+// ── Federated learning extensions (feature-gated) ────────────────────────
+#[cfg(feature = "federated")]
+pub mod terrain_fl;
+#[cfg(feature = "federated")]
 pub mod consciousness_sync;
+#[cfg(feature = "federated")]
 pub mod federated_genomics;
 
 #[cfg(feature = "hdk")]
@@ -86,12 +99,18 @@ pub mod routing_registry;
 
 pub mod metrics;
 
+// ── Infrastructure extensions (feature-gated) ────────────────────────────
+#[cfg(feature = "infrastructure")]
 pub mod saga;
+#[cfg(feature = "infrastructure")]
 pub mod migration;
-pub mod notifications;
+pub mod notifications; // Notifications are core — used by all clusters
 
+#[cfg(feature = "infrastructure")]
 pub mod license_enforcement;
+#[cfg(feature = "infrastructure")]
 pub mod merkle_timestamp;
+#[cfg(feature = "infrastructure")]
 pub mod timestamp_anchor;
 
 #[cfg(kani)]

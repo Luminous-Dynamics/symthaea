@@ -276,9 +276,7 @@ impl TryFrom<&Entry> for JurisdictionConstraintEntry {
 /// Validate a jurisdiction constraint entry.
 ///
 /// Returns `Ok(())` if valid, or `Err(reason)` if invalid.
-pub fn validate_jurisdiction_constraint(
-    entry: &JurisdictionConstraintEntry,
-) -> Result<(), String> {
+pub fn validate_jurisdiction_constraint(entry: &JurisdictionConstraintEntry) -> Result<(), String> {
     if entry.zone_id.is_empty() {
         return Err("Zone ID cannot be empty".into());
     }
@@ -385,13 +383,11 @@ impl SchemaMigration for BridgeQueryEntry {
     fn migrate(_raw: &Entry, from_version: u8) -> Result<Option<Self>, String> {
         match from_version {
             1 => Ok(None), // Already at current version — no migration needed
-            v if v > Self::CURRENT_VERSION => {
-                Err(format!(
-                    "BridgeQueryEntry schema version {} is newer than supported version {}",
-                    v,
-                    Self::CURRENT_VERSION
-                ))
-            }
+            v if v > Self::CURRENT_VERSION => Err(format!(
+                "BridgeQueryEntry schema version {} is newer than supported version {}",
+                v,
+                Self::CURRENT_VERSION
+            )),
             v => Err(format!(
                 "BridgeQueryEntry has no migration path from version {}",
                 v
@@ -406,13 +402,11 @@ impl SchemaMigration for BridgeEventEntry {
     fn migrate(_raw: &Entry, from_version: u8) -> Result<Option<Self>, String> {
         match from_version {
             1 => Ok(None), // Already at current version — no migration needed
-            v if v > Self::CURRENT_VERSION => {
-                Err(format!(
-                    "BridgeEventEntry schema version {} is newer than supported version {}",
-                    v,
-                    Self::CURRENT_VERSION
-                ))
-            }
+            v if v > Self::CURRENT_VERSION => Err(format!(
+                "BridgeEventEntry schema version {} is newer than supported version {}",
+                v,
+                Self::CURRENT_VERSION
+            )),
             v => Err(format!(
                 "BridgeEventEntry has no migration path from version {}",
                 v
@@ -427,13 +421,11 @@ impl SchemaMigration for CachedCredentialEntry {
     fn migrate(_raw: &Entry, from_version: u8) -> Result<Option<Self>, String> {
         match from_version {
             1 => Ok(None), // Already at current version — no migration needed
-            v if v > Self::CURRENT_VERSION => {
-                Err(format!(
-                    "CachedCredentialEntry schema version {} is newer than supported version {}",
-                    v,
-                    Self::CURRENT_VERSION
-                ))
-            }
+            v if v > Self::CURRENT_VERSION => Err(format!(
+                "CachedCredentialEntry schema version {} is newer than supported version {}",
+                v,
+                Self::CURRENT_VERSION
+            )),
             v => Err(format!(
                 "CachedCredentialEntry has no migration path from version {}",
                 v
@@ -524,9 +516,7 @@ pub fn check_link_author_match(
     action_author: &AgentPubKey,
 ) -> ValidateCallbackResult {
     if action_author != original_author {
-        ValidateCallbackResult::Invalid(
-            "Only the original author can delete this link".into(),
-        )
+        ValidateCallbackResult::Invalid("Only the original author can delete this link".into())
     } else {
         ValidateCallbackResult::Valid
     }
@@ -1211,12 +1201,7 @@ mod tests {
     fn make_jurisdiction() -> JurisdictionConstraintEntry {
         JurisdictionConstraintEntry {
             zone_id: "eu-gdpr-zone-1".into(),
-            zone_polygon: vec![
-                (35.0, -10.0),
-                (71.0, -10.0),
-                (71.0, 40.0),
-                (35.0, 40.0),
-            ],
+            zone_polygon: vec![(35.0, -10.0), (71.0, -10.0), (71.0, 40.0), (35.0, 40.0)],
             regulatory_tags: vec!["gdpr".into(), "right_to_erasure".into()],
             fiat_zone: Some("EUR".into()),
             enforcement_risk: 0.85,
@@ -1381,28 +1366,40 @@ mod tests {
     #[test]
     fn migration_current_version_returns_none() {
         // All three types at version 1 should return Ok(None) — no migration needed
-        let entry = Entry::App(AppEntryBytes::try_from(
-            SerializedBytes::try_from(make_query("property", "{}")).unwrap(),
-        ).unwrap());
+        let entry = Entry::App(
+            AppEntryBytes::try_from(
+                SerializedBytes::try_from(make_query("property", "{}")).unwrap(),
+            )
+            .unwrap(),
+        );
         assert!(BridgeQueryEntry::migrate(&entry, 1).unwrap().is_none());
 
-        let entry = Entry::App(AppEntryBytes::try_from(
-            SerializedBytes::try_from(make_event("housing", "{}")).unwrap(),
-        ).unwrap());
+        let entry = Entry::App(
+            AppEntryBytes::try_from(
+                SerializedBytes::try_from(make_event("housing", "{}")).unwrap(),
+            )
+            .unwrap(),
+        );
         assert!(BridgeEventEntry::migrate(&entry, 1).unwrap().is_none());
 
-        let entry = Entry::App(AppEntryBytes::try_from(
-            SerializedBytes::try_from(make_cached_credential("did:test", "{}")).unwrap(),
-        ).unwrap());
+        let entry = Entry::App(
+            AppEntryBytes::try_from(
+                SerializedBytes::try_from(make_cached_credential("did:test", "{}")).unwrap(),
+            )
+            .unwrap(),
+        );
         assert!(CachedCredentialEntry::migrate(&entry, 1).unwrap().is_none());
     }
 
     #[test]
     fn migration_future_version_returns_error() {
         // Version 99 is from the future — migration should fail
-        let entry = Entry::App(AppEntryBytes::try_from(
-            SerializedBytes::try_from(make_query("property", "{}")).unwrap(),
-        ).unwrap());
+        let entry = Entry::App(
+            AppEntryBytes::try_from(
+                SerializedBytes::try_from(make_query("property", "{}")).unwrap(),
+            )
+            .unwrap(),
+        );
         let err = BridgeQueryEntry::migrate(&entry, 99).unwrap_err();
         assert!(err.contains("newer than supported"));
         assert!(err.contains("99"));
@@ -1417,9 +1414,12 @@ mod tests {
     #[test]
     fn migration_version_zero_returns_error() {
         // Version 0 has no migration path
-        let entry = Entry::App(AppEntryBytes::try_from(
-            SerializedBytes::try_from(make_query("property", "{}")).unwrap(),
-        ).unwrap());
+        let entry = Entry::App(
+            AppEntryBytes::try_from(
+                SerializedBytes::try_from(make_query("property", "{}")).unwrap(),
+            )
+            .unwrap(),
+        );
         let err = BridgeQueryEntry::migrate(&entry, 0).unwrap_err();
         assert!(err.contains("no migration path"));
     }
@@ -1436,24 +1436,24 @@ mod tests {
     fn read_with_migration_current_version_succeeds() {
         // read_with_migration should succeed for a well-formed current-version entry
         let query = make_query("property", r#"{"key":"val"}"#);
-        let entry = Entry::App(AppEntryBytes::try_from(
-            SerializedBytes::try_from(query.clone()).unwrap(),
-        ).unwrap());
+        let entry = Entry::App(
+            AppEntryBytes::try_from(SerializedBytes::try_from(query.clone()).unwrap()).unwrap(),
+        );
         let result = read_with_migration::<BridgeQueryEntry>(&entry).unwrap();
         assert_eq!(result.domain, "property");
         assert_eq!(result.schema_version, 1);
 
         let event = make_event("housing", "{}");
-        let entry = Entry::App(AppEntryBytes::try_from(
-            SerializedBytes::try_from(event.clone()).unwrap(),
-        ).unwrap());
+        let entry = Entry::App(
+            AppEntryBytes::try_from(SerializedBytes::try_from(event.clone()).unwrap()).unwrap(),
+        );
         let result = read_with_migration::<BridgeEventEntry>(&entry).unwrap();
         assert_eq!(result.domain, "housing");
 
         let cred = make_cached_credential("did:test:abc", r#"{"p":1}"#);
-        let entry = Entry::App(AppEntryBytes::try_from(
-            SerializedBytes::try_from(cred.clone()).unwrap(),
-        ).unwrap());
+        let entry = Entry::App(
+            AppEntryBytes::try_from(SerializedBytes::try_from(cred.clone()).unwrap()).unwrap(),
+        );
         let result = read_with_migration::<CachedCredentialEntry>(&entry).unwrap();
         assert_eq!(result.did, "did:test:abc");
     }

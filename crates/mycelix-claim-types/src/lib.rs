@@ -30,24 +30,37 @@ pub enum EmpiricalLevel {
 impl EmpiricalLevel {
     pub fn label(&self) -> &'static str {
         match self {
-            Self::E0 => "Unverified", Self::E1 => "Preliminary",
-            Self::E2 => "Tested", Self::E3 => "Replicated", Self::E4 => "Established",
+            Self::E0 => "Unverified",
+            Self::E1 => "Preliminary",
+            Self::E2 => "Tested",
+            Self::E3 => "Replicated",
+            Self::E4 => "Established",
         }
     }
 
     /// Convert to continuous 0.0-1.0 scale.
     pub fn as_f32(&self) -> f32 {
         match self {
-            Self::E0 => 0.0, Self::E1 => 0.25, Self::E2 => 0.5, Self::E3 => 0.75, Self::E4 => 1.0,
+            Self::E0 => 0.0,
+            Self::E1 => 0.25,
+            Self::E2 => 0.5,
+            Self::E3 => 0.75,
+            Self::E4 => 1.0,
         }
     }
 
     pub fn from_f32(v: f32) -> Self {
-        if v >= 0.875 { Self::E4 }
-        else if v >= 0.625 { Self::E3 }
-        else if v >= 0.375 { Self::E2 }
-        else if v >= 0.125 { Self::E1 }
-        else { Self::E0 }
+        if v >= 0.875 {
+            Self::E4
+        } else if v >= 0.625 {
+            Self::E3
+        } else if v >= 0.375 {
+            Self::E2
+        } else if v >= 0.125 {
+            Self::E1
+        } else {
+            Self::E0
+        }
     }
 }
 
@@ -66,14 +79,19 @@ pub enum NormativeLevel {
 impl NormativeLevel {
     pub fn label(&self) -> &'static str {
         match self {
-            Self::N0 => "Raw", Self::N1 => "Contested",
-            Self::N2 => "Emerging", Self::N3 => "Endorsed",
+            Self::N0 => "Raw",
+            Self::N1 => "Contested",
+            Self::N2 => "Emerging",
+            Self::N3 => "Endorsed",
         }
     }
 
     pub fn as_f32(&self) -> f32 {
         match self {
-            Self::N0 => 0.0, Self::N1 => 0.33, Self::N2 => 0.67, Self::N3 => 1.0,
+            Self::N0 => 0.0,
+            Self::N1 => 0.33,
+            Self::N2 => 0.67,
+            Self::N3 => 1.0,
         }
     }
 }
@@ -93,14 +111,19 @@ pub enum MaterialityLevel {
 impl MaterialityLevel {
     pub fn label(&self) -> &'static str {
         match self {
-            Self::M0 => "Abstract", Self::M1 => "Potential",
-            Self::M2 => "Applicable", Self::M3 => "Transformative",
+            Self::M0 => "Abstract",
+            Self::M1 => "Potential",
+            Self::M2 => "Applicable",
+            Self::M3 => "Transformative",
         }
     }
 
     pub fn as_f32(&self) -> f32 {
         match self {
-            Self::M0 => 0.0, Self::M1 => 0.33, Self::M2 => 0.67, Self::M3 => 1.0,
+            Self::M0 => 0.0,
+            Self::M1 => 0.33,
+            Self::M2 => 0.67,
+            Self::M3 => 1.0,
         }
     }
 }
@@ -124,16 +147,28 @@ pub enum ClaimType {
 impl ClaimType {
     pub fn label(&self) -> &'static str {
         match self {
-            Self::Fact => "Fact", Self::Opinion => "Opinion",
-            Self::Prediction => "Prediction", Self::Hypothesis => "Hypothesis",
-            Self::Definition => "Definition", Self::Historical => "Historical",
-            Self::Normative => "Normative", Self::Narrative => "Narrative",
+            Self::Fact => "Fact",
+            Self::Opinion => "Opinion",
+            Self::Prediction => "Prediction",
+            Self::Hypothesis => "Hypothesis",
+            Self::Definition => "Definition",
+            Self::Historical => "Historical",
+            Self::Normative => "Normative",
+            Self::Narrative => "Narrative",
         }
     }
 
     pub fn all() -> &'static [ClaimType] {
-        &[Self::Fact, Self::Opinion, Self::Prediction, Self::Hypothesis,
-          Self::Definition, Self::Historical, Self::Normative, Self::Narrative]
+        &[
+            Self::Fact,
+            Self::Opinion,
+            Self::Prediction,
+            Self::Hypothesis,
+            Self::Definition,
+            Self::Historical,
+            Self::Normative,
+            Self::Narrative,
+        ]
     }
 }
 

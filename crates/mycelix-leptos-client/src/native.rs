@@ -19,10 +19,10 @@
 //! let result = transport.call_zome("commons", "proposals", "list", encode(&())?).await?;
 //! ```
 
+use futures_util::{SinkExt, StreamExt};
 use std::collections::HashMap;
 use std::sync::Arc;
-use tokio::sync::{Mutex, oneshot};
-use futures_util::{SinkExt, StreamExt};
+use tokio::sync::{oneshot, Mutex};
 use tokio_tungstenite::tungstenite::Message;
 
 use crate::error::ClientError;
@@ -44,10 +44,18 @@ struct Inner {
 #[derive(Clone)]
 pub struct NativeWsTransport {
     inner: Arc<Mutex<Inner>>,
-    write_tx: Arc<Mutex<Option<futures_util::stream::SplitSink<
-        tokio_tungstenite::WebSocketStream<tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>>,
-        Message,
-    >>>>,
+    write_tx: Arc<
+        Mutex<
+            Option<
+                futures_util::stream::SplitSink<
+                    tokio_tungstenite::WebSocketStream<
+                        tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>,
+                    >,
+                    Message,
+                >,
+            >,
+        >,
+    >,
 }
 
 impl NativeWsTransport {
@@ -64,7 +72,11 @@ impl NativeWsTransport {
         }
     }
 
-    async fn send_request(&self, request_type: &str, data: Vec<u8>) -> Result<Vec<u8>, ClientError> {
+    async fn send_request(
+        &self,
+        request_type: &str,
+        data: Vec<u8>,
+    ) -> Result<Vec<u8>, ClientError> {
         let (tx, rx) = oneshot::channel();
 
         let id = {
@@ -85,11 +97,14 @@ impl NativeWsTransport {
 
         let mut write_guard = self.write_tx.lock().await;
         let write = write_guard.as_mut().ok_or(ClientError::NotConnected)?;
-        write.send(Message::Binary(bytes.into())).await
+        write
+            .send(Message::Binary(bytes.into()))
+            .await
             .map_err(|e| ClientError::WebSocketError(e.to_string()))?;
         drop(write_guard);
 
-        rx.await.map_err(|_| ClientError::WebSocketError("channel closed".into()))?
+        rx.await
+            .map_err(|_| ClientError::WebSocketError("channel closed".into()))?
     }
 }
 
@@ -108,11 +123,12 @@ impl HolochainTransport for NativeWsTransport {
 
         Box::pin(async move {
             let inner = this.inner.lock().await;
-            let (dna_hash, agent) = inner.cell_map.get(&role)
+            let (dna_hash, agent) = inner
+                .cell_map
+                .get(&role)
                 .ok_or_else(|| ClientError::UnknownRole(role.clone()))?
                 .clone();
-            let provenance = inner.agent_pub_key.clone()
-                .unwrap_or_else(|| agent.clone());
+            let provenance = inner.agent_pub_key.clone().unwrap_or_else(|| agent.clone());
             drop(inner);
 
             let mut nonce = vec![0u8; 32];
@@ -160,11 +176,17 @@ impl HolochainTransport for NativeWsTransport {
 
             // Holochain conductor requires Origin header in WebSocket upgrade
             use tokio_tungstenite::tungstenite::client::IntoClientRequest;
-            let mut request = config.url.clone().into_client_request()
+            let mut request = config
+                .url
+                .clone()
+                .into_client_request()
                 .map_err(|e| ClientError::ConnectionFailed(e.to_string()))?;
-            request.headers_mut().insert("Origin", "http://localhost".parse().unwrap());
+            request
+                .headers_mut()
+                .insert("Origin", "http://localhost".parse().unwrap());
 
-            let (ws_stream, _) = tokio_tungstenite::connect_async(request).await
+            let (ws_stream, _) = tokio_tungstenite::connect_async(request)
+                .await
                 .map_err(|e| ClientError::ConnectionFailed(e.to_string()))?;
 
             let (write, mut read) = ws_stream.split();
@@ -209,13 +231,19 @@ impl HolochainTransport for NativeWsTransport {
             let info: AppInfoResponse = rmp_serde::from_slice(&info_bytes)
                 .map_err(|e| ClientError::InvalidResponse(format!("app_info decode: {e}")))?;
 
-            eprintln!("[NativeWs] App: {}, {} roles", info.installed_app_id, info.cell_info.len());
+            eprintln!(
+                "[NativeWs] App: {}, {} roles",
+                info.installed_app_id,
+                info.cell_info.len()
+            );
 
             let mut inner = this.inner.lock().await;
             for entry in &info.cell_info {
                 for cell in &entry.cells {
                     if let CellInfoVariant::Provisioned(p) = cell {
-                        inner.cell_map.insert(entry.role_name.clone(), p.cell_id.clone());
+                        inner
+                            .cell_map
+                            .insert(entry.role_name.clone(), p.cell_id.clone());
                         if inner.agent_pub_key.is_none() {
                             inner.agent_pub_key = Some(p.cell_id.1.clone());
                         }
@@ -225,7 +253,10 @@ impl HolochainTransport for NativeWsTransport {
             }
             inner.status = ConnectionStatus::Connected;
 
-            eprintln!("[NativeWs] Connected! {} roles mapped", inner.cell_map.len());
+            eprintln!(
+                "[NativeWs] Connected! {} roles mapped",
+                inner.cell_map.len()
+            );
             Ok(())
         })
     }

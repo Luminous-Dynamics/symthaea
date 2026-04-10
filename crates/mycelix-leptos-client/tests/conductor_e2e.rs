@@ -9,7 +9,7 @@
 //! Run with:
 //!   cargo test -p mycelix-leptos-client --test conductor_e2e -- --ignored --nocapture
 
-use mycelix_leptos_client::{encode, decode};
+use mycelix_leptos_client::{decode, encode};
 
 fn admin_url() -> String {
     std::env::var("ADMIN_URL").unwrap_or_else(|_| "ws://localhost:33743".to_string())
@@ -34,7 +34,10 @@ async fn admin_list_apps() {
 
     let admin = match AdminWebsocket::connect(addr).await {
         Ok(a) => a,
-        Err(e) => { eprintln!("SKIP: {e:?}"); return; }
+        Err(e) => {
+            eprintln!("SKIP: {e:?}");
+            return;
+        }
     };
     eprintln!("Connected!");
 
@@ -57,8 +60,11 @@ async fn app_connect_and_info() {
     use std::sync::Arc;
 
     let url = "localhost:8888".to_string();
-    let token: Vec<u8> = std::env::var("MYCELIX_APP_TOKEN").unwrap_or_default().into_bytes();
-    let signer: Arc<dyn holochain_client::AgentSigner + Send + Sync> = Arc::new(ClientAgentSigner::default());
+    let token: Vec<u8> = std::env::var("MYCELIX_APP_TOKEN")
+        .unwrap_or_default()
+        .into_bytes();
+    let signer: Arc<dyn holochain_client::AgentSigner + Send + Sync> =
+        Arc::new(ClientAgentSigner::default());
 
     eprintln!("App: {url}");
 
