@@ -291,4 +291,45 @@ mod tests {
         verify_sovereign_tier(&result, "did:mycelix:charlie", 0.4, 0.002, 0.0)
             .expect("Should verify");
     }
+
+    #[cfg(feature = "backend-winterfell")]
+    #[test]
+    fn proof_metrics_benchmark() {
+        let tiers = [
+            ("Citizen", 0.55, 0.4),
+            ("Steward", 0.72, 0.6),
+            ("Guardian", 0.92, 0.8),
+        ];
+
+        println!("\n=== Sovereign ZKP Proof Metrics ===");
+        for (name, score, threshold) in &tiers {
+            let request = SovereignProofRequest {
+                agent_did: format!("did:mycelix:bench-{}", name.to_lowercase()),
+                decayed_score: *score,
+                required_threshold: *threshold,
+                lambda: 0.002,
+                elapsed_days: 30.0,
+            };
+
+            let result = prove_sovereign_tier(&request).unwrap();
+            let proof_kb = result.proof_bytes.len() as f64 / 1024.0;
+
+            // Verify
+            let start = std::time::Instant::now();
+            verify_sovereign_tier(
+                &result,
+                &request.agent_did,
+                *threshold,
+                0.002,
+                30.0,
+            ).unwrap();
+            let verify_ms = start.elapsed().as_secs_f64() * 1000.0;
+
+            println!(
+                "  {name}: prove={:.1}ms verify={:.1}ms size={:.1}KB",
+                result.prove_time_ms, verify_ms, proof_kb,
+            );
+        }
+        println!("=== End Metrics ===\n");
+    }
 }
