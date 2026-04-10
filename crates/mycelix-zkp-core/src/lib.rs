@@ -33,6 +33,7 @@ pub mod circuits;
 pub mod consciousness;
 #[cfg(feature = "backend-miden")]
 pub mod miden_consciousness;
+pub mod miden_parameterized;
 #[cfg(feature = "dilithium")]
 pub mod dilithium;
 pub mod domain;
