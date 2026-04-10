@@ -3,11 +3,15 @@ name = "symtropy-consciousness-physics"
 version = "0.1.0"
 edition = "2021"
 license = "AGPL-3.0-or-later"
-description = "Consciousness-physics coupling: Φ as a first-class physics parameter"
+description = "Integrated information (Phi) as a first-class physics parameter: 5-channel coupling, thermodynamic closure with Landauer bound, CEMI-inspired harmony fields, and 63 research experiments."
+repository = "https://github.com/luminous-dynamics/symtropy"
+keywords = ["physics", "consciousness", "integrated-information", "thermodynamics", "simulation"]
+categories = ["simulation", "science", "game-engines"]
+readme = "README.md"
 
 [dependencies]
-symtropy-math = { path = "../symtropy-math" }
-symtropy-physics = { path = "../symtropy-physics" }
+symtropy-math = { version = "0.1.0", path = "../symtropy-math" }
+symtropy-physics = { version = "0.1.0", path = "../symtropy-physics" }
 symthaea-consciousness-equation = { path = "../../../symthaea/crates/symthaea-consciousness-equation" }
 symthaea-core = { path = "../../../symthaea/symthaea-core", optional = true }
 nalgebra = "0.34"

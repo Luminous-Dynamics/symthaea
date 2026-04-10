@@ -3,7 +3,11 @@ name = "symtropy-math"
 version = "0.1.0"
 edition = "2021"
 license = "AGPL-3.0-or-later"
-description = "N-dimensional geometric algebra for the Symtropy consciousness-physics engine"
+description = "N-dimensional geometric algebra: const-generic points, bivectors, rotors, and collision shapes (2D/3D/4D+). Stack-allocated, zero-heap physics primitives."
+repository = "https://github.com/luminous-dynamics/symtropy"
+keywords = ["physics", "n-dimensional", "geometric-algebra", "collision", "bivector"]
+categories = ["mathematics", "game-engines", "simulation", "science"]
+readme = "README.md"
 
 [dependencies]
 nalgebra = "0.34"

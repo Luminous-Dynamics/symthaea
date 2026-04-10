@@ -3,10 +3,14 @@ name = "symtropy-physics"
 version = "0.1.0"
 edition = "2021"
 license = "AGPL-3.0-or-later"
-description = "N-dimensional rigid body physics engine for the Symtropy consciousness-physics runtime"
+description = "N-dimensional rigid body physics with GJK+EPA collision, CCD, joints, raycasting, and warm-starting. Pluggable PhysicsCallback trait for coupling custom metrics to forces and friction."
+repository = "https://github.com/luminous-dynamics/symtropy"
+keywords = ["physics", "n-dimensional", "gjk", "collision-detection", "rigid-body"]
+categories = ["game-engines", "simulation", "science"]
+readme = "README.md"
 
 [dependencies]
-symtropy-math = { path = "../symtropy-math" }
+symtropy-math = { version = "0.1.0", path = "../symtropy-math" }
 nalgebra = "0.34"
 arrayvec = "0.7"
 
