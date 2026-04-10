@@ -58,8 +58,30 @@ pub struct MidenConsciousnessProof {
     pub stack_outputs: Vec<u64>,
 }
 
-/// Compute the score commitment: SHA-256(phi_bytes || "MYCELIX:ConsciousnessTier:v2")
-pub fn compute_score_commitment(phi_score: f64) -> [u8; 32] {
+/// Compute the score commitment: SHA-256(phi_bytes || domain_tag || nonce || epoch).
+///
+/// The nonce and epoch_secs ensure each commitment is unique and time-bound,
+/// preventing replay attacks where a valid proof is reused across sessions.
+pub fn compute_score_commitment(
+    phi_score: f64,
+    nonce: &[u8; 32],
+    epoch_secs: u64,
+) -> [u8; 32] {
+    let mut hasher = Sha256::new();
+    hasher.update(phi_score.to_le_bytes());
+    hasher.update(b"MYCELIX:ConsciousnessTier:v2");
+    hasher.update(nonce);
+    hasher.update(epoch_secs.to_le_bytes());
+    let result = hasher.finalize();
+    let mut commitment = [0u8; 32];
+    commitment.copy_from_slice(&result);
+    commitment
+}
+
+/// Legacy commitment without nonce/epoch (for backward-compatible test helpers).
+/// Do NOT use for new proofs — use `compute_score_commitment` with nonce+epoch.
+#[cfg(test)]
+fn compute_score_commitment_legacy(phi_score: f64) -> [u8; 32] {
     let mut hasher = Sha256::new();
     hasher.update(phi_score.to_le_bytes());
     hasher.update(b"MYCELIX:ConsciousnessTier:v2");
@@ -247,8 +269,21 @@ pub fn prove_consciousness_tier_miden(
     // Determine the proven tier from the threshold
     let proven_tier = tier_from_threshold_permille(threshold_permille);
 
-    // Compute score commitment (binds the proof to this specific phi)
-    let commitment = compute_score_commitment(phi_permille as f64 / 1000.0);
+    // Compute score commitment (binds the proof to this specific phi).
+    // For now, Miden prover generates its own nonce+epoch internally.
+    let nonce = {
+        let mut n = [0u8; 32];
+        // Deterministic nonce from phi+threshold for reproducible tests.
+        // In production, callers should pass a random nonce.
+        let seed = (phi_permille as u64) << 32 | (threshold_permille as u64);
+        n[..8].copy_from_slice(&seed.to_le_bytes());
+        n
+    };
+    let epoch_secs = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+    let commitment = compute_score_commitment(phi_permille as f64 / 1000.0, &nonce, epoch_secs);
 
     // Serialize proof
     let proof_bytes = proof.to_bytes();
@@ -388,22 +423,45 @@ mod tests {
 
     #[test]
     fn test_score_commitment_deterministic() {
-        let c1 = compute_score_commitment(0.75);
-        let c2 = compute_score_commitment(0.75);
-        assert_eq!(c1, c2, "Same score should produce same commitment");
+        let nonce = [0xAAu8; 32];
+        let epoch = 1_776_000_000u64;
+        let c1 = compute_score_commitment(0.75, &nonce, epoch);
+        let c2 = compute_score_commitment(0.75, &nonce, epoch);
+        assert_eq!(c1, c2, "Same inputs should produce same commitment");
     }
 
     #[test]
     fn test_score_commitment_different_scores() {
-        let c1 = compute_score_commitment(0.5);
-        let c2 = compute_score_commitment(0.6);
+        let nonce = [0xBBu8; 32];
+        let epoch = 1_776_000_000u64;
+        let c1 = compute_score_commitment(0.5, &nonce, epoch);
+        let c2 = compute_score_commitment(0.6, &nonce, epoch);
         assert_ne!(c1, c2, "Different scores should produce different commitments");
     }
 
     #[test]
     fn test_score_commitment_non_zero() {
-        let c = compute_score_commitment(0.0);
-        assert_ne!(c, [0u8; 32], "Even zero score should produce non-zero commitment");
+        let nonce = [0u8; 32];
+        let c = compute_score_commitment(0.0, &nonce, 0);
+        assert_ne!(c, [0u8; 32], "Even zero inputs should produce non-zero commitment");
+    }
+
+    #[test]
+    fn test_score_commitment_different_nonces() {
+        let n1 = [0x01u8; 32];
+        let n2 = [0x02u8; 32];
+        let epoch = 1_776_000_000u64;
+        let c1 = compute_score_commitment(0.5, &n1, epoch);
+        let c2 = compute_score_commitment(0.5, &n2, epoch);
+        assert_ne!(c1, c2, "Different nonces must produce different commitments (replay prevention)");
+    }
+
+    #[test]
+    fn test_score_commitment_different_epochs() {
+        let nonce = [0xCCu8; 32];
+        let c1 = compute_score_commitment(0.5, &nonce, 1_000_000);
+        let c2 = compute_score_commitment(0.5, &nonce, 2_000_000);
+        assert_ne!(c1, c2, "Different epochs must produce different commitments");
     }
 
     #[test]
@@ -465,7 +523,7 @@ mod tests {
     fn test_validate_valid_proof_accepted() {
         let proof = MidenConsciousnessProof {
             proof_bytes: vec![0u8; 80_000], // 80KB — typical Miden proof
-            score_commitment: compute_score_commitment(0.75),
+            score_commitment: compute_score_commitment_legacy(0.75),
             proven_tier: ConsciousnessTier::Steward,
             proof_system: MidenProofSystem::MidenZkStark,
             stack_outputs: vec![1], // 1 = tier check passed
@@ -477,7 +535,7 @@ mod tests {
     fn test_miden_proof_serde_roundtrip() {
         let proof = MidenConsciousnessProof {
             proof_bytes: vec![1, 2, 3, 4, 5],
-            score_commitment: compute_score_commitment(0.5),
+            score_commitment: compute_score_commitment_legacy(0.5),
             proven_tier: ConsciousnessTier::Citizen,
             proof_system: MidenProofSystem::MidenZkStark,
             stack_outputs: vec![1],

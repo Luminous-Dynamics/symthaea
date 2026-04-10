@@ -9,10 +9,10 @@
 use std::hint::black_box;
 use std::time::Instant;
 
+use mycelix_zkp_core::domain::DomainTag;
 use mycelix_zkp_core::fixed_point::FixedPoint;
 use mycelix_zkp_core::pogq::{simulate_pogq, PoGQPublicInputs, PoGQWitness};
 use mycelix_zkp_core::types::AuthenticatedProof;
-use mycelix_zkp_core::domain::DomainTag;
 
 fn bench_fixed_point_ops(iterations: u64) {
     let a = FixedPoint::from_f32(0.85);
@@ -123,7 +123,7 @@ fn bench_signed_message(iterations: u64) {
 
 #[cfg(feature = "dilithium")]
 fn bench_dilithium(iterations: u64) {
-    use mycelix_zkp_core::dilithium::{DilithiumKeypair, verify_signature};
+    use mycelix_zkp_core::dilithium::{verify_signature, DilithiumKeypair};
 
     let kp = DilithiumKeypair::generate();
 

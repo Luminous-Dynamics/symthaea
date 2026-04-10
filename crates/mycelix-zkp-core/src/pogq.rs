@@ -256,7 +256,10 @@ mod tests {
             ],
         };
         let result = simulate_pogq(&inputs, &witness);
-        assert!(!result.quarantined, "all scores above threshold, no quarantine");
+        assert!(
+            !result.quarantined,
+            "all scores above threshold, no quarantine"
+        );
         assert_eq!(result.final_viol, 0);
         assert_eq!(result.rounds_processed, 4);
     }
@@ -272,14 +275,17 @@ mod tests {
             ],
         };
         let result = simulate_pogq(&inputs, &witness);
-        assert!(result.quarantined, "2 consecutive violations should trigger quarantine (k=2)");
+        assert!(
+            result.quarantined,
+            "2 consecutive violations should trigger quarantine (k=2)"
+        );
     }
 
     #[test]
     fn test_quarantine_release() {
         let mut inputs = default_inputs(0.9);
         inputs.quar_init = 1; // Start quarantined
-        inputs.m_clears = 1;  // Release after 1 clear
+        inputs.m_clears = 1; // Release after 1 clear
 
         let witness = PoGQWitness {
             scores: vec![
@@ -287,7 +293,10 @@ mod tests {
             ],
         };
         let result = simulate_pogq(&inputs, &witness);
-        assert!(!result.quarantined, "1 clear should release from quarantine (m=1)");
+        assert!(
+            !result.quarantined,
+            "1 clear should release from quarantine (m=1)"
+        );
     }
 
     #[test]
@@ -303,7 +312,10 @@ mod tests {
             ],
         };
         let result = simulate_pogq(&inputs, &witness);
-        assert!(!result.quarantined, "warmup prevents quarantine even with violations");
+        assert!(
+            !result.quarantined,
+            "warmup prevents quarantine even with violations"
+        );
         assert!(result.trace[0].in_warmup);
     }
 
@@ -372,12 +384,7 @@ mod tests {
             proof_size: 200_000,
         };
 
-        let cmp = DualBackendComparison::from_results(
-            Some(&r0),
-            Some(&wf),
-            Some(true),
-            Some(true),
-        );
+        let cmp = DualBackendComparison::from_results(Some(&r0), Some(&wf), Some(true), Some(true));
 
         assert!(cmp.decisions_match == Some(true));
         let speedup = cmp.speedup.unwrap();

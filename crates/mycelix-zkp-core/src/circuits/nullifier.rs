@@ -104,7 +104,9 @@ impl NullifierSet {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::circuits::merkle_membership::{compute_merkle_root, generate_merkle_path, verify_merkle_path};
+    use crate::circuits::merkle_membership::{
+        compute_merkle_root, generate_merkle_path, verify_merkle_path,
+    };
 
     #[test]
     fn test_nullifier_deterministic() {
@@ -124,13 +126,21 @@ mod tests {
     fn test_different_groups_different_nullifiers() {
         let n1 = compute_nullifier(b"alice_secret", b"circle_1");
         let n2 = compute_nullifier(b"alice_secret", b"circle_2");
-        assert_ne!(n1, n2, "same member in different groups must have different nullifiers");
+        assert_ne!(
+            n1, n2,
+            "same member in different groups must have different nullifiers"
+        );
     }
 
     #[test]
     fn test_nullifier_with_merkle_membership() {
         // 4 members in a care circle
-        let members: Vec<&[u8]> = vec![b"alice_secret", b"bob_secret", b"carol_secret", b"dave_secret"];
+        let members: Vec<&[u8]> = vec![
+            b"alice_secret",
+            b"bob_secret",
+            b"carol_secret",
+            b"dave_secret",
+        ];
         let leaves: Vec<[u8; 32]> = members.iter().map(|s| compute_member_leaf(*s)).collect();
         let root = compute_merkle_root(&leaves);
 
@@ -159,10 +169,16 @@ mod tests {
         let n = compute_nullifier(b"alice", b"vote_proposal_1");
 
         // First use: accepted
-        assert!(nullifier_set.check_and_mark(&n), "first use should be accepted");
+        assert!(
+            nullifier_set.check_and_mark(&n),
+            "first use should be accepted"
+        );
 
         // Second use: rejected
-        assert!(!nullifier_set.check_and_mark(&n), "second use should be rejected");
+        assert!(
+            !nullifier_set.check_and_mark(&n),
+            "second use should be rejected"
+        );
         assert!(nullifier_set.is_used(&n));
     }
 
@@ -177,8 +193,10 @@ mod tests {
         let alice_path = generate_merkle_path(&leaves, 0);
 
         // Eve's leaf with Alice's path should fail
-        assert!(!verify_merkle_path(&eve_leaf, &alice_path, &root),
-            "non-member must not verify");
+        assert!(
+            !verify_merkle_path(&eve_leaf, &alice_path, &root),
+            "non-member must not verify"
+        );
     }
 
     #[test]
@@ -191,7 +209,10 @@ mod tests {
         };
         assert!(validate_nullifier_proof(&valid).is_ok());
 
-        let zero_null = NullifierProof { nullifier: [0; 32], ..valid.clone() };
+        let zero_null = NullifierProof {
+            nullifier: [0; 32],
+            ..valid.clone()
+        };
         assert!(validate_nullifier_proof(&zero_null).is_err());
     }
 }
