@@ -442,7 +442,7 @@ impl MultiWorldSimulator {
                     generation: 0,
                     trauma_level: 0.0,
                     cumulative_dose_sv: 0.0, adversarial: None,
-                    coordination_understanding: self.config.policy.coordination_understanding_initial,
+                    coordination_understanding: self.config.policy.coordination_understanding_initial, mycel_score: 0.1, sap_balance: 100.0, is_biological: true, wounds: Vec::new(),
                 };
                 world.next_agent_id += 1;
                 world.agents.push(agent);
@@ -549,7 +549,7 @@ impl MultiWorldSimulator {
                 generation: 0,
                 trauma_level: 0.0,
                 cumulative_dose_sv: 0.0, adversarial: None,
-                coordination_understanding: self.config.policy.coordination_understanding_initial,
+                coordination_understanding: self.config.policy.coordination_understanding_initial, mycel_score: 0.1, sap_balance: 100.0, is_biological: true, wounds: Vec::new(),
             };
             world.next_agent_id += 1;
             world.agents.push(agent);
@@ -4421,7 +4421,7 @@ harmony_policy = true
             needs: PsychologicalNeeds::new(),
             tend_balance: 0.0, parent_ids: None,
             faction_id: None, generation: 0,
-            trauma_level: 0.0, cumulative_dose_sv: 0.0, adversarial: None, coordination_understanding: 0.0,
+            trauma_level: 0.0, cumulative_dose_sv: 0.0, adversarial: None, coordination_understanding: 0.0, mycel_score: 0.1, sap_balance: 100.0, is_biological: true, wounds: Vec::new(),
         };
         happy.skills.learn(0, 0.5);
         happy.needs.engagement = 0.8;

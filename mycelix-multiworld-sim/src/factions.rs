@@ -696,7 +696,7 @@ mod tests {
                 faction_id: None,
                 generation: 0,
                 trauma_level: 0.0,
-                    cumulative_dose_sv: 0.0, adversarial: None, coordination_understanding: 0.0,
+                    cumulative_dose_sv: 0.0, adversarial: None, coordination_understanding: 0.0, mycel_score: 0.1, sap_balance: 100.0, is_biological: true, wounds: Vec::new(),
             };
             world.agents.push(agent);
             world.next_agent_id += 1;
@@ -939,7 +939,7 @@ mod tests {
                 is_immigrant: false, needs: crate::needs::PsychologicalNeeds::new(),
                 tend_balance: 0.0, parent_ids: None,
                 faction_id: if i < 60 { Some(1) } else if i < 90 { Some(2) } else { None },
-                generation: 0, trauma_level: 0.0, cumulative_dose_sv: 0.0, adversarial: None, coordination_understanding: 0.0,
+                generation: 0, trauma_level: 0.0, cumulative_dose_sv: 0.0, adversarial: None, coordination_understanding: 0.0, mycel_score: 0.1, sap_balance: 100.0, is_biological: true, wounds: Vec::new(),
             }
         }).collect();
 

@@ -264,7 +264,25 @@ pub struct CivAgent {
     /// or be compassionate but cooperate naively without strategic reasoning (low).
     #[serde(default)]
     pub coordination_understanding: f64,
+    /// MYCEL soulbound reputation score [0.0, 1.0].
+    /// Computed from Participation(40%) + Recognition(20%) + Quality(20%) + Longevity(20%).
+    #[serde(default = "default_mycel")]
+    pub mycel_score: f64,
+    /// SAP transferable balance (demurrage-bearing currency).
+    #[serde(default = "default_sap")]
+    pub sap_balance: f64,
+    /// Whether this agent is biological (true) or AI (false).
+    /// AI agents are capped at Steward tier per Constitution Article XI.
+    #[serde(default = "default_biological")]
+    pub is_biological: bool,
+    /// Active wounds (compartmental healing model).
+    #[serde(default)]
+    pub wounds: Vec<crate::wound_healing::WoundState>,
 }
+
+fn default_mycel() -> f64 { 0.1 }
+fn default_sap() -> f64 { 100.0 }
+fn default_biological() -> bool { true }
 
 impl CivAgent {
     /// Age in months at a given tick.
@@ -397,7 +415,7 @@ mod tests {
             faction_id: None,
             generation: 0,
             trauma_level: 0.0,
-                    cumulative_dose_sv: 0.0, adversarial: None, coordination_understanding: 0.0,
+                    cumulative_dose_sv: 0.0, adversarial: None, coordination_understanding: 0.0, mycel_score: 0.1, sap_balance: 100.0, is_biological: true, wounds: Vec::new(),
         }
     }
 
