@@ -1,9 +1,0 @@
-[package]
-name = "plexus-node"
-version.workspace = true
-edition.workspace = true
-license.workspace = true
-description = "Symthaea Prism — plexus-node"
-
-[dependencies]
-plexus-common = { path = "../plexus-common" }
