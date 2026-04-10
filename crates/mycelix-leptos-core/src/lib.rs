@@ -85,6 +85,9 @@ pub use holochain_provider::{
 // while provider::use_holochain::<T>() is generic. Access the concrete one
 // via mycelix_leptos_core::holochain_provider::use_holochain().
 
+// Re-exports — types
+pub use personal_leptos_types::TrustTier;
+
 // Re-exports — UI components
 pub use connection_status::ConnectionStatusIndicator;
 pub use trust_badge::TrustBadge;

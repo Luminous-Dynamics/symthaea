@@ -3,6 +3,8 @@
 //! Craft Dashboard — live stats from domain context, conductor-connected or mock.
 
 use leptos::prelude::*;
+use mycelix_leptos_core::TrustTier;
+use mycelix_leptos_core::tier_gate::TierGate;
 use crate::context::use_craft;
 
 #[component]
@@ -26,29 +28,29 @@ pub fn DashboardPage() -> impl IntoView {
                         <span class="consciousness-tooltip" tabindex="0">
                             <span class="tooltip-icon">"?"</span>
                             <span class="tooltip-content">
-                                "Guilds use consciousness scores to gate roles. "
-                                "Higher scores unlock more authority — "
-                                "like earning mastery in a craft guild."
+                                "Guilds use the 8D Sovereign Profile to gate roles. "
+                                "Your combined civic score across all 8 dimensions "
+                                "determines your tier."
                                 <div class="tier-list">
                                     <div class="tier-row">
                                         <span class="tier-name">"Observer"</span>
-                                        <span class="tier-score">"0.1+"</span>
+                                        <span class="tier-score">"< 0.3"</span>
                                     </div>
                                     <div class="tier-row">
-                                        <span class="tier-name">"Apprentice"</span>
+                                        <span class="tier-name">"Participant"</span>
                                         <span class="tier-score">"0.3+"</span>
                                     </div>
                                     <div class="tier-row">
-                                        <span class="tier-name">"Journeyman"</span>
-                                        <span class="tier-score">"0.5+"</span>
+                                        <span class="tier-name">"Citizen"</span>
+                                        <span class="tier-score">"0.4+ (voting)"</span>
                                     </div>
                                     <div class="tier-row">
-                                        <span class="tier-name">"Master"</span>
-                                        <span class="tier-score">"0.75+"</span>
+                                        <span class="tier-name">"Steward"</span>
+                                        <span class="tier-score">"0.6+ (constitutional)"</span>
                                     </div>
                                     <div class="tier-row">
-                                        <span class="tier-name">"Elder"</span>
-                                        <span class="tier-score">"0.9+"</span>
+                                        <span class="tier-name">"Guardian"</span>
+                                        <span class="tier-score">"0.8+ (emergency)"</span>
                                     </div>
                                 </div>
                             </span>
@@ -92,10 +94,33 @@ pub fn DashboardPage() -> impl IntoView {
                     <ul class="feature-list">
                         <li>"Credentials verified via Praxis Proof of Learning"</li>
                         <li>"Living credentials decay via Ebbinghaus curve"</li>
-                        <li>"Guilds gate access via consciousness scores"</li>
+                        <li>"Guilds gated by 8D Sovereign Profile"</li>
                         <li>"Job matching runs locally on your device"</li>
                         <li>"Your profile lives on your Holochain agent"</li>
                     </ul>
+                </div>
+
+                // Guild creation — gated by Citizen tier (0.4+ combined score)
+                <div class="dash-card">
+                    <h3>"Create a Guild"</h3>
+                    <p class="text-secondary">
+                        "Professional federations with consciousness-gated roles. "
+                        "Requires Citizen tier or higher."
+                    </p>
+                    <TierGate min_tier=TrustTier::Standard action="Create a Guild">
+                        <a href="/employer" class="btn-primary">"Create Guild"</a>
+                    </TierGate>
+                </div>
+
+                // Federation — gated by Guardian tier (0.8+ combined score)
+                <div class="dash-card">
+                    <h3>"Establish Federation"</h3>
+                    <p class="text-secondary">
+                        "Link guilds across bioregions for shared standards."
+                    </p>
+                    <TierGate min_tier=TrustTier::Guardian action="Establish Federation">
+                        <button class="btn-primary" disabled>"Federation Portal"</button>
+                    </TierGate>
                 </div>
             </div>
         </div>
