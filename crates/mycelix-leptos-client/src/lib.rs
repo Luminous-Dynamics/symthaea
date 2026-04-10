@@ -46,26 +46,29 @@
 //! }
 //! ```
 
-pub mod error;
-pub mod types;
-pub mod transport;
-pub mod mock;
 #[cfg(feature = "browser")]
 pub mod browser;
-#[cfg(feature = "tauri")]
-pub mod tauri;
+pub mod client;
+pub mod error;
+pub mod mock;
 #[cfg(feature = "native")]
 pub mod native;
-pub mod client;
+#[cfg(feature = "tauri")]
+pub mod tauri;
+pub mod transport;
+pub mod types;
 
 // Re-exports for convenience
 pub use client::HolochainClient;
 pub use error::ClientError;
-pub use transport::HolochainTransport;
-pub use types::{ConnectConfig, ConnectionStatus, ZomeCallRequest, ZomeCallResponse, encode, decode};
 pub use mock::MockTransport;
 #[cfg(feature = "native")]
 pub use native::NativeWsTransport;
+pub use transport::HolochainTransport;
+pub use types::{
+    decode, encode, ConnectConfig, ConnectionStatus, ReconnectConfig, ZomeCallRequest,
+    ZomeCallResponse,
+};
 
 #[cfg(feature = "browser")]
 pub use browser::BrowserWsTransport;

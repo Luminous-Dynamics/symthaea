@@ -10,7 +10,7 @@ use serde::{de::DeserializeOwned, Serialize};
 
 use crate::error::ClientError;
 use crate::transport::HolochainTransport;
-use crate::types::{ConnectConfig, ConnectionStatus, decode, encode};
+use crate::types::{decode, encode, ConnectConfig, ConnectionStatus};
 
 /// A typed Holochain client bound to a specific hApp and default role.
 ///
@@ -54,11 +54,7 @@ impl<T: HolochainTransport> HolochainClient<T> {
     /// * `app_id` — The hApp identifier (e.g. "mycelix-unified"). Used for logging.
     /// * `default_role` — The default role name for `call_zome` (can be overridden
     ///   per-call with `call_zome_on_role`).
-    pub fn new(
-        transport: T,
-        app_id: impl Into<String>,
-        default_role: impl Into<String>,
-    ) -> Self {
+    pub fn new(transport: T, app_id: impl Into<String>, default_role: impl Into<String>) -> Self {
         Self {
             transport,
             app_id: app_id.into(),
@@ -75,15 +71,13 @@ impl<T: HolochainTransport> HolochainClient<T> {
     /// # Arguments
     /// * `url` — WebSocket URL (e.g. "ws://localhost:8888")
     /// * `auth_token` — Optional authentication token from the admin API.
-    pub async fn connect(
-        &self,
-        url: &str,
-        auth_token: Option<Vec<u8>>,
-    ) -> Result<(), ClientError> {
+    pub async fn connect(&self, url: &str, auth_token: Option<Vec<u8>>) -> Result<(), ClientError> {
         let config = ConnectConfig {
             url: url.to_string(),
             app_id: self.app_id.clone(),
             auth_token,
+            reconnect: None,
+            request_timeout_ms: None,
         };
         self.transport.connect(config).await
     }

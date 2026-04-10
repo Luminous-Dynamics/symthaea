@@ -14,6 +14,7 @@
 
 use hdk::prelude::*;
 use guild_integrity::*;
+use mycelix_bridge_common as bridge;
 
 // ---------------------------------------------------------------------------
 // Input types
@@ -100,6 +101,13 @@ fn get_my_role_in_guild(guild_id: &ActionHash) -> ExternResult<Option<(ActionHas
 /// Create a new guild. Requires Journeyman-equivalent consciousness (500+ permille).
 #[hdk_extern]
 pub fn create_guild(input: CreateGuildInput) -> ExternResult<ActionHash> {
+    // Consciousness gate: Citizen tier (≥0.4 combined) + identity ≥0.25
+    bridge::gate_consciousness(
+        "craft_bridge",
+        &bridge::requirement_for_voting(),
+        "create_guild",
+    )?;
+
     let now = sys_time()?;
     let guild = Guild {
         name: input.name,
@@ -185,6 +193,13 @@ pub fn join_guild(guild_id: ActionHash) -> ExternResult<ActionHash> {
 /// Promote a guild member to a higher role. Requires Master+ in the same guild.
 #[hdk_extern]
 pub fn promote_member(input: PromoteMemberInput) -> ExternResult<ActionHash> {
+    // Consciousness gate: Steward tier (≥0.6 combined) + identity ≥0.5 + community ≥0.3
+    bridge::gate_consciousness(
+        "craft_bridge",
+        &bridge::requirement_for_constitutional(),
+        "promote_member",
+    )?;
+
     // Verify the caller has Master+ role in this guild
     let my_role = get_my_role_in_guild(&input.guild_id)?
         .ok_or(wasm_error!(WasmErrorInner::Guest("You are not a member of this guild".into())))?;
@@ -222,6 +237,13 @@ pub fn promote_member(input: PromoteMemberInput) -> ExternResult<ActionHash> {
 /// Create a certification path for a guild. Requires Master+ role.
 #[hdk_extern]
 pub fn create_certification_path(input: CreateCertificationPathInput) -> ExternResult<ActionHash> {
+    // Consciousness gate: Steward tier (≥0.6 combined) + identity ≥0.5 + community ≥0.3
+    bridge::gate_consciousness(
+        "craft_bridge",
+        &bridge::requirement_for_constitutional(),
+        "create_certification_path",
+    )?;
+
     // Verify caller has Master+ role
     let my_role = get_my_role_in_guild(&input.guild_id)?
         .ok_or(wasm_error!(WasmErrorInner::Guest("You are not a member of this guild".into())))?;
@@ -251,6 +273,13 @@ pub fn create_certification_path(input: CreateCertificationPathInput) -> ExternR
 /// Establish a federation link with another guild. Requires Elder role.
 #[hdk_extern]
 pub fn establish_federation(input: EstablishFederationInput) -> ExternResult<ActionHash> {
+    // Consciousness gate: Guardian tier (≥0.8 combined) + identity ≥0.7 + community ≥0.5
+    bridge::gate_consciousness(
+        "craft_bridge",
+        &bridge::requirement_for_guardian(),
+        "establish_federation",
+    )?;
+
     // Verify caller has Elder role
     let my_role = get_my_role_in_guild(&input.local_guild_id)?
         .ok_or(wasm_error!(WasmErrorInner::Guest("You are not a member of this guild".into())))?;

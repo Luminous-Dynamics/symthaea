@@ -482,7 +482,7 @@ fn krum_aggregation(gradients: &[Vec<f32>], f: usize) -> Result<Vec<f32>, String
         }
 
         // Sort by distance and sum the m closest
-        distances.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap());
+        distances.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
         let score: f32 = distances.iter().take(m).map(|(_, d)| d).sum();
         scores[i] = score;
     }
@@ -491,9 +491,9 @@ fn krum_aggregation(gradients: &[Vec<f32>], f: usize) -> Result<Vec<f32>, String
     let best_idx = scores
         .iter()
         .enumerate()
-        .min_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap())
+        .min_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
         .map(|(idx, _)| idx)
-        .unwrap();
+        .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("No gradients to aggregate".into())))?;
 
     Ok(gradients[best_idx].clone())
 }

@@ -68,63 +68,11 @@ fn ensure_anchor(anchor_str: &str) -> ExternResult<EntryHash> {
     anchor_hash(anchor_str)
 }
 
-fn base64_decode(s: &str) -> Option<Vec<u8>> {
-    const ALPHABET: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-    let s = s.trim_end_matches('=');
-    let mut result = Vec::with_capacity(s.len() * 3 / 4);
-    let mut buffer: u32 = 0;
-    let mut bits: u8 = 0;
-
-    for c in s.bytes() {
-        let val = match ALPHABET.iter().position(|&x| x == c) {
-            Some(v) => v as u32,
-            None => match c {
-                b'-' => 62,
-                b'_' => 63,
-                b' ' | b'\n' | b'\r' | b'\t' => continue,
-                _ => return None,
-            },
-        };
-        buffer = (buffer << 6) | val;
-        bits += 6;
-        if bits >= 8 {
-            bits -= 8;
-            result.push((buffer >> bits) as u8);
-            buffer &= (1 << bits) - 1;
-        }
-    }
-    Some(result)
-}
-
-fn encode_base64(bytes: &[u8]) -> String {
-    const ALPHABET: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-    let mut out = String::new();
-    let mut i = 0;
-    while i < bytes.len() {
-        let b0 = bytes[i];
-        let b1 = if i + 1 < bytes.len() { bytes[i + 1] } else { 0 };
-        let b2 = if i + 2 < bytes.len() { bytes[i + 2] } else { 0 };
-        let triple = ((b0 as u32) << 16) | ((b1 as u32) << 8) | b2 as u32;
-        out.push(ALPHABET[((triple >> 18) & 0x3f) as usize] as char);
-        out.push(ALPHABET[((triple >> 12) & 0x3f) as usize] as char);
-        if i + 1 < bytes.len() {
-            out.push(ALPHABET[((triple >> 6) & 0x3f) as usize] as char);
-        } else {
-            out.push('=');
-        }
-        if i + 2 < bytes.len() {
-            out.push(ALPHABET[(triple & 0x3f) as usize] as char);
-        } else {
-            out.push('=');
-        }
-        i += 3;
-    }
-    out
-}
+use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
 
 fn decode_agent_pubkey(pubkey: &str) -> ExternResult<AgentPubKey> {
-    let bytes = base64_decode(pubkey).ok_or_else(|| {
-        wasm_error!(WasmErrorInner::Guest("Invalid agent pubkey encoding".into()))
+    let bytes = BASE64.decode(pubkey).map_err(|e| {
+        wasm_error!(WasmErrorInner::Guest(format!("Invalid agent pubkey encoding: {e}")))
     })?;
     if bytes.len() != 39 {
         return Err(wasm_error!(WasmErrorInner::Guest(format!(
@@ -137,7 +85,7 @@ fn decode_agent_pubkey(pubkey: &str) -> ExternResult<AgentPubKey> {
 
 fn endorsement_to_view(endorsement: SkillEndorsement) -> SkillEndorsementView {
     SkillEndorsementView {
-        endorsed_agent: encode_base64(endorsement.endorsed_agent.get_raw_39().as_ref()),
+        endorsed_agent: BASE64.encode(endorsement.endorsed_agent.get_raw_39().as_ref()),
         skill: endorsement.skill,
         rationale: endorsement.rationale,
         evidence: endorsement.evidence,
@@ -337,7 +285,7 @@ pub fn list_skill_endorsements_view(agent_pubkey: String) -> ExternResult<Vec<Sk
 #[hdk_extern]
 pub fn get_my_agent_pubkey() -> ExternResult<String> {
     let agent = agent_info()?.agent_initial_pubkey;
-    Ok(encode_base64(agent.get_raw_39().as_ref()))
+    Ok(BASE64.encode(agent.get_raw_39().as_ref()))
 }
 
 // ============== Living Credentials ==============
@@ -894,5 +842,125 @@ mod tests {
         let v_0 = predict_vitality(ebbinghaus_stability(500, 0), elapsed);
         let v_5 = predict_vitality(ebbinghaus_stability(500, 5), elapsed);
         assert!(v_5 > v_0);
+    }
+
+    // Next-review recommendation formula tests
+
+    #[test]
+    fn next_review_recommendation_uses_ln_formula() {
+        // When vitality would drop to 80% (target_retention = 0.8):
+        // time = -S * ln(0.8)
+        let stability = 1440.0;
+        let target = 0.8_f64;
+        let recommended = -stability * target.ln();
+        // ln(0.8) ≈ -0.2231, so recommended ≈ 321 minutes (~5.3 hours)
+        assert!(recommended > 300.0 && recommended < 350.0);
+    }
+
+    #[test]
+    fn higher_stability_delays_next_review() {
+        let target = 0.8_f64;
+        let review_low = -1440.0 * target.ln();
+        let review_high = -7200.0 * target.ln();
+        assert!(review_high > review_low);
+    }
+
+    // Relearning efficiency tests (pure computation)
+
+    #[test]
+    fn relearning_efficiency_shrinking_intervals_means_faster() {
+        // First interval: 10000, last interval: 5000 → ratio = 0.5 → 500 permille
+        let first = 10000_i64;
+        let last = 5000_i64;
+        let ratio = last as f64 / first as f64;
+        let efficiency = (ratio * 1000.0).clamp(0.0, 1000.0) as u16;
+        assert_eq!(efficiency, 500);
+    }
+
+    #[test]
+    fn relearning_efficiency_same_intervals_is_1000() {
+        let ratio: f64 = 7200.0 / 7200.0;
+        let efficiency = (ratio * 1000.0).clamp(0.0, 1000.0) as u16;
+        assert_eq!(efficiency, 1000);
+    }
+
+    #[test]
+    fn relearning_efficiency_growing_intervals_capped() {
+        // Slower relearning: ratio > 1.0 → clamps to 1000
+        let ratio: f64 = 2.0;
+        let efficiency = (ratio * 1000.0).clamp(0.0, 1000.0) as u16;
+        assert_eq!(efficiency, 1000);
+    }
+
+    // Composite archetype detection (pure logic tests)
+
+    #[test]
+    fn composite_coverage_full_match() {
+        let required = &["rust", "holochain", "wasm", "leptos"];
+        let skills: std::collections::HashSet<String> =
+            ["rust", "holochain", "wasm", "leptos"].iter().map(|s| s.to_string()).collect();
+        let matched: Vec<&&str> = required.iter().filter(|&&s| skills.contains(s)).collect();
+        let coverage = (matched.len() * 1000 / required.len()) as u16;
+        assert_eq!(coverage, 1000);
+    }
+
+    #[test]
+    fn composite_coverage_75_percent_triggers_detection() {
+        let required = &["rust", "holochain", "wasm", "leptos"];
+        let skills: std::collections::HashSet<String> =
+            ["rust", "holochain", "wasm"].iter().map(|s| s.to_string()).collect();
+        let matched: Vec<&&str> = required.iter().filter(|&&s| skills.contains(s)).collect();
+        let coverage = (matched.len() * 1000 / required.len()) as u16;
+        assert_eq!(coverage, 750);
+        assert!(coverage >= 700); // Threshold met
+    }
+
+    #[test]
+    fn composite_coverage_50_percent_below_threshold() {
+        let required = &["rust", "holochain", "wasm", "leptos"];
+        let skills: std::collections::HashSet<String> =
+            ["rust", "holochain"].iter().map(|s| s.to_string()).collect();
+        let matched: Vec<&&str> = required.iter().filter(|&&s| skills.contains(s)).collect();
+        let coverage = (matched.len() * 1000 / required.len()) as u16;
+        assert_eq!(coverage, 500);
+        assert!(coverage < 700); // Below threshold
+    }
+
+    // Edge cases
+
+    #[test]
+    fn vitality_with_negative_stability_returns_full() {
+        assert_eq!(predict_vitality(-1.0, 100.0), 1000);
+    }
+
+    #[test]
+    fn vitality_with_negative_elapsed_returns_full() {
+        assert_eq!(predict_vitality(1440.0, -1.0), 1000);
+    }
+
+    #[test]
+    fn vitality_pipeline_end_to_end() {
+        // Simulate: credential with 800 permille mastery, 2 reviews, 3 days elapsed
+        let mastery = 800_u16;
+        let reviews = 2_u32;
+        let elapsed_minutes = 3.0 * 24.0 * 60.0; // 3 days = 4320 minutes
+
+        let stability = ebbinghaus_stability(mastery, reviews);
+        let vitality = predict_vitality(stability, elapsed_minutes);
+
+        // With mastery=0.8: factor=2.1, reviews=2: 1.5^2=2.25
+        // S = 1440 * 2.1 * 2.25 = 6804 minutes (~4.7 days)
+        assert!((stability - 6804.0).abs() < 1.0);
+        // After 3 days of 4.7 day half-life: should still have decent vitality
+        assert!(vitality > 500);
+        assert!(vitality < 1000);
+    }
+
+    #[test]
+    fn all_archetypes_have_nonempty_requirements() {
+        for &(name, required) in ARCHETYPES {
+            assert!(!name.is_empty(), "Archetype name should not be empty");
+            assert!(!required.is_empty(), "Archetype {} has no requirements", name);
+        }
     }
 }

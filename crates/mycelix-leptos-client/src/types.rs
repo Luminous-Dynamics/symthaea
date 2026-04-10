@@ -25,6 +25,8 @@ pub enum ConnectionStatus {
     Connecting,
     /// Successfully connected and ready for zome calls.
     Connected,
+    /// Attempting to reconnect after a disconnect (attempt N of max).
+    Reconnecting { attempt: u32, max_attempts: u32 },
     /// The connection is in an error state.
     Error(String),
 }
@@ -43,6 +45,34 @@ pub struct ConnectConfig {
     /// Optional authentication token. If `Some`, the transport sends an
     /// `authenticate` message immediately after the WebSocket opens.
     pub auth_token: Option<Vec<u8>>,
+    /// Optional auto-reconnect configuration. If `Some`, the transport will
+    /// attempt to reconnect when the WebSocket closes unexpectedly.
+    pub reconnect: Option<ReconnectConfig>,
+    /// Timeout in milliseconds for individual zome call requests.
+    /// Defaults to 30_000ms (30 seconds) if `None`.
+    pub request_timeout_ms: Option<u32>,
+}
+
+/// Configuration for automatic WebSocket reconnection.
+#[derive(Debug, Clone)]
+pub struct ReconnectConfig {
+    /// Maximum number of reconnection attempts before giving up.
+    pub max_attempts: u32,
+    /// Initial delay between reconnection attempts in milliseconds.
+    /// Doubled after each failed attempt (exponential backoff).
+    pub base_delay_ms: u32,
+    /// Maximum delay between reconnection attempts in milliseconds.
+    pub max_delay_ms: u32,
+}
+
+impl Default for ReconnectConfig {
+    fn default() -> Self {
+        Self {
+            max_attempts: 5,
+            base_delay_ms: 1_000,
+            max_delay_ms: 30_000,
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -258,8 +288,7 @@ pub(crate) struct ZomeCallWireData {
 ///
 /// Returns [`ClientError::SerializationError`] if serialization fails.
 pub fn encode<T: Serialize>(value: &T) -> Result<Vec<u8>, ClientError> {
-    rmp_serde::to_vec_named(value)
-        .map_err(|e| ClientError::SerializationError(e.to_string()))
+    rmp_serde::to_vec_named(value).map_err(|e| ClientError::SerializationError(e.to_string()))
 }
 
 /// Decode MessagePack bytes into a typed value.
@@ -270,8 +299,7 @@ pub fn encode<T: Serialize>(value: &T) -> Result<Vec<u8>, ClientError> {
 ///
 /// Returns [`ClientError::SerializationError`] if deserialization fails.
 pub fn decode<T: for<'de> Deserialize<'de>>(bytes: &[u8]) -> Result<T, ClientError> {
-    rmp_serde::from_slice(bytes)
-        .map_err(|e| ClientError::SerializationError(e.to_string()))
+    rmp_serde::from_slice(bytes).map_err(|e| ClientError::SerializationError(e.to_string()))
 }
 
 // ---------------------------------------------------------------------------
@@ -329,6 +357,8 @@ mod tests {
             url: "ws://localhost:8888".into(),
             app_id: "mycelix-unified".into(),
             auth_token: Some(vec![1, 2, 3]),
+            reconnect: None,
+            request_timeout_ms: None,
         };
         assert_eq!(config.url, "ws://localhost:8888");
         assert_eq!(config.app_id, "mycelix-unified");
@@ -419,14 +449,18 @@ mod tests {
 
     #[test]
     fn app_request_authenticate() {
-        let req = AppRequest::Authenticate { token: vec![1, 2, 3, 4] };
+        let req = AppRequest::Authenticate {
+            token: vec![1, 2, 3, 4],
+        };
         let bytes = rmp_serde::to_vec_named(&req).unwrap();
         assert!(!bytes.is_empty());
     }
 
     #[test]
     fn app_request_app_info() {
-        let req = AppRequest::AppInfo { installed_app_id: "mycelix-unified".into() };
+        let req = AppRequest::AppInfo {
+            installed_app_id: "mycelix-unified".into(),
+        };
         let bytes = rmp_serde::to_vec_named(&req).unwrap();
         assert!(!bytes.is_empty());
     }
@@ -495,12 +529,20 @@ mod tests {
     #[test]
     fn encode_nested_enum() {
         #[derive(Debug, PartialEq, Serialize, Deserialize)]
-        enum Status { Active, Draft, Executed }
+        enum Status {
+            Active,
+            Draft,
+            Executed,
+        }
 
         #[derive(Debug, PartialEq, Serialize, Deserialize)]
-        struct Item { status: Status }
+        struct Item {
+            status: Status,
+        }
 
-        let item = Item { status: Status::Active };
+        let item = Item {
+            status: Status::Active,
+        };
         let encoded = encode(&item).unwrap();
         let decoded: Item = decode(&encoded).unwrap();
         assert_eq!(decoded.status, Status::Active);
@@ -509,11 +551,23 @@ mod tests {
     #[test]
     fn encode_vec_of_structs() {
         #[derive(Debug, PartialEq, Serialize, Deserialize)]
-        struct Vote { voter: String, choice: String, weight: f64 }
+        struct Vote {
+            voter: String,
+            choice: String,
+            weight: f64,
+        }
 
         let votes = vec![
-            Vote { voter: "alice".into(), choice: "for".into(), weight: 1.5 },
-            Vote { voter: "bob".into(), choice: "against".into(), weight: 0.8 },
+            Vote {
+                voter: "alice".into(),
+                choice: "for".into(),
+                weight: 1.5,
+            },
+            Vote {
+                voter: "bob".into(),
+                choice: "against".into(),
+                weight: 0.8,
+            },
         ];
 
         let encoded = encode(&votes).unwrap();
@@ -532,8 +586,16 @@ mod tests {
             tags: Vec<String>,
         }
 
-        let with_parent = Record { id: "1".into(), parent: Some("0".into()), tags: vec!["a".into()] };
-        let without = Record { id: "2".into(), parent: None, tags: vec![] };
+        let with_parent = Record {
+            id: "1".into(),
+            parent: Some("0".into()),
+            tags: vec!["a".into()],
+        };
+        let without = Record {
+            id: "2".into(),
+            parent: None,
+            tags: vec![],
+        };
 
         let e1 = encode(&with_parent).unwrap();
         let e2 = encode(&without).unwrap();
@@ -547,8 +609,8 @@ mod tests {
 
     #[test]
     fn mock_transport_returns_not_connected() {
-        use crate::MockTransport;
         use crate::transport::HolochainTransport;
+        use crate::MockTransport;
 
         let mock = MockTransport::new();
         assert_eq!(mock.status(), ConnectionStatus::Disconnected);

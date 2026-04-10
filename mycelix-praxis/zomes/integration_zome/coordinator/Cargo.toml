@@ -24,3 +24,6 @@ praxis-core = { path = "../../../crates/praxis-core" }
 serde.workspace = true
 serde_json.workspace = true
 holochain_serialized_bytes.workspace = true
+
+# Cross-cluster bridge
+mycelix-bridge-common = { path = "../../../../crates/mycelix-bridge-common" }

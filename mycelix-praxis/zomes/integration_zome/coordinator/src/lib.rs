@@ -2453,6 +2453,130 @@ pub fn list_my_graduations(_: ()) -> ExternResult<Vec<Record>> {
     Ok(records)
 }
 
+// ============== Praxis → Craft Credential Pipeline ==============
+//
+// Publishes a Praxis-issued credential as a living credential on the Craft cluster.
+// Requires the unified hApp with both "praxis" and "craft" roles installed.
+
+/// Input for publishing a Praxis credential to the Craft professional graph.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct PublishToCraftInput {
+    /// ActionHash of the credential in the Praxis credential_zome.
+    pub credential_hash: ActionHash,
+    /// Optional guild context for the Craft credential.
+    pub guild_id: Option<String>,
+    pub guild_name: Option<String>,
+}
+
+/// Publish a Praxis credential to the Craft cluster as a living credential.
+///
+/// 1. Fetches the credential from the local Praxis credential_zome
+/// 2. Extracts mastery, epistemic code, and provenance
+/// 3. Dispatches a cross-cluster call to craft_graph.publish_credential()
+///
+/// Requires: unified hApp with "craft" role installed.
+#[hdk_extern]
+pub fn publish_to_craft(input: PublishToCraftInput) -> ExternResult<()> {
+    // Gate: Citizen tier minimum for cross-cluster publishing
+    mycelix_bridge_common::gate_consciousness(
+        "edunet_bridge",
+        &mycelix_bridge_common::requirement_for_voting(),
+        "publish_to_craft",
+    )?;
+
+    // Fetch the credential from local credential_zome
+    let record = get(input.credential_hash.clone(), GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Credential not found — issue it first via credential_coordinator".into()
+        )))?;
+
+    // Parse the credential entry (using serde_json for flexibility)
+    let credential_json = match record.entry().as_option() {
+        Some(Entry::App(bytes)) => {
+            serde_json::from_slice::<serde_json::Value>(bytes.bytes())
+                .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!(
+                    "Failed to parse credential: {e}"
+                ))))?
+        }
+        _ => return Err(wasm_error!(WasmErrorInner::Guest(
+            "Credential record has no app entry".into()
+        ))),
+    };
+
+    // Extract fields for Craft's PublishedCredentialInput
+    let credential_id = credential_json.get("id")
+        .or_else(|| credential_json.get("credential_id"))
+        .and_then(|v| v.as_str())
+        .unwrap_or("unknown")
+        .to_string();
+
+    let title = credential_json.get("title")
+        .or_else(|| credential_json.get("credential_subject").and_then(|s| s.get("name")))
+        .and_then(|v| v.as_str())
+        .unwrap_or("Praxis Credential")
+        .to_string();
+
+    let issuer = credential_json.get("issuer")
+        .and_then(|v| v.as_str())
+        .unwrap_or("praxis")
+        .to_string();
+
+    let issued_on = credential_json.get("issuance_date")
+        .or_else(|| credential_json.get("issued_on"))
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .to_string();
+
+    let mastery = credential_json.get("mastery_permille")
+        .and_then(|v| v.as_u64())
+        .map(|v| v as u16);
+
+    let epistemic_code = credential_json.get("epistemic_code")
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string());
+
+    // Build the Craft-compatible payload
+    let craft_payload = serde_json::json!({
+        "credential_id": credential_id,
+        "title": title,
+        "issuer": issuer,
+        "issued_on": issued_on,
+        "source_dna": "praxis",
+        "action_hash": input.credential_hash.to_string(),
+        "summary": format!("Proof of Learning from Praxis — {}", title),
+        "guild_id": input.guild_id,
+        "guild_name": input.guild_name,
+        "epistemic_code": epistemic_code,
+        "mastery_permille": mastery,
+    });
+
+    // Cross-cluster call to Craft via OtherRole
+    let response = call(
+        CallTargetCell::OtherRole("craft".into()),
+        ZomeName::from("craft_graph"),
+        FunctionName::from("publish_credential"),
+        None,
+        &ExternIO::encode(craft_payload)
+            .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Encode: {e}"))))?,
+    )?;
+
+    match response {
+        ZomeCallResponse::Ok(_) => Ok(()),
+        ZomeCallResponse::Unauthorized(_, _, _, _) => Err(wasm_error!(
+            WasmErrorInner::Guest("Unauthorized cross-cluster call to Craft".into())
+        )),
+        ZomeCallResponse::NetworkError(err) => Err(wasm_error!(
+            WasmErrorInner::Guest(format!("Network error publishing to Craft: {err}"))
+        )),
+        ZomeCallResponse::CountersigningSession(err) => Err(wasm_error!(
+            WasmErrorInner::Guest(format!("Countersigning error: {err}"))
+        )),
+        ZomeCallResponse::AuthenticationFailed(_, _) => Err(wasm_error!(
+            WasmErrorInner::Guest("Authentication failed calling Craft".into())
+        )),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

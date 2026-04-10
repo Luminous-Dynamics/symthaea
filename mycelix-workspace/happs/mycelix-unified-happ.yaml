@@ -1,6 +1,6 @@
 ---
 # Mycelix Unified hApp Bundle
-# Combines Personal + Identity + Hearth + Commons + Civic + Attribution + Finance + Governance DNAs for cross-cluster communication.
+# Combines Personal + Identity + Hearth + Commons + Civic + Attribution + Finance + Governance + Praxis + Craft DNAs for cross-cluster communication.
 #
 # When all DNAs are installed as separate roles within the same hApp,
 # zomes can call between clusters using:
@@ -220,6 +220,17 @@ roles:
       deferred: false
     dna:
       path: ../../mycelix-praxis/dna/praxis.dna
+      modifiers:
+        network_seed: ~
+        properties: ~
+      clone_limit: 0
+
+  - name: craft
+    provisioning:
+      strategy: create
+      deferred: false
+    dna:
+      path: ../../mycelix-craft/dna/mycelix_craft.dna
       modifiers:
         network_seed: ~
         properties: ~

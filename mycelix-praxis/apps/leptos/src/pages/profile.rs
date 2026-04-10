@@ -1,6 +1,10 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
+//
+// NOTE: Craft zome calls (craft_graph.*) require the unified hApp with a "craft" role.
+// Currently calls use the Praxis default role — these will need cross-role dispatch
+// once the Praxis frontend migrates to mycelix-leptos-core's HolochainProviderAuto.
 
 use leptos::prelude::*;
 use wasm_bindgen_futures::spawn_local;
@@ -146,7 +150,7 @@ fn ProfileInner() -> impl IntoView {
         async move {
             match hc
                 .call_zome::<(), String>(
-                    "professional_graph",
+                    "craft_graph",
                     "get_my_agent_pubkey",
                     &(),
                 )
@@ -163,14 +167,14 @@ fn ProfileInner() -> impl IntoView {
             let target = view_agent.get();
             let result = if target.trim().is_empty() {
                 hc.call_zome::<(), Vec<SkillEndorsementView>>(
-                    "professional_graph",
+                    "craft_graph",
                     "get_my_endorsements_view",
                     &(),
                 )
                 .await
             } else {
                 hc.call_zome::<String, Vec<SkillEndorsementView>>(
-                    "professional_graph",
+                    "craft_graph",
                     "list_skill_endorsements_view",
                     &target,
                 )
@@ -202,7 +206,7 @@ fn ProfileInner() -> impl IntoView {
 
         spawn_local(async move {
             let result: Result<(), String> = hc
-                .call_zome_default("professional_graph", "set_profile", &payload)
+                .call_zome_default("craft_graph", "set_profile", &payload)
                 .await;
             match result {
                 Ok(_) => set_status.set(Some("Profile published to professional graph.".into())),
@@ -241,7 +245,7 @@ fn ProfileInner() -> impl IntoView {
 
         spawn_local(async move {
             let result: Result<(), String> = hc
-                .call_zome_default("professional_graph", "endorse_skill", &payload)
+                .call_zome_default("craft_graph", "endorse_skill", &payload)
                 .await;
             match result {
                 Ok(_) => {
@@ -441,7 +445,7 @@ fn ProfileInner() -> impl IntoView {
 
                             spawn_local(async move {
                                 let result: Result<(), String> = hc
-                                    .call_zome_default("professional_graph", "publish_credential", &payload)
+                                    .call_zome_default("craft_graph", "publish_credential", &payload)
                                     .await;
                                 if let Err(e) = result {
                                     set_status.set(Some(format!("Publish failed: {e}")));

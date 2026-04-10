@@ -16,7 +16,7 @@ use wasm_bindgen::JsValue;
 use wasm_bindgen_futures::spawn_local;
 
 use mycelix_leptos_client::{
-    BrowserWsTransport, ConnectConfig, HolochainTransport,
+    BrowserWsTransport, ConnectConfig, ReconnectConfig, HolochainTransport,
     encode, decode,
 };
 
@@ -30,6 +30,7 @@ pub enum ConnectionStatus {
     Disconnected,
     Connecting,
     Connected,
+    Reconnecting,
     Mock,
 }
 
@@ -39,6 +40,7 @@ impl ConnectionStatus {
             Self::Disconnected => "status-disconnected",
             Self::Connecting => "status-connecting",
             Self::Connected => "status-connected",
+            Self::Reconnecting => "status-reconnecting",
             Self::Mock => "status-mock",
         }
     }
@@ -48,6 +50,7 @@ impl ConnectionStatus {
             Self::Disconnected => "Disconnected",
             Self::Connecting => "Connecting\u{2026}",
             Self::Connected => "Connected",
+            Self::Reconnecting => "Reconnecting\u{2026}",
             Self::Mock => "Mock",
         }
     }
@@ -159,6 +162,22 @@ impl HolochainCtx {
         self.status.get_untracked() == ConnectionStatus::Mock
     }
 
+    /// Return the connected agent pubkey in Holochain's `u...` display form.
+    pub fn connected_agent_pub_key_b64(&self) -> Option<String> {
+        self.transport
+            .borrow()
+            .as_ref()
+            .and_then(|transport| transport.connected_agent_pub_key_b64())
+    }
+
+    /// Return the connected agent DID derived from the conductor cell.
+    pub fn connected_agent_did(&self) -> Option<String> {
+        self.transport
+            .borrow()
+            .as_ref()
+            .and_then(|transport| transport.connected_agent_did())
+    }
+
     /// Get the display label for the current status.
     pub fn status_label(&self) -> &'static str {
         if let Some(ref labels) = self.status_labels {
@@ -166,6 +185,7 @@ impl HolochainCtx {
                 ConnectionStatus::Disconnected => labels.disconnected,
                 ConnectionStatus::Connecting => labels.connecting,
                 ConnectionStatus::Connected => labels.connected,
+                ConnectionStatus::Reconnecting => labels.connecting,
                 ConnectionStatus::Mock => labels.mock,
             }
         } else {
@@ -260,6 +280,8 @@ pub fn HolochainProviderAuto(
                     url,
                     app_id,
                     auth_token: token.map(|s| s.into_bytes()),
+                    reconnect: Some(ReconnectConfig::default()),
+                    request_timeout_ms: Some(30_000),
                 };
 
                 match ws_transport.connect(connect_config).await {

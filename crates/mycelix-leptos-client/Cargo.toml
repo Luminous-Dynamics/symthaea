@@ -6,6 +6,7 @@ license = "AGPL-3.0-or-later"
 description = "Browser-compatible Holochain client for Leptos frontends"
 
 [dependencies]
+base64 = "0.22"
 serde = { version = "1", features = ["derive"] }
 rmp-serde = "1"
 thiserror = "2"
@@ -14,7 +15,7 @@ wasm-bindgen-futures = "0.4"
 js-sys = "0.3"
 web-sys = { version = "0.3", features = [
     "WebSocket", "MessageEvent", "BinaryType", "Blob",
-    "ErrorEvent", "CloseEvent", "console"
+    "ErrorEvent", "CloseEvent", "console", "Window"
 ] }
 futures = { version = "0.3", default-features = false, features = ["alloc"] }
 serde_json = "1"

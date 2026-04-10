@@ -83,7 +83,9 @@ pub fn MockExamPage() -> impl IntoView {
 
     let clear_timer = move || {
         if let Some(id) = timer_id.get_untracked() {
-            web_sys::window().unwrap().clear_interval_with_handle(id);
+            if let Some(window) = web_sys::window() {
+                window.clear_interval_with_handle(id);
+            }
             timer_id.set(None);
         }
     };
@@ -205,15 +207,15 @@ pub fn MockExamPage() -> impl IntoView {
                 }
             });
         });
-        let id = web_sys::window()
-            .unwrap()
-            .set_interval_with_callback_and_timeout_and_arguments_0(
+        if let Some(window) = web_sys::window() {
+            if let Ok(id) = window.set_interval_with_callback_and_timeout_and_arguments_0(
                 cb.as_ref().unchecked_ref(),
                 1_000,
-            )
-            .unwrap();
-        cb.forget(); // intentional: closure must outlive the interval; cleared via clear_timer()
-        timer_id.set(Some(id));
+            ) {
+                cb.forget(); // intentional: closure must outlive the interval; cleared via clear_timer()
+                timer_id.set(Some(id));
+            }
+        }
     };
 
     let minutes = move || time_left.get() / 60;

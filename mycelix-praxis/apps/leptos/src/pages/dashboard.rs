@@ -1297,11 +1297,11 @@ fn ProgressPortability() -> impl IntoView {
                     style="display: none"
                     on:change=move |ev| {
                         use wasm_bindgen::JsCast;
-                        let target = ev.target().unwrap();
+                        let Some(target) = ev.target() else { return };
                         let input: web_sys::HtmlInputElement = target.unchecked_into();
                         if let Some(files) = input.files() {
                             if let Some(file) = files.get(0) {
-                                let reader = web_sys::FileReader::new().unwrap();
+                                let Ok(reader) = web_sys::FileReader::new() else { return };
                                 let reader_clone = reader.clone();
                                 let onload = wasm_bindgen::closure::Closure::wrap(Box::new(move |_: web_sys::Event| {
                                     if let Ok(result) = reader_clone.result() {

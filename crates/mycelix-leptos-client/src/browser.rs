@@ -20,9 +20,11 @@
 use crate::error::ClientError;
 use crate::transport::HolochainTransport;
 use crate::types::{
-    AppRequest, AppResponse, CallZomeRequestWire, CellId, CellInfoVariant,
-    ConnectConfig, ConnectionStatus, WireRequest, WireResponse,
+    AppRequest, AppResponse, CallZomeRequestWire, CellId, CellInfoVariant, ConnectConfig,
+    ConnectionStatus, ReconnectConfig, WireRequest, WireResponse,
 };
+use base64::engine::general_purpose::URL_SAFE_NO_PAD;
+use base64::Engine as _;
 
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -65,6 +67,10 @@ struct Inner {
     _callbacks: Vec<JsValue>,
     /// Signal handler — called when the conductor sends a signal (not a response).
     signal_handler: Option<Box<dyn Fn(Vec<u8>)>>,
+    /// Stored connect config for reconnection attempts.
+    connect_config: Option<ConnectConfig>,
+    /// Current reconnect attempt counter (0 = not reconnecting).
+    reconnect_attempt: u32,
 }
 
 impl Default for Inner {
@@ -78,6 +84,8 @@ impl Default for Inner {
             agent_pub_key: None,
             _callbacks: Vec::new(),
             signal_handler: None,
+            connect_config: None,
+            reconnect_attempt: 0,
         }
     }
 }
@@ -101,9 +109,12 @@ impl Default for Inner {
 ///
 /// # Reconnection
 ///
-/// The current implementation does not auto-reconnect. If the WebSocket
-/// closes, subsequent `call_zome` calls will return [`ClientError::NotConnected`].
-/// Call [`connect`](BrowserWsTransport::connect) again to re-establish.
+/// If `ConnectConfig.reconnect` is set to `Some(ReconnectConfig)`, the transport
+/// will automatically attempt to reconnect when the WebSocket closes. It uses
+/// exponential backoff (base_delay_ms doubled each attempt, capped at max_delay_ms).
+/// Pending requests at the time of disconnect are failed immediately.
+/// If reconnect is `None`, the transport enters `Disconnected` and subsequent
+/// `call_zome` calls return [`ClientError::NotConnected`].
 #[derive(Clone)]
 pub struct BrowserWsTransport {
     inner: Rc<RefCell<Inner>>,
@@ -134,6 +145,24 @@ impl BrowserWsTransport {
         self.inner.borrow_mut().signal_handler = Some(Box::new(handler));
     }
 
+    /// Return the connected agent pubkey bytes discovered from app info.
+    pub fn connected_agent_pub_key(&self) -> Option<Vec<u8>> {
+        self.inner.borrow().agent_pub_key.clone()
+    }
+
+    /// Return the connected agent pubkey in the same `u...` base64url form
+    /// used by Holochain hash display formatting.
+    pub fn connected_agent_pub_key_b64(&self) -> Option<String> {
+        self.connected_agent_pub_key()
+            .map(|bytes| format!("u{}", URL_SAFE_NO_PAD.encode(bytes)))
+    }
+
+    /// Return the connected Mycelix DID derived from the conductor agent key.
+    pub fn connected_agent_did(&self) -> Option<String> {
+        self.connected_agent_pub_key_b64()
+            .map(|key| format!("did:mycelix:{key}"))
+    }
+
     /// Allocate the next request ID.
     fn next_id(inner: &mut Inner) -> u64 {
         let id = inner.next_id;
@@ -144,7 +173,8 @@ impl BrowserWsTransport {
     /// Send a request envelope over the WebSocket and await the response bytes.
     ///
     /// This is the core request/response primitive used by authenticate,
-    /// app_info, and call_zome.
+    /// app_info, and call_zome. If a `request_timeout_ms` is configured, the
+    /// request will be failed with `ClientError::Timeout` after that duration.
     fn send_request(
         inner_rc: &Rc<RefCell<Inner>>,
         request_type: &str,
@@ -154,7 +184,7 @@ impl BrowserWsTransport {
         let request_type = request_type.to_string();
 
         Box::pin(async move {
-            let (id, wire_bytes) = {
+            let (id, wire_bytes, timeout_ms) = {
                 let mut state = inner.borrow_mut();
 
                 let ws = state.ws.as_ref().ok_or(ClientError::NotConnected)?;
@@ -172,7 +202,11 @@ impl BrowserWsTransport {
                 let wire_bytes = rmp_serde::to_vec_named(&envelope)
                     .map_err(|e| ClientError::SerializationError(e.to_string()))?;
 
-                (id, wire_bytes)
+                let timeout_ms = state.connect_config.as_ref()
+                    .and_then(|c| c.request_timeout_ms)
+                    .unwrap_or(30_000);
+
+                (id, wire_bytes, timeout_ms)
             };
 
             // Create a oneshot channel for the response
@@ -194,9 +228,24 @@ impl BrowserWsTransport {
                     .map_err(|e| ClientError::WebSocketError(format!("{e:?}")))?;
             }
 
-            rx.await.map_err(|_| {
-                ClientError::WebSocketError("Response channel dropped".to_string())
-            })?
+            // Schedule a timeout that removes the pending request
+            let inner_for_timeout = Rc::clone(&inner);
+            let timeout_closure = Closure::once(move || {
+                let mut state = inner_for_timeout.borrow_mut();
+                if let Some(pending) = state.pending.remove(&id) {
+                    (pending.resolve)(Err(ClientError::Timeout(timeout_ms)));
+                }
+            });
+            if let Some(window) = web_sys::window() {
+                let _ = window.set_timeout_with_callback_and_timeout_and_arguments_0(
+                    timeout_closure.as_ref().unchecked_ref(),
+                    timeout_ms as i32,
+                );
+                timeout_closure.forget();
+            }
+
+            rx.await
+                .map_err(|_| ClientError::WebSocketError("Response channel dropped".to_string()))?
         })
     }
 
@@ -292,10 +341,71 @@ impl BrowserWsTransport {
                     };
 
                     let mut state = inner.borrow_mut();
-                    state.status = ConnectionStatus::Disconnected;
                     state.ws = None;
 
-                    // Fail all pending requests
+                    // Check if auto-reconnect is configured
+                    let reconnect_config = state.connect_config.as_ref()
+                        .and_then(|c| c.reconnect.clone());
+
+                    if let Some(ref rc) = reconnect_config {
+                        let attempt = state.reconnect_attempt + 1;
+                        if attempt <= rc.max_attempts {
+                            state.reconnect_attempt = attempt;
+                            state.status = ConnectionStatus::Reconnecting {
+                                attempt,
+                                max_attempts: rc.max_attempts,
+                            };
+                            let delay = (rc.base_delay_ms * 2u32.saturating_pow(attempt - 1))
+                                .min(rc.max_delay_ms);
+                            let config = state.connect_config.clone().unwrap();
+                            let inner_for_reconnect = Rc::clone(&inner);
+
+                            // Fail pending requests (they won't survive the reconnect gap)
+                            let pending: Vec<_> = state.pending.drain().collect();
+                            drop(state);
+                            for (_, req) in pending {
+                                (req.resolve)(Err(ClientError::ConnectionFailed(reason.clone())));
+                            }
+
+                            web_sys::console::log_1(&format!(
+                                "[HC] Reconnect attempt {attempt}/{} in {delay}ms",
+                                rc.max_attempts
+                            ).into());
+
+                            // Schedule reconnect after delay
+                            let closure = Closure::once(move || {
+                                let transport = BrowserWsTransport { inner: inner_for_reconnect };
+                                wasm_bindgen_futures::spawn_local(async move {
+                                    match transport.connect(config).await {
+                                        Ok(()) => {
+                                            web_sys::console::log_1(
+                                                &"[HC] Reconnected successfully".into()
+                                            );
+                                            transport.inner.borrow_mut().reconnect_attempt = 0;
+                                        }
+                                        Err(e) => {
+                                            web_sys::console::warn_1(
+                                                &format!("[HC] Reconnect failed: {e}").into()
+                                            );
+                                            // on_close will fire again → next attempt
+                                        }
+                                    }
+                                });
+                            });
+                            let _ = web_sys::window().map(|w: web_sys::Window| {
+                                let _ = w.set_timeout_with_callback_and_timeout_and_arguments_0(
+                                    closure.as_ref().unchecked_ref(),
+                                    delay as i32,
+                                );
+                                closure.forget();
+                            });
+
+                            return;
+                        }
+                    }
+
+                    // No reconnect or exhausted attempts: go to Disconnected
+                    state.status = ConnectionStatus::Disconnected;
                     let pending: Vec<_> = state.pending.drain().collect();
                     drop(state);
                     for (_, req) in pending {
@@ -373,11 +483,12 @@ impl HolochainTransport for BrowserWsTransport {
             // Re-attach callbacks after the open event (onerror was overwritten)
             Self::attach_callbacks(&inner, &ws);
 
-            // Store the connected WebSocket
+            // Store the connected WebSocket and config (for reconnect)
             {
                 let mut state = inner.borrow_mut();
                 state.ws = Some(ws);
                 state.status = ConnectionStatus::Connected;
+                state.connect_config = Some(config.clone());
             }
 
             // --- Fix 1: Authentication ---
@@ -386,8 +497,7 @@ impl HolochainTransport for BrowserWsTransport {
                 let auth_bytes = rmp_serde::to_vec_named(&auth_payload)
                     .map_err(|e| ClientError::SerializationError(e.to_string()))?;
 
-                let response_bytes =
-                    Self::send_request(&inner, "authenticate", auth_bytes).await?;
+                let response_bytes = Self::send_request(&inner, "authenticate", auth_bytes).await?;
 
                 // The conductor responds with an empty success or an error.
                 // If we got here without error, authentication succeeded.
@@ -412,14 +522,15 @@ impl HolochainTransport for BrowserWsTransport {
                 let app_info_bytes = rmp_serde::to_vec_named(&app_info_payload)
                     .map_err(|e| ClientError::SerializationError(e.to_string()))?;
 
-                let response_bytes =
-                    Self::send_request(&inner, "request", app_info_bytes).await?;
+                let response_bytes = Self::send_request(&inner, "request", app_info_bytes).await?;
 
                 // Parse the response to build role→cell_id mapping
-                let app_info: AppResponse = rmp_serde::from_slice(&response_bytes)
-                    .map_err(|e| ClientError::InvalidResponse(format!(
-                        "Failed to parse app_info response: {e}"
-                    )))?;
+                let app_info: AppResponse =
+                    rmp_serde::from_slice(&response_bytes).map_err(|e| {
+                        ClientError::InvalidResponse(format!(
+                            "Failed to parse app_info response: {e}"
+                        ))
+                    })?;
 
                 match app_info {
                     AppResponse::AppInfo(info) => {
@@ -429,10 +540,9 @@ impl HolochainTransport for BrowserWsTransport {
                         for entry in &info.cell_info {
                             for cell_variant in &entry.cells {
                                 if let CellInfoVariant::Provisioned(cell) = cell_variant {
-                                    state.cell_map.insert(
-                                        entry.role_name.clone(),
-                                        cell.cell_id.clone(),
-                                    );
+                                    state
+                                        .cell_map
+                                        .insert(entry.role_name.clone(), cell.cell_id.clone());
                                     // Capture agent pub key from the first cell
                                     if first_agent.is_none() {
                                         first_agent = Some(cell.cell_id.1.clone());
@@ -449,13 +559,15 @@ impl HolochainTransport for BrowserWsTransport {
                                 &format!(
                                     "app_info for '{}' returned no provisioned cells",
                                     config.app_id
-                                ).into(),
+                                )
+                                .into(),
                             );
                         }
                     }
                     AppResponse::Error(e) => {
                         return Err(ClientError::ConnectionFailed(format!(
-                            "app_info failed: {}", e.message
+                            "app_info failed: {}",
+                            e.message
                         )));
                     }
                     _ => {
@@ -519,15 +631,12 @@ impl HolochainTransport for BrowserWsTransport {
             let call_bytes = rmp_serde::to_vec_named(&call_request)
                 .map_err(|e| ClientError::SerializationError(e.to_string()))?;
 
-            let response_bytes =
-                Self::send_request(&inner, "request", call_bytes).await?;
+            let response_bytes = Self::send_request(&inner, "request", call_bytes).await?;
 
             // Try to decode as AppResponse for proper error handling
             match rmp_serde::from_slice::<AppResponse>(&response_bytes) {
                 Ok(AppResponse::ZomeCalled(data)) => Ok(data),
-                Ok(AppResponse::Error(e)) => {
-                    Err(ClientError::ZomeCallFailed(e.message))
-                }
+                Ok(AppResponse::Error(e)) => Err(ClientError::ZomeCallFailed(e.message)),
                 Ok(other) => Err(ClientError::InvalidResponse(format!(
                     "Unexpected response type for call_zome: {other:?}"
                 ))),

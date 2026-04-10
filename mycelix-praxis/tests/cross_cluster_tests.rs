@@ -278,6 +278,148 @@ async fn test_dispatch_rate_limiting() {
 }
 
 // ============================================================================
+// Test: Praxis → Craft Credential Pipeline (via publish_to_craft orchestrator)
+// ============================================================================
+
+/// Input type matching integration_coordinator::PublishToCraftInput
+#[derive(serde::Serialize, serde::Deserialize, Debug)]
+pub struct PublishToCraftInput {
+    pub credential_hash: ActionHash,
+    pub guild_id: Option<String>,
+    pub guild_name: Option<String>,
+}
+
+#[tokio::test(flavor = "multi_thread")]
+#[ignore = "requires unified hApp with both praxis and craft roles"]
+async fn test_praxis_to_craft_credential_publish() {
+    // This test requires the unified hApp manifest with both praxis and craft DNAs.
+    // Build: hc app pack mycelix-workspace/happs/ -o mycelix-unified.happ
+    let conductor = SweetConductor::from_standard_config().await;
+
+    let praxis_dna = SweetDnaFile::from_bundle(
+        std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("dna/praxis.dna")
+    ).await.unwrap();
+    let craft_dna = SweetDnaFile::from_bundle(
+        std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../mycelix-craft/dna/mycelix_craft.dna")
+    ).await.unwrap();
+
+    // Install both DNAs as separate roles in one app (unified hApp pattern)
+    let (praxis_cell, craft_cell) = conductor
+        .setup_app("unified-test", &[praxis_dna, craft_dna])
+        .await
+        .unwrap()
+        .into_tuple();
+
+    // Step 1: Issue a credential in Praxis
+    let credential_input = serde_json::json!({
+        "credential_type": "proof_of_learning",
+        "title": "Rust Fundamentals",
+        "description": "Mastery of Rust programming basics",
+        "mastery_permille": 850,
+        "epistemic_code": "E3-N1-M2",
+    });
+
+    let credential_hash: ActionHash = conductor
+        .call(
+            &praxis_cell.zome("credential_coordinator"),
+            "issue_credential",
+            credential_input,
+        )
+        .await;
+
+    // Step 2: Publish to Craft via the orchestrator
+    let publish_input = PublishToCraftInput {
+        credential_hash: credential_hash.clone(),
+        guild_id: Some("rust-guild".into()),
+        guild_name: Some("Rust Developers".into()),
+    };
+
+    let publish_result = conductor
+        .call_fallible::<_, ()>(
+            &praxis_cell.zome("integration_coordinator"),
+            "publish_to_craft",
+            publish_input,
+        )
+        .await;
+
+    assert!(
+        publish_result.is_ok(),
+        "publish_to_craft should succeed with unified hApp: {:?}",
+        publish_result.err()
+    );
+
+    // Step 3: Verify the credential exists in Craft with vitality=1000
+    let craft_credentials: Vec<serde_json::Value> = conductor
+        .call(
+            &craft_cell.zome("craft_graph"),
+            "list_my_published_credentials",
+            (),
+        )
+        .await;
+
+    assert!(
+        !craft_credentials.is_empty(),
+        "Craft should have at least one published credential after pipeline"
+    );
+
+    // Verify the credential has the Praxis source and full vitality
+    let first = &craft_credentials[0];
+    assert_eq!(
+        first.get("source_dna").and_then(|v| v.as_str()),
+        Some("praxis"),
+        "Credential should reference praxis as source DNA"
+    );
+}
+
+/// Test that cross-cluster publish fails gracefully without Craft role installed.
+#[tokio::test(flavor = "multi_thread")]
+#[ignore = "requires running conductor"]
+async fn test_publish_to_craft_fails_without_craft_role() {
+    let conductor = SweetConductor::from_standard_config().await;
+    let dna = SweetDnaFile::from_bundle(
+        std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("dna/praxis.dna")
+    ).await.unwrap();
+    let (alice,) = conductor.setup_app("praxis-only", &[dna]).await.unwrap().into_tuple();
+
+    // Issue credential locally
+    let credential_input = serde_json::json!({
+        "credential_type": "proof_of_learning",
+        "title": "Test Credential",
+        "description": "Test",
+        "mastery_permille": 500,
+    });
+
+    let credential_hash: ActionHash = conductor
+        .call(
+            &alice.zome("credential_coordinator"),
+            "issue_credential",
+            credential_input,
+        )
+        .await;
+
+    // Try to publish to Craft — should fail because "craft" role doesn't exist
+    let publish_input = PublishToCraftInput {
+        credential_hash,
+        guild_id: None,
+        guild_name: None,
+    };
+
+    let result = conductor
+        .call_fallible::<_, ()>(
+            &alice.zome("integration_coordinator"),
+            "publish_to_craft",
+            publish_input,
+        )
+        .await;
+
+    assert!(
+        result.is_err(),
+        "publish_to_craft should fail when Craft role is not installed"
+    );
+}
+
+// ============================================================================
 // Test: Governance Gate Audit Trail
 // ============================================================================
 

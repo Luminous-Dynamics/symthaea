@@ -13,3 +13,4 @@ hdk = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 guild_integrity = { path = "../integrity" }
+mycelix-bridge-common = { path = "../../../../crates/mycelix-bridge-common" }

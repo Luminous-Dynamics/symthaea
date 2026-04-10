@@ -50,6 +50,13 @@ fn ensure_anchor(text: &str) -> ExternResult<ActionHash> {
 /// Rate-limited to 100 calls per 60 seconds per agent.
 #[hdk_extern]
 pub fn dispatch_call(input: bridge::DispatchInput) -> ExternResult<bridge::DispatchResult> {
+    // Consciousness gate: Participant tier (≥0.3 combined)
+    bridge::gate_consciousness(
+        "craft_bridge",
+        &bridge::requirement_for_basic(),
+        "dispatch_call",
+    )?;
+
     if input.zome.trim().is_empty() {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "Dispatch zome name cannot be empty".into()
