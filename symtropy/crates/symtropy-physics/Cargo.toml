@@ -14,6 +14,10 @@ arrayvec = "0.7"
 proptest = "1.4"
 criterion = { version = "0.5", features = ["html_reports"] }
 
+[[bin]]
+name = "replay-cli"
+path = "src/bin/replay_cli.rs"
+
 [[bench]]
 name = "physics_bench"
 harness = false

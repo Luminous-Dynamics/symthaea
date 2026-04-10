@@ -65,5 +65,26 @@ atlas = ["dep:sol-atlas-bevy", "dep:sol-atlas-core"]
 world = ["dep:symtropy-world"]
 net = ["world", "dep:symtropy-net"]
 
+[workspace]
+# Core engine crates — testable with `cargo test --workspace --exclude symtropy`
+members = [
+    ".",
+    "crates/symtropy-math",
+    "crates/symtropy-physics",
+    "crates/symtropy-consciousness-physics",
+    "crates/symtropy-render-bridge",
+    "crates/symtropy-robotics-bridge",
+]
+# Excluded: depend on Mycelix, Holochain, Lightyear, or require Bevy runtime
+exclude = [
+    "crates/symtropy-world",
+    "crates/symtropy-net",
+    "crates/symtropy-sim-bridge",
+    "crates/symtropy-manipulator-demo",
+    "crates/symtropy-gravcraft-demo",
+    "crates/symtropy-holochain-relay",
+    "crates/symtropy-lightyear",
+]
+
 [lints.clippy]
 all = "warn"

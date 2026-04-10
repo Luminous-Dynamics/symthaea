@@ -3,10 +3,13 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Physics world: owns bodies, steps simulation, resolves collisions.
 
+use std::collections::BTreeMap;
+use std::collections::HashMap;
+
 use nalgebra::SVector;
 use symtropy_math::Point;
 
-use crate::body::{BodyHandle, RigidBody};
+use crate::body::{BodyHandle, NetId, RigidBody};
 use crate::broadphase;
 use crate::contact::{CollisionEvent, ContactManifold};
 use crate::constraint::Constraint;
@@ -58,6 +61,8 @@ pub struct PhysicsWorld<const D: usize> {
     pub contacts: Vec<ContactManifold<D>>,
     /// Collision events from the last step (for game logic callbacks).
     pub collision_events: Vec<CollisionEvent<D>>,
+    /// Sensor overlap events from the last step.
+    pub sensor_events: Vec<crate::contact::SensorEvent>,
     /// Position correction iterations per step.
     pub solver_iterations: usize,
     /// Sleep velocity threshold.
@@ -68,6 +73,10 @@ pub struct PhysicsWorld<const D: usize> {
     pub slop: f64,
     /// Baumgarte stabilization factor.
     pub baumgarte: f64,
+    /// NetId → BodyHandle mapping for cross-machine replay determinism.
+    net_id_map: BTreeMap<NetId, BodyHandle>,
+    /// BodyHandle → Vec index for O(1) body lookup.
+    handle_to_index: HashMap<BodyHandle, usize>,
     next_handle: usize,
 }
 
@@ -80,11 +89,14 @@ impl<const D: usize> PhysicsWorld<D> {
             gravity,
             contacts: Vec::new(),
             collision_events: Vec::new(),
+            sensor_events: Vec::new(),
             solver_iterations: 4,
             slop: 0.01,
             baumgarte: 0.2,
             sleep_threshold: 0.5,
             sleep_ticks: 60, // ~1 second at 64Hz
+            net_id_map: BTreeMap::new(),
+            handle_to_index: HashMap::new(),
             next_handle: 0,
         }
     }
@@ -98,7 +110,9 @@ impl<const D: usize> PhysicsWorld<D> {
     ) -> BodyHandle {
         let handle = self.allocate_handle();
         let body = RigidBody::dynamic_sphere(handle, position, radius, mass);
+        let idx = self.bodies.len();
         self.bodies.push(body);
+        self.handle_to_index.insert(handle, idx);
         handle
     }
 
@@ -106,8 +120,42 @@ impl<const D: usize> PhysicsWorld<D> {
     pub fn add_body(&mut self, mut body: RigidBody<D>) -> BodyHandle {
         let handle = self.allocate_handle();
         body.handle = handle;
+        let idx = self.bodies.len();
         self.bodies.push(body);
+        self.handle_to_index.insert(handle, idx);
         handle
+    }
+
+    /// Add multiple bodies with stable network IDs in deterministic order.
+    ///
+    /// Bodies are sorted by `NetId` before insertion, ensuring the same
+    /// `BodyHandle` assignment regardless of the caller's iteration order.
+    /// Returns an error if any `NetId` is duplicated.
+    pub fn add_bodies_deterministic(
+        &mut self,
+        mut bodies: Vec<(NetId, RigidBody<D>)>,
+    ) -> Result<Vec<BodyHandle>, String> {
+        bodies.sort_by_key(|(id, _)| *id);
+        let mut handles = Vec::with_capacity(bodies.len());
+        for (net_id, mut body) in bodies {
+            if self.net_id_map.contains_key(&net_id) {
+                return Err(format!("duplicate NetId({})", net_id.0));
+            }
+            let handle = self.allocate_handle();
+            body.handle = handle;
+            body.net_id = Some(net_id);
+            self.net_id_map.insert(net_id, handle);
+            let idx = self.bodies.len();
+            self.bodies.push(body);
+            self.handle_to_index.insert(handle, idx);
+            handles.push(handle);
+        }
+        Ok(handles)
+    }
+
+    /// Resolve a stable `NetId` to its `BodyHandle`.
+    pub fn handle_for_net_id(&self, net_id: NetId) -> Option<BodyHandle> {
+        self.net_id_map.get(&net_id).copied()
     }
 
     /// Add a constraint between two bodies.
@@ -117,12 +165,17 @@ impl<const D: usize> PhysicsWorld<D> {
 
     /// Get a reference to a body by handle.
     pub fn body(&self, handle: BodyHandle) -> Option<&RigidBody<D>> {
-        self.bodies.iter().find(|b| b.handle == handle)
+        self.handle_to_index
+            .get(&handle)
+            .and_then(|&idx| self.bodies.get(idx))
     }
 
     /// Get a mutable reference to a body by handle.
     pub fn body_mut(&mut self, handle: BodyHandle) -> Option<&mut RigidBody<D>> {
-        self.bodies.iter_mut().find(|b| b.handle == handle)
+        self.handle_to_index
+            .get(&handle)
+            .copied()
+            .and_then(|idx| self.bodies.get_mut(idx))
     }
 
     /// Step with consciousness-physics callback.
@@ -141,6 +194,7 @@ impl<const D: usize> PhysicsWorld<D> {
     fn step_internal(&mut self, dt: f64, mut callback: Option<&mut dyn PhysicsCallback<D>>) {
         // 0. Clear events from previous step
         self.collision_events.clear();
+        self.sensor_events.clear();
 
         // 1. Integrate all bodies (skip sleeping)
         for body in &mut self.bodies {
@@ -168,6 +222,17 @@ impl<const D: usize> PhysicsWorld<D> {
                 );
 
                 if result.intersecting {
+                    // Sensor detection: emit event but skip collision resolution
+                    if self.bodies[a].is_sensor || self.bodies[b].is_sensor {
+                        let (sensor, other) = if self.bodies[a].is_sensor {
+                            (pair.0, pair.1)
+                        } else {
+                            (pair.1, pair.0)
+                        };
+                        self.sensor_events.push(crate::contact::SensorEvent { sensor, other });
+                        continue;
+                    }
+
                     // EPA for accurate penetration depth and normal
                     if let Some(epa_result) = crate::epa::penetration(
                         self.bodies[a].collider.as_ref(),
@@ -338,17 +403,10 @@ impl<const D: usize> PhysicsWorld<D> {
     }
 
     fn find_body_indices(&self, a: BodyHandle, b: BodyHandle) -> (Option<usize>, Option<usize>) {
-        let mut ia = None;
-        let mut ib = None;
-        for (i, body) in self.bodies.iter().enumerate() {
-            if body.handle == a {
-                ia = Some(i);
-            }
-            if body.handle == b {
-                ib = Some(i);
-            }
-        }
-        (ia, ib)
+        (
+            self.handle_to_index.get(&a).copied(),
+            self.handle_to_index.get(&b).copied(),
+        )
     }
 
     fn allocate_handle(&mut self) -> BodyHandle {
@@ -488,5 +546,118 @@ mod tests {
 
         let final_ke = world.total_kinetic_energy();
         assert!(final_ke < initial_ke, "KE should decrease with damping");
+    }
+
+    #[test]
+    fn add_bodies_deterministic_assigns_net_ids() {
+        use symtropy_math::{Point, Sphere};
+        let mut world = PhysicsWorld::<3>::new(SVector::from([0.0, -9.81, 0.0]));
+
+        let bodies = vec![
+            (NetId(42), RigidBody::dynamic_sphere(BodyHandle(0), Point::new([0.0, 5.0, 0.0]), 1.0, 1.0)),
+            (NetId(7), RigidBody::dynamic_sphere(BodyHandle(0), Point::new([3.0, 5.0, 0.0]), 1.0, 2.0)),
+            (NetId(99), RigidBody::static_body(BodyHandle(0), Point::origin(), Box::new(Sphere::<3>::new(Point::origin(), 10.0)))),
+        ];
+
+        let handles = world.add_bodies_deterministic(bodies).unwrap();
+        assert_eq!(handles.len(), 3);
+        assert_eq!(world.body_count(), 3);
+
+        // Verify NetId lookup works
+        let h7 = world.handle_for_net_id(NetId(7)).unwrap();
+        let h42 = world.handle_for_net_id(NetId(42)).unwrap();
+        let h99 = world.handle_for_net_id(NetId(99)).unwrap();
+
+        // Bodies are sorted by NetId, so NetId(7) gets handle first
+        assert!(h7 < h42, "NetId(7) inserted before NetId(42)");
+        assert!(h42 < h99, "NetId(42) inserted before NetId(99)");
+
+        // Verify the bodies have correct net_id stored
+        assert_eq!(world.body(h42).unwrap().net_id, Some(NetId(42)));
+
+        // Unknown NetId returns None
+        assert!(world.handle_for_net_id(NetId(999)).is_none());
+    }
+
+    #[test]
+    fn add_bodies_deterministic_rejects_duplicates() {
+        let mut world = PhysicsWorld::<3>::new(SVector::zeros());
+        let bodies = vec![
+            (NetId(1), RigidBody::dynamic_sphere(BodyHandle(0), Point::origin(), 1.0, 1.0)),
+            (NetId(1), RigidBody::dynamic_sphere(BodyHandle(0), Point::origin(), 1.0, 1.0)),
+        ];
+        assert!(world.add_bodies_deterministic(bodies).is_err());
+    }
+
+    #[test]
+    fn collision_groups_prevent_collision() {
+        let mut world = PhysicsWorld::<3>::new(SVector::zeros());
+
+        // Two overlapping spheres in different groups
+        let h1 = world.add_sphere(Point::new([0.0, 0.0, 0.0]), 1.0, 1.0);
+        let h2 = world.add_sphere(Point::new([0.5, 0.0, 0.0]), 1.0, 1.0);
+
+        // Put them in non-overlapping groups
+        world.body_mut(h1).unwrap().collision_group = 0x01;
+        world.body_mut(h1).unwrap().collision_mask = 0x01;
+        world.body_mut(h2).unwrap().collision_group = 0x02;
+        world.body_mut(h2).unwrap().collision_mask = 0x02;
+
+        // Step — they overlap but shouldn't collide
+        world.step(0.016);
+        assert!(
+            world.collision_events.is_empty(),
+            "bodies in different groups should not collide"
+        );
+    }
+
+    #[test]
+    fn collision_groups_allow_matching() {
+        let mut world = PhysicsWorld::<3>::new(SVector::zeros());
+
+        // Two overlapping spheres in the same group
+        let h1 = world.add_sphere(Point::new([0.0, 0.0, 0.0]), 1.0, 1.0);
+        let h2 = world.add_sphere(Point::new([0.5, 0.0, 0.0]), 1.0, 1.0);
+
+        world.body_mut(h1).unwrap().collision_group = 0x01;
+        world.body_mut(h1).unwrap().collision_mask = 0x01;
+        world.body_mut(h2).unwrap().collision_group = 0x01;
+        world.body_mut(h2).unwrap().collision_mask = 0x01;
+
+        // Give converging velocity so impulse is generated
+        world.body_mut(h1).unwrap().linear_velocity = SVector::from([1.0, 0.0, 0.0]);
+        world.body_mut(h2).unwrap().linear_velocity = SVector::from([-1.0, 0.0, 0.0]);
+
+        world.step(0.016);
+        // Check contacts were generated (impulse events require relative velocity)
+        assert!(
+            !world.contacts.is_empty(),
+            "bodies in matching groups should generate contacts"
+        );
+    }
+
+    #[test]
+    fn sensor_detects_overlap_without_impulse() {
+        let mut world = PhysicsWorld::<3>::new(SVector::zeros());
+
+        let h1 = world.add_sphere(Point::new([0.0, 0.0, 0.0]), 1.0, 1.0);
+        let h2 = world.add_sphere(Point::new([0.5, 0.0, 0.0]), 1.0, 1.0);
+
+        // Mark h1 as a sensor
+        world.body_mut(h1).unwrap().is_sensor = true;
+
+        world.step(0.016);
+
+        // Should have sensor event, not collision event
+        assert!(
+            world.collision_events.is_empty(),
+            "sensor should not produce collision events"
+        );
+        assert!(
+            !world.sensor_events.is_empty(),
+            "sensor should produce sensor events"
+        );
+        assert_eq!(world.sensor_events[0].sensor, h1);
+        assert_eq!(world.sensor_events[0].other, h2);
     }
 }

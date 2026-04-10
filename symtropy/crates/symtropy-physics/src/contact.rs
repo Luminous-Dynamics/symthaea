@@ -18,6 +18,15 @@ pub struct CollisionEvent<const D: usize> {
     pub depth: f64,
 }
 
+/// Sensor overlap event (no collision resolution, just notification).
+#[derive(Clone, Debug)]
+pub struct SensorEvent {
+    /// The sensor body.
+    pub sensor: BodyHandle,
+    /// The other body overlapping the sensor.
+    pub other: BodyHandle,
+}
+
 /// Contact information from a collision between two bodies.
 #[derive(Clone, Debug)]
 pub struct ContactManifold<const D: usize> {

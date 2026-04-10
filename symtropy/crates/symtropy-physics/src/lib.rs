@@ -21,11 +21,15 @@ pub mod constraint;
 pub mod epa;
 pub mod gjk;
 pub mod integrator;
+pub mod joints;
+pub mod replay;
 pub mod world;
 
-pub use body::{BodyHandle, BodyType, RigidBody};
-pub use contact::{CollisionEvent, ContactManifold};
+pub use body::{BodyHandle, BodyType, NetId, RigidBody};
+pub use contact::{CollisionEvent, ContactManifold, SensorEvent};
 pub use constraint::Constraint;
 pub use epa::EpaResult;
 pub use broadphase::{Aabb, Lbvh, morton_encode, morton_prefix};
+pub use joints::{BallJoint, FixedJoint};
+pub use replay::{apply_commands, ReplayTape, WorldCommand, WorldSnapshot};
 pub use world::{NoOpCallback, PhysicsCallback, PhysicsWorld};

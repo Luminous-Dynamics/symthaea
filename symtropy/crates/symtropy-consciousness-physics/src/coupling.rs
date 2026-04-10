@@ -8,7 +8,8 @@
 //! The `ConsciousnessField` aggregates all entities and provides modulation
 //! functions that the physics engine calls during simulation.
 
-use std::collections::HashMap;
+use std::collections::BTreeMap;
+use std::collections::VecDeque;
 
 use nalgebra::SVector;
 use symthaea_consciousness_equation::{
@@ -16,6 +17,7 @@ use symthaea_consciousness_equation::{
 };
 
 use crate::energy::EnergyBudget;
+use crate::harmony_field::{HarmonyField, HarmonySource};
 use crate::safety::SafetyTier;
 use crate::sanctuary::{SanctuaryConditions, SanctuaryZone};
 use crate::thermodynamics::{ThermodynamicConstants, ThermodynamicLedger};
@@ -36,7 +38,7 @@ pub struct AgentMemory {
     /// Ticks since last positive energy regeneration.
     pub ticks_since_regen: u64,
     /// Rolling energy average over last 100 ticks (for reward signal).
-    pub energy_window: Vec<f64>,
+    pub energy_window: VecDeque<f64>,
     /// Maximum partner history entries.
     pub max_partners: usize,
 }
@@ -47,7 +49,7 @@ impl Default for AgentMemory {
             known_wells: Vec::new(),
             partner_history: Vec::new(),
             ticks_since_regen: 0,
-            energy_window: Vec::with_capacity(100),
+            energy_window: VecDeque::with_capacity(100),
             max_partners: 20,
         }
     }
@@ -56,9 +58,9 @@ impl Default for AgentMemory {
 impl AgentMemory {
     /// Record an energy observation for the rolling window.
     pub fn record_energy(&mut self, energy_fraction: f64) {
-        self.energy_window.push(energy_fraction);
+        self.energy_window.push_back(energy_fraction);
         if self.energy_window.len() > 100 {
-            self.energy_window.remove(0);
+            self.energy_window.pop_front();
         }
     }
 
@@ -67,8 +69,9 @@ impl AgentMemory {
     pub fn windowed_reward(&self) -> f64 {
         if self.energy_window.len() < 2 { return 0.0; }
         let n = self.energy_window.len();
-        let first_half: f64 = self.energy_window[..n/2].iter().sum::<f64>() / (n/2) as f64;
-        let second_half: f64 = self.energy_window[n/2..].iter().sum::<f64>() / (n - n/2) as f64;
+        let half = n / 2;
+        let first_half: f64 = self.energy_window.iter().take(half).sum::<f64>() / half as f64;
+        let second_half: f64 = self.energy_window.iter().skip(half).sum::<f64>() / (n - half) as f64;
         second_half - first_half
     }
 
@@ -234,9 +237,18 @@ impl EntityConsciousness {
 /// and provides physics modulation functions.
 pub struct ConsciousnessField<const D: usize> {
     /// Per-entity consciousness states.
-    pub entities: HashMap<BodyHandle, EntityConsciousness>,
+    pub entities: BTreeMap<BodyHandle, EntityConsciousness>,
     /// Per-entity sanctuary zones.
-    pub sanctuaries: HashMap<BodyHandle, SanctuaryZone<D>>,
+    pub sanctuaries: BTreeMap<BodyHandle, SanctuaryZone<D>>,
+    /// Harmony field for Channel 4 (Harmony → Friction) coupling.
+    /// Rebuilt each frame from entity positions and harmony activations.
+    pub harmony_field: HarmonyField<D>,
+    /// Cached entity positions (rebuilt each frame by `rebuild_harmony_field`).
+    /// Used by Phi-gravity and other position-dependent calculations.
+    entity_positions: BTreeMap<BodyHandle, SVector<f64, D>>,
+    /// Phi-gravity coupling strength (0.0 = disabled, default 0.5).
+    /// Higher values create stronger attraction between conscious entities.
+    pub phi_gravity_strength: f64,
     /// Collective consciousness (average Φ across all entities).
     pub collective_phi: f64,
     /// Thermodynamic ledger: tracks energy conservation across the system.
@@ -252,8 +264,11 @@ impl<const D: usize> ConsciousnessField<D> {
     /// Create an empty consciousness field.
     pub fn new() -> Self {
         Self {
-            entities: HashMap::new(),
-            sanctuaries: HashMap::new(),
+            entities: BTreeMap::new(),
+            sanctuaries: BTreeMap::new(),
+            harmony_field: HarmonyField::new(),
+            entity_positions: BTreeMap::new(),
+            phi_gravity_strength: 0.0, // disabled by default
             collective_phi: 0.0,
             ledger: ThermodynamicLedger::new(),
             constants: ThermodynamicConstants::default(),
@@ -288,7 +303,34 @@ impl<const D: usize> ConsciousnessField<D> {
         position: symtropy_math::Point<D>,
     ) {
         if let Some(entity) = self.entities.get_mut(&handle) {
-            entity.compute(inputs);
+            // Temperature-consciousness feedback: excessive heat reduces clarity.
+            // At body temperature (310K), no penalty. At 410K+, inputs scaled to 10%.
+            let temp_penalty = ((1.0 - (entity.energy.temperature - 310.0) / 100.0)
+                .clamp(0.1, 1.0)) as f64;
+            let effective_inputs = if temp_penalty < 0.99 {
+                ConsciousnessInputs {
+                    phi: inputs.phi * temp_penalty,
+                    broadcast: inputs.broadcast * temp_penalty,
+                    working_memory: inputs.working_memory * temp_penalty,
+                    attention: inputs.attention * temp_penalty,
+                    recurrence: inputs.recurrence,  // temporal structure unaffected
+                    embodiment: inputs.embodiment,   // body awareness unaffected
+                    knowledge: inputs.knowledge,     // stored knowledge unaffected
+                    synchrony: inputs.synchrony * temp_penalty,
+                }
+            } else {
+                inputs.clone()
+            };
+
+            let phi_before = entity.phi();
+            entity.compute(&effective_inputs);
+            let phi_after = entity.phi();
+
+            // Track actual Phi change for J/Phi metric accuracy
+            let delta_phi = (phi_after - phi_before).abs();
+            if delta_phi > 1e-10 {
+                self.ledger.record_phi_change(delta_phi);
+            }
 
             // Update sanctuary zone
             if let Some(sanctuary) = self.sanctuaries.get_mut(&handle) {
@@ -360,10 +402,15 @@ impl<const D: usize> ConsciousnessField<D> {
         // KE equivalent ≈ absorbed * 0.5 (simplified impulse-to-energy conversion).
         if absorbed > 1e-10 {
             use std::sync::atomic::Ordering;
-            let prev_bits = self.sanctuary_absorbed.load(Ordering::Relaxed);
-            let prev = f64::from_bits(prev_bits);
-            let new = prev + absorbed * 0.5;
-            self.sanctuary_absorbed.store(new.to_bits(), Ordering::Relaxed);
+            let absorbed_energy = absorbed * 0.5;
+            let _ = self.sanctuary_absorbed.fetch_update(
+                Ordering::Relaxed,
+                Ordering::Relaxed,
+                |bits| {
+                    let prev = f64::from_bits(bits);
+                    Some((prev + absorbed_energy).to_bits())
+                },
+            );
         }
         dampened
     }
@@ -430,6 +477,57 @@ impl<const D: usize> ConsciousnessField<D> {
         0.5 + 1.5 * self.collective_phi
     }
 
+    /// Rebuild the harmony field from current entity positions and activations.
+    ///
+    /// Call this each frame after entity positions are known (e.g., from physics sync).
+    /// This populates the harmony field sources used by Channel 4 (Harmony → Friction).
+    pub fn rebuild_harmony_field(&mut self, positions: &[(BodyHandle, symtropy_math::Point<D>)]) {
+        self.harmony_field.sources.clear();
+        self.entity_positions.clear();
+        for (handle, pos) in positions {
+            self.entity_positions.insert(*handle, pos.to_vector());
+            if let Some(entity) = self.entities.get(handle) {
+                self.harmony_field.sources.push(HarmonySource {
+                    position: *pos,
+                    activations: entity.harmony_activations,
+                    strength: entity.phi().max(0.1),
+                    radius: self.constants.harmony_range,
+                    created_at: 0.0,
+                    propagation_speed: f64::MAX,
+                });
+            }
+        }
+    }
+
+    /// Apply dimensional leakage effects to entity energy budgets.
+    ///
+    /// Leakage sinks drain energy; leakage sources inject energy. This couples
+    /// the dimensional leakage system to the thermodynamic layer, so agents near
+    /// leakage points actually gain or lose energy.
+    ///
+    /// Only active when `leakage.enabled` is true.
+    pub fn apply_dimensional_leakage(
+        &mut self,
+        leakage: &crate::dimensional_leakage::DimensionalLeakage,
+        positions: &[(BodyHandle, [f64; 3])],
+    ) {
+        if !leakage.enabled {
+            return;
+        }
+        for (handle, pos) in positions {
+            let effect = leakage.total_effect_at(pos);
+            if let Some(entity) = self.entities.get_mut(handle) {
+                if effect > 0.0 {
+                    entity.energy.regenerate(effect);
+                    self.ledger.record_dissipation(-effect); // Energy enters 3D
+                } else if effect < 0.0 {
+                    let consumed = entity.energy.consume(effect.abs());
+                    self.ledger.record_dissipation(consumed); // Energy exits 3D
+                }
+            }
+        }
+    }
+
     fn recompute_collective(&mut self) {
         if self.entities.is_empty() {
             self.collective_phi = 0.0;
@@ -458,7 +556,36 @@ impl<const D: usize> PhysicsCallback<D> for ConsciousnessField<D> {
             .get(&body)
             .map(|e| e.effective_motor_gain())
             .unwrap_or(1.0);
-        force * gain
+        let mut result = force * gain;
+
+        // Phi-gravity: conscious entities attract each other (when enabled)
+        if self.phi_gravity_strength > 1e-10 {
+            if let (Some(pos), Some(entity)) = (
+                self.entity_positions.get(&body),
+                self.entities.get(&body),
+            ) {
+                let self_phi = entity.phi();
+                if self_phi > 0.01 {
+                    let nearby: Vec<_> = self
+                        .entity_positions
+                        .iter()
+                        .filter(|(h, _)| **h != body)
+                        .filter_map(|(h, p)| {
+                            self.entities.get(h).map(|e| (*p, e.phi()))
+                        })
+                        .collect();
+                    let gravity = crate::fep_gradient::phi_gravity(
+                        pos,
+                        self_phi,
+                        &nearby,
+                        self.phi_gravity_strength,
+                    );
+                    result += gravity;
+                }
+            }
+        }
+
+        result
     }
 
     fn modulate_impulse(&self, impulse: f64, contact_point: &SVector<f64, D>) -> f64 {
@@ -471,12 +598,17 @@ impl<const D: usize> PhysicsCallback<D> for ConsciousnessField<D> {
         result
     }
 
-    fn friction_multiplier(&self, _contact_point: &SVector<f64, D>, body: BodyHandle) -> f64 {
-        // Use entity's harmony activations to query the harmony field effect
-        // For now, return 1.0 (harmony field integration requires the field to be
-        // stored on ConsciousnessField, which is a future enhancement)
-        let _ = body;
-        1.0
+    fn friction_multiplier(&self, contact_point: &SVector<f64, D>, body: BodyHandle) -> f64 {
+        if self.harmony_field.sources.is_empty() {
+            return 1.0;
+        }
+        let entity_harmonies = self
+            .entities
+            .get(&body)
+            .map(|e| e.harmony_activations)
+            .unwrap_or([0.0; 8]);
+        let point = symtropy_math::Point(*contact_point);
+        self.harmony_field.friction_multiplier(&point, &entity_harmonies)
     }
 
     fn on_collision(&mut self, event: &symtropy_physics::CollisionEvent<D>) {
@@ -505,8 +637,6 @@ impl<const D: usize> PhysicsCallback<D> for ConsciousnessField<D> {
 
             // Wire dissipate_heat: collision energy becomes heat (raises temperature + entropy)
             entity.energy.dissipate_heat(consumed * 0.5);
-
-            self.ledger.record_phi_change(event.impulse * 0.001);
         }
         if let Some(entity) = self.entities.get_mut(&event.body_b) {
             let surprise_factor = (1.0 - resonance).max(0.1);
@@ -515,8 +645,6 @@ impl<const D: usize> PhysicsCallback<D> for ConsciousnessField<D> {
             let drain = event.impulse * drain_rate;
             let consumed = entity.energy.consume(drain);
             entity.energy.dissipate_heat(consumed * 0.5);
-
-            self.ledger.record_phi_change(event.impulse * 0.001);
         }
     }
 
@@ -752,5 +880,101 @@ mod tests {
             );
             prev_gain = gain;
         }
+    }
+
+    #[test]
+    fn harmony_friction_reduces_for_resonant_entities() {
+        use symtropy_physics::world::PhysicsCallback;
+
+        let mut field = ConsciousnessField::<3>::new();
+        let h0 = BodyHandle(0);
+        let h1 = BodyHandle(1);
+        field.register(h0, 100.0, 10.0);
+        field.register(h1, 100.0, 10.0);
+
+        // Set aligned harmonies (Sacred Stillness)
+        field.entities.get_mut(&h0).unwrap().harmony_activations = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0];
+        field.entities.get_mut(&h1).unwrap().harmony_activations = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0];
+
+        field.update_entity(h0, &test_inputs(0.8), symtropy_math::Point::origin());
+        field.update_entity(h1, &test_inputs(0.8), symtropy_math::Point::new([5.0, 0.0, 0.0]));
+
+        // Rebuild harmony field with known positions
+        let positions = vec![
+            (h0, symtropy_math::Point::new([0.0, 0.0, 0.0])),
+            (h1, symtropy_math::Point::new([5.0, 0.0, 0.0])),
+        ];
+        field.rebuild_harmony_field(&positions);
+
+        // Contact near h1 — h0's harmony field should reduce friction
+        let contact = SVector::from([2.5, 0.0, 0.0]);
+        let mult = PhysicsCallback::<3>::friction_multiplier(&field, &contact, h0);
+        assert!(
+            mult < 1.0,
+            "resonant friction multiplier {} should be < 1.0 (harmony reduces friction)",
+            mult
+        );
+    }
+
+    #[test]
+    fn dimensional_leakage_drains_energy() {
+        use crate::dimensional_leakage::{DimensionalLeakage, LeakagePoint};
+
+        let mut field = ConsciousnessField::<3>::new();
+        let h = BodyHandle(0);
+        field.register(h, 100.0, 10.0);
+        field.update_entity(h, &test_inputs(0.8), symtropy_math::Point::origin());
+
+        let energy_before = field.entities.get(&h).unwrap().energy.available;
+
+        let mut leakage = DimensionalLeakage::new();
+        leakage.add_point(LeakagePoint::sink([0.0, 0.0, 0.0], 1.0, 5.0, 50.0));
+        leakage.enabled = true;
+
+        // Entity at origin, sink at origin → should drain energy
+        field.apply_dimensional_leakage(&leakage, &[(h, [1.0, 0.0, 0.0])]);
+
+        let energy_after = field.entities.get(&h).unwrap().energy.available;
+        assert!(
+            energy_after < energy_before,
+            "energy should decrease near a sink: before={energy_before}, after={energy_after}"
+        );
+    }
+
+    #[test]
+    fn dimensional_leakage_disabled_no_effect() {
+        use crate::dimensional_leakage::{DimensionalLeakage, LeakagePoint};
+
+        let mut field = ConsciousnessField::<3>::new();
+        let h = BodyHandle(0);
+        field.register(h, 100.0, 10.0);
+
+        let energy_before = field.entities.get(&h).unwrap().energy.available;
+
+        let mut leakage = DimensionalLeakage::new();
+        leakage.add_point(LeakagePoint::sink([0.0, 0.0, 0.0], 1.0, 5.0, 50.0));
+        // NOT enabled
+
+        field.apply_dimensional_leakage(&leakage, &[(h, [0.0, 0.0, 0.0])]);
+
+        let energy_after = field.entities.get(&h).unwrap().energy.available;
+        assert!(
+            (energy_after - energy_before).abs() < 1e-10,
+            "disabled leakage should not affect energy"
+        );
+    }
+
+    #[test]
+    fn harmony_friction_neutral_without_rebuild() {
+        use symtropy_physics::world::PhysicsCallback;
+
+        let field = ConsciousnessField::<3>::new();
+        let contact = SVector::from([0.0, 0.0, 0.0]);
+        let mult = PhysicsCallback::<3>::friction_multiplier(&field, &contact, BodyHandle(0));
+        assert!(
+            (mult - 1.0).abs() < 1e-10,
+            "without harmony sources, friction should be neutral (1.0), got {}",
+            mult
+        );
     }
 }

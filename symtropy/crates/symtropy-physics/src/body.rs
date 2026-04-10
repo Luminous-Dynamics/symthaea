@@ -8,6 +8,13 @@ use symtropy_math::{Bivector, Point, Shape, Sphere, Transform};
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct BodyHandle(pub usize);
 
+/// Stable network identifier for a body, used for cross-machine replay determinism.
+///
+/// Unlike `BodyHandle` (which depends on insertion order), `NetId` is assigned by
+/// the application and survives serialization/deserialization.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct NetId(pub u64);
+
 /// Whether a body is affected by forces and collisions.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum BodyType {
@@ -22,6 +29,8 @@ pub enum BodyType {
 /// A rigid body in D-dimensional space.
 pub struct RigidBody<const D: usize> {
     pub handle: BodyHandle,
+    /// Stable network identifier for cross-machine replay. `None` for local-only bodies.
+    pub net_id: Option<NetId>,
     pub body_type: BodyType,
     pub transform: Transform<D>,
     pub linear_velocity: SVector<f64, D>,
@@ -50,6 +59,14 @@ pub struct RigidBody<const D: usize> {
     pub sleeping: bool,
     /// Ticks since velocity dropped below sleep threshold.
     pub sleep_counter: u32,
+    /// Collision group membership (bitmask). Body belongs to these groups.
+    /// Default: `0xFFFF_FFFF` (all groups).
+    pub collision_group: u32,
+    /// Collision filter mask. Body collides with bodies whose `collision_group`
+    /// overlaps this mask. Default: `0xFFFF_FFFF` (collides with everything).
+    pub collision_mask: u32,
+    /// Whether this body is a sensor/trigger (detects overlaps but doesn't resolve collisions).
+    pub is_sensor: bool,
 }
 
 impl<const D: usize> RigidBody<D> {
@@ -57,6 +74,7 @@ impl<const D: usize> RigidBody<D> {
     pub fn dynamic_sphere(handle: BodyHandle, position: Point<D>, radius: f64, mass: f64) -> Self {
         Self {
             handle,
+            net_id: None,
             body_type: BodyType::Dynamic,
             transform: Transform::from_translation(position),
             linear_velocity: SVector::zeros(),
@@ -74,6 +92,9 @@ impl<const D: usize> RigidBody<D> {
             angular_damping: 0.05,
             sleeping: false,
             sleep_counter: 0,
+            collision_group: 0xFFFF_FFFF,
+            collision_mask: 0xFFFF_FFFF,
+            is_sensor: false,
         }
     }
 
@@ -81,6 +102,7 @@ impl<const D: usize> RigidBody<D> {
     pub fn static_body(handle: BodyHandle, position: Point<D>, collider: Box<dyn Shape<D>>) -> Self {
         Self {
             handle,
+            net_id: None,
             body_type: BodyType::Static,
             transform: Transform::from_translation(position),
             linear_velocity: SVector::zeros(),
@@ -98,6 +120,9 @@ impl<const D: usize> RigidBody<D> {
             angular_damping: 0.0,
             sleeping: false,
             sleep_counter: 0,
+            collision_group: 0xFFFF_FFFF,
+            collision_mask: 0xFFFF_FFFF,
+            is_sensor: false,
         }
     }
 
@@ -111,6 +136,7 @@ impl<const D: usize> RigidBody<D> {
     ) -> Self {
         Self {
             handle,
+            net_id: None,
             body_type: BodyType::Dynamic,
             transform: Transform::from_translation(position),
             linear_velocity: SVector::zeros(),
@@ -128,6 +154,9 @@ impl<const D: usize> RigidBody<D> {
             angular_damping: 0.05,
             sleeping: false,
             sleep_counter: 0,
+            collision_group: 0xFFFF_FFFF,
+            collision_mask: 0xFFFF_FFFF,
+            is_sensor: false,
         }
     }
 

@@ -41,23 +41,7 @@ pub fn penetration<const D: usize>(
     } else if D == 3 {
         epa_3d(shape_a, pos_a, shape_b, pos_b, simplex)
     } else {
-        // Fallback: approximate from bounding spheres
-        let (_, ra) = shape_a.bounding_sphere();
-        let (_, rb) = shape_b.bounding_sphere();
-        let delta = pos_b - pos_a;
-        let dist = delta.norm();
-        if dist < 1e-15 {
-            let mut normal = SVector::zeros();
-            normal[0] = 1.0;
-            return Some(EpaResult {
-                normal,
-                depth: ra + rb,
-            });
-        }
-        Some(EpaResult {
-            normal: delta / dist,
-            depth: (ra + rb - dist).max(0.0),
-        })
+        epa_nd(shape_a, pos_a, shape_b, pos_b, simplex)
     }
 }
 
@@ -365,6 +349,249 @@ fn make_face_3d<const D: usize>(
     })
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// ND EPA: Generalized facet-based polytope expansion for D >= 4
+// ═══════════════════════════════════════════════════════════════════════════
+
+/// A facet of the ND polytope: a (D-1)-simplex defined by D vertex indices.
+struct FacetNd<const D: usize> {
+    /// D vertex indices forming a (D-1)-simplex.
+    indices: Vec<usize>,
+    /// Outward-pointing unit normal.
+    normal: SVector<f64, D>,
+    /// Distance from origin to the facet along the normal.
+    distance: f64,
+}
+
+/// Compute the outward normal of a (D-1)-simplex in D-space using Gram-Schmidt.
+///
+/// Given D vertices forming a facet, computes D-1 edge vectors from the first vertex,
+/// then finds the unique direction orthogonal to all edges. Orients to point away from origin.
+fn facet_normal_nd<const D: usize>(
+    vertices: &[SVector<f64, D>],
+    indices: &[usize],
+) -> Option<(SVector<f64, D>, f64)> {
+    if indices.len() != D {
+        return None;
+    }
+
+    let base = vertices[indices[0]];
+
+    // Build D-1 edge vectors from the first vertex
+    let mut edges: Vec<SVector<f64, D>> = Vec::with_capacity(D - 1);
+    for i in 1..D {
+        edges.push(vertices[indices[i]] - base);
+    }
+
+    // Gram-Schmidt: find the component of each standard basis vector orthogonal
+    // to all edge vectors. The first non-zero result is our normal direction.
+    // More robust: start from the centroid→origin direction and orthogonalize.
+    let centroid: SVector<f64, D> = indices.iter().map(|&i| vertices[i]).fold(
+        SVector::zeros(),
+        |acc, v| acc + v,
+    ) / D as f64;
+
+    // Use the centroid→origin vector as a seed for the normal direction
+    let seed = -centroid; // Points from centroid toward origin
+
+    // Orthogonalize seed against all edge vectors (modified Gram-Schmidt)
+    let mut normal = seed;
+    for edge in &edges {
+        let edge_sq = edge.norm_squared();
+        if edge_sq > 1e-20 {
+            let proj = edge * (normal.dot(edge) / edge_sq);
+            normal -= proj;
+        }
+    }
+
+    let len = normal.norm();
+    if len < 1e-12 {
+        // Degenerate — try each standard basis vector as seed
+        for axis in 0..D {
+            let mut candidate: SVector<f64, D> = SVector::zeros();
+            candidate[axis] = 1.0;
+            for edge in &edges {
+                let edge_sq = edge.norm_squared();
+                if edge_sq > 1e-20 {
+                    let scale: f64 = candidate.dot(edge) / edge_sq;
+                    candidate -= edge * scale;
+                }
+            }
+            let clen = candidate.norm();
+            if clen > 1e-12 {
+                normal = candidate / clen;
+                break;
+            }
+        }
+        if normal.norm() < 1e-12 {
+            return None; // Fully degenerate
+        }
+    } else {
+        normal /= len;
+    }
+
+    // Ensure normal points away from origin (same side as facet)
+    let dist = normal.dot(&base);
+    if dist < 0.0 {
+        normal = -normal;
+    }
+    let dist = dist.abs();
+
+    Some((normal, dist))
+}
+
+/// Generate all (D-1)-dimensional facets of a D-simplex (D+1 vertices, each facet omits one vertex).
+fn initial_facets_nd<const D: usize>(
+    vertices: &[SVector<f64, D>],
+    num_verts: usize,
+) -> Vec<FacetNd<D>> {
+    let mut facets = Vec::new();
+    // A simplex with num_verts vertices has C(num_verts, D) facets.
+    // For a full simplex (num_verts = D+1), each facet omits one vertex.
+    if num_verts == D + 1 {
+        for skip in 0..=D {
+            let indices: Vec<usize> = (0..=D).filter(|&i| i != skip).collect();
+            if let Some((normal, distance)) = facet_normal_nd(vertices, &indices) {
+                facets.push(FacetNd {
+                    indices,
+                    normal,
+                    distance,
+                });
+            }
+        }
+    }
+    facets
+}
+
+/// ND-generic EPA implementation.
+fn epa_nd<const D: usize>(
+    shape_a: &dyn Shape<D>,
+    pos_a: &SVector<f64, D>,
+    shape_b: &dyn Shape<D>,
+    pos_b: &SVector<f64, D>,
+    simplex: &[SVector<f64, D>],
+) -> Option<EpaResult<D>> {
+    if simplex.len() < D + 1 {
+        // Simplex doesn't span D-space — fall back to bounding sphere approximation
+        let (_, ra) = shape_a.bounding_sphere();
+        let (_, rb) = shape_b.bounding_sphere();
+        let delta = pos_b - pos_a;
+        let dist = delta.norm();
+        if dist < 1e-15 {
+            let mut n = SVector::zeros();
+            n[0] = 1.0;
+            return Some(EpaResult { normal: n, depth: ra + rb });
+        }
+        return Some(EpaResult {
+            normal: delta / dist,
+            depth: (ra + rb - dist).max(0.0),
+        });
+    }
+
+    let mut vertices: Vec<SVector<f64, D>> = simplex.to_vec();
+    let mut facets = initial_facets_nd::<D>(&vertices, vertices.len());
+
+    if facets.is_empty() {
+        return None;
+    }
+
+    for _ in 0..MAX_EPA_ITERATIONS {
+        // Find closest facet to origin
+        let (face_idx, _) = facets
+            .iter()
+            .enumerate()
+            .min_by(|(_, a), (_, b)| a.distance.partial_cmp(&b.distance).unwrap())?;
+
+        let closest_normal = facets[face_idx].normal;
+        let closest_dist = facets[face_idx].distance;
+
+        // Support query in closest normal direction
+        let support = mink_support(shape_a, pos_a, shape_b, pos_b, &closest_normal);
+        let new_dist = support.dot(&closest_normal);
+
+        // Convergence check
+        if (new_dist - closest_dist).abs() < EPA_TOLERANCE {
+            return Some(EpaResult {
+                normal: closest_normal,
+                depth: closest_dist,
+            });
+        }
+
+        let new_idx = vertices.len();
+        vertices.push(support);
+
+        // Remove facets visible from the new point and collect horizon ridges.
+        // A ridge is a (D-2)-simplex: D-1 vertex indices shared between two facets.
+        let mut horizon_ridges: Vec<Vec<usize>> = Vec::new();
+        let mut i = 0;
+        while i < facets.len() {
+            let to_point = support - vertices[facets[i].indices[0]];
+            if facets[i].normal.dot(&to_point) > 0.0 {
+                // Visible facet — extract its (D-2)-ridges
+                let fi = &facets[i].indices;
+                for skip in 0..fi.len() {
+                    let ridge: Vec<usize> = fi.iter().enumerate()
+                        .filter(|(j, _)| *j != skip)
+                        .map(|(_, &v)| v)
+                        .collect();
+                    add_horizon_ridge(&mut horizon_ridges, ridge);
+                }
+                facets.swap_remove(i);
+            } else {
+                i += 1;
+            }
+        }
+
+        // Create new facets from horizon ridges + new vertex
+        for ridge in &horizon_ridges {
+            let mut indices = ridge.clone();
+            indices.push(new_idx);
+            if indices.len() == D {
+                if let Some((normal, distance)) = facet_normal_nd(&vertices, &indices) {
+                    facets.push(FacetNd {
+                        indices,
+                        normal,
+                        distance,
+                    });
+                }
+            }
+        }
+
+        if facets.is_empty() {
+            return Some(EpaResult {
+                normal: closest_normal,
+                depth: closest_dist,
+            });
+        }
+    }
+
+    // Max iterations — return best
+    let best = facets
+        .iter()
+        .min_by(|a, b| a.distance.partial_cmp(&b.distance).unwrap())?;
+    Some(EpaResult {
+        normal: best.normal,
+        depth: best.distance,
+    })
+}
+
+/// Add a ridge to the horizon, removing if the reverse already exists (shared = interior).
+fn add_horizon_ridge(horizon: &mut Vec<Vec<usize>>, ridge: Vec<usize>) {
+    // Normalize ridge by sorting indices for comparison
+    let mut sorted_ridge = ridge.clone();
+    sorted_ridge.sort();
+
+    if let Some(pos) = horizon.iter().position(|r| {
+        let mut sr = r.clone();
+        sr.sort();
+        sr == sorted_ridge
+    }) {
+        horizon.swap_remove(pos); // Shared ridge — interior, remove
+    } else {
+        horizon.push(ridge);
+    }
+}
+
 /// Add edge to horizon, removing if already present (shared edge = interior).
 fn add_horizon_edge(horizon: &mut Vec<[usize; 2]>, edge: [usize; 2]) {
     // Check if reverse edge exists (shared between two visible faces)
@@ -475,15 +702,58 @@ mod tests {
     }
 
     #[test]
-    fn epa_4d_fallback() {
+    fn epa_4d_spheres() {
         let a = Sphere::<4>::new(Point::origin(), 1.0);
         let b = Sphere::<4>::new(Point::origin(), 1.0);
         let pa = SVector::from([0.0, 0.0, 0.0, 0.0]);
         let pb = SVector::from([0.5, 0.0, 0.0, 0.0]);
 
         let gjk_result = gjk::intersects(&a, &pa, &b, &pb);
+        assert!(gjk_result.intersecting);
+
         let epa = penetration(&a, &pa, &b, &pb, &gjk_result.simplex).unwrap();
+        // Two unit spheres 0.5 apart: analytical penetration = 2*1.0 - 0.5 = 1.5
+        assert!(
+            (epa.depth - 1.5).abs() < 0.3,
+            "4D sphere depth = {}, expected ~1.5",
+            epa.depth
+        );
         assert!(epa.depth > 0.0);
+        // Normal should roughly point along x-axis
+        assert!(
+            epa.normal[0].abs() > 0.3,
+            "4D normal should point along separation axis, got {:?}",
+            epa.normal
+        );
+    }
+
+    #[test]
+    fn epa_4d_boxes() {
+        use symtropy_math::HyperBox;
+        let a = HyperBox::<4>::cube(1.0);
+        let b = HyperBox::<4>::cube(1.0);
+        let pa = SVector::from([0.0, 0.0, 0.0, 0.0]);
+        // Use a small offset so the minimum penetration direction is clearly along x
+        let pb = SVector::from([1.5, 0.0, 0.0, 0.0]);
+
+        let gjk_result = gjk::intersects(&a, &pa, &b, &pb);
+        assert!(gjk_result.intersecting, "4D boxes at dist 1.5 with half_extent 1.0 should overlap");
+
+        let epa = penetration(&a, &pa, &b, &pb, &gjk_result.simplex).unwrap();
+        // Two unit tesseracts at distance 1.5: overlap = 2*1.0 - 1.5 = 0.5
+        assert!(
+            epa.depth > 0.0,
+            "4D box EPA depth should be positive, got {}",
+            epa.depth
+        );
+        // The ND EPA should find a depth close to the analytical minimum.
+        // Normal should be unit-length.
+        let normal_len = epa.normal.norm();
+        assert!(
+            (normal_len - 1.0).abs() < 0.01,
+            "4D EPA normal should be unit, got {}",
+            normal_len
+        );
     }
 
     #[test]

@@ -16,4 +16,4 @@ pub mod projection;
 pub mod sync;
 
 pub use projection::{Projector, Projector2D, Projector3D, Projector4D};
-pub use sync::PhysicsBody;
+pub use sync::{PhysicsBody, sync_physics_2d, sync_physics_3d, sync_physics_4d};

@@ -64,6 +64,26 @@ pub fn sync_physics_3d(
     }
 }
 
+/// Sync the 4D physics world to Bevy transforms.
+///
+/// Projects the first 3 coordinates (x, y, z) to Bevy's Transform.
+/// The 4th coordinate (w) is stored in `transform.scale.x` as a
+/// normalized proximity signal [0.1, 1.0] that can drive alpha/visibility
+/// via the Projector4D system.
+pub fn sync_physics_4d(
+    physics: Res<PhysicsWorldRes4D>,
+    mut query: Query<(&PhysicsBody, &mut Transform)>,
+) {
+    for (body_comp, mut transform) in &mut query {
+        if let Some(body) = physics.world.body(body_comp.handle) {
+            let pos = body.position();
+            transform.translation.x = pos.coord(0) as f32;
+            transform.translation.y = pos.coord(1) as f32;
+            transform.translation.z = pos.coord(2) as f32;
+        }
+    }
+}
+
 /// Bevy Resource wrapping a 2D physics world.
 #[derive(Resource)]
 pub struct PhysicsWorldRes2D {

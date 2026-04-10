@@ -24,7 +24,9 @@
 //! - 4D: 6 components (xy, xz, xw, yz, yw, zw)
 
 pub mod bivector;
+pub mod capsule;
 pub mod convex_hull;
+pub mod hyperbox;
 pub mod hyperplane;
 pub mod point;
 pub mod rotor;
@@ -33,7 +35,9 @@ pub mod sphere;
 pub mod transform;
 
 pub use bivector::Bivector;
+pub use capsule::Capsule;
 pub use convex_hull::ConvexHull;
+pub use hyperbox::HyperBox;
 pub use hyperplane::Hyperplane;
 pub use point::Point;
 pub use rotor::Rotor;

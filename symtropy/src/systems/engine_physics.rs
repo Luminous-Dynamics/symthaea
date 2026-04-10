@@ -112,12 +112,13 @@ pub fn physics_step(mut physics: ResMut<PhysicsWorldRes>, time: Res<Time<Fixed>>
 pub fn consciousness_sync_system(
     mut physics: ResMut<PhysicsWorldRes>,
     player_c: Res<PlayerConsciousness>,
+    biometrics: Res<crate::resources::BiometricsCtx>,
     harmony: Res<crate::systems::harmonies::LocalHarmonyState>,
     players: Query<(&PhysicsBody, &Transform), With<Player>>,
     npcs: Query<(&PhysicsBody, &Transform, &NpcConsciousness), With<CrewNpc>>,
 ) {
-    // Sync player consciousness — use REAL values from the consciousness system
-    let biometrics_load = 0.3; // TODO: wire from BiometricsCtx when available in this system
+    // Sync player consciousness — use REAL values from the biometrics system
+    let biometrics_load = biometrics.model.allostatic_load as f64;
     for (body_comp, transform) in &players {
         let inputs = symthaea_consciousness_equation::ConsciousnessInputs {
             phi: (1.0 - biometrics_load) * 0.8 + 0.2,
@@ -168,6 +169,22 @@ pub fn consciousness_sync_system(
         ]);
         physics.consciousness.update_entity(body_comp.handle, &inputs, pos);
     }
+
+    // Rebuild harmony field from all entity positions for Channel 4 (Harmony → Friction)
+    let positions: Vec<_> = players
+        .iter()
+        .chain(npcs.iter().map(|(b, t, _)| (b, t)))
+        .map(|(body_comp, transform)| {
+            (
+                body_comp.handle,
+                symtropy_math::Point::new([
+                    transform.translation.x as f64,
+                    transform.translation.y as f64,
+                ]),
+            )
+        })
+        .collect();
+    physics.consciousness.rebuild_harmony_field(&positions);
 }
 
 /// Sync physics body positions back to Bevy Transforms.

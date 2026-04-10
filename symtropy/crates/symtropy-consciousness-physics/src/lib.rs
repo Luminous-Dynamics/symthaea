@@ -7,13 +7,13 @@
 //! a first-class physics parameter that modulates forces, energy budgets, and
 //! collision responses.
 //!
-//! # Five Coupling Channels
+//! # Five Coupling Channels (per FORMAL_SPECIFICATION.md)
 //!
-//! 1. **Φ → Motor gain**: Higher consciousness = more force authority (safety tiers)
-//! 2. **Φ → Energy budget**: Consciousness gates available energy per tick
-//! 3. **Harmony → Collision**: Sanctuary zones dampen collision impulses
-//! 4. **Collective Φ → Global**: Civilization consciousness affects world parameters
-//! 5. **Bottleneck → Environment**: Agent's limiting factor triggers environmental response
+//! 1. **Φ → Force**: Motor gain modulation via NRC 4-tier safety (Green/Yellow/Orange/Red)
+//! 2. **Φ → Energy**: Consciousness-gated energy budget (movement, maintenance, collision costs)
+//! 3. **Harmony → Impulse**: Sanctuary zones dampen collision impulses (Sacred Stillness)
+//! 4. **Harmony → Friction**: 1/r² CEMI-inspired fields modulate friction coefficients
+//! 5. **Collision → Consciousness**: Prediction error feedback reduces motor precision
 
 pub mod active_inference;
 pub mod convergence;

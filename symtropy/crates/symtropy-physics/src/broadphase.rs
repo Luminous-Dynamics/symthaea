@@ -169,6 +169,7 @@ impl<const D: usize> Lbvh<D> {
                     if oi > li {
                         let ot = bodies[self.sorted_indices[oi]].body_type;
                         if lt == BodyType::Static && ot == BodyType::Static { continue; }
+                        if !should_collide(&bodies[self.sorted_indices[li]], &bodies[self.sorted_indices[oi]]) { continue; }
                         if la.overlaps(&self.leaf_aabbs[oi]) {
                             let (ha, hb) = (bodies[self.sorted_indices[li]].handle, bodies[self.sorted_indices[oi]].handle);
                             if ha < hb { pairs.push(BroadphasePair(ha, hb)); }
@@ -187,6 +188,13 @@ impl<const D: usize> Lbvh<D> {
     }
 }
 
+/// Check if two bodies should collide based on collision group/mask filters.
+/// Both bodies must accept each other: `(a.group & b.mask != 0) && (b.group & a.mask != 0)`.
+#[inline]
+fn should_collide<const D: usize>(a: &RigidBody<D>, b: &RigidBody<D>) -> bool {
+    (a.collision_group & b.collision_mask != 0) && (b.collision_group & a.collision_mask != 0)
+}
+
 /// Find all potentially colliding pairs. Uses LBVH for ≥50 bodies, brute-force otherwise.
 pub fn find_pairs<const D: usize>(bodies: &[RigidBody<D>]) -> Vec<BroadphasePair> {
     if bodies.len() < BRUTE_FORCE_THRESHOLD { find_pairs_brute(bodies) }
@@ -199,6 +207,7 @@ fn find_pairs_brute<const D: usize>(bodies: &[RigidBody<D>]) -> Vec<BroadphasePa
         let ti = bodies[i].body_type;
         for j in (i+1)..bodies.len() {
             if ti == BodyType::Static && bodies[j].body_type == BodyType::Static { continue; }
+            if !should_collide(&bodies[i], &bodies[j]) { continue; }
             let (ci, ri) = bodies[i].collider.bounding_sphere();
             let (cj, rj) = bodies[j].collider.bounding_sphere();
             let wi = bodies[i].transform.transform_point(&ci);
