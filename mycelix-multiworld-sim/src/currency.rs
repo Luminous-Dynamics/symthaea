@@ -234,6 +234,38 @@ pub fn distribute_demurrage(collected: f64) -> (f64, f64, f64) {
     )
 }
 
+/// Commons spending allocation for public goods.
+#[derive(Debug, Clone, Copy)]
+pub struct CommonsSpending {
+    /// Infrastructure investment (40% of spend).
+    pub infrastructure: f64,
+    /// Education funding (30% of spend).
+    pub education: f64,
+    /// Medicine/health funding (30% of spend).
+    pub medicine: f64,
+}
+
+/// Spend excess commons pool on public goods, respecting 25% reserve.
+///
+/// `rate` controls how much of excess is spent per tick (0.1 = 10%).
+/// Returns the spending allocation. Deducts from commons_local.
+pub fn spend_commons(state: &mut WorldCurrencyState, rate: f64) -> CommonsSpending {
+    let reserve_min = state.sap_total_supply * SAP_COMMONS_RESERVE_FRACTION;
+    let total_commons = state.sap_commons_local + state.sap_commons_planetary + state.sap_commons_system;
+    let excess = (total_commons - reserve_min).max(0.0);
+    let spend = excess * rate.clamp(0.0, 0.5);
+
+    // Spend from local pool first
+    let actual_spend = spend.min(state.sap_commons_local);
+    state.sap_commons_local -= actual_spend;
+
+    CommonsSpending {
+        infrastructure: actual_spend * 0.4,
+        education: actual_spend * 0.3,
+        medicine: actual_spend * 0.3,
+    }
+}
+
 /// Check if the constitutional SAP commons reserve is maintained.
 ///
 /// Returns true if commons pools hold ≥ 25% of total supply.

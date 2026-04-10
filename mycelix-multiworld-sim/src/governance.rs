@@ -182,7 +182,7 @@ impl WorldGovernance {
         rng: &mut StochasticEngine,
         amendment_enabled: bool,
     ) -> Vec<CivEvent> {
-        self.tick_governance_full(world, current_tick, rng, amendment_enabled, false)
+        self.tick_governance_full(world, current_tick, rng, amendment_enabled, false, 0.0)
     }
 
     /// Run one tick of governance with full policy control including hostile guardian mode.
@@ -193,6 +193,7 @@ impl WorldGovernance {
         rng: &mut StochasticEngine,
         amendment_enabled: bool,
         hostile_guardian: bool,
+        voting_suppression: f64,
     ) -> Vec<CivEvent> {
         let mut events = Vec::new();
         let population = world.population();
@@ -244,8 +245,10 @@ impl WorldGovernance {
             && current_tick % AMENDMENT_REVIEW_PERIOD == 0
             && effective_eligible > 0.3
         {
-            // Amendment probability depends on MYCEL-blended eligible fraction and stability
-            let amendment_prob = effective_eligible * (1.0 - self.stability_score * 0.5);
+            // Amendment probability: MYCEL-blended eligible fraction × stability × metabolism phase
+            // Stillness phase suppresses voting (Metabolism Charter)
+            let suppression_factor = 1.0 - voting_suppression.clamp(0.0, 0.95);
+            let amendment_prob = effective_eligible * (1.0 - self.stability_score * 0.5) * suppression_factor;
             if rng.bernoulli(amendment_prob.clamp(0.0, 0.8)) {
                 self.amendment_count += 1;
                 self.amendments_this_period += 1;

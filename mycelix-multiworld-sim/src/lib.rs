@@ -207,6 +207,8 @@ pub struct MultiWorldSimulator {
     generation_ship_launched: bool,
     /// Viability engine: enforces thermodynamic axioms, EROI, and scaling laws.
     pub viability_engine: viability::ViabilityEngine,
+    /// Per-world metabolism phase modifiers (recomputed each tick).
+    phase_modifiers: std::collections::HashMap<u32, metabolism::PhaseModifiers>,
     /// Module registry: pluggable simulation modules (Phase 3 architecture).
     pub module_registry: module_registry::ModuleRegistry,
     /// Power-law cascade engine: correlated disaster propagation.
@@ -248,6 +250,7 @@ impl MultiWorldSimulator {
             carrying_capacity_base: std::collections::HashMap::new(),
             narrative_engine: narrative::NarrativeEngine::new(),
             viability_engine: viability::ViabilityEngine::new(),
+            phase_modifiers: std::collections::HashMap::new(),
             module_registry: module_registry::ModuleRegistry::new(),
             cascade_engine: cascade::CascadeEngine::new(5), // up to 5 worlds
             supply_chain: supply_chain::SupplyChainGraph::new(),
@@ -2271,8 +2274,12 @@ impl MultiWorldSimulator {
                 let stability = world.governance.stability_score;
                 world.governance.evolve_authority(epoch, pop, mean_phi, stability);
                 let mut gov = std::mem::take(&mut world.governance);
+                let voting_suppression = self.phase_modifiers
+                    .get(&world.id)
+                    .map(|m| m.voting_suppression)
+                    .unwrap_or(0.0);
                 let gov_events = gov.tick_governance_full(
-                    world, tick, rng, amendment_enabled, hostile_guardian,
+                    world, tick, rng, amendment_enabled, hostile_guardian, voting_suppression,
                 );
                 world.governance = gov;
                 all_gov_events.extend(gov_events);
@@ -3090,7 +3097,7 @@ impl MultiWorldSimulator {
             }
 
             // Phase 0.5: Metabolism — compute phase modifiers for this tick
-            let mut phase_modifiers: std::collections::HashMap<u32, metabolism::PhaseModifiers> =
+            self.phase_modifiers =
                 std::collections::HashMap::new();
             if self.config.policy.metabolism.enabled {
                 for world in &mut self.worlds {
@@ -3099,7 +3106,7 @@ impl MultiWorldSimulator {
                         &mut world.metabolism_state,
                         self.current_tick,
                     );
-                    phase_modifiers.insert(world.id, mods);
+                    self.phase_modifiers.insert(world.id, mods);
                 }
             }
 
@@ -3188,7 +3195,7 @@ impl MultiWorldSimulator {
 
             // Phase 1.5: Wound Healing — advance healing phases
             for world in &mut self.worlds {
-                let healing_mult = phase_modifiers
+                let healing_mult = self.phase_modifiers
                     .get(&world.id)
                     .map(|m| m.healing_mult)
                     .unwrap_or(1.0);
@@ -3223,7 +3230,7 @@ impl MultiWorldSimulator {
 
             // Metabolism: apply recovery multiplier to allostatic load
             for world in &mut self.worlds {
-                let mult = phase_modifiers.get(&world.id).map(|m| m.recovery_mult).unwrap_or(1.0);
+                let mult = self.phase_modifiers.get(&world.id).map(|m| m.recovery_mult).unwrap_or(1.0);
                 if (mult - 1.0).abs() > 0.01 {
                     let boost = (mult - 1.0) * 0.002;
                     for agent in world.agents.iter_mut().filter(|a| a.is_alive()) {
@@ -3239,7 +3246,7 @@ impl MultiWorldSimulator {
 
             // Metabolism: modulate production output
             for world in &mut self.worlds {
-                let prod_mult = phase_modifiers.get(&world.id).map(|m| m.production_mult).unwrap_or(1.0);
+                let prod_mult = self.phase_modifiers.get(&world.id).map(|m| m.production_mult).unwrap_or(1.0);
                 if (prod_mult - 1.0).abs() > 0.01 {
                     for output in &mut world.economy.sector_output {
                         *output *= prod_mult;
@@ -3281,6 +3288,22 @@ impl MultiWorldSimulator {
                 world.currency_state.sap_commons_planetary += planetary;
                 world.currency_state.sap_commons_system += system;
                 world.currency_state.sap_demurrage_collected = collected;
+
+                // Commons pool → public goods investment (Economic Charter)
+                let spending = currency::spend_commons(&mut world.currency_state, 0.1);
+                world.infrastructure_level = (world.infrastructure_level + spending.infrastructure * 0.001).min(1.0);
+                // Education effect: boost all agents' education_level slightly
+                if spending.education > 0.01 {
+                    for agent in world.agents.iter_mut().filter(|a| a.is_alive()) {
+                        agent.education_level = (agent.education_level + spending.education * 0.00001).min(1.0);
+                    }
+                }
+                // Medicine effect: reduce allostatic load for all agents
+                if spending.medicine > 0.01 {
+                    for agent in world.agents.iter_mut().filter(|a| a.is_alive()) {
+                        agent.needs.allostatic_load = (agent.needs.allostatic_load - spending.medicine * 0.00001).max(0.0);
+                    }
+                }
 
                 // MYCEL computation
                 for agent in world.agents.iter_mut().filter(|a| a.is_alive()) {
@@ -3504,7 +3527,7 @@ impl MultiWorldSimulator {
 
             // Metabolism: modulate innovation rate
             for world in &mut self.worlds {
-                let innov_mult = phase_modifiers.get(&world.id).map(|m| m.innovation_mult).unwrap_or(1.0);
+                let innov_mult = self.phase_modifiers.get(&world.id).map(|m| m.innovation_mult).unwrap_or(1.0);
                 if (innov_mult - 1.0).abs() > 0.01 {
                     world.knowledge.innovation_rate *= innov_mult;
                 }
