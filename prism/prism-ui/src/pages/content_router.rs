@@ -16,7 +16,7 @@ use crate::state::{BrowserState, PageView};
 #[component]
 pub fn ContentRouter() -> impl IntoView {
     let state = expect_context::<BrowserState>();
-    let search_engine = expect_context::<StoredValue<SearchEngine>>();
+    let search_engine = expect_context::<StoredValue<Option<SearchEngine>>>();
 
     move || {
         if state.loading.get() {
@@ -31,7 +31,10 @@ pub fn ContentRouter() -> impl IntoView {
             PageView::Page { html } => {
                 // Apply the Sentient Overlay — annotate page content with epistemic claims
                 let annotated = search_engine.with_value(|e| {
-                    sentient_overlay::annotate_html(&html, e)
+                    match e {
+                        Some(eng) => sentient_overlay::annotate_html(&html, eng),
+                        None => html.clone(),
+                    }
                 });
                 view! {
                     <div class="reader-content" inner_html=annotated></div>
@@ -70,13 +73,29 @@ fn WelcomePage() -> impl IntoView {
 
             <div class="try-section">
                 <h2>"Try Searching"</h2>
-                <p>"Type a query in the search bar above:"</p>
+                <p>"Tap a query to search:"</p>
                 <ul>
-                    <li><strong>"ocean acidification"</strong>" — climate science from NOAA"</li>
-                    <li><strong>"consciousness"</strong>" — IIT, GWT, hard problem"</li>
-                    <li><strong>"rust programming"</strong>" — memory safety, ownership"</li>
-                    <li><strong>"quantum physics"</strong>" — entanglement, uncertainty"</li>
-                    <li><strong>"DNA genetics"</strong>" — double helix, CRISPR"</li>
+                    {[
+                        ("ocean acidification", "climate science from NOAA"),
+                        ("consciousness", "IIT, GWT, hard problem"),
+                        ("rust programming", "memory safety, ownership"),
+                        ("quantum physics", "entanglement, uncertainty"),
+                        ("DNA genetics", "double helix, CRISPR"),
+                    ].into_iter().map(|(query, desc)| {
+                        let q = query.to_string();
+                        view! {
+                            <li>
+                                <a href="javascript:void(0)" class="example-query"
+                                   on:click=move |_| {
+                                       crate::engine::trigger_search(&q);
+                                   }
+                                >
+                                    <strong>{query}</strong>
+                                </a>
+                                " — "{desc}
+                            </li>
+                        }
+                    }).collect::<Vec<_>>()}
                 </ul>
 
                 <h2>"How It Works"</h2>
@@ -109,8 +128,8 @@ fn WelcomePage() -> impl IntoView {
 #[component]
 fn SearchResultsPage(query: String, results: Vec<SearchResult>) -> impl IntoView {
     let count = results.len();
-    let search_engine = expect_context::<StoredValue<SearchEngine>>();
-    let total_claims = search_engine.with_value(|e| e.claim_count());
+    let search_engine = expect_context::<StoredValue<Option<SearchEngine>>>();
+    let total_claims = search_engine.with_value(|e| e.as_ref().map(|s| s.claim_count()).unwrap_or(0));
 
     let max_sim = results.iter().map(|r| r.query_similarity).fold(0.0_f32, f32::max);
     let weak_results = max_sim < 0.08;

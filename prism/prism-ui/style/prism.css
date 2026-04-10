@@ -514,6 +514,16 @@ body {
 }
 .welcome .tagline { color: var(--content-text-secondary); font-size: 1.1em; margin-bottom: 32px; }
 .welcome .try-section { text-align: left; max-width: 500px; margin: 0 auto; }
+.example-query {
+    color: var(--prism-accent);
+    text-decoration: none;
+    cursor: pointer;
+    padding: 2px 0;
+    border-bottom: 1px dashed var(--prism-accent);
+    transition: opacity 0.15s;
+}
+.example-query:hover { opacity: 0.8; }
+.example-query:active { opacity: 0.6; }
 
 /* ── Sentient Overlay (Voice of the People) ── */
 
@@ -998,6 +1008,11 @@ body {
     .reader-content { padding: 20px 16px 48px; }
     .chrome-top { padding: 0 12px; }
     .search-row { padding: 0 12px 6px; }
+    .search-input {
+        height: 44px;           /* Apple HIG minimum tap target */
+        font-size: 16px;        /* Prevents iOS zoom on focus */
+        padding: 0 14px;
+    }
     .brand-sub { display: none; }
     .theme-switcher { display: none; }
     /* Compare view: horizontal scroll on mobile */
@@ -1012,4 +1027,28 @@ body {
         flex-shrink: 0;
         scroll-snap-align: start;
     }
+}
+
+/* Loading screen */
+.loading-screen {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+    color: var(--chrome-text-bright);
+    gap: 16px;
+}
+.loading-screen .brand {
+    font-size: 32px;
+    color: var(--prism-accent);
+}
+.loading-screen p {
+    font-size: 14px;
+    color: var(--chrome-text-dim);
+    animation: pulse 1.5s ease-in-out infinite;
+}
+@keyframes pulse {
+    0%, 100% { opacity: 0.4; }
+    50% { opacity: 1; }
 }

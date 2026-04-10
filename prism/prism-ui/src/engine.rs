@@ -3,13 +3,24 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Bridge between the Leptos UI and Prism engine crates.
 
-use leptos::prelude::Set;
+use leptos::prelude::*;
 use prism_common::{ContentZone, SafetyLevel};
 use prism_privacy::ConsentStore;
 use prism_reflex::ReflexArc;
 use prism_search::SearchEngine;
 
 use crate::state::{BrowserState, PageView};
+
+/// Trigger a search from outside the search bar (e.g., clicking an example query).
+pub fn trigger_search(query: &str) {
+    let state = expect_context::<BrowserState>();
+    let engine_cell = expect_context::<StoredValue<Option<SearchEngine>>>();
+    engine_cell.with_value(|opt| {
+        if let Some(se) = opt {
+            search_query(query, &state, se);
+        }
+    });
+}
 
 /// Sanitize HTML for safe innerHTML rendering (reader mode).
 ///

@@ -35,7 +35,7 @@ fn save_to_history(query: &str) {
 #[component]
 pub fn SearchBar() -> impl IntoView {
     let state = expect_context::<BrowserState>();
-    let search_engine = expect_context::<StoredValue<SearchEngine>>();
+    let engine_cell = expect_context::<StoredValue<Option<SearchEngine>>>();
     let reflex = expect_context::<StoredValue<ReflexArc>>();
 
     let (input, set_input) = signal(String::new());
@@ -69,10 +69,12 @@ pub fn SearchBar() -> impl IntoView {
             state_submit.set_page_title.set(format!("Compare: {}", value));
             state_submit.set_view.set(PageView::Compare { query: value });
         } else {
-            search_engine.with_value(|se| {
-                reflex.with_value(|r| {
-                    engine::process_input(&value, &state_submit, se, r);
-                });
+            engine_cell.with_value(|opt| {
+                if let Some(search) = opt {
+                    reflex.with_value(|r| {
+                        engine::process_input(&value, &state_submit, search, r);
+                    });
+                }
             });
         }
 

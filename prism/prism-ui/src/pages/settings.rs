@@ -20,8 +20,8 @@ const THEMES: &[(&str, &str, &str, &str)] = &[
 
 #[component]
 pub fn SettingsPage() -> impl IntoView {
-    let engine = expect_context::<StoredValue<SearchEngine>>();
-    let claim_count = engine.with_value(|e| e.claim_count());
+    let engine = expect_context::<StoredValue<Option<SearchEngine>>>();
+    let claim_count = engine.with_value(|e| e.as_ref().map(|s| s.claim_count()).unwrap_or(0));
 
     // Current theme
     let (current_theme, set_current_theme) = signal(

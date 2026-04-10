@@ -15,19 +15,48 @@ use crate::state::{BrowserState, PageView};
 use prism_search::SearchEngine;
 use prism_reflex::ReflexArc;
 
+/// Try to fetch the precomputed index from /static/prism-index.bin.
+/// Falls back to computing from scratch if fetch fails.
+async fn load_search_engine() -> SearchEngine {
+    match gloo_net::http::Request::get("/static/prism-index.bin").send().await {
+        Ok(resp) if resp.ok() => {
+            match resp.binary().await {
+                Ok(bytes) => {
+                    log::info!("Loaded precomputed index ({} bytes)", bytes.len());
+                    return SearchEngine::from_precomputed(&bytes);
+                }
+                Err(e) => log::info!("Index fetch body error: {e}, computing from scratch"),
+            }
+        }
+        Ok(resp) => log::info!("Index fetch returned {}, computing from scratch", resp.status()),
+        Err(e) => log::info!("Index fetch failed: {e}, computing from scratch"),
+    }
+    SearchEngine::with_seed_claims()
+}
+
 const PRISM_ICON_MINI: &str = r##"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="24" height="24"><defs><linearGradient id="pg" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#2DD4BF" stop-opacity="0.3"/><stop offset="100%" stop-color="#050507" stop-opacity="0.6"/></linearGradient></defs><polygon points="256,80 400,380 112,380" fill="url(#pg)" stroke="#2DD4BF" stroke-width="12"/><line x1="256" y1="80" x2="256" y2="380" stroke="#2DD4BF" stroke-width="8" opacity="0.9"/><circle cx="256" cy="460" r="16" fill="#2DD4BF" opacity="0.8"/></svg>"##;
 
 const GEAR_ICON: &str = r##"<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>"##;
 
 #[component]
 pub fn App() -> impl IntoView {
-    let search_engine = StoredValue::new(SearchEngine::with_seed_claims());
+    let (engine_ready, set_engine_ready) = signal(false);
     let reflex = StoredValue::new(ReflexArc::new());
     let state = BrowserState::new();
 
     provide_context(state.clone());
-    provide_context(search_engine);
     provide_context(reflex);
+
+    // Load search engine asynchronously (fetch precomputed index, fallback to compute)
+    // We provide the context synchronously with a placeholder, then replace it when ready.
+    let engine_cell: StoredValue<Option<SearchEngine>> = StoredValue::new(None);
+    provide_context(engine_cell);
+
+    wasm_bindgen_futures::spawn_local(async move {
+        let engine = load_search_engine().await;
+        engine_cell.set_value(Some(engine));
+        set_engine_ready.set(true);
+    });
 
     // Load persisted settings on mount
     Effect::new(move |_| {
@@ -61,24 +90,34 @@ pub fn App() -> impl IntoView {
     };
 
     view! {
-        <div class="chrome">
-            <div class="chrome-top">
-                <span class="brand-icon" inner_html=PRISM_ICON_MINI></span>
-                <span class="brand">"Prism"</span>
-                <span class="brand-sub">"by Mycelix"</span>
-                <div style="flex:1"></div>
-                <DhtStatusBadge />
-                <ThemeSwitcher />
-                <div class="gear-btn" on:click=open_settings title="Settings" inner_html=GEAR_ICON></div>
-                <SecurityBadge />
+        <Show
+            when=move || engine_ready.get()
+            fallback=|| view! {
+                <div class="loading-screen">
+                    <span class="brand">"Prism"</span>
+                    <p>"Loading epistemic index\u{2026}"</p>
+                </div>
+            }
+        >
+            <div class="chrome">
+                <div class="chrome-top">
+                    <span class="brand-icon" inner_html=PRISM_ICON_MINI></span>
+                    <span class="brand">"Prism"</span>
+                    <span class="brand-sub">"by Mycelix"</span>
+                    <div style="flex:1"></div>
+                    <DhtStatusBadge />
+                    <ThemeSwitcher />
+                    <div class="gear-btn" on:click=open_settings title="Settings" inner_html=GEAR_ICON></div>
+                    <SecurityBadge />
+                </div>
+                <div class="search-row">
+                    <SearchBar />
+                </div>
             </div>
-            <div class="search-row">
-                <SearchBar />
-            </div>
-        </div>
 
-        <div class="content-viewport">
-            <ContentRouter />
-        </div>
+            <div class="content-viewport">
+                <ContentRouter />
+            </div>
+        </Show>
     }
 }
