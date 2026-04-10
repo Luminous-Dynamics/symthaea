@@ -12,7 +12,7 @@
 use crate::agent::BiologicalSex;
 use crate::events::{CivEvent, CivEventType};
 use crate::stochastic::StochasticEngine;
-use crate::world::{World, WorldResources};
+use crate::world::{CulturalProfile, World, WorldResources};
 
 use serde::{Deserialize, Serialize};
 

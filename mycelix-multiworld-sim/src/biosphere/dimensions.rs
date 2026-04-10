@@ -12,7 +12,7 @@
 use serde::{Deserialize, Serialize};
 
 use super::deep_time_data::DeepTimeData;
-use super::mass_extinctions::MassExtinctionEvent;
+use super::mass_extinctions::{extinction_multiplier, MassExtinctionEvent};
 use super::temporal_bins::{MaAge, TemporalBin, TimeResolution};
 use super::uncertainty;
 

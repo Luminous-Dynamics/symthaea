@@ -83,6 +83,8 @@ pub mod stoichiometry;
 pub mod relativistic_dht;
 pub mod epistemic_decay;
 pub mod skill_integrity;
+pub mod statistics;
+pub mod csv_output;
 
 use config::{EpochId, SimulationConfig};
 use epoch::{EpochManager, EpochSnapshot};
@@ -209,6 +211,8 @@ pub struct MultiWorldSimulator {
     pub disaster_config: config_loader::DisasterConfig,
     /// JSONL output path for live metrics (None = disabled).
     pub jsonl_output_path: Option<std::path::PathBuf>,
+    /// CSV time-series recorder for scientific analysis (None = disabled).
+    csv_recorder: Option<csv_output::CsvRecorder>,
 }
 
 impl MultiWorldSimulator {
@@ -255,6 +259,7 @@ impl MultiWorldSimulator {
                 std::path::Path::new("config/disasters.toml"),
             ),
             jsonl_output_path: None,
+            csv_recorder: None,
         }
     }
 
@@ -268,6 +273,15 @@ impl MultiWorldSimulator {
 
     pub fn enable_jsonl_output(&mut self, path: std::path::PathBuf) {
         self.jsonl_output_path = Some(path);
+    }
+
+    /// Enable CSV time-series output for scientific analysis.
+    ///
+    /// Writes one row per world per tick with population, Phi, Gini, allostatic
+    /// load, resource levels, governance authority, and more. Output is amenable
+    /// to R/Python analysis.
+    pub fn enable_csv_output(&mut self, path: std::path::PathBuf) {
+        self.csv_recorder = Some(csv_output::CsvRecorder::new(path));
     }
 
     /// Enable interstellar mode: launch a generation ship at the specified tick.
@@ -3710,6 +3724,12 @@ impl MultiWorldSimulator {
                     1.0, // kessler density
                 );
                 let _ = metrics.append_jsonl(path);
+            }
+
+            // Phase 9.8: CSV time-series output (scientific analysis)
+            if let Some(ref mut recorder) = self.csv_recorder {
+                let active = self.disaster_engine.active_disasters.len() as u32;
+                let _ = recorder.record_tick(self.current_tick, &self.worlds, active);
             }
 
             // Phase 10: Emergencies
