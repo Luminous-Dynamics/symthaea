@@ -31,6 +31,7 @@
 pub mod backend;
 pub mod circuits;
 pub mod consciousness;
+pub mod sovereign;
 #[cfg(feature = "backend-miden")]
 pub mod miden_consciousness;
 pub mod miden_parameterized;
