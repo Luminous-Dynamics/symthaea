@@ -16,13 +16,13 @@
 
 use hdk::prelude::*;
 use plays_integrity::*;
-use mycelix_bridge_common::{gate_consciousness, requirement_for_voting, GovernanceRequirement};
+use mycelix_bridge_common::{gate_civic, requirement_for_voting, GovernanceRequirement};
 
 fn require_consciousness(
     requirement: &GovernanceRequirement,
     action_name: &str,
 ) -> ExternResult<()> {
-    gate_consciousness("music_bridge", requirement, action_name).map(|_| ())
+    gate_civic("music_bridge", requirement, action_name).map(|_| ())
 }
 
 /// Helper to ensure a path exists and return its entry hash
@@ -177,7 +177,7 @@ pub struct BalanceOwed {
 /// Create a settlement batch for an artist
 #[hdk_extern]
 pub fn create_settlement_batch(artist: AgentPubKey) -> ExternResult<ActionHash> {
-    require_consciousness(&requirement_for_voting(), "create_settlement_batch")?;
+    require_consciousness(&civic_requirement_voting(), "create_settlement_batch")?;
     let plays = get_my_unsettled_plays(())?;
 
     // Filter plays for this artist

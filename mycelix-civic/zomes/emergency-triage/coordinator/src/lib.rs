@@ -29,7 +29,7 @@ fn require_consciousness(
 
 #[hdk_extern]
 pub fn triage_patient(input: TriagePatientInput) -> ExternResult<Record> {
-    require_consciousness(&requirement_for_basic(), "triage_patient")?;
+    require_consciousness(&civic_requirement_basic(), "triage_patient")?;
     if input.patient_id.is_empty() || input.patient_id.len() > 128 {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "Patient ID must be 1-128 characters".into()
@@ -121,7 +121,7 @@ pub struct TriagePatientInput {
 /// Update a triage assessment (re-triage)
 #[hdk_extern]
 pub fn update_triage(input: UpdateTriageInput) -> ExternResult<Record> {
-    require_consciousness(&requirement_for_proposal(), "update_triage")?;
+    require_consciousness(&civic_requirement_proposal(), "update_triage")?;
     let current_record = get(input.original_triage_hash.clone(), GetOptions::default())?.ok_or(
         wasm_error!(WasmErrorInner::Guest("Triage record not found".into())),
     )?;

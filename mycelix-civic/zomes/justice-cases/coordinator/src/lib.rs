@@ -24,7 +24,7 @@ fn require_consciousness(
 
 #[hdk_extern]
 pub fn file_case(case: Case) -> ExternResult<Record> {
-    let _eligibility = require_consciousness(&requirement_for_proposal(), "file_case")?;
+    let _eligibility = require_consciousness(&civic_requirement_proposal(), "file_case")?;
 
     let action_hash = create_entry(&EntryTypes::Case(case.clone()))?;
     let record = get_latest_record(action_hash.clone())?.ok_or(wasm_error!(
@@ -169,7 +169,7 @@ pub struct AddPartyInput {
 /// Submit evidence for a case
 #[hdk_extern]
 pub fn submit_evidence(evidence: Evidence) -> ExternResult<Record> {
-    let _eligibility = require_consciousness(&requirement_for_proposal(), "submit_evidence")?;
+    let _eligibility = require_consciousness(&civic_requirement_proposal(), "submit_evidence")?;
 
     let action_hash = create_entry(&EntryTypes::Evidence(evidence.clone()))?;
     let record = get_latest_record(action_hash.clone())?.ok_or(wasm_error!(

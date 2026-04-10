@@ -127,9 +127,9 @@ pub fn dispatch_call(input: DispatchInput) -> ExternResult<DispatchResult> {
 /// to the target domain zome.
 #[hdk_extern]
 pub fn query_music(query: MusicQueryEntry) -> ExternResult<Record> {
-    mycelix_bridge_common::gate_consciousness(
+    mycelix_bridge_common::gate_civic(
         "music_bridge",
-        &mycelix_bridge_common::requirement_for_basic(),
+        &mycelix_bridge_common::civic_requirement_basic(),
         "query_music",
     )?;
 
@@ -199,9 +199,9 @@ pub fn query_music(query: MusicQueryEntry) -> ExternResult<Record> {
 /// Resolve a pending query with a result
 #[hdk_extern]
 pub fn resolve_query(input: ResolveQueryInput) -> ExternResult<Record> {
-    mycelix_bridge_common::gate_consciousness(
+    mycelix_bridge_common::gate_civic(
         "music_bridge",
-        &mycelix_bridge_common::requirement_for_voting(),
+        &mycelix_bridge_common::civic_requirement_voting(),
         "resolve_query",
     )?;
 
@@ -244,9 +244,9 @@ pub struct BridgeEventSignal {
 /// Broadcast a cross-domain event and emit a signal to connected clients
 #[hdk_extern]
 pub fn broadcast_event(event: MusicEventEntry) -> ExternResult<Record> {
-    mycelix_bridge_common::gate_consciousness(
+    mycelix_bridge_common::gate_civic(
         "music_bridge",
-        &mycelix_bridge_common::requirement_for_basic(),
+        &mycelix_bridge_common::civic_requirement_basic(),
         "broadcast_event",
     )?;
 
@@ -395,9 +395,9 @@ pub struct CrossClusterInput {
 /// Requires Citizen+ consciousness tier.
 #[hdk_extern]
 pub fn cross_cluster_dispatch(input: CrossClusterInput) -> ExternResult<DispatchResult> {
-    mycelix_bridge_common::gate_consciousness(
+    mycelix_bridge_common::gate_civic(
         "music_bridge",
-        &mycelix_bridge_common::requirement_for_voting(),
+        &mycelix_bridge_common::civic_requirement_voting(),
         "cross_cluster_dispatch",
     )?;
 

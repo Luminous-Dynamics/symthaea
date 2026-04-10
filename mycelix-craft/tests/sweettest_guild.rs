@@ -146,7 +146,7 @@ async fn test_guild_creator_auto_joins_as_elder() {
 // Consciousness gating tests
 // ---------------------------------------------------------------------------
 
-/// NOTE: Consciousness gating via `gate_consciousness()` requires a consciousness
+/// NOTE: Consciousness gating via `gate_civic()` requires a consciousness
 /// credential on the agent's source chain (typically from identity_bridge).
 /// In a fresh test conductor, no credentials exist, so gating calls are expected
 /// to either:
@@ -165,7 +165,7 @@ async fn test_create_guild_is_consciousness_gated() {
         .unwrap()
         .into_tuple();
 
-    // Without an identity cluster, gate_consciousness should fail or bootstrap
+    // Without an identity cluster, gate_civic should fail or bootstrap
     let result = conductor
         .call_fallible::<_, ActionHash>(
             &alice.zome("guild_coordinator"),

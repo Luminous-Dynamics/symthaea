@@ -25,7 +25,7 @@ fn anchor_hash(anchor_string: &str) -> ExternResult<EntryHash> {
 
 #[hdk_extern]
 pub fn publish(input: PublishInput) -> ExternResult<Record> {
-    let _eligibility = require_consciousness(&requirement_for_proposal(), "publish")?;
+    let _eligibility = require_consciousness(&civic_requirement_proposal(), "publish")?;
 
     let now = sys_time()?;
     let publication = Publication {
@@ -79,7 +79,7 @@ pub struct PublishInput {
 
 #[hdk_extern]
 pub fn add_content_block(input: AddBlockInput) -> ExternResult<Record> {
-    let _eligibility = require_consciousness(&requirement_for_basic(), "add_content_block")?;
+    let _eligibility = require_consciousness(&civic_requirement_basic(), "add_content_block")?;
 
     let block = ContentBlock {
         publication_id: input.publication_id.clone(),
@@ -108,7 +108,7 @@ pub struct AddBlockInput {
 
 #[hdk_extern]
 pub fn update_publication(input: UpdateInput) -> ExternResult<Record> {
-    let _eligibility = require_consciousness(&requirement_for_proposal(), "update_publication")?;
+    let _eligibility = require_consciousness(&civic_requirement_proposal(), "update_publication")?;
 
     let filter = ChainQueryFilter::new()
         .entry_type(EntryType::App(AppEntryDef::try_from(
@@ -506,7 +506,7 @@ pub struct CreateArtMetadataInput {
 /// Attach visual art metadata to a publication (Participant+).
 #[hdk_extern]
 pub fn create_art_metadata(input: CreateArtMetadataInput) -> ExternResult<Record> {
-    let _eligibility = require_consciousness(&requirement_for_proposal(), "create_art_metadata")?;
+    let _eligibility = require_consciousness(&civic_requirement_proposal(), "create_art_metadata")?;
 
     let metadata = VisualArtMetadata {
         publication_id: input.publication_hash.to_string(),

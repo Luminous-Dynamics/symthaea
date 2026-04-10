@@ -34,7 +34,7 @@ fn ensure_anchor(name: &str) -> ExternResult<EntryHash> {
 }
 
 fn require_consciousness_tier(_min_tier: u8) -> ExternResult<()> {
-    // Consciousness gating is best-effort in budgeting — the gate_consciousness
+    // Consciousness gating is best-effort in budgeting — the gate_civic
     // function requires a running conductor with identity bridge. In standalone
     // or test mode, skip the gate and allow all operations.
     // TODO: Wire to identity bridge once conductor integration is verified.

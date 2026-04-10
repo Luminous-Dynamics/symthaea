@@ -157,9 +157,9 @@ fn can_finalize(decision_type: &DecisionType, role: &MemberRole) -> bool {
 /// Map a decision type to its governance requirement.
 fn requirement_for_decision_type(dt: &DecisionType) -> GovernanceRequirement {
     match dt {
-        DecisionType::MajorityVote => requirement_for_basic(),
-        DecisionType::ElderDecision | DecisionType::GuardianDecision => requirement_for_proposal(),
-        DecisionType::Consensus => requirement_for_voting(),
+        DecisionType::MajorityVote => civic_requirement_basic(),
+        DecisionType::ElderDecision | DecisionType::GuardianDecision => civic_requirement_proposal(),
+        DecisionType::Consensus => civic_requirement_voting(),
     }
 }
 

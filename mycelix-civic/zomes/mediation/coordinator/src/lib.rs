@@ -38,7 +38,7 @@ fn ensure_anchor(anchor_str: &str) -> ExternResult<EntryHash> {
 /// Request mediation for a dispute.
 #[hdk_extern]
 pub fn request_mediation(request: MediationRequest) -> ExternResult<ActionHash> {
-    let _eligibility = require_consciousness(&requirement_for_proposal(), "request_mediation")?;
+    let _eligibility = require_consciousness(&civic_requirement_proposal(), "request_mediation")?;
 
     let action_hash = create_entry(&EntryTypes::MediationRequest(request.clone()))?;
 
@@ -93,7 +93,7 @@ pub fn get_my_requests(_: ()) -> ExternResult<Vec<Record>> {
 /// Respondent accepts a mediation request.
 #[hdk_extern]
 pub fn accept_mediation(request_hash: ActionHash) -> ExternResult<ActionHash> {
-    let _eligibility = require_consciousness(&requirement_for_proposal(), "accept_mediation")?;
+    let _eligibility = require_consciousness(&civic_requirement_proposal(), "accept_mediation")?;
 
     let record = get(request_hash.clone(), GetOptions::default())?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Request not found".into())))?;
@@ -128,7 +128,7 @@ pub struct AssignMediatorInput {
 /// Assign a mediator to a mediation request.
 #[hdk_extern]
 pub fn assign_mediator(input: AssignMediatorInput) -> ExternResult<ActionHash> {
-    let _eligibility = require_consciousness(&requirement_for_voting(), "assign_mediator")?;
+    let _eligibility = require_consciousness(&civic_requirement_voting(), "assign_mediator")?;
 
     let record = get(input.request_hash.clone(), GetOptions::default())?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Request not found".into())))?;
@@ -156,7 +156,7 @@ pub fn assign_mediator(input: AssignMediatorInput) -> ExternResult<ActionHash> {
 /// Record a mediation session.
 #[hdk_extern]
 pub fn record_session(session: MediationSession) -> ExternResult<ActionHash> {
-    let _eligibility = require_consciousness(&requirement_for_proposal(), "record_session")?;
+    let _eligibility = require_consciousness(&civic_requirement_proposal(), "record_session")?;
 
     let action_hash = create_entry(&EntryTypes::MediationSession(session.clone()))?;
 
@@ -174,7 +174,7 @@ pub fn record_session(session: MediationSession) -> ExternResult<ActionHash> {
 /// Get all sessions for a mediation request.
 #[hdk_extern]
 pub fn get_request_sessions(request_id: String) -> ExternResult<Vec<Record>> {
-    let _eligibility = require_consciousness(&requirement_for_basic(), "get_request_sessions")?;
+    let _eligibility = require_consciousness(&civic_requirement_basic(), "get_request_sessions")?;
 
     let base = anchor_hash(&format!("mediation/request/{}/sessions", request_id))?;
     let links = get_links(
@@ -200,7 +200,7 @@ pub fn get_request_sessions(request_id: String) -> ExternResult<Vec<Record>> {
 /// Propose a mediation agreement.
 #[hdk_extern]
 pub fn propose_agreement(agreement: MediationAgreement) -> ExternResult<ActionHash> {
-    let _eligibility = require_consciousness(&requirement_for_proposal(), "propose_agreement")?;
+    let _eligibility = require_consciousness(&civic_requirement_proposal(), "propose_agreement")?;
 
     let action_hash = create_entry(&EntryTypes::MediationAgreement(agreement.clone()))?;
 
@@ -214,7 +214,7 @@ pub fn propose_agreement(agreement: MediationAgreement) -> ExternResult<ActionHa
 /// Accept an existing agreement (add the calling agent to agreed_by).
 #[hdk_extern]
 pub fn accept_agreement(agreement_hash: ActionHash) -> ExternResult<ActionHash> {
-    let _eligibility = require_consciousness(&requirement_for_proposal(), "accept_agreement")?;
+    let _eligibility = require_consciousness(&civic_requirement_proposal(), "accept_agreement")?;
 
     let record = get(agreement_hash.clone(), GetOptions::default())?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Agreement not found".into())))?;
@@ -242,7 +242,7 @@ pub fn accept_agreement(agreement_hash: ActionHash) -> ExternResult<ActionHash> 
 /// Mark a mediation as resolved.
 #[hdk_extern]
 pub fn resolve_mediation(request_hash: ActionHash) -> ExternResult<ActionHash> {
-    let _eligibility = require_consciousness(&requirement_for_proposal(), "resolve_mediation")?;
+    let _eligibility = require_consciousness(&civic_requirement_proposal(), "resolve_mediation")?;
 
     let record = get(request_hash.clone(), GetOptions::default())?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Request not found".into())))?;
@@ -268,7 +268,7 @@ pub fn resolve_mediation(request_hash: ActionHash) -> ExternResult<ActionHash> {
 /// Dispatches to the justice_cases zome via `call(CallTargetCell::Local, ...)`.
 #[hdk_extern]
 pub fn escalate_to_justice(request_hash: ActionHash) -> ExternResult<ActionHash> {
-    let _eligibility = require_consciousness(&requirement_for_proposal(), "escalate_to_justice")?;
+    let _eligibility = require_consciousness(&civic_requirement_proposal(), "escalate_to_justice")?;
 
     let record = get(request_hash.clone(), GetOptions::default())?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Request not found".into())))?;
@@ -336,7 +336,7 @@ pub fn escalate_to_justice(request_hash: ActionHash) -> ExternResult<ActionHash>
 /// Get all open (non-resolved, non-withdrawn) mediation requests.
 #[hdk_extern]
 pub fn get_open_requests(_: ()) -> ExternResult<Vec<Record>> {
-    let _eligibility = require_consciousness(&requirement_for_basic(), "get_open_requests")?;
+    let _eligibility = require_consciousness(&civic_requirement_basic(), "get_open_requests")?;
 
     let base = anchor_hash("all_mediation_requests")?;
     let links = get_links(
@@ -373,7 +373,7 @@ pub fn get_open_requests(_: ()) -> ExternResult<Vec<Record>> {
 /// Get all sessions for a specific mediator.
 #[hdk_extern]
 pub fn get_mediator_sessions(mediator_did: String) -> ExternResult<Vec<Record>> {
-    let _eligibility = require_consciousness(&requirement_for_basic(), "get_mediator_sessions")?;
+    let _eligibility = require_consciousness(&civic_requirement_basic(), "get_mediator_sessions")?;
 
     let base = anchor_hash(&format!("mediator/{}/sessions", mediator_did))?;
     let links = get_links(

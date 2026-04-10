@@ -41,7 +41,7 @@ pub struct CaseVerificationResult {
 
 #[hdk_extern]
 pub fn create_enforcement(enforcement: Enforcement) -> ExternResult<Record> {
-    let _eligibility = require_consciousness(&requirement_for_voting(), "create_enforcement")?;
+    let _eligibility = require_consciousness(&civic_requirement_voting(), "create_enforcement")?;
     let action_hash = create_entry(&EntryTypes::Enforcement(enforcement.clone()))?;
     let record = get_latest_record(action_hash.clone())?.ok_or(wasm_error!(
         WasmErrorInner::Guest("Could not get created enforcement".into())
@@ -95,7 +95,7 @@ pub fn get_decision_enforcement(decision_id: String) -> ExternResult<Vec<Record>
 /// Record an enforcement action taken
 #[hdk_extern]
 pub fn record_action(input: RecordActionInput) -> ExternResult<Record> {
-    let _eligibility = require_consciousness(&requirement_for_voting(), "record_action")?;
+    let _eligibility = require_consciousness(&civic_requirement_voting(), "record_action")?;
     let record = get(input.enforcement_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
         WasmErrorInner::Guest("Enforcement not found".into())
     ))?;
@@ -127,7 +127,7 @@ pub struct RecordActionInput {
 #[hdk_extern]
 pub fn update_enforcement_status(input: UpdateEnforcementStatusInput) -> ExternResult<Record> {
     let _eligibility =
-        require_consciousness(&requirement_for_voting(), "update_enforcement_status")?;
+        require_consciousness(&civic_requirement_voting(), "update_enforcement_status")?;
     let record = get(input.enforcement_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
         WasmErrorInner::Guest("Enforcement not found".into())
     ))?;
@@ -184,7 +184,7 @@ pub struct UpdateEnforcementStatusInput {
 /// Complete enforcement
 #[hdk_extern]
 pub fn complete_enforcement(input: CompleteEnforcementInput) -> ExternResult<Record> {
-    let _eligibility = require_consciousness(&requirement_for_voting(), "complete_enforcement")?;
+    let _eligibility = require_consciousness(&civic_requirement_voting(), "complete_enforcement")?;
     let record = get(input.enforcement_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
         WasmErrorInner::Guest("Enforcement not found".into())
     ))?;
@@ -221,7 +221,7 @@ pub struct CompleteEnforcementInput {
 /// Mark enforcement as failed
 #[hdk_extern]
 pub fn mark_enforcement_failed(input: FailedEnforcementInput) -> ExternResult<Record> {
-    let _eligibility = require_consciousness(&requirement_for_voting(), "mark_enforcement_failed")?;
+    let _eligibility = require_consciousness(&civic_requirement_voting(), "mark_enforcement_failed")?;
     let record = get(input.enforcement_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
         WasmErrorInner::Guest("Enforcement not found".into())
     ))?;
@@ -320,7 +320,7 @@ pub fn get_enforcements_by_status(status: EnforcementStatus) -> ExternResult<Vec
 #[hdk_extern]
 pub fn execute_cross_happ_action(input: CrossHappActionInput) -> ExternResult<Record> {
     let _eligibility = require_consciousness(
-        &requirement_for_constitutional(),
+        &civic_requirement_constitutional(),
         "execute_cross_happ_action",
     )?;
     let record = get(input.enforcement_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(

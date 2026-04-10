@@ -29,7 +29,7 @@ const MIN_VOTING_PERIOD_MS: i64 = 5 * 60 * 1_000_000; // 5 minutes in microsecon
 #[hdk_extern]
 pub fn create_proposal(proposal: Proposal) -> ExternResult<Record> {
     // Consciousness gate: Participant tier + identity >= 0.25
-    let _eligibility = require_consciousness(&requirement_for_proposal(), "create_proposal")?;
+    let _eligibility = require_consciousness(&civic_requirement_proposal(), "create_proposal")?;
 
     // Validate title is not empty or whitespace-only
     if proposal.title.trim().is_empty() {
@@ -90,7 +90,7 @@ pub fn get_all_proposals(_: ()) -> ExternResult<Vec<Record>> {
 #[hdk_extern]
 pub fn cast_vote(vote: Vote) -> ExternResult<Record> {
     // Consciousness gate: Citizen tier + identity >= 0.25
-    let _eligibility = require_consciousness(&requirement_for_voting(), "cast_vote")?;
+    let _eligibility = require_consciousness(&civic_requirement_voting(), "cast_vote")?;
 
     // Check for double-voting: look up existing votes linked to this proposal
     let existing_vote_links = get_links(

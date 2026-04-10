@@ -29,7 +29,7 @@ fn require_consciousness(
 #[hdk_extern]
 pub fn list_secondary_material(listing: SecondaryMaterialListing) -> ExternResult<Record> {
     let _eligibility =
-        require_consciousness(&requirement_for_basic(), "list_secondary_material")?;
+        require_consciousness(&civic_requirement_basic(), "list_secondary_material")?;
 
     if !listing.quantity_kg.is_finite() || listing.quantity_kg <= 0.0 {
         return Err(wasm_error!(WasmErrorInner::Guest(
@@ -270,7 +270,7 @@ fn haversine_km(lat1: f64, lon1: f64, lat2: f64, lon2: f64) -> f64 {
 /// Place an order for secondary material
 #[hdk_extern]
 pub fn place_order(order: SecondaryMaterialOrder) -> ExternResult<Record> {
-    let _eligibility = require_consciousness(&requirement_for_basic(), "place_order")?;
+    let _eligibility = require_consciousness(&civic_requirement_basic(), "place_order")?;
 
     if !order.quantity_kg.is_finite() || order.quantity_kg <= 0.0 {
         return Err(wasm_error!(WasmErrorInner::Guest(
@@ -352,7 +352,7 @@ pub struct CompostDemandMatch {
 #[hdk_extern]
 pub fn find_plots_needing_compost(_: ()) -> ExternResult<Vec<CompostDemandMatch>> {
     let _eligibility =
-        require_consciousness(&requirement_for_basic(), "find_plots_needing_compost")?;
+        require_consciousness(&civic_requirement_basic(), "find_plots_needing_compost")?;
 
     // Query food-production for all plots via cross-zome call
     let plots_response = call(

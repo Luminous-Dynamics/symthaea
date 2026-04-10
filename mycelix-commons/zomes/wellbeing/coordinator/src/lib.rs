@@ -54,7 +54,7 @@ const EXPECTED_CHECKINS_PER_MONTH: f32 = 15.0;
 /// After creation, evaluates trend detection for nudge generation.
 #[hdk_extern]
 pub fn create_checkin(input: WellbeingCheckIn) -> ExternResult<Record> {
-    require_consciousness(&requirement_for_basic(), "create_checkin")?;
+    require_consciousness(&civic_requirement_basic(), "create_checkin")?;
 
     let action_hash = create_entry(&EntryTypes::WellbeingCheckIn(input))?;
 
@@ -214,7 +214,7 @@ pub fn get_circle_shared_checkins(circle_hash: ActionHash) -> ExternResult<Vec<R
 /// Does NOT reveal individual data — only aggregate statistics.
 #[hdk_extern]
 pub fn compute_aggregate(_: ()) -> ExternResult<Record> {
-    require_consciousness(&requirement_for_basic(), "compute_aggregate")?;
+    require_consciousness(&civic_requirement_basic(), "compute_aggregate")?;
 
     let agent_info = agent_info()?;
     let now = sys_time()?;

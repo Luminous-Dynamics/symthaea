@@ -25,7 +25,7 @@ fn anchor_hash(anchor_string: &str) -> ExternResult<EntryHash> {
 
 #[hdk_extern]
 pub fn file_dispute(input: FileDisputeInput) -> ExternResult<Record> {
-    let _eligibility = require_consciousness(&requirement_for_proposal(), "file_dispute")?;
+    let _eligibility = require_consciousness(&civic_requirement_proposal(), "file_dispute")?;
     let now = sys_time()?;
     let dispute = PropertyDispute {
         id: format!("dispute:{}:{}", input.property_id, now.as_micros()),
@@ -69,7 +69,7 @@ pub struct FileDisputeInput {
 
 #[hdk_extern]
 pub fn file_ownership_claim(input: FileClaimInput) -> ExternResult<Record> {
-    let _eligibility = require_consciousness(&requirement_for_proposal(), "file_ownership_claim")?;
+    let _eligibility = require_consciousness(&civic_requirement_proposal(), "file_ownership_claim")?;
     let now = sys_time()?;
     let claim = OwnershipClaim {
         id: format!("claim:{}:{}", input.property_id, now.as_micros()),
@@ -101,7 +101,7 @@ pub struct FileClaimInput {
 
 #[hdk_extern]
 pub fn escalate_to_justice(input: EscalateInput) -> ExternResult<Record> {
-    let _eligibility = require_consciousness(&requirement_for_voting(), "escalate_to_justice")?;
+    let _eligibility = require_consciousness(&civic_requirement_voting(), "escalate_to_justice")?;
     let filter = ChainQueryFilter::new()
         .entry_type(EntryType::App(AppEntryDef::try_from(
             UnitEntryTypes::PropertyDispute,
@@ -148,7 +148,7 @@ pub struct EscalateInput {
 
 #[hdk_extern]
 pub fn resolve_dispute(input: ResolveDisputeInput) -> ExternResult<Record> {
-    let _eligibility = require_consciousness(&requirement_for_voting(), "resolve_dispute")?;
+    let _eligibility = require_consciousness(&civic_requirement_voting(), "resolve_dispute")?;
     let filter = ChainQueryFilter::new()
         .entry_type(EntryType::App(AppEntryDef::try_from(
             UnitEntryTypes::PropertyDispute,
@@ -275,7 +275,7 @@ pub fn get_property_claims(property_id: String) -> ExternResult<Vec<Record>> {
 /// Update dispute status
 #[hdk_extern]
 pub fn update_dispute_status(input: UpdateDisputeStatusInput) -> ExternResult<Record> {
-    let _eligibility = require_consciousness(&requirement_for_voting(), "update_dispute_status")?;
+    let _eligibility = require_consciousness(&civic_requirement_voting(), "update_dispute_status")?;
     let filter = ChainQueryFilter::new()
         .entry_type(EntryType::App(AppEntryDef::try_from(
             UnitEntryTypes::PropertyDispute,
@@ -317,7 +317,7 @@ pub struct UpdateDisputeStatusInput {
 /// Update ownership claim status
 #[hdk_extern]
 pub fn update_claim_status(input: UpdateClaimStatusInput) -> ExternResult<Record> {
-    let _eligibility = require_consciousness(&requirement_for_voting(), "update_claim_status")?;
+    let _eligibility = require_consciousness(&civic_requirement_voting(), "update_claim_status")?;
     let filter = ChainQueryFilter::new()
         .entry_type(EntryType::App(AppEntryDef::try_from(
             UnitEntryTypes::OwnershipClaim,
@@ -357,7 +357,7 @@ pub struct UpdateClaimStatusInput {
 /// Add evidence to a dispute
 #[hdk_extern]
 pub fn add_dispute_evidence(input: AddEvidenceInput) -> ExternResult<Record> {
-    let _eligibility = require_consciousness(&requirement_for_proposal(), "add_dispute_evidence")?;
+    let _eligibility = require_consciousness(&civic_requirement_proposal(), "add_dispute_evidence")?;
     let filter = ChainQueryFilter::new()
         .entry_type(EntryType::App(AppEntryDef::try_from(
             UnitEntryTypes::PropertyDispute,
@@ -461,7 +461,7 @@ pub fn get_ownership_claim(claim_id: String) -> ExternResult<Option<Record>> {
 /// Add supporting document to ownership claim
 #[hdk_extern]
 pub fn add_claim_document(input: AddDocumentInput) -> ExternResult<Record> {
-    let _eligibility = require_consciousness(&requirement_for_proposal(), "add_claim_document")?;
+    let _eligibility = require_consciousness(&civic_requirement_proposal(), "add_claim_document")?;
     let filter = ChainQueryFilter::new()
         .entry_type(EntryType::App(AppEntryDef::try_from(
             UnitEntryTypes::OwnershipClaim,

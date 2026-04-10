@@ -113,7 +113,7 @@ fn require_consciousness(
 /// Only guardians (Founder, Elder, or Adult) can call this.
 #[hdk_extern]
 pub fn create_autonomy_profile(input: CreateAutonomyProfileInput) -> ExternResult<Record> {
-    let _eligibility = require_consciousness(&requirement_for_voting(), "create_autonomy_profile")?;
+    let _eligibility = require_consciousness(&civic_requirement_voting(), "create_autonomy_profile")?;
     let now = sys_time()?;
 
     // Verify the caller has a guardian-level role in this hearth.
@@ -170,7 +170,7 @@ pub fn create_autonomy_profile(input: CreateAutonomyProfileInput) -> ExternResul
 /// Request a new capability (typically called by a youth member).
 #[hdk_extern]
 pub fn request_capability(input: RequestCapabilityInput) -> ExternResult<Record> {
-    let _eligibility = require_consciousness(&requirement_for_basic(), "request_capability")?;
+    let _eligibility = require_consciousness(&civic_requirement_basic(), "request_capability")?;
     require_membership(&input.hearth_hash)?;
     let caller = agent_info()?.agent_initial_pubkey;
     let now = sys_time()?;
@@ -206,7 +206,7 @@ pub fn request_capability(input: RequestCapabilityInput) -> ExternResult<Record>
 /// Only guardians (Founder, Elder, or Adult) can approve/deny capabilities.
 #[hdk_extern]
 pub fn approve_capability(input: ApproveCapabilityInput) -> ExternResult<Record> {
-    let _eligibility = require_consciousness(&requirement_for_voting(), "approve_capability")?;
+    let _eligibility = require_consciousness(&civic_requirement_voting(), "approve_capability")?;
     let caller = agent_info()?.agent_initial_pubkey;
     let now = sys_time()?;
 
@@ -281,7 +281,7 @@ pub fn approve_capability(input: ApproveCapabilityInput) -> ExternResult<Record>
 /// Deny a capability request (convenience wrapper — calls approve with approved=false).
 #[hdk_extern]
 pub fn deny_capability(input: ApproveCapabilityInput) -> ExternResult<Record> {
-    let _eligibility = require_consciousness(&requirement_for_voting(), "deny_capability")?;
+    let _eligibility = require_consciousness(&civic_requirement_voting(), "deny_capability")?;
     let denial_input = ApproveCapabilityInput {
         request_hash: input.request_hash,
         approved: false,
@@ -295,7 +295,7 @@ pub fn deny_capability(input: ApproveCapabilityInput) -> ExternResult<Record> {
 /// triggers severance via cross-zome call to hearth_bridge.
 #[hdk_extern]
 pub fn advance_tier(input: AdvanceTierInput) -> ExternResult<Record> {
-    let _eligibility = require_consciousness(&requirement_for_constitutional(), "advance_tier")?;
+    let _eligibility = require_consciousness(&civic_requirement_constitutional(), "advance_tier")?;
     let now = sys_time()?;
 
     // Get the current profile (follow update chain)
@@ -396,7 +396,7 @@ pub fn advance_tier(input: AdvanceTierInput) -> ExternResult<Record> {
 /// and updates the profile's current_tier at that point.
 #[hdk_extern]
 pub fn progress_transition(transition_hash: ActionHash) -> ExternResult<Record> {
-    let _eligibility = require_consciousness(&requirement_for_voting(), "progress_transition")?;
+    let _eligibility = require_consciousness(&civic_requirement_voting(), "progress_transition")?;
     let now = sys_time()?;
 
     let record = get_latest_record(transition_hash.clone())?.ok_or(wasm_error!(

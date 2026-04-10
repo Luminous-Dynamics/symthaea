@@ -10,14 +10,14 @@
 use balances_integrity::*;
 use hdk::prelude::*;
 use mycelix_bridge_common::{
-    gate_consciousness, requirement_for_proposal, requirement_for_voting, GovernanceRequirement,
+    gate_civic, requirement_for_proposal, requirement_for_voting, GovernanceRequirement,
 };
 
 fn require_consciousness(
     requirement: &GovernanceRequirement,
     action_name: &str,
 ) -> ExternResult<()> {
-    gate_consciousness("music_bridge", requirement, action_name).map(|_| ())
+    gate_civic("music_bridge", requirement, action_name).map(|_| ())
 }
 
 /// Helper to ensure a path exists and return its entry hash
@@ -152,7 +152,7 @@ fn get_artist_account(agent: AgentPubKey) -> ExternResult<Option<ArtistAccount>>
 /// Record a deposit (after on-chain verification)
 #[hdk_extern]
 pub fn record_deposit(input: RecordDepositInput) -> ExternResult<ActionHash> {
-    require_consciousness(&requirement_for_proposal(), "record_deposit")?;
+    require_consciousness(&civic_requirement_proposal(), "record_deposit")?;
     let my_agent = agent_info()?.agent_initial_pubkey;
 
     let deposit = Deposit {
@@ -278,7 +278,7 @@ fn update_listener_balance(agent: AgentPubKey, delta: i64) -> ExternResult<()> {
 /// Request a cashout (artist)
 #[hdk_extern]
 pub fn request_cashout(amount: u64) -> ExternResult<ActionHash> {
-    require_consciousness(&requirement_for_voting(), "request_cashout")?;
+    require_consciousness(&civic_requirement_voting(), "request_cashout")?;
     let my_agent = agent_info()?.agent_initial_pubkey;
 
     // Get artist account
@@ -320,7 +320,7 @@ pub fn request_cashout(amount: u64) -> ExternResult<ActionHash> {
 /// Execute transfer from listener to artist (internal, called by plays zome)
 #[hdk_extern]
 pub fn execute_transfer(input: ExecuteTransferInput) -> ExternResult<ActionHash> {
-    require_consciousness(&requirement_for_voting(), "execute_transfer")?;
+    require_consciousness(&civic_requirement_voting(), "execute_transfer")?;
     // Create transfer record
     let transfer = Transfer {
         from: input.from.clone(),

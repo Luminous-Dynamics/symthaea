@@ -27,7 +27,7 @@ fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
 
 #[hdk_extern]
 pub fn catalog_seed(seed: SeedVariety) -> ExternResult<Record> {
-    require_consciousness(&requirement_for_basic(), "catalog_seed")?;
+    require_consciousness(&civic_requirement_basic(), "catalog_seed")?;
     let action_hash = create_entry(&EntryTypes::SeedVariety(seed.clone()))?;
 
     create_entry(&EntryTypes::Anchor(Anchor("all_seeds".to_string())))?;
@@ -73,7 +73,7 @@ pub fn get_seeds_by_species(species: String) -> ExternResult<Vec<Record>> {
 
 #[hdk_extern]
 pub fn share_practice(practice: TraditionalPractice) -> ExternResult<Record> {
-    require_consciousness(&requirement_for_basic(), "share_practice")?;
+    require_consciousness(&civic_requirement_basic(), "share_practice")?;
     let action_hash = create_entry(&EntryTypes::TraditionalPractice(practice.clone()))?;
 
     create_entry(&EntryTypes::Anchor(Anchor("all_practices".to_string())))?;
@@ -114,7 +114,7 @@ pub fn get_practices_by_category(category: String) -> ExternResult<Vec<Record>> 
 
 #[hdk_extern]
 pub fn share_recipe(recipe: Recipe) -> ExternResult<Record> {
-    require_consciousness(&requirement_for_basic(), "share_recipe")?;
+    require_consciousness(&civic_requirement_basic(), "share_recipe")?;
     let agent = agent_info()?.agent_initial_pubkey;
     let action_hash = create_entry(&EntryTypes::Recipe(recipe.clone()))?;
 
@@ -165,7 +165,7 @@ pub struct MatchSeedInput {
 
 #[hdk_extern]
 pub fn offer_seeds(stock: SeedStock) -> ExternResult<Record> {
-    require_consciousness(&requirement_for_basic(), "offer_seeds")?;
+    require_consciousness(&civic_requirement_basic(), "offer_seeds")?;
     let action_hash = create_entry(&EntryTypes::SeedStock(stock.clone()))?;
     create_link(
         stock.variety_hash,
@@ -180,7 +180,7 @@ pub fn offer_seeds(stock: SeedStock) -> ExternResult<Record> {
 
 #[hdk_extern]
 pub fn request_seeds(request: SeedRequest) -> ExternResult<Record> {
-    require_consciousness(&requirement_for_basic(), "request_seeds")?;
+    require_consciousness(&civic_requirement_basic(), "request_seeds")?;
     let action_hash = create_entry(&EntryTypes::SeedRequest(request))?;
     create_entry(&EntryTypes::Anchor(Anchor("all_seed_requests".to_string())))?;
     create_link(
@@ -217,7 +217,7 @@ pub fn get_open_seed_requests(_: ()) -> ExternResult<Vec<Record>> {
 
 #[hdk_extern]
 pub fn match_seed_request(input: MatchSeedInput) -> ExternResult<Record> {
-    require_consciousness(&requirement_for_proposal(), "match_seed_request")?;
+    require_consciousness(&civic_requirement_proposal(), "match_seed_request")?;
     let record = get(input.request_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
         WasmErrorInner::Guest("Seed request not found".into())
     ))?;
@@ -241,7 +241,7 @@ pub fn match_seed_request(input: MatchSeedInput) -> ExternResult<Record> {
 
 #[hdk_extern]
 pub fn add_nutrient_profile(profile: NutrientProfile) -> ExternResult<Record> {
-    require_consciousness(&requirement_for_basic(), "add_nutrient_profile")?;
+    require_consciousness(&civic_requirement_basic(), "add_nutrient_profile")?;
     let action_hash = create_entry(&EntryTypes::NutrientProfile(profile.clone()))?;
     let crop_anchor = format!("nutrients:{}", profile.crop_name.to_lowercase());
     create_entry(&EntryTypes::Anchor(Anchor(crop_anchor.clone())))?;
@@ -281,7 +281,7 @@ pub fn get_nutrient_profile(crop_name: String) -> ExternResult<Option<Record>> {
 
 #[hdk_extern]
 pub fn rate_seed_exchange(rating: SeedQualityRating) -> ExternResult<Record> {
-    require_consciousness(&requirement_for_basic(), "rate_seed_exchange")?;
+    require_consciousness(&civic_requirement_basic(), "rate_seed_exchange")?;
     let action_hash = create_entry(&EntryTypes::SeedQualityRating(rating.clone()))?;
 
     // Link from exchange → rating (for finding all ratings on an exchange)
@@ -337,7 +337,7 @@ pub struct UpdateSeedVarietyInput {
 
 #[hdk_extern]
 pub fn update_seed_variety(input: UpdateSeedVarietyInput) -> ExternResult<ActionHash> {
-    require_consciousness(&requirement_for_proposal(), "update_seed_variety")?;
+    require_consciousness(&civic_requirement_proposal(), "update_seed_variety")?;
     update_entry(
         input.original_action_hash,
         &EntryTypes::SeedVariety(input.updated_entry),
@@ -354,7 +354,7 @@ pub struct UpdateTraditionalPracticeInput {
 pub fn update_traditional_practice(
     input: UpdateTraditionalPracticeInput,
 ) -> ExternResult<ActionHash> {
-    require_consciousness(&requirement_for_proposal(), "update_traditional_practice")?;
+    require_consciousness(&civic_requirement_proposal(), "update_traditional_practice")?;
     update_entry(
         input.original_action_hash,
         &EntryTypes::TraditionalPractice(input.updated_entry),
@@ -369,7 +369,7 @@ pub struct UpdateRecipeInput {
 
 #[hdk_extern]
 pub fn update_recipe(input: UpdateRecipeInput) -> ExternResult<ActionHash> {
-    require_consciousness(&requirement_for_proposal(), "update_recipe")?;
+    require_consciousness(&civic_requirement_proposal(), "update_recipe")?;
     update_entry(
         input.original_action_hash,
         &EntryTypes::Recipe(input.updated_entry),

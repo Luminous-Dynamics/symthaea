@@ -1003,7 +1003,7 @@ pub fn get_consciousness_credential(did: String) -> ExternResult<ConsciousnessCr
 
 /// Refresh a consciousness credential by re-fetching from the identity cluster.
 ///
-/// Called by `gate_consciousness()` when a credential is nearing expiry (within
+/// Called by `gate_civic()` when a credential is nearing expiry (within
 /// 2 hours). Fetches a fresh credential from the identity bridge, updates the
 /// local engagement dimension, and caches the result.
 ///

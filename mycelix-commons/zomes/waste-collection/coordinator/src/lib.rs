@@ -28,7 +28,7 @@ fn require_consciousness(
 /// Request a waste collection (pickup)
 #[hdk_extern]
 pub fn request_collection(request: CollectionRequest) -> ExternResult<Record> {
-    let _eligibility = require_consciousness(&requirement_for_basic(), "request_collection")?;
+    let _eligibility = require_consciousness(&civic_requirement_basic(), "request_collection")?;
 
     // Validate quantity
     if !request.quantity_kg.is_finite() || request.quantity_kg <= 0.0 {
@@ -141,7 +141,7 @@ pub fn get_requests_by_status(status: CollectionStatus) -> ExternResult<Vec<Reco
 /// Create a collection run from pending requests
 #[hdk_extern]
 pub fn create_collection_run(run: CollectionRun) -> ExternResult<Record> {
-    let _eligibility = require_consciousness(&requirement_for_basic(), "create_collection_run")?;
+    let _eligibility = require_consciousness(&civic_requirement_basic(), "create_collection_run")?;
 
     // Validate stops
     if run.stops.is_empty() {
@@ -309,7 +309,7 @@ fn haversine_km(lat1: f64, lon1: f64, lat2: f64, lon2: f64) -> f64 {
 #[hdk_extern]
 pub fn plan_optimized_route(input: PlanOptimizedRouteInput) -> ExternResult<OptimizedRouteResult> {
     let _eligibility =
-        require_consciousness(&requirement_for_basic(), "plan_optimized_route")?;
+        require_consciousness(&civic_requirement_basic(), "plan_optimized_route")?;
 
     // Get all pending requests
     let status_anchor = format!("collection_status:{:?}", CollectionStatus::Requested);
@@ -468,7 +468,7 @@ pub struct ConfirmDeliveryInput {
 /// Confirm delivery of waste at a collection stop
 #[hdk_extern]
 pub fn confirm_delivery(input: ConfirmDeliveryInput) -> ExternResult<Record> {
-    let _eligibility = require_consciousness(&requirement_for_basic(), "confirm_delivery")?;
+    let _eligibility = require_consciousness(&civic_requirement_basic(), "confirm_delivery")?;
 
     // Validate actual kg
     if !input.actual_kg.is_finite() || input.actual_kg < 0.0 {

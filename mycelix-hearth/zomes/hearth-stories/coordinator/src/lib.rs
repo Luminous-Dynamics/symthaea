@@ -90,7 +90,7 @@ pub struct AddToCollectionInput {
 /// Create a new family story. Links it to the hearth and creates tag links.
 #[hdk_extern]
 pub fn create_story(input: CreateStoryInput) -> ExternResult<Record> {
-    require_consciousness(&requirement_for_basic(), "create_story")?;
+    require_consciousness(&civic_requirement_basic(), "create_story")?;
     require_membership(&input.hearth_hash)?;
     let caller = agent_info()?.agent_initial_pubkey;
     let now = sys_time()?;
@@ -150,7 +150,7 @@ pub fn create_story(input: CreateStoryInput) -> ExternResult<Record> {
 /// Only the original storyteller may update their story.
 #[hdk_extern]
 pub fn update_story(input: UpdateStoryInput) -> ExternResult<Record> {
-    require_consciousness(&requirement_for_proposal(), "update_story")?;
+    require_consciousness(&civic_requirement_proposal(), "update_story")?;
     let caller = agent_info()?.agent_initial_pubkey;
 
     let record = get(input.story_hash.clone(), GetOptions::default())?
@@ -191,7 +191,7 @@ pub fn update_story(input: UpdateStoryInput) -> ExternResult<Record> {
 /// Only the original storyteller may add media to their story.
 #[hdk_extern]
 pub fn add_media_to_story(input: AddMediaInput) -> ExternResult<()> {
-    require_consciousness(&requirement_for_proposal(), "add_media_to_story")?;
+    require_consciousness(&civic_requirement_proposal(), "add_media_to_story")?;
     let caller = agent_info()?.agent_initial_pubkey;
 
     let record = get(input.story_hash.clone(), GetOptions::default())?
@@ -224,7 +224,7 @@ pub fn add_media_to_story(input: AddMediaInput) -> ExternResult<()> {
 /// Create a new story collection. Links it to the hearth.
 #[hdk_extern]
 pub fn create_collection(input: CreateCollectionInput) -> ExternResult<Record> {
-    require_consciousness(&requirement_for_basic(), "create_collection")?;
+    require_consciousness(&civic_requirement_basic(), "create_collection")?;
     require_membership(&input.hearth_hash)?;
     let caller = agent_info()?.agent_initial_pubkey;
 
@@ -254,7 +254,7 @@ pub fn create_collection(input: CreateCollectionInput) -> ExternResult<Record> {
 /// Add a story to a collection via a link.
 #[hdk_extern]
 pub fn add_to_collection(input: AddToCollectionInput) -> ExternResult<()> {
-    require_consciousness(&requirement_for_proposal(), "add_to_collection")?;
+    require_consciousness(&civic_requirement_proposal(), "add_to_collection")?;
     // Fetch the collection to get its hearth_hash for membership check
     let record = get(input.collection_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
         WasmErrorInner::Guest("Collection not found".into())
@@ -280,7 +280,7 @@ pub fn add_to_collection(input: AddToCollectionInput) -> ExternResult<()> {
 /// Create a new family tradition. Links it to the hearth.
 #[hdk_extern]
 pub fn create_tradition(input: CreateTraditionInput) -> ExternResult<Record> {
-    require_consciousness(&requirement_for_basic(), "create_tradition")?;
+    require_consciousness(&civic_requirement_basic(), "create_tradition")?;
     require_membership(&input.hearth_hash)?;
 
     let tradition = FamilyTradition {
@@ -313,7 +313,7 @@ pub fn create_tradition(input: CreateTraditionInput) -> ExternResult<Record> {
 /// Reads the tradition to obtain its hearth_hash, then validates membership.
 #[hdk_extern]
 pub fn observe_tradition(tradition_hash: ActionHash) -> ExternResult<Record> {
-    require_consciousness(&requirement_for_proposal(), "observe_tradition")?;
+    require_consciousness(&civic_requirement_proposal(), "observe_tradition")?;
     let caller = agent_info()?.agent_initial_pubkey;
     let now = sys_time()?;
 

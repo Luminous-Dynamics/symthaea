@@ -25,7 +25,7 @@ fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
 
 #[hdk_extern]
 pub fn submit_request(req: MaintenanceRequest) -> ExternResult<Record> {
-    let _eligibility = require_consciousness(&requirement_for_basic(), "submit_request")?;
+    let _eligibility = require_consciousness(&civic_requirement_basic(), "submit_request")?;
     let action_hash = create_entry(&EntryTypes::MaintenanceRequest(req.clone()))?;
 
     // Link to open requests
@@ -66,7 +66,7 @@ pub struct AcknowledgeRequestInput {
 /// Acknowledge a maintenance request
 #[hdk_extern]
 pub fn acknowledge_request(input: AcknowledgeRequestInput) -> ExternResult<Record> {
-    let _eligibility = require_consciousness(&requirement_for_proposal(), "acknowledge_request")?;
+    let _eligibility = require_consciousness(&civic_requirement_proposal(), "acknowledge_request")?;
     let record = get(input.request_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
         WasmErrorInner::Guest("Request not found".into())
     ))?;
@@ -97,7 +97,7 @@ pub fn acknowledge_request(input: AcknowledgeRequestInput) -> ExternResult<Recor
 /// Create a work order for a maintenance request
 #[hdk_extern]
 pub fn create_work_order(order: WorkOrder) -> ExternResult<Record> {
-    let _eligibility = require_consciousness(&requirement_for_proposal(), "create_work_order")?;
+    let _eligibility = require_consciousness(&civic_requirement_proposal(), "create_work_order")?;
     if order.assigned_to.len() > 256 {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "Assigned-to must be at most 256 characters".into()
@@ -148,7 +148,7 @@ pub struct CompleteWorkOrderInput {
 /// Complete a work order and mark the request as completed
 #[hdk_extern]
 pub fn complete_work_order(input: CompleteWorkOrderInput) -> ExternResult<Record> {
-    let _eligibility = require_consciousness(&requirement_for_proposal(), "complete_work_order")?;
+    let _eligibility = require_consciousness(&civic_requirement_proposal(), "complete_work_order")?;
     let record = get(input.work_order_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
         WasmErrorInner::Guest("Work order not found".into())
     ))?;
@@ -221,7 +221,7 @@ pub fn complete_work_order(input: CompleteWorkOrderInput) -> ExternResult<Record
 /// Schedule a building inspection
 #[hdk_extern]
 pub fn schedule_inspection(inspection: Inspection) -> ExternResult<Record> {
-    let _eligibility = require_consciousness(&requirement_for_proposal(), "schedule_inspection")?;
+    let _eligibility = require_consciousness(&civic_requirement_proposal(), "schedule_inspection")?;
     let action_hash = create_entry(&EntryTypes::Inspection(inspection.clone()))?;
 
     create_link(
@@ -247,7 +247,7 @@ pub struct RecordInspectionInput {
 /// Record the results of an inspection
 #[hdk_extern]
 pub fn record_inspection(input: RecordInspectionInput) -> ExternResult<Record> {
-    let _eligibility = require_consciousness(&requirement_for_proposal(), "record_inspection")?;
+    let _eligibility = require_consciousness(&civic_requirement_proposal(), "record_inspection")?;
     let record = get(input.inspection_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
         WasmErrorInner::Guest("Inspection not found".into())
     ))?;

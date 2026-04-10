@@ -36,7 +36,7 @@ fn require_consciousness(
 /// Create a new service offer
 #[hdk_extern]
 pub fn create_service_offer(offer: ServiceOffer) -> ExternResult<Record> {
-    let _eligibility = require_consciousness(&requirement_for_basic(), "create_service_offer")?;
+    let _eligibility = require_consciousness(&civic_requirement_basic(), "create_service_offer")?;
     let action_hash = create_entry(&EntryTypes::ServiceOffer(offer.clone()))?;
 
     // Link agent to offer
@@ -142,7 +142,7 @@ pub fn search_offers(query: String) -> ExternResult<Vec<Record>> {
 /// Create a new service request
 #[hdk_extern]
 pub fn create_service_request(request: ServiceRequest) -> ExternResult<Record> {
-    let _eligibility = require_consciousness(&requirement_for_basic(), "create_service_request")?;
+    let _eligibility = require_consciousness(&civic_requirement_basic(), "create_service_request")?;
     let action_hash = create_entry(&EntryTypes::ServiceRequest(request.clone()))?;
 
     // Link agent to request
@@ -232,7 +232,7 @@ pub struct CompleteExchangeInput {
 /// Complete a service exchange, creating a TimeExchange record and updating credits
 #[hdk_extern]
 pub fn complete_exchange(input: CompleteExchangeInput) -> ExternResult<Record> {
-    let _eligibility = require_consciousness(&requirement_for_proposal(), "complete_exchange")?;
+    let _eligibility = require_consciousness(&civic_requirement_proposal(), "complete_exchange")?;
     let now = sys_time()?;
 
     let exchange = TimeExchange {
@@ -308,7 +308,7 @@ pub struct RateExchangeInput {
 /// Rate a completed exchange
 #[hdk_extern]
 pub fn rate_exchange(input: RateExchangeInput) -> ExternResult<Record> {
-    let _eligibility = require_consciousness(&requirement_for_basic(), "rate_exchange")?;
+    let _eligibility = require_consciousness(&civic_requirement_basic(), "rate_exchange")?;
     if input.rating < 1 || input.rating > 5 {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "Rating must be between 1 and 5".into()

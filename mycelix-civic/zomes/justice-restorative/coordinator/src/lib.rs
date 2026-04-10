@@ -25,7 +25,7 @@ fn require_consciousness(
 
 #[hdk_extern]
 pub fn create_circle(circle: RestorativeCircle) -> ExternResult<Record> {
-    require_consciousness(&requirement_for_basic(), "create_circle")?;
+    require_consciousness(&civic_requirement_basic(), "create_circle")?;
     let action_hash = create_entry(&EntryTypes::RestorativeCircle(circle.clone()))?;
     let record = get_latest_record(action_hash.clone())?.ok_or(wasm_error!(
         WasmErrorInner::Guest("Could not get created circle".into())
@@ -85,7 +85,7 @@ pub fn get_case_circle(case_id: String) -> ExternResult<Option<Record>> {
 /// Record participant consent
 #[hdk_extern]
 pub fn record_consent(input: ConsentInput) -> ExternResult<Record> {
-    require_consciousness(&requirement_for_basic(), "record_consent")?;
+    require_consciousness(&civic_requirement_basic(), "record_consent")?;
     let record = get(input.circle_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
         WasmErrorInner::Guest("Circle not found".into())
     ))?;
@@ -127,7 +127,7 @@ pub struct ConsentInput {
 /// Record a circle session
 #[hdk_extern]
 pub fn record_session(input: RecordSessionInput) -> ExternResult<Record> {
-    require_consciousness(&requirement_for_basic(), "record_session")?;
+    require_consciousness(&civic_requirement_basic(), "record_session")?;
     let record = get(input.circle_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
         WasmErrorInner::Guest("Circle not found".into())
     ))?;
@@ -170,7 +170,7 @@ pub struct RecordSessionInput {
 /// Add an agreement to the circle
 #[hdk_extern]
 pub fn add_agreement(input: AddAgreementInput) -> ExternResult<Record> {
-    require_consciousness(&requirement_for_basic(), "add_agreement")?;
+    require_consciousness(&civic_requirement_basic(), "add_agreement")?;
     let record = get(input.circle_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
         WasmErrorInner::Guest("Circle not found".into())
     ))?;
@@ -201,7 +201,7 @@ pub struct AddAgreementInput {
 /// Update circle status
 #[hdk_extern]
 pub fn update_circle_status(input: UpdateCircleStatusInput) -> ExternResult<Record> {
-    require_consciousness(&requirement_for_proposal(), "update_circle_status")?;
+    require_consciousness(&civic_requirement_proposal(), "update_circle_status")?;
     let record = get(input.circle_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
         WasmErrorInner::Guest("Circle not found".into())
     ))?;
@@ -232,7 +232,7 @@ pub struct UpdateCircleStatusInput {
 /// Complete the circle
 #[hdk_extern]
 pub fn complete_circle(input: CompleteCircleInput) -> ExternResult<Record> {
-    require_consciousness(&requirement_for_proposal(), "complete_circle")?;
+    require_consciousness(&civic_requirement_proposal(), "complete_circle")?;
     let record = get(input.circle_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
         WasmErrorInner::Guest("Circle not found".into())
     ))?;
@@ -354,7 +354,7 @@ pub struct RestitutionCompletionStatus {
 /// linked to the TEND mutual credit system.
 #[hdk_extern]
 pub fn create_restitution_agreement(input: CreateRestitutionInput) -> ExternResult<Record> {
-    require_consciousness(&requirement_for_proposal(), "create_restitution_agreement")?;
+    require_consciousness(&civic_requirement_proposal(), "create_restitution_agreement")?;
 
     // Verify circle exists and is in appropriate status
     let circle_record = get(input.circle_hash.clone(), GetOptions::default())?.ok_or(
@@ -423,7 +423,7 @@ pub fn create_restitution_agreement(input: CreateRestitutionInput) -> ExternResu
 /// the TEND exchange ID for cross-reference verification.
 #[hdk_extern]
 pub fn record_restitution_payment(input: RecordRestitutionPaymentInput) -> ExternResult<Record> {
-    require_consciousness(&requirement_for_basic(), "record_restitution_payment")?;
+    require_consciousness(&civic_requirement_basic(), "record_restitution_payment")?;
 
     let record = get(input.agreement_hash.clone(), GetOptions::default())?.ok_or(
         wasm_error!(WasmErrorInner::Guest(

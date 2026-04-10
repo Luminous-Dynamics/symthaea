@@ -72,7 +72,7 @@ pub struct ClearingInput {
 
 #[hdk_extern]
 pub fn create_circle(input: CreateCircleInput) -> ExternResult<Record> {
-    let _eligibility = require_consciousness(&requirement_for_basic(), "create_circle")?;
+    let _eligibility = require_consciousness(&civic_requirement_basic(), "create_circle")?;
     let founder = agent_info()?.agent_initial_pubkey;
     let now = sys_time()?;
 
@@ -195,7 +195,7 @@ pub struct UpdateCreditCircleInput {
 /// Update a credit circle entry (general-purpose update replacing the whole entry)
 #[hdk_extern]
 pub fn update_circle(input: UpdateCreditCircleInput) -> ExternResult<ActionHash> {
-    let _eligibility = require_consciousness(&requirement_for_proposal(), "update_circle")?;
+    let _eligibility = require_consciousness(&civic_requirement_proposal(), "update_circle")?;
     update_entry(
         input.original_action_hash,
         EntryTypes::CreditCircle(input.updated_entry),
@@ -211,7 +211,7 @@ pub struct UpdateCreditLineInput {
 /// Update a credit line entry (general-purpose update replacing the whole entry)
 #[hdk_extern]
 pub fn update_credit_line(input: UpdateCreditLineInput) -> ExternResult<ActionHash> {
-    let _eligibility = require_consciousness(&requirement_for_proposal(), "update_credit_line")?;
+    let _eligibility = require_consciousness(&civic_requirement_proposal(), "update_credit_line")?;
     update_entry(
         input.original_action_hash,
         EntryTypes::CreditLine(input.updated_entry),
@@ -225,7 +225,7 @@ pub fn update_credit_line(input: UpdateCreditLineInput) -> ExternResult<ActionHa
 /// Join a credit circle
 #[hdk_extern]
 pub fn join_circle(input: JoinCircleInput) -> ExternResult<Record> {
-    let _eligibility = require_consciousness(&requirement_for_basic(), "join_circle")?;
+    let _eligibility = require_consciousness(&civic_requirement_basic(), "join_circle")?;
     let member = agent_info()?.agent_initial_pubkey;
     let now = sys_time()?;
 
@@ -345,7 +345,7 @@ pub fn get_circle_members(circle_hash: ActionHash) -> ExternResult<Vec<AgentPubK
 /// Transfer credits to another member
 #[hdk_extern]
 pub fn transfer(input: TransferInput) -> ExternResult<Record> {
-    let _eligibility = require_consciousness(&requirement_for_basic(), "transfer")?;
+    let _eligibility = require_consciousness(&civic_requirement_basic(), "transfer")?;
     let from = agent_info()?.agent_initial_pubkey;
     let now = sys_time()?;
 
@@ -591,7 +591,7 @@ pub fn get_circle_balances(circle_hash: ActionHash) -> ExternResult<Vec<Balance>
 /// This finds cycles of debt and clears them automatically
 #[hdk_extern]
 pub fn run_clearing(input: ClearingInput) -> ExternResult<Vec<Record>> {
-    let _eligibility = require_consciousness(&requirement_for_proposal(), "run_clearing")?;
+    let _eligibility = require_consciousness(&civic_requirement_proposal(), "run_clearing")?;
     let now = sys_time()?;
     let members = get_circle_members(input.circle_hash.clone())?;
 
@@ -708,7 +708,7 @@ pub fn run_clearing(input: ClearingInput) -> ExternResult<Vec<Record>> {
 /// Adjust a member's credit limit (requires governance approval in production)
 #[hdk_extern]
 pub fn adjust_credit_limit(input: AdjustCreditLimitInput) -> ExternResult<Record> {
-    let _eligibility = require_consciousness(&requirement_for_proposal(), "adjust_credit_limit")?;
+    let _eligibility = require_consciousness(&civic_requirement_proposal(), "adjust_credit_limit")?;
     let now = sys_time()?;
 
     // Get circle to check max limit

@@ -56,7 +56,7 @@ pub struct StartCircleInput {
 /// and emits a HearthSignal::GratitudeExpressed signal.
 #[hdk_extern]
 pub fn express_gratitude(input: ExpressGratitudeInput) -> ExternResult<Record> {
-    require_consciousness(&requirement_for_basic(), "express_gratitude")?;
+    require_consciousness(&civic_requirement_basic(), "express_gratitude")?;
     require_membership(&input.hearth_hash)?;
     let caller = agent_info()?.agent_initial_pubkey;
     let now = sys_time()?;
@@ -114,7 +114,7 @@ pub fn express_gratitude(input: ExpressGratitudeInput) -> ExternResult<Record> {
 /// Start a new appreciation circle with a theme and initial participants.
 #[hdk_extern]
 pub fn start_appreciation_circle(input: StartCircleInput) -> ExternResult<Record> {
-    require_consciousness(&requirement_for_basic(), "start_appreciation_circle")?;
+    require_consciousness(&civic_requirement_basic(), "start_appreciation_circle")?;
     require_membership(&input.hearth_hash)?;
     let now = sys_time()?;
 
@@ -155,7 +155,7 @@ pub fn start_appreciation_circle(input: StartCircleInput) -> ExternResult<Record
 /// Join an existing appreciation circle by adding the calling agent to participants.
 #[hdk_extern]
 pub fn join_circle(circle_hash: ActionHash) -> ExternResult<Record> {
-    require_consciousness(&requirement_for_basic(), "join_circle")?;
+    require_consciousness(&civic_requirement_basic(), "join_circle")?;
     let caller = agent_info()?.agent_initial_pubkey;
 
     let record = get(circle_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
@@ -202,7 +202,7 @@ pub fn join_circle(circle_hash: ActionHash) -> ExternResult<Record> {
 /// Only the circle creator (action author) can complete it.
 #[hdk_extern]
 pub fn complete_circle(circle_hash: ActionHash) -> ExternResult<Record> {
-    require_consciousness(&requirement_for_proposal(), "complete_circle")?;
+    require_consciousness(&civic_requirement_proposal(), "complete_circle")?;
     let caller = agent_info()?.agent_initial_pubkey;
     let now = sys_time()?;
 

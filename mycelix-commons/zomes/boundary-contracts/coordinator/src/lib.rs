@@ -223,7 +223,7 @@ fn ensure_anchor(anchor_str: &str) -> ExternResult<EntryHash> {
 }
 
 /// Governance requirement for proposing contracts: Participant tier + identity >= 0.25.
-fn requirement_for_proposal() -> mycelix_bridge_common::GovernanceRequirement {
+fn civic_requirement_proposal() -> mycelix_bridge_common::GovernanceRequirement {
     mycelix_bridge_common::GovernanceRequirement {
         min_tier: mycelix_bridge_common::ConsciousnessTier::Participant,
         min_identity: Some(0.25),
@@ -250,7 +250,7 @@ pub struct ProposeContractInput {
 /// Checks the other party's standing boundaries for blocks.
 #[hdk_extern]
 pub fn propose_contract(input: ProposeContractInput) -> ExternResult<Record> {
-    require_consciousness(&requirement_for_proposal(), "propose_contract")?;
+    require_consciousness(&civic_requirement_proposal(), "propose_contract")?;
 
     let agent_info = agent_info()?;
     let proposer = agent_info.agent_initial_pubkey.clone();
@@ -342,7 +342,7 @@ pub fn propose_contract(input: ProposeContractInput) -> ExternResult<Record> {
 /// Only the non-proposing party can call this.
 #[hdk_extern]
 pub fn sign_contract(contract_hash: ActionHash) -> ExternResult<Record> {
-    require_consciousness(&requirement_for_basic(), "sign_contract")?;
+    require_consciousness(&civic_requirement_basic(), "sign_contract")?;
 
     let agent_info = agent_info()?;
     let signer = agent_info.agent_initial_pubkey;
@@ -749,7 +749,7 @@ pub fn can_propose_to(provider: AgentPubKey) -> ExternResult<bool> {
     let me = agent_info.agent_initial_pubkey;
 
     // Check consciousness gate
-    if require_consciousness(&requirement_for_proposal(), "can_propose_to").is_err() {
+    if require_consciousness(&civic_requirement_proposal(), "can_propose_to").is_err() {
         return Ok(false);
     }
 

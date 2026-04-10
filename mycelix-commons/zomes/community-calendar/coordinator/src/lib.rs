@@ -54,7 +54,7 @@ fn date_from_timestamp(ts: &Timestamp) -> String {
 /// Create a new calendar event with anchored indices.
 #[hdk_extern]
 pub fn create_event(event: CalendarEvent) -> ExternResult<ActionHash> {
-    require_consciousness(&requirement_for_proposal(), "create_event")?;
+    require_consciousness(&civic_requirement_proposal(), "create_event")?;
 
     // Validate inputs that go beyond integrity checks
     if event.title.trim().is_empty() {
@@ -122,7 +122,7 @@ pub fn create_event(event: CalendarEvent) -> ExternResult<ActionHash> {
 /// Retrieve a single event by its action hash.
 #[hdk_extern]
 pub fn get_event(hash: ActionHash) -> ExternResult<Record> {
-    require_consciousness(&requirement_for_basic(), "get_event")?;
+    require_consciousness(&civic_requirement_basic(), "get_event")?;
     get(hash, GetOptions::default())?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Event not found".into())))
 }
@@ -130,7 +130,7 @@ pub fn get_event(hash: ActionHash) -> ExternResult<Record> {
 /// Get all events on a given date (format: "YYYY-MM-DD").
 #[hdk_extern]
 pub fn get_events_by_date(date_str: String) -> ExternResult<Vec<Record>> {
-    require_consciousness(&requirement_for_basic(), "get_events_by_date")?;
+    require_consciousness(&civic_requirement_basic(), "get_events_by_date")?;
     if date_str.len() != 10 {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "Date must be in YYYY-MM-DD format".into()
@@ -147,7 +147,7 @@ pub fn get_events_by_date(date_str: String) -> ExternResult<Vec<Record>> {
 /// Get all events in a given category.
 #[hdk_extern]
 pub fn get_events_by_category(category: String) -> ExternResult<Vec<Record>> {
-    require_consciousness(&requirement_for_basic(), "get_events_by_category")?;
+    require_consciousness(&civic_requirement_basic(), "get_events_by_category")?;
     let cat_key = category.to_lowercase().replace(' ', "_");
     let anchor = anchor_hash(&format!("events_cat:{}", cat_key))?;
     let links = get_links(
@@ -163,7 +163,7 @@ pub fn get_events_by_category(category: String) -> ExternResult<Vec<Record>> {
 /// use, a time-bucketed index would be more efficient.
 #[hdk_extern]
 pub fn get_upcoming_events(limit: u32) -> ExternResult<Vec<Record>> {
-    require_consciousness(&requirement_for_basic(), "get_upcoming_events")?;
+    require_consciousness(&civic_requirement_basic(), "get_upcoming_events")?;
     let anchor = anchor_hash("all_events")?;
     let links = get_links(
         LinkQuery::try_new(anchor, LinkTypes::AllEvents)?,
@@ -199,7 +199,7 @@ pub fn get_upcoming_events(limit: u32) -> ExternResult<Vec<Record>> {
 /// RSVP to a calendar event.
 #[hdk_extern]
 pub fn rsvp_to_event(rsvp: Rsvp) -> ExternResult<ActionHash> {
-    require_consciousness(&requirement_for_basic(), "rsvp_to_event")?;
+    require_consciousness(&civic_requirement_basic(), "rsvp_to_event")?;
 
     // Verify the event exists
     let _event_record = get(rsvp.event_id.clone(), GetOptions::default())?.ok_or(
@@ -232,7 +232,7 @@ pub fn rsvp_to_event(rsvp: Rsvp) -> ExternResult<ActionHash> {
 /// Get all RSVPs for an event.
 #[hdk_extern]
 pub fn get_event_rsvps(event_id: ActionHash) -> ExternResult<Vec<Record>> {
-    require_consciousness(&requirement_for_basic(), "get_event_rsvps")?;
+    require_consciousness(&civic_requirement_basic(), "get_event_rsvps")?;
     let links = get_links(
         LinkQuery::try_new(event_id, LinkTypes::EventToRsvp)?,
         GetStrategy::default(),
@@ -243,7 +243,7 @@ pub fn get_event_rsvps(event_id: ActionHash) -> ExternResult<Vec<Record>> {
 /// Get all RSVPs for the calling agent.
 #[hdk_extern]
 pub fn get_my_rsvps(_: ()) -> ExternResult<Vec<Record>> {
-    require_consciousness(&requirement_for_basic(), "get_my_rsvps")?;
+    require_consciousness(&civic_requirement_basic(), "get_my_rsvps")?;
     let caller = agent_info()?.agent_initial_pubkey;
     let agent_anchor = anchor_hash(&format!("agent_rsvps:{}", caller))?;
     let links = get_links(
@@ -260,7 +260,7 @@ pub fn get_my_rsvps(_: ()) -> ExternResult<Vec<Record>> {
 /// Cancel an event by deleting its entry. Returns the delete action hash.
 #[hdk_extern]
 pub fn cancel_event(hash: ActionHash) -> ExternResult<ActionHash> {
-    require_consciousness(&requirement_for_proposal(), "cancel_event")?;
+    require_consciousness(&civic_requirement_proposal(), "cancel_event")?;
     // Verify the event exists and was authored by the caller
     let record = get(hash.clone(), GetOptions::default())?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Event not found".into())))?;
@@ -280,7 +280,7 @@ pub fn cancel_event(hash: ActionHash) -> ExternResult<ActionHash> {
 /// Get events near a geographic location using geohash-based indexing.
 #[hdk_extern]
 pub fn get_nearby_events(input: commons_types::geo::NearbyQuery) -> ExternResult<Vec<Record>> {
-    require_consciousness(&requirement_for_basic(), "get_nearby_events")?;
+    require_consciousness(&civic_requirement_basic(), "get_nearby_events")?;
     let geohash = commons_types::geo::geohash_encode(input.latitude, input.longitude, 6);
     let geo_anchor = anchor_hash(&format!("geo:{}", geohash))?;
     let links = get_links(

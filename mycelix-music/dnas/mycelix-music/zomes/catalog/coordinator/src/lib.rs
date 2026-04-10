@@ -10,7 +10,7 @@
 use catalog_integrity::*;
 use hdk::prelude::*;
 use mycelix_bridge_common::{
-    gate_consciousness, requirement_for_proposal, GovernanceRequirement,
+    gate_civic, requirement_for_proposal, GovernanceRequirement,
 };
 
 /// Consciousness gate: requires at least Participant tier for write operations.
@@ -18,7 +18,7 @@ fn require_consciousness(
     requirement: &GovernanceRequirement,
     action_name: &str,
 ) -> ExternResult<()> {
-    gate_consciousness("music_bridge", requirement, action_name).map(|_| ())
+    gate_civic("music_bridge", requirement, action_name).map(|_| ())
 }
 
 /// Helper to ensure a path exists and return its entry hash
@@ -31,7 +31,7 @@ fn ensure_path(path: Path, link_type: LinkTypes) -> ExternResult<EntryHash> {
 /// Create a new song entry
 #[hdk_extern]
 pub fn create_song(song: Song) -> ExternResult<ActionHash> {
-    require_consciousness(&requirement_for_proposal(), "create_song")?;
+    require_consciousness(&civic_requirement_proposal(), "create_song")?;
     let action_hash = create_entry(EntryTypes::Song(song.clone()))?;
 
     // Link from artist to song
@@ -154,7 +154,7 @@ pub fn get_songs_by_genre(genre: String) -> ExternResult<Vec<Song>> {
 /// Create an album
 #[hdk_extern]
 pub fn create_album(album: Album) -> ExternResult<ActionHash> {
-    require_consciousness(&requirement_for_proposal(), "create_album")?;
+    require_consciousness(&civic_requirement_proposal(), "create_album")?;
     let action_hash = create_entry(EntryTypes::Album(album.clone()))?;
 
     // Link from artist to album
@@ -222,7 +222,7 @@ pub fn get_album_with_songs(action_hash: ActionHash) -> ExternResult<Option<Albu
 /// Create or update artist profile
 #[hdk_extern]
 pub fn set_artist_profile(profile: ArtistProfile) -> ExternResult<ActionHash> {
-    require_consciousness(&requirement_for_proposal(), "set_artist_profile")?;
+    require_consciousness(&civic_requirement_proposal(), "set_artist_profile")?;
     let my_agent = agent_info()?.agent_initial_pubkey;
     let profile_path = Path::from(format!("profile/{}", my_agent));
     let typed_path = profile_path.typed(LinkTypes::AllArtists)?;

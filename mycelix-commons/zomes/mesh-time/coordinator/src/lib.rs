@@ -4,14 +4,14 @@
 use hdk::prelude::*;
 use mesh_time_integrity::*;
 use mycelix_bridge_common::{
-    gate_consciousness, requirement_for_basic, GovernanceEligibility, GovernanceRequirement,
+    gate_civic, requirement_for_basic, GovernanceEligibility, GovernanceRequirement,
 };
 
 fn require_consciousness(
     requirement: &GovernanceRequirement,
     action_name: &str,
 ) -> ExternResult<GovernanceEligibility> {
-    gate_consciousness("commons_bridge", requirement, action_name)
+    gate_civic("commons_bridge", requirement, action_name)
 }
 
 /// Helper to get an anchor entry hash
@@ -28,7 +28,7 @@ fn ensure_anchor(anchor_str: &str) -> ExternResult<EntryHash> {
 /// Record a time anchor on the DHT (Participant+).
 #[hdk_extern]
 pub fn record_time_anchor(anchor: TimeAnchor) -> ExternResult<Record> {
-    let _eligibility = require_consciousness(&requirement_for_basic(), "record_time_anchor")?;
+    let _eligibility = require_consciousness(&civic_requirement_basic(), "record_time_anchor")?;
 
     let action_hash = create_entry(&EntryTypes::TimeAnchor(anchor.clone()))?;
 
@@ -79,7 +79,7 @@ pub fn get_mesh_time(_: ()) -> ExternResult<Vec<TimeAnchor>> {
 /// Dispute a skewed time anchor (Participant+).
 #[hdk_extern]
 pub fn dispute_time_anchor(dispute: TimeDispute) -> ExternResult<Record> {
-    let _eligibility = require_consciousness(&requirement_for_basic(), "dispute_time_anchor")?;
+    let _eligibility = require_consciousness(&civic_requirement_basic(), "dispute_time_anchor")?;
 
     let action_hash = create_entry(&EntryTypes::TimeDispute(dispute.clone()))?;
 

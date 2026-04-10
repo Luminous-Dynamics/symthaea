@@ -55,7 +55,7 @@ fn emissions_factor(mode: &TripMode) -> f64 {
 
 #[hdk_extern]
 pub fn log_trip(mut trip: TripLog) -> ExternResult<Record> {
-    require_consciousness(&requirement_for_basic(), "log_trip")?;
+    require_consciousness(&civic_requirement_basic(), "log_trip")?;
     let agent = agent_info()?.agent_initial_pubkey;
 
     // Auto-calculate emissions if not provided (zero means calculate)
@@ -200,7 +200,7 @@ pub struct RedeemInput {
 
 #[hdk_extern]
 pub fn redeem_credits(input: RedeemInput) -> ExternResult<Record> {
-    require_consciousness(&requirement_for_basic(), "redeem_credits")?;
+    require_consciousness(&civic_requirement_basic(), "redeem_credits")?;
     let agent = agent_info()?.agent_initial_pubkey;
 
     // Verify sufficient balance before redeeming

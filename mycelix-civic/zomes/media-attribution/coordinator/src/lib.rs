@@ -26,7 +26,7 @@ fn require_consciousness(
 
 #[hdk_extern]
 pub fn add_attribution(input: AddAttributionInput) -> ExternResult<Record> {
-    require_consciousness(&requirement_for_basic(), "add_attribution")?;
+    require_consciousness(&civic_requirement_basic(), "add_attribution")?;
     let now = sys_time()?;
     let attribution = Attribution {
         id: format!(
@@ -69,7 +69,7 @@ pub struct AddAttributionInput {
 
 #[hdk_extern]
 pub fn set_royalty_rule(input: SetRoyaltyInput) -> ExternResult<Record> {
-    require_consciousness(&requirement_for_basic(), "set_royalty_rule")?;
+    require_consciousness(&civic_requirement_basic(), "set_royalty_rule")?;
     let now = sys_time()?;
     let rule = RoyaltyRule {
         id: format!(
@@ -107,7 +107,7 @@ pub struct SetRoyaltyInput {
 
 #[hdk_extern]
 pub fn record_usage(input: RecordUsageInput) -> ExternResult<Record> {
-    require_consciousness(&requirement_for_basic(), "record_usage")?;
+    require_consciousness(&civic_requirement_basic(), "record_usage")?;
     let now = sys_time()?;
     let usage = UsageRecord {
         id: format!("usage:{}:{}", input.publication_id, now.as_micros()),
@@ -204,7 +204,7 @@ pub fn get_attribution(attribution_id: String) -> ExternResult<Option<Record>> {
 /// Verify an attribution
 #[hdk_extern]
 pub fn verify_attribution(input: VerifyAttributionInput) -> ExternResult<Record> {
-    require_consciousness(&requirement_for_proposal(), "verify_attribution")?;
+    require_consciousness(&civic_requirement_proposal(), "verify_attribution")?;
     let filter = ChainQueryFilter::new()
         .entry_type(EntryType::App(AppEntryDef::try_from(
             UnitEntryTypes::Attribution,
@@ -248,7 +248,7 @@ pub struct VerifyAttributionInput {
 /// Update share percentage
 #[hdk_extern]
 pub fn update_share_percentage(input: UpdateShareInput) -> ExternResult<Record> {
-    require_consciousness(&requirement_for_proposal(), "update_share_percentage")?;
+    require_consciousness(&civic_requirement_proposal(), "update_share_percentage")?;
     let filter = ChainQueryFilter::new()
         .entry_type(EntryType::App(AppEntryDef::try_from(
             UnitEntryTypes::Attribution,
@@ -285,7 +285,7 @@ pub struct UpdateShareInput {
 /// Update an attribution entry
 #[hdk_extern]
 pub fn update_attribution(input: UpdateAttributionInput) -> ExternResult<ActionHash> {
-    require_consciousness(&requirement_for_proposal(), "update_attribution")?;
+    require_consciousness(&civic_requirement_proposal(), "update_attribution")?;
     update_entry(
         input.original_action_hash,
         &EntryTypes::Attribution(input.updated_entry),
@@ -302,7 +302,7 @@ pub struct UpdateAttributionInput {
 /// Update a royalty rule entry
 #[hdk_extern]
 pub fn update_royalty_rule(input: UpdateRoyaltyRuleInput) -> ExternResult<ActionHash> {
-    require_consciousness(&requirement_for_proposal(), "update_royalty_rule")?;
+    require_consciousness(&civic_requirement_proposal(), "update_royalty_rule")?;
     update_entry(
         input.original_action_hash,
         &EntryTypes::RoyaltyRule(input.updated_entry),
@@ -359,7 +359,7 @@ pub fn get_publication_usage(publication_id: String) -> ExternResult<Vec<Record>
 /// Deactivate a royalty rule
 #[hdk_extern]
 pub fn deactivate_royalty_rule(input: DeactivateRoyaltyInput) -> ExternResult<Record> {
-    require_consciousness(&requirement_for_proposal(), "deactivate_royalty_rule")?;
+    require_consciousness(&civic_requirement_proposal(), "deactivate_royalty_rule")?;
     let filter = ChainQueryFilter::new()
         .entry_type(EntryType::App(AppEntryDef::try_from(
             UnitEntryTypes::RoyaltyRule,
@@ -557,7 +557,7 @@ pub fn compute_average_share(shares: &[f64]) -> f64 {
 /// Remove an attribution (only by original author/creator)
 #[hdk_extern]
 pub fn remove_attribution(input: RemoveAttributionInput) -> ExternResult<()> {
-    require_consciousness(&requirement_for_proposal(), "remove_attribution")?;
+    require_consciousness(&civic_requirement_proposal(), "remove_attribution")?;
     let filter = ChainQueryFilter::new()
         .entry_type(EntryType::App(AppEntryDef::try_from(
             UnitEntryTypes::Attribution,

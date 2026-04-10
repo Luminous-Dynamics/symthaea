@@ -102,7 +102,7 @@ fn is_in_epoch(ts: &Timestamp, epoch_start: &Timestamp, epoch_end: &Timestamp) -
 /// Create a new family rhythm and link it to the hearth.
 #[hdk_extern]
 pub fn create_rhythm(input: CreateRhythmInput) -> ExternResult<Record> {
-    require_consciousness(&requirement_for_basic(), "create_rhythm")?;
+    require_consciousness(&civic_requirement_basic(), "create_rhythm")?;
     require_membership(&input.hearth_hash)?;
     let now = sys_time()?;
 
@@ -135,7 +135,7 @@ pub fn create_rhythm(input: CreateRhythmInput) -> ExternResult<Record> {
 /// Reads the rhythm to obtain its hearth_hash, then validates membership.
 #[hdk_extern]
 pub fn log_occurrence(input: LogOccurrenceInput) -> ExternResult<Record> {
-    require_consciousness(&requirement_for_basic(), "log_occurrence")?;
+    require_consciousness(&civic_requirement_basic(), "log_occurrence")?;
     // Read the rhythm to get the hearth_hash for membership validation
     let rhythm_record = get(input.rhythm_hash.clone(), GetOptions::default())?.ok_or(
         wasm_error!(WasmErrorInner::Guest("Rhythm not found".into())),
@@ -189,7 +189,7 @@ pub fn log_occurrence(input: LogOccurrenceInput) -> ExternResult<Record> {
 /// (Founder, Elder, or Adult).
 #[hdk_extern]
 pub fn set_presence(input: SetPresenceInput) -> ExternResult<Record> {
-    require_consciousness(&requirement_for_basic(), "set_presence")?;
+    require_consciousness(&civic_requirement_basic(), "set_presence")?;
     let caller = agent_info()?.agent_initial_pubkey;
     let role = require_membership(&input.hearth_hash)?;
 

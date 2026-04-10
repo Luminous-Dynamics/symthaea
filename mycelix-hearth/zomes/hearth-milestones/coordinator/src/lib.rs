@@ -59,7 +59,7 @@ pub struct BeginTransitionInput {
 /// Creates the Milestone entry and links it to both the hearth and the member.
 #[hdk_extern]
 pub fn record_milestone(input: RecordMilestoneInput) -> ExternResult<Record> {
-    require_consciousness(&requirement_for_basic(), "record_milestone")?;
+    require_consciousness(&civic_requirement_basic(), "record_milestone")?;
     require_membership(&input.hearth_hash)?;
     let now = sys_time()?;
 
@@ -108,7 +108,7 @@ pub fn record_milestone(input: RecordMilestoneInput) -> ExternResult<Record> {
 /// Starts in the PreLiminal phase with recategorization blocked.
 #[hdk_extern]
 pub fn begin_transition(input: BeginTransitionInput) -> ExternResult<Record> {
-    require_consciousness(&requirement_for_basic(), "begin_transition")?;
+    require_consciousness(&civic_requirement_basic(), "begin_transition")?;
     require_membership(&input.hearth_hash)?;
     let now = sys_time()?;
 
@@ -154,7 +154,7 @@ pub fn begin_transition(input: BeginTransitionInput) -> ExternResult<Record> {
 /// Only guardians (Founder, Elder, Adult) can advance transitions.
 #[hdk_extern]
 pub fn advance_transition(transition_hash: ActionHash) -> ExternResult<Record> {
-    require_consciousness(&requirement_for_proposal(), "advance_transition")?;
+    require_consciousness(&civic_requirement_proposal(), "advance_transition")?;
     let record = get(transition_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
         WasmErrorInner::Guest("Transition not found".into())
     ))?;
@@ -200,7 +200,7 @@ pub fn advance_transition(transition_hash: ActionHash) -> ExternResult<Record> {
 /// completed first). Only guardians can complete transitions.
 #[hdk_extern]
 pub fn complete_transition(transition_hash: ActionHash) -> ExternResult<Record> {
-    require_consciousness(&requirement_for_proposal(), "complete_transition")?;
+    require_consciousness(&civic_requirement_proposal(), "complete_transition")?;
     let now = sys_time()?;
 
     let record = get(transition_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(

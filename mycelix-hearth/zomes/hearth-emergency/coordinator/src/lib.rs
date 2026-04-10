@@ -88,7 +88,7 @@ fn is_alert_type_life_threatening(alert_type: &AlertType) -> bool {
 /// Links the plan from the hearth via HearthToPlans.
 #[hdk_extern]
 pub fn create_emergency_plan(input: CreateEmergencyPlanInput) -> ExternResult<Record> {
-    require_consciousness(&requirement_for_proposal(), "create_emergency_plan")?;
+    require_consciousness(&civic_requirement_proposal(), "create_emergency_plan")?;
     require_membership(&input.hearth_hash)?;
     let now = sys_time()?;
     let plan = EmergencyPlan {
@@ -118,7 +118,7 @@ pub fn create_emergency_plan(input: CreateEmergencyPlanInput) -> ExternResult<Re
 /// Update an existing emergency plan.
 #[hdk_extern]
 pub fn update_emergency_plan(input: UpdatePlanInput) -> ExternResult<Record> {
-    require_consciousness(&requirement_for_proposal(), "update_emergency_plan")?;
+    require_consciousness(&civic_requirement_proposal(), "update_emergency_plan")?;
     require_membership(&input.input.hearth_hash)?;
     let now = sys_time()?;
     let plan = EmergencyPlan {
@@ -142,7 +142,7 @@ pub fn update_emergency_plan(input: UpdatePlanInput) -> ExternResult<Record> {
 /// Links the alert from the hearth and emits a HearthSignal::EmergencyAlert.
 #[hdk_extern]
 pub fn raise_alert(input: RaiseAlertInput) -> ExternResult<Record> {
-    require_consciousness(&requirement_for_basic(), "raise_alert")?;
+    require_consciousness(&civic_requirement_basic(), "raise_alert")?;
     require_membership(&input.hearth_hash)?;
     let now = sys_time()?;
     let agent = agent_info()?.agent_initial_pubkey;
@@ -186,7 +186,7 @@ pub fn raise_alert(input: RaiseAlertInput) -> ExternResult<Record> {
 /// Links the check-in from the alert and from the agent.
 #[hdk_extern]
 pub fn check_in(input: CheckInInput) -> ExternResult<Record> {
-    require_consciousness(&requirement_for_basic(), "check_in")?;
+    require_consciousness(&civic_requirement_basic(), "check_in")?;
     let now = sys_time()?;
     let agent = agent_info()?.agent_initial_pubkey;
 
@@ -240,7 +240,7 @@ pub fn check_in(input: CheckInInput) -> ExternResult<Record> {
 /// Status: only unresolved alerts (resolved_at is None) can be resolved.
 #[hdk_extern]
 pub fn resolve_alert(alert_hash: ActionHash) -> ExternResult<Record> {
-    require_consciousness(&requirement_for_proposal(), "resolve_alert")?;
+    require_consciousness(&civic_requirement_proposal(), "resolve_alert")?;
     let now = sys_time()?;
 
     let existing = get(alert_hash.clone(), GetOptions::default())?

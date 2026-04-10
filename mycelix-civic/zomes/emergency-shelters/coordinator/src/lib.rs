@@ -29,7 +29,7 @@ fn require_consciousness(
 
 #[hdk_extern]
 pub fn register_shelter(input: RegisterShelterInput) -> ExternResult<Record> {
-    require_consciousness(&requirement_for_basic(), "register_shelter")?;
+    require_consciousness(&civic_requirement_basic(), "register_shelter")?;
     if input.name.is_empty() || input.name.len() > 256 {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "Name must be 1-256 characters".into()
@@ -128,7 +128,7 @@ pub struct RegisterShelterInput {
 /// Update shelter status
 #[hdk_extern]
 pub fn update_shelter_status(input: UpdateShelterStatusInput) -> ExternResult<Record> {
-    require_consciousness(&requirement_for_proposal(), "update_shelter_status")?;
+    require_consciousness(&civic_requirement_proposal(), "update_shelter_status")?;
     let current_record = get(input.shelter_hash.clone(), GetOptions::default())?.ok_or(
         wasm_error!(WasmErrorInner::Guest("Shelter not found".into())),
     )?;
@@ -185,7 +185,7 @@ pub struct UpdateShelterStatusInput {
 /// Update a shelter entry (general update)
 #[hdk_extern]
 pub fn update_shelter(input: UpdateShelterInput) -> ExternResult<ActionHash> {
-    require_consciousness(&requirement_for_proposal(), "update_shelter")?;
+    require_consciousness(&civic_requirement_proposal(), "update_shelter")?;
     update_entry(
         input.original_action_hash,
         &EntryTypes::Shelter(input.updated_entry),
@@ -202,7 +202,7 @@ pub struct UpdateShelterInput {
 /// Check in a person or party to a shelter
 #[hdk_extern]
 pub fn check_in_person(input: CheckInPersonInput) -> ExternResult<Record> {
-    require_consciousness(&requirement_for_basic(), "check_in_person")?;
+    require_consciousness(&civic_requirement_basic(), "check_in_person")?;
     if input.person_name.is_empty() || input.person_name.len() > 256 {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "Person name must be 1-256 characters".into()
@@ -320,7 +320,7 @@ pub struct CheckInPersonInput {
 /// Check out a person from a shelter
 #[hdk_extern]
 pub fn check_out_person(input: CheckOutPersonInput) -> ExternResult<Record> {
-    require_consciousness(&requirement_for_basic(), "check_out_person")?;
+    require_consciousness(&civic_requirement_basic(), "check_out_person")?;
     let current_record = get(input.registration_hash.clone(), GetOptions::default())?.ok_or(
         wasm_error!(WasmErrorInner::Guest("Registration not found".into())),
     )?;

@@ -220,7 +220,7 @@ pub fn find_matches_for_request(input: FindMatchesInput) -> ExternResult<Vec<Rec
 /// Suggest a specific match (manual matching by an organizer or system)
 #[hdk_extern]
 pub fn suggest_match(care_match: CareMatch) -> ExternResult<Record> {
-    let _eligibility = require_consciousness(&requirement_for_proposal(), "suggest_match")?;
+    let _eligibility = require_consciousness(&civic_requirement_proposal(), "suggest_match")?;
     let action_hash = create_entry(&EntryTypes::CareMatch(care_match.clone()))?;
 
     let req_anchor = ensure_anchor(&format!("request_matches:{}", care_match.request_hash))?;
@@ -271,14 +271,14 @@ pub fn suggest_match(care_match: CareMatch) -> ExternResult<Record> {
 /// Accept a suggested match
 #[hdk_extern]
 pub fn accept_match(match_hash: ActionHash) -> ExternResult<Record> {
-    let _eligibility = require_consciousness(&requirement_for_basic(), "accept_match")?;
+    let _eligibility = require_consciousness(&civic_requirement_basic(), "accept_match")?;
     update_match_status(match_hash, MatchStatus::Accepted)
 }
 
 /// Decline a suggested match
 #[hdk_extern]
 pub fn decline_match(match_hash: ActionHash) -> ExternResult<Record> {
-    let _eligibility = require_consciousness(&requirement_for_basic(), "decline_match")?;
+    let _eligibility = require_consciousness(&civic_requirement_basic(), "decline_match")?;
     update_match_status(match_hash, MatchStatus::Declined)
 }
 

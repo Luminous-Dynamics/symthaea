@@ -1,5 +1,4 @@
 #![deny(unsafe_code)]
-
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
@@ -1672,23 +1671,23 @@ mod tests {
 
         #[test]
         fn test_governance_requirement_tiers() {
-            let basic = requirement_for_basic();
+            let basic = civic_requirement_basic();
             assert_eq!(basic.min_tier, ConsciousnessTier::Participant);
             assert!(basic.min_identity.is_none());
 
-            let proposal = requirement_for_proposal();
+            let proposal = civic_requirement_proposal();
             assert_eq!(proposal.min_tier, ConsciousnessTier::Participant);
             assert_eq!(proposal.min_identity, Some(0.25));
 
-            let voting = requirement_for_voting();
+            let voting = civic_requirement_voting();
             assert_eq!(voting.min_tier, ConsciousnessTier::Citizen);
 
-            let constitutional = requirement_for_constitutional();
+            let constitutional = civic_requirement_constitutional();
             assert_eq!(constitutional.min_tier, ConsciousnessTier::Steward);
             assert_eq!(constitutional.min_identity, Some(0.5));
             assert_eq!(constitutional.min_community, Some(0.3));
 
-            let guardian = requirement_for_guardian();
+            let guardian = civic_requirement_guardian();
             assert_eq!(guardian.min_tier, ConsciousnessTier::Guardian);
             assert_eq!(guardian.min_identity, Some(0.7));
             assert_eq!(guardian.min_community, Some(0.5));
@@ -1881,7 +1880,7 @@ mod tests {
                 "did:mycelix:bridge".into(),
                 1_000_000,
             );
-            let req = requirement_for_basic();
+            let req = civic_requirement_basic();
             // not expired (now < expires_at)
             let result = evaluate_governance(&cred, &req, 2_000_000);
             assert!(
@@ -1902,7 +1901,7 @@ mod tests {
                 "did:mycelix:bridge".into(),
                 1_000_000,
             );
-            let req = requirement_for_basic();
+            let req = civic_requirement_basic();
             let result = evaluate_governance(&cred, &req, 2_000_000);
             assert!(
                 !result.eligible,

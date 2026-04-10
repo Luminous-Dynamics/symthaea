@@ -232,9 +232,9 @@ pub fn dispatch_call(input: DispatchInput) -> ExternResult<DispatchResult> {
 #[hdk_extern]
 pub fn query_commons(query: CommonsQuery) -> ExternResult<Record> {
     // Require at least Participant tier to submit queries (prevents DHT spam from Observers)
-    mycelix_bridge_common::gate_consciousness(
+    mycelix_bridge_common::gate_civic(
         "commons_bridge",
-        &mycelix_bridge_common::requirement_for_basic(),
+        &mycelix_bridge_common::civic_requirement_basic(),
         "query_commons",
     )?;
 
@@ -312,9 +312,9 @@ fn resolve_domain_zome(domain: &str, query_type: &str) -> Option<String> {
 #[hdk_extern]
 pub fn resolve_query(input: ResolveQueryInput) -> ExternResult<Record> {
     // Require Citizen tier to resolve queries (modifies existing data)
-    mycelix_bridge_common::gate_consciousness(
+    mycelix_bridge_common::gate_civic(
         "commons_bridge",
-        &mycelix_bridge_common::requirement_for_voting(),
+        &mycelix_bridge_common::civic_requirement_voting(),
         "resolve_query",
     )?;
 
@@ -360,9 +360,9 @@ pub struct BridgeEventSignal {
 #[hdk_extern]
 pub fn broadcast_event(event: CommonsEvent) -> ExternResult<Record> {
     // Require at least Participant tier to broadcast events
-    mycelix_bridge_common::gate_consciousness(
+    mycelix_bridge_common::gate_civic(
         "commons_bridge",
-        &mycelix_bridge_common::requirement_for_basic(),
+        &mycelix_bridge_common::civic_requirement_basic(),
         "broadcast_event",
     )?;
 
@@ -1302,7 +1302,7 @@ pub fn get_consciousness_credential(did: String) -> ExternResult<ConsciousnessCr
 
 /// Refresh a consciousness credential by re-fetching from the identity cluster.
 ///
-/// Called by `gate_consciousness()` when a credential is nearing expiry (within
+/// Called by `gate_civic()` when a credential is nearing expiry (within
 /// 2 hours). Fetches a fresh credential from the identity bridge, updates the
 /// local engagement dimension, and caches the result.
 ///

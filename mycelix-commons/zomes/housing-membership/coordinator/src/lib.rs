@@ -25,7 +25,7 @@ fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
 
 #[hdk_extern]
 pub fn submit_application(app: MemberApplication) -> ExternResult<Record> {
-    let _eligibility = require_consciousness(&requirement_for_proposal(), "submit_application")?;
+    let _eligibility = require_consciousness(&civic_requirement_proposal(), "submit_application")?;
     for reference in &app.references {
         if reference.len() > 512 {
             return Err(wasm_error!(WasmErrorInner::Guest(
@@ -67,7 +67,7 @@ pub struct ReviewApplicationInput {
 /// Review an application (change its status)
 #[hdk_extern]
 pub fn review_application(input: ReviewApplicationInput) -> ExternResult<Record> {
-    let _eligibility = require_consciousness(&requirement_for_voting(), "review_application")?;
+    let _eligibility = require_consciousness(&civic_requirement_voting(), "review_application")?;
     let record = get(input.application_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
         WasmErrorInner::Guest("Application not found".into())
     ))?;
@@ -101,7 +101,7 @@ pub struct ApproveMemberInput {
 /// Approve an application and create a member record
 #[hdk_extern]
 pub fn approve_member(input: ApproveMemberInput) -> ExternResult<Record> {
-    let _eligibility = require_consciousness(&requirement_for_voting(), "approve_member")?;
+    let _eligibility = require_consciousness(&civic_requirement_voting(), "approve_member")?;
     let record = get(input.application_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
         WasmErrorInner::Guest("Application not found".into())
     ))?;
@@ -178,7 +178,7 @@ pub struct AddToWaitlistInput {
 /// Add an applicant to the waitlist
 #[hdk_extern]
 pub fn add_to_waitlist(input: AddToWaitlistInput) -> ExternResult<Record> {
-    let _eligibility = require_consciousness(&requirement_for_proposal(), "add_to_waitlist")?;
+    let _eligibility = require_consciousness(&civic_requirement_proposal(), "add_to_waitlist")?;
     let now = sys_time()?;
 
     // Determine position by counting existing waitlist entries
@@ -262,7 +262,7 @@ pub struct CreateRentToOwnInput {
 /// Create a rent-to-own agreement
 #[hdk_extern]
 pub fn create_rent_to_own(input: CreateRentToOwnInput) -> ExternResult<Record> {
-    let _eligibility = require_consciousness(&requirement_for_voting(), "create_rent_to_own")?;
+    let _eligibility = require_consciousness(&civic_requirement_voting(), "create_rent_to_own")?;
     let now = sys_time()?;
 
     let agreement = RentToOwnAgreement {
@@ -309,7 +309,7 @@ pub struct RecordRentPaymentInput {
 /// Record a rent payment and update accumulated equity
 #[hdk_extern]
 pub fn record_rent_payment(input: RecordRentPaymentInput) -> ExternResult<Record> {
-    let _eligibility = require_consciousness(&requirement_for_basic(), "record_rent_payment")?;
+    let _eligibility = require_consciousness(&civic_requirement_basic(), "record_rent_payment")?;
     let record = get(input.agreement_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
         WasmErrorInner::Guest("Agreement not found".into())
     ))?;

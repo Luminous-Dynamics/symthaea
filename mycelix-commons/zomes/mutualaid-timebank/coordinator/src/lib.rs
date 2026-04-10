@@ -87,7 +87,7 @@ pub struct SearchRequestsInput {
 
 #[hdk_extern]
 pub fn create_service_offer(input: CreateOfferInput) -> ExternResult<Record> {
-    let _eligibility = require_consciousness(&requirement_for_basic(), "create_service_offer")?;
+    let _eligibility = require_consciousness(&civic_requirement_basic(), "create_service_offer")?;
     let provider = agent_info()?.agent_initial_pubkey;
     let now = sys_time()?;
 
@@ -225,7 +225,7 @@ pub fn search_offers(input: SearchOffersInput) -> ExternResult<Vec<Record>> {
 /// Deactivate a service offer
 #[hdk_extern]
 pub fn deactivate_offer(hash: ActionHash) -> ExternResult<Record> {
-    let _eligibility = require_consciousness(&requirement_for_proposal(), "deactivate_offer")?;
+    let _eligibility = require_consciousness(&civic_requirement_proposal(), "deactivate_offer")?;
     let record = get_latest_record(hash.clone())?.ok_or(wasm_error!(WasmErrorInner::Guest(
         "Offer not found".to_string()
     )))?;
@@ -263,7 +263,7 @@ pub fn deactivate_offer(hash: ActionHash) -> ExternResult<Record> {
 /// Create a new service request
 #[hdk_extern]
 pub fn create_service_request(input: CreateRequestInput) -> ExternResult<Record> {
-    let _eligibility = require_consciousness(&requirement_for_basic(), "create_service_request")?;
+    let _eligibility = require_consciousness(&civic_requirement_basic(), "create_service_request")?;
     let requester = agent_info()?.agent_initial_pubkey;
     let now = sys_time()?;
 
@@ -413,7 +413,7 @@ pub fn search_requests(input: SearchRequestsInput) -> ExternResult<Vec<Record>> 
 /// Record a completed time exchange
 #[hdk_extern]
 pub fn record_exchange(input: RecordExchangeInput) -> ExternResult<Record> {
-    let _eligibility = require_consciousness(&requirement_for_basic(), "record_exchange")?;
+    let _eligibility = require_consciousness(&civic_requirement_basic(), "record_exchange")?;
     let now = sys_time()?;
 
     let exchange = TimeExchange {
@@ -520,7 +520,7 @@ pub fn get_exchanges_by_agent(agent: AgentPubKey) -> ExternResult<Vec<Record>> {
 /// Confirm an exchange (both parties must confirm)
 #[hdk_extern]
 pub fn confirm_exchange(hash: ActionHash) -> ExternResult<Record> {
-    let _eligibility = require_consciousness(&requirement_for_proposal(), "confirm_exchange")?;
+    let _eligibility = require_consciousness(&civic_requirement_proposal(), "confirm_exchange")?;
     let record = get_latest_record(hash.clone())?.ok_or(wasm_error!(WasmErrorInner::Guest(
         "Exchange not found".to_string()
     )))?;
@@ -552,7 +552,7 @@ pub fn confirm_exchange(hash: ActionHash) -> ExternResult<Record> {
 /// Rate an exchange
 #[hdk_extern]
 pub fn rate_exchange(input: RateExchangeInput) -> ExternResult<Record> {
-    let _eligibility = require_consciousness(&requirement_for_proposal(), "rate_exchange")?;
+    let _eligibility = require_consciousness(&civic_requirement_proposal(), "rate_exchange")?;
     let record = get(input.exchange_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
         WasmErrorInner::Guest("Exchange not found".to_string())
     ))?;
