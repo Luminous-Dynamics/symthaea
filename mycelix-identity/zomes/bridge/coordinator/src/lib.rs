@@ -1508,6 +1508,160 @@ pub fn refresh_consciousness_credential(did: String) -> ExternResult<Consciousne
     issue_consciousness_credential(did)
 }
 
+/// Backward-compatible alias for bridge-common's gate_consciousness() calls.
+///
+/// gate_consciousness() calls FunctionName::new("get_consciousness_credential").
+#[hdk_extern]
+pub fn get_consciousness_credential(did: String) -> ExternResult<ConsciousnessCredential> {
+    issue_consciousness_credential(did)
+}
+
+// ============================================================================
+// 8D Sovereign Credential Issuance
+// ============================================================================
+
+/// Issue an 8D Sovereign Credential for a DID.
+///
+/// Gathers all available dimensions from local and cross-cluster sources.
+/// Dimensions without a data source default to 0.0 (conservative — never
+/// grants unearned access). As more cluster collectors are wired, more
+/// dimensions will be populated with real data.
+///
+/// Currently populated:
+/// - D0 Epistemic Integrity: from MFA assurance level (identity proxy)
+/// - D2 Network Resilience: from MFA assurance level (identity proxy)
+/// - D4 Civic Participation: from community trust score
+/// - D5 Stewardship & Care: from aggregated reputation
+/// - D6 Semantic Resonance: from community trust score
+///
+/// Not yet wired (default 0.0):
+/// - D1 Thermodynamic Yield: needs energy cluster
+/// - D3 Economic Velocity: needs finance cluster (TEND)
+/// - D7 Domain Competence: needs craft cluster
+#[hdk_extern]
+pub fn issue_sovereign_credential(
+    did: String,
+) -> ExternResult<sovereign_profile::SovereignCredential> {
+    enforce_rate_limit("issue_sovereign_credential")?;
+    if !did.starts_with("did:mycelix:") {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Invalid DID format — must start with did:mycelix:".into()
+        )));
+    }
+
+    // Gather dimensions from existing identity sources
+    let identity_score = get_mfa_assurance_for_did(&did)?;
+    let reputation_score = get_aggregated_reputation(&did)?;
+    let community_score = get_community_trust_score(&did)?;
+
+    // Cross-cluster collectors (each falls back to 0.0 if unavailable)
+    let economic_velocity = collect_economic_velocity(&did);
+    let domain_competence = collect_domain_competence(&did);
+    let civic_participation_extra = collect_civic_participation(&did);
+
+    // Build 8D profile
+    let profile = sovereign_profile::SovereignProfile {
+        epistemic_integrity: identity_score, // proxy: identity verification quality
+        thermodynamic_yield: 0.0,            // TODO: wire energy cluster
+        network_resilience: identity_score,   // proxy: verified identity ≈ stable node
+        economic_velocity,
+        civic_participation: community_score.max(civic_participation_extra),
+        stewardship_care: reputation_score,
+        semantic_resonance: community_score,  // proxy: peer trust ≈ community alignment
+        domain_competence,
+    };
+
+    let weights = sovereign_profile::weights::DimensionWeights::governance();
+    let tier = profile.tier(&weights);
+
+    let now = sys_time()?;
+    let now_us = now.as_micros() as u64;
+    let ttl_us = 24 * 60 * 60 * 1_000_000; // 24 hours
+
+    Ok(sovereign_profile::SovereignCredential {
+        did,
+        profile,
+        tier,
+        issued_at: now_us,
+        expires_at: now_us + ttl_us,
+        issuer: format!("did:mycelix:{}", agent_info()?.agent_initial_pubkey),
+        extensions: vec![],
+    })
+}
+
+/// Alias for bridge-common compatibility with gate_civic().
+#[hdk_extern]
+pub fn get_sovereign_credential(
+    did: String,
+) -> ExternResult<sovereign_profile::SovereignCredential> {
+    issue_sovereign_credential(did)
+}
+
+// ---------------------------------------------------------------------------
+// Cross-cluster dimension collectors (best-effort, fallback to 0.0)
+// ---------------------------------------------------------------------------
+
+/// Collect economic velocity from finance cluster (TEND zome).
+fn collect_economic_velocity(did: &str) -> f64 {
+    // Try cross-cluster call to finance
+    match call(
+        CallTargetCell::OtherRole("finance".into()),
+        ZomeName::new("tend_coordinator"),
+        FunctionName::new("get_tend_reputation_input"),
+        None,
+        did.to_string(),
+    ) {
+        Ok(ZomeCallResponse::Ok(result)) => {
+            // Returns f32 [0,1] — scale to f64
+            result.decode::<f32>().unwrap_or(0.0) as f64
+        }
+        _ => 0.0, // Finance cluster not available
+    }
+}
+
+/// Collect domain competence from craft cluster (guild + credential vitality).
+fn collect_domain_competence(_did: &str) -> f64 {
+    // Try cross-cluster call to craft for credential count
+    // Each credential's vitality contributes; 3+ credentials = saturated
+    match call(
+        CallTargetCell::OtherRole("craft".into()),
+        ZomeName::new("craft_graph"),
+        FunctionName::new("list_my_published_credentials"),
+        None,
+        (),
+    ) {
+        Ok(ZomeCallResponse::Ok(result)) => {
+            // Returns Vec of credentials — normalize by count and assume average vitality
+            let count = result
+                .decode::<Vec<serde_json::Value>>()
+                .map(|v| v.len())
+                .unwrap_or(0);
+            // 3 credentials = full saturation, linear scale
+            (count as f64 / 3.0).min(1.0)
+        }
+        _ => 0.0, // Craft cluster not available
+    }
+}
+
+/// Collect civic participation from governance cluster (vote counts).
+fn collect_civic_participation(_did: &str) -> f64 {
+    // Try cross-cluster call to governance for voice credits
+    match call(
+        CallTargetCell::OtherRole("governance".into()),
+        ZomeName::new("voting_coordinator"),
+        FunctionName::new("get_agent_vote_count"),
+        None,
+        (),
+    ) {
+        Ok(ZomeCallResponse::Ok(result)) => {
+            let count = result.decode::<u32>().unwrap_or(0);
+            // 20 votes = full saturation
+            (count as f64 / 20.0).min(1.0)
+        }
+        _ => 0.0, // Governance cluster not available
+    }
+}
+
 /// Compute a community trust score for a DID from peer trust credentials.
 ///
 /// Queries all non-revoked, non-expired trust credentials where
