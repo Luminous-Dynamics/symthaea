@@ -13,9 +13,11 @@ use crate::state::{BrowserState, PageView};
 
 /// Trigger a search from outside the search bar (e.g., clicking an example query).
 pub fn trigger_search(query: &str) {
+    log::info!("trigger_search called with: {}", query);
     let state = expect_context::<BrowserState>();
     let engine_cell = expect_context::<StoredValue<Option<SearchEngine>>>();
     engine_cell.with_value(|opt| {
+        log::info!("engine_cell has value: {}", opt.is_some());
         if let Some(se) = opt {
             search_query(query, &state, se);
         }

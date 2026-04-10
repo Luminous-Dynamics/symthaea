@@ -85,13 +85,13 @@ fn WelcomePage() -> impl IntoView {
                         let q = query.to_string();
                         view! {
                             <li>
-                                <a href="javascript:void(0)" class="example-query"
+                                <span class="example-query"
                                    on:click=move |_| {
                                        crate::engine::trigger_search(&q);
                                    }
                                 >
                                     <strong>{query}</strong>
-                                </a>
+                                </span>
                                 " — "{desc}
                             </li>
                         }
