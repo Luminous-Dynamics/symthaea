@@ -161,7 +161,7 @@ pub fn generate_proposals(
         }
 
         // 2% per tick per faction
-        if !rng.bernoulli(0.02 * faction.strength) {
+        if !rng.bernoulli(0.05 * faction.strength) {
             continue;
         }
 
@@ -202,19 +202,19 @@ fn ideology_to_changes(
     // Economic dimension → trade openness
     // High economic (> 0.6) → increase trade; Low (< 0.4) → decrease
     if ideology[0] > 0.6 {
-        let new_val = (current.trade_openness + 0.1).min(1.0);
+        let new_val = (current.trade_openness + 0.2).min(1.0);
         changes.push(PolicyChange::TradeOpenness(new_val));
     } else if ideology[0] < 0.4 {
-        let new_val = (current.trade_openness - 0.1).max(0.0);
+        let new_val = (current.trade_openness - 0.2).max(0.0);
         changes.push(PolicyChange::TradeOpenness(new_val));
     }
 
     // Authoritarian dimension → defense spending
     if ideology[1] > 0.6 {
-        let new_val = (current.defense_spending + 0.05).min(0.3);
+        let new_val = (current.defense_spending + 0.1).min(0.3);
         changes.push(PolicyChange::DefenseSpending(new_val));
     } else if ideology[1] < 0.3 {
-        let new_val = (current.defense_spending - 0.05).max(0.0);
+        let new_val = (current.defense_spending - 0.1).max(0.0);
         changes.push(PolicyChange::DefenseSpending(new_val));
     }
 
@@ -227,7 +227,7 @@ fn ideology_to_changes(
 
     // Collective dimension → care effectiveness
     if ideology[3] > 0.6 {
-        let new_val = (current.care_effectiveness + 0.1).min(1.0);
+        let new_val = (current.care_effectiveness + 0.2).min(1.0);
         changes.push(PolicyChange::CareEffectiveness(new_val));
     }
 
