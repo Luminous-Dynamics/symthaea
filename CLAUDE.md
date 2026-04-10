@@ -28,7 +28,6 @@ Full details: @.claude/rules/CREDENTIALS.md
 | 8110 | Civic UI (Governance+Finance) | governance.luminousdynamics.io |
 | 8111 | Health UI | health.luminousdynamics.io |
 | 8112 | Hearth UI | hearth.luminousdynamics.io |
-| 8117 | Pulse (Decentralized Email) | mail.mycelix.net |
 | 8121 | Music UI | music.luminousdynamics.io |
 | 8124 | Portal UI | portal.mycelix.net |
 | 8129 | Craft UI | craft.mycelix.net |

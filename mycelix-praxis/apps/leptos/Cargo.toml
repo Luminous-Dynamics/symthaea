@@ -26,9 +26,8 @@ gloo-timers = { version = "0.3", features = ["futures"] }
 # Shared types from the praxis backend
 praxis-core = { path = "../../crates/praxis-core", default-features = false }
 
-# Shared Holochain client + UI components for Leptos apps
+# Shared Holochain transport for Leptos apps
 mycelix-leptos-client = { path = "../../../crates/mycelix-leptos-client", features = ["browser"] }
-mycelix-leptos-core = { path = "../../../crates/mycelix-leptos-core" }
 send_wrapper = "0.6"
 
 [profile.release]

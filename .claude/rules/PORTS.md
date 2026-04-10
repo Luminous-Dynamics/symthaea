@@ -64,7 +64,7 @@ Alphabetical by cluster short name. Port = 81XX.
 | 8114 | mycelix-knowledge | knowledge.mycelix.net | Reserved |
 | 8115 | mycelix-legacy | legacy.mycelix.net | Reserved |
 | 8116 | mycelix-lunar | lunar.mycelix.net | Reserved |
-| 8117 | **mycelix-pulse** | **mail.mycelix.net** | **LIVE** |
+| 8117 | mycelix-mail | mail.mycelix.net | Reserved |
 | 8118 | mycelix-manufacturing | manufacturing.mycelix.net | Reserved |
 | 8119 | mycelix-marketplace | marketplace.mycelix.net | Reserved |
 | 8120 | mycelix-multiworld-sim | multiworld.mycelix.net | Reserved |

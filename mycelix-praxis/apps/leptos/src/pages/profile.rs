@@ -149,7 +149,7 @@ fn ProfileInner() -> impl IntoView {
         let hc = hc_pubkey.clone();
         async move {
             match hc
-                .call_zome_default::<(), String>(
+                .call_zome::<(), String>(
                     "craft_graph",
                     "get_my_agent_pubkey",
                     &(),
@@ -166,14 +166,14 @@ fn ProfileInner() -> impl IntoView {
         async move {
             let target = view_agent.get();
             let result = if target.trim().is_empty() {
-                hc.call_zome_default::<(), Vec<SkillEndorsementView>>(
+                hc.call_zome::<(), Vec<SkillEndorsementView>>(
                     "craft_graph",
                     "get_my_endorsements_view",
                     &(),
                 )
                 .await
             } else {
-                hc.call_zome_default::<String, Vec<SkillEndorsementView>>(
+                hc.call_zome::<String, Vec<SkillEndorsementView>>(
                     "craft_graph",
                     "list_skill_endorsements_view",
                     &target,
