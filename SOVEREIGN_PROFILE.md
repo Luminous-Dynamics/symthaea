@@ -16,7 +16,7 @@ The **8D Sovereign Profile** maps civic identity as a holographic, multi-faceted
 | D3 | Economic Velocity | finance/TEND | Anti-hoarding compliance | 50 TEND exchanges |
 | D4 | Civic Participation | governance/voting | Jury duty, voting, proposals | 20 governance actions |
 | D5 | Stewardship & Care | attribution/reciprocity | Verified commons labor | 30 pledges |
-| D6 | Semantic Resonance | core-FL/hyperfeel | Community value alignment | Cosine similarity |
+| D6 | Semantic Resonance | core-FL/hyperfeel (not yet in unified hApp) | Community value alignment | Cosine similarity |
 | D7 | Domain Competence | craft/credentials | Peer-verified expertise | 3 living credentials |
 
 ## Architecture
