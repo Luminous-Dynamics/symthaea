@@ -48,7 +48,12 @@ impl TreeNode {
     fn predict(&self, features: &[f64; N_FEATURES]) -> u8 {
         match self {
             TreeNode::Leaf { class, .. } => *class,
-            TreeNode::Split { feature, threshold, left, right } => {
+            TreeNode::Split {
+                feature,
+                threshold,
+                left,
+                right,
+            } => {
                 if features[*feature] <= *threshold {
                     left.predict(features)
                 } else {
@@ -61,7 +66,12 @@ impl TreeNode {
     fn leaf_counts(&self, features: &[f64; N_FEATURES]) -> [usize; N_CLASSES] {
         match self {
             TreeNode::Leaf { counts, .. } => *counts,
-            TreeNode::Split { feature, threshold, left, right } => {
+            TreeNode::Split {
+                feature,
+                threshold,
+                left,
+                right,
+            } => {
                 if features[*feature] <= *threshold {
                     left.leaf_counts(features)
                 } else {
@@ -127,7 +137,12 @@ impl RandomForestClassifier {
             let boot_labels: Vec<_> = indices.iter().map(|&i| labels[i]).collect();
 
             let tree = Self::build_tree(
-                &boot_features, &boot_labels, 0, max_depth, min_samples, &mut rng_state,
+                &boot_features,
+                &boot_labels,
+                0,
+                max_depth,
+                min_samples,
+                &mut rng_state,
             );
             trees.push(tree);
         }
@@ -150,10 +165,16 @@ impl RandomForestClassifier {
         }
 
         if n <= min_samples || depth >= max_depth {
-            return TreeNode::Leaf { class: majority_class(&counts), counts };
+            return TreeNode::Leaf {
+                class: majority_class(&counts),
+                counts,
+            };
         }
         if counts.iter().filter(|&&c| c > 0).count() == 1 {
-            return TreeNode::Leaf { class: majority_class(&counts), counts };
+            return TreeNode::Leaf {
+                class: majority_class(&counts),
+                counts,
+            };
         }
 
         let parent_gini = gini(&counts, n);
@@ -207,29 +228,51 @@ impl RandomForestClassifier {
         }
 
         if best_gain <= 0.0 {
-            return TreeNode::Leaf { class: majority_class(&counts), counts };
+            return TreeNode::Leaf {
+                class: majority_class(&counts),
+                counts,
+            };
         }
 
         let (left_feat, left_lab): (Vec<_>, Vec<_>) = features
-            .iter().zip(labels.iter())
+            .iter()
+            .zip(labels.iter())
             .filter(|(f, _)| f[best_feature] <= best_threshold)
             .map(|(f, &l)| (*f, l))
             .unzip();
         let (right_feat, right_lab): (Vec<_>, Vec<_>) = features
-            .iter().zip(labels.iter())
+            .iter()
+            .zip(labels.iter())
             .filter(|(f, _)| f[best_feature] > best_threshold)
             .map(|(f, &l)| (*f, l))
             .unzip();
 
         if left_feat.is_empty() || right_feat.is_empty() {
-            return TreeNode::Leaf { class: majority_class(&counts), counts };
+            return TreeNode::Leaf {
+                class: majority_class(&counts),
+                counts,
+            };
         }
 
         TreeNode::Split {
             feature: best_feature,
             threshold: best_threshold,
-            left: Box::new(Self::build_tree(&left_feat, &left_lab, depth + 1, max_depth, min_samples, rng)),
-            right: Box::new(Self::build_tree(&right_feat, &right_lab, depth + 1, max_depth, min_samples, rng)),
+            left: Box::new(Self::build_tree(
+                &left_feat,
+                &left_lab,
+                depth + 1,
+                max_depth,
+                min_samples,
+                rng,
+            )),
+            right: Box::new(Self::build_tree(
+                &right_feat,
+                &right_lab,
+                depth + 1,
+                max_depth,
+                min_samples,
+                rng,
+            )),
         }
     }
 
@@ -257,7 +300,11 @@ impl RandomForestClassifier {
         }
         let sum: f64 = total_counts.iter().sum();
         if sum > 0.0 {
-            [total_counts[0] / sum, total_counts[1] / sum, total_counts[2] / sum]
+            [
+                total_counts[0] / sum,
+                total_counts[1] / sum,
+                total_counts[2] / sum,
+            ]
         } else {
             [0.0, 0.0, 1.0]
         }
@@ -369,9 +416,15 @@ mod tests {
     #[test]
     fn test_forest_trains_and_predicts() {
         let features = [
-            [1.0, 0.0, 0.0, 0.0, 1.5, 0.8, 0.5, 1.8, 1.42, 0.83, 0.0, 0.5, 0.0, 0.0, 1.0],
-            [0.5, 0.0, 0.0, 0.5, 0.8, 1.5, -0.5, 4.2, 1.06, 1.70, 0.0, 0.8, 0.0, 0.0, 0.0],
-            [0.2, 0.0, 0.0, 0.3, 0.6, 0.6, 0.0, -0.4, 0.57, 0.75, 2.0, 0.2, 0.0, 0.0, 3.0],
+            [
+                1.0, 0.0, 0.0, 0.0, 1.5, 0.8, 0.5, 1.8, 1.42, 0.83, 0.0, 0.5, 0.0, 0.0, 1.0,
+            ],
+            [
+                0.5, 0.0, 0.0, 0.5, 0.8, 1.5, -0.5, 4.2, 1.06, 1.70, 0.0, 0.8, 0.0, 0.0, 0.0,
+            ],
+            [
+                0.2, 0.0, 0.0, 0.3, 0.6, 0.6, 0.0, -0.4, 0.57, 0.75, 2.0, 0.2, 0.0, 0.0, 3.0,
+            ],
         ];
         let labels = [0u8, 1, 2];
         let forest = RandomForestClassifier::train(&features, &labels, 10, 5);
@@ -434,14 +487,34 @@ mod tests {
         let rf_acc = ClassAccuracy::compute(&rf_pred, &test_entry.ss);
         let baseline_acc = ClassAccuracy::compute(&baseline_pred, &test_entry.ss);
 
-        eprintln!("\n=== Holdout: {} ({} res) ===", test_entry.name, test_entry.sequence.len());
+        eprintln!(
+            "\n=== Holdout: {} ({} res) ===",
+            test_entry.name,
+            test_entry.sequence.len()
+        );
         eprintln!("Chou-Fasman Q3: {:.1}%", baseline_q3 * 100.0);
         eprintln!("Random Forest Q3: {:.1}%", rf_q3 * 100.0);
-        eprintln!("  H: {:.1}% vs {:.1}%", baseline_acc.class_q(0) * 100.0, rf_acc.class_q(0) * 100.0);
-        eprintln!("  E: {:.1}% vs {:.1}%", baseline_acc.class_q(1) * 100.0, rf_acc.class_q(1) * 100.0);
-        eprintln!("  C: {:.1}% vs {:.1}%", baseline_acc.class_q(2) * 100.0, rf_acc.class_q(2) * 100.0);
+        eprintln!(
+            "  H: {:.1}% vs {:.1}%",
+            baseline_acc.class_q(0) * 100.0,
+            rf_acc.class_q(0) * 100.0
+        );
+        eprintln!(
+            "  E: {:.1}% vs {:.1}%",
+            baseline_acc.class_q(1) * 100.0,
+            rf_acc.class_q(1) * 100.0
+        );
+        eprintln!(
+            "  C: {:.1}% vs {:.1}%",
+            baseline_acc.class_q(2) * 100.0,
+            rf_acc.class_q(2) * 100.0
+        );
 
-        assert!(rf_q3 > 0.30, "RF Q3 = {:.1}% should be > 30%", rf_q3 * 100.0);
+        assert!(
+            rf_q3 > 0.30,
+            "RF Q3 = {:.1}% should be > 30%",
+            rf_q3 * 100.0
+        );
         assert_eq!(rf_pred.len(), test_entry.ss.len());
     }
 
@@ -458,8 +531,12 @@ mod tests {
             let baseline_pred = predict_chou_fasman(&entry.sequence);
             for i in 0..entry.ss.len() {
                 total_residues += 1;
-                if rf_pred[i] == entry.ss[i] { rf_correct += 1; }
-                if baseline_pred[i] == entry.ss[i] { baseline_correct += 1; }
+                if rf_pred[i] == entry.ss[i] {
+                    rf_correct += 1;
+                }
+                if baseline_pred[i] == entry.ss[i] {
+                    baseline_correct += 1;
+                }
             }
         }
 
@@ -471,6 +548,11 @@ mod tests {
         eprintln!("Random Forest Q3: {:.1}%", rf_q3 * 100.0);
         eprintln!("Improvement: {:.1} pp", (rf_q3 - baseline_q3) * 100.0);
 
-        assert!(rf_q3 >= baseline_q3, "RF ({:.1}%) should beat baseline ({:.1}%)", rf_q3 * 100.0, baseline_q3 * 100.0);
+        assert!(
+            rf_q3 >= baseline_q3,
+            "RF ({:.1}%) should beat baseline ({:.1}%)",
+            rf_q3 * 100.0,
+            baseline_q3 * 100.0
+        );
     }
 }

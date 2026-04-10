@@ -29,14 +29,18 @@ async fn js(page: &chromiumoxide::Page, expr: &str) -> String {
 /// Click a button by text content match
 async fn click_button(page: &chromiumoxide::Page, text: &str) -> bool {
     let escaped = text.replace('\'', "\\'");
-    let result = js(page, &format!(
-        r#"(()=>{{
+    let result = js(
+        page,
+        &format!(
+            r#"(()=>{{
             for(const b of document.querySelectorAll('button,a')){{
                 if(b.textContent.includes('{escaped}')){{b.click();return 'clicked'}}
             }}
             return 'not_found'
         }})()"#
-    )).await;
+        ),
+    )
+    .await;
     if result == "clicked" {
         println!("    ✓ Clicked: {text}");
         true
@@ -50,8 +54,10 @@ async fn click_button(page: &chromiumoxide::Page, text: &str) -> bool {
 async fn type_into(page: &chromiumoxide::Page, placeholder: &str, text: &str) {
     let escaped_ph = placeholder.replace('\'', "\\'");
     let escaped_text = text.replace('\'', "\\'");
-    js(page, &format!(
-        r#"(()=>{{
+    js(
+        page,
+        &format!(
+            r#"(()=>{{
             const inputs = document.querySelectorAll('input');
             for(const i of inputs){{
                 if((i.placeholder||'').toLowerCase().includes('{escaped_ph}'.toLowerCase())){{
@@ -62,28 +68,41 @@ async fn type_into(page: &chromiumoxide::Page, placeholder: &str, text: &str) {
             }}
             return 'not_found'
         }})()"#
-    )).await;
+        ),
+    )
+    .await;
     println!("    ✓ Typed '{text}' into [{placeholder}]");
 }
 
 /// Get page heading
 async fn heading(page: &chromiumoxide::Page) -> String {
-    js(page, "document.querySelector('h1,h2')?.textContent?.trim()||'?'").await
+    js(
+        page,
+        "document.querySelector('h1,h2')?.textContent?.trim()||'?'",
+    )
+    .await
 }
 
 /// Count interactive elements
 async fn count_interactive(page: &chromiumoxide::Page) -> String {
-    js(page, r#"
+    js(
+        page,
+        r#"
         const b = document.querySelectorAll('button').length;
         const a = document.querySelectorAll('a').length;
         const i = document.querySelectorAll('input').length;
         `${b} buttons, ${a} links, ${i} inputs`
-    "#).await
+    "#,
+    )
+    .await
 }
 
 /// Take screenshot and save
 async fn screenshot(page: &chromiumoxide::Page, name: &str) {
-    match page.screenshot(chromiumoxide::page::ScreenshotParams::builder().build()).await {
+    match page
+        .screenshot(chromiumoxide::page::ScreenshotParams::builder().build())
+        .await
+    {
         Ok(bytes) => {
             let path = format!("/tmp/praxis-active/{name}.png");
             if let Ok(()) = std::fs::write(&path, &bytes) {
@@ -177,7 +196,10 @@ async fn main() {
     println!("[3.1] Dashboard: {h}");
 
     let progress = js(&page, r#"document.querySelector('.caps-progress-card')?.textContent?.substring(0, 100)||'no progress card'"#).await;
-    println!("    Progress: {}", progress.chars().take(80).collect::<String>());
+    println!(
+        "    Progress: {}",
+        progress.chars().take(80).collect::<String>()
+    );
     screenshot(&page, "08_dashboard").await;
 
     // ━━━ Phase 4: Knowledge Garden ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -219,7 +241,10 @@ async fn main() {
 
     // Read the question
     let question = js(&page, r#"document.querySelector('.exam-question,.question-text,h3')?.textContent?.trim()||'no question found'"#).await;
-    println!("    Question: {}", question.chars().take(100).collect::<String>());
+    println!(
+        "    Question: {}",
+        question.chars().take(100).collect::<String>()
+    );
 
     // Show answer
     println!("\n[5.4] Show Answer (read-only, Φ={PHI:.2} ≥ 0.1 ✓)");
@@ -228,7 +253,10 @@ async fn main() {
     screenshot(&page, "13_answer").await;
 
     let answer = js(&page, r#"document.querySelector('.answer-box,.solution,code')?.textContent?.trim()||'no answer visible'"#).await;
-    println!("    Answer: {}", answer.chars().take(100).collect::<String>());
+    println!(
+        "    Answer: {}",
+        answer.chars().take(100).collect::<String>()
+    );
 
     // Mark correct (self-assessment)
     println!("\n[5.5] Self-assess: Correct (Φ={PHI:.2} ≥ 0.4 ✓)");
@@ -284,5 +312,8 @@ async fn main() {
         .filter_map(|e| e.ok())
         .map(|e| e.file_name().to_string_lossy().to_string())
         .collect();
-    println!("\n{} screenshots saved to /tmp/praxis-active/", screenshots.len());
+    println!(
+        "\n{} screenshots saved to /tmp/praxis-active/",
+        screenshots.len()
+    );
 }

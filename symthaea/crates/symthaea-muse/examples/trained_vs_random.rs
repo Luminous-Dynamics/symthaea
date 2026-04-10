@@ -12,10 +12,10 @@
 //! ```
 
 use std::path::Path;
-use symthaea_muse::{compose, MuseConfig, MusicalState, MelodyMode};
+use symthaea_muse::critic::evaluate_composition;
 use symthaea_muse::export::{export_wav, ExportFormat};
 use symthaea_muse::rhythm::compute_tempo;
-use symthaea_muse::critic::evaluate_composition;
+use symthaea_muse::{compose, MelodyMode, MuseConfig, MusicalState};
 
 fn main() {
     println!("═══════════════════════════════════════════════════════");
@@ -28,36 +28,68 @@ fn main() {
     std::fs::create_dir_all(audio_dir).ok();
 
     let states: Vec<(&str, MusicalState)> = vec![
-        ("serene", MusicalState {
-            harmony_activations: [0.3, 0.7, 0.6, 0.2, 0.5, 0.6, 0.3, 0.8],
-            serotonin: 0.8, dopamine: 0.3, noradrenaline: 0.1,
-            arousal: 0.2, valence: 0.6, consciousness_level: 0.8,
-            prediction_error: 0.05,
-        }),
-        ("turbulent", MusicalState {
-            harmony_activations: [0.2, 0.2, 0.3, 0.8, 0.4, 0.2, 0.7, 0.1],
-            serotonin: 0.2, dopamine: 0.8, noradrenaline: 0.9,
-            arousal: 0.9, valence: -0.4, consciousness_level: 0.6,
-            prediction_error: 0.7,
-        }),
-        ("contemplative", MusicalState {
-            harmony_activations: [0.6, 0.4, 0.8, 0.1, 0.3, 0.4, 0.2, 0.9],
-            serotonin: 0.7, dopamine: 0.4, noradrenaline: 0.2,
-            arousal: 0.15, valence: 0.1, consciousness_level: 0.9,
-            prediction_error: 0.1,
-        }),
-        ("joyful", MusicalState {
-            harmony_activations: [0.7, 0.9, 0.5, 0.7, 0.6, 0.8, 0.6, 0.2],
-            serotonin: 0.6, dopamine: 0.9, noradrenaline: 0.3,
-            arousal: 0.7, valence: 0.8, consciousness_level: 0.85,
-            prediction_error: 0.15,
-        }),
+        (
+            "serene",
+            MusicalState {
+                harmony_activations: [0.3, 0.7, 0.6, 0.2, 0.5, 0.6, 0.3, 0.8],
+                serotonin: 0.8,
+                dopamine: 0.3,
+                noradrenaline: 0.1,
+                arousal: 0.2,
+                valence: 0.6,
+                consciousness_level: 0.8,
+                prediction_error: 0.05,
+            },
+        ),
+        (
+            "turbulent",
+            MusicalState {
+                harmony_activations: [0.2, 0.2, 0.3, 0.8, 0.4, 0.2, 0.7, 0.1],
+                serotonin: 0.2,
+                dopamine: 0.8,
+                noradrenaline: 0.9,
+                arousal: 0.9,
+                valence: -0.4,
+                consciousness_level: 0.6,
+                prediction_error: 0.7,
+            },
+        ),
+        (
+            "contemplative",
+            MusicalState {
+                harmony_activations: [0.6, 0.4, 0.8, 0.1, 0.3, 0.4, 0.2, 0.9],
+                serotonin: 0.7,
+                dopamine: 0.4,
+                noradrenaline: 0.2,
+                arousal: 0.15,
+                valence: 0.1,
+                consciousness_level: 0.9,
+                prediction_error: 0.1,
+            },
+        ),
+        (
+            "joyful",
+            MusicalState {
+                harmony_activations: [0.7, 0.9, 0.5, 0.7, 0.6, 0.8, 0.6, 0.2],
+                serotonin: 0.6,
+                dopamine: 0.9,
+                noradrenaline: 0.3,
+                arousal: 0.7,
+                valence: 0.8,
+                consciousness_level: 0.85,
+                prediction_error: 0.15,
+            },
+        ),
     ];
 
-    println!("  {:12} | {:>6} {:>6} {:>6} | {:>6} {:>6} {:>6} | {:>7}",
-        "State", "C:note", "C:mel", "C:comp", "N:note", "N:mel", "N:comp", "Δcomp");
-    println!("  {:─>12}─┼─{:─>6}─{:─>6}─{:─>6}─┼─{:─>6}─{:─>6}─{:─>6}─┼─{:─>7}",
-        "", "", "", "", "", "", "", "");
+    println!(
+        "  {:12} | {:>6} {:>6} {:>6} | {:>6} {:>6} {:>6} | {:>7}",
+        "State", "C:note", "C:mel", "C:comp", "N:note", "N:mel", "N:comp", "Δcomp"
+    );
+    println!(
+        "  {:─>12}─┼─{:─>6}─{:─>6}─{:─>6}─┼─{:─>6}─{:─>6}─{:─>6}─┼─{:─>7}",
+        "", "", "", "", "", "", "", ""
+    );
 
     for (name, state) in &states {
         let config_classic = MuseConfig {
@@ -77,22 +109,40 @@ fn main() {
         let classic = compose(&config_classic, state, 42);
         let classic_verdict = evaluate_composition(&classic, state);
         let tempo_c = compute_tempo(&config_classic, state);
-        classic.to_midi_file(&midi_dir.join(format!("{name}_classic.mid")), tempo_c).ok();
-        export_wav(&classic, &audio_dir.join(format!("trained_{name}_classic.wav")), ExportFormat::WavF32).ok();
+        classic
+            .to_midi_file(&midi_dir.join(format!("{name}_classic.mid")), tempo_c)
+            .ok();
+        export_wav(
+            &classic,
+            &audio_dir.join(format!("trained_{name}_classic.wav")),
+            ExportFormat::WavF32,
+        )
+        .ok();
 
         // Neural (trained projections loaded automatically in compose)
         let neural = compose(&config_neural, state, 42);
         let neural_verdict = evaluate_composition(&neural, state);
         let tempo_n = compute_tempo(&config_neural, state);
-        neural.to_midi_file(&midi_dir.join(format!("{name}_neural.mid")), tempo_n).ok();
-        export_wav(&neural, &audio_dir.join(format!("trained_{name}_neural.wav")), ExportFormat::WavF32).ok();
+        neural
+            .to_midi_file(&midi_dir.join(format!("{name}_neural.mid")), tempo_n)
+            .ok();
+        export_wav(
+            &neural,
+            &audio_dir.join(format!("trained_{name}_neural.wav")),
+            ExportFormat::WavF32,
+        )
+        .ok();
 
         let delta = neural_verdict.composite - classic_verdict.composite;
         println!(
             "  {:12} | {:5} {:6.3} {:6.3} | {:5} {:6.3} {:6.3} | {:+7.3}",
             name,
-            classic.notes.len(), classic_verdict.melodic_interest, classic_verdict.composite,
-            neural.notes.len(), neural_verdict.melodic_interest, neural_verdict.composite,
+            classic.notes.len(),
+            classic_verdict.melodic_interest,
+            classic_verdict.composite,
+            neural.notes.len(),
+            neural_verdict.melodic_interest,
+            neural_verdict.composite,
             delta,
         );
     }

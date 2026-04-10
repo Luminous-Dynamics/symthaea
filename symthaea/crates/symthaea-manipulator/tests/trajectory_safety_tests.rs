@@ -28,7 +28,10 @@ fn test_ik_unreachable_target_returns_none() {
     let target = [5.0, 5.0, 5.0];
     let q0 = vec![0.0; 7];
     let result = kin.ik_dls(&target, &q0, 0.1, 200, 0.01);
-    assert!(result.is_none(), "IK should return None for unreachable target");
+    assert!(
+        result.is_none(),
+        "IK should return None for unreachable target"
+    );
 }
 
 #[test]
@@ -41,7 +44,10 @@ fn test_ik_target_below_floor() {
     // May or may not converge (joint limits might prevent it)
     // but if it does, the solution should still respect joint limits
     if let Some(q) = result {
-        assert!(kin.within_limits(&q), "Solution must respect joint limits even for low target");
+        assert!(
+            kin.within_limits(&q),
+            "Solution must respect joint limits even for low target"
+        );
     }
 }
 
@@ -88,7 +94,8 @@ fn test_multi_waypoint_trajectory() {
         vec![0.0, 0.3, 0.0, -1.5, 0.0, 0.5, 0.0], // Return to start
     ];
 
-    let waypoints: Vec<[f64; 3]> = configs.iter()
+    let waypoints: Vec<[f64; 3]> = configs
+        .iter()
         .map(|q| kin.end_effector_position(q))
         .collect();
 
@@ -110,10 +117,7 @@ fn test_multi_waypoint_trajectory() {
             + (achieved[1] - target[1]).powi(2)
             + (achieved[2] - target[2]).powi(2))
         .sqrt();
-        assert!(
-            error < 0.02,
-            "Waypoint {i} error too large: {error:.4}"
-        );
+        assert!(error < 0.02, "Waypoint {i} error too large: {error:.4}");
 
         // Joint limits respected
         assert!(kin.within_limits(&q), "Waypoint {i} violates joint limits");
@@ -141,7 +145,12 @@ fn test_trajectory_continuity() {
     let sol2 = kin.ik_dls(&pos2, &sol1, 0.1, 200, 0.01).unwrap();
 
     // Solutions for nearby targets (using warm-start) should be nearby in joint space
-    let joint_dist: f64 = sol1.iter().zip(&sol2).map(|(a, b)| (a - b).powi(2)).sum::<f64>().sqrt();
+    let joint_dist: f64 = sol1
+        .iter()
+        .zip(&sol2)
+        .map(|(a, b)| (a - b).powi(2))
+        .sum::<f64>()
+        .sqrt();
     assert!(
         joint_dist < 1.0,
         "Nearby targets should produce nearby joint solutions: dist={joint_dist:.4}"
@@ -170,7 +179,10 @@ fn test_clearance_decreases_toward_boundary() {
         assert!(
             clearances[i] <= clearances[i - 1] + 1e-10,
             "Clearance should decrease toward boundary: c[{}]={:.4} > c[{}]={:.4}",
-            i, clearances[i], i - 1, clearances[i - 1]
+            i,
+            clearances[i],
+            i - 1,
+            clearances[i - 1]
         );
     }
 }
@@ -181,7 +193,10 @@ fn test_clearance_negative_outside_boundary() {
 
     // Well outside workspace
     let c = boundary.clearance(&[2.0, 0.0, 0.3], ManipulatorSafetyLevel::Green);
-    assert!(c < 0.0, "Clearance outside workspace should be negative: {c}");
+    assert!(
+        c < 0.0,
+        "Clearance outside workspace should be negative: {c}"
+    );
 }
 
 #[test]
@@ -196,7 +211,10 @@ fn test_clearance_with_human_zone() {
     // Far from human
     let far = boundary.clearance(&[0.0, 0.5, 0.3], ManipulatorSafetyLevel::Green);
 
-    assert!(near < far, "Clearance near human should be less than far: near={near:.4}, far={far:.4}");
+    assert!(
+        near < far,
+        "Clearance near human should be less than far: near={near:.4}, far={far:.4}"
+    );
 }
 
 #[test]
@@ -235,7 +253,10 @@ fn test_safety_level_torque_gain_ordering() {
         assert!(
             gains[i] <= gains[i - 1],
             "Torque gain should decrease with safety level: {:?}={} > {:?}={}",
-            i, gains[i], i - 1, gains[i - 1]
+            i,
+            gains[i],
+            i - 1,
+            gains[i - 1]
         );
     }
     assert_eq!(gains[3], 0.0, "Red should have zero gain");
@@ -256,8 +277,8 @@ fn test_workspace_fraction_ordering() {
     for i in 1..fractions.len() {
         assert!(
             fractions[i] <= fractions[i - 1],
-            "Workspace fraction should decrease: {:?}"
-            , fractions
+            "Workspace fraction should decrease: {:?}",
+            fractions
         );
     }
 }
@@ -269,8 +290,14 @@ fn test_position_inside_green_but_outside_yellow() {
     let pos: [f64; 3] = [0.7, 0.0, 0.3];
     let radius = (pos[0] * pos[0] + pos[1] * pos[1] + pos[2] * pos[2]).sqrt();
 
-    assert!(boundary.is_within(&pos, ManipulatorSafetyLevel::Green), "Should be inside Green workspace");
-    assert!(!boundary.is_within(&pos, ManipulatorSafetyLevel::Yellow), "Should be outside Yellow workspace (80%)");
+    assert!(
+        boundary.is_within(&pos, ManipulatorSafetyLevel::Green),
+        "Should be inside Green workspace"
+    );
+    assert!(
+        !boundary.is_within(&pos, ManipulatorSafetyLevel::Yellow),
+        "Should be outside Yellow workspace (80%)"
+    );
 }
 
 #[test]
@@ -290,8 +317,8 @@ fn test_orange_red_workspace_zero() {
 fn test_multiple_human_zones() {
     let boundary = WorkspaceBoundary {
         human_zones: vec![
-            [0.3, 0.0, 0.3, 0.15],   // Human 1
-            [-0.3, 0.0, 0.3, 0.15],  // Human 2 (opposite side)
+            [0.3, 0.0, 0.3, 0.15],  // Human 1
+            [-0.3, 0.0, 0.3, 0.15], // Human 2 (opposite side)
         ],
         ..Default::default()
     };
@@ -317,10 +344,7 @@ fn test_simulator_long_horizon_stability() {
     for i in 0..1000 {
         sim.step(&cmd, 0.001);
         let state = sim.state();
-        assert!(
-            state.is_finite(),
-            "State should remain finite at step {i}"
-        );
+        assert!(state.is_finite(), "State should remain finite at step {i}");
     }
 }
 

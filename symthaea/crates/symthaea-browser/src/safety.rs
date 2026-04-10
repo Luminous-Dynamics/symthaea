@@ -59,8 +59,7 @@ impl BrowserSafetyPolicy {
 
         // Blocklist always wins
         for pattern in &self.url_blocklist {
-            if lower.starts_with(&pattern.to_lowercase())
-                || lower.contains(&pattern.to_lowercase())
+            if lower.starts_with(&pattern.to_lowercase()) || lower.contains(&pattern.to_lowercase())
             {
                 warn!(url, pattern, "URL blocked by blocklist");
                 return false;
@@ -86,12 +85,7 @@ impl BrowserSafetyPolicy {
     pub fn is_action_allowed(&self, action: &BrowserAction, phi: f64) -> bool {
         let threshold = (action.required_phi() * self.phi_multiplier).max(self.global_phi_floor);
         if phi < threshold {
-            warn!(
-                ?action,
-                phi,
-                threshold,
-                "Action blocked: insufficient Phi"
-            );
+            warn!(?action, phi, threshold, "Action blocked: insufficient Phi");
             return false;
         }
 

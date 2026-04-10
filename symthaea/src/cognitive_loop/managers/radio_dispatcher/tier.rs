@@ -8,9 +8,10 @@ use super::super::super::subsystem_trait::{
 };
 use super::hardware::RegulatoryDatabase;
 use super::transport::{
-    CompressedDelta, DiscoveryBeacon, MeshEncryption, PeerSession, RouteEntry,
-    RouteTable, TierCompressedPayload,
+    CompressedDelta, DiscoveryBeacon, MeshEncryption, PeerSession, RouteEntry, RouteTable,
+    TierCompressedPayload,
 };
+use crate::domain::{DomainProfile, DomainTransportClass};
 use std::collections::{HashMap, VecDeque};
 
 // Re-export named constants from thresholds.rs for local use.
@@ -226,21 +227,57 @@ impl PayloadClass {
 /// Falls back to the highest available tier if the ideal tier is unavailable.
 pub struct PayloadClassifier {
     /// Which tiers are currently operational.
-    available_tiers: [bool; 3], // [Local, Metro, Regional]
+    available_tiers: [bool; 4], // [Local, Metro, Regional, Interplanetary]
+    /// Domain policy that constrains valid routing choices.
+    domain: DomainProfile,
 }
 
 impl Default for PayloadClassifier {
     fn default() -> Self {
         Self {
-            available_tiers: [true, true, true], // All tiers available
+            available_tiers: [true, true, true, false],
+            domain: DomainProfile::default(),
         }
     }
 }
 
 impl PayloadClassifier {
+    pub(crate) fn tier_transport_class(tier: RadioTier) -> DomainTransportClass {
+        match tier {
+            RadioTier::Local => DomainTransportClass::LocalMesh,
+            RadioTier::Metro => DomainTransportClass::MetroRelay,
+            RadioTier::Regional => DomainTransportClass::RegionalRelay,
+            RadioTier::Interplanetary => DomainTransportClass::InterplanetaryRelay,
+        }
+    }
+
+    fn preferred_tiers_for_domain(&self) -> Vec<RadioTier> {
+        self.domain
+            .transport
+            .priority_order()
+            .into_iter()
+            .filter_map(|transport| match transport {
+                DomainTransportClass::LocalMesh => Some(RadioTier::Local),
+                DomainTransportClass::MetroRelay => Some(RadioTier::Metro),
+                DomainTransportClass::RegionalRelay => Some(RadioTier::Regional),
+                DomainTransportClass::InterplanetaryRelay => Some(RadioTier::Interplanetary),
+            })
+            .collect()
+    }
+
     /// Update tier availability (called when radio hardware status changes).
     pub fn set_tier_available(&mut self, tier: RadioTier, available: bool) {
         self.available_tiers[tier as usize] = available;
+    }
+
+    /// Set the active domain policy for routing.
+    pub fn set_domain_profile(&mut self, domain: DomainProfile) {
+        self.domain = domain;
+    }
+
+    /// Get the current domain policy.
+    pub fn domain_profile(&self) -> &DomainProfile {
+        &self.domain
     }
 
     /// Check if a specific tier is currently available.
@@ -272,34 +309,46 @@ impl PayloadClassifier {
         }
 
         let min_tier = class.min_tier();
+        let preferred_tiers = self.preferred_tiers_for_domain();
 
-        // Try tiers from min_tier upward (toward higher bandwidth)
-        // RadioTier order: Local(0) > Metro(1) > Regional(2)
-        // We want to find the best available tier at or above min_tier bandwidth
-        let candidates: Vec<RadioTier> = RadioTier::ALL
+        // Try the domain's preferred tiers first, but only those currently
+        // available and capable of meeting the nominal bandwidth requirement.
+        let candidates: Vec<RadioTier> = preferred_tiers
             .iter()
             .copied()
             .filter(|&t| self.available_tiers[t as usize])
+            .filter(|&t| {
+                self.domain
+                    .supports_transport(Self::tier_transport_class(t))
+            })
             .filter(|&t| (t as usize) <= (min_tier as usize))
             .collect();
 
         if candidates.is_empty() {
-            // No tier at the required bandwidth level — try any available tier
-            // but only if the payload can physically fit
-            for &tier in &RadioTier::ALL {
-                if self.available_tiers[tier as usize] {
-                    let profile = tier.profile();
-                    if payload_size <= profile.mtu {
-                        return Some(RoutingDecision::Routed {
-                            tier,
-                            fragmented: false,
-                            estimated_fragments: 1,
-                        });
-                    }
+            // No tier meets the nominal bandwidth preference.
+            // In delay-tolerant domains, fall back to any allowed tier and
+            // permit fragmentation/store-and-forward.
+            for tier in preferred_tiers {
+                if !self.available_tiers[tier as usize] {
+                    continue;
+                }
+                let profile = tier.profile();
+                let fragmented = payload_size > profile.mtu;
+
+                if !fragmented || self.domain.transport.store_and_forward_required {
+                    return Some(RoutingDecision::Routed {
+                        tier,
+                        fragmented,
+                        estimated_fragments: if fragmented {
+                            (payload_size + profile.mtu - 1) / profile.mtu
+                        } else {
+                            1
+                        },
+                    });
                 }
             }
             return Some(RoutingDecision::Blocked {
-                reason: "no tier with sufficient MTU available",
+                reason: "domain transport unavailable",
             });
         }
 
@@ -805,6 +854,19 @@ impl Default for SpectrumManager {
 }
 
 impl SpectrumManager {
+    /// Create with a specific domain profile.
+    pub fn with_domain_profile(domain: DomainProfile) -> Self {
+        let mut manager = Self::default();
+        manager.set_domain_profile(domain);
+        manager
+    }
+
+    fn tier_allowed_by_domain(&self, tier: RadioTier) -> bool {
+        self.classifier
+            .domain_profile()
+            .supports_transport(PayloadClassifier::tier_transport_class(tier))
+    }
+
     /// Co-prime scheduling interval (cycles).
     pub const INTERVAL: u32 = 53;
 
@@ -826,6 +888,9 @@ impl SpectrumManager {
     /// Report a packet loss event on a specific tier.
     pub fn report_loss(&mut self, tier: RadioTier) {
         let idx = tier as usize;
+        if idx >= self.tier_loss_ema.len() {
+            return;
+        }
         self.tier_loss_ema[idx] =
             self.tier_loss_ema[idx] * (1.0 - TIER_LOSS_EMA_ALPHA) + TIER_LOSS_EMA_ALPHA;
     }
@@ -833,6 +898,9 @@ impl SpectrumManager {
     /// Report a successful packet delivery on a specific tier.
     pub fn report_success(&mut self, tier: RadioTier) {
         let idx = tier as usize;
+        if idx >= self.tier_loss_ema.len() {
+            return;
+        }
         self.tier_loss_ema[idx] *= 1.0 - TIER_LOSS_EMA_ALPHA;
     }
 
@@ -942,9 +1010,23 @@ impl SpectrumManager {
     /// Set tier availability (called by radio hardware monitor).
     pub fn set_tier_available(&mut self, tier: RadioTier, available: bool) {
         let idx = tier as usize;
+        if idx >= self.tier_available.len() {
+            self.classifier.set_tier_available(tier, available);
+            return;
+        }
         self.tier_available[idx] = available;
         self.classifier.set_tier_available(tier, available);
         self.update_network_health();
+    }
+
+    /// Apply a domain profile to downstream routing decisions.
+    pub fn set_domain_profile(&mut self, domain: DomainProfile) {
+        self.classifier.set_domain_profile(domain);
+    }
+
+    /// Get the current domain profile used by the classifier.
+    pub fn domain_profile(&self) -> &DomainProfile {
+        self.classifier.domain_profile()
     }
 
     /// Get the current network health.
@@ -989,7 +1071,11 @@ impl SpectrumManager {
     ///
     /// If no previous state exists for this peer, returns a full vector.
     /// Updates the peer's last-known state after compression.
-    pub(super) fn compress_delta(&mut self, peer_id: &[u8; 8], current_hv: &[u8; 2048]) -> CompressedDelta {
+    pub(super) fn compress_delta(
+        &mut self,
+        peer_id: &[u8; 8],
+        current_hv: &[u8; 2048],
+    ) -> CompressedDelta {
         // Find peer's last HV
         let previous = self
             .peer_last_hv
@@ -1083,7 +1169,7 @@ impl SpectrumManager {
         RadioTier::ALL
             .iter()
             .copied()
-            .find(|&tier| self.tier_available[tier as usize])
+            .find(|&tier| self.tier_available[tier as usize] && self.tier_allowed_by_domain(tier))
     }
 
     /// Select tier based on consciousness confidence level.
@@ -1102,7 +1188,10 @@ impl SpectrumManager {
         if confidence > RADIO_CONSCIOUSNESS_HIGH_CONFIDENCE {
             // High confidence: prefer most reliable available tier
             for &tier in &RadioTier::ALL {
-                if self.tier_available[tier as usize] && payload_size <= tier.profile().mtu {
+                if self.tier_available[tier as usize]
+                    && self.tier_allowed_by_domain(tier)
+                    && payload_size <= tier.profile().mtu
+                {
                     return Some(tier);
                 }
             }
@@ -1112,6 +1201,7 @@ impl SpectrumManager {
                 .iter()
                 .copied()
                 .filter(|&t| self.tier_available[t as usize])
+                .filter(|&t| self.tier_allowed_by_domain(t))
                 .filter(|&t| payload_size <= t.profile().mtu || t == RadioTier::Local)
                 .map(|t| (t, t.profile().energy_per_bit_nj))
                 .collect();
@@ -1407,6 +1497,7 @@ impl SpectrumManager {
             .iter()
             .copied()
             .filter(|&t| self.tier_available[t as usize])
+            .filter(|&t| self.tier_allowed_by_domain(t))
             .filter(|&t| payload_size <= t.profile().mtu || t == RadioTier::Local)
             .map(|t| (t, t.profile().energy_per_bit_nj))
             .collect();

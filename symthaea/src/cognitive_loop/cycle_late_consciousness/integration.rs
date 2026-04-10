@@ -60,7 +60,12 @@ impl CognitiveLoopService {
                     if self.consciousness.self_model_tier.meta_cognition.is_some() {
                         supporters.push("meta_cognition".to_string());
                     }
-                    if self.consciousness.consciousness_monitors.phenomenal_binding.is_some() {
+                    if self
+                        .consciousness
+                        .consciousness_monitors
+                        .phenomenal_binding
+                        .is_some()
+                    {
                         supporters.push("phenomenal_binding".to_string());
                     }
                     if self.config.enable_knowledge_engine {
@@ -331,7 +336,9 @@ impl CognitiveLoopService {
         let _t = Instant::now();
         let (phenomenal_binding_strength, phenomenal_fragmented) =
             if ctx.urgency.run_consciousness_monitors() {
-                if let Some(ref mut binding) = self.consciousness.consciousness_monitors.phenomenal_binding {
+                if let Some(ref mut binding) =
+                    self.consciousness.consciousness_monitors.phenomenal_binding
+                {
                     let dims = [
                         ctx.unified_psi,
                         ctx.coherence as f64,
@@ -813,10 +820,13 @@ impl CognitiveLoopService {
         // memory even without full conscious access (pre-attentive encoding).
         if ctx.surprise_triggered {
             let valence = -(ctx.prediction_error as f64 * 0.3); // surprise is mildly negative
-            self.consciousness.master_equation.narrative_coherence.add_episode(
-                format!("surprise_pre_pe{:.2}", ctx.prediction_error),
-                valence,
-            );
+            self.consciousness
+                .master_equation
+                .narrative_coherence
+                .add_episode(
+                    format!("surprise_pre_pe{:.2}", ctx.prediction_error),
+                    valence,
+                );
         }
 
         // Run every 10th cycle to amortize cost. Maps cognitive loop signals to
@@ -827,16 +837,20 @@ impl CognitiveLoopService {
             // Wire embodiment factor from cognitive loop signals.
             // Science: Friston (2010) — low PE = good embodied prediction (sensorimotor accuracy)
             // Science: Barrett (2017) — interoceptive coherence from allostatic regulation
-            self.consciousness.master_equation.embodiment_factor.record_prediction(
-                1.0 - ctx.prediction_error as f64,
-                1.0 - ctx.prediction_error as f64,
-            );
+            self.consciousness
+                .master_equation
+                .embodiment_factor
+                .record_prediction(
+                    1.0 - ctx.prediction_error as f64,
+                    1.0 - ctx.prediction_error as f64,
+                );
             // Use allostatic load as direct interoceptive coherence signal.
             // Low allostatic load = high body coherence (expected ≈ actual).
             {
                 let allostatic = self.neuromod.bath.allostatic_load;
                 let coherence = 1.0 - allostatic as f64;
-                self.consciousness.master_equation
+                self.consciousness
+                    .master_equation
                     .embodiment_factor
                     .update_interoceptive(coherence, coherence);
             }
@@ -847,7 +861,8 @@ impl CognitiveLoopService {
             // Conway (2005) — narrative identity forms from dense episodic sampling.
             if self.stats.total_cycles % 5 == 0 {
                 let valence = (1.0 - ctx.prediction_error as f64).clamp(-1.0, 1.0);
-                self.consciousness.master_equation
+                self.consciousness
+                    .master_equation
                     .narrative_coherence
                     .add_episode(format!("cycle_{}", self.stats.total_cycles), valence);
             }
@@ -857,7 +872,8 @@ impl CognitiveLoopService {
             // Science: Schacter et al. (2012) — prospection uses same networks as episodic memory
             if self.stats.total_cycles % 25 == 0 {
                 let horizon = ((1.0 - ctx.prediction_error as f64) * 10.0).max(1.0) as usize;
-                self.consciousness.master_equation
+                self.consciousness
+                    .master_equation
                     .narrative_coherence
                     .add_future_scenario(
                         format!("prediction_horizon_{}", self.stats.total_cycles),
@@ -886,11 +902,10 @@ impl CognitiveLoopService {
                     format!("coherence_{:.1}", ctx.coherence),
                     format!("safety_{:.1}", late.predictive_self_safety),
                 ];
-                self.consciousness.master_equation.social_embedding.update_self_model(
-                    self_goals,
-                    self_beliefs,
-                    late.affective_valence as f64,
-                );
+                self.consciousness
+                    .master_equation
+                    .social_embedding
+                    .update_self_model(self_goals, self_beliefs, late.affective_valence as f64);
 
                 // User agent model: the system IS modeling the user (their input
                 // drives prediction, their patterns are tracked by social_coherence).
@@ -903,13 +918,16 @@ impl CognitiveLoopService {
                         self.behavior.social_mgr.social.social_cooperation_rate
                     ),
                 ];
-                self.consciousness.master_equation.social_embedding.update_agent_model(
-                    "user",
-                    user_beliefs,
-                    user_goals,
-                    0.0, // neutral valence (we don't know user's emotions)
-                    self.behavior.social_mgr.social.social_prediction_accuracy as f64,
-                );
+                self.consciousness
+                    .master_equation
+                    .social_embedding
+                    .update_agent_model(
+                        "user",
+                        user_beliefs,
+                        user_goals,
+                        0.0, // neutral valence (we don't know user's emotions)
+                        self.behavior.social_mgr.social.social_prediction_accuracy as f64,
+                    );
 
                 // Feed prediction accuracy as ToM feedback — when the system
                 // correctly predicts user input patterns, its "other_modeling_accuracy"
@@ -922,10 +940,12 @@ impl CognitiveLoopService {
                 let c_level = self.carryover.history.consciousness_level;
                 let c_tom_mod = 0.85 + 0.25 * c_level; // [0.85, 1.10]
                 let accuracy = (raw_accuracy * c_tom_mod).clamp(0.0, 1.0);
-                self.consciousness.master_equation
+                self.consciousness
+                    .master_equation
                     .social_embedding
                     .record_tom_prediction("user", accuracy);
-                self.consciousness.master_equation
+                self.consciousness
+                    .master_equation
                     .social_embedding
                     .provide_tom_feedback("user", accuracy);
             }
@@ -1151,7 +1171,8 @@ impl CognitiveLoopService {
                 } else {
                     format!("consolidation_c{:.2}", level)
                 };
-                self.consciousness.master_equation
+                self.consciousness
+                    .master_equation
                     .narrative_coherence
                     .add_episode(episode_label, episode_valence);
             }
@@ -1199,7 +1220,8 @@ impl CognitiveLoopService {
                 let probability = (1.0 - pe).clamp(0.1, 0.9);
                 // Desirability: valence of the predicted state
                 let desirability = late.body_valence as f64;
-                self.consciousness.master_equation
+                self.consciousness
+                    .master_equation
                     .narrative_coherence
                     .add_future_scenario(
                         format!("prediction_h{}_pe{:.2}", horizon_steps, pe),

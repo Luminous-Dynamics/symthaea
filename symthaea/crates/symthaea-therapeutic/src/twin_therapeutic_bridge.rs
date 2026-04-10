@@ -263,8 +263,7 @@ impl TwinTherapeuticBridge {
                 target_alpha_coherence,
                 min_theta,
             } => {
-                let alpha_progress =
-                    (eeg.alpha_coherence / target_alpha_coherence).min(1.0) as f64;
+                let alpha_progress = (eeg.alpha_coherence / target_alpha_coherence).min(1.0) as f64;
                 let theta_progress = (eeg.theta_frontal_midline / min_theta).min(1.0) as f64;
                 (alpha_progress * 0.5 + theta_progress * 0.5).min(1.0)
             }
@@ -287,9 +286,7 @@ impl TwinTherapeuticBridge {
     /// Session outcome if the session has completed or terminated.
     pub fn outcome(&self) -> Option<SessionOutcome> {
         match &self.session.status {
-            SessionStatus::Completed | SessionStatus::Terminated(_) => {
-                Some(self.session.outcome())
-            }
+            SessionStatus::Completed | SessionStatus::Terminated(_) => Some(self.session.outcome()),
             _ => None,
         }
     }
@@ -420,8 +417,7 @@ mod tests {
 
     #[test]
     fn progress_increases_when_eeg_matches_target() {
-        let mut bridge =
-            TwinTherapeuticBridge::with_adaptation_rate(Protocol::flow_state(), 0.5);
+        let mut bridge = TwinTherapeuticBridge::with_adaptation_rate(Protocol::flow_state(), 0.5);
         let good_eeg = relaxed_eeg();
 
         // Run several ticks with good EEG and high Phi.
@@ -485,10 +481,8 @@ mod tests {
 
     #[test]
     fn meditation_protocol_responds_to_theta() {
-        let mut bridge = TwinTherapeuticBridge::with_adaptation_rate(
-            Protocol::meditative_absorption(),
-            0.5,
-        );
+        let mut bridge =
+            TwinTherapeuticBridge::with_adaptation_rate(Protocol::meditative_absorption(), 0.5);
         // Feed high theta + alpha coherence: should see progress.
         let eeg = meditative_eeg();
         for _ in 0..10 {
@@ -509,8 +503,7 @@ mod tests {
 
     #[test]
     fn estimated_ticks_returns_zero_when_reached() {
-        let mut bridge =
-            TwinTherapeuticBridge::with_adaptation_rate(Protocol::flow_state(), 1.0);
+        let mut bridge = TwinTherapeuticBridge::with_adaptation_rate(Protocol::flow_state(), 1.0);
         // With adaptation_rate=1.0 and perfect EEG+Phi the progress should
         // reach the target quickly.
         for _ in 0..50 {

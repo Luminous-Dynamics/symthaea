@@ -86,7 +86,11 @@ impl FeatureNormalizer {
     ///
     /// Constant features (max == min) map to 0.5.
     fn normalize(&self, features: &[f32]) -> Vec<f32> {
-        assert_eq!(features.len(), self.mins.len(), "feature dimension mismatch");
+        assert_eq!(
+            features.len(),
+            self.mins.len(),
+            "feature dimension mismatch"
+        );
         features
             .iter()
             .enumerate()
@@ -170,15 +174,22 @@ impl LearnedMoralClassifier {
             for (text, label) in samples {
                 let hv = self.surface_encoder.encode(text);
                 let idx = label_to_index(*label);
-                for (a, &v) in accum[idx].iter_mut().zip(hv.values.iter()) { *a += v; }
+                for (a, &v) in accum[idx].iter_mut().zip(hv.values.iter()) {
+                    *a += v;
+                }
                 counts[idx] += 1;
             }
-            let mut protos = [ContinuousHV::zero(dim), ContinuousHV::zero(dim), ContinuousHV::zero(dim)];
+            let mut protos = [
+                ContinuousHV::zero(dim),
+                ContinuousHV::zero(dim),
+                ContinuousHV::zero(dim),
+            ];
             for i in 0..3 {
                 if counts[i] > 0 {
                     let norm: f32 = accum[i].iter().map(|x| x * x).sum::<f32>().sqrt();
                     if norm > 0.0 {
-                        protos[i] = ContinuousHV::from_vec(accum[i].iter().map(|x| x / norm).collect());
+                        protos[i] =
+                            ContinuousHV::from_vec(accum[i].iter().map(|x| x / norm).collect());
                     }
                 }
             }
@@ -302,12 +313,30 @@ mod tests {
 
         // Synthetic training data with clear moral signals
         let samples = vec![
-            ("helping others and being kind".to_string(), MoralLabel::Good),
-            ("sharing food with those in need".to_string(), MoralLabel::Good),
-            ("hurting innocent people is terrible".to_string(), MoralLabel::Bad),
-            ("stealing and lying to everyone".to_string(), MoralLabel::Bad),
-            ("the weather is cloudy today".to_string(), MoralLabel::Neutral),
-            ("water boils at one hundred degrees".to_string(), MoralLabel::Neutral),
+            (
+                "helping others and being kind".to_string(),
+                MoralLabel::Good,
+            ),
+            (
+                "sharing food with those in need".to_string(),
+                MoralLabel::Good,
+            ),
+            (
+                "hurting innocent people is terrible".to_string(),
+                MoralLabel::Bad,
+            ),
+            (
+                "stealing and lying to everyone".to_string(),
+                MoralLabel::Bad,
+            ),
+            (
+                "the weather is cloudy today".to_string(),
+                MoralLabel::Neutral,
+            ),
+            (
+                "water boils at one hundred degrees".to_string(),
+                MoralLabel::Neutral,
+            ),
         ];
 
         clf.train(&samples);
@@ -325,12 +354,30 @@ mod tests {
         let mut clf = LearnedMoralClassifier::new();
 
         let samples = vec![
-            ("helping others and being kind".to_string(), MoralLabel::Good),
-            ("sharing food with those in need".to_string(), MoralLabel::Good),
-            ("hurting innocent people is terrible".to_string(), MoralLabel::Bad),
-            ("stealing and lying to everyone".to_string(), MoralLabel::Bad),
-            ("the weather is cloudy today".to_string(), MoralLabel::Neutral),
-            ("water boils at one hundred degrees".to_string(), MoralLabel::Neutral),
+            (
+                "helping others and being kind".to_string(),
+                MoralLabel::Good,
+            ),
+            (
+                "sharing food with those in need".to_string(),
+                MoralLabel::Good,
+            ),
+            (
+                "hurting innocent people is terrible".to_string(),
+                MoralLabel::Bad,
+            ),
+            (
+                "stealing and lying to everyone".to_string(),
+                MoralLabel::Bad,
+            ),
+            (
+                "the weather is cloudy today".to_string(),
+                MoralLabel::Neutral,
+            ),
+            (
+                "water boils at one hundred degrees".to_string(),
+                MoralLabel::Neutral,
+            ),
         ];
 
         clf.train(&samples);
@@ -365,7 +412,10 @@ mod tests {
         let normed = normalizer.normalize(&[-1.0, 0.0, 5.0]);
         assert!((normed[0] - 0.0).abs() < 1e-6, "min should map to 0.0");
         assert!((normed[1] - 0.0).abs() < 1e-6, "min should map to 0.0");
-        assert!((normed[2] - 0.5).abs() < 1e-6, "constant feature should map to 0.5");
+        assert!(
+            (normed[2] - 0.5).abs() < 1e-6,
+            "constant feature should map to 0.5"
+        );
 
         let normed = normalizer.normalize(&[1.0, 10.0, 5.0]);
         assert!((normed[0] - 1.0).abs() < 1e-6, "max should map to 1.0");
@@ -373,7 +423,13 @@ mod tests {
 
         // Values outside range should be clamped
         let normed = normalizer.normalize(&[-5.0, 15.0, 5.0]);
-        assert!((normed[0] - 0.0).abs() < 1e-6, "below min should clamp to 0.0");
-        assert!((normed[1] - 1.0).abs() < 1e-6, "above max should clamp to 1.0");
+        assert!(
+            (normed[0] - 0.0).abs() < 1e-6,
+            "below min should clamp to 0.0"
+        );
+        assert!(
+            (normed[1] - 1.0).abs() < 1e-6,
+            "above max should clamp to 1.0"
+        );
     }
 }

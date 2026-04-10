@@ -67,7 +67,11 @@ fn main() {
     #[cfg(feature = "humanoid")]
     println!(
         "✓ {} embodiment bridge(s) active",
-        if service.has_motor_bridge() { "1+" } else { "0" }
+        if service.has_motor_bridge() {
+            "1+"
+        } else {
+            "0"
+        }
     );
     println!();
 

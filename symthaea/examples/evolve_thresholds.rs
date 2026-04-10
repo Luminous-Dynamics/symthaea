@@ -11,13 +11,13 @@
 //!
 //! Output: Per-generation statistics and final Pareto front.
 
-use symthaea_neuroevolution::{
-    decode_thresholds, encode_thresholds, ThresholdPhenotype,
-    NeuralGenome,
-    threshold_genome::evaluate_threshold_fitness,
-    governance::{gate_threshold_proposal, GovernanceResult},
-};
 use symthaea_core::hdc::binary_hv::BinaryHV;
+use symthaea_neuroevolution::{
+    decode_thresholds, encode_thresholds,
+    governance::{gate_threshold_proposal, GovernanceResult},
+    threshold_genome::evaluate_threshold_fitness,
+    NeuralGenome, ThresholdPhenotype,
+};
 
 /// Population size per generation.
 const POP_SIZE: usize = 30;
@@ -65,7 +65,11 @@ fn random_individual(rng: &mut Rng) -> Individual {
     let genome = NeuralGenome::random(rng.next());
     let phenotype = genome.decode_thresholds();
     let fitness = evaluate_threshold_fitness(&phenotype);
-    Individual { genome, fitness, phenotype }
+    Individual {
+        genome,
+        fitness,
+        phenotype,
+    }
 }
 
 /// Mutate a genome by flipping random bytes in the threshold region (bits 400-634).
@@ -105,19 +109,23 @@ fn crossover(a: &NeuralGenome, b: &NeuralGenome, rng: &mut Rng) -> NeuralGenome 
 fn main() {
     println!("═══════════════════════════════════════════════════════════════");
     println!("  Threshold Evolution Runner");
-    println!("  {} individuals, {} generations", POP_SIZE, NUM_GENERATIONS);
+    println!(
+        "  {} individuals, {} generations",
+        POP_SIZE, NUM_GENERATIONS
+    );
     println!("  18 evolvable thresholds (safety/moral excluded)");
     println!("═══════════════════════════════════════════════════════════════\n");
 
     let mut rng = Rng::new(42);
 
     // Initialize population
-    let mut population: Vec<Individual> = (0..POP_SIZE)
-        .map(|_| random_individual(&mut rng))
-        .collect();
+    let mut population: Vec<Individual> =
+        (0..POP_SIZE).map(|_| random_individual(&mut rng)).collect();
 
-    println!("{:>5}  {:>8}  {:>8}  {:>8}  {:>10}  {:>10}",
-        "Gen", "Best", "Mean", "Worst", "FEP_Surp", "Dream_Int");
+    println!(
+        "{:>5}  {:>8}  {:>8}  {:>8}  {:>10}  {:>10}",
+        "Gen", "Best", "Mean", "Worst", "FEP_Surp", "Dream_Int"
+    );
     println!("{}", "-".repeat(65));
 
     for gen in 0..NUM_GENERATIONS {
@@ -131,9 +139,7 @@ fn main() {
 
         println!(
             "{:>5}  {:>8.4}  {:>8.4}  {:>8.4}  {:>10.2}  {:>10}",
-            gen, best, mean, worst,
-            best_pheno.fep_surprise_scale,
-            best_pheno.dream_base_interval,
+            gen, best, mean, worst, best_pheno.fep_surprise_scale, best_pheno.dream_base_interval,
         );
 
         // Elitism: keep top 20%
@@ -162,33 +168,103 @@ fn main() {
     population.sort_by(|a, b| b.fitness.partial_cmp(&a.fitness).unwrap());
 
     println!("\n═══════════════════════════════════════════════════════════════");
-    println!("  Final Best Individual (fitness: {:.4})", population[0].fitness);
+    println!(
+        "  Final Best Individual (fitness: {:.4})",
+        population[0].fitness
+    );
     println!("═══════════════════════════════════════════════════════════════\n");
 
     let best = &population[0].phenotype;
     let defaults = ThresholdPhenotype::default();
 
-    println!("{:<35} {:>10} {:>10} {:>8}", "Threshold", "Evolved", "Default", "Delta%");
+    println!(
+        "{:<35} {:>10} {:>10} {:>8}",
+        "Threshold", "Evolved", "Default", "Delta%"
+    );
     println!("{}", "-".repeat(68));
 
-    print_row("fep_surprise_scale", best.fep_surprise_scale, defaults.fep_surprise_scale);
+    print_row(
+        "fep_surprise_scale",
+        best.fep_surprise_scale,
+        defaults.fep_surprise_scale,
+    );
     print_row("fep_lr_decay", best.fep_lr_decay, defaults.fep_lr_decay);
-    print_row_u64("dream_base_interval", best.dream_base_interval, defaults.dream_base_interval);
-    print_row_u64("dream_min_interval", best.dream_min_interval, defaults.dream_min_interval);
-    print_row("neuromod_d2_baseline", best.neuromod_d2_baseline as f32, defaults.neuromod_d2_baseline as f32);
-    print_row("neuromod_ne_phasic_threshold", best.neuromod_ne_phasic_threshold, defaults.neuromod_ne_phasic_threshold);
-    print_row("neuromod_arousal_ema_decay", best.neuromod_arousal_ema_decay, defaults.neuromod_arousal_ema_decay);
-    print_row("homeostasis_recalibrate_high", best.homeostasis_recalibrate_high, defaults.homeostasis_recalibrate_high);
-    print_row("homeostasis_recalibrate_low", best.homeostasis_recalibrate_low, defaults.homeostasis_recalibrate_low);
-    print_row("neuromod_ema_alpha", best.neuromod_ema_alpha, defaults.neuromod_ema_alpha);
-    print_row("frustration_dampen_threshold", best.frustration_dampen_threshold as f32, defaults.frustration_dampen_threshold as f32);
-    print_row("engagement_low_threshold", best.engagement_low_threshold as f32, defaults.engagement_low_threshold as f32);
-    print_row("flow_exploration_increment", best.flow_exploration_increment, defaults.flow_exploration_increment);
+    print_row_u64(
+        "dream_base_interval",
+        best.dream_base_interval,
+        defaults.dream_base_interval,
+    );
+    print_row_u64(
+        "dream_min_interval",
+        best.dream_min_interval,
+        defaults.dream_min_interval,
+    );
+    print_row(
+        "neuromod_d2_baseline",
+        best.neuromod_d2_baseline as f32,
+        defaults.neuromod_d2_baseline as f32,
+    );
+    print_row(
+        "neuromod_ne_phasic_threshold",
+        best.neuromod_ne_phasic_threshold,
+        defaults.neuromod_ne_phasic_threshold,
+    );
+    print_row(
+        "neuromod_arousal_ema_decay",
+        best.neuromod_arousal_ema_decay,
+        defaults.neuromod_arousal_ema_decay,
+    );
+    print_row(
+        "homeostasis_recalibrate_high",
+        best.homeostasis_recalibrate_high,
+        defaults.homeostasis_recalibrate_high,
+    );
+    print_row(
+        "homeostasis_recalibrate_low",
+        best.homeostasis_recalibrate_low,
+        defaults.homeostasis_recalibrate_low,
+    );
+    print_row(
+        "neuromod_ema_alpha",
+        best.neuromod_ema_alpha,
+        defaults.neuromod_ema_alpha,
+    );
+    print_row(
+        "frustration_dampen_threshold",
+        best.frustration_dampen_threshold as f32,
+        defaults.frustration_dampen_threshold as f32,
+    );
+    print_row(
+        "engagement_low_threshold",
+        best.engagement_low_threshold as f32,
+        defaults.engagement_low_threshold as f32,
+    );
+    print_row(
+        "flow_exploration_increment",
+        best.flow_exploration_increment,
+        defaults.flow_exploration_increment,
+    );
     print_row("coherence_low", best.coherence_low, defaults.coherence_low);
-    print_row("arousal_trap_threshold", best.arousal_trap_threshold, defaults.arousal_trap_threshold);
-    print_row("self_model_weight_high", best.self_model_weight_high, defaults.self_model_weight_high);
-    print_row("homeostasis_pull_cruise", best.homeostasis_pull_cruise, defaults.homeostasis_pull_cruise);
-    print_row("confidence_crash_threshold", best.confidence_crash_threshold as f32, defaults.confidence_crash_threshold as f32);
+    print_row(
+        "arousal_trap_threshold",
+        best.arousal_trap_threshold,
+        defaults.arousal_trap_threshold,
+    );
+    print_row(
+        "self_model_weight_high",
+        best.self_model_weight_high,
+        defaults.self_model_weight_high,
+    );
+    print_row(
+        "homeostasis_pull_cruise",
+        best.homeostasis_pull_cruise,
+        defaults.homeostasis_pull_cruise,
+    );
+    print_row(
+        "confidence_crash_threshold",
+        best.confidence_crash_threshold as f32,
+        defaults.confidence_crash_threshold as f32,
+    );
 
     // Governance gate check
     println!("\n═══════════════════════════════════════════════════════════════");
@@ -215,7 +291,13 @@ fn print_row(name: &str, evolved: f32, default: f32) {
         0
     };
     let sign = if delta >= 0 { "+" } else { "" };
-    println!("{:<35} {:>10.4} {:>10.4} {:>7}%", name, evolved, default, format!("{sign}{delta}"));
+    println!(
+        "{:<35} {:>10.4} {:>10.4} {:>7}%",
+        name,
+        evolved,
+        default,
+        format!("{sign}{delta}")
+    );
 }
 
 fn print_row_u64(name: &str, evolved: u64, default: u64) {
@@ -225,5 +307,11 @@ fn print_row_u64(name: &str, evolved: u64, default: u64) {
         0
     };
     let sign = if delta >= 0 { "+" } else { "" };
-    println!("{:<35} {:>10} {:>10} {:>7}%", name, evolved, default, format!("{sign}{delta}"));
+    println!(
+        "{:<35} {:>10} {:>10} {:>7}%",
+        name,
+        evolved,
+        default,
+        format!("{sign}{delta}")
+    );
 }

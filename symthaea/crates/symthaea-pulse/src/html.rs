@@ -499,6 +499,8 @@ pub fn generate_pulse_html(
 fn write_head(html: &mut String, timestamp: &str, profile: &str, consciousness: f64) {
     let bg_hue = 130.0 + (consciousness * 20.0);
     let bg_sat = 25.0 + (consciousness * 15.0);
+    let timestamp = escape_html(timestamp);
+    let profile = escape_html(profile);
 
     let _ = write!(
         html,
@@ -1238,7 +1240,7 @@ fn write_vitals_pane(
             let _ = write!(html,
                 "<span class=\"anomaly-marker\" style=\"background: {}15; color: {}; border: 1px solid {}30; margin: 2px 4px;\" \
                  title=\"Cycle {}: {}\">{}</span>\n",
-                a.color, a.color, a.color, a.cycle, a.description, a.kind);
+                a.color, a.color, a.color, a.cycle, escape_html(&a.description), escape_html(&a.kind));
         }
         let _ = write!(html, "</div>\n");
     }
@@ -1355,7 +1357,11 @@ fn write_vitals_pane(
 </div>
 </div>
 "#,
-        v.urgency, cycle_hz, v.consciousness_state, v.selected_strategy, v.total_cycles
+        escape_html(&v.urgency),
+        cycle_hz,
+        escape_html(&v.consciousness_state),
+        escape_html(&v.selected_strategy),
+        v.total_cycles
     );
 }
 
@@ -1451,14 +1457,14 @@ fn write_neurobath_pane(html: &mut String, bath: &NeuroBath) {
 </div>
 </div>
 "#,
-        bath.circadian_phase,
+        escape_html(&bath.circadian_phase),
         bath.ei_ratio,
         bath.allostatic_load * 100.0,
         bath.sleep_pressure,
         if bath.personality.is_empty() {
             String::new()
         } else {
-            format!(" · {}", bath.personality)
+            format!(" · {}", escape_html(&bath.personality))
         },
         attractor_label,
         entropy_color,
@@ -1540,7 +1546,7 @@ fn write_moral_pane(html: &mut String, compass: &MoralCompass, sparkline: &[Spar
   <span class="vital-value" style="color: var(--solar-gold);">{}</span>
 </div>
 "#,
-            compass.dominant_harmonic
+            escape_html(&compass.dominant_harmonic)
         );
     }
 
@@ -1861,6 +1867,12 @@ fn write_substrate_pane(html: &mut String, substrate: &SubstrateInfo) {
     };
 
     let confidence_color = health_color(substrate.honest_confidence);
+    let substrate_label = escape_html(
+        &substrate
+            .substrate_type
+            .replace("Digital", " Digital")
+            .replace("Neurons", " Neurons"),
+    );
 
     let _ = write!(
         html,
@@ -1874,10 +1886,7 @@ fn write_substrate_pane(html: &mut String, substrate: &SubstrateInfo) {
 "#,
         0.4 + substrate.honest_confidence * 0.6,
         icon,
-        substrate
-            .substrate_type
-            .replace("Digital", " Digital")
-            .replace("Neurons", " Neurons"),
+        substrate_label,
         confidence_color.replace('#', ""),
         confidence_color.replace('#', ""),
         confidence_color,
@@ -2268,9 +2277,9 @@ fn write_governance_pane(html: &mut String, gov: &GovernanceInfo) {
         },
         phi = gov.collective_phi,
         mode = if gov.community_mode.is_empty() {
-            "—"
+            "—".to_string()
         } else {
-            &gov.community_mode
+            escape_html(&gov.community_mode)
         },
         mode_color = match gov.community_mode.as_str() {
             "Exploratory" => "#e8c547",
@@ -2380,9 +2389,9 @@ fn write_glyph_pane(html: &mut String, glyph: &super::GlyphInfo) {
         label = status_label,
         mod_color = modality_color,
         modality = if glyph.dominant_modality.is_empty() {
-            "—"
+            "—".to_string()
         } else {
-            &glyph.dominant_modality
+            escape_html(&glyph.dominant_modality)
         },
         coh_color = if glyph.coherence > 0.6 {
             "#e8c547"
@@ -2393,9 +2402,9 @@ fn write_glyph_pane(html: &mut String, glyph: &super::GlyphInfo) {
         },
         coherence = glyph.coherence,
         glyph_name = if glyph.resonant_glyph.is_empty() {
-            "—"
+            "—".to_string()
         } else {
-            &glyph.resonant_glyph
+            escape_html(&glyph.resonant_glyph)
         },
         spiral = glyph.spiral_position,
         octave = octave,
@@ -3197,9 +3206,9 @@ fn write_fabrication_pane(html: &mut String, fab: &FabricationInfo) {
         label = status_label,
         jobs = fab.active_print_jobs,
         safety = if fab.safety_level.is_empty() {
-            "Green"
+            "Green".to_string()
         } else {
-            &fab.safety_level
+            escape_html(&fab.safety_level)
         },
         safety_color = match fab.safety_level.as_str() {
             "Red" => "#c76b5a",
@@ -3235,9 +3244,9 @@ fn write_fabrication_pane(html: &mut String, fab: &FabricationInfo) {
         },
         coherence = fab.prediction_coherence,
         action = if fab.recommended_action.is_empty() {
-            "—"
+            "—".to_string()
         } else {
-            &fab.recommended_action
+            escape_html(&fab.recommended_action)
         },
         reward = fab.reward_ema,
         reward_color = if fab.reward_ema > 0.01 {
@@ -3359,7 +3368,9 @@ fn write_narrative_pane(html: &mut String, narrative: &Narrative) {
 </div>
 </div>
 "#,
-        narrative.consciousness_state, narrative.error_pattern, narrative.selected_strategy
+        escape_html(&narrative.consciousness_state),
+        escape_html(&narrative.error_pattern),
+        escape_html(&narrative.selected_strategy)
     );
 }
 
@@ -3418,14 +3429,14 @@ fn write_immune_pane(html: &mut String, immune: &super::ImmuneInfo) {
         color = status_color,
         label = status_label,
         safety = if immune.safety_level.is_empty() {
-            "GREEN"
+            "GREEN".to_string()
         } else {
-            &immune.safety_level
+            escape_html(&immune.safety_level)
         },
         posture = if immune.guardian_posture.is_empty() {
-            "Hold"
+            "Hold".to_string()
         } else {
-            &immune.guardian_posture
+            escape_html(&immune.guardian_posture)
         },
         patrol = if immune.patrol_active { "Yes" } else { "No" },
         threat_color = if immune.active_threats > 0 {
@@ -3486,9 +3497,18 @@ fn write_cortical_pane(html: &mut String, activations: &[(String, f32)]) {
     // Row 2 (parietal/temporal): Sensory, Integration, Auditory, Social
     // Row 3 (occipital/limbic): Visual, Memory, Emotional, Creative
     let layout_order = [
-        "Prefrontal", "Executive", "Motor", "Language",
-        "Sensory", "Integration", "Auditory", "Social",
-        "Visual", "Memory", "Emotional", "Creative",
+        "Prefrontal",
+        "Executive",
+        "Motor",
+        "Language",
+        "Sensory",
+        "Integration",
+        "Auditory",
+        "Social",
+        "Visual",
+        "Memory",
+        "Emotional",
+        "Creative",
     ];
 
     for region_name in layout_order {
@@ -3528,11 +3548,12 @@ fn write_cortical_pane(html: &mut String, activations: &[(String, f32)]) {
     html.push_str("</div>\n");
 
     // Summary bar: mean activation across all regions.
-    let mean: f32 = activations.iter().map(|(_, v)| v).sum::<f32>() / activations.len().max(1) as f32;
+    let mean: f32 =
+        activations.iter().map(|(_, v)| v).sum::<f32>() / activations.len().max(1) as f32;
     let max_region = activations
         .iter()
         .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal))
-        .map(|(n, v)| format!("{n}: {v:.3}"))
+        .map(|(n, v)| format!("{}: {v:.3}", escape_html(n)))
         .unwrap_or_default();
 
     html.push_str(&format!(
@@ -3683,7 +3704,7 @@ fn write_footer(html: &mut String, timestamp: &str) {
 </div>
 </body>
 </html>"#,
-        timestamp
+        escape_html(timestamp)
     );
 }
 
@@ -3718,7 +3739,7 @@ fn write_comparison_banner(html: &mut String, delta: &PulseDelta) {
         html,
         "<div class=\"compare-banner\">Comparing against snapshot from <strong>{}</strong> · \
          C(t) {} · Phi {} · Pipeline {} · Stress {} · Moral {}</div>\n",
-        delta.prev_timestamp,
+        escape_html(&delta.prev_timestamp),
         format_delta(delta.consciousness_level, 3),
         format_delta(delta.spectral_phi, 4),
         format_delta(delta.pipeline_consciousness, 3),
@@ -4320,12 +4341,7 @@ fn write_timeline_pane(html: &mut String, previous: &[PulseSnapshot], current: &
     // X-axis timestamp labels
     for (i, snap) in all.iter().enumerate() {
         let x = pad_l + i as f64 * x_step;
-        // Show short timestamp (HH:MM or date)
-        let label = if snap.timestamp.len() > 11 {
-            &snap.timestamp[11..16] // HH:MM
-        } else {
-            &snap.timestamp
-        };
+        let label = escape_html(&short_timestamp_label(&snap.timestamp));
         let _ = write!(html,
             "<text x=\"{:.1}\" y=\"{:.1}\" fill=\"rgba(213,208,200,0.3)\" font-size=\"9\" text-anchor=\"middle\">{}</text>\n",
             x, h - 4.0, label);
@@ -4578,6 +4594,15 @@ fn escape_html(s: &str) -> String {
         .replace('"', "&quot;")
 }
 
+fn short_timestamp_label(timestamp: &str) -> String {
+    let chars: Vec<char> = timestamp.chars().collect();
+    if chars.len() >= 16 {
+        chars[11..16].iter().collect()
+    } else {
+        timestamp.to_string()
+    }
+}
+
 fn write_sovereign_pane(html: &mut String, sov: &super::SovereignInfo) {
     let time_color = match sov.time_quality.as_str() {
         "Authoritative" => "#7ec8a0",
@@ -4644,7 +4669,7 @@ fn write_sovereign_pane(html: &mut String, sov: &super::SovereignInfo) {
 </div>
 </div>"##,
         tc = time_color,
-        tq = sov.time_quality,
+        tq = escape_html(&sov.time_quality),
         tp = sov.time_peer_count,
         ts = sov.time_stratum,
         to = sov.time_offset_us,
@@ -4675,8 +4700,8 @@ fn write_sovereign_pane(html: &mut String, sov: &super::SovereignInfo) {
 mod tests {
     use super::*;
     use crate::{
-        Anomaly, CantorInfo, DreamInfo, DriveInfo, FabricationInfo, GlyphInfo, GovernanceInfo,
-        ImmuneInfo, IntegrityInfo, KnowledgeInfo, LanguageInfo, LearningInfo,
+        Anomaly, CantorInfo, CircularEconomyInfo, DreamInfo, DriveInfo, FabricationInfo, GlyphInfo,
+        GovernanceInfo, ImmuneInfo, IntegrityInfo, KnowledgeInfo, LanguageInfo, LearningInfo,
         MeshConsciousnessInfo, MoralCompass, Narrative, NeuroBath, NeuroevolutionInfo,
         PerceptionInfo, PulseSnapshot, ReasoningInfo, SovereignInfo, SparklinePoint, SpectrumInfo,
         SubstrateInfo, SwarmInfo, VisionInfo, Vitals,
@@ -4815,10 +4840,12 @@ mod tests {
             reasoning: ReasoningInfo::default(),
             dream: DreamInfo::default(),
             immune: ImmuneInfo::default(),
+            cortical_activations: Vec::new(),
             sovereign: SovereignInfo::default(),
             neuroevolution: NeuroevolutionInfo::default(),
             fabrication: FabricationInfo::default(),
             mesh_consciousness: MeshConsciousnessInfo::default(),
+            circular_economy: CircularEconomyInfo::default(),
         }
     }
 
@@ -5057,6 +5084,97 @@ mod tests {
         assert_eq!(escape_html("a < b & c > d"), "a &lt; b &amp; c &gt; d");
         assert_eq!(escape_html("say \"hello\""), "say &quot;hello&quot;");
         assert_eq!(escape_html("plain text"), "plain text");
+    }
+
+    #[test]
+    fn test_short_timestamp_label_handles_short_values() {
+        assert_eq!(short_timestamp_label("2026-03-10 14:00:00"), "14:00");
+        assert_eq!(short_timestamp_label("123456789012"), "123456789012");
+        assert_eq!(short_timestamp_label("short"), "short");
+    }
+
+    #[test]
+    fn test_html_escapes_untrusted_snapshot_strings() {
+        let mut snap = test_snapshot();
+        snap.timestamp = "2026-03-10 <unsafe>".into();
+        snap.profile = "\"bad\"<tag>".into();
+        snap.vitals.urgency = "<rush>".into();
+        snap.vitals.consciousness_state = "<awake>".into();
+        snap.vitals.selected_strategy = "<explore>".into();
+        snap.bath.circadian_phase = "<night>".into();
+        snap.bath.personality = "<bold>".into();
+        snap.compass.dominant_harmonic = "<harm>".into();
+        snap.substrate.substrate_type = "Silicon<script>".into();
+        snap.governance.community_mode = "<coop>".into();
+        snap.glyph.dominant_modality = "<modal>".into();
+        snap.glyph.resonant_glyph = "<glyph>".into();
+        snap.fabrication.safety_level = "<amber>".into();
+        snap.fabrication.recommended_action = "<pause>".into();
+        snap.narrative.consciousness_state = "<state>".into();
+        snap.narrative.error_pattern = "<pattern>".into();
+        snap.narrative.selected_strategy = "<strategy>".into();
+        snap.immune.safety_level = "<red>".into();
+        snap.immune.guardian_posture = "<guard>".into();
+        snap.sovereign.time_quality = "<time>".into();
+
+        let previous = PulseSnapshot {
+            timestamp: "123456789012".into(),
+            ..test_snapshot()
+        };
+        let delta = PulseDelta {
+            prev_timestamp: "<prev>".into(),
+            consciousness_level: 0.1,
+            spectral_phi: 0.2,
+            pipeline_consciousness: 0.3,
+            temporal_coherence: 0.0,
+            phenomenal_binding: 0.0,
+            living_mind_vitality: 0.0,
+            effective_feasibility: 0.0,
+            honest_confidence: 0.0,
+            prediction_error: 0.0,
+            somatic_stress: 0.0,
+            thermodynamic_load: 0.0,
+            dopamine: 0.0,
+            noradrenaline: 0.0,
+            serotonin: 0.0,
+            acetylcholine: 0.0,
+            gaba: 0.0,
+            oxytocin: 0.0,
+            glutamate: 0.0,
+            adenosine: 0.0,
+            endocannabinoid: 0.0,
+            harmonies_alignment: 0.0,
+            moral_score: 0.0,
+            value_score: 0.0,
+            moral_topo_unity: 0.0,
+            soul_alignment: 0.0,
+            empathic_compassion: 0.0,
+        };
+
+        let html = generate_pulse_html(
+            &snap.timestamp,
+            &snap.profile,
+            &snap.vitals,
+            &snap.bath,
+            &snap.compass,
+            None,
+            None,
+            &snap.substrate,
+            &snap.narrative,
+            &snap.sparkline,
+            Some(&delta),
+            &[previous],
+            &snap,
+            &[],
+            "report",
+        );
+
+        assert!(html.contains("2026-03-10 &lt;unsafe&gt;"));
+        assert!(html.contains("&quot;bad&quot;&lt;tag&gt;"));
+        assert!(html.contains("&lt;prev&gt;"));
+        assert!(html.contains("&lt;state&gt;"));
+        assert!(html.contains("&lt;guard&gt;"));
+        assert!(html.contains("123456789012"));
     }
 
     #[test]

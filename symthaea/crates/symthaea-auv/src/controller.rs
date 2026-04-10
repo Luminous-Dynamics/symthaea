@@ -37,14 +37,22 @@ impl AuvController {
 
         let network = HdcLtcUnifiedNetwork::from_genesis(net_config, genesis);
 
-        let weight_hv = ContinuousHV::from_genesis(genesis, "auv::output_weights", NUM_ACTUATORS * HDC_DIM);
+        let weight_hv =
+            ContinuousHV::from_genesis(genesis, "auv::output_weights", NUM_ACTUATORS * HDC_DIM);
         let mut output_weights: Vec<f32> = weight_hv.as_slice().to_vec();
-        for w in &mut output_weights { *w *= 0.01; }
+        for w in &mut output_weights {
+            *w *= 0.01;
+        }
 
         // Bias: all zero (neutral buoyancy = no thrust needed)
         let output_bias = [0.0f32; NUM_ACTUATORS];
 
-        Self { network, output_weights, output_bias, learning_rate: config.learning_rate }
+        Self {
+            network,
+            output_weights,
+            output_bias,
+            learning_rate: config.learning_rate,
+        }
     }
 
     pub fn forward(&mut self, sensor_hv: &ContinuousHV, dt: f32) -> AuvCommand {
@@ -56,7 +64,9 @@ impl AuvController {
         for i in 0..NUM_ACTUATORS {
             let offset = i * HDC_DIM;
             let mut sum = 0.0f32;
-            for j in 0..HDC_DIM { sum += self.output_weights[offset + j] * hv[j]; }
+            for j in 0..HDC_DIM {
+                sum += self.output_weights[offset + j] * hv[j];
+            }
             raw[i] = sum + self.output_bias[i];
         }
 
@@ -68,11 +78,17 @@ impl AuvController {
         AuvCommand { thrusters }.clamped()
     }
 
-    pub fn reset(&mut self) { self.network.reset(); }
+    pub fn reset(&mut self) {
+        self.network.reset();
+    }
 }
 
 fn fast_tanh(x: f32) -> f32 {
-    if x.abs() > 4.97 { x.signum() } else { x * (27.0 + x * x) / (27.0 + 9.0 * x * x) }
+    if x.abs() > 4.97 {
+        x.signum()
+    } else {
+        x * (27.0 + x * x) / (27.0 + 9.0 * x * x)
+    }
 }
 
 #[cfg(test)]
@@ -86,7 +102,9 @@ mod tests {
         let mut ctrl = AuvController::new(&genesis, &config);
         let hv = ContinuousHV::random(HDC_DIM, 42);
         let cmd = ctrl.forward(&hv, 0.01);
-        for &t in &cmd.thrusters { assert!(t >= -1.0 && t <= 1.0); }
+        for &t in &cmd.thrusters {
+            assert!(t >= -1.0 && t <= 1.0);
+        }
     }
 
     #[test]

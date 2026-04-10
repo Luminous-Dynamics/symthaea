@@ -4,12 +4,12 @@
 use leptos::prelude::*;
 use wasm_bindgen_futures::JsFuture;
 
+use crate::components::factcheck_status::FactcheckStatus;
 use crate::components::glass_panel::GlassPanel;
 use crate::components::glyph_display::GlyphDisplay;
 use crate::components::harmony_radar::HarmonyRadar;
 use crate::components::neuro_bars::NeuroBars;
 use crate::components::phi_meter::PhiMeter;
-use crate::components::factcheck_status::FactcheckStatus;
 use crate::components::workspace_viz::WorkspaceViz;
 use crate::state::AppState;
 use crate::worker::EngineWorker;

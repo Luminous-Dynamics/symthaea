@@ -33,10 +33,7 @@ impl GravcraftHdcEncoder {
         // Normalize channels to [-1, 1] range using tanh
         let weights: Vec<f32> = channels.iter().map(|&c| c.tanh()).collect();
 
-        ContinuousHV::encode_weighted(
-            &self.bases[..weights.len()],
-            &weights,
-        )
+        ContinuousHV::encode_weighted(&self.bases[..weights.len()], &weights)
     }
 }
 

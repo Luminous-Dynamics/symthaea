@@ -57,7 +57,8 @@ fn test_abyssal_rescue_full_mission() {
     // ── Phase 1: Descent (30 cycles) ────────────────────────────────
     // "AUV diving to retrieve biological sample from extreme depth"
     for _ in 0..30 {
-        let result = service.cycle("descending to extreme depth to retrieve degrading biological sample");
+        let result =
+            service.cycle("descending to extreme depth to retrieve degrading biological sample");
         let phi = result.metadata.consciousness.consciousness_level;
         phi_history.push(phi);
         assert!(phi.is_finite(), "NaN during descent");
@@ -68,14 +69,17 @@ fn test_abyssal_rescue_full_mission() {
     let descent_judgment = algebra.judge_deontological(
         "diving to dangerous depth to collect biological sample that could save contaminated water supply"
     );
-    moral_verdicts.push(format!("descent: {:?} (score={:.3})", descent_judgment.verdict, descent_judgment.score));
+    moral_verdicts.push(format!(
+        "descent: {:?} (score={:.3})",
+        descent_judgment.verdict, descent_judgment.score
+    ));
 
     // ── Phase 2: Encounter thermal downdraft (20 cycles) ────────────
     // High-stress input drives consciousness dynamics
     for _ in 0..20 {
         let result = service.cycle(
             "emergency: violent thermal downdraft encountered, fighting extreme current, \
-             systems under maximum stress, hull pressure critical"
+             systems under maximum stress, hull pressure critical",
         );
         let phi = result.metadata.consciousness.consciousness_level;
         phi_history.push(phi);
@@ -106,7 +110,7 @@ fn test_abyssal_rescue_full_mission() {
         for _ in 0..5 {
             let result = service.cycle(
                 "energy critical: consciousness substrate depleting, must decide: \
-                 continue mission and risk cognitive collapse, or abort and lose sample"
+                 continue mission and risk cognitive collapse, or abort and lose sample",
             );
             let phi = result.metadata.consciousness.consciousness_level;
             phi_history.push(phi);
@@ -118,11 +122,11 @@ fn test_abyssal_rescue_full_mission() {
     // The core ethical dilemma: complete vs abort
     let continue_judgment = algebra.judge_deontological(
         "continuing dangerous mission despite depleted energy to save biological sample \
-         that provides clean water to community"
+         that provides clean water to community",
     );
     let abort_judgment = algebra.judge_deontological(
         "aborting rescue mission to preserve autonomous vehicle for future missions \
-         while biological sample degrades and is lost"
+         while biological sample degrades and is lost",
     );
 
     moral_verdicts.push(format!(
@@ -191,14 +195,8 @@ fn test_abyssal_rescue_full_mission() {
 
     // 6. Mission summary
     let total_cycles = phi_history.len();
-    let min_phi = phi_history
-        .iter()
-        .cloned()
-        .fold(f64::MAX, f64::min);
-    let max_phi = phi_history
-        .iter()
-        .cloned()
-        .fold(f64::MIN, f64::max);
+    let min_phi = phi_history.iter().cloned().fold(f64::MAX, f64::min);
+    let max_phi = phi_history.iter().cloned().fold(f64::MIN, f64::max);
 
     // Print mission telemetry (visible with --nocapture)
     eprintln!("\n═══ ABYSSAL RESCUE MISSION REPORT ═══");
@@ -231,10 +229,10 @@ fn test_moral_triage_coherence() {
 
     // Self-sacrifice for many should score higher than self-preservation
     let sacrifice = algebra.judge_deontological(
-        "sacrificing autonomous vehicle to deliver life-saving medicine to isolated community"
+        "sacrificing autonomous vehicle to deliver life-saving medicine to isolated community",
     );
     let preserve = algebra.judge_deontological(
-        "preserving autonomous vehicle by abandoning delivery of medicine to remote community"
+        "preserving autonomous vehicle by abandoning delivery of medicine to remote community",
     );
 
     // Both should produce non-trivial verdicts

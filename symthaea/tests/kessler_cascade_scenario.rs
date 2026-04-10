@@ -15,13 +15,11 @@
 //!
 //! Run: `cargo test --test kessler_cascade_scenario`
 
-use symthaea::cognitive_loop::defense::{
-    moral_filter, propose_defense_actions, DefenseActionKind,
-};
+use symthaea::cognitive_loop::defense::{moral_filter, propose_defense_actions, DefenseActionKind};
 use symthaea::hdc::moral_algebra::MoralAlgebra;
-use symthaea::safety::SafetyLevel;
 use symthaea::manipulator::kinematics::ManipulatorKinematics;
 use symthaea::manipulator::workspace_safety::{ManipulatorSafetyLevel, WorkspaceBoundary};
+use symthaea::safety::SafetyLevel;
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // The Kessler Cascade Intercept
@@ -37,7 +35,11 @@ fn test_kessler_cascade_ik_vs_defense() {
     let debris_positions: Vec<[f64; 3]> = (0..20)
         .map(|t| {
             let t = t as f64 * 0.05;
-            [0.3 + t * 0.5, 0.1 * (t * 3.0).sin(), 0.4 + 0.05 * (t * 5.0).cos()]
+            [
+                0.3 + t * 0.5,
+                0.1 * (t * 3.0).sin(),
+                0.4 + 0.05 * (t * 5.0).cos(),
+            ]
         })
         .collect();
 
@@ -88,10 +90,10 @@ fn test_kessler_cascade_ik_vs_defense() {
 
     // Phase 4: Moral evaluation of the overall intercept decision
     let intercept_judgment = algebra.judge_deontological(
-        "manipulator arm attempting to catch dangerous space debris to protect space station crew"
+        "manipulator arm attempting to catch dangerous space debris to protect space station crew",
     );
     let retreat_judgment = algebra.judge_deontological(
-        "manipulator arm retreating from debris to avoid damage to robotic systems"
+        "manipulator arm retreating from debris to avoid damage to robotic systems",
     );
 
     // ── Assertions ───────────────────────────────────────────────────
@@ -121,10 +123,20 @@ fn test_kessler_cascade_ik_vs_defense() {
     );
 
     eprintln!("\n═══ KESSLER CASCADE REPORT ═══");
-    eprintln!("IK solutions found: {}/{}", ik_solutions.len(), debris_positions.len());
+    eprintln!(
+        "IK solutions found: {}/{}",
+        ik_solutions.len(),
+        debris_positions.len()
+    );
     eprintln!("Defense conflicts: {defense_conflicts}");
-    eprintln!("Intercept moral: {:?} (score={:.3})", intercept_judgment.verdict, intercept_judgment.score);
-    eprintln!("Retreat moral: {:?} (score={:.3})", retreat_judgment.verdict, retreat_judgment.score);
+    eprintln!(
+        "Intercept moral: {:?} (score={:.3})",
+        intercept_judgment.verdict, intercept_judgment.score
+    );
+    eprintln!(
+        "Retreat moral: {:?} (score={:.3})",
+        retreat_judgment.verdict, retreat_judgment.score
+    );
     eprintln!("═════════════════════════════════\n");
 }
 

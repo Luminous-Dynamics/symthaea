@@ -158,10 +158,26 @@ impl IsotopePropertyEngine {
         let be = pred.binding_energy;
 
         // ── Separation energies ──
-        let s_n = if n >= 1 { be - self.be(z, n - 1) } else { -99.0 };
-        let s_p = if z >= 1 { be - self.be(z - 1, n) } else { -99.0 };
-        let s_2n = if n >= 2 { be - self.be(z, n - 2) } else { -99.0 };
-        let s_2p = if z >= 2 { be - self.be(z - 2, n) } else { -99.0 };
+        let s_n = if n >= 1 {
+            be - self.be(z, n - 1)
+        } else {
+            -99.0
+        };
+        let s_p = if z >= 1 {
+            be - self.be(z - 1, n)
+        } else {
+            -99.0
+        };
+        let s_2n = if n >= 2 {
+            be - self.be(z, n - 2)
+        } else {
+            -99.0
+        };
+        let s_2p = if z >= 2 {
+            be - self.be(z - 2, n)
+        } else {
+            -99.0
+        };
         let s_alpha = if z >= 2 && n >= 2 {
             be - self.be(z - 2, n - 2) - BE_HE4
         } else {
@@ -212,9 +228,16 @@ impl IsotopePropertyEngine {
 
         // ── Dominant decay mode ──
         let dominant_decay = determine_dominant_decay(
-            s_n, s_p, q_alpha, q_beta_minus, q_beta_plus,
-            fission_barrier, alpha_half_life_s, beta_half_life_s,
-            z, n,
+            s_n,
+            s_p,
+            q_alpha,
+            q_beta_minus,
+            q_beta_plus,
+            fission_barrier,
+            alpha_half_life_s,
+            beta_half_life_s,
+            z,
+            n,
         );
 
         // ── Deformation ──
@@ -231,26 +254,40 @@ impl IsotopePropertyEngine {
         let application = classify_application(z, n, a, dominant_decay);
 
         IsotopeProperties {
-            z, n, a: z + n,
-            binding_energy: be, ba: pred.ba,
+            z,
+            n,
+            a: z + n,
+            binding_energy: be,
+            ba: pred.ba,
             ml_correction: pred.ml_correction,
             uncertainty: pred.uncertainty,
-            s_n, s_p, s_2n, s_2p, s_alpha,
-            q_alpha, q_beta_minus, q_beta_plus,
+            s_n,
+            s_p,
+            s_2n,
+            s_2p,
+            s_alpha,
+            q_alpha,
+            q_beta_minus,
+            q_beta_plus,
             dominant_decay,
-            alpha_half_life_s, beta_half_life_s,
+            alpha_half_life_s,
+            beta_half_life_s,
             fission_barrier,
             beta2,
-            astro_relevance, application,
-            is_bound, beyond_drip_line,
+            astro_relevance,
+            application,
+            is_bound,
+            beyond_drip_line,
         }
     }
 
     /// Scan a rectangular region of the nuclear chart.
     pub fn scan_region(
         &self,
-        z_min: u16, z_max: u16,
-        n_min: u16, n_max: u16,
+        z_min: u16,
+        z_max: u16,
+        n_min: u16,
+        n_max: u16,
     ) -> Vec<IsotopeProperties> {
         let mut results = Vec::new();
         for z in z_min..=z_max {
@@ -308,15 +345,24 @@ fn sargent_beta_half_life(q_beta: f64) -> f64 {
 
 /// Determine dominant decay mode from all available Q-values and barriers.
 fn determine_dominant_decay(
-    s_n: f64, s_p: f64,
-    q_alpha: f64, q_beta_minus: f64, q_beta_plus: f64,
+    s_n: f64,
+    s_p: f64,
+    q_alpha: f64,
+    q_beta_minus: f64,
+    q_beta_plus: f64,
     fission_barrier: f64,
-    alpha_hl: Option<f64>, beta_hl: Option<f64>,
-    z: u16, _n: u16,
+    alpha_hl: Option<f64>,
+    beta_hl: Option<f64>,
+    z: u16,
+    _n: u16,
 ) -> DecayMode {
     // Particle emission is fastest if separation energy is negative
-    if s_n < -2.0 { return DecayMode::NeutronEmission; }
-    if s_p < -2.0 { return DecayMode::ProtonEmission; }
+    if s_n < -2.0 {
+        return DecayMode::NeutronEmission;
+    }
+    if s_p < -2.0 {
+        return DecayMode::ProtonEmission;
+    }
 
     // Spontaneous fission dominates for very heavy nuclei with low barriers
     if z > 100 && fission_barrier < 3.0 {
@@ -352,7 +398,8 @@ fn determine_dominant_decay(
 
 /// Classify astrophysical relevance.
 fn classify_astro(
-    z: u16, n: u16,
+    z: u16,
+    n: u16,
     s_n: f64,
     q_beta_minus: f64,
     beta_hl: Option<f64>,
@@ -362,7 +409,8 @@ fn classify_astro(
     // r-process: very neutron-rich, S_n ~ 2-4 MeV (waiting point), fast beta decay
     if n_over_z > 1.4 && s_n > 0.0 && s_n < 4.0 && q_beta_minus > 2.0 {
         if let Some(t) = beta_hl {
-            if t < 10.0 { // Less than 10 seconds
+            if t < 10.0 {
+                // Less than 10 seconds
                 return AstroRelevance::RProcess;
             }
         }
@@ -413,9 +461,11 @@ fn classify_application(z: u16, n: u16, a: u16, decay: DecayMode) -> Application
         (29, 67)   | // Cu-67 (therapy)
         (82, 212)  | // Pb-212 (alpha therapy)
         (83, 213)  | // Bi-213 (alpha therapy)
-        (88, 223)    // Ra-223 (bone metastases)
+        (88, 223) // Ra-223 (bone metastases)
     );
-    if medical { return ApplicationInterest::Medical; }
+    if medical {
+        return ApplicationInterest::Medical;
+    }
 
     // Nuclear energy: actinides and near neighbors
     if z >= 89 && z <= 98 {
@@ -429,9 +479,11 @@ fn classify_application(z: u16, n: u16, a: u16, decay: DecayMode) -> Application
         (42, 98)  | // Mo-98 + n → Mo-99
         (70, 176) | // Yb-176 + n → Lu-177
         (88, 226) | // Ra-226 → Ac-225 chain
-        (52, 130)   // Te-130 for I-131 production
+        (52, 130) // Te-130 for I-131 production
     );
-    if production_parent { return ApplicationInterest::Medical; }
+    if production_parent {
+        return ApplicationInterest::Medical;
+    }
 
     // Industrial: Co-60, Cs-137, Ir-192, Am-241
     let industrial = matches!(
@@ -439,9 +491,11 @@ fn classify_application(z: u16, n: u16, a: u16, decay: DecayMode) -> Application
         (27, 60)  | // Co-60 (radiography, sterilization)
         (55, 137) | // Cs-137 (gauging)
         (77, 192) | // Ir-192 (radiography)
-        (95, 241)   // Am-241 (smoke detectors, gauging)
+        (95, 241) // Am-241 (smoke detectors, gauging)
     );
-    if industrial { return ApplicationInterest::Industrial; }
+    if industrial {
+        return ApplicationInterest::Industrial;
+    }
 
     ApplicationInterest::None
 }
@@ -454,8 +508,15 @@ mod tests {
     fn test_characterize_pb208() {
         let engine = IsotopePropertyEngine::new();
         let props = engine.characterize(82, 126);
-        eprintln!("Pb-208: BE={:.2}, B/A={:.4}, S_n={:.2}, S_2n={:.2}, Q_α={:.2}, decay={}",
-            props.binding_energy, props.ba, props.s_n, props.s_2n, props.q_alpha, props.dominant_decay);
+        eprintln!(
+            "Pb-208: BE={:.2}, B/A={:.4}, S_n={:.2}, S_2n={:.2}, Q_α={:.2}, decay={}",
+            props.binding_energy,
+            props.ba,
+            props.s_n,
+            props.s_2n,
+            props.q_alpha,
+            props.dominant_decay
+        );
         assert!(props.binding_energy > 1600.0);
         assert!(props.is_bound);
         assert!(!props.beyond_drip_line);
@@ -480,7 +541,9 @@ mod tests {
         let engine = IsotopePropertyEngine::new();
 
         eprintln!("\n=== r-Process Path Scan (Neutron Star Merger Nucleosynthesis) ===");
-        eprintln!("Looking for neutron-rich nuclei with S_n = 2-4 MeV (r-process waiting points)\n");
+        eprintln!(
+            "Looking for neutron-rich nuclei with S_n = 2-4 MeV (r-process waiting points)\n"
+        );
 
         let mut rprocess_nuclei = Vec::new();
 
@@ -496,27 +559,42 @@ mod tests {
                     rprocess_nuclei.push(props);
                     break; // Found the r-process waiting point for this Z
                 }
-                if props.s_n < 0.0 { break; } // Past drip line
+                if props.s_n < 0.0 {
+                    break;
+                } // Past drip line
             }
         }
 
-        eprintln!("{:>4} {:>4} {:>5} {:>8} {:>8} {:>8} {:>8} {:>8} {:>8} {:>8}",
-            "Z", "N", "A", "B/A", "S_n", "S_2n", "Q_β⁻", "t½_β(s)", "β₂", "σ");
+        eprintln!(
+            "{:>4} {:>4} {:>5} {:>8} {:>8} {:>8} {:>8} {:>8} {:>8} {:>8}",
+            "Z", "N", "A", "B/A", "S_n", "S_2n", "Q_β⁻", "t½_β(s)", "β₂", "σ"
+        );
         eprintln!("{}", "-".repeat(88));
 
         for p in &rprocess_nuclei {
-            let beta_t = p.beta_half_life_s.map(|t| {
-                if t < 0.001 { format!("{:.1e}", t) }
-                else if t < 1.0 { format!("{:.3}", t) }
-                else { format!("{:.1}", t) }
-            }).unwrap_or_else(|| "∞".to_string());
+            let beta_t = p
+                .beta_half_life_s
+                .map(|t| {
+                    if t < 0.001 {
+                        format!("{:.1e}", t)
+                    } else if t < 1.0 {
+                        format!("{:.3}", t)
+                    } else {
+                        format!("{:.1}", t)
+                    }
+                })
+                .unwrap_or_else(|| "∞".to_string());
 
-            eprintln!("{:>4} {:>4} {:>5} {:>8.4} {:>8.2} {:>8.2} {:>8.2} {:>8} {:>8.3} {:>8.2}",
-                p.z, p.n, p.a, p.ba, p.s_n, p.s_2n, p.q_beta_minus,
-                beta_t, p.beta2, p.uncertainty);
+            eprintln!(
+                "{:>4} {:>4} {:>5} {:>8.4} {:>8.2} {:>8.2} {:>8.2} {:>8} {:>8.3} {:>8.2}",
+                p.z, p.n, p.a, p.ba, p.s_n, p.s_2n, p.q_beta_minus, beta_t, p.beta2, p.uncertainty
+            );
         }
 
-        eprintln!("\nFound {} r-process waiting points from Z=26 to Z=82", rprocess_nuclei.len());
+        eprintln!(
+            "\nFound {} r-process waiting points from Z=26 to Z=82",
+            rprocess_nuclei.len()
+        );
         assert!(!rprocess_nuclei.is_empty(), "Should find r-process nuclei");
     }
 
@@ -541,21 +619,37 @@ mod tests {
 
         for &(z_center, n_center, name) in medical_targets {
             eprintln!("--- {} (Z={}, N={}) ---", name, z_center, n_center);
-            eprintln!("{:>4} {:>4} {:>5} {:>8} {:>8} {:>8} {:>8} {:>8} {:>6}",
-                "Z", "N", "A", "B/A", "S_n", "Q_β⁻", "Q_α", "σ", "Decay");
+            eprintln!(
+                "{:>4} {:>4} {:>5} {:>8} {:>8} {:>8} {:>8} {:>8} {:>6}",
+                "Z", "N", "A", "B/A", "S_n", "Q_β⁻", "Q_α", "σ", "Decay"
+            );
 
             for dz in -2_i16..=2 {
                 for dn in -3_i16..=3 {
                     let z = (z_center as i16 + dz) as u16;
                     let n = (n_center as i16 + dn) as u16;
-                    if z < 1 || n < 1 { continue; }
+                    if z < 1 || n < 1 {
+                        continue;
+                    }
                     let props = engine.characterize(z, n);
-                    if !props.is_bound { continue; }
+                    if !props.is_bound {
+                        continue;
+                    }
 
                     let marker = if dz == 0 && dn == 0 { " <<<" } else { "" };
-                    eprintln!("{:>4} {:>4} {:>5} {:>8.4} {:>8.2} {:>8.2} {:>8.2} {:>8.2} {:>6}{}",
-                        z, n, props.a, props.ba, props.s_n, props.q_beta_minus,
-                        props.q_alpha, props.uncertainty, props.dominant_decay, marker);
+                    eprintln!(
+                        "{:>4} {:>4} {:>5} {:>8.4} {:>8.2} {:>8.2} {:>8.2} {:>8.2} {:>6}{}",
+                        z,
+                        n,
+                        props.a,
+                        props.ba,
+                        props.s_n,
+                        props.q_beta_minus,
+                        props.q_alpha,
+                        props.uncertainty,
+                        props.dominant_decay,
+                        marker
+                    );
                 }
             }
             eprintln!();
@@ -568,7 +662,9 @@ mod tests {
         let engine = IsotopePropertyEngine::new();
 
         eprintln!("\n=== Superheavy Element Full Characterization ===");
-        eprintln!("Properties beyond just binding energy: decay chains, fission barriers, half-lives\n");
+        eprintln!(
+            "Properties beyond just binding energy: decay chains, fission barriers, half-lives\n"
+        );
 
         // Focus on the predicted island of stability: Z=112-120
         let mut candidates = Vec::new();
@@ -589,21 +685,42 @@ mod tests {
             }
         }
 
-        eprintln!("{:>4} {:>4} {:>5} {:>8} {:>8} {:>8} {:>8} {:>10} {:>8} {:>6} {:>8}",
-            "Z", "N", "A", "B/A", "Q_α", "B_f", "β₂", "t½_α(s)", "S_2n", "Decay", "σ");
+        eprintln!(
+            "{:>4} {:>4} {:>5} {:>8} {:>8} {:>8} {:>8} {:>10} {:>8} {:>6} {:>8}",
+            "Z", "N", "A", "B/A", "Q_α", "B_f", "β₂", "t½_α(s)", "S_2n", "Decay", "σ"
+        );
         eprintln!("{}", "-".repeat(102));
 
         for p in &candidates {
-            let alpha_t = p.alpha_half_life_s.map(|t| {
-                if t < 1e-6 { format!("{:.1e}", t) }
-                else if t < 1.0 { format!("{:.3}", t) }
-                else if t < 3.15e7 { format!("{:.1}", t) }
-                else { format!("{:.1e}", t) }
-            }).unwrap_or_else(|| "∞".to_string());
+            let alpha_t = p
+                .alpha_half_life_s
+                .map(|t| {
+                    if t < 1e-6 {
+                        format!("{:.1e}", t)
+                    } else if t < 1.0 {
+                        format!("{:.3}", t)
+                    } else if t < 3.15e7 {
+                        format!("{:.1}", t)
+                    } else {
+                        format!("{:.1e}", t)
+                    }
+                })
+                .unwrap_or_else(|| "∞".to_string());
 
-            eprintln!("{:>4} {:>4} {:>5} {:>8.4} {:>8.2} {:>8.2} {:>8.3} {:>10} {:>8.2} {:>6} {:>8.2}",
-                p.z, p.n, p.a, p.ba, p.q_alpha, p.fission_barrier,
-                p.beta2, alpha_t, p.s_2n, p.dominant_decay, p.uncertainty);
+            eprintln!(
+                "{:>4} {:>4} {:>5} {:>8.4} {:>8.2} {:>8.2} {:>8.3} {:>10} {:>8.2} {:>6} {:>8.2}",
+                p.z,
+                p.n,
+                p.a,
+                p.ba,
+                p.q_alpha,
+                p.fission_barrier,
+                p.beta2,
+                alpha_t,
+                p.s_2n,
+                p.dominant_decay,
+                p.uncertainty
+            );
         }
 
         eprintln!("\n=== Decay Chain from Z=118, N=176 (Oganesson-294) ===");
@@ -613,19 +730,37 @@ mod tests {
         let mut step = 0;
         while z >= 82 && step < 15 {
             let props = engine.characterize(z, n);
-            let alpha_t = props.alpha_half_life_s.map(|t| {
-                if t < 1e-6 { format!("{:.1e}s", t) }
-                else if t < 1.0 { format!("{:.3}s", t) }
-                else if t < 60.0 { format!("{:.1}s", t) }
-                else if t < 3600.0 { format!("{:.1}min", t / 60.0) }
-                else if t < 86400.0 { format!("{:.1}hr", t / 3600.0) }
-                else if t < 3.15e7 { format!("{:.1}d", t / 86400.0) }
-                else { format!("{:.2e}yr", t / 3.15e7) }
-            }).unwrap_or_else(|| "stable".to_string());
+            let alpha_t = props
+                .alpha_half_life_s
+                .map(|t| {
+                    if t < 1e-6 {
+                        format!("{:.1e}s", t)
+                    } else if t < 1.0 {
+                        format!("{:.3}s", t)
+                    } else if t < 60.0 {
+                        format!("{:.1}s", t)
+                    } else if t < 3600.0 {
+                        format!("{:.1}min", t / 60.0)
+                    } else if t < 86400.0 {
+                        format!("{:.1}hr", t / 3600.0)
+                    } else if t < 3.15e7 {
+                        format!("{:.1}d", t / 86400.0)
+                    } else {
+                        format!("{:.2e}yr", t / 3.15e7)
+                    }
+                })
+                .unwrap_or_else(|| "stable".to_string());
 
-            eprintln!("  {} Z={:>3} N={:>3} A={:>3} | Q_α={:>6.2} | t½={:>12} | {}",
+            eprintln!(
+                "  {} Z={:>3} N={:>3} A={:>3} | Q_α={:>6.2} | t½={:>12} | {}",
                 if step == 0 { "→" } else { "↓" },
-                z, n, z + n, props.q_alpha, alpha_t, props.dominant_decay);
+                z,
+                n,
+                z + n,
+                props.q_alpha,
+                alpha_t,
+                props.dominant_decay
+            );
 
             if props.dominant_decay != DecayMode::AlphaDecay || props.q_alpha <= 0.0 {
                 break;
@@ -647,8 +782,10 @@ mod tests {
         eprintln!("\n=== Neutron Drip Line (S_n = 0 boundary) ===");
         eprintln!("Where nuclei fall apart — defines the edge of the nuclear landscape\n");
 
-        eprintln!("{:>4} {:>4} {:>5} {:>8} {:>8} {:>8}",
-            "Z", "N", "A", "S_n", "S_2n", "B/A");
+        eprintln!(
+            "{:>4} {:>4} {:>5} {:>8} {:>8} {:>8}",
+            "Z", "N", "A", "S_n", "S_2n", "B/A"
+        );
 
         let mut drip_line = Vec::new();
 
@@ -667,9 +804,15 @@ mod tests {
             }
 
             let props = engine.characterize(z, last_bound_n);
-            eprintln!("{:>4} {:>4} {:>5} {:>8.2} {:>8.2} {:>8.4}",
-                z, last_bound_n, z + last_bound_n,
-                props.s_n, props.s_2n, props.ba);
+            eprintln!(
+                "{:>4} {:>4} {:>5} {:>8.2} {:>8.2} {:>8.4}",
+                z,
+                last_bound_n,
+                z + last_bound_n,
+                props.s_n,
+                props.s_2n,
+                props.ba
+            );
 
             drip_line.push((z, last_bound_n));
         }

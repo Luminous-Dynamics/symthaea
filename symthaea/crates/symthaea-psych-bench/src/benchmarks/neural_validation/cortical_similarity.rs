@@ -121,7 +121,10 @@ impl PsychBenchmark for CorticalSimilarityBenchmark {
             notes: vec![
                 "Compares simulated 12-region activations against TRIBE v2 fMRI predictions"
                     .to_string(),
-                format!("Mean Pearson r = {:.4} (bootstrap 95% CI)", mean_f64(&pearson_values)),
+                format!(
+                    "Mean Pearson r = {:.4} (bootstrap 95% CI)",
+                    mean_f64(&pearson_values)
+                ),
             ],
         }
     }
@@ -177,10 +180,16 @@ impl PsychBenchmark for TemporalDynamicsBenchmark {
             );
             // Add temporal dynamics: visual flash at t=1-2s, auditory at t=3-4s.
             if cycle >= 31 && cycle < 62 {
-                map.set(CorticalRegion::Visual, map.get(CorticalRegion::Visual) + 0.3);
+                map.set(
+                    CorticalRegion::Visual,
+                    map.get(CorticalRegion::Visual) + 0.3,
+                );
             }
             if cycle >= 93 && cycle < 124 {
-                map.set(CorticalRegion::Auditory, map.get(CorticalRegion::Auditory) + 0.3);
+                map.set(
+                    CorticalRegion::Auditory,
+                    map.get(CorticalRegion::Auditory) + 0.3,
+                );
             }
             ts.push(map);
         }
@@ -290,11 +299,26 @@ impl PsychBenchmark for BidirectionalValidationBenchmark {
 
         // Simulate Symthaea generating different types of output.
         let output_types = [
-            ("visual_description", "A bright red ball bounces across a green field"),
-            ("emotional_narrative", "She felt a deep warmth as the child smiled"),
-            ("analytical_reasoning", "If all A are B and some B are C then some A might be C"),
-            ("motor_instruction", "Reach forward, grasp the handle, and pull down firmly"),
-            ("social_dialogue", "I understand your concern and I want to help you"),
+            (
+                "visual_description",
+                "A bright red ball bounces across a green field",
+            ),
+            (
+                "emotional_narrative",
+                "She felt a deep warmth as the child smiled",
+            ),
+            (
+                "analytical_reasoning",
+                "If all A are B and some B are C then some A might be C",
+            ),
+            (
+                "motor_instruction",
+                "Reach forward, grasp the handle, and pull down firmly",
+            ),
+            (
+                "social_dialogue",
+                "I understand your concern and I want to help you",
+            ),
         ];
 
         let mut consistency_scores = Vec::new();
@@ -411,7 +435,8 @@ impl PsychBenchmark for SubstrateComparisonBenchmark {
                 MetricValue::from_samples_bootstrap(
                     &pearson_values,
                     config.seed.wrapping_add(
-                        name.bytes().fold(0u64, |a, b| a.wrapping_mul(31).wrapping_add(b as u64)),
+                        name.bytes()
+                            .fold(0u64, |a, b| a.wrapping_mul(31).wrapping_add(b as u64)),
                     ),
                 ),
             );
@@ -458,7 +483,8 @@ fn biological_activation_profile() -> HashMap<CorticalRegion, f32> {
 
 /// Silicon substrate: stronger prefrontal/executive, weaker emotional/social.
 fn silicon_activation_profile() -> HashMap<CorticalRegion, f32> {
-    let mut m: HashMap<CorticalRegion, f32> = CorticalRegion::ALL.iter().map(|r| (*r, 1.0)).collect();
+    let mut m: HashMap<CorticalRegion, f32> =
+        CorticalRegion::ALL.iter().map(|r| (*r, 1.0)).collect();
     *m.get_mut(&CorticalRegion::Prefrontal).unwrap() = 1.3;
     *m.get_mut(&CorticalRegion::Executive).unwrap() = 1.2;
     *m.get_mut(&CorticalRegion::Emotional).unwrap() = 0.6;
@@ -469,7 +495,8 @@ fn silicon_activation_profile() -> HashMap<CorticalRegion, f32> {
 
 /// Neuromorphic substrate: spike-based, stronger sensory/motor, weaker language.
 fn neuromorphic_activation_profile() -> HashMap<CorticalRegion, f32> {
-    let mut m: HashMap<CorticalRegion, f32> = CorticalRegion::ALL.iter().map(|r| (*r, 1.0)).collect();
+    let mut m: HashMap<CorticalRegion, f32> =
+        CorticalRegion::ALL.iter().map(|r| (*r, 1.0)).collect();
     *m.get_mut(&CorticalRegion::Sensory).unwrap() = 1.3;
     *m.get_mut(&CorticalRegion::Motor).unwrap() = 1.2;
     *m.get_mut(&CorticalRegion::Language).unwrap() = 0.6;
@@ -479,7 +506,8 @@ fn neuromorphic_activation_profile() -> HashMap<CorticalRegion, f32> {
 
 /// Quantum substrate: enhanced integration/binding, reduced temporal resolution.
 fn quantum_activation_profile() -> HashMap<CorticalRegion, f32> {
-    let mut m: HashMap<CorticalRegion, f32> = CorticalRegion::ALL.iter().map(|r| (*r, 1.0)).collect();
+    let mut m: HashMap<CorticalRegion, f32> =
+        CorticalRegion::ALL.iter().map(|r| (*r, 1.0)).collect();
     *m.get_mut(&CorticalRegion::Integration).unwrap() = 1.4;
     *m.get_mut(&CorticalRegion::Visual).unwrap() = 1.1; // Entanglement binding
     *m.get_mut(&CorticalRegion::Memory).unwrap() = 0.7;
@@ -518,8 +546,14 @@ impl PsychBenchmark for ParcellationRobustnessBenchmark {
             }
 
             metrics.insert(
-                format!("{}_pearson_r", atlas.name().to_lowercase().replace('-', "_")),
-                MetricValue::from_samples_bootstrap(&pearson_values, config.seed.wrapping_add(atlas.num_parcels() as u64)),
+                format!(
+                    "{}_pearson_r",
+                    atlas.name().to_lowercase().replace('-', "_")
+                ),
+                MetricValue::from_samples_bootstrap(
+                    &pearson_values,
+                    config.seed.wrapping_add(atlas.num_parcels() as u64),
+                ),
             );
         }
 
@@ -541,7 +575,10 @@ impl PsychBenchmark for ParcellationRobustnessBenchmark {
         }
     }
 
-    fn run_ablation(&self, configs: &[crate::harness::config::AblationConfig]) -> Vec<BenchmarkResult> {
+    fn run_ablation(
+        &self,
+        configs: &[crate::harness::config::AblationConfig],
+    ) -> Vec<BenchmarkResult> {
         configs.iter().map(|ac| self.run(&ac.base)).collect()
     }
 
@@ -575,22 +612,23 @@ impl PsychBenchmark for EvidenceUpgradeBenchmark {
 
         // Run the cortical similarity first.
         let similarity_result = CorticalSimilarityBenchmark.run(config);
-        let mean_r = similarity_result.metrics.get("cortical_pearson_r")
+        let mean_r = similarity_result
+            .metrics
+            .get("cortical_pearson_r")
             .map(|m| m.mean)
             .unwrap_or(0.0);
 
         // Attempt evidence upgrade.
         let mut framework = SubstrateValidationFramework::new();
-        let old_level = framework.get("silicon")
+        let old_level = framework
+            .get("silicon")
             .map(|k| k.evidence_level)
             .unwrap_or(symthaea_core::hdc::substrate_validation::EvidenceLevel::None);
 
         let threshold = 0.3;
         let new_level = framework.record_cortical_similarity(mean_r, threshold);
 
-        let upgraded = new_level
-            .map(|nl| nl > old_level)
-            .unwrap_or(false);
+        let upgraded = new_level.map(|nl| nl > old_level).unwrap_or(false);
 
         let elapsed = start.elapsed().as_millis() as u64;
 
@@ -633,7 +671,10 @@ impl PsychBenchmark for EvidenceUpgradeBenchmark {
         }
     }
 
-    fn run_ablation(&self, configs: &[crate::harness::config::AblationConfig]) -> Vec<BenchmarkResult> {
+    fn run_ablation(
+        &self,
+        configs: &[crate::harness::config::AblationConfig],
+    ) -> Vec<BenchmarkResult> {
         configs.iter().map(|ac| self.run(&ac.base)).collect()
     }
 
@@ -678,20 +719,24 @@ impl PsychBenchmark for EegValidationBenchmark {
             let pred_eeg = activations_to_eeg(&pred_map);
 
             // Overall EEG correlation.
-            band_correlations.entry("overall".to_string())
+            band_correlations
+                .entry("overall".to_string())
                 .or_default()
                 .push(sim_eeg.correlation(&pred_eeg));
 
             // Per-band correlation across regions.
             for band in EegBand::ALL {
-                let sim_vec: Vec<f64> = CorticalRegion::ALL.iter()
+                let sim_vec: Vec<f64> = CorticalRegion::ALL
+                    .iter()
                     .map(|r| sim_eeg.get(*r, band) as f64)
                     .collect();
-                let pred_vec: Vec<f64> = CorticalRegion::ALL.iter()
+                let pred_vec: Vec<f64> = CorticalRegion::ALL
+                    .iter()
                     .map(|r| pred_eeg.get(*r, band) as f64)
                     .collect();
                 let r = symthaea_core::hdc::cortical_activation::pearson_f64(&sim_vec, &pred_vec);
-                band_correlations.entry(format!("{}_r", band.as_str()))
+                band_correlations
+                    .entry(format!("{}_r", band.as_str()))
                     .or_default()
                     .push(r);
             }
@@ -722,7 +767,10 @@ impl PsychBenchmark for EegValidationBenchmark {
         }
     }
 
-    fn run_ablation(&self, configs: &[crate::harness::config::AblationConfig]) -> Vec<BenchmarkResult> {
+    fn run_ablation(
+        &self,
+        configs: &[crate::harness::config::AblationConfig],
+    ) -> Vec<BenchmarkResult> {
         configs.iter().map(|ac| self.run(&ac.base)).collect()
     }
 
@@ -783,7 +831,8 @@ impl PsychBenchmark for HybridSubstrateBenchmark {
                 MetricValue::from_samples_bootstrap(
                     &pearson_values,
                     config.seed.wrapping_add(
-                        name.bytes().fold(0u64, |a, b| a.wrapping_mul(31).wrapping_add(b as u64)),
+                        name.bytes()
+                            .fold(0u64, |a, b| a.wrapping_mul(31).wrapping_add(b as u64)),
                     ),
                 ),
             );
@@ -801,12 +850,16 @@ impl PsychBenchmark for HybridSubstrateBenchmark {
             trial_trace: Vec::new(),
             notes: vec![
                 "Per-region substrate assignment: find optimal hybrid configuration".to_string(),
-                "Optimal: bio Emotional/Social + silicon Prefrontal/Exec + quantum Integration".to_string(),
+                "Optimal: bio Emotional/Social + silicon Prefrontal/Exec + quantum Integration"
+                    .to_string(),
             ],
         }
     }
 
-    fn run_ablation(&self, configs: &[crate::harness::config::AblationConfig]) -> Vec<BenchmarkResult> {
+    fn run_ablation(
+        &self,
+        configs: &[crate::harness::config::AblationConfig],
+    ) -> Vec<BenchmarkResult> {
         configs.iter().map(|ac| self.run(&ac.base)).collect()
     }
 
@@ -824,7 +877,8 @@ impl PsychBenchmark for HybridSubstrateBenchmark {
 /// quantum for integration. Hypothesis: each region works best on the substrate
 /// closest to its biological function.
 fn build_hybrid_optimal() -> HashMap<CorticalRegion, f32> {
-    let mut m: HashMap<CorticalRegion, f32> = CorticalRegion::ALL.iter().map(|r| (*r, 1.0)).collect();
+    let mut m: HashMap<CorticalRegion, f32> =
+        CorticalRegion::ALL.iter().map(|r| (*r, 1.0)).collect();
     // Biological strengths: emotion, social, memory, sensory (keep at 1.0)
     // Silicon strengths: executive, prefrontal, language
     *m.get_mut(&CorticalRegion::Prefrontal).unwrap() = 1.2;
@@ -838,7 +892,8 @@ fn build_hybrid_optimal() -> HashMap<CorticalRegion, f32> {
 
 /// Hybrid inverse: deliberately bad assignment to test that it scores worse.
 fn build_hybrid_inverse() -> HashMap<CorticalRegion, f32> {
-    let mut m: HashMap<CorticalRegion, f32> = CorticalRegion::ALL.iter().map(|r| (*r, 1.0)).collect();
+    let mut m: HashMap<CorticalRegion, f32> =
+        CorticalRegion::ALL.iter().map(|r| (*r, 1.0)).collect();
     *m.get_mut(&CorticalRegion::Emotional).unwrap() = 0.4;
     *m.get_mut(&CorticalRegion::Social).unwrap() = 0.4;
     *m.get_mut(&CorticalRegion::Integration).unwrap() = 0.5;
@@ -850,9 +905,7 @@ fn build_hybrid_inverse() -> HashMap<CorticalRegion, f32> {
 // Helpers
 // ============================================================================
 
-fn to_activation_map(
-    activations: &HashMap<CorticalRegion, f32>,
-) -> CorticalActivationMap {
+fn to_activation_map(activations: &HashMap<CorticalRegion, f32>) -> CorticalActivationMap {
     CorticalActivationMap::from_map(activations.clone(), ActivationSource::Simulated, 0)
 }
 
@@ -899,9 +952,10 @@ fn simulate_tribe_prediction_for_text(
     use rand::rngs::StdRng;
     use rand::{Rng, SeedableRng};
 
-    let seed = config
-        .seed
-        .wrapping_add(text.bytes().fold(0u64, |a, b| a.wrapping_mul(31).wrapping_add(b as u64)));
+    let seed = config.seed.wrapping_add(
+        text.bytes()
+            .fold(0u64, |a, b| a.wrapping_mul(31).wrapping_add(b as u64)),
+    );
     let mut rng = StdRng::seed_from_u64(seed);
 
     // Content-aware base: text with visual words → high visual prediction, etc.
@@ -911,10 +965,26 @@ fn simulate_tribe_prediction_for_text(
     let social_words = ["understand", "help", "concern", "friend", "trust"];
 
     let text_lower = text.to_lowercase();
-    let visual_boost = visual_words.iter().filter(|w| text_lower.contains(*w)).count() as f32 * 0.1;
-    let emotional_boost = emotional_words.iter().filter(|w| text_lower.contains(*w)).count() as f32 * 0.1;
-    let motor_boost = motor_words.iter().filter(|w| text_lower.contains(*w)).count() as f32 * 0.1;
-    let social_boost = social_words.iter().filter(|w| text_lower.contains(*w)).count() as f32 * 0.1;
+    let visual_boost = visual_words
+        .iter()
+        .filter(|w| text_lower.contains(*w))
+        .count() as f32
+        * 0.1;
+    let emotional_boost = emotional_words
+        .iter()
+        .filter(|w| text_lower.contains(*w))
+        .count() as f32
+        * 0.1;
+    let motor_boost = motor_words
+        .iter()
+        .filter(|w| text_lower.contains(*w))
+        .count() as f32
+        * 0.1;
+    let social_boost = social_words
+        .iter()
+        .filter(|w| text_lower.contains(*w))
+        .count() as f32
+        * 0.1;
 
     let mut activations = HashMap::new();
     for region in CorticalRegion::ALL {

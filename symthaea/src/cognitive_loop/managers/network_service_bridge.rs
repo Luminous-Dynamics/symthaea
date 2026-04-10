@@ -40,8 +40,8 @@
 //! ```
 
 use super::swarm_manager::{
-    convert_affective_sync, convert_consciousness_vector, convert_peer_event, SwarmEvent,
-    SwarmManager,
+    convert_affective_sync, convert_consciousness_vector, convert_navigation_estimate,
+    convert_peer_event, SwarmEvent, SwarmManager,
 };
 use crate::swarm::{AffectiveSync, ConsciousnessVector, NetworkService, PeerEvent};
 use std::sync::mpsc;
@@ -106,6 +106,7 @@ impl NetworkServiceBridge {
     ) -> NetworkServiceBridgeHandle {
         let mut peer_rx = service.subscribe_peer_events();
         let mut consciousness_rx = service.subscribe_consciousness();
+        let mut navigation_rx = service.subscribe_navigation();
         let forwarded = std::sync::Arc::new(std::sync::atomic::AtomicU64::new(0));
         let lagged = std::sync::Arc::new(std::sync::atomic::AtomicU64::new(0));
 
@@ -154,6 +155,25 @@ impl NetworkServiceBridge {
                             Err(broadcast::error::RecvError::Closed) => break,
                         }
                     }
+                    result = navigation_rx.recv() => {
+                        match result {
+                            Ok((peer_id, estimate)) => {
+                                let event = convert_navigation_estimate(&peer_id, &estimate);
+                                if tx.send(event).is_err() {
+                                    break;
+                                }
+                                fwd.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                            }
+                            Err(broadcast::error::RecvError::Lagged(n)) => {
+                                lag.fetch_add(n, std::sync::atomic::Ordering::Relaxed);
+                                tracing::warn!(
+                                    lagged = n,
+                                    "NetworkServiceBridge: navigation_rx lagged"
+                                );
+                            }
+                            Err(broadcast::error::RecvError::Closed) => break,
+                        }
+                    }
                 }
             }
             tracing::info!("NetworkServiceBridge: task exiting");
@@ -188,6 +208,7 @@ impl NetworkServiceBridge {
 
         let mut peer_rx = service.subscribe_peer_events();
         let mut consciousness_rx = service.subscribe_consciousness();
+        let mut navigation_rx = service.subscribe_navigation();
         let forwarded = std::sync::Arc::new(std::sync::atomic::AtomicU64::new(0));
         let lagged = std::sync::Arc::new(std::sync::atomic::AtomicU64::new(0));
         let rejected = std::sync::Arc::new(std::sync::atomic::AtomicU64::new(0));
@@ -258,6 +279,25 @@ impl NetworkServiceBridge {
                                 tracing::warn!(
                                     lagged = n,
                                     "NetworkServiceBridge: consciousness_rx lagged (attestation mode)"
+                                );
+                            }
+                            Err(broadcast::error::RecvError::Closed) => break,
+                        }
+                    }
+                    result = navigation_rx.recv() => {
+                        match result {
+                            Ok((peer_id, estimate)) => {
+                                let event = convert_navigation_estimate(&peer_id, &estimate);
+                                if tx.send(event).is_err() {
+                                    break;
+                                }
+                                fwd.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                            }
+                            Err(broadcast::error::RecvError::Lagged(n)) => {
+                                lag.fetch_add(n, std::sync::atomic::Ordering::Relaxed);
+                                tracing::warn!(
+                                    lagged = n,
+                                    "NetworkServiceBridge: navigation_rx lagged (attestation mode)"
                                 );
                             }
                             Err(broadcast::error::RecvError::Closed) => break,
@@ -459,6 +499,7 @@ pub fn spawn_federated_coordinator(
 mod tests {
     use super::*;
     use crate::swarm::{ConsciousnessVector, PeerEvent, PeerInfo};
+    use positioning::{GaussianEstimate3D, PeerEstimate3D};
 
     fn make_peer_info(id: &str) -> PeerInfo {
         PeerInfo::new(id)
@@ -605,11 +646,13 @@ mod tests {
         // Create broadcast channels to simulate NetworkService
         let (peer_tx, _) = tokio::sync::broadcast::channel::<PeerEvent>(16);
         let (cons_tx, _) = tokio::sync::broadcast::channel::<(String, ConsciousnessVector)>(16);
+        let (nav_tx, _) = tokio::sync::broadcast::channel::<(String, PeerEstimate3D)>(16);
 
         // We can't use NetworkServiceBridge::spawn directly without a real
         // NetworkService, but we can test the channel flow end-to-end
         let peer_rx = peer_tx.subscribe();
         let consciousness_rx = cons_tx.subscribe();
+        let navigation_rx = nav_tx.subscribe();
 
         let forwarded = std::sync::Arc::new(std::sync::atomic::AtomicU64::new(0));
         let lagged = std::sync::Arc::new(std::sync::atomic::AtomicU64::new(0));
@@ -619,6 +662,7 @@ mod tests {
         tokio::spawn(async move {
             let mut peer_rx = peer_rx;
             let mut consciousness_rx = consciousness_rx;
+            let mut navigation_rx = navigation_rx;
             loop {
                 tokio::select! {
                     result = peer_rx.recv() => {
@@ -642,6 +686,16 @@ mod tests {
                             Err(_) => break,
                         }
                     }
+                    result = navigation_rx.recv() => {
+                        match result {
+                            Ok((peer_id, estimate)) => {
+                                let event = convert_navigation_estimate(&peer_id, &estimate);
+                                if tx_clone.send(event).is_err() { break; }
+                                fwd.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                            }
+                            Err(_) => break,
+                        }
+                    }
                 }
             }
         });
@@ -651,6 +705,16 @@ mod tests {
             .send(PeerEvent::Connected(make_peer_info("p1")))
             .unwrap();
         cons_tx.send(("p2".into(), make_cv(0.6))).unwrap();
+        nav_tx
+            .send((
+                "p3".into(),
+                PeerEstimate3D {
+                    peer_id: "p3".into(),
+                    estimate: GaussianEstimate3D::from_diagonal_sigma([1.0, 0.0, 0.0], 5.0),
+                    confidence: Some(0.8),
+                },
+            ))
+            .unwrap();
 
         // Give async task time to forward
         tokio::time::sleep(std::time::Duration::from_millis(50)).await;
@@ -658,8 +722,11 @@ mod tests {
         // Drain on sync side
         let mut manager = SwarmManager::default();
         let n = drain_swarm_channel(&rx, &mut manager);
-        assert_eq!(n, 2, "Should have forwarded peer + consciousness events");
-        assert_eq!(forwarded.load(std::sync::atomic::Ordering::Relaxed), 2);
+        assert_eq!(
+            n, 3,
+            "Should have forwarded peer + consciousness + navigation events"
+        );
+        assert_eq!(forwarded.load(std::sync::atomic::Ordering::Relaxed), 3);
     }
 
     #[test]

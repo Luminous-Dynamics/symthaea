@@ -218,26 +218,26 @@ const HYDROPHOBICITY: [f64; 20] = [
 
 /// Net charge at physiological pH (~7.0).
 const CHARGE: [f64; 20] = [
-    0.0, // Ala
-    1.0, // Arg
-    0.0, // Asn
+    0.0,  // Ala
+    1.0,  // Arg
+    0.0,  // Asn
     -1.0, // Asp
-    0.0, // Cys
-    0.0, // Gln
+    0.0,  // Cys
+    0.0,  // Gln
     -1.0, // Glu
-    0.0, // Gly
-    0.1, // His (partially protonated, pKa ~6.0)
-    0.0, // Ile
-    0.0, // Leu
-    1.0, // Lys
-    0.0, // Met
-    0.0, // Phe
-    0.0, // Pro
-    0.0, // Ser
-    0.0, // Thr
-    0.0, // Trp
-    0.0, // Tyr
-    0.0, // Val
+    0.0,  // Gly
+    0.1,  // His (partially protonated, pKa ~6.0)
+    0.0,  // Ile
+    0.0,  // Leu
+    1.0,  // Lys
+    0.0,  // Met
+    0.0,  // Phe
+    0.0,  // Pro
+    0.0,  // Ser
+    0.0,  // Thr
+    0.0,  // Trp
+    0.0,  // Tyr
+    0.0,  // Val
 ];
 
 /// Van der Waals volume in cubic angstroms.
@@ -416,7 +416,10 @@ pub fn is_charged(aa: AminoAcid) -> bool {
 
 /// True if aromatic side chain (Phe, Trp, Tyr, His).
 pub fn is_aromatic(aa: AminoAcid) -> bool {
-    matches!(aa, AminoAcid::Phe | AminoAcid::Trp | AminoAcid::Tyr | AminoAcid::His)
+    matches!(
+        aa,
+        AminoAcid::Phe | AminoAcid::Trp | AminoAcid::Tyr | AminoAcid::His
+    )
 }
 
 /// True if small side chain (Gly, Ala, Ser).
@@ -426,7 +429,7 @@ pub fn is_small(aa: AminoAcid) -> bool {
 
 /// Van der Waals volume normalized to [0, 1] (min=Gly 60.1, max=Trp 227.8).
 pub fn volume_normalized(aa: AminoAcid) -> f64 {
-    const MIN_VOL: f64 = 60.1;  // Gly
+    const MIN_VOL: f64 = 60.1; // Gly
     const MAX_VOL: f64 = 227.8; // Trp
     (volume(aa) - MIN_VOL) / (MAX_VOL - MIN_VOL)
 }
@@ -546,8 +549,14 @@ mod tests {
 
     #[test]
     fn test_secondary_structure_char_roundtrip() {
-        assert_eq!(SecondaryStructure::from_char('H'), SecondaryStructure::Helix);
-        assert_eq!(SecondaryStructure::from_char('E'), SecondaryStructure::Sheet);
+        assert_eq!(
+            SecondaryStructure::from_char('H'),
+            SecondaryStructure::Helix
+        );
+        assert_eq!(
+            SecondaryStructure::from_char('E'),
+            SecondaryStructure::Sheet
+        );
         assert_eq!(SecondaryStructure::from_char('C'), SecondaryStructure::Coil);
         assert_eq!(SecondaryStructure::from_char('X'), SecondaryStructure::Coil);
 

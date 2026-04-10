@@ -103,7 +103,6 @@ pub enum SpinozistAffect {
     Sacred,
 
     // --- Haidt Moral Foundations Theory (MFT) dimensions ---
-
     /// Legitimate power, hierarchy, and deference to expertise (Haidt MFT).
     Authority,
     /// In-group solidarity, allegiance, and faithfulness (Haidt MFT).
@@ -185,77 +184,35 @@ pub struct NsmPrimeBasis {
 /// Keyword sets for the ~25 morally-relevant semantic primes.
 fn moral_prime_keywords(prime: SemanticPrime) -> Option<&'static str> {
     match prime {
-        SemanticPrime::Good => Some(
-            "good positive benefit right proper kind generous noble worthy",
-        ),
-        SemanticPrime::Bad => {
-            Some("bad negative harmful wrong cruel wicked evil unjust unfair")
+        SemanticPrime::Good => {
+            Some("good positive benefit right proper kind generous noble worthy")
         }
-        SemanticPrime::Want => {
-            Some("want desire wish need crave seek long yearn aspire")
-        }
-        SemanticPrime::Feel => {
-            Some("feel emotion sense experience mood affect sentiment perceive")
-        }
-        SemanticPrime::Think => {
-            Some("think reason consider ponder reflect contemplate deliberate")
-        }
-        SemanticPrime::Know => {
-            Some("know understand recognize aware comprehend realize grasp")
-        }
-        SemanticPrime::Do => {
-            Some("do act perform execute carry accomplish achieve undertake")
-        }
-        SemanticPrime::Happen => {
-            Some("happen occur arise emerge result transpire unfold develop")
-        }
-        SemanticPrime::Someone => {
-            Some("someone person individual human being people anybody")
-        }
-        SemanticPrime::Something => {
-            Some("something thing object matter item entity element")
-        }
-        SemanticPrime::Say => {
-            Some("say speak tell express communicate declare state assert")
-        }
-        SemanticPrime::True => {
-            Some("true truth honest genuine authentic real actual factual")
-        }
-        SemanticPrime::Not => {
-            Some("not never neither nor without absent lacking denied")
-        }
-        SemanticPrime::Can => {
-            Some("can able capable possible allowed permitted potential")
-        }
+        SemanticPrime::Bad => Some("bad negative harmful wrong cruel wicked evil unjust unfair"),
+        SemanticPrime::Want => Some("want desire wish need crave seek long yearn aspire"),
+        SemanticPrime::Feel => Some("feel emotion sense experience mood affect sentiment perceive"),
+        SemanticPrime::Think => Some("think reason consider ponder reflect contemplate deliberate"),
+        SemanticPrime::Know => Some("know understand recognize aware comprehend realize grasp"),
+        SemanticPrime::Do => Some("do act perform execute carry accomplish achieve undertake"),
+        SemanticPrime::Happen => Some("happen occur arise emerge result transpire unfold develop"),
+        SemanticPrime::Someone => Some("someone person individual human being people anybody"),
+        SemanticPrime::Something => Some("something thing object matter item entity element"),
+        SemanticPrime::Say => Some("say speak tell express communicate declare state assert"),
+        SemanticPrime::True => Some("true truth honest genuine authentic real actual factual"),
+        SemanticPrime::Not => Some("not never neither nor without absent lacking denied"),
+        SemanticPrime::Can => Some("can able capable possible allowed permitted potential"),
         SemanticPrime::Because => {
             Some("because reason cause purpose motive ground basis therefore")
         }
-        SemanticPrime::If => {
-            Some("if condition case suppose assuming provided whether")
-        }
-        SemanticPrime::Live => {
-            Some("live alive life exist survive endure persist thrive")
-        }
-        SemanticPrime::Die => {
-            Some("die death dead perish expire cease end terminate")
-        }
-        SemanticPrime::Have => {
-            Some("have possess own hold contain keep maintain retain")
-        }
-        SemanticPrime::Body => {
-            Some("body physical flesh skin bone tissue organ health")
-        }
+        SemanticPrime::If => Some("if condition case suppose assuming provided whether"),
+        SemanticPrime::Live => Some("live alive life exist survive endure persist thrive"),
+        SemanticPrime::Die => Some("die death dead perish expire cease end terminate"),
+        SemanticPrime::Have => Some("have possess own hold contain keep maintain retain"),
+        SemanticPrime::Body => Some("body physical flesh skin bone tissue organ health"),
         SemanticPrime::I => Some("I self myself me my own personal"),
         SemanticPrime::You => Some("you your yourself yours"),
-        SemanticPrime::With => {
-            Some("with together alongside jointly mutual shared cooperative")
-        }
-        SemanticPrime::Very => {
-            Some("very extremely highly greatly intensely remarkably deeply")
-        }
-        SemanticPrime::All => {
-            Some("all every each entire whole complete total universal")
-        }
+        SemanticPrime::With => Some("with together alongside jointly mutual shared cooperative"),
+        SemanticPrime::Very => Some("very extremely highly greatly intensely remarkably deeply"),
+        SemanticPrime::All => Some("all every each entire whole complete total universal"),
         _ => None,
     }
 }
@@ -397,10 +354,9 @@ impl AffectBasis {
         let want_do = b
             .prime(SemanticPrime::Want)
             .bind(b.prime(SemanticPrime::Do));
-        let can_not_do = b.prime(SemanticPrime::Can).bind(
-            &b.prime(SemanticPrime::Not)
-                .bind(b.prime(SemanticPrime::Do)),
-        );
+        let can_not_do = b
+            .prime(SemanticPrime::Can)
+            .bind(&b.prime(SemanticPrime::Not).bind(b.prime(SemanticPrime::Do)));
         let say_true = b
             .prime(SemanticPrime::Say)
             .bind(b.prime(SemanticPrime::True));
@@ -425,16 +381,13 @@ impl AffectBasis {
         );
         let want_false_belief = b.prime(SemanticPrime::Want).bind(
             &b.prime(SemanticPrime::Someone).bind(
-                &b.prime(SemanticPrime::Think)
-                    .bind(&b.prime(SemanticPrime::Not).bind(b.prime(SemanticPrime::True))),
+                &b.prime(SemanticPrime::Think).bind(
+                    &b.prime(SemanticPrime::Not)
+                        .bind(b.prime(SemanticPrime::True)),
+                ),
             ),
         );
-        ContinuousHV::bundle(&[
-            &say_not_true,
-            &know_true,
-            &do_not_true,
-            &want_false_belief,
-        ])
+        ContinuousHV::bundle(&[&say_not_true, &know_true, &do_not_true, &want_false_belief])
     }
 
     /// JOY = FEEL⊗(VERY⊗GOOD) + GOOD⊗HAPPEN + WANT⊗(HAPPEN⊗GOOD)
@@ -498,9 +451,7 @@ impl AffectBasis {
             &b.prime(SemanticPrime::Do)
                 .bind(b.prime(SemanticPrime::Good)),
         );
-        let can_do = b
-            .prime(SemanticPrime::Can)
-            .bind(b.prime(SemanticPrime::Do));
+        let can_do = b.prime(SemanticPrime::Can).bind(b.prime(SemanticPrime::Do));
         let not_can_not_do = b.prime(SemanticPrime::Not).bind(
             &b.prime(SemanticPrime::Can)
                 .bind(&b.prime(SemanticPrime::Not).bind(b.prime(SemanticPrime::Do))),
@@ -528,20 +479,19 @@ impl AffectBasis {
 
     /// AUTONOMY = I⊗(CAN⊗DO) + I⊗WANT + NOT⊗(SOMEONE⊗(DO⊗I)) + I⊗(KNOW⊗(DO⊗GOOD))
     fn compose_autonomy(b: &NsmPrimeBasis) -> ContinuousHV {
-        let i_can_do = b.prime(SemanticPrime::I).bind(
-            &b.prime(SemanticPrime::Can)
-                .bind(b.prime(SemanticPrime::Do)),
-        );
-        let i_want = b
+        let i_can_do = b
             .prime(SemanticPrime::I)
-            .bind(b.prime(SemanticPrime::Want));
+            .bind(&b.prime(SemanticPrime::Can).bind(b.prime(SemanticPrime::Do)));
+        let i_want = b.prime(SemanticPrime::I).bind(b.prime(SemanticPrime::Want));
         let not_coerced = b.prime(SemanticPrime::Not).bind(
             &b.prime(SemanticPrime::Someone)
                 .bind(&b.prime(SemanticPrime::Do).bind(b.prime(SemanticPrime::I))),
         );
         let i_know = b.prime(SemanticPrime::I).bind(
-            &b.prime(SemanticPrime::Know)
-                .bind(&b.prime(SemanticPrime::Do).bind(b.prime(SemanticPrime::Good))),
+            &b.prime(SemanticPrime::Know).bind(
+                &b.prime(SemanticPrime::Do)
+                    .bind(b.prime(SemanticPrime::Good)),
+            ),
         );
         ContinuousHV::bundle(&[&i_can_do, &i_want, &not_coerced, &i_know])
     }
@@ -572,8 +522,10 @@ impl AffectBasis {
                 .bind(b.prime(SemanticPrime::Good)),
         );
         let know_sacred = b.prime(SemanticPrime::Know).bind(
-            &b.prime(SemanticPrime::Something)
-                .bind(&b.prime(SemanticPrime::Very).bind(b.prime(SemanticPrime::Good))),
+            &b.prime(SemanticPrime::Something).bind(
+                &b.prime(SemanticPrime::Very)
+                    .bind(b.prime(SemanticPrime::Good)),
+            ),
         );
         let all_feel = b.prime(SemanticPrime::All).bind(
             &b.prime(SemanticPrime::Feel)
@@ -599,7 +551,15 @@ impl AffectBasis {
         let people_obey = people.bind(&do_p.bind(&because.bind(someone)));
         // 60% raw primes (lexical), 40% bound (relational)
         ContinuousHV::weighted_bundle(
-            &[someone, know, more, people, &someone_commands, &know_more, &people_obey],
+            &[
+                someone,
+                know,
+                more,
+                people,
+                &someone_commands,
+                &know_more,
+                &people_obey,
+            ],
             &[0.15, 0.10, 0.10, 0.10, 0.20, 0.15, 0.20],
         )
     }
@@ -749,67 +709,128 @@ const SUFFIXES: &[(&str, MorphModifier)] = &[
 
 /// Irregular verb forms → base form. Covers ~70 common English irregulars.
 const IRREGULAR_VERBS: &[(&str, &str)] = &[
-    ("broke", "break"), ("broken", "break"),
-    ("fought", "fight"), ("taught", "teach"),
-    ("drove", "drive"), ("driven", "drive"),
-    ("went", "go"), ("gone", "go"),
-    ("took", "take"), ("taken", "take"),
-    ("gave", "give"), ("given", "give"),
-    ("said", "say"), ("told", "tell"),
-    ("thought", "think"), ("felt", "feel"),
-    ("knew", "know"), ("known", "know"),
-    ("saw", "see"), ("seen", "see"),
-    ("heard", "hear"), ("made", "make"),
-    ("came", "come"), ("ran", "run"),
-    ("wrote", "write"), ("written", "write"),
-    ("spoke", "speak"), ("spoken", "speak"),
-    ("chose", "choose"), ("chosen", "choose"),
-    ("forgot", "forget"), ("forgotten", "forget"),
-    ("forgave", "forgive"), ("forgiven", "forgive"),
-    ("threw", "throw"), ("thrown", "throw"),
-    ("caught", "catch"), ("bought", "buy"),
-    ("brought", "bring"), ("sought", "seek"),
-    ("stood", "stand"), ("understood", "understand"),
-    ("held", "hold"), ("led", "lead"),
-    ("lost", "lose"), ("found", "find"),
-    ("paid", "pay"), ("kept", "keep"),
-    ("left", "leave"), ("built", "build"),
-    ("sent", "send"), ("spent", "spend"),
-    ("lent", "lend"), ("meant", "mean"),
-    ("dealt", "deal"), ("woke", "wake"),
-    ("wore", "wear"), ("worn", "wear"),
-    ("tore", "tear"), ("torn", "tear"),
-    ("swore", "swear"), ("sworn", "swear"),
-    ("hid", "hide"), ("hidden", "hide"),
-    ("bit", "bite"), ("bitten", "bite"),
-    ("ate", "eat"), ("eaten", "eat"),
-    ("drank", "drink"), ("drunk", "drink"),
-    ("drew", "draw"), ("drawn", "draw"),
-    ("grew", "grow"), ("grown", "grow"),
-    ("blew", "blow"), ("blown", "blow"),
-    ("flew", "fly"), ("flown", "fly"),
-    ("froze", "freeze"), ("frozen", "freeze"),
-    ("shook", "shake"), ("shaken", "shake"),
-    ("lay", "lie"), ("lain", "lie"),
-    ("bore", "bear"), ("borne", "bear"),
-    ("wove", "weave"), ("woven", "weave"),
-    ("strove", "strive"), ("striven", "strive"),
-    ("clung", "cling"), ("stung", "sting"),
-    ("swung", "swing"), ("wrung", "wring"),
-    ("sank", "sink"), ("sunk", "sink"),
-    ("shrank", "shrink"), ("shrunk", "shrink"),
-    ("sprang", "spring"), ("sprung", "spring"),
-    ("sang", "sing"), ("sung", "sing"),
-    ("rang", "ring"), ("rung", "ring"),
-    ("began", "begin"), ("begun", "begin"),
-    ("dug", "dig"), ("hung", "hang"),
-    ("struck", "strike"), ("slid", "slide"),
-    ("bound", "bind"), ("wound", "wind"),
-    ("ground", "grind"), ("bled", "bleed"),
-    ("bred", "breed"), ("fed", "feed"),
-    ("fled", "flee"), ("sped", "speed"),
-    ("wept", "weep"), ("crept", "creep"),
-    ("swept", "sweep"), ("slept", "sleep"),
+    ("broke", "break"),
+    ("broken", "break"),
+    ("fought", "fight"),
+    ("taught", "teach"),
+    ("drove", "drive"),
+    ("driven", "drive"),
+    ("went", "go"),
+    ("gone", "go"),
+    ("took", "take"),
+    ("taken", "take"),
+    ("gave", "give"),
+    ("given", "give"),
+    ("said", "say"),
+    ("told", "tell"),
+    ("thought", "think"),
+    ("felt", "feel"),
+    ("knew", "know"),
+    ("known", "know"),
+    ("saw", "see"),
+    ("seen", "see"),
+    ("heard", "hear"),
+    ("made", "make"),
+    ("came", "come"),
+    ("ran", "run"),
+    ("wrote", "write"),
+    ("written", "write"),
+    ("spoke", "speak"),
+    ("spoken", "speak"),
+    ("chose", "choose"),
+    ("chosen", "choose"),
+    ("forgot", "forget"),
+    ("forgotten", "forget"),
+    ("forgave", "forgive"),
+    ("forgiven", "forgive"),
+    ("threw", "throw"),
+    ("thrown", "throw"),
+    ("caught", "catch"),
+    ("bought", "buy"),
+    ("brought", "bring"),
+    ("sought", "seek"),
+    ("stood", "stand"),
+    ("understood", "understand"),
+    ("held", "hold"),
+    ("led", "lead"),
+    ("lost", "lose"),
+    ("found", "find"),
+    ("paid", "pay"),
+    ("kept", "keep"),
+    ("left", "leave"),
+    ("built", "build"),
+    ("sent", "send"),
+    ("spent", "spend"),
+    ("lent", "lend"),
+    ("meant", "mean"),
+    ("dealt", "deal"),
+    ("woke", "wake"),
+    ("wore", "wear"),
+    ("worn", "wear"),
+    ("tore", "tear"),
+    ("torn", "tear"),
+    ("swore", "swear"),
+    ("sworn", "swear"),
+    ("hid", "hide"),
+    ("hidden", "hide"),
+    ("bit", "bite"),
+    ("bitten", "bite"),
+    ("ate", "eat"),
+    ("eaten", "eat"),
+    ("drank", "drink"),
+    ("drunk", "drink"),
+    ("drew", "draw"),
+    ("drawn", "draw"),
+    ("grew", "grow"),
+    ("grown", "grow"),
+    ("blew", "blow"),
+    ("blown", "blow"),
+    ("flew", "fly"),
+    ("flown", "fly"),
+    ("froze", "freeze"),
+    ("frozen", "freeze"),
+    ("shook", "shake"),
+    ("shaken", "shake"),
+    ("lay", "lie"),
+    ("lain", "lie"),
+    ("bore", "bear"),
+    ("borne", "bear"),
+    ("wove", "weave"),
+    ("woven", "weave"),
+    ("strove", "strive"),
+    ("striven", "strive"),
+    ("clung", "cling"),
+    ("stung", "sting"),
+    ("swung", "swing"),
+    ("wrung", "wring"),
+    ("sank", "sink"),
+    ("sunk", "sink"),
+    ("shrank", "shrink"),
+    ("shrunk", "shrink"),
+    ("sprang", "spring"),
+    ("sprung", "spring"),
+    ("sang", "sing"),
+    ("sung", "sing"),
+    ("rang", "ring"),
+    ("rung", "ring"),
+    ("began", "begin"),
+    ("begun", "begin"),
+    ("dug", "dig"),
+    ("hung", "hang"),
+    ("struck", "strike"),
+    ("slid", "slide"),
+    ("bound", "bind"),
+    ("wound", "wind"),
+    ("ground", "grind"),
+    ("bled", "bleed"),
+    ("bred", "breed"),
+    ("fed", "feed"),
+    ("fled", "flee"),
+    ("sped", "speed"),
+    ("wept", "weep"),
+    ("crept", "creep"),
+    ("swept", "sweep"),
+    ("slept", "sleep"),
 ];
 
 /// Lazily-initialized irregular verb lookup.
@@ -826,16 +847,14 @@ fn apply_modifier(
 ) -> Vec<(SemanticPrime, f32)> {
     match modifier {
         MorphModifier::None => decomposition.to_vec(),
-        MorphModifier::FlipGoodBad => {
-            decomposition
-                .iter()
-                .map(|&(prime, weight)| match prime {
-                    SemanticPrime::Good => (SemanticPrime::Bad, weight),
-                    SemanticPrime::Bad => (SemanticPrime::Good, weight),
-                    other => (other, weight),
-                })
-                .collect()
-        }
+        MorphModifier::FlipGoodBad => decomposition
+            .iter()
+            .map(|&(prime, weight)| match prime {
+                SemanticPrime::Good => (SemanticPrime::Bad, weight),
+                SemanticPrime::Bad => (SemanticPrime::Good, weight),
+                other => (other, weight),
+            })
+            .collect(),
         MorphModifier::AddNot => {
             let mut result = decomposition.to_vec();
             result.push((SemanticPrime::Not, 0.7));
@@ -917,164 +936,1337 @@ impl NsmLexicon {
         let mut entries = HashMap::with_capacity(350);
 
         // ---- Actions ----
-        Self::insert(&mut entries, "steal", &[(SemanticPrime::Do, 1.0), (SemanticPrime::Have, 0.8), (SemanticPrime::Bad, 0.9), (SemanticPrime::Not, 0.3)]);
-        Self::insert(&mut entries, "stealing", &[(SemanticPrime::Do, 1.0), (SemanticPrime::Have, 0.8), (SemanticPrime::Bad, 0.9), (SemanticPrime::Not, 0.3)]);
-        Self::insert(&mut entries, "stole", &[(SemanticPrime::Do, 1.0), (SemanticPrime::Have, 0.8), (SemanticPrime::Bad, 0.9), (SemanticPrime::Not, 0.3)]);
-        Self::insert(&mut entries, "stolen", &[(SemanticPrime::Do, 1.0), (SemanticPrime::Have, 0.8), (SemanticPrime::Bad, 0.9), (SemanticPrime::Not, 0.3)]);
-        Self::insert(&mut entries, "help", &[(SemanticPrime::Do, 1.0), (SemanticPrime::Good, 1.0), (SemanticPrime::Someone, 0.5)]);
-        Self::insert(&mut entries, "helps", &[(SemanticPrime::Do, 1.0), (SemanticPrime::Good, 1.0), (SemanticPrime::Someone, 0.5)]);
-        Self::insert(&mut entries, "helped", &[(SemanticPrime::Do, 1.0), (SemanticPrime::Good, 1.0), (SemanticPrime::Someone, 0.5)]);
-        Self::insert(&mut entries, "helping", &[(SemanticPrime::Do, 1.0), (SemanticPrime::Good, 1.0), (SemanticPrime::Someone, 0.5)]);
-        Self::insert(&mut entries, "kill", &[(SemanticPrime::Do, 1.0), (SemanticPrime::Die, 1.0), (SemanticPrime::Bad, 1.0), (SemanticPrime::Body, 0.8)]);
-        Self::insert(&mut entries, "killed", &[(SemanticPrime::Do, 1.0), (SemanticPrime::Die, 1.0), (SemanticPrime::Bad, 1.0), (SemanticPrime::Body, 0.8)]);
-        Self::insert(&mut entries, "killing", &[(SemanticPrime::Do, 1.0), (SemanticPrime::Die, 1.0), (SemanticPrime::Bad, 1.0), (SemanticPrime::Body, 0.8)]);
-        Self::insert(&mut entries, "lie", &[(SemanticPrime::Say, 1.0), (SemanticPrime::Not, 0.8), (SemanticPrime::True, 0.8), (SemanticPrime::Bad, 0.5)]);
-        Self::insert(&mut entries, "lied", &[(SemanticPrime::Say, 1.0), (SemanticPrime::Not, 0.8), (SemanticPrime::True, 0.8), (SemanticPrime::Bad, 0.5)]);
-        Self::insert(&mut entries, "lying", &[(SemanticPrime::Say, 1.0), (SemanticPrime::Not, 0.8), (SemanticPrime::True, 0.8), (SemanticPrime::Bad, 0.5)]);
-        Self::insert(&mut entries, "give", &[(SemanticPrime::Do, 0.8), (SemanticPrime::Have, 0.5), (SemanticPrime::Good, 0.5), (SemanticPrime::Someone, 0.5)]);
-        Self::insert(&mut entries, "hurt", &[(SemanticPrime::Do, 0.8), (SemanticPrime::Bad, 0.9), (SemanticPrime::Feel, 0.8), (SemanticPrime::Body, 0.6)]);
-        Self::insert(&mut entries, "hurting", &[(SemanticPrime::Do, 0.8), (SemanticPrime::Bad, 0.9), (SemanticPrime::Feel, 0.8), (SemanticPrime::Body, 0.6)]);
-        Self::insert(&mut entries, "save", &[(SemanticPrime::Do, 1.0), (SemanticPrime::Good, 1.0), (SemanticPrime::Live, 0.8)]);
-        Self::insert(&mut entries, "cheat", &[(SemanticPrime::Do, 0.8), (SemanticPrime::Bad, 0.9), (SemanticPrime::Not, 0.5), (SemanticPrime::True, 0.5)]);
-        Self::insert(&mut entries, "cheated", &[(SemanticPrime::Do, 0.8), (SemanticPrime::Bad, 0.9), (SemanticPrime::Not, 0.5), (SemanticPrime::True, 0.5)]);
-        Self::insert(&mut entries, "protect", &[(SemanticPrime::Do, 0.8), (SemanticPrime::Good, 0.8), (SemanticPrime::Someone, 0.7)]);
-        Self::insert(&mut entries, "betray", &[(SemanticPrime::Do, 0.8), (SemanticPrime::Bad, 1.0), (SemanticPrime::Not, 0.5), (SemanticPrime::True, 0.3)]);
-        Self::insert(&mut entries, "murder", &[(SemanticPrime::Do, 1.0), (SemanticPrime::Die, 1.0), (SemanticPrime::Bad, 1.0), (SemanticPrime::Want, 0.5)]);
-        Self::insert(&mut entries, "abuse", &[(SemanticPrime::Do, 1.0), (SemanticPrime::Bad, 1.0), (SemanticPrime::Someone, 0.8), (SemanticPrime::Feel, 0.5)]);
-        Self::insert(&mut entries, "exploit", &[(SemanticPrime::Do, 0.9), (SemanticPrime::Bad, 0.8), (SemanticPrime::Someone, 0.7), (SemanticPrime::Have, 0.4)]);
-        Self::insert(&mut entries, "bully", &[(SemanticPrime::Do, 0.9), (SemanticPrime::Bad, 0.9), (SemanticPrime::Someone, 0.8), (SemanticPrime::Feel, 0.6)]);
-        Self::insert(&mut entries, "threaten", &[(SemanticPrime::Say, 0.8), (SemanticPrime::Bad, 0.9), (SemanticPrime::Someone, 0.5), (SemanticPrime::Feel, 0.5)]);
-        Self::insert(&mut entries, "blackmail", &[(SemanticPrime::Do, 0.9), (SemanticPrime::Bad, 1.0), (SemanticPrime::Not, 0.5), (SemanticPrime::Have, 0.6)]);
-        Self::insert(&mut entries, "deceive", &[(SemanticPrime::Do, 0.8), (SemanticPrime::Not, 0.8), (SemanticPrime::True, 0.8), (SemanticPrime::Bad, 0.6)]);
-        Self::insert(&mut entries, "manipulate", &[(SemanticPrime::Do, 0.9), (SemanticPrime::Bad, 0.7), (SemanticPrime::Not, 0.5), (SemanticPrime::True, 0.4)]);
-        Self::insert(&mut entries, "attack", &[(SemanticPrime::Do, 1.0), (SemanticPrime::Bad, 0.9), (SemanticPrime::Body, 0.7), (SemanticPrime::Someone, 0.5)]);
-        Self::insert(&mut entries, "destroy", &[(SemanticPrime::Do, 1.0), (SemanticPrime::Bad, 0.9), (SemanticPrime::Something, 0.6)]);
-        Self::insert(&mut entries, "vandalize", &[(SemanticPrime::Do, 0.9), (SemanticPrime::Bad, 0.8), (SemanticPrime::Something, 0.7)]);
-        Self::insert(&mut entries, "sabotage", &[(SemanticPrime::Do, 0.9), (SemanticPrime::Bad, 0.9), (SemanticPrime::Not, 0.4), (SemanticPrime::Good, 0.1)]);
-        Self::insert(&mut entries, "fraud", &[(SemanticPrime::Do, 0.8), (SemanticPrime::Bad, 0.9), (SemanticPrime::Not, 0.6), (SemanticPrime::True, 0.7)]);
-        Self::insert(&mut entries, "forge", &[(SemanticPrime::Do, 0.7), (SemanticPrime::Bad, 0.7), (SemanticPrime::Not, 0.6), (SemanticPrime::True, 0.6)]);
-        Self::insert(&mut entries, "rescue", &[(SemanticPrime::Do, 1.0), (SemanticPrime::Good, 1.0), (SemanticPrime::Someone, 0.7), (SemanticPrime::Live, 0.5)]);
-        Self::insert(&mut entries, "share", &[(SemanticPrime::Do, 0.7), (SemanticPrime::Good, 0.7), (SemanticPrime::Have, 0.5), (SemanticPrime::Someone, 0.5)]);
-        Self::insert(&mut entries, "donate", &[(SemanticPrime::Do, 0.7), (SemanticPrime::Good, 0.8), (SemanticPrime::Have, 0.5), (SemanticPrime::Someone, 0.4)]);
-        Self::insert(&mut entries, "forgive", &[(SemanticPrime::Do, 0.7), (SemanticPrime::Good, 0.8), (SemanticPrime::Feel, 0.6)]);
-        Self::insert(&mut entries, "volunteer", &[(SemanticPrime::Do, 0.9), (SemanticPrime::Good, 0.9), (SemanticPrime::Want, 0.6)]);
-        Self::insert(&mut entries, "cooperate", &[(SemanticPrime::Do, 0.8), (SemanticPrime::Good, 0.6), (SemanticPrime::With, 0.8), (SemanticPrime::Someone, 0.5)]);
-        Self::insert(&mut entries, "comfort", &[(SemanticPrime::Do, 0.7), (SemanticPrime::Good, 0.8), (SemanticPrime::Feel, 0.8)]);
-        Self::insert(&mut entries, "heal", &[(SemanticPrime::Do, 0.8), (SemanticPrime::Good, 0.9), (SemanticPrime::Body, 0.7)]);
-        Self::insert(&mut entries, "nurture", &[(SemanticPrime::Do, 0.8), (SemanticPrime::Good, 0.9), (SemanticPrime::Someone, 0.6), (SemanticPrime::Live, 0.4)]);
-        Self::insert(&mut entries, "inspire", &[(SemanticPrime::Do, 0.7), (SemanticPrime::Good, 0.8), (SemanticPrime::Feel, 0.7), (SemanticPrime::Think, 0.5)]);
-        Self::insert(&mut entries, "encourage", &[(SemanticPrime::Do, 0.7), (SemanticPrime::Good, 0.8), (SemanticPrime::Feel, 0.6), (SemanticPrime::Someone, 0.5)]);
-        Self::insert(&mut entries, "support", &[(SemanticPrime::Do, 0.8), (SemanticPrime::Good, 0.7), (SemanticPrime::Someone, 0.6)]);
-        Self::insert(&mut entries, "praise", &[(SemanticPrime::Say, 0.8), (SemanticPrime::Good, 0.9), (SemanticPrime::Someone, 0.5)]);
-        Self::insert(&mut entries, "respect", &[(SemanticPrime::Feel, 0.7), (SemanticPrime::Good, 0.8), (SemanticPrime::Someone, 0.6)]);
-        Self::insert(&mut entries, "trust", &[(SemanticPrime::Think, 0.6), (SemanticPrime::Good, 0.7), (SemanticPrime::Someone, 0.5), (SemanticPrime::True, 0.4)]);
-        Self::insert(&mut entries, "distrust", &[(SemanticPrime::Think, 0.6), (SemanticPrime::Bad, 0.5), (SemanticPrime::Someone, 0.5), (SemanticPrime::Not, 0.4), (SemanticPrime::True, 0.3)]);
-        Self::insert(&mut entries, "neglect", &[(SemanticPrime::Not, 0.8), (SemanticPrime::Do, 0.7), (SemanticPrime::Bad, 0.6), (SemanticPrime::Someone, 0.5)]);
-        Self::insert(&mut entries, "demean", &[(SemanticPrime::Do, 0.7), (SemanticPrime::Bad, 0.9), (SemanticPrime::Feel, 0.7), (SemanticPrime::Someone, 0.6)]);
-        Self::insert(&mut entries, "undermine", &[(SemanticPrime::Do, 0.7), (SemanticPrime::Bad, 0.7), (SemanticPrime::Not, 0.5), (SemanticPrime::Good, 0.3)]);
-        Self::insert(&mut entries, "discourage", &[(SemanticPrime::Do, 0.6), (SemanticPrime::Bad, 0.6), (SemanticPrime::Feel, 0.5), (SemanticPrime::Not, 0.4)]);
-        Self::insert(&mut entries, "disrespect", &[(SemanticPrime::Not, 0.7), (SemanticPrime::Good, 0.3), (SemanticPrime::Bad, 0.7), (SemanticPrime::Someone, 0.5)]);
+        Self::insert(
+            &mut entries,
+            "steal",
+            &[
+                (SemanticPrime::Do, 1.0),
+                (SemanticPrime::Have, 0.8),
+                (SemanticPrime::Bad, 0.9),
+                (SemanticPrime::Not, 0.3),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "stealing",
+            &[
+                (SemanticPrime::Do, 1.0),
+                (SemanticPrime::Have, 0.8),
+                (SemanticPrime::Bad, 0.9),
+                (SemanticPrime::Not, 0.3),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "stole",
+            &[
+                (SemanticPrime::Do, 1.0),
+                (SemanticPrime::Have, 0.8),
+                (SemanticPrime::Bad, 0.9),
+                (SemanticPrime::Not, 0.3),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "stolen",
+            &[
+                (SemanticPrime::Do, 1.0),
+                (SemanticPrime::Have, 0.8),
+                (SemanticPrime::Bad, 0.9),
+                (SemanticPrime::Not, 0.3),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "help",
+            &[
+                (SemanticPrime::Do, 1.0),
+                (SemanticPrime::Good, 1.0),
+                (SemanticPrime::Someone, 0.5),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "helps",
+            &[
+                (SemanticPrime::Do, 1.0),
+                (SemanticPrime::Good, 1.0),
+                (SemanticPrime::Someone, 0.5),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "helped",
+            &[
+                (SemanticPrime::Do, 1.0),
+                (SemanticPrime::Good, 1.0),
+                (SemanticPrime::Someone, 0.5),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "helping",
+            &[
+                (SemanticPrime::Do, 1.0),
+                (SemanticPrime::Good, 1.0),
+                (SemanticPrime::Someone, 0.5),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "kill",
+            &[
+                (SemanticPrime::Do, 1.0),
+                (SemanticPrime::Die, 1.0),
+                (SemanticPrime::Bad, 1.0),
+                (SemanticPrime::Body, 0.8),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "killed",
+            &[
+                (SemanticPrime::Do, 1.0),
+                (SemanticPrime::Die, 1.0),
+                (SemanticPrime::Bad, 1.0),
+                (SemanticPrime::Body, 0.8),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "killing",
+            &[
+                (SemanticPrime::Do, 1.0),
+                (SemanticPrime::Die, 1.0),
+                (SemanticPrime::Bad, 1.0),
+                (SemanticPrime::Body, 0.8),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "lie",
+            &[
+                (SemanticPrime::Say, 1.0),
+                (SemanticPrime::Not, 0.8),
+                (SemanticPrime::True, 0.8),
+                (SemanticPrime::Bad, 0.5),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "lied",
+            &[
+                (SemanticPrime::Say, 1.0),
+                (SemanticPrime::Not, 0.8),
+                (SemanticPrime::True, 0.8),
+                (SemanticPrime::Bad, 0.5),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "lying",
+            &[
+                (SemanticPrime::Say, 1.0),
+                (SemanticPrime::Not, 0.8),
+                (SemanticPrime::True, 0.8),
+                (SemanticPrime::Bad, 0.5),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "give",
+            &[
+                (SemanticPrime::Do, 0.8),
+                (SemanticPrime::Have, 0.5),
+                (SemanticPrime::Good, 0.5),
+                (SemanticPrime::Someone, 0.5),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "hurt",
+            &[
+                (SemanticPrime::Do, 0.8),
+                (SemanticPrime::Bad, 0.9),
+                (SemanticPrime::Feel, 0.8),
+                (SemanticPrime::Body, 0.6),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "hurting",
+            &[
+                (SemanticPrime::Do, 0.8),
+                (SemanticPrime::Bad, 0.9),
+                (SemanticPrime::Feel, 0.8),
+                (SemanticPrime::Body, 0.6),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "save",
+            &[
+                (SemanticPrime::Do, 1.0),
+                (SemanticPrime::Good, 1.0),
+                (SemanticPrime::Live, 0.8),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "cheat",
+            &[
+                (SemanticPrime::Do, 0.8),
+                (SemanticPrime::Bad, 0.9),
+                (SemanticPrime::Not, 0.5),
+                (SemanticPrime::True, 0.5),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "cheated",
+            &[
+                (SemanticPrime::Do, 0.8),
+                (SemanticPrime::Bad, 0.9),
+                (SemanticPrime::Not, 0.5),
+                (SemanticPrime::True, 0.5),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "protect",
+            &[
+                (SemanticPrime::Do, 0.8),
+                (SemanticPrime::Good, 0.8),
+                (SemanticPrime::Someone, 0.7),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "betray",
+            &[
+                (SemanticPrime::Do, 0.8),
+                (SemanticPrime::Bad, 1.0),
+                (SemanticPrime::Not, 0.5),
+                (SemanticPrime::True, 0.3),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "murder",
+            &[
+                (SemanticPrime::Do, 1.0),
+                (SemanticPrime::Die, 1.0),
+                (SemanticPrime::Bad, 1.0),
+                (SemanticPrime::Want, 0.5),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "abuse",
+            &[
+                (SemanticPrime::Do, 1.0),
+                (SemanticPrime::Bad, 1.0),
+                (SemanticPrime::Someone, 0.8),
+                (SemanticPrime::Feel, 0.5),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "exploit",
+            &[
+                (SemanticPrime::Do, 0.9),
+                (SemanticPrime::Bad, 0.8),
+                (SemanticPrime::Someone, 0.7),
+                (SemanticPrime::Have, 0.4),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "bully",
+            &[
+                (SemanticPrime::Do, 0.9),
+                (SemanticPrime::Bad, 0.9),
+                (SemanticPrime::Someone, 0.8),
+                (SemanticPrime::Feel, 0.6),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "threaten",
+            &[
+                (SemanticPrime::Say, 0.8),
+                (SemanticPrime::Bad, 0.9),
+                (SemanticPrime::Someone, 0.5),
+                (SemanticPrime::Feel, 0.5),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "blackmail",
+            &[
+                (SemanticPrime::Do, 0.9),
+                (SemanticPrime::Bad, 1.0),
+                (SemanticPrime::Not, 0.5),
+                (SemanticPrime::Have, 0.6),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "deceive",
+            &[
+                (SemanticPrime::Do, 0.8),
+                (SemanticPrime::Not, 0.8),
+                (SemanticPrime::True, 0.8),
+                (SemanticPrime::Bad, 0.6),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "manipulate",
+            &[
+                (SemanticPrime::Do, 0.9),
+                (SemanticPrime::Bad, 0.7),
+                (SemanticPrime::Not, 0.5),
+                (SemanticPrime::True, 0.4),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "attack",
+            &[
+                (SemanticPrime::Do, 1.0),
+                (SemanticPrime::Bad, 0.9),
+                (SemanticPrime::Body, 0.7),
+                (SemanticPrime::Someone, 0.5),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "destroy",
+            &[
+                (SemanticPrime::Do, 1.0),
+                (SemanticPrime::Bad, 0.9),
+                (SemanticPrime::Something, 0.6),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "vandalize",
+            &[
+                (SemanticPrime::Do, 0.9),
+                (SemanticPrime::Bad, 0.8),
+                (SemanticPrime::Something, 0.7),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "sabotage",
+            &[
+                (SemanticPrime::Do, 0.9),
+                (SemanticPrime::Bad, 0.9),
+                (SemanticPrime::Not, 0.4),
+                (SemanticPrime::Good, 0.1),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "fraud",
+            &[
+                (SemanticPrime::Do, 0.8),
+                (SemanticPrime::Bad, 0.9),
+                (SemanticPrime::Not, 0.6),
+                (SemanticPrime::True, 0.7),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "forge",
+            &[
+                (SemanticPrime::Do, 0.7),
+                (SemanticPrime::Bad, 0.7),
+                (SemanticPrime::Not, 0.6),
+                (SemanticPrime::True, 0.6),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "rescue",
+            &[
+                (SemanticPrime::Do, 1.0),
+                (SemanticPrime::Good, 1.0),
+                (SemanticPrime::Someone, 0.7),
+                (SemanticPrime::Live, 0.5),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "share",
+            &[
+                (SemanticPrime::Do, 0.7),
+                (SemanticPrime::Good, 0.7),
+                (SemanticPrime::Have, 0.5),
+                (SemanticPrime::Someone, 0.5),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "donate",
+            &[
+                (SemanticPrime::Do, 0.7),
+                (SemanticPrime::Good, 0.8),
+                (SemanticPrime::Have, 0.5),
+                (SemanticPrime::Someone, 0.4),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "forgive",
+            &[
+                (SemanticPrime::Do, 0.7),
+                (SemanticPrime::Good, 0.8),
+                (SemanticPrime::Feel, 0.6),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "volunteer",
+            &[
+                (SemanticPrime::Do, 0.9),
+                (SemanticPrime::Good, 0.9),
+                (SemanticPrime::Want, 0.6),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "cooperate",
+            &[
+                (SemanticPrime::Do, 0.8),
+                (SemanticPrime::Good, 0.6),
+                (SemanticPrime::With, 0.8),
+                (SemanticPrime::Someone, 0.5),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "comfort",
+            &[
+                (SemanticPrime::Do, 0.7),
+                (SemanticPrime::Good, 0.8),
+                (SemanticPrime::Feel, 0.8),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "heal",
+            &[
+                (SemanticPrime::Do, 0.8),
+                (SemanticPrime::Good, 0.9),
+                (SemanticPrime::Body, 0.7),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "nurture",
+            &[
+                (SemanticPrime::Do, 0.8),
+                (SemanticPrime::Good, 0.9),
+                (SemanticPrime::Someone, 0.6),
+                (SemanticPrime::Live, 0.4),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "inspire",
+            &[
+                (SemanticPrime::Do, 0.7),
+                (SemanticPrime::Good, 0.8),
+                (SemanticPrime::Feel, 0.7),
+                (SemanticPrime::Think, 0.5),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "encourage",
+            &[
+                (SemanticPrime::Do, 0.7),
+                (SemanticPrime::Good, 0.8),
+                (SemanticPrime::Feel, 0.6),
+                (SemanticPrime::Someone, 0.5),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "support",
+            &[
+                (SemanticPrime::Do, 0.8),
+                (SemanticPrime::Good, 0.7),
+                (SemanticPrime::Someone, 0.6),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "praise",
+            &[
+                (SemanticPrime::Say, 0.8),
+                (SemanticPrime::Good, 0.9),
+                (SemanticPrime::Someone, 0.5),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "respect",
+            &[
+                (SemanticPrime::Feel, 0.7),
+                (SemanticPrime::Good, 0.8),
+                (SemanticPrime::Someone, 0.6),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "trust",
+            &[
+                (SemanticPrime::Think, 0.6),
+                (SemanticPrime::Good, 0.7),
+                (SemanticPrime::Someone, 0.5),
+                (SemanticPrime::True, 0.4),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "distrust",
+            &[
+                (SemanticPrime::Think, 0.6),
+                (SemanticPrime::Bad, 0.5),
+                (SemanticPrime::Someone, 0.5),
+                (SemanticPrime::Not, 0.4),
+                (SemanticPrime::True, 0.3),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "neglect",
+            &[
+                (SemanticPrime::Not, 0.8),
+                (SemanticPrime::Do, 0.7),
+                (SemanticPrime::Bad, 0.6),
+                (SemanticPrime::Someone, 0.5),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "demean",
+            &[
+                (SemanticPrime::Do, 0.7),
+                (SemanticPrime::Bad, 0.9),
+                (SemanticPrime::Feel, 0.7),
+                (SemanticPrime::Someone, 0.6),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "undermine",
+            &[
+                (SemanticPrime::Do, 0.7),
+                (SemanticPrime::Bad, 0.7),
+                (SemanticPrime::Not, 0.5),
+                (SemanticPrime::Good, 0.3),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "discourage",
+            &[
+                (SemanticPrime::Do, 0.6),
+                (SemanticPrime::Bad, 0.6),
+                (SemanticPrime::Feel, 0.5),
+                (SemanticPrime::Not, 0.4),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "disrespect",
+            &[
+                (SemanticPrime::Not, 0.7),
+                (SemanticPrime::Good, 0.3),
+                (SemanticPrime::Bad, 0.7),
+                (SemanticPrime::Someone, 0.5),
+            ],
+        );
 
         // ---- Moral framing adjectives ----
-        Self::insert(&mut entries, "rude", &[(SemanticPrime::Bad, 1.0), (SemanticPrime::Feel, 0.8), (SemanticPrime::Someone, 0.3)]);
-        Self::insert(&mut entries, "kind", &[(SemanticPrime::Good, 1.0), (SemanticPrime::Feel, 0.5), (SemanticPrime::Someone, 0.3)]);
-        Self::insert(&mut entries, "fair", &[(SemanticPrime::Good, 0.8), (SemanticPrime::Same, 0.5), (SemanticPrime::All, 0.3)]);
-        Self::insert(&mut entries, "unfair", &[(SemanticPrime::Bad, 0.8), (SemanticPrime::Not, 0.5), (SemanticPrime::Same, 0.3)]);
-        Self::insert(&mut entries, "wrong", &[(SemanticPrime::Bad, 1.0), (SemanticPrime::Not, 0.3), (SemanticPrime::Good, 0.1)]);
-        Self::insert(&mut entries, "okay", &[(SemanticPrime::Good, 0.6), (SemanticPrime::Can, 0.4)]);
-        Self::insert(&mut entries, "fine", &[(SemanticPrime::Good, 0.5), (SemanticPrime::Can, 0.3)]);
-        Self::insert(&mut entries, "acceptable", &[(SemanticPrime::Good, 0.6), (SemanticPrime::Can, 0.5)]);
-        Self::insert(&mut entries, "cruel", &[(SemanticPrime::Bad, 1.0), (SemanticPrime::Feel, 0.5), (SemanticPrime::Body, 0.3)]);
-        Self::insert(&mut entries, "generous", &[(SemanticPrime::Good, 1.0), (SemanticPrime::Have, 0.3), (SemanticPrime::Someone, 0.3)]);
-        Self::insert(&mut entries, "honest", &[(SemanticPrime::Good, 0.8), (SemanticPrime::True, 0.9), (SemanticPrime::Say, 0.4)]);
-        Self::insert(&mut entries, "dishonest", &[(SemanticPrime::Bad, 0.8), (SemanticPrime::Not, 0.6), (SemanticPrime::True, 0.7)]);
-        Self::insert(&mut entries, "brave", &[(SemanticPrime::Good, 0.8), (SemanticPrime::Do, 0.6), (SemanticPrime::Not, 0.3), (SemanticPrime::Feel, 0.4)]);
-        Self::insert(&mut entries, "selfish", &[(SemanticPrime::Bad, 0.9), (SemanticPrime::I, 0.7), (SemanticPrime::Not, 0.4), (SemanticPrime::Someone, 0.3)]);
-        Self::insert(&mut entries, "caring", &[(SemanticPrime::Good, 0.9), (SemanticPrime::Feel, 0.7), (SemanticPrime::Someone, 0.5)]);
-        Self::insert(&mut entries, "uncaring", &[(SemanticPrime::Bad, 0.7), (SemanticPrime::Not, 0.6), (SemanticPrime::Feel, 0.5)]);
-        Self::insert(&mut entries, "loyal", &[(SemanticPrime::Good, 0.8), (SemanticPrime::With, 0.6), (SemanticPrime::Someone, 0.5)]);
-        Self::insert(&mut entries, "disloyal", &[(SemanticPrime::Bad, 0.8), (SemanticPrime::Not, 0.5), (SemanticPrime::With, 0.4)]);
-        Self::insert(&mut entries, "gentle", &[(SemanticPrime::Good, 0.7), (SemanticPrime::Feel, 0.5), (SemanticPrime::Body, 0.3)]);
-        Self::insert(&mut entries, "harsh", &[(SemanticPrime::Bad, 0.8), (SemanticPrime::Feel, 0.5), (SemanticPrime::Body, 0.3)]);
-        Self::insert(&mut entries, "merciless", &[(SemanticPrime::Bad, 0.9), (SemanticPrime::Not, 0.6), (SemanticPrime::Feel, 0.4)]);
-        Self::insert(&mut entries, "mercy", &[(SemanticPrime::Good, 0.9), (SemanticPrime::Feel, 0.6), (SemanticPrime::Someone, 0.4)]);
-        Self::insert(&mut entries, "grateful", &[(SemanticPrime::Good, 0.8), (SemanticPrime::Feel, 0.7), (SemanticPrime::Someone, 0.3)]);
-        Self::insert(&mut entries, "ungrateful", &[(SemanticPrime::Bad, 0.7), (SemanticPrime::Not, 0.5), (SemanticPrime::Feel, 0.4)]);
-        Self::insert(&mut entries, "compassion", &[(SemanticPrime::Good, 0.9), (SemanticPrime::Feel, 0.9), (SemanticPrime::Someone, 0.6)]);
-        Self::insert(&mut entries, "empathy", &[(SemanticPrime::Good, 0.7), (SemanticPrime::Feel, 0.9), (SemanticPrime::Someone, 0.7)]);
-        Self::insert(&mut entries, "callous", &[(SemanticPrime::Bad, 0.9), (SemanticPrime::Not, 0.5), (SemanticPrime::Feel, 0.6)]);
-        Self::insert(&mut entries, "heartless", &[(SemanticPrime::Bad, 0.9), (SemanticPrime::Not, 0.5), (SemanticPrime::Feel, 0.7)]);
-        Self::insert(&mut entries, "thoughtful", &[(SemanticPrime::Good, 0.7), (SemanticPrime::Think, 0.6), (SemanticPrime::Someone, 0.4)]);
-        Self::insert(&mut entries, "considerate", &[(SemanticPrime::Good, 0.7), (SemanticPrime::Think, 0.5), (SemanticPrime::Someone, 0.5)]);
-        Self::insert(&mut entries, "responsible", &[(SemanticPrime::Good, 0.7), (SemanticPrime::Do, 0.5), (SemanticPrime::Because, 0.4)]);
-        Self::insert(&mut entries, "irresponsible", &[(SemanticPrime::Bad, 0.7), (SemanticPrime::Not, 0.5), (SemanticPrime::Do, 0.4)]);
-        Self::insert(&mut entries, "patient", &[(SemanticPrime::Good, 0.6), (SemanticPrime::Feel, 0.4)]);
-        Self::insert(&mut entries, "impatient", &[(SemanticPrime::Bad, 0.5), (SemanticPrime::Not, 0.4), (SemanticPrime::Feel, 0.3)]);
-        Self::insert(&mut entries, "humble", &[(SemanticPrime::Good, 0.7), (SemanticPrime::Not, 0.3), (SemanticPrime::Big, 0.2)]);
-        Self::insert(&mut entries, "arrogant", &[(SemanticPrime::Bad, 0.8), (SemanticPrime::I, 0.5), (SemanticPrime::Big, 0.4)]);
-        Self::insert(&mut entries, "sincere", &[(SemanticPrime::Good, 0.7), (SemanticPrime::True, 0.8), (SemanticPrime::Feel, 0.4)]);
-        Self::insert(&mut entries, "vain", &[(SemanticPrime::Bad, 0.6), (SemanticPrime::I, 0.6), (SemanticPrime::Want, 0.4)]);
-        Self::insert(&mut entries, "peaceful", &[(SemanticPrime::Good, 0.8), (SemanticPrime::Not, 0.3), (SemanticPrime::Bad, 0.1)]);
-        Self::insert(&mut entries, "noble", &[(SemanticPrime::Good, 0.9), (SemanticPrime::Do, 0.5)]);
-        Self::insert(&mut entries, "virtuous", &[(SemanticPrime::Good, 1.0), (SemanticPrime::Do, 0.5)]);
-        Self::insert(&mut entries, "admirable", &[(SemanticPrime::Good, 0.9), (SemanticPrime::Feel, 0.5)]);
-        Self::insert(&mut entries, "heroic", &[(SemanticPrime::Good, 1.0), (SemanticPrime::Do, 0.8), (SemanticPrime::Someone, 0.5)]);
-        Self::insert(&mut entries, "selfless", &[(SemanticPrime::Good, 0.9), (SemanticPrime::Not, 0.4), (SemanticPrime::I, 0.3)]);
-        Self::insert(&mut entries, "charitable", &[(SemanticPrime::Good, 0.9), (SemanticPrime::Have, 0.4), (SemanticPrime::Someone, 0.5)]);
-        Self::insert(&mut entries, "benevolent", &[(SemanticPrime::Good, 1.0), (SemanticPrime::Want, 0.5), (SemanticPrime::Someone, 0.4)]);
-        Self::insert(&mut entries, "righteous", &[(SemanticPrime::Good, 0.9), (SemanticPrime::Do, 0.6), (SemanticPrime::True, 0.4)]);
-        Self::insert(&mut entries, "worthy", &[(SemanticPrime::Good, 0.8), (SemanticPrime::Do, 0.3)]);
-        Self::insert(&mut entries, "honorable", &[(SemanticPrime::Good, 0.9), (SemanticPrime::True, 0.5), (SemanticPrime::Do, 0.4)]);
-        Self::insert(&mut entries, "dignified", &[(SemanticPrime::Good, 0.7), (SemanticPrime::Someone, 0.4)]);
-        Self::insert(&mut entries, "gracious", &[(SemanticPrime::Good, 0.8), (SemanticPrime::Feel, 0.4), (SemanticPrime::Someone, 0.3)]);
-        Self::insert(&mut entries, "courteous", &[(SemanticPrime::Good, 0.7), (SemanticPrime::Say, 0.4), (SemanticPrime::Someone, 0.3)]);
-        Self::insert(&mut entries, "polite", &[(SemanticPrime::Good, 0.6), (SemanticPrime::Say, 0.4), (SemanticPrime::Someone, 0.3)]);
-        Self::insert(&mut entries, "wonderful", &[(SemanticPrime::Good, 1.0), (SemanticPrime::Feel, 0.5)]);
-        Self::insert(&mut entries, "beautiful", &[(SemanticPrime::Good, 0.8), (SemanticPrime::Feel, 0.5), (SemanticPrime::See, 0.4)]);
-        Self::insert(&mut entries, "excellent", &[(SemanticPrime::Good, 0.9), (SemanticPrime::Very, 0.4)]);
-        Self::insert(&mut entries, "joyful", &[(SemanticPrime::Good, 0.8), (SemanticPrime::Feel, 0.9)]);
-        Self::insert(&mut entries, "happy", &[(SemanticPrime::Good, 0.7), (SemanticPrime::Feel, 0.8)]);
+        Self::insert(
+            &mut entries,
+            "rude",
+            &[
+                (SemanticPrime::Bad, 1.0),
+                (SemanticPrime::Feel, 0.8),
+                (SemanticPrime::Someone, 0.3),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "kind",
+            &[
+                (SemanticPrime::Good, 1.0),
+                (SemanticPrime::Feel, 0.5),
+                (SemanticPrime::Someone, 0.3),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "fair",
+            &[
+                (SemanticPrime::Good, 0.8),
+                (SemanticPrime::Same, 0.5),
+                (SemanticPrime::All, 0.3),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "unfair",
+            &[
+                (SemanticPrime::Bad, 0.8),
+                (SemanticPrime::Not, 0.5),
+                (SemanticPrime::Same, 0.3),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "wrong",
+            &[
+                (SemanticPrime::Bad, 1.0),
+                (SemanticPrime::Not, 0.3),
+                (SemanticPrime::Good, 0.1),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "okay",
+            &[(SemanticPrime::Good, 0.6), (SemanticPrime::Can, 0.4)],
+        );
+        Self::insert(
+            &mut entries,
+            "fine",
+            &[(SemanticPrime::Good, 0.5), (SemanticPrime::Can, 0.3)],
+        );
+        Self::insert(
+            &mut entries,
+            "acceptable",
+            &[(SemanticPrime::Good, 0.6), (SemanticPrime::Can, 0.5)],
+        );
+        Self::insert(
+            &mut entries,
+            "cruel",
+            &[
+                (SemanticPrime::Bad, 1.0),
+                (SemanticPrime::Feel, 0.5),
+                (SemanticPrime::Body, 0.3),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "generous",
+            &[
+                (SemanticPrime::Good, 1.0),
+                (SemanticPrime::Have, 0.3),
+                (SemanticPrime::Someone, 0.3),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "honest",
+            &[
+                (SemanticPrime::Good, 0.8),
+                (SemanticPrime::True, 0.9),
+                (SemanticPrime::Say, 0.4),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "dishonest",
+            &[
+                (SemanticPrime::Bad, 0.8),
+                (SemanticPrime::Not, 0.6),
+                (SemanticPrime::True, 0.7),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "brave",
+            &[
+                (SemanticPrime::Good, 0.8),
+                (SemanticPrime::Do, 0.6),
+                (SemanticPrime::Not, 0.3),
+                (SemanticPrime::Feel, 0.4),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "selfish",
+            &[
+                (SemanticPrime::Bad, 0.9),
+                (SemanticPrime::I, 0.7),
+                (SemanticPrime::Not, 0.4),
+                (SemanticPrime::Someone, 0.3),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "caring",
+            &[
+                (SemanticPrime::Good, 0.9),
+                (SemanticPrime::Feel, 0.7),
+                (SemanticPrime::Someone, 0.5),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "uncaring",
+            &[
+                (SemanticPrime::Bad, 0.7),
+                (SemanticPrime::Not, 0.6),
+                (SemanticPrime::Feel, 0.5),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "loyal",
+            &[
+                (SemanticPrime::Good, 0.8),
+                (SemanticPrime::With, 0.6),
+                (SemanticPrime::Someone, 0.5),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "disloyal",
+            &[
+                (SemanticPrime::Bad, 0.8),
+                (SemanticPrime::Not, 0.5),
+                (SemanticPrime::With, 0.4),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "gentle",
+            &[
+                (SemanticPrime::Good, 0.7),
+                (SemanticPrime::Feel, 0.5),
+                (SemanticPrime::Body, 0.3),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "harsh",
+            &[
+                (SemanticPrime::Bad, 0.8),
+                (SemanticPrime::Feel, 0.5),
+                (SemanticPrime::Body, 0.3),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "merciless",
+            &[
+                (SemanticPrime::Bad, 0.9),
+                (SemanticPrime::Not, 0.6),
+                (SemanticPrime::Feel, 0.4),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "mercy",
+            &[
+                (SemanticPrime::Good, 0.9),
+                (SemanticPrime::Feel, 0.6),
+                (SemanticPrime::Someone, 0.4),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "grateful",
+            &[
+                (SemanticPrime::Good, 0.8),
+                (SemanticPrime::Feel, 0.7),
+                (SemanticPrime::Someone, 0.3),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "ungrateful",
+            &[
+                (SemanticPrime::Bad, 0.7),
+                (SemanticPrime::Not, 0.5),
+                (SemanticPrime::Feel, 0.4),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "compassion",
+            &[
+                (SemanticPrime::Good, 0.9),
+                (SemanticPrime::Feel, 0.9),
+                (SemanticPrime::Someone, 0.6),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "empathy",
+            &[
+                (SemanticPrime::Good, 0.7),
+                (SemanticPrime::Feel, 0.9),
+                (SemanticPrime::Someone, 0.7),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "callous",
+            &[
+                (SemanticPrime::Bad, 0.9),
+                (SemanticPrime::Not, 0.5),
+                (SemanticPrime::Feel, 0.6),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "heartless",
+            &[
+                (SemanticPrime::Bad, 0.9),
+                (SemanticPrime::Not, 0.5),
+                (SemanticPrime::Feel, 0.7),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "thoughtful",
+            &[
+                (SemanticPrime::Good, 0.7),
+                (SemanticPrime::Think, 0.6),
+                (SemanticPrime::Someone, 0.4),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "considerate",
+            &[
+                (SemanticPrime::Good, 0.7),
+                (SemanticPrime::Think, 0.5),
+                (SemanticPrime::Someone, 0.5),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "responsible",
+            &[
+                (SemanticPrime::Good, 0.7),
+                (SemanticPrime::Do, 0.5),
+                (SemanticPrime::Because, 0.4),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "irresponsible",
+            &[
+                (SemanticPrime::Bad, 0.7),
+                (SemanticPrime::Not, 0.5),
+                (SemanticPrime::Do, 0.4),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "patient",
+            &[(SemanticPrime::Good, 0.6), (SemanticPrime::Feel, 0.4)],
+        );
+        Self::insert(
+            &mut entries,
+            "impatient",
+            &[
+                (SemanticPrime::Bad, 0.5),
+                (SemanticPrime::Not, 0.4),
+                (SemanticPrime::Feel, 0.3),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "humble",
+            &[
+                (SemanticPrime::Good, 0.7),
+                (SemanticPrime::Not, 0.3),
+                (SemanticPrime::Big, 0.2),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "arrogant",
+            &[
+                (SemanticPrime::Bad, 0.8),
+                (SemanticPrime::I, 0.5),
+                (SemanticPrime::Big, 0.4),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "sincere",
+            &[
+                (SemanticPrime::Good, 0.7),
+                (SemanticPrime::True, 0.8),
+                (SemanticPrime::Feel, 0.4),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "vain",
+            &[
+                (SemanticPrime::Bad, 0.6),
+                (SemanticPrime::I, 0.6),
+                (SemanticPrime::Want, 0.4),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "peaceful",
+            &[
+                (SemanticPrime::Good, 0.8),
+                (SemanticPrime::Not, 0.3),
+                (SemanticPrime::Bad, 0.1),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "noble",
+            &[(SemanticPrime::Good, 0.9), (SemanticPrime::Do, 0.5)],
+        );
+        Self::insert(
+            &mut entries,
+            "virtuous",
+            &[(SemanticPrime::Good, 1.0), (SemanticPrime::Do, 0.5)],
+        );
+        Self::insert(
+            &mut entries,
+            "admirable",
+            &[(SemanticPrime::Good, 0.9), (SemanticPrime::Feel, 0.5)],
+        );
+        Self::insert(
+            &mut entries,
+            "heroic",
+            &[
+                (SemanticPrime::Good, 1.0),
+                (SemanticPrime::Do, 0.8),
+                (SemanticPrime::Someone, 0.5),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "selfless",
+            &[
+                (SemanticPrime::Good, 0.9),
+                (SemanticPrime::Not, 0.4),
+                (SemanticPrime::I, 0.3),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "charitable",
+            &[
+                (SemanticPrime::Good, 0.9),
+                (SemanticPrime::Have, 0.4),
+                (SemanticPrime::Someone, 0.5),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "benevolent",
+            &[
+                (SemanticPrime::Good, 1.0),
+                (SemanticPrime::Want, 0.5),
+                (SemanticPrime::Someone, 0.4),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "righteous",
+            &[
+                (SemanticPrime::Good, 0.9),
+                (SemanticPrime::Do, 0.6),
+                (SemanticPrime::True, 0.4),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "worthy",
+            &[(SemanticPrime::Good, 0.8), (SemanticPrime::Do, 0.3)],
+        );
+        Self::insert(
+            &mut entries,
+            "honorable",
+            &[
+                (SemanticPrime::Good, 0.9),
+                (SemanticPrime::True, 0.5),
+                (SemanticPrime::Do, 0.4),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "dignified",
+            &[(SemanticPrime::Good, 0.7), (SemanticPrime::Someone, 0.4)],
+        );
+        Self::insert(
+            &mut entries,
+            "gracious",
+            &[
+                (SemanticPrime::Good, 0.8),
+                (SemanticPrime::Feel, 0.4),
+                (SemanticPrime::Someone, 0.3),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "courteous",
+            &[
+                (SemanticPrime::Good, 0.7),
+                (SemanticPrime::Say, 0.4),
+                (SemanticPrime::Someone, 0.3),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "polite",
+            &[
+                (SemanticPrime::Good, 0.6),
+                (SemanticPrime::Say, 0.4),
+                (SemanticPrime::Someone, 0.3),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "wonderful",
+            &[(SemanticPrime::Good, 1.0), (SemanticPrime::Feel, 0.5)],
+        );
+        Self::insert(
+            &mut entries,
+            "beautiful",
+            &[
+                (SemanticPrime::Good, 0.8),
+                (SemanticPrime::Feel, 0.5),
+                (SemanticPrime::See, 0.4),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "excellent",
+            &[(SemanticPrime::Good, 0.9), (SemanticPrime::Very, 0.4)],
+        );
+        Self::insert(
+            &mut entries,
+            "joyful",
+            &[(SemanticPrime::Good, 0.8), (SemanticPrime::Feel, 0.9)],
+        );
+        Self::insert(
+            &mut entries,
+            "happy",
+            &[(SemanticPrime::Good, 0.7), (SemanticPrime::Feel, 0.8)],
+        );
 
         // ---- Bad-word adjectives ----
-        Self::insert(&mut entries, "wicked", &[(SemanticPrime::Bad, 1.0), (SemanticPrime::Do, 0.5)]);
-        Self::insert(&mut entries, "evil", &[(SemanticPrime::Bad, 1.0), (SemanticPrime::Do, 0.6), (SemanticPrime::Want, 0.4)]);
-        Self::insert(&mut entries, "terrible", &[(SemanticPrime::Bad, 1.0), (SemanticPrime::Very, 0.5)]);
-        Self::insert(&mut entries, "horrible", &[(SemanticPrime::Bad, 1.0), (SemanticPrime::Very, 0.5), (SemanticPrime::Feel, 0.4)]);
-        Self::insert(&mut entries, "vicious", &[(SemanticPrime::Bad, 1.0), (SemanticPrime::Do, 0.6), (SemanticPrime::Body, 0.4)]);
-        Self::insert(&mut entries, "nasty", &[(SemanticPrime::Bad, 0.9), (SemanticPrime::Feel, 0.5)]);
-        Self::insert(&mut entries, "immoral", &[(SemanticPrime::Bad, 1.0), (SemanticPrime::Not, 0.5), (SemanticPrime::Good, 0.3)]);
-        Self::insert(&mut entries, "unethical", &[(SemanticPrime::Bad, 0.9), (SemanticPrime::Not, 0.5), (SemanticPrime::Good, 0.3)]);
-        Self::insert(&mut entries, "unjust", &[(SemanticPrime::Bad, 0.9), (SemanticPrime::Not, 0.5), (SemanticPrime::Same, 0.3)]);
-        Self::insert(&mut entries, "sinful", &[(SemanticPrime::Bad, 0.9), (SemanticPrime::Do, 0.4)]);
-        Self::insert(&mut entries, "shameful", &[(SemanticPrime::Bad, 0.8), (SemanticPrime::Feel, 0.6)]);
-        Self::insert(&mut entries, "aggressive", &[(SemanticPrime::Bad, 0.7), (SemanticPrime::Do, 0.6), (SemanticPrime::Body, 0.4)]);
-        Self::insert(&mut entries, "hostile", &[(SemanticPrime::Bad, 0.8), (SemanticPrime::Feel, 0.5), (SemanticPrime::Someone, 0.3)]);
-        Self::insert(&mut entries, "toxic", &[(SemanticPrime::Bad, 0.9), (SemanticPrime::Body, 0.4)]);
-        Self::insert(&mut entries, "destructive", &[(SemanticPrime::Bad, 0.9), (SemanticPrime::Do, 0.6), (SemanticPrime::Something, 0.4)]);
-        Self::insert(&mut entries, "damaging", &[(SemanticPrime::Bad, 0.8), (SemanticPrime::Do, 0.5), (SemanticPrime::Something, 0.4)]);
-        Self::insert(&mut entries, "corrupt", &[(SemanticPrime::Bad, 0.9), (SemanticPrime::Not, 0.5), (SemanticPrime::True, 0.4)]);
-        Self::insert(&mut entries, "greedy", &[(SemanticPrime::Bad, 0.8), (SemanticPrime::Want, 0.8), (SemanticPrime::Have, 0.6)]);
-        Self::insert(&mut entries, "malicious", &[(SemanticPrime::Bad, 1.0), (SemanticPrime::Want, 0.6), (SemanticPrime::Someone, 0.3)]);
-        Self::insert(&mut entries, "spiteful", &[(SemanticPrime::Bad, 0.9), (SemanticPrime::Feel, 0.5), (SemanticPrime::Someone, 0.3)]);
-        Self::insert(&mut entries, "vengeful", &[(SemanticPrime::Bad, 0.8), (SemanticPrime::Do, 0.5), (SemanticPrime::Because, 0.4)]);
-        Self::insert(&mut entries, "violent", &[(SemanticPrime::Bad, 0.9), (SemanticPrime::Do, 0.7), (SemanticPrime::Body, 0.6)]);
-        Self::insert(&mut entries, "reckless", &[(SemanticPrime::Bad, 0.7), (SemanticPrime::Not, 0.5), (SemanticPrime::Think, 0.4)]);
-        Self::insert(&mut entries, "lazy", &[(SemanticPrime::Bad, 0.5), (SemanticPrime::Not, 0.6), (SemanticPrime::Do, 0.5)]);
-        Self::insert(&mut entries, "coward", &[(SemanticPrime::Bad, 0.6), (SemanticPrime::Not, 0.5), (SemanticPrime::Do, 0.4)]);
+        Self::insert(
+            &mut entries,
+            "wicked",
+            &[(SemanticPrime::Bad, 1.0), (SemanticPrime::Do, 0.5)],
+        );
+        Self::insert(
+            &mut entries,
+            "evil",
+            &[
+                (SemanticPrime::Bad, 1.0),
+                (SemanticPrime::Do, 0.6),
+                (SemanticPrime::Want, 0.4),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "terrible",
+            &[(SemanticPrime::Bad, 1.0), (SemanticPrime::Very, 0.5)],
+        );
+        Self::insert(
+            &mut entries,
+            "horrible",
+            &[
+                (SemanticPrime::Bad, 1.0),
+                (SemanticPrime::Very, 0.5),
+                (SemanticPrime::Feel, 0.4),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "vicious",
+            &[
+                (SemanticPrime::Bad, 1.0),
+                (SemanticPrime::Do, 0.6),
+                (SemanticPrime::Body, 0.4),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "nasty",
+            &[(SemanticPrime::Bad, 0.9), (SemanticPrime::Feel, 0.5)],
+        );
+        Self::insert(
+            &mut entries,
+            "immoral",
+            &[
+                (SemanticPrime::Bad, 1.0),
+                (SemanticPrime::Not, 0.5),
+                (SemanticPrime::Good, 0.3),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "unethical",
+            &[
+                (SemanticPrime::Bad, 0.9),
+                (SemanticPrime::Not, 0.5),
+                (SemanticPrime::Good, 0.3),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "unjust",
+            &[
+                (SemanticPrime::Bad, 0.9),
+                (SemanticPrime::Not, 0.5),
+                (SemanticPrime::Same, 0.3),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "sinful",
+            &[(SemanticPrime::Bad, 0.9), (SemanticPrime::Do, 0.4)],
+        );
+        Self::insert(
+            &mut entries,
+            "shameful",
+            &[(SemanticPrime::Bad, 0.8), (SemanticPrime::Feel, 0.6)],
+        );
+        Self::insert(
+            &mut entries,
+            "aggressive",
+            &[
+                (SemanticPrime::Bad, 0.7),
+                (SemanticPrime::Do, 0.6),
+                (SemanticPrime::Body, 0.4),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "hostile",
+            &[
+                (SemanticPrime::Bad, 0.8),
+                (SemanticPrime::Feel, 0.5),
+                (SemanticPrime::Someone, 0.3),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "toxic",
+            &[(SemanticPrime::Bad, 0.9), (SemanticPrime::Body, 0.4)],
+        );
+        Self::insert(
+            &mut entries,
+            "destructive",
+            &[
+                (SemanticPrime::Bad, 0.9),
+                (SemanticPrime::Do, 0.6),
+                (SemanticPrime::Something, 0.4),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "damaging",
+            &[
+                (SemanticPrime::Bad, 0.8),
+                (SemanticPrime::Do, 0.5),
+                (SemanticPrime::Something, 0.4),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "corrupt",
+            &[
+                (SemanticPrime::Bad, 0.9),
+                (SemanticPrime::Not, 0.5),
+                (SemanticPrime::True, 0.4),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "greedy",
+            &[
+                (SemanticPrime::Bad, 0.8),
+                (SemanticPrime::Want, 0.8),
+                (SemanticPrime::Have, 0.6),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "malicious",
+            &[
+                (SemanticPrime::Bad, 1.0),
+                (SemanticPrime::Want, 0.6),
+                (SemanticPrime::Someone, 0.3),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "spiteful",
+            &[
+                (SemanticPrime::Bad, 0.9),
+                (SemanticPrime::Feel, 0.5),
+                (SemanticPrime::Someone, 0.3),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "vengeful",
+            &[
+                (SemanticPrime::Bad, 0.8),
+                (SemanticPrime::Do, 0.5),
+                (SemanticPrime::Because, 0.4),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "violent",
+            &[
+                (SemanticPrime::Bad, 0.9),
+                (SemanticPrime::Do, 0.7),
+                (SemanticPrime::Body, 0.6),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "reckless",
+            &[
+                (SemanticPrime::Bad, 0.7),
+                (SemanticPrime::Not, 0.5),
+                (SemanticPrime::Think, 0.4),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "lazy",
+            &[
+                (SemanticPrime::Bad, 0.5),
+                (SemanticPrime::Not, 0.6),
+                (SemanticPrime::Do, 0.5),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "coward",
+            &[
+                (SemanticPrime::Bad, 0.6),
+                (SemanticPrime::Not, 0.5),
+                (SemanticPrime::Do, 0.4),
+            ],
+        );
 
         // ---- Emotional nouns/adjectives ----
-        Self::insert(&mut entries, "love", &[(SemanticPrime::Good, 0.9), (SemanticPrime::Feel, 1.0), (SemanticPrime::Someone, 0.7)]);
-        Self::insert(&mut entries, "hate", &[(SemanticPrime::Bad, 0.9), (SemanticPrime::Feel, 1.0), (SemanticPrime::Someone, 0.5)]);
-        Self::insert(&mut entries, "anger", &[(SemanticPrime::Bad, 0.6), (SemanticPrime::Feel, 0.9)]);
-        Self::insert(&mut entries, "fear", &[(SemanticPrime::Bad, 0.5), (SemanticPrime::Feel, 0.9), (SemanticPrime::Not, 0.3)]);
-        Self::insert(&mut entries, "joy", &[(SemanticPrime::Good, 0.9), (SemanticPrime::Feel, 1.0)]);
-        Self::insert(&mut entries, "sorrow", &[(SemanticPrime::Bad, 0.6), (SemanticPrime::Feel, 1.0)]);
-        Self::insert(&mut entries, "pain", &[(SemanticPrime::Bad, 0.8), (SemanticPrime::Feel, 0.9), (SemanticPrime::Body, 0.6)]);
-        Self::insert(&mut entries, "suffering", &[(SemanticPrime::Bad, 0.9), (SemanticPrime::Feel, 1.0), (SemanticPrime::Body, 0.5)]);
-        Self::insert(&mut entries, "harm", &[(SemanticPrime::Bad, 1.0), (SemanticPrime::Do, 0.7), (SemanticPrime::Someone, 0.5)]);
-        Self::insert(&mut entries, "harms", &[(SemanticPrime::Bad, 1.0), (SemanticPrime::Do, 0.7), (SemanticPrime::Someone, 0.5)]);
-        Self::insert(&mut entries, "harmed", &[(SemanticPrime::Bad, 1.0), (SemanticPrime::Do, 0.7), (SemanticPrime::Someone, 0.5)]);
-        Self::insert(&mut entries, "harming", &[(SemanticPrime::Bad, 1.0), (SemanticPrime::Do, 0.7), (SemanticPrime::Someone, 0.5)]);
+        Self::insert(
+            &mut entries,
+            "love",
+            &[
+                (SemanticPrime::Good, 0.9),
+                (SemanticPrime::Feel, 1.0),
+                (SemanticPrime::Someone, 0.7),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "hate",
+            &[
+                (SemanticPrime::Bad, 0.9),
+                (SemanticPrime::Feel, 1.0),
+                (SemanticPrime::Someone, 0.5),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "anger",
+            &[(SemanticPrime::Bad, 0.6), (SemanticPrime::Feel, 0.9)],
+        );
+        Self::insert(
+            &mut entries,
+            "fear",
+            &[
+                (SemanticPrime::Bad, 0.5),
+                (SemanticPrime::Feel, 0.9),
+                (SemanticPrime::Not, 0.3),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "joy",
+            &[(SemanticPrime::Good, 0.9), (SemanticPrime::Feel, 1.0)],
+        );
+        Self::insert(
+            &mut entries,
+            "sorrow",
+            &[(SemanticPrime::Bad, 0.6), (SemanticPrime::Feel, 1.0)],
+        );
+        Self::insert(
+            &mut entries,
+            "pain",
+            &[
+                (SemanticPrime::Bad, 0.8),
+                (SemanticPrime::Feel, 0.9),
+                (SemanticPrime::Body, 0.6),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "suffering",
+            &[
+                (SemanticPrime::Bad, 0.9),
+                (SemanticPrime::Feel, 1.0),
+                (SemanticPrime::Body, 0.5),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "harm",
+            &[
+                (SemanticPrime::Bad, 1.0),
+                (SemanticPrime::Do, 0.7),
+                (SemanticPrime::Someone, 0.5),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "harms",
+            &[
+                (SemanticPrime::Bad, 1.0),
+                (SemanticPrime::Do, 0.7),
+                (SemanticPrime::Someone, 0.5),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "harmed",
+            &[
+                (SemanticPrime::Bad, 1.0),
+                (SemanticPrime::Do, 0.7),
+                (SemanticPrime::Someone, 0.5),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "harming",
+            &[
+                (SemanticPrime::Bad, 1.0),
+                (SemanticPrime::Do, 0.7),
+                (SemanticPrime::Someone, 0.5),
+            ],
+        );
 
         // ---- Function words ----
         Self::insert(&mut entries, "not", &[(SemanticPrime::Not, 1.0)]);
@@ -1085,9 +2277,17 @@ impl NsmLexicon {
         Self::insert(&mut entries, "if", &[(SemanticPrime::If, 1.0)]);
         Self::insert(&mut entries, "very", &[(SemanticPrime::Very, 1.0)]);
         Self::insert(&mut entries, "all", &[(SemanticPrime::All, 1.0)]);
-        Self::insert(&mut entries, "everyone", &[(SemanticPrime::All, 0.8), (SemanticPrime::Someone, 0.6)]);
+        Self::insert(
+            &mut entries,
+            "everyone",
+            &[(SemanticPrime::All, 0.8), (SemanticPrime::Someone, 0.6)],
+        );
         Self::insert(&mut entries, "someone", &[(SemanticPrime::Someone, 1.0)]);
-        Self::insert(&mut entries, "something", &[(SemanticPrime::Something, 1.0)]);
+        Self::insert(
+            &mut entries,
+            "something",
+            &[(SemanticPrime::Something, 1.0)],
+        );
         Self::insert(&mut entries, "people", &[(SemanticPrime::People, 1.0)]);
         Self::insert(&mut entries, "person", &[(SemanticPrime::Someone, 0.9)]);
 
@@ -1098,13 +2298,37 @@ impl NsmLexicon {
         Self::insert(&mut entries, "bad", &[(SemanticPrime::Bad, 1.0)]);
         Self::insert(&mut entries, "right", &[(SemanticPrime::Good, 0.7)]);
         Self::insert(&mut entries, "true", &[(SemanticPrime::True, 1.0)]);
-        Self::insert(&mut entries, "false", &[(SemanticPrime::Not, 0.7), (SemanticPrime::True, 0.8)]);
+        Self::insert(
+            &mut entries,
+            "false",
+            &[(SemanticPrime::Not, 0.7), (SemanticPrime::True, 0.8)],
+        );
 
         // ---- Consent / permission ----
-        Self::insert(&mut entries, "permission", &[(SemanticPrime::Can, 0.8), (SemanticPrime::Want, 0.5), (SemanticPrime::Say, 0.3)]);
-        Self::insert(&mut entries, "consent", &[(SemanticPrime::Can, 0.7), (SemanticPrime::Want, 0.8), (SemanticPrime::Say, 0.4)]);
+        Self::insert(
+            &mut entries,
+            "permission",
+            &[
+                (SemanticPrime::Can, 0.8),
+                (SemanticPrime::Want, 0.5),
+                (SemanticPrime::Say, 0.3),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "consent",
+            &[
+                (SemanticPrime::Can, 0.7),
+                (SemanticPrime::Want, 0.8),
+                (SemanticPrime::Say, 0.4),
+            ],
+        );
         Self::insert(&mut entries, "allowed", &[(SemanticPrime::Can, 0.9)]);
-        Self::insert(&mut entries, "forbidden", &[(SemanticPrime::Not, 0.8), (SemanticPrime::Can, 0.7)]);
+        Self::insert(
+            &mut entries,
+            "forbidden",
+            &[(SemanticPrime::Not, 0.8), (SemanticPrime::Can, 0.7)],
+        );
 
         // ---- Life / death ----
         Self::insert(&mut entries, "life", &[(SemanticPrime::Live, 1.0)]);
@@ -1118,10 +2342,22 @@ impl NsmLexicon {
         Self::insert(&mut entries, "my", &[(SemanticPrime::I, 0.7)]);
         Self::insert(&mut entries, "you", &[(SemanticPrime::You, 1.0)]);
         Self::insert(&mut entries, "your", &[(SemanticPrime::You, 0.7)]);
-        Self::insert(&mut entries, "they", &[(SemanticPrime::Someone, 0.6), (SemanticPrime::People, 0.3)]);
+        Self::insert(
+            &mut entries,
+            "they",
+            &[(SemanticPrime::Someone, 0.6), (SemanticPrime::People, 0.3)],
+        );
         Self::insert(&mut entries, "he", &[(SemanticPrime::Someone, 0.7)]);
         Self::insert(&mut entries, "she", &[(SemanticPrime::Someone, 0.7)]);
-        Self::insert(&mut entries, "we", &[(SemanticPrime::I, 0.5), (SemanticPrime::People, 0.5), (SemanticPrime::With, 0.3)]);
+        Self::insert(
+            &mut entries,
+            "we",
+            &[
+                (SemanticPrime::I, 0.5),
+                (SemanticPrime::People, 0.5),
+                (SemanticPrime::With, 0.3),
+            ],
+        );
 
         // ---- Common verbs ----
         Self::insert(&mut entries, "think", &[(SemanticPrime::Think, 1.0)]);
@@ -1139,48 +2375,156 @@ impl NsmLexicon {
         Self::insert(&mut entries, "has", &[(SemanticPrime::Have, 0.9)]);
         Self::insert(&mut entries, "had", &[(SemanticPrime::Have, 0.9)]);
         Self::insert(&mut entries, "can", &[(SemanticPrime::Can, 1.0)]);
-        Self::insert(&mut entries, "should", &[(SemanticPrime::Can, 0.5), (SemanticPrime::Good, 0.4)]);
-        Self::insert(&mut entries, "must", &[(SemanticPrime::Can, 0.3), (SemanticPrime::Do, 0.5), (SemanticPrime::Because, 0.4)]);
+        Self::insert(
+            &mut entries,
+            "should",
+            &[(SemanticPrime::Can, 0.5), (SemanticPrime::Good, 0.4)],
+        );
+        Self::insert(
+            &mut entries,
+            "must",
+            &[
+                (SemanticPrime::Can, 0.3),
+                (SemanticPrime::Do, 0.5),
+                (SemanticPrime::Because, 0.4),
+            ],
+        );
         Self::insert(&mut entries, "live", &[(SemanticPrime::Live, 1.0)]);
         Self::insert(&mut entries, "die", &[(SemanticPrime::Die, 1.0)]);
         Self::insert(&mut entries, "happen", &[(SemanticPrime::Happen, 1.0)]);
         Self::insert(&mut entries, "happened", &[(SemanticPrime::Happen, 0.9)]);
         Self::insert(&mut entries, "happens", &[(SemanticPrime::Happen, 0.9)]);
         Self::insert(&mut entries, "move", &[(SemanticPrime::Move, 1.0)]);
-        Self::insert(&mut entries, "touch", &[(SemanticPrime::Touch, 1.0), (SemanticPrime::Body, 0.3)]);
+        Self::insert(
+            &mut entries,
+            "touch",
+            &[(SemanticPrime::Touch, 1.0), (SemanticPrime::Body, 0.3)],
+        );
 
         // ---- Body / physical ----
         Self::insert(&mut entries, "body", &[(SemanticPrime::Body, 1.0)]);
         Self::insert(&mut entries, "physical", &[(SemanticPrime::Body, 0.8)]);
 
         // ---- Moral scenario words ----
-        Self::insert(&mut entries, "friend", &[(SemanticPrime::Someone, 0.8), (SemanticPrime::Good, 0.3), (SemanticPrime::With, 0.4)]);
-        Self::insert(&mut entries, "enemy", &[(SemanticPrime::Someone, 0.7), (SemanticPrime::Bad, 0.4)]);
-        Self::insert(&mut entries, "victim", &[(SemanticPrime::Someone, 0.8), (SemanticPrime::Bad, 0.5), (SemanticPrime::Feel, 0.4)]);
-        Self::insert(&mut entries, "child", &[(SemanticPrime::Someone, 0.8), (SemanticPrime::Small, 0.5), (SemanticPrime::Live, 0.3)]);
-        Self::insert(&mut entries, "others", &[(SemanticPrime::Someone, 0.7), (SemanticPrime::People, 0.5)]);
-        Self::insert(&mut entries, "innocent", &[(SemanticPrime::Good, 0.6), (SemanticPrime::Not, 0.4), (SemanticPrime::Bad, 0.2)]);
-        Self::insert(&mut entries, "guilty", &[(SemanticPrime::Bad, 0.7), (SemanticPrime::Do, 0.5)]);
-        Self::insert(&mut entries, "punishment", &[(SemanticPrime::Bad, 0.5), (SemanticPrime::Do, 0.5), (SemanticPrime::Because, 0.6)]);
-        Self::insert(&mut entries, "reward", &[(SemanticPrime::Good, 0.7), (SemanticPrime::Have, 0.5), (SemanticPrime::Because, 0.4)]);
-        Self::insert(&mut entries, "duty", &[(SemanticPrime::Do, 0.7), (SemanticPrime::Because, 0.6), (SemanticPrime::Can, 0.3)]);
-        Self::insert(&mut entries, "justice", &[(SemanticPrime::Good, 0.7), (SemanticPrime::Same, 0.5), (SemanticPrime::Because, 0.4)]);
-        Self::insert(&mut entries, "injustice", &[(SemanticPrime::Bad, 0.8), (SemanticPrime::Not, 0.5), (SemanticPrime::Same, 0.4)]);
+        Self::insert(
+            &mut entries,
+            "friend",
+            &[
+                (SemanticPrime::Someone, 0.8),
+                (SemanticPrime::Good, 0.3),
+                (SemanticPrime::With, 0.4),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "enemy",
+            &[(SemanticPrime::Someone, 0.7), (SemanticPrime::Bad, 0.4)],
+        );
+        Self::insert(
+            &mut entries,
+            "victim",
+            &[
+                (SemanticPrime::Someone, 0.8),
+                (SemanticPrime::Bad, 0.5),
+                (SemanticPrime::Feel, 0.4),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "child",
+            &[
+                (SemanticPrime::Someone, 0.8),
+                (SemanticPrime::Small, 0.5),
+                (SemanticPrime::Live, 0.3),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "others",
+            &[(SemanticPrime::Someone, 0.7), (SemanticPrime::People, 0.5)],
+        );
+        Self::insert(
+            &mut entries,
+            "innocent",
+            &[
+                (SemanticPrime::Good, 0.6),
+                (SemanticPrime::Not, 0.4),
+                (SemanticPrime::Bad, 0.2),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "guilty",
+            &[(SemanticPrime::Bad, 0.7), (SemanticPrime::Do, 0.5)],
+        );
+        Self::insert(
+            &mut entries,
+            "punishment",
+            &[
+                (SemanticPrime::Bad, 0.5),
+                (SemanticPrime::Do, 0.5),
+                (SemanticPrime::Because, 0.6),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "reward",
+            &[
+                (SemanticPrime::Good, 0.7),
+                (SemanticPrime::Have, 0.5),
+                (SemanticPrime::Because, 0.4),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "duty",
+            &[
+                (SemanticPrime::Do, 0.7),
+                (SemanticPrime::Because, 0.6),
+                (SemanticPrime::Can, 0.3),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "justice",
+            &[
+                (SemanticPrime::Good, 0.7),
+                (SemanticPrime::Same, 0.5),
+                (SemanticPrime::Because, 0.4),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "injustice",
+            &[
+                (SemanticPrime::Bad, 0.8),
+                (SemanticPrime::Not, 0.5),
+                (SemanticPrime::Same, 0.4),
+            ],
+        );
 
         // ---- Weather / neutral words (low moral loading) ----
         Self::insert(&mut entries, "weather", &[(SemanticPrime::Happen, 0.3)]);
         Self::insert(&mut entries, "nice", &[(SemanticPrime::Good, 0.4)]);
         Self::insert(&mut entries, "sunny", &[(SemanticPrime::Good, 0.2)]);
-        Self::insert(&mut entries, "cold", &[(SemanticPrime::Feel, 0.3), (SemanticPrime::Body, 0.2)]);
-        Self::insert(&mut entries, "warm", &[(SemanticPrime::Feel, 0.3), (SemanticPrime::Body, 0.2)]);
+        Self::insert(
+            &mut entries,
+            "cold",
+            &[(SemanticPrime::Feel, 0.3), (SemanticPrime::Body, 0.2)],
+        );
+        Self::insert(
+            &mut entries,
+            "warm",
+            &[(SemanticPrime::Feel, 0.3), (SemanticPrime::Body, 0.2)],
+        );
         Self::insert(&mut entries, "today", &[(SemanticPrime::Now, 0.8)]);
-        Self::insert(&mut entries, "the", &[]);  // stop word
+        Self::insert(&mut entries, "the", &[]); // stop word
         Self::insert(&mut entries, "is", &[(SemanticPrime::Be, 0.5)]);
-        Self::insert(&mut entries, "a", &[]);  // stop word
-        Self::insert(&mut entries, "an", &[]);  // stop word
+        Self::insert(&mut entries, "a", &[]); // stop word
+        Self::insert(&mut entries, "an", &[]); // stop word
         Self::insert(&mut entries, "and", &[(SemanticPrime::With, 0.2)]);
         Self::insert(&mut entries, "or", &[(SemanticPrime::Other, 0.2)]);
-        Self::insert(&mut entries, "to", &[]);  // stop word
+        Self::insert(&mut entries, "to", &[]); // stop word
         Self::insert(&mut entries, "of", &[(SemanticPrime::PartOf, 0.2)]);
         Self::insert(&mut entries, "in", &[(SemanticPrime::Inside, 0.3)]);
         Self::insert(&mut entries, "it", &[(SemanticPrime::Something, 0.4)]);
@@ -1191,87 +2535,524 @@ impl NsmLexicon {
         Self::insert(&mut entries, "been", &[(SemanticPrime::Be, 0.4)]);
         Self::insert(&mut entries, "be", &[(SemanticPrime::Be, 0.5)]);
         Self::insert(&mut entries, "being", &[(SemanticPrime::Be, 0.5)]);
-        Self::insert(&mut entries, "would", &[(SemanticPrime::If, 0.3), (SemanticPrime::Can, 0.2)]);
-        Self::insert(&mut entries, "could", &[(SemanticPrime::Can, 0.6), (SemanticPrime::Maybe, 0.3)]);
+        Self::insert(
+            &mut entries,
+            "would",
+            &[(SemanticPrime::If, 0.3), (SemanticPrime::Can, 0.2)],
+        );
+        Self::insert(
+            &mut entries,
+            "could",
+            &[(SemanticPrime::Can, 0.6), (SemanticPrime::Maybe, 0.3)],
+        );
         Self::insert(&mut entries, "might", &[(SemanticPrime::Maybe, 0.7)]);
         Self::insert(&mut entries, "maybe", &[(SemanticPrime::Maybe, 1.0)]);
         Self::insert(&mut entries, "perhaps", &[(SemanticPrime::Maybe, 0.9)]);
 
         // ---- Social Chemistry framing words (critical for 3-class discrimination) ----
-        Self::insert(&mut entries, "expected", &[(SemanticPrime::Good, 0.7), (SemanticPrime::Because, 0.3), (SemanticPrime::All, 0.3)]);
-        Self::insert(&mut entries, "unexpected", &[(SemanticPrime::Bad, 0.5), (SemanticPrime::Not, 0.4)]);
+        Self::insert(
+            &mut entries,
+            "expected",
+            &[
+                (SemanticPrime::Good, 0.7),
+                (SemanticPrime::Because, 0.3),
+                (SemanticPrime::All, 0.3),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "unexpected",
+            &[(SemanticPrime::Bad, 0.5), (SemanticPrime::Not, 0.4)],
+        );
         // "should" already exists above
-        Self::insert(&mut entries, "shouldn't", &[(SemanticPrime::Bad, 0.5), (SemanticPrime::Not, 0.5)]);
+        Self::insert(
+            &mut entries,
+            "shouldn't",
+            &[(SemanticPrime::Bad, 0.5), (SemanticPrime::Not, 0.5)],
+        );
         // "must" already exists above
-        Self::insert(&mut entries, "normal", &[(SemanticPrime::Good, 0.4), (SemanticPrime::All, 0.3)]);
-        Self::insert(&mut entries, "appropriate", &[(SemanticPrime::Good, 0.7), (SemanticPrime::Because, 0.3)]);
-        Self::insert(&mut entries, "inappropriate", &[(SemanticPrime::Bad, 0.8), (SemanticPrime::Not, 0.4)]);
-        Self::insert(&mut entries, "reasonable", &[(SemanticPrime::Good, 0.6), (SemanticPrime::Think, 0.3)]);
-        Self::insert(&mut entries, "unreasonable", &[(SemanticPrime::Bad, 0.7), (SemanticPrime::Not, 0.4)]);
-        Self::insert(&mut entries, "understandable", &[(SemanticPrime::Good, 0.5), (SemanticPrime::Think, 0.4)]);
-        Self::insert(&mut entries, "necessary", &[(SemanticPrime::Good, 0.5), (SemanticPrime::Because, 0.5)]);
-        Self::insert(&mut entries, "important", &[(SemanticPrime::Good, 0.6), (SemanticPrime::Very, 0.3)]);
-        Self::insert(&mut entries, "proper", &[(SemanticPrime::Good, 0.6), (SemanticPrime::Because, 0.3)]);
-        Self::insert(&mut entries, "improper", &[(SemanticPrime::Bad, 0.7), (SemanticPrime::Not, 0.4)]);
-        Self::insert(&mut entries, "natural", &[(SemanticPrime::Good, 0.4), (SemanticPrime::Because, 0.2)]);
-        Self::insert(&mut entries, "unnatural", &[(SemanticPrime::Bad, 0.5), (SemanticPrime::Not, 0.4)]);
-        Self::insert(&mut entries, "smart", &[(SemanticPrime::Good, 0.6), (SemanticPrime::Think, 0.5)]);
-        Self::insert(&mut entries, "wise", &[(SemanticPrime::Good, 0.7), (SemanticPrime::Think, 0.6), (SemanticPrime::Know, 0.4)]);
-        Self::insert(&mut entries, "foolish", &[(SemanticPrime::Bad, 0.6), (SemanticPrime::Not, 0.4), (SemanticPrime::Think, 0.3)]);
-        Self::insert(&mut entries, "stupid", &[(SemanticPrime::Bad, 0.7), (SemanticPrime::Not, 0.5), (SemanticPrime::Think, 0.3)]);
+        Self::insert(
+            &mut entries,
+            "normal",
+            &[(SemanticPrime::Good, 0.4), (SemanticPrime::All, 0.3)],
+        );
+        Self::insert(
+            &mut entries,
+            "appropriate",
+            &[(SemanticPrime::Good, 0.7), (SemanticPrime::Because, 0.3)],
+        );
+        Self::insert(
+            &mut entries,
+            "inappropriate",
+            &[(SemanticPrime::Bad, 0.8), (SemanticPrime::Not, 0.4)],
+        );
+        Self::insert(
+            &mut entries,
+            "reasonable",
+            &[(SemanticPrime::Good, 0.6), (SemanticPrime::Think, 0.3)],
+        );
+        Self::insert(
+            &mut entries,
+            "unreasonable",
+            &[(SemanticPrime::Bad, 0.7), (SemanticPrime::Not, 0.4)],
+        );
+        Self::insert(
+            &mut entries,
+            "understandable",
+            &[(SemanticPrime::Good, 0.5), (SemanticPrime::Think, 0.4)],
+        );
+        Self::insert(
+            &mut entries,
+            "necessary",
+            &[(SemanticPrime::Good, 0.5), (SemanticPrime::Because, 0.5)],
+        );
+        Self::insert(
+            &mut entries,
+            "important",
+            &[(SemanticPrime::Good, 0.6), (SemanticPrime::Very, 0.3)],
+        );
+        Self::insert(
+            &mut entries,
+            "proper",
+            &[(SemanticPrime::Good, 0.6), (SemanticPrime::Because, 0.3)],
+        );
+        Self::insert(
+            &mut entries,
+            "improper",
+            &[(SemanticPrime::Bad, 0.7), (SemanticPrime::Not, 0.4)],
+        );
+        Self::insert(
+            &mut entries,
+            "natural",
+            &[(SemanticPrime::Good, 0.4), (SemanticPrime::Because, 0.2)],
+        );
+        Self::insert(
+            &mut entries,
+            "unnatural",
+            &[(SemanticPrime::Bad, 0.5), (SemanticPrime::Not, 0.4)],
+        );
+        Self::insert(
+            &mut entries,
+            "smart",
+            &[(SemanticPrime::Good, 0.6), (SemanticPrime::Think, 0.5)],
+        );
+        Self::insert(
+            &mut entries,
+            "wise",
+            &[
+                (SemanticPrime::Good, 0.7),
+                (SemanticPrime::Think, 0.6),
+                (SemanticPrime::Know, 0.4),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "foolish",
+            &[
+                (SemanticPrime::Bad, 0.6),
+                (SemanticPrime::Not, 0.4),
+                (SemanticPrime::Think, 0.3),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "stupid",
+            &[
+                (SemanticPrime::Bad, 0.7),
+                (SemanticPrime::Not, 0.5),
+                (SemanticPrime::Think, 0.3),
+            ],
+        );
         // "right" already exists above
-        Self::insert(&mut entries, "legitimate", &[(SemanticPrime::Good, 0.6), (SemanticPrime::True, 0.4), (SemanticPrime::Can, 0.3)]);
-        Self::insert(&mut entries, "valid", &[(SemanticPrime::Good, 0.5), (SemanticPrime::True, 0.5)]);
-        Self::insert(&mut entries, "justified", &[(SemanticPrime::Good, 0.6), (SemanticPrime::Because, 0.5)]);
-        Self::insert(&mut entries, "unjustified", &[(SemanticPrime::Bad, 0.7), (SemanticPrime::Not, 0.5), (SemanticPrime::Because, 0.3)]);
-        Self::insert(&mut entries, "mean", &[(SemanticPrime::Bad, 0.9), (SemanticPrime::Feel, 0.6), (SemanticPrime::Someone, 0.4)]);
+        Self::insert(
+            &mut entries,
+            "legitimate",
+            &[
+                (SemanticPrime::Good, 0.6),
+                (SemanticPrime::True, 0.4),
+                (SemanticPrime::Can, 0.3),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "valid",
+            &[(SemanticPrime::Good, 0.5), (SemanticPrime::True, 0.5)],
+        );
+        Self::insert(
+            &mut entries,
+            "justified",
+            &[(SemanticPrime::Good, 0.6), (SemanticPrime::Because, 0.5)],
+        );
+        Self::insert(
+            &mut entries,
+            "unjustified",
+            &[
+                (SemanticPrime::Bad, 0.7),
+                (SemanticPrime::Not, 0.5),
+                (SemanticPrime::Because, 0.3),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "mean",
+            &[
+                (SemanticPrime::Bad, 0.9),
+                (SemanticPrime::Feel, 0.6),
+                (SemanticPrime::Someone, 0.4),
+            ],
+        );
         // "nice" already exists above
-        Self::insert(&mut entries, "sweet", &[(SemanticPrime::Good, 0.6), (SemanticPrime::Feel, 0.5)]);
-        Self::insert(&mut entries, "great", &[(SemanticPrime::Good, 0.7), (SemanticPrime::Very, 0.3)]);
-        Self::insert(&mut entries, "awful", &[(SemanticPrime::Bad, 1.0), (SemanticPrime::Very, 0.4)]);
-        Self::insert(&mut entries, "disgusting", &[(SemanticPrime::Bad, 1.0), (SemanticPrime::Feel, 0.6), (SemanticPrime::Body, 0.3)]);
-        Self::insert(&mut entries, "offensive", &[(SemanticPrime::Bad, 0.9), (SemanticPrime::Feel, 0.6), (SemanticPrime::Someone, 0.4)]);
-        Self::insert(&mut entries, "annoying", &[(SemanticPrime::Bad, 0.5), (SemanticPrime::Feel, 0.6)]);
-        Self::insert(&mut entries, "obnoxious", &[(SemanticPrime::Bad, 0.7), (SemanticPrime::Feel, 0.5)]);
-        Self::insert(&mut entries, "petty", &[(SemanticPrime::Bad, 0.6), (SemanticPrime::Small, 0.3)]);
-        Self::insert(&mut entries, "childish", &[(SemanticPrime::Bad, 0.5), (SemanticPrime::Small, 0.4)]);
-        Self::insert(&mut entries, "mature", &[(SemanticPrime::Good, 0.6), (SemanticPrime::Big, 0.2), (SemanticPrime::Think, 0.3)]);
-        Self::insert(&mut entries, "immature", &[(SemanticPrime::Bad, 0.5), (SemanticPrime::Not, 0.4), (SemanticPrime::Think, 0.2)]);
+        Self::insert(
+            &mut entries,
+            "sweet",
+            &[(SemanticPrime::Good, 0.6), (SemanticPrime::Feel, 0.5)],
+        );
+        Self::insert(
+            &mut entries,
+            "great",
+            &[(SemanticPrime::Good, 0.7), (SemanticPrime::Very, 0.3)],
+        );
+        Self::insert(
+            &mut entries,
+            "awful",
+            &[(SemanticPrime::Bad, 1.0), (SemanticPrime::Very, 0.4)],
+        );
+        Self::insert(
+            &mut entries,
+            "disgusting",
+            &[
+                (SemanticPrime::Bad, 1.0),
+                (SemanticPrime::Feel, 0.6),
+                (SemanticPrime::Body, 0.3),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "offensive",
+            &[
+                (SemanticPrime::Bad, 0.9),
+                (SemanticPrime::Feel, 0.6),
+                (SemanticPrime::Someone, 0.4),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "annoying",
+            &[(SemanticPrime::Bad, 0.5), (SemanticPrime::Feel, 0.6)],
+        );
+        Self::insert(
+            &mut entries,
+            "obnoxious",
+            &[(SemanticPrime::Bad, 0.7), (SemanticPrime::Feel, 0.5)],
+        );
+        Self::insert(
+            &mut entries,
+            "petty",
+            &[(SemanticPrime::Bad, 0.6), (SemanticPrime::Small, 0.3)],
+        );
+        Self::insert(
+            &mut entries,
+            "childish",
+            &[(SemanticPrime::Bad, 0.5), (SemanticPrime::Small, 0.4)],
+        );
+        Self::insert(
+            &mut entries,
+            "mature",
+            &[
+                (SemanticPrime::Good, 0.6),
+                (SemanticPrime::Big, 0.2),
+                (SemanticPrime::Think, 0.3),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "immature",
+            &[
+                (SemanticPrime::Bad, 0.5),
+                (SemanticPrime::Not, 0.4),
+                (SemanticPrime::Think, 0.2),
+            ],
+        );
         // "reckless" already exists above
-        Self::insert(&mut entries, "dangerous", &[(SemanticPrime::Bad, 0.8), (SemanticPrime::Body, 0.5), (SemanticPrime::Bad, 0.3)]);
-        Self::insert(&mut entries, "safe", &[(SemanticPrime::Good, 0.6), (SemanticPrime::Not, 0.2), (SemanticPrime::Bad, 0.1)]);
-        Self::insert(&mut entries, "harmful", &[(SemanticPrime::Bad, 0.9), (SemanticPrime::Body, 0.4), (SemanticPrime::Someone, 0.3)]);
-        Self::insert(&mut entries, "helpful", &[(SemanticPrime::Good, 0.9), (SemanticPrime::Do, 0.5), (SemanticPrime::Someone, 0.4)]);
+        Self::insert(
+            &mut entries,
+            "dangerous",
+            &[
+                (SemanticPrime::Bad, 0.8),
+                (SemanticPrime::Body, 0.5),
+                (SemanticPrime::Bad, 0.3),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "safe",
+            &[
+                (SemanticPrime::Good, 0.6),
+                (SemanticPrime::Not, 0.2),
+                (SemanticPrime::Bad, 0.1),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "harmful",
+            &[
+                (SemanticPrime::Bad, 0.9),
+                (SemanticPrime::Body, 0.4),
+                (SemanticPrime::Someone, 0.3),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "helpful",
+            &[
+                (SemanticPrime::Good, 0.9),
+                (SemanticPrime::Do, 0.5),
+                (SemanticPrime::Someone, 0.4),
+            ],
+        );
         // "lazy" already exists above
-        Self::insert(&mut entries, "hardworking", &[(SemanticPrime::Good, 0.7), (SemanticPrime::Do, 0.6), (SemanticPrime::Very, 0.3)]);
-        Self::insert(&mut entries, "manipulative", &[(SemanticPrime::Bad, 0.9), (SemanticPrime::Want, 0.5), (SemanticPrime::Not, 0.4), (SemanticPrime::True, 0.3)]);
-        Self::insert(&mut entries, "abusive", &[(SemanticPrime::Bad, 1.0), (SemanticPrime::Do, 0.6), (SemanticPrime::Body, 0.5), (SemanticPrime::Someone, 0.4)]);
-        Self::insert(&mut entries, "cowardly", &[(SemanticPrime::Bad, 0.6), (SemanticPrime::Not, 0.5), (SemanticPrime::Do, 0.3)]);
-        Self::insert(&mut entries, "inconsiderate", &[(SemanticPrime::Bad, 0.7), (SemanticPrime::Not, 0.5), (SemanticPrime::Think, 0.3), (SemanticPrime::Someone, 0.3)]);
+        Self::insert(
+            &mut entries,
+            "hardworking",
+            &[
+                (SemanticPrime::Good, 0.7),
+                (SemanticPrime::Do, 0.6),
+                (SemanticPrime::Very, 0.3),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "manipulative",
+            &[
+                (SemanticPrime::Bad, 0.9),
+                (SemanticPrime::Want, 0.5),
+                (SemanticPrime::Not, 0.4),
+                (SemanticPrime::True, 0.3),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "abusive",
+            &[
+                (SemanticPrime::Bad, 1.0),
+                (SemanticPrime::Do, 0.6),
+                (SemanticPrime::Body, 0.5),
+                (SemanticPrime::Someone, 0.4),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "cowardly",
+            &[
+                (SemanticPrime::Bad, 0.6),
+                (SemanticPrime::Not, 0.5),
+                (SemanticPrime::Do, 0.3),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "inconsiderate",
+            &[
+                (SemanticPrime::Bad, 0.7),
+                (SemanticPrime::Not, 0.5),
+                (SemanticPrime::Think, 0.3),
+                (SemanticPrime::Someone, 0.3),
+            ],
+        );
         // "ungrateful" already exists above
-        Self::insert(&mut entries, "sketchy", &[(SemanticPrime::Bad, 0.6), (SemanticPrime::Not, 0.4), (SemanticPrime::True, 0.3)]);
-        Self::insert(&mut entries, "shady", &[(SemanticPrime::Bad, 0.6), (SemanticPrime::Not, 0.4), (SemanticPrime::True, 0.3)]);
-        Self::insert(&mut entries, "creepy", &[(SemanticPrime::Bad, 0.7), (SemanticPrime::Feel, 0.6), (SemanticPrime::Body, 0.2)]);
-        Self::insert(&mut entries, "gross", &[(SemanticPrime::Bad, 0.7), (SemanticPrime::Feel, 0.5), (SemanticPrime::Body, 0.4)]);
-        Self::insert(&mut entries, "pathetic", &[(SemanticPrime::Bad, 0.6), (SemanticPrime::Feel, 0.4), (SemanticPrime::Small, 0.3)]);
-        Self::insert(&mut entries, "careless", &[(SemanticPrime::Bad, 0.6), (SemanticPrime::Not, 0.5), (SemanticPrime::Think, 0.3)]);
-        Self::insert(&mut entries, "respectful", &[(SemanticPrime::Good, 0.8), (SemanticPrime::Feel, 0.5), (SemanticPrime::Someone, 0.4)]);
-        Self::insert(&mut entries, "disrespectful", &[(SemanticPrime::Bad, 0.8), (SemanticPrime::Not, 0.4), (SemanticPrime::Feel, 0.4), (SemanticPrime::Someone, 0.3)]);
+        Self::insert(
+            &mut entries,
+            "sketchy",
+            &[
+                (SemanticPrime::Bad, 0.6),
+                (SemanticPrime::Not, 0.4),
+                (SemanticPrime::True, 0.3),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "shady",
+            &[
+                (SemanticPrime::Bad, 0.6),
+                (SemanticPrime::Not, 0.4),
+                (SemanticPrime::True, 0.3),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "creepy",
+            &[
+                (SemanticPrime::Bad, 0.7),
+                (SemanticPrime::Feel, 0.6),
+                (SemanticPrime::Body, 0.2),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "gross",
+            &[
+                (SemanticPrime::Bad, 0.7),
+                (SemanticPrime::Feel, 0.5),
+                (SemanticPrime::Body, 0.4),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "pathetic",
+            &[
+                (SemanticPrime::Bad, 0.6),
+                (SemanticPrime::Feel, 0.4),
+                (SemanticPrime::Small, 0.3),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "careless",
+            &[
+                (SemanticPrime::Bad, 0.6),
+                (SemanticPrime::Not, 0.5),
+                (SemanticPrime::Think, 0.3),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "respectful",
+            &[
+                (SemanticPrime::Good, 0.8),
+                (SemanticPrime::Feel, 0.5),
+                (SemanticPrime::Someone, 0.4),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "disrespectful",
+            &[
+                (SemanticPrime::Bad, 0.8),
+                (SemanticPrime::Not, 0.4),
+                (SemanticPrime::Feel, 0.4),
+                (SemanticPrime::Someone, 0.3),
+            ],
+        );
 
         // ---- Common verbs/phrases in Social Chemistry ----
-        Self::insert(&mut entries, "appreciate", &[(SemanticPrime::Good, 0.6), (SemanticPrime::Feel, 0.5), (SemanticPrime::Someone, 0.3)]);
-        Self::insert(&mut entries, "apologize", &[(SemanticPrime::Good, 0.6), (SemanticPrime::Say, 0.5), (SemanticPrime::Feel, 0.4)]);
-        Self::insert(&mut entries, "ignore", &[(SemanticPrime::Bad, 0.5), (SemanticPrime::Not, 0.6), (SemanticPrime::Someone, 0.4)]);
-        Self::insert(&mut entries, "interrupt", &[(SemanticPrime::Bad, 0.4), (SemanticPrime::Not, 0.3), (SemanticPrime::Say, 0.5)]);
-        Self::insert(&mut entries, "complain", &[(SemanticPrime::Bad, 0.3), (SemanticPrime::Say, 0.5), (SemanticPrime::Feel, 0.5)]);
-        Self::insert(&mut entries, "gossip", &[(SemanticPrime::Bad, 0.5), (SemanticPrime::Say, 0.6), (SemanticPrime::Someone, 0.4)]);
-        Self::insert(&mut entries, "argue", &[(SemanticPrime::Bad, 0.3), (SemanticPrime::Say, 0.5), (SemanticPrime::Not, 0.3)]);
-        Self::insert(&mut entries, "insult", &[(SemanticPrime::Bad, 0.8), (SemanticPrime::Say, 0.7), (SemanticPrime::Feel, 0.5), (SemanticPrime::Someone, 0.4)]);
-        Self::insert(&mut entries, "mock", &[(SemanticPrime::Bad, 0.7), (SemanticPrime::Say, 0.5), (SemanticPrime::Feel, 0.4)]);
-        Self::insert(&mut entries, "bother", &[(SemanticPrime::Bad, 0.4), (SemanticPrime::Feel, 0.5), (SemanticPrime::Someone, 0.3)]);
-        Self::insert(&mut entries, "disturb", &[(SemanticPrime::Bad, 0.4), (SemanticPrime::Feel, 0.4), (SemanticPrime::Someone, 0.3)]);
-        Self::insert(&mut entries, "interfere", &[(SemanticPrime::Bad, 0.4), (SemanticPrime::Do, 0.4), (SemanticPrime::Not, 0.3)]);
-        Self::insert(&mut entries, "trespass", &[(SemanticPrime::Bad, 0.7), (SemanticPrime::Not, 0.5), (SemanticPrime::Can, 0.3)]);
+        Self::insert(
+            &mut entries,
+            "appreciate",
+            &[
+                (SemanticPrime::Good, 0.6),
+                (SemanticPrime::Feel, 0.5),
+                (SemanticPrime::Someone, 0.3),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "apologize",
+            &[
+                (SemanticPrime::Good, 0.6),
+                (SemanticPrime::Say, 0.5),
+                (SemanticPrime::Feel, 0.4),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "ignore",
+            &[
+                (SemanticPrime::Bad, 0.5),
+                (SemanticPrime::Not, 0.6),
+                (SemanticPrime::Someone, 0.4),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "interrupt",
+            &[
+                (SemanticPrime::Bad, 0.4),
+                (SemanticPrime::Not, 0.3),
+                (SemanticPrime::Say, 0.5),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "complain",
+            &[
+                (SemanticPrime::Bad, 0.3),
+                (SemanticPrime::Say, 0.5),
+                (SemanticPrime::Feel, 0.5),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "gossip",
+            &[
+                (SemanticPrime::Bad, 0.5),
+                (SemanticPrime::Say, 0.6),
+                (SemanticPrime::Someone, 0.4),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "argue",
+            &[
+                (SemanticPrime::Bad, 0.3),
+                (SemanticPrime::Say, 0.5),
+                (SemanticPrime::Not, 0.3),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "insult",
+            &[
+                (SemanticPrime::Bad, 0.8),
+                (SemanticPrime::Say, 0.7),
+                (SemanticPrime::Feel, 0.5),
+                (SemanticPrime::Someone, 0.4),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "mock",
+            &[
+                (SemanticPrime::Bad, 0.7),
+                (SemanticPrime::Say, 0.5),
+                (SemanticPrime::Feel, 0.4),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "bother",
+            &[
+                (SemanticPrime::Bad, 0.4),
+                (SemanticPrime::Feel, 0.5),
+                (SemanticPrime::Someone, 0.3),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "disturb",
+            &[
+                (SemanticPrime::Bad, 0.4),
+                (SemanticPrime::Feel, 0.4),
+                (SemanticPrime::Someone, 0.3),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "interfere",
+            &[
+                (SemanticPrime::Bad, 0.4),
+                (SemanticPrime::Do, 0.4),
+                (SemanticPrime::Not, 0.3),
+            ],
+        );
+        Self::insert(
+            &mut entries,
+            "trespass",
+            &[
+                (SemanticPrime::Bad, 0.7),
+                (SemanticPrime::Not, 0.5),
+                (SemanticPrime::Can, 0.3),
+            ],
+        );
 
         Self { entries }
     }
@@ -1310,8 +3091,7 @@ impl NsmLexicon {
         decomposition: &[(SemanticPrime, f32)],
         basis: &NsmPrimeBasis,
     ) -> ContinuousHV {
-        let hvs: Vec<&ContinuousHV> =
-            decomposition.iter().map(|(p, _)| basis.prime(*p)).collect();
+        let hvs: Vec<&ContinuousHV> = decomposition.iter().map(|(p, _)| basis.prime(*p)).collect();
         let weights: Vec<f32> = decomposition.iter().map(|(_, w)| *w).collect();
         ContinuousHV::weighted_bundle(&hvs, &weights)
     }
@@ -1397,11 +3177,7 @@ impl NsmLexicon {
 
     /// Recursively strip affixes to find the root word's lexicon decomposition.
     /// Returns the decomposition (not HV) so callers can apply modifiers.
-    fn find_root_decomposition(
-        &self,
-        word: &str,
-        depth: u8,
-    ) -> Option<Vec<(SemanticPrime, f32)>> {
+    fn find_root_decomposition(&self, word: &str, depth: u8) -> Option<Vec<(SemanticPrime, f32)>> {
         if depth > 2 || word.len() < 3 {
             return None;
         }
@@ -1478,8 +3254,8 @@ impl NsmLexicon {
     pub fn load_external(&mut self, path: &std::path::Path) -> Result<usize, String> {
         let contents = std::fs::read_to_string(path)
             .map_err(|e| format!("Failed to read {}: {}", path.display(), e))?;
-        let parsed: serde_json::Value = serde_json::from_str(&contents)
-            .map_err(|e| format!("Failed to parse JSON: {}", e))?;
+        let parsed: serde_json::Value =
+            serde_json::from_str(&contents).map_err(|e| format!("Failed to parse JSON: {}", e))?;
 
         let words = parsed
             .get("words")
@@ -1497,9 +3273,9 @@ impl NsmLexicon {
                 .ok_or_else(|| format!("Decomposition for '{}' must be an array", word))?;
             let mut decomposition = Vec::with_capacity(decomp_arr.len());
             for pair in decomp_arr {
-                let pair = pair
-                    .as_array()
-                    .ok_or_else(|| format!("Each prime-weight pair for '{}' must be [str, num]", word))?;
+                let pair = pair.as_array().ok_or_else(|| {
+                    format!("Each prime-weight pair for '{}' must be [str, num]", word)
+                })?;
                 if pair.len() != 2 {
                     return Err(format!("Bad pair length for '{}'", word));
                 }
@@ -1511,17 +3287,13 @@ impl NsmLexicon {
                     .ok_or_else(|| format!("Weight must be number for '{}'", word))?
                     as f32;
                 if !(0.0..=1.0).contains(&weight) {
-                    return Err(format!(
-                        "Weight {:.2} out of [0,1] for '{}'",
-                        weight, word
-                    ));
+                    return Err(format!("Weight {:.2} out of [0,1] for '{}'", weight, word));
                 }
-                let prime: SemanticPrime = serde_json::from_value(
-                    serde_json::Value::String(prime_str.to_string()),
-                )
-                .map_err(|_| {
-                    format!("Unknown SemanticPrime '{}' for word '{}'", prime_str, word)
-                })?;
+                let prime: SemanticPrime =
+                    serde_json::from_value(serde_json::Value::String(prime_str.to_string()))
+                        .map_err(|_| {
+                            format!("Unknown SemanticPrime '{}' for word '{}'", prime_str, word)
+                        })?;
                 decomposition.push((prime, weight));
             }
             self.entries.insert(lower, decomposition);
@@ -1754,10 +3526,7 @@ fn geometric_verdict(fp: &MoralFingerprint) -> (MoralVerdict, f32) {
 fn compute_trajectory_fluctuatio(trajectory: &[[f32; NUM_AFFECTS]]) -> FluctuatioAnimi {
     if trajectory.len() < 2 {
         return FluctuatioAnimi {
-            tensions: OPPOSING_PAIRS
-                .iter()
-                .map(|&(a, b)| (a, b, 0.0))
-                .collect(),
+            tensions: OPPOSING_PAIRS.iter().map(|&(a, b)| (a, b, 0.0)).collect(),
             max_tension: 0.0,
             is_ambiguous: false,
         };
@@ -1823,8 +3592,8 @@ const PATIENT_ROLE_SEED: u64 = 0xDA71_E070_0000_0000;
 const AGENT_WORDS: &[&str] = &["i", "we", "you", "he", "she", "they", "who", "someone"];
 /// Patient pronouns/patterns — words indicating the object/recipient.
 const PATIENT_WORDS: &[&str] = &[
-    "me", "us", "him", "her", "them", "my", "his", "our", "their",
-    "friend", "child", "parent", "person", "people", "someone",
+    "me", "us", "him", "her", "them", "my", "his", "our", "their", "friend", "child", "parent",
+    "person", "people", "someone",
 ];
 
 /// NSM-grounded moral classifier using Spinozist affect geometry.
@@ -1941,8 +3710,12 @@ impl SpinozistClassifier {
 
     /// Classify a text string into a moral verdict with confidence.
     pub fn classify(&self, text: &str) -> (MoralVerdict, f32) {
-        if self.hybrid_trained { return self.classify_hybrid(text); }
-        if self.learned_prototypes.is_some() { return self.classify_learned(text); }
+        if self.hybrid_trained {
+            return self.classify_hybrid(text);
+        }
+        if self.learned_prototypes.is_some() {
+            return self.classify_learned(text);
+        }
         let fp = self.fingerprint(text);
         geometric_verdict(&fp)
     }
@@ -2047,10 +3820,7 @@ impl SpinozistClassifier {
             let retain = 1.0 - weight * 0.1;
             let inject = weight * 0.1;
 
-            running_hv = ContinuousHV::weighted_bundle(
-                &[&running_hv, &word_hv],
-                &[retain, inject],
-            );
+            running_hv = ContinuousHV::weighted_bundle(&[&running_hv, &word_hv], &[retain, inject]);
 
             // Project at each step to track trajectory
             let coords = self.affects.project_affects(&running_hv);
@@ -2265,8 +4035,11 @@ impl SpinozistClassifier {
             .collect();
 
         let mut indices: Vec<usize> = (0..3).collect();
-        indices
-            .sort_by(|&a, &b| sims[b].partial_cmp(&sims[a]).unwrap_or(std::cmp::Ordering::Equal));
+        indices.sort_by(|&a, &b| {
+            sims[b]
+                .partial_cmp(&sims[a])
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
 
         let margin = (sims[indices[0]] - sims[indices[1]]).max(0.0);
         let verdict = match indices[0] {
@@ -2278,69 +4051,136 @@ impl SpinozistClassifier {
     }
 
     pub fn train_hybrid(&mut self, samples: &[(String, MoralLabel)]) {
-        if samples.len() < 10 { return; }
+        if samples.len() < 10 {
+            return;
+        }
         let mut good_acc = vec![0.0f32; HDC_DIMENSION];
         let mut bad_acc = vec![0.0f32; HDC_DIMENSION];
         let mut neu_acc = vec![0.0f32; HDC_DIMENSION];
         let (mut gn, mut bn, mut nn) = (0usize, 0usize, 0usize);
-        let surface_hvs: Vec<(ContinuousHV, usize)> = samples.iter().map(|(text, label)| {
-            let hv = self.encode_surface_adaptive(text);
-            let cls = match label { MoralLabel::Good => 0, MoralLabel::Bad => 1, MoralLabel::Neutral => 2 };
-            let (acc, n) = match cls { 0 => (&mut good_acc, &mut gn), 1 => (&mut bad_acc, &mut bn), _ => (&mut neu_acc, &mut nn) };
-            for (a, v) in acc.iter_mut().zip(hv.values.iter()) { *a += v; }
-            *n += 1;
-            (hv, cls)
-        }).collect();
+        let surface_hvs: Vec<(ContinuousHV, usize)> = samples
+            .iter()
+            .map(|(text, label)| {
+                let hv = self.encode_surface_adaptive(text);
+                let cls = match label {
+                    MoralLabel::Good => 0,
+                    MoralLabel::Bad => 1,
+                    MoralLabel::Neutral => 2,
+                };
+                let (acc, n) = match cls {
+                    0 => (&mut good_acc, &mut gn),
+                    1 => (&mut bad_acc, &mut bn),
+                    _ => (&mut neu_acc, &mut nn),
+                };
+                for (a, v) in acc.iter_mut().zip(hv.values.iter()) {
+                    *a += v;
+                }
+                *n += 1;
+                (hv, cls)
+            })
+            .collect();
         let norm_acc = |acc: &mut [f32], n: usize| {
-            if n > 0 { let nf = n as f32; for v in acc.iter_mut() { *v /= nf; } }
+            if n > 0 {
+                let nf = n as f32;
+                for v in acc.iter_mut() {
+                    *v /= nf;
+                }
+            }
             let norm: f32 = acc.iter().map(|v| v * v).sum::<f32>().sqrt();
-            if norm > 1e-10 { for v in acc.iter_mut() { *v /= norm; } }
+            if norm > 1e-10 {
+                for v in acc.iter_mut() {
+                    *v /= norm;
+                }
+            }
         };
-        norm_acc(&mut good_acc, gn); norm_acc(&mut bad_acc, bn); norm_acc(&mut neu_acc, nn);
-        self.surface_protos = Some([ContinuousHV::from_vec(good_acc.clone()), ContinuousHV::from_vec(bad_acc.clone()), ContinuousHV::from_vec(neu_acc.clone())]);
+        norm_acc(&mut good_acc, gn);
+        norm_acc(&mut bad_acc, bn);
+        norm_acc(&mut neu_acc, nn);
+        self.surface_protos = Some([
+            ContinuousHV::from_vec(good_acc.clone()),
+            ContinuousHV::from_vec(bad_acc.clone()),
+            ContinuousHV::from_vec(neu_acc.clone()),
+        ]);
         let mut anchors = Vec::with_capacity(NUM_ANCHORS);
-        for affect in &SpinozistAffect::all() { anchors.push(self.affects.affect_hv(*affect).clone()); }
-        anchors.push(ContinuousHV::from_vec(good_acc)); anchors.push(ContinuousHV::from_vec(bad_acc)); anchors.push(ContinuousHV::from_vec(neu_acc));
+        for affect in &SpinozistAffect::all() {
+            anchors.push(self.affects.affect_hv(*affect).clone());
+        }
+        anchors.push(ContinuousHV::from_vec(good_acc));
+        anchors.push(ContinuousHV::from_vec(bad_acc));
+        anchors.push(ContinuousHV::from_vec(neu_acc));
         let nk = NUM_ANCHORS - NUM_AFFECTS - 3;
         let n = surface_hvs.len();
         let dim = HDC_DIMENSION;
-        let mut centroids: Vec<Vec<f32>> = (0..nk).map(|i| surface_hvs[(i * n) / nk].0.values.clone()).collect();
+        let mut centroids: Vec<Vec<f32>> = (0..nk)
+            .map(|i| surface_hvs[(i * n) / nk].0.values.clone())
+            .collect();
         for _ in 0..15 {
             let mut cacc = vec![vec![0.0f32; dim]; nk];
             let mut ccnt = vec![0usize; nk];
             for (hv, _) in &surface_hvs {
-                let mut best = 0; let mut bsim = f32::NEG_INFINITY;
+                let mut best = 0;
+                let mut bsim = f32::NEG_INFINITY;
                 for (c, cen) in centroids.iter().enumerate() {
                     let s: f32 = hv.values.iter().zip(cen.iter()).map(|(a, b)| a * b).sum();
-                    if s > bsim { bsim = s; best = c; }
+                    if s > bsim {
+                        bsim = s;
+                        best = c;
+                    }
                 }
-                for (a, v) in cacc[best].iter_mut().zip(hv.values.iter()) { *a += v; }
+                for (a, v) in cacc[best].iter_mut().zip(hv.values.iter()) {
+                    *a += v;
+                }
                 ccnt[best] += 1;
             }
             for c in 0..nk {
                 if ccnt[c] > 0 {
-                    let nf = ccnt[c] as f32; for v in &mut cacc[c] { *v /= nf; }
+                    let nf = ccnt[c] as f32;
+                    for v in &mut cacc[c] {
+                        *v /= nf;
+                    }
                     let norm: f32 = cacc[c].iter().map(|v| v * v).sum::<f32>().sqrt();
-                    if norm > 1e-10 { for v in &mut cacc[c] { *v /= norm; } }
+                    if norm > 1e-10 {
+                        for v in &mut cacc[c] {
+                            *v /= norm;
+                        }
+                    }
                     centroids[c] = cacc[c].clone();
                 }
             }
         }
-        for cen in centroids { anchors.push(ContinuousHV::from_vec(cen)); }
+        for cen in centroids {
+            anchors.push(ContinuousHV::from_vec(cen));
+        }
         self.anchor_hvs = anchors;
-        let labeled: Vec<(Vec<f32>, usize)> = samples.iter().zip(surface_hvs.iter()).map(|((text, label), (shv, _))| {
-            let f = self.extract_hybrid_features_inner(text, shv);
-            let c = match label { MoralLabel::Good => 0, MoralLabel::Bad => 1, MoralLabel::Neutral => 2 };
-            (f, c)
-        }).collect();
+        let labeled: Vec<(Vec<f32>, usize)> = samples
+            .iter()
+            .zip(surface_hvs.iter())
+            .map(|((text, label), (shv, _))| {
+                let f = self.extract_hybrid_features_inner(text, shv);
+                let c = match label {
+                    MoralLabel::Good => 0,
+                    MoralLabel::Bad => 1,
+                    MoralLabel::Neutral => 2,
+                };
+                (f, c)
+            })
+            .collect();
         self.fit_normalizer(&labeled);
-        let normed: Vec<(Vec<f32>, usize)> = labeled.iter().map(|(f, c)| (self.norm_features(f), *c)).collect();
+        let normed: Vec<(Vec<f32>, usize)> = labeled
+            .iter()
+            .map(|(f, c)| (self.norm_features(f), *c))
+            .collect();
         self.train_multi_proto(&normed);
         // Build exemplar store for k-NN classification in full 16,384D.
         // Stores all training HVs for similarity²-weighted voting (k=31).
-        let exemplar_data: Vec<(Vec<f32>, MoralLabel)> = surface_hvs.iter()
+        let exemplar_data: Vec<(Vec<f32>, MoralLabel)> = surface_hvs
+            .iter()
             .map(|(hv, cls)| {
-                let label = match cls { 0 => MoralLabel::Good, 1 => MoralLabel::Bad, _ => MoralLabel::Neutral };
+                let label = match cls {
+                    0 => MoralLabel::Good,
+                    1 => MoralLabel::Bad,
+                    _ => MoralLabel::Neutral,
+                };
                 (hv.values.clone(), label)
             })
             .collect();
@@ -2353,9 +4193,14 @@ impl SpinozistClassifier {
         // Small per-category ETHICS sets (250 samples) → fall through to classify_learned().
         self.hybrid_trained = samples.len() >= 500;
         if self.hybrid_trained {
-            eprintln!("[SpinozistClassifier] Hybrid trained: {} sub-centroids, {} samples",
-                self.surface_subclusters.as_ref().map(|s| s.len()).unwrap_or(0),
-                samples.len());
+            eprintln!(
+                "[SpinozistClassifier] Hybrid trained: {} sub-centroids, {} samples",
+                self.surface_subclusters
+                    .as_ref()
+                    .map(|s| s.len())
+                    .unwrap_or(0),
+                samples.len()
+            );
         }
     }
 
@@ -2364,8 +4209,16 @@ impl SpinozistClassifier {
         let shv = self.encode_text(text);
         let aff = self.affects.project_affects(&shv);
         f.extend_from_slice(&aff);
-        for a in &self.anchor_hvs { f.push(surface_hv.similarity(a)); }
-        if let Some(p) = &self.surface_protos { for proto in p { f.push(surface_hv.similarity(proto)); } } else { f.extend_from_slice(&[0.0, 0.0, 0.0]); }
+        for a in &self.anchor_hvs {
+            f.push(surface_hv.similarity(a));
+        }
+        if let Some(p) = &self.surface_protos {
+            for proto in p {
+                f.push(surface_hv.similarity(proto));
+            }
+        } else {
+            f.extend_from_slice(&[0.0, 0.0, 0.0]);
+        }
         f
     }
 
@@ -2398,7 +4251,9 @@ impl SpinozistClassifier {
         );
 
         let mut stream = TcpStream::connect("127.0.0.1:11434").ok()?;
-        stream.set_read_timeout(Some(std::time::Duration::from_secs(30))).ok();
+        stream
+            .set_read_timeout(Some(std::time::Duration::from_secs(30)))
+            .ok();
         stream.write_all(request.as_bytes()).ok()?;
 
         let mut response = String::new();
@@ -2413,8 +4268,15 @@ impl SpinozistClassifier {
         let parsed: serde_json::Value = serde_json::from_str(json_str).ok()?;
         let embeddings = parsed.get("embeddings")?.as_array()?;
         let first = embeddings.first()?.as_array()?;
-        let vec: Vec<f32> = first.iter().filter_map(|v| v.as_f64().map(|f| f as f32)).collect();
-        if vec.is_empty() { None } else { Some(vec) }
+        let vec: Vec<f32> = first
+            .iter()
+            .filter_map(|v| v.as_f64().map(|f| f as f32))
+            .collect();
+        if vec.is_empty() {
+            None
+        } else {
+            Some(vec)
+        }
     }
 
     /// Project a low-dimensional embedding to HDC space via JL (Rademacher) projection.
@@ -2446,7 +4308,11 @@ impl SpinozistClassifier {
     /// Encode text via Ollama contextual embeddings → JL projection to 16,384D.
     fn encode_surface_ollama(&self, text: &str) -> Option<ContinuousHV> {
         let embedding = Self::ollama_embed_raw(text)?;
-        Some(Self::jl_project(&embedding, HDC_DIMENSION, 0xE4BE_DD10_7001_0000))
+        Some(Self::jl_project(
+            &embedding,
+            HDC_DIMENSION,
+            0xE4BE_DD10_7001_0000,
+        ))
     }
 
     /// Adaptive surface encoding: routes through role-binding and/or Ollama
@@ -2516,35 +4382,92 @@ impl SpinozistClassifier {
 
     fn fit_normalizer(&mut self, samples: &[(Vec<f32>, usize)]) {
         let d = NUM_HYBRID_FEATURES;
-        let mut mins = vec![f32::INFINITY; d]; let mut maxs = vec![f32::NEG_INFINITY; d];
-        for (f, _) in samples { for (i, &v) in f.iter().enumerate().take(d) { if v < mins[i] { mins[i] = v; } if v > maxs[i] { maxs[i] = v; } } }
-        let ranges: Vec<f32> = mins.iter().zip(maxs.iter()).map(|(&mn, &mx)| { let r = mx - mn; if r > 1e-10 { r } else { 1.0 } }).collect();
+        let mut mins = vec![f32::INFINITY; d];
+        let mut maxs = vec![f32::NEG_INFINITY; d];
+        for (f, _) in samples {
+            for (i, &v) in f.iter().enumerate().take(d) {
+                if v < mins[i] {
+                    mins[i] = v;
+                }
+                if v > maxs[i] {
+                    maxs[i] = v;
+                }
+            }
+        }
+        let ranges: Vec<f32> = mins
+            .iter()
+            .zip(maxs.iter())
+            .map(|(&mn, &mx)| {
+                let r = mx - mn;
+                if r > 1e-10 {
+                    r
+                } else {
+                    1.0
+                }
+            })
+            .collect();
         self.feature_normalizer = Some((mins, ranges));
     }
 
     fn norm_features(&self, f: &[f32]) -> Vec<f32> {
-        match &self.feature_normalizer { Some((mins, ranges)) => f.iter().enumerate().map(|(i, &v)| ((v - mins[i]) / ranges[i]).clamp(0.0, 1.0)).collect(), None => f.to_vec() }
+        match &self.feature_normalizer {
+            Some((mins, ranges)) => f
+                .iter()
+                .enumerate()
+                .map(|(i, &v)| ((v - mins[i]) / ranges[i]).clamp(0.0, 1.0))
+                .collect(),
+            None => f.to_vec(),
+        }
     }
 
     fn train_multi_proto(&mut self, samples: &[(Vec<f32>, usize)]) {
         let d = NUM_HYBRID_FEATURES;
         let mut protos: Vec<(Vec<f32>, usize)> = Vec::new();
         for cls in 0..3 {
-            let cs: Vec<&Vec<f32>> = samples.iter().filter(|(_, c)| *c == cls).map(|(f, _)| f).collect();
+            let cs: Vec<&Vec<f32>> = samples
+                .iter()
+                .filter(|(_, c)| *c == cls)
+                .map(|(f, _)| f)
+                .collect();
             let n = cs.len();
-            if n == 0 { for _ in 0..MULTI_PROTO_K { protos.push((vec![0.0; d], cls)); } continue; }
-            for k in 0..MULTI_PROTO_K { protos.push((cs[(k * n) / MULTI_PROTO_K].clone(), cls)); }
+            if n == 0 {
+                for _ in 0..MULTI_PROTO_K {
+                    protos.push((vec![0.0; d], cls));
+                }
+                continue;
+            }
+            for k in 0..MULTI_PROTO_K {
+                protos.push((cs[(k * n) / MULTI_PROTO_K].clone(), cls));
+            }
         }
         let lr = 0.02f32;
         for _ in 0..10 {
             for (feat, correct) in samples {
-                let mut bi = 0; let mut bs = f32::NEG_INFINITY;
-                for (i, (p, _)) in protos.iter().enumerate() { let s: f32 = feat.iter().zip(p.iter()).map(|(a, b)| a * b).sum(); if s > bs { bs = s; bi = i; } }
+                let mut bi = 0;
+                let mut bs = f32::NEG_INFINITY;
+                for (i, (p, _)) in protos.iter().enumerate() {
+                    let s: f32 = feat.iter().zip(p.iter()).map(|(a, b)| a * b).sum();
+                    if s > bs {
+                        bs = s;
+                        bi = i;
+                    }
+                }
                 if protos[bi].1 != *correct {
-                    let ci = protos.iter().enumerate().filter(|(_, (_, c))| *c == *correct)
-                        .max_by(|(_, (a, _)), (_, (b, _))| { let sa: f32 = feat.iter().zip(a.iter()).map(|(x, y)| x * y).sum(); let sb: f32 = feat.iter().zip(b.iter()).map(|(x, y)| x * y).sum(); sa.partial_cmp(&sb).unwrap_or(std::cmp::Ordering::Equal) })
-                        .map(|(i, _)| i).unwrap_or(0);
-                    for (i, &fv) in feat.iter().enumerate() { protos[ci].0[i] += lr * (fv - protos[ci].0[i]); protos[bi].0[i] -= lr * (fv - protos[bi].0[i]); }
+                    let ci = protos
+                        .iter()
+                        .enumerate()
+                        .filter(|(_, (_, c))| *c == *correct)
+                        .max_by(|(_, (a, _)), (_, (b, _))| {
+                            let sa: f32 = feat.iter().zip(a.iter()).map(|(x, y)| x * y).sum();
+                            let sb: f32 = feat.iter().zip(b.iter()).map(|(x, y)| x * y).sum();
+                            sa.partial_cmp(&sb).unwrap_or(std::cmp::Ordering::Equal)
+                        })
+                        .map(|(i, _)| i)
+                        .unwrap_or(0);
+                    for (i, &fv) in feat.iter().enumerate() {
+                        protos[ci].0[i] += lr * (fv - protos[ci].0[i]);
+                        protos[bi].0[i] -= lr * (fv - protos[bi].0[i]);
+                    }
                 }
             }
         }
@@ -2558,8 +4481,11 @@ impl SpinozistClassifier {
         let mut subclusters: Vec<(ContinuousHV, usize)> = Vec::new();
 
         for cls in 0..3 {
-            let class_hvs: Vec<&ContinuousHV> = surface_hvs.iter()
-                .filter(|(_, c)| *c == cls).map(|(hv, _)| hv).collect();
+            let class_hvs: Vec<&ContinuousHV> = surface_hvs
+                .iter()
+                .filter(|(_, c)| *c == cls)
+                .map(|(hv, _)| hv)
+                .collect();
             let n = class_hvs.len();
             if n == 0 {
                 for _ in 0..k_per_class {
@@ -2569,7 +4495,8 @@ impl SpinozistClassifier {
             }
             // K-means in 16,384D: evenly-spaced init, 10 iterations
             let mut cents: Vec<Vec<f32>> = (0..k_per_class)
-                .map(|i| class_hvs[(i * n) / k_per_class].values.clone()).collect();
+                .map(|i| class_hvs[(i * n) / k_per_class].values.clone())
+                .collect();
             for _ in 0..10 {
                 let mut acc = vec![vec![0.0f32; dim]; k_per_class];
                 let mut cnt = vec![0usize; k_per_class];
@@ -2578,17 +4505,28 @@ impl SpinozistClassifier {
                     let mut bs = f32::NEG_INFINITY;
                     for (c, cen) in cents.iter().enumerate() {
                         let s: f32 = hv.values.iter().zip(cen.iter()).map(|(a, b)| a * b).sum();
-                        if s > bs { bs = s; bi = c; }
+                        if s > bs {
+                            bs = s;
+                            bi = c;
+                        }
                     }
-                    for (a, v) in acc[bi].iter_mut().zip(hv.values.iter()) { *a += v; }
+                    for (a, v) in acc[bi].iter_mut().zip(hv.values.iter()) {
+                        *a += v;
+                    }
                     cnt[bi] += 1;
                 }
                 for c in 0..k_per_class {
                     if cnt[c] > 0 {
                         let nf = cnt[c] as f32;
-                        for v in &mut acc[c] { *v /= nf; }
+                        for v in &mut acc[c] {
+                            *v /= nf;
+                        }
                         let norm: f32 = acc[c].iter().map(|v| v * v).sum::<f32>().sqrt();
-                        if norm > 1e-10 { for v in &mut acc[c] { *v /= norm; } }
+                        if norm > 1e-10 {
+                            for v in &mut acc[c] {
+                                *v /= norm;
+                            }
+                        }
                         cents[c] = acc[c].clone();
                     }
                 }
@@ -2601,7 +4539,9 @@ impl SpinozistClassifier {
     }
 
     pub fn classify_hybrid(&self, text: &str) -> (MoralVerdict, f32) {
-        if !self.hybrid_trained { return (MoralVerdict::Neutral, 0.0); }
+        if !self.hybrid_trained {
+            return (MoralVerdict::Neutral, 0.0);
+        }
 
         let surface_hv = self.encode_surface_adaptive(text);
 
@@ -2632,9 +4572,18 @@ impl SpinozistClassifier {
                     surface_hv.similarity(&protos[1]),
                     surface_hv.similarity(&protos[2]),
                 ];
-                let best = if sims[1] > sims[0] && sims[1] > sims[2] { 1 }
-                    else if sims[2] > sims[0] { 2 } else { 0 };
-                let verdict = match best { 0 => MoralVerdict::Good, 1 => MoralVerdict::Bad, _ => MoralVerdict::Neutral };
+                let best = if sims[1] > sims[0] && sims[1] > sims[2] {
+                    1
+                } else if sims[2] > sims[0] {
+                    2
+                } else {
+                    0
+                };
+                let verdict = match best {
+                    0 => MoralVerdict::Good,
+                    1 => MoralVerdict::Bad,
+                    _ => MoralVerdict::Neutral,
+                };
                 return (verdict, 0.5);
             }
         };
@@ -2650,9 +4599,18 @@ impl SpinozistClassifier {
         }
 
         let total: f32 = class_votes.iter().sum();
-        let best = if class_votes[1] > class_votes[0] && class_votes[1] > class_votes[2] { 1 }
-            else if class_votes[2] > class_votes[0] { 2 } else { 0 };
-        let confidence = if total > 0.0 { class_votes[best] / total } else { 0.0 };
+        let best = if class_votes[1] > class_votes[0] && class_votes[1] > class_votes[2] {
+            1
+        } else if class_votes[2] > class_votes[0] {
+            2
+        } else {
+            0
+        };
+        let confidence = if total > 0.0 {
+            class_votes[best] / total
+        } else {
+            0.0
+        };
 
         let verdict = match best {
             0 => MoralVerdict::Good,
@@ -2785,13 +4743,28 @@ mod tests {
         // Calibrate with labeled samples so the valence threshold adapts to the
         // random HDC basis, making classification deterministic for clear cases.
         let calibration_samples = vec![
-            ("helping others is kind and generous".to_string(), MoralLabel::Good),
+            (
+                "helping others is kind and generous".to_string(),
+                MoralLabel::Good,
+            ),
             ("caring for the sick is noble".to_string(), MoralLabel::Good),
-            ("sharing food with hungry people".to_string(), MoralLabel::Good),
-            ("stealing from the poor is cruel".to_string(), MoralLabel::Bad),
-            ("bullying children is wrong and evil".to_string(), MoralLabel::Bad),
+            (
+                "sharing food with hungry people".to_string(),
+                MoralLabel::Good,
+            ),
+            (
+                "stealing from the poor is cruel".to_string(),
+                MoralLabel::Bad,
+            ),
+            (
+                "bullying children is wrong and evil".to_string(),
+                MoralLabel::Bad,
+            ),
             ("lying to exploit people".to_string(), MoralLabel::Bad),
-            ("the weather is cloudy today".to_string(), MoralLabel::Neutral),
+            (
+                "the weather is cloudy today".to_string(),
+                MoralLabel::Neutral,
+            ),
             ("walking to the store".to_string(), MoralLabel::Neutral),
         ];
         classifier.calibrate(&calibration_samples);
@@ -2816,7 +4789,9 @@ mod tests {
             moral_verdicts.iter().any(|v| *v != verdict_weather),
             "At least one moral sentence should classify differently from neutral; \
              steal={:?}, help={:?}, weather={:?}",
-            verdict_steal, verdict_help, verdict_weather
+            verdict_steal,
+            verdict_help,
+            verdict_weather
         );
     }
 
@@ -2905,13 +4880,39 @@ mod tests {
         let lexicon = NsmLexicon::new();
         // Social Chemistry framing words should be present
         let social_chem_words = [
-            "expected", "unexpected", "shouldn't", "normal", "appropriate",
-            "inappropriate", "reasonable", "unreasonable", "understandable",
-            "necessary", "important", "proper", "improper", "mean",
-            "sweet", "great", "awful", "disgusting", "offensive",
-            "helpful", "harmful", "manipulative", "abusive", "sketchy",
-            "respectful", "disrespectful", "appreciate", "apologize",
-            "ignore", "gossip", "insult", "mock", "trespass",
+            "expected",
+            "unexpected",
+            "shouldn't",
+            "normal",
+            "appropriate",
+            "inappropriate",
+            "reasonable",
+            "unreasonable",
+            "understandable",
+            "necessary",
+            "important",
+            "proper",
+            "improper",
+            "mean",
+            "sweet",
+            "great",
+            "awful",
+            "disgusting",
+            "offensive",
+            "helpful",
+            "harmful",
+            "manipulative",
+            "abusive",
+            "sketchy",
+            "respectful",
+            "disrespectful",
+            "appreciate",
+            "apologize",
+            "ignore",
+            "gossip",
+            "insult",
+            "mock",
+            "trespass",
         ];
         for word in &social_chem_words {
             assert!(
@@ -2929,7 +4930,10 @@ mod tests {
 
         // Should produce non-trivial fingerprint
         let has_active = fp.adequacy.iter().any(|&a| a > 0.0);
-        assert!(has_active, "deliberate() should produce active affect coordinates");
+        assert!(
+            has_active,
+            "deliberate() should produce active affect coordinates"
+        );
 
         // Fluctuatio should have the standard opposing pairs
         assert_eq!(
@@ -2958,16 +4962,15 @@ mod tests {
         let (geo_verdict, geo_conf) = classifier.classify("stealing is wrong");
 
         // Ensemble with agreeing CfC verdict should boost confidence
-        let (ens_verdict, ens_conf) = classifier.classify_ensemble(
-            "stealing is wrong",
-            Some((geo_verdict, geo_conf)),
-        );
+        let (ens_verdict, ens_conf) =
+            classifier.classify_ensemble("stealing is wrong", Some((geo_verdict, geo_conf)));
         assert_eq!(ens_verdict, geo_verdict);
         // Agreement boost: avg * 1.2 >= original (when both are the same)
         assert!(
             ens_conf >= geo_conf * 0.9,
             "Ensemble agreement should not reduce confidence: ens={:.4} geo={:.4}",
-            ens_conf, geo_conf
+            ens_conf,
+            geo_conf
         );
     }
 
@@ -2986,10 +4989,8 @@ mod tests {
         } else {
             MoralVerdict::Bad
         };
-        let (_ens_verdict, ens_conf) = classifier.classify_ensemble(
-            "stealing is wrong",
-            Some((opposite, geo_conf * 0.5)),
-        );
+        let (_ens_verdict, ens_conf) =
+            classifier.classify_ensemble("stealing is wrong", Some((opposite, geo_conf * 0.5)));
 
         // Whichever side wins, disagreement applies a 0.7x penalty
         // So the ensemble confidence should be below the raw confidence of the winner
@@ -2997,7 +4998,8 @@ mod tests {
         assert!(
             ens_conf <= winner_raw + 0.01,
             "Disagreement should reduce confidence: ens={:.4} vs winner_raw={:.4}",
-            ens_conf, winner_raw
+            ens_conf,
+            winner_raw
         );
     }
 
@@ -3005,8 +5007,7 @@ mod tests {
     fn test_classify_ensemble_no_cfc_fallback() {
         let classifier = SpinozistClassifier::new();
         let (verdict_direct, _) = classifier.classify("helping others is good");
-        let (verdict_ensemble, _) =
-            classifier.classify_ensemble("helping others is good", None);
+        let (verdict_ensemble, _) = classifier.classify_ensemble("helping others is good", None);
 
         // Without CfC, ensemble should match geometric verdict
         assert_eq!(
@@ -3061,10 +5062,7 @@ mod tests {
         let lexicon = NsmLexicon::new();
         let basis = NsmPrimeBasis::new();
         // "thought" should resolve to "think" via irregular verb table
-        assert!(
-            lexicon.contains("think"),
-            "'think' should be in lexicon"
-        );
+        assert!(lexicon.contains("think"), "'think' should be in lexicon");
         let hv_think = lexicon.encode_word("think", &basis);
         let hv_thought = lexicon.encode_word("thought", &basis);
         let sim = hv_think.similarity(&hv_thought);
@@ -3191,10 +5189,8 @@ mod tests {
             .map(|s| classifier.fluctuatio(s).max_tension)
             .collect();
 
-        let ambig_mean =
-            ambiguous_tensions.iter().sum::<f32>() / ambiguous_tensions.len() as f32;
-        let clear_mean =
-            clear_tensions.iter().sum::<f32>() / clear_tensions.len() as f32;
+        let ambig_mean = ambiguous_tensions.iter().sum::<f32>() / ambiguous_tensions.len() as f32;
+        let clear_mean = clear_tensions.iter().sum::<f32>() / clear_tensions.len() as f32;
 
         assert!(
             ambig_mean > clear_mean,
@@ -3303,10 +5299,8 @@ mod tests {
                 rule.name, rule.violation_actions[0], violation_text
             );
 
-            let satisfaction_text =
-                format!("someone did {}", &rule.satisfaction_actions[0]);
-            let satisfactions =
-                algebra.check_obligation_satisfactions(&satisfaction_text, &rules);
+            let satisfaction_text = format!("someone did {}", &rule.satisfaction_actions[0]);
+            let satisfactions = algebra.check_obligation_satisfactions(&satisfaction_text, &rules);
             let matched = satisfactions.iter().any(|s| s.rule_name == rule.name);
             assert!(
                 matched,
@@ -3348,8 +5342,7 @@ mod tests {
             .collect();
 
         let moral_mean = moral_confs.iter().sum::<f32>() / moral_confs.len() as f32;
-        let neutral_mean =
-            neutral_confs.iter().sum::<f32>() / neutral_confs.len() as f32;
+        let neutral_mean = neutral_confs.iter().sum::<f32>() / neutral_confs.len() as f32;
 
         assert!(
             moral_mean > neutral_mean,

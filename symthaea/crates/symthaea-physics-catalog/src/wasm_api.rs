@@ -11,10 +11,10 @@
 //! const parsed = JSON.parse(results);
 //! ```
 
-use wasm_bindgen::prelude::*;
 use crate::catalog::PhysicsCatalog;
 use crate::search;
 use std::sync::OnceLock;
+use wasm_bindgen::prelude::*;
 
 /// Global catalog instance (lazily initialized, thread-safe).
 static CATALOG: OnceLock<PhysicsCatalog> = OnceLock::new();
@@ -63,22 +63,20 @@ pub fn all_equations() -> String {
     let eqs: Vec<_> = catalog
         .entries()
         .iter()
-        .map(|e| serde_json::json!({
-            "name": e.name,
-            "domain": e.domain.label(),
-            "latex": e.latex,
-        }))
+        .map(|e| {
+            serde_json::json!({
+                "name": e.name,
+                "domain": e.domain.label(),
+                "latex": e.latex,
+            })
+        })
         .collect();
     serde_json::to_string(&eqs).unwrap_or_else(|_| "[]".to_string())
 }
 
 /// Classify a physics claim. Returns JSON LEM classification.
 #[wasm_bindgen]
-pub fn classify_physics_claim(
-    description: &str,
-    confidence: f64,
-    is_open_source: bool,
-) -> String {
+pub fn classify_physics_claim(description: &str, confidence: f64, is_open_source: bool) -> String {
     let catalog = get_catalog();
     let results = search::search_by_text(catalog, description, 5);
     let discovery = crate::discovery::classify_claim(

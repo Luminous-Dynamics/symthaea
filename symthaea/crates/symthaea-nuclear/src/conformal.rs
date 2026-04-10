@@ -16,8 +16,8 @@
 
 #[cfg(test)]
 mod tests {
-    use crate::ml_mass::MlMassPredictor;
     use crate::ame2020::ame2020_reference_nuclei;
+    use crate::ml_mass::MlMassPredictor;
 
     fn predictor() -> MlMassPredictor {
         MlMassPredictor::new()

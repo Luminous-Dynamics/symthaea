@@ -86,14 +86,20 @@ impl SelfFactKind {
                 format!("self can {} confidence {:.2}", name, confidence)
             }
             Self::Limitation { name } => format!("self cannot {}", name),
-            Self::Trait { description, strength } => {
+            Self::Trait {
+                description,
+                strength,
+            } => {
                 format!("self tends {} strength {:.2}", description, strength)
             }
             Self::Episode {
                 summary,
                 valence,
                 cycle,
-            } => format!("self experienced {} valence {:.2} cycle {}", summary, valence, cycle),
+            } => format!(
+                "self experienced {} valence {:.2} cycle {}",
+                summary, valence, cycle
+            ),
             Self::Performance { domain, accuracy } => {
                 format!("self accuracy {} {:.2}", domain, accuracy)
             }

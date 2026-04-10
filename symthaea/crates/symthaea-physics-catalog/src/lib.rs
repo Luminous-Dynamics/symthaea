@@ -24,14 +24,14 @@
 //! const lem = classify_claim("Element 115 produces gravity waves", 0.0, false);
 //! ```
 
-pub mod hv;
 pub mod catalog;
-pub mod search;
 pub mod discovery;
+pub mod hv;
+pub mod search;
 
 #[cfg(target_arch = "wasm32")]
 pub mod wasm_api;
 
 pub use catalog::*;
-pub use search::*;
 pub use discovery::*;
+pub use search::*;

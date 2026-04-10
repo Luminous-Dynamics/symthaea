@@ -103,14 +103,14 @@ impl ChemicalReadings {
     /// Potability score (0.0–1.0) based on distance from WHO thresholds.
     pub fn potability_score(&self) -> f64 {
         let scores = [
-            1.0 - ((self.ph - 7.0).abs() / 1.5).min(1.0),             // pH
-            1.0 - (self.turbidity_ntu / 5.0).min(1.0),                 // turbidity
-            1.0 - (self.tds_ppm / 1000.0).min(1.0),                   // TDS
-            1.0 - (self.nitrates_mg_l / 50.0).min(1.0),               // nitrates
-            1.0 - (self.arsenic_ug_l / 10.0).min(1.0),                // arsenic
-            1.0 - (self.lead_ug_l / 10.0).min(1.0),                   // lead
-            (self.dissolved_oxygen_mg_l / 8.0).min(1.0),               // DO (higher = better)
-            1.0 - ((self.chlorine_mg_l - 0.5).abs() / 4.5).min(1.0),  // chlorine (optimal ~0.5)
+            1.0 - ((self.ph - 7.0).abs() / 1.5).min(1.0), // pH
+            1.0 - (self.turbidity_ntu / 5.0).min(1.0),    // turbidity
+            1.0 - (self.tds_ppm / 1000.0).min(1.0),       // TDS
+            1.0 - (self.nitrates_mg_l / 50.0).min(1.0),   // nitrates
+            1.0 - (self.arsenic_ug_l / 10.0).min(1.0),    // arsenic
+            1.0 - (self.lead_ug_l / 10.0).min(1.0),       // lead
+            (self.dissolved_oxygen_mg_l / 8.0).min(1.0),  // DO (higher = better)
+            1.0 - ((self.chlorine_mg_l - 0.5).abs() / 4.5).min(1.0), // chlorine (optimal ~0.5)
         ];
         scores.iter().sum::<f64>() / scores.len() as f64
     }
@@ -224,7 +224,9 @@ pub struct AuvCommand {
 impl AuvCommand {
     /// All thrusters off.
     pub fn zero() -> Self {
-        Self { thrusters: [0.0; NUM_ACTUATORS] }
+        Self {
+            thrusters: [0.0; NUM_ACTUATORS],
+        }
     }
 
     /// Gentle forward thrust (surge only).
@@ -356,7 +358,9 @@ mod tests {
 
     #[test]
     fn test_command_clamped() {
-        let cmd = AuvCommand { thrusters: [2.0, -2.0, 0.5, 0.0, 0.0, 0.0, 0.0, 0.0] };
+        let cmd = AuvCommand {
+            thrusters: [2.0, -2.0, 0.5, 0.0, 0.0, 0.0, 0.0, 0.0],
+        };
         let clamped = cmd.clamped();
         assert_eq!(clamped.thrusters[0], 1.0);
         assert_eq!(clamped.thrusters[1], -1.0);

@@ -11,7 +11,7 @@ use rand::rngs::StdRng;
 use rand::SeedableRng;
 use symthaea_canvas::CognitiveSnapshot;
 
-use crate::{generate, score_scene, AtelierConfig, Artwork};
+use crate::{generate, score_scene, Artwork, AtelierConfig};
 
 /// Create artwork with iterative refinement.
 ///

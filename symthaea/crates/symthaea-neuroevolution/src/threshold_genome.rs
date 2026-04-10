@@ -20,7 +20,7 @@
 use serde::{Deserialize, Serialize};
 use symthaea_core::hdc::binary_hv::BinaryHV;
 
-use crate::genome::{extract_bits, set_bits, bits_to_linear, linear_to_bits};
+use crate::genome::{bits_to_linear, extract_bits, linear_to_bits, set_bits};
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // THRESHOLD LOCUS DEFINITIONS (bits 400+ of the 16,384-bit BinaryHV)
@@ -181,81 +181,161 @@ pub fn decode_thresholds(hv: &BinaryHV) -> ThresholdPhenotype {
     ThresholdPhenotype {
         fep_surprise_scale: bits_to_linear(
             extract_bits(hv, FEP_SURPRISE_SCALE_START, FEP_SURPRISE_SCALE_BITS),
-            FEP_SURPRISE_SCALE_BITS, 1.0, 10.0,
+            FEP_SURPRISE_SCALE_BITS,
+            1.0,
+            10.0,
         ),
         fep_lr_decay: bits_to_linear(
             extract_bits(hv, FEP_LR_DECAY_START, FEP_LR_DECAY_BITS),
-            FEP_LR_DECAY_BITS, 0.80, 0.999,
+            FEP_LR_DECAY_BITS,
+            0.80,
+            0.999,
         ),
         dream_base_interval: {
             let raw = bits_to_linear(
                 extract_bits(hv, DREAM_BASE_INTERVAL_START, DREAM_BASE_INTERVAL_BITS),
-                DREAM_BASE_INTERVAL_BITS, 20.0, 500.0,
+                DREAM_BASE_INTERVAL_BITS,
+                20.0,
+                500.0,
             );
             raw.round() as u64
         },
         dream_min_interval: {
             let raw = bits_to_linear(
                 extract_bits(hv, DREAM_MIN_INTERVAL_START, DREAM_MIN_INTERVAL_BITS),
-                DREAM_MIN_INTERVAL_BITS, 10.0, 100.0,
+                DREAM_MIN_INTERVAL_BITS,
+                10.0,
+                100.0,
             );
             raw.round() as u64
         },
         neuromod_d2_baseline: bits_to_linear(
             extract_bits(hv, NEUROMOD_D2_BASELINE_START, NEUROMOD_D2_BASELINE_BITS),
-            NEUROMOD_D2_BASELINE_BITS, 0.1, 0.9,
+            NEUROMOD_D2_BASELINE_BITS,
+            0.1,
+            0.9,
         ) as f64,
         neuromod_ne_phasic_threshold: bits_to_linear(
-            extract_bits(hv, NEUROMOD_NE_PHASIC_THRESHOLD_START, NEUROMOD_NE_PHASIC_THRESHOLD_BITS),
-            NEUROMOD_NE_PHASIC_THRESHOLD_BITS, 0.1, 0.8,
+            extract_bits(
+                hv,
+                NEUROMOD_NE_PHASIC_THRESHOLD_START,
+                NEUROMOD_NE_PHASIC_THRESHOLD_BITS,
+            ),
+            NEUROMOD_NE_PHASIC_THRESHOLD_BITS,
+            0.1,
+            0.8,
         ),
         neuromod_arousal_ema_decay: bits_to_linear(
-            extract_bits(hv, NEUROMOD_AROUSAL_EMA_DECAY_START, NEUROMOD_AROUSAL_EMA_DECAY_BITS),
-            NEUROMOD_AROUSAL_EMA_DECAY_BITS, 0.8, 0.99,
+            extract_bits(
+                hv,
+                NEUROMOD_AROUSAL_EMA_DECAY_START,
+                NEUROMOD_AROUSAL_EMA_DECAY_BITS,
+            ),
+            NEUROMOD_AROUSAL_EMA_DECAY_BITS,
+            0.8,
+            0.99,
         ),
         homeostasis_recalibrate_high: bits_to_linear(
-            extract_bits(hv, HOMEOSTASIS_RECALIBRATE_HIGH_START, HOMEOSTASIS_RECALIBRATE_HIGH_BITS),
-            HOMEOSTASIS_RECALIBRATE_HIGH_BITS, 1.05, 1.30,
+            extract_bits(
+                hv,
+                HOMEOSTASIS_RECALIBRATE_HIGH_START,
+                HOMEOSTASIS_RECALIBRATE_HIGH_BITS,
+            ),
+            HOMEOSTASIS_RECALIBRATE_HIGH_BITS,
+            1.05,
+            1.30,
         ),
         homeostasis_recalibrate_low: bits_to_linear(
-            extract_bits(hv, HOMEOSTASIS_RECALIBRATE_LOW_START, HOMEOSTASIS_RECALIBRATE_LOW_BITS),
-            HOMEOSTASIS_RECALIBRATE_LOW_BITS, 0.70, 0.95,
+            extract_bits(
+                hv,
+                HOMEOSTASIS_RECALIBRATE_LOW_START,
+                HOMEOSTASIS_RECALIBRATE_LOW_BITS,
+            ),
+            HOMEOSTASIS_RECALIBRATE_LOW_BITS,
+            0.70,
+            0.95,
         ),
         neuromod_ema_alpha: bits_to_linear(
             extract_bits(hv, NEUROMOD_EMA_ALPHA_START, NEUROMOD_EMA_ALPHA_BITS),
-            NEUROMOD_EMA_ALPHA_BITS, 0.01, 0.15,
+            NEUROMOD_EMA_ALPHA_BITS,
+            0.01,
+            0.15,
         ),
         frustration_dampen_threshold: bits_to_linear(
-            extract_bits(hv, FRUSTRATION_DAMPEN_THRESHOLD_START, FRUSTRATION_DAMPEN_THRESHOLD_BITS),
-            FRUSTRATION_DAMPEN_THRESHOLD_BITS, 0.2, 0.8,
+            extract_bits(
+                hv,
+                FRUSTRATION_DAMPEN_THRESHOLD_START,
+                FRUSTRATION_DAMPEN_THRESHOLD_BITS,
+            ),
+            FRUSTRATION_DAMPEN_THRESHOLD_BITS,
+            0.2,
+            0.8,
         ) as f64,
         engagement_low_threshold: bits_to_linear(
-            extract_bits(hv, ENGAGEMENT_LOW_THRESHOLD_START, ENGAGEMENT_LOW_THRESHOLD_BITS),
-            ENGAGEMENT_LOW_THRESHOLD_BITS, 0.1, 0.6,
+            extract_bits(
+                hv,
+                ENGAGEMENT_LOW_THRESHOLD_START,
+                ENGAGEMENT_LOW_THRESHOLD_BITS,
+            ),
+            ENGAGEMENT_LOW_THRESHOLD_BITS,
+            0.1,
+            0.6,
         ) as f64,
         flow_exploration_increment: bits_to_linear(
-            extract_bits(hv, FLOW_EXPLORATION_INCREMENT_START, FLOW_EXPLORATION_INCREMENT_BITS),
-            FLOW_EXPLORATION_INCREMENT_BITS, 0.01, 0.15,
+            extract_bits(
+                hv,
+                FLOW_EXPLORATION_INCREMENT_START,
+                FLOW_EXPLORATION_INCREMENT_BITS,
+            ),
+            FLOW_EXPLORATION_INCREMENT_BITS,
+            0.01,
+            0.15,
         ),
         coherence_low: bits_to_linear(
             extract_bits(hv, COHERENCE_LOW_START, COHERENCE_LOW_BITS),
-            COHERENCE_LOW_BITS, 0.15, 0.50,
+            COHERENCE_LOW_BITS,
+            0.15,
+            0.50,
         ),
         arousal_trap_threshold: bits_to_linear(
-            extract_bits(hv, AROUSAL_TRAP_THRESHOLD_START, AROUSAL_TRAP_THRESHOLD_BITS),
-            AROUSAL_TRAP_THRESHOLD_BITS, 0.5, 0.95,
+            extract_bits(
+                hv,
+                AROUSAL_TRAP_THRESHOLD_START,
+                AROUSAL_TRAP_THRESHOLD_BITS,
+            ),
+            AROUSAL_TRAP_THRESHOLD_BITS,
+            0.5,
+            0.95,
         ),
         self_model_weight_high: bits_to_linear(
-            extract_bits(hv, SELF_MODEL_WEIGHT_HIGH_START, SELF_MODEL_WEIGHT_HIGH_BITS),
-            SELF_MODEL_WEIGHT_HIGH_BITS, 0.4, 0.95,
+            extract_bits(
+                hv,
+                SELF_MODEL_WEIGHT_HIGH_START,
+                SELF_MODEL_WEIGHT_HIGH_BITS,
+            ),
+            SELF_MODEL_WEIGHT_HIGH_BITS,
+            0.4,
+            0.95,
         ),
         homeostasis_pull_cruise: bits_to_linear(
-            extract_bits(hv, HOMEOSTASIS_PULL_CRUISE_START, HOMEOSTASIS_PULL_CRUISE_BITS),
-            HOMEOSTASIS_PULL_CRUISE_BITS, 0.5, 3.0,
+            extract_bits(
+                hv,
+                HOMEOSTASIS_PULL_CRUISE_START,
+                HOMEOSTASIS_PULL_CRUISE_BITS,
+            ),
+            HOMEOSTASIS_PULL_CRUISE_BITS,
+            0.5,
+            3.0,
         ),
         confidence_crash_threshold: bits_to_linear(
-            extract_bits(hv, CONFIDENCE_CRASH_THRESHOLD_START, CONFIDENCE_CRASH_THRESHOLD_BITS),
-            CONFIDENCE_CRASH_THRESHOLD_BITS, 0.15, 0.50,
+            extract_bits(
+                hv,
+                CONFIDENCE_CRASH_THRESHOLD_START,
+                CONFIDENCE_CRASH_THRESHOLD_BITS,
+            ),
+            CONFIDENCE_CRASH_THRESHOLD_BITS,
+            0.15,
+            0.50,
         ) as f64,
     }
 }
@@ -263,42 +343,189 @@ pub fn decode_thresholds(hv: &BinaryHV) -> ThresholdPhenotype {
 /// Encode a threshold phenotype into the BinaryHV genome (bits 400+).
 /// Does NOT modify bits 0-399 (neural genome region).
 pub fn encode_thresholds(hv: &mut BinaryHV, pheno: &ThresholdPhenotype) {
-    set_bits(hv, FEP_SURPRISE_SCALE_START, FEP_SURPRISE_SCALE_BITS,
-        linear_to_bits(pheno.fep_surprise_scale, FEP_SURPRISE_SCALE_BITS, 1.0, 10.0));
-    set_bits(hv, FEP_LR_DECAY_START, FEP_LR_DECAY_BITS,
-        linear_to_bits(pheno.fep_lr_decay, FEP_LR_DECAY_BITS, 0.80, 0.999));
-    set_bits(hv, DREAM_BASE_INTERVAL_START, DREAM_BASE_INTERVAL_BITS,
-        linear_to_bits(pheno.dream_base_interval as f32, DREAM_BASE_INTERVAL_BITS, 20.0, 500.0));
-    set_bits(hv, DREAM_MIN_INTERVAL_START, DREAM_MIN_INTERVAL_BITS,
-        linear_to_bits(pheno.dream_min_interval as f32, DREAM_MIN_INTERVAL_BITS, 10.0, 100.0));
-    set_bits(hv, NEUROMOD_D2_BASELINE_START, NEUROMOD_D2_BASELINE_BITS,
-        linear_to_bits(pheno.neuromod_d2_baseline as f32, NEUROMOD_D2_BASELINE_BITS, 0.1, 0.9));
-    set_bits(hv, NEUROMOD_NE_PHASIC_THRESHOLD_START, NEUROMOD_NE_PHASIC_THRESHOLD_BITS,
-        linear_to_bits(pheno.neuromod_ne_phasic_threshold, NEUROMOD_NE_PHASIC_THRESHOLD_BITS, 0.1, 0.8));
-    set_bits(hv, NEUROMOD_AROUSAL_EMA_DECAY_START, NEUROMOD_AROUSAL_EMA_DECAY_BITS,
-        linear_to_bits(pheno.neuromod_arousal_ema_decay, NEUROMOD_AROUSAL_EMA_DECAY_BITS, 0.8, 0.99));
-    set_bits(hv, HOMEOSTASIS_RECALIBRATE_HIGH_START, HOMEOSTASIS_RECALIBRATE_HIGH_BITS,
-        linear_to_bits(pheno.homeostasis_recalibrate_high, HOMEOSTASIS_RECALIBRATE_HIGH_BITS, 1.05, 1.30));
-    set_bits(hv, HOMEOSTASIS_RECALIBRATE_LOW_START, HOMEOSTASIS_RECALIBRATE_LOW_BITS,
-        linear_to_bits(pheno.homeostasis_recalibrate_low, HOMEOSTASIS_RECALIBRATE_LOW_BITS, 0.70, 0.95));
-    set_bits(hv, NEUROMOD_EMA_ALPHA_START, NEUROMOD_EMA_ALPHA_BITS,
-        linear_to_bits(pheno.neuromod_ema_alpha, NEUROMOD_EMA_ALPHA_BITS, 0.01, 0.15));
-    set_bits(hv, FRUSTRATION_DAMPEN_THRESHOLD_START, FRUSTRATION_DAMPEN_THRESHOLD_BITS,
-        linear_to_bits(pheno.frustration_dampen_threshold as f32, FRUSTRATION_DAMPEN_THRESHOLD_BITS, 0.2, 0.8));
-    set_bits(hv, ENGAGEMENT_LOW_THRESHOLD_START, ENGAGEMENT_LOW_THRESHOLD_BITS,
-        linear_to_bits(pheno.engagement_low_threshold as f32, ENGAGEMENT_LOW_THRESHOLD_BITS, 0.1, 0.6));
-    set_bits(hv, FLOW_EXPLORATION_INCREMENT_START, FLOW_EXPLORATION_INCREMENT_BITS,
-        linear_to_bits(pheno.flow_exploration_increment, FLOW_EXPLORATION_INCREMENT_BITS, 0.01, 0.15));
-    set_bits(hv, COHERENCE_LOW_START, COHERENCE_LOW_BITS,
-        linear_to_bits(pheno.coherence_low, COHERENCE_LOW_BITS, 0.15, 0.50));
-    set_bits(hv, AROUSAL_TRAP_THRESHOLD_START, AROUSAL_TRAP_THRESHOLD_BITS,
-        linear_to_bits(pheno.arousal_trap_threshold, AROUSAL_TRAP_THRESHOLD_BITS, 0.5, 0.95));
-    set_bits(hv, SELF_MODEL_WEIGHT_HIGH_START, SELF_MODEL_WEIGHT_HIGH_BITS,
-        linear_to_bits(pheno.self_model_weight_high, SELF_MODEL_WEIGHT_HIGH_BITS, 0.4, 0.95));
-    set_bits(hv, HOMEOSTASIS_PULL_CRUISE_START, HOMEOSTASIS_PULL_CRUISE_BITS,
-        linear_to_bits(pheno.homeostasis_pull_cruise, HOMEOSTASIS_PULL_CRUISE_BITS, 0.5, 3.0));
-    set_bits(hv, CONFIDENCE_CRASH_THRESHOLD_START, CONFIDENCE_CRASH_THRESHOLD_BITS,
-        linear_to_bits(pheno.confidence_crash_threshold as f32, CONFIDENCE_CRASH_THRESHOLD_BITS, 0.15, 0.50));
+    set_bits(
+        hv,
+        FEP_SURPRISE_SCALE_START,
+        FEP_SURPRISE_SCALE_BITS,
+        linear_to_bits(pheno.fep_surprise_scale, FEP_SURPRISE_SCALE_BITS, 1.0, 10.0),
+    );
+    set_bits(
+        hv,
+        FEP_LR_DECAY_START,
+        FEP_LR_DECAY_BITS,
+        linear_to_bits(pheno.fep_lr_decay, FEP_LR_DECAY_BITS, 0.80, 0.999),
+    );
+    set_bits(
+        hv,
+        DREAM_BASE_INTERVAL_START,
+        DREAM_BASE_INTERVAL_BITS,
+        linear_to_bits(
+            pheno.dream_base_interval as f32,
+            DREAM_BASE_INTERVAL_BITS,
+            20.0,
+            500.0,
+        ),
+    );
+    set_bits(
+        hv,
+        DREAM_MIN_INTERVAL_START,
+        DREAM_MIN_INTERVAL_BITS,
+        linear_to_bits(
+            pheno.dream_min_interval as f32,
+            DREAM_MIN_INTERVAL_BITS,
+            10.0,
+            100.0,
+        ),
+    );
+    set_bits(
+        hv,
+        NEUROMOD_D2_BASELINE_START,
+        NEUROMOD_D2_BASELINE_BITS,
+        linear_to_bits(
+            pheno.neuromod_d2_baseline as f32,
+            NEUROMOD_D2_BASELINE_BITS,
+            0.1,
+            0.9,
+        ),
+    );
+    set_bits(
+        hv,
+        NEUROMOD_NE_PHASIC_THRESHOLD_START,
+        NEUROMOD_NE_PHASIC_THRESHOLD_BITS,
+        linear_to_bits(
+            pheno.neuromod_ne_phasic_threshold,
+            NEUROMOD_NE_PHASIC_THRESHOLD_BITS,
+            0.1,
+            0.8,
+        ),
+    );
+    set_bits(
+        hv,
+        NEUROMOD_AROUSAL_EMA_DECAY_START,
+        NEUROMOD_AROUSAL_EMA_DECAY_BITS,
+        linear_to_bits(
+            pheno.neuromod_arousal_ema_decay,
+            NEUROMOD_AROUSAL_EMA_DECAY_BITS,
+            0.8,
+            0.99,
+        ),
+    );
+    set_bits(
+        hv,
+        HOMEOSTASIS_RECALIBRATE_HIGH_START,
+        HOMEOSTASIS_RECALIBRATE_HIGH_BITS,
+        linear_to_bits(
+            pheno.homeostasis_recalibrate_high,
+            HOMEOSTASIS_RECALIBRATE_HIGH_BITS,
+            1.05,
+            1.30,
+        ),
+    );
+    set_bits(
+        hv,
+        HOMEOSTASIS_RECALIBRATE_LOW_START,
+        HOMEOSTASIS_RECALIBRATE_LOW_BITS,
+        linear_to_bits(
+            pheno.homeostasis_recalibrate_low,
+            HOMEOSTASIS_RECALIBRATE_LOW_BITS,
+            0.70,
+            0.95,
+        ),
+    );
+    set_bits(
+        hv,
+        NEUROMOD_EMA_ALPHA_START,
+        NEUROMOD_EMA_ALPHA_BITS,
+        linear_to_bits(
+            pheno.neuromod_ema_alpha,
+            NEUROMOD_EMA_ALPHA_BITS,
+            0.01,
+            0.15,
+        ),
+    );
+    set_bits(
+        hv,
+        FRUSTRATION_DAMPEN_THRESHOLD_START,
+        FRUSTRATION_DAMPEN_THRESHOLD_BITS,
+        linear_to_bits(
+            pheno.frustration_dampen_threshold as f32,
+            FRUSTRATION_DAMPEN_THRESHOLD_BITS,
+            0.2,
+            0.8,
+        ),
+    );
+    set_bits(
+        hv,
+        ENGAGEMENT_LOW_THRESHOLD_START,
+        ENGAGEMENT_LOW_THRESHOLD_BITS,
+        linear_to_bits(
+            pheno.engagement_low_threshold as f32,
+            ENGAGEMENT_LOW_THRESHOLD_BITS,
+            0.1,
+            0.6,
+        ),
+    );
+    set_bits(
+        hv,
+        FLOW_EXPLORATION_INCREMENT_START,
+        FLOW_EXPLORATION_INCREMENT_BITS,
+        linear_to_bits(
+            pheno.flow_exploration_increment,
+            FLOW_EXPLORATION_INCREMENT_BITS,
+            0.01,
+            0.15,
+        ),
+    );
+    set_bits(
+        hv,
+        COHERENCE_LOW_START,
+        COHERENCE_LOW_BITS,
+        linear_to_bits(pheno.coherence_low, COHERENCE_LOW_BITS, 0.15, 0.50),
+    );
+    set_bits(
+        hv,
+        AROUSAL_TRAP_THRESHOLD_START,
+        AROUSAL_TRAP_THRESHOLD_BITS,
+        linear_to_bits(
+            pheno.arousal_trap_threshold,
+            AROUSAL_TRAP_THRESHOLD_BITS,
+            0.5,
+            0.95,
+        ),
+    );
+    set_bits(
+        hv,
+        SELF_MODEL_WEIGHT_HIGH_START,
+        SELF_MODEL_WEIGHT_HIGH_BITS,
+        linear_to_bits(
+            pheno.self_model_weight_high,
+            SELF_MODEL_WEIGHT_HIGH_BITS,
+            0.4,
+            0.95,
+        ),
+    );
+    set_bits(
+        hv,
+        HOMEOSTASIS_PULL_CRUISE_START,
+        HOMEOSTASIS_PULL_CRUISE_BITS,
+        linear_to_bits(
+            pheno.homeostasis_pull_cruise,
+            HOMEOSTASIS_PULL_CRUISE_BITS,
+            0.5,
+            3.0,
+        ),
+    );
+    set_bits(
+        hv,
+        CONFIDENCE_CRASH_THRESHOLD_START,
+        CONFIDENCE_CRASH_THRESHOLD_BITS,
+        linear_to_bits(
+            pheno.confidence_crash_threshold as f32,
+            CONFIDENCE_CRASH_THRESHOLD_BITS,
+            0.15,
+            0.50,
+        ),
+    );
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -434,7 +661,10 @@ mod tests {
     fn test_default_phenotype_has_high_fitness() {
         let defaults = ThresholdPhenotype::default();
         let fitness = evaluate_threshold_fitness(&defaults);
-        assert!(fitness > 0.8, "default thresholds should be consistent, got {fitness}");
+        assert!(
+            fitness > 0.8,
+            "default thresholds should be consistent, got {fitness}"
+        );
     }
 
     #[test]
@@ -442,7 +672,10 @@ mod tests {
         let mut pheno = ThresholdPhenotype::default();
         pheno.homeostasis_recalibrate_low = 1.2; // Above high (1.15)
         let fitness = evaluate_threshold_fitness(&pheno);
-        assert!(fitness < 0.8, "inverted homeostasis should be penalized, got {fitness}");
+        assert!(
+            fitness < 0.8,
+            "inverted homeostasis should be penalized, got {fitness}"
+        );
     }
 
     #[test]
@@ -450,7 +683,10 @@ mod tests {
         let mut pheno = ThresholdPhenotype::default();
         pheno.dream_min_interval = 200; // Above base (100)
         let fitness = evaluate_threshold_fitness(&pheno);
-        assert!(fitness < 0.8, "inverted dream intervals should be penalized, got {fitness}");
+        assert!(
+            fitness < 0.8,
+            "inverted dream intervals should be penalized, got {fitness}"
+        );
     }
 
     #[test]
@@ -462,6 +698,9 @@ mod tests {
         encode_thresholds(&mut hv, &pheno);
 
         let neural_after: Vec<u8> = hv.0[..50].to_vec();
-        assert_eq!(neural_before, neural_after, "threshold encoding must not touch neural region");
+        assert_eq!(
+            neural_before, neural_after,
+            "threshold encoding must not touch neural region"
+        );
     }
 }

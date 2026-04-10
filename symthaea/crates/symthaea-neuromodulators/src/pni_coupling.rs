@@ -249,8 +249,7 @@ impl PniCoupling {
         self.state.cytokines.il6 += CHRONIC_INFLAMMATION_RATE * load;
 
         // Immune competence degrades under stress
-        self.state.immune_competence =
-            (1.0 - 0.4 * cortisol - 0.3 * load).clamp(0.0, 1.0);
+        self.state.immune_competence = (1.0 - 0.4 * cortisol - 0.3 * load).clamp(0.0, 1.0);
 
         self.state.cytokines.clamp_all();
         self.recompute_derived();
@@ -359,8 +358,8 @@ impl PniCoupling {
         let c = &self.state.cytokines;
 
         // Net inflammation: pro minus anti
-        self.state.inflammation_index = (c.il6 + c.tnf_alpha + c.il1_beta) / 3.0
-            - (c.il10 + c.tgf_beta) / 2.0;
+        self.state.inflammation_index =
+            (c.il6 + c.tnf_alpha + c.il1_beta) / 3.0 - (c.il10 + c.tgf_beta) / 2.0;
 
         // Sickness behavior tracks inflammation via EMA (sluggish onset/offset)
         let target_sickness = if self.state.inflammation_index > SICKNESS_THRESHOLD {
@@ -368,8 +367,8 @@ impl PniCoupling {
         } else {
             0.0
         };
-        self.state.sickness_behavior += SICKNESS_TRACKING_RATE
-            * (target_sickness - self.state.sickness_behavior);
+        self.state.sickness_behavior +=
+            SICKNESS_TRACKING_RATE * (target_sickness - self.state.sickness_behavior);
         self.state.sickness_behavior = self.state.sickness_behavior.clamp(0.0, 1.0);
 
         // Consciousness cost
@@ -422,7 +421,10 @@ mod tests {
 
         pni.update_from_threat(0.8, 10);
 
-        assert!(pni.state.cytokines.il6 > il6_before, "IL-6 should rise on threat");
+        assert!(
+            pni.state.cytokines.il6 > il6_before,
+            "IL-6 should rise on threat"
+        );
         assert!(
             pni.state.cytokines.tnf_alpha > tnf_before,
             "TNF-alpha should rise on threat"
@@ -599,7 +601,10 @@ mod tests {
             pni.update_from_threat(0.7, 15);
             pni.tick(1.0);
         }
-        assert!(pni.state.inflammation_index > 0.0, "should be inflamed after threat");
+        assert!(
+            pni.state.inflammation_index > 0.0,
+            "should be inflamed after threat"
+        );
         let peak_cost = pni.state.consciousness_inflammation_cost;
         assert!(peak_cost > 0.0, "should have consciousness cost");
 
@@ -653,7 +658,10 @@ mod tests {
         assert!(deltas.delta_noradrenaline.abs() < 1e-6);
         assert!(deltas.delta_adenosine.abs() < 1e-6);
         // IL-10 baseline = 0.2 → small oxytocin boost
-        assert!(deltas.delta_oxytocin > 0.0, "baseline IL-10 should give oxytocin boost");
+        assert!(
+            deltas.delta_oxytocin > 0.0,
+            "baseline IL-10 should give oxytocin boost"
+        );
     }
 
     #[test]

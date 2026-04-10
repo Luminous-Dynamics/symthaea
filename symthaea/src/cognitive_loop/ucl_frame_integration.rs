@@ -95,8 +95,11 @@ impl UCLFrameIntegration {
             .collect();
 
         // Sort by similarity (highest first)
-        self.last_detected
-            .sort_by(|a, b| b.similarity.partial_cmp(&a.similarity).unwrap_or(std::cmp::Ordering::Equal));
+        self.last_detected.sort_by(|a, b| {
+            b.similarity
+                .partial_cmp(&a.similarity)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
 
         // Blend detected frame encodings into compressed_state
         for detected in &self.last_detected {

@@ -127,7 +127,6 @@ pub struct AppEntry {
     pub proprietary: bool,
 
     // ── Detection: how to recognize this app across platforms ──
-
     /// Windows: names as they appear in Add/Remove Programs or winget
     pub windows_names: &'static [&'static str],
     /// macOS: .app names or brew formula/cask names
@@ -144,7 +143,6 @@ pub struct AppEntry {
     pub brew_names: &'static [&'static str],
 
     // ── Recommendation: what to use on NixOS ──
-
     /// The PRIMARY recommendation — what Symthaea suggests by default
     pub primary: NixRecommendation,
     /// Alternative recommendations — shown when user clicks "Alternatives"
@@ -220,7 +218,9 @@ impl AppDatabase {
             // Index by canonical name
             name_index.insert(entry.name.to_lowercase(), i);
             // Index by all platform-specific names
-            for name in entry.windows_names.iter()
+            for name in entry
+                .windows_names
+                .iter()
                 .chain(entry.macos_names.iter())
                 .chain(entry.linux_names.iter())
                 .chain(entry.flatpak_ids.iter())
@@ -232,7 +232,11 @@ impl AppDatabase {
             }
         }
 
-        Self { entries, bundles, name_index }
+        Self {
+            entries,
+            bundles,
+            name_index,
+        }
     }
 
     /// Match a single app name against the database.
@@ -283,7 +287,8 @@ impl AppDatabase {
         // Calculate readiness score
         let total = matched.len() + unmatched.len();
         let readiness = if total > 0 {
-            let score_sum: f32 = matched.iter()
+            let score_sum: f32 = matched
+                .iter()
                 .map(|m| m.entry.primary.quality.confidence())
                 .sum();
             score_sum / total as f32
@@ -296,9 +301,13 @@ impl AppDatabase {
         for m in &matched {
             *category_counts.entry(m.entry.category).or_insert(0) += 1;
         }
-        let suggested_bundles: Vec<&'static AppBundle> = self.bundles.iter()
+        let suggested_bundles: Vec<&'static AppBundle> = self
+            .bundles
+            .iter()
             .filter(|b| {
-                let count: usize = b.trigger_categories.iter()
+                let count: usize = b
+                    .trigger_categories
+                    .iter()
                     .map(|c| category_counts.get(c).copied().unwrap_or(0))
                     .sum();
                 count >= b.trigger_threshold
@@ -307,27 +316,41 @@ impl AppDatabase {
             .collect();
 
         // Generate summary
-        let native_count = matched.iter()
-            .filter(|m| m.entry.primary.quality == MatchQuality::Native
-                     || m.entry.primary.quality == MatchQuality::OfficialLinux)
+        let native_count = matched
+            .iter()
+            .filter(|m| {
+                m.entry.primary.quality == MatchQuality::Native
+                    || m.entry.primary.quality == MatchQuality::OfficialLinux
+            })
             .count();
-        let alt_count = matched.iter()
-            .filter(|m| m.entry.primary.quality == MatchQuality::StrongAlternative
-                     || m.entry.primary.quality == MatchQuality::PartialAlternative)
+        let alt_count = matched
+            .iter()
+            .filter(|m| {
+                m.entry.primary.quality == MatchQuality::StrongAlternative
+                    || m.entry.primary.quality == MatchQuality::PartialAlternative
+            })
             .count();
 
         let summary = if readiness > 0.85 {
-            format!("{} of {} apps work natively on NixOS. Your system is highly compatible!",
-                    native_count, total)
+            format!(
+                "{} of {} apps work natively on NixOS. Your system is highly compatible!",
+                native_count, total
+            )
         } else if readiness > 0.65 {
-            format!("{} apps work natively, {} have good alternatives. Review the alternatives below.",
-                    native_count, alt_count)
+            format!(
+                "{} apps work natively, {} have good alternatives. Review the alternatives below.",
+                native_count, alt_count
+            )
         } else if readiness > 0.45 {
-            format!("{} apps need alternatives. Consider dual-boot for full compatibility.",
-                    alt_count + unmatched.len())
+            format!(
+                "{} apps need alternatives. Consider dual-boot for full compatibility.",
+                alt_count + unmatched.len()
+            )
         } else {
-            format!("Many apps lack Linux equivalents ({} unmatched). Dual-boot strongly recommended.",
-                    unmatched.len())
+            format!(
+                "Many apps lack Linux equivalents ({} unmatched). Dual-boot strongly recommended.",
+                unmatched.len()
+            )
         };
 
         MigrationReport {
@@ -363,14 +386,26 @@ impl AppDatabase {
                     apps.push(name.to_string());
                 }
             }
-        } else if lines.iter().any(|l| l.contains("winget") || l.contains("Microsoft.")) {
+        } else if lines
+            .iter()
+            .any(|l| l.contains("winget") || l.contains("Microsoft."))
+        {
             // winget list output: skip header, parse name column
             let mut past_header = false;
             for line in &lines {
-                if line.contains("----") { past_header = true; continue; }
-                if !past_header { continue; }
+                if line.contains("----") {
+                    past_header = true;
+                    continue;
+                }
+                if !past_header {
+                    continue;
+                }
                 // winget list: Name | Id | Version | Source
-                let name = line.split_whitespace().take(3).collect::<Vec<_>>().join(" ");
+                let name = line
+                    .split_whitespace()
+                    .take(3)
+                    .collect::<Vec<_>>()
+                    .join(" ");
                 if !name.is_empty() {
                     apps.push(name.trim().to_string());
                 }
@@ -381,7 +416,10 @@ impl AppDatabase {
                     apps.push(id);
                 }
             }
-        } else if lines.iter().any(|l| l.starts_with("ii ") || l.contains("/stable")) {
+        } else if lines
+            .iter()
+            .any(|l| l.starts_with("ii ") || l.contains("/stable"))
+        {
             // dpkg --list output
             for line in &lines {
                 if line.starts_with("ii ") {
@@ -392,14 +430,20 @@ impl AppDatabase {
                     }
                 }
             }
-        } else if lines.iter().any(|l| l.contains("extra/") || l.contains("core/")) {
+        } else if lines
+            .iter()
+            .any(|l| l.contains("extra/") || l.contains("core/"))
+        {
             // pacman -Q output
             for line in &lines {
                 if let Some(pkg) = line.split_whitespace().next() {
                     apps.push(pkg.to_string());
                 }
             }
-        } else if lines.iter().any(|l| l.contains(".desktop") || l.contains("org.")) {
+        } else if lines
+            .iter()
+            .any(|l| l.contains(".desktop") || l.contains("org."))
+        {
             // flatpak list output
             for line in &lines {
                 let id = line.trim();
@@ -436,8 +480,13 @@ impl AppDatabase {
 fn extract_winget_id(line: &str) -> Option<String> {
     // Look for Publisher.App pattern
     for word in line.split_whitespace() {
-        if word.contains('.') && word.chars().filter(|c| *c == '.').count() >= 1
-            && word.chars().next().map(|c| c.is_uppercase()).unwrap_or(false)
+        if word.contains('.')
+            && word.chars().filter(|c| *c == '.').count() >= 1
+            && word
+                .chars()
+                .next()
+                .map(|c| c.is_uppercase())
+                .unwrap_or(false)
         {
             return Some(word.to_string());
         }
@@ -538,7 +587,6 @@ static APPS: &[AppEntry] = &[
         primary: ("brave", "Brave", MatchQuality::Native, "Same browser on Linux.", []),
         alts: []
     ),
-
     // ── Office ──
     app!("Microsoft Office", AppCategory::Office, true,
         win: ["Microsoft Office", "Microsoft Word", "Microsoft Excel", "Microsoft PowerPoint", "Microsoft 365"],
@@ -567,7 +615,6 @@ static APPS: &[AppEntry] = &[
         alts: [("libreoffice-still", "LibreOffice Writer", MatchQuality::StrongAlternative,
              "Rock-solid word processor. May reformat complex documents slightly.", ["Formatting differences on complex docs"])]
     ),
-
     // ── Development ──
     app!("Visual Studio Code", AppCategory::IDE, false,
         win: ["Visual Studio Code", "VS Code", "Code"], mac: ["Visual Studio Code"],
@@ -614,7 +661,6 @@ static APPS: &[AppEntry] = &[
         alts: [("vscode", "VS Code", MatchQuality::StrongAlternative,
              "Free, extensible, excellent Java support via extensions.", ["Different UI", "No built-in database tools"])]
     ),
-
     // ── Creative ──
     app!("Adobe Photoshop", AppCategory::Creative2D, true,
         win: ["Adobe Photoshop", "Photoshop"], mac: ["Adobe Photoshop"],
@@ -643,7 +689,6 @@ static APPS: &[AppEntry] = &[
             ["Different tools layout", "Some advanced AI features missing"]),
         alts: []
     ),
-
     // ── Audio ──
     app!("Spotify", AppCategory::Streaming, true,
         win: ["Spotify"], mac: ["Spotify"], linux: ["spotify-client"],
@@ -672,7 +717,6 @@ static APPS: &[AppEntry] = &[
              ["Proprietary, expensive", "Smaller community than Ableton"])
         ]
     ),
-
     // ── Communication ──
     app!("Discord", AppCategory::Communication, true,
         win: ["Discord"], mac: ["Discord"], linux: ["discord"],
@@ -720,7 +764,6 @@ static APPS: &[AppEntry] = &[
              "Decentralized, self-hostable, end-to-end encrypted via Matrix protocol.",
              ["Different network", "More complex than iMessage"])]
     ),
-
     // ── Gaming ──
     app!("Steam", AppCategory::Gaming, true,
         win: ["Steam"], mac: ["Steam"], linux: ["steam"],
@@ -743,7 +786,6 @@ static APPS: &[AppEntry] = &[
              "Universal game launcher. Supports Epic, GOG, Battle.net, and more.",
              ["Manual configuration sometimes needed"])]
     ),
-
     // ── System / Utilities ──
     app!("7-Zip", AppCategory::Archive, false,
         win: ["7-Zip", "7zip"], mac: [], linux: ["p7zip"],
@@ -794,7 +836,6 @@ static APPS: &[AppEntry] = &[
             "Same database, same format. Your .kdbx file just works.", []),
         alts: []
     ),
-
     // ── More Browsers ──
     app!("Vivaldi", AppCategory::Browser, true,
         win: ["Vivaldi"], mac: ["Vivaldi"], linux: ["vivaldi-stable"],
@@ -810,7 +851,6 @@ static APPS: &[AppEntry] = &[
         primary: ("opera", "Opera", MatchQuality::Native, "Official Opera for Linux.", ["Proprietary"]),
         alts: []
     ),
-
     // ── More Communication ──
     app!("Telegram", AppCategory::Communication, false,
         win: ["Telegram Desktop", "Telegram"], mac: ["Telegram"], linux: ["telegram-desktop"],
@@ -835,7 +875,6 @@ static APPS: &[AppEntry] = &[
             "Community WhatsApp wrapper. Same account, same chats.", ["Unofficial wrapper", "Web-based"]),
         alts: []
     ),
-
     // ── More Dev Tools ──
     app!("Neovim", AppCategory::Editor, false,
         win: ["Neovim"], mac: ["nvim", "neovim"], linux: ["neovim", "nvim"],
@@ -873,7 +912,6 @@ static APPS: &[AppEntry] = &[
         primary: ("python3", "Python 3", MatchQuality::Native, "Same Python. Use nix develop for per-project versions instead of pyenv.", []),
         alts: []
     ),
-
     // ── More Creative ──
     app!("Blender", AppCategory::Creative3D, false,
         win: ["Blender"], mac: ["Blender"], linux: ["blender"],
@@ -917,7 +955,6 @@ static APPS: &[AppEntry] = &[
         primary: ("handbrake", "HandBrake", MatchQuality::Native, "Same transcoder.", []),
         alts: []
     ),
-
     // ── More Media ──
     app!("Thunderbird", AppCategory::Email, false,
         win: ["Mozilla Thunderbird", "Thunderbird"], mac: ["Thunderbird"], linux: ["thunderbird"],
@@ -941,7 +978,6 @@ static APPS: &[AppEntry] = &[
         primary: ("filezilla", "FileZilla", MatchQuality::Native, "Same FTP client.", []),
         alts: []
     ),
-
     // ── More System ──
     app!("Notepad++", AppCategory::Editor, false,
         win: ["Notepad++", "Notepad Plus Plus"], mac: [], linux: [],
@@ -968,7 +1004,6 @@ static APPS: &[AppEntry] = &[
             []),
         alts: []
     ),
-
     // ── macOS-specific ──
     app!("Xcode", AppCategory::IDE, true,
         win: [], mac: ["Xcode"], linux: [],
@@ -1003,7 +1038,6 @@ static APPS: &[AppEntry] = &[
              "Professional DAW. More powerful than GarageBand but steeper learning curve.",
              ["More complex", "Requires audio knowledge"])]
     ),
-
     // ── More Browsers ──
     app!("Chromium", AppCategory::Browser, false,
         win: ["Chromium"], mac: ["Chromium"], linux: ["chromium", "chromium-browser"],
@@ -1031,7 +1065,6 @@ static APPS: &[AppEntry] = &[
              "Mainstream Firefox with broader extension support and faster updates.",
              ["No legacy XUL extension support"])]
     ),
-
     // ── Office / Productivity ──
     app!("LibreOffice", AppCategory::Office, false,
         win: ["LibreOffice"], mac: ["LibreOffice"], linux: ["libreoffice", "libreoffice-still", "libreoffice-fresh"],
@@ -1087,7 +1120,6 @@ static APPS: &[AppEntry] = &[
             "Same reference manager. Your library syncs via Zotero account.", []),
         alts: []
     ),
-
     // ── More Development ──
     app!("Vim", AppCategory::Editor, false,
         win: ["Vim", "gVim"], mac: ["vim", "macvim"], linux: ["vim", "vim-gtk3", "gvim"],
@@ -1234,7 +1266,6 @@ static APPS: &[AppEntry] = &[
             "Same Ansible. Playbooks, roles, and inventory work identically. Even better on Linux — native SSH.", []),
         alts: []
     ),
-
     // ── More Creative ──
     app!("Krita", AppCategory::Creative2D, false,
         win: ["Krita"], mac: ["Krita"], linux: ["krita"],
@@ -1322,7 +1353,6 @@ static APPS: &[AppEntry] = &[
             "Same music notation software. Scores, parts, and MIDI playback all carry over.", []),
         alts: []
     ),
-
     // ── More Communication ──
     app!("Element", AppCategory::Communication, false,
         win: ["Element"], mac: ["Element"], linux: ["element-desktop"],
@@ -1357,7 +1387,6 @@ static APPS: &[AppEntry] = &[
             "Same team chat client. Self-hosted Slack alternative. Same server, same channels.", []),
         alts: []
     ),
-
     // ── More Gaming ──
     app!("Lutris", AppCategory::GamingTools, false,
         win: [], mac: [], linux: ["lutris"],
@@ -1404,7 +1433,6 @@ static APPS: &[AppEntry] = &[
             "Same multi-system emulator frontend. Core library, shaders, and saves carry over.", []),
         alts: []
     ),
-
     // ── More System / Utility ──
     app!("htop", AppCategory::SystemUtil, false,
         win: [], mac: ["htop"], linux: ["htop"],
@@ -1500,7 +1528,6 @@ static APPS: &[AppEntry] = &[
             "QEMU/KVM with a graphical manager. Near-native VM performance via hardware virtualization.", []),
         alts: []
     ),
-
     // ── More Media ──
     app!("mpv", AppCategory::MediaPlayer, false,
         win: ["mpv"], mac: ["mpv"], linux: ["mpv"],
@@ -1615,8 +1642,16 @@ mod tests {
     #[test]
     fn test_database_builds() {
         let db = AppDatabase::new();
-        assert!(db.entries().len() >= 20, "Database has {} entries", db.entries().len());
-        assert!(db.bundles().len() >= 4, "Database has {} bundles", db.bundles().len());
+        assert!(
+            db.entries().len() >= 20,
+            "Database has {} entries",
+            db.entries().len()
+        );
+        assert!(
+            db.bundles().len() >= 4,
+            "Database has {} bundles",
+            db.bundles().len()
+        );
     }
 
     #[test]
@@ -1675,11 +1710,18 @@ mod tests {
     fn test_every_entry_has_justification() {
         let db = AppDatabase::new();
         for entry in db.entries() {
-            assert!(!entry.primary.justification.is_empty(),
-                "App '{}' primary has no justification", entry.name);
+            assert!(
+                !entry.primary.justification.is_empty(),
+                "App '{}' primary has no justification",
+                entry.name
+            );
             for alt in entry.alternatives {
-                assert!(!alt.justification.is_empty(),
-                    "App '{}' alternative '{}' has no justification", entry.name, alt.display_name);
+                assert!(
+                    !alt.justification.is_empty(),
+                    "App '{}' alternative '{}' has no justification",
+                    entry.name,
+                    alt.display_name
+                );
             }
         }
     }
@@ -1688,8 +1730,12 @@ mod tests {
     fn test_migration_report() {
         let db = AppDatabase::new();
         let apps = vec![
-            "Firefox".into(), "Visual Studio Code".into(), "Steam".into(),
-            "Adobe Photoshop".into(), "iMessage".into(), "SomeUnknownApp".into(),
+            "Firefox".into(),
+            "Visual Studio Code".into(),
+            "Steam".into(),
+            "Adobe Photoshop".into(),
+            "iMessage".into(),
+            "SomeUnknownApp".into(),
         ];
         let report = db.match_list(&apps);
 
@@ -1704,8 +1750,10 @@ mod tests {
         let db = AppDatabase::new();
         let apps = vec!["Steam".into(), "Discord".into()];
         let report = db.match_list(&apps);
-        assert!(report.suggested_bundles.iter().any(|b| b.name == "Gaming"),
-            "Gaming bundle should be suggested when Steam is present");
+        assert!(
+            report.suggested_bundles.iter().any(|b| b.name == "Gaming"),
+            "Gaming bundle should be suggested when Steam is present"
+        );
     }
 
     #[test]
@@ -1713,8 +1761,13 @@ mod tests {
         let db = AppDatabase::new();
         let apps = vec!["Ableton Live".into()];
         let report = db.match_list(&apps);
-        assert!(report.suggested_bundles.iter().any(|b| b.name == "Music Production"),
-            "Music bundle should be suggested when DAW is present");
+        assert!(
+            report
+                .suggested_bundles
+                .iter()
+                .any(|b| b.name == "Music Production"),
+            "Music bundle should be suggested when DAW is present"
+        );
     }
 
     #[test]
@@ -1726,7 +1779,11 @@ mod tests {
                              Visual Studio Code      Microsoft.VisualStudioCode  1.88\n\
                              Steam                   Valve.Steam                 latest";
         let apps = db.parse_app_list(winget_output);
-        assert!(apps.len() >= 3, "Parsed {} apps from winget output", apps.len());
+        assert!(
+            apps.len() >= 3,
+            "Parsed {} apps from winget output",
+            apps.len()
+        );
     }
 
     #[test]
@@ -1734,7 +1791,11 @@ mod tests {
         let db = AppDatabase::new();
         let brew_output = "---APPS---\nFirefox\nSpotify\n---BREW---\ngit\nhtop\nnvim";
         let apps = db.parse_app_list(brew_output);
-        assert!(apps.len() >= 5, "Parsed {} apps from brew output", apps.len());
+        assert!(
+            apps.len() >= 5,
+            "Parsed {} apps from brew output",
+            apps.len()
+        );
     }
 
     #[test]
@@ -1776,7 +1837,10 @@ mod tests {
         assert!(office.primary.justification.contains("compatibility"));
 
         // LibreOffice should be an alternative
-        assert!(office.alternatives.iter().any(|a| a.nix_pkg == "libreoffice"));
+        assert!(office
+            .alternatives
+            .iter()
+            .any(|a| a.nix_pkg == "libreoffice"));
     }
 
     #[test]
@@ -1806,7 +1870,10 @@ mod tests {
 
     #[test]
     fn parse_channel_version_extracts_major_minor() {
-        assert_eq!(super::parse_channel_version("25.05.20260401.abc1234"), "25.05");
+        assert_eq!(
+            super::parse_channel_version("25.05.20260401.abc1234"),
+            "25.05"
+        );
         assert_eq!(super::parse_channel_version("24.11"), "24.11");
         assert_eq!(super::parse_channel_version("25.05"), "25.05");
         assert_eq!(super::parse_channel_version("unknown"), "unknown");

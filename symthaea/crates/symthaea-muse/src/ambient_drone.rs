@@ -49,7 +49,7 @@ impl AmbientDrone {
         // Drone frequency follows the key (first harmony = root)
         // Use a very low octave for warmth
         let base_freq = 65.41; // C2
-        // Modulate by valence: positive = major feel (slight sharp), negative = minor (slight flat)
+                               // Modulate by valence: positive = major feel (slight sharp), negative = minor (slight flat)
         let detune = state.valence * 2.0; // ±2 cents
         self.target_freq = base_freq * 2.0f32.powf(detune / 1200.0);
 
@@ -80,7 +80,9 @@ impl AmbientDrone {
             // Advance asynchronous LFOs (incommensurable rates → never repeats)
             for i in 0..3 {
                 self.lfo_phases[i] += self.lfo_rates[i] / sr;
-                if self.lfo_phases[i] > 1.0 { self.lfo_phases[i] -= 1.0; }
+                if self.lfo_phases[i] > 1.0 {
+                    self.lfo_phases[i] -= 1.0;
+                }
             }
 
             // LFO outputs: smooth sine waves at different timescales
@@ -99,9 +101,9 @@ impl AmbientDrone {
             let freqs = [base, base * 2.0, base * 1.5, base * 4.0];
             // Per-partial amplitude modulation (each partial breathes independently)
             let amps = [
-                1.0 + lfo0 * 0.1,       // fundamental: gentle pulse
-                0.3 + lfo1 * 0.08,      // octave: different cycle
-                0.15 + lfo2 * 0.05,     // fifth: yet another
+                1.0 + lfo0 * 0.1,          // fundamental: gentle pulse
+                0.3 + lfo1 * 0.08,         // octave: different cycle
+                0.15 + lfo2 * 0.05,        // fifth: yet another
                 0.05 + lfo0 * lfo1 * 0.02, // 2oct: product of two LFOs (complex)
             ];
 
@@ -139,7 +141,10 @@ mod tests {
         let mut drone = AmbientDrone::new(44100);
         drone.update_state(&MusicalState::default(), 0);
         let output = drone.render(4410);
-        assert!(output.iter().any(|s| s[0].abs() > 0.0001), "drone should produce signal");
+        assert!(
+            output.iter().any(|s| s[0].abs() > 0.0001),
+            "drone should produce signal"
+        );
     }
 
     #[test]
@@ -153,15 +158,27 @@ mod tests {
         drone.update_state(&state, 10); // many notes
         let vol_many = drone.target_volume;
 
-        assert!(vol_none > vol_many, "drone should be quieter with notes: none={vol_none} many={vol_many}");
+        assert!(
+            vol_none > vol_many,
+            "drone should be quieter with notes: none={vol_none} many={vol_many}"
+        );
     }
 
     #[test]
     fn drone_is_always_present() {
         let mut drone = AmbientDrone::new(44100);
-        drone.update_state(&MusicalState { consciousness_level: 0.1, ..Default::default() }, 20);
+        drone.update_state(
+            &MusicalState {
+                consciousness_level: 0.1,
+                ..Default::default()
+            },
+            20,
+        );
         // Even with many notes and low consciousness, drone should be > 0
-        assert!(drone.target_volume > 0.001, "drone should always be present");
+        assert!(
+            drone.target_volume > 0.001,
+            "drone should always be present"
+        );
     }
 
     #[test]

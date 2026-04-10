@@ -728,11 +728,15 @@ impl EpistemicClaimValidation {
         let count = evidence.len();
         let has_experimental = evidence.iter().any(|e| {
             let lower = e.to_lowercase();
-            lower.contains("experiment") || lower.contains("controlled") || lower.contains("replicated")
+            lower.contains("experiment")
+                || lower.contains("controlled")
+                || lower.contains("replicated")
         });
         let has_peer_review = evidence.iter().any(|e| {
             let lower = e.to_lowercase();
-            lower.contains("peer review") || lower.contains("consensus") || lower.contains("validated")
+            lower.contains("peer review")
+                || lower.contains("consensus")
+                || lower.contains("validated")
         });
 
         if has_peer_review && has_experimental && count >= 3 {
@@ -947,12 +951,7 @@ mod tests {
 
     #[test]
     fn test_claim_validation_no_evidence() {
-        let v = EpistemicClaimValidation::validate(
-            "Crystals heal diseases",
-            "health",
-            0.9,
-            &[],
-        );
+        let v = EpistemicClaimValidation::validate("Crystals heal diseases", "health", 0.9, &[]);
         assert_eq!(v.evidence_level, EvidenceLevel::None);
         assert!(v.is_overconfident());
         assert!(v.feasibility_gap > 0.8);

@@ -97,10 +97,7 @@ impl HvCompressor {
     }
 
     /// Create a compressor for an arbitrary dimension.
-    pub fn with_dim(
-        dim: usize,
-        bits: u8,
-    ) -> Result<Self, turbo_quant::error::TurboQuantError> {
+    pub fn with_dim(dim: usize, bits: u8) -> Result<Self, turbo_quant::error::TurboQuantError> {
         let quantizer = PolarQuantizer::new(dim, bits, 42)?;
         Ok(Self { quantizer, bits })
     }

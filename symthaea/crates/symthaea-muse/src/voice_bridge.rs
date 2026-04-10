@@ -40,8 +40,12 @@ impl MuseVoiceBridge {
             sample_rate,
             #[cfg(feature = "broca")]
             broca: {
-                let genesis = symthaea_core::genesis::GenesisSeed::from_phrase("symthaea-muse-voice");
-                symthaea_broca::BrocaGenerator::new(&genesis, symthaea_broca::BrocaConfig::default())
+                let genesis =
+                    symthaea_core::genesis::GenesisSeed::from_phrase("symthaea-muse-voice");
+                symthaea_broca::BrocaGenerator::new(
+                    &genesis,
+                    symthaea_broca::BrocaConfig::default(),
+                )
             },
         }
     }
@@ -110,17 +114,9 @@ impl MuseVoiceBridge {
             ]
         } else if state.harmony_activations[7] > 0.5 {
             // Sacred Stillness
-            &[
-                "I feel peace.",
-                "I feel still.",
-                "Silence.",
-                "I am calm.",
-            ]
+            &["I feel peace.", "I feel still.", "Silence.", "I am calm."]
         } else if state.valence < -0.2 {
-            &[
-                "I feel the dark.",
-                "Something is rising.",
-            ]
+            &["I feel the dark.", "Something is rising."]
         } else {
             &[
                 "I feel awareness.",
@@ -145,9 +141,9 @@ impl MuseVoiceBridge {
         channels.channels[5] = 1.0; // reflect intent
 
         // Emotions
-        channels.channels[9] = state.valence;           // valence
-        channels.channels[10] = state.arousal;           // arousal
-        channels.channels[11] = state.serotonin;         // warmth
+        channels.channels[9] = state.valence; // valence
+        channels.channels[10] = state.arousal; // arousal
+        channels.channels[11] = state.serotonin; // warmth
 
         // Consciousness
         channels.channels[12] = state.consciousness_level; // Ψ
@@ -155,22 +151,35 @@ impl MuseVoiceBridge {
         channels.channels[14] = state.harmony_activations[0]; // coherence
 
         // Epistemic status: confident when high Ψ
-        channels.channels[8] = if state.consciousness_level > 0.7 { 0.0 } else { 2.0 }; // Certain vs Uncertain
+        channels.channels[8] = if state.consciousness_level > 0.7 {
+            0.0
+        } else {
+            2.0
+        }; // Certain vs Uncertain
 
         let result = self.broca.generate(&channels);
         let text = result.text.trim().to_string();
 
         // Filter: reject if empty, too short, or contains code tokens (untrained weights)
-        if text.is_empty() || text.len() < 5
-            || text.contains("pub ") || text.contains("fn ") || text.contains("struct")
-            || text.contains("&mut") || text.contains("<T") || text.contains("[]")
+        if text.is_empty()
+            || text.len() < 5
+            || text.contains("pub ")
+            || text.contains("fn ")
+            || text.contains("struct")
+            || text.contains("&mut")
+            || text.contains("<T")
+            || text.contains("[]")
             || text.contains("unknown unknown")
         {
             None // fall back to curated phrases
         } else {
             // Clean up: take first sentence only, cap length
             let clean = text.split('.').next().unwrap_or(&text).trim().to_string();
-            if clean.len() >= 5 { Some(format!("{}.", clean)) } else { None }
+            if clean.len() >= 5 {
+                Some(format!("{}.", clean))
+            } else {
+                None
+            }
         }
     }
 

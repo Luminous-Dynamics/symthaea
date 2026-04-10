@@ -130,6 +130,14 @@ pub enum EmbodimentPlatform {
     Helicopter,
     Auv,
     Manipulator,
+    /// Lower-limb exoskeleton — shared authority with human user.
+    Exoskeleton,
+    /// Surgical robot — sub-mm RCM-constrained precision.
+    Surgical,
+    /// Orbital servicing arm — zero-g dual-body dynamics.
+    Orbital,
+    /// Legged quadruped — CPG-modulated locomotion.
+    Quadruped,
     /// Virtual caregiver agent — no physical embodiment.
     CareProvider,
     /// Browser agent — web pages as sensory environment via CDP.
@@ -214,6 +222,87 @@ pub trait EmbodimentBridge: Send + Sync {
     /// hardware should report lower values.
     fn physical_reliability(&self) -> f64 {
         1.0
+    }
+}
+
+// ── Platform Plugin System ───────────────────────────────────────────────
+
+/// Factory + metadata for a robotics platform.
+///
+/// Each platform crate exports a `pub struct XPlugin;` implementing this trait.
+/// The cognitive loop's constructor collects all enabled plugins into a
+/// `PlatformRegistry` and dispatches bridge creation by `EmbodimentPlatform`.
+///
+/// This reduces "add a platform" to 3 steps:
+/// 1. Add variant to `EmbodimentPlatform`
+/// 2. Add feature flag + optional dep to Cargo.toml
+/// 3. Register the plugin in the constructor's `build_registry()`
+pub trait PlatformPlugin: Send + Sync {
+    /// Which platform this plugin provides.
+    fn platform(&self) -> EmbodimentPlatform;
+
+    /// Feature name for diagnostics (e.g., "helicopter", "exoskeleton").
+    fn feature_name(&self) -> &'static str;
+
+    /// Number of actuators for this platform.
+    fn num_actuators(&self) -> usize;
+
+    /// Create a new embodiment bridge from a genesis seed.
+    fn create_bridge(&self, genesis: &crate::genesis::GenesisSeed) -> Box<dyn EmbodimentBridge>;
+}
+
+/// Compile-time platform registry.
+///
+/// Collects `PlatformPlugin` implementations registered by feature-gated
+/// platform crates. The constructor calls `create_bridge()` on the matching
+/// plugin to instantiate the correct embodiment.
+pub struct PlatformRegistry {
+    plugins: Vec<Box<dyn PlatformPlugin>>,
+}
+
+impl PlatformRegistry {
+    /// Create an empty registry.
+    pub fn new() -> Self {
+        Self { plugins: Vec::new() }
+    }
+
+    /// Register a platform plugin.
+    pub fn register(&mut self, plugin: Box<dyn PlatformPlugin>) {
+        self.plugins.push(plugin);
+    }
+
+    /// Create an embodiment bridge for the given platform.
+    /// Returns `None` if no plugin is registered for that platform.
+    pub fn create_bridge(
+        &self,
+        platform: EmbodimentPlatform,
+        genesis: &crate::genesis::GenesisSeed,
+    ) -> Option<Box<dyn EmbodimentBridge>> {
+        self.plugins
+            .iter()
+            .find(|p| p.platform() == platform)
+            .map(|p| p.create_bridge(genesis))
+    }
+
+    /// List all registered platforms.
+    pub fn registered_platforms(&self) -> Vec<EmbodimentPlatform> {
+        self.plugins.iter().map(|p| p.platform()).collect()
+    }
+
+    /// Number of registered plugins.
+    pub fn len(&self) -> usize {
+        self.plugins.len()
+    }
+
+    /// Whether the registry is empty.
+    pub fn is_empty(&self) -> bool {
+        self.plugins.is_empty()
+    }
+}
+
+impl Default for PlatformRegistry {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

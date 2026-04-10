@@ -120,10 +120,7 @@ mod tests {
         assert!(BrowserAction::NoOp.is_read_only());
         assert!(BrowserAction::Screenshot.is_read_only());
         assert!(BrowserAction::ExtractText { selector: None }.is_read_only());
-        assert!(!BrowserAction::Navigate {
-            url: "x".into()
-        }
-        .is_read_only());
+        assert!(!BrowserAction::Navigate { url: "x".into() }.is_read_only());
         assert!(!BrowserAction::Click {
             selector: ElementSelector::Css("a".into())
         }

@@ -27,12 +27,12 @@ fn main() {
 
 #[cfg(feature = "humanoid")]
 fn run() {
+    use std::time::Instant;
+    use symthaea_core::genesis::GenesisSeed;
     use symthaea_humanoid::controller::HumanoidController;
     use symthaea_humanoid::encoder::HumanoidHdcEncoder;
     use symthaea_humanoid::simulator::{HumanoidPhysicsSimulator, SimpleHumanoidSimulator};
     use symthaea_humanoid::types::*;
-    use symthaea_core::genesis::GenesisSeed;
-    use std::time::Instant;
 
     println!("╔══════════════════════════════════════════════════════════════╗");
     println!("║  Residual Standing: PD + Learned Correction                 ║");
@@ -42,8 +42,8 @@ fn run() {
 
     let config = HumanoidConfig {
         genesis_phrase: "residual-standing-v1".to_string(),
-        network_layers: 1,       // Minimal network for CMA-ES speed
-        neurons_per_layer: 2,    // 2 neurons × 1 layer = 2 CfC neurons total
+        network_layers: 1,    // Minimal network for CMA-ES speed
+        neurons_per_layer: 2, // 2 neurons × 1 layer = 2 CfC neurons total
         ..HumanoidConfig::default()
     };
 
@@ -56,12 +56,15 @@ fn run() {
     let n_bias = init_bias.len();
     let n_params = n_weights + n_bias + 1; // +1 for residual gain
 
-    println!("  Parameters: {} (weights + bias + residual_gain)", n_params);
+    println!(
+        "  Parameters: {} (weights + bias + residual_gain)",
+        n_params
+    );
 
     // CMA-ES — larger population since we know the landscape is hard
     let pop_size = 16;
     let n_generations = 50;
-    let eval_steps = 200;       // 5 seconds of simulated standing
+    let eval_steps = 200; // 5 seconds of simulated standing
     let dt = 0.025;
 
     let mut mean: Vec<f64> = vec![0.0; n_params]; // Start at zero residual
@@ -83,8 +86,10 @@ fn run() {
     let mut best_ever_fitness = f64::NEG_INFINITY;
     let mut best_ever_params: Vec<f64> = mean.clone();
 
-    println!("{:>5} {:>12} {:>12} {:>12} {:>8}",
-        "Gen", "BestFit", "MeanFit", "BestEver", "Sigma");
+    println!(
+        "{:>5} {:>12} {:>12} {:>12} {:>8}",
+        "Gen", "BestFit", "MeanFit", "BestEver", "Sigma"
+    );
 
     for gen in 0..n_generations {
         let mut population: Vec<Vec<f64>> = Vec::with_capacity(pop_size);
@@ -94,9 +99,13 @@ fn run() {
             let mut candidate = vec![0.0f64; n_params];
             let mut rng = (gen * pop_size + p + 42) as u64;
             for i in 0..n_params {
-                rng ^= rng << 13; rng ^= rng >> 7; rng ^= rng << 17;
+                rng ^= rng << 13;
+                rng ^= rng >> 7;
+                rng ^= rng << 17;
                 let u1 = (rng as f64 / u64::MAX as f64).max(1e-10);
-                rng ^= rng << 13; rng ^= rng >> 7; rng ^= rng << 17;
+                rng ^= rng << 13;
+                rng ^= rng >> 7;
+                rng ^= rng << 17;
                 let u2 = rng as f64 / u64::MAX as f64;
                 let normal = (-2.0 * u1.ln()).sqrt() * (2.0 * std::f64::consts::PI * u2).cos();
                 candidate[i] = mean[i] + sigma * step_sizes[i] * normal;
@@ -111,8 +120,8 @@ fn run() {
             fitnesses.push(fitness);
         }
 
-        let mut ranked: Vec<(usize, f64)> = fitnesses.iter().enumerate()
-            .map(|(i, &f)| (i, f)).collect();
+        let mut ranked: Vec<(usize, f64)> =
+            fitnesses.iter().enumerate().map(|(i, &f)| (i, f)).collect();
         ranked.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
 
         let best_fitness = ranked[0].1;
@@ -125,11 +134,15 @@ fn run() {
 
         let n_elite = pop_size / 2;
         let mut new_mean = vec![0.0f64; n_params];
-        let weight_sum: f64 = (1..=n_elite).map(|i| (n_elite as f64 + 0.5 - i as f64).max(0.0)).sum();
+        let weight_sum: f64 = (1..=n_elite)
+            .map(|i| (n_elite as f64 + 0.5 - i as f64).max(0.0))
+            .sum();
         for rank in 0..n_elite {
             let idx = ranked[rank].0;
             let w = (n_elite as f64 + 0.5 - rank as f64).max(0.0) / weight_sum;
-            for i in 0..n_params { new_mean[i] += w * population[idx][i]; }
+            for i in 0..n_params {
+                new_mean[i] += w * population[idx][i];
+            }
         }
 
         for i in 0..n_params {
@@ -148,8 +161,10 @@ fn run() {
 
         if gen % 5 == 0 || gen == n_generations - 1 {
             let gain = best_ever_params[n_params - 1];
-            println!("{:>5} {:>12.4} {:>12.4} {:>12.4} {:>8.5} gain={:.3}",
-                gen, best_fitness, mean_fitness, best_ever_fitness, sigma, gain);
+            println!(
+                "{:>5} {:>12.4} {:>12.4} {:>12.4} {:>8.5} gain={:.3}",
+                gen, best_fitness, mean_fitness, best_ever_fitness, sigma, gain
+            );
             use std::io::Write;
             std::io::stdout().flush().unwrap_or(());
         }
@@ -165,8 +180,14 @@ fn run() {
 
     let gain = best_ever_params[n_params - 1].clamp(0.0, 0.3) as f32;
     let mut controller = HumanoidController::new(&genesis, &config);
-    let weights: Vec<f32> = best_ever_params[..n_weights].iter().map(|&w| w as f32).collect();
-    let bias: Vec<f32> = best_ever_params[n_weights..n_weights + n_bias].iter().map(|&w| w as f32).collect();
+    let weights: Vec<f32> = best_ever_params[..n_weights]
+        .iter()
+        .map(|&w| w as f32)
+        .collect();
+    let bias: Vec<f32> = best_ever_params[n_weights..n_weights + n_bias]
+        .iter()
+        .map(|&w| w as f32)
+        .collect();
     controller.set_output_projection(&weights, &bias);
 
     let mut encoder = HumanoidHdcEncoder::new(&genesis, config.num_levels);
@@ -189,17 +210,31 @@ fn run() {
         sim.step(&cmd, dt);
 
         let s = sim.state();
-        if s.head_height >= 0.8 { steps_standing += 1; }
-        let r = if s.head_height >= 1.2 { 1.0 } else { (s.head_height / 1.4).max(0.0) }
-            * s.torso_vertical[2].max(0.0);
+        if s.head_height >= 0.8 {
+            steps_standing += 1;
+        }
+        let r = if s.head_height >= 1.2 {
+            1.0
+        } else {
+            (s.head_height / 1.4).max(0.0)
+        } * s.torso_vertical[2].max(0.0);
         total_reward += r;
-        if s.head_height < 0.5 && !fell { fell = true; println!("  Fell at step {}", step); }
+        if s.head_height < 0.5 && !fell {
+            fell = true;
+            println!("  Fell at step {}", step);
+        }
     }
 
     println!("  Mean reward: {:.4}", total_reward / 2000.0);
-    println!("  Standing: {} / 2000 ({:.1}%)", steps_standing, steps_standing as f64 / 20.0);
+    println!(
+        "  Standing: {} / 2000 ({:.1}%)",
+        steps_standing,
+        steps_standing as f64 / 20.0
+    );
     println!("  Residual gain: {:.3}", gain);
-    if !fell { println!("  *** INDEPENDENT STANDING ACHIEVED ***"); }
+    if !fell {
+        println!("  *** INDEPENDENT STANDING ACHIEVED ***");
+    }
 
     // Compare: PD alone
     println!();
@@ -213,13 +248,22 @@ fn run() {
         let pd = pd_standing_baseline(&state, &pd_gains);
         sim.step(&pd, dt);
         let s = sim.state();
-        if s.head_height >= 0.8 { pd_standing += 1; }
-        let r = if s.head_height >= 1.2 { 1.0 } else { (s.head_height / 1.4).max(0.0) }
-            * s.torso_vertical[2].max(0.0);
+        if s.head_height >= 0.8 {
+            pd_standing += 1;
+        }
+        let r = if s.head_height >= 1.2 {
+            1.0
+        } else {
+            (s.head_height / 1.4).max(0.0)
+        } * s.torso_vertical[2].max(0.0);
         pd_reward += r;
     }
     println!("  PD mean reward: {:.4}", pd_reward / 2000.0);
-    println!("  PD standing: {} / 2000 ({:.1}%)", pd_standing, pd_standing as f64 / 20.0);
+    println!(
+        "  PD standing: {} / 2000 ({:.1}%)",
+        pd_standing,
+        pd_standing as f64 / 20.0
+    );
 }
 
 #[cfg(feature = "humanoid")]
@@ -243,7 +287,10 @@ fn evaluate_residual(
 
     let mut controller = HumanoidController::new(genesis, config);
     let weights: Vec<f32> = params[..n_weights].iter().map(|&w| w as f32).collect();
-    let bias: Vec<f32> = params[n_weights..n_weights + n_bias].iter().map(|&w| w as f32).collect();
+    let bias: Vec<f32> = params[n_weights..n_weights + n_bias]
+        .iter()
+        .map(|&w| w as f32)
+        .collect();
     controller.set_output_projection(&weights, &bias);
 
     let mut encoder = HumanoidHdcEncoder::new(genesis, config.num_levels);
@@ -264,7 +311,11 @@ fn evaluate_residual(
         sim.step(&cmd, dt);
 
         let s = sim.state();
-        let head_r = if s.head_height >= 1.2 { 1.0 } else { (s.head_height / 1.4).max(0.0) };
+        let head_r = if s.head_height >= 1.2 {
+            1.0
+        } else {
+            (s.head_height / 1.4).max(0.0)
+        };
         let upright = s.torso_vertical[2].max(0.0);
         let effort_bonus = (1.0 - cmd.control_effort() as f64).max(0.0) * 0.1;
         total_reward += head_r * upright + effort_bonus;

@@ -11,14 +11,14 @@ use crate::MusicalState;
 /// Detected emotional quality of the current consciousness state.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EmotionalQuality {
-    Joy,       // positive valence, high arousal
-    Peace,     // positive valence, low arousal
-    Sadness,   // negative valence, low arousal
-    Tension,   // negative valence, high arousal
-    Wonder,    // rising consciousness
-    Triumph,   // high dopamine + positive valence
-    Mystery,   // low consciousness, moderate arousal
-    Urgency,   // high noradrenaline + high arousal
+    Joy,     // positive valence, high arousal
+    Peace,   // positive valence, low arousal
+    Sadness, // negative valence, low arousal
+    Tension, // negative valence, high arousal
+    Wonder,  // rising consciousness
+    Triumph, // high dopamine + positive valence
+    Mystery, // low consciousness, moderate arousal
+    Urgency, // high noradrenaline + high arousal
 }
 
 /// Musical gesture prescribed for an emotion.
@@ -78,8 +78,8 @@ pub fn gesture_for_emotion(emotion: EmotionalQuality) -> MusicalGesture {
         EmotionalQuality::Joy => MusicalGesture {
             emotion,
             prefer_major: true,
-            direction_bias: 0.4,     // ascending
-            duration_scale: 0.8,     // slightly shorter (energetic)
+            direction_bias: 0.4,      // ascending
+            duration_scale: 0.8,      // slightly shorter (energetic)
             interval_preference: 4.0, // thirds and fourths
             velocity_scale: 1.1,
             harmonic_tension: 0.2,
@@ -88,40 +88,40 @@ pub fn gesture_for_emotion(emotion: EmotionalQuality) -> MusicalGesture {
         EmotionalQuality::Peace => MusicalGesture {
             emotion,
             prefer_major: true,
-            direction_bias: 0.0,     // neutral
-            duration_scale: 2.0,     // long sustained notes
+            direction_bias: 0.0,      // neutral
+            duration_scale: 2.0,      // long sustained notes
             interval_preference: 2.0, // stepwise motion
             velocity_scale: 0.6,
-            harmonic_tension: 0.0,   // consonant
-            staccato: 0.0,           // full legato
+            harmonic_tension: 0.0, // consonant
+            staccato: 0.0,         // full legato
         },
         EmotionalQuality::Sadness => MusicalGesture {
             emotion,
             prefer_major: false,
-            direction_bias: -0.4,    // descending
-            duration_scale: 1.5,     // longer notes
+            direction_bias: -0.4,     // descending
+            duration_scale: 1.5,      // longer notes
             interval_preference: 1.5, // small intervals (seconds)
-            velocity_scale: 0.5,     // soft
+            velocity_scale: 0.5,      // soft
             harmonic_tension: 0.3,
             staccato: 0.0,
         },
         EmotionalQuality::Tension => MusicalGesture {
             emotion,
             prefer_major: false,
-            direction_bias: 0.1,     // slightly ascending (building)
-            duration_scale: 0.6,     // shorter notes
+            direction_bias: 0.1,      // slightly ascending (building)
+            duration_scale: 0.6,      // shorter notes
             interval_preference: 6.0, // tritones, wide leaps
             velocity_scale: 1.2,
-            harmonic_tension: 0.8,   // very dissonant
+            harmonic_tension: 0.8, // very dissonant
             staccato: 0.3,
         },
         EmotionalQuality::Wonder => MusicalGesture {
             emotion,
             prefer_major: true,
-            direction_bias: 0.6,     // strongly ascending
+            direction_bias: 0.6, // strongly ascending
             duration_scale: 1.2,
             interval_preference: 7.0, // octave leaps
-            velocity_scale: 0.7,     // piano to forte
+            velocity_scale: 0.7,      // piano to forte
             harmonic_tension: 0.1,
             staccato: 0.0,
         },
@@ -129,31 +129,31 @@ pub fn gesture_for_emotion(emotion: EmotionalQuality) -> MusicalGesture {
             emotion,
             prefer_major: true,
             direction_bias: 0.5,
-            duration_scale: 0.7,     // energetic
+            duration_scale: 0.7,      // energetic
             interval_preference: 5.0, // fourths and fifths (heroic)
-            velocity_scale: 1.3,     // fortissimo
-            harmonic_tension: 0.1,   // strong resolution (V→I)
+            velocity_scale: 1.3,      // fortissimo
+            harmonic_tension: 0.1,    // strong resolution (V→I)
             staccato: 0.2,
         },
         EmotionalQuality::Mystery => MusicalGesture {
             emotion,
-            prefer_major: false,     // whole-tone / ambiguous
+            prefer_major: false, // whole-tone / ambiguous
             direction_bias: 0.0,
             duration_scale: 1.8,
             interval_preference: 3.0, // minor thirds (ambiguous)
-            velocity_scale: 0.4,     // very quiet
-            harmonic_tension: 0.5,   // ambiguous
+            velocity_scale: 0.4,      // very quiet
+            harmonic_tension: 0.5,    // ambiguous
             staccato: 0.0,
         },
         EmotionalQuality::Urgency => MusicalGesture {
             emotion,
             prefer_major: false,
             direction_bias: 0.3,
-            duration_scale: 0.4,     // very short notes
+            duration_scale: 0.4,      // very short notes
             interval_preference: 1.0, // chromatic motion
-            velocity_scale: 1.4,     // loud
+            velocity_scale: 1.4,      // loud
             harmonic_tension: 0.7,
-            staccato: 0.6,           // very staccato
+            staccato: 0.6, // very staccato
         },
     }
 }
@@ -175,10 +175,13 @@ pub fn apply_gesture_to_pitch(
     }
 
     // Find nearest scale tone to base_freq
-    let base_idx = scale.iter()
+    let base_idx = scale
+        .iter()
         .enumerate()
         .min_by(|(_, a), (_, b)| {
-            ((**a - base_freq).abs()).partial_cmp(&((**b - base_freq).abs())).unwrap()
+            ((**a - base_freq).abs())
+                .partial_cmp(&((**b - base_freq).abs()))
+                .unwrap()
         })
         .map(|(i, _)| i)
         .unwrap_or(0);
@@ -238,14 +241,19 @@ mod tests {
 
     #[test]
     fn detect_joyful_state() {
-        let state = MusicalState { valence: 0.6, arousal: 0.7, ..Default::default() };
+        let state = MusicalState {
+            valence: 0.6,
+            arousal: 0.7,
+            ..Default::default()
+        };
         assert_eq!(detect_emotion(&state), EmotionalQuality::Joy);
     }
 
     #[test]
     fn detect_peaceful_state() {
         let state = MusicalState {
-            valence: 0.3, arousal: 0.1,
+            valence: 0.3,
+            arousal: 0.1,
             harmony_activations: [0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.7],
             ..Default::default()
         };
@@ -254,7 +262,12 @@ mod tests {
 
     #[test]
     fn detect_tense_state() {
-        let state = MusicalState { valence: -0.5, arousal: 0.8, prediction_error: 0.6, ..Default::default() };
+        let state = MusicalState {
+            valence: -0.5,
+            arousal: 0.8,
+            prediction_error: 0.6,
+            ..Default::default()
+        };
         assert_eq!(detect_emotion(&state), EmotionalQuality::Tension);
     }
 
@@ -262,13 +275,17 @@ mod tests {
     fn high_stillness_negative_valence_is_not_peace() {
         // Regression: precedence bug made stillness>0.5 override negative valence
         let state = MusicalState {
-            valence: -0.8, arousal: 0.1,
+            valence: -0.8,
+            arousal: 0.1,
             harmony_activations: [0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.7],
             ..Default::default()
         };
         let emotion = detect_emotion(&state);
-        assert_ne!(emotion, EmotionalQuality::Peace,
-            "negative valence with high stillness should be Sadness, not Peace");
+        assert_ne!(
+            emotion,
+            EmotionalQuality::Peace,
+            "negative valence with high stillness should be Sadness, not Peace"
+        );
         assert_eq!(emotion, EmotionalQuality::Sadness);
     }
 

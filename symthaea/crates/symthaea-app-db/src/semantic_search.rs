@@ -23,19 +23,28 @@ impl HV {
         let mut bits = vec![0u8; DIM / 8];
         let mut state = seed;
         for byte in bits.iter_mut() {
-            state = state.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+            state = state
+                .wrapping_mul(6364136223846793005)
+                .wrapping_add(1442695040888963407);
             *byte = (state >> 33) as u8;
         }
         HV { bits }
     }
 
     fn zeros() -> Self {
-        HV { bits: vec![0u8; DIM / 8] }
+        HV {
+            bits: vec![0u8; DIM / 8],
+        }
     }
 
     /// XOR bind (associative memory)
     fn bind(&self, other: &HV) -> HV {
-        let bits: Vec<u8> = self.bits.iter().zip(&other.bits).map(|(a, b)| a ^ b).collect();
+        let bits: Vec<u8> = self
+            .bits
+            .iter()
+            .zip(&other.bits)
+            .map(|(a, b)| a ^ b)
+            .collect();
         HV { bits }
     }
 
@@ -43,7 +52,9 @@ impl HV {
     fn permute(&self, shift: usize) -> HV {
         let total_bits = DIM;
         let shift = shift % total_bits;
-        if shift == 0 { return self.clone(); }
+        if shift == 0 {
+            return self.clone();
+        }
 
         let mut new_bits = vec![0u8; DIM / 8];
         for i in 0..total_bits {
@@ -61,7 +72,10 @@ impl HV {
 
     /// Hamming similarity (0.0 to 1.0, where 1.0 = identical)
     fn similarity(&self, other: &HV) -> f32 {
-        let matching: u32 = self.bits.iter().zip(&other.bits)
+        let matching: u32 = self
+            .bits
+            .iter()
+            .zip(&other.bits)
             .map(|(a, b)| (!(a ^ b)).count_ones())
             .sum();
         matching as f32 / DIM as f32
@@ -70,8 +84,12 @@ impl HV {
 
 /// Threshold bundle: majority vote across multiple vectors
 fn bundle(vectors: &[HV]) -> HV {
-    if vectors.is_empty() { return HV::zeros(); }
-    if vectors.len() == 1 { return vectors[0].clone(); }
+    if vectors.is_empty() {
+        return HV::zeros();
+    }
+    if vectors.len() == 1 {
+        return vectors[0].clone();
+    }
 
     let mut counts = vec![0i32; DIM];
     for v in vectors {
@@ -97,16 +115,25 @@ fn bundle(vectors: &[HV]) -> HV {
 /// Encode a string into an HV using character n-gram binding
 fn encode_text(text: &str) -> HV {
     let text = text.to_lowercase();
-    let chars: Vec<char> = text.chars().filter(|c| c.is_alphanumeric() || *c == ' ').collect();
+    let chars: Vec<char> = text
+        .chars()
+        .filter(|c| c.is_alphanumeric() || *c == ' ')
+        .collect();
 
-    if chars.is_empty() { return HV::zeros(); }
+    if chars.is_empty() {
+        return HV::zeros();
+    }
 
     // Character-level encoding with position binding
-    let ngram_vectors: Vec<HV> = chars.windows(3).enumerate().map(|(pos, window)| {
-        let trigram: String = window.iter().collect();
-        let char_hv = HV::random_from_seed(hash_str(&trigram));
-        char_hv.permute(pos % 7) // Position sensitivity
-    }).collect();
+    let ngram_vectors: Vec<HV> = chars
+        .windows(3)
+        .enumerate()
+        .map(|(pos, window)| {
+            let trigram: String = window.iter().collect();
+            let char_hv = HV::random_from_seed(hash_str(&trigram));
+            char_hv.permute(pos % 7) // Position sensitivity
+        })
+        .collect();
 
     if ngram_vectors.is_empty() {
         // Fallback for very short strings
@@ -136,94 +163,197 @@ struct PackageEntry {
 static PACKAGE_DB: LazyLock<Vec<PackageEntry>> = LazyLock::new(|| {
     let packages: Vec<(&str, &str, &str)> = vec![
         // Browsers
-        ("firefox", "firefox", "web browser privacy open source mozilla"),
-        ("chromium", "chromium", "web browser google chrome open source"),
+        (
+            "firefox",
+            "firefox",
+            "web browser privacy open source mozilla",
+        ),
+        (
+            "chromium",
+            "chromium",
+            "web browser google chrome open source",
+        ),
         ("google chrome", "google-chrome", "web browser google fast"),
         ("brave", "brave", "web browser privacy crypto ad-blocking"),
         ("vivaldi", "vivaldi", "web browser customizable power user"),
-        ("tor browser", "tor-browser", "web browser anonymous privacy tor network"),
-        ("microsoft edge", "microsoft-edge", "web browser microsoft windows"),
-
+        (
+            "tor browser",
+            "tor-browser",
+            "web browser anonymous privacy tor network",
+        ),
+        (
+            "microsoft edge",
+            "microsoft-edge",
+            "web browser microsoft windows",
+        ),
         // Text Editors
         ("vim", "vim", "text editor terminal modal vi"),
-        ("neovim", "neovim", "text editor terminal modal lua modern vim"),
+        (
+            "neovim",
+            "neovim",
+            "text editor terminal modal lua modern vim",
+        ),
         ("emacs", "emacs", "text editor extensible lisp org-mode"),
         ("helix", "helix", "text editor terminal modal rust modern"),
         ("nano", "nano", "text editor terminal simple beginner"),
         ("micro", "micro", "text editor terminal simple modern"),
         ("kakoune", "kakoune", "text editor terminal modal selection"),
-        ("visual studio code", "vscode", "code editor ide microsoft typescript extensions"),
-        ("vscodium", "vscodium", "code editor ide open source telemetry-free"),
+        (
+            "visual studio code",
+            "vscode",
+            "code editor ide microsoft typescript extensions",
+        ),
+        (
+            "vscodium",
+            "vscodium",
+            "code editor ide open source telemetry-free",
+        ),
         ("zed", "zed", "code editor fast rust gpu collaborative"),
-
         // Terminals
         ("alacritty", "alacritty", "terminal emulator gpu rust fast"),
         ("kitty", "kitty", "terminal emulator gpu python images"),
-        ("wezterm", "wezterm", "terminal emulator gpu rust lua multiplexer"),
+        (
+            "wezterm",
+            "wezterm",
+            "terminal emulator gpu rust lua multiplexer",
+        ),
         ("foot", "foot", "terminal emulator wayland fast minimal"),
-
         // Shells
         ("bash", "bash", "shell scripting default posix"),
         ("zsh", "zsh", "shell interactive plugins oh-my-zsh"),
         ("fish", "fish", "shell friendly interactive auto-complete"),
         ("nushell", "nushell", "shell structured data modern rust"),
-
         // Development
         ("git", "git", "version control distributed source code"),
-        ("docker", "docker", "container runtime virtualization devops"),
-        ("podman", "podman", "container runtime rootless docker compatible"),
+        (
+            "docker",
+            "docker",
+            "container runtime virtualization devops",
+        ),
+        (
+            "podman",
+            "podman",
+            "container runtime rootless docker compatible",
+        ),
         ("nodejs", "nodejs", "javascript runtime server npm"),
-        ("python", "python3", "programming language scripting data science"),
-        ("rust", "rustc", "programming language systems memory safety"),
-        ("go", "go", "programming language google concurrent fast compile"),
+        (
+            "python",
+            "python3",
+            "programming language scripting data science",
+        ),
+        (
+            "rust",
+            "rustc",
+            "programming language systems memory safety",
+        ),
+        (
+            "go",
+            "go",
+            "programming language google concurrent fast compile",
+        ),
         ("java", "jdk", "programming language jvm enterprise"),
         ("gcc", "gcc", "compiler c c++ fortran gnu"),
         ("clang", "clang", "compiler c c++ llvm"),
         ("cmake", "cmake", "build system generator c c++"),
         ("make", "gnumake", "build automation tool"),
         ("direnv", "direnv", "environment variable shell directory"),
-        ("nix-direnv", "nix-direnv", "nix development environment shell integration"),
-
+        (
+            "nix-direnv",
+            "nix-direnv",
+            "nix development environment shell integration",
+        ),
         // Media
         ("vlc", "vlc", "media player video audio versatile"),
         ("mpv", "mpv", "media player video minimal command line"),
-        ("ffmpeg", "ffmpeg", "video audio conversion encoding streaming"),
-        ("obs studio", "obs-studio", "screen recording streaming broadcast"),
+        (
+            "ffmpeg",
+            "ffmpeg",
+            "video audio conversion encoding streaming",
+        ),
+        (
+            "obs studio",
+            "obs-studio",
+            "screen recording streaming broadcast",
+        ),
         ("kdenlive", "kdenlive", "video editor non-linear kde"),
         ("audacity", "audacity", "audio editor recording sound"),
         ("gimp", "gimp", "image editor photo manipulation graphics"),
-        ("inkscape", "inkscape", "vector graphics editor svg illustration"),
+        (
+            "inkscape",
+            "inkscape",
+            "vector graphics editor svg illustration",
+        ),
         ("blender", "blender", "3d modeling animation rendering"),
         ("krita", "krita", "digital painting drawing art"),
-        ("imagemagick", "imagemagick", "image conversion processing command line"),
+        (
+            "imagemagick",
+            "imagemagick",
+            "image conversion processing command line",
+        ),
         ("yt-dlp", "yt-dlp", "video downloader youtube command line"),
         ("spotify", "spotify", "music streaming service player"),
-
         // Office
-        ("libreoffice", "libreoffice", "office suite word processor spreadsheet presentation"),
-        ("thunderbird", "thunderbird", "email client mozilla calendar"),
-        ("calibre", "calibre", "ebook manager reader converter library"),
+        (
+            "libreoffice",
+            "libreoffice",
+            "office suite word processor spreadsheet presentation",
+        ),
+        (
+            "thunderbird",
+            "thunderbird",
+            "email client mozilla calendar",
+        ),
+        (
+            "calibre",
+            "calibre",
+            "ebook manager reader converter library",
+        ),
         ("zathura", "zathura", "pdf viewer minimal keyboard vim"),
         ("okular", "okular", "pdf document viewer kde"),
         ("evince", "evince", "pdf document viewer gnome"),
-
         // Communication
         ("discord", "discord", "chat voice gaming community"),
         ("slack", "slack", "team communication workplace messaging"),
-        ("signal", "signal-desktop", "messaging encrypted private secure"),
-        ("telegram", "telegram-desktop", "messaging cloud fast groups"),
-        ("element", "element-desktop", "matrix chat decentralized encrypted"),
+        (
+            "signal",
+            "signal-desktop",
+            "messaging encrypted private secure",
+        ),
+        (
+            "telegram",
+            "telegram-desktop",
+            "messaging cloud fast groups",
+        ),
+        (
+            "element",
+            "element-desktop",
+            "matrix chat decentralized encrypted",
+        ),
         ("zoom", "zoom-us", "video conferencing meeting call"),
-        ("teams", "teams-for-linux", "microsoft teams video chat work"),
-
+        (
+            "teams",
+            "teams-for-linux",
+            "microsoft teams video chat work",
+        ),
         // System Tools
         ("htop", "htop", "system monitor process viewer terminal"),
-        ("btop", "btop", "system monitor resource usage terminal modern"),
-        ("neofetch", "neofetch", "system information display terminal"),
-        ("fastfetch", "fastfetch", "system information display fast modern"),
+        (
+            "btop",
+            "btop",
+            "system monitor resource usage terminal modern",
+        ),
+        (
+            "neofetch",
+            "neofetch",
+            "system information display terminal",
+        ),
+        (
+            "fastfetch",
+            "fastfetch",
+            "system information display fast modern",
+        ),
         ("tmux", "tmux", "terminal multiplexer session manager"),
         ("zellij", "zellij", "terminal multiplexer rust modern"),
-
         // CLI Tools
         ("ripgrep", "ripgrep", "search grep fast recursive rust"),
         ("fd", "fd", "find files fast alternative rust"),
@@ -231,56 +361,102 @@ static PACKAGE_DB: LazyLock<Vec<PackageEntry>> = LazyLock::new(|| {
         ("eza", "eza", "ls alternative modern colors git"),
         ("fzf", "fzf", "fuzzy finder search filter"),
         ("zoxide", "zoxide", "cd alternative smart directory jump"),
-        ("starship", "starship", "shell prompt customizable rust cross-shell"),
+        (
+            "starship",
+            "starship",
+            "shell prompt customizable rust cross-shell",
+        ),
         ("jq", "jq", "json processor command line query"),
         ("curl", "curl", "http client download transfer"),
         ("wget", "wget", "download manager http ftp"),
         ("aria2", "aria2", "download manager multi-protocol parallel"),
-
         // Network
         ("nmap", "nmap", "network scanner security port"),
-        ("wireshark", "wireshark", "network protocol analyzer packet capture"),
+        (
+            "wireshark",
+            "wireshark",
+            "network protocol analyzer packet capture",
+        ),
         ("tailscale", "tailscale", "vpn mesh network wireguard"),
-        ("wireguard", "wireguard-tools", "vpn tunnel fast modern encryption"),
+        (
+            "wireguard",
+            "wireguard-tools",
+            "vpn tunnel fast modern encryption",
+        ),
         ("nginx", "nginx", "web server reverse proxy load balancer"),
-
         // Gaming
         ("steam", "steam", "gaming platform store valve linux proton"),
         ("lutris", "lutris", "gaming platform wine runner manager"),
-        ("wine", "wineWowPackages.stable", "windows compatibility layer gaming"),
-        ("mangohud", "mangohud", "gaming overlay fps monitoring vulkan"),
+        (
+            "wine",
+            "wineWowPackages.stable",
+            "windows compatibility layer gaming",
+        ),
+        (
+            "mangohud",
+            "mangohud",
+            "gaming overlay fps monitoring vulkan",
+        ),
         ("gamemode", "gamemode", "gaming performance optimizer linux"),
-        ("retroarch", "retroarch", "emulator retro gaming multi-system"),
-        ("minecraft", "prismlauncher", "game sandbox building adventure"),
-
+        (
+            "retroarch",
+            "retroarch",
+            "emulator retro gaming multi-system",
+        ),
+        (
+            "minecraft",
+            "prismlauncher",
+            "game sandbox building adventure",
+        ),
         // Virtualization
         ("qemu", "qemu", "virtual machine emulator kvm"),
-        ("virt-manager", "virt-manager", "virtual machine manager gui libvirt"),
+        (
+            "virt-manager",
+            "virt-manager",
+            "virtual machine manager gui libvirt",
+        ),
         ("virtualbox", "virtualbox", "virtual machine oracle desktop"),
-
         // Security
-        ("keepassxc", "keepassxc", "password manager encrypted offline"),
-        ("bitwarden", "bitwarden-desktop", "password manager cloud encrypted"),
-
+        (
+            "keepassxc",
+            "keepassxc",
+            "password manager encrypted offline",
+        ),
+        (
+            "bitwarden",
+            "bitwarden-desktop",
+            "password manager cloud encrypted",
+        ),
         // Fonts
-        ("nerd fonts", "nerd-fonts.fira-code", "programming font icons ligatures"),
-        ("jetbrains mono", "nerd-fonts.jetbrains-mono", "programming font monospace"),
+        (
+            "nerd fonts",
+            "nerd-fonts.fira-code",
+            "programming font icons ligatures",
+        ),
+        (
+            "jetbrains mono",
+            "nerd-fonts.jetbrains-mono",
+            "programming font monospace",
+        ),
         ("noto fonts", "noto-fonts", "unicode font international cjk"),
     ];
 
-    packages.iter().map(|(name, nixpkg, desc)| {
-        // Encode name + description together
-        let name_hv = encode_text(name);
-        let desc_hv = encode_text(desc);
-        let vector = bundle(&[name_hv, desc_hv]);
+    packages
+        .iter()
+        .map(|(name, nixpkg, desc)| {
+            // Encode name + description together
+            let name_hv = encode_text(name);
+            let desc_hv = encode_text(desc);
+            let vector = bundle(&[name_hv, desc_hv]);
 
-        PackageEntry {
-            name,
-            nixpkg,
-            description: desc,
-            vector,
-        }
-    }).collect()
+            PackageEntry {
+                name,
+                nixpkg,
+                description: desc,
+                vector,
+            }
+        })
+        .collect()
 });
 
 /// Search result from semantic package search
@@ -296,7 +472,8 @@ pub struct SearchResult {
 pub fn semantic_search(query: &str, limit: usize) -> Vec<SearchResult> {
     let query_hv = encode_text(query);
 
-    let mut results: Vec<SearchResult> = PACKAGE_DB.iter()
+    let mut results: Vec<SearchResult> = PACKAGE_DB
+        .iter()
         .map(|entry| SearchResult {
             name: entry.name,
             nixpkg: entry.nixpkg,
@@ -306,7 +483,11 @@ pub fn semantic_search(query: &str, limit: usize) -> Vec<SearchResult> {
         .collect();
 
     // Sort by similarity descending
-    results.sort_by(|a, b| b.similarity.partial_cmp(&a.similarity).unwrap_or(std::cmp::Ordering::Equal));
+    results.sort_by(|a, b| {
+        b.similarity
+            .partial_cmp(&a.similarity)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
     results.truncate(limit);
 
     // Filter out low-similarity results (below 0.55 = basically random)
@@ -326,8 +507,11 @@ mod tests {
         let names: Vec<&str> = results.iter().map(|r| r.name).collect();
         // At least one browser should be in top 5
         assert!(
-            names.iter().any(|n| ["firefox", "chromium", "brave", "google chrome", "vivaldi"].contains(n)),
-            "Should find a browser in results: {:?}", names
+            names
+                .iter()
+                .any(|n| ["firefox", "chromium", "brave", "google chrome", "vivaldi"].contains(n)),
+            "Should find a browser in results: {:?}",
+            names
         );
     }
 
@@ -337,8 +521,11 @@ mod tests {
         assert!(!results.is_empty(), "Should find editors");
         let names: Vec<&str> = results.iter().map(|r| r.name).collect();
         assert!(
-            names.iter().any(|n| ["vim", "neovim", "emacs", "helix", "nano", "micro"].contains(n)),
-            "Should find an editor in results: {:?}", names
+            names
+                .iter()
+                .any(|n| ["vim", "neovim", "emacs", "helix", "nano", "micro"].contains(n)),
+            "Should find an editor in results: {:?}",
+            names
         );
     }
 
@@ -356,7 +543,8 @@ mod tests {
         let names: Vec<&str> = results.iter().map(|r| r.name).collect();
         assert!(
             names.iter().any(|n| ["keepassxc", "bitwarden"].contains(n)),
-            "Should find password managers: {:?}", names
+            "Should find password managers: {:?}",
+            names
         );
     }
 
@@ -366,8 +554,11 @@ mod tests {
         assert!(!results.is_empty());
         let names: Vec<&str> = results.iter().map(|r| r.name).collect();
         assert!(
-            names.iter().any(|n| ["steam", "lutris", "wine", "gamemode", "retroarch"].contains(n)),
-            "Should find gaming tools: {:?}", names
+            names
+                .iter()
+                .any(|n| ["steam", "lutris", "wine", "gamemode", "retroarch"].contains(n)),
+            "Should find gaming tools: {:?}",
+            names
         );
     }
 
@@ -384,8 +575,11 @@ mod tests {
         assert!(!results.is_empty());
         let names: Vec<&str> = results.iter().map(|r| r.name).collect();
         assert!(
-            names.iter().any(|n| ["kdenlive", "obs studio", "ffmpeg", "blender"].contains(n)),
-            "Should find video tools: {:?}", names
+            names
+                .iter()
+                .any(|n| ["kdenlive", "obs studio", "ffmpeg", "blender"].contains(n)),
+            "Should find video tools: {:?}",
+            names
         );
     }
 
@@ -395,8 +589,11 @@ mod tests {
         assert!(!results.is_empty());
         let names: Vec<&str> = results.iter().map(|r| r.name).collect();
         assert!(
-            names.iter().any(|n| ["alacritty", "kitty", "wezterm", "foot"].contains(n)),
-            "Should find terminals: {:?}", names
+            names
+                .iter()
+                .any(|n| ["alacritty", "kitty", "wezterm", "foot"].contains(n)),
+            "Should find terminals: {:?}",
+            names
         );
     }
 
@@ -412,8 +609,12 @@ mod tests {
     fn search_similarity_scores_bounded() {
         let results = semantic_search("firefox", 100);
         for r in &results {
-            assert!(r.similarity >= 0.0 && r.similarity <= 1.0,
-                "Similarity {} out of bounds for {}", r.similarity, r.name);
+            assert!(
+                r.similarity >= 0.0 && r.similarity <= 1.0,
+                "Similarity {} out of bounds for {}",
+                r.similarity,
+                r.name
+            );
         }
     }
 
@@ -422,7 +623,12 @@ mod tests {
         let results = semantic_search("docker", 5);
         for r in &results {
             assert!(!r.nixpkg.is_empty(), "Package {} has empty nixpkg", r.name);
-            assert!(!r.nixpkg.contains(' '), "Package {} nixpkg has spaces: {}", r.name, r.nixpkg);
+            assert!(
+                !r.nixpkg.contains(' '),
+                "Package {} nixpkg has spaces: {}",
+                r.name,
+                r.nixpkg
+            );
         }
     }
 }

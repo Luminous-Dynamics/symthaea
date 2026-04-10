@@ -62,8 +62,13 @@ fn bench_hdc_random(genesis: &GenesisSeed) {
     }
     let elapsed = start.elapsed();
     let per_op = elapsed / n;
-    println!("  random({}D)     {:>8.0}ns/op  ({} ops in {:.2}ms)",
-        HDC_DIMENSION, per_op.as_nanos(), n, elapsed.as_secs_f64() * 1000.0);
+    println!(
+        "  random({}D)     {:>8.0}ns/op  ({} ops in {:.2}ms)",
+        HDC_DIMENSION,
+        per_op.as_nanos(),
+        n,
+        elapsed.as_secs_f64() * 1000.0
+    );
 }
 
 fn bench_hdc_bind(genesis: &GenesisSeed) {
@@ -76,8 +81,13 @@ fn bench_hdc_bind(genesis: &GenesisSeed) {
     }
     let elapsed = start.elapsed();
     let per_op = elapsed / n;
-    println!("  bind({}D)       {:>8.0}ns/op  ({} ops in {:.2}ms)",
-        HDC_DIMENSION, per_op.as_nanos(), n, elapsed.as_secs_f64() * 1000.0);
+    println!(
+        "  bind({}D)       {:>8.0}ns/op  ({} ops in {:.2}ms)",
+        HDC_DIMENSION,
+        per_op.as_nanos(),
+        n,
+        elapsed.as_secs_f64() * 1000.0
+    );
 }
 
 fn bench_hdc_similarity(genesis: &GenesisSeed) {
@@ -91,8 +101,14 @@ fn bench_hdc_similarity(genesis: &GenesisSeed) {
     }
     let elapsed = start.elapsed();
     let per_op = elapsed / n;
-    println!("  similarity({}D) {:>8.0}ns/op  ({} ops in {:.2}ms) [sum={:.2}]",
-        HDC_DIMENSION, per_op.as_nanos(), n, elapsed.as_secs_f64() * 1000.0, sum / n as f32);
+    println!(
+        "  similarity({}D) {:>8.0}ns/op  ({} ops in {:.2}ms) [sum={:.2}]",
+        HDC_DIMENSION,
+        per_op.as_nanos(),
+        n,
+        elapsed.as_secs_f64() * 1000.0,
+        sum / n as f32
+    );
 }
 
 fn bench_hdc_bundle(genesis: &GenesisSeed) {
@@ -107,8 +123,13 @@ fn bench_hdc_bundle(genesis: &GenesisSeed) {
     }
     let elapsed = start.elapsed();
     let per_op = elapsed / n;
-    println!("  bundle(5×{}D)  {:>8.0}ns/op  ({} ops in {:.2}ms)",
-        HDC_DIMENSION, per_op.as_nanos(), n, elapsed.as_secs_f64() * 1000.0);
+    println!(
+        "  bundle(5×{}D)  {:>8.0}ns/op  ({} ops in {:.2}ms)",
+        HDC_DIMENSION,
+        per_op.as_nanos(),
+        n,
+        elapsed.as_secs_f64() * 1000.0
+    );
 }
 
 fn bench_hdc_weighted_bundle(genesis: &GenesisSeed) {
@@ -124,8 +145,13 @@ fn bench_hdc_weighted_bundle(genesis: &GenesisSeed) {
     }
     let elapsed = start.elapsed();
     let per_op = elapsed / n;
-    println!("  weighted_bundle(10×{}D) {:>8.0}ns/op  ({} ops in {:.2}ms)",
-        HDC_DIMENSION, per_op.as_nanos(), n, elapsed.as_secs_f64() * 1000.0);
+    println!(
+        "  weighted_bundle(10×{}D) {:>8.0}ns/op  ({} ops in {:.2}ms)",
+        HDC_DIMENSION,
+        per_op.as_nanos(),
+        n,
+        elapsed.as_secs_f64() * 1000.0
+    );
 }
 
 #[cfg(feature = "humanoid")]
@@ -141,49 +167,77 @@ fn bench_encoding() {
         let mut enc = HumanoidHdcEncoder::new(&genesis, 32);
         let state = HumanoidState::standing();
         // Warm up
-        for _ in 0..10 { enc.encode(&state); }
+        for _ in 0..10 {
+            enc.encode(&state);
+        }
         enc.reset();
 
         let n = 1_000;
         let start = Instant::now();
-        for _ in 0..n { enc.encode(&state); }
+        for _ in 0..n {
+            enc.encode(&state);
+        }
         let elapsed = start.elapsed();
         let per_op = elapsed / n;
-        println!("  encode(DMC21, 72ch)       {:>8.0}us/state  ({} states in {:.2}ms)",
-            per_op.as_micros(), n, elapsed.as_secs_f64() * 1000.0);
+        println!(
+            "  encode(DMC21, 72ch)       {:>8.0}us/state  ({} states in {:.2}ms)",
+            per_op.as_micros(),
+            n,
+            elapsed.as_secs_f64() * 1000.0
+        );
     }
 
     // Dexterous53 encoding (142 channels)
     {
         let mut enc = HumanoidHdcEncoder::new_for(&genesis, 32, HumanoidMorphology::Dexterous53);
         let state = HumanoidState::standing_for(HumanoidMorphology::Dexterous53);
-        for _ in 0..10 { enc.encode(&state); }
+        for _ in 0..10 {
+            enc.encode(&state);
+        }
         enc.reset();
 
         let n = 1_000;
         let start = Instant::now();
-        for _ in 0..n { enc.encode(&state); }
+        for _ in 0..n {
+            enc.encode(&state);
+        }
         let elapsed = start.elapsed();
         let per_op = elapsed / n;
-        println!("  encode(Dex53, 142ch)      {:>8.0}us/state  ({} states in {:.2}ms)",
-            per_op.as_micros(), n, elapsed.as_secs_f64() * 1000.0);
+        println!(
+            "  encode(Dex53, 142ch)      {:>8.0}us/state  ({} states in {:.2}ms)",
+            per_op.as_micros(),
+            n,
+            elapsed.as_secs_f64() * 1000.0
+        );
     }
 
     // Predictive encoding (72ch + LTC layer)
     {
         let mut enc = HumanoidHdcEncoder::new_predictive(&genesis, 32, HumanoidMorphology::Dmc21);
         let state = HumanoidState::standing();
-        for _ in 0..10 { enc.encode(&state); }
+        for _ in 0..10 {
+            enc.encode(&state);
+        }
         enc.reset();
 
         let n = 1_000;
         let start = Instant::now();
-        for _ in 0..n { enc.encode(&state); }
+        for _ in 0..n {
+            enc.encode(&state);
+        }
         let elapsed = start.elapsed();
         let per_op = elapsed / n;
-        println!("  encode(predictive, 72ch)  {:>8.0}us/state  ({} states in {:.2}ms)",
-            per_op.as_micros(), n, elapsed.as_secs_f64() * 1000.0);
-        println!("    PE={:.4}  confidence={:.4}", enc.prediction_error(), enc.confidence());
+        println!(
+            "  encode(predictive, 72ch)  {:>8.0}us/state  ({} states in {:.2}ms)",
+            per_op.as_micros(),
+            n,
+            elapsed.as_secs_f64() * 1000.0
+        );
+        println!(
+            "    PE={:.4}  confidence={:.4}",
+            enc.prediction_error(),
+            enc.confidence()
+        );
     }
 }
 
@@ -227,5 +281,9 @@ fn bench_training() {
 
     // Extrapolate
     let est_200_ep = elapsed.as_secs_f64() * (200.0 / 5.0);
-    println!("    Est. 200 episodes: {:.1}s ({:.1} min)", est_200_ep, est_200_ep / 60.0);
+    println!(
+        "    Est. 200 episodes: {:.1}s ({:.1} min)",
+        est_200_ep,
+        est_200_ep / 60.0
+    );
 }

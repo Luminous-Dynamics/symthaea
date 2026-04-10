@@ -73,7 +73,12 @@ pub fn sanitize_input(s: &str, field_name: &str, allow_slashes: bool) -> Result<
         match ch {
             'a'..='z' | 'A'..='Z' | '0'..='9' | '-' | '_' | '.' => {}
             '/' if allow_slashes => {}
-            _ => return Err(format!("{} contains invalid character '{}'", field_name, ch)),
+            _ => {
+                return Err(format!(
+                    "{} contains invalid character '{}'",
+                    field_name, ch
+                ))
+            }
         }
     }
     Ok(s.to_string())

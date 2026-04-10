@@ -19,8 +19,7 @@ fn arb_small_matrix(n: usize) -> impl Strategy<Value = HdcMatrix> {
 }
 
 fn arb_vector(n: usize) -> impl Strategy<Value = HdcVector> {
-    proptest::collection::vec(-10.0..=10.0f64, n)
-        .prop_map(|data| HdcVector::new(data))
+    proptest::collection::vec(-10.0..=10.0f64, n).prop_map(|data| HdcVector::new(data))
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════

@@ -9,9 +9,9 @@
 //! Supports loading from a samples directory or generating synthetic
 //! reference samples from the existing high-quality additive engine.
 
+use crate::instruments::Instrument;
 use std::collections::HashMap;
 use std::path::Path;
-use crate::instruments::Instrument;
 
 /// A loaded audio sample.
 #[derive(Debug, Clone)]
@@ -55,7 +55,9 @@ impl InstrumentKey {
 
 impl SampleLibrary {
     pub fn new() -> Self {
-        Self { samples: HashMap::new() }
+        Self {
+            samples: HashMap::new(),
+        }
     }
 
     /// Load samples from a directory.
@@ -93,7 +95,9 @@ impl SampleLibrary {
         for (&(k, note), sample) in &self.samples {
             if k == key {
                 if let Some((_, best_note)) = best {
-                    if (note as i16 - target_note as i16).abs() < (best_note as i16 - target_note as i16).abs() {
+                    if (note as i16 - target_note as i16).abs()
+                        < (best_note as i16 - target_note as i16).abs()
+                    {
                         best = Some((sample, note));
                     }
                 } else {
@@ -122,10 +126,10 @@ impl SampleLibrary {
 
         // Generate at C2, C3, C4, C5, C6
         let notes: [(u8, f32); 5] = [
-            (36, 65.41),  // C2
-            (48, 130.81), // C3
-            (60, 261.63), // C4
-            (72, 523.25), // C5
+            (36, 65.41),   // C2
+            (48, 130.81),  // C3
+            (60, 261.63),  // C4
+            (72, 523.25),  // C5
             (84, 1046.50), // C6
         ];
 
@@ -142,38 +146,56 @@ impl SampleLibrary {
                 for i in 0..num_samples {
                     let t = i as f32 / sr;
                     // ADSR envelope
-                    let env = if t < 0.01 { t / 0.01 }
-                        else if t < 0.1 { 1.0 - (t - 0.01) * 0.3 / 0.09 }
-                        else if t < duration_secs - 0.3 { 0.7 }
-                        else { 0.7 * (1.0 - (t - (duration_secs - 0.3)) / 0.3).max(0.0) };
+                    let env = if t < 0.01 {
+                        t / 0.01
+                    } else if t < 0.1 {
+                        1.0 - (t - 0.01) * 0.3 / 0.09
+                    } else if t < duration_secs - 0.3 {
+                        0.7
+                    } else {
+                        0.7 * (1.0 - (t - (duration_secs - 0.3)) / 0.3).max(0.0)
+                    };
 
                     // Additive synthesis with all partials
                     let mut s = 0.0f32;
                     for (h, &amp) in partials.iter().enumerate() {
                         let cf = freq * (h + 1) as f32;
-                        if cf >= sr * 0.5 { break; }
+                        if cf >= sr * 0.5 {
+                            break;
+                        }
                         let phase = t * cf * std::f32::consts::TAU;
                         s += amp * phase.sin();
                     }
 
                     // Normalize
                     let partial_sum: f32 = partials.iter().sum();
-                    let norm = if partial_sum > 0.01 { 1.0 / partial_sum } else { 1.0 };
+                    let norm = if partial_sum > 0.01 {
+                        1.0 / partial_sum
+                    } else {
+                        1.0
+                    };
 
                     data.push(s * norm * env * 0.8);
                 }
 
-                self.samples.insert((key, midi_note), Sample {
-                    data,
-                    sample_rate,
-                    root_note: midi_note,
-                });
+                self.samples.insert(
+                    (key, midi_note),
+                    Sample {
+                        data,
+                        sample_rate,
+                        root_note: midi_note,
+                    },
+                );
             }
         }
     }
 
-    pub fn sample_count(&self) -> usize { self.samples.len() }
-    pub fn has_samples(&self) -> bool { !self.samples.is_empty() }
+    pub fn sample_count(&self) -> usize {
+        self.samples.len()
+    }
+    pub fn has_samples(&self) -> bool {
+        !self.samples.is_empty()
+    }
 }
 
 /// Render a sample at a given playback rate (pitch shift).
@@ -189,7 +211,9 @@ pub fn render_sample(
 
     for _ in 0..output_len {
         let idx = pos as usize;
-        if idx + 1 >= sample.data.len() { break; }
+        if idx + 1 >= sample.data.len() {
+            break;
+        }
 
         // Linear interpolation
         let frac = (pos - idx as f64) as f32;
@@ -217,7 +241,9 @@ fn midi_to_freq(note: u8) -> f32 {
 fn parse_sample_name(name: &str) -> Option<(InstrumentKey, u8)> {
     // Expected format: "piano_c4", "violin_a3", etc.
     let parts: Vec<&str> = name.split('_').collect();
-    if parts.len() < 2 { return None; }
+    if parts.len() < 2 {
+        return None;
+    }
 
     let key = match parts[0].to_lowercase().as_str() {
         "piano" => InstrumentKey::Piano,
@@ -237,7 +263,9 @@ fn parse_sample_name(name: &str) -> Option<(InstrumentKey, u8)> {
 
 fn parse_note_name(s: &str) -> Option<u8> {
     let bytes = s.as_bytes();
-    if bytes.len() < 2 { return None; }
+    if bytes.len() < 2 {
+        return None;
+    }
 
     let pitch_class = match bytes[0] {
         b'c' => 0,
@@ -255,24 +283,23 @@ fn parse_note_name(s: &str) -> Option<u8> {
 }
 
 fn load_wav(path: &Path, expected_note: u8) -> Result<Sample, String> {
-    let reader = hound::WavReader::open(path)
-        .map_err(|e| format!("WAV read error: {e}"))?;
+    let reader = hound::WavReader::open(path).map_err(|e| format!("WAV read error: {e}"))?;
     let spec = reader.spec();
     let sample_rate = spec.sample_rate;
 
     let data: Vec<f32> = match spec.sample_format {
         hound::SampleFormat::Int => {
             let max = (1 << (spec.bits_per_sample - 1)) as f32;
-            reader.into_samples::<i32>()
+            reader
+                .into_samples::<i32>()
                 .filter_map(|s| s.ok())
                 .map(|s| s as f32 / max)
                 .collect()
         }
-        hound::SampleFormat::Float => {
-            reader.into_samples::<f32>()
-                .filter_map(|s| s.ok())
-                .collect()
-        }
+        hound::SampleFormat::Float => reader
+            .into_samples::<f32>()
+            .filter_map(|s| s.ok())
+            .collect(),
     };
 
     // If stereo, take left channel
@@ -319,7 +346,11 @@ mod tests {
     fn synthetic_samples_generate() {
         let mut lib = SampleLibrary::new();
         lib.generate_synthetic(44100);
-        assert!(lib.sample_count() >= 20, "should generate samples: {}", lib.sample_count());
+        assert!(
+            lib.sample_count() >= 20,
+            "should generate samples: {}",
+            lib.sample_count()
+        );
     }
 
     #[test]
@@ -329,13 +360,18 @@ mod tests {
         let result = lib.get_sample(Instrument::Piano, 440.0);
         assert!(result.is_some(), "should find piano sample for A4");
         let (_, rate) = result.unwrap();
-        assert!(rate > 0.5 && rate < 2.0, "playback rate should be reasonable: {rate}");
+        assert!(
+            rate > 0.5 && rate < 2.0,
+            "playback rate should be reasonable: {rate}"
+        );
     }
 
     #[test]
     fn render_sample_correct_length() {
         let sample = Sample {
-            data: (0..44100).map(|i| (i as f32 / 44100.0 * 440.0 * std::f32::consts::TAU).sin()).collect(),
+            data: (0..44100)
+                .map(|i| (i as f32 / 44100.0 * 440.0 * std::f32::consts::TAU).sin())
+                .collect(),
             sample_rate: 44100,
             root_note: 69,
         };

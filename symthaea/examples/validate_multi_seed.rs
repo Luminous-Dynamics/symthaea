@@ -56,23 +56,36 @@ fn run(seed: usize, cycles: usize, evolved: bool) -> (f64, f64) {
     let mean = phis.iter().sum::<f64>() / n;
     let last100 = if cycles >= 100 {
         phis[cycles - 100..].iter().sum::<f64>() / 100.0
-    } else { mean };
+    } else {
+        mean
+    };
     (mean, last100)
 }
 
 fn std_dev(v: &[f64]) -> f64 {
     let n = v.len() as f64;
-    if n < 2.0 { return 0.0; }
+    if n < 2.0 {
+        return 0.0;
+    }
     let m = v.iter().sum::<f64>() / n;
     (v.iter().map(|x| (x - m).powi(2)).sum::<f64>() / (n - 1.0)).sqrt()
 }
 
 fn main() {
-    let seeds: usize = std::env::var("SEEDS").ok().and_then(|s| s.parse().ok()).unwrap_or(5);
-    let cycles: usize = std::env::var("CYCLES").ok().and_then(|s| s.parse().ok()).unwrap_or(500);
+    let seeds: usize = std::env::var("SEEDS")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(5);
+    let cycles: usize = std::env::var("CYCLES")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(500);
 
     println!("═══════════════════════════════════════════════════════════════");
-    println!("  Multi-Seed Validation ({} seeds × {} cycles × 2)", seeds, cycles);
+    println!(
+        "  Multi-Seed Validation ({} seeds × {} cycles × 2)",
+        seeds, cycles
+    );
     println!("═══════════════════════════════════════════════════════════════\n");
 
     let mut d_mean = Vec::new();
@@ -86,8 +99,10 @@ fn main() {
         print!(" Φ={:.4} | evolved...", dm);
         let (em, el) = run(s, cycles, true);
         println!(" Φ={:.4}", em);
-        d_mean.push(dm); e_mean.push(em);
-        d_last.push(dl); e_last.push(el);
+        d_mean.push(dm);
+        e_mean.push(em);
+        d_last.push(dl);
+        e_last.push(el);
     }
 
     let dm = d_mean.iter().sum::<f64>() / seeds as f64;
@@ -99,25 +114,70 @@ fn main() {
     println!("  Results (mean ± std)");
     println!("═══════════════════════════════════════════════════════════════\n");
     println!("  {:>12}  {:>16}  {:>16}", "", "Defaults", "CLS-Evolved");
-    println!("  {:>12}  {:>7.4} ± {:.4}  {:>7.4} ± {:.4}", "Mean Φ", dm, ds, em, es);
-    println!("  {:>12}  {:>7.4} ± {:.4}  {:>7.4} ± {:.4}", "Last 100 Φ",
-        d_last.iter().sum::<f64>() / seeds as f64, std_dev(&d_last),
-        e_last.iter().sum::<f64>() / seeds as f64, std_dev(&e_last));
+    println!(
+        "  {:>12}  {:>7.4} ± {:.4}  {:>7.4} ± {:.4}",
+        "Mean Φ", dm, ds, em, es
+    );
+    println!(
+        "  {:>12}  {:>7.4} ± {:.4}  {:>7.4} ± {:.4}",
+        "Last 100 Φ",
+        d_last.iter().sum::<f64>() / seeds as f64,
+        std_dev(&d_last),
+        e_last.iter().sum::<f64>() / seeds as f64,
+        std_dev(&e_last)
+    );
 
-    let delta = if dm > 1e-6 { (em - dm) / dm * 100.0 } else { 0.0 };
+    let delta = if dm > 1e-6 {
+        (em - dm) / dm * 100.0
+    } else {
+        0.0
+    };
     let pooled = ((ds * ds + es * es) / 2.0).sqrt();
-    let d = if pooled > 1e-10 { (em - dm) / pooled } else { 0.0 };
-    let diffs: Vec<f64> = d_mean.iter().zip(e_mean.iter()).map(|(a, b)| b - a).collect();
+    let d = if pooled > 1e-10 {
+        (em - dm) / pooled
+    } else {
+        0.0
+    };
+    let diffs: Vec<f64> = d_mean
+        .iter()
+        .zip(e_mean.iter())
+        .map(|(a, b)| b - a)
+        .collect();
     let diff_m = diffs.iter().sum::<f64>() / seeds as f64;
     let diff_s = std_dev(&diffs);
-    let t = if diff_s > 1e-10 { diff_m / (diff_s / (seeds as f64).sqrt()) } else { 0.0 };
+    let t = if diff_s > 1e-10 {
+        diff_m / (diff_s / (seeds as f64).sqrt())
+    } else {
+        0.0
+    };
     // t-critical for two-tailed p<0.05: df=4→2.776, df=3→3.182, df=2→4.303
-    let t_crit = if seeds >= 5 { 2.776 } else if seeds >= 4 { 3.182 } else { 4.303 };
+    let t_crit = if seeds >= 5 {
+        2.776
+    } else if seeds >= 4 {
+        3.182
+    } else {
+        4.303
+    };
 
     println!("\n  Delta: {:>+.2}%", delta);
-    println!("  Cohen's d: {:.3} ({})", d,
-        if d.abs() < 0.2 { "negligible" } else if d.abs() < 0.5 { "small" }
-        else if d.abs() < 0.8 { "medium" } else { "large" });
-    println!("  Paired t: {:.3} (df={}, crit={:.3})", t, seeds - 1, t_crit);
+    println!(
+        "  Cohen's d: {:.3} ({})",
+        d,
+        if d.abs() < 0.2 {
+            "negligible"
+        } else if d.abs() < 0.5 {
+            "small"
+        } else if d.abs() < 0.8 {
+            "medium"
+        } else {
+            "large"
+        }
+    );
+    println!(
+        "  Paired t: {:.3} (df={}, crit={:.3})",
+        t,
+        seeds - 1,
+        t_crit
+    );
     println!("  Significant (p<0.05): {}", t.abs() > t_crit);
 }

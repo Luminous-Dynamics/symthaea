@@ -22,13 +22,13 @@ use tokio::time::sleep;
 
 #[derive(Debug, Clone, PartialEq)]
 enum AgentAction {
-    Observe,                            // Look at the page (costs attention)
-    Think,                              // Process current observation (low cost)
-    Click(String),                      // Click element by text
-    Type(String, String),               // Type text into field (placeholder, value)
-    Navigate(String),                   // Go to URL
-    Wait,                               // Do nothing this cycle
-    Done,                               // Mission complete
+    Observe,              // Look at the page (costs attention)
+    Think,                // Process current observation (low cost)
+    Click(String),        // Click element by text
+    Type(String, String), // Type text into field (placeholder, value)
+    Navigate(String),     // Go to URL
+    Wait,                 // Do nothing this cycle
+    Done,                 // Mission complete
 }
 
 #[derive(Debug, Clone)]
@@ -147,7 +147,10 @@ impl ConsciousAgent {
             _ => AgentAction::Done,
         };
 
-        if matches!(action, AgentAction::Click(_) | AgentAction::Navigate(_) | AgentAction::Type(_, _)) {
+        if matches!(
+            action,
+            AgentAction::Click(_) | AgentAction::Navigate(_) | AgentAction::Type(_, _)
+        ) {
             self.cycles_since_act = 0;
             // After acting, expect page to change → raise PE
             self.prediction_error = 0.8;
@@ -158,7 +161,10 @@ impl ConsciousAgent {
 
     fn decide_onboarding(&mut self, obs: &PageState) -> AgentAction {
         // Already onboarded?
-        if obs.headings.iter().any(|h| h.contains("Good") && (h.contains("morning") || h.contains("evening") || h.contains("afternoon"))) {
+        if obs.headings.iter().any(|h| {
+            h.contains("Good")
+                && (h.contains("morning") || h.contains("evening") || h.contains("afternoon"))
+        }) {
             self.complete_goal();
             self.prediction_error = 0.5; // Mild surprise: already done
             return AgentAction::Think;
@@ -166,7 +172,11 @@ impl ConsciousAgent {
 
         // On welcome page?
         if obs.headings.iter().any(|h| h.contains("Hey there")) {
-            if obs.inputs.iter().any(|i| i.contains("name") || i.contains("Name")) {
+            if obs
+                .inputs
+                .iter()
+                .any(|i| i.contains("name") || i.contains("Name"))
+            {
                 return AgentAction::Type("name".into(), "Symthaea".into());
             }
             if obs.buttons.iter().any(|b| b.contains("Continue")) {
@@ -175,7 +185,11 @@ impl ConsciousAgent {
         }
 
         // Framework selection?
-        if obs.buttons.iter().any(|b| b.contains("South African") || b.contains("CAPS")) {
+        if obs
+            .buttons
+            .iter()
+            .any(|b| b.contains("South African") || b.contains("CAPS"))
+        {
             return AgentAction::Click("South African".into());
         }
 
@@ -203,7 +217,9 @@ impl ConsciousAgent {
     fn decide_garden(&mut self, obs: &PageState) -> AgentAction {
         if obs.url.contains("/skill-map") {
             // Check if we already clicked Mathematics (detect repeated action)
-            let math_clicks = self.action_history.iter()
+            let math_clicks = self
+                .action_history
+                .iter()
                 .filter(|(_, a)| matches!(a, AgentAction::Click(t) if t.contains("Mathematics")))
                 .count();
             if math_clicks == 0 && obs.buttons.iter().any(|b| b.contains("Mathematics")) {
@@ -233,7 +249,11 @@ impl ConsciousAgent {
         }
 
         // In exam — show answer
-        if obs.buttons.iter().any(|b| b.contains("Show Answer") || b.contains("Show")) {
+        if obs
+            .buttons
+            .iter()
+            .any(|b| b.contains("Show Answer") || b.contains("Show"))
+        {
             return AgentAction::Click("Show".into());
         }
 
@@ -287,11 +307,20 @@ async fn capture_page_state(page: &chromiumoxide::Page) -> PageState {
     let links = js_array(page, "document.querySelectorAll('a')", "textContent").await;
     let text_snippets = js_array(page, "document.querySelectorAll('p')", "textContent").await;
 
-    PageState { url, title, headings, buttons, inputs, links, text_snippets }
+    PageState {
+        url,
+        title,
+        headings,
+        buttons,
+        inputs,
+        links,
+        text_snippets,
+    }
 }
 
 async fn js(page: &chromiumoxide::Page, expr: &str) -> String {
-    page.evaluate(expr).await
+    page.evaluate(expr)
+        .await
         .ok()
         .and_then(|v| v.into_value::<String>().ok())
         .unwrap_or_default()
@@ -387,7 +416,9 @@ async fn main() {
             _ => String::new(),
         };
 
-        println!("  [{cycle:2}] Φ={phi:.2} PE={pe:.2} goal={goal_display:30} {action_symbol}{detail}");
+        println!(
+            "  [{cycle:2}] Φ={phi:.2} PE={pe:.2} goal={goal_display:30} {action_symbol}{detail}"
+        );
 
         // Execute
         match &action {
@@ -396,14 +427,18 @@ async fn main() {
                 let state = capture_page_state(&page).await;
                 let cognitive = state.to_cognitive_input();
                 let line_count = cognitive.lines().count();
-                println!("       → Perceived: {} ({line_count} elements)", state.title);
+                println!(
+                    "       → Perceived: {} ({line_count} elements)",
+                    state.title
+                );
                 agent.observe(state);
 
                 // Screenshot every observation
                 screenshot_count += 1;
-                if let Ok(bytes) = page.screenshot(
-                    chromiumoxide::page::ScreenshotParams::builder().build()
-                ).await {
+                if let Ok(bytes) = page
+                    .screenshot(chromiumoxide::page::ScreenshotParams::builder().build())
+                    .await
+                {
                     let path = format!("/tmp/praxis-conscious/{screenshot_count:02}.png");
                     std::fs::write(&path, &bytes).ok();
                 }
@@ -429,20 +464,48 @@ async fn main() {
     }
 
     let elapsed = start.elapsed();
-    let actions: Vec<_> = agent.action_history.iter()
-        .filter(|(_, a)| matches!(a, AgentAction::Click(_) | AgentAction::Type(_, _) | AgentAction::Navigate(_)))
+    let actions: Vec<_> = agent
+        .action_history
+        .iter()
+        .filter(|(_, a)| {
+            matches!(
+                a,
+                AgentAction::Click(_) | AgentAction::Type(_, _) | AgentAction::Navigate(_)
+            )
+        })
         .collect();
 
     println!("\n╔══════════════════════════════════════════════════════╗");
     println!("║  Session Summary                                     ║");
     println!("╠══════════════════════════════════════════════════════╣");
-    println!("║  Total cycles:     {:3}                                ║", agent.total_cycles);
-    println!("║  Actions taken:    {:3}                                ║", actions.len());
-    println!("║  Goals completed:  {:3}                                ║", agent.completed_goals.len());
-    println!("║  Goals remaining:  {:3}                                ║", agent.goal_stack.len());
-    println!("║  Screenshots:      {:3}                                ║", screenshot_count);
-    println!("║  Wall time:        {:.1}s                             ║", elapsed.as_secs_f64());
-    println!("║  Consciousness:    Φ = {:.2}                          ║", agent.phi);
+    println!(
+        "║  Total cycles:     {:3}                                ║",
+        agent.total_cycles
+    );
+    println!(
+        "║  Actions taken:    {:3}                                ║",
+        actions.len()
+    );
+    println!(
+        "║  Goals completed:  {:3}                                ║",
+        agent.completed_goals.len()
+    );
+    println!(
+        "║  Goals remaining:  {:3}                                ║",
+        agent.goal_stack.len()
+    );
+    println!(
+        "║  Screenshots:      {:3}                                ║",
+        screenshot_count
+    );
+    println!(
+        "║  Wall time:        {:.1}s                             ║",
+        elapsed.as_secs_f64()
+    );
+    println!(
+        "║  Consciousness:    Φ = {:.2}                          ║",
+        agent.phi
+    );
     println!("╚══════════════════════════════════════════════════════╝");
 
     println!("\nAction timeline:");

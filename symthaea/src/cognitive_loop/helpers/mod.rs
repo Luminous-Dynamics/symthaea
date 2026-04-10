@@ -28,8 +28,8 @@ pub(super) use parallel::{
 
 // Re-export consciousness metrics parallel branch items (Phase "consciousness metrics").
 pub(in crate::cognitive_loop) use parallel::{
-    parallel_consciousness_branch_a, parallel_consciousness_branch_b,
-    ConsciousnessMetricsBranchA, ConsciousnessMetricsBranchB, DeferredFeedback,
+    parallel_consciousness_branch_a, parallel_consciousness_branch_b, ConsciousnessMetricsBranchA,
+    ConsciousnessMetricsBranchB, DeferredFeedback,
 };
 
 // Re-export Phase 7 result structs so cycle.rs can destructure them
@@ -644,7 +644,8 @@ impl CognitiveLoopService {
         }
         self.stats.learning_paused = self.behavior.adaptive_behavior.pause_learning;
         self.stats.adaptive_learning_rate = self
-            .behavior.adaptive_behavior
+            .behavior
+            .adaptive_behavior
             .effective_learning_rate(self.combined_learning_rate());
         self.stats.adaptive_speech_rate = self.behavior.adaptive_behavior.speech_rate_multiplier;
 
@@ -685,25 +686,41 @@ impl CognitiveLoopService {
 
         // Self-reflection stats
         let assess_str = self
-            .consciousness.self_model_tier
+            .consciousness
+            .self_model_tier
             .self_reflection
             .self_assessment
             .as_str();
         if self.stats.self_assessment != assess_str {
             self.stats.self_assessment = assess_str.to_string();
         }
-        self.stats.reflection_count = self.consciousness.self_model_tier.self_reflection.reflection_count;
-        self.stats.adjustments_made = self.consciousness.self_model_tier.self_reflection.adjustments_made;
+        self.stats.reflection_count = self
+            .consciousness
+            .self_model_tier
+            .self_reflection
+            .reflection_count;
+        self.stats.adjustments_made = self
+            .consciousness
+            .self_model_tier
+            .self_reflection
+            .adjustments_made;
         self.stats.learning_effectiveness = self
-            .consciousness.self_model_tier
+            .consciousness
+            .self_model_tier
             .self_reflection
             .learning_effectiveness();
         let summary = self.consciousness.self_model_tier.self_reflection.summary();
         self.stats.next_reflection_in = summary.next_reflection_in;
-        self.stats.adapted_flow_threshold =
-            self.consciousness.self_model_tier.self_reflection.flow_error_threshold;
-        self.stats.adapted_boredom_threshold =
-            self.consciousness.self_model_tier.self_reflection.boredom_threshold;
+        self.stats.adapted_flow_threshold = self
+            .consciousness
+            .self_model_tier
+            .self_reflection
+            .flow_error_threshold;
+        self.stats.adapted_boredom_threshold = self
+            .consciousness
+            .self_model_tier
+            .self_reflection
+            .boredom_threshold;
 
         // ═══════════════════════════════════════════════════════════════════════
         // MEGA-UNIFIED ARCHITECTURE STATS
@@ -884,7 +901,8 @@ impl CognitiveLoopService {
         self.behavior.emotion_contagion.reset();
         self.behavior.curiosity_drive.reset();
         // Reset unified emotional state so emotional_valence() returns 0.0
-        self.unification_engine.emotional = crate::consciousness::dynamics::consciousness_unification::EmotionalBridge::new();
+        self.unification_engine.emotional =
+            crate::consciousness::dynamics::consciousness_unification::EmotionalBridge::new();
         self.consciousness.self_model_tier.self_reflection.reset(); // Preserves learned thresholds
         self.fep.agent = ActiveInferenceAgent::new(self.fep.agent.config.clone());
         self.coherence_tracker.reset();
@@ -898,13 +916,18 @@ impl CognitiveLoopService {
                 crate::consciousness::consciousness_thermodynamics::ThermodynamicsConfig::default(),
             );
         }
-        if let Some(ref mut binding) = self.consciousness.consciousness_monitors.phenomenal_binding {
+        if let Some(ref mut binding) = self.consciousness.consciousness_monitors.phenomenal_binding
+        {
             *binding =
                 crate::consciousness::phenomenal_binding::TemporalSynchronizationAnalyzer::new(
                     crate::consciousness::phenomenal_binding::PhenomenalBindingConfig::default(),
                 );
         }
-        if let Some(ref mut hfe) = self.consciousness.consciousness_monitors.hierarchical_free_energy {
+        if let Some(ref mut hfe) = self
+            .consciousness
+            .consciousness_monitors
+            .hierarchical_free_energy
+        {
             *hfe = crate::consciousness::hierarchical_free_energy::HierarchicalFreeEnergy::new(
                 crate::consciousness::hierarchical_free_energy::HierarchicalFEConfig::default(),
             );
@@ -925,7 +948,8 @@ impl CognitiveLoopService {
         self.swarm_manager = super::managers::SwarmManager::default();
         #[cfg(feature = "mesh")]
         {
-            self.spectrum_manager = super::managers::SpectrumManager::default();
+            let domain = self.spectrum_manager.domain_profile().clone();
+            self.spectrum_manager = super::managers::SpectrumManager::with_domain_profile(domain);
         }
         #[cfg(feature = "therapeutic")]
         {

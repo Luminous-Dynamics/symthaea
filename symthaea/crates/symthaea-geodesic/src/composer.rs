@@ -59,9 +59,7 @@ enum TemplateKind {
 fn extract_template(node: &ProgramNode) -> (TemplateKind, Vec<BinaryHV>) {
     use crate::periodic_table::encode_structural as enc;
     match node {
-        ProgramNode::Atom(_) | ProgramNode::Typed(_, _) => {
-            (TemplateKind::Leaf, vec![enc(node)])
-        }
+        ProgramNode::Atom(_) | ProgramNode::Typed(_, _) => (TemplateKind::Leaf, vec![enc(node)]),
         ProgramNode::Apply { func, args } => {
             let mut children = vec![enc(func)];
             children.extend(args.iter().map(|a| enc(a)));
@@ -69,43 +67,61 @@ fn extract_template(node: &ProgramNode) -> (TemplateKind, Vec<BinaryHV>) {
         }
         ProgramNode::Sequence(steps) => {
             let children = steps.iter().map(|s| enc(s)).collect();
-            (TemplateKind::Sequence { length: steps.len() }, children)
+            (
+                TemplateKind::Sequence {
+                    length: steps.len(),
+                },
+                children,
+            )
         }
-        ProgramNode::Branch { condition, then_branch, else_branch } => {
-            (TemplateKind::Branch, vec![
-                enc(condition), enc(then_branch), enc(else_branch),
-            ])
-        }
-        ProgramNode::Iterate { init, step, condition } => {
-            (TemplateKind::Iterate, vec![
-                enc(init), enc(step), enc(condition),
-            ])
-        }
-        ProgramNode::Recurse { base_case, recursive_step } => {
-            (TemplateKind::Recurse, vec![
-                enc(base_case), enc(recursive_step),
-            ])
-        }
+        ProgramNode::Branch {
+            condition,
+            then_branch,
+            else_branch,
+        } => (
+            TemplateKind::Branch,
+            vec![enc(condition), enc(then_branch), enc(else_branch)],
+        ),
+        ProgramNode::Iterate {
+            init,
+            step,
+            condition,
+        } => (
+            TemplateKind::Iterate,
+            vec![enc(init), enc(step), enc(condition)],
+        ),
+        ProgramNode::Recurse {
+            base_case,
+            recursive_step,
+        } => (
+            TemplateKind::Recurse,
+            vec![enc(base_case), enc(recursive_step)],
+        ),
         ProgramNode::Map { func, collection } => {
             (TemplateKind::Map, vec![enc(func), enc(collection)])
         }
-        ProgramNode::Filter { predicate, collection } => {
-            (TemplateKind::Filter, vec![enc(predicate), enc(collection)])
-        }
-        ProgramNode::Reduce { func, initial, collection } => {
-            (TemplateKind::Reduce, vec![
-                enc(func), enc(initial), enc(collection),
-            ])
-        }
-        ProgramNode::Compose(f, g) => {
-            (TemplateKind::Compose, vec![enc(f), enc(g)])
-        }
-        ProgramNode::Collect(source) => {
-            (TemplateKind::Collect, vec![enc(source)])
-        }
+        ProgramNode::Filter {
+            predicate,
+            collection,
+        } => (TemplateKind::Filter, vec![enc(predicate), enc(collection)]),
+        ProgramNode::Reduce {
+            func,
+            initial,
+            collection,
+        } => (
+            TemplateKind::Reduce,
+            vec![enc(func), enc(initial), enc(collection)],
+        ),
+        ProgramNode::Compose(f, g) => (TemplateKind::Compose, vec![enc(f), enc(g)]),
+        ProgramNode::Collect(source) => (TemplateKind::Collect, vec![enc(source)]),
         ProgramNode::Abstract(examples) => {
             let children = examples.iter().map(|e| enc(e)).collect();
-            (TemplateKind::Sequence { length: examples.len() }, children)
+            (
+                TemplateKind::Sequence {
+                    length: examples.len(),
+                },
+                children,
+            )
         }
     }
 }
@@ -121,12 +137,15 @@ fn find_best_donors(
     donors: &[(String, ProgramNode, BinaryHV)],
 ) -> Vec<ProgramNode> {
     use crate::periodic_table::encode_structural;
-    child_targets.iter()
+    child_targets
+        .iter()
         .map(|target_child| {
-            donors.iter()
+            donors
+                .iter()
                 .max_by(|a, b| {
                     // Compare using structural encoding of the donor node
-                    encode_structural(&a.1).similarity(target_child)
+                    encode_structural(&a.1)
+                        .similarity(target_child)
                         .partial_cmp(&encode_structural(&b.1).similarity(target_child))
                         .unwrap_or(Ordering::Equal)
                 })
@@ -139,9 +158,10 @@ fn find_best_donors(
 /// Reassemble a ProgramNode from a template kind and filled children.
 fn assemble(template: &TemplateKind, children: Vec<ProgramNode>) -> ProgramNode {
     match template {
-        TemplateKind::Leaf => {
-            children.into_iter().next().unwrap_or(ProgramNode::atom("?"))
-        }
+        TemplateKind::Leaf => children
+            .into_iter()
+            .next()
+            .unwrap_or(ProgramNode::atom("?")),
         TemplateKind::Apply { .. } => {
             if children.is_empty() {
                 return ProgramNode::atom("?");
@@ -150,20 +170,26 @@ fn assemble(template: &TemplateKind, children: Vec<ProgramNode>) -> ProgramNode 
             let args = children[1..].to_vec();
             ProgramNode::apply(func, args)
         }
-        TemplateKind::Sequence { .. } => {
-            ProgramNode::Sequence(children)
-        }
+        TemplateKind::Sequence { .. } => ProgramNode::Sequence(children),
         TemplateKind::Branch => {
             if children.len() < 3 {
                 return ProgramNode::atom("?");
             }
-            ProgramNode::branch(children[0].clone(), children[1].clone(), children[2].clone())
+            ProgramNode::branch(
+                children[0].clone(),
+                children[1].clone(),
+                children[2].clone(),
+            )
         }
         TemplateKind::Iterate => {
             if children.len() < 3 {
                 return ProgramNode::atom("?");
             }
-            ProgramNode::iterate(children[0].clone(), children[1].clone(), children[2].clone())
+            ProgramNode::iterate(
+                children[0].clone(),
+                children[1].clone(),
+                children[2].clone(),
+            )
         }
         TemplateKind::Recurse => {
             if children.len() < 2 {
@@ -187,7 +213,11 @@ fn assemble(template: &TemplateKind, children: Vec<ProgramNode>) -> ProgramNode 
             if children.len() < 3 {
                 return ProgramNode::atom("?");
             }
-            ProgramNode::reduce(children[0].clone(), children[1].clone(), children[2].clone())
+            ProgramNode::reduce(
+                children[0].clone(),
+                children[1].clone(),
+                children[2].clone(),
+            )
         }
         TemplateKind::Compose => {
             if children.len() < 2 {
@@ -195,11 +225,11 @@ fn assemble(template: &TemplateKind, children: Vec<ProgramNode>) -> ProgramNode 
             }
             ProgramNode::compose(children[0].clone(), children[1].clone())
         }
-        TemplateKind::Collect => {
-            children.into_iter().next()
-                .map(ProgramNode::collect)
-                .unwrap_or(ProgramNode::atom("?"))
-        }
+        TemplateKind::Collect => children
+            .into_iter()
+            .next()
+            .map(ProgramNode::collect)
+            .unwrap_or(ProgramNode::atom("?")),
     }
 }
 
@@ -235,11 +265,7 @@ pub fn compose_from_patterns(
     let mut all_subs: Vec<(String, ProgramNode, BinaryHV)> = Vec::new();
     for entry in memory.as_library().iter() {
         // Re-encode sub-patterns using structural encoding
-        all_subs.push((
-            String::new(),
-            entry.0.clone(),
-            encode_structural(&entry.0),
-        ));
+        all_subs.push((String::new(), entry.0.clone(), encode_structural(&entry.0)));
     }
     // Also add decomposed sub-trees from top-K patterns
     for (entry, _sim) in &top_k {
@@ -265,7 +291,8 @@ pub fn compose_from_patterns(
     let comp_score = oracle.score(&composed, target).composite;
 
     // 7. Compare to best single pattern
-    let best_single = top_k.first()
+    let best_single = top_k
+        .first()
         .map(|(e, _)| oracle.score(&e.node, target).composite)
         .unwrap_or(0.0);
 
@@ -334,9 +361,21 @@ mod tests {
         let target_b = ProgramNode::atom("x").encode();
 
         let donors = vec![
-            ("add".to_string(), ProgramNode::op("ADD"), ProgramNode::op("ADD").encode()),
-            ("mul".to_string(), ProgramNode::op("MUL"), ProgramNode::op("MUL").encode()),
-            ("x".to_string(), ProgramNode::atom("x"), ProgramNode::atom("x").encode()),
+            (
+                "add".to_string(),
+                ProgramNode::op("ADD"),
+                ProgramNode::op("ADD").encode(),
+            ),
+            (
+                "mul".to_string(),
+                ProgramNode::op("MUL"),
+                ProgramNode::op("MUL").encode(),
+            ),
+            (
+                "x".to_string(),
+                ProgramNode::atom("x"),
+                ProgramNode::atom("x").encode(),
+            ),
         ];
 
         let filled = find_best_donors(&[target_a, target_b], &donors);
@@ -358,7 +397,10 @@ mod tests {
         let result = compose_from_patterns(&target, &memory, 3);
         // Either None (retrieval was better) or Some with high score
         if let Some((_, score)) = result {
-            assert!(score > 0.9, "if composition returned, it should be good: {score}");
+            assert!(
+                score > 0.9,
+                "if composition returned, it should be good: {score}"
+            );
         }
     }
 
@@ -371,13 +413,17 @@ mod tests {
             ProgramNode::iterate(
                 ProgramNode::atom("i = 1"),
                 ProgramNode::branch(
-                    ProgramNode::apply(ProgramNode::op("LT"),
-                        vec![ProgramNode::atom("arr[i]"), ProgramNode::atom("min")]),
+                    ProgramNode::apply(
+                        ProgramNode::op("LT"),
+                        vec![ProgramNode::atom("arr[i]"), ProgramNode::atom("min")],
+                    ),
                     ProgramNode::atom("min = arr[i]"),
                     ProgramNode::atom("/* skip */"),
                 ),
-                ProgramNode::apply(ProgramNode::op("LT"),
-                    vec![ProgramNode::atom("i"), ProgramNode::atom("len")]),
+                ProgramNode::apply(
+                    ProgramNode::op("LT"),
+                    vec![ProgramNode::atom("i"), ProgramNode::atom("len")],
+                ),
             ),
             ProgramNode::atom("min"),
         ]);
@@ -386,6 +432,9 @@ mod tests {
 
         // Composition should produce SOMETHING — it may or may not beat retrieval
         // but the mechanism should run without panic
-        println!("Novel composition result: {:?}", result.as_ref().map(|(_, s)| s));
+        println!(
+            "Novel composition result: {:?}",
+            result.as_ref().map(|(_, s)| s)
+        );
     }
 }

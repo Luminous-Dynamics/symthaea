@@ -37,14 +37,20 @@ fn make_disembodied_service() -> CognitiveLoopService {
 #[test]
 fn test_embodied_service_has_bridge() {
     let service = make_embodied_service();
-    assert!(service.has_embodiment(), "Humanoid embodiment should be active");
+    assert!(
+        service.has_embodiment(),
+        "Humanoid embodiment should be active"
+    );
     assert_eq!(service.embodiment_platform(), EmbodimentPlatform::Humanoid);
 }
 
 #[test]
 fn test_disembodied_service_no_bridge() {
     let service = make_disembodied_service();
-    assert!(!service.has_embodiment(), "Default config should be disembodied");
+    assert!(
+        !service.has_embodiment(),
+        "Default config should be disembodied"
+    );
     assert_eq!(service.embodiment_platform(), EmbodimentPlatform::None);
 }
 

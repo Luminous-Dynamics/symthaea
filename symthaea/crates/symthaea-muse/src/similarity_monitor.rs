@@ -8,8 +8,8 @@
 //!
 //! Target similarity ratio: 0.5-0.7 (moderate repetition with development).
 
-use std::collections::VecDeque;
 use crate::Note;
+use std::collections::VecDeque;
 
 /// Compact representation of a phrase for similarity comparison.
 #[derive(Debug, Clone)]
@@ -53,7 +53,9 @@ impl SimilarityMonitor {
 
     /// Record a completed phrase.
     pub fn record_phrase(&mut self, notes: &[Note]) {
-        if notes.len() < 2 { return; }
+        if notes.len() < 2 {
+            return;
+        }
         let vec = notes_to_vector(notes);
 
         // Compute similarity to history before adding
@@ -68,15 +70,20 @@ impl SimilarityMonitor {
 
     /// Compute max similarity of a phrase vector against history.
     fn max_similarity(&self, vec: &PhraseVector) -> f32 {
-        if self.history.is_empty() { return 0.0; }
-        self.history.iter()
+        if self.history.is_empty() {
+            return 0.0;
+        }
+        self.history
+            .iter()
             .map(|h| cosine_similarity(vec, h))
             .fold(0.0f32, f32::max)
     }
 
     /// Recommend an action based on similarity balance.
     pub fn recommend(&self) -> SimilarityAction {
-        if self.history.len() < 3 { return SimilarityAction::NoAction; }
+        if self.history.len() < 3 {
+            return SimilarityAction::NoAction;
+        }
 
         if self.similarity_ema < self.target_min {
             SimilarityAction::ForceRepeat
@@ -87,8 +94,12 @@ impl SimilarityMonitor {
         }
     }
 
-    pub fn current_similarity(&self) -> f32 { self.current_similarity }
-    pub fn similarity_ema(&self) -> f32 { self.similarity_ema }
+    pub fn current_similarity(&self) -> f32 {
+        self.current_similarity
+    }
+    pub fn similarity_ema(&self) -> f32 {
+        self.similarity_ema
+    }
 
     pub fn reset(&mut self) {
         self.history.clear();
@@ -104,24 +115,42 @@ fn notes_to_vector(notes: &[Note]) -> PhraseVector {
 
     let mut histogram = [0.0f32; 12];
     for w in notes.windows(2) {
-        let interval = ((w[1].frequency / w[0].frequency).log2() * 12.0).round().abs() as usize;
+        let interval = ((w[1].frequency / w[0].frequency).log2() * 12.0)
+            .round()
+            .abs() as usize;
         let bin = interval.min(11);
         histogram[bin] += 1.0;
     }
     let hist_sum: f32 = histogram.iter().sum();
     if hist_sum > 0.0 {
-        for h in &mut histogram { *h /= hist_sum; }
+        for h in &mut histogram {
+            *h /= hist_sum;
+        }
     }
 
     let mean_dur = notes.iter().map(|n| n.duration).sum::<f32>() / notes.len() as f32;
 
-    let ascending = notes.windows(2).filter(|w| w[1].frequency > w[0].frequency).count();
-    let descending = notes.windows(2).filter(|w| w[1].frequency < w[0].frequency).count();
+    let ascending = notes
+        .windows(2)
+        .filter(|w| w[1].frequency > w[0].frequency)
+        .count();
+    let descending = notes
+        .windows(2)
+        .filter(|w| w[1].frequency < w[0].frequency)
+        .count();
     let contour = if notes.len() > 1 {
         (ascending as f32 - descending as f32) / (notes.len() - 1) as f32
-    } else { 0.0 };
+    } else {
+        0.0
+    };
 
-    PhraseVector { pitch_centroid: centroid, pitch_range: max_f - min_f, interval_histogram: histogram, mean_duration: mean_dur, contour }
+    PhraseVector {
+        pitch_centroid: centroid,
+        pitch_range: max_f - min_f,
+        interval_histogram: histogram,
+        mean_duration: mean_dur,
+        contour,
+    }
 }
 
 fn cosine_similarity(a: &PhraseVector, b: &PhraseVector) -> f32 {
@@ -133,7 +162,9 @@ fn cosine_similarity(a: &PhraseVector, b: &PhraseVector) -> f32 {
     let mag_a: f32 = fa.iter().map(|x| x * x).sum::<f32>().sqrt();
     let mag_b: f32 = fb.iter().map(|x| x * x).sum::<f32>().sqrt();
 
-    if mag_a < 1e-8 || mag_b < 1e-8 { return 0.0; }
+    if mag_a < 1e-8 || mag_b < 1e-8 {
+        return 0.0;
+    }
     (dot / (mag_a * mag_b)).clamp(0.0, 1.0)
 }
 
@@ -152,7 +183,12 @@ mod tests {
     use super::*;
 
     fn n(freq: f32, dur: f32) -> Note {
-        Note { frequency: freq, start_time: 0.0, duration: dur, velocity: 0.7 }
+        Note {
+            frequency: freq,
+            start_time: 0.0,
+            duration: dur,
+            velocity: 0.7,
+        }
     }
 
     #[test]
@@ -161,7 +197,11 @@ mod tests {
         let phrase = vec![n(261.63, 0.5), n(329.63, 0.5), n(392.00, 0.5)];
         mon.record_phrase(&phrase);
         mon.record_phrase(&phrase); // identical
-        assert!(mon.current_similarity() > 0.9, "identical should be >0.9: {}", mon.current_similarity());
+        assert!(
+            mon.current_similarity() > 0.9,
+            "identical should be >0.9: {}",
+            mon.current_similarity()
+        );
     }
 
     #[test]
@@ -171,14 +211,18 @@ mod tests {
         mon.record_phrase(&phrase1);
         let phrase2 = vec![n(880.0, 0.1), n(440.0, 0.1), n(220.0, 0.1)]; // very different
         mon.record_phrase(&phrase2);
-        assert!(mon.current_similarity() < 0.5, "different should be low: {}", mon.current_similarity());
+        assert!(
+            mon.current_similarity() < 0.5,
+            "different should be low: {}",
+            mon.current_similarity()
+        );
     }
 
     #[test]
     fn force_repeat_when_too_novel() {
         let mut mon = SimilarityMonitor::new();
         mon.similarity_ema = 0.2; // very low
-        // Add some history
+                                  // Add some history
         for i in 0..5 {
             mon.history.push_back(PhraseVector {
                 pitch_centroid: 300.0 + i as f32 * 100.0,

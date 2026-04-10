@@ -236,11 +236,7 @@ impl HodgeConsciousnessDecomposition {
     /// gradient (exact), curl (co-exact), and harmonic components.
     pub fn decompose(complex: &ConsciousnessComplex, edge_signal: &[f64]) -> Self {
         let m = complex.edges.len();
-        assert_eq!(
-            edge_signal.len(),
-            m,
-            "Signal length must match edge count"
-        );
+        assert_eq!(edge_signal.len(), m, "Signal length must match edge count");
 
         let laplacian = complex.hodge_laplacian_1();
 
@@ -275,14 +271,12 @@ impl HodgeConsciousnessDecomposition {
                 let b1 = complex.boundary_1();
                 let b1_proj: f64 = (0..complex.num_vertices)
                     .map(|v| {
-                        let sum: f64 =
-                            (0..m).map(|e| b1[v][e] * eigenvectors[e][idx]).sum();
+                        let sum: f64 = (0..m).map(|e| b1[v][e] * eigenvectors[e][idx]).sum();
                         sum * sum
                     })
                     .sum();
 
-                let b1_norm: f64 =
-                    (0..m).map(|e| eigenvectors[e][idx].powi(2)).sum();
+                let b1_norm: f64 = (0..m).map(|e| eigenvectors[e][idx].powi(2)).sum();
                 let gradient_fraction = if b1_norm > 1e-12 {
                     b1_proj / (eigenvalue * b1_norm)
                 } else {
@@ -291,10 +285,8 @@ impl HodgeConsciousnessDecomposition {
                 let gradient_fraction = gradient_fraction.clamp(0.0, 1.0);
 
                 for i in 0..m {
-                    gradient_flow[i] +=
-                        projection * eigenvectors[i][idx] * gradient_fraction;
-                    curl_flow[i] +=
-                        projection * eigenvectors[i][idx] * (1.0 - gradient_fraction);
+                    gradient_flow[i] += projection * eigenvectors[i][idx] * gradient_fraction;
+                    curl_flow[i] += projection * eigenvectors[i][idx] * (1.0 - gradient_fraction);
                 }
             }
         }
@@ -303,13 +295,7 @@ impl HodgeConsciousnessDecomposition {
         let euler = betti
             .iter()
             .enumerate()
-            .map(|(k, &b)| {
-                if k % 2 == 0 {
-                    b as i64
-                } else {
-                    -(b as i64)
-                }
-            })
+            .map(|(k, &b)| if k % 2 == 0 { b as i64 } else { -(b as i64) })
             .sum();
 
         let harmonic_ratio = if total_energy > 1e-12 {
@@ -342,12 +328,9 @@ impl TopologicalPhi {
         // Betti-based Phi: weighted sum of Betti numbers.
         // beta_1 (loops) indicates feedback integration.
         // beta_2 (voids) indicates higher-order integration.
-        let beta_1 =
-            decomposition.betti_numbers.get(1).copied().unwrap_or(0) as f64;
-        let beta_2 =
-            decomposition.betti_numbers.get(2).copied().unwrap_or(0) as f64;
-        let phi_betti =
-            ((beta_1 + 2.0 * beta_2) / (1.0 + beta_1 + beta_2)).clamp(0.0, 1.0);
+        let beta_1 = decomposition.betti_numbers.get(1).copied().unwrap_or(0) as f64;
+        let beta_2 = decomposition.betti_numbers.get(2).copied().unwrap_or(0) as f64;
+        let phi_betti = ((beta_1 + 2.0 * beta_2) / (1.0 + beta_1 + beta_2)).clamp(0.0, 1.0);
 
         // Combined: geometric mean of harmonic and topological measures.
         let phi_topological = (phi_harmonic * phi_betti.max(0.01)).sqrt();
@@ -356,16 +339,8 @@ impl TopologicalPhi {
             phi_harmonic,
             phi_betti,
             phi_topological,
-            integration_loops: decomposition
-                .betti_numbers
-                .get(1)
-                .copied()
-                .unwrap_or(0),
-            higher_order_voids: decomposition
-                .betti_numbers
-                .get(2)
-                .copied()
-                .unwrap_or(0),
+            integration_loops: decomposition.betti_numbers.get(1).copied().unwrap_or(0),
+            higher_order_voids: decomposition.betti_numbers.get(2).copied().unwrap_or(0),
         }
     }
 }
@@ -425,21 +400,14 @@ impl ConsciousnessManifold {
         let mut curvature_sum = 0.0;
         let mut curvature_count = 0;
         for i in 1..(n - 1) {
-            let v1: Vec<f64> =
-                (0..d).map(|j| states[i][j] - states[i - 1][j]).collect();
-            let v2: Vec<f64> =
-                (0..d).map(|j| states[i + 1][j] - states[i][j]).collect();
+            let v1: Vec<f64> = (0..d).map(|j| states[i][j] - states[i - 1][j]).collect();
+            let v2: Vec<f64> = (0..d).map(|j| states[i + 1][j] - states[i][j]).collect();
             let norm1: f64 = v1.iter().map(|x| x * x).sum::<f64>().sqrt();
             let norm2: f64 = v2.iter().map(|x| x * x).sum::<f64>().sqrt();
             if norm1 > 1e-12 && norm2 > 1e-12 {
-                let cos_angle: f64 = v1
-                    .iter()
-                    .zip(&v2)
-                    .map(|(a, b)| a * b)
-                    .sum::<f64>()
-                    / (norm1 * norm2);
-                curvature_sum +=
-                    (1.0 - cos_angle.clamp(-1.0, 1.0)).acos().abs() / norm1;
+                let cos_angle: f64 =
+                    v1.iter().zip(&v2).map(|(a, b)| a * b).sum::<f64>() / (norm1 * norm2);
+                curvature_sum += (1.0 - cos_angle.clamp(-1.0, 1.0)).acos().abs() / norm1;
                 curvature_count += 1;
             }
         }
@@ -478,8 +446,7 @@ impl ConsciousnessManifold {
 fn diagonal_dominance_eigenvalues(matrix: &[Vec<f64>]) -> Vec<f64> {
     let n = matrix.len();
     let mut eigenvalues: Vec<f64> = (0..n).map(|i| matrix[i][i]).collect();
-    eigenvalues
-        .sort_by(|a, b| b.partial_cmp(a).unwrap_or(std::cmp::Ordering::Equal));
+    eigenvalues.sort_by(|a, b| b.partial_cmp(a).unwrap_or(std::cmp::Ordering::Equal));
     eigenvalues
 }
 
@@ -579,10 +546,8 @@ fn symmetric_eigen(matrix: &[Vec<f64>]) -> (Vec<f64>, Vec<Vec<f64>>) {
                 new_a[q][i] = new_a[i][q];
             }
         }
-        new_a[p][p] =
-            c * c * a[p][p] + 2.0 * s * c * a[p][q] + s * s * a[q][q];
-        new_a[q][q] =
-            s * s * a[p][p] - 2.0 * s * c * a[p][q] + c * c * a[q][q];
+        new_a[p][p] = c * c * a[p][p] + 2.0 * s * c * a[p][q] + s * s * a[q][q];
+        new_a[q][q] = s * s * a[p][p] - 2.0 * s * c * a[p][q] + c * c * a[q][q];
         new_a[p][q] = 0.0;
         new_a[q][p] = 0.0;
         a = new_a;
@@ -619,8 +584,7 @@ mod tests {
             vec![0.9, 1.0, 0.7],
             vec![0.8, 0.7, 1.0],
         ];
-        let complex =
-            ConsciousnessComplex::from_correlation_matrix(&matrix, 0.5);
+        let complex = ConsciousnessComplex::from_correlation_matrix(&matrix, 0.5);
         assert_eq!(complex.edges.len(), 3);
         assert_eq!(complex.triangles.len(), 1);
         let betti = complex.betti_numbers();
@@ -637,8 +601,7 @@ mod tests {
             vec![0.0, 0.9, 1.0, 0.9],
             vec![0.9, 0.0, 0.9, 1.0],
         ];
-        let complex =
-            ConsciousnessComplex::from_correlation_matrix(&matrix, 0.5);
+        let complex = ConsciousnessComplex::from_correlation_matrix(&matrix, 0.5);
         assert_eq!(complex.edges.len(), 4);
         assert_eq!(complex.triangles.len(), 0);
         let betti = complex.betti_numbers();
@@ -655,8 +618,7 @@ mod tests {
             vec![0.0, 0.0, 1.0, 0.8],
             vec![0.0, 0.0, 0.8, 1.0],
         ];
-        let complex =
-            ConsciousnessComplex::from_correlation_matrix(&matrix, 0.5);
+        let complex = ConsciousnessComplex::from_correlation_matrix(&matrix, 0.5);
         let betti = complex.betti_numbers();
         assert_eq!(betti[0], 2, "Two connected components");
     }
@@ -670,11 +632,9 @@ mod tests {
             vec![0.0, 0.9, 1.0, 0.9],
             vec![0.9, 0.0, 0.9, 1.0],
         ];
-        let complex =
-            ConsciousnessComplex::from_correlation_matrix(&matrix, 0.5);
+        let complex = ConsciousnessComplex::from_correlation_matrix(&matrix, 0.5);
         let signal = vec![1.0, 1.0, 1.0, 1.0]; // Constant flow around cycle
-        let decomp =
-            HodgeConsciousnessDecomposition::decompose(&complex, &signal);
+        let decomp = HodgeConsciousnessDecomposition::decompose(&complex, &signal);
 
         assert!(decomp.harmonic_ratio >= 0.0);
         assert!(decomp.harmonic_ratio <= 1.0);
@@ -765,19 +725,12 @@ mod tests {
             vec![0.9, 0.9, 1.0, 0.9],
             vec![0.9, 0.9, 0.9, 1.0],
         ];
-        let complex =
-            ConsciousnessComplex::from_correlation_matrix(&matrix, 0.5);
+        let complex = ConsciousnessComplex::from_correlation_matrix(&matrix, 0.5);
         let betti = complex.betti_numbers();
         let euler: i64 = betti
             .iter()
             .enumerate()
-            .map(|(k, &b)| {
-                if k % 2 == 0 {
-                    b as i64
-                } else {
-                    -(b as i64)
-                }
-            })
+            .map(|(k, &b)| if k % 2 == 0 { b as i64 } else { -(b as i64) })
             .sum();
         // K4 with 4 triangles: beta_0=1, beta_1=0, beta_2=1 -> chi=2
         assert_eq!(euler, 2, "Tetrahedron boundary has chi=2");

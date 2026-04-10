@@ -26,6 +26,7 @@
 #![deny(unsafe_code)]
 
 pub mod accelerator;
+pub mod antimatter;
 pub mod cmod_adapter;
 #[allow(
     clippy::useless_format,
@@ -41,7 +42,6 @@ pub mod cmod_evaluation;
     clippy::needless_range_loop
 )]
 pub mod cross_machine_evaluation;
-pub mod antimatter;
 pub mod datacenter;
 pub mod fission;
 pub mod fusion_twin;

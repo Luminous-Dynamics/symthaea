@@ -70,24 +70,24 @@ impl SubstrateTimbreModifier {
             SubstrateTimbreType::Biological => Self {
                 substrate,
                 vibrato_scale: 2.0,      // natural vibrato
-                noise_addition: 0.03,     // breath noise
-                preferred_partials: 8,    // moderate richness
-                attack_scale: 1.0,        // natural
-                fm_scale: 0.5,            // mild modulation
-                stereo_correlation: 1.0,  // normal stereo
-                morph_rate: 0.5,          // moderate evolution
-                jitter: 0.02,             // slight imprecision
+                noise_addition: 0.03,    // breath noise
+                preferred_partials: 8,   // moderate richness
+                attack_scale: 1.0,       // natural
+                fm_scale: 0.5,           // mild modulation
+                stereo_correlation: 1.0, // normal stereo
+                morph_rate: 0.5,         // moderate evolution
+                jitter: 0.02,            // slight imprecision
             },
             SubstrateTimbreType::Silicon => Self {
                 substrate,
-                vibrato_scale: 0.1,       // minimal vibrato
-                noise_addition: 0.0,      // clean
-                preferred_partials: 4,    // sparse, pure
-                attack_scale: 0.5,        // snappy
-                fm_scale: 1.0,            // precise FM
+                vibrato_scale: 0.1,    // minimal vibrato
+                noise_addition: 0.0,   // clean
+                preferred_partials: 4, // sparse, pure
+                attack_scale: 0.5,     // snappy
+                fm_scale: 1.0,         // precise FM
                 stereo_correlation: 1.0,
                 morph_rate: 1.0,
-                jitter: 0.0,             // perfectly precise
+                jitter: 0.0, // perfectly precise
             },
             SubstrateTimbreType::Quantum => Self {
                 substrate,
@@ -95,20 +95,20 @@ impl SubstrateTimbreModifier {
                 noise_addition: 0.01,
                 preferred_partials: 12,
                 attack_scale: 0.8,
-                fm_scale: 1.5,            // rich interference patterns
-                stereo_correlation: 0.0,  // entangled: anti-correlated channels
-                morph_rate: 3.0,          // rapid superposition collapse
+                fm_scale: 1.5,           // rich interference patterns
+                stereo_correlation: 0.0, // entangled: anti-correlated channels
+                morph_rate: 3.0,         // rapid superposition collapse
                 jitter: 0.005,
             },
             SubstrateTimbreType::Photonic => Self {
                 substrate,
-                vibrato_scale: 0.05,      // almost none
+                vibrato_scale: 0.05, // almost none
                 noise_addition: 0.005,
-                preferred_partials: 16,   // maximum brightness
-                attack_scale: 0.1,        // ultra-fast transients
+                preferred_partials: 16, // maximum brightness
+                attack_scale: 0.1,      // ultra-fast transients
                 fm_scale: 0.8,
                 stereo_correlation: 1.0,
-                morph_rate: 5.0,          // speed of light
+                morph_rate: 5.0, // speed of light
                 jitter: 0.0,
             },
             SubstrateTimbreType::Neuromorphic => Self {
@@ -120,17 +120,17 @@ impl SubstrateTimbreModifier {
                 fm_scale: 0.7,
                 stereo_correlation: 0.8,
                 morph_rate: 0.8,
-                jitter: 0.05,             // spike-train irregularity
+                jitter: 0.05, // spike-train irregularity
             },
             SubstrateTimbreType::Biochemical => Self {
                 substrate,
                 vibrato_scale: 1.5,
-                noise_addition: 0.04,     // molecular noise
+                noise_addition: 0.04, // molecular noise
                 preferred_partials: 6,
-                attack_scale: 3.0,        // very slow
+                attack_scale: 3.0, // very slow
                 fm_scale: 0.3,
                 stereo_correlation: 1.0,
-                morph_rate: 0.1,          // glacial evolution
+                morph_rate: 0.1, // glacial evolution
                 jitter: 0.03,
             },
             SubstrateTimbreType::Hybrid => Self {
@@ -146,8 +146,8 @@ impl SubstrateTimbreModifier {
             },
             SubstrateTimbreType::Exotic => Self {
                 substrate,
-                vibrato_scale: 3.0,       // alien vibrato
-                noise_addition: 0.06,     // high noise
+                vibrato_scale: 3.0,   // alien vibrato
+                noise_addition: 0.06, // high noise
                 preferred_partials: 10,
                 attack_scale: 0.7,
                 fm_scale: 2.5,            // extreme modulation
@@ -189,7 +189,8 @@ impl SubstrateTimbreModifier {
 
         // Create oscillating correlation for quantum substrates
         let phase = sample_idx as f32 * 0.001; // slow oscillation
-        let corr = self.stereo_correlation + (1.0 - self.stereo_correlation.abs()) * 0.5 * phase.sin();
+        let corr =
+            self.stereo_correlation + (1.0 - self.stereo_correlation.abs()) * 0.5 * phase.sin();
 
         let mid = 0.5 * (1.0 + corr);
         let side = 0.5 * (1.0 - corr);
@@ -205,24 +206,39 @@ mod tests {
     #[test]
     fn biological_warm_character() {
         let bio = SubstrateTimbreModifier::for_substrate(SubstrateTimbreType::Biological);
-        assert!(bio.vibrato_scale > 1.0, "biological should have natural vibrato");
-        assert!(bio.noise_addition > 0.0, "biological should have breath noise");
+        assert!(
+            bio.vibrato_scale > 1.0,
+            "biological should have natural vibrato"
+        );
+        assert!(
+            bio.noise_addition > 0.0,
+            "biological should have breath noise"
+        );
         assert!(bio.jitter > 0.0, "biological should have imprecision");
     }
 
     #[test]
     fn silicon_crystalline_character() {
         let si = SubstrateTimbreModifier::for_substrate(SubstrateTimbreType::Silicon);
-        assert!(si.vibrato_scale < 0.2, "silicon should have minimal vibrato");
+        assert!(
+            si.vibrato_scale < 0.2,
+            "silicon should have minimal vibrato"
+        );
         assert_eq!(si.noise_addition, 0.0, "silicon should be clean");
         assert_eq!(si.jitter, 0.0, "silicon should be precise");
-        assert!(si.preferred_partials <= 6, "silicon should have sparse spectrum");
+        assert!(
+            si.preferred_partials <= 6,
+            "silicon should have sparse spectrum"
+        );
     }
 
     #[test]
     fn quantum_entangled_stereo() {
         let q = SubstrateTimbreModifier::for_substrate(SubstrateTimbreType::Quantum);
-        assert!(q.stereo_correlation < 0.5, "quantum should have low stereo correlation");
+        assert!(
+            q.stereo_correlation < 0.5,
+            "quantum should have low stereo correlation"
+        );
 
         let (l, r) = q.stereo_decorrelation(0);
         assert!((l - r).abs() > 0.01, "quantum channels should differ");
@@ -231,8 +247,14 @@ mod tests {
     #[test]
     fn photonic_fast_bright() {
         let ph = SubstrateTimbreModifier::for_substrate(SubstrateTimbreType::Photonic);
-        assert!(ph.attack_scale < 0.2, "photonic should have ultra-fast attack");
-        assert_eq!(ph.preferred_partials, 16, "photonic should be maximally bright");
+        assert!(
+            ph.attack_scale < 0.2,
+            "photonic should have ultra-fast attack"
+        );
+        assert_eq!(
+            ph.preferred_partials, 16,
+            "photonic should be maximally bright"
+        );
         assert!(ph.morph_rate > 3.0, "photonic should morph rapidly");
     }
 
@@ -245,7 +267,10 @@ mod tests {
 
         assert_eq!(config.num_partials, 10);
         assert!(config.noise_mix > 0.0);
-        assert!(config.max_fm_depth > original_fm, "exotic should increase FM depth");
+        assert!(
+            config.max_fm_depth > original_fm,
+            "exotic should increase FM depth"
+        );
     }
 
     #[test]

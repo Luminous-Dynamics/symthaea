@@ -624,10 +624,16 @@ impl PredictiveHdcEncoder {
                 let mut sum = 0.0f32;
                 for j in 0..k {
                     // Deterministic pseudo-random index selection via mixing
-                    let hash = ((i as u64).wrapping_mul(2654435761) ^ (j as u64).wrapping_mul(2246822519)) as usize;
+                    let hash = ((i as u64).wrapping_mul(2654435761)
+                        ^ (j as u64).wrapping_mul(2246822519))
+                        as usize;
                     let idx = hash % input_len;
                     // Deterministic sign: ±1 based on hash bit
-                    let sign = if (hash >> 16) & 1 == 0 { 1.0f32 } else { -1.0f32 };
+                    let sign = if (hash >> 16) & 1 == 0 {
+                        1.0f32
+                    } else {
+                        -1.0f32
+                    };
                     sum += sign * hdv.values[idx];
                 }
                 sum * scale

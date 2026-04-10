@@ -25,12 +25,12 @@ fn main() {
 
 #[cfg(feature = "humanoid")]
 fn run() {
+    use std::time::Instant;
+    use symthaea_core::genesis::GenesisSeed;
     use symthaea_humanoid::controller::HumanoidController;
     use symthaea_humanoid::encoder::HumanoidHdcEncoder;
     use symthaea_humanoid::simulator::{HumanoidPhysicsSimulator, SimpleHumanoidSimulator};
     use symthaea_humanoid::types::*;
-    use symthaea_core::genesis::GenesisSeed;
-    use std::time::Instant;
 
     println!("╔══════════════════════════════════════════════════════════════╗");
     println!("║  CMA-ES Independent Standing                                ║");
@@ -55,17 +55,23 @@ fn run() {
     let n_bias = init_bias.len();
     let n_params = n_weights + n_bias;
 
-    println!("  Parameters: {} weights + {} bias = {} total", n_weights, n_bias, n_params);
+    println!(
+        "  Parameters: {} weights + {} bias = {} total",
+        n_weights, n_bias, n_params
+    );
 
     // CMA-ES hyperparameters
-    let pop_size = 16;         // Smaller population for speed
-    let n_generations = 100;   // Quick test — scale up if converging
-    let eval_steps = 300;      // Steps per fitness evaluation (no PD!)
+    let pop_size = 16; // Smaller population for speed
+    let n_generations = 100; // Quick test — scale up if converging
+    let eval_steps = 300; // Steps per fitness evaluation (no PD!)
     let dt = 0.025;
 
     // Initial mean = current weights, initial sigma = 0.1
-    let mut mean: Vec<f64> = init_weights.iter().chain(init_bias.iter())
-        .map(|&w| w as f64).collect();
+    let mut mean: Vec<f64> = init_weights
+        .iter()
+        .chain(init_bias.iter())
+        .map(|&w| w as f64)
+        .collect();
     let mut sigma: f64 = 0.1;
 
     // Diagonal CMA-ES (separable): per-parameter step sizes
@@ -85,8 +91,10 @@ fn run() {
     let mut best_ever_fitness = f64::NEG_INFINITY;
     let mut best_ever_params: Vec<f64> = mean.clone();
 
-    println!("{:>5} {:>12} {:>12} {:>12} {:>8}",
-        "Gen", "BestFit", "MeanFit", "BestEver", "Sigma");
+    println!(
+        "{:>5} {:>12} {:>12} {:>12} {:>8}",
+        "Gen", "BestFit", "MeanFit", "BestEver", "Sigma"
+    );
 
     for gen in 0..n_generations {
         // Sample population
@@ -112,17 +120,16 @@ fn run() {
             }
 
             // Evaluate fitness: run controller ALONE for eval_steps
-            let fitness = evaluate_candidate(
-                &candidate, n_weights, &genesis, &config, eval_steps, dt,
-            );
+            let fitness =
+                evaluate_candidate(&candidate, n_weights, &genesis, &config, eval_steps, dt);
 
             population.push(candidate);
             fitnesses.push(fitness);
         }
 
         // Sort by fitness (descending)
-        let mut ranked: Vec<(usize, f64)> = fitnesses.iter().enumerate()
-            .map(|(i, &f)| (i, f)).collect();
+        let mut ranked: Vec<(usize, f64)> =
+            fitnesses.iter().enumerate().map(|(i, &f)| (i, f)).collect();
         ranked.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
 
         let best_fitness = ranked[0].1;
@@ -136,7 +143,9 @@ fn run() {
         // Update mean: weighted average of top 50%
         let n_elite = pop_size / 2;
         let mut new_mean = vec![0.0f64; n_params];
-        let weight_sum: f64 = (1..=n_elite).map(|i| (n_elite as f64 + 0.5 - i as f64).max(0.0)).sum();
+        let weight_sum: f64 = (1..=n_elite)
+            .map(|i| (n_elite as f64 + 0.5 - i as f64).max(0.0))
+            .sum();
         for rank in 0..n_elite {
             let idx = ranked[rank].0;
             let w = (n_elite as f64 + 0.5 - rank as f64).max(0.0) / weight_sum;
@@ -162,14 +171,19 @@ fn run() {
         mean = new_mean;
 
         if gen % 10 == 0 || gen == n_generations - 1 {
-            println!("{:>5} {:>12.4} {:>12.4} {:>12.4} {:>8.5}",
-                gen, best_fitness, mean_fitness, best_ever_fitness, sigma);
+            println!(
+                "{:>5} {:>12.4} {:>12.4} {:>12.4} {:>8.5}",
+                gen, best_fitness, mean_fitness, best_ever_fitness, sigma
+            );
         }
     }
 
     let elapsed = start.elapsed();
     println!();
-    println!("━━━ CMA-ES Complete ({:.1} min) ━━━", elapsed.as_secs_f64() / 60.0);
+    println!(
+        "━━━ CMA-ES Complete ({:.1} min) ━━━",
+        elapsed.as_secs_f64() / 60.0
+    );
     println!("  Best ever fitness: {:.4}", best_ever_fitness);
     println!("  Total evaluations: {}", n_generations * pop_size);
 
@@ -177,14 +191,19 @@ fn run() {
     println!();
     println!("━━━ Final Evaluation (best-ever weights, 2000 steps, no PD) ━━━");
 
-    let final_fitness = evaluate_candidate(
-        &best_ever_params, n_weights, &genesis, &config, 2000, dt,
-    );
+    let final_fitness =
+        evaluate_candidate(&best_ever_params, n_weights, &genesis, &config, 2000, dt);
 
     // Detailed eval
     let mut controller = HumanoidController::new(&genesis, &config);
-    let weights: Vec<f32> = best_ever_params[..n_weights].iter().map(|&w| w as f32).collect();
-    let bias: Vec<f32> = best_ever_params[n_weights..].iter().map(|&w| w as f32).collect();
+    let weights: Vec<f32> = best_ever_params[..n_weights]
+        .iter()
+        .map(|&w| w as f32)
+        .collect();
+    let bias: Vec<f32> = best_ever_params[n_weights..]
+        .iter()
+        .map(|&w| w as f32)
+        .collect();
     controller.set_output_projection(&weights, &bias);
 
     let mut encoder = HumanoidHdcEncoder::new(&genesis, config.num_levels);
@@ -199,13 +218,21 @@ fn run() {
         let cmd = controller.forward(&hv, dt as f32);
         sim.step(&cmd, dt);
         let s = sim.state();
-        if s.head_height >= 0.8 { steps_standing += 1; }
-        if s.head_height < 0.5 && !fell { fell = true; fall_step = step; }
+        if s.head_height >= 0.8 {
+            steps_standing += 1;
+        }
+        if s.head_height < 0.5 && !fell {
+            fell = true;
+            fall_step = step;
+        }
     }
 
     let standing_pct = steps_standing as f64 / 2000.0 * 100.0;
     println!("  Fitness: {:.4}", final_fitness);
-    println!("  Standing: {} / 2000 ({:.1}%)", steps_standing, standing_pct);
+    println!(
+        "  Standing: {} / 2000 ({:.1}%)",
+        steps_standing, standing_pct
+    );
     if fell {
         println!("  Fell at step {}", fall_step);
     } else {
@@ -243,8 +270,11 @@ fn evaluate_candidate(
 
         let s = sim.state();
         // Reward: head height + uprightness + low control effort
-        let head_reward = if s.head_height >= 1.2 { 1.0 }
-            else { (s.head_height / 1.4).max(0.0) };
+        let head_reward = if s.head_height >= 1.2 {
+            1.0
+        } else {
+            (s.head_height / 1.4).max(0.0)
+        };
         let upright = s.torso_vertical[2].max(0.0);
         let effort_penalty = cmd.control_effort() as f64 * 0.1;
         total_reward += head_reward * upright - effort_penalty;

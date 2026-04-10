@@ -151,9 +151,12 @@ impl TemporalHierarchy {
             &MusicInferenceResult {
                 action: result.note_action,
                 free_energy: result.level_free_energies[0],
-                prediction_error: 0.0, surprise: 0.0,
-                is_surprised: false, learning_rate_mod: 1.0,
-                sensory_precision: 1.0, prior_precision: 1.0,
+                prediction_error: 0.0,
+                surprise: 0.0,
+                is_surprised: false,
+                learning_rate_mod: 1.0,
+                sensory_precision: 1.0,
+                prior_precision: 1.0,
             },
             state,
         );
@@ -196,10 +199,30 @@ impl TemporalHierarchy {
 
         // Compute phrase-level statistics
         let n = self.phrase_accumulator.len() as f32;
-        let _avg_centroid: f32 = self.phrase_accumulator.iter().map(|f| f.spectral_centroid).sum::<f32>() / n;
-        let avg_tension: f32 = self.phrase_accumulator.iter().map(|f| f.harmonic_tension).sum::<f32>() / n;
-        let avg_flux: f32 = self.phrase_accumulator.iter().map(|f| f.spectral_flux).sum::<f32>() / n;
-        let avg_energy: f32 = self.phrase_accumulator.iter().map(|f| f.rms_energy).sum::<f32>() / n;
+        let _avg_centroid: f32 = self
+            .phrase_accumulator
+            .iter()
+            .map(|f| f.spectral_centroid)
+            .sum::<f32>()
+            / n;
+        let avg_tension: f32 = self
+            .phrase_accumulator
+            .iter()
+            .map(|f| f.harmonic_tension)
+            .sum::<f32>()
+            / n;
+        let avg_flux: f32 = self
+            .phrase_accumulator
+            .iter()
+            .map(|f| f.spectral_flux)
+            .sum::<f32>()
+            / n;
+        let avg_energy: f32 = self
+            .phrase_accumulator
+            .iter()
+            .map(|f| f.rms_energy)
+            .sum::<f32>()
+            / n;
 
         // Phrase suggestion based on accumulated features
         self.current_phrase = if avg_tension > 0.6 {
@@ -230,9 +253,15 @@ impl TemporalHierarchy {
     }
 
     /// Get current timescale states.
-    pub fn phrase_suggestion(&self) -> PhraseSuggestion { self.current_phrase }
-    pub fn section_arc(&self) -> SectionArc { self.current_section }
-    pub fn phrase_cycle(&self) -> usize { self.phrase_cycles }
+    pub fn phrase_suggestion(&self) -> PhraseSuggestion {
+        self.current_phrase
+    }
+    pub fn section_arc(&self) -> SectionArc {
+        self.current_section
+    }
+    pub fn phrase_cycle(&self) -> usize {
+        self.phrase_cycles
+    }
 }
 
 #[cfg(test)]
@@ -241,8 +270,12 @@ mod tests {
 
     fn steady_features() -> AudioFeatures {
         AudioFeatures {
-            spectral_centroid: 0.4, spectral_flux: 0.1, rhythm_entropy: 0.3,
-            harmonic_tension: 0.2, rms_energy: 0.4, zero_crossing_rate: 0.1,
+            spectral_centroid: 0.4,
+            spectral_flux: 0.1,
+            rhythm_entropy: 0.3,
+            harmonic_tension: 0.2,
+            rms_energy: 0.4,
+            zero_crossing_rate: 0.1,
         }
     }
 
@@ -272,10 +305,14 @@ mod tests {
         assert_eq!(h.section_arc(), SectionArc::Build);
 
         // Run through one full section
-        for _ in 0..6 { h.infer(&steady_features()); }
+        for _ in 0..6 {
+            h.infer(&steady_features());
+        }
         assert_eq!(h.section_arc(), SectionArc::Peak);
 
-        for _ in 0..6 { h.infer(&steady_features()); }
+        for _ in 0..6 {
+            h.infer(&steady_features());
+        }
         assert_eq!(h.section_arc(), SectionArc::Release);
     }
 
@@ -283,10 +320,13 @@ mod tests {
     fn high_tension_triggers_cadence() {
         let mut h = TemporalHierarchy::new(5, 4);
         let tense = AudioFeatures {
-            harmonic_tension: 0.8, spectral_flux: 0.3,
+            harmonic_tension: 0.8,
+            spectral_flux: 0.3,
             ..steady_features()
         };
-        for _ in 0..5 { h.infer(&tense); }
+        for _ in 0..5 {
+            h.infer(&tense);
+        }
         assert_eq!(h.phrase_suggestion(), PhraseSuggestion::Cadence);
     }
 
@@ -304,8 +344,14 @@ mod tests {
         let orig_arousal = state.arousal;
         h.apply(&result, &mut state);
         // Release should decrease arousal
-        assert!(state.arousal < orig_arousal, "Release arc should decrease arousal");
+        assert!(
+            state.arousal < orig_arousal,
+            "Release arc should decrease arousal"
+        );
         // Cadence should boost coherence
-        assert!(state.harmony_activations[0] > 0.3, "Cadence should boost coherence");
+        assert!(
+            state.harmony_activations[0] > 0.3,
+            "Cadence should boost coherence"
+        );
     }
 }

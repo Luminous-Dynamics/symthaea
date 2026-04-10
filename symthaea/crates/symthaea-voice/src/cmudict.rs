@@ -28,11 +28,15 @@ fn parse_cmudict(raw: &str) -> HashMap<String, Vec<Phoneme>> {
     let mut dict = HashMap::new();
 
     for line in raw.lines() {
-        if line.starts_with(";;;") || line.is_empty() { continue; }
+        if line.starts_with(";;;") || line.is_empty() {
+            continue;
+        }
 
         // Format: WORD  PH1 PH2 PH3...  (double space separator)
         let parts: Vec<&str> = line.splitn(2, "  ").collect();
-        if parts.len() < 2 { continue; }
+        if parts.len() < 2 {
+            continue;
+        }
 
         let word = parts[0].trim();
         // Skip pronunciation variants like WORD(2)
@@ -43,7 +47,8 @@ fn parse_cmudict(raw: &str) -> HashMap<String, Vec<Phoneme>> {
         };
 
         let phonemes_str = parts[1].trim();
-        let phonemes: Vec<Phoneme> = phonemes_str.split_whitespace()
+        let phonemes: Vec<Phoneme> = phonemes_str
+            .split_whitespace()
             .filter_map(|arp| arpabet_to_phoneme(arp))
             .collect();
 
@@ -58,8 +63,11 @@ fn parse_cmudict(raw: &str) -> HashMap<String, Vec<Phoneme>> {
 /// Convert ARPAbet symbol to our Phoneme type.
 fn arpabet_to_phoneme(arp: &str) -> Option<Phoneme> {
     // ARPAbet has stress markers: AA0, AA1, AA2
-    let (base, stress) = if arp.len() > 2 && arp.as_bytes()[arp.len()-1].is_ascii_digit() {
-        (&arp[..arp.len()-1], (arp.as_bytes()[arp.len()-1] - b'0'))
+    let (base, stress) = if arp.len() > 2 && arp.as_bytes()[arp.len() - 1].is_ascii_digit() {
+        (
+            &arp[..arp.len() - 1],
+            (arp.as_bytes()[arp.len() - 1] - b'0'),
+        )
     } else {
         (arp, 0u8)
     };
@@ -109,7 +117,12 @@ fn arpabet_to_phoneme(arp: &str) -> Option<Phoneme> {
         _ => return None,
     };
 
-    Some(Phoneme { ipa, is_vowel, stress, base_duration_ms: dur })
+    Some(Phoneme {
+        ipa,
+        is_vowel,
+        stress,
+        base_duration_ms: dur,
+    })
 }
 
 #[cfg(test)]
@@ -119,7 +132,11 @@ mod tests {
     #[test]
     fn cmudict_loads() {
         let dict = get_cmudict();
-        assert!(dict.len() > 100000, "should have 100K+ entries: {}", dict.len());
+        assert!(
+            dict.len() > 100000,
+            "should have 100K+ entries: {}",
+            dict.len()
+        );
     }
 
     #[test]

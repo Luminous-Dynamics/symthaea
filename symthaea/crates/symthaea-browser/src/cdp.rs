@@ -231,10 +231,7 @@ impl CdpSession {
         match selector {
             ElementSelector::Css(css) => {
                 // Focus the element first
-                let elem = page
-                    .find_element(css)
-                    .await
-                    .context("Element not found")?;
+                let elem = page.find_element(css).await.context("Element not found")?;
                 elem.click().await.context("Focus failed")?;
                 // Type via JS since chromiumoxide 0.7 lacks page-level type_str
                 let escaped = text.replace('\\', "\\\\").replace('\'', "\\'");
@@ -256,9 +253,7 @@ impl CdpSession {
                      document.activeElement.dispatchEvent(new Event('input', {{bubbles: true}}))",
                     escaped
                 );
-                page.evaluate(js)
-                    .await
-                    .context("Type after focus failed")?;
+                page.evaluate(js).await.context("Type after focus failed")?;
             }
         }
         debug!(text_len = text.len(), "Typed text");
@@ -286,9 +281,7 @@ impl CdpSession {
             .await
             .context("Failed to connect to existing Chrome")?;
 
-        tokio::spawn(async move {
-            while let Some(_event) = handler.next().await {}
-        });
+        tokio::spawn(async move { while let Some(_event) = handler.next().await {} });
 
         let page = browser
             .new_page("about:blank")
@@ -305,7 +298,11 @@ impl CdpSession {
     pub async fn get_page_state_js(&self) -> Result<PageObservation> {
         let page = self.page.lock().await;
         let url = page.url().await.unwrap_or(None).unwrap_or_default();
-        let title = page.get_title().await.unwrap_or(None).unwrap_or_else(|| "Untitled".into());
+        let title = page
+            .get_title()
+            .await
+            .unwrap_or(None)
+            .unwrap_or_else(|| "Untitled".into());
 
         let json = page.evaluate(r#"JSON.stringify({
             headings: Array.from(document.querySelectorAll('h1,h2')).slice(0,10).map(e=>e.textContent?.trim()||''),
@@ -315,22 +312,34 @@ impl CdpSession {
             texts: Array.from(document.querySelectorAll('p')).slice(0,5).map(e=>e.textContent?.trim().substring(0,80)||'')
         })"#).await.context("JS eval failed")?;
 
-        let data: serde_json::Value = serde_json::from_str(
-            &json.into_value::<String>().unwrap_or_default()
-        ).unwrap_or_default();
+        let data: serde_json::Value =
+            serde_json::from_str(&json.into_value::<String>().unwrap_or_default())
+                .unwrap_or_default();
 
         let mut elements = Vec::new();
         let extract = |key: &str, role: &str| -> Vec<AccessibleElement> {
-            data.get(key).and_then(|v| v.as_array()).map(|arr| {
-                arr.iter().filter_map(|v| {
-                    let name = v.as_str().unwrap_or("").to_string();
-                    if name.is_empty() { return None; }
-                    Some(AccessibleElement {
-                        backend_node_id: -1, role: role.to_string(), name, value: None,
-                        description: None, focused: false, disabled: false,
-                    })
-                }).collect()
-            }).unwrap_or_default()
+            data.get(key)
+                .and_then(|v| v.as_array())
+                .map(|arr| {
+                    arr.iter()
+                        .filter_map(|v| {
+                            let name = v.as_str().unwrap_or("").to_string();
+                            if name.is_empty() {
+                                return None;
+                            }
+                            Some(AccessibleElement {
+                                backend_node_id: -1,
+                                role: role.to_string(),
+                                name,
+                                value: None,
+                                description: None,
+                                focused: false,
+                                disabled: false,
+                            })
+                        })
+                        .collect()
+                })
+                .unwrap_or_default()
         };
 
         elements.extend(extract("headings", "heading"));
@@ -339,7 +348,12 @@ impl CdpSession {
         elements.extend(extract("links", "link"));
         elements.extend(extract("texts", "text"));
 
-        Ok(PageObservation { url, title, elements, focused_element: None })
+        Ok(PageObservation {
+            url,
+            title,
+            elements,
+            focused_element: None,
+        })
     }
 
     /// Try AX tree first, fall back to JS extraction.

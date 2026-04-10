@@ -23,7 +23,13 @@ impl SidechainDucker {
     /// - `release_ms`: envelope release time (~50-100ms for smooth recovery)
     /// - `threshold`: linear amplitude above which ducking engages (0.1-0.3)
     /// - `ratio`: gain reduction ratio (4.0 = 4:1 ducking)
-    pub fn new(sample_rate: u32, attack_ms: f32, release_ms: f32, threshold: f32, ratio: f32) -> Self {
+    pub fn new(
+        sample_rate: u32,
+        attack_ms: f32,
+        release_ms: f32,
+        threshold: f32,
+        ratio: f32,
+    ) -> Self {
         let sr = sample_rate as f32;
         Self {
             envelope: 0.0,
@@ -110,7 +116,10 @@ impl DuckingMatrix {
                 if si == ti || si >= voice_buffers.len() || ti >= voice_buffers.len() {
                     continue;
                 }
-                for i in 0..chunk_len.min(voice_buffers[si].len()).min(voice_buffers[ti].len()) {
+                for i in 0..chunk_len
+                    .min(voice_buffers[si].len())
+                    .min(voice_buffers[ti].len())
+                {
                     let gain = entry.ducker.process(voice_buffers[si][i]);
                     voice_buffers[ti][i] *= gain;
                 }
@@ -146,7 +155,10 @@ mod tests {
     fn ducker_unity_below_threshold() {
         let mut d = SidechainDucker::new(44100, 1.0, 50.0, 0.3, 4.0);
         let gain = d.process(0.05);
-        assert!((gain - 1.0).abs() < 0.01, "below threshold should be unity: {gain}");
+        assert!(
+            (gain - 1.0).abs() < 0.01,
+            "below threshold should be unity: {gain}"
+        );
     }
 
     #[test]

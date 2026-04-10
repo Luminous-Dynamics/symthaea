@@ -151,9 +151,14 @@ impl NuclearDiscoveryEngine {
 
         // Discovery interest: high when uncertain AND shell-enhanced AND unmeasured
         let unmeasured_bonus = if measured_be.is_none() { 1.0 } else { 0.3 };
-        let shell_bonus = if shell_corr < -3.0 { (-shell_corr / 10.0).min(1.0) } else { 0.0 };
+        let shell_bonus = if shell_corr < -3.0 {
+            (-shell_corr / 10.0).min(1.0)
+        } else {
+            0.0
+        };
         let uncertainty_bonus = (sigma / 10.0).min(1.0);
-        let discovery_interest = (unmeasured_bonus * 0.4 + shell_bonus * 0.35 + uncertainty_bonus * 0.25).min(1.0);
+        let discovery_interest =
+            (unmeasured_bonus * 0.4 + shell_bonus * 0.35 + uncertainty_bonus * 0.25).min(1.0);
 
         PredictionWithUncertainty {
             z,
@@ -183,7 +188,8 @@ impl NuclearDiscoveryEngine {
             })
             .filter_map(|m| {
                 let a = m.z + m.n;
-                let pred = self.semf.binding_energy(a, m.z) + self.shell.shell_correction_energy(a, m.z);
+                let pred =
+                    self.semf.binding_energy(a, m.z) + self.shell.shell_correction_energy(a, m.z);
                 Some(m.binding_energy_mev - pred)
             })
             .collect();
@@ -221,7 +227,10 @@ impl NuclearDiscoveryEngine {
         }
 
         // Calibration statistics
-        let calibrated: Vec<_> = predictions.iter().filter(|p| p.residual.is_some()).collect();
+        let calibrated: Vec<_> = predictions
+            .iter()
+            .filter(|p| p.residual.is_some())
+            .collect();
         let n_cal = calibrated.len();
         let mean_res = if n_cal > 0 {
             calibrated.iter().map(|p| p.residual.unwrap()).sum::<f64>() / n_cal as f64
@@ -229,7 +238,12 @@ impl NuclearDiscoveryEngine {
             0.0
         };
         let rms_res = if n_cal > 0 {
-            (calibrated.iter().map(|p| p.residual.unwrap().powi(2)).sum::<f64>() / n_cal as f64).sqrt()
+            (calibrated
+                .iter()
+                .map(|p| p.residual.unwrap().powi(2))
+                .sum::<f64>()
+                / n_cal as f64)
+                .sqrt()
         } else {
             0.0
         };
@@ -311,8 +325,10 @@ impl NuclearDiscoveryEngine {
         out.push_str("=== Nuclear Discovery Report ===\n");
         out.push_str(&format!(
             "Region: Z={}-{}, N={}-{} ({} isotopes)\n",
-            report.z_range.0, report.z_range.1,
-            report.n_range.0, report.n_range.1,
+            report.z_range.0,
+            report.z_range.1,
+            report.n_range.0,
+            report.n_range.1,
             report.predictions.len()
         ));
         out.push_str(&format!(
@@ -322,7 +338,10 @@ impl NuclearDiscoveryEngine {
             report.calibration.fraction_within_1sigma * 100.0
         ));
 
-        out.push_str(&format!("Top {} Discovery Candidates:\n", report.candidates.len()));
+        out.push_str(&format!(
+            "Top {} Discovery Candidates:\n",
+            report.candidates.len()
+        ));
         out.push_str("  Z   N    A  | Interest | σ (MeV) | Shell (MeV) | Reason\n");
         out.push_str("------|----------|---------|-------------|-------\n");
 
@@ -371,8 +390,16 @@ mod tests {
         let far = engine.predict(130, 220);
 
         // Both should have finite, positive uncertainty
-        assert!(near.sigma > 0.0 && near.sigma.is_finite(), "Near σ={}", near.sigma);
-        assert!(far.sigma > 0.0 && far.sigma.is_finite(), "Far σ={}", far.sigma);
+        assert!(
+            near.sigma > 0.0 && near.sigma.is_finite(),
+            "Near σ={}",
+            near.sigma
+        );
+        assert!(
+            far.sigma > 0.0 && far.sigma.is_finite(),
+            "Far σ={}",
+            far.sigma
+        );
 
         // The well-measured region should have lower uncertainty than extrapolation
         assert!(

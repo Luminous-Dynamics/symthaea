@@ -18,9 +18,9 @@ use std::fs::File;
 use std::io::BufReader;
 use std::path::Path;
 use std::time::Instant;
+use symthaea::hdc::learned_moral_classifier::LearnedMoralClassifier;
 use symthaea::hdc::moral_algebra::{EnsembleJudgment, MoralAlgebra, MoralVerdict};
 use symthaea::hdc::moral_parser::MoralParser;
-use symthaea::hdc::learned_moral_classifier::LearnedMoralClassifier;
 use symthaea::hdc::moral_prototypes::{
     MoralLabel, MoralPrototypeClassifier, MoralSample, TrainedPrototypes, TrainedVirtuePrototypes,
     VirtueLabel, VirtueMatchClassifier, VirtueSample, MORAL_PROTO_DIM,
@@ -234,7 +234,10 @@ fn main() {
 
     // Prefer v3 (8192D) prototypes — they classify better due to denser representations
     if !use_learned {
-        println!("  Ablation: skipping learned prototypes (mode={})\n", ablation_mode);
+        println!(
+            "  Ablation: skipping learned prototypes (mode={})\n",
+            ablation_mode
+        );
     } else if prototypes_v3_path.exists() {
         println!(
             "Loading cached v3 learned prototypes from {}...",
@@ -349,9 +352,13 @@ fn main() {
                         .filter(|ex| !ex.split.contains("test"))
                         .take(2000) // 2K optimal for CfC contrastive training
                         .filter_map(|ex| {
-                            let text = if !ex.rot.is_empty() { ex.rot.clone() }
-                                else if !ex.action.is_empty() { ex.action.clone() }
-                                else { return None; };
+                            let text = if !ex.rot.is_empty() {
+                                ex.rot.clone()
+                            } else if !ex.action.is_empty() {
+                                ex.action.clone()
+                            } else {
+                                return None;
+                            };
                             let judgment: i32 = ex.rot_judgment.parse().unwrap_or(0);
                             Some((text, MoralLabel::from_rot_judgment(judgment)))
                         })
@@ -359,7 +366,8 @@ fn main() {
                     cfc.train(&samples);
                     println!(
                         "  CfC classifier trained on {} samples in {:.1}s\n",
-                        samples.len(), train_start.elapsed().as_secs_f64()
+                        samples.len(),
+                        train_start.elapsed().as_secs_f64()
                     );
                 }
             }
@@ -384,9 +392,13 @@ fn main() {
                         .filter(|ex| !ex.split.contains("test"))
                         .take(5000)
                         .filter_map(|ex| {
-                            let text = if !ex.rot.is_empty() { ex.rot.clone() }
-                                else if !ex.action.is_empty() { ex.action.clone() }
-                                else { return None; };
+                            let text = if !ex.rot.is_empty() {
+                                ex.rot.clone()
+                            } else if !ex.action.is_empty() {
+                                ex.action.clone()
+                            } else {
+                                return None;
+                            };
                             let judgment: i32 = ex.rot_judgment.parse().unwrap_or(0);
                             Some((text, MoralLabel::from_rot_judgment(judgment)))
                         })
@@ -398,7 +410,8 @@ fn main() {
                     s.train_hybrid(&cal_samples);
                     println!(
                         "  Spinozist hybrid trained on {} samples in {:.1}s\n",
-                        cal_samples.len(), cal_start.elapsed().as_secs_f64()
+                        cal_samples.len(),
+                        cal_start.elapsed().as_secs_f64()
                     );
                 }
             }
@@ -432,9 +445,12 @@ fn main() {
         if let Some(r) = benchmark_scruples(&algebra, &parser) {
             results.push(r);
         }
-        if let Some(r) =
-            benchmark_social_chemistry(&algebra, &parser, direct_social_chem_classifier.as_ref(), Some(&mut cfc_classifier))
-        {
+        if let Some(r) = benchmark_social_chemistry(
+            &algebra,
+            &parser,
+            direct_social_chem_classifier.as_ref(),
+            Some(&mut cfc_classifier),
+        ) {
             results.push(r);
         }
         if let Some(r) = benchmark_moral_exceptqa(&algebra, &parser) {
@@ -524,7 +540,9 @@ fn benchmark_ethics(
         for (idx, ex) in examples.iter().enumerate().take(MAX_SAMPLES * 2) {
             // Positional split: evaluate on odd-indexed examples only
             // (even-indexed used for training in per-category classifiers)
-            if idx % 2 == 0 { continue; }
+            if idx % 2 == 0 {
+                continue;
+            }
             if let Some(expected) = ex.label {
                 let per_cat = per_cat_classifiers.get(&category);
                 let predicted = predict_ethics_with_classifier(
@@ -768,8 +786,12 @@ fn benchmark_social_chemistry(
     let mut eval_count = 0;
     for ex in data.examples.iter() {
         // Only evaluate on test/test-extra split (proper train/test separation)
-        if !ex.split.contains("test") { continue; }
-        if eval_count >= MAX_SAMPLES { break; }
+        if !ex.split.contains("test") {
+            continue;
+        }
+        if eval_count >= MAX_SAMPLES {
+            break;
+        }
         eval_count += 1;
         // Use rule-of-thumb judgment if available
         if !ex.rot_judgment.is_empty() {
@@ -1402,8 +1424,12 @@ fn benchmark_spinozist_social_chemistry(
     let mut errors = Vec::new();
 
     for ex in data.examples.iter() {
-        if !ex.split.contains("test") { continue; }
-        if total >= MAX_SAMPLES { break; }
+        if !ex.split.contains("test") {
+            continue;
+        }
+        if total >= MAX_SAMPLES {
+            break;
+        }
         total += 1;
 
         let expected: i32 = ex.rot_judgment.parse().unwrap_or(0);
@@ -1426,9 +1452,18 @@ fn benchmark_spinozist_social_chemistry(
         }
     }
 
-    let accuracy = if total > 0 { correct as f32 / total as f32 } else { 0.0 };
+    let accuracy = if total > 0 {
+        correct as f32 / total as f32
+    } else {
+        0.0
+    };
     let duration = start.elapsed().as_millis();
-    println!("  Spinozist accuracy: {}/{} ({:.1}%)\n", correct, total, accuracy * 100.0);
+    println!(
+        "  Spinozist accuracy: {}/{} ({:.1}%)\n",
+        correct,
+        total,
+        accuracy * 100.0
+    );
 
     Some(BenchmarkResult {
         dataset: "Social Chemistry (Spinozist)".to_string(),
@@ -1482,10 +1517,18 @@ fn benchmark_spinozist_ethics(
             .filter_map(|(_, ex)| {
                 let label = match *category {
                     "commonsense" => {
-                        if ex.label == Some(1) { MoralLabel::Bad } else { MoralLabel::Good }
+                        if ex.label == Some(1) {
+                            MoralLabel::Bad
+                        } else {
+                            MoralLabel::Good
+                        }
                     }
                     _ => {
-                        if ex.label == Some(1) { MoralLabel::Good } else { MoralLabel::Bad }
+                        if ex.label == Some(1) {
+                            MoralLabel::Good
+                        } else {
+                            MoralLabel::Bad
+                        }
                     }
                 };
                 Some((clean_ethics_text(&ex.text), label))
@@ -1534,9 +1577,19 @@ fn benchmark_spinozist_ethics(
             }
         }
 
-        let accuracy = if total > 0 { correct as f32 / total as f32 } else { 0.0 };
+        let accuracy = if total > 0 {
+            correct as f32 / total as f32
+        } else {
+            0.0
+        };
         let duration = start.elapsed().as_millis();
-        println!("  Spinozist/{}: {}/{} ({:.1}%)", category, correct, total, accuracy * 100.0);
+        println!(
+            "  Spinozist/{}: {}/{} ({:.1}%)",
+            category,
+            correct,
+            total,
+            accuracy * 100.0
+        );
 
         category_results.push(BenchmarkResult {
             dataset: format!("ETHICS/Spinozist/{}", category),
@@ -1688,10 +1741,19 @@ fn benchmark_ordered_knn() -> Option<BenchmarkResult> {
 
     for &blend in &blend_weights {
         let train_start = Instant::now();
-        let label_str = if blend == 0.0 { "bag-only" }
-            else if blend == 1.0 { "order-only" }
-            else { "hybrid" };
-        println!("  Encoding {} samples (blend={:.1}, {})...", train_texts.len(), blend, label_str);
+        let label_str = if blend == 0.0 {
+            "bag-only"
+        } else if blend == 1.0 {
+            "order-only"
+        } else {
+            "hybrid"
+        };
+        println!(
+            "  Encoding {} samples (blend={:.1}, {})...",
+            train_texts.len(),
+            blend,
+            label_str
+        );
 
         let encoded: Vec<(Vec<f32>, MoralLabel)> = train_texts
             .iter()
@@ -1724,7 +1786,14 @@ fn benchmark_ordered_knn() -> Option<BenchmarkResult> {
             }
         }
         let acc = correct as f32 / test_encoded.len() as f32;
-        println!("    blend={:.1} k={}: {}/{} ({:.1}%)", blend, k, correct, test_encoded.len(), acc * 100.0);
+        println!(
+            "    blend={:.1} k={}: {}/{} ({:.1}%)",
+            blend,
+            k,
+            correct,
+            test_encoded.len(),
+            acc * 100.0
+        );
 
         if acc > overall_best_acc {
             overall_best_acc = acc;
@@ -1737,11 +1806,18 @@ fn benchmark_ordered_knn() -> Option<BenchmarkResult> {
     let total = test_texts.len();
     println!(
         "  Best: blend={:.1}, k={}, {}/{} ({:.1}%)",
-        overall_best_blend, overall_best_k, overall_best_correct, total, overall_best_acc * 100.0
+        overall_best_blend,
+        overall_best_k,
+        overall_best_correct,
+        total,
+        overall_best_acc * 100.0
     );
 
     Some(BenchmarkResult {
-        dataset: format!("Social Chemistry (Ordered k-NN blend={:.1})", overall_best_blend),
+        dataset: format!(
+            "Social Chemistry (Ordered k-NN blend={:.1})",
+            overall_best_blend
+        ),
         category: None,
         total,
         correct: overall_best_correct,
@@ -1829,7 +1905,13 @@ fn benchmark_knn_classifier() -> Option<BenchmarkResult> {
             }
         }
         let acc = correct as f32 / test_encoded.len() as f32;
-        println!("  k={:2}: {}/{} ({:.1}%)", k, correct, test_encoded.len(), acc * 100.0);
+        println!(
+            "  k={:2}: {}/{} ({:.1}%)",
+            k,
+            correct,
+            test_encoded.len(),
+            acc * 100.0
+        );
         if acc > best_acc {
             best_acc = acc;
             best_k = k;
@@ -1841,7 +1923,10 @@ fn benchmark_knn_classifier() -> Option<BenchmarkResult> {
     let eval_time = train_start.elapsed();
     println!(
         "  Best: k={}, {}/{} ({:.1}%) [weighted sim²]",
-        best_k, best_correct, total, best_acc * 100.0
+        best_k,
+        best_correct,
+        total,
+        best_acc * 100.0
     );
 
     let total_time = train_start.elapsed();
@@ -1857,9 +1942,7 @@ fn benchmark_knn_classifier() -> Option<BenchmarkResult> {
 }
 
 fn benchmark_multi_prototype_classifier() -> Option<BenchmarkResult> {
-    use symthaea::hdc::moral_prototypes::{
-        MoralSample, MultiPrototypeClassifier, MORAL_PROTO_DIM,
-    };
+    use symthaea::hdc::moral_prototypes::{MoralSample, MultiPrototypeClassifier, MORAL_PROTO_DIM};
 
     let path = format!("{}/social_chemistry_292k.json", DATASETS_PATH);
     if !Path::new(&path).exists() {
@@ -1935,7 +2018,9 @@ fn benchmark_multi_prototype_classifier() -> Option<BenchmarkResult> {
     let accuracy = correct as f32 / total as f32;
     println!(
         "  MultiProto accuracy: {}/{} ({:.1}%)",
-        correct, total, accuracy * 100.0
+        correct,
+        total,
+        accuracy * 100.0
     );
 
     Some(BenchmarkResult {
@@ -2235,7 +2320,9 @@ fn train_per_category_ethics_prototypes(
             .iter()
             .enumerate()
             .filter_map(|(idx, ex)| {
-                if idx % 2 != 0 { return None; }
+                if idx % 2 != 0 {
+                    return None;
+                }
                 let label_val = ex.label?;
                 let label = match category.as_str() {
                     // commonsense: 0=acceptable(Good), 1=wrong(Bad)

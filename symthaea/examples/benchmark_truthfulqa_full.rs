@@ -206,7 +206,10 @@ fn encode_text(text: &str) -> BinaryHV {
     if words.is_empty() {
         return BinaryHV::random(0);
     }
-    let word_hvs: Vec<BinaryHV> = words.iter().map(|w| BinaryHV::random(word_seed(w))).collect();
+    let word_hvs: Vec<BinaryHV> = words
+        .iter()
+        .map(|w| BinaryHV::random(word_seed(w)))
+        .collect();
     BinaryHV::bundle(&word_hvs)
 }
 

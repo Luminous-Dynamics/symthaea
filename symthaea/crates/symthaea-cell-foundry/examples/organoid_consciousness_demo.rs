@@ -33,12 +33,8 @@ fn main() {
 
     let mut pipeline = OrganoidPipeline::new(config);
 
-    println!(
-        "Day  | Cells  | Neurons | Syn/N  | Phi      | Stage"
-    );
-    println!(
-        "-----|--------|---------|--------|----------|------------------"
-    );
+    println!("Day  | Cells  | Neurons | Syn/N  | Phi      | Stage");
+    println!("-----|--------|---------|--------|----------|------------------");
 
     let result = pipeline.run();
 

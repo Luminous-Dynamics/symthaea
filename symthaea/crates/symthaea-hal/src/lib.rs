@@ -77,12 +77,12 @@ pub mod servo;
 // ── Public re-exports ────────────────────────────────────────────────
 
 pub use calibration::{CalibrationProfile, JointCalibration};
-pub use motor_safety::MotorSafetyLevel;
 pub use error::{HalError, HalResult};
 pub use gpio_estop::{EstopPoller, GpioEstop};
 pub use imu::{ComplementaryFilter, Mpu6050Decoder};
 pub use ina219::Ina219Decoder;
 pub use interlock::{SafetyConfig, SafetyInterlock};
+pub use motor_safety::MotorSafetyLevel;
 pub use pca9685::Pca9685;
 pub use recording::{RecordingAdapter, ReplayAdapter, SensorRecording};
 pub use runtime::{

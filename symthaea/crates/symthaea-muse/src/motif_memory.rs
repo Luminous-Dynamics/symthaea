@@ -6,8 +6,8 @@
 //! This module tracks the last N phrases, scores their repeatability,
 //! and decides when to replay vs generate new material.
 
-use std::collections::VecDeque;
 use crate::{MusicalState, Note};
+use std::collections::VecDeque;
 
 const MAX_PHRASES: usize = 8;
 const MAX_PHRASE_LEN: usize = 12;
@@ -90,9 +90,9 @@ impl MotifMemory {
 
         let psi = state.consciousness_level;
         let coherence = state.harmony_activations[0]; // ResonantCoherence
-        let play = state.harmony_activations[3];       // InfinitePlay
-        let progress = state.harmony_activations[6];   // EvolutionaryProgression
-        let stillness = state.harmony_activations[7];  // SacredStillness
+        let play = state.harmony_activations[3]; // InfinitePlay
+        let progress = state.harmony_activations[6]; // EvolutionaryProgression
+        let stillness = state.harmony_activations[7]; // SacredStillness
 
         if stillness > 0.6 {
             MotifStrategy::Ostinato
@@ -174,9 +174,7 @@ impl MotifMemory {
             }
             MotifStrategy::Ostinato => {
                 // Use shortest stored phrase
-                if let Some(phrase) = self.phrases.iter()
-                    .min_by_key(|p| p.notes.len())
-                {
+                if let Some(phrase) = self.phrases.iter().min_by_key(|p| p.notes.len()) {
                     for note in &phrase.notes {
                         self.replay_queue.push_back(*note);
                     }
@@ -197,8 +195,12 @@ impl MotifMemory {
         self.phrase_len_target = self.phrase_len_target.clamp(2, MAX_PHRASE_LEN);
     }
 
-    pub fn phrase_count(&self) -> usize { self.phrases.len() }
-    pub fn replay_queue_len(&self) -> usize { self.replay_queue.len() }
+    pub fn phrase_count(&self) -> usize {
+        self.phrases.len()
+    }
+    pub fn replay_queue_len(&self) -> usize {
+        self.replay_queue.len()
+    }
 
     pub fn reset(&mut self) {
         self.phrases.clear();
@@ -213,7 +215,12 @@ mod tests {
     use super::*;
 
     fn test_note(freq: f32) -> Note {
-        Note { frequency: freq, start_time: 0.0, duration: 0.5, velocity: 0.7 }
+        Note {
+            frequency: freq,
+            start_time: 0.0,
+            duration: 0.5,
+            velocity: 0.7,
+        }
     }
 
     #[test]
@@ -271,7 +278,10 @@ mod tests {
         mem.record_note(test_note(261.63));
         mem.record_note(test_note(329.63));
 
-        let state = MusicalState { consciousness_level: 0.1, ..Default::default() };
+        let state = MusicalState {
+            consciousness_level: 0.1,
+            ..Default::default()
+        };
         assert_eq!(mem.decide_strategy(&state), MotifStrategy::GenerateNew);
     }
 
@@ -291,10 +301,19 @@ mod tests {
     #[test]
     fn phrase_length_scales_with_consciousness() {
         let mut mem = MotifMemory::new();
-        mem.set_phrase_length(&MusicalState { consciousness_level: 0.1, ..Default::default() });
+        mem.set_phrase_length(&MusicalState {
+            consciousness_level: 0.1,
+            ..Default::default()
+        });
         let low = mem.phrase_len_target;
-        mem.set_phrase_length(&MusicalState { consciousness_level: 0.9, ..Default::default() });
+        mem.set_phrase_length(&MusicalState {
+            consciousness_level: 0.9,
+            ..Default::default()
+        });
         let high = mem.phrase_len_target;
-        assert!(high > low, "high Psi should have longer phrases: {high} vs {low}");
+        assert!(
+            high > low,
+            "high Psi should have longer phrases: {high} vs {low}"
+        );
     }
 }

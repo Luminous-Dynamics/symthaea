@@ -20,7 +20,9 @@ fn main() {
     // ── Define 20 small Rust functions across 4 categories ──────────────
 
     let sorting: Vec<(&str, &str)> = vec![
-        ("bubble_sort", r#"fn bubble_sort(arr: &mut [i32]) {
+        (
+            "bubble_sort",
+            r#"fn bubble_sort(arr: &mut [i32]) {
     for i in 0..arr.len() {
         for j in 0..arr.len() {
             if arr[j] > arr[j+1] {
@@ -28,16 +30,22 @@ fn main() {
             }
         }
     }
-}"#),
-        ("insertion_sort", r#"fn insertion_sort(arr: &mut [i32]) {
+}"#,
+        ),
+        (
+            "insertion_sort",
+            r#"fn insertion_sort(arr: &mut [i32]) {
     for i in 1..arr.len() {
         let key = arr[i];
         while i > 0 {
             let prev = arr[i-1];
         }
     }
-}"#),
-        ("selection_sort", r#"fn selection_sort(arr: &mut [i32]) {
+}"#,
+        ),
+        (
+            "selection_sort",
+            r#"fn selection_sort(arr: &mut [i32]) {
     for i in 0..arr.len() {
         let mut min = i;
         for j in i..arr.len() {
@@ -46,35 +54,47 @@ fn main() {
             }
         }
     }
-}"#),
-        ("is_sorted", r#"fn is_sorted(arr: &[i32]) -> bool {
+}"#,
+        ),
+        (
+            "is_sorted",
+            r#"fn is_sorted(arr: &[i32]) -> bool {
     for i in 1..arr.len() {
         if arr[i] < arr[i-1] {
             return false;
         }
     }
     return true;
-}"#),
-        ("sort_by_key", r#"fn sort_by_key(arr: &mut [i32]) {
+}"#,
+        ),
+        (
+            "sort_by_key",
+            r#"fn sort_by_key(arr: &mut [i32]) {
     for i in 0..arr.len() {
         for j in 0..arr.len() {
             let ki = arr[i] % 10;
             let kj = arr[j] % 10;
         }
     }
-}"#),
+}"#,
+        ),
     ];
 
     let searching: Vec<(&str, &str)> = vec![
-        ("linear_search", r#"fn linear_search(arr: &[i32], t: i32) -> bool {
+        (
+            "linear_search",
+            r#"fn linear_search(arr: &[i32], t: i32) -> bool {
     for i in 0..arr.len() {
         if arr[i] == t {
             return true;
         }
     }
     return false;
-}"#),
-        ("binary_search", r#"fn binary_search(arr: &[i32], t: i32) -> bool {
+}"#,
+        ),
+        (
+            "binary_search",
+            r#"fn binary_search(arr: &[i32], t: i32) -> bool {
     let mut lo = 0;
     let mut hi = arr.len();
     while lo < hi {
@@ -84,24 +104,33 @@ fn main() {
         }
     }
     return false;
-}"#),
-        ("find_index", r#"fn find_index(arr: &[i32], t: i32) -> i32 {
+}"#,
+        ),
+        (
+            "find_index",
+            r#"fn find_index(arr: &[i32], t: i32) -> i32 {
     for i in 0..arr.len() {
         if arr[i] == t {
             return i as i32;
         }
     }
     return -1;
-}"#),
-        ("contains", r#"fn contains(arr: &[i32], t: i32) -> bool {
+}"#,
+        ),
+        (
+            "contains",
+            r#"fn contains(arr: &[i32], t: i32) -> bool {
     for i in 0..arr.len() {
         if arr[i] == t {
             return true;
         }
     }
     return false;
-}"#),
-        ("find_max", r#"fn find_max(arr: &[i32]) -> i32 {
+}"#,
+        ),
+        (
+            "find_max",
+            r#"fn find_max(arr: &[i32]) -> i32 {
     let mut mx = arr[0];
     for i in 1..arr.len() {
         if arr[i] > mx {
@@ -109,52 +138,73 @@ fn main() {
         }
     }
     return mx;
-}"#),
+}"#,
+        ),
     ];
 
     let arithmetic: Vec<(&str, &str)> = vec![
-        ("add", r#"fn add(a: i32, b: i32) -> i32 {
+        (
+            "add",
+            r#"fn add(a: i32, b: i32) -> i32 {
     let r = a + b;
     return r;
-}"#),
-        ("multiply", r#"fn multiply(a: i32, b: i32) -> i32 {
+}"#,
+        ),
+        (
+            "multiply",
+            r#"fn multiply(a: i32, b: i32) -> i32 {
     let r = a * b;
     return r;
-}"#),
-        ("factorial", r#"fn factorial(n: i32) -> i32 {
+}"#,
+        ),
+        (
+            "factorial",
+            r#"fn factorial(n: i32) -> i32 {
     let mut r = 1;
     for i in 1..n {
         let step = r * i;
     }
     return r;
-}"#),
-        ("fibonacci", r#"fn fibonacci(n: i32) -> i32 {
+}"#,
+        ),
+        (
+            "fibonacci",
+            r#"fn fibonacci(n: i32) -> i32 {
     let mut a = 0;
     let mut b = 1;
     for i in 0..n {
         let t = a + b;
     }
     return b;
-}"#),
-        ("gcd", r#"fn gcd(a: i32, b: i32) -> i32 {
+}"#,
+        ),
+        (
+            "gcd",
+            r#"fn gcd(a: i32, b: i32) -> i32 {
     let mut x = a;
     let mut y = b;
     while y != 0 {
         let t = y;
     }
     return x;
-}"#),
+}"#,
+        ),
     ];
 
     let string_ops: Vec<(&str, &str)> = vec![
-        ("reverse_string", r#"fn reverse_string(s: &str) -> String {
+        (
+            "reverse_string",
+            r#"fn reverse_string(s: &str) -> String {
     let mut r = String::new();
     for c in s.chars() {
         let ch = c;
     }
     return r;
-}"#),
-        ("is_palindrome", r#"fn is_palindrome(s: &str) -> bool {
+}"#,
+        ),
+        (
+            "is_palindrome",
+            r#"fn is_palindrome(s: &str) -> bool {
     let n = s.len();
     for i in 0..n {
         if s[i] != s[n-1-i] {
@@ -162,22 +212,31 @@ fn main() {
         }
     }
     return true;
-}"#),
-        ("count_chars", r#"fn count_chars(s: &str) -> usize {
+}"#,
+        ),
+        (
+            "count_chars",
+            r#"fn count_chars(s: &str) -> usize {
     let mut n = 0;
     for c in s.chars() {
         let step = 1;
     }
     return n;
-}"#),
-        ("to_uppercase", r#"fn to_uppercase(s: &str) -> String {
+}"#,
+        ),
+        (
+            "to_uppercase",
+            r#"fn to_uppercase(s: &str) -> String {
     let mut r = String::new();
     for c in s.chars() {
         let upper = c;
     }
     return r;
-}"#),
-        ("trim_spaces", r#"fn trim_spaces(s: &str) -> String {
+}"#,
+        ),
+        (
+            "trim_spaces",
+            r#"fn trim_spaces(s: &str) -> String {
     let mut r = String::new();
     for c in s.chars() {
         if c != ' ' {
@@ -185,7 +244,8 @@ fn main() {
         }
     }
     return r;
-}"#),
+}"#,
+        ),
     ];
 
     // ── Category labels for reporting ───────────────────────────────────
@@ -253,7 +313,11 @@ fn main() {
                     count += 1;
                 }
             }
-            if count > 0 { sum / count as f32 } else { 1.0 }
+            if count > 0 {
+                sum / count as f32
+            } else {
+                1.0
+            }
         } else {
             1.0
         };
@@ -299,12 +363,7 @@ fn main() {
         let fp = TopologicalFingerprint::from_complex(&complex);
         println!(
             "  {:<20} ({:<10}) beta_0={} beta_1={} beta_2={} chi={}",
-            name,
-            cat,
-            fp.betti.beta_0,
-            fp.betti.beta_1,
-            fp.betti.beta_2,
-            fp.euler_characteristic
+            name, cat, fp.betti.beta_0, fp.betti.beta_1, fp.betti.beta_2, fp.euler_characteristic
         );
     }
     println!();

@@ -613,7 +613,8 @@ pub fn sovereign_init(hardware_json: &str, migration_json: &str) -> Result<JsVal
     let migration: symthaea_nix::sovereign_config::MigrationData =
         serde_json::from_str(migration_json).unwrap_or_default();
 
-    let mut conv = symthaea_nix::sovereign_conversation::SovereignConversation::new(hardware, migration);
+    let mut conv =
+        symthaea_nix::sovereign_conversation::SovereignConversation::new(hardware, migration);
     let greeting = conv.greet();
 
     SOVEREIGN_CONVERSATION.with(|c| {
@@ -625,8 +626,7 @@ pub fn sovereign_init(hardware_json: &str, migration_json: &str) -> Result<JsVal
         "message": greeting.message,
         "config_preview": greeting.config_preview,
     });
-    serde_wasm_bindgen::to_value(&json)
-        .map_err(|e| JsError::new(&e.to_string()))
+    serde_wasm_bindgen::to_value(&json).map_err(|e| JsError::new(&e.to_string()))
 }
 
 /// Send a message to the sovereign conversation.
@@ -635,15 +635,15 @@ pub fn sovereign_init(hardware_json: &str, migration_json: &str) -> Result<JsVal
 pub fn sovereign_chat(message: &str) -> Result<JsValue, JsError> {
     SOVEREIGN_CONVERSATION.with(|c| {
         let mut borrow = c.borrow_mut();
-        let conv = borrow.as_mut()
-            .ok_or_else(|| JsError::new("Conversation not initialized. Call sovereign_init() first."))?;
+        let conv = borrow.as_mut().ok_or_else(|| {
+            JsError::new("Conversation not initialized. Call sovereign_init() first.")
+        })?;
         let response = conv.respond(message);
         let json = serde_json::json!({
             "message": response.message,
             "config_preview": response.config_preview,
         });
-        serde_wasm_bindgen::to_value(&json)
-            .map_err(|e| JsError::new(&e.to_string()))
+        serde_wasm_bindgen::to_value(&json).map_err(|e| JsError::new(&e.to_string()))
     })
 }
 
@@ -674,8 +674,7 @@ pub fn generate_sovereign_config(
         "welcome_message": config.welcome_message,
         "warnings": config.warnings,
     });
-    serde_wasm_bindgen::to_value(&json)
-        .map_err(|e| JsError::new(&e.to_string()))
+    serde_wasm_bindgen::to_value(&json).map_err(|e| JsError::new(&e.to_string()))
 }
 
 /// Match a list of app names against the NixOS package database.
@@ -691,13 +690,17 @@ pub fn match_app_list(app_list_text: &str) -> Result<JsValue, JsError> {
         .collect();
     let report = db.match_list(&names);
     // Manual JSON construction to handle &'static references
-    let matched: Vec<serde_json::Value> = report.matched.iter().map(|m| {
-        serde_json::json!({
-            "source_name": m.source_name,
-            "nix_package": m.entry.name,
-            "category": format!("{:?}", m.entry.category),
+    let matched: Vec<serde_json::Value> = report
+        .matched
+        .iter()
+        .map(|m| {
+            serde_json::json!({
+                "source_name": m.source_name,
+                "nix_package": m.entry.name,
+                "category": format!("{:?}", m.entry.category),
+            })
         })
-    }).collect();
+        .collect();
     let bundles: Vec<&str> = report.suggested_bundles.iter().map(|b| b.name).collect();
     let json = serde_json::json!({
         "total_apps": report.total_apps,
@@ -707,6 +710,5 @@ pub fn match_app_list(app_list_text: &str) -> Result<JsValue, JsError> {
         "suggested_bundles": bundles,
         "summary": report.summary,
     });
-    serde_wasm_bindgen::to_value(&json)
-        .map_err(|e| JsError::new(&e.to_string()))
+    serde_wasm_bindgen::to_value(&json).map_err(|e| JsError::new(&e.to_string()))
 }

@@ -382,7 +382,11 @@ impl NameResolver {
     /// - Check if the name ends in `.eth` → resolve via ENS
     /// - Check if the name ends in a Handshake TLD → resolve via HNS
     /// - Cache successful resolutions with appropriate TTL
-    pub fn resolve_external(&mut self, _name: &MeshName, _now_secs: u64) -> Option<ResolvedEndpoint> {
+    pub fn resolve_external(
+        &mut self,
+        _name: &MeshName,
+        _now_secs: u64,
+    ) -> Option<ResolvedEndpoint> {
         // Integration point for ENS/Handshake resolution.
         // Requires an Ethereum provider dependency (ethers-rs or alloy).
         None
@@ -558,9 +562,11 @@ mod tests {
         assert!(ResolvedEndpoint::EnsName("mycelix.eth".to_string())
             .display()
             .starts_with("ens:"));
-        assert!(ResolvedEndpoint::ContentAddress("QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG".to_string())
-            .display()
-            .starts_with("cid:"));
+        assert!(ResolvedEndpoint::ContentAddress(
+            "QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG".to_string()
+        )
+        .display()
+        .starts_with("cid:"));
     }
 
     #[test]

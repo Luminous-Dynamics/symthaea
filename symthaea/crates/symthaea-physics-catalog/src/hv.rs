@@ -124,6 +124,10 @@ mod tests {
         let newton = HV::from_name("Newton Second Law");
         let maxwell = HV::from_name("Maxwell Gauss Law");
         let sim = newton.similarity(&maxwell);
-        assert!(sim.abs() < 0.3, "Different equations should be dissimilar: {}", sim);
+        assert!(
+            sim.abs() < 0.3,
+            "Different equations should be dissimilar: {}",
+            sim
+        );
     }
 }

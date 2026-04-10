@@ -28,12 +28,18 @@ fn test_each_contaminant_detected_individually() {
     // pH too high
     let mut alkaline = clean;
     alkaline.ph = 9.5;
-    assert!(!detect_anomalies(&alkaline).is_empty(), "High pH should be detected");
+    assert!(
+        !detect_anomalies(&alkaline).is_empty(),
+        "High pH should be detected"
+    );
 
     // Turbidity
     let mut turbid = clean;
     turbid.turbidity_ntu = 10.0;
-    assert!(!detect_anomalies(&turbid).is_empty(), "High turbidity detected");
+    assert!(
+        !detect_anomalies(&turbid).is_empty(),
+        "High turbidity detected"
+    );
 
     // TDS
     let mut tds = clean;
@@ -43,12 +49,18 @@ fn test_each_contaminant_detected_individually() {
     // Nitrates
     let mut nitrates = clean;
     nitrates.nitrates_mg_l = 60.0;
-    assert!(!detect_anomalies(&nitrates).is_empty(), "High nitrates detected");
+    assert!(
+        !detect_anomalies(&nitrates).is_empty(),
+        "High nitrates detected"
+    );
 
     // Arsenic
     let mut arsenic = clean;
     arsenic.arsenic_ug_l = 15.0;
-    assert!(!detect_anomalies(&arsenic).is_empty(), "High arsenic detected");
+    assert!(
+        !detect_anomalies(&arsenic).is_empty(),
+        "High arsenic detected"
+    );
 
     // Lead
     let mut lead = clean;
@@ -58,7 +70,10 @@ fn test_each_contaminant_detected_individually() {
     // Chlorine
     let mut chlorine = clean;
     chlorine.chlorine_mg_l = 6.0;
-    assert!(!detect_anomalies(&chlorine).is_empty(), "High chlorine detected");
+    assert!(
+        !detect_anomalies(&chlorine).is_empty(),
+        "High chlorine detected"
+    );
 
     // Dissolved oxygen (low)
     let mut low_do = clean;
@@ -274,7 +289,11 @@ fn test_auv_simulator_full_thrust_stability() {
 
     // Velocity should be capped at physical limits, not divergent
     let state = sim.state();
-    assert!(state.speed() <= 6.0, "Speed should be bounded: {}", state.speed());
+    assert!(
+        state.speed() <= 6.0,
+        "Speed should be bounded: {}",
+        state.speed()
+    );
 }
 
 #[test]
@@ -285,8 +304,10 @@ fn test_auv_simulator_alternating_thrust() {
     for i in 0..100 {
         let direction = if i % 20 < 10 { 0.3 } else { -0.3 };
         let cmd = AuvCommand {
-            thrusters: [direction, -direction, direction, -direction,
-                       direction, -direction, direction, -direction],
+            thrusters: [
+                direction, -direction, direction, -direction, direction, -direction, direction,
+                -direction,
+            ],
         };
         sim.step(&cmd, 0.01);
         let state = sim.state();

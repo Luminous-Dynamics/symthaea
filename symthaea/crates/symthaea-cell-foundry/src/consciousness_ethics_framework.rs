@@ -99,10 +99,7 @@ pub enum ConsciousnessIndicator {
     /// Integrated information as measured by IIT (Tononi 2004).
     IntegratedInformation { phi: f64 },
     /// Evoked potential response to stimulation.
-    ResponseToStimulation {
-        latency_ms: f32,
-        amplitude: f32,
-    },
+    ResponseToStimulation { latency_ms: f32, amplitude: f32 },
     /// Sleep-wake-like alternating activity cycles.
     SleepWakeCycles {
         cycle_detected: bool,
@@ -113,7 +110,9 @@ pub enum ConsciousnessIndicator {
 }
 
 /// Ethics tier (0-4), ordered by severity.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, serde::Serialize, serde::Deserialize,
+)]
 pub enum EthicsTier {
     /// No consciousness indicators. Standard tissue protocols.
     Tier0,
@@ -385,8 +384,7 @@ impl ConsciousnessEthicsFramework {
         lfp: Option<&LocalFieldPotential>,
     ) -> OrganoidEthicsAssessment {
         let indicators = self.detect_indicators(metrics, lfp);
-        let (tier, convergence_count, tier_from_convergence) =
-            self.classify_tier(&indicators);
+        let (tier, convergence_count, tier_from_convergence) = self.classify_tier(&indicators);
         let actions = self.generate_actions(tier);
         let risk = self.risk_score(&indicators, tier, metrics.stage as u32);
         let recommendation = self.recommend(tier, risk);
@@ -591,9 +589,7 @@ impl ConsciousnessEthicsFramework {
                 actions.push(RequiredAction::EnhancedMonitoring {
                     interval_minutes: 60,
                 });
-                actions.push(RequiredAction::DataPreservation {
-                    retention_years: 5,
-                });
+                actions.push(RequiredAction::DataPreservation { retention_years: 5 });
             }
             EthicsTier::Tier2 => {
                 actions.push(RequiredAction::EnhancedMonitoring {
@@ -940,10 +936,7 @@ mod tests {
         assert!(assessment
             .required_actions
             .iter()
-            .any(|a| matches!(
-                a,
-                RequiredAction::EthicsCommitteeNotification { .. }
-            )));
+            .any(|a| matches!(a, RequiredAction::EthicsCommitteeNotification { .. })));
     }
 
     #[test]

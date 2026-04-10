@@ -133,11 +133,7 @@ mod tests {
     #[test]
     fn test_fm100_n150_deformed() {
         let (b2, _) = frdm_deformation(100, 150);
-        assert!(
-            b2 > 0.2,
-            "Fm-250 should be well-deformed: β₂={}",
-            b2
-        );
+        assert!(b2 > 0.2, "Fm-250 should be well-deformed: β₂={}", b2);
         assert!(!is_near_spherical(100, 150));
     }
 

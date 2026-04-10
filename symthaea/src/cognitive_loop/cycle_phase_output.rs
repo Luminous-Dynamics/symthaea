@@ -363,10 +363,20 @@ impl CognitiveLoopService {
                     .map(|f| f.gradient)
                     .unwrap_or(0.0),
                 hodge_curl_fraction: topo_summary.hodge_fractions.map(|f| f.curl).unwrap_or(0.0),
-                hodge_critical_scale: topo_summary.hodge_fractions
-                    .map(|f| if f.critical_scale.is_nan() { -1.0 } else { f.critical_scale })
+                hodge_critical_scale: topo_summary
+                    .hodge_fractions
+                    .map(|f| {
+                        if f.critical_scale.is_nan() {
+                            -1.0
+                        } else {
+                            f.critical_scale
+                        }
+                    })
                     .unwrap_or(-1.0),
-                hodge_at_criticality: topo_summary.hodge_fractions.map(|f| f.at_criticality).unwrap_or(false),
+                hodge_at_criticality: topo_summary
+                    .hodge_fractions
+                    .map(|f| f.at_criticality)
+                    .unwrap_or(false),
                 in_active_rest: self.stats.in_active_rest,
                 stillness_dominance_streak: self.stats.stillness_dominance_streak,
                 unified_verdict: self
@@ -1205,10 +1215,8 @@ impl CognitiveLoopService {
             };
             use symthaea_core::hdc::substrate_independence::CorticalRegion;
 
-            let mut cam = CorticalActivationMap::zeros(
-                ActivationSource::Simulated,
-                self.stats.total_cycles,
-            );
+            let mut cam =
+                CorticalActivationMap::zeros(ActivationSource::Simulated, self.stats.total_cycles);
 
             // Prefrontal: reasoning confidence (meta-cognition proxy)
             cam.set(
@@ -1219,8 +1227,7 @@ impl CognitiveLoopService {
             // Visual: grid encoding norm + spatial complexity
             cam.set(
                 CorticalRegion::Visual,
-                (metadata.grid_encoding_norm * 0.5
-                    + metadata.grid_spatial_complexity * 0.5)
+                (metadata.grid_encoding_norm * 0.5 + metadata.grid_spatial_complexity * 0.5)
                     .clamp(0.0, 1.0),
             );
 
@@ -1228,7 +1235,11 @@ impl CognitiveLoopService {
             cam.set(CorticalRegion::Auditory, metadata.voice_confidence);
 
             // Language: reasoning narrative presence as proxy (0.4 when active)
-            let lang_active = if metadata.reasoning_narrative.is_empty() { 0.1 } else { 0.5 };
+            let lang_active = if metadata.reasoning_narrative.is_empty() {
+                0.1
+            } else {
+                0.5
+            };
             cam.set(CorticalRegion::Language, lang_active);
 
             // Memory: codebook utilization from resonator metrics
@@ -1252,8 +1263,7 @@ impl CognitiveLoopService {
             // Social: social trust + social prediction accuracy
             cam.set(
                 CorticalRegion::Social,
-                (metadata.social_trust_current * 0.5
-                    + metadata.social_prediction_accuracy * 0.5)
+                (metadata.social_trust_current * 0.5 + metadata.social_prediction_accuracy * 0.5)
                     .clamp(0.0, 1.0),
             );
 
@@ -1266,8 +1276,7 @@ impl CognitiveLoopService {
             // Integration: temporal binding + cross-module agreement
             cam.set(
                 CorticalRegion::Integration,
-                (metadata.temporal_binding_strength * 0.5
-                    + metadata.cross_module_agreement * 0.5)
+                (metadata.temporal_binding_strength * 0.5 + metadata.cross_module_agreement * 0.5)
                     .clamp(0.0, 1.0),
             );
 
@@ -1278,7 +1287,11 @@ impl CognitiveLoopService {
             );
 
             // Creative: surprise-triggered exploration as creativity proxy
-            let creative = if perception.exploration.surprise_triggered { 0.7 } else { 0.2 };
+            let creative = if perception.exploration.surprise_triggered {
+                0.7
+            } else {
+                0.2
+            };
             cam.set(CorticalRegion::Creative, creative);
 
             // Accumulate into ring buffer for temporal analysis.
@@ -1651,8 +1664,8 @@ impl CognitiveLoopService {
         {
             metadata.defense_actions_proposed = self.defense_actions_proposed;
             metadata.defense_actions_approved = self.defense_actions_approved;
-            metadata.immune_motor_halt = self.carryover.quality.safety_motor_halt
-                || self.carryover.quality.subsystem_veto;
+            metadata.immune_motor_halt =
+                self.carryover.quality.safety_motor_halt || self.carryover.quality.subsystem_veto;
         }
 
         // ── End-of-cycle stats ──
@@ -2115,7 +2128,10 @@ mod tests {
         let result = svc.cycle("consolidation check");
         // is_consolidating is a bool — verify it's accessible and has a valid value
         let consolidating = result.metadata.is_consolidating;
-        assert!(consolidating || !consolidating, "is_consolidating should be a valid bool");
+        assert!(
+            consolidating || !consolidating,
+            "is_consolidating should be a valid bool"
+        );
     }
 
     #[test]

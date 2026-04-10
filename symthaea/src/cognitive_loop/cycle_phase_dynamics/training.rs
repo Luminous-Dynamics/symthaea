@@ -299,10 +299,18 @@ impl CognitiveLoopService {
                 meta_awareness: coherence, // approximate from coherence
                 coherence,
                 knowledge_grounding: 0.5,
-                detected_primitives: perception.encoding.encoding_result.detected_primitives.clone(),
+                detected_primitives: perception
+                    .encoding
+                    .encoding_result
+                    .detected_primitives
+                    .clone(),
                 ..Default::default()
             };
-            if let Some(result) = self.language_comm.broca_lite.generate_from_signals_with_input(&signals, Some(input)) {
+            if let Some(result) = self
+                .language_comm
+                .broca_lite
+                .generate_from_signals_with_input(&signals, Some(input))
+            {
                 self.language_comm.last_broca_text = Some(result.text.clone());
                 self.language_comm.last_language_source = Some("broca_lite".into());
 
@@ -789,7 +797,8 @@ impl CognitiveLoopService {
                 if let Some(ref ku) = self.known_unknowns {
                     // Use knowledge context to detect domain
                     for fact in &s.knowledge_context {
-                        let domain = crate::knowledge::claim_priority::ClaimPrioritizer::infer_domain(fact);
+                        let domain =
+                            crate::knowledge::claim_priority::ClaimPrioritizer::infer_domain(fact);
                         let modifier = ku.modulate_confidence(&domain) as f32;
                         if modifier < 1.0 {
                             s.epistemic_confidence *= modifier;
@@ -823,11 +832,15 @@ impl CognitiveLoopService {
                     #[cfg(feature = "epistemic")]
                     let broca_text_for_factcheck = {
                         use crate::knowledge::claim_priority::ClaimPrioritizer;
-                        let claims = super::super::broca_factcheck::BrocaFactcheckBridge::extract_claims(broca_text);
+                        let claims =
+                            super::super::broca_factcheck::BrocaFactcheckBridge::extract_claims(
+                                broca_text,
+                            );
                         if !claims.is_empty() {
                             let prioritizer = ClaimPrioritizer::new(Default::default());
                             let prioritized = prioritizer.prioritize(&claims);
-                            let top_claims: Vec<String> = prioritized.into_iter().map(|p| p.claim).collect();
+                            let top_claims: Vec<String> =
+                                prioritized.into_iter().map(|p| p.claim).collect();
                             self.factcheck_bridge.submit_for_verification(&top_claims);
                         }
                         // Process pending verdicts from previous cycle
@@ -933,8 +946,8 @@ impl CognitiveLoopService {
                     .unwrap_or(0.0);
                 if nsm_coverage > 0.0 {
                     // Confidence modulation: coverage > 0.5 boosts, < 0.5 dampens.
-                    let coverage_delta =
-                        (nsm_coverage - 0.5) * super::super::thresholds::NSM_COVERAGE_CONFIDENCE_SCALE;
+                    let coverage_delta = (nsm_coverage - 0.5)
+                        * super::super::thresholds::NSM_COVERAGE_CONFIDENCE_SCALE;
                     self.adjust_confidence_pri(
                         "nsm_expressive_coverage",
                         coverage_delta,
@@ -972,8 +985,8 @@ impl CognitiveLoopService {
                     final_coherence * (0.5 + 0.5 * nsm_cov.max(0.0).min(1.0));
                 if articulation_quality > 0.3 {
                     // Scale is small (±2%) to avoid runaway feedback loops.
-                    let phi_boost =
-                        (articulation_quality - 0.3) * super::super::thresholds::NSM_BROCA_PHI_SCALE;
+                    let phi_boost = (articulation_quality - 0.3)
+                        * super::super::thresholds::NSM_BROCA_PHI_SCALE;
                     self.unification_engine.psi =
                         (self.unification_engine.psi + phi_boost as f64).clamp(0.0, 1.0);
                 }

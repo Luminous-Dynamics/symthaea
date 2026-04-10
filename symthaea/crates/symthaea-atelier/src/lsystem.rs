@@ -193,7 +193,15 @@ mod tests {
 
     #[test]
     fn turtle_produces_path() {
-        let path = turtle_walk("F+F+F+F", 100.0, 100.0, 0.0, 50.0, std::f32::consts::FRAC_PI_2, 1.0);
+        let path = turtle_walk(
+            "F+F+F+F",
+            100.0,
+            100.0,
+            0.0,
+            50.0,
+            std::f32::consts::FRAC_PI_2,
+            1.0,
+        );
         assert!(path.contains("M "));
         assert!(path.contains("L "));
     }

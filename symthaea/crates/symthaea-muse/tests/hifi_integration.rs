@@ -13,8 +13,8 @@
 //! 7. Sidechain ducking audibility (>1dB reduction)
 //! 8. Binaural ITD physical correctness (~0.6ms max)
 
-use symthaea_muse::*;
 use symthaea_muse::streaming::StreamingSynth;
+use symthaea_muse::*;
 
 // ─── 1. Real-Time Performance ───────────────────────────────────────────────
 
@@ -24,11 +24,17 @@ fn streaming_sustains_realtime() {
     // With all modules (wavetable, sidechain, binaural, reverb, feedback):
     // budget = 32ms per chunk.
     let mut synth = StreamingSynth::new(
-        MuseConfig { duration_secs: 10.0, max_notes: 32, ..Default::default() },
+        MuseConfig {
+            duration_secs: 10.0,
+            max_notes: 32,
+            ..Default::default()
+        },
         44100,
     );
     synth.update_state(&MusicalState {
-        consciousness_level: 0.8, arousal: 0.6, dopamine: 0.7,
+        consciousness_level: 0.8,
+        arousal: 0.6,
+        dopamine: 0.7,
         harmony_activations: [0.7, 0.5, 0.6, 0.4, 0.3, 0.5, 0.6, 0.3],
         ..Default::default()
     });
@@ -37,11 +43,15 @@ fn streaming_sustains_realtime() {
     synth.enable_sidechain = true;
 
     // Warm up
-    for _ in 0..10 { synth.render_chunk(); }
+    for _ in 0..10 {
+        synth.render_chunk();
+    }
 
     // Measure 100 chunks
     let start = std::time::Instant::now();
-    for _ in 0..100 { synth.render_chunk(); }
+    for _ in 0..100 {
+        synth.render_chunk();
+    }
     let elapsed = start.elapsed();
 
     let chunk_ms = synth.chunk_samples() as f64 / 44100.0 * 1000.0;
@@ -70,14 +80,22 @@ fn feedback_loop_does_not_diverge() {
     // diverge if feedback gains are too high. Run 1000 cycles and verify
     // all state values remain bounded.
     let mut synth = StreamingSynth::new(
-        MuseConfig { duration_secs: 60.0, max_notes: 32, ..Default::default() },
+        MuseConfig {
+            duration_secs: 60.0,
+            max_notes: 32,
+            ..Default::default()
+        },
         44100,
     );
     synth.update_state(&MusicalState {
-        consciousness_level: 0.5, arousal: 0.5, dopamine: 0.5,
-        serotonin: 0.5, noradrenaline: 0.5,
+        consciousness_level: 0.5,
+        arousal: 0.5,
+        dopamine: 0.5,
+        serotonin: 0.5,
+        noradrenaline: 0.5,
         harmony_activations: [0.5; 8],
-        valence: 0.0, prediction_error: 0.3,
+        valence: 0.0,
+        prediction_error: 0.3,
     });
     synth.feedback_strength = 1.0; // maximum feedback
 
@@ -89,14 +107,22 @@ fn feedback_loop_does_not_diverge() {
             assert!(
                 s[0].is_finite() && s[1].is_finite(),
                 "NaN/Inf at cycle {cycle}, sample {i}: [{}, {}]",
-                s[0], s[1]
+                s[0],
+                s[1]
             );
         }
 
         // Check state remains bounded
         let features = synth.feedback_features();
-        assert!(features.rms_energy <= 1.0, "RMS diverged at cycle {cycle}: {}", features.rms_energy);
-        assert!(features.spectral_centroid <= 1.0, "Centroid diverged at cycle {cycle}");
+        assert!(
+            features.rms_energy <= 1.0,
+            "RMS diverged at cycle {cycle}: {}",
+            features.rms_energy
+        );
+        assert!(
+            features.spectral_centroid <= 1.0,
+            "Centroid diverged at cycle {cycle}"
+        );
     }
 }
 
@@ -105,11 +131,16 @@ fn feedback_loop_does_not_collapse() {
     // Opposite problem: negative feedback could kill all signal.
     // After 500 cycles with full feedback, there should still be audio output.
     let mut synth = StreamingSynth::new(
-        MuseConfig { duration_secs: 30.0, max_notes: 16, ..Default::default() },
+        MuseConfig {
+            duration_secs: 30.0,
+            max_notes: 16,
+            ..Default::default()
+        },
         44100,
     );
     synth.update_state(&MusicalState {
-        consciousness_level: 0.7, arousal: 0.4,
+        consciousness_level: 0.7,
+        arousal: 0.4,
         harmony_activations: [0.6, 0.5, 0.4, 0.3, 0.5, 0.6, 0.4, 0.5],
         ..Default::default()
     });
@@ -119,7 +150,8 @@ fn feedback_loop_does_not_collapse() {
     for _ in 0..500 {
         let chunk = synth.render_chunk();
         let rms: f32 = (chunk.iter().map(|s| s[0] * s[0] + s[1] * s[1]).sum::<f32>()
-            / chunk.len().max(1) as f32).sqrt();
+            / chunk.len().max(1) as f32)
+            .sqrt();
         last_rms = rms;
     }
 
@@ -138,17 +170,24 @@ fn chunk_boundaries_are_click_free() {
     // With wavetable + binaural + reverb all wired, chunk boundaries
     // must remain continuous (no clicks from phase resets).
     let mut synth = StreamingSynth::new(
-        MuseConfig { duration_secs: 10.0, max_notes: 16, ..Default::default() },
+        MuseConfig {
+            duration_secs: 10.0,
+            max_notes: 16,
+            ..Default::default()
+        },
         44100,
     );
     synth.update_state(&MusicalState {
-        consciousness_level: 0.8, arousal: 0.5,
+        consciousness_level: 0.8,
+        arousal: 0.5,
         harmony_activations: [0.6; 8],
         ..Default::default()
     });
 
     // Generate notes first
-    for _ in 0..20 { synth.render_chunk(); }
+    for _ in 0..20 {
+        synth.render_chunk();
+    }
 
     // Check 50 consecutive chunk boundaries
     let mut max_discontinuity = 0.0f32;
@@ -183,8 +222,8 @@ fn flac_header_valid() {
     // Verify FLAC export produces valid files with correct magic bytes.
     // (Full decode requires symphonia, which is in mycelix-music workspace.
     //  Here we verify the structural integrity of the encoded stream.)
-    use symthaea_muse::spectral_vocoder::SpectralVocoder;
     use symthaea_core::genesis::GenesisSeed;
+    use symthaea_muse::spectral_vocoder::SpectralVocoder;
 
     let genesis = GenesisSeed::from_phrase("flac-test");
     let mut vocoder = SpectralVocoder::new(&genesis, 44100);
@@ -192,7 +231,8 @@ fn flac_header_valid() {
     let chunk = vocoder.render_chunk(&state, 4096);
 
     // Convert to i16 for FLAC encoding
-    let samples_i32: Vec<i32> = chunk.iter()
+    let samples_i32: Vec<i32> = chunk
+        .iter()
         .flat_map(|[l, r]| {
             let li = (l * 32767.0).clamp(-32768.0, 32767.0) as i32;
             let ri = (r * 32767.0).clamp(-32768.0, 32767.0) as i32;
@@ -220,10 +260,15 @@ fn flac_header_valid() {
     assert!(
         bytes.len() < raw_size,
         "FLAC should compress: {} >= {} raw bytes",
-        bytes.len(), raw_size
+        bytes.len(),
+        raw_size
     );
     let ratio = raw_size as f64 / bytes.len() as f64;
-    eprintln!("  FLAC compression ratio: {ratio:.2}x ({} → {} bytes)", raw_size, bytes.len());
+    eprintln!(
+        "  FLAC compression ratio: {ratio:.2}x ({} → {} bytes)",
+        raw_size,
+        bytes.len()
+    );
 }
 
 // ─── 5. Extreme Input Robustness ────────────────────────────────────────────
@@ -231,20 +276,34 @@ fn flac_header_valid() {
 #[test]
 fn extreme_zero_consciousness() {
     // consciousness_level=0, all harmonies=0, arousal=0
-    let config = MuseConfig { duration_secs: 2.0, max_notes: 8, ..Default::default() };
+    let config = MuseConfig {
+        duration_secs: 2.0,
+        max_notes: 8,
+        ..Default::default()
+    };
     let state = MusicalState {
-        consciousness_level: 0.0, arousal: 0.0, dopamine: 0.0,
-        serotonin: 0.0, noradrenaline: 0.0,
+        consciousness_level: 0.0,
+        arousal: 0.0,
+        dopamine: 0.0,
+        serotonin: 0.0,
+        noradrenaline: 0.0,
         harmony_activations: [0.0; 8],
-        valence: 0.0, prediction_error: 0.0,
+        valence: 0.0,
+        prediction_error: 0.0,
     };
     let comp = compose(&config, &state, 42);
     // Should not panic, all samples finite
     match &comp.audio {
         AudioData::StereoF32(s) => {
-            for pair in s { assert!(pair[0].is_finite() && pair[1].is_finite()); }
+            for pair in s {
+                assert!(pair[0].is_finite() && pair[1].is_finite());
+            }
         }
-        AudioData::F32(s) => { for &v in s { assert!(v.is_finite()); } }
+        AudioData::F32(s) => {
+            for &v in s {
+                assert!(v.is_finite());
+            }
+        }
         AudioData::I16(_) => {} // i16 can't be NaN
     }
 }
@@ -252,28 +311,48 @@ fn extreme_zero_consciousness() {
 #[test]
 fn extreme_max_consciousness() {
     // All values at maximum
-    let config = MuseConfig { duration_secs: 2.0, max_notes: 32, ..Default::default() };
+    let config = MuseConfig {
+        duration_secs: 2.0,
+        max_notes: 32,
+        ..Default::default()
+    };
     let state = MusicalState {
-        consciousness_level: 1.0, arousal: 1.0, dopamine: 1.0,
-        serotonin: 1.0, noradrenaline: 1.0,
+        consciousness_level: 1.0,
+        arousal: 1.0,
+        dopamine: 1.0,
+        serotonin: 1.0,
+        noradrenaline: 1.0,
         harmony_activations: [1.0; 8],
-        valence: 1.0, prediction_error: 1.0,
+        valence: 1.0,
+        prediction_error: 1.0,
     };
     let comp = compose(&config, &state, 42);
     match &comp.audio {
         AudioData::StereoF32(s) => {
-            for pair in s { assert!(pair[0].is_finite() && pair[1].is_finite()); }
+            for pair in s {
+                assert!(pair[0].is_finite() && pair[1].is_finite());
+            }
         }
-        AudioData::F32(s) => { for &v in s { assert!(v.is_finite()); } }
+        AudioData::F32(s) => {
+            for &v in s {
+                assert!(v.is_finite());
+            }
+        }
         AudioData::I16(_) => {}
     }
 }
 
 #[test]
 fn extreme_negative_valence() {
-    let config = MuseConfig { duration_secs: 2.0, max_notes: 8, ..Default::default() };
+    let config = MuseConfig {
+        duration_secs: 2.0,
+        max_notes: 8,
+        ..Default::default()
+    };
     let state = MusicalState {
-        valence: -1.0, arousal: 0.9, noradrenaline: 0.9,
+        valence: -1.0,
+        arousal: 0.9,
+        noradrenaline: 0.9,
         ..Default::default()
     };
     let comp = compose(&config, &state, 42);
@@ -284,11 +363,16 @@ fn extreme_negative_valence() {
 fn extreme_streaming_zero_state() {
     // StreamingSynth with zero consciousness for 200 chunks
     let mut synth = StreamingSynth::new(
-        MuseConfig { duration_secs: 30.0, max_notes: 16, ..Default::default() },
+        MuseConfig {
+            duration_secs: 30.0,
+            max_notes: 16,
+            ..Default::default()
+        },
         44100,
     );
     synth.update_state(&MusicalState {
-        consciousness_level: 0.0, arousal: 0.0,
+        consciousness_level: 0.0,
+        arousal: 0.0,
         harmony_activations: [0.0; 8],
         ..Default::default()
     });
@@ -304,9 +388,14 @@ fn extreme_streaming_zero_state() {
 
 #[test]
 fn compose_is_deterministic() {
-    let config = MuseConfig { duration_secs: 4.0, max_notes: 16, ..Default::default() };
+    let config = MuseConfig {
+        duration_secs: 4.0,
+        max_notes: 16,
+        ..Default::default()
+    };
     let state = MusicalState {
-        consciousness_level: 0.7, arousal: 0.5,
+        consciousness_level: 0.7,
+        arousal: 0.5,
         harmony_activations: [0.6, 0.5, 0.4, 0.3, 0.7, 0.5, 0.6, 0.4],
         ..Default::default()
     };
@@ -329,16 +418,31 @@ fn compose_is_deterministic() {
 
 #[test]
 fn different_seeds_different_output() {
-    let config = MuseConfig { duration_secs: 2.0, max_notes: 8, ..Default::default() };
+    let config = MuseConfig {
+        duration_secs: 2.0,
+        max_notes: 8,
+        ..Default::default()
+    };
     let state = MusicalState::default();
 
     let comp1 = compose(&config, &state, 42);
     let comp2 = compose(&config, &state, 99);
 
     // Different seeds should produce different note sequences
-    let freqs1: Vec<i32> = comp1.notes.iter().map(|n| (n.frequency * 10.0) as i32).collect();
-    let freqs2: Vec<i32> = comp2.notes.iter().map(|n| (n.frequency * 10.0) as i32).collect();
-    assert_ne!(freqs1, freqs2, "different seeds should produce different melodies");
+    let freqs1: Vec<i32> = comp1
+        .notes
+        .iter()
+        .map(|n| (n.frequency * 10.0) as i32)
+        .collect();
+    let freqs2: Vec<i32> = comp2
+        .notes
+        .iter()
+        .map(|n| (n.frequency * 10.0) as i32)
+        .collect();
+    assert_ne!(
+        freqs1, freqs2,
+        "different seeds should produce different melodies"
+    );
 }
 
 // ─── 7. Sidechain Ducking Audibility ────────────────────────────────────────
@@ -433,9 +537,7 @@ fn binaural_center_source_has_equal_channels() {
     };
     renderer.update_state(&state);
 
-    let signal: Vec<f32> = (0..1024)
-        .map(|i| (i as f32 * 0.1).sin() * 0.5)
-        .collect();
+    let signal: Vec<f32> = (0..1024).map(|i| (i as f32 * 0.1).sin() * 0.5).collect();
     let output = renderer.render(&[signal]);
 
     let rms_l: f32 = (output.iter().map(|s| s[0] * s[0]).sum::<f32>() / output.len() as f32).sqrt();
@@ -457,14 +559,22 @@ fn binaural_center_source_has_equal_channels() {
 fn all_modules_coexist_in_streaming() {
     // Enable every module simultaneously and verify no panics for 100 chunks
     let mut synth = StreamingSynth::new(
-        MuseConfig { duration_secs: 10.0, max_notes: 32, ..Default::default() },
+        MuseConfig {
+            duration_secs: 10.0,
+            max_notes: 32,
+            ..Default::default()
+        },
         44100,
     );
     synth.update_state(&MusicalState {
-        consciousness_level: 0.75, arousal: 0.6, dopamine: 0.7,
-        serotonin: 0.4, noradrenaline: 0.5,
+        consciousness_level: 0.75,
+        arousal: 0.6,
+        dopamine: 0.7,
+        serotonin: 0.4,
+        noradrenaline: 0.5,
         harmony_activations: [0.8, 0.6, 0.7, 0.5, 0.4, 0.6, 0.5, 0.7],
-        valence: 0.3, prediction_error: 0.2,
+        valence: 0.3,
+        prediction_error: 0.2,
     });
     synth.enable_binaural = true;
     synth.enable_sidechain = true;

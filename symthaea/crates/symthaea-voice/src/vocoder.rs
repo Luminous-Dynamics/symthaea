@@ -12,15 +12,28 @@ use symthaea_vocal_tract::types::{FormantFrame, SourceType};
 
 /// Stable formant resonator with coefficient interpolation.
 struct StableResonator {
-    y1: f32, y2: f32,
-    a1: f32, a2: f32, gain: f32,
-    target_a1: f32, target_a2: f32, target_gain: f32,
+    y1: f32,
+    y2: f32,
+    a1: f32,
+    a2: f32,
+    gain: f32,
+    target_a1: f32,
+    target_a2: f32,
+    target_gain: f32,
 }
 
 impl StableResonator {
     fn new() -> Self {
-        Self { y1: 0.0, y2: 0.0, a1: 0.0, a2: 0.0, gain: 0.01,
-               target_a1: 0.0, target_a2: 0.0, target_gain: 0.01 }
+        Self {
+            y1: 0.0,
+            y2: 0.0,
+            a1: 0.0,
+            a2: 0.0,
+            gain: 0.01,
+            target_a1: 0.0,
+            target_a2: 0.0,
+            target_gain: 0.01,
+        }
     }
 
     fn set_target(&mut self, freq: f32, bandwidth: f32, sr: f32) {
@@ -48,7 +61,9 @@ impl StableResonator {
 
 /// Synthesize audio with warmth and depth.
 pub fn synthesize(frames: &[FormantFrame], sample_rate: u32) -> Vec<f32> {
-    if frames.is_empty() { return Vec::new(); }
+    if frames.is_empty() {
+        return Vec::new();
+    }
 
     let sr = sample_rate as f32;
     let frame_rate = 200.0;
@@ -57,7 +72,11 @@ pub fn synthesize(frames: &[FormantFrame], sample_rate: u32) -> Vec<f32> {
     let mut output = Vec::with_capacity(frames.len() * samples_per_frame);
     let mut glottal_phase = 0.0f32;
     let mut noise_state = 42u32;
-    let mut res = [StableResonator::new(), StableResonator::new(), StableResonator::new()];
+    let mut res = [
+        StableResonator::new(),
+        StableResonator::new(),
+        StableResonator::new(),
+    ];
     let mut smooth_f0 = frames[0].f0.max(80.0);
     let mut smooth_energy = 0.0f32;
 
@@ -74,8 +93,16 @@ pub fn synthesize(frames: &[FormantFrame], sample_rate: u32) -> Vec<f32> {
 
     for (frame_idx, frame) in frames.iter().enumerate() {
         // FIX 2: Dynamic bandwidth — wider during transitions
-        let prev_source = if frame_idx > 0 { frames[frame_idx - 1].source_type } else { frame.source_type };
-        let bw_mult = if prev_source != frame.source_type { 1.4 } else { 1.0 };
+        let prev_source = if frame_idx > 0 {
+            frames[frame_idx - 1].source_type
+        } else {
+            frame.source_type
+        };
+        let bw_mult = if prev_source != frame.source_type {
+            1.4
+        } else {
+            1.0
+        };
 
         res[0].set_target(frame.f1, frame.b1 * bw_mult, sr);
         res[1].set_target(frame.f2, frame.b2 * bw_mult, sr);
@@ -94,7 +121,9 @@ pub fn synthesize(frames: &[FormantFrame], sample_rate: u32) -> Vec<f32> {
             match frame.source_type {
                 SourceType::Vowel | SourceType::Liquid | SourceType::Nasal => {
                     glottal_phase += smooth_f0 / sr;
-                    if glottal_phase >= 1.0 { glottal_phase -= 1.0; }
+                    if glottal_phase >= 1.0 {
+                        glottal_phase -= 1.0;
+                    }
 
                     // Glottal pulse with softer shape
                     let pulse = if glottal_phase < 0.35 {
@@ -115,7 +144,8 @@ pub fn synthesize(frames: &[FormantFrame], sample_rate: u32) -> Vec<f32> {
                     // Gentle breathiness
                     if glottal_phase < 0.4 {
                         noise_state = lcg(&mut noise_state);
-                        source += noise_f32(noise_state) * 0.05 * smooth_energy; // reduced from 0.10
+                        source += noise_f32(noise_state) * 0.05 * smooth_energy;
+                        // reduced from 0.10
                     }
                 }
                 SourceType::Fricative => {
@@ -124,8 +154,11 @@ pub fn synthesize(frames: &[FormantFrame], sample_rate: u32) -> Vec<f32> {
                     source = noise_f32(noise_state) * smooth_energy * 1.5; // boosted from 0.8
                     if frame.voicing > 0.3 {
                         glottal_phase += smooth_f0 / sr;
-                        if glottal_phase >= 1.0 { glottal_phase -= 1.0; }
-                        source += (glottal_phase * std::f32::consts::TAU).sin() * smooth_energy * 0.3;
+                        if glottal_phase >= 1.0 {
+                            glottal_phase -= 1.0;
+                        }
+                        source +=
+                            (glottal_phase * std::f32::consts::TAU).sin() * smooth_energy * 0.3;
                     }
                 }
                 SourceType::Stop => {
@@ -139,7 +172,10 @@ pub fn synthesize(frames: &[FormantFrame], sample_rate: u32) -> Vec<f32> {
                 }
                 SourceType::Silent => {
                     source = 0.0;
-                    for r in &mut res { r.y1 *= 0.99; r.y2 *= 0.99; }
+                    for r in &mut res {
+                        r.y1 *= 0.99;
+                        r.y2 *= 0.99;
+                    }
                 }
             }
 
@@ -188,10 +224,19 @@ mod tests {
 
     fn vowel_frame(f1: f32, f2: f32, f0: f32) -> FormantFrame {
         FormantFrame {
-            f1, f2, f3: 2500.0, b1: 80.0, b2: 100.0, b3: 120.0,
-            f0, energy: 0.8, voicing: 0.9, time: 0.0,
+            f1,
+            f2,
+            f3: 2500.0,
+            b1: 80.0,
+            b2: 100.0,
+            b3: 120.0,
+            f0,
+            energy: 0.8,
+            voicing: 0.9,
+            time: 0.0,
             source_type: SourceType::Vowel,
-            nasal_zero_freq: 0.0, nasal_zero_bw: 0.0,
+            nasal_zero_freq: 0.0,
+            nasal_zero_bw: 0.0,
         }
     }
 
@@ -207,29 +252,61 @@ mod tests {
         let mut frames = vec![vowel_frame(730.0, 1090.0, 120.0); 60];
         frames.extend(vec![vowel_frame(270.0, 2290.0, 120.0); 60]);
         let audio = synthesize(&frames, 44100);
-        let max_jump: f32 = audio.windows(2).map(|w| (w[1]-w[0]).abs()).fold(0.0, f32::max);
+        let max_jump: f32 = audio
+            .windows(2)
+            .map(|w| (w[1] - w[0]).abs())
+            .fold(0.0, f32::max);
         assert!(max_jump < 1.0, "smooth: {max_jump}");
     }
 
     #[test]
     fn silence_is_silent() {
-        let frames = vec![FormantFrame {
-            f1: 0.0, f2: 0.0, f3: 0.0, b1: 80.0, b2: 100.0, b3: 120.0,
-            f0: 0.0, energy: 0.0, voicing: 0.0, time: 0.0,
-            source_type: SourceType::Silent, nasal_zero_freq: 0.0, nasal_zero_bw: 0.0,
-        }; 50];
+        let frames = vec![
+            FormantFrame {
+                f1: 0.0,
+                f2: 0.0,
+                f3: 0.0,
+                b1: 80.0,
+                b2: 100.0,
+                b3: 120.0,
+                f0: 0.0,
+                energy: 0.0,
+                voicing: 0.0,
+                time: 0.0,
+                source_type: SourceType::Silent,
+                nasal_zero_freq: 0.0,
+                nasal_zero_bw: 0.0,
+            };
+            50
+        ];
         let audio = synthesize(&frames, 44100);
         assert!(audio.iter().all(|&s| s.abs() < 0.5));
     }
 
     #[test]
     fn fricative_produces_noise() {
-        let frames = vec![FormantFrame {
-            f1: 300.0, f2: 1800.0, f3: 4500.0, b1: 80.0, b2: 100.0, b3: 120.0,
-            f0: 0.0, energy: 0.8, voicing: 0.0, time: 0.0,
-            source_type: SourceType::Fricative, nasal_zero_freq: 0.0, nasal_zero_bw: 0.0,
-        }; 50];
+        let frames = vec![
+            FormantFrame {
+                f1: 300.0,
+                f2: 1800.0,
+                f3: 4500.0,
+                b1: 80.0,
+                b2: 100.0,
+                b3: 120.0,
+                f0: 0.0,
+                energy: 0.8,
+                voicing: 0.0,
+                time: 0.0,
+                source_type: SourceType::Fricative,
+                nasal_zero_freq: 0.0,
+                nasal_zero_bw: 0.0,
+            };
+            50
+        ];
         let audio = synthesize(&frames, 44100);
-        assert!(audio.iter().any(|&s| s.abs() > 0.01), "fricative should produce noise");
+        assert!(
+            audio.iter().any(|&s| s.abs() > 0.01),
+            "fricative should produce noise"
+        );
     }
 }

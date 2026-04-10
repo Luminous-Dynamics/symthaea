@@ -49,7 +49,10 @@ impl GlasserMapping {
 
     /// Get all parcels assigned to a region.
     pub fn region_parcels(&self, region: CorticalRegion) -> &[ParcelIndex] {
-        self.inverse.get(&region).map(|v| v.as_slice()).unwrap_or(&[])
+        self.inverse
+            .get(&region)
+            .map(|v| v.as_slice())
+            .unwrap_or(&[])
     }
 
     /// Total number of mapped parcels.
@@ -110,7 +113,9 @@ impl GlasserMapping {
         //   13-14 (V8, 4), mapped below
         // ================================================================
         assign(
-            &[1, 2, 3, 4, 5, 6, 13, 14, 15, 18, 19, 153, 154, 155, 156, 160, 163],
+            &[
+                1, 2, 3, 4, 5, 6, 13, 14, 15, 18, 19, 153, 154, 155, 156, 160, 163,
+            ],
             CorticalRegion::Visual,
         );
 
@@ -150,7 +155,9 @@ impl GlasserMapping {
         // Prefrontal cortex (dlPFC, vmPFC, OFC, areas 9, 10, 46, 47, 8)
         // ================================================================
         assign(
-            &[68, 69, 70, 71, 72, 73, 74, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90],
+            &[
+                68, 69, 70, 71, 72, 73, 74, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90,
+            ],
             CorticalRegion::Prefrontal,
         );
 
@@ -174,10 +181,7 @@ impl GlasserMapping {
         // ================================================================
         // Social (TPJ, posterior STS, mPFC areas, pSTS)
         // ================================================================
-        assign(
-            &[139, 140, 141, 142, 143, 144, 145],
-            CorticalRegion::Social,
-        );
+        assign(&[139, 140, 141, 142, 143, 144, 145], CorticalRegion::Social);
 
         // ================================================================
         // Executive (dlPFC/ACC overlap, anterior insula, areas 8C, i6-8, s6-8)
@@ -201,11 +205,12 @@ impl GlasserMapping {
         //              precuneus, retrosplenial, POS)
         // ================================================================
         assign(
-            &[7, 10, 11, 12, 16, 17, 25, 32, 33, 34, 35, 36, 37, 38, 39, 40,
-              41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 102, 103, 113, 114, 115,
-              116, 117, 118, 119, 120, 121, 122, 123, 127, 138, 151, 152,
-              157, 158, 159, 161, 162, 166, 167, 168, 169, 170, 171, 172,
-              177, 178, 179, 180],
+            &[
+                7, 10, 11, 12, 16, 17, 25, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45,
+                46, 47, 48, 49, 50, 102, 103, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122,
+                123, 127, 138, 151, 152, 157, 158, 159, 161, 162, 166, 167, 168, 169, 170, 171,
+                172, 177, 178, 179, 180,
+            ],
             CorticalRegion::Integration,
         );
 
@@ -239,7 +244,10 @@ impl DesikanKillianyMapping {
     }
 
     pub fn region_parcels(&self, region: CorticalRegion) -> &[ParcelIndex] {
-        self.inverse.get(&region).map(|v| v.as_slice()).unwrap_or(&[])
+        self.inverse
+            .get(&region)
+            .map(|v| v.as_slice())
+            .unwrap_or(&[])
     }
 
     pub fn num_parcels(&self) -> usize {
@@ -258,7 +266,14 @@ impl DesikanKillianyMapping {
         }
         sums.into_iter()
             .map(|(region, (sum, count))| {
-                (region, if count > 0 { (sum / count as f64) as f32 } else { 0.0 })
+                (
+                    region,
+                    if count > 0 {
+                        (sum / count as f64) as f32
+                    } else {
+                        0.0
+                    },
+                )
             })
             .collect()
     }
@@ -279,18 +294,18 @@ impl DesikanKillianyMapping {
 
         // DK parcels (left hemisphere 1-34, right 35-68)
         // Mapping based on Desikan et al. (2006) anatomical labels
-        assign(&[5, 11, 21], CorticalRegion::Visual);          // cuneus, lingual, pericalcarine
-        assign(&[30, 31], CorticalRegion::Auditory);            // superiortemporal, transversetemporal
-        assign(&[18, 19, 20], CorticalRegion::Language);        // parsorbitalis, parstriangularis, parsopercularis
-        assign(&[22, 23], CorticalRegion::Motor);               // precentral, paracentral
-        assign(&[24, 29], CorticalRegion::Sensory);             // postcentral, supramarginal
+        assign(&[5, 11, 21], CorticalRegion::Visual); // cuneus, lingual, pericalcarine
+        assign(&[30, 31], CorticalRegion::Auditory); // superiortemporal, transversetemporal
+        assign(&[18, 19, 20], CorticalRegion::Language); // parsorbitalis, parstriangularis, parsopercularis
+        assign(&[22, 23], CorticalRegion::Motor); // precentral, paracentral
+        assign(&[24, 29], CorticalRegion::Sensory); // postcentral, supramarginal
         assign(&[27, 28, 3, 14, 25], CorticalRegion::Prefrontal); // superiorfrontal, frontalpole, caudalmiddlefrontal, medialorbitofrontal, rostralmiddlefrontal
-        assign(&[6, 7, 17], CorticalRegion::Memory);            // entorhinal, fusiform, parahippocampal
-        assign(&[1, 10, 26], CorticalRegion::Emotional);        // caudalanteriorcingulate, isthmuscingulate, rostralanteriorcingulate
-        assign(&[2, 16], CorticalRegion::Social);               // bankssts (STS), lateralorbitofrontal
-        assign(&[8, 12, 15], CorticalRegion::Executive);        // inferiorparietal, lateraloccipital, middletemporal
-        assign(&[9, 13, 34], CorticalRegion::Creative);         // inferiortemporal, lingual(overlap), insula
-        assign(&[4, 32, 33], CorticalRegion::Integration);      // corpuscallosum, precuneus, posteriorcingulate
+        assign(&[6, 7, 17], CorticalRegion::Memory); // entorhinal, fusiform, parahippocampal
+        assign(&[1, 10, 26], CorticalRegion::Emotional); // caudalanteriorcingulate, isthmuscingulate, rostralanteriorcingulate
+        assign(&[2, 16], CorticalRegion::Social); // bankssts (STS), lateralorbitofrontal
+        assign(&[8, 12, 15], CorticalRegion::Executive); // inferiorparietal, lateraloccipital, middletemporal
+        assign(&[9, 13, 34], CorticalRegion::Creative); // inferiortemporal, lingual(overlap), insula
+        assign(&[4, 32, 33], CorticalRegion::Integration); // corpuscallosum, precuneus, posteriorcingulate
 
         Self { forward, inverse }
     }
@@ -323,7 +338,10 @@ impl SchaeferMapping {
     }
 
     pub fn region_parcels(&self, region: CorticalRegion) -> &[ParcelIndex] {
-        self.inverse.get(&region).map(|v| v.as_slice()).unwrap_or(&[])
+        self.inverse
+            .get(&region)
+            .map(|v| v.as_slice())
+            .unwrap_or(&[])
     }
 
     pub fn num_parcels(&self) -> usize {
@@ -342,7 +360,14 @@ impl SchaeferMapping {
         }
         sums.into_iter()
             .map(|(region, (sum, count))| {
-                (region, if count > 0 { (sum / count as f64) as f32 } else { 0.0 })
+                (
+                    region,
+                    if count > 0 {
+                        (sum / count as f64) as f32
+                    } else {
+                        0.0
+                    },
+                )
             })
             .collect()
     }
@@ -363,18 +388,18 @@ impl SchaeferMapping {
 
         // Schaefer 100 parcels mapped via Yeo 7 networks → CorticalRegion
         // Parcels 1-50 left hemisphere, 51-100 right hemisphere
-        assign(&[1, 2, 3, 4, 5, 6, 7], CorticalRegion::Visual);       // Visual network
-        assign(&[8, 9, 10, 11], CorticalRegion::Sensory);              // Somatomotor A
-        assign(&[12, 13, 14], CorticalRegion::Motor);                  // Somatomotor B
-        assign(&[15, 16, 17, 18, 19], CorticalRegion::Integration);    // Dorsal Attention
-        assign(&[20, 21, 22, 23, 24], CorticalRegion::Executive);      // Ventral Attention / Salience
+        assign(&[1, 2, 3, 4, 5, 6, 7], CorticalRegion::Visual); // Visual network
+        assign(&[8, 9, 10, 11], CorticalRegion::Sensory); // Somatomotor A
+        assign(&[12, 13, 14], CorticalRegion::Motor); // Somatomotor B
+        assign(&[15, 16, 17, 18, 19], CorticalRegion::Integration); // Dorsal Attention
+        assign(&[20, 21, 22, 23, 24], CorticalRegion::Executive); // Ventral Attention / Salience
         assign(&[25, 26, 27, 28, 29, 30, 31], CorticalRegion::Prefrontal); // Frontoparietal / Control
-        assign(&[32, 33, 34, 35, 36, 37, 38], CorticalRegion::Creative);   // Default Mode A (medial)
-        assign(&[39, 40, 41, 42], CorticalRegion::Social);             // Default Mode B (lateral temporal)
-        assign(&[43, 44], CorticalRegion::Memory);                     // Limbic / temporal pole
-        assign(&[45, 46], CorticalRegion::Emotional);                  // Limbic / OFC
-        assign(&[47, 48], CorticalRegion::Language);                   // Language (perisylvian)
-        assign(&[49, 50], CorticalRegion::Auditory);                   // Auditory (STG)
+        assign(&[32, 33, 34, 35, 36, 37, 38], CorticalRegion::Creative); // Default Mode A (medial)
+        assign(&[39, 40, 41, 42], CorticalRegion::Social); // Default Mode B (lateral temporal)
+        assign(&[43, 44], CorticalRegion::Memory); // Limbic / temporal pole
+        assign(&[45, 46], CorticalRegion::Emotional); // Limbic / OFC
+        assign(&[47, 48], CorticalRegion::Language); // Language (perisylvian)
+        assign(&[49, 50], CorticalRegion::Auditory); // Auditory (STG)
 
         Self { forward, inverse }
     }
@@ -470,7 +495,8 @@ mod tests {
             let left = mapping.parcel_to_region(p);
             let right = mapping.parcel_to_region(p + 180);
             assert_eq!(
-                left, right,
+                left,
+                right,
                 "Parcel {p} (left={left:?}) and {} (right={right:?}) differ",
                 p + 180
             );

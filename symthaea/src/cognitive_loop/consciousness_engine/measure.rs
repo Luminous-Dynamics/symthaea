@@ -226,8 +226,7 @@ impl ConsciousnessEngine {
                     // Pipeline has run at least once — use its binding metric
                     // Blend: 60% oscillatory + 40% perceptual coherence for robustness
                     let osc_binding = self.cache.last_pipeline_consciousness.min(1.0);
-                    (osc_binding * 0.6 + input.coherence as f64 * 0.4)
-                        * input.binding_capability
+                    (osc_binding * 0.6 + input.coherence as f64 * 0.4) * input.binding_capability
                 } else {
                     input.coherence as f64 * input.binding_capability
                 };

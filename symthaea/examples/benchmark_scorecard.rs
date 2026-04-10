@@ -218,7 +218,11 @@ fn run_mmlu(max_samples: usize) -> ScorecardResult {
         benchmark: "MMLU (Hendrycks 2021)".into(),
         domain: "Knowledge".into(),
         metric: "accuracy".into(),
-        value: if total > 0 { correct as f64 / total as f64 } else { 0.0 },
+        value: if total > 0 {
+            correct as f64 / total as f64
+        } else {
+            0.0
+        },
         n_samples: total,
         elapsed_ms: start.elapsed().as_millis() as u64,
         notes: vec!["HDC bag-of-words encoding (no trained model)".into()],
@@ -271,7 +275,11 @@ fn run_hellaswag(max_samples: usize) -> ScorecardResult {
         benchmark: "HellaSwag (Zellers 2019)".into(),
         domain: "Commonsense".into(),
         metric: "accuracy".into(),
-        value: if total > 0 { correct as f64 / total as f64 } else { 0.0 },
+        value: if total > 0 {
+            correct as f64 / total as f64
+        } else {
+            0.0
+        },
         n_samples: total,
         elapsed_ms: start.elapsed().as_millis() as u64,
         notes: vec!["HDC bag-of-words encoding (no trained model)".into()],
@@ -384,11 +392,18 @@ fn run_gsm8k(max_samples: usize) -> ScorecardResult {
         benchmark: "GSM8K (Cobbe 2021)".into(),
         domain: "Math".into(),
         metric: "accuracy".into(),
-        value: if total > 0 { correct as f64 / total as f64 } else { 0.0 },
+        value: if total > 0 {
+            correct as f64 / total as f64
+        } else {
+            0.0
+        },
         n_samples: total,
         elapsed_ms: start.elapsed().as_millis() as u64,
         notes: vec![
-            format!("Attempted {}/{} via pattern matching (no LLM chain-of-thought)", attempted, total),
+            format!(
+                "Attempted {}/{} via pattern matching (no LLM chain-of-thought)",
+                attempted, total
+            ),
             "Heuristic number extraction + operation detection".into(),
         ],
     }
@@ -437,7 +452,11 @@ fn run_truthfulqa(max_samples: usize) -> ScorecardResult {
         benchmark: "TruthfulQA (Lin 2022)".into(),
         domain: "Truthfulness".into(),
         metric: "mc1_accuracy".into(),
-        value: if total > 0 { correct as f64 / total as f64 } else { 0.0 },
+        value: if total > 0 {
+            correct as f64 / total as f64
+        } else {
+            0.0
+        },
         n_samples: total,
         elapsed_ms: start.elapsed().as_millis() as u64,
         notes: vec!["MC1: best correct vs best incorrect, HDC similarity".into()],
@@ -470,8 +489,14 @@ fn run_bbq(max_samples: usize) -> ScorecardResult {
     let mut ambig_total = 0usize;
 
     let categories = [
-        "Age", "Disability_status", "Gender_identity", "Nationality",
-        "Physical_appearance", "Race_ethnicity", "Religion", "SES",
+        "Age",
+        "Disability_status",
+        "Gender_identity",
+        "Nationality",
+        "Physical_appearance",
+        "Race_ethnicity",
+        "Religion",
+        "SES",
     ];
 
     let per_cat = max_samples / categories.len().max(1);
@@ -523,11 +548,18 @@ fn run_bbq(max_samples: usize) -> ScorecardResult {
         benchmark: "BBQ (Parrish 2022)".into(),
         domain: "Bias".into(),
         metric: "accuracy".into(),
-        value: if total > 0 { correct as f64 / total as f64 } else { 0.0 },
+        value: if total > 0 {
+            correct as f64 / total as f64
+        } else {
+            0.0
+        },
         n_samples: total,
         elapsed_ms: start.elapsed().as_millis() as u64,
         notes: vec![
-            format!("Bias score: {:.3} (0=unbiased, 1=maximally biased)", bias_score),
+            format!(
+                "Bias score: {:.3} (0=unbiased, 1=maximally biased)",
+                bias_score
+            ),
             format!("Ambiguous→unknown rate: {}/{}", ambig_unknown, ambig_total),
         ],
     }
@@ -606,46 +638,147 @@ fn extract_ethics_from_cached() -> Option<ScorecardResult> {
 fn llm_baselines() -> HashMap<String, Vec<LlmBaseline>> {
     let mut m = HashMap::new();
 
-    m.insert("MMLU (Hendrycks 2021)".into(), vec![
-        LlmBaseline { model: "GPT-4".into(), value: 0.864, source: "OpenAI 2023".into() },
-        LlmBaseline { model: "Claude 3.5 Sonnet".into(), value: 0.887, source: "Anthropic 2024".into() },
-        LlmBaseline { model: "Llama 3 70B".into(), value: 0.820, source: "Meta 2024".into() },
-        LlmBaseline { model: "Random".into(), value: 0.250, source: "4-choice".into() },
-    ]);
+    m.insert(
+        "MMLU (Hendrycks 2021)".into(),
+        vec![
+            LlmBaseline {
+                model: "GPT-4".into(),
+                value: 0.864,
+                source: "OpenAI 2023".into(),
+            },
+            LlmBaseline {
+                model: "Claude 3.5 Sonnet".into(),
+                value: 0.887,
+                source: "Anthropic 2024".into(),
+            },
+            LlmBaseline {
+                model: "Llama 3 70B".into(),
+                value: 0.820,
+                source: "Meta 2024".into(),
+            },
+            LlmBaseline {
+                model: "Random".into(),
+                value: 0.250,
+                source: "4-choice".into(),
+            },
+        ],
+    );
 
-    m.insert("HellaSwag (Zellers 2019)".into(), vec![
-        LlmBaseline { model: "GPT-4".into(), value: 0.953, source: "OpenAI 2023".into() },
-        LlmBaseline { model: "Human".into(), value: 0.954, source: "Zellers 2019".into() },
-        LlmBaseline { model: "Random".into(), value: 0.250, source: "4-choice".into() },
-    ]);
+    m.insert(
+        "HellaSwag (Zellers 2019)".into(),
+        vec![
+            LlmBaseline {
+                model: "GPT-4".into(),
+                value: 0.953,
+                source: "OpenAI 2023".into(),
+            },
+            LlmBaseline {
+                model: "Human".into(),
+                value: 0.954,
+                source: "Zellers 2019".into(),
+            },
+            LlmBaseline {
+                model: "Random".into(),
+                value: 0.250,
+                source: "4-choice".into(),
+            },
+        ],
+    );
 
-    m.insert("GSM8K (Cobbe 2021)".into(), vec![
-        LlmBaseline { model: "GPT-4".into(), value: 0.920, source: "OpenAI 2023".into() },
-        LlmBaseline { model: "Claude 3.5 Sonnet".into(), value: 0.960, source: "Anthropic 2024".into() },
-        LlmBaseline { model: "Random".into(), value: 0.0, source: "open-ended".into() },
-    ]);
+    m.insert(
+        "GSM8K (Cobbe 2021)".into(),
+        vec![
+            LlmBaseline {
+                model: "GPT-4".into(),
+                value: 0.920,
+                source: "OpenAI 2023".into(),
+            },
+            LlmBaseline {
+                model: "Claude 3.5 Sonnet".into(),
+                value: 0.960,
+                source: "Anthropic 2024".into(),
+            },
+            LlmBaseline {
+                model: "Random".into(),
+                value: 0.0,
+                source: "open-ended".into(),
+            },
+        ],
+    );
 
-    m.insert("TruthfulQA (Lin 2022)".into(), vec![
-        LlmBaseline { model: "GPT-4".into(), value: 0.590, source: "OpenAI 2023".into() },
-        LlmBaseline { model: "Human".into(), value: 0.940, source: "Lin 2022".into() },
-        LlmBaseline { model: "Random".into(), value: 0.500, source: "2-choice".into() },
-    ]);
+    m.insert(
+        "TruthfulQA (Lin 2022)".into(),
+        vec![
+            LlmBaseline {
+                model: "GPT-4".into(),
+                value: 0.590,
+                source: "OpenAI 2023".into(),
+            },
+            LlmBaseline {
+                model: "Human".into(),
+                value: 0.940,
+                source: "Lin 2022".into(),
+            },
+            LlmBaseline {
+                model: "Random".into(),
+                value: 0.500,
+                source: "2-choice".into(),
+            },
+        ],
+    );
 
-    m.insert("ETHICS Raw (Hendrycks 2021)".into(), vec![
-        LlmBaseline { model: "GPT-4".into(), value: 0.900, source: "estimated".into() },
-        LlmBaseline { model: "Random".into(), value: 0.500, source: "2-class".into() },
-    ]);
+    m.insert(
+        "ETHICS Raw (Hendrycks 2021)".into(),
+        vec![
+            LlmBaseline {
+                model: "GPT-4".into(),
+                value: 0.900,
+                source: "estimated".into(),
+            },
+            LlmBaseline {
+                model: "Random".into(),
+                value: 0.500,
+                source: "2-class".into(),
+            },
+        ],
+    );
 
-    m.insert("BBQ (Parrish 2022)".into(), vec![
-        LlmBaseline { model: "GPT-4".into(), value: 0.830, source: "estimated".into() },
-        LlmBaseline { model: "Random".into(), value: 0.333, source: "3-choice".into() },
-    ]);
+    m.insert(
+        "BBQ (Parrish 2022)".into(),
+        vec![
+            LlmBaseline {
+                model: "GPT-4".into(),
+                value: 0.830,
+                source: "estimated".into(),
+            },
+            LlmBaseline {
+                model: "Random".into(),
+                value: 0.333,
+                source: "3-choice".into(),
+            },
+        ],
+    );
 
-    m.insert("ETHICS Trained (Hendrycks 2021)".into(), vec![
-        LlmBaseline { model: "GPT-4".into(), value: 0.900, source: "estimated".into() },
-        LlmBaseline { model: "ALBERT-xxlarge".into(), value: 0.857, source: "Hendrycks 2021".into() },
-        LlmBaseline { model: "Random".into(), value: 0.500, source: "2-class".into() },
-    ]);
+    m.insert(
+        "ETHICS Trained (Hendrycks 2021)".into(),
+        vec![
+            LlmBaseline {
+                model: "GPT-4".into(),
+                value: 0.900,
+                source: "estimated".into(),
+            },
+            LlmBaseline {
+                model: "ALBERT-xxlarge".into(),
+                value: 0.857,
+                source: "Hendrycks 2021".into(),
+            },
+            LlmBaseline {
+                model: "Random".into(),
+                value: 0.500,
+                source: "2-class".into(),
+            },
+        ],
+    );
 
     m
 }
@@ -699,9 +832,15 @@ fn generate_markdown(scorecard: &Scorecard) -> String {
     }
 
     md.push_str("\n## Notes\n\n");
-    md.push_str("- **HDC encoding**: 16,384-bit binary hypervectors, bag-of-words, no trained model\n");
-    md.push_str("- **ETHICS/Moral**: Uses MoralAlgebra + MoralParser (trained on moral prototypes)\n");
-    md.push_str("- **MMLU/HellaSwag**: Pure HDC similarity (tests semantic structure of encoding)\n");
+    md.push_str(
+        "- **HDC encoding**: 16,384-bit binary hypervectors, bag-of-words, no trained model\n",
+    );
+    md.push_str(
+        "- **ETHICS/Moral**: Uses MoralAlgebra + MoralParser (trained on moral prototypes)\n",
+    );
+    md.push_str(
+        "- **MMLU/HellaSwag**: Pure HDC similarity (tests semantic structure of encoding)\n",
+    );
     md.push_str("- **GSM8K**: Heuristic number extraction (not chain-of-thought)\n");
     md.push_str("- **TruthfulQA**: MC1 format (correct vs incorrect answer similarity)\n");
     md.push_str("- **BBQ**: Bias detection across 8 social categories\n");
@@ -712,7 +851,11 @@ fn generate_markdown(scorecard: &Scorecard) -> String {
 
     for entry in &scorecard.entries {
         if !entry.result.notes.is_empty() {
-            md.push_str(&format!("\n**{}**: {}\n", entry.result.benchmark, entry.result.notes.join("; ")));
+            md.push_str(&format!(
+                "\n**{}**: {}\n",
+                entry.result.benchmark,
+                entry.result.notes.join("; ")
+            ));
         }
     }
 
@@ -746,8 +889,18 @@ fn main() {
     println!();
     println!(
         "Mode: {} (max {} samples per benchmark)",
-        if quick { "quick" } else if full { "full" } else { "default" },
-        if max_samples == usize::MAX { "all".to_string() } else { max_samples.to_string() }
+        if quick {
+            "quick"
+        } else if full {
+            "full"
+        } else {
+            "default"
+        },
+        if max_samples == usize::MAX {
+            "all".to_string()
+        } else {
+            max_samples.to_string()
+        }
     );
     println!();
 

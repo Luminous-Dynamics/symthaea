@@ -114,7 +114,10 @@ mod tests {
             .collect();
         let loss_before = cosine_loss(&predicted, &target);
         let loss_after = cosine_loss(&updated, &target);
-        assert!(loss_after < loss_before, "gradient descent should reduce loss");
+        assert!(
+            loss_after < loss_before,
+            "gradient descent should reduce loss"
+        );
     }
 
     #[test]

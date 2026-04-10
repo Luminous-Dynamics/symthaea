@@ -18,36 +18,36 @@ use crate::MusicalState;
 /// Piano partial amplitudes at ff and pp (C4, Fletcher & Rossing 1998).
 /// Index 0 = fundamental, index 15 = 16th partial.
 pub const PIANO_FF: [f32; 16] = [
-    1.000, 0.891, 0.794, 0.631, 0.501, 0.398, 0.316, 0.251,
-    0.200, 0.158, 0.126, 0.100, 0.079, 0.063, 0.050, 0.040,
+    1.000, 0.891, 0.794, 0.631, 0.501, 0.398, 0.316, 0.251, 0.200, 0.158, 0.126, 0.100, 0.079,
+    0.063, 0.050, 0.040,
 ];
 pub const PIANO_PP: [f32; 16] = [
-    1.000, 0.630, 0.398, 0.251, 0.158, 0.100, 0.063, 0.040,
-    0.025, 0.016, 0.010, 0.006, 0.004, 0.003, 0.002, 0.001,
+    1.000, 0.630, 0.398, 0.251, 0.158, 0.100, 0.063, 0.040, 0.025, 0.016, 0.010, 0.006, 0.004,
+    0.003, 0.002, 0.001,
 ];
 
 /// Violin partial amplitudes (measured G3, Saunders/Schelleng).
 pub const VIOLIN: [f32; 16] = [
-    1.000, 0.520, 0.380, 0.230, 0.250, 0.150, 0.180, 0.100,
-    0.130, 0.080, 0.100, 0.060, 0.075, 0.045, 0.055, 0.030,
+    1.000, 0.520, 0.380, 0.230, 0.250, 0.150, 0.180, 0.100, 0.130, 0.080, 0.100, 0.060, 0.075,
+    0.045, 0.055, 0.030,
 ];
 
 /// Cello partial amplitudes (measured C2).
 pub const CELLO: [f32; 16] = [
-    1.000, 0.480, 0.350, 0.270, 0.200, 0.180, 0.130, 0.120,
-    0.090, 0.100, 0.070, 0.080, 0.050, 0.060, 0.035, 0.045,
+    1.000, 0.480, 0.350, 0.270, 0.200, 0.180, 0.130, 0.120, 0.090, 0.100, 0.070, 0.080, 0.050,
+    0.060, 0.035, 0.045,
 ];
 
 /// Flute-like (strong fundamental, weak upper partials).
 pub const FLUTE: [f32; 16] = [
-    1.000, 0.200, 0.050, 0.010, 0.005, 0.002, 0.001, 0.001,
-    0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000,
+    1.000, 0.200, 0.050, 0.010, 0.005, 0.002, 0.001, 0.001, 0.000, 0.000, 0.000, 0.000, 0.000,
+    0.000, 0.000, 0.000,
 ];
 
 /// Organ-like (drawbar registration: 8'+4'+2-2/3'+2').
 pub const ORGAN: [f32; 16] = [
-    1.000, 0.500, 0.250, 0.125, 0.060, 0.030, 0.015, 0.008,
-    0.004, 0.002, 0.001, 0.001, 0.000, 0.000, 0.000, 0.000,
+    1.000, 0.500, 0.250, 0.125, 0.060, 0.030, 0.015, 0.008, 0.004, 0.002, 0.001, 0.001, 0.000,
+    0.000, 0.000, 0.000,
 ];
 
 /// Piano decay time T60 by octave (seconds, Weinreich 1977).
@@ -113,8 +113,8 @@ impl Instrument {
     /// FM parameters: (carrier_ratio, mod_ratio, index, index_decay_rate).
     pub fn fm_params(&self) -> (f32, f32, f32, f32) {
         match self {
-            Self::ElectricPiano => (1.0, 1.0, 1.5, 15.0),  // Rhodes: gentler index
-            Self::Bell => (1.0, 3.5, 2.5, 3.0),             // Bell: reduced index for warmth
+            Self::ElectricPiano => (1.0, 1.0, 1.5, 15.0), // Rhodes: gentler index
+            Self::Bell => (1.0, 3.5, 2.5, 3.0),           // Bell: reduced index for warmth
             _ => (1.0, 1.0, 0.3, 10.0),
         }
     }
@@ -242,9 +242,17 @@ pub fn select_instrument(state: &MusicalState) -> Instrument {
     } else if psi < 0.3 {
         Instrument::Flute
     } else if da > 0.7 {
-        if arousal > 0.5 { Instrument::Bell } else { Instrument::ElectricPiano }
+        if arousal > 0.5 {
+            Instrument::Bell
+        } else {
+            Instrument::ElectricPiano
+        }
     } else if psi > 0.7 && arousal > 0.5 {
-        if state.harmony_activations[2] > 0.5 { Instrument::Violin } else { Instrument::Organ }
+        if state.harmony_activations[2] > 0.5 {
+            Instrument::Violin
+        } else {
+            Instrument::Organ
+        }
     } else if arousal > 0.4 {
         Instrument::AcousticGuitar
     } else {
@@ -257,15 +265,15 @@ pub fn select_instrument(state: &MusicalState) -> Instrument {
 /// Chord quality (semitone offsets from root).
 #[derive(Debug, Clone, Copy)]
 pub enum ChordType {
-    Major,       // [0, 4, 7]
-    Minor,       // [0, 3, 7]
-    Major7,      // [0, 4, 7, 11]
-    Minor7,      // [0, 3, 7, 10]
-    Dom7,        // [0, 4, 7, 10]
-    Sus2,        // [0, 2, 7]
-    Sus4,        // [0, 5, 7]
-    Dim,         // [0, 3, 6] — diminished (tension/fear)
-    Aug,         // [0, 4, 8] — augmented (unease/wonder)
+    Major,  // [0, 4, 7]
+    Minor,  // [0, 3, 7]
+    Major7, // [0, 4, 7, 11]
+    Minor7, // [0, 3, 7, 10]
+    Dom7,   // [0, 4, 7, 10]
+    Sus2,   // [0, 2, 7]
+    Sus4,   // [0, 5, 7]
+    Dim,    // [0, 3, 6] — diminished (tension/fear)
+    Aug,    // [0, 4, 8] — augmented (unease/wonder)
 }
 
 impl ChordType {
@@ -286,7 +294,10 @@ impl ChordType {
 
     /// Convert to frequency ratios relative to root.
     pub fn ratios(&self) -> Vec<f32> {
-        self.semitones().iter().map(|&s| 2.0f32.powf(s as f32 / 12.0)).collect()
+        self.semitones()
+            .iter()
+            .map(|&s| 2.0f32.powf(s as f32 / 12.0))
+            .collect()
     }
 }
 
@@ -302,29 +313,73 @@ pub struct ProgressionChord {
 pub fn pop_progression() -> Vec<ProgressionChord> {
     // I - V - vi - IV (C - G - Am - F)
     vec![
-        ProgressionChord { root_semitones: 0, chord_type: ChordType::Major, duration_beats: 4.0 },
-        ProgressionChord { root_semitones: 7, chord_type: ChordType::Major, duration_beats: 4.0 },
-        ProgressionChord { root_semitones: 9, chord_type: ChordType::Minor, duration_beats: 4.0 },
-        ProgressionChord { root_semitones: 5, chord_type: ChordType::Major, duration_beats: 4.0 },
+        ProgressionChord {
+            root_semitones: 0,
+            chord_type: ChordType::Major,
+            duration_beats: 4.0,
+        },
+        ProgressionChord {
+            root_semitones: 7,
+            chord_type: ChordType::Major,
+            duration_beats: 4.0,
+        },
+        ProgressionChord {
+            root_semitones: 9,
+            chord_type: ChordType::Minor,
+            duration_beats: 4.0,
+        },
+        ProgressionChord {
+            root_semitones: 5,
+            chord_type: ChordType::Major,
+            duration_beats: 4.0,
+        },
     ]
 }
 
 pub fn jazz_progression() -> Vec<ProgressionChord> {
     // ii7 - V7 - Imaj7
     vec![
-        ProgressionChord { root_semitones: 2, chord_type: ChordType::Minor7, duration_beats: 4.0 },
-        ProgressionChord { root_semitones: 7, chord_type: ChordType::Dom7, duration_beats: 4.0 },
-        ProgressionChord { root_semitones: 0, chord_type: ChordType::Major7, duration_beats: 8.0 },
+        ProgressionChord {
+            root_semitones: 2,
+            chord_type: ChordType::Minor7,
+            duration_beats: 4.0,
+        },
+        ProgressionChord {
+            root_semitones: 7,
+            chord_type: ChordType::Dom7,
+            duration_beats: 4.0,
+        },
+        ProgressionChord {
+            root_semitones: 0,
+            chord_type: ChordType::Major7,
+            duration_beats: 8.0,
+        },
     ]
 }
 
 pub fn ambient_progression() -> Vec<ProgressionChord> {
     // Isus2 - IVsus2 - visus2 - Vsus4
     vec![
-        ProgressionChord { root_semitones: 0, chord_type: ChordType::Sus2, duration_beats: 8.0 },
-        ProgressionChord { root_semitones: 5, chord_type: ChordType::Sus2, duration_beats: 8.0 },
-        ProgressionChord { root_semitones: 9, chord_type: ChordType::Sus2, duration_beats: 8.0 },
-        ProgressionChord { root_semitones: 7, chord_type: ChordType::Sus4, duration_beats: 8.0 },
+        ProgressionChord {
+            root_semitones: 0,
+            chord_type: ChordType::Sus2,
+            duration_beats: 8.0,
+        },
+        ProgressionChord {
+            root_semitones: 5,
+            chord_type: ChordType::Sus2,
+            duration_beats: 8.0,
+        },
+        ProgressionChord {
+            root_semitones: 9,
+            chord_type: ChordType::Sus2,
+            duration_beats: 8.0,
+        },
+        ProgressionChord {
+            root_semitones: 7,
+            chord_type: ChordType::Sus4,
+            duration_beats: 8.0,
+        },
     ]
 }
 
@@ -332,10 +387,26 @@ pub fn ambient_progression() -> Vec<ProgressionChord> {
 pub fn minor_progression() -> Vec<ProgressionChord> {
     // i - iv - v - i (natural minor, no leading tone → unresolved)
     vec![
-        ProgressionChord { root_semitones: 0, chord_type: ChordType::Minor, duration_beats: 4.0 },
-        ProgressionChord { root_semitones: 5, chord_type: ChordType::Minor, duration_beats: 4.0 },
-        ProgressionChord { root_semitones: 7, chord_type: ChordType::Minor, duration_beats: 4.0 },
-        ProgressionChord { root_semitones: 0, chord_type: ChordType::Minor, duration_beats: 4.0 },
+        ProgressionChord {
+            root_semitones: 0,
+            chord_type: ChordType::Minor,
+            duration_beats: 4.0,
+        },
+        ProgressionChord {
+            root_semitones: 5,
+            chord_type: ChordType::Minor,
+            duration_beats: 4.0,
+        },
+        ProgressionChord {
+            root_semitones: 7,
+            chord_type: ChordType::Minor,
+            duration_beats: 4.0,
+        },
+        ProgressionChord {
+            root_semitones: 0,
+            chord_type: ChordType::Minor,
+            duration_beats: 4.0,
+        },
     ]
 }
 
@@ -343,10 +414,26 @@ pub fn minor_progression() -> Vec<ProgressionChord> {
 pub fn tension_progression() -> Vec<ProgressionChord> {
     // i - bII - vii° - i (Phrygian approach + diminished = maximum tension)
     vec![
-        ProgressionChord { root_semitones: 0, chord_type: ChordType::Minor, duration_beats: 4.0 },
-        ProgressionChord { root_semitones: 1, chord_type: ChordType::Major, duration_beats: 2.0 },
-        ProgressionChord { root_semitones: 11, chord_type: ChordType::Dim, duration_beats: 2.0 },
-        ProgressionChord { root_semitones: 0, chord_type: ChordType::Minor, duration_beats: 4.0 },
+        ProgressionChord {
+            root_semitones: 0,
+            chord_type: ChordType::Minor,
+            duration_beats: 4.0,
+        },
+        ProgressionChord {
+            root_semitones: 1,
+            chord_type: ChordType::Major,
+            duration_beats: 2.0,
+        },
+        ProgressionChord {
+            root_semitones: 11,
+            chord_type: ChordType::Dim,
+            duration_beats: 2.0,
+        },
+        ProgressionChord {
+            root_semitones: 0,
+            chord_type: ChordType::Minor,
+            duration_beats: 4.0,
+        },
     ]
 }
 
@@ -381,9 +468,14 @@ mod tests {
     #[test]
     fn piano_partials_decay() {
         for i in 1..16 {
-            assert!(PIANO_FF[i] < PIANO_FF[i - 1] || (PIANO_FF[i] - PIANO_FF[i-1]).abs() < 0.01,
+            assert!(
+                PIANO_FF[i] < PIANO_FF[i - 1] || (PIANO_FF[i] - PIANO_FF[i - 1]).abs() < 0.01,
                 "piano ff partials should generally decay: [{}]={}, [{}]={}",
-                i-1, PIANO_FF[i-1], i, PIANO_FF[i]);
+                i - 1,
+                PIANO_FF[i - 1],
+                i,
+                PIANO_FF[i]
+            );
         }
     }
 
@@ -394,7 +486,9 @@ mod tests {
         let mut has_signal = false;
         for _ in 0..4410 {
             let s = ks.tick();
-            if s.abs() > 0.01 { has_signal = true; }
+            if s.abs() > 0.01 {
+                has_signal = true;
+            }
         }
         assert!(has_signal, "KS should produce sound");
     }
@@ -404,21 +498,39 @@ mod tests {
         let mut ks = KarplusStrong::new(440.0, 44100, 0.990, 0.5); // faster decay
         ks.excite(0.8);
         // Early RMS
-        let early: f32 = (0..1000).map(|_| { let s = ks.tick(); s * s }).sum::<f32>() / 1000.0;
+        let early: f32 = (0..1000)
+            .map(|_| {
+                let s = ks.tick();
+                s * s
+            })
+            .sum::<f32>()
+            / 1000.0;
         // Skip ahead
-        for _ in 0..20000 { ks.tick(); }
-        let late: f32 = (0..1000).map(|_| { let s = ks.tick(); s * s }).sum::<f32>() / 1000.0;
-        assert!(late < early, "KS should decay: early={early:.6}, late={late:.6}");
+        for _ in 0..20000 {
+            ks.tick();
+        }
+        let late: f32 = (0..1000)
+            .map(|_| {
+                let s = ks.tick();
+                s * s
+            })
+            .sum::<f32>()
+            / 1000.0;
+        assert!(
+            late < early,
+            "KS should decay: early={early:.6}, late={late:.6}"
+        );
     }
 
     #[test]
     fn fm_electric_piano_sounds() {
         let buf = render_fm_instrument(Instrument::ElectricPiano, 261.63, 0.8, 1.0, 44100);
         assert!(buf.len() > 44100); // note + release
-        // Should have signal
+                                    // Should have signal
         assert!(buf.iter().any(|&s| s.abs() > 0.1));
         // Should decay
-        let late_rms: f32 = (buf[buf.len()-1000..].iter().map(|s| s*s).sum::<f32>() / 1000.0).sqrt();
+        let late_rms: f32 =
+            (buf[buf.len() - 1000..].iter().map(|s| s * s).sum::<f32>() / 1000.0).sqrt();
         assert!(late_rms < 0.3, "FM should decay: late_rms={late_rms}");
     }
 
@@ -427,7 +539,7 @@ mod tests {
         let buf = render_fm_instrument(Instrument::Bell, 440.0, 0.7, 2.0, 44100);
         assert!(!buf.is_empty());
         // Bell should ring long (slow decay)
-        let mid_rms: f32 = (buf[44100..45100].iter().map(|s| s*s).sum::<f32>() / 1000.0).sqrt();
+        let mid_rms: f32 = (buf[44100..45100].iter().map(|s| s * s).sum::<f32>() / 1000.0).sqrt();
         assert!(mid_rms > 0.01, "bell should still ring at 1s: {mid_rms}");
     }
 
@@ -443,12 +555,15 @@ mod tests {
     #[test]
     fn instrument_selection_varies() {
         let calm = MusicalState {
-            consciousness_level: 0.2, arousal: 0.1,
+            consciousness_level: 0.2,
+            arousal: 0.1,
             harmony_activations: [0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.8],
             ..Default::default()
         };
         let excited = MusicalState {
-            consciousness_level: 0.8, arousal: 0.8, dopamine: 0.9,
+            consciousness_level: 0.8,
+            arousal: 0.8,
+            dopamine: 0.9,
             ..Default::default()
         };
         assert_ne!(select_instrument(&calm), select_instrument(&excited));
@@ -457,30 +572,44 @@ mod tests {
     #[test]
     fn progression_selection_varies() {
         let ambient = MusicalState {
-            consciousness_level: 0.2, arousal: 0.1,
+            consciousness_level: 0.2,
+            arousal: 0.1,
             harmony_activations: [0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.8],
             ..Default::default()
         };
         let jazz = MusicalState {
-            consciousness_level: 0.8, dopamine: 0.8,
+            consciousness_level: 0.8,
+            dopamine: 0.8,
             ..Default::default()
         };
         let p_amb = select_progression(&ambient);
         let p_jazz = select_progression(&jazz);
-        assert_ne!(p_amb.len(), p_jazz.len(), "different states should select different progressions");
+        assert_ne!(
+            p_amb.len(),
+            p_jazz.len(),
+            "different states should select different progressions"
+        );
     }
 
     #[test]
     fn all_instruments_have_partials() {
         let instruments = [
-            Instrument::Piano, Instrument::PianoPP, Instrument::Violin,
-            Instrument::Cello, Instrument::Flute, Instrument::Organ,
+            Instrument::Piano,
+            Instrument::PianoPP,
+            Instrument::Violin,
+            Instrument::Cello,
+            Instrument::Flute,
+            Instrument::Organ,
             Instrument::Pad,
         ];
         for inst in &instruments {
             let p = inst.partials();
             assert_eq!(p.len(), 16);
-            assert!((p[0] - 1.0).abs() < 0.01, "{:?} fundamental should be 1.0", inst);
+            assert!(
+                (p[0] - 1.0).abs() < 0.01,
+                "{:?} fundamental should be 1.0",
+                inst
+            );
         }
     }
 }

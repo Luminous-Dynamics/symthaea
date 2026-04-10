@@ -56,13 +56,22 @@ fn inputs() -> Vec<&'static str> {
 
 fn pearson(x: &[f64], y: &[f64]) -> f64 {
     let n = x.len() as f64;
-    if n < 3.0 { return 0.0; }
+    if n < 3.0 {
+        return 0.0;
+    }
     let mx = x.iter().sum::<f64>() / n;
     let my = y.iter().sum::<f64>() / n;
-    let cov: f64 = x.iter().zip(y).map(|(a, b)| (a - mx) * (b - my)).sum::<f64>() / n;
+    let cov: f64 = x
+        .iter()
+        .zip(y)
+        .map(|(a, b)| (a - mx) * (b - my))
+        .sum::<f64>()
+        / n;
     let sx = (x.iter().map(|a| (a - mx).powi(2)).sum::<f64>() / n).sqrt();
     let sy = (y.iter().map(|b| (b - my).powi(2)).sum::<f64>() / n).sqrt();
-    if sx < 1e-15 || sy < 1e-15 { return 0.0; }
+    if sx < 1e-15 || sy < 1e-15 {
+        return 0.0;
+    }
     cov / (sx * sy)
 }
 
@@ -98,13 +107,29 @@ fn test_c1_phi_differs_conscious_vs_zombie() {
         }
     }
 
-    let c_mean = if conscious_phi.is_empty() { 0.0 } else { conscious_phi.iter().sum::<f64>() / conscious_phi.len() as f64 };
-    let z_mean = if zombie_phi.is_empty() { 0.0 } else { zombie_phi.iter().sum::<f64>() / zombie_phi.len() as f64 };
+    let c_mean = if conscious_phi.is_empty() {
+        0.0
+    } else {
+        conscious_phi.iter().sum::<f64>() / conscious_phi.len() as f64
+    };
+    let z_mean = if zombie_phi.is_empty() {
+        0.0
+    } else {
+        zombie_phi.iter().sum::<f64>() / zombie_phi.len() as f64
+    };
     let phi_diff = (c_mean - z_mean).abs();
 
     eprintln!("\n═══ C1: CONSCIOUS vs ZOMBIE — REAL PHI ═══");
-    eprintln!("  Conscious: {}/{} cycles with Phi, mean={c_mean:.4}", conscious_phi.len(), 60);
-    eprintln!("  Zombie:    {}/{} cycles with Phi, mean={z_mean:.4}", zombie_phi.len(), 60);
+    eprintln!(
+        "  Conscious: {}/{} cycles with Phi, mean={c_mean:.4}",
+        conscious_phi.len(),
+        60
+    );
+    eprintln!(
+        "  Zombie:    {}/{} cycles with Phi, mean={z_mean:.4}",
+        zombie_phi.len(),
+        60
+    );
     eprintln!("  Phi difference: {phi_diff:.4}");
     if phi_diff > 0.1 {
         eprintln!("  VERDICT: Consciousness components CHANGE integrated information.");
@@ -114,8 +139,12 @@ fn test_c1_phi_differs_conscious_vs_zombie() {
     eprintln!("═══════════════════════════════════════════\n");
 
     // Both should produce finite values
-    for &p in &conscious_phi { assert!(p.is_finite()); }
-    for &p in &zombie_phi { assert!(p.is_finite()); }
+    for &p in &conscious_phi {
+        assert!(p.is_finite());
+    }
+    for &p in &zombie_phi {
+        assert!(p.is_finite());
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -232,30 +261,46 @@ fn test_c3_dose_response() {
             phi_tau_sum += r.metadata.phi_tau_factor as f64;
         }
 
-        let phi_mean = if phi_count > 0 { phi_sum / phi_count as f64 } else { 0.0 };
+        let phi_mean = if phi_count > 0 {
+            phi_sum / phi_count as f64
+        } else {
+            0.0
+        };
         let error_mean = error_sum / total as f64;
         let proxy_mean = proxy_sum / total as f64;
         let phi_tau_mean = phi_tau_sum / total as f64;
 
-        dose_results.push((*label, phi_mean, error_mean, proxy_mean, phi_count, phi_tau_mean));
+        dose_results.push((
+            *label,
+            phi_mean,
+            error_mean,
+            proxy_mean,
+            phi_count,
+            phi_tau_mean,
+        ));
     }
 
     eprintln!("\n═══ C3: DOSE-RESPONSE (500 cycles) ═══");
-    eprintln!("  {:10} | {:>8} | {:>8} | {:>8} | {:>8} | Phi cycles", "Dose", "Phi", "Error", "Proxy", "PhiTau");
+    eprintln!(
+        "  {:10} | {:>8} | {:>8} | {:>8} | {:>8} | Phi cycles",
+        "Dose", "Phi", "Error", "Proxy", "PhiTau"
+    );
     for (label, phi, error, proxy, count, phi_tau) in &dose_results {
-        eprintln!("  {label:10} | {phi:8.3} | {error:8.4} | {proxy:8.4} | {phi_tau:8.4} | {count}/500");
+        eprintln!(
+            "  {label:10} | {phi:8.3} | {error:8.4} | {proxy:8.4} | {phi_tau:8.4} | {count}/500"
+        );
     }
 
     // Check monotonicity: full > partial > minimal for Phi
-    let phi_monotonic = dose_results[0].1 >= dose_results[1].1
-        && dose_results[1].1 >= dose_results[2].1;
+    let phi_monotonic =
+        dose_results[0].1 >= dose_results[1].1 && dose_results[1].1 >= dose_results[2].1;
     // Check monotonicity: full < partial < minimal for error (lower is better)
-    let error_monotonic = dose_results[0].2 <= dose_results[1].2
-        && dose_results[1].2 <= dose_results[2].2;
+    let error_monotonic =
+        dose_results[0].2 <= dose_results[1].2 && dose_results[1].2 <= dose_results[2].2;
 
     // Check monotonicity: full > partial > minimal for phi_tau (feedback active)
-    let phi_tau_monotonic = dose_results[0].5 >= dose_results[1].5
-        && dose_results[1].5 >= dose_results[2].5;
+    let phi_tau_monotonic =
+        dose_results[0].5 >= dose_results[1].5 && dose_results[1].5 >= dose_results[2].5;
 
     if phi_monotonic {
         eprintln!("  Phi is dose-monotonic: more consciousness → more integration.");
@@ -313,15 +358,37 @@ fn test_c4_cross_validated_prediction() {
     // Fit on train
     let phi_mean_train = train_phi.iter().sum::<f64>() / train_phi.len() as f64;
     let err_mean_train = train_error.iter().sum::<f64>() / train_error.len() as f64;
-    let phi_var_train = train_phi.iter().map(|p| (p - phi_mean_train).powi(2)).sum::<f64>() / train_phi.len() as f64;
-    let cov_train = train_phi.iter().zip(train_error).map(|(p, e)| (p - phi_mean_train) * (e - err_mean_train)).sum::<f64>() / train_phi.len() as f64;
-    let b = if phi_var_train > 1e-15 { cov_train / phi_var_train } else { 0.0 };
+    let phi_var_train = train_phi
+        .iter()
+        .map(|p| (p - phi_mean_train).powi(2))
+        .sum::<f64>()
+        / train_phi.len() as f64;
+    let cov_train = train_phi
+        .iter()
+        .zip(train_error)
+        .map(|(p, e)| (p - phi_mean_train) * (e - err_mean_train))
+        .sum::<f64>()
+        / train_phi.len() as f64;
+    let b = if phi_var_train > 1e-15 {
+        cov_train / phi_var_train
+    } else {
+        0.0
+    };
     let a = err_mean_train - b * phi_mean_train;
 
     // Predict on test
     let predictions: Vec<f64> = test_phi.iter().map(|p| a + b * p).collect();
-    let test_mse: f64 = predictions.iter().zip(test_error).map(|(pred, actual)| (pred - actual).powi(2)).sum::<f64>() / test_error.len() as f64;
-    let baseline_mse: f64 = test_error.iter().map(|e| (e - err_mean_train).powi(2)).sum::<f64>() / test_error.len() as f64;
+    let test_mse: f64 = predictions
+        .iter()
+        .zip(test_error)
+        .map(|(pred, actual)| (pred - actual).powi(2))
+        .sum::<f64>()
+        / test_error.len() as f64;
+    let baseline_mse: f64 = test_error
+        .iter()
+        .map(|e| (e - err_mean_train).powi(2))
+        .sum::<f64>()
+        / test_error.len() as f64;
 
     let r_squared_oos = 1.0 - test_mse / baseline_mse.max(1e-15);
 
@@ -372,7 +439,11 @@ fn test_c5_multi_seed_phi_correlation() {
 
         let r_proxy = pearson(&phi_vals, &proxy_vals);
         let r_error = pearson(&phi_vals, &error_vals);
-        let phi_mean = if phi_vals.is_empty() { 0.0 } else { phi_vals.iter().sum::<f64>() / phi_vals.len() as f64 };
+        let phi_mean = if phi_vals.is_empty() {
+            0.0
+        } else {
+            phi_vals.iter().sum::<f64>() / phi_vals.len() as f64
+        };
 
         seed_results.push((*seed, phi_mean, r_proxy, r_error, phi_vals.len()));
     }
@@ -384,7 +455,12 @@ fn test_c5_multi_seed_phi_correlation() {
 
     let r_proxy_values: Vec<f64> = seed_results.iter().map(|s| s.2).collect();
     let r_proxy_mean = r_proxy_values.iter().sum::<f64>() / r_proxy_values.len() as f64;
-    let r_proxy_std = (r_proxy_values.iter().map(|r| (r - r_proxy_mean).powi(2)).sum::<f64>() / r_proxy_values.len() as f64).sqrt();
+    let r_proxy_std = (r_proxy_values
+        .iter()
+        .map(|r| (r - r_proxy_mean).powi(2))
+        .sum::<f64>()
+        / r_proxy_values.len() as f64)
+        .sqrt();
 
     eprintln!("\n═══ C5: MULTI-SEED PHI CORRELATION ═══");
     for (seed, phi_mean, r_proxy, r_error, count) in &seed_results {

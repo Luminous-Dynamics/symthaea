@@ -98,12 +98,9 @@ impl MuseStream {
     pub fn next_note(&mut self) -> Option<Note> {
         if self.note_queue.is_empty() {
             // Generate a batch of notes
-            let notes = self.neural.generate(
-                &self.config,
-                &self.state,
-                &self.scale,
-                self.beat_duration,
-            );
+            let notes =
+                self.neural
+                    .generate(&self.config, &self.state, &self.scale, self.beat_duration);
 
             // Push ALL generated notes to the queue
             for note in notes {
@@ -203,7 +200,10 @@ mod tests {
     fn time_advances() {
         let mut stream = MuseStream::new(43, default_config());
         let _ = stream.next_note();
-        assert!(stream.time_cursor() > 0.0, "time should advance after a note");
+        assert!(
+            stream.time_cursor() > 0.0,
+            "time should advance after a note"
+        );
     }
 
     #[test]

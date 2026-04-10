@@ -89,9 +89,22 @@ fn estimate_complexity(text: &str) -> f32 {
 
     // Presence of hedging/nuance words increases complexity
     let nuance_words = [
-        "but", "however", "although", "unless", "except", "sometimes",
-        "depends", "context", "nuance", "complex", "difficult", "dilemma",
-        "conflict", "tension", "balance", "tradeoff",
+        "but",
+        "however",
+        "although",
+        "unless",
+        "except",
+        "sometimes",
+        "depends",
+        "context",
+        "nuance",
+        "complex",
+        "difficult",
+        "dilemma",
+        "conflict",
+        "tension",
+        "balance",
+        "tradeoff",
     ];
     let nuance_count = text
         .to_lowercase()
@@ -108,14 +121,48 @@ fn estimate_polarity(text: &str) -> f32 {
     let lower = text.to_lowercase();
 
     let positive_words = [
-        "good", "right", "kind", "help", "fair", "honest", "compassion",
-        "generous", "respect", "care", "love", "protect", "support", "virtue",
-        "duty", "justice", "responsible", "ethical", "moral", "noble",
+        "good",
+        "right",
+        "kind",
+        "help",
+        "fair",
+        "honest",
+        "compassion",
+        "generous",
+        "respect",
+        "care",
+        "love",
+        "protect",
+        "support",
+        "virtue",
+        "duty",
+        "justice",
+        "responsible",
+        "ethical",
+        "moral",
+        "noble",
     ];
     let negative_words = [
-        "wrong", "bad", "harm", "steal", "lie", "cheat", "cruel", "selfish",
-        "unfair", "dishonest", "hurt", "abuse", "neglect", "exploit", "corrupt",
-        "immoral", "unethical", "evil", "violence", "deceive",
+        "wrong",
+        "bad",
+        "harm",
+        "steal",
+        "lie",
+        "cheat",
+        "cruel",
+        "selfish",
+        "unfair",
+        "dishonest",
+        "hurt",
+        "abuse",
+        "neglect",
+        "exploit",
+        "corrupt",
+        "immoral",
+        "unethical",
+        "evil",
+        "violence",
+        "deceive",
     ];
 
     let pos_count = positive_words
@@ -209,13 +256,12 @@ fn load_moral_choice(path: &std::path::Path) -> Vec<MoralExample> {
     };
     let items: Vec<serde_json::Value> = match serde_json::from_str::<serde_json::Value>(&data) {
         Ok(serde_json::Value::Array(arr)) => arr,
-        Ok(serde_json::Value::Object(obj)) => {
-            obj.get("examples")
-                .or_else(|| obj.get("data"))
-                .and_then(|e| e.as_array())
-                .cloned()
-                .unwrap_or_default()
-        }
+        Ok(serde_json::Value::Object(obj)) => obj
+            .get("examples")
+            .or_else(|| obj.get("data"))
+            .and_then(|e| e.as_array())
+            .cloned()
+            .unwrap_or_default(),
         Ok(_) => Vec::new(),
         Err(e) => {
             eprintln!("Warning: could not parse {}: {}", path.display(), e);
@@ -282,13 +328,12 @@ fn load_social_chemistry(path: &std::path::Path) -> Vec<MoralExample> {
     };
     let items: Vec<serde_json::Value> = match serde_json::from_str::<serde_json::Value>(&data) {
         Ok(serde_json::Value::Array(arr)) => arr,
-        Ok(serde_json::Value::Object(obj)) => {
-            obj.get("examples")
-                .or_else(|| obj.get("data"))
-                .and_then(|e| e.as_array())
-                .cloned()
-                .unwrap_or_default()
-        }
+        Ok(serde_json::Value::Object(obj)) => obj
+            .get("examples")
+            .or_else(|| obj.get("data"))
+            .and_then(|e| e.as_array())
+            .cloned()
+            .unwrap_or_default(),
         Ok(_) => Vec::new(),
         Err(e) => {
             eprintln!("Warning: could not parse {}: {}", path.display(), e);
@@ -306,14 +351,8 @@ fn load_social_chemistry(path: &std::path::Path) -> Vec<MoralExample> {
             .and_then(|v| v.as_str())
             .unwrap_or("");
 
-        let action = item
-            .get("action")
-            .and_then(|v| v.as_str())
-            .unwrap_or("");
-        let situation = item
-            .get("situation")
-            .and_then(|v| v.as_str())
-            .unwrap_or("");
+        let action = item.get("action").and_then(|v| v.as_str()).unwrap_or("");
+        let situation = item.get("situation").and_then(|v| v.as_str()).unwrap_or("");
 
         let text = if !situation.is_empty() && !rot.is_empty() {
             format!("{situation} -- {rot}")
@@ -363,13 +402,12 @@ fn load_moral_stories(path: &std::path::Path) -> Vec<MoralExample> {
     };
     let items: Vec<serde_json::Value> = match serde_json::from_str::<serde_json::Value>(&data) {
         Ok(serde_json::Value::Array(arr)) => arr,
-        Ok(serde_json::Value::Object(obj)) => {
-            obj.get("examples")
-                .or_else(|| obj.get("data"))
-                .and_then(|e| e.as_array())
-                .cloned()
-                .unwrap_or_default()
-        }
+        Ok(serde_json::Value::Object(obj)) => obj
+            .get("examples")
+            .or_else(|| obj.get("data"))
+            .and_then(|e| e.as_array())
+            .cloned()
+            .unwrap_or_default(),
         Ok(_) => Vec::new(),
         Err(e) => {
             eprintln!("Warning: could not parse {}: {}", path.display(), e);
@@ -379,14 +417,8 @@ fn load_moral_stories(path: &std::path::Path) -> Vec<MoralExample> {
 
     let mut examples = Vec::new();
     for item in items.iter().take(MAX_PER_DATASET) {
-        let norm = item
-            .get("norm")
-            .and_then(|v| v.as_str())
-            .unwrap_or("");
-        let situation = item
-            .get("situation")
-            .and_then(|v| v.as_str())
-            .unwrap_or("");
+        let norm = item.get("norm").and_then(|v| v.as_str()).unwrap_or("");
+        let situation = item.get("situation").and_then(|v| v.as_str()).unwrap_or("");
         let moral_action = item
             .get("moral_action")
             .or_else(|| item.get("moral"))
@@ -466,8 +498,8 @@ fn derive_cube(example: &MoralExample, rng: &mut Rng) -> (u8, u8, u8, f32, f32) 
 
     // Quality: derived from e_tier and complexity
     let jitter_q = (rng.next_f32() - 0.5) * 0.1;
-    let quality = ((e_tier as f32 / 4.0) * 0.5 + example.complexity * 0.3 + 0.2 + jitter_q)
-        .clamp(0.2, 0.95);
+    let quality =
+        ((e_tier as f32 / 4.0) * 0.5 + example.complexity * 0.3 + 0.2 + jitter_q).clamp(0.2, 0.95);
 
     (e_tier, n_tier, m_tier, h_value, quality)
 }
@@ -476,14 +508,7 @@ fn derive_cube(example: &MoralExample, rng: &mut Rng) -> (u8, u8, u8, f32, f32) 
 // Channel construction
 // ============================================================================
 
-fn build_channels(
-    e: u8,
-    n: u8,
-    m: u8,
-    h: f32,
-    quality: f32,
-    polarity: f32,
-) -> ThoughtChannels {
+fn build_channels(e: u8, n: u8, m: u8, h: f32, quality: f32, polarity: f32) -> ThoughtChannels {
     let mut ch = ThoughtChannels::default();
 
     // [0..8] Intent one-hot: idx 5 = "evaluate" (moral evaluation intent)
@@ -495,18 +520,10 @@ fn build_channels(
     ch.set_epistemic(e as f32 / 4.0);
 
     // [9..12] Emotion: valence from moral polarity, arousal=0.5, warmth=0.5
-    ch.set_emotion(
-        polarity.clamp(-1.0, 1.0),
-        0.5,
-        0.5,
-    );
+    ch.set_emotion(polarity.clamp(-1.0, 1.0), 0.5, 0.5);
 
     // [12..15] Consciousness: moderate psi, meta-awareness from H, coherence from H
-    ch.set_consciousness(
-        (0.4 + h * 0.4).clamp(0.0, 1.0),
-        h * 0.8,
-        h,
-    );
+    ch.set_consciousness((0.4 + h * 0.4).clamp(0.0, 1.0), h * 0.8, h);
 
     // [17] Mood temperature: neutral-warm for moral reasoning
     ch.channels[17] = 0.85;
@@ -559,7 +576,10 @@ fn main() {
     eprintln!("  moral_choice.json: {} examples", moral_choice.len());
 
     let social_chem = load_social_chemistry(&data_root.join("social_chemistry_292k.json"));
-    eprintln!("  social_chemistry_292k.json: {} examples", social_chem.len());
+    eprintln!(
+        "  social_chemistry_292k.json: {} examples",
+        social_chem.len()
+    );
 
     let moral_stories = load_moral_stories(&data_root.join("moral_stories.json"));
     eprintln!("  moral_stories.json: {} examples", moral_stories.len());
@@ -626,7 +646,11 @@ fn main() {
             serde_json::to_writer(&mut f, pair).expect("serialize");
             writeln!(f).expect("newline");
         }
-        eprintln!("\nWrote {} training pairs to {}", train.len(), path.display());
+        eprintln!(
+            "\nWrote {} training pairs to {}",
+            train.len(),
+            path.display()
+        );
     }
 
     // Write eval set
@@ -671,14 +695,8 @@ fn main() {
     eprintln!("  E-tier: {:?}", e_counts);
     eprintln!("  N-tier: {:?}", n_counts);
     eprintln!("  M-tier: {:?}", m_counts);
-    eprintln!(
-        "  H-value mean: {:.3}",
-        h_sum / total as f32,
-    );
-    eprintln!(
-        "  Quality mean: {:.3}",
-        q_sum / total as f32,
-    );
+    eprintln!("  H-value mean: {:.3}", h_sum / total as f32,);
+    eprintln!("  Quality mean: {:.3}", q_sum / total as f32,);
     eprintln!(
         "\nTotal: {} pairs ({} channels each), 80/20 split",
         total, NUM_CHANNELS,

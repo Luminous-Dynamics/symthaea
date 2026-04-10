@@ -278,16 +278,17 @@ mod tests {
         let betti = complex.betti_numbers();
 
         assert_eq!(betti[0], 1, "Should have 1 connected component");
-        assert_eq!(betti[1], 1, "Cycle should have beta_1 = 1 (one independent loop)");
+        assert_eq!(
+            betti[1], 1,
+            "Cycle should have beta_1 = 1 (one independent loop)"
+        );
         assert_eq!(betti[2], 0, "No triangles -> beta_2 = 0");
     }
 
     #[test]
     fn test_bridge_produces_valid_bounded_outputs() {
         // Random-ish state
-        let state: Vec<f64> = (0..32)
-            .map(|i| ((i as f64) * 0.37).sin())
-            .collect();
+        let state: Vec<f64> = (0..32).map(|i| ((i as f64) * 0.37).sin()).collect();
 
         let result = compute_topological_consciousness(&state, None);
 

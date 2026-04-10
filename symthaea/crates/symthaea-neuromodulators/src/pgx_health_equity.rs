@@ -390,10 +390,10 @@ impl PgxHealthEquityEngine {
             gene: "CYP2D6".into(),
             allele: "*4".into(),
             frequencies: HashMap::from([
-                (AncestryGroup::European, 0.19),    // AMP: 18.5%, TOPMed: 13.8%
-                (AncestryGroup::African, 0.04),     // AMP: 3-5%, TOPMed: 3.6%
-                (AncestryGroup::EastAsian, 0.01),   // AMP: 0.5-9.1%
-                (AncestryGroup::SouthAsian, 0.12),  // Literature range 9-12%
+                (AncestryGroup::European, 0.19),   // AMP: 18.5%, TOPMed: 13.8%
+                (AncestryGroup::African, 0.04),    // AMP: 3-5%, TOPMed: 3.6%
+                (AncestryGroup::EastAsian, 0.01),  // AMP: 0.5-9.1%
+                (AncestryGroup::SouthAsian, 0.12), // Literature range 9-12%
                 (AncestryGroup::NativeAmerican, 0.08),
                 (AncestryGroup::Mixed, 0.10),
             ]),
@@ -405,10 +405,10 @@ impl PgxHealthEquityEngine {
             gene: "CYP2D6".into(),
             allele: "*10".into(),
             frequencies: HashMap::from([
-                (AncestryGroup::European, 0.02),    // AMP: <2%, TOPMed: 1.6%
-                (AncestryGroup::African, 0.05),     // AMP: 4-6%, TOPMed: 3.8%
-                (AncestryGroup::EastAsian, 0.43),   // AMP: 9-44%, Korean 46.2%
-                (AncestryGroup::SouthAsian, 0.20),  // Gaedigk 2017: ~20%
+                (AncestryGroup::European, 0.02),   // AMP: <2%, TOPMed: 1.6%
+                (AncestryGroup::African, 0.05),    // AMP: 4-6%, TOPMed: 3.8%
+                (AncestryGroup::EastAsian, 0.43),  // AMP: 9-44%, Korean 46.2%
+                (AncestryGroup::SouthAsian, 0.20), // Gaedigk 2017: ~20%
                 (AncestryGroup::NativeAmerican, 0.05),
                 (AncestryGroup::Mixed, 0.10),
             ]),
@@ -420,10 +420,10 @@ impl PgxHealthEquityEngine {
             gene: "CYP2D6".into(),
             allele: "*17".into(),
             frequencies: HashMap::from([
-                (AncestryGroup::European, 0.00),    // AMP: <0.5%, TOPMed: 0.16%
-                (AncestryGroup::African, 0.19),     // AMP: 17-19%, TOPMed: 15.7%
-                (AncestryGroup::EastAsian, 0.00),   // <0.5%
-                (AncestryGroup::SouthAsian, 0.02),  // ~0.07% (very rare outside Africa)
+                (AncestryGroup::European, 0.00),   // AMP: <0.5%, TOPMed: 0.16%
+                (AncestryGroup::African, 0.19),    // AMP: 17-19%, TOPMed: 15.7%
+                (AncestryGroup::EastAsian, 0.00),  // <0.5%
+                (AncestryGroup::SouthAsian, 0.02), // ~0.07% (very rare outside Africa)
                 (AncestryGroup::NativeAmerican, 0.01),
                 (AncestryGroup::Mixed, 0.05),
             ]),
@@ -435,10 +435,10 @@ impl PgxHealthEquityEngine {
             gene: "CYP2D6".into(),
             allele: "*41".into(),
             frequencies: HashMap::from([
-                (AncestryGroup::European, 0.09),    // AMP: 9%, TOPMed: 9.8%
-                (AncestryGroup::African, 0.04),     // AMP: 4-11.5%, TOPMed: 2.4%
-                (AncestryGroup::EastAsian, 0.02),   // Korean: 1.4%, range 2-4%
-                (AncestryGroup::SouthAsian, 0.07),  // Indian studies: 10-20%
+                (AncestryGroup::European, 0.09),   // AMP: 9%, TOPMed: 9.8%
+                (AncestryGroup::African, 0.04),    // AMP: 4-11.5%, TOPMed: 2.4%
+                (AncestryGroup::EastAsian, 0.02),  // Korean: 1.4%, range 2-4%
+                (AncestryGroup::SouthAsian, 0.07), // Indian studies: 10-20%
                 (AncestryGroup::NativeAmerican, 0.04),
                 (AncestryGroup::Mixed, 0.05),
             ]),
@@ -453,10 +453,10 @@ impl PgxHealthEquityEngine {
             gene: "CYP2D6".into(),
             allele: "*1xN".into(),
             frequencies: HashMap::from([
-                (AncestryGroup::European, 0.02),    // Gaedigk 2017: 1.97%
-                (AncestryGroup::African, 0.05),     // Pan-African ~3-5%; NOT 29% (Ethiopia only)
-                (AncestryGroup::EastAsian, 0.01),   // East Asian: 0.8%
-                (AncestryGroup::SouthAsian, 0.04),  // Central/South Asian: 1.5-4%
+                (AncestryGroup::European, 0.02),   // Gaedigk 2017: 1.97%
+                (AncestryGroup::African, 0.05),    // Pan-African ~3-5%; NOT 29% (Ethiopia only)
+                (AncestryGroup::EastAsian, 0.01),  // East Asian: 0.8%
+                (AncestryGroup::SouthAsian, 0.04), // Central/South Asian: 1.5-4%
                 (AncestryGroup::NativeAmerican, 0.02),
                 (AncestryGroup::Mixed, 0.03),
             ]),
@@ -469,10 +469,10 @@ impl PgxHealthEquityEngine {
             gene: "CYP2C19".into(),
             allele: "*2".into(),
             frequencies: HashMap::from([
-                (AncestryGroup::European, 0.15),    // Ionova 2020: 14.6%
-                (AncestryGroup::African, 0.18),     // Ionova 2020: 17.5%
-                (AncestryGroup::EastAsian, 0.29),   // Ionova 2020: 28.4%
-                (AncestryGroup::SouthAsian, 0.32),  // Ionova 2020: 31.8%
+                (AncestryGroup::European, 0.15),   // Ionova 2020: 14.6%
+                (AncestryGroup::African, 0.18),    // Ionova 2020: 17.5%
+                (AncestryGroup::EastAsian, 0.29),  // Ionova 2020: 28.4%
+                (AncestryGroup::SouthAsian, 0.32), // Ionova 2020: 31.8%
                 (AncestryGroup::NativeAmerican, 0.12),
                 (AncestryGroup::Mixed, 0.18),
             ]),
@@ -484,10 +484,10 @@ impl PgxHealthEquityEngine {
             gene: "CYP2C19".into(),
             allele: "*17".into(),
             frequencies: HashMap::from([
-                (AncestryGroup::European, 0.22),    // Ionova 2020: 21.7%
-                (AncestryGroup::African, 0.22),     // Ionova 2020: 22.0%
-                (AncestryGroup::EastAsian, 0.04),   // Ionova 2020: 3.7%
-                (AncestryGroup::SouthAsian, 0.17),  // Ionova 2020: 17.3%
+                (AncestryGroup::European, 0.22),   // Ionova 2020: 21.7%
+                (AncestryGroup::African, 0.22),    // Ionova 2020: 22.0%
+                (AncestryGroup::EastAsian, 0.04),  // Ionova 2020: 3.7%
+                (AncestryGroup::SouthAsian, 0.17), // Ionova 2020: 17.3%
                 (AncestryGroup::NativeAmerican, 0.10),
                 (AncestryGroup::Mixed, 0.15),
             ]),
@@ -501,10 +501,10 @@ impl PgxHealthEquityEngine {
             gene: "CYP2C9".into(),
             allele: "*2".into(),
             frequencies: HashMap::from([
-                (AncestryGroup::European, 0.13),    // 12.7%
-                (AncestryGroup::African, 0.02),     // 2.4% (Sub-Saharan mostly absent)
-                (AncestryGroup::EastAsian, 0.00),   // <1%, effectively absent
-                (AncestryGroup::SouthAsian, 0.05),  // 4.6%
+                (AncestryGroup::European, 0.13),   // 12.7%
+                (AncestryGroup::African, 0.02),    // 2.4% (Sub-Saharan mostly absent)
+                (AncestryGroup::EastAsian, 0.00),  // <1%, effectively absent
+                (AncestryGroup::SouthAsian, 0.05), // 4.6%
                 (AncestryGroup::NativeAmerican, 0.01),
                 (AncestryGroup::Mixed, 0.05),
             ]),
@@ -516,10 +516,10 @@ impl PgxHealthEquityEngine {
             gene: "CYP2C9".into(),
             allele: "*3".into(),
             frequencies: HashMap::from([
-                (AncestryGroup::European, 0.07),    // 6.9%
-                (AncestryGroup::African, 0.01),     // 1.3%
-                (AncestryGroup::EastAsian, 0.04),   // 3.4%
-                (AncestryGroup::SouthAsian, 0.11),  // 11.3% — highest globally
+                (AncestryGroup::European, 0.07),   // 6.9%
+                (AncestryGroup::African, 0.01),    // 1.3%
+                (AncestryGroup::EastAsian, 0.04),  // 3.4%
+                (AncestryGroup::SouthAsian, 0.11), // 11.3% — highest globally
                 (AncestryGroup::NativeAmerican, 0.02),
                 (AncestryGroup::Mixed, 0.04),
             ]),
@@ -532,10 +532,10 @@ impl PgxHealthEquityEngine {
             gene: "CYP3A4".into(),
             allele: "*22".into(),
             frequencies: HashMap::from([
-                (AncestryGroup::European, 0.05),    // gnomAD v4 NFE: 4.7%
-                (AncestryGroup::African, 0.001),    // gnomAD v4 AFR: 0.9% (African-American admixed); continental <0.1%
-                (AncestryGroup::EastAsian, 0.00),   // gnomAD v4 EAS: 0% (absent)
-                (AncestryGroup::SouthAsian, 0.01),  // gnomAD v4 SAS: 0.9% (n=4,810 genomes); was 0.03 (overestimate)
+                (AncestryGroup::European, 0.05),   // gnomAD v4 NFE: 4.7%
+                (AncestryGroup::African, 0.001), // gnomAD v4 AFR: 0.9% (African-American admixed); continental <0.1%
+                (AncestryGroup::EastAsian, 0.00), // gnomAD v4 EAS: 0% (absent)
+                (AncestryGroup::SouthAsian, 0.01), // gnomAD v4 SAS: 0.9% (n=4,810 genomes); was 0.03 (overestimate)
                 (AncestryGroup::NativeAmerican, 0.02),
                 (AncestryGroup::Mixed, 0.02),
             ]),
@@ -571,10 +571,10 @@ impl PgxHealthEquityEngine {
             gene: "CYP2B6".into(),
             allele: "*4".into(),
             frequencies: HashMap::from([
-                (AncestryGroup::European, 0.04),       // PharmGKB: 3-5%
-                (AncestryGroup::African, 0.01),        // Rare in African populations
-                (AncestryGroup::EastAsian, 0.07),      // PharmGKB: 5-9%
-                (AncestryGroup::SouthAsian, 0.05),     // Limited data
+                (AncestryGroup::European, 0.04),   // PharmGKB: 3-5%
+                (AncestryGroup::African, 0.01),    // Rare in African populations
+                (AncestryGroup::EastAsian, 0.07),  // PharmGKB: 5-9%
+                (AncestryGroup::SouthAsian, 0.05), // Limited data
                 (AncestryGroup::NativeAmerican, 0.03),
                 (AncestryGroup::Mixed, 0.04),
             ]),
@@ -589,9 +589,9 @@ impl PgxHealthEquityEngine {
             gene: "CYP2B6".into(),
             allele: "*18".into(),
             frequencies: HashMap::from([
-                (AncestryGroup::European, 0.00),       // Absent
-                (AncestryGroup::African, 0.04),        // 3-5% Sub-Saharan African
-                (AncestryGroup::EastAsian, 0.00),      // Absent
+                (AncestryGroup::European, 0.00),  // Absent
+                (AncestryGroup::African, 0.04),   // 3-5% Sub-Saharan African
+                (AncestryGroup::EastAsian, 0.00), // Absent
                 (AncestryGroup::SouthAsian, 0.00),
                 (AncestryGroup::NativeAmerican, 0.00),
                 (AncestryGroup::Mixed, 0.01),
@@ -610,12 +610,12 @@ impl PgxHealthEquityEngine {
             gene: "CYP3A5".into(),
             allele: "*3".into(),
             frequencies: HashMap::from([
-                (AncestryGroup::European, 0.94),       // PMC3738061: 82-95%; PMC5600063: 94.3%
-                (AncestryGroup::African, 0.18),        // PMC3738061: Yoruban 6%, Afr-Am 33%; PMC5600063: 18%
-                (AncestryGroup::EastAsian, 0.71),      // PMC3738061: Japanese 85%, Chinese 65%; PMC5600063: 71.3%
-                (AncestryGroup::SouthAsian, 0.67),     // PMC3738061: SE Asian 67%
+                (AncestryGroup::European, 0.94), // PMC3738061: 82-95%; PMC5600063: 94.3%
+                (AncestryGroup::African, 0.18), // PMC3738061: Yoruban 6%, Afr-Am 33%; PMC5600063: 18%
+                (AncestryGroup::EastAsian, 0.71), // PMC3738061: Japanese 85%, Chinese 65%; PMC5600063: 71.3%
+                (AncestryGroup::SouthAsian, 0.67), // PMC3738061: SE Asian 67%
                 (AncestryGroup::NativeAmerican, 0.80), // Limited data; estimated intermediate
-                (AncestryGroup::Mixed, 0.60),          // Weighted average
+                (AncestryGroup::Mixed, 0.60),     // Weighted average
             ]),
             functional_status: AlleleFunction::NoFunction,
             source: "PMC3738061 / PMC5600063 / Birdwell 2015".into(),
@@ -627,9 +627,9 @@ impl PgxHealthEquityEngine {
             gene: "CYP3A5".into(),
             allele: "*6".into(),
             frequencies: HashMap::from([
-                (AncestryGroup::European, 0.00),       // Absent/very rare
-                (AncestryGroup::African, 0.13),        // 12-17% Sub-Saharan African
-                (AncestryGroup::EastAsian, 0.00),      // Absent
+                (AncestryGroup::European, 0.00),  // Absent/very rare
+                (AncestryGroup::African, 0.13),   // 12-17% Sub-Saharan African
+                (AncestryGroup::EastAsian, 0.00), // Absent
                 (AncestryGroup::SouthAsian, 0.00),
                 (AncestryGroup::NativeAmerican, 0.00),
                 (AncestryGroup::Mixed, 0.03),
@@ -654,7 +654,9 @@ impl PgxHealthEquityEngine {
                 action: DosingAction::AvoidDrug,
                 dose_adjustment: None,
                 alternative_drug: Some("morphine (non-CYP2D6)".into()),
-                monitoring: Some("Risk of respiratory depression from rapid morphine conversion".into()),
+                monitoring: Some(
+                    "Risk of respiratory depression from rapid morphine conversion".into(),
+                ),
             },
             evidence_level: EvidenceLevel::Strong,
             source_population: AncestryGroup::European,
@@ -813,9 +815,7 @@ impl PgxHealthEquityEngine {
                 action: DosingAction::ReduceDose(0.67),
                 dose_adjustment: Some(0.67),
                 alternative_drug: None,
-                monitoring: Some(
-                    "Consider 400mg dose. Monitor for CNS side effects.".into(),
-                ),
+                monitoring: Some("Consider 400mg dose. Monitor for CNS side effects.".into()),
             },
             evidence_level: EvidenceLevel::Strong,
             source_population: AncestryGroup::European,
@@ -875,7 +875,9 @@ impl PgxHealthEquityEngine {
             gene: "CYP2D6".into(),
             phenotype: MetabolizerPhenotype::Intermediate,
             recommendation: DosingRecommendation {
-                action: DosingAction::UseAlternative("aromatase inhibitor or higher tamoxifen dose".into()),
+                action: DosingAction::UseAlternative(
+                    "aromatase inhibitor or higher tamoxifen dose".into(),
+                ),
                 dose_adjustment: Some(2.0),
                 alternative_drug: Some("aromatase inhibitor (anastrozole, letrozole)".into()),
                 monitoring: Some(
@@ -908,7 +910,9 @@ impl PgxHealthEquityEngine {
                 action: DosingAction::StandardDose,
                 dose_adjustment: Some(1.0),
                 alternative_drug: None,
-                monitoring: Some("Standard dose appropriate. UM may have higher endoxifen levels.".into()),
+                monitoring: Some(
+                    "Standard dose appropriate. UM may have higher endoxifen levels.".into(),
+                ),
             },
             evidence_level: EvidenceLevel::Strong,
             source_population: AncestryGroup::European,
@@ -1076,7 +1080,7 @@ impl PgxHealthEquityEngine {
         self.cpic_guidelines.push(CpicGuideline {
             drug: "tacrolimus".into(),
             gene: "CYP3A5".into(),
-            phenotype: MetabolizerPhenotype::Intermediate,  // Expressor: *1/*3
+            phenotype: MetabolizerPhenotype::Intermediate, // Expressor: *1/*3
             recommendation: DosingRecommendation {
                 action: DosingAction::IncreaseDose(1.5),
                 dose_adjustment: Some(1.5),
@@ -1093,7 +1097,7 @@ impl PgxHealthEquityEngine {
         self.cpic_guidelines.push(CpicGuideline {
             drug: "tacrolimus".into(),
             gene: "CYP3A5".into(),
-            phenotype: MetabolizerPhenotype::Poor,  // Non-expressor: *3/*3
+            phenotype: MetabolizerPhenotype::Poor, // Non-expressor: *3/*3
             recommendation: DosingRecommendation {
                 action: DosingAction::StandardDose,
                 dose_adjustment: Some(1.0),
@@ -1137,9 +1141,7 @@ impl PgxHealthEquityEngine {
                 action: DosingAction::ReduceDose(0.75),
                 dose_adjustment: Some(0.75),
                 alternative_drug: None,
-                monitoring: Some(
-                    "IM: reduce dose 25%. Monitor serum phenytoin levels.".into(),
-                ),
+                monitoring: Some("IM: reduce dose 25%. Monitor serum phenytoin levels.".into()),
             },
             evidence_level: EvidenceLevel::Strong,
             source_population: AncestryGroup::European,
@@ -1174,7 +1176,11 @@ impl PgxHealthEquityEngine {
             .allele_frequencies
             .iter()
             .filter(|a| a.gene == gene)
-            .filter_map(|a| a.frequencies.get(&ancestry).map(|&f| (a.functional_status, f)))
+            .filter_map(|a| {
+                a.frequencies
+                    .get(&ancestry)
+                    .map(|&f| (a.functional_status, f))
+            })
             .collect();
 
         // Sum of non-normal allele frequencies; remainder is *1 (normal).
@@ -1240,8 +1246,14 @@ impl PgxHealthEquityEngine {
             let dist = self.metabolizer_distribution(gene, anc);
 
             // Adverse event risk: driven by PM (drug accumulation) + UM for prodrugs.
-            let pm_frac = dist.get(&MetabolizerPhenotype::Poor).copied().unwrap_or(0.0);
-            let um_frac = dist.get(&MetabolizerPhenotype::UltraRapid).copied().unwrap_or(0.0);
+            let pm_frac = dist
+                .get(&MetabolizerPhenotype::Poor)
+                .copied()
+                .unwrap_or(0.0);
+            let um_frac = dist
+                .get(&MetabolizerPhenotype::UltraRapid)
+                .copied()
+                .unwrap_or(0.0);
 
             // For prodrugs (codeine, clopidogrel, tamoxifen), UM is dangerous; for others, PM is.
             let is_prodrug = drug == "codeine" || drug == "clopidogrel" || drug == "tamoxifen";
@@ -1375,9 +1387,7 @@ impl PgxHealthEquityEngine {
 
         // Check if this patient's ancestry is underserved for this drug-gene pair.
         let equity = self.equity_analysis(drug, base.unwrap().gene.as_str());
-        let is_underserved = equity
-            .underserved_populations
-            .contains(&patient_ancestry);
+        let is_underserved = equity.underserved_populations.contains(&patient_ancestry);
 
         if is_underserved {
             // Enhance monitoring for underserved populations.
@@ -1437,10 +1447,22 @@ impl PgxHealthEquityEngine {
 
         for &(ancestry, pop_millions) in &ancestries {
             let dist = self.metabolizer_distribution(gene, ancestry);
-            let pm = dist.get(&MetabolizerPhenotype::Poor).copied().unwrap_or(0.0);
-            let um = dist.get(&MetabolizerPhenotype::UltraRapid).copied().unwrap_or(0.0);
-            let nm = dist.get(&MetabolizerPhenotype::Normal).copied().unwrap_or(0.0);
-            let im = dist.get(&MetabolizerPhenotype::Intermediate).copied().unwrap_or(0.0);
+            let pm = dist
+                .get(&MetabolizerPhenotype::Poor)
+                .copied()
+                .unwrap_or(0.0);
+            let um = dist
+                .get(&MetabolizerPhenotype::UltraRapid)
+                .copied()
+                .unwrap_or(0.0);
+            let nm = dist
+                .get(&MetabolizerPhenotype::Normal)
+                .copied()
+                .unwrap_or(0.0);
+            let im = dist
+                .get(&MetabolizerPhenotype::Intermediate)
+                .copied()
+                .unwrap_or(0.0);
 
             let at_risk_fraction = if is_expressor_risk {
                 // For tacrolimus: NM + IM are expressors who need dose increase.
@@ -1531,10 +1553,22 @@ impl PgxHealthEquityEngine {
 
         for (name, anc) in &ancestries {
             let dist = self.metabolizer_distribution(gene, *anc);
-            let um = dist.get(&MetabolizerPhenotype::UltraRapid).copied().unwrap_or(0.0);
-            let nm = dist.get(&MetabolizerPhenotype::Normal).copied().unwrap_or(0.0);
-            let im = dist.get(&MetabolizerPhenotype::Intermediate).copied().unwrap_or(0.0);
-            let pm = dist.get(&MetabolizerPhenotype::Poor).copied().unwrap_or(0.0);
+            let um = dist
+                .get(&MetabolizerPhenotype::UltraRapid)
+                .copied()
+                .unwrap_or(0.0);
+            let nm = dist
+                .get(&MetabolizerPhenotype::Normal)
+                .copied()
+                .unwrap_or(0.0);
+            let im = dist
+                .get(&MetabolizerPhenotype::Intermediate)
+                .copied()
+                .unwrap_or(0.0);
+            let pm = dist
+                .get(&MetabolizerPhenotype::Poor)
+                .copied()
+                .unwrap_or(0.0);
 
             let mut flags = Vec::new();
             if um > HIGH_FREQUENCY_PHENOTYPE_THRESHOLD {
@@ -1588,9 +1622,7 @@ impl PgxHealthEquityEngine {
                 let blended_freq: f64 = population
                     .composition
                     .iter()
-                    .map(|(anc, weight)| {
-                        a.frequencies.get(anc).copied().unwrap_or(0.0) * weight
-                    })
+                    .map(|(anc, weight)| a.frequencies.get(anc).copied().unwrap_or(0.0) * weight)
                     .sum();
                 (a.functional_status, blended_freq)
             })
@@ -1685,8 +1717,14 @@ impl PgxHealthEquityEngine {
                     .sum::<f64>()
                     / 2.0;
 
-                let pm = dist.get(&MetabolizerPhenotype::Poor).copied().unwrap_or(0.0);
-                let um = dist.get(&MetabolizerPhenotype::UltraRapid).copied().unwrap_or(0.0);
+                let pm = dist
+                    .get(&MetabolizerPhenotype::Poor)
+                    .copied()
+                    .unwrap_or(0.0);
+                let um = dist
+                    .get(&MetabolizerPhenotype::UltraRapid)
+                    .copied()
+                    .unwrap_or(0.0);
 
                 // Risk model (matches equity_analysis).
                 let adverse = if is_prodrug {
@@ -1768,7 +1806,10 @@ mod tests {
         // Pan-African duplication ~5% (Gaedigk 2017). 29% was Ethiopia-specific
         // (Aklillu 1996), not representative of all African populations.
         // UM ~5-7% pan-African is realistic.
-        assert!(um > 0.03 && um < 0.15, "African CYP2D6 UM={um:.3}, expected 3-15%");
+        assert!(
+            um > 0.03 && um < 0.15,
+            "African CYP2D6 UM={um:.3}, expected 3-15%"
+        );
     }
 
     #[test]
@@ -2150,11 +2191,16 @@ mod tests {
             MetabolizerPhenotype::Normal,
         ] {
             let admixed = admixed_dist[pheno];
-            assert!(admixed >= 0.0 && admixed <= 1.0,
-                "African American CYP2D6 {pheno:?}: admixed={admixed:.4} out of [0,1]");
+            assert!(
+                admixed >= 0.0 && admixed <= 1.0,
+                "African American CYP2D6 {pheno:?}: admixed={admixed:.4} out of [0,1]"
+            );
             total += admixed;
         }
-        assert!((total - 1.0).abs() < 0.01, "Distribution should sum to ~1.0, got {total}");
+        assert!(
+            (total - 1.0).abs() < 0.01,
+            "Distribution should sum to ~1.0, got {total}"
+        );
         // Admixed should differ from both pure ancestral groups
         let admixed_pm = admixed_dist[&MetabolizerPhenotype::Poor];
         let afr_pm = afr_dist[&MetabolizerPhenotype::Poor];
@@ -2221,7 +2267,10 @@ mod tests {
 
         // African American (80% African, 20% European) gap should be non-zero
         // but less extreme than pure African divergence from European.
-        let aa_result = results.iter().find(|(n, _, _)| n == "African American").unwrap();
+        let aa_result = results
+            .iter()
+            .find(|(n, _, _)| n == "African American")
+            .unwrap();
         assert!(
             aa_result.1 > 0.0,
             "African American should have a nonzero gap for codeine/CYP2D6"

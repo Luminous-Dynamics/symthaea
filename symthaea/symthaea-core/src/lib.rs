@@ -57,6 +57,9 @@ pub mod consciousness_metrics;
 /// Core consciousness state types and configuration.
 #[allow(missing_docs)]
 pub mod core;
+/// Shared embodiment types: MotorSafetyLevel, EmbodimentBridge trait, telemetry.
+#[allow(missing_docs)]
+pub mod embodiment;
 /// System bootstrap and initialization.
 #[allow(missing_docs)]
 pub mod genesis;
@@ -76,6 +79,3 @@ pub mod phi_engine;
 pub mod physics;
 /// Shared temporal prediction trait for O(1) CfC-based forecasting.
 pub mod temporal;
-/// Shared embodiment types: MotorSafetyLevel, EmbodimentBridge trait, telemetry.
-#[allow(missing_docs)]
-pub mod embodiment;

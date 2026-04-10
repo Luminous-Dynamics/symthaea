@@ -8,7 +8,7 @@
 //! ```
 
 use std::path::Path;
-use symthaea_muse::training::{train_projections, save_projections, TrainingConfig};
+use symthaea_muse::training::{save_projections, train_projections, TrainingConfig};
 use symthaea_muse::MuseConfig;
 
 fn main() {
@@ -39,8 +39,10 @@ fn main() {
         ..Default::default()
     };
 
-    println!("  Config: {} epochs, pop={}, σ={}, lr={}",
-        config.epochs, config.population_size, config.noise_sigma, config.learning_rate);
+    println!(
+        "  Config: {} epochs, pop={}, σ={}, lr={}",
+        config.epochs, config.population_size, config.noise_sigma, config.learning_rate
+    );
     println!("  Dataset: MAESTRO (max {} melodies)", config.max_melodies);
     println!("  Loading melodies...\n");
 
@@ -89,15 +91,20 @@ fn main() {
 
     // Before: default config (random projections)
     let before = symthaea_muse::compose(
-        &MuseConfig { max_notes: 16, duration_secs: 4.0, ..Default::default() },
-        &state, 42,
+        &MuseConfig {
+            max_notes: 16,
+            duration_secs: 4.0,
+            ..Default::default()
+        },
+        &state,
+        42,
     );
-    let tempo = symthaea_muse::rhythm::compute_tempo(
-        &MuseConfig::default(), &state,
-    );
+    let tempo = symthaea_muse::rhythm::compute_tempo(&MuseConfig::default(), &state);
     let before_path = Path::new("target/training-comparison");
     std::fs::create_dir_all(before_path).ok();
-    before.to_midi_file(&before_path.join("before.mid"), tempo).ok();
+    before
+        .to_midi_file(&before_path.join("before.mid"), tempo)
+        .ok();
 
     // After: trained projections
     // (For now, compose uses whatever projections are in NeuralMelody::new)
@@ -110,9 +117,12 @@ fn main() {
             melody_mode: symthaea_muse::MelodyMode::Neural,
             ..Default::default()
         },
-        &state, 42,
+        &state,
+        42,
     );
-    after.to_midi_file(&before_path.join("after_neural.mid"), tempo).ok();
+    after
+        .to_midi_file(&before_path.join("after_neural.mid"), tempo)
+        .ok();
 
     println!("  Before (Classic): {} notes", before.notes.len());
     println!("  After (Neural):   {} notes", after.notes.len());

@@ -97,10 +97,7 @@ fn main() {
 
     // Print sorted by base ranking.
     let base_ranking = &ranked[base_idx];
-    print!(
-        "{:>4} | {:<14}| {:<8}|",
-        "Rank", "Drug", "Gene"
-    );
+    print!("{:>4} | {:<14}| {:<8}|", "Rank", "Drug", "Gene");
     for label in PERTURBATION_LABELS {
         print!(" {:>6} |", label);
     }
@@ -143,7 +140,9 @@ fn main() {
     // Also check top-3 and bottom-3 stability.
     let top3_stable = (0..3.min(n_drugs)).all(|rank| {
         let base_pair = base_ranking[rank];
-        ranked.iter().all(|r| r[..3.min(n_drugs)].contains(&base_pair))
+        ranked
+            .iter()
+            .all(|r| r[..3.min(n_drugs)].contains(&base_pair))
     });
     let bot3_stable = if n_drugs >= 3 {
         ((n_drugs - 3)..n_drugs).all(|rank| {
@@ -188,8 +187,14 @@ fn main() {
             gaps[1].max(gaps[3]),
         );
         let range_20: (f64, f64) = (
-            *gaps.iter().min_by(|a, b| a.partial_cmp(b).unwrap()).unwrap(),
-            *gaps.iter().max_by(|a, b| a.partial_cmp(b).unwrap()).unwrap(),
+            *gaps
+                .iter()
+                .min_by(|a, b| a.partial_cmp(b).unwrap())
+                .unwrap(),
+            *gaps
+                .iter()
+                .max_by(|a, b| a.partial_cmp(b).unwrap())
+                .unwrap(),
         );
         let max_delta = range_20.1 - range_20.0;
 
@@ -285,11 +290,12 @@ fn main() {
         })
         .fold(f64::NEG_INFINITY, f64::max);
 
-    let stability_word = if top3_stable && (consistent_flags as f64 / total_flags.max(1) as f64) > 0.7 {
-        "stable"
-    } else {
-        "partially stable"
-    };
+    let stability_word =
+        if top3_stable && (consistent_flags as f64 / total_flags.max(1) as f64) > 0.7 {
+            "stable"
+        } else {
+            "partially stable"
+        };
 
     println!(
         "Equity gap rankings are {} to +/-20% allele frequency uncertainty.",
@@ -303,9 +309,7 @@ fn main() {
         "Maximum gap score delta across all perturbations: {:.3}",
         max_delta_overall
     );
-    println!(
-        "This demonstrates that our conclusions are robust to the known uncertainty"
-    );
+    println!("This demonstrates that our conclusions are robust to the known uncertainty");
     println!("in population-level allele frequency estimates.");
 
     println!(

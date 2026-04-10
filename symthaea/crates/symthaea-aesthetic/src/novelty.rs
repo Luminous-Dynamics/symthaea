@@ -235,7 +235,11 @@ mod tests {
             complexity,
             surprise: 0.0,
             harmony,
-            birkhoff: if complexity > 0.01 { order / complexity } else { 0.0 },
+            birkhoff: if complexity > 0.01 {
+                order / complexity
+            } else {
+                0.0
+            },
             composite,
         }
     }
@@ -245,7 +249,10 @@ mod tests {
         let mut tracker = NoveltyTracker::default();
         let score = make_score(0.5, 0.5, 0.5, 0.5);
         let novelty = tracker.record_and_score(&score);
-        assert!((novelty - 0.5).abs() < 0.1, "first score novelty = {novelty}");
+        assert!(
+            (novelty - 0.5).abs() < 0.1,
+            "first score novelty = {novelty}"
+        );
     }
 
     #[test]
@@ -292,10 +299,7 @@ mod tests {
         // Model should predict higher for high-harmony scores
         let high_h = model.predict(&make_score(0.3, 0.5, 0.9, 0.0));
         let low_h = model.predict(&make_score(0.3, 0.5, 0.1, 0.0));
-        assert!(
-            high_h > low_h,
-            "high harmony {high_h} should > low {low_h}"
-        );
+        assert!(high_h > low_h, "high harmony {high_h} should > low {low_h}");
     }
 
     #[test]

@@ -130,7 +130,8 @@ impl CognitiveLoopService {
         // Proportional: trust deviation from neutral (0.5) scales bias strength
         let trust_deviation = self.behavior.social_mgr.social.social_trust - SOCIAL_TRUST_MIDPOINT; // [-0.5, 0.5]
         let social_strategy_bias = if trust_deviation > SOCIAL_TRUST_DEADZONE
-            && self.behavior.social_mgr.social.social_cooperation_rate > SOCIAL_COOPERATION_THRESHOLD
+            && self.behavior.social_mgr.social.social_cooperation_rate
+                > SOCIAL_COOPERATION_THRESHOLD
         {
             // High trust: strength scales [0, 1] over deviation [deadzone, 0.5]
             let strength =
@@ -194,10 +195,11 @@ impl CognitiveLoopService {
         // ── Knowledge signals → exploration modulation ──────────────────
         // Deep causal understanding → exploit (reduce exploration)
         // High novelty → explore (boost exploration) — Berlyne (1960)
-        let knowledge_signals = self
-            .memory.knowledge_manager
-            .as_ref()
-            .map(|km: &crate::knowledge::KnowledgeManager| (km.signals().causal_depth, km.signals().novelty));
+        let knowledge_signals = self.memory.knowledge_manager.as_ref().map(
+            |km: &crate::knowledge::KnowledgeManager| {
+                (km.signals().causal_depth, km.signals().novelty)
+            },
+        );
         if let Some((causal_depth, novelty)) = knowledge_signals {
             if causal_depth > super::thresholds::KNOWLEDGE_CAUSAL_DEPTH_EXPLOIT_THRESHOLD {
                 self.adjust_exploration(
@@ -501,19 +503,20 @@ impl CognitiveLoopService {
         // encoding into compressed_state, the system's beliefs about its own
         // attention causally shape what it perceives next — closing the loop
         // from observation to top-down control.
-        let compressed_state = if let Some(ref schema) = self.consciousness.self_model_tier.attention_schema {
-            let ast_encoding = schema.encode_for_thought_vector();
-            let ast_weight = super::thresholds::AST_ENCODING_WEIGHT;
-            let mut modulated = compressed_state;
-            for (i, &ast_val) in ast_encoding.iter().enumerate() {
-                if i < modulated.len() {
-                    modulated[i] += ast_val * ast_weight;
+        let compressed_state =
+            if let Some(ref schema) = self.consciousness.self_model_tier.attention_schema {
+                let ast_encoding = schema.encode_for_thought_vector();
+                let ast_weight = super::thresholds::AST_ENCODING_WEIGHT;
+                let mut modulated = compressed_state;
+                for (i, &ast_val) in ast_encoding.iter().enumerate() {
+                    if i < modulated.len() {
+                        modulated[i] += ast_val * ast_weight;
+                    }
                 }
-            }
-            modulated
-        } else {
-            compressed_state
-        };
+                modulated
+            } else {
+                compressed_state
+            };
 
         // Substrate encoding noise on compressed state (256D CfC input path).
         // Mirrors the BinaryHV noise above — constrained substrates get Gaussian
@@ -617,7 +620,8 @@ impl CognitiveLoopService {
         // Query knowledge engine for moral precedent
         // Extracts facts tagged with ethics/social domains for grounded moral reasoning.
         let knowledge_moral_context: Vec<String> = self
-            .memory.episodic_persistence
+            .memory
+            .episodic_persistence
             .last_reasoning_context
             .as_ref()
             .map(|ctx| {
@@ -637,7 +641,8 @@ impl CognitiveLoopService {
         // Knowledge confidence multiplier: scales ethical confidence by knowledge grounding
         // Science: Kahneman (2011) — epistemic uncertainty should constrain decision confidence
         let knowledge_confidence_multiplier = self
-            .memory.episodic_persistence
+            .memory
+            .episodic_persistence
             .last_reasoning_context
             .as_ref()
             .map(|ctx| {

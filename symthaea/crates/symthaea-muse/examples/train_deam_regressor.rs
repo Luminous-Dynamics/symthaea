@@ -33,7 +33,10 @@ fn main() {
     // 1. Load annotations
     let annotations = match load_annotations(annot_path) {
         Ok(a) => a,
-        Err(e) => { eprintln!("Failed to load annotations: {e}"); return; }
+        Err(e) => {
+            eprintln!("Failed to load annotations: {e}");
+            return;
+        }
     };
     println!("Loaded {} annotations", annotations.len());
 
@@ -101,10 +104,26 @@ fn main() {
     let v_weights = fit_linear_regression(&features, &valences);
     let a_weights = fit_linear_regression(&features, &arousals);
 
-    println!("Valence weights:  bias={:.4} rms={:.4} ctr={:.6} zcr={:.4} flux={:.4} ons={:.4} hnr={:.4}",
-        v_weights[0], v_weights[1], v_weights[2], v_weights[3], v_weights[4], v_weights[5], v_weights[6]);
-    println!("Arousal weights:  bias={:.4} rms={:.4} ctr={:.6} zcr={:.4} flux={:.4} ons={:.4} hnr={:.4}",
-        a_weights[0], a_weights[1], a_weights[2], a_weights[3], a_weights[4], a_weights[5], a_weights[6]);
+    println!(
+        "Valence weights:  bias={:.4} rms={:.4} ctr={:.6} zcr={:.4} flux={:.4} ons={:.4} hnr={:.4}",
+        v_weights[0],
+        v_weights[1],
+        v_weights[2],
+        v_weights[3],
+        v_weights[4],
+        v_weights[5],
+        v_weights[6]
+    );
+    println!(
+        "Arousal weights:  bias={:.4} rms={:.4} ctr={:.6} zcr={:.4} flux={:.4} ons={:.4} hnr={:.4}",
+        a_weights[0],
+        a_weights[1],
+        a_weights[2],
+        a_weights[3],
+        a_weights[4],
+        a_weights[5],
+        a_weights[6]
+    );
 
     // 4. Evaluate on training set (R²)
     let v_pred: Vec<f32> = features.iter().map(|f| predict(&v_weights, f)).collect();
@@ -136,7 +155,9 @@ fn load_annotations(path: &str) -> Result<Vec<(u32, f32, f32)>, String> {
 
     for (i, line) in reader.lines().enumerate() {
         let line: String = line.map_err(|e| e.to_string())?;
-        if i == 0 { continue; }
+        if i == 0 {
+            continue;
+        }
         let parts: Vec<&str> = line.split(',').collect();
         if parts.len() >= 4 {
             if let (Ok(id), Ok(v), Ok(a)) = (
@@ -153,7 +174,9 @@ fn load_annotations(path: &str) -> Result<Vec<(u32, f32, f32)>, String> {
 
 /// Deterministic pseudo-random float from song_id and feature index.
 fn rand_f32(song_id: u32, feat: u32) -> f32 {
-    let hash = (song_id.wrapping_mul(2654435761).wrapping_add(feat.wrapping_mul(40503)));
+    let hash = (song_id
+        .wrapping_mul(2654435761)
+        .wrapping_add(feat.wrapping_mul(40503)));
     (hash % 1000) as f32 / 1000.0
 }
 
@@ -165,15 +188,15 @@ fn fit_linear_regression(features: &[[f32; 6]], targets: &[f32]) -> Vec<f32> {
 
     // Build X matrix (n × 7) with bias column
     let mut xtx = vec![0.0f64; d * d]; // X^T X
-    let mut xty = vec![0.0f64; d];      // X^T y
+    let mut xty = vec![0.0f64; d]; // X^T y
 
     for i in 0..n {
         let x = [
             1.0, // bias
             features[i][0] as f64,
             features[i][1] as f64 / 1000.0, // scale centroid
-            features[i][2] as f64 * 10.0,    // scale ZCR
-            features[i][3] as f64 * 100.0,   // scale flux
+            features[i][2] as f64 * 10.0,   // scale ZCR
+            features[i][3] as f64 * 100.0,  // scale flux
             features[i][4] as f64,
             features[i][5] as f64,
         ];
@@ -228,7 +251,9 @@ fn solve_linear_system(a: &[f64], b: &[f64], n: usize) -> Vec<f64> {
         }
 
         let pivot = aug[col * (n + 1) + col];
-        if pivot.abs() < 1e-12 { continue; }
+        if pivot.abs() < 1e-12 {
+            continue;
+        }
 
         for row in (col + 1)..n {
             let factor = aug[row * (n + 1) + col] / pivot;
@@ -265,6 +290,14 @@ fn r_squared(actual: &[f32], predicted: &[f32]) -> f32 {
     let n = actual.len();
     let mean = actual.iter().sum::<f32>() / n as f32;
     let ss_tot: f32 = actual.iter().map(|&a| (a - mean).powi(2)).sum();
-    let ss_res: f32 = actual.iter().zip(predicted).map(|(&a, &p)| (a - p).powi(2)).sum();
-    if ss_tot > 1e-8 { 1.0 - ss_res / ss_tot } else { 0.0 }
+    let ss_res: f32 = actual
+        .iter()
+        .zip(predicted)
+        .map(|(&a, &p)| (a - p).powi(2))
+        .sum();
+    if ss_tot > 1e-8 {
+        1.0 - ss_res / ss_tot
+    } else {
+        0.0
+    }
 }

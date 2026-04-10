@@ -44,13 +44,14 @@ pub fn evaluate_composition(comp: &Composition, state: &MusicalState) -> MusicVe
 
     // Rhythmic regularity: low CV of inter-onset intervals
     let rhythmic_regularity = if notes.len() >= 3 {
-        let intervals: Vec<f32> = notes.windows(2)
+        let intervals: Vec<f32> = notes
+            .windows(2)
             .map(|w| (w[1].start_time - w[0].start_time).max(0.001))
             .collect();
         let mean = intervals.iter().sum::<f32>() / intervals.len() as f32;
         if mean > 0.001 {
-            let variance = intervals.iter().map(|&i| (i - mean).powi(2)).sum::<f32>()
-                / intervals.len() as f32;
+            let variance =
+                intervals.iter().map(|&i| (i - mean).powi(2)).sum::<f32>() / intervals.len() as f32;
             let cv = variance.sqrt() / mean;
             (1.0 - cv).clamp(0.0, 1.0)
         } else {
@@ -66,7 +67,10 @@ pub fn evaluate_composition(comp: &Composition, state: &MusicalState) -> MusicVe
     // Voice balance: velocity standard deviation (low = balanced)
     let voice_balance = if notes.len() >= 2 {
         let mean_vel: f32 = notes.iter().map(|n| n.velocity).sum::<f32>() / notes.len() as f32;
-        let vel_var: f32 = notes.iter().map(|n| (n.velocity - mean_vel).powi(2)).sum::<f32>()
+        let vel_var: f32 = notes
+            .iter()
+            .map(|n| (n.velocity - mean_vel).powi(2))
+            .sum::<f32>()
             / notes.len() as f32;
         (1.0 - vel_var.sqrt() * 2.0).clamp(0.0, 1.0)
     } else {
@@ -109,13 +113,17 @@ fn evaluate_form_coherence(comp: &Composition, state: &MusicalState) -> f32 {
     // Check that notes in different sections have different pitch centroids
     let mut section_centroids = Vec::new();
     for section in &song_form.sections {
-        let sec_notes: Vec<&Note> = comp.notes.iter()
-            .filter(|n| n.start_time >= section.start_time
-                && n.start_time < section.start_time + section.duration)
+        let sec_notes: Vec<&Note> = comp
+            .notes
+            .iter()
+            .filter(|n| {
+                n.start_time >= section.start_time
+                    && n.start_time < section.start_time + section.duration
+            })
             .collect();
         if !sec_notes.is_empty() {
-            let centroid = sec_notes.iter().map(|n| n.frequency).sum::<f32>()
-                / sec_notes.len() as f32;
+            let centroid =
+                sec_notes.iter().map(|n| n.frequency).sum::<f32>() / sec_notes.len() as f32;
             section_centroids.push(centroid);
         }
     }
@@ -126,9 +134,11 @@ fn evaluate_form_coherence(comp: &Composition, state: &MusicalState) -> f32 {
 
     // Measure variance between section centroids (higher = more contrast)
     let mean = section_centroids.iter().sum::<f32>() / section_centroids.len() as f32;
-    let variance = section_centroids.iter()
+    let variance = section_centroids
+        .iter()
         .map(|c| (c - mean).powi(2))
-        .sum::<f32>() / section_centroids.len() as f32;
+        .sum::<f32>()
+        / section_centroids.len() as f32;
     // Normalize: typical centroid range ~100-600 Hz, so variance up to ~60000
     let normalized = (variance.sqrt() / 200.0).clamp(0.0, 1.0);
     // Berlyne: moderate contrast is best (not identical, not random)
@@ -146,13 +156,29 @@ fn evaluate_contour(notes: &[Note]) -> f32 {
     let first_half = &notes[..half];
     let second_half = &notes[half..];
 
-    let first_direction: f32 = first_half.windows(2)
-        .map(|w| if w[1].frequency > w[0].frequency { 1.0 } else { -1.0 })
-        .sum::<f32>() / (first_half.len() - 1).max(1) as f32;
+    let first_direction: f32 = first_half
+        .windows(2)
+        .map(|w| {
+            if w[1].frequency > w[0].frequency {
+                1.0
+            } else {
+                -1.0
+            }
+        })
+        .sum::<f32>()
+        / (first_half.len() - 1).max(1) as f32;
 
-    let second_direction: f32 = second_half.windows(2)
-        .map(|w| if w[1].frequency > w[0].frequency { 1.0 } else { -1.0 })
-        .sum::<f32>() / (second_half.len() - 1).max(1) as f32;
+    let second_direction: f32 = second_half
+        .windows(2)
+        .map(|w| {
+            if w[1].frequency > w[0].frequency {
+                1.0
+            } else {
+                -1.0
+            }
+        })
+        .sum::<f32>()
+        / (second_half.len() - 1).max(1) as f32;
 
     // Ideal arc: first half ascending (positive), second half descending (negative)
     let arc_quality = (first_direction - second_direction) / 2.0;
@@ -249,8 +275,7 @@ fn apply_music_wisdom(state: &mut MusicalState, verdict: &MusicVerdict) {
 
     // Good form coherence → boost progression harmony
     if verdict.form_coherence > 0.5 {
-        state.harmony_activations[6] =
-            (state.harmony_activations[6] + lr * 0.3).clamp(0.0, 1.0);
+        state.harmony_activations[6] = (state.harmony_activations[6] + lr * 0.3).clamp(0.0, 1.0);
     }
 }
 
@@ -286,17 +311,60 @@ mod tests {
     fn contour_detects_arc() {
         // Rising then falling melody = good arc
         let arc_notes = vec![
-            Note { frequency: 200.0, start_time: 0.0, duration: 0.5, velocity: 0.8 },
-            Note { frequency: 300.0, start_time: 0.5, duration: 0.5, velocity: 0.8 },
-            Note { frequency: 400.0, start_time: 1.0, duration: 0.5, velocity: 0.8 },
-            Note { frequency: 500.0, start_time: 1.5, duration: 0.5, velocity: 0.8 },
-            Note { frequency: 400.0, start_time: 2.0, duration: 0.5, velocity: 0.8 },
-            Note { frequency: 300.0, start_time: 2.5, duration: 0.5, velocity: 0.8 },
-            Note { frequency: 200.0, start_time: 3.0, duration: 0.5, velocity: 0.8 },
-            Note { frequency: 100.0, start_time: 3.5, duration: 0.5, velocity: 0.8 },
+            Note {
+                frequency: 200.0,
+                start_time: 0.0,
+                duration: 0.5,
+                velocity: 0.8,
+            },
+            Note {
+                frequency: 300.0,
+                start_time: 0.5,
+                duration: 0.5,
+                velocity: 0.8,
+            },
+            Note {
+                frequency: 400.0,
+                start_time: 1.0,
+                duration: 0.5,
+                velocity: 0.8,
+            },
+            Note {
+                frequency: 500.0,
+                start_time: 1.5,
+                duration: 0.5,
+                velocity: 0.8,
+            },
+            Note {
+                frequency: 400.0,
+                start_time: 2.0,
+                duration: 0.5,
+                velocity: 0.8,
+            },
+            Note {
+                frequency: 300.0,
+                start_time: 2.5,
+                duration: 0.5,
+                velocity: 0.8,
+            },
+            Note {
+                frequency: 200.0,
+                start_time: 3.0,
+                duration: 0.5,
+                velocity: 0.8,
+            },
+            Note {
+                frequency: 100.0,
+                start_time: 3.5,
+                duration: 0.5,
+                velocity: 0.8,
+            },
         ];
         let contour = evaluate_contour(&arc_notes);
-        assert!(contour > 0.5, "rising-falling arc should score high: {contour}");
+        assert!(
+            contour > 0.5,
+            "rising-falling arc should score high: {contour}"
+        );
     }
 
     #[test]
@@ -315,7 +383,10 @@ mod tests {
             42,
         );
         let coherence = evaluate_form_coherence(&comp, &state);
-        assert!(coherence >= 0.0 && coherence <= 1.0, "coherence={coherence}");
+        assert!(
+            coherence >= 0.0 && coherence <= 1.0,
+            "coherence={coherence}"
+        );
     }
 
     #[test]
@@ -335,16 +406,56 @@ mod tests {
     #[test]
     fn high_variety_high_melodic_interest() {
         let diverse_notes = vec![
-            Note { frequency: 100.0, start_time: 0.0, duration: 0.5, velocity: 0.8 },
-            Note { frequency: 200.0, start_time: 0.5, duration: 0.5, velocity: 0.8 },
-            Note { frequency: 300.0, start_time: 1.0, duration: 0.5, velocity: 0.8 },
-            Note { frequency: 400.0, start_time: 1.5, duration: 0.5, velocity: 0.8 },
+            Note {
+                frequency: 100.0,
+                start_time: 0.0,
+                duration: 0.5,
+                velocity: 0.8,
+            },
+            Note {
+                frequency: 200.0,
+                start_time: 0.5,
+                duration: 0.5,
+                velocity: 0.8,
+            },
+            Note {
+                frequency: 300.0,
+                start_time: 1.0,
+                duration: 0.5,
+                velocity: 0.8,
+            },
+            Note {
+                frequency: 400.0,
+                start_time: 1.5,
+                duration: 0.5,
+                velocity: 0.8,
+            },
         ];
         let repetitive_notes = vec![
-            Note { frequency: 261.0, start_time: 0.0, duration: 0.5, velocity: 0.8 },
-            Note { frequency: 261.0, start_time: 0.5, duration: 0.5, velocity: 0.8 },
-            Note { frequency: 261.0, start_time: 1.0, duration: 0.5, velocity: 0.8 },
-            Note { frequency: 261.0, start_time: 1.5, duration: 0.5, velocity: 0.8 },
+            Note {
+                frequency: 261.0,
+                start_time: 0.0,
+                duration: 0.5,
+                velocity: 0.8,
+            },
+            Note {
+                frequency: 261.0,
+                start_time: 0.5,
+                duration: 0.5,
+                velocity: 0.8,
+            },
+            Note {
+                frequency: 261.0,
+                start_time: 1.0,
+                duration: 0.5,
+                velocity: 0.8,
+            },
+            Note {
+                frequency: 261.0,
+                start_time: 1.5,
+                duration: 0.5,
+                velocity: 0.8,
+            },
         ];
 
         let diverse_comp = Composition {
@@ -368,7 +479,8 @@ mod tests {
         assert!(
             v_diverse.melodic_interest > v_repetitive.melodic_interest,
             "diverse {} should beat repetitive {}",
-            v_diverse.melodic_interest, v_repetitive.melodic_interest
+            v_diverse.melodic_interest,
+            v_repetitive.melodic_interest
         );
     }
 
@@ -419,7 +531,8 @@ mod tests {
         assert!(
             state.serotonin > original_serotonin,
             "serotonin should increase: {} → {}",
-            original_serotonin, state.serotonin
+            original_serotonin,
+            state.serotonin
         );
     }
 }

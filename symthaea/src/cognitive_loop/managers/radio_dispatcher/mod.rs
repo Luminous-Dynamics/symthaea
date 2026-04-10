@@ -31,11 +31,11 @@
 //! - `consciousness_routing` — Consciousness-aware mesh routing, store-and-forward
 //! - `advanced` — RTL-SDR hardware, CCSDS space packets
 
+mod advanced;
+mod consciousness_routing;
+mod hardware;
 mod tier;
 mod transport;
-mod hardware;
-mod consciousness_routing;
-mod advanced;
 
 // ── Re-exports from tier ────────────────────────────────────────────────────
 pub use tier::{
@@ -52,8 +52,8 @@ pub use transport::{
 
 // ── Re-exports from hardware ────────────────────────────────────────────────
 pub use hardware::{
-    BandAllocation, LicenseType, MockRadioHardware, NullRadioHardware, RadioError,
-    RadioHardware, RegulatoryDatabase, RegulatoryRegion,
+    BandAllocation, LicenseType, MockRadioHardware, NullRadioHardware, RadioError, RadioHardware,
+    RegulatoryDatabase, RegulatoryRegion,
 };
 
 // ── Re-exports from consciousness_routing ───────────────────────────────────
@@ -65,8 +65,8 @@ pub use consciousness_routing::{
 
 // ── Re-exports from advanced ────────────────────────────────────────────────
 pub use advanced::{
-    apid, bands, CcsdsPacket, DetectedSignal, RtlSdrHardware, SignalClass,
-    light_time_seconds, min_sharing_cadence_for_latency,
+    apid, bands, light_time_seconds, min_sharing_cadence_for_latency, CcsdsPacket, DetectedSignal,
+    RtlSdrHardware, SignalClass,
 };
 
 #[cfg(test)]

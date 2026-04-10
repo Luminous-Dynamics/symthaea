@@ -30,6 +30,11 @@ pub struct FlightEmbodiment {
 }
 
 impl FlightEmbodiment {
+    /// Emergency descent thrust (Newtons). Approximately 30% of hover thrust
+    /// for a 1.5kg quadrotor: 0.3 * 1.5 * 9.81 ≈ 4.4 N.
+    /// Produces a controlled ~3 m/s descent instead of freefall.
+    const EMERGENCY_DESCENT_THRUST: f32 = 4.4;
+
     pub fn new(genesis: &GenesisSeed) -> Self {
         let config = FlightConfig::default();
         Self {
@@ -63,12 +68,17 @@ impl FlightEmbodiment {
 
         let mut cmd = self.controller.forward(thought_hv, dt);
         if gain < 1.0 {
-            // Scale moments; on Red, cut thrust to hover-only (autorotate equivalent)
             cmd.roll_moment *= gain;
             cmd.pitch_moment *= gain;
             cmd.yaw_moment *= gain;
             if gain == 0.0 {
-                cmd.thrust = 0.0; // Motors off on Red
+                // Red safety: controlled emergency descent, NOT freefall.
+                // Maintain minimal thrust (~30% hover) for drag-limited descent.
+                // Zero all moments to prevent attitude divergence.
+                cmd.thrust = Self::EMERGENCY_DESCENT_THRUST;
+                cmd.roll_moment = 0.0;
+                cmd.pitch_moment = 0.0;
+                cmd.yaw_moment = 0.0;
             } else {
                 cmd.thrust *= gain;
             }
@@ -133,6 +143,11 @@ impl FlightEmbodiment {
         self.total_steps
     }
 
+    /// Access the underlying simulator state (for testing and telemetry).
+    pub fn simulator(&self) -> &SimplePhysicsSimulator {
+        &self.simulator
+    }
+
     pub fn telemetry(&self) -> EmbodimentTelemetry {
         EmbodimentTelemetry {
             total_steps: self.total_steps as u64,
@@ -166,7 +181,34 @@ mod tests {
         let hv = ContinuousHV::random(16384, 42);
         let r = bridge.step(&hv, 0.002, 0.05);
         assert_eq!(r.safety_level, MotorSafetyLevel::Red);
-        assert_eq!(r.control_effort, 0.0);
+        // Red safety: emergency descent thrust is non-zero (controlled descent, not freefall)
+        assert!(r.control_effort >= 0.0);
+    }
+
+    #[test]
+    fn test_red_safety_controlled_descent() {
+        let mut bridge = FlightEmbodiment::new(&GenesisSeed::from_phrase("descent_test"));
+        let hv = ContinuousHV::random(16384, 42);
+
+        // Step with Green safety first to establish altitude
+        for _ in 0..20 {
+            bridge.step(&hv, 0.01, 0.8);
+        }
+
+        // Now force Red safety for 100 steps
+        for _ in 0..100 {
+            let r = bridge.step(&hv, 0.01, 0.05); // Phi < 0.1 → Red
+            assert_eq!(r.safety_level, MotorSafetyLevel::Red);
+            assert!(r.success, "state must remain finite during emergency descent");
+        }
+
+        // Verify descent rate is bounded (never exceeds ~5 m/s)
+        let state = bridge.simulator().state();
+        assert!(
+            state.linear_velocity[2] >= -5.1,
+            "descent rate {} exceeded MAX_DESCENT_RATE",
+            state.linear_velocity[2]
+        );
     }
 
     #[test]

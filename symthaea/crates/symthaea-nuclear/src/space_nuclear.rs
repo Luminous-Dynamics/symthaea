@@ -121,8 +121,7 @@ fn geiger_nuttall_half_life_years(z_daughter: u16, q_mev: f64) -> f64 {
         return f64::INFINITY;
     }
     let zd = z_daughter as f64;
-    let log10_t_seconds =
-        (1.66175 * zd - 8.5166) / q_mev.sqrt() + (-0.20228 * zd - 33.9069);
+    let log10_t_seconds = (1.66175 * zd - 8.5166) / q_mev.sqrt() + (-0.20228 * zd - 33.9069);
     let t_seconds = 10.0_f64.powf(log10_t_seconds);
     t_seconds / SECONDS_PER_YEAR
 }
@@ -224,7 +223,11 @@ pub fn scan_novel_rtg_candidates(predictor: &MlMassPredictor) -> Vec<RtgCandidat
     }
 
     // Sort by specific power descending
-    candidates.sort_by(|a, b| b.specific_power_wg.partial_cmp(&a.specific_power_wg).unwrap());
+    candidates.sort_by(|a, b| {
+        b.specific_power_wg
+            .partial_cmp(&a.specific_power_wg)
+            .unwrap()
+    });
     candidates
 }
 
@@ -385,7 +388,7 @@ pub fn evaluate_ntp_fuels(predictor: &MlMassPredictor) -> Vec<NtpFuelCandidate> 
         ("Pu-239", 94, 145, 748.0),
         ("Am-242m", 95, 147, 8500.0), // highest thermal fission xs
         ("U-233", 92, 141, 530.0),
-        ("Cf-252", 98, 154, 32.0),    // spontaneous fission source
+        ("Cf-252", 98, 154, 32.0), // spontaneous fission source
     ];
 
     let mut candidates: Vec<NtpFuelCandidate> = fuels
@@ -483,8 +486,12 @@ fn half_life_category(z: u16, n: u16, ba: f64) -> String {
     // Magic number products tend to be stable
     let magic_z = [2, 8, 20, 28, 50, 82];
     let magic_n = [2, 8, 20, 28, 50, 82, 126];
-    let near_magic_z = magic_z.iter().any(|&m| (z as i32 - m as i32).unsigned_abs() <= 2);
-    let near_magic_n = magic_n.iter().any(|&m| (n as i32 - m as i32).unsigned_abs() <= 2);
+    let near_magic_z = magic_z
+        .iter()
+        .any(|&m| (z as i32 - m as i32).unsigned_abs() <= 2);
+    let near_magic_n = magic_n
+        .iter()
+        .any(|&m| (n as i32 - m as i32).unsigned_abs() <= 2);
 
     if !is_likely_radioactive(z, n) {
         "stable".to_string()
@@ -557,8 +564,7 @@ pub fn evaluate_activation_products(
             let pred = predictor.predict(prod_z, prod_n);
             let radioactive = is_likely_radioactive(prod_z, prod_n);
             let hl_cat = half_life_category(prod_z, prod_n, pred.ba);
-            let activity =
-                estimate_activity_relative(prod_z, &hl_cat, years_in_deep_space);
+            let activity = estimate_activity_relative(prod_z, &hl_cat, years_in_deep_space);
 
             products.push(ActivationProduct {
                 parent_name: parent_name.to_string(),
@@ -605,7 +611,11 @@ pub fn generate_space_nuclear_report(
     mission_years: f64,
 ) -> SpaceNuclearReport {
     let mut rtg_known = known_rtg_fuels(predictor);
-    rtg_known.sort_by(|a, b| b.specific_power_wg.partial_cmp(&a.specific_power_wg).unwrap());
+    rtg_known.sort_by(|a, b| {
+        b.specific_power_wg
+            .partial_cmp(&a.specific_power_wg)
+            .unwrap()
+    });
 
     let rtg_novel = scan_novel_rtg_candidates(predictor);
     let shielding = evaluate_shielding_materials();
@@ -761,7 +771,10 @@ mod tests {
         assert!(!materials.is_empty());
 
         // H-rich materials (polyethylene, LiH, water) should score well
-        let poly = materials.iter().find(|m| m.name.contains("Polyethylene")).unwrap();
+        let poly = materials
+            .iter()
+            .find(|m| m.name.contains("Polyethylene"))
+            .unwrap();
         let lead = materials.iter().find(|m| m.name.contains("Lead")).unwrap();
         // Polyethylene should outscore lead (H-rich, low secondaries)
         assert!(
@@ -772,8 +785,14 @@ mod tests {
         );
 
         // Heavy materials should have higher secondary neutron factor
-        let tungsten = materials.iter().find(|m| m.name.contains("Tungsten")).unwrap();
-        let al = materials.iter().find(|m| m.name.contains("Aluminum")).unwrap();
+        let tungsten = materials
+            .iter()
+            .find(|m| m.name.contains("Tungsten"))
+            .unwrap();
+        let al = materials
+            .iter()
+            .find(|m| m.name.contains("Aluminum"))
+            .unwrap();
         assert!(tungsten.secondary_neutron_factor > al.secondary_neutron_factor);
     }
 
@@ -943,7 +962,11 @@ mod tests {
         for f in &report.ntp_fuels {
             println!(
                 "  {}: Q={:.1} MeV, barrier={:.2} MeV, xs={:.0} b, Isp_rel={:.3}",
-                f.name, f.energy_per_fission_mev, f.fission_barrier_mev, f.thermal_xs_barns, f.isp_relative
+                f.name,
+                f.energy_per_fission_mev,
+                f.fission_barrier_mev,
+                f.thermal_xs_barns,
+                f.isp_relative
             );
         }
 

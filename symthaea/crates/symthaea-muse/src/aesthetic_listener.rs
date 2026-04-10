@@ -53,7 +53,11 @@ impl AestheticListener {
     }
 
     /// Assess the aesthetic quality of the current audio output.
-    pub fn assess(&mut self, features: &AudioFeatures, state: &MusicalState) -> AestheticAssessment {
+    pub fn assess(
+        &mut self,
+        features: &AudioFeatures,
+        state: &MusicalState,
+    ) -> AestheticAssessment {
         // Consonance: inverse of harmonic_tension × spectral noise
         // Low ZCR + low tension = consonant
         let consonance = (1.0 - features.harmonic_tension) * (1.0 - features.zero_crossing_rate);
@@ -91,7 +95,8 @@ impl AestheticListener {
         self.smoothed.consonance += a * (assessment.consonance - self.smoothed.consonance);
         self.smoothed.harshness += a * (assessment.harshness - self.smoothed.harshness);
         self.smoothed.breathiness += a * (assessment.breathiness - self.smoothed.breathiness);
-        self.smoothed.dynamic_balance += a * (assessment.dynamic_balance - self.smoothed.dynamic_balance);
+        self.smoothed.dynamic_balance +=
+            a * (assessment.dynamic_balance - self.smoothed.dynamic_balance);
         self.smoothed.beauty += a * (assessment.beauty - self.smoothed.beauty);
 
         assessment
@@ -151,10 +156,21 @@ mod tests {
             rms_energy: 0.05,
             zero_crossing_rate: 0.03,
         };
-        let state = MusicalState { consciousness_level: 0.5, ..Default::default() };
+        let state = MusicalState {
+            consciousness_level: 0.5,
+            ..Default::default()
+        };
         let assessment = listener.assess(&features, &state);
-        assert!(assessment.beauty > 0.6, "quiet smooth should be beautiful: {:.3}", assessment.beauty);
-        assert!(assessment.harshness < 0.2, "should not be harsh: {:.3}", assessment.harshness);
+        assert!(
+            assessment.beauty > 0.6,
+            "quiet smooth should be beautiful: {:.3}",
+            assessment.beauty
+        );
+        assert!(
+            assessment.harshness < 0.2,
+            "should not be harsh: {:.3}",
+            assessment.harshness
+        );
     }
 
     #[test]
@@ -168,10 +184,21 @@ mod tests {
             rms_energy: 0.8,
             zero_crossing_rate: 0.5,
         };
-        let state = MusicalState { consciousness_level: 0.3, ..Default::default() };
+        let state = MusicalState {
+            consciousness_level: 0.3,
+            ..Default::default()
+        };
         let assessment = listener.assess(&features, &state);
-        assert!(assessment.harshness > 0.4, "loud noisy should be harsh: {:.3}", assessment.harshness);
-        assert!(assessment.beauty < 0.5, "harsh audio should score low: {:.3}", assessment.beauty);
+        assert!(
+            assessment.harshness > 0.4,
+            "loud noisy should be harsh: {:.3}",
+            assessment.harshness
+        );
+        assert!(
+            assessment.beauty < 0.5,
+            "harsh audio should score low: {:.3}",
+            assessment.beauty
+        );
     }
 
     #[test]
@@ -182,7 +209,10 @@ mod tests {
         listener.smoothed.beauty = 0.2;
 
         let mut state = MusicalState {
-            dopamine: 0.8, noradrenaline: 0.7, serotonin: 0.3, arousal: 0.8,
+            dopamine: 0.8,
+            noradrenaline: 0.7,
+            serotonin: 0.3,
+            arousal: 0.8,
             ..Default::default()
         };
         let orig_dopamine = state.dopamine;
@@ -201,21 +231,31 @@ mod tests {
         listener.smoothed.harshness = 0.1;
         listener.smoothed.beauty = 0.8;
 
-        let mut state = MusicalState { dopamine: 0.5, ..Default::default() };
+        let mut state = MusicalState {
+            dopamine: 0.5,
+            ..Default::default()
+        };
         let orig = state.dopamine;
         listener.apply_corrections(&mut state);
-        assert!((state.dopamine - orig).abs() < 0.01, "should not intervene when beautiful");
+        assert!(
+            (state.dopamine - orig).abs() < 0.01,
+            "should not intervene when beautiful"
+        );
     }
 
     #[test]
     fn smoothing_converges() {
         let mut listener = AestheticListener::new();
         let features = AudioFeatures {
-            rms_energy: 0.1, harmonic_tension: 0.2, zero_crossing_rate: 0.05,
+            rms_energy: 0.1,
+            harmonic_tension: 0.2,
+            zero_crossing_rate: 0.05,
             ..Default::default()
         };
         let state = MusicalState::default();
-        for _ in 0..50 { listener.assess(&features, &state); }
+        for _ in 0..50 {
+            listener.assess(&features, &state);
+        }
         let smoothed = listener.smoothed_assessment();
         assert!(smoothed.beauty > 0.0, "smoothed beauty should converge");
     }

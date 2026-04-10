@@ -67,7 +67,11 @@ pub fn parse_midi(data: &[u8]) -> Result<Vec<Note>, MidiLoadError> {
     // ── Convert to Note format ──
     let secs_per_tick = (tempo_us_per_beat as f64) / (ticks_per_beat as f64 * 1_000_000.0);
     let mut notes = convert_events_to_notes(&all_events, secs_per_tick as f32);
-    notes.sort_by(|a, b| a.start_time.partial_cmp(&b.start_time).unwrap_or(std::cmp::Ordering::Equal));
+    notes.sort_by(|a, b| {
+        a.start_time
+            .partial_cmp(&b.start_time)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
 
     Ok(notes)
 }
@@ -85,7 +89,10 @@ fn load_melodies_recursive(dir: &Path, melodies: &mut Vec<Vec<Note>>) {
             let path = entry.path();
             if path.is_dir() {
                 load_melodies_recursive(&path, melodies);
-            } else if path.extension().map_or(false, |ext| ext == "mid" || ext == "midi") {
+            } else if path
+                .extension()
+                .map_or(false, |ext| ext == "mid" || ext == "midi")
+            {
                 if let Ok(notes) = load_midi(&path) {
                     if !notes.is_empty() {
                         melodies.push(notes);
@@ -132,8 +139,7 @@ fn read_u16_be(data: &[u8]) -> u16 {
 }
 
 fn read_u32_be(data: &[u8]) -> u32 {
-    ((data[0] as u32) << 24) | ((data[1] as u32) << 16)
-        | ((data[2] as u32) << 8) | (data[3] as u32)
+    ((data[0] as u32) << 24) | ((data[1] as u32) << 16) | ((data[2] as u32) << 8) | (data[3] as u32)
 }
 
 fn read_vlq(data: &[u8], pos: &mut usize) -> u32 {
@@ -152,7 +158,11 @@ fn read_vlq(data: &[u8], pos: &mut usize) -> u32 {
     value
 }
 
-fn parse_track(data: &[u8], _ticks_per_beat: u16, _default_tempo: u32) -> (Vec<MidiNoteEvent>, u32) {
+fn parse_track(
+    data: &[u8],
+    _ticks_per_beat: u16,
+    _default_tempo: u32,
+) -> (Vec<MidiNoteEvent>, u32) {
     let mut events = Vec::new();
     let mut pos = 0;
     let mut tick: u32 = 0;
@@ -182,26 +192,45 @@ fn parse_track(data: &[u8], _ticks_per_beat: u16, _default_tempo: u32) -> (Vec<M
         match msg_type {
             0x90 => {
                 // NoteOn
-                if pos + 1 >= data.len() { break; }
+                if pos + 1 >= data.len() {
+                    break;
+                }
                 let note = data[pos];
                 let velocity = data[pos + 1];
                 pos += 2;
                 last_status = status;
                 if velocity > 0 {
-                    events.push(MidiNoteEvent { tick, note, velocity, is_on: true });
+                    events.push(MidiNoteEvent {
+                        tick,
+                        note,
+                        velocity,
+                        is_on: true,
+                    });
                 } else {
                     // Velocity 0 = NoteOff
-                    events.push(MidiNoteEvent { tick, note, velocity: 0, is_on: false });
+                    events.push(MidiNoteEvent {
+                        tick,
+                        note,
+                        velocity: 0,
+                        is_on: false,
+                    });
                 }
             }
             0x80 => {
                 // NoteOff
-                if pos + 1 >= data.len() { break; }
+                if pos + 1 >= data.len() {
+                    break;
+                }
                 let note = data[pos];
                 let _velocity = data[pos + 1];
                 pos += 2;
                 last_status = status;
-                events.push(MidiNoteEvent { tick, note, velocity: 0, is_on: false });
+                events.push(MidiNoteEvent {
+                    tick,
+                    note,
+                    velocity: 0,
+                    is_on: false,
+                });
             }
             0xA0 | 0xB0 | 0xE0 => {
                 // Aftertouch, Control Change, Pitch Bend — 2 data bytes
@@ -216,7 +245,9 @@ fn parse_track(data: &[u8], _ticks_per_beat: u16, _default_tempo: u32) -> (Vec<M
             0xF0 => {
                 if status == 0xFF {
                     // Meta event
-                    if pos + 1 >= data.len() { break; }
+                    if pos + 1 >= data.len() {
+                        break;
+                    }
                     let meta_type = data[pos];
                     pos += 1;
                     let meta_len = read_vlq(data, &mut pos) as usize;
@@ -335,15 +366,14 @@ mod tests {
         let midi_data = comp.to_midi(tempo);
 
         let reimported = parse_midi(&midi_data).expect("should parse our own MIDI");
-        assert!(
-            !reimported.is_empty(),
-            "re-imported MIDI should have notes"
-        );
+        assert!(!reimported.is_empty(), "re-imported MIDI should have notes");
         // Note count should match (each note → NoteOn + NoteOff)
         assert_eq!(
-            reimported.len(), comp.notes.len(),
+            reimported.len(),
+            comp.notes.len(),
             "note count mismatch: imported {} vs original {}",
-            reimported.len(), comp.notes.len()
+            reimported.len(),
+            comp.notes.len()
         );
     }
 

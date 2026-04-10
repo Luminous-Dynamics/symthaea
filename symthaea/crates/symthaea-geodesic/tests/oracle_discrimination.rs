@@ -60,26 +60,52 @@ fn test_oracle_correct_vs_wrong_programs() {
         // 1. ADD vs MUL (wrong operator)
         (
             "add",
-            ProgramNode::apply(ProgramNode::op("ADD"), vec![ProgramNode::atom("a"), ProgramNode::atom("b")]),
-            ProgramNode::apply(ProgramNode::op("MUL"), vec![ProgramNode::atom("a"), ProgramNode::atom("b")]),
+            ProgramNode::apply(
+                ProgramNode::op("ADD"),
+                vec![ProgramNode::atom("a"), ProgramNode::atom("b")],
+            ),
+            ProgramNode::apply(
+                ProgramNode::op("MUL"),
+                vec![ProgramNode::atom("a"), ProgramNode::atom("b")],
+            ),
         ),
         // 2. SUB vs DIV (wrong operator)
         (
             "subtract",
-            ProgramNode::apply(ProgramNode::op("SUB"), vec![ProgramNode::atom("x"), ProgramNode::atom("y")]),
-            ProgramNode::apply(ProgramNode::op("DIV"), vec![ProgramNode::atom("x"), ProgramNode::atom("y")]),
+            ProgramNode::apply(
+                ProgramNode::op("SUB"),
+                vec![ProgramNode::atom("x"), ProgramNode::atom("y")],
+            ),
+            ProgramNode::apply(
+                ProgramNode::op("DIV"),
+                vec![ProgramNode::atom("x"), ProgramNode::atom("y")],
+            ),
         ),
         // 3. Sequence(a, b) vs Sequence(b, a) (wrong order)
         (
             "sequence_order",
-            ProgramNode::Sequence(vec![ProgramNode::atom("first"), ProgramNode::atom("second")]),
-            ProgramNode::Sequence(vec![ProgramNode::atom("second"), ProgramNode::atom("first")]),
+            ProgramNode::Sequence(vec![
+                ProgramNode::atom("first"),
+                ProgramNode::atom("second"),
+            ]),
+            ProgramNode::Sequence(vec![
+                ProgramNode::atom("second"),
+                ProgramNode::atom("first"),
+            ]),
         ),
         // 4. Branch(cond, A, B) vs Branch(cond, B, A) (swapped branches)
         (
             "branch_swap",
-            ProgramNode::branch(ProgramNode::atom("cond"), ProgramNode::atom("yes"), ProgramNode::atom("no")),
-            ProgramNode::branch(ProgramNode::atom("cond"), ProgramNode::atom("no"), ProgramNode::atom("yes")),
+            ProgramNode::branch(
+                ProgramNode::atom("cond"),
+                ProgramNode::atom("yes"),
+                ProgramNode::atom("no"),
+            ),
+            ProgramNode::branch(
+                ProgramNode::atom("cond"),
+                ProgramNode::atom("no"),
+                ProgramNode::atom("yes"),
+            ),
         ),
         // 5. Map(f, col) vs Filter(f, col) (wrong combinator)
         (
@@ -90,8 +116,16 @@ fn test_oracle_correct_vs_wrong_programs() {
         // 6. Reduce(add, 0, arr) vs Reduce(mul, 1, arr) (wrong accumulator)
         (
             "reduce_op",
-            ProgramNode::reduce(ProgramNode::op("ADD"), ProgramNode::atom("0"), ProgramNode::atom("arr")),
-            ProgramNode::reduce(ProgramNode::op("MUL"), ProgramNode::atom("1"), ProgramNode::atom("arr")),
+            ProgramNode::reduce(
+                ProgramNode::op("ADD"),
+                ProgramNode::atom("0"),
+                ProgramNode::atom("arr"),
+            ),
+            ProgramNode::reduce(
+                ProgramNode::op("MUL"),
+                ProgramNode::atom("1"),
+                ProgramNode::atom("arr"),
+            ),
         ),
         // 7. Iterate(i=0, i<n, body) vs Iterate(i=0, i>n, body) (wrong condition)
         (
@@ -99,12 +133,18 @@ fn test_oracle_correct_vs_wrong_programs() {
             ProgramNode::iterate(
                 ProgramNode::atom("i=0"),
                 ProgramNode::atom("i+=1"),
-                ProgramNode::apply(ProgramNode::op("LT"), vec![ProgramNode::atom("i"), ProgramNode::atom("n")]),
+                ProgramNode::apply(
+                    ProgramNode::op("LT"),
+                    vec![ProgramNode::atom("i"), ProgramNode::atom("n")],
+                ),
             ),
             ProgramNode::iterate(
                 ProgramNode::atom("i=0"),
                 ProgramNode::atom("i+=1"),
-                ProgramNode::apply(ProgramNode::op("GT"), vec![ProgramNode::atom("i"), ProgramNode::atom("n")]),
+                ProgramNode::apply(
+                    ProgramNode::op("GT"),
+                    vec![ProgramNode::atom("i"), ProgramNode::atom("n")],
+                ),
             ),
         ),
         // 8. Recurse(base=1, n*f(n-1)) vs Recurse(base=0, n+f(n-1)) (wrong base + op)
@@ -112,18 +152,27 @@ fn test_oracle_correct_vs_wrong_programs() {
             "recurse_base",
             ProgramNode::recurse(
                 ProgramNode::atom("1"),
-                ProgramNode::apply(ProgramNode::op("MUL"), vec![ProgramNode::atom("n"), ProgramNode::atom("f(n-1)")]),
+                ProgramNode::apply(
+                    ProgramNode::op("MUL"),
+                    vec![ProgramNode::atom("n"), ProgramNode::atom("f(n-1)")],
+                ),
             ),
             ProgramNode::recurse(
                 ProgramNode::atom("0"),
-                ProgramNode::apply(ProgramNode::op("ADD"), vec![ProgramNode::atom("n"), ProgramNode::atom("f(n-1)")]),
+                ProgramNode::apply(
+                    ProgramNode::op("ADD"),
+                    vec![ProgramNode::atom("n"), ProgramNode::atom("f(n-1)")],
+                ),
             ),
         ),
         // 9. Same structure, different atoms
         (
             "atom_difference",
             ProgramNode::apply(ProgramNode::atom("sort"), vec![ProgramNode::atom("array")]),
-            ProgramNode::apply(ProgramNode::atom("reverse"), vec![ProgramNode::atom("array")]),
+            ProgramNode::apply(
+                ProgramNode::atom("reverse"),
+                vec![ProgramNode::atom("array")],
+            ),
         ),
         // 10. Compose(f, g) vs Compose(g, f) (wrong composition order)
         (
@@ -134,7 +183,10 @@ fn test_oracle_correct_vs_wrong_programs() {
     ];
 
     println!("\n=== Oracle Discrimination Experiment ===\n");
-    println!("{:<20} {:>10} {:>10} {:>10} {:>8}", "Test", "Correct", "Wrong", "Delta", "Discrim?");
+    println!(
+        "{:<20} {:>10} {:>10} {:>10} {:>8}",
+        "Test", "Correct", "Wrong", "Delta", "Discrim?"
+    );
     println!("{}", "-".repeat(65));
 
     let mut correct_wins = 0;
@@ -158,7 +210,10 @@ fn test_oracle_correct_vs_wrong_programs() {
 
         println!(
             "{:<20} {:>10.4} {:>10.4} {:>+10.4} {:>8}",
-            name, correct_score, wrong_score, delta,
+            name,
+            correct_score,
+            wrong_score,
+            delta,
             if discriminates { "YES" } else { "NO" }
         );
     }
@@ -169,7 +224,9 @@ fn test_oracle_correct_vs_wrong_programs() {
     println!("{}", "-".repeat(65));
     println!(
         "Discrimination accuracy: {}/{} ({:.0}%)",
-        correct_wins, total, accuracy * 100.0
+        correct_wins,
+        total,
+        accuracy * 100.0
     );
     println!("Mean score delta: {:+.4}", mean_delta);
     println!();
@@ -202,11 +259,41 @@ fn test_self_consistency_scores() {
     // A program scored against its own encoding should produce high similarity.
     // This tests the oracle's internal consistency, not discrimination.
     let programs: Vec<(&str, ProgramNode)> = vec![
-        ("add", ProgramNode::apply(ProgramNode::op("ADD"), vec![ProgramNode::atom("a"), ProgramNode::atom("b")])),
-        ("map", ProgramNode::map(ProgramNode::atom("f"), ProgramNode::atom("col"))),
-        ("branch", ProgramNode::branch(ProgramNode::atom("c"), ProgramNode::atom("t"), ProgramNode::atom("f"))),
-        ("sequence", ProgramNode::Sequence(vec![ProgramNode::atom("a"), ProgramNode::atom("b"), ProgramNode::atom("c")])),
-        ("iterate", ProgramNode::iterate(ProgramNode::atom("init"), ProgramNode::atom("step"), ProgramNode::atom("cond"))),
+        (
+            "add",
+            ProgramNode::apply(
+                ProgramNode::op("ADD"),
+                vec![ProgramNode::atom("a"), ProgramNode::atom("b")],
+            ),
+        ),
+        (
+            "map",
+            ProgramNode::map(ProgramNode::atom("f"), ProgramNode::atom("col")),
+        ),
+        (
+            "branch",
+            ProgramNode::branch(
+                ProgramNode::atom("c"),
+                ProgramNode::atom("t"),
+                ProgramNode::atom("f"),
+            ),
+        ),
+        (
+            "sequence",
+            ProgramNode::Sequence(vec![
+                ProgramNode::atom("a"),
+                ProgramNode::atom("b"),
+                ProgramNode::atom("c"),
+            ]),
+        ),
+        (
+            "iterate",
+            ProgramNode::iterate(
+                ProgramNode::atom("init"),
+                ProgramNode::atom("step"),
+                ProgramNode::atom("cond"),
+            ),
+        ),
     ];
 
     println!("\n=== Self-Consistency Scores ===\n");
@@ -228,10 +315,31 @@ fn test_encoding_distance_vs_oracle_distance() {
     let base_hv = base.encode();
 
     let variants: Vec<(&str, ProgramNode)> = vec![
-        ("same", ProgramNode::apply(ProgramNode::op("ADD"), vec![ProgramNode::atom("a"), ProgramNode::atom("b")])),
-        ("diff_args", ProgramNode::apply(ProgramNode::op("ADD"), vec![ProgramNode::atom("x"), ProgramNode::atom("y")])),
-        ("diff_op", ProgramNode::apply(ProgramNode::op("SUB"), vec![ProgramNode::atom("a"), ProgramNode::atom("b")])),
-        ("totally_diff", ProgramNode::map(ProgramNode::atom("sort"), ProgramNode::atom("list"))),
+        (
+            "same",
+            ProgramNode::apply(
+                ProgramNode::op("ADD"),
+                vec![ProgramNode::atom("a"), ProgramNode::atom("b")],
+            ),
+        ),
+        (
+            "diff_args",
+            ProgramNode::apply(
+                ProgramNode::op("ADD"),
+                vec![ProgramNode::atom("x"), ProgramNode::atom("y")],
+            ),
+        ),
+        (
+            "diff_op",
+            ProgramNode::apply(
+                ProgramNode::op("SUB"),
+                vec![ProgramNode::atom("a"), ProgramNode::atom("b")],
+            ),
+        ),
+        (
+            "totally_diff",
+            ProgramNode::map(ProgramNode::atom("sort"), ProgramNode::atom("list")),
+        ),
     ];
 
     println!("\n=== Encoding Distance vs Oracle Distance ===\n");

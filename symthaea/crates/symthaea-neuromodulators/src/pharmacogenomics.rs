@@ -145,10 +145,10 @@ impl AncestryGroup {
     /// Science: Bradford (2002) — CYP2D6 PM prevalence by ethnicity.
     pub fn cyp2d6_poor_prevalence(&self) -> f32 {
         match self {
-            Self::European => 0.07,      // ~7%
-            Self::African => 0.03,       // ~3%
-            Self::EastAsian => 0.01,     // ~1%
-            Self::SouthAsian => 0.04,    // ~4%
+            Self::European => 0.07,   // ~7%
+            Self::African => 0.03,    // ~3%
+            Self::EastAsian => 0.01,  // ~1%
+            Self::SouthAsian => 0.04, // ~4%
             Self::NativeAmerican => 0.02,
             Self::Mixed => 0.05,
         }
@@ -158,7 +158,7 @@ impl AncestryGroup {
     pub fn cyp2d6_ultra_rapid_prevalence(&self) -> f32 {
         match self {
             Self::European => 0.05,
-            Self::African => 0.29,   // ~29% — notably high
+            Self::African => 0.29, // ~29% — notably high
             Self::EastAsian => 0.01,
             Self::SouthAsian => 0.08,
             Self::NativeAmerican => 0.03,
@@ -411,34 +411,44 @@ impl PgxProfile {
 
         // HTR2A rs6311: T allele → higher 5-HT2A density → stronger psychedelic response.
         // Homozygous T/T ≈ 1.4× receptor density (Turecki 1999).
-        let htr2a_effect = self.variant_zygosity(GeneticVariant::HTR2A_rs6311).effect_size();
+        let htr2a_effect = self
+            .variant_zygosity(GeneticVariant::HTR2A_rs6311)
+            .effect_size();
         cs.serotonin_receptor_density = 0.5 + 0.4 * htr2a_effect;
 
         // COMT Val158Met: Val = high activity → fast DA clearance.
         // Val/Val (WildType in our encoding) = 0.8 clearance rate.
         // Met/Met (Homozygous) = 0.3 clearance rate.
-        let comt_effect = self.variant_zygosity(GeneticVariant::COMT_Val158Met).effect_size();
+        let comt_effect = self
+            .variant_zygosity(GeneticVariant::COMT_Val158Met)
+            .effect_size();
         cs.dopamine_clearance_rate = 0.8 - 0.5 * comt_effect;
 
         // OPRM1 A118G: G allele → reduced mu-opioid binding.
-        let oprm1_effect = self.variant_zygosity(GeneticVariant::OPRM1_A118G).effect_size();
+        let oprm1_effect = self
+            .variant_zygosity(GeneticVariant::OPRM1_A118G)
+            .effect_size();
         cs.opioid_sensitivity = 0.7 - 0.3 * oprm1_effect;
 
         // BDNF Val66Met: Met → reduced neuroplasticity.
-        let bdnf_effect = self.variant_zygosity(GeneticVariant::BDNF_Val66Met).effect_size();
+        let bdnf_effect = self
+            .variant_zygosity(GeneticVariant::BDNF_Val66Met)
+            .effect_size();
         cs.neuroplasticity_factor = 0.8 - 0.3 * bdnf_effect;
 
         // 5-HTTLPR: short allele → lower transporter efficiency → higher synaptic 5-HT.
-        let sht_effect = self.variant_zygosity(GeneticVariant::SLC6A4_5HTTLPR).effect_size();
+        let sht_effect = self
+            .variant_zygosity(GeneticVariant::SLC6A4_5HTTLPR)
+            .effect_size();
         cs.serotonin_transporter_efficiency = 0.7 - 0.3 * sht_effect;
 
         // Phi baseline modifier: composite of integration-relevant variants.
         // Higher 5-HT2A density and lower DA clearance both correlate with richer
         // phenomenal integration (Carhart-Harris 2018 entropic brain).
-        cs.phi_baseline_modifier =
-            1.0 + 0.1 * (cs.serotonin_receptor_density as f64 - 0.5)
-                + 0.05 * (0.5 - cs.dopamine_clearance_rate as f64)
-                + 0.05 * (cs.neuroplasticity_factor as f64 - 0.5);
+        cs.phi_baseline_modifier = 1.0
+            + 0.1 * (cs.serotonin_receptor_density as f64 - 0.5)
+            + 0.05 * (0.5 - cs.dopamine_clearance_rate as f64)
+            + 0.05 * (cs.neuroplasticity_factor as f64 - 0.5);
 
         cs
     }
@@ -459,9 +469,11 @@ impl PgxProfile {
 
         // Scale effects by dose and genetic sensitivity.
         let neuromod_effects = NeuromodEffects {
-            delta_serotonin: base_effects.delta_serotonin * base_dose
+            delta_serotonin: base_effects.delta_serotonin
+                * base_dose
                 * (1.0 + 0.3 * (cs.serotonin_receptor_density - 0.5)),
-            delta_dopamine: base_effects.delta_dopamine * base_dose
+            delta_dopamine: base_effects.delta_dopamine
+                * base_dose
                 * (1.0 - 0.2 * (cs.dopamine_clearance_rate - 0.5)),
             delta_noradrenaline: base_effects.delta_noradrenaline * base_dose,
             delta_gaba: base_effects.delta_gaba * base_dose,
@@ -475,12 +487,14 @@ impl PgxProfile {
             + neuromod_effects.delta_gaba.abs()
             + neuromod_effects.delta_glutamate.abs();
 
-        let consciousness_impact =
-            total_neuromod_shift as f64 * 0.1 * cs.phi_baseline_modifier;
+        let consciousness_impact = total_neuromod_shift as f64 * 0.1 * cs.phi_baseline_modifier;
 
         // Accumulation warning for poor metabolizers on drugs with narrow therapeutic index.
         let accumulation_warning = phenotype == MetabolizerPhenotype::Poor
-            && matches!(drug, DrugClass::SSRI | DrugClass::Opioid | DrugClass::Antipsychotic);
+            && matches!(
+                drug,
+                DrugClass::SSRI | DrugClass::Opioid | DrugClass::Antipsychotic
+            );
 
         PharmaResponse {
             drug_class: drug,
@@ -507,8 +521,8 @@ impl PgxProfile {
         // the transporter is already partially blocked → smaller marginal effect.
         let sert_modifier = 0.5 + 0.5 * cs.serotonin_transporter_efficiency;
 
-        let delta_5ht = 0.30 * dose * sert_modifier
-            * (1.0 + 0.3 * (cs.serotonin_receptor_density - 0.5));
+        let delta_5ht =
+            0.30 * dose * sert_modifier * (1.0 + 0.3 * (cs.serotonin_receptor_density - 0.5));
 
         let neuromod_effects = NeuromodEffects {
             delta_serotonin: delta_5ht,
@@ -545,7 +559,8 @@ impl PgxProfile {
         let phenotype = self.metabolizer(CypEnzyme::CYP3A4);
         let cs = self.consciousness_sensitivity();
 
-        let effective_half_life = 4.0 * phenotype.half_life_multiplier()
+        let effective_half_life = 4.0
+            * phenotype.half_life_multiplier()
             * (1.0 + 0.3 * (1.0 - cs.dopamine_clearance_rate)); // slower COMT → longer
 
         let peak_concentration = dose * phenotype.peak_concentration_multiplier();
@@ -597,8 +612,7 @@ impl PgxProfile {
 
         // Dissociative Phi dip: glutamate blockade disrupts integration temporarily.
         // Rebound not modeled here (would need time-series).
-        let consciousness_impact =
-            -0.10 * dose as f64 * cs.phi_baseline_modifier;
+        let consciousness_impact = -0.10 * dose as f64 * cs.phi_baseline_modifier;
 
         PharmaResponse {
             drug_class: DrugClass::Ketamine,
@@ -639,36 +653,56 @@ mod tests {
     fn test_ssri_response_varies_by_5httlpr() {
         // Short/short (Homozygous) → lower transporter efficiency → smaller SSRI boost
         let mut profile_short = PgxProfile::default_european();
-        profile_short.genetic_variants.retain(|(v, _)| *v != GeneticVariant::SLC6A4_5HTTLPR);
-        profile_short.genetic_variants.push((GeneticVariant::SLC6A4_5HTTLPR, Zygosity::Homozygous));
+        profile_short
+            .genetic_variants
+            .retain(|(v, _)| *v != GeneticVariant::SLC6A4_5HTTLPR);
+        profile_short
+            .genetic_variants
+            .push((GeneticVariant::SLC6A4_5HTTLPR, Zygosity::Homozygous));
 
         let mut profile_wt = PgxProfile::default_european();
-        profile_wt.genetic_variants.retain(|(v, _)| *v != GeneticVariant::SLC6A4_5HTTLPR);
-        profile_wt.genetic_variants.push((GeneticVariant::SLC6A4_5HTTLPR, Zygosity::WildType));
+        profile_wt
+            .genetic_variants
+            .retain(|(v, _)| *v != GeneticVariant::SLC6A4_5HTTLPR);
+        profile_wt
+            .genetic_variants
+            .push((GeneticVariant::SLC6A4_5HTTLPR, Zygosity::WildType));
 
         let resp_short = profile_short.ssri_response(1.0);
         let resp_wt = profile_wt.ssri_response(1.0);
 
         // Short allele carriers have lower transporter efficiency → smaller delta
-        assert!(resp_short.neuromod_effects.delta_serotonin < resp_wt.neuromod_effects.delta_serotonin);
+        assert!(
+            resp_short.neuromod_effects.delta_serotonin < resp_wt.neuromod_effects.delta_serotonin
+        );
     }
 
     #[test]
     fn test_psychedelic_response_scales_with_5ht2a() {
         // Homozygous T/T → higher 5-HT2A density → stronger response
         let mut profile_high = PgxProfile::default_european();
-        profile_high.genetic_variants.retain(|(v, _)| *v != GeneticVariant::HTR2A_rs6311);
-        profile_high.genetic_variants.push((GeneticVariant::HTR2A_rs6311, Zygosity::Homozygous));
+        profile_high
+            .genetic_variants
+            .retain(|(v, _)| *v != GeneticVariant::HTR2A_rs6311);
+        profile_high
+            .genetic_variants
+            .push((GeneticVariant::HTR2A_rs6311, Zygosity::Homozygous));
 
         let mut profile_low = PgxProfile::default_european();
-        profile_low.genetic_variants.retain(|(v, _)| *v != GeneticVariant::HTR2A_rs6311);
-        profile_low.genetic_variants.push((GeneticVariant::HTR2A_rs6311, Zygosity::WildType));
+        profile_low
+            .genetic_variants
+            .retain(|(v, _)| *v != GeneticVariant::HTR2A_rs6311);
+        profile_low
+            .genetic_variants
+            .push((GeneticVariant::HTR2A_rs6311, Zygosity::WildType));
 
         let resp_high = profile_high.psychedelic_response(1.0);
         let resp_low = profile_low.psychedelic_response(1.0);
 
         assert!(resp_high.consciousness_impact > resp_low.consciousness_impact);
-        assert!(resp_high.neuromod_effects.delta_serotonin > resp_low.neuromod_effects.delta_serotonin);
+        assert!(
+            resp_high.neuromod_effects.delta_serotonin > resp_low.neuromod_effects.delta_serotonin
+        );
     }
 
     #[test]
@@ -687,18 +721,28 @@ mod tests {
     fn test_consciousness_sensitivity_comt_variant() {
         // COMT Val/Val (WildType) → fast clearance; Met/Met (Homozygous) → slow clearance
         let mut profile_val = PgxProfile::default_european();
-        profile_val.genetic_variants.retain(|(v, _)| *v != GeneticVariant::COMT_Val158Met);
-        profile_val.genetic_variants.push((GeneticVariant::COMT_Val158Met, Zygosity::WildType));
+        profile_val
+            .genetic_variants
+            .retain(|(v, _)| *v != GeneticVariant::COMT_Val158Met);
+        profile_val
+            .genetic_variants
+            .push((GeneticVariant::COMT_Val158Met, Zygosity::WildType));
 
         let mut profile_met = PgxProfile::default_european();
-        profile_met.genetic_variants.retain(|(v, _)| *v != GeneticVariant::COMT_Val158Met);
-        profile_met.genetic_variants.push((GeneticVariant::COMT_Val158Met, Zygosity::Homozygous));
+        profile_met
+            .genetic_variants
+            .retain(|(v, _)| *v != GeneticVariant::COMT_Val158Met);
+        profile_met
+            .genetic_variants
+            .push((GeneticVariant::COMT_Val158Met, Zygosity::Homozygous));
 
         let cs_val = profile_val.consciousness_sensitivity();
         let cs_met = profile_met.consciousness_sensitivity();
 
-        assert!(cs_val.dopamine_clearance_rate > cs_met.dopamine_clearance_rate,
-            "Val/Val should have faster DA clearance than Met/Met");
+        assert!(
+            cs_val.dopamine_clearance_rate > cs_met.dopamine_clearance_rate,
+            "Val/Val should have faster DA clearance than Met/Met"
+        );
     }
 
     #[test]
@@ -724,55 +768,88 @@ mod tests {
     #[test]
     fn test_ancestry_affects_prevalence() {
         // African ancestry has notably higher CYP2D6 ultra-rapid prevalence.
-        assert!(AncestryGroup::African.cyp2d6_ultra_rapid_prevalence()
-            > AncestryGroup::European.cyp2d6_ultra_rapid_prevalence());
+        assert!(
+            AncestryGroup::African.cyp2d6_ultra_rapid_prevalence()
+                > AncestryGroup::European.cyp2d6_ultra_rapid_prevalence()
+        );
         // European ancestry has higher poor-metabolizer prevalence than East Asian.
-        assert!(AncestryGroup::European.cyp2d6_poor_prevalence()
-            > AncestryGroup::EastAsian.cyp2d6_poor_prevalence());
+        assert!(
+            AncestryGroup::European.cyp2d6_poor_prevalence()
+                > AncestryGroup::EastAsian.cyp2d6_poor_prevalence()
+        );
     }
 
     #[test]
     fn test_bdnf_variant_modulates_neuroplasticity() {
         let mut profile_met = PgxProfile::default_european();
-        profile_met.genetic_variants.retain(|(v, _)| *v != GeneticVariant::BDNF_Val66Met);
-        profile_met.genetic_variants.push((GeneticVariant::BDNF_Val66Met, Zygosity::Homozygous));
+        profile_met
+            .genetic_variants
+            .retain(|(v, _)| *v != GeneticVariant::BDNF_Val66Met);
+        profile_met
+            .genetic_variants
+            .push((GeneticVariant::BDNF_Val66Met, Zygosity::Homozygous));
 
         let mut profile_val = PgxProfile::default_european();
-        profile_val.genetic_variants.retain(|(v, _)| *v != GeneticVariant::BDNF_Val66Met);
-        profile_val.genetic_variants.push((GeneticVariant::BDNF_Val66Met, Zygosity::WildType));
+        profile_val
+            .genetic_variants
+            .retain(|(v, _)| *v != GeneticVariant::BDNF_Val66Met);
+        profile_val
+            .genetic_variants
+            .push((GeneticVariant::BDNF_Val66Met, Zygosity::WildType));
 
         let cs_met = profile_met.consciousness_sensitivity();
         let cs_val = profile_val.consciousness_sensitivity();
 
-        assert!(cs_met.neuroplasticity_factor < cs_val.neuroplasticity_factor,
-            "BDNF Met/Met should have lower neuroplasticity than Val/Val");
+        assert!(
+            cs_met.neuroplasticity_factor < cs_val.neuroplasticity_factor,
+            "BDNF Met/Met should have lower neuroplasticity than Val/Val"
+        );
     }
 
     #[test]
     fn test_predict_response_all_drug_classes() {
         let profile = PgxProfile::default_european();
         let drug_classes = [
-            DrugClass::SSRI, DrugClass::SNRI, DrugClass::Benzodiazepine,
-            DrugClass::Psychedelic, DrugClass::Stimulant, DrugClass::Opioid,
-            DrugClass::Antipsychotic, DrugClass::Ketamine,
+            DrugClass::SSRI,
+            DrugClass::SNRI,
+            DrugClass::Benzodiazepine,
+            DrugClass::Psychedelic,
+            DrugClass::Stimulant,
+            DrugClass::Opioid,
+            DrugClass::Antipsychotic,
+            DrugClass::Ketamine,
         ];
         for drug in &drug_classes {
             let resp = profile.predict_response(*drug, 1.0);
-            assert!(resp.effective_half_life > 0.0, "Half-life must be positive for {:?}", drug);
-            assert!(resp.peak_concentration > 0.0, "Peak must be positive for {:?}", drug);
+            assert!(
+                resp.effective_half_life > 0.0,
+                "Half-life must be positive for {:?}",
+                drug
+            );
+            assert!(
+                resp.peak_concentration > 0.0,
+                "Peak must be positive for {:?}",
+                drug
+            );
         }
     }
 
     #[test]
     fn test_poor_cyp2d6_ssri_accumulation_warning() {
         let mut profile = PgxProfile::default_european();
-        profile.metabolizer_map.insert(CypEnzyme::CYP2D6, MetabolizerPhenotype::Poor);
+        profile
+            .metabolizer_map
+            .insert(CypEnzyme::CYP2D6, MetabolizerPhenotype::Poor);
 
         let resp = profile.ssri_response(1.0);
-        assert!(resp.accumulation_warning,
-            "Poor CYP2D6 metabolizer on SSRI should trigger accumulation warning");
-        assert!(resp.effective_half_life > 24.0,
-            "Poor metabolizer half-life should exceed normal 24h");
+        assert!(
+            resp.accumulation_warning,
+            "Poor CYP2D6 metabolizer on SSRI should trigger accumulation warning"
+        );
+        assert!(
+            resp.effective_half_life > 24.0,
+            "Poor metabolizer half-life should exceed normal 24h"
+        );
     }
 
     #[test]
@@ -794,17 +871,27 @@ mod tests {
     fn test_psychedelic_longer_with_slow_comt() {
         // Met/Met COMT → slower DA clearance → longer psychedelic duration.
         let mut profile_slow = PgxProfile::default_european();
-        profile_slow.genetic_variants.retain(|(v, _)| *v != GeneticVariant::COMT_Val158Met);
-        profile_slow.genetic_variants.push((GeneticVariant::COMT_Val158Met, Zygosity::Homozygous));
+        profile_slow
+            .genetic_variants
+            .retain(|(v, _)| *v != GeneticVariant::COMT_Val158Met);
+        profile_slow
+            .genetic_variants
+            .push((GeneticVariant::COMT_Val158Met, Zygosity::Homozygous));
 
         let mut profile_fast = PgxProfile::default_european();
-        profile_fast.genetic_variants.retain(|(v, _)| *v != GeneticVariant::COMT_Val158Met);
-        profile_fast.genetic_variants.push((GeneticVariant::COMT_Val158Met, Zygosity::WildType));
+        profile_fast
+            .genetic_variants
+            .retain(|(v, _)| *v != GeneticVariant::COMT_Val158Met);
+        profile_fast
+            .genetic_variants
+            .push((GeneticVariant::COMT_Val158Met, Zygosity::WildType));
 
         let resp_slow = profile_slow.psychedelic_response(1.0);
         let resp_fast = profile_fast.psychedelic_response(1.0);
 
-        assert!(resp_slow.effective_half_life > resp_fast.effective_half_life,
-            "Slow COMT should prolong psychedelic half-life");
+        assert!(
+            resp_slow.effective_half_life > resp_fast.effective_half_life,
+            "Slow COMT should prolong psychedelic half-life"
+        );
     }
 }

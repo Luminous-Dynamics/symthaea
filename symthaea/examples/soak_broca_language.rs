@@ -84,8 +84,14 @@ fn main() {
     println!("  Broca Language Pipeline Soak Test");
     println!("═══════════════════════════════════════════════════════════════");
     println!("  Cycles:        {cycles}");
-    println!("  LLM (Gemma 4): {}", if enable_llm { "ENABLED" } else { "disabled" });
-    println!("  Voice:         {}", if enable_voice { "ENABLED" } else { "disabled" });
+    println!(
+        "  LLM (Gemma 4): {}",
+        if enable_llm { "ENABLED" } else { "disabled" }
+    );
+    println!(
+        "  Voice:         {}",
+        if enable_voice { "ENABLED" } else { "disabled" }
+    );
     println!(
         "  Distillation:  {}",
         std::env::var("SYMTHAEA_DISTILL_PATH")
@@ -156,14 +162,31 @@ fn main() {
     println!("  Results");
     println!("═══════════════════════════════════════════════════════════════");
     println!("  Total cycles:      {cycles}");
-    println!("  Language outputs:   {language_count} ({:.1}%)", 100.0 * language_count as f64 / cycles as f64);
-    println!("  Avg text length:    {:.0} chars", if language_count > 0 { total_text_len as f64 / language_count as f64 } else { 0.0 });
+    println!(
+        "  Language outputs:   {language_count} ({:.1}%)",
+        100.0 * language_count as f64 / cycles as f64
+    );
+    println!(
+        "  Avg text length:    {:.0} chars",
+        if language_count > 0 {
+            total_text_len as f64 / language_count as f64
+        } else {
+            0.0
+        }
+    );
     if enable_llm {
         println!("  LLM upgrades:      {llm_upgrade_count}");
     }
     if enable_voice {
-        println!("  Voice samples:     {voice_sample_count} ({:.1}s at 16kHz)", voice_sample_count as f64 / 16000.0);
+        println!(
+            "  Voice samples:     {voice_sample_count} ({:.1}s at 16kHz)",
+            voice_sample_count as f64 / 16000.0
+        );
     }
-    println!("  Elapsed:           {:.2}s ({:.1} cycles/sec)", elapsed.as_secs_f64(), cycles as f64 / elapsed.as_secs_f64());
+    println!(
+        "  Elapsed:           {:.2}s ({:.1} cycles/sec)",
+        elapsed.as_secs_f64(),
+        cycles as f64 / elapsed.as_secs_f64()
+    );
     println!("═══════════════════════════════════════════════════════════════");
 }

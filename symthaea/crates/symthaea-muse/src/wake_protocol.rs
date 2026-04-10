@@ -111,7 +111,8 @@ impl HarmonyRecognizer {
         let mut scores = [0.0f32; 8];
 
         // Find the strongest pitch class (likely the root)
-        let root_pc = chroma.iter()
+        let root_pc = chroma
+            .iter()
             .enumerate()
             .max_by(|a, b| a.1.partial_cmp(b.1).unwrap())
             .map(|(i, _)| i)
@@ -172,7 +173,8 @@ impl HarmonyRecognizer {
             }
         }
 
-        let (dominant, &dominant_confidence) = scores.iter()
+        let (dominant, &dominant_confidence) = scores
+            .iter()
             .enumerate()
             .max_by(|a, b| a.1.partial_cmp(b.1).unwrap())
             .unwrap();
@@ -194,20 +196,29 @@ impl HarmonyRecognizer {
         let mut window_count = 0usize;
 
         for chunk in samples.chunks(self.fft_size) {
-            if chunk.len() < self.fft_size { break; }
-            let mut buffer: Vec<Complex<f32>> = chunk.iter()
+            if chunk.len() < self.fft_size {
+                break;
+            }
+            let mut buffer: Vec<Complex<f32>> = chunk
+                .iter()
                 .enumerate()
                 .map(|(i, &s)| {
-                    let w = 0.5 * (1.0 - (2.0 * std::f32::consts::PI * i as f32 / self.fft_size as f32).cos());
+                    let w = 0.5
+                        * (1.0
+                            - (2.0 * std::f32::consts::PI * i as f32 / self.fft_size as f32).cos());
                     Complex::new(s * w, 0.0)
                 })
                 .collect();
             fft.process(&mut buffer);
 
             for (i, bin) in buffer[..self.fft_size / 2].iter().enumerate() {
-                if i == 0 { continue; }
+                if i == 0 {
+                    continue;
+                }
                 let freq = i as f32 * hz_per_bin;
-                if freq < 50.0 || freq > 4000.0 { continue; }
+                if freq < 50.0 || freq > 4000.0 {
+                    continue;
+                }
                 let midi = 12.0 * (freq / 440.0).log2() + 69.0;
                 let pc = ((midi.round() as i32) % 12 + 12) % 12;
                 chroma[pc as usize] += bin.norm();
@@ -313,7 +324,10 @@ impl WakeProtocol {
         // (allows skipping phases that are hard to detect, like short crossfades)
         let accept = matches
             || (confidence.is_silence && expected_harmony_idx == 7)
-            || WAKE_ORDER.iter().skip(self.phase).any(|&h| h == detected_harmony_idx);
+            || WAKE_ORDER
+                .iter()
+                .skip(self.phase)
+                .any(|&h| h == detected_harmony_idx);
 
         if accept && confidence.dominant_confidence > 0.15 {
             self.confirmation_count += 1;
@@ -321,7 +335,11 @@ impl WakeProtocol {
             if self.confirmation_count >= self.confirmation_threshold {
                 // If we detected a later harmony, skip to it
                 if !matches {
-                    if let Some(pos) = WAKE_ORDER.iter().skip(self.phase).position(|&h| h == detected_harmony_idx) {
+                    if let Some(pos) = WAKE_ORDER
+                        .iter()
+                        .skip(self.phase)
+                        .position(|&h| h == detected_harmony_idx)
+                    {
                         self.phase += pos; // skip to the detected harmony's position
                     }
                 }
@@ -440,8 +458,14 @@ mod tests {
             .map(|i| (2.0 * std::f32::consts::PI * 440.0 * i as f32 / 44100.0).sin() * 0.5)
             .collect();
         let conf = rec.analyze(&samples);
-        assert!(!conf.is_silence, "440Hz sine should not be classified as silence");
-        assert!(conf.dominant_confidence > 0.05, "should have some confidence");
+        assert!(
+            !conf.is_silence,
+            "440Hz sine should not be classified as silence"
+        );
+        assert!(
+            conf.dominant_confidence > 0.05,
+            "should have some confidence"
+        );
     }
 
     #[test]
@@ -452,12 +476,15 @@ mod tests {
             .map(|i| {
                 let t = i as f32 / 44100.0;
                 (2.0 * std::f32::consts::PI * 220.0 * t).sin() * 0.4
-                + (2.0 * std::f32::consts::PI * 330.0 * t).sin() * 0.4
+                    + (2.0 * std::f32::consts::PI * 330.0 * t).sin() * 0.4
             })
             .collect();
         let conf = rec.analyze(&samples);
         // Should have high score for Integral Wisdom (index 2, interval 7)
-        assert!(conf.scores[2] > 0.1,
-            "perfect 5th should boost Integral Wisdom, score={:.3}", conf.scores[2]);
+        assert!(
+            conf.scores[2] > 0.1,
+            "perfect 5th should boost Integral Wisdom, score={:.3}",
+            conf.scores[2]
+        );
     }
 }

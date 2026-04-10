@@ -63,6 +63,7 @@ use crate::swarm::config::BootstrapConfig;
 #[cfg(feature = "swarm")]
 use crate::swarm::IrohNode;
 use parking_lot::RwLock;
+use positioning::{GaussianEstimate3D, PeerEstimate3D, PeerFusion3D, PublishableEstimate3D};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::broadcast;
@@ -73,6 +74,9 @@ const CONSCIOUSNESS_CHANNEL_SIZE: usize = 100;
 
 /// Channel buffer size for peer events
 const PEER_EVENT_CHANNEL_SIZE: usize = 50;
+
+/// Channel buffer size for navigation estimate updates.
+const NAVIGATION_CHANNEL_SIZE: usize = 50;
 
 /// Events about peer state changes
 #[derive(Debug, Clone)]
@@ -98,6 +102,13 @@ pub enum PeerEvent {
         peer_id: String,
         phi: f64,
         sequence: u64,
+    },
+
+    /// Peer navigation estimate updated.
+    NavigationUpdate {
+        peer_id: String,
+        position_m: [f64; 3],
+        sigma_m: f64,
     },
 }
 
@@ -125,8 +136,19 @@ pub struct ServiceStats {
     /// Successful bootstraps
     pub bootstrap_successes: u32,
 
+    /// Total peer navigation updates received.
+    pub navigation_updates_received: u64,
+
     /// Service uptime in seconds
     pub uptime_seconds: u64,
+}
+
+/// Local plus remote navigation state carried by the swarm service.
+#[derive(Debug, Clone, PartialEq)]
+pub struct NavigationStateSnapshot {
+    pub local: Option<GaussianEstimate3D>,
+    pub peers: Vec<PeerEstimate3D>,
+    pub fused: Option<GaussianEstimate3D>,
 }
 
 /// The main network service for swarm integration
@@ -154,6 +176,9 @@ pub struct NetworkService {
     /// Channel for peer events
     peer_event_tx: broadcast::Sender<PeerEvent>,
 
+    /// Channel for broadcasting navigation estimate updates to subscribers.
+    navigation_tx: broadcast::Sender<(String, PeerEstimate3D)>,
+
     /// Service statistics
     stats: Arc<RwLock<ServiceStats>>,
 
@@ -168,6 +193,12 @@ pub struct NetworkService {
 
     /// Whether the service is running
     running: Arc<std::sync::atomic::AtomicBool>,
+
+    /// Latest local navigation estimate, if the runtime has published one.
+    local_navigation: Arc<RwLock<Option<GaussianEstimate3D>>>,
+
+    /// Latest peer navigation estimates indexed by peer ID.
+    peer_navigation: Arc<RwLock<HashMap<String, PeerEstimate3D>>>,
 }
 
 impl NetworkService {
@@ -176,6 +207,7 @@ impl NetworkService {
     pub async fn new(config: SwarmConfig) -> SwarmResult<Self> {
         let (consciousness_tx, _) = broadcast::channel(CONSCIOUSNESS_CHANNEL_SIZE);
         let (peer_event_tx, _) = broadcast::channel(PEER_EVENT_CHANNEL_SIZE);
+        let (navigation_tx, _) = broadcast::channel(NAVIGATION_CHANNEL_SIZE);
 
         warn!("NetworkService created in STUB mode (swarm feature not enabled)");
 
@@ -186,9 +218,12 @@ impl NetworkService {
             peer_consciousness: Arc::new(RwLock::new(HashMap::new())),
             consciousness_tx,
             peer_event_tx,
+            navigation_tx,
             stats: Arc::new(RwLock::new(ServiceStats::default())),
             start_time: std::time::Instant::now(),
             running: Arc::new(std::sync::atomic::AtomicBool::new(true)),
+            local_navigation: Arc::new(RwLock::new(None)),
+            peer_navigation: Arc::new(RwLock::new(HashMap::new())),
             #[cfg(feature = "pqc-handshake")]
             pqc_manager: None, // Stub: no PQC without swarm
         })
@@ -199,6 +234,7 @@ impl NetworkService {
     pub async fn new(config: SwarmConfig) -> SwarmResult<Self> {
         let (consciousness_tx, _) = broadcast::channel(CONSCIOUSNESS_CHANNEL_SIZE);
         let (peer_event_tx, _) = broadcast::channel(PEER_EVENT_CHANNEL_SIZE);
+        let (navigation_tx, _) = broadcast::channel(NAVIGATION_CHANNEL_SIZE);
 
         // Create Iroh node
         let iroh = IrohNode::new(config.clone()).await?;
@@ -216,9 +252,12 @@ impl NetworkService {
             peer_consciousness: Arc::new(RwLock::new(HashMap::new())),
             consciousness_tx,
             peer_event_tx,
+            navigation_tx,
             stats: Arc::new(RwLock::new(ServiceStats::default())),
             start_time: std::time::Instant::now(),
             running: Arc::new(std::sync::atomic::AtomicBool::new(true)),
+            local_navigation: Arc::new(RwLock::new(None)),
+            peer_navigation: Arc::new(RwLock::new(HashMap::new())),
             #[cfg(feature = "pqc-handshake")]
             pqc_manager: Some(Arc::new(RwLock::new(
                 super::pqc_handshake::PqcHandshakeManager::new(config),
@@ -285,9 +324,9 @@ impl NetworkService {
                             "Signing key file too short (need 32 bytes)".into(),
                         ));
                     }
-                    let key_bytes: [u8; 32] = bytes[..32].try_into().map_err(|_| {
-                        SwarmError::Internal("Invalid signing key bytes".into())
-                    })?;
+                    let key_bytes: [u8; 32] = bytes[..32]
+                        .try_into()
+                        .map_err(|_| SwarmError::Internal("Invalid signing key bytes".into()))?;
                     let key = ed25519_dalek::SigningKey::from_bytes(&key_bytes);
                     tracing::info!(
                         path = %key_path.display(),
@@ -325,7 +364,9 @@ impl NetworkService {
         let pubkey_hex = hex::encode(signing_key.verifying_key().as_bytes());
         tracing::info!(pubkey = %&pubkey_hex[..16], "Attestation manager initialized");
 
-        let mgr = Arc::new(parking_lot::RwLock::new(AttestationManager::new(signing_key)));
+        let mgr = Arc::new(parking_lot::RwLock::new(AttestationManager::new(
+            signing_key,
+        )));
 
         // Wire into IrohNode if available
         #[cfg(feature = "swarm")]
@@ -349,6 +390,11 @@ impl NetworkService {
         stats
     }
 
+    /// Get the network service configuration.
+    pub fn config(&self) -> &SwarmConfig {
+        &self.config
+    }
+
     /// Subscribe to consciousness updates from peers
     pub fn subscribe_consciousness(&self) -> broadcast::Receiver<(String, ConsciousnessVector)> {
         self.consciousness_tx.subscribe()
@@ -357,6 +403,20 @@ impl NetworkService {
     /// Subscribe to peer events
     pub fn subscribe_peer_events(&self) -> broadcast::Receiver<PeerEvent> {
         self.peer_event_tx.subscribe()
+    }
+
+    /// Subscribe to navigation estimate updates from peers.
+    pub fn subscribe_navigation(&self) -> broadcast::Receiver<(String, PeerEstimate3D)> {
+        self.navigation_tx.subscribe()
+    }
+
+    fn local_navigation_peer_id(&self) -> String {
+        let node_id = self.node_id();
+        if node_id.is_empty() {
+            "local".to_string()
+        } else {
+            node_id
+        }
     }
 
     /// Get connected peer count
@@ -377,6 +437,100 @@ impl NetworkService {
     /// Get the latest consciousness state from a peer
     pub fn get_peer_consciousness(&self, peer_id: &str) -> Option<ConsciousnessVector> {
         self.peer_consciousness.read().get(peer_id).cloned()
+    }
+
+    /// Publish the local platform's latest navigation estimate into the service.
+    pub fn publish_local_navigation(&self, estimate: GaussianEstimate3D) {
+        *self.local_navigation.write() = Some(estimate);
+    }
+
+    /// Publish any platform estimate that can expose a conservative 3D bound.
+    ///
+    /// Returns the peer-shareable estimate that callers can forward through
+    /// the swarm transport when they are ready to advertise local state.
+    pub fn publish_local_navigation_estimate<E: PublishableEstimate3D>(
+        &self,
+        estimate: &E,
+        confidence: Option<f64>,
+    ) -> PeerEstimate3D {
+        let peer_estimate = estimate.peer_estimate(self.local_navigation_peer_id(), confidence);
+        self.publish_local_navigation(peer_estimate.estimate.clone());
+        peer_estimate
+    }
+
+    /// Get the latest local navigation estimate.
+    pub fn local_navigation(&self) -> Option<GaussianEstimate3D> {
+        self.local_navigation.read().clone()
+    }
+
+    /// Get the latest navigation estimate from a specific peer.
+    pub fn get_peer_navigation(&self, peer_id: &str) -> Option<PeerEstimate3D> {
+        self.peer_navigation.read().get(peer_id).cloned()
+    }
+
+    /// Process a navigation estimate received from a peer.
+    pub fn receive_navigation_estimate(&self, peer_id: &str, estimate: PeerEstimate3D) {
+        self.peer_navigation
+            .write()
+            .insert(peer_id.to_string(), estimate.clone());
+
+        self.stats.write().navigation_updates_received += 1;
+
+        let _ = self
+            .navigation_tx
+            .send((peer_id.to_string(), estimate.clone()));
+
+        let sigma_m = estimate.estimate.covariance[0].sqrt();
+        let _ = self.peer_event_tx.send(PeerEvent::NavigationUpdate {
+            peer_id: peer_id.to_string(),
+            position_m: estimate.estimate.mean,
+            sigma_m,
+        });
+    }
+
+    /// Receive a peer estimate from any platform estimate that implements the
+    /// shared publishable-estimate contract.
+    pub fn receive_publishable_navigation<E: PublishableEstimate3D>(
+        &self,
+        peer_id: &str,
+        estimate: &E,
+        confidence: Option<f64>,
+    ) {
+        self.receive_navigation_estimate(
+            peer_id,
+            estimate.peer_estimate(peer_id.to_string(), confidence),
+        );
+    }
+
+    /// Build a conservative fused navigation estimate from local + peer states.
+    pub fn fused_navigation_estimate(&self) -> Option<GaussianEstimate3D> {
+        let local = self.local_navigation.read().clone()?;
+        let peers = self.peer_navigation.read();
+        let mut fusion = PeerFusion3D::new(local);
+        for peer in peers.values() {
+            fusion.upsert_peer(peer.clone());
+        }
+        Some(fusion.fused_estimate())
+    }
+
+    /// Snapshot current local, peer, and fused navigation state.
+    pub fn navigation_state_snapshot(&self) -> NavigationStateSnapshot {
+        let local = self.local_navigation.read().clone();
+        let peers: Vec<PeerEstimate3D> = self.peer_navigation.read().values().cloned().collect();
+        let fused = if let Some(local_estimate) = local.clone() {
+            let mut fusion = PeerFusion3D::new(local_estimate);
+            for peer in &peers {
+                fusion.upsert_peer(peer.clone());
+            }
+            Some(fusion.fused_estimate())
+        } else {
+            None
+        };
+        NavigationStateSnapshot {
+            local,
+            peers,
+            fused,
+        }
     }
 
     /// Bootstrap into the network using configured bootstrap nodes
@@ -847,6 +1001,7 @@ impl NetworkService {
     pub fn disconnect_peer(&self, peer_id: &str, reason: &str) {
         if self.peers.write().remove(peer_id).is_some() {
             self.peer_consciousness.write().remove(peer_id);
+            self.peer_navigation.write().remove(peer_id);
 
             #[cfg(feature = "swarm")]
             if let Some(iroh) = &self.iroh {
@@ -1053,6 +1208,7 @@ mod tests {
         assert_eq!(stats.bytes_received, 0);
         assert_eq!(stats.bootstrap_attempts, 0);
         assert_eq!(stats.bootstrap_successes, 0);
+        assert_eq!(stats.navigation_updates_received, 0);
         assert_eq!(stats.uptime_seconds, 0);
     }
 
@@ -1066,11 +1222,13 @@ mod tests {
             bytes_received: 2000,
             bootstrap_attempts: 3,
             bootstrap_successes: 2,
+            navigation_updates_received: 7,
             uptime_seconds: 3600,
         };
         let cloned = stats.clone();
         assert_eq!(cloned.connected_peers, 5);
         assert_eq!(cloned.messages_sent, 100);
+        assert_eq!(cloned.navigation_updates_received, 7);
     }
 
     // =========================================================================
@@ -1229,6 +1387,27 @@ mod tests {
         match cloned {
             PeerEvent::Disconnected { peer_id, .. } => assert_eq!(peer_id, "clone-test"),
             _ => panic!("Clone failed"),
+        }
+    }
+
+    #[test]
+    fn test_peer_event_navigation_update() {
+        let event = PeerEvent::NavigationUpdate {
+            peer_id: "nav-peer".to_string(),
+            position_m: [1.0, 2.0, 3.0],
+            sigma_m: 4.0,
+        };
+        match event {
+            PeerEvent::NavigationUpdate {
+                peer_id,
+                position_m,
+                sigma_m,
+            } => {
+                assert_eq!(peer_id, "nav-peer");
+                assert_eq!(position_m, [1.0, 2.0, 3.0]);
+                assert!((sigma_m - 4.0).abs() < f64::EPSILON);
+            }
+            _ => panic!("Expected NavigationUpdate event"),
         }
     }
 
@@ -1463,6 +1642,84 @@ mod tests {
             }
             _ => panic!("Expected ConsciousnessUpdate event"),
         }
+    }
+
+    #[tokio::test]
+    async fn test_receive_navigation_estimate_updates_stats_and_broadcasts() {
+        let service = NetworkService::new(SwarmConfig::default()).await.unwrap();
+        let mut rx = service.subscribe_navigation();
+        let mut event_rx = service.subscribe_peer_events();
+
+        let estimate = PeerEstimate3D {
+            peer_id: "peer-nav".to_string(),
+            estimate: GaussianEstimate3D::from_diagonal_sigma([10.0, 0.0, 0.0], 3.0),
+            confidence: Some(0.8),
+        };
+        service.receive_navigation_estimate("peer-nav", estimate.clone());
+
+        let stats = service.stats();
+        assert_eq!(stats.navigation_updates_received, 1);
+
+        let received = rx.try_recv().expect("navigation update");
+        assert_eq!(received.0, "peer-nav");
+        assert_eq!(received.1, estimate);
+
+        match event_rx.try_recv().expect("peer event") {
+            PeerEvent::NavigationUpdate {
+                peer_id,
+                position_m,
+                ..
+            } => {
+                assert_eq!(peer_id, "peer-nav");
+                assert_eq!(position_m, [10.0, 0.0, 0.0]);
+            }
+            _ => panic!("Expected NavigationUpdate event"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_fused_navigation_estimate_combines_local_and_peer() {
+        let service = NetworkService::new(SwarmConfig::default()).await.unwrap();
+        service.publish_local_navigation(GaussianEstimate3D::from_diagonal_sigma(
+            [0.0, 0.0, 0.0],
+            2.0,
+        ));
+        service.receive_navigation_estimate(
+            "peer-nav",
+            PeerEstimate3D {
+                peer_id: "peer-nav".to_string(),
+                estimate: GaussianEstimate3D::from_diagonal_sigma([8.0, 0.0, 0.0], 3.0),
+                confidence: Some(0.8),
+            },
+        );
+
+        let fused = service.fused_navigation_estimate().expect("fused estimate");
+        assert!(fused.mean[0] > 0.0);
+        assert!(fused.mean[0] < 8.0);
+
+        let snapshot = service.navigation_state_snapshot();
+        assert!(snapshot.local.is_some());
+        assert_eq!(snapshot.peers.len(), 1);
+        assert!(snapshot.fused.is_some());
+    }
+
+    #[tokio::test]
+    async fn test_publishable_navigation_helpers_accept_shared_estimates() {
+        let service = NetworkService::new(SwarmConfig::default()).await.unwrap();
+
+        let local = GaussianEstimate3D::from_diagonal_sigma([1.0, 2.0, 3.0], 4.0);
+        let local_peer = service.publish_local_navigation_estimate(&local, Some(0.9));
+        assert_eq!(local_peer.estimate.mean, [1.0, 2.0, 3.0]);
+        assert_eq!(service.local_navigation().unwrap().mean, [1.0, 2.0, 3.0]);
+
+        let remote = GaussianEstimate3D::from_diagonal_sigma([9.0, 0.0, 0.0], 5.0);
+        service.receive_publishable_navigation("peer-generic", &remote, Some(0.6));
+
+        let stored = service
+            .get_peer_navigation("peer-generic")
+            .expect("generic peer navigation");
+        assert_eq!(stored.estimate.mean, [9.0, 0.0, 0.0]);
+        assert_eq!(stored.confidence, Some(0.6));
     }
 
     #[tokio::test]

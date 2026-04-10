@@ -188,7 +188,10 @@ mod tests {
             // moral_score (features[0]) should differ
             let diff = (g[0] - b[0]).abs();
             // Even if both are 0.0 (cold start), they should produce different features
-            assert_ne!(g, b, "different moral texts should produce different features");
+            assert_ne!(
+                g, b,
+                "different moral texts should produce different features"
+            );
             let _ = diff; // use the variable
         }
     }

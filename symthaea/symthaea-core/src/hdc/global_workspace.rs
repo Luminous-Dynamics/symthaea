@@ -158,10 +158,10 @@ impl Default for WorkspaceConfig {
         Self {
             max_capacity: 3,      // Typical: 3-4 items
             entry_threshold: 0.3, // Dehaene (2011): ignition should fire for
-                                  // most salient content, not just peaks.
-                                  // 0.5 was too high — Phi-weighted activations
-                                  // from the cognitive loop are typically 0.2-0.5.
-            decay_rate: 0.1,      // 10% per timestep
+            // most salient content, not just peaks.
+            // 0.5 was too high — Phi-weighted activations
+            // from the cognitive loop are typically 0.2-0.5.
+            decay_rate: 0.1, // 10% per timestep
             enable_broadcasting: true,
             winner_takes_all: false, // Allow multiple contents
             max_duration: 50,        // Auto-remove after 50 steps
@@ -406,7 +406,8 @@ impl GlobalWorkspace {
             self.competitors.retain(|content| {
                 // PAC modulation: high MI boosts coalition activation
                 #[cfg(feature = "ctc_wiring")]
-                let effective_activation = content.activation * (0.5 + 0.5 * self.pac_mi.clamp(0.0, 1.0));
+                let effective_activation =
+                    content.activation * (0.5 + 0.5 * self.pac_mi.clamp(0.0, 1.0));
                 #[cfg(not(feature = "ctc_wiring"))]
                 let effective_activation = content.activation;
 

@@ -37,7 +37,6 @@ pub struct ThermodynamicPhysicsBridge {
     // ═══════════════════════════════════════════════════════════════════════
     // Maxwell's Demon as Attention
     // ═══════════════════════════════════════════════════════════════════════
-
     /// Bits of information gathered by attention this cycle.
     pub attention_demon_bits: f64,
     /// Work extracted by attention (information → action) in effective joules.
@@ -48,14 +47,12 @@ pub struct ThermodynamicPhysicsBridge {
     // ═══════════════════════════════════════════════════════════════════════
     // Landauer Limit for Memory
     // ═══════════════════════════════════════════════════════════════════════
-
     /// Minimum energy to consolidate memory this cycle (effective joules).
     pub memory_landauer_cost: f64,
 
     // ═══════════════════════════════════════════════════════════════════════
     // Carnot Efficiency
     // ═══════════════════════════════════════════════════════════════════════
-
     /// Theoretical maximum efficiency (1 - T_cold/T_hot).
     pub carnot_efficiency: f64,
     /// Actual consciousness efficiency (useful work / total energy).
@@ -66,7 +63,6 @@ pub struct ThermodynamicPhysicsBridge {
     // ═══════════════════════════════════════════════════════════════════════
     // Fluctuation Theorem for Insight
     // ═══════════════════════════════════════════════════════════════════════
-
     /// Probability of spontaneous insight (rare entropy-decreasing event).
     pub insight_probability: f64,
     /// Whether an insight event was detected this cycle.
@@ -75,7 +71,6 @@ pub struct ThermodynamicPhysicsBridge {
     // ═══════════════════════════════════════════════════════════════════════
     // Onsager Cross-Coupling Health
     // ═══════════════════════════════════════════════════════════════════════
-
     /// Onsager symmetry measure (0 = perfectly symmetric, higher = asymmetric).
     /// Lower is better — symmetric transport indicates well-integrated consciousness.
     pub onsager_asymmetry: f64,
@@ -87,7 +82,6 @@ pub struct ThermodynamicPhysicsBridge {
     // ═══════════════════════════════════════════════════════════════════════
     // Nonequilibrium Physics (Phase 6)
     // ═══════════════════════════════════════════════════════════════════════
-
     /// Rolling work samples for Jarzynski free energy estimation.
     #[serde(skip)]
     pub(crate) work_samples: std::collections::VecDeque<f64>,
@@ -124,7 +118,6 @@ pub struct ThermodynamicPhysicsBridge {
     // ═══════════════════════════════════════════════════════════════════════
     // Epistemic Free Energy (arXiv 2601.17607)
     // ═══════════════════════════════════════════════════════════════════════
-
     /// Epistemic free energy: F = E[loss] - T*H[beliefs].
     /// Positive = beliefs are costly relative to entropy; negative = beliefs are cheap.
     /// Science: Thermodynamic Theory of Learning (Still et al., arXiv 2601.17607).
@@ -161,8 +154,12 @@ impl Default for ThermodynamicPhysicsBridge {
             insight_probability: 0.0,
             insight_detected: false,
             onsager_asymmetry: 1.0,
-            history: std::collections::VecDeque::with_capacity(thresholds::THERMO_ONSAGER_WINDOW + 1),
-            work_samples: std::collections::VecDeque::with_capacity(thresholds::THERMO_JARZYNSKI_WINDOW + 1),
+            history: std::collections::VecDeque::with_capacity(
+                thresholds::THERMO_ONSAGER_WINDOW + 1,
+            ),
+            work_samples: std::collections::VecDeque::with_capacity(
+                thresholds::THERMO_JARZYNSKI_WINDOW + 1,
+            ),
             jarzynski_free_energy: 0.0,
             jarzynski_hfe_divergence: 0.0,
             prigogine_violated: false,
@@ -209,8 +206,7 @@ impl ThermodynamicPhysicsBridge {
         let t_eff = effective_temperature.max(0.01); // Avoid division by zero
         let ln2 = std::f64::consts::LN_2;
 
-        self.attention_demon_bits = (attention_sensitivity * information_processed)
-            .max(0.0);
+        self.attention_demon_bits = (attention_sensitivity * information_processed).max(0.0);
         let demon_efficiency = thresholds::THERMO_ATTENTION_DEMON_EFFICIENCY;
         self.attention_work = self.attention_demon_bits * k_eff * t_eff * ln2 * demon_efficiency;
         self.attention_erasure_cost = self.attention_demon_bits * k_eff * t_eff * ln2;
@@ -310,11 +306,7 @@ impl ThermodynamicPhysicsBridge {
 
         if self.work_samples.len() >= 3 {
             let beta = 1.0 / (k_eff * t_eff);
-            let exp_sum: f64 = self
-                .work_samples
-                .iter()
-                .map(|&w| (-beta * w).exp())
-                .sum();
+            let exp_sum: f64 = self.work_samples.iter().map(|&w| (-beta * w).exp()).sum();
             let avg_exp = exp_sum / self.work_samples.len() as f64;
             if avg_exp > 0.0 && avg_exp.is_finite() {
                 self.jarzynski_free_energy = -avg_exp.ln() / beta;
@@ -323,8 +315,7 @@ impl ThermodynamicPhysicsBridge {
 
         // Compare with HFE — divergence indicates model inaccuracy
         if hfe_total.is_finite() && self.jarzynski_free_energy.is_finite() {
-            self.jarzynski_hfe_divergence =
-                (self.jarzynski_free_energy - hfe_total).abs();
+            self.jarzynski_hfe_divergence = (self.jarzynski_free_energy - hfe_total).abs();
         }
 
         // 6c. Prigogine minimum entropy production principle
@@ -435,10 +426,9 @@ impl ThermodynamicPhysicsBridge {
     /// throughput by thermodynamic cost.
     #[cfg(feature = "epistemic")]
     pub fn epistemic_energy_budget(&self) -> usize {
-        let available = (self.total_energy_budget
-            - self.memory_landauer_cost
-            - self.attention_erasure_cost)
-            .max(0.0);
+        let available =
+            (self.total_energy_budget - self.memory_landauer_cost - self.attention_erasure_cost)
+                .max(0.0);
         // Cost per claim = k_B_eff * T_eff * ln(2)
         let k_eff = thresholds::K_CONSCIOUSNESS_BOLTZMANN;
         // Use Carnot T_cold as floor to avoid division issues when actual_efficiency is 0
@@ -536,16 +526,16 @@ mod tests {
     fn test_maxwell_demon_accounting() {
         let mut b = make_bridge();
         b.compute(
-            0.8,  // attention_sensitivity
+            0.8,   // attention_sensitivity
             100.0, // information_processed
-            0.7,  // coherence
-            0.3,  // prediction_error
-            0.5,  // effective_temperature
-            0.2,  // entropy_production_rate
-            0.6,  // order_parameter
+            0.7,   // coherence
+            0.3,   // prediction_error
+            0.5,   // effective_temperature
+            0.2,   // entropy_production_rate
+            0.6,   // order_parameter
             1e-10, // energy_per_cycle
-            0.5,  // prev_order_parameter
-            0.5,  // hfe_total
+            0.5,   // prev_order_parameter
+            0.5,   // hfe_total
             &default_regime(),
         );
         // Demon gathers bits = sensitivity × info
@@ -565,7 +555,19 @@ mod tests {
     #[test]
     fn test_landauer_cost_positive() {
         let mut b = make_bridge();
-        b.compute(0.5, 50.0, 0.5, 0.5, 0.4, 0.1, 0.5, 1e-10, 0.5, 0.5, &default_regime());
+        b.compute(
+            0.5,
+            50.0,
+            0.5,
+            0.5,
+            0.4,
+            0.1,
+            0.5,
+            1e-10,
+            0.5,
+            0.5,
+            &default_regime(),
+        );
         assert!(b.memory_landauer_cost > 0.0);
         assert!(b.memory_landauer_cost.is_finite());
     }
@@ -574,7 +576,19 @@ mod tests {
     fn test_carnot_efficiency_bounded() {
         let mut b = make_bridge();
         // High temperature → high Carnot efficiency
-        b.compute(0.5, 50.0, 0.5, 0.3, 1.0, 0.1, 0.5, 1e-10, 0.5, 0.5, &default_regime());
+        b.compute(
+            0.5,
+            50.0,
+            0.5,
+            0.3,
+            1.0,
+            0.1,
+            0.5,
+            1e-10,
+            0.5,
+            0.5,
+            &default_regime(),
+        );
         assert!(b.carnot_efficiency > 0.0);
         assert!(b.carnot_efficiency < 1.0);
         // T_hot=1.0, T_cold=THERMO_CARNOT_T_COLD → η = 1 - T_cold/1.0
@@ -588,7 +602,19 @@ mod tests {
 
         // Low temperature → low efficiency
         // T_hot=0.25+, T_cold=THERMO_CARNOT_T_COLD → approaches 0
-        b.compute(0.5, 50.0, 0.5, 0.3, 0.25, 0.1, 0.5, 1e-10, 0.5, 0.5, &default_regime());
+        b.compute(
+            0.5,
+            50.0,
+            0.5,
+            0.3,
+            0.25,
+            0.1,
+            0.5,
+            1e-10,
+            0.5,
+            0.5,
+            &default_regime(),
+        );
         // With T_hot=0.25 < T_cold=0.3, Carnot = 0.0 (can't extract work)
         assert!(
             b.carnot_efficiency < 0.01,
@@ -603,7 +629,19 @@ mod tests {
         // Moderate order increase (0.3 → 0.45) = entropy-decreasing event
         // order_delta = 0.15 > 0.1 threshold, t_eff = 0.5
         // P(insight) = exp(-0.15 / 0.5) = exp(-0.3) ≈ 0.741 > THRESHOLD (0.7)
-        b.compute(0.5, 50.0, 0.5, 0.3, 0.5, 0.1, 0.45, 1e-10, 0.3, 0.5, &default_regime());
+        b.compute(
+            0.5,
+            50.0,
+            0.5,
+            0.3,
+            0.5,
+            0.1,
+            0.45,
+            1e-10,
+            0.3,
+            0.5,
+            &default_regime(),
+        );
         assert!(b.insight_probability > 0.0);
         assert!(
             b.insight_probability > thresholds::THERMO_INSIGHT_PROBABILITY_THRESHOLD,
@@ -619,7 +657,19 @@ mod tests {
         let mut b = make_bridge();
         // Feed identical samples → perfectly symmetric → asymmetry ≈ 0
         for _ in 0..5 {
-            b.compute(0.5, 50.0, 0.5, 0.3, 0.5, 0.1, 0.5, 1e-10, 0.5, 0.5, &default_regime());
+            b.compute(
+                0.5,
+                50.0,
+                0.5,
+                0.3,
+                0.5,
+                0.1,
+                0.5,
+                1e-10,
+                0.5,
+                0.5,
+                &default_regime(),
+            );
         }
         // Covariance of identical inputs = 0 variance → asymmetry = 0
         assert!(b.onsager_asymmetry < 0.01);
@@ -661,13 +711,19 @@ mod tests {
         b.compute_epistemic_thermodynamics(2.0, 1.0, 0.3);
         let esl_hot = b.epistemic_speed_limit_violation;
         // ESL = 0.3^2 / (2.0 * 1.0) = 0.09 / 2.0 = 0.045
-        assert!(esl_hot < 1.0, "hot system should allow fast belief change, got ESL={esl_hot}");
+        assert!(
+            esl_hot < 1.0,
+            "hot system should allow fast belief change, got ESL={esl_hot}"
+        );
 
         // Low temperature + low entropy production → ESL high (thermodynamically expensive)
         b.compute_epistemic_thermodynamics(0.05, 0.01, 0.3);
         let esl_cold = b.epistemic_speed_limit_violation;
         // ESL = 0.09 / (0.05 * 0.01) = 0.09 / 0.0005 = 180.0
-        assert!(esl_cold > 1.0, "cold system should flag fast belief change, got ESL={esl_cold}");
+        assert!(
+            esl_cold > 1.0,
+            "cold system should flag fast belief change, got ESL={esl_cold}"
+        );
         assert!(esl_cold > esl_hot, "cold ESL should exceed hot ESL");
 
         // Zero belief delta → ESL = 0
@@ -676,14 +732,29 @@ mod tests {
             b.epistemic_speed_limit_violation.abs() < 1e-12,
             "zero belief delta → zero ESL"
         );
-        assert!(b.epistemic_free_energy < 0.0, "zero loss - positive T*H should be negative");
+        assert!(
+            b.epistemic_free_energy < 0.0,
+            "zero loss - positive T*H should be negative"
+        );
     }
 
     #[test]
     fn test_all_values_finite() {
         let mut b = make_bridge();
         // Edge case: very small values
-        b.compute(0.0, 0.0, 0.0, 0.0, 0.01, 0.0, 0.0, 0.0, 0.0, 0.0, &default_regime());
+        b.compute(
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.01,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            &default_regime(),
+        );
         assert!(b.attention_demon_bits.is_finite());
         assert!(b.attention_work.is_finite());
         assert!(b.memory_landauer_cost.is_finite());
@@ -692,7 +763,19 @@ mod tests {
         assert!(b.onsager_asymmetry.is_finite());
 
         // Edge case: very large values
-        b.compute(1.0, 1e6, 1.0, 1.0, 2.0, 1.0, 1.0, 1e-5, 0.0, 1.0, &default_regime());
+        b.compute(
+            1.0,
+            1e6,
+            1.0,
+            1.0,
+            2.0,
+            1.0,
+            1.0,
+            1e-5,
+            0.0,
+            1.0,
+            &default_regime(),
+        );
         assert!(b.attention_demon_bits.is_finite());
         assert!(b.carnot_efficiency.is_finite());
         assert!(b.efficiency_ratio.is_finite());
@@ -703,11 +786,26 @@ mod tests {
     fn test_epistemic_energy_budget() {
         let mut b = make_bridge();
         // After compute, memory_landauer_cost and attention_erasure_cost are populated
-        b.compute(0.5, 50.0, 0.5, 0.3, 0.5, 0.1, 0.5, 1e-10, 0.5, 0.5, &default_regime());
+        b.compute(
+            0.5,
+            50.0,
+            0.5,
+            0.3,
+            0.5,
+            0.1,
+            0.5,
+            1e-10,
+            0.5,
+            0.5,
+            &default_regime(),
+        );
 
         // With default total_energy_budget=1.0, we should get a positive claim budget
         let budget = b.epistemic_energy_budget();
-        assert!(budget > 0, "should be able to validate at least one claim, got {budget}");
+        assert!(
+            budget > 0,
+            "should be able to validate at least one claim, got {budget}"
+        );
 
         // Exhausted budget → 0 claims
         b.total_energy_budget = 0.0;

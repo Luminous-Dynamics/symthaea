@@ -128,11 +128,11 @@ pub fn low_energy_cross_section(v_rel: f64) -> f64 {
 
 /// Antimatter reactor prediction horizons (seconds).
 pub const ANTIMATTER_HORIZONS: &[f32] = &[
-    1e-6,    // 1μs — containment jitter
-    1e-3,    // 1ms — injection cycle
-    1.0,     // 1s — production batch
-    100.0,   // 100s — fuel cycle
-    3600.0,  // 1hr — operational shift
+    1e-6,   // 1μs — containment jitter
+    1e-3,   // 1ms — injection cycle
+    1.0,    // 1s — production batch
+    100.0,  // 100s — fuel cycle
+    3600.0, // 1hr — operational shift
 ];
 
 pub const ANTIMATTER_HORIZON_LABELS: &[&str] = &[
@@ -483,7 +483,11 @@ mod tests {
         let freq = penning_trap_frequencies(10.0, 0.005, 6.0, m_p, q);
 
         assert!(freq.trap_stable, "6T trap should be stable");
-        assert!(freq.cyclotron_hz > 1e6, "Cyclotron freq should be MHz range: {}", freq.cyclotron_hz);
+        assert!(
+            freq.cyclotron_hz > 1e6,
+            "Cyclotron freq should be MHz range: {}",
+            freq.cyclotron_hz
+        );
         assert!(freq.axial_hz > 0.0, "Axial freq should be positive");
         assert!(freq.magnetron_hz > 0.0, "Magnetron freq should be positive");
         // Frequency ordering: cyclotron >> axial >> magnetron
@@ -553,7 +557,10 @@ mod tests {
         twin.set_reference(&reading);
         let output = twin.step(&reading, 0.001);
         assert!(output.free_energy.is_finite());
-        assert_eq!(output.prediction_similarities.len(), ANTIMATTER_HORIZONS.len());
+        assert_eq!(
+            output.prediction_similarities.len(),
+            ANTIMATTER_HORIZONS.len()
+        );
     }
 
     #[test]
@@ -572,8 +579,7 @@ mod tests {
 
         // First point (zero density) should have low permeability
         assert!(
-            results[0].permeability < results[9].permeability
-                || results[0].blanket_intact,
+            results[0].permeability < results[9].permeability || results[0].blanket_intact,
             "Blanket should be more intact at low energy density"
         );
 

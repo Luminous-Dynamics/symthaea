@@ -194,7 +194,13 @@ fn compose_text(rng: &mut Rng, e: u8, n: u8, m: u8, h: f32) -> String {
     let n_fragment = rng.pick(N_FRAMING[n as usize]);
     let m_fragment = rng.pick(M_TEMPORAL[m as usize]);
 
-    let h_idx = if h < 0.33 { 0 } else if h < 0.66 { 1 } else { 2 };
+    let h_idx = if h < 0.33 {
+        0
+    } else if h < 0.66 {
+        1
+    } else {
+        2
+    };
     let h_fragment = rng.pick(H_DEPTH[h_idx]);
 
     // Compose: N-framing + E-assertion + M-temporal + H-depth
@@ -411,5 +417,9 @@ fn main() {
     eprintln!("  N-tier: {:?}", n_counts);
     eprintln!("  M-tier: {:?}", m_counts);
     eprintln!("  Total:  {} pairs ({} channels each)", total, NUM_CHANNELS);
-    eprintln!("  Cube channels at indices {}-{}", EPISTEMIC_CUBE_BASE, EPISTEMIC_CUBE_BASE + EPISTEMIC_CUBE_CHANNELS - 1);
+    eprintln!(
+        "  Cube channels at indices {}-{}",
+        EPISTEMIC_CUBE_BASE,
+        EPISTEMIC_CUBE_BASE + EPISTEMIC_CUBE_CHANNELS - 1
+    );
 }

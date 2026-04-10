@@ -232,11 +232,7 @@ pub fn one_proton_separation(predictor: &MlMassPredictor, z: u16, n: u16) -> f64
 /// - Neutron drip: for each Z in 2..=z_max, find the first N where S_n < 0
 /// - Proton drip: for each N in 2..=n_max, find the first Z where S_p < 0
 /// - Also counts total bound nuclei and identifies peninsulas
-pub fn map_drip_lines(
-    predictor: &MlMassPredictor,
-    z_max: u16,
-    n_max: u16,
-) -> DripLineMap {
+pub fn map_drip_lines(predictor: &MlMassPredictor, z_max: u16, n_max: u16) -> DripLineMap {
     let mut neutron_drip = Vec::new();
     let mut proton_drip = Vec::new();
     let mut total_bound: usize = 0;
@@ -346,11 +342,7 @@ pub fn map_drip_lines(
 ///
 /// Expected: ΔE_C ≈ 0.7 × (2×max(Z,N) - 1) / A^(1/3) MeV
 /// Deviation = Nolen-Schiffer anomaly.
-pub fn mirror_coulomb_displacement(
-    predictor: &MlMassPredictor,
-    z: u16,
-    n: u16,
-) -> MirrorPair {
+pub fn mirror_coulomb_displacement(predictor: &MlMassPredictor, z: u16, n: u16) -> MirrorPair {
     let a = z + n;
     let be_zn = predictor.predict(z, n).binding_energy;
     let be_mirror = predictor.predict(n, z).binding_energy;
@@ -379,10 +371,7 @@ pub fn mirror_coulomb_displacement(
 ///
 /// Mirror pairs satisfy Z != N (otherwise trivial) and both Z,N >= 1.
 /// We scan T_z = (N-Z)/2 = +1/2 mirrors: Z < N, swap gives Z > N.
-pub fn scan_mirror_pairs(
-    predictor: &MlMassPredictor,
-    a_max: u16,
-) -> Vec<MirrorPair> {
+pub fn scan_mirror_pairs(predictor: &MlMassPredictor, a_max: u16) -> Vec<MirrorPair> {
     let mut pairs = Vec::new();
     for a in 2..a_max {
         // For odd-A mirror pairs: Z = (A-1)/2, N = (A+1)/2 (T_z = +1/2)
@@ -413,10 +402,7 @@ pub fn scan_mirror_pairs(
 /// We pick the most asymmetric even-even isobar with Z >= 2 and N >= 2.
 /// Only even A (so Z=A/2, N=A/2 exists as integer) and we pick Z = A/2 - 2
 /// for (N-Z) = 4 to get a clean signal.
-pub fn extract_symmetry_energy(
-    predictor: &MlMassPredictor,
-    a: u16,
-) -> Option<SymmetryEnergyPoint> {
+pub fn extract_symmetry_energy(predictor: &MlMassPredictor, a: u16) -> Option<SymmetryEnergyPoint> {
     if a < 8 || a % 2 != 0 {
         return None;
     }
@@ -502,11 +488,7 @@ pub fn pairing_gap_map(
 
     for z in (z_min..=z_max).step_by(2) {
         // Scan near stability: N ≈ Z for light, N ≈ 1.5Z for heavy
-        let n_center = if z < 20 {
-            z
-        } else {
-            (z as f64 * 1.3) as u16
-        };
+        let n_center = if z < 20 { z } else { (z as f64 * 1.3) as u16 };
 
         // Scan a window around N_center
         let n_lo = n_center.saturating_sub(6).max(2);
@@ -600,7 +582,10 @@ mod tests {
     fn test_sn_isotopic_chain_shell_gaps() {
         let p = predictor();
         println!("\n=== Tin (Z=50) Isotopic Chain: S_2n and Shell Gaps ===");
-        println!("{:>4} {:>4} {:>10} {:>10}", "Z", "N", "S_2n(MeV)", "Gap(MeV)");
+        println!(
+            "{:>4} {:>4} {:>10} {:>10}",
+            "Z", "N", "S_2n(MeV)", "Gap(MeV)"
+        );
         println!("{}", "-".repeat(34));
 
         let analysis = analyze_isotopic_chain(&p, 50, 50, 100);
@@ -632,7 +617,10 @@ mod tests {
     fn test_ca_isotopic_chain_new_magic() {
         let p = predictor();
         println!("\n=== Calcium (Z=20) Isotopic Chain: Hunting N=32,34 ===");
-        println!("{:>4} {:>4} {:>10} {:>10}", "Z", "N", "S_2n(MeV)", "Gap(MeV)");
+        println!(
+            "{:>4} {:>4} {:>10} {:>10}",
+            "Z", "N", "S_2n(MeV)", "Gap(MeV)"
+        );
         println!("{}", "-".repeat(34));
 
         let analysis = analyze_isotopic_chain(&p, 20, 16, 50);
@@ -773,14 +761,8 @@ mod tests {
             "Should find hundreds of bound nuclei, got {}",
             map.total_bound_nuclei
         );
-        assert!(
-            !map.neutron_drip.is_empty(),
-            "Should map neutron drip line"
-        );
-        assert!(
-            !map.proton_drip.is_empty(),
-            "Should map proton drip line"
-        );
+        assert!(!map.neutron_drip.is_empty(), "Should map neutron drip line");
+        assert!(!map.proton_drip.is_empty(), "Should map proton drip line");
     }
 
     // ── Mirror nuclei ───────────────────────────────────────────────────
@@ -823,8 +805,13 @@ mod tests {
             };
             println!(
                 "{:>4} {:>4} {:>4} {:>10.3} {:>10.3} {:>10.3} {:>9.1}%",
-                pair.a, pair.z, pair.n, pair.delta_ec, pair.delta_ec_expected,
-                pair.anomaly, pct_dev
+                pair.a,
+                pair.z,
+                pair.n,
+                pair.delta_ec,
+                pair.delta_ec_expected,
+                pair.anomaly,
+                pct_dev
             );
             total_anomaly_sq += pair.anomaly * pair.anomaly;
             count += 1;
@@ -877,7 +864,10 @@ mod tests {
             );
         }
 
-        assert!(!survey.is_empty(), "Should extract some symmetry energy points");
+        assert!(
+            !survey.is_empty(),
+            "Should extract some symmetry energy points"
+        );
     }
 
     // ── Pairing gap ─────────────────────────────────────────────────────
@@ -952,13 +942,13 @@ mod tests {
             "Proton drip line points: {}",
             survey.drip_lines.proton_drip.len()
         );
-        println!("Total bound nuclei: {}", survey.drip_lines.total_bound_nuclei);
+        println!(
+            "Total bound nuclei: {}",
+            survey.drip_lines.total_bound_nuclei
+        );
         println!("Peninsulas: {}", survey.drip_lines.peninsulas.len());
         println!("Mirror pairs analyzed: {}", survey.mirror_pairs.len());
-        println!(
-            "Symmetry energy points: {}",
-            survey.symmetry_energy.len()
-        );
+        println!("Symmetry energy points: {}", survey.symmetry_energy.len());
         println!("Pairing gap points: {}", survey.pairing_gaps.len());
 
         // Basic sanity checks

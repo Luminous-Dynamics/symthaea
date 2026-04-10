@@ -242,7 +242,9 @@ impl IIT4Calculator {
                 // Cause info: MI between mechanism and context (past → present)
                 let refs: Vec<&ContinuousHV> = context.iter().collect();
                 let bundle = ContinuousHV::bundle(&refs);
-                let cause_info = self.estimator.mutual_information_fast(&components[i], &bundle);
+                let cause_info = self
+                    .estimator
+                    .mutual_information_fast(&components[i], &bundle);
 
                 // Effect info: use intrinsic information as proxy for future constraint
                 let effect_info = self.intrinsic_information(&components[i]);

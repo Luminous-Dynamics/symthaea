@@ -64,8 +64,8 @@
 
 use lru::LruCache;
 use serde::{Deserialize, Serialize};
-use std::num::NonZeroUsize;
 use std::collections::VecDeque;
+use std::num::NonZeroUsize;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 // ============================================================================

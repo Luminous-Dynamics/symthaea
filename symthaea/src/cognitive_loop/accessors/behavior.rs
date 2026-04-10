@@ -10,6 +10,7 @@ use crate::dynamics::temporal_signatures::ConsciousnessPattern;
 use crate::memory::coherence_tracker::ConversationCoherenceTracker;
 use crate::voice::cognitive_bridge::VoiceConsciousnessSignals;
 use crate::voice::voice_feedback::VoiceOutputMetrics;
+use positioning::{GaussianEstimate3D, PeerEstimate3D, PublishableEstimate3D};
 
 use super::super::{
     ActionHint, AdaptiveBehavior, CognitiveDepth, CouplingQuality, CuriosityDrive,
@@ -386,7 +387,8 @@ impl CognitiveLoopService {
     ) {
         self.behavior.social_mgr.social.social_trust = trust.clamp(0.0, 1.0);
         self.behavior.social_mgr.social.social_cooperation_rate = cooperation_rate.clamp(0.0, 1.0);
-        self.behavior.social_mgr.social.social_prediction_accuracy = prediction_accuracy.clamp(0.0, 1.0);
+        self.behavior.social_mgr.social.social_prediction_accuracy =
+            prediction_accuracy.clamp(0.0, 1.0);
         self.behavior.social_mgr.social.social_models_count = models_count;
         self.behavior.social_mgr.social.social_mean_trust = mean_trust.clamp(0.0, 1.0);
     }
@@ -864,9 +866,11 @@ impl CognitiveLoopService {
         let combined = identity * 0.25 + reputation * 0.25 + community * 0.30 + engagement * 0.20;
 
         self.behavior.social_mgr.social.social_trust = (community as f32).clamp(0.0, 1.0);
-        self.behavior.social_mgr.social.social_cooperation_rate = (reputation as f32).clamp(0.0, 1.0);
+        self.behavior.social_mgr.social.social_cooperation_rate =
+            (reputation as f32).clamp(0.0, 1.0);
         self.behavior.social_mgr.social.social_mean_trust = (combined as f32).clamp(0.0, 1.0);
-        self.behavior.social_mgr.social.social_prediction_accuracy = (identity as f32).clamp(0.0, 1.0);
+        self.behavior.social_mgr.social.social_prediction_accuracy =
+            (identity as f32).clamp(0.0, 1.0);
 
         // Modulate oxytocin from community dimension (social bonding).
         // Community trust maps to 0.0–0.3 oxytocin injection (conservative range).
@@ -923,25 +927,32 @@ impl CognitiveLoopService {
     /// rt.block_on(cls.enable_network_attestation())?;
     /// ```
     #[cfg(feature = "identity")]
-    pub async fn enable_network_attestation(
-        &self,
-    ) -> anyhow::Result<()> {
-        use crate::swarm::{NetworkService, SwarmConfig};
+    pub async fn enable_network_attestation(&mut self) -> anyhow::Result<()> {
         use super::super::managers::network_service_bridge::NetworkServiceBridge;
+        use crate::swarm::{NetworkService, SwarmConfig};
 
         let swarm_config = SwarmConfig::production();
-        let mut service = NetworkService::new(swarm_config).await
+        #[cfg(feature = "mesh")]
+        self.spectrum_manager
+            .set_domain_profile(swarm_config.domain.clone());
+        let mut service = NetworkService::new(swarm_config)
+            .await
             .map_err(|e| anyhow::anyhow!("NetworkService init failed: {e}"))?;
 
-        let attestation_mgr = service.initialize_attestation()
+        let attestation_mgr = service
+            .initialize_attestation()
             .map_err(|e| anyhow::anyhow!("Attestation init failed: {e}"))?;
+
+        let service = std::sync::Arc::new(service);
 
         let tx = self.swarm_event_sender();
         let _bridge = NetworkServiceBridge::spawn_with_attestation(
-            &service,
+            service.as_ref(),
             tx,
             Some(attestation_mgr.clone()),
         );
+
+        self.network_service = Some(service);
 
         let pubkey = attestation_mgr.read().public_key_hex().to_string();
         tracing::info!(
@@ -995,6 +1006,36 @@ impl CognitiveLoopService {
     /// Mean peer Φ across connected swarm peers.
     pub fn swarm_mean_peer_phi(&self) -> f64 {
         self.swarm_manager.mean_peer_phi()
+    }
+
+    /// Borrow the retained swarm network service, if one is active.
+    pub fn network_service(&self) -> Option<&std::sync::Arc<crate::swarm::NetworkService>> {
+        self.network_service.as_ref()
+    }
+
+    /// Publish a local navigation estimate into the retained swarm service.
+    ///
+    /// Returns the peer-shareable estimate if a live network service is active.
+    pub fn publish_local_navigation_estimate<E: PublishableEstimate3D>(
+        &self,
+        estimate: &E,
+        confidence: Option<f64>,
+    ) -> Option<PeerEstimate3D> {
+        self.network_service
+            .as_ref()
+            .map(|service| service.publish_local_navigation_estimate(estimate, confidence))
+    }
+
+    /// Receive a peer navigation estimate in conservative Gaussian form.
+    pub fn receive_peer_navigation_estimate(
+        &self,
+        peer_id: &str,
+        estimate: GaussianEstimate3D,
+        confidence: Option<f64>,
+    ) {
+        if let Some(service) = &self.network_service {
+            service.receive_publishable_navigation(peer_id, &estimate, confidence);
+        }
     }
 
     // ========================================================================
@@ -1438,12 +1479,15 @@ impl CognitiveLoopService {
     /// Override with `SYMTHAEA_LLM_MODEL` env var.
     pub fn enable_llm_language(&mut self) {
         if self.llm_language.is_none() {
-            self.llm_language = Some(super::super::llm_language_channel::LlmLanguageChannel::spawn());
+            self.llm_language =
+                Some(super::super::llm_language_channel::LlmLanguageChannel::spawn());
         }
     }
 
     /// Drain completed LLM language responses (non-blocking).
-    pub fn drain_llm_language(&self) -> Vec<super::super::llm_language_channel::LlmLanguageResponse> {
+    pub fn drain_llm_language(
+        &self,
+    ) -> Vec<super::super::llm_language_channel::LlmLanguageResponse> {
         self.llm_language
             .as_ref()
             .map(|ch| ch.drain_responses())

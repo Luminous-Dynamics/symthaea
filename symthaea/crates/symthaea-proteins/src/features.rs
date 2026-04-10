@@ -72,7 +72,11 @@ pub fn extract_features(seq: &[AminoAcid], pos: usize) -> [f64; N_FEATURES] {
 
     [
         // 0: relative position
-        if len <= 1 { 0.5 } else { pos as f64 / (len - 1) as f64 },
+        if len <= 1 {
+            0.5
+        } else {
+            pos as f64 / (len - 1) as f64
+        },
         // 1-5: window averages
         avg_hydro,
         avg_charge,
@@ -119,11 +123,22 @@ mod tests {
         let seq = parse_sequence("AAAAAAAAAAAAAAA");
         let f = extract_features(&seq, 7);
         // All alanine: hydrophobicity should be Ala's value (1.8)
-        assert!((f[1] - 1.8).abs() < 0.01, "avg hydro should be ~1.8, got {}", f[1]);
+        assert!(
+            (f[1] - 1.8).abs() < 0.01,
+            "avg hydro should be ~1.8, got {}",
+            f[1]
+        );
         // Helix propensity of Ala = 1.42
-        assert!((f[4] - 1.42).abs() < 0.01, "avg helix should be ~1.42, got {}", f[4]);
+        assert!(
+            (f[4] - 1.42).abs() < 0.01,
+            "avg helix should be ~1.42, got {}",
+            f[4]
+        );
         // Ala is a small residue
-        assert!(f[14] > 5.0, "all-Ala window should have many small residues");
+        assert!(
+            f[14] > 5.0,
+            "all-Ala window should have many small residues"
+        );
     }
 
     #[test]
@@ -140,7 +155,10 @@ mod tests {
     fn test_single_residue() {
         let seq = parse_sequence("G");
         let f = extract_features(&seq, 0);
-        assert!((f[0] - 0.5).abs() < 1e-10, "single residue position should be 0.5");
+        assert!(
+            (f[0] - 0.5).abs() < 1e-10,
+            "single residue position should be 0.5"
+        );
         // Gly is a helix breaker
         assert!(f[10] > 0.0, "Gly window should have breakers");
     }
@@ -151,7 +169,12 @@ mod tests {
         for pos in 0..seq.len() {
             let f = extract_features(&seq, pos);
             for (i, &val) in f.iter().enumerate() {
-                assert!(val.is_finite(), "feature {} at pos {} is not finite", i, pos);
+                assert!(
+                    val.is_finite(),
+                    "feature {} at pos {} is not finite",
+                    i,
+                    pos
+                );
             }
         }
     }

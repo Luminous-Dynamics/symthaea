@@ -24,6 +24,8 @@ use crate::perturbations::{is_critical_failure, PerturbationSchedule};
 use crate::reward;
 use crate::road::Road;
 use crate::simulator::{BicycleModelSimulator, VehiclePhysicsSimulator};
+use crate::subterranean::{CaveRelayDecision, SubterraneanBridge, SurveyAnchor};
+use crate::subterranean_navigation::{SubterraneanNavigator, SubterraneanTrainingContext};
 use crate::swarm::{SwarmConfig, SwarmSimulator};
 use crate::types::*;
 
@@ -48,6 +50,12 @@ pub struct EpisodeMetrics {
     pub avg_control_effort: f64,
     /// Number of exploration bursts triggered.
     pub exploration_count: usize,
+    /// Final subterranean navigation sigma when subterranean context is active.
+    pub subterranean_navigation_sigma_m: Option<f64>,
+    /// Number of subterranean navigation updates applied.
+    pub subterranean_navigation_updates: usize,
+    /// How often relay policy fell back to buffer-and-forward.
+    pub subterranean_buffered_relays: usize,
     /// Total steps completed (may be < steps_per_episode if early termination).
     pub total_steps: usize,
     /// Task for this episode.
@@ -72,6 +80,8 @@ pub struct VehicleTrainer {
     road: Road,
     /// Optional swarm config — when set, peer vehicles populate mesh channels.
     swarm_config: Option<SwarmConfig>,
+    /// Optional subterranean context for GPS-denied cave/tunnel operation.
+    subterranean_context: Option<SubterraneanTrainingContext>,
     /// Training-level perturbations (swarm scenario events like lead-brake cascades).
     training_perturbations: Vec<TrainingPerturbation>,
 }
@@ -88,6 +98,7 @@ impl VehicleTrainer {
             perturbation_schedule: PerturbationSchedule::none(),
             road: Road::straight(),
             swarm_config: None,
+            subterranean_context: None,
             training_perturbations: Vec::new(),
         }
     }
@@ -103,6 +114,7 @@ impl VehicleTrainer {
             perturbation_schedule: PerturbationSchedule::none(),
             road: Road::straight(),
             swarm_config: None,
+            subterranean_context: None,
             training_perturbations: Vec::new(),
         }
     }
@@ -119,6 +131,7 @@ impl VehicleTrainer {
             perturbation_schedule: PerturbationSchedule::none(),
             road: Road::straight(),
             swarm_config: None,
+            subterranean_context: None,
             training_perturbations: Vec::new(),
         })
     }
@@ -138,6 +151,15 @@ impl VehicleTrainer {
     /// Set a swarm config — peer vehicles will populate the 4 mesh channels during training.
     pub fn with_swarm(mut self, swarm_config: SwarmConfig) -> Self {
         self.swarm_config = Some(swarm_config);
+        self
+    }
+
+    /// Enable subterranean navigation and relay policy during training episodes.
+    pub fn with_subterranean_context(
+        mut self,
+        subterranean_context: SubterraneanTrainingContext,
+    ) -> Self {
+        self.subterranean_context = Some(subterranean_context);
         self
     }
 
@@ -260,6 +282,7 @@ impl VehicleTrainer {
         let mut current_tau_factor = fep_result.tau_factor;
         let mut current_fe = fep_result.free_energy;
         let mut low_reward_streak = 0u32;
+        let mut subterranean_buffered_relays = 0usize;
 
         let mut telemetry = if self.config.collect_telemetry {
             Vec::with_capacity(self.config.steps_per_episode)
@@ -306,6 +329,15 @@ impl VehicleTrainer {
             Some(SwarmSimulator::new(scaled_cfg))
         });
 
+        let subterranean_bridge = self
+            .subterranean_context
+            .as_ref()
+            .map(|_| SubterraneanBridge::default());
+        let mut subterranean_navigator = self
+            .subterranean_context
+            .as_ref()
+            .map(|_| SubterraneanNavigator::new([0.0, 0.0, 0.0], 25.0));
+
         for step in 0..self.config.steps_per_episode {
             // -- PERTURBATION SCHEDULE --
             if use_perturbations {
@@ -342,6 +374,40 @@ impl VehicleTrainer {
             // -- STATE-LEVEL PERTURBATIONS (sensor blindness, mesh spoof) --
             if use_perturbations {
                 self.perturbation_schedule.apply_to_state(step, &mut state);
+            }
+
+            if let (Some(context), Some(bridge), Some(navigator)) = (
+                self.subterranean_context.as_ref(),
+                subterranean_bridge.as_ref(),
+                subterranean_navigator.as_mut(),
+            ) {
+                navigator.ingest_vehicle_odometry(&state);
+                let ego_position = [state.position_x, state.position_y, 0.0];
+                if let Some((anchor, distance_m)) =
+                    nearest_subterranean_anchor(&context.anchors, ego_position)
+                {
+                    if distance_m <= context.survey_fix_radius_m {
+                        navigator.ingest_survey_fix(bridge, state.timestamp, anchor);
+                    } else if distance_m <= context.range_radius_m {
+                        let sigma_m = if context.acoustic_ranging { 1.5 } else { 0.75 };
+                        navigator.ingest_anchor_range(
+                            bridge,
+                            state.timestamp,
+                            anchor,
+                            distance_m,
+                            sigma_m,
+                            context.acoustic_ranging,
+                        );
+                    }
+                }
+
+                let blackout = state.mesh_confidence < context.blackout_mesh_confidence_threshold;
+                if matches!(
+                    bridge.relay_decision(&context.relay_node, context.priority, blackout),
+                    CaveRelayDecision::BufferAndForward
+                ) {
+                    subterranean_buffered_relays += 1;
+                }
             }
 
             let proj = self.road.project(state.position_x, state.position_y);
@@ -487,6 +553,16 @@ impl VehicleTrainer {
         }
 
         let n = steps_completed.max(1) as f64;
+        let (subterranean_navigation_sigma_m, subterranean_navigation_updates) =
+            if let Some(navigator) = subterranean_navigator.as_ref() {
+                let estimate = navigator.estimate();
+                (
+                    Some(estimate.position_sigma_m),
+                    estimate.update_count as usize,
+                )
+            } else {
+                (None, 0)
+            };
 
         EpisodeMetrics {
             episode,
@@ -502,6 +578,9 @@ impl VehicleTrainer {
             avg_heading_error: total_heading_error / n,
             avg_control_effort: total_control_effort / n,
             exploration_count,
+            subterranean_navigation_sigma_m,
+            subterranean_navigation_updates,
+            subterranean_buffered_relays,
             total_steps: steps_completed,
             task,
             telemetry,
@@ -715,6 +794,22 @@ impl VehicleTrainer {
     }
 }
 
+fn nearest_subterranean_anchor(
+    anchors: &[SurveyAnchor],
+    position_m: [f64; 3],
+) -> Option<(&SurveyAnchor, f64)> {
+    anchors
+        .iter()
+        .map(|anchor| {
+            let dx = anchor.position_m[0] - position_m[0];
+            let dy = anchor.position_m[1] - position_m[1];
+            let dz = anchor.position_m[2] - position_m[2];
+            let distance = (dx * dx + dy * dy + dz * dz).sqrt();
+            (anchor, distance)
+        })
+        .min_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -757,6 +852,35 @@ mod tests {
         for (i, m) in metrics.iter().enumerate() {
             assert_eq!(m.episode, i);
         }
+    }
+
+    #[test]
+    fn test_subterranean_context_produces_navigation_updates() {
+        let config = VehicleConfig {
+            num_episodes: 1,
+            steps_per_episode: 50,
+            ..VehicleConfig::default()
+        };
+        let genesis = GenesisSeed::from_phrase(&config.genesis_phrase);
+        let trainer = VehicleTrainer::new(config.clone()).with_subterranean_context(
+            SubterraneanTrainingContext {
+                anchors: vec![SurveyAnchor {
+                    anchor_id: "survey_a".to_string(),
+                    position_m: [0.0, 0.0, 0.0],
+                    admitted: true,
+                }],
+                ..SubterraneanTrainingContext::default()
+            },
+        );
+
+        let mut encoder = VehicleHdcEncoder::new(&genesis, config.num_levels);
+        let mut controller = VehicleController::new(&genesis, &config);
+        let mut fep_agent =
+            ActiveInferenceVehicleAgent::new(VehicleFepConfig::default(), VehicleTask::LaneKeep);
+
+        let metrics = trainer.run_episode(&mut encoder, &mut controller, &mut fep_agent, 0);
+        assert!(metrics.subterranean_navigation_sigma_m.is_some());
+        assert!(metrics.subterranean_navigation_updates > 0);
     }
 
     #[test]

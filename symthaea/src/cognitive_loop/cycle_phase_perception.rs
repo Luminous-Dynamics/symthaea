@@ -61,9 +61,15 @@ impl CognitiveLoopService {
         // PHASE 0.4: Moral Evaluation (throttled: every Nth cycle or on new input)
         // ═══════════════════════════════════════════════════════════════════════
         let _t = Instant::now();
-        let (moral_score, moral_concern_detected, moral_judgment,
-             spinozist_affect_coords, spinozist_fluctuatio, spinozist_ambiguous, spinozist_confidence) =
-            self.run_moral_phase(input, input_negation_polarity);
+        let (
+            moral_score,
+            moral_concern_detected,
+            moral_judgment,
+            spinozist_affect_coords,
+            spinozist_fluctuatio,
+            spinozist_ambiguous,
+            spinozist_confidence,
+        ) = self.run_moral_phase(input, input_negation_polarity);
         module_timings.moral_algebra = _t.elapsed().as_micros() as u64;
 
         // ═══════════════════════════════════════════════════════════════════════

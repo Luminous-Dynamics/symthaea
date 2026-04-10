@@ -17,7 +17,9 @@ fn main() {
         ..Default::default()
     };
 
-    println!("phi,mean_alt_error,control_effort,angular_speed,hover_fraction,crashed,steps_survived");
+    println!(
+        "phi,mean_alt_error,control_effort,angular_speed,hover_fraction,crashed,steps_survived"
+    );
 
     let results = benchmarks::phi_correlation_sweep(&config, 20.0, 900);
 

@@ -60,30 +60,18 @@ impl Metrics {
             "consciousness_level",
             "Current consciousness level (0.0-1.0)"
         );
-        metrics::describe_gauge!(
-            "phi_value",
-            "Current Phi (integrated information) value"
-        );
+        metrics::describe_gauge!("phi_value", "Current Phi (integrated information) value");
         metrics::describe_counter!(
             "gate_vetoes_total",
             "Total number of times the Phi gate vetoed action execution"
         );
-        metrics::describe_gauge!(
-            "free_energy",
-            "Current free energy of the world model"
-        );
+        metrics::describe_gauge!("free_energy", "Current free energy of the world model");
         metrics::describe_counter!(
             "anomalies_total",
             "Total anomalies detected from journal analysis"
         );
-        metrics::describe_gauge!(
-            "causal_edge_count",
-            "Number of edges in the causal graph"
-        );
-        metrics::describe_gauge!(
-            "episodic_count",
-            "Number of episodes in episodic memory"
-        );
+        metrics::describe_gauge!("causal_edge_count", "Number of edges in the causal graph");
+        metrics::describe_gauge!("episodic_count", "Number of episodes in episodic memory");
 
         Ok(Metrics { handle })
     }
@@ -164,8 +152,7 @@ impl Metrics {
 
     /// Record a phase duration observation.
     pub fn observe_phase_duration(&self, phase: &str, seconds: f64) {
-        metrics::histogram!("phase_duration_seconds", "phase" => phase.to_string())
-            .record(seconds);
+        metrics::histogram!("phase_duration_seconds", "phase" => phase.to_string()).record(seconds);
     }
 }
 
@@ -256,10 +243,7 @@ pub async fn serve_metrics(port: u16) -> Result<(), Box<dyn std::error::Error + 
                         }
                     };
                     let resp = Response::builder()
-                        .header(
-                            "Content-Type",
-                            "text/plain; version=0.0.4; charset=utf-8",
-                        )
+                        .header("Content-Type", "text/plain; version=0.0.4; charset=utf-8")
                         .body(Full::new(Bytes::from(body)))
                         .unwrap_or_else(|_| Response::new(Full::new(Bytes::from("error"))));
                     Ok::<_, hyper::Error>(resp)

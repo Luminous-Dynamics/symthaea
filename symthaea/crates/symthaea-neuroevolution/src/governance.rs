@@ -102,20 +102,32 @@ pub fn blend_thresholds(
         fep_lr_decay: b * current.fep_lr_decay + a * proposed.fep_lr_decay,
         dream_base_interval: lerp_u64(current.dream_base_interval, proposed.dream_base_interval, a),
         dream_min_interval: lerp_u64(current.dream_min_interval, proposed.dream_min_interval, a),
-        neuromod_d2_baseline: b as f64 * current.neuromod_d2_baseline + a as f64 * proposed.neuromod_d2_baseline,
-        neuromod_ne_phasic_threshold: b * current.neuromod_ne_phasic_threshold + a * proposed.neuromod_ne_phasic_threshold,
-        neuromod_arousal_ema_decay: b * current.neuromod_arousal_ema_decay + a * proposed.neuromod_arousal_ema_decay,
-        homeostasis_recalibrate_high: b * current.homeostasis_recalibrate_high + a * proposed.homeostasis_recalibrate_high,
-        homeostasis_recalibrate_low: b * current.homeostasis_recalibrate_low + a * proposed.homeostasis_recalibrate_low,
+        neuromod_d2_baseline: b as f64 * current.neuromod_d2_baseline
+            + a as f64 * proposed.neuromod_d2_baseline,
+        neuromod_ne_phasic_threshold: b * current.neuromod_ne_phasic_threshold
+            + a * proposed.neuromod_ne_phasic_threshold,
+        neuromod_arousal_ema_decay: b * current.neuromod_arousal_ema_decay
+            + a * proposed.neuromod_arousal_ema_decay,
+        homeostasis_recalibrate_high: b * current.homeostasis_recalibrate_high
+            + a * proposed.homeostasis_recalibrate_high,
+        homeostasis_recalibrate_low: b * current.homeostasis_recalibrate_low
+            + a * proposed.homeostasis_recalibrate_low,
         neuromod_ema_alpha: b * current.neuromod_ema_alpha + a * proposed.neuromod_ema_alpha,
-        frustration_dampen_threshold: b as f64 * current.frustration_dampen_threshold + a as f64 * proposed.frustration_dampen_threshold,
-        engagement_low_threshold: b as f64 * current.engagement_low_threshold + a as f64 * proposed.engagement_low_threshold,
-        flow_exploration_increment: b * current.flow_exploration_increment + a * proposed.flow_exploration_increment,
+        frustration_dampen_threshold: b as f64 * current.frustration_dampen_threshold
+            + a as f64 * proposed.frustration_dampen_threshold,
+        engagement_low_threshold: b as f64 * current.engagement_low_threshold
+            + a as f64 * proposed.engagement_low_threshold,
+        flow_exploration_increment: b * current.flow_exploration_increment
+            + a * proposed.flow_exploration_increment,
         coherence_low: b * current.coherence_low + a * proposed.coherence_low,
-        arousal_trap_threshold: b * current.arousal_trap_threshold + a * proposed.arousal_trap_threshold,
-        self_model_weight_high: b * current.self_model_weight_high + a * proposed.self_model_weight_high,
-        homeostasis_pull_cruise: b * current.homeostasis_pull_cruise + a * proposed.homeostasis_pull_cruise,
-        confidence_crash_threshold: b as f64 * current.confidence_crash_threshold + a as f64 * proposed.confidence_crash_threshold,
+        arousal_trap_threshold: b * current.arousal_trap_threshold
+            + a * proposed.arousal_trap_threshold,
+        self_model_weight_high: b * current.self_model_weight_high
+            + a * proposed.self_model_weight_high,
+        homeostasis_pull_cruise: b * current.homeostasis_pull_cruise
+            + a * proposed.homeostasis_pull_cruise,
+        confidence_crash_threshold: b as f64 * current.confidence_crash_threshold
+            + a as f64 * proposed.confidence_crash_threshold,
     }
 }
 
@@ -137,7 +149,10 @@ mod tests {
         };
         let result = gate_threshold_proposal(&current, &proposed, 0.7, 0.8);
         match result {
-            GovernanceResult::Approved { blended, confidence } => {
+            GovernanceResult::Approved {
+                blended,
+                confidence,
+            } => {
                 // Blended should be 90% current + 10% proposed
                 let expected = 0.9 * 3.0 + 0.1 * 5.0; // 3.2
                 assert!((blended.fep_surprise_scale - expected).abs() < 0.01);

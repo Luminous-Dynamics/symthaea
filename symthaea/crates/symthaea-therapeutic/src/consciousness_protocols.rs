@@ -25,10 +25,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum TargetState {
     /// Csikszentmihalyi flow: high Phi, optimal arousal band.
-    FlowState {
-        min_phi: f64,
-        optimal_arousal: f32,
-    },
+    FlowState { min_phi: f64, optimal_arousal: f32 },
     /// Deep meditative absorption with alpha/theta crossover.
     MeditativeAbsorption {
         target_alpha_coherence: f32,
@@ -181,10 +178,7 @@ pub enum TransitionCondition {
         threshold: f32,
     },
     /// Advance when Phi stabilises above `min_phi` for `stability_window` ticks.
-    PhiStabilized {
-        min_phi: f64,
-        stability_window: u32,
-    },
+    PhiStabilized { min_phi: f64, stability_window: u32 },
     /// Manual advance by the therapist.
     TherapistAdvance,
 }
@@ -704,11 +698,7 @@ impl SessionState {
 
     /// Advance one tick (one minute).  Returns the modalities that should be
     /// active during this tick.
-    pub fn tick(
-        &mut self,
-        phi: f64,
-        metrics: &[(BiofeedbackMetric, f32)],
-    ) -> Vec<Modality> {
+    pub fn tick(&mut self, phi: f64, metrics: &[(BiofeedbackMetric, f32)]) -> Vec<Modality> {
         if self.status != SessionStatus::Active {
             return Vec::new();
         }
@@ -922,9 +912,9 @@ impl SessionState {
         let phase = &self.protocol.phases[self.current_phase];
         let should_advance = match &phase.transition_condition {
             TransitionCondition::TimeBased(t) => self.elapsed_mins >= *t,
-            TransitionCondition::MetricReached { metric, threshold } => metrics
-                .iter()
-                .any(|(m, v)| m == metric && *v >= *threshold),
+            TransitionCondition::MetricReached { metric, threshold } => {
+                metrics.iter().any(|(m, v)| m == metric && *v >= *threshold)
+            }
             TransitionCondition::PhiStabilized {
                 min_phi,
                 stability_window,
@@ -964,10 +954,14 @@ mod tests {
     #[test]
     fn trauma_protocol_has_dissociation_safety() {
         let p = Protocol::trauma_integration();
-        let has_dissociation = p.safety_constraints.iter().any(|c| {
-            matches!(c.condition, SafetyCondition::DissociationDetected)
-        });
-        assert!(has_dissociation, "Trauma protocol must guard against dissociation");
+        let has_dissociation = p
+            .safety_constraints
+            .iter()
+            .any(|c| matches!(c.condition, SafetyCondition::DissociationDetected));
+        assert!(
+            has_dissociation,
+            "Trauma protocol must guard against dissociation"
+        );
     }
 
     #[test]
@@ -1031,7 +1025,10 @@ mod tests {
         // Tick through all phases with high phi
         for _ in 0..50 {
             let _ = s.tick(0.7, &[(BiofeedbackMetric::ThetaPower, 0.6)]);
-            if matches!(s.status, SessionStatus::Completed | SessionStatus::Terminated(_)) {
+            if matches!(
+                s.status,
+                SessionStatus::Completed | SessionStatus::Terminated(_)
+            ) {
                 break;
             }
         }
@@ -1093,21 +1090,29 @@ mod tests {
         // Phase 1 transition: MetricReached { ThetaPower, 0.5 }
         // Provide metric above threshold
         let _ = s.tick(0.5, &[(BiofeedbackMetric::ThetaPower, 0.55)]);
-        assert_eq!(s.current_phase, 2, "Theta threshold should advance to absorption");
+        assert_eq!(
+            s.current_phase, 2,
+            "Theta threshold should advance to absorption"
+        );
     }
 
     #[test]
     fn grief_protocol_has_emotional_range_safety() {
         let p = Protocol::grief_processing();
         // Should have phi-based guards for emotional range
-        let has_phi_below = p.safety_constraints.iter().any(|c| {
-            matches!(c.condition, SafetyCondition::PhiBelow(_))
-        });
-        let has_phi_above = p.safety_constraints.iter().any(|c| {
-            matches!(c.condition, SafetyCondition::PhiAbove(_))
-        });
+        let has_phi_below = p
+            .safety_constraints
+            .iter()
+            .any(|c| matches!(c.condition, SafetyCondition::PhiBelow(_)));
+        let has_phi_above = p
+            .safety_constraints
+            .iter()
+            .any(|c| matches!(c.condition, SafetyCondition::PhiAbove(_)));
         assert!(has_phi_below, "Grief protocol needs emotional floor guard");
-        assert!(has_phi_above, "Grief protocol needs emotional ceiling guard");
+        assert!(
+            has_phi_above,
+            "Grief protocol needs emotional ceiling guard"
+        );
     }
 
     #[test]

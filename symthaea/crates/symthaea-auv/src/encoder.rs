@@ -13,46 +13,58 @@ const CHANNEL_RANGES: [[f32; 2]; NUM_STATE_CHANNELS] = [
     [-1000.0, 1000.0], // pos_x
     [-1000.0, 1000.0], // pos_y
     [0.0, 500.0],      // pos_z (depth)
-    [-1.0, 1.0], [-1.0, 1.0], [-1.0, 1.0], [-1.0, 1.0], // quaternion
-    [-3.0, 3.0], [-3.0, 3.0], [-3.0, 3.0],   // linear vel (AUVs are slow)
-    [-2.0, 2.0], [-2.0, 2.0], [-2.0, 2.0],   // angular vel
-    [0.0, 500.0],      // depth
-    [0.0, 5000.0],     // pressure kPa
-    [0.0, 40.0],       // water temp °C
-    [-500.0, 500.0],   // buoyancy force N
-    [-1.0, 1.0], [-1.0, 1.0], [-1.0, 1.0], [-1.0, 1.0], // thruster feedback (first 4)
-    [-1.0, 1.0], [-1.0, 1.0], [-1.0, 1.0],               // thruster feedback (last 3)
+    [-1.0, 1.0],
+    [-1.0, 1.0],
+    [-1.0, 1.0],
+    [-1.0, 1.0], // quaternion
+    [-3.0, 3.0],
+    [-3.0, 3.0],
+    [-3.0, 3.0], // linear vel (AUVs are slow)
+    [-2.0, 2.0],
+    [-2.0, 2.0],
+    [-2.0, 2.0],     // angular vel
+    [0.0, 500.0],    // depth
+    [0.0, 5000.0],   // pressure kPa
+    [0.0, 40.0],     // water temp °C
+    [-500.0, 500.0], // buoyancy force N
+    [-1.0, 1.0],
+    [-1.0, 1.0],
+    [-1.0, 1.0],
+    [-1.0, 1.0], // thruster feedback (first 4)
+    [-1.0, 1.0],
+    [-1.0, 1.0],
+    [-1.0, 1.0], // thruster feedback (last 3)
     // Chemical channels
-    [0.0, 14.0],       // pH
-    [0.0, 1000.0],     // turbidity NTU
-    [0.0, 5000.0],     // TDS ppm
-    [0.0, 100.0],      // nitrates mg/L
-    [0.0, 100.0],      // arsenic µg/L
-    [0.0, 100.0],      // lead µg/L
-    [0.0, 5.0],        // chlorine mg/L
-    [0.0, 20.0],       // dissolved oxygen mg/L
+    [0.0, 14.0],   // pH
+    [0.0, 1000.0], // turbidity NTU
+    [0.0, 5000.0], // TDS ppm
+    [0.0, 100.0],  // nitrates mg/L
+    [0.0, 100.0],  // arsenic µg/L
+    [0.0, 100.0],  // lead µg/L
+    [0.0, 5.0],    // chlorine mg/L
+    [0.0, 20.0],   // dissolved oxygen mg/L
 ];
 
 /// Semantic weights: chemical sensors and depth boosted for commons stewardship.
 const CHANNEL_WEIGHTS: [f32; NUM_STATE_CHANNELS] = [
-    1.0, 1.0, 2.0,          // position (depth critical)
-    1.5, 1.5, 1.5, 1.5,     // quaternion
-    1.0, 1.0, 1.0,          // velocity
-    1.5, 1.5, 1.5,          // angular velocity
-    2.0,                     // depth (critical for AUV)
-    1.0,                     // pressure
-    1.0,                     // water temp
-    1.0,                     // buoyancy
+    1.0, 1.0, 2.0, // position (depth critical)
+    1.5, 1.5, 1.5, 1.5, // quaternion
+    1.0, 1.0, 1.0, // velocity
+    1.5, 1.5, 1.5, // angular velocity
+    2.0, // depth (critical for AUV)
+    1.0, // pressure
+    1.0, // water temp
+    1.0, // buoyancy
     0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8, // thruster feedback
     // Chemical channels — boosted for water stewardship mission
-    2.0,                     // pH (critical)
-    2.0,                     // turbidity (critical)
-    1.5,                     // TDS
-    2.5,                     // nitrates (SUPREME — agricultural runoff)
-    3.0,                     // arsenic (SUPREME — health critical)
-    3.0,                     // lead (SUPREME — health critical)
-    1.5,                     // chlorine
-    2.0,                     // dissolved oxygen (critical for ecosystem)
+    2.0, // pH (critical)
+    2.0, // turbidity (critical)
+    1.5, // TDS
+    2.5, // nitrates (SUPREME — agricultural runoff)
+    3.0, // arsenic (SUPREME — health critical)
+    3.0, // lead (SUPREME — health critical)
+    1.5, // chlorine
+    2.0, // dissolved oxygen (critical for ecosystem)
 ];
 
 /// HDC encoder for AUV state.
@@ -74,7 +86,13 @@ impl AuvHdcEncoder {
             .map(|i| ContinuousHV::from_genesis(genesis, &format!("auv::lv::{i}"), dim))
             .collect();
 
-        Self { base_vectors, level_vectors, prev_channels: None, derivative_weight: 0.3, num_levels }
+        Self {
+            base_vectors,
+            level_vectors,
+            prev_channels: None,
+            derivative_weight: 0.3,
+            num_levels,
+        }
     }
 
     pub fn encode(&mut self, state: &AuvState) -> ContinuousHV {
@@ -85,12 +103,18 @@ impl AuvHdcEncoder {
         for ch in 0..NUM_STATE_CHANNELS {
             let [lo, hi] = CHANNEL_RANGES[ch];
             let range = hi - lo;
-            let norm = if range.abs() < 1e-10 { 0.5 } else { ((channels[ch] - lo) / range).clamp(0.0, 1.0) };
+            let norm = if range.abs() < 1e-10 {
+                0.5
+            } else {
+                ((channels[ch] - lo) / range).clamp(0.0, 1.0)
+            };
             let k = (norm * (self.num_levels - 1) as f32).round() as usize;
             let k = k.min(self.num_levels - 1);
 
             let mut level_hv = ContinuousHV::zero(dim);
-            for l in 0..=k { level_hv.add_in_place(&self.level_vectors[l]); }
+            for l in 0..=k {
+                level_hv.add_in_place(&self.level_vectors[l]);
+            }
             level_hv = level_hv.normalize();
 
             let bound = level_hv.bind(&self.base_vectors[ch]);
@@ -104,7 +128,9 @@ impl AuvHdcEncoder {
         result
     }
 
-    pub fn reset(&mut self) { self.prev_channels = None; }
+    pub fn reset(&mut self) {
+        self.prev_channels = None;
+    }
 }
 
 #[cfg(test)]
@@ -150,6 +176,9 @@ mod tests {
         clean.chemical.arsenic_ug_l = 50.0; // Contaminated
         let h_dirty = enc.encode(&clean);
         let sim = h_clean.similarity(&h_dirty);
-        assert!(sim < 0.99, "Contamination should change encoding: sim={sim}");
+        assert!(
+            sim < 0.99,
+            "Contamination should change encoding: sim={sim}"
+        );
     }
 }

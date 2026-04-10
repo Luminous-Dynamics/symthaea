@@ -68,12 +68,10 @@ pub fn generate(
             ..*config
         };
         let curves = crate::curves::generate(&curve_config, snapshot, rng);
-        let curve_layer = SceneNode::group(None)
-            .with_child(curves)
-            .with_style(Style {
-                opacity: Some(0.5 + psi * 0.3),
-                ..Style::default()
-            });
+        let curve_layer = SceneNode::group(None).with_child(curves).with_style(Style {
+            opacity: Some(0.5 + psi * 0.3),
+            ..Style::default()
+        });
         root.children.push(curve_layer);
     }
 
@@ -183,6 +181,10 @@ mod tests {
         let mut rng = StdRng::seed_from_u64(42);
         let scene = generate(&config, &snapshot, &mut rng);
         // Color field + persistence + curves = 3 (harmony shapes need Psi > 0.5, not >=)
-        assert!(scene.children.len() >= 3, "got {} layers", scene.children.len());
+        assert!(
+            scene.children.len() >= 3,
+            "got {} layers",
+            scene.children.len()
+        );
     }
 }

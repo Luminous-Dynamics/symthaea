@@ -15,12 +15,8 @@ fn main() {
     println!("Running 10 organoids with different seeds...");
     println!();
 
-    println!(
-        "Seed | Final Day | Peak Phi  | Cells | Neurons | Ethics Halt"
-    );
-    println!(
-        "-----|-----------|-----------|-------|---------|------------"
-    );
+    println!("Seed | Final Day | Peak Phi  | Cells | Neurons | Ethics Halt");
+    println!("-----|-----------|-----------|-------|---------|------------");
 
     let mut best_seed = 0u64;
     let mut best_phi = 0.0f64;

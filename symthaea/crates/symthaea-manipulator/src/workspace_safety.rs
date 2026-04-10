@@ -21,19 +21,24 @@ pub enum ManipulatorSafetyLevel {
 
 impl ManipulatorSafetyLevel {
     pub fn from_phi(phi: f64) -> Self {
-        if phi > 0.6 { Self::Green }
-        else if phi > 0.3 { Self::Yellow }
-        else if phi > 0.1 { Self::Orange }
-        else { Self::Red }
+        if phi > 0.6 {
+            Self::Green
+        } else if phi > 0.3 {
+            Self::Yellow
+        } else if phi > 0.1 {
+            Self::Orange
+        } else {
+            Self::Red
+        }
     }
 
     /// Maximum force (Newtons) at end-effector for this safety level.
     pub fn max_force_n(&self) -> f64 {
         match self {
-            Self::Green => 87.0,   // Full Panda-class force
-            Self::Yellow => 20.0,  // Reduced for safety
-            Self::Orange => 0.0,   // No contact allowed
-            Self::Red => 0.0,      // Power cut
+            Self::Green => 87.0,  // Full Panda-class force
+            Self::Yellow => 20.0, // Reduced for safety
+            Self::Orange => 0.0,  // No contact allowed
+            Self::Red => 0.0,     // Power cut
         }
     }
 
@@ -85,8 +90,12 @@ impl WorkspaceBoundary {
         let radius = (pos[0] * pos[0] + pos[1] * pos[1] + pos[2] * pos[2]).sqrt();
         let max = self.max_radius * safety.workspace_fraction();
 
-        if radius > max { return false; }
-        if pos[2] < self.min_height { return false; }
+        if radius > max {
+            return false;
+        }
+        if pos[2] < self.min_height {
+            return false;
+        }
 
         // Check human proximity zones
         for zone in &self.human_zones {
@@ -94,7 +103,9 @@ impl WorkspaceBoundary {
             let dy = pos[1] - zone[1];
             let dz = pos[2] - zone[2];
             let dist = (dx * dx + dy * dy + dz * dz).sqrt();
-            if dist < zone[3] { return false; }
+            if dist < zone[3] {
+                return false;
+            }
         }
 
         true
@@ -117,7 +128,9 @@ impl WorkspaceBoundary {
             min_human_clearance = min_human_clearance.min(dist - zone[3]);
         }
 
-        radius_clearance.min(height_clearance).min(min_human_clearance)
+        radius_clearance
+            .min(height_clearance)
+            .min(min_human_clearance)
     }
 }
 
@@ -127,17 +140,32 @@ mod tests {
 
     #[test]
     fn test_safety_levels() {
-        assert_eq!(ManipulatorSafetyLevel::from_phi(0.8), ManipulatorSafetyLevel::Green);
-        assert_eq!(ManipulatorSafetyLevel::from_phi(0.5), ManipulatorSafetyLevel::Yellow);
-        assert_eq!(ManipulatorSafetyLevel::from_phi(0.2), ManipulatorSafetyLevel::Orange);
-        assert_eq!(ManipulatorSafetyLevel::from_phi(0.05), ManipulatorSafetyLevel::Red);
+        assert_eq!(
+            ManipulatorSafetyLevel::from_phi(0.8),
+            ManipulatorSafetyLevel::Green
+        );
+        assert_eq!(
+            ManipulatorSafetyLevel::from_phi(0.5),
+            ManipulatorSafetyLevel::Yellow
+        );
+        assert_eq!(
+            ManipulatorSafetyLevel::from_phi(0.2),
+            ManipulatorSafetyLevel::Orange
+        );
+        assert_eq!(
+            ManipulatorSafetyLevel::from_phi(0.05),
+            ManipulatorSafetyLevel::Red
+        );
     }
 
     #[test]
     fn test_force_limits() {
         assert_eq!(ManipulatorSafetyLevel::Green.max_force_n(), 87.0);
         assert_eq!(ManipulatorSafetyLevel::Red.max_force_n(), 0.0);
-        assert!(ManipulatorSafetyLevel::Yellow.max_force_n() < ManipulatorSafetyLevel::Green.max_force_n());
+        assert!(
+            ManipulatorSafetyLevel::Yellow.max_force_n()
+                < ManipulatorSafetyLevel::Green.max_force_n()
+        );
     }
 
     #[test]

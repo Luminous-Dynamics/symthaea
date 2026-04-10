@@ -215,7 +215,8 @@ impl CognitiveLoopService {
     /// Evaluate temporal prediction horizon accuracy from the vision manifold.
     #[cfg(feature = "vision-manifold")]
     pub fn vision_evaluate_horizons(&self) -> Option<symthaea_vision_manifold::HorizonAccuracy> {
-        self.sensorimotor.vision_sensory
+        self.sensorimotor
+            .vision_sensory
             .vision_bridge
             .as_ref()
             .map(|b| b.manifold().evaluate_horizons())
@@ -488,7 +489,8 @@ impl CognitiveLoopService {
     /// Get the current embodiment platform.
     #[cfg(feature = "humanoid")]
     pub fn embodiment_platform(&self) -> super::super::motor_bridge::EmbodimentPlatform {
-        self.sensorimotor.embodiment_bridge
+        self.sensorimotor
+            .embodiment_bridge
             .as_ref()
             .map(|b| b.platform())
             .unwrap_or(super::super::motor_bridge::EmbodimentPlatform::None)
@@ -504,6 +506,68 @@ impl CognitiveLoopService {
     #[cfg(feature = "humanoid")]
     pub fn last_proprioceptive_hv(&self) -> Option<&symthaea_core::hdc::ContinuousHV> {
         self.sensorimotor.last_proprioceptive_hv.as_ref()
+    }
+
+    /// Switch the embodiment platform at runtime.
+    ///
+    /// Replaces the current embodiment bridge with a new one for the given platform.
+    /// The old bridge is dropped. Proprioceptive HV and telemetry are reset.
+    /// Consciousness state (Phi, memories, etc.) is preserved — only the body changes.
+    ///
+    /// This enables Multiple Realizability experiments: does consciousness survive
+    /// a body transfer? Does Phi adapt when the proprioceptive dimensionality changes?
+    #[cfg(feature = "humanoid")]
+    pub fn switch_embodiment(
+        &mut self,
+        platform: super::super::motor_bridge::EmbodimentPlatform,
+    ) {
+        use super::super::motor_bridge::EmbodimentPlatform;
+        let genesis = symthaea_core::genesis::GenesisSeed::from_phrase(
+            self.config
+                .genesis_phrase
+                .as_deref()
+                .unwrap_or("default"),
+        );
+        let new_bridge: Option<Box<dyn super::super::motor_bridge::EmbodimentBridge>> =
+            match platform {
+                EmbodimentPlatform::Humanoid => {
+                    let bridge = super::super::motor_bridge::MotorBridge::new(&genesis);
+                    Some(Box::new(bridge))
+                }
+                #[cfg(feature = "helicopter")]
+                EmbodimentPlatform::Helicopter => {
+                    let inner =
+                        crate::helicopter::embodiment::HelicopterEmbodiment::new(&genesis);
+                    Some(Box::new(super::super::constructor::HelicopterBridgeAdapter(inner)))
+                }
+                #[cfg(feature = "flight")]
+                EmbodimentPlatform::Quadrotor => {
+                    let inner = crate::flight::embodiment::FlightEmbodiment::new(&genesis);
+                    Some(Box::new(super::super::constructor::FlightBridgeAdapter(inner)))
+                }
+                #[cfg(feature = "vehicle")]
+                EmbodimentPlatform::Vehicle => {
+                    let inner = crate::vehicle::embodiment::VehicleEmbodiment::new(&genesis);
+                    Some(Box::new(super::super::constructor::VehicleBridgeAdapter(inner)))
+                }
+                #[cfg(feature = "manipulator")]
+                EmbodimentPlatform::Manipulator => {
+                    let inner =
+                        crate::manipulator::embodiment::ManipulatorEmbodiment::new(&genesis);
+                    Some(Box::new(super::super::constructor::ManipulatorBridgeAdapter(inner)))
+                }
+                #[cfg(feature = "auv")]
+                EmbodimentPlatform::Auv => {
+                    let inner = crate::auv::embodiment::AuvEmbodiment::new(&genesis);
+                    Some(Box::new(super::super::constructor::AuvBridgeAdapter(inner)))
+                }
+                _ => None,
+            };
+
+        self.sensorimotor.embodiment_bridge = new_bridge;
+        self.sensorimotor.last_proprioceptive_hv = None;
+        self.sensorimotor.embodiment_telemetry =
+            super::super::motor_bridge::EmbodimentTelemetry::default();
     }
 
     /// Get the math service for dispatching mathematical queries.
@@ -545,12 +609,18 @@ impl CognitiveLoopService {
 
     /// Get the latest knowledge telemetry (if enabled).
     pub fn knowledge_telemetry(&self) -> Option<&crate::knowledge::KnowledgeTelemetry> {
-        self.memory.knowledge_manager.as_ref().map(|km| km.telemetry())
+        self.memory
+            .knowledge_manager
+            .as_ref()
+            .map(|km| km.telemetry())
     }
 
     /// Get the latest knowledge signals (if enabled).
     pub fn knowledge_signals(&self) -> Option<&crate::knowledge::KnowledgeSignals> {
-        self.memory.knowledge_manager.as_ref().map(|km| km.signals())
+        self.memory
+            .knowledge_manager
+            .as_ref()
+            .map(|km| km.signals())
     }
 
     /// Register a custom entity in the knowledge extractor.
@@ -580,7 +650,10 @@ impl CognitiveLoopService {
 
     /// Get the last assembled reasoning context (if knowledge engine is enabled).
     pub fn reasoning_context(&self) -> Option<&crate::knowledge::ReasoningContext> {
-        self.memory.episodic_persistence.last_reasoning_context.as_ref()
+        self.memory
+            .episodic_persistence
+            .last_reasoning_context
+            .as_ref()
     }
 
     /// Trace causal chains from a starting concept through the knowledge causal bridge.
@@ -681,7 +754,8 @@ impl CognitiveLoopService {
     /// Last Birkhoff aesthetic score (0.0-1.0) from the canvas pipeline.
     #[cfg(feature = "canvas")]
     pub fn canvas_aesthetic_score(&self) -> f32 {
-        self.sensorimotor.motor_rendering
+        self.sensorimotor
+            .motor_rendering
             .canvas_manager
             .as_ref()
             .map(|m| m.last_telemetry().aesthetic_score)
@@ -691,7 +765,8 @@ impl CognitiveLoopService {
     /// Take the last generated canvas SVG (drains it).
     #[cfg(feature = "canvas")]
     pub fn take_canvas_svg(&mut self) -> Option<String> {
-        self.sensorimotor.motor_rendering
+        self.sensorimotor
+            .motor_rendering
             .canvas_manager
             .as_mut()
             .and_then(|m| m.take_svg())
@@ -700,7 +775,8 @@ impl CognitiveLoopService {
     /// Last canvas generation time in microseconds.
     #[cfg(feature = "canvas")]
     pub fn canvas_generation_time_us(&self) -> u64 {
-        self.sensorimotor.motor_rendering
+        self.sensorimotor
+            .motor_rendering
             .canvas_manager
             .as_ref()
             .map(|m| m.last_telemetry().generation_time_us)
@@ -1047,9 +1123,7 @@ impl CognitiveLoopService {
     // ── Thermodynamic Unification Accessors ──────────────────────────────
 
     /// Access the unified thermodynamic state (read-only).
-    pub fn thermodynamic_state(
-        &self,
-    ) -> &super::thermodynamic_state::UnifiedThermodynamicState {
+    pub fn thermodynamic_state(&self) -> &super::thermodynamic_state::UnifiedThermodynamicState {
         self.thermodynamic_mgr.state()
     }
 
@@ -1086,12 +1160,13 @@ impl CognitiveLoopService {
     pub fn muse_musical_state(&self) -> &symthaea_muse::MusicalState {
         self.muse_manager.musical_state()
     }
-
 }
 
 impl CognitiveLoopService {
     /// Get mutable access to threshold overrides for applying evolved parameters.
-    pub fn threshold_overrides_mut(&mut self) -> &mut super::super::threshold_overrides::ThresholdOverrides {
+    pub fn threshold_overrides_mut(
+        &mut self,
+    ) -> &mut super::super::threshold_overrides::ThresholdOverrides {
         &mut self.threshold_overrides
     }
 

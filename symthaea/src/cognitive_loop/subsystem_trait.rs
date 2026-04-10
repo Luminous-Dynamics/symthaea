@@ -836,9 +836,8 @@ pub fn safe_process(
     // 1. On panic, we return NEUTRAL (no partial output propagates).
     // 2. The subsystem may be in an inconsistent state, but the health tracker
     //    will disable it after repeated panics, preventing cascading corruption.
-    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        subsystem.process(snapshot)
-    }));
+    let result =
+        std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| subsystem.process(snapshot)));
 
     match result {
         Ok(output) => {

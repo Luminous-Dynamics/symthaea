@@ -63,16 +63,10 @@ fn disaster_type_value(crisis_type: &str) -> serde_json::Value {
     // Mycelix civic emergency-incidents `DisasterType` uses Rust enum variant names
     // (e.g., "Infrastructure", "CyberAttack"). Unknown values map to `Other(String)`.
     match crisis_type {
-        "Hurricane"
-        | "Earthquake"
-        | "Wildfire"
-        | "Flood"
-        | "Tornado"
-        | "Pandemic"
-        | "Industrial"
-        | "MassCasualty"
-        | "CyberAttack"
-        | "Infrastructure" => serde_json::Value::String(crisis_type.to_string()),
+        "Hurricane" | "Earthquake" | "Wildfire" | "Flood" | "Tornado" | "Pandemic"
+        | "Industrial" | "MassCasualty" | "CyberAttack" | "Infrastructure" => {
+            serde_json::Value::String(crisis_type.to_string())
+        }
         other => serde_json::json!({ "Other": other }),
     }
 }
@@ -355,7 +349,12 @@ impl<T: ConductorTransport> GovernanceDispatcher<T> {
                 coherence,
                 care_activation,
             } => {
-                let _ = (consciousness_phi, meta_awareness, coherence, care_activation);
+                let _ = (
+                    consciousness_phi,
+                    meta_awareness,
+                    coherence,
+                    care_activation,
+                );
                 let reason = if rationale.trim().is_empty() {
                     serde_json::Value::Null
                 } else {

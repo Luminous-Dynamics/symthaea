@@ -556,8 +556,10 @@ mod tests {
         }
         // All conflict kinds produce a valid recommended action (is_external or is_internal)
         let action = ConflictKind::IntegrationCollapse.recommended_action();
-        assert!(action.is_external() || action.is_internal(),
-            "recommended_action should be either external or internal");
+        assert!(
+            action.is_external() || action.is_internal(),
+            "recommended_action should be either external or internal"
+        );
     }
 
     #[test]

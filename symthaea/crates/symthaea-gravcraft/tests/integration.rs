@@ -89,7 +89,10 @@ fn geodesic_vs_force_produces_different_motion() {
     // Craft should move (not static)
     let final_pos = positions.last().unwrap();
     let distance = (final_pos[0].powi(2) + final_pos[1].powi(2) + final_pos[2].powi(2)).sqrt();
-    assert!(distance > 0.0, "Craft should move under metric perturbation");
+    assert!(
+        distance > 0.0,
+        "Craft should move under metric perturbation"
+    );
 
     // All positions should be finite (no divergence)
     assert!(
@@ -106,7 +109,7 @@ fn three_amplifier_delta_configuration() {
     let craft_pos = [0.0, 0.0, 0.0];
 
     let delta_cmds = [
-        (0.03, 10.0, 0.0, 0.0),                        // 0°
+        (0.03, 10.0, 0.0, 0.0),                              // 0°
         (0.03, 10.0, 2.0 * std::f64::consts::PI / 3.0, 0.0), // 120°
         (0.03, 10.0, 4.0 * std::f64::consts::PI / 3.0, 0.0), // 240°
     ];

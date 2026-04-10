@@ -81,7 +81,10 @@ fn main() {
                 Some(MetricValue::Label(l)) => l.as_str(),
                 _ => "Unknown",
             };
-            let confidence = match result.metrics.get(&format!("{}_honest_confidence", substrate)) {
+            let confidence = match result
+                .metrics
+                .get(&format!("{}_honest_confidence", substrate))
+            {
                 Some(MetricValue::Float(c)) => *c,
                 _ => 0.0,
             };

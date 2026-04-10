@@ -81,18 +81,14 @@ impl std::fmt::Display for DecayMode {
 /// Element symbol lookup for Z = 0..118.
 fn element_symbol(z: u16) -> &'static str {
     const SYMBOLS: &[&str] = &[
-        "n", "H", "He", "Li", "Be", "B", "C", "N", "O", "F", "Ne",
-        "Na", "Mg", "Al", "Si", "P", "S", "Cl", "Ar", "K", "Ca",
-        "Sc", "Ti", "V", "Cr", "Mn", "Fe", "Co", "Ni", "Cu", "Zn",
-        "Ga", "Ge", "As", "Se", "Br", "Kr", "Rb", "Sr", "Y", "Zr",
-        "Nb", "Mo", "Tc", "Ru", "Rh", "Pd", "Ag", "Cd", "In", "Sn",
-        "Sb", "Te", "I", "Xe", "Cs", "Ba", "La", "Ce", "Pr", "Nd",
-        "Pm", "Sm", "Eu", "Gd", "Tb", "Dy", "Ho", "Er", "Tm", "Yb",
-        "Lu", "Hf", "Ta", "W", "Re", "Os", "Ir", "Pt", "Au", "Hg",
-        "Tl", "Pb", "Bi", "Po", "At", "Rn", "Fr", "Ra", "Ac", "Th",
-        "Pa", "U", "Np", "Pu", "Am", "Cm", "Bk", "Cf", "Es", "Fm",
-        "Md", "No", "Lr", "Rf", "Db", "Sg", "Bh", "Hs", "Mt", "Ds",
-        "Rg", "Cn", "Nh", "Fl", "Mc", "Lv", "Ts", "Og",
+        "n", "H", "He", "Li", "Be", "B", "C", "N", "O", "F", "Ne", "Na", "Mg", "Al", "Si", "P",
+        "S", "Cl", "Ar", "K", "Ca", "Sc", "Ti", "V", "Cr", "Mn", "Fe", "Co", "Ni", "Cu", "Zn",
+        "Ga", "Ge", "As", "Se", "Br", "Kr", "Rb", "Sr", "Y", "Zr", "Nb", "Mo", "Tc", "Ru", "Rh",
+        "Pd", "Ag", "Cd", "In", "Sn", "Sb", "Te", "I", "Xe", "Cs", "Ba", "La", "Ce", "Pr", "Nd",
+        "Pm", "Sm", "Eu", "Gd", "Tb", "Dy", "Ho", "Er", "Tm", "Yb", "Lu", "Hf", "Ta", "W", "Re",
+        "Os", "Ir", "Pt", "Au", "Hg", "Tl", "Pb", "Bi", "Po", "At", "Rn", "Fr", "Ra", "Ac", "Th",
+        "Pa", "U", "Np", "Pu", "Am", "Cm", "Bk", "Cf", "Es", "Fm", "Md", "No", "Lr", "Rf", "Db",
+        "Sg", "Bh", "Hs", "Mt", "Ds", "Rg", "Cn", "Nh", "Fl", "Mc", "Lv", "Ts", "Og",
     ];
     if (z as usize) < SYMBOLS.len() {
         SYMBOLS[z as usize]
@@ -272,7 +268,7 @@ fn is_stable(z: u16, n: u16) -> bool {
         (50, 120) | // Sn-120
         (53, 127) | // I-127
         (58, 140) | // Ce-140
-        (60, 142)   // Nd-142
+        (60, 142) // Nd-142
     )
 }
 
@@ -322,7 +318,12 @@ pub struct DecayChain {
 ///
 /// Follows the dominant decay mode at each step, limited to `max_steps`
 /// to prevent infinite loops on numerical artifacts.
-pub fn trace_decay_chain(predictor: &MlMassPredictor, z: u16, n: u16, max_steps: usize) -> DecayChain {
+pub fn trace_decay_chain(
+    predictor: &MlMassPredictor,
+    z: u16,
+    n: u16,
+    max_steps: usize,
+) -> DecayChain {
     let parent_name = nuclide_name(z, z + n);
     let mut steps = Vec::new();
     let mut cur_z = z;
@@ -450,11 +451,7 @@ pub struct FissileMaterial {
 /// - Gaussian yield around peak with sigma ~ 6
 ///
 /// The compound nucleus is (Z, N+1) for thermal neutron capture.
-pub fn fission_fragments(
-    predictor: &MlMassPredictor,
-    z: u16,
-    n: u16,
-) -> FissileMaterial {
+pub fn fission_fragments(predictor: &MlMassPredictor, z: u16, n: u16) -> FissileMaterial {
     let name = nuclide_name(z, z + n);
     // Compound nucleus after neutron capture
     let a_compound = z + n + 1;
@@ -588,20 +585,118 @@ pub struct KnownDecayStep {
 /// U-238 → Pb-206 (uranium series, 14 steps).
 pub fn uranium_series_known() -> Vec<KnownDecayStep> {
     vec![
-        KnownDecayStep { z: 92, n: 146, name: "U-238",  mode: DecayMode::Alpha,     q_known: 4.270, half_life_known: "4.468e9 yr"  },
-        KnownDecayStep { z: 90, n: 144, name: "Th-234", mode: DecayMode::BetaMinus,  q_known: 0.273, half_life_known: "24.10 days"  },
-        KnownDecayStep { z: 91, n: 143, name: "Pa-234", mode: DecayMode::BetaMinus,  q_known: 2.197, half_life_known: "6.70 hr"     },
-        KnownDecayStep { z: 92, n: 142, name: "U-234",  mode: DecayMode::Alpha,      q_known: 4.858, half_life_known: "2.455e5 yr"  },
-        KnownDecayStep { z: 90, n: 140, name: "Th-230", mode: DecayMode::Alpha,      q_known: 4.770, half_life_known: "7.538e4 yr"  },
-        KnownDecayStep { z: 88, n: 138, name: "Ra-226", mode: DecayMode::Alpha,      q_known: 4.871, half_life_known: "1600 yr"     },
-        KnownDecayStep { z: 86, n: 136, name: "Rn-222", mode: DecayMode::Alpha,      q_known: 5.590, half_life_known: "3.823 days"  },
-        KnownDecayStep { z: 84, n: 134, name: "Po-218", mode: DecayMode::Alpha,      q_known: 6.115, half_life_known: "3.10 min"    },
-        KnownDecayStep { z: 82, n: 132, name: "Pb-214", mode: DecayMode::BetaMinus,  q_known: 1.024, half_life_known: "26.8 min"    },
-        KnownDecayStep { z: 83, n: 131, name: "Bi-214", mode: DecayMode::BetaMinus,  q_known: 3.272, half_life_known: "19.9 min"    },
-        KnownDecayStep { z: 84, n: 130, name: "Po-214", mode: DecayMode::Alpha,      q_known: 7.833, half_life_known: "164.3 us"    },
-        KnownDecayStep { z: 82, n: 128, name: "Pb-210", mode: DecayMode::BetaMinus,  q_known: 0.064, half_life_known: "22.2 yr"     },
-        KnownDecayStep { z: 83, n: 127, name: "Bi-210", mode: DecayMode::BetaMinus,  q_known: 1.163, half_life_known: "5.013 days"  },
-        KnownDecayStep { z: 84, n: 126, name: "Po-210", mode: DecayMode::Alpha,      q_known: 5.407, half_life_known: "138.4 days"  },
+        KnownDecayStep {
+            z: 92,
+            n: 146,
+            name: "U-238",
+            mode: DecayMode::Alpha,
+            q_known: 4.270,
+            half_life_known: "4.468e9 yr",
+        },
+        KnownDecayStep {
+            z: 90,
+            n: 144,
+            name: "Th-234",
+            mode: DecayMode::BetaMinus,
+            q_known: 0.273,
+            half_life_known: "24.10 days",
+        },
+        KnownDecayStep {
+            z: 91,
+            n: 143,
+            name: "Pa-234",
+            mode: DecayMode::BetaMinus,
+            q_known: 2.197,
+            half_life_known: "6.70 hr",
+        },
+        KnownDecayStep {
+            z: 92,
+            n: 142,
+            name: "U-234",
+            mode: DecayMode::Alpha,
+            q_known: 4.858,
+            half_life_known: "2.455e5 yr",
+        },
+        KnownDecayStep {
+            z: 90,
+            n: 140,
+            name: "Th-230",
+            mode: DecayMode::Alpha,
+            q_known: 4.770,
+            half_life_known: "7.538e4 yr",
+        },
+        KnownDecayStep {
+            z: 88,
+            n: 138,
+            name: "Ra-226",
+            mode: DecayMode::Alpha,
+            q_known: 4.871,
+            half_life_known: "1600 yr",
+        },
+        KnownDecayStep {
+            z: 86,
+            n: 136,
+            name: "Rn-222",
+            mode: DecayMode::Alpha,
+            q_known: 5.590,
+            half_life_known: "3.823 days",
+        },
+        KnownDecayStep {
+            z: 84,
+            n: 134,
+            name: "Po-218",
+            mode: DecayMode::Alpha,
+            q_known: 6.115,
+            half_life_known: "3.10 min",
+        },
+        KnownDecayStep {
+            z: 82,
+            n: 132,
+            name: "Pb-214",
+            mode: DecayMode::BetaMinus,
+            q_known: 1.024,
+            half_life_known: "26.8 min",
+        },
+        KnownDecayStep {
+            z: 83,
+            n: 131,
+            name: "Bi-214",
+            mode: DecayMode::BetaMinus,
+            q_known: 3.272,
+            half_life_known: "19.9 min",
+        },
+        KnownDecayStep {
+            z: 84,
+            n: 130,
+            name: "Po-214",
+            mode: DecayMode::Alpha,
+            q_known: 7.833,
+            half_life_known: "164.3 us",
+        },
+        KnownDecayStep {
+            z: 82,
+            n: 128,
+            name: "Pb-210",
+            mode: DecayMode::BetaMinus,
+            q_known: 0.064,
+            half_life_known: "22.2 yr",
+        },
+        KnownDecayStep {
+            z: 83,
+            n: 127,
+            name: "Bi-210",
+            mode: DecayMode::BetaMinus,
+            q_known: 1.163,
+            half_life_known: "5.013 days",
+        },
+        KnownDecayStep {
+            z: 84,
+            n: 126,
+            name: "Po-210",
+            mode: DecayMode::Alpha,
+            q_known: 5.407,
+            half_life_known: "138.4 days",
+        },
         // Endpoint: Pb-206 (stable)
     ]
 }
@@ -609,17 +704,94 @@ pub fn uranium_series_known() -> Vec<KnownDecayStep> {
 /// U-235 → Pb-207 (actinium series, 11 steps).
 pub fn actinium_series_known() -> Vec<KnownDecayStep> {
     vec![
-        KnownDecayStep { z: 92, n: 143, name: "U-235",  mode: DecayMode::Alpha,     q_known: 4.679, half_life_known: "7.038e8 yr"  },
-        KnownDecayStep { z: 90, n: 141, name: "Th-231", mode: DecayMode::BetaMinus,  q_known: 0.391, half_life_known: "25.5 hr"     },
-        KnownDecayStep { z: 91, n: 140, name: "Pa-231", mode: DecayMode::Alpha,      q_known: 5.150, half_life_known: "3.276e4 yr"  },
-        KnownDecayStep { z: 89, n: 138, name: "Ac-227", mode: DecayMode::BetaMinus,  q_known: 0.045, half_life_known: "21.77 yr"    },
-        KnownDecayStep { z: 90, n: 137, name: "Th-227", mode: DecayMode::Alpha,      q_known: 6.147, half_life_known: "18.7 days"   },
-        KnownDecayStep { z: 88, n: 135, name: "Ra-223", mode: DecayMode::Alpha,      q_known: 5.979, half_life_known: "11.43 days"  },
-        KnownDecayStep { z: 86, n: 133, name: "Rn-219", mode: DecayMode::Alpha,      q_known: 6.946, half_life_known: "3.96 s"      },
-        KnownDecayStep { z: 84, n: 131, name: "Po-215", mode: DecayMode::Alpha,      q_known: 7.526, half_life_known: "1.781 ms"    },
-        KnownDecayStep { z: 82, n: 129, name: "Pb-211", mode: DecayMode::BetaMinus,  q_known: 1.367, half_life_known: "36.1 min"    },
-        KnownDecayStep { z: 83, n: 128, name: "Bi-211", mode: DecayMode::Alpha,      q_known: 6.750, half_life_known: "2.14 min"    },
-        KnownDecayStep { z: 81, n: 126, name: "Tl-207", mode: DecayMode::BetaMinus,  q_known: 1.418, half_life_known: "4.77 min"    },
+        KnownDecayStep {
+            z: 92,
+            n: 143,
+            name: "U-235",
+            mode: DecayMode::Alpha,
+            q_known: 4.679,
+            half_life_known: "7.038e8 yr",
+        },
+        KnownDecayStep {
+            z: 90,
+            n: 141,
+            name: "Th-231",
+            mode: DecayMode::BetaMinus,
+            q_known: 0.391,
+            half_life_known: "25.5 hr",
+        },
+        KnownDecayStep {
+            z: 91,
+            n: 140,
+            name: "Pa-231",
+            mode: DecayMode::Alpha,
+            q_known: 5.150,
+            half_life_known: "3.276e4 yr",
+        },
+        KnownDecayStep {
+            z: 89,
+            n: 138,
+            name: "Ac-227",
+            mode: DecayMode::BetaMinus,
+            q_known: 0.045,
+            half_life_known: "21.77 yr",
+        },
+        KnownDecayStep {
+            z: 90,
+            n: 137,
+            name: "Th-227",
+            mode: DecayMode::Alpha,
+            q_known: 6.147,
+            half_life_known: "18.7 days",
+        },
+        KnownDecayStep {
+            z: 88,
+            n: 135,
+            name: "Ra-223",
+            mode: DecayMode::Alpha,
+            q_known: 5.979,
+            half_life_known: "11.43 days",
+        },
+        KnownDecayStep {
+            z: 86,
+            n: 133,
+            name: "Rn-219",
+            mode: DecayMode::Alpha,
+            q_known: 6.946,
+            half_life_known: "3.96 s",
+        },
+        KnownDecayStep {
+            z: 84,
+            n: 131,
+            name: "Po-215",
+            mode: DecayMode::Alpha,
+            q_known: 7.526,
+            half_life_known: "1.781 ms",
+        },
+        KnownDecayStep {
+            z: 82,
+            n: 129,
+            name: "Pb-211",
+            mode: DecayMode::BetaMinus,
+            q_known: 1.367,
+            half_life_known: "36.1 min",
+        },
+        KnownDecayStep {
+            z: 83,
+            n: 128,
+            name: "Bi-211",
+            mode: DecayMode::Alpha,
+            q_known: 6.750,
+            half_life_known: "2.14 min",
+        },
+        KnownDecayStep {
+            z: 81,
+            n: 126,
+            name: "Tl-207",
+            mode: DecayMode::BetaMinus,
+            q_known: 1.418,
+            half_life_known: "4.77 min",
+        },
         // Endpoint: Pb-207 (stable)
     ]
 }
@@ -627,16 +799,86 @@ pub fn actinium_series_known() -> Vec<KnownDecayStep> {
 /// Th-232 → Pb-208 (thorium series, 10 steps).
 pub fn thorium_series_known() -> Vec<KnownDecayStep> {
     vec![
-        KnownDecayStep { z: 90, n: 142, name: "Th-232", mode: DecayMode::Alpha,     q_known: 4.083, half_life_known: "1.405e10 yr" },
-        KnownDecayStep { z: 88, n: 140, name: "Ra-228", mode: DecayMode::BetaMinus,  q_known: 0.046, half_life_known: "5.75 yr"     },
-        KnownDecayStep { z: 89, n: 139, name: "Ac-228", mode: DecayMode::BetaMinus,  q_known: 2.124, half_life_known: "6.15 hr"     },
-        KnownDecayStep { z: 90, n: 138, name: "Th-228", mode: DecayMode::Alpha,      q_known: 5.520, half_life_known: "1.912 yr"    },
-        KnownDecayStep { z: 88, n: 136, name: "Ra-224", mode: DecayMode::Alpha,      q_known: 5.789, half_life_known: "3.66 days"   },
-        KnownDecayStep { z: 86, n: 134, name: "Rn-220", mode: DecayMode::Alpha,      q_known: 6.405, half_life_known: "55.6 s"      },
-        KnownDecayStep { z: 84, n: 132, name: "Po-216", mode: DecayMode::Alpha,      q_known: 6.906, half_life_known: "0.145 s"     },
-        KnownDecayStep { z: 82, n: 130, name: "Pb-212", mode: DecayMode::BetaMinus,  q_known: 0.574, half_life_known: "10.64 hr"    },
-        KnownDecayStep { z: 83, n: 129, name: "Bi-212", mode: DecayMode::Alpha,      q_known: 6.207, half_life_known: "60.55 min"   },
-        KnownDecayStep { z: 81, n: 127, name: "Tl-208", mode: DecayMode::BetaMinus,  q_known: 5.001, half_life_known: "3.053 min"   },
+        KnownDecayStep {
+            z: 90,
+            n: 142,
+            name: "Th-232",
+            mode: DecayMode::Alpha,
+            q_known: 4.083,
+            half_life_known: "1.405e10 yr",
+        },
+        KnownDecayStep {
+            z: 88,
+            n: 140,
+            name: "Ra-228",
+            mode: DecayMode::BetaMinus,
+            q_known: 0.046,
+            half_life_known: "5.75 yr",
+        },
+        KnownDecayStep {
+            z: 89,
+            n: 139,
+            name: "Ac-228",
+            mode: DecayMode::BetaMinus,
+            q_known: 2.124,
+            half_life_known: "6.15 hr",
+        },
+        KnownDecayStep {
+            z: 90,
+            n: 138,
+            name: "Th-228",
+            mode: DecayMode::Alpha,
+            q_known: 5.520,
+            half_life_known: "1.912 yr",
+        },
+        KnownDecayStep {
+            z: 88,
+            n: 136,
+            name: "Ra-224",
+            mode: DecayMode::Alpha,
+            q_known: 5.789,
+            half_life_known: "3.66 days",
+        },
+        KnownDecayStep {
+            z: 86,
+            n: 134,
+            name: "Rn-220",
+            mode: DecayMode::Alpha,
+            q_known: 6.405,
+            half_life_known: "55.6 s",
+        },
+        KnownDecayStep {
+            z: 84,
+            n: 132,
+            name: "Po-216",
+            mode: DecayMode::Alpha,
+            q_known: 6.906,
+            half_life_known: "0.145 s",
+        },
+        KnownDecayStep {
+            z: 82,
+            n: 130,
+            name: "Pb-212",
+            mode: DecayMode::BetaMinus,
+            q_known: 0.574,
+            half_life_known: "10.64 hr",
+        },
+        KnownDecayStep {
+            z: 83,
+            n: 129,
+            name: "Bi-212",
+            mode: DecayMode::Alpha,
+            q_known: 6.207,
+            half_life_known: "60.55 min",
+        },
+        KnownDecayStep {
+            z: 81,
+            n: 127,
+            name: "Tl-208",
+            mode: DecayMode::BetaMinus,
+            q_known: 5.001,
+            half_life_known: "3.053 min",
+        },
         // Endpoint: Pb-208 (stable)
     ]
 }
@@ -644,17 +886,94 @@ pub fn thorium_series_known() -> Vec<KnownDecayStep> {
 /// Np-237 → Bi-209 (neptunium series).
 pub fn neptunium_series_known() -> Vec<KnownDecayStep> {
     vec![
-        KnownDecayStep { z: 93, n: 144, name: "Np-237", mode: DecayMode::Alpha,     q_known: 4.959, half_life_known: "2.144e6 yr"  },
-        KnownDecayStep { z: 91, n: 142, name: "Pa-233", mode: DecayMode::BetaMinus,  q_known: 0.571, half_life_known: "26.97 days"  },
-        KnownDecayStep { z: 92, n: 141, name: "U-233",  mode: DecayMode::Alpha,      q_known: 4.909, half_life_known: "1.592e5 yr"  },
-        KnownDecayStep { z: 90, n: 139, name: "Th-229", mode: DecayMode::Alpha,      q_known: 5.168, half_life_known: "7340 yr"     },
-        KnownDecayStep { z: 88, n: 137, name: "Ra-225", mode: DecayMode::BetaMinus,  q_known: 0.362, half_life_known: "14.9 days"   },
-        KnownDecayStep { z: 89, n: 136, name: "Ac-225", mode: DecayMode::Alpha,      q_known: 5.935, half_life_known: "10.0 days"   },
-        KnownDecayStep { z: 87, n: 134, name: "Fr-221", mode: DecayMode::Alpha,      q_known: 6.458, half_life_known: "4.9 min"     },
-        KnownDecayStep { z: 85, n: 132, name: "At-217", mode: DecayMode::Alpha,      q_known: 7.201, half_life_known: "32.3 ms"     },
-        KnownDecayStep { z: 83, n: 130, name: "Bi-213", mode: DecayMode::BetaMinus,  q_known: 1.423, half_life_known: "45.6 min"    },
-        KnownDecayStep { z: 84, n: 129, name: "Po-213", mode: DecayMode::Alpha,      q_known: 8.536, half_life_known: "3.72 us"     },
-        KnownDecayStep { z: 82, n: 127, name: "Pb-209", mode: DecayMode::BetaMinus,  q_known: 0.644, half_life_known: "3.25 hr"     },
+        KnownDecayStep {
+            z: 93,
+            n: 144,
+            name: "Np-237",
+            mode: DecayMode::Alpha,
+            q_known: 4.959,
+            half_life_known: "2.144e6 yr",
+        },
+        KnownDecayStep {
+            z: 91,
+            n: 142,
+            name: "Pa-233",
+            mode: DecayMode::BetaMinus,
+            q_known: 0.571,
+            half_life_known: "26.97 days",
+        },
+        KnownDecayStep {
+            z: 92,
+            n: 141,
+            name: "U-233",
+            mode: DecayMode::Alpha,
+            q_known: 4.909,
+            half_life_known: "1.592e5 yr",
+        },
+        KnownDecayStep {
+            z: 90,
+            n: 139,
+            name: "Th-229",
+            mode: DecayMode::Alpha,
+            q_known: 5.168,
+            half_life_known: "7340 yr",
+        },
+        KnownDecayStep {
+            z: 88,
+            n: 137,
+            name: "Ra-225",
+            mode: DecayMode::BetaMinus,
+            q_known: 0.362,
+            half_life_known: "14.9 days",
+        },
+        KnownDecayStep {
+            z: 89,
+            n: 136,
+            name: "Ac-225",
+            mode: DecayMode::Alpha,
+            q_known: 5.935,
+            half_life_known: "10.0 days",
+        },
+        KnownDecayStep {
+            z: 87,
+            n: 134,
+            name: "Fr-221",
+            mode: DecayMode::Alpha,
+            q_known: 6.458,
+            half_life_known: "4.9 min",
+        },
+        KnownDecayStep {
+            z: 85,
+            n: 132,
+            name: "At-217",
+            mode: DecayMode::Alpha,
+            q_known: 7.201,
+            half_life_known: "32.3 ms",
+        },
+        KnownDecayStep {
+            z: 83,
+            n: 130,
+            name: "Bi-213",
+            mode: DecayMode::BetaMinus,
+            q_known: 1.423,
+            half_life_known: "45.6 min",
+        },
+        KnownDecayStep {
+            z: 84,
+            n: 129,
+            name: "Po-213",
+            mode: DecayMode::Alpha,
+            q_known: 8.536,
+            half_life_known: "3.72 us",
+        },
+        KnownDecayStep {
+            z: 82,
+            n: 127,
+            name: "Pb-209",
+            mode: DecayMode::BetaMinus,
+            q_known: 0.644,
+            half_life_known: "3.25 hr",
+        },
         // Endpoint: Bi-209 (stable)
     ]
 }
@@ -662,8 +981,22 @@ pub fn neptunium_series_known() -> Vec<KnownDecayStep> {
 /// Pu-241 → Am-241 → Np-237 (weapons aging chain).
 pub fn weapons_aging_chain_known() -> Vec<KnownDecayStep> {
     vec![
-        KnownDecayStep { z: 94, n: 147, name: "Pu-241", mode: DecayMode::BetaMinus,  q_known: 0.021, half_life_known: "14.29 yr"    },
-        KnownDecayStep { z: 95, n: 146, name: "Am-241", mode: DecayMode::Alpha,       q_known: 5.638, half_life_known: "432.2 yr"    },
+        KnownDecayStep {
+            z: 94,
+            n: 147,
+            name: "Pu-241",
+            mode: DecayMode::BetaMinus,
+            q_known: 0.021,
+            half_life_known: "14.29 yr",
+        },
+        KnownDecayStep {
+            z: 95,
+            n: 146,
+            name: "Am-241",
+            mode: DecayMode::Alpha,
+            q_known: 5.638,
+            half_life_known: "432.2 yr",
+        },
         // Continues into Np-237 series
     ]
 }
@@ -923,12 +1256,7 @@ pub struct CriticalMassResult {
 ///
 /// The fission barrier-to-cross-section mapping is calibrated against
 /// known critical masses of U-235, Pu-239, and U-233.
-pub fn critical_mass(
-    z: u16,
-    n: u16,
-    density_gcc: f64,
-    known_bare_kg: f64,
-) -> CriticalMassResult {
+pub fn critical_mass(z: u16, n: u16, density_gcc: f64, known_bare_kg: f64) -> CriticalMassResult {
     let a = (z + n) as f64;
     let name = nuclide_name(z, z + n);
 
@@ -1004,15 +1332,30 @@ pub fn generate_forensics_report(predictor: &MlMassPredictor) -> String {
 
     // 1. Fission fragments
     report.push_str("--- 1. FISSION FRAGMENT CHARACTERIZATION ---\n\n");
-    for &(z, n, name) in &[(92u16, 143u16, "U-235"), (94, 145, "Pu-239"), (92, 141, "U-233")] {
+    for &(z, n, name) in &[
+        (92u16, 143u16, "U-235"),
+        (94, 145, "Pu-239"),
+        (92, 141, "U-233"),
+    ] {
         let material = fission_fragments(predictor, z, n);
-        report.push_str(&format!("Fissile target: {} (compound nucleus A={})\n", name, z + n + 1));
-        report.push_str(&format!("Signature isotopes found: {:?}\n", material.signature_isotopes));
+        report.push_str(&format!(
+            "Fissile target: {} (compound nucleus A={})\n",
+            name,
+            z + n + 1
+        ));
+        report.push_str(&format!(
+            "Signature isotopes found: {:?}\n",
+            material.signature_isotopes
+        ));
         report.push_str("Top 5 fragment pairs by yield:\n");
         for (i, pair) in material.fragment_pairs.iter().take(5).enumerate() {
             report.push_str(&format!(
                 "  {}. {} + {} | TKE={:.1} MeV | yield={:.3}\n",
-                i + 1, pair.light.name, pair.heavy.name, pair.tke, pair.relative_yield
+                i + 1,
+                pair.light.name,
+                pair.heavy.name,
+                pair.tke,
+                pair.relative_yield
             ));
             report.push_str(&format!(
                 "     Light: BE={:.1} MeV, decay={}, t½={}\n",
@@ -1044,8 +1387,14 @@ pub fn generate_forensics_report(predictor: &MlMassPredictor) -> String {
         ("Uranium series (U-238 → Pb-206)", uranium_series_known()),
         ("Actinium series (U-235 → Pb-207)", actinium_series_known()),
         ("Thorium series (Th-232 → Pb-208)", thorium_series_known()),
-        ("Neptunium series (Np-237 → Bi-209)", neptunium_series_known()),
-        ("Weapons aging (Pu-241 → Am-241 → Np-237)", weapons_aging_chain_known()),
+        (
+            "Neptunium series (Np-237 → Bi-209)",
+            neptunium_series_known(),
+        ),
+        (
+            "Weapons aging (Pu-241 → Am-241 → Np-237)",
+            weapons_aging_chain_known(),
+        ),
     ];
 
     for (name, known) in &chains {
@@ -1086,7 +1435,10 @@ pub fn generate_forensics_report(predictor: &MlMassPredictor) -> String {
     report.push_str("\nAge determination from Am/Pu ratio:\n");
     for &ratio in &[0.05, 0.10, 0.20, 0.50, 1.00, 2.00] {
         let age = weapon_age_from_ratio(ratio);
-        report.push_str(&format!("  Am/Pu = {:.2} → age = {:.2} years\n", ratio, age));
+        report.push_str(&format!(
+            "  Am/Pu = {:.2} → age = {:.2} years\n",
+            ratio, age
+        ));
     }
 
     // Enrichment indicators
@@ -1111,8 +1463,12 @@ pub fn generate_forensics_report(predictor: &MlMassPredictor) -> String {
     for m in &masses {
         report.push_str(&format!(
             "  {:>8} {:>10.2} {:>10.1} {:>10.1} {:>10.1} {:>10.1}\n",
-            m.name, m.fission_barrier, m.sigma_f_proxy, m.bare_critical_mass_kg,
-            m.reflected_critical_mass_kg, m.known_bare_mass_kg
+            m.name,
+            m.fission_barrier,
+            m.sigma_f_proxy,
+            m.bare_critical_mass_kg,
+            m.reflected_critical_mass_kg,
+            m.known_bare_mass_kg
         ));
     }
 
@@ -1202,13 +1558,29 @@ mod tests {
         for (i, step) in chain.steps.iter().enumerate() {
             println!(
                 "  Step {}: {} ({}) Q={:.3} MeV  t½={}  BE={:.1} MeV",
-                i, step.name, step.decay_mode, step.q_value, step.half_life_str, step.binding_energy
+                i,
+                step.name,
+                step.decay_mode,
+                step.q_value,
+                step.half_life_str,
+                step.binding_energy
             );
         }
-        println!("Endpoint: {} (alpha={}, beta={})", chain.endpoint, chain.n_alpha, chain.n_beta);
+        println!(
+            "Endpoint: {} (alpha={}, beta={})",
+            chain.endpoint, chain.n_alpha, chain.n_beta
+        );
         // U-238 series has 8 alpha + 6 beta decays
-        assert!(chain.n_alpha >= 4, "Too few alpha decays: {}", chain.n_alpha);
-        assert!(chain.steps.len() >= 5, "Chain too short: {} steps", chain.steps.len());
+        assert!(
+            chain.n_alpha >= 4,
+            "Too few alpha decays: {}",
+            chain.n_alpha
+        );
+        assert!(
+            chain.steps.len() >= 5,
+            "Chain too short: {} steps",
+            chain.steps.len()
+        );
     }
 
     #[test]
@@ -1223,7 +1595,10 @@ mod tests {
                 i, step.name, step.decay_mode, step.q_value, step.half_life_str
             );
         }
-        println!("Endpoint: {} (alpha={}, beta={})", chain.endpoint, chain.n_alpha, chain.n_beta);
+        println!(
+            "Endpoint: {} (alpha={}, beta={})",
+            chain.endpoint, chain.n_alpha, chain.n_beta
+        );
         assert!(chain.n_alpha >= 4);
     }
 
@@ -1238,7 +1613,10 @@ mod tests {
                 i, step.name, step.decay_mode, step.q_value, step.half_life_str
             );
         }
-        println!("Endpoint: {} (alpha={}, beta={})", chain.endpoint, chain.n_alpha, chain.n_beta);
+        println!(
+            "Endpoint: {} (alpha={}, beta={})",
+            chain.endpoint, chain.n_alpha, chain.n_beta
+        );
     }
 
     // ── Known chain validation ───────────────────────────────────────────
@@ -1250,10 +1628,16 @@ mod tests {
         let results = validate_decay_chain(&p, &known, "Uranium");
 
         println!("\n=== URANIUM SERIES VALIDATION (U-238 → Pb-206) ===");
-        println!("{:>8} {:>5} {:>10} {:>10} {:>+10}", "Nuclide", "Mode", "Q_calc", "Q_known", "Delta");
+        println!(
+            "{:>8} {:>5} {:>10} {:>10} {:>+10}",
+            "Nuclide", "Mode", "Q_calc", "Q_known", "Delta"
+        );
         let mut total_err = 0.0;
         for (name, mode, q_calc, q_known, delta) in &results {
-            println!("{:>8} {:>5} {:>10.3} {:>10.3} {:>+10.3}", name, mode, q_calc, q_known, delta);
+            println!(
+                "{:>8} {:>5} {:>10.3} {:>10.3} {:>+10.3}",
+                name, mode, q_calc, q_known, delta
+            );
             total_err += delta * delta;
         }
         let rms = (total_err / results.len() as f64).sqrt();
@@ -1269,9 +1653,15 @@ mod tests {
         let results = validate_decay_chain(&p, &known, "Actinium");
 
         println!("\n=== ACTINIUM SERIES VALIDATION (U-235 → Pb-207) ===");
-        println!("{:>8} {:>5} {:>10} {:>10} {:>+10}", "Nuclide", "Mode", "Q_calc", "Q_known", "Delta");
+        println!(
+            "{:>8} {:>5} {:>10} {:>10} {:>+10}",
+            "Nuclide", "Mode", "Q_calc", "Q_known", "Delta"
+        );
         for (name, mode, q_calc, q_known, delta) in &results {
-            println!("{:>8} {:>5} {:>10.3} {:>10.3} {:>+10.3}", name, mode, q_calc, q_known, delta);
+            println!(
+                "{:>8} {:>5} {:>10.3} {:>10.3} {:>+10.3}",
+                name, mode, q_calc, q_known, delta
+            );
         }
     }
 
@@ -1282,9 +1672,15 @@ mod tests {
         let results = validate_decay_chain(&p, &known, "Thorium");
 
         println!("\n=== THORIUM SERIES VALIDATION (Th-232 → Pb-208) ===");
-        println!("{:>8} {:>5} {:>10} {:>10} {:>+10}", "Nuclide", "Mode", "Q_calc", "Q_known", "Delta");
+        println!(
+            "{:>8} {:>5} {:>10} {:>10} {:>+10}",
+            "Nuclide", "Mode", "Q_calc", "Q_known", "Delta"
+        );
         for (name, mode, q_calc, q_known, delta) in &results {
-            println!("{:>8} {:>5} {:>10.3} {:>10.3} {:>+10.3}", name, mode, q_calc, q_known, delta);
+            println!(
+                "{:>8} {:>5} {:>10.3} {:>10.3} {:>+10.3}",
+                name, mode, q_calc, q_known, delta
+            );
         }
     }
 
@@ -1295,9 +1691,15 @@ mod tests {
         let results = validate_decay_chain(&p, &known, "Neptunium");
 
         println!("\n=== NEPTUNIUM SERIES VALIDATION (Np-237 → Bi-209) ===");
-        println!("{:>8} {:>5} {:>10} {:>10} {:>+10}", "Nuclide", "Mode", "Q_calc", "Q_known", "Delta");
+        println!(
+            "{:>8} {:>5} {:>10} {:>10} {:>+10}",
+            "Nuclide", "Mode", "Q_calc", "Q_known", "Delta"
+        );
         for (name, mode, q_calc, q_known, delta) in &results {
-            println!("{:>8} {:>5} {:>10.3} {:>10.3} {:>+10.3}", name, mode, q_calc, q_known, delta);
+            println!(
+                "{:>8} {:>5} {:>10.3} {:>10.3} {:>+10.3}",
+                name, mode, q_calc, q_known, delta
+            );
         }
     }
 
@@ -1309,7 +1711,10 @@ mod tests {
 
         println!("\n=== WEAPONS AGING CHAIN (Pu-241 → Am-241 → Np-237) ===");
         for (name, mode, q_calc, q_known, delta) in &results {
-            println!("{}: {} Q_calc={:.3} Q_known={:.3} delta={:+.3} MeV", name, mode, q_calc, q_known, delta);
+            println!(
+                "{}: {} Q_calc={:.3} Q_known={:.3} delta={:+.3} MeV",
+                name, mode, q_calc, q_known, delta
+            );
         }
     }
 
@@ -1322,7 +1727,10 @@ mod tests {
 
         println!("\n=== U-235 FISSION FRAGMENT DISTRIBUTION ===");
         println!("Signature isotopes: {:?}", mat.signature_isotopes);
-        println!("{:>3} {:>8} {:>8} {:>8} {:>8} {:>6}", "#", "Light", "Heavy", "TKE(MeV)", "Yield", "H-mode");
+        println!(
+            "{:>3} {:>8} {:>8} {:>8} {:>8} {:>6}",
+            "#", "Light", "Heavy", "TKE(MeV)", "Yield", "H-mode"
+        );
 
         for (i, pair) in mat.fragment_pairs.iter().take(10).enumerate() {
             println!(
@@ -1348,7 +1756,10 @@ mod tests {
         // Show decay chains for most probable pair
         println!("\nMost probable heavy fragment decay chain:");
         for step in &top.heavy.decay_chain.steps {
-            println!("  {} ({}) Q={:.3} MeV t½={}", step.name, step.decay_mode, step.q_value, step.half_life_str);
+            println!(
+                "  {} ({}) Q={:.3} MeV t½={}",
+                step.name, step.decay_mode, step.q_value, step.half_life_str
+            );
         }
     }
 
@@ -1362,7 +1773,11 @@ mod tests {
         for (i, pair) in mat.fragment_pairs.iter().take(8).enumerate() {
             println!(
                 "  {}. {} + {} TKE={:.1} MeV yield={:.3}",
-                i + 1, pair.light.name, pair.heavy.name, pair.tke, pair.relative_yield
+                i + 1,
+                pair.light.name,
+                pair.heavy.name,
+                pair.tke,
+                pair.relative_yield
             );
         }
         assert!(!mat.fragment_pairs.is_empty());
@@ -1378,7 +1793,11 @@ mod tests {
         for (i, pair) in mat.fragment_pairs.iter().take(5).enumerate() {
             println!(
                 "  {}. {} + {} TKE={:.1} MeV yield={:.3}",
-                i + 1, pair.light.name, pair.heavy.name, pair.tke, pair.relative_yield
+                i + 1,
+                pair.light.name,
+                pair.heavy.name,
+                pair.tke,
+                pair.relative_yield
             );
         }
     }
@@ -1388,9 +1807,14 @@ mod tests {
     #[test]
     fn test_pu_am_ingrowth_curve() {
         println!("\n=== Pu-241 → Am-241 INGROWTH CURVE ===");
-        println!("{:>8} {:>12} {:>12} {:>12}", "Age(yr)", "Am/Pu ratio", "Pu-241 rem", "Am-241 frac");
+        println!(
+            "{:>8} {:>12} {:>12} {:>12}",
+            "Age(yr)", "Am/Pu ratio", "Pu-241 rem", "Am-241 frac"
+        );
 
-        for &t in &[0.0, 1.0, 2.0, 5.0, 10.0, 14.29, 20.0, 30.0, 40.0, 50.0, 70.0, 100.0] {
+        for &t in &[
+            0.0, 1.0, 2.0, 5.0, 10.0, 14.29, 20.0, 30.0, 40.0, 50.0, 70.0, 100.0,
+        ] {
             let ig = pu_am_ingrowth(t);
             println!(
                 "{:>8.2} {:>12.4} {:>12.4} {:>12.6}",
@@ -1426,7 +1850,10 @@ mod tests {
             let t_recovered = weapon_age_from_ratio(ig.am_pu_ratio);
             println!(
                 "  True age={:.1} yr, Am/Pu={:.4}, recovered={:.2} yr, error={:.3} yr",
-                t_true, ig.am_pu_ratio, t_recovered, (t_recovered - t_true).abs()
+                t_true,
+                ig.am_pu_ratio,
+                t_recovered,
+                (t_recovered - t_true).abs()
             );
             // The simplified inversion should be accurate to within ~10% for
             // short times where Am-241 decay is negligible
@@ -1454,7 +1881,9 @@ mod tests {
             let ind = uranium_enrichment_indicator(enr);
             println!(
                 "  {:.1}% U-235: U234/U238 act.ratio={:.2}, class={}",
-                ind.enrichment * 100.0, ind.u234_u238_activity, ind.classification
+                ind.enrichment * 100.0,
+                ind.u234_u238_activity,
+                ind.classification
             );
             assert!(
                 ind.classification.contains(expected_class),
@@ -1481,19 +1910,31 @@ mod tests {
         // Weapon: no Cs-134
         let weapon = cs_ratio_decay(0.0, 0.0);
         assert!(weapon.cs134_cs137_ratio < 0.01);
-        println!("Weapon: ratio={:.4} → {}", weapon.cs134_cs137_ratio, weapon.source_type);
+        println!(
+            "Weapon: ratio={:.4} → {}",
+            weapon.cs134_cs137_ratio, weapon.source_type
+        );
 
         // Reactor at t=0 (initial ratio ~0.8)
         let reactor_0 = cs_ratio_decay(0.8, 0.0);
-        println!("Reactor t=0: ratio={:.4} → {}", reactor_0.cs134_cs137_ratio, reactor_0.source_type);
+        println!(
+            "Reactor t=0: ratio={:.4} → {}",
+            reactor_0.cs134_cs137_ratio, reactor_0.source_type
+        );
 
         // Reactor at t=5 yr
         let reactor_5 = cs_ratio_decay(0.8, 5.0);
-        println!("Reactor t=5yr: ratio={:.4} → {}", reactor_5.cs134_cs137_ratio, reactor_5.source_type);
+        println!(
+            "Reactor t=5yr: ratio={:.4} → {}",
+            reactor_5.cs134_cs137_ratio, reactor_5.source_type
+        );
 
         // Reactor at t=10 yr
         let reactor_10 = cs_ratio_decay(0.8, 10.0);
-        println!("Reactor t=10yr: ratio={:.4} → {}", reactor_10.cs134_cs137_ratio, reactor_10.source_type);
+        println!(
+            "Reactor t=10yr: ratio={:.4} → {}",
+            reactor_10.cs134_cs137_ratio, reactor_10.source_type
+        );
 
         // Ratio should decay with time
         assert!(reactor_5.cs134_cs137_ratio < reactor_0.cs134_cs137_ratio);
@@ -1502,7 +1943,11 @@ mod tests {
         // Time inversion
         let t = time_from_cs_ratio(reactor_5.cs134_cs137_ratio, 0.8);
         println!("Recovered time from ratio: {:.2} yr (expected 5.0)", t);
-        assert!((t - 5.0).abs() < 0.1, "Time recovery error too large: {}", t);
+        assert!(
+            (t - 5.0).abs() < 0.1,
+            "Time recovery error too large: {}",
+            t
+        );
     }
 
     // ── Critical mass ────────────────────────────────────────────────────
@@ -1519,9 +1964,13 @@ mod tests {
         for m in &masses {
             println!(
                 "{:>8} {:>10.2} {:>10.1} {:>10.1} {:>10.1} {:>10.1} {:>8.2}",
-                m.name, m.fission_barrier, m.sigma_f_proxy,
-                m.bare_critical_mass_kg, m.reflected_critical_mass_kg,
-                m.known_bare_mass_kg, m.accuracy_ratio
+                m.name,
+                m.fission_barrier,
+                m.sigma_f_proxy,
+                m.bare_critical_mass_kg,
+                m.reflected_critical_mass_kg,
+                m.known_bare_mass_kg,
+                m.accuracy_ratio
             );
         }
 

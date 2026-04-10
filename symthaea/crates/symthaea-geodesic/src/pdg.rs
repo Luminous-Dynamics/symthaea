@@ -346,7 +346,9 @@ impl ProgramDependenceGraph {
                     if let Some((head_id, kind)) = branch_stack.last().copied() {
                         if kind == NodeKind::LoopHead {
                             // Find the loop header's indentation
-                            let head_line = pdg.nodes.iter()
+                            let head_line = pdg
+                                .nodes
+                                .iter()
                                 .find(|n| n.id == head_id)
                                 .and_then(|n| n.line)
                                 .and_then(|l| lines.get(l - 1))
@@ -720,7 +722,11 @@ fn compute() -> i32 {
         // 3 vertices
         assert_eq!(sc.vertices.len(), 3);
         // 3 unique edges (undirected, control-flow only)
-        assert_eq!(sc.simplices[1].len(), 3, "expected 3 one-simplices (CF edges)");
+        assert_eq!(
+            sc.simplices[1].len(),
+            3,
+            "expected 3 one-simplices (CF edges)"
+        );
         // 1 triangle (all 3 pairs connected)
         assert_eq!(
             sc.simplices[2].len(),

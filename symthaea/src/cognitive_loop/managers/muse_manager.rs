@@ -27,7 +27,9 @@
 //! - Koelsch (2014): Brain correlates of music-evoked emotions
 //! - Fritz et al. (2009): Universal recognition of emotional cues in music
 
-use super::super::subsystem_trait::{output_flags, CognitiveSubsystem, CycleSnapshot, SubsystemOutput};
+use super::super::subsystem_trait::{
+    output_flags, CognitiveSubsystem, CycleSnapshot, SubsystemOutput,
+};
 use serde::{Deserialize, Serialize};
 use symthaea_muse::streaming::StreamingSynth;
 use symthaea_muse::{MuseConfig, MusicalState};
@@ -344,9 +346,9 @@ impl MuseManager {
     fn apply_safety_fade(&mut self, chunk: &mut [[f32; 2]]) {
         let target = match self.injected_safety_level {
             SAFETY_RED => 0.0,
-            SAFETY_ORANGE => 0.3,  // Low drone level
+            SAFETY_ORANGE => 0.3, // Low drone level
             SAFETY_YELLOW => 0.7,
-            _ => 1.0,              // Green: full volume
+            _ => 1.0, // Green: full volume
         };
 
         // Fade completes in MUSE_SILENCE_FADE_MS milliseconds of audio

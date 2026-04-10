@@ -94,11 +94,7 @@ impl TriOracle {
 
     /// Score a candidate ProgramNode against an expected ProgramNode.
     /// Uses all three oracles and returns consensus.
-    pub fn score(
-        &self,
-        candidate: &ProgramNode,
-        expected: &ProgramNode,
-    ) -> TriOracleScore {
+    pub fn score(&self, candidate: &ProgramNode, expected: &ProgramNode) -> TriOracleScore {
         // Blend property-based structural encoding (name-independent, for composition)
         // with name-based encoding (operator-discriminative, for scoring).
         // Structural encoding makes ADD(a,b) ≈ ADD(x,y) but also ADD(a,b) ≈ MUL(a,b).
@@ -121,11 +117,8 @@ impl TriOracle {
         let topological = Self::topological_score(candidate, expected);
 
         // Oracle 3: Trajectory (CfC evolution divergence)
-        let trajectory = Self::trajectory_score(
-            &candidate_enc,
-            &expected_enc,
-            self.config.trajectory_steps,
-        );
+        let trajectory =
+            Self::trajectory_score(&candidate_enc, &expected_enc, self.config.trajectory_steps);
 
         // Consensus
         let composite = self.config.structural_weight * structural
@@ -141,18 +134,10 @@ impl TriOracle {
     }
 
     /// Score encodings directly (fastest path — structural + trajectory only).
-    pub fn score_encodings(
-        &self,
-        candidate: &BinaryHV,
-        expected: &BinaryHV,
-    ) -> TriOracleScore {
+    pub fn score_encodings(&self, candidate: &BinaryHV, expected: &BinaryHV) -> TriOracleScore {
         let structural = Self::structural_score(candidate, expected);
         let topological = 0.5; // neutral — no ProgramNode available for PDG
-        let trajectory = Self::trajectory_score(
-            candidate,
-            expected,
-            self.config.trajectory_steps,
-        );
+        let trajectory = Self::trajectory_score(candidate, expected, self.config.trajectory_steps);
 
         let composite = self.config.structural_weight * structural
             + self.config.topological_weight * topological
@@ -240,8 +225,7 @@ impl TriOracle {
 
         // Also compare structural size (node/edge counts)
         let size_ratio = if e_fp.node_count > 0 {
-            1.0 - ((c_fp.node_count as f32 - e_fp.node_count as f32).abs()
-                / e_fp.node_count as f32)
+            1.0 - ((c_fp.node_count as f32 - e_fp.node_count as f32).abs() / e_fp.node_count as f32)
                 .min(1.0)
                 * 0.2
         } else {
@@ -309,7 +293,11 @@ fn extract_children(node: &ProgramNode) -> Vec<&ProgramNode> {
             condition,
             then_branch,
             else_branch,
-        } => vec![condition.as_ref(), then_branch.as_ref(), else_branch.as_ref()],
+        } => vec![
+            condition.as_ref(),
+            then_branch.as_ref(),
+            else_branch.as_ref(),
+        ],
         ProgramNode::Map { func, collection } => vec![func.as_ref(), collection.as_ref()],
         ProgramNode::Filter {
             predicate,

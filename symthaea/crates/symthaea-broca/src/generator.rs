@@ -505,23 +505,24 @@ impl BrocaGenerator {
 
             // Apply gating and compute audit trail values
             // When bypass_gating is true, skip all gating for raw CfC quality iteration.
-            let this_epistemic_boost = if !self.config.bypass_gating && self.config.enable_epistemic_gate {
-                let ordinal = channels.epistemic_ordinal();
-                self.epistemic_gate.apply(&mut logits, ordinal);
-                // Compute representative boost magnitude for the trace
-                if ordinal > 3.5 {
-                    self.config.gating.unknown_hedging_boost
-                        * self.config.gating.ood_boost_multiplier
-                } else if ordinal > 2.5 {
-                    self.config.gating.unknown_hedging_boost
-                } else if ordinal > 1.5 {
-                    self.config.gating.uncertain_hedging_boost
+            let this_epistemic_boost =
+                if !self.config.bypass_gating && self.config.enable_epistemic_gate {
+                    let ordinal = channels.epistemic_ordinal();
+                    self.epistemic_gate.apply(&mut logits, ordinal);
+                    // Compute representative boost magnitude for the trace
+                    if ordinal > 3.5 {
+                        self.config.gating.unknown_hedging_boost
+                            * self.config.gating.ood_boost_multiplier
+                    } else if ordinal > 2.5 {
+                        self.config.gating.unknown_hedging_boost
+                    } else if ordinal > 1.5 {
+                        self.config.gating.uncertain_hedging_boost
+                    } else {
+                        0.0
+                    }
                 } else {
                     0.0
-                }
-            } else {
-                0.0
-            };
+                };
 
             // Apply per-axis epistemic cube gating (E/N/M/H)
             // Complements the 1D ordinal gate with fine-grained axis modulation:
@@ -531,7 +532,9 @@ impl BrocaGenerator {
                 self.epistemic_cube_gate.apply(&mut logits, channels);
             }
 
-            let this_emotional_boost = if !self.config.bypass_gating && self.config.enable_emotional_modulation {
+            let this_emotional_boost = if !self.config.bypass_gating
+                && self.config.enable_emotional_modulation
+            {
                 self.emotional_modulator.apply(&mut logits, channels, pos);
                 // Compute maximum boost magnitude from arousal/valence/warmth effects
                 let arousal = channels.arousal();

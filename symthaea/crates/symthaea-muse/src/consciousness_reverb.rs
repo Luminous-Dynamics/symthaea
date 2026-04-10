@@ -26,9 +26,9 @@ pub struct ConsciousnessReverb {
 struct DelayLine {
     buffer: Vec<f32>,
     write_pos: usize,
-    delay_samples: f32,   // current (smoothed) delay
-    target_delay: f32,    // target delay
-    smooth_rate: f32,     // interpolation rate (lower = smoother)
+    delay_samples: f32, // current (smoothed) delay
+    target_delay: f32,  // target delay
+    smooth_rate: f32,   // interpolation rate (lower = smoother)
 }
 
 impl DelayLine {
@@ -57,7 +57,8 @@ impl DelayLine {
         let delay_frac = self.delay_samples - delay_int as f32;
         let read_pos0 = (self.write_pos + self.buffer.len() - delay_int) % self.buffer.len();
         let read_pos1 = (self.write_pos + self.buffer.len() - delay_int - 1) % self.buffer.len();
-        let output = self.buffer[read_pos0] * (1.0 - delay_frac) + self.buffer[read_pos1] * delay_frac;
+        let output =
+            self.buffer[read_pos0] * (1.0 - delay_frac) + self.buffer[read_pos1] * delay_frac;
 
         self.write_pos = (self.write_pos + 1) % self.buffer.len();
         output
@@ -177,7 +178,8 @@ impl ConsciousnessReverb {
 
         // Pre-delay: higher consciousness = larger room = more pre-delay
         let predelay_ms = psi * 80.0; // 0-80ms
-        self.pre_delay.set_delay((predelay_ms * 0.001 * self.sample_rate) as usize);
+        self.pre_delay
+            .set_delay((predelay_ms * 0.001 * self.sample_rate) as usize);
 
         // Room size: consciousness maps to Freeverb feedback.
         // CRITICAL: update params in-place to preserve reverb tail.
@@ -187,7 +189,8 @@ impl ConsciousnessReverb {
         self.late_reverb.set_params(room, damping, wet);
 
         // Early reflections from harmony activations
-        self.early_reflections.update_harmonies(&state.harmony_activations);
+        self.early_reflections
+            .update_harmonies(&state.harmony_activations);
 
         // Air absorption: serotonin → warmth (lower cutoff = more absorption)
         let cutoff = 4000.0 + (1.0 - state.serotonin) * 12000.0; // 4-16kHz
@@ -207,7 +210,9 @@ impl ConsciousnessReverb {
 
         // 3. Comb delay modulation (slow LFO for lush tail)
         self.mod_phase += 0.3 / self.sample_rate; // ~0.3 Hz LFO
-        if self.mod_phase > 1.0 { self.mod_phase -= 1.0; }
+        if self.mod_phase > 1.0 {
+            self.mod_phase -= 1.0;
+        }
 
         // 4. Late reverb (Freeverb)
         let (late_l, late_r) = self.late_reverb.process_stereo(er_l, er_r);
@@ -239,7 +244,10 @@ mod tests {
                 has_output = true;
             }
         }
-        assert!(has_output, "reverb should produce decaying output after impulse");
+        assert!(
+            has_output,
+            "reverb should produce decaying output after impulse"
+        );
     }
 
     #[test]
@@ -247,12 +255,18 @@ mod tests {
         let mut reverb = ConsciousnessReverb::new(44100);
 
         // Low consciousness = short pre-delay
-        let low_state = MusicalState { consciousness_level: 0.1, ..Default::default() };
+        let low_state = MusicalState {
+            consciousness_level: 0.1,
+            ..Default::default()
+        };
         reverb.update_state(&low_state);
         assert!(reverb.pre_delay.target_delay < 500.0);
 
         // High consciousness = long pre-delay
-        let high_state = MusicalState { consciousness_level: 0.9, ..Default::default() };
+        let high_state = MusicalState {
+            consciousness_level: 0.9,
+            ..Default::default()
+        };
         reverb.update_state(&high_state);
         assert!(reverb.pre_delay.target_delay > 2000.0);
     }
@@ -277,7 +291,10 @@ mod tests {
         };
         reverb.update_state(&active);
         let any_nonzero = reverb.early_reflections.taps.iter().any(|t| t.gain > 0.0);
-        assert!(any_nonzero, "active harmonies should produce reflection gains");
+        assert!(
+            any_nonzero,
+            "active harmonies should produce reflection gains"
+        );
     }
 
     #[test]
@@ -299,6 +316,9 @@ mod tests {
                 diff_count += 1;
             }
         }
-        assert!(diff_count > 100, "stereo channels should differ with harmony panning");
+        assert!(
+            diff_count > 100,
+            "stereo channels should differ with harmony panning"
+        );
     }
 }

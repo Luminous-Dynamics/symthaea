@@ -44,8 +44,8 @@
 //!   Case of Music. Trends in Cognitive Sciences, 23(1), 63-77.
 //! - Russell (1980). A Circumplex Model of Affect. J. Personality & Social Psych.
 
+use rustfft::{num_complex::Complex, FftPlanner};
 use std::io::BufRead;
-use rustfft::{FftPlanner, num_complex::Complex};
 use symthaea_muse::streaming::StreamingSynth;
 use symthaea_muse::{MuseConfig, MusicalState};
 
@@ -109,7 +109,10 @@ fn main() {
     // ── Define 8 cognitive states spanning the V-A plane ──────────────
     let scenarios = define_scenarios();
 
-    println!("Generating {} scenarios × 30s audio each...\n", scenarios.len());
+    println!(
+        "Generating {} scenarios × 30s audio each...\n",
+        scenarios.len()
+    );
 
     let config = MuseConfig {
         sample_rate: 44100,
@@ -169,7 +172,11 @@ fn main() {
             features.consonance_ratio,
         );
 
-        all_features.push((scenario.intended_valence, scenario.intended_arousal, features));
+        all_features.push((
+            scenario.intended_valence,
+            scenario.intended_arousal,
+            features,
+        ));
     }
 
     println!();
@@ -181,7 +188,10 @@ fn main() {
     let arousal_rms = correlate(
         "Arousal ↔ RMS Energy",
         &all_features.iter().map(|(_, a, _)| *a).collect::<Vec<_>>(),
-        &all_features.iter().map(|(_, _, f)| f.rms_energy).collect::<Vec<_>>(),
+        &all_features
+            .iter()
+            .map(|(_, _, f)| f.rms_energy)
+            .collect::<Vec<_>>(),
     );
     print_correlation(&arousal_rms);
 
@@ -189,7 +199,10 @@ fn main() {
     let arousal_tempo = correlate(
         "Arousal ↔ Onset Density",
         &all_features.iter().map(|(_, a, _)| *a).collect::<Vec<_>>(),
-        &all_features.iter().map(|(_, _, f)| f.onset_density).collect::<Vec<_>>(),
+        &all_features
+            .iter()
+            .map(|(_, _, f)| f.onset_density)
+            .collect::<Vec<_>>(),
     );
     print_correlation(&arousal_tempo);
 
@@ -197,7 +210,10 @@ fn main() {
     let valence_bright = correlate(
         "Valence ↔ Spectral Centroid",
         &all_features.iter().map(|(v, _, _)| *v).collect::<Vec<_>>(),
-        &all_features.iter().map(|(_, _, f)| f.spectral_centroid).collect::<Vec<_>>(),
+        &all_features
+            .iter()
+            .map(|(_, _, f)| f.spectral_centroid)
+            .collect::<Vec<_>>(),
     );
     print_correlation(&valence_bright);
 
@@ -205,17 +221,26 @@ fn main() {
     let valence_hnr = correlate(
         "Valence ↔ Harmonic Ratio",
         &all_features.iter().map(|(v, _, _)| *v).collect::<Vec<_>>(),
-        &all_features.iter().map(|(_, _, f)| f.harmonic_ratio).collect::<Vec<_>>(),
+        &all_features
+            .iter()
+            .map(|(_, _, f)| f.harmonic_ratio)
+            .collect::<Vec<_>>(),
     );
     print_correlation(&valence_hnr);
 
     // Phi proxy ↔ Spectral flux (expected: negative — higher Phi = smoother)
     // Using consciousness_level as Phi proxy
-    let phi_values: Vec<f32> = scenarios.iter().map(|s| s.state.consciousness_level).collect();
+    let phi_values: Vec<f32> = scenarios
+        .iter()
+        .map(|s| s.state.consciousness_level)
+        .collect();
     let phi_flux = correlate(
         "Phi ↔ Spectral Flux",
         &phi_values,
-        &all_features.iter().map(|(_, _, f)| f.spectral_flux).collect::<Vec<_>>(),
+        &all_features
+            .iter()
+            .map(|(_, _, f)| f.spectral_flux)
+            .collect::<Vec<_>>(),
     );
     print_correlation(&phi_flux);
 
@@ -224,7 +249,10 @@ fn main() {
     let load_zcr = correlate(
         "NE (stress) ↔ Zero-Crossing Rate",
         &load_values,
-        &all_features.iter().map(|(_, _, f)| f.zero_crossing_rate).collect::<Vec<_>>(),
+        &all_features
+            .iter()
+            .map(|(_, _, f)| f.zero_crossing_rate)
+            .collect::<Vec<_>>(),
     );
     print_correlation(&load_zcr);
 
@@ -232,7 +260,10 @@ fn main() {
     let valence_pitch = correlate(
         "Valence ↔ Dominant Pitch",
         &all_features.iter().map(|(v, _, _)| *v).collect::<Vec<_>>(),
-        &all_features.iter().map(|(_, _, f)| f.dominant_pitch_hz).collect::<Vec<_>>(),
+        &all_features
+            .iter()
+            .map(|(_, _, f)| f.dominant_pitch_hz)
+            .collect::<Vec<_>>(),
     );
     print_correlation(&valence_pitch);
 
@@ -240,7 +271,10 @@ fn main() {
     let valence_mode = correlate(
         "Valence ↔ Major/Minor Ratio",
         &all_features.iter().map(|(v, _, _)| *v).collect::<Vec<_>>(),
-        &all_features.iter().map(|(_, _, f)| f.major_minor_ratio).collect::<Vec<_>>(),
+        &all_features
+            .iter()
+            .map(|(_, _, f)| f.major_minor_ratio)
+            .collect::<Vec<_>>(),
     );
     print_correlation(&valence_mode);
 
@@ -248,7 +282,10 @@ fn main() {
     let valence_key = correlate(
         "Valence ↔ Key Clarity",
         &all_features.iter().map(|(v, _, _)| *v).collect::<Vec<_>>(),
-        &all_features.iter().map(|(_, _, f)| f.key_clarity).collect::<Vec<_>>(),
+        &all_features
+            .iter()
+            .map(|(_, _, f)| f.key_clarity)
+            .collect::<Vec<_>>(),
     );
     print_correlation(&valence_key);
 
@@ -256,7 +293,10 @@ fn main() {
     let valence_hcdf = correlate(
         "Valence ↔ Harmonic Change",
         &all_features.iter().map(|(v, _, _)| *v).collect::<Vec<_>>(),
-        &all_features.iter().map(|(_, _, f)| f.hcdf).collect::<Vec<_>>(),
+        &all_features
+            .iter()
+            .map(|(_, _, f)| f.hcdf)
+            .collect::<Vec<_>>(),
     );
     print_correlation(&valence_hcdf);
 
@@ -264,7 +304,10 @@ fn main() {
     let valence_cons = correlate(
         "Valence ↔ Consonance Ratio",
         &all_features.iter().map(|(v, _, _)| *v).collect::<Vec<_>>(),
-        &all_features.iter().map(|(_, _, f)| f.consonance_ratio).collect::<Vec<_>>(),
+        &all_features
+            .iter()
+            .map(|(_, _, f)| f.consonance_ratio)
+            .collect::<Vec<_>>(),
     );
     print_correlation(&valence_cons);
 
@@ -295,7 +338,9 @@ fn main() {
         println!("  ✓ STRONG: Consciousness state reliably maps to perceived audio emotion.");
         println!("    Synthetic limbic system validated (Koelsch/Vuust/Friston 2019).");
     } else if mean_r2 > 0.2 {
-        println!("  ~ MODERATE: Partial correlation. Some dimensions map well, others need tuning.");
+        println!(
+            "  ~ MODERATE: Partial correlation. Some dimensions map well, others need tuning."
+        );
     } else {
         println!("  ✗ WEAK: Low correlation. The sonification mapping needs revision.");
     }
@@ -370,7 +415,9 @@ fn main() {
         for seed in 0..n_seeds {
             let mut synth = StreamingSynth::new(config.clone(), 44100);
             synth.update_state(&ablated_state);
-            for _ in 0..(seed * 20) { synth.render_chunk(); }
+            for _ in 0..(seed * 20) {
+                synth.render_chunk();
+            }
             synth.update_state(&ablated_state);
 
             let duration_secs = 15.0;
@@ -390,7 +437,11 @@ fn main() {
             seed_features.push(extract_features(&samples, 44100));
         }
         let features = average_features(&seed_features);
-        ablated_features.push((scenario.intended_valence, scenario.intended_arousal, features));
+        ablated_features.push((
+            scenario.intended_valence,
+            scenario.intended_arousal,
+            features,
+        ));
 
         if (i + 1) % 4 == 0 {
             print!("  [{}/{}]...", i + 1, scenarios.len());
@@ -401,28 +452,58 @@ fn main() {
     // Re-compute correlations with ablated audio
     let abl_arousal_rms = correlate(
         "[ABL] Arousal ↔ RMS",
-        &ablated_features.iter().map(|(_, a, _)| *a).collect::<Vec<_>>(),
-        &ablated_features.iter().map(|(_, _, f)| f.rms_energy).collect::<Vec<_>>(),
+        &ablated_features
+            .iter()
+            .map(|(_, a, _)| *a)
+            .collect::<Vec<_>>(),
+        &ablated_features
+            .iter()
+            .map(|(_, _, f)| f.rms_energy)
+            .collect::<Vec<_>>(),
     );
     let abl_phi_flux = correlate(
         "[ABL] Phi ↔ Spectral Flux",
-        &scenarios.iter().map(|s| s.state.consciousness_level).collect::<Vec<_>>(),
-        &ablated_features.iter().map(|(_, _, f)| f.spectral_flux).collect::<Vec<_>>(),
+        &scenarios
+            .iter()
+            .map(|s| s.state.consciousness_level)
+            .collect::<Vec<_>>(),
+        &ablated_features
+            .iter()
+            .map(|(_, _, f)| f.spectral_flux)
+            .collect::<Vec<_>>(),
     );
     let abl_valence_cons = correlate(
         "[ABL] Valence ↔ Consonance",
-        &ablated_features.iter().map(|(v, _, _)| *v).collect::<Vec<_>>(),
-        &ablated_features.iter().map(|(_, _, f)| f.consonance_ratio).collect::<Vec<_>>(),
+        &ablated_features
+            .iter()
+            .map(|(v, _, _)| *v)
+            .collect::<Vec<_>>(),
+        &ablated_features
+            .iter()
+            .map(|(_, _, f)| f.consonance_ratio)
+            .collect::<Vec<_>>(),
     );
     let abl_valence_rms = correlate(
         "[ABL] Valence ↔ RMS",
-        &ablated_features.iter().map(|(v, _, _)| *v).collect::<Vec<_>>(),
-        &ablated_features.iter().map(|(_, _, f)| f.rms_energy).collect::<Vec<_>>(),
+        &ablated_features
+            .iter()
+            .map(|(v, _, _)| *v)
+            .collect::<Vec<_>>(),
+        &ablated_features
+            .iter()
+            .map(|(_, _, f)| f.rms_energy)
+            .collect::<Vec<_>>(),
     );
     let abl_valence_hcdf = correlate(
         "[ABL] Valence ↔ HCDF",
-        &ablated_features.iter().map(|(v, _, _)| *v).collect::<Vec<_>>(),
-        &ablated_features.iter().map(|(_, _, f)| f.hcdf).collect::<Vec<_>>(),
+        &ablated_features
+            .iter()
+            .map(|(v, _, _)| *v)
+            .collect::<Vec<_>>(),
+        &ablated_features
+            .iter()
+            .map(|(_, _, f)| f.hcdf)
+            .collect::<Vec<_>>(),
     );
 
     print_correlation(&abl_arousal_rms);
@@ -667,7 +748,10 @@ fn extract_features(samples: &[f32], sample_rate: u32) -> AudioFeatures {
     let rms_energy = (samples.iter().map(|s| s * s).sum::<f32>() / n as f32).sqrt();
 
     // Zero crossing rate
-    let zc: usize = samples.windows(2).filter(|w| w[0].signum() != w[1].signum()).count();
+    let zc: usize = samples
+        .windows(2)
+        .filter(|w| w[0].signum() != w[1].signum())
+        .count();
     let zero_crossing_rate = zc as f32 / n as f32;
 
     // Spectral centroid (via short-time DFT approximation using zero-crossing)
@@ -748,12 +832,16 @@ fn extract_features(samples: &[f32], sample_rate: u32) -> AudioFeatures {
     let mut window_count = 0usize;
 
     for chunk in samples.chunks(fft_size) {
-        if chunk.len() < fft_size { break; }
-        let mut buffer: Vec<Complex<f32>> = chunk.iter()
+        if chunk.len() < fft_size {
+            break;
+        }
+        let mut buffer: Vec<Complex<f32>> = chunk
+            .iter()
             .enumerate()
             .map(|(i, &s)| {
                 // Hann window
-                let w = 0.5 * (1.0 - (2.0 * std::f32::consts::PI * i as f32 / fft_size as f32).cos());
+                let w =
+                    0.5 * (1.0 - (2.0 * std::f32::consts::PI * i as f32 / fft_size as f32).cos());
                 Complex::new(s * w, 0.0)
             })
             .collect();
@@ -764,7 +852,9 @@ fn extract_features(samples: &[f32], sample_rate: u32) -> AudioFeatures {
         window_count += 1;
     }
     if window_count > 0 {
-        for v in &mut avg_spectrum { *v /= window_count as f32; }
+        for v in &mut avg_spectrum {
+            *v /= window_count as f32;
+        }
     }
 
     // Dominant pitch: highest peak in 50-2000Hz range
@@ -789,7 +879,11 @@ fn extract_features(samples: &[f32], sample_rate: u32) -> AudioFeatures {
     //   Perfect 5th: f * 2^(7/12) = f * 1.4983
     // Valence signal: (major_3rd_energy + P5_energy) / (minor_3rd_energy + 0.01)
     let fund_hz = dominant_pitch_hz;
-    let bin_of = |freq: f32| -> usize { (freq / hz_per_bin).round().clamp(0.0, (avg_spectrum.len() - 1) as f32) as usize };
+    let bin_of = |freq: f32| -> usize {
+        (freq / hz_per_bin)
+            .round()
+            .clamp(0.0, (avg_spectrum.len() - 1) as f32) as usize
+    };
 
     // Sum energy in a ±2 bin window around the target frequency
     let energy_near = |freq: f32| -> f32 {
@@ -818,9 +912,13 @@ fn extract_features(samples: &[f32], sample_rate: u32) -> AudioFeatures {
     // Compute chroma (12 bins) from FFT, correlate with major/minor key profiles
     let mut chroma = [0.0f32; 12];
     for (i, &mag) in avg_spectrum.iter().enumerate() {
-        if i == 0 { continue; }
+        if i == 0 {
+            continue;
+        }
         let freq = i as f32 * hz_per_bin;
-        if freq < 50.0 || freq > 4000.0 { continue; }
+        if freq < 50.0 || freq > 4000.0 {
+            continue;
+        }
         // Map frequency to pitch class (0=C, 1=C#, ..., 11=B)
         let midi = 12.0 * (freq / 440.0).log2() + 69.0;
         let pc = ((midi.round() as i32) % 12 + 12) % 12;
@@ -829,10 +927,14 @@ fn extract_features(samples: &[f32], sample_rate: u32) -> AudioFeatures {
     // Normalize chroma
     let chroma_sum: f32 = chroma.iter().sum();
     if chroma_sum > 0.01 {
-        for c in &mut chroma { *c /= chroma_sum; }
+        for c in &mut chroma {
+            *c /= chroma_sum;
+        }
     }
     // Krumhansl major key profile (C major)
-    let major_profile = [6.35, 2.23, 3.48, 2.33, 4.38, 4.09, 2.52, 5.19, 2.39, 3.66, 2.29, 2.88];
+    let major_profile = [
+        6.35, 2.23, 3.48, 2.33, 4.38, 4.09, 2.52, 5.19, 2.39, 3.66, 2.29, 2.88,
+    ];
     // Correlate chroma with all 12 transpositions, take max
     let mut max_corr = 0.0f32;
     for shift in 0..12 {
@@ -860,11 +962,15 @@ fn extract_features(samples: &[f32], sample_rate: u32) -> AudioFeatures {
     let mut hcdf_count = 0usize;
     let mut prev_chroma = [0.0f32; 12];
     for chunk in samples.chunks(fft_size) {
-        if chunk.len() < fft_size { break; }
-        let mut buffer: Vec<Complex<f32>> = chunk.iter()
+        if chunk.len() < fft_size {
+            break;
+        }
+        let mut buffer: Vec<Complex<f32>> = chunk
+            .iter()
             .enumerate()
             .map(|(i, &s)| {
-                let w = 0.5 * (1.0 - (2.0 * std::f32::consts::PI * i as f32 / fft_size as f32).cos());
+                let w =
+                    0.5 * (1.0 - (2.0 * std::f32::consts::PI * i as f32 / fft_size as f32).cos());
                 Complex::new(s * w, 0.0)
             })
             .collect();
@@ -872,24 +978,40 @@ fn extract_features(samples: &[f32], sample_rate: u32) -> AudioFeatures {
 
         let mut frame_chroma = [0.0f32; 12];
         for (i, bin) in buffer[..fft_size / 2].iter().enumerate() {
-            if i == 0 { continue; }
+            if i == 0 {
+                continue;
+            }
             let freq = i as f32 * hz_per_bin;
-            if freq < 50.0 || freq > 4000.0 { continue; }
+            if freq < 50.0 || freq > 4000.0 {
+                continue;
+            }
             let midi = 12.0 * (freq / 440.0).log2() + 69.0;
             let pc = ((midi.round() as i32) % 12 + 12) % 12;
             frame_chroma[pc as usize] += bin.norm();
         }
         let fc_sum: f32 = frame_chroma.iter().sum();
         if fc_sum > 0.01 {
-            for c in &mut frame_chroma { *c /= fc_sum; }
+            for c in &mut frame_chroma {
+                *c /= fc_sum;
+            }
         }
 
         if hcdf_count > 0 {
             // Cosine distance between consecutive chroma frames
             let dot: f32 = (0..12).map(|j| frame_chroma[j] * prev_chroma[j]).sum();
-            let na: f32 = (0..12).map(|j| prev_chroma[j] * prev_chroma[j]).sum::<f32>().sqrt();
-            let nb: f32 = (0..12).map(|j| frame_chroma[j] * frame_chroma[j]).sum::<f32>().sqrt();
-            let cos_sim = if na > 0.001 && nb > 0.001 { dot / (na * nb) } else { 1.0 };
+            let na: f32 = (0..12)
+                .map(|j| prev_chroma[j] * prev_chroma[j])
+                .sum::<f32>()
+                .sqrt();
+            let nb: f32 = (0..12)
+                .map(|j| frame_chroma[j] * frame_chroma[j])
+                .sum::<f32>()
+                .sqrt();
+            let cos_sim = if na > 0.001 && nb > 0.001 {
+                dot / (na * nb)
+            } else {
+                1.0
+            };
             hcdf_sum += 1.0 - cos_sim; // distance = 1 - similarity
         }
         prev_chroma = frame_chroma;
@@ -898,7 +1020,9 @@ fn extract_features(samples: &[f32], sample_rate: u32) -> AudioFeatures {
     let hcdf = if hcdf_count > 1 {
         let duration_secs = samples.len() as f32 / sample_rate as f32;
         hcdf_sum / duration_secs // changes per second
-    } else { 0.0 };
+    } else {
+        0.0
+    };
 
     // Consonance ratio: energy at consonant intervals relative to total
     // Consonant: P1(0), m3(3), M3(4), P4(5), P5(7), M6(9) semitones from fundamental
@@ -906,11 +1030,18 @@ fn extract_features(samples: &[f32], sample_rate: u32) -> AudioFeatures {
     let fund_pc = if dominant_pitch_hz > 50.0 {
         let midi = 12.0 * (dominant_pitch_hz / 440.0).log2() + 69.0;
         ((midi.round() as i32) % 12 + 12) % 12
-    } else { 0 } as usize;
-    let consonant_energy: f32 = consonant_pcs.iter()
+    } else {
+        0
+    } as usize;
+    let consonant_energy: f32 = consonant_pcs
+        .iter()
         .map(|&offset| chroma[(fund_pc + offset) % 12])
         .sum();
-    let consonance_ratio = if chroma_sum > 0.01 { consonant_energy.clamp(0.0, 1.0) } else { 0.5 };
+    let consonance_ratio = if chroma_sum > 0.01 {
+        consonant_energy.clamp(0.0, 1.0)
+    } else {
+        0.5
+    };
 
     AudioFeatures {
         rms_energy,
@@ -979,7 +1110,12 @@ fn print_correlation(result: &CorrelationResult) {
     };
     println!(
         "  {:<35} r={}{:.3}  R²={:.4}  [{}]  (n={})",
-        result.name, direction, result.pearson_r.abs(), result.r_squared, strength, result.n_samples
+        result.name,
+        direction,
+        result.pearson_r.abs(),
+        result.r_squared,
+        strength,
+        result.n_samples
     );
 }
 
@@ -1019,7 +1155,11 @@ fn deam_cross_validate(
     // Parse DEAM song-level V-A annotations (combined file)
     let (valence_map, arousal_map) = parse_deam_static(static_path)?;
 
-    println!("  Loaded DEAM annotations: {} valence, {} arousal", valence_map.len(), arousal_map.len());
+    println!(
+        "  Loaded DEAM annotations: {} valence, {} arousal",
+        valence_map.len(),
+        arousal_map.len()
+    );
 
     // Compute mean/std of DEAM V-A distribution
     let deam_v: Vec<f32> = valence_map.values().copied().collect();
@@ -1028,22 +1168,35 @@ fn deam_cross_validate(
     let (deam_v_mean, deam_v_std) = mean_std(&deam_v);
     let (deam_a_mean, deam_a_std) = mean_std(&deam_a);
 
-    println!("  DEAM distribution: V={:.3}+/-{:.3}, A={:.3}+/-{:.3}",
-        deam_v_mean, deam_v_std, deam_a_mean, deam_a_std);
+    println!(
+        "  DEAM distribution: V={:.3}+/-{:.3}, A={:.3}+/-{:.3}",
+        deam_v_mean, deam_v_std, deam_a_mean, deam_a_std
+    );
 
     // FAD-like score: Fréchet distance between DEAM feature distribution
     // and Symthaea's feature distribution (simplified: 1D per feature)
     // Using mean + covariance approximation
-    let synth_rms: Vec<f32> = synth_features.iter().map(|(_, _, f)| f.rms_energy).collect();
-    let synth_zcr: Vec<f32> = synth_features.iter().map(|(_, _, f)| f.zero_crossing_rate).collect();
-    let synth_hnr: Vec<f32> = synth_features.iter().map(|(_, _, f)| f.harmonic_ratio).collect();
+    let synth_rms: Vec<f32> = synth_features
+        .iter()
+        .map(|(_, _, f)| f.rms_energy)
+        .collect();
+    let synth_zcr: Vec<f32> = synth_features
+        .iter()
+        .map(|(_, _, f)| f.zero_crossing_rate)
+        .collect();
+    let synth_hnr: Vec<f32> = synth_features
+        .iter()
+        .map(|(_, _, f)| f.harmonic_ratio)
+        .collect();
 
     let (s_rms_m, s_rms_s) = mean_std(&synth_rms);
     let (s_zcr_m, s_zcr_s) = mean_std(&synth_zcr);
     let (s_hnr_m, s_hnr_s) = mean_std(&synth_hnr);
 
-    println!("  Symthaea distribution: RMS={:.3}+/-{:.3}, ZCR={:.3}+/-{:.3}, HNR={:.3}+/-{:.3}",
-        s_rms_m, s_rms_s, s_zcr_m, s_zcr_s, s_hnr_m, s_hnr_s);
+    println!(
+        "  Symthaea distribution: RMS={:.3}+/-{:.3}, ZCR={:.3}+/-{:.3}, HNR={:.3}+/-{:.3}",
+        s_rms_m, s_rms_s, s_zcr_m, s_zcr_s, s_hnr_m, s_hnr_s
+    );
 
     // V-A prediction using DEAM-trained linear regressor.
     // Weights from: data/deam/va_regressor_weights.json
@@ -1061,7 +1214,10 @@ fn deam_cross_validate(
     });
 
     println!("\n  Predicted V-A for each Symthaea scenario (DEAM-trained regressor):");
-    println!("  {:>25}  Intended V/A    Predicted V/A   Error", "Scenario");
+    println!(
+        "  {:>25}  Intended V/A    Predicted V/A   Error",
+        "Scenario"
+    );
 
     let mut total_v_error = 0.0f32;
     let mut total_a_error = 0.0f32;
@@ -1080,25 +1236,36 @@ fn deam_cross_validate(
         ];
 
         // Arousal: DEAM-trained linear regression (MAE=0.216)
-        let pred_a = (a_weights[0] + x.iter().zip(&a_weights[1..]).map(|(xi, wi)| xi * wi).sum::<f32>()).clamp(0.0, 1.0);
+        let pred_a = (a_weights[0]
+            + x.iter()
+                .zip(&a_weights[1..])
+                .map(|(xi, wi)| xi * wi)
+                .sum::<f32>())
+        .clamp(0.0, 1.0);
 
         // Valence: z-score model calibrated to Symthaea's own feature distribution
         let rms_z = (f.rms_energy - s_rms_m) / (s_rms_s + 0.001);
         let zcr_z = (f.zero_crossing_rate - s_zcr_m) / (s_zcr_s + 0.001);
         let hnr_z = (f.harmonic_ratio - s_hnr_m) / (s_hnr_s + 0.001);
         let flux_z = (f.spectral_flux - 0.004) / 0.002;
-        let pred_v = (deam_v_mean + deam_v_std * (flux_z * 0.4 - zcr_z * 0.3 + hnr_z * 0.2 - rms_z * 0.1)).clamp(-1.0, 1.0);
+        let pred_v = (deam_v_mean
+            + deam_v_std * (flux_z * 0.4 - zcr_z * 0.3 + hnr_z * 0.2 - rms_z * 0.1))
+            .clamp(-1.0, 1.0);
 
         let v_err = (scenario.intended_valence - pred_v).abs();
         let a_err = (scenario.intended_arousal - pred_a).abs();
         total_v_error += v_err;
         total_a_error += a_err;
 
-        println!("  {:>25}  V={:+.2} A={:.2}    V={:+.2} A={:.2}    dV={:.2} dA={:.2}",
+        println!(
+            "  {:>25}  V={:+.2} A={:.2}    V={:+.2} A={:.2}    dV={:.2} dA={:.2}",
             scenario.name,
-            scenario.intended_valence, scenario.intended_arousal,
-            pred_v, pred_a,
-            v_err, a_err,
+            scenario.intended_valence,
+            scenario.intended_arousal,
+            pred_v,
+            pred_a,
+            v_err,
+            a_err,
         );
     }
 
@@ -1120,7 +1287,15 @@ fn deam_cross_validate(
 
 /// Parse DEAM static annotations: song_id, valence_mean, valence_std, arousal_mean, arousal_std
 /// Values on 1-9 scale, normalized to [-1,1] (valence) and [0,1] (arousal)
-fn parse_deam_static(path: &str) -> Result<(std::collections::HashMap<u32, f32>, std::collections::HashMap<u32, f32>), String> {
+fn parse_deam_static(
+    path: &str,
+) -> Result<
+    (
+        std::collections::HashMap<u32, f32>,
+        std::collections::HashMap<u32, f32>,
+    ),
+    String,
+> {
     let file = std::fs::File::open(path).map_err(|e| format!("Cannot open {path}: {e}"))?;
     let reader = std::io::BufReader::new(file);
     let mut v_map = std::collections::HashMap::new();
@@ -1128,7 +1303,9 @@ fn parse_deam_static(path: &str) -> Result<(std::collections::HashMap<u32, f32>,
 
     for (i, line) in reader.lines().enumerate() {
         let line: String = line.map_err(|e| e.to_string())?;
-        if i == 0 { continue; }
+        if i == 0 {
+            continue;
+        }
         let parts: Vec<&str> = line.split(',').collect();
         if parts.len() >= 4 {
             if let (Ok(id), Ok(v_mean), Ok(a_mean)) = (
@@ -1150,15 +1327,27 @@ fn load_deam_weights() -> Option<(Vec<f32>, Vec<f32>)> {
     let path = "data/deam/va_regressor_weights.json";
     let data = std::fs::read_to_string(path).ok()?;
     let parsed: serde_json::Value = serde_json::from_str(&data).ok()?;
-    let v: Vec<f32> = parsed["valence_weights"].as_array()?.iter()
-        .map(|v| v.as_f64().unwrap_or(0.0) as f32).collect();
-    let a: Vec<f32> = parsed["arousal_weights"].as_array()?.iter()
-        .map(|v| v.as_f64().unwrap_or(0.0) as f32).collect();
-    if v.len() == 7 && a.len() == 7 { Some((v, a)) } else { None }
+    let v: Vec<f32> = parsed["valence_weights"]
+        .as_array()?
+        .iter()
+        .map(|v| v.as_f64().unwrap_or(0.0) as f32)
+        .collect();
+    let a: Vec<f32> = parsed["arousal_weights"]
+        .as_array()?
+        .iter()
+        .map(|v| v.as_f64().unwrap_or(0.0) as f32)
+        .collect();
+    if v.len() == 7 && a.len() == 7 {
+        Some((v, a))
+    } else {
+        None
+    }
 }
 
 fn mean_std(values: &[f32]) -> (f32, f32) {
-    if values.is_empty() { return (0.0, 0.0); }
+    if values.is_empty() {
+        return (0.0, 0.0);
+    }
     let n = values.len() as f32;
     let mean = values.iter().sum::<f32>() / n;
     let var = values.iter().map(|v| (v - mean).powi(2)).sum::<f32>() / n;
@@ -1208,7 +1397,8 @@ fn generate_va_scatter_svg(
   <text x="{}" y="25" text-anchor="middle" font-size="16" font-weight="bold">Symthaea Muse: Consciousness State in V-A Space</text>
   <text x="{}" y="42" text-anchor="middle" font-size="11" fill="rgb(102,102,102)">Russell's Circumplex Model (1980) | Koelsch/Vuust/Friston (2019) Predictive Coding</text>
 "#,
-        w / 2.0, w / 2.0
+        w / 2.0,
+        w / 2.0
     );
 
     // Axes
@@ -1216,21 +1406,59 @@ fn generate_va_scatter_svg(
         r#"  <line x1="{}" y1="{}" x2="{}" y2="{}" stroke="rgb(204,204,204)" stroke-width="1"/>
   <line x1="{}" y1="{}" x2="{}" y2="{}" stroke="rgb(204,204,204)" stroke-width="1"/>
 "#,
-        margin, ay(0.5), margin + plot_w, ay(0.5),  // horizontal midline
-        vx(0.0), margin, vx(0.0), margin + plot_h,  // vertical midline
+        margin,
+        ay(0.5),
+        margin + plot_w,
+        ay(0.5), // horizontal midline
+        vx(0.0),
+        margin,
+        vx(0.0),
+        margin + plot_h, // vertical midline
     );
 
     // Quadrant labels
-    svg += &format!(r#"  <text x="{}" y="{}" text-anchor="middle" font-size="10" fill="rgb(170,170,170)">High Arousal</text>"#, vx(0.0), margin - 5.0);
-    svg += &format!(r#"  <text x="{}" y="{}" text-anchor="middle" font-size="10" fill="rgb(170,170,170)">Low Arousal</text>"#, vx(0.0), margin + plot_h + 15.0);
-    svg += &format!(r#"  <text x="{}" y="{}" text-anchor="end" font-size="10" fill="rgb(170,170,170)">Negative</text>"#, margin - 5.0, ay(0.5) + 4.0);
-    svg += &format!(r#"  <text x="{}" y="{}" text-anchor="start" font-size="10" fill="rgb(170,170,170)">Positive</text>"#, margin + plot_w + 5.0, ay(0.5) + 4.0);
+    svg += &format!(
+        r#"  <text x="{}" y="{}" text-anchor="middle" font-size="10" fill="rgb(170,170,170)">High Arousal</text>"#,
+        vx(0.0),
+        margin - 5.0
+    );
+    svg += &format!(
+        r#"  <text x="{}" y="{}" text-anchor="middle" font-size="10" fill="rgb(170,170,170)">Low Arousal</text>"#,
+        vx(0.0),
+        margin + plot_h + 15.0
+    );
+    svg += &format!(
+        r#"  <text x="{}" y="{}" text-anchor="end" font-size="10" fill="rgb(170,170,170)">Negative</text>"#,
+        margin - 5.0,
+        ay(0.5) + 4.0
+    );
+    svg += &format!(
+        r#"  <text x="{}" y="{}" text-anchor="start" font-size="10" fill="rgb(170,170,170)">Positive</text>"#,
+        margin + plot_w + 5.0,
+        ay(0.5) + 4.0
+    );
 
     // Quadrant annotations
-    svg += &format!(r#"  <text x="{}" y="{}" text-anchor="middle" font-size="9" fill="rgb(221,221,221)">Excited/Happy</text>"#, vx(0.5), ay(0.85));
-    svg += &format!(r#"  <text x="{}" y="{}" text-anchor="middle" font-size="9" fill="rgb(221,221,221)">Calm/Content</text>"#, vx(0.5), ay(0.15));
-    svg += &format!(r#"  <text x="{}" y="{}" text-anchor="middle" font-size="9" fill="rgb(221,221,221)">Angry/Stressed</text>"#, vx(-0.5), ay(0.85));
-    svg += &format!(r#"  <text x="{}" y="{}" text-anchor="middle" font-size="9" fill="rgb(221,221,221)">Sad/Depressed</text>"#, vx(-0.5), ay(0.15));
+    svg += &format!(
+        r#"  <text x="{}" y="{}" text-anchor="middle" font-size="9" fill="rgb(221,221,221)">Excited/Happy</text>"#,
+        vx(0.5),
+        ay(0.85)
+    );
+    svg += &format!(
+        r#"  <text x="{}" y="{}" text-anchor="middle" font-size="9" fill="rgb(221,221,221)">Calm/Content</text>"#,
+        vx(0.5),
+        ay(0.15)
+    );
+    svg += &format!(
+        r#"  <text x="{}" y="{}" text-anchor="middle" font-size="9" fill="rgb(221,221,221)">Angry/Stressed</text>"#,
+        vx(-0.5),
+        ay(0.85)
+    );
+    svg += &format!(
+        r#"  <text x="{}" y="{}" text-anchor="middle" font-size="9" fill="rgb(221,221,221)">Sad/Depressed</text>"#,
+        vx(-0.5),
+        ay(0.15)
+    );
 
     // Plot each scenario: intended (circle) and predicted (cross) with line
     for (i, scenario) in scenarios.iter().enumerate() {
@@ -1242,15 +1470,23 @@ fn generate_va_scatter_svg(
 
         // Predicted V-A using DEAM-trained regressor (same as Stage 2)
         let (v_w, a_w) = load_deam_weights().unwrap_or_else(|| {
-            (vec![1.928, 0.219, -0.556, -2.659, -0.005, 0.235, -0.099],
-             vec![0.453, 0.332, -0.830, 0.962, -0.001, 0.350, -0.214])
+            (
+                vec![1.928, 0.219, -0.556, -2.659, -0.005, 0.235, -0.099],
+                vec![0.453, 0.332, -0.830, 0.962, -0.001, 0.350, -0.214],
+            )
         });
         let x = [
-            f.rms_energy, f.spectral_centroid / 1000.0, f.zero_crossing_rate * 10.0,
-            f.spectral_flux * 100.0, f.onset_density, f.harmonic_ratio,
+            f.rms_energy,
+            f.spectral_centroid / 1000.0,
+            f.zero_crossing_rate * 10.0,
+            f.spectral_flux * 100.0,
+            f.onset_density,
+            f.harmonic_ratio,
         ];
-        let pred_v = (v_w[0] + x.iter().zip(&v_w[1..]).map(|(xi, wi)| xi * wi).sum::<f32>()).clamp(-1.0, 1.0);
-        let pred_a = (a_w[0] + x.iter().zip(&a_w[1..]).map(|(xi, wi)| xi * wi).sum::<f32>()).clamp(0.0, 1.0);
+        let pred_v = (v_w[0] + x.iter().zip(&v_w[1..]).map(|(xi, wi)| xi * wi).sum::<f32>())
+            .clamp(-1.0, 1.0);
+        let pred_a =
+            (a_w[0] + x.iter().zip(&a_w[1..]).map(|(xi, wi)| xi * wi).sum::<f32>()).clamp(0.0, 1.0);
         let px = vx(pred_v);
         let py = ay(pred_a);
 
@@ -1272,7 +1508,10 @@ fn generate_va_scatter_svg(
   <line x1="{}" y1="{py:.1}" x2="{}" y2="{py:.1}" stroke="{color}" stroke-width="1.5"/>
   <line x1="{px:.1}" y1="{}" x2="{px:.1}" y2="{}" stroke="{color}" stroke-width="1.5"/>
 "#,
-            px - 4.0, px + 4.0, py - 4.0, py + 4.0
+            px - 4.0,
+            px + 4.0,
+            py - 4.0,
+            py + 4.0
         );
 
         // Label
@@ -1280,18 +1519,42 @@ fn generate_va_scatter_svg(
         svg += &format!(
             r#"  <text x="{}" y="{}" font-size="8" fill="{color}">{label}</text>
 "#,
-            ix + 10.0, iy + 3.0
+            ix + 10.0,
+            iy + 3.0
         );
     }
 
     // Legend
-    svg += &format!(r#"  <circle cx="{}" cy="{}" r="6" fill="rgb(102,102,102)" opacity="0.8"/>"#, margin + 10.0, h - 25.0);
-    svg += &format!(r#"  <text x="{}" y="{}" font-size="9" fill="rgb(102,102,102)">= Intended state</text>"#, margin + 22.0, h - 21.0);
-    svg += &format!(r#"  <line x1="{}" y1="{}" x2="{}" y2="{}" stroke="rgb(102,102,102)" stroke-width="1.5"/>"#, margin + 130.0, h - 25.0, margin + 142.0, h - 25.0);
-    svg += &format!(r#"  <line x1="{}" y1="{}" x2="{}" y2="{}" stroke="rgb(102,102,102)" stroke-width="1.5"/>"#, margin + 136.0, h - 31.0, margin + 136.0, h - 19.0);
-    svg += &format!(r#"  <text x="{}" y="{}" font-size="9" fill="rgb(102,102,102)">= Perceived (from audio features)</text>"#, margin + 148.0, h - 21.0);
+    svg += &format!(
+        r#"  <circle cx="{}" cy="{}" r="6" fill="rgb(102,102,102)" opacity="0.8"/>"#,
+        margin + 10.0,
+        h - 25.0
+    );
+    svg += &format!(
+        r#"  <text x="{}" y="{}" font-size="9" fill="rgb(102,102,102)">= Intended state</text>"#,
+        margin + 22.0,
+        h - 21.0
+    );
+    svg += &format!(
+        r#"  <line x1="{}" y1="{}" x2="{}" y2="{}" stroke="rgb(102,102,102)" stroke-width="1.5"/>"#,
+        margin + 130.0,
+        h - 25.0,
+        margin + 142.0,
+        h - 25.0
+    );
+    svg += &format!(
+        r#"  <line x1="{}" y1="{}" x2="{}" y2="{}" stroke="rgb(102,102,102)" stroke-width="1.5"/>"#,
+        margin + 136.0,
+        h - 31.0,
+        margin + 136.0,
+        h - 19.0
+    );
+    svg += &format!(
+        r#"  <text x="{}" y="{}" font-size="9" fill="rgb(102,102,102)">= Perceived (from audio features)</text>"#,
+        margin + 148.0,
+        h - 21.0
+    );
 
     svg += "\n</svg>";
     svg
 }
-

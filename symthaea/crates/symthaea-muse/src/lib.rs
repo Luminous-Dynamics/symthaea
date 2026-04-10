@@ -45,9 +45,9 @@ pub mod pitch;
 pub mod rhythm;
 pub mod stream;
 pub mod streaming;
-pub mod training;
 pub mod structure;
 pub mod synth;
+pub mod training;
 pub mod voice;
 
 use serde::{Deserialize, Serialize};
@@ -340,7 +340,8 @@ pub fn compose(config: &MuseConfig, state: &MusicalState, seed: u64) -> Composit
     let base_scale = pitch::build_scale(state);
 
     // 3. Generate melody per section with key shifts and density modulation
-    let notes_per_section = config.max_notes
+    let notes_per_section = config
+        .max_notes
         .max(2)
         .checked_div(song_form.sections.len().max(1))
         .unwrap_or(config.max_notes)
@@ -350,8 +351,8 @@ pub fn compose(config: &MuseConfig, state: &MusicalState, seed: u64) -> Composit
 
     for (sec_idx, section) in song_form.sections.iter().enumerate() {
         let density = structure::density_multiplier(section.section_type);
-        let sec_max = ((notes_per_section as f32) * density * section.energy_level.max(0.3))
-            .round() as usize;
+        let sec_max =
+            ((notes_per_section as f32) * density * section.energy_level.max(0.3)).round() as usize;
 
         let sec_config = MuseConfig {
             max_notes: sec_max.max(1),
@@ -607,43 +608,43 @@ pub mod aesthetic_listener;
 pub mod ambient_drone;
 pub mod audio_feedback;
 pub mod auto_master;
-pub mod density_regulator;
+pub mod binaural;
+pub mod collaborative;
 pub mod composer_mind;
+pub mod consciousness_reverb;
 pub mod creative_agency;
+pub mod density_regulator;
 pub mod dramatic;
 pub mod emotional_gestures;
-pub mod learned_melody;
 pub mod genre_presets;
+pub mod instruments;
+pub mod learned_melody;
 pub mod melodic_grammar;
 pub mod midi_export;
 pub mod midi_trainer;
+pub mod mixing;
 pub mod motif_memory;
-pub mod voice_leader;
+pub mod musical_inference;
 pub mod param_tuner;
+pub mod percussion;
 pub mod performance;
+pub mod phi_optimizer;
 pub mod production;
 pub mod rhythm_engine;
 pub mod sample_player;
+pub mod sidechain;
 pub mod similarity_monitor;
+pub mod spectral_vocoder;
 pub mod state_smoother;
+pub mod substrate_timbre;
+pub mod synesthesia;
 pub mod taste_bench;
 pub mod taste_melody;
 pub mod taste_space;
+pub mod temporal_hierarchy;
+pub mod timbre_space;
 #[cfg(feature = "voice")]
 pub mod voice_bridge;
-pub mod binaural;
-pub mod collaborative;
-pub mod consciousness_reverb;
-pub mod mixing;
-pub mod musical_inference;
-pub mod percussion;
-pub mod phi_optimizer;
-pub mod sidechain;
-pub mod spectral_vocoder;
-pub mod substrate_timbre;
-pub mod synesthesia;
-pub mod temporal_hierarchy;
-pub mod instruments;
-pub mod timbre_space;
+pub mod voice_leader;
 pub mod wake_protocol;
 pub mod wavetable;

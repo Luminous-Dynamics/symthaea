@@ -108,9 +108,7 @@ pub struct ConsciousnessCheckpoint {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub enum TransferResult {
     /// Full preservation above acceptable threshold.
-    Success {
-        preservation: f64,
-    },
+    Success { preservation: f64 },
     /// Transfer completed but some domains degraded below threshold.
     PartialPreservation {
         preservation: f64,
@@ -122,9 +120,7 @@ pub enum TransferResult {
         last_checkpoint: ConsciousnessCheckpoint,
     },
     /// Transfer failed completely.
-    Failed {
-        error: String,
-    },
+    Failed { error: String },
 }
 
 // ============================================================================
@@ -468,7 +464,8 @@ impl SubstrateTransferMatrix {
                 (*st, avg)
             })
             .collect();
-        substrate_rankings.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+        substrate_rankings
+            .sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
 
         // --- Domain vulnerability: variance of domain scores across transfers ---
         let mut domain_scores: HashMap<CognitiveDomain, Vec<f64>> = HashMap::new();
@@ -644,7 +641,10 @@ mod tests {
             coherence: 0.4,
         });
         let abort = validator.should_abort();
-        assert!(abort.is_some(), "Should abort when Psi drops below threshold");
+        assert!(
+            abort.is_some(),
+            "Should abort when Psi drops below threshold"
+        );
         assert!(abort.unwrap().contains("abort threshold"));
     }
 
@@ -833,8 +833,10 @@ mod tests {
 
     #[test]
     fn empty_protocol_has_zero_preservation() {
-        let mut proto =
-            TransferProtocol::new(SubstrateType::SiliconDigital, SubstrateType::QuantumComputer);
+        let mut proto = TransferProtocol::new(
+            SubstrateType::SiliconDigital,
+            SubstrateType::QuantumComputer,
+        );
         let pres = proto.compute_preservation();
         assert_eq!(pres, 0.0, "Empty protocol should have zero preservation");
     }

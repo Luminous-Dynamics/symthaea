@@ -52,8 +52,7 @@ fn test_substrate_affects_embodied_consciousness() {
     let mut phi_sums = Vec::new();
 
     for substrate in &substrates {
-        let mut service =
-            make_embodied_substrate_service(EmbodimentPlatform::Humanoid, *substrate);
+        let mut service = make_embodied_substrate_service(EmbodimentPlatform::Humanoid, *substrate);
 
         let mut phi_sum = 0.0f64;
         for _ in 0..30 {
@@ -96,7 +95,11 @@ fn test_substrate_switch_during_embodied_mission() {
     for i in 0..20 {
         let result = service.cycle("biological embodied phase");
         assert!(
-            result.metadata.consciousness.consciousness_level.is_finite(),
+            result
+                .metadata
+                .consciousness
+                .consciousness_level
+                .is_finite(),
             "NaN during biological phase at cycle {i}"
         );
     }
@@ -112,7 +115,11 @@ fn test_substrate_switch_during_embodied_mission() {
     for i in 0..20 {
         let result = service.cycle("silicon embodied phase");
         assert!(
-            result.metadata.consciousness.consciousness_level.is_finite(),
+            result
+                .metadata
+                .consciousness
+                .consciousness_level
+                .is_finite(),
             "NaN after substrate switch at cycle {i}"
         );
     }
@@ -165,8 +172,7 @@ fn test_all_substrates_embodied_stability() {
     ];
 
     for substrate in &substrates {
-        let mut service =
-            make_embodied_substrate_service(EmbodimentPlatform::Humanoid, *substrate);
+        let mut service = make_embodied_substrate_service(EmbodimentPlatform::Humanoid, *substrate);
 
         for i in 0..10 {
             let result = service.cycle("stability test across substrates");
@@ -182,7 +188,8 @@ fn test_all_substrates_embodied_stability() {
         assert!(
             telem.total_steps >= 10,
             "Motor should step on {:?}: steps={}",
-            substrate, telem.total_steps
+            substrate,
+            telem.total_steps
         );
     }
 }
@@ -220,7 +227,11 @@ fn test_substrate_chain_with_embodiment() {
         for cycle in 0..5 {
             let result = service.cycle("substrate chain test");
             assert!(
-                result.metadata.consciousness.consciousness_level.is_finite(),
+                result
+                    .metadata
+                    .consciousness
+                    .consciousness_level
+                    .is_finite(),
                 "NaN on substrate {:?} (#{idx}), cycle {cycle}",
                 substrate
             );
@@ -255,8 +266,14 @@ fn test_substrate_telemetry_in_metadata() {
     let tau = service.substrate_tau_factor();
 
     assert!(feasibility.is_finite(), "Feasibility should be finite");
-    assert!(feasibility >= 0.0 && feasibility <= 1.0, "Feasibility in [0,1]: {feasibility}");
-    assert!(tau.is_finite() && tau > 0.0, "Tau factor should be positive: {tau}");
+    assert!(
+        feasibility >= 0.0 && feasibility <= 1.0,
+        "Feasibility in [0,1]: {feasibility}"
+    );
+    assert!(
+        tau.is_finite() && tau > 0.0,
+        "Tau factor should be positive: {tau}"
+    );
 
     // Biological neurons should have high feasibility
     assert!(

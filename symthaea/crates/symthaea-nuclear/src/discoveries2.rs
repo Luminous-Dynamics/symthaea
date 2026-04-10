@@ -30,7 +30,11 @@ mod tests {
             .map(|n| (n.z, n.n))
             .collect();
 
-        eprintln!("\n{} FRIB BLIND PREDICTIONS {}", "=".repeat(20), "=".repeat(20));
+        eprintln!(
+            "\n{} FRIB BLIND PREDICTIONS {}",
+            "=".repeat(20),
+            "=".repeat(20)
+        );
         eprintln!("Neutron-rich nuclei FRIB is likely measuring (2023-2025).\n");
 
         // (label, Z, N_range)
@@ -78,7 +82,11 @@ mod tests {
     fn isomeric_candidates() {
         let pred = predictor();
 
-        eprintln!("\n{} ISOMERIC CANDIDATES (Z=70-80, N=100-120) {}", "=".repeat(12), "=".repeat(12));
+        eprintln!(
+            "\n{} ISOMERIC CANDIDATES (Z=70-80, N=100-120) {}",
+            "=".repeat(12),
+            "=".repeat(12)
+        );
         eprintln!("Looking for shell gaps > 2.5 MeV in S_n or S_p.\n");
 
         let mut candidates: Vec<(u16, u16, f64, &str)> = Vec::new();
@@ -121,7 +129,10 @@ mod tests {
                 kind
             );
         }
-        eprintln!("\nTotal candidates with gap > 2.5 MeV: {}", candidates.len());
+        eprintln!(
+            "\nTotal candidates with gap > 2.5 MeV: {}",
+            candidates.len()
+        );
     }
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -133,7 +144,9 @@ mod tests {
         let pred = predictor();
 
         eprintln!(
-            "\n{} NEUTRON SEPARATION ENERGY SURFACE {}", "=".repeat(15), "=".repeat(15)
+            "\n{} NEUTRON SEPARATION ENERGY SURFACE {}",
+            "=".repeat(15),
+            "=".repeat(15)
         );
         eprintln!("S_n = BE(Z,N) - BE(Z,N-1) across Z=20-82, N=20-130 (step 2).\n");
 
@@ -191,14 +204,30 @@ mod tests {
             residuals: Vec<f64>,
         }
 
-        let mut spherical = Group { label: "Spherical (|β₂|<0.05)", residuals: Vec::new() };
-        let mut transitional = Group { label: "Transitional (0.05-0.15)", residuals: Vec::new() };
-        let mut deformed = Group { label: "Deformed (0.15-0.30)", residuals: Vec::new() };
-        let mut superdeformed = Group { label: "Superdeformed (>0.30)", residuals: Vec::new() };
+        let mut spherical = Group {
+            label: "Spherical (|β₂|<0.05)",
+            residuals: Vec::new(),
+        };
+        let mut transitional = Group {
+            label: "Transitional (0.05-0.15)",
+            residuals: Vec::new(),
+        };
+        let mut deformed = Group {
+            label: "Deformed (0.15-0.30)",
+            residuals: Vec::new(),
+        };
+        let mut superdeformed = Group {
+            label: "Superdeformed (>0.30)",
+            residuals: Vec::new(),
+        };
 
         for nuc in &nuclei {
-            if !nuc.is_measured { continue; }
-            if nuc.z < 8 || nuc.n < 8 { continue; } // skip very light
+            if !nuc.is_measured {
+                continue;
+            }
+            if nuc.z < 8 || nuc.n < 8 {
+                continue;
+            } // skip very light
 
             let dz_be = dz_binding_energy(nuc.z, nuc.n);
             let residual = nuc.binding_energy_mev - dz_be;
@@ -229,10 +258,7 @@ mod tests {
             }
             let mean = g.residuals.iter().sum::<f64>() / count as f64;
             let rms = (g.residuals.iter().map(|r| r * r).sum::<f64>() / count as f64).sqrt();
-            eprintln!(
-                "{:<30} {:>6} {:>12.4} {:>12.4}",
-                g.label, count, mean, rms
-            );
+            eprintln!("{:<30} {:>6} {:>12.4} {:>12.4}", g.label, count, mean, rms);
         }
 
         eprintln!("\nNote: FRDM table covers superheavy region primarily;");
@@ -335,10 +361,14 @@ mod tests {
             let mut points: Vec<(f64, f64)> = Vec::new(); // (x=(N-Z)^2/A, y=BE)
             for z in 1..a {
                 let n = a - z;
-                if n < 1 { continue; }
+                if n < 1 {
+                    continue;
+                }
                 let zz = z as u16;
                 let nn = n as u16;
-                if !measured.contains(&(zz, nn)) { continue; }
+                if !measured.contains(&(zz, nn)) {
+                    continue;
+                }
                 let be = be_map[&(zz, nn)];
                 // Subtract Coulomb contribution before fitting symmetry term
                 let a_c = 0.7; // Coulomb coefficient (MeV)
@@ -349,7 +379,9 @@ mod tests {
                 let x = ((n as f64 - z as f64).powi(2)) / a as f64;
                 points.push((x, be_corrected));
             }
-            if points.len() < 3 { continue; }
+            if points.len() < 3 {
+                continue;
+            }
 
             // Linear regression: BE = a0 - a_sym * x
             // => y = a0 + b*x where b = -a_sym
@@ -359,7 +391,9 @@ mod tests {
             let sum_xy: f64 = points.iter().map(|p| p.0 * p.1).sum();
             let sum_xx: f64 = points.iter().map(|p| p.0 * p.0).sum();
             let denom = n_pts * sum_xx - sum_x * sum_x;
-            if denom.abs() < 1e-10 { continue; }
+            if denom.abs() < 1e-10 {
+                continue;
+            }
 
             let slope = (n_pts * sum_xy - sum_x * sum_y) / denom;
             let a_sym = -slope; // negative slope = positive symmetry energy
@@ -384,9 +418,8 @@ mod tests {
             .collect();
         if !valid.is_empty() {
             let mean = valid.iter().sum::<f64>() / valid.len() as f64;
-            let std = (valid.iter().map(|v| (v - mean).powi(2)).sum::<f64>()
-                / valid.len() as f64)
-                .sqrt();
+            let std =
+                (valid.iter().map(|v| (v - mean).powi(2)).sum::<f64>() / valid.len() as f64).sqrt();
             eprintln!(
                 "\nMean a_sym = {:.2} ± {:.2} MeV (accepted ≈ 23 MeV)",
                 mean, std
@@ -454,8 +487,12 @@ mod tests {
             let mut points: Vec<(f64, f64)> = Vec::new();
             for z in 1..a {
                 let n = a - z;
-                if n < 1 { continue; }
-                if !measured.contains(&(z as u16, n as u16)) { continue; }
+                if n < 1 {
+                    continue;
+                }
+                if !measured.contains(&(z as u16, n as u16)) {
+                    continue;
+                }
                 let be = be_map[&(z as u16, n as u16)];
                 // Subtract Coulomb contribution before fitting symmetry term
                 let a_c = 0.7; // Coulomb coefficient (MeV)
@@ -466,7 +503,9 @@ mod tests {
                 let x = ((n as f64 - z as f64).powi(2)) / a as f64;
                 points.push((x, be_corrected));
             }
-            if points.len() < 4 { continue; }
+            if points.len() < 4 {
+                continue;
+            }
 
             let n_pts = points.len() as f64;
             let sx: f64 = points.iter().map(|p| p.0).sum();
@@ -474,7 +513,9 @@ mod tests {
             let sxy: f64 = points.iter().map(|p| p.0 * p.1).sum();
             let sxx: f64 = points.iter().map(|p| p.0 * p.0).sum();
             let d = n_pts * sxx - sx * sx;
-            if d.abs() < 1e-10 { continue; }
+            if d.abs() < 1e-10 {
+                continue;
+            }
 
             let slope = (n_pts * sxy - sx * sy) / d;
             let a_sym = -slope;
@@ -499,12 +540,15 @@ mod tests {
         let k_ss = (n_f * sxy - sx * sy) / d;
         let j_vol = (sy - k_ss * sx) / n_f;
 
-        eprintln!("Extracted parameters from {} isobaric chains:", a_sym_data.len());
-        eprintln!("  Volume symmetry energy  J = {:.2} MeV (accepted ≈ 30-34 MeV)", j_vol);
         eprintln!(
-            "  Surface symmetry coeff  K_ss = {:.2} MeV",
-            k_ss
+            "Extracted parameters from {} isobaric chains:",
+            a_sym_data.len()
         );
+        eprintln!(
+            "  Volume symmetry energy  J = {:.2} MeV (accepted ≈ 30-34 MeV)",
+            j_vol
+        );
+        eprintln!("  Surface symmetry coeff  K_ss = {:.2} MeV", k_ss);
 
         // Estimate L from the empirical correlation:
         // L ≈ (3/ρ₀) × d(a_sym)/d(ρ) ≈ ... from finite nucleus data
@@ -534,10 +578,7 @@ mod tests {
             "  Danielewicz method:     L ≈ {:.1} MeV  (using a_sym(A~208) = {:.1} MeV)",
             l_param, a_sym_208
         );
-        eprintln!(
-            "  Centelles correlation:  L ≈ {:.1} MeV",
-            l_centelles
-        );
+        eprintln!("  Centelles correlation:  L ≈ {:.1} MeV", l_centelles);
 
         eprintln!("\nGW170817 constraint check (40 < L < 120 MeV):");
         for (name, l_val) in [("Danielewicz", l_param), ("Centelles", l_centelles)] {
@@ -556,14 +597,8 @@ mod tests {
         let r_14_d = 10.0 + 0.04 * l_param;
         let r_14_c = 10.0 + 0.04 * l_centelles;
         eprintln!("\nNeutron star radius estimates (1.4 M_sun):");
-        eprintln!(
-            "  From Danielewicz L: R ≈ {:.1} km",
-            r_14_d
-        );
-        eprintln!(
-            "  From Centelles L:   R ≈ {:.1} km",
-            r_14_c
-        );
+        eprintln!("  From Danielewicz L: R ≈ {:.1} km", r_14_d);
+        eprintln!("  From Centelles L:   R ≈ {:.1} km", r_14_c);
         eprintln!("  NICER observation:  R = 12.4 ± 1.0 km (Miller et al. 2021)");
     }
 
@@ -618,7 +653,7 @@ mod tests {
 
         for &(z, n, name, q_exp_kev) in candidates {
             // Daughter: Z+2, N-2
-            let be_parent = pred.predict(z, n).binding_energy;         // MeV
+            let be_parent = pred.predict(z, n).binding_energy; // MeV
             let be_daughter = pred.predict(z + 2, n - 2).binding_energy; // MeV
 
             // Q_bb = BE(daughter) - BE(parent) + 2*m_e - 2*m_e
@@ -655,7 +690,8 @@ mod tests {
 
         // Compute RMS before and after correction
         let n_pts = entries.len() as f64;
-        let rms_orig = (entries.iter().map(|e| e.residual * e.residual).sum::<f64>() / n_pts).sqrt();
+        let rms_orig =
+            (entries.iter().map(|e| e.residual * e.residual).sum::<f64>() / n_pts).sqrt();
         let rms_corr = (entries
             .iter()
             .map(|e| {
@@ -667,10 +703,16 @@ mod tests {
             .sqrt();
 
         let mean_orig = entries.iter().map(|e| e.residual).sum::<f64>() / n_pts;
-        let mean_corr =
-            entries.iter().map(|e| e.residual - c_fit * e.x_coulomb).sum::<f64>() / n_pts;
+        let mean_corr = entries
+            .iter()
+            .map(|e| e.residual - c_fit * e.x_coulomb)
+            .sum::<f64>()
+            / n_pts;
 
-        eprintln!("Fitted Coulomb correction coefficient: c = {:.3} keV", c_fit);
+        eprintln!(
+            "Fitted Coulomb correction coefficient: c = {:.3} keV",
+            c_fit
+        );
         eprintln!();
         eprintln!(
             "{:<10} {:>4} {:>4} {:>4}  {:>8} {:>8} {:>8} {:>8} {:>10} {:>10}",
@@ -705,7 +747,10 @@ mod tests {
         eprintln!("  Corrected mean bias: {:+.1} keV", mean_corr);
         eprintln!("  Original  RMS:       {:.1} keV", rms_orig);
         eprintln!("  Corrected RMS:       {:.1} keV", rms_corr);
-        eprintln!("  Improvement:         {:.1}%", 100.0 * (1.0 - rms_corr / rms_orig));
+        eprintln!(
+            "  Improvement:         {:.1}%",
+            100.0 * (1.0 - rms_corr / rms_orig)
+        );
         eprintln!("  Coulomb coeff c:     {:.3} keV", c_fit);
     }
 }

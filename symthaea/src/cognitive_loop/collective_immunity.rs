@@ -207,11 +207,7 @@ impl CollectiveImmuneState {
     ///
     /// Reference: arXiv:2512.15011 — epistemic diversity across LMs mitigates knowledge collapse
     #[cfg(feature = "epistemic")]
-    pub fn compute_echo_chamber_risk(
-        &mut self,
-        individual_phi_mean: f64,
-        collective_phi: f64,
-    ) {
+    pub fn compute_echo_chamber_risk(&mut self, individual_phi_mean: f64, collective_phi: f64) {
         // High individual Phi + low collective Phi = echo chamber
         let individual = individual_phi_mean.clamp(0.0, 1.0);
         let collective = collective_phi.clamp(0.0, 1.0);
@@ -222,8 +218,7 @@ impl CollectiveImmuneState {
             0.0
         };
 
-        self.network_epistemic_health =
-            collective * (1.0 - self.echo_chamber_risk as f64);
+        self.network_epistemic_health = collective * (1.0 - self.echo_chamber_risk as f64);
     }
 
     /// Neuromodulator adjustments for collective immune response.

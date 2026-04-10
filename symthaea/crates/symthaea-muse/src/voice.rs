@@ -168,11 +168,7 @@ fn derive_ostinato(lead: &[Note], state: &MusicalState) -> Voice {
     }
 
     // Calculate motif duration
-    let motif_duration: f32 = motif
-        .iter()
-        .map(|n| n.duration)
-        .sum::<f32>()
-        .max(0.1);
+    let motif_duration: f32 = motif.iter().map(|n| n.duration).sum::<f32>().max(0.1);
 
     // Total piece duration from the last lead note
     let total_duration = lead
@@ -237,10 +233,30 @@ mod tests {
 
     fn test_lead() -> Vec<Note> {
         vec![
-            Note { frequency: 261.63, start_time: 0.0, duration: 0.5, velocity: 0.8 },
-            Note { frequency: 329.63, start_time: 0.5, duration: 0.5, velocity: 0.7 },
-            Note { frequency: 392.00, start_time: 1.0, duration: 0.5, velocity: 0.9 },
-            Note { frequency: 523.25, start_time: 1.5, duration: 0.5, velocity: 0.6 },
+            Note {
+                frequency: 261.63,
+                start_time: 0.0,
+                duration: 0.5,
+                velocity: 0.8,
+            },
+            Note {
+                frequency: 329.63,
+                start_time: 0.5,
+                duration: 0.5,
+                velocity: 0.7,
+            },
+            Note {
+                frequency: 392.00,
+                start_time: 1.0,
+                duration: 0.5,
+                velocity: 0.9,
+            },
+            Note {
+                frequency: 523.25,
+                start_time: 1.5,
+                duration: 0.5,
+                velocity: 0.6,
+            },
         ]
     }
 
@@ -282,7 +298,11 @@ mod tests {
             ..Default::default()
         };
         let arr = arrange(&test_lead(), &state);
-        assert_eq!(arr.voices.len(), 4, "should have Lead + Bass + Harmony + Ostinato");
+        assert_eq!(
+            arr.voices.len(),
+            4,
+            "should have Lead + Bass + Harmony + Ostinato"
+        );
     }
 
     #[test]
@@ -292,8 +312,16 @@ mod tests {
             ..Default::default()
         };
         let arr = arrange(&test_lead(), &state);
-        let bass = arr.voices.iter().find(|v| v.role == VoiceRole::Bass).unwrap();
-        let lead = arr.voices.iter().find(|v| v.role == VoiceRole::Lead).unwrap();
+        let bass = arr
+            .voices
+            .iter()
+            .find(|v| v.role == VoiceRole::Bass)
+            .unwrap();
+        let lead = arr
+            .voices
+            .iter()
+            .find(|v| v.role == VoiceRole::Lead)
+            .unwrap();
         for (b, l) in bass.notes.iter().zip(lead.notes.iter().step_by(2)) {
             assert!(
                 b.frequency < l.frequency,
@@ -311,8 +339,16 @@ mod tests {
             ..Default::default()
         };
         let arr = arrange(&test_lead(), &state);
-        let harmony = arr.voices.iter().find(|v| v.role == VoiceRole::Harmony).unwrap();
-        let lead = arr.voices.iter().find(|v| v.role == VoiceRole::Lead).unwrap();
+        let harmony = arr
+            .voices
+            .iter()
+            .find(|v| v.role == VoiceRole::Harmony)
+            .unwrap();
+        let lead = arr
+            .voices
+            .iter()
+            .find(|v| v.role == VoiceRole::Lead)
+            .unwrap();
         for (h, l) in harmony.notes.iter().zip(lead.notes.iter()) {
             assert!(
                 h.frequency > l.frequency,

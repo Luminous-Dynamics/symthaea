@@ -131,12 +131,7 @@ impl InputTelemetryEncoder {
     /// Create a new encoder with a specific RNG seed for the ESN.
     pub fn with_seed(seed: u64) -> Self {
         Self {
-            esn: EchoStateNetwork::new(
-                ESN_RESERVOIR_SIZE,
-                ESN_SPECTRAL_RADIUS,
-                ESN_SPARSITY,
-                seed,
-            ),
+            esn: EchoStateNetwork::new(ESN_RESERVOIR_SIZE, ESN_SPECTRAL_RADIUS, ESN_SPARSITY, seed),
             esn_trained: false,
             mouse_history: VecDeque::with_capacity(MAX_MOUSE_HISTORY),
             keystroke_history: VecDeque::with_capacity(MAX_KEYSTROKE_HISTORY),
@@ -168,8 +163,7 @@ impl InputTelemetryEncoder {
                 let norm_velocity = (velocity / 10.0).min(1.0);
 
                 // EMA update
-                self.mouse_velocity_ema = self.mouse_velocity_ema
-                    * (1.0 - VELOCITY_EMA_ALPHA)
+                self.mouse_velocity_ema = self.mouse_velocity_ema * (1.0 - VELOCITY_EMA_ALPHA)
                     + norm_velocity * VELOCITY_EMA_ALPHA;
 
                 // Feed ESN for surprise detection
@@ -247,9 +241,8 @@ impl InputTelemetryEncoder {
         // Valence: surprise drives negative, predictability drives positive
         // Low surprise + moderate activity = engaged (positive)
         // High surprise = stressed (negative)
-        let valence =
-            (-self.velocity_surprise * 0.6 + (1.0 - self.velocity_surprise) * 0.3 - 0.15)
-                .clamp(-1.0, 1.0);
+        let valence = (-self.velocity_surprise * 0.6 + (1.0 - self.velocity_surprise) * 0.3 - 0.15)
+            .clamp(-1.0, 1.0);
 
         // Dominance: active input = sense of control
         // High keystroke rate = dominant, long dwell (frozen) = submissive

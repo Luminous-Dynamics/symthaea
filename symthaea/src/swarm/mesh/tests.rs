@@ -1310,8 +1310,8 @@ fn test_compress_fragment_reassemble_heartbeat() {
     let reassembled_envelope = assembler
         .assemble()
         .expect("heartbeat assembly should succeed");
-    let decompressed = decompress_packet(&reassembled_envelope)
-        .expect("heartbeat decompression should succeed");
+    let decompressed =
+        decompress_packet(&reassembled_envelope).expect("heartbeat decompression should succeed");
     assert_eq!(
         decompressed, original_bytes,
         "Heartbeat roundtrip should match"
@@ -1582,8 +1582,16 @@ fn test_rotating_key_pair_epoch_initialized() {
     let _epoch_a = pair_a.epoch();
     let _epoch_b = pair_b.epoch();
     // Both key pairs should report the same current key
-    assert_eq!(pair_a.current_key(), &key, "pair_a should hold the provided key");
-    assert_eq!(pair_b.current_key(), &key, "pair_b should hold the provided key");
+    assert_eq!(
+        pair_a.current_key(),
+        &key,
+        "pair_a should hold the provided key"
+    );
+    assert_eq!(
+        pair_b.current_key(),
+        &key,
+        "pair_b should hold the provided key"
+    );
 }
 
 #[cfg(feature = "mesh-encryption")]

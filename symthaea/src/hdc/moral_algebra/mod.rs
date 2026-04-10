@@ -41,13 +41,13 @@
 //! Semantic roles      Bound HVs            Judgment
 //! ```
 
-mod primitives;
-mod operators;
 mod judgment;
+mod operators;
+mod primitives;
 
-pub use primitives::*;
-pub use operators::*;
 pub use judgment::*;
+pub use operators::*;
+pub use primitives::*;
 
 // ============================================================================
 // Tests

@@ -280,10 +280,7 @@ mod tests {
             );
         }
 
-        eprintln!(
-            "\nPassed: {}/{} (within tolerance)\n",
-            pass_count, total
-        );
+        eprintln!("\nPassed: {}/{} (within tolerance)\n", pass_count, total);
 
         // At least 70% should be within tolerance (generous tolerances)
         assert!(

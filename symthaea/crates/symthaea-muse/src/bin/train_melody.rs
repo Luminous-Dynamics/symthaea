@@ -25,7 +25,10 @@ fn main() {
     let mut all_pairs = Vec::new();
 
     let data_dirs = [
-        ("MAESTRO (virtuoso piano)", "data/midi/maestro/maestro-v3.0.0"),
+        (
+            "MAESTRO (virtuoso piano)",
+            "data/midi/maestro/maestro-v3.0.0",
+        ),
         ("Nottingham (folk tunes)", "data/midi/nottingham"),
     ];
 
@@ -56,32 +59,51 @@ fn main() {
     println!("  Total pairs: {}", stats.total_pairs);
     println!("  Mean interval: {:.2} semitones", stats.mean_interval);
     println!("  Interval SD: {:.2} semitones", stats.std_interval);
-    println!("  Stepwise ratio: {:.1}% (intervals ≤ 2 semitones)", stats.stepwise_ratio * 100.0);
+    println!(
+        "  Stepwise ratio: {:.1}% (intervals ≤ 2 semitones)",
+        stats.stepwise_ratio * 100.0
+    );
     println!("  Mean duration: {:.2} beats", stats.mean_duration);
     println!();
 
     // Validate our melodic grammar against real data
     println!("  Validation against melodic grammar assumptions:");
     if stats.stepwise_ratio > 0.5 {
-        println!("    ✓ Stepwise motion dominates ({:.0}% > 50%)", stats.stepwise_ratio * 100.0);
+        println!(
+            "    ✓ Stepwise motion dominates ({:.0}% > 50%)",
+            stats.stepwise_ratio * 100.0
+        );
     } else {
-        println!("    ✗ Stepwise motion lower than expected ({:.0}%)", stats.stepwise_ratio * 100.0);
+        println!(
+            "    ✗ Stepwise motion lower than expected ({:.0}%)",
+            stats.stepwise_ratio * 100.0
+        );
     }
     if stats.mean_interval.abs() < 1.0 {
-        println!("    ✓ Mean interval near zero ({:.2}) — melodies are balanced", stats.mean_interval);
+        println!(
+            "    ✓ Mean interval near zero ({:.2}) — melodies are balanced",
+            stats.mean_interval
+        );
     }
     println!();
 
     // Phase 3: Encode features for CfC training
     println!("Phase 3: Encoding HDC features...");
-    let features: Vec<Vec<f32>> = all_pairs.iter()
+    let features: Vec<Vec<f32>> = all_pairs
+        .iter()
         .map(midi_trainer::encode_features)
         .collect();
-    let targets: Vec<Vec<f32>> = all_pairs.iter()
-        .map(midi_trainer::encode_target)
-        .collect();
-    println!("  Feature vectors: {} × {}D", features.len(), features.first().map(|f| f.len()).unwrap_or(0));
-    println!("  Target vectors: {} × {}D", targets.len(), targets.first().map(|t| t.len()).unwrap_or(0));
+    let targets: Vec<Vec<f32>> = all_pairs.iter().map(midi_trainer::encode_target).collect();
+    println!(
+        "  Feature vectors: {} × {}D",
+        features.len(),
+        features.first().map(|f| f.len()).unwrap_or(0)
+    );
+    println!(
+        "  Target vectors: {} × {}D",
+        targets.len(),
+        targets.first().map(|t| t.len()).unwrap_or(0)
+    );
     println!();
 
     // Phase 4: Train simple linear model (CfC training would use GpuCfcLayer)
@@ -185,15 +207,31 @@ fn main() {
     // Print what the model learned
     println!("\nPhase 6: What the model learned...");
     println!("  Top interval predictors (weight magnitude):");
-    let mut feature_names: Vec<(usize, f32)> = (0..input_dim)
-        .map(|j| (j, weights[0][j].abs()))
-        .collect();
+    let mut feature_names: Vec<(usize, f32)> =
+        (0..input_dim).map(|j| (j, weights[0][j].abs())).collect();
     feature_names.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
 
     let names = [
-        "iv[-8]", "iv[-7]", "iv[-6]", "iv[-5]", "iv[-4]", "iv[-3]", "iv[-2]", "iv[-1]",
-        "dur[-8]", "dur[-7]", "dur[-6]", "dur[-5]", "dur[-4]", "dur[-3]", "dur[-2]", "dur[-1]",
-        "beat_pos", "phrase_pos", "valence", "arousal",
+        "iv[-8]",
+        "iv[-7]",
+        "iv[-6]",
+        "iv[-5]",
+        "iv[-4]",
+        "iv[-3]",
+        "iv[-2]",
+        "iv[-1]",
+        "dur[-8]",
+        "dur[-7]",
+        "dur[-6]",
+        "dur[-5]",
+        "dur[-4]",
+        "dur[-3]",
+        "dur[-2]",
+        "dur[-1]",
+        "beat_pos",
+        "phrase_pos",
+        "valence",
+        "arousal",
     ];
 
     for (j, w) in feature_names.iter().take(5) {
@@ -222,10 +260,14 @@ fn load_midi_recursive(dir: &Path) -> Vec<midi_trainer::MelodyTrainingPair> {
             let path = entry.path();
             if path.is_dir() {
                 visit(&path, pairs);
-            } else if path.extension().map(|e| {
-                let e = e.to_string_lossy().to_lowercase();
-                e == "mid" || e == "midi"
-            }).unwrap_or(false) {
+            } else if path
+                .extension()
+                .map(|e| {
+                    let e = e.to_string_lossy().to_lowercase();
+                    e == "mid" || e == "midi"
+                })
+                .unwrap_or(false)
+            {
                 match midi_trainer::parse_midi(&path) {
                     Ok(melody) => {
                         if melody.notes.len() >= 10 {

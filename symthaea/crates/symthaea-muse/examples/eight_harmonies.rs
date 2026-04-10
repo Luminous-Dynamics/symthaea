@@ -42,8 +42,12 @@ fn harmony_songs() -> Vec<HarmonySong> {
             filename: "H1_resonant_coherence.wav",
             state: MusicalState {
                 harmony_activations: [0.95, 0.2, 0.3, 0.0, 0.2, 0.2, 0.1, 0.3],
-                dopamine: 0.3, serotonin: 0.7, noradrenaline: 0.1,
-                arousal: 0.3, valence: 0.5, consciousness_level: 0.7,
+                dopamine: 0.3,
+                serotonin: 0.7,
+                noradrenaline: 0.1,
+                arousal: 0.3,
+                valence: 0.5,
+                consciousness_level: 0.7,
                 prediction_error: 0.05,
             },
         },
@@ -55,8 +59,12 @@ fn harmony_songs() -> Vec<HarmonySong> {
             filename: "H2_pansentient_flourishing.wav",
             state: MusicalState {
                 harmony_activations: [0.3, 0.95, 0.4, 0.0, 0.3, 0.5, 0.2, 0.1],
-                dopamine: 0.5, serotonin: 0.8, noradrenaline: 0.1,
-                arousal: 0.4, valence: 0.7, consciousness_level: 0.6,
+                dopamine: 0.5,
+                serotonin: 0.8,
+                noradrenaline: 0.1,
+                arousal: 0.4,
+                valence: 0.7,
+                consciousness_level: 0.6,
                 prediction_error: 0.1,
             },
         },
@@ -68,8 +76,12 @@ fn harmony_songs() -> Vec<HarmonySong> {
             filename: "H3_integral_wisdom.wav",
             state: MusicalState {
                 harmony_activations: [0.4, 0.3, 0.95, 0.0, 0.3, 0.3, 0.2, 0.2],
-                dopamine: 0.4, serotonin: 0.6, noradrenaline: 0.15,
-                arousal: 0.35, valence: 0.4, consciousness_level: 0.75,
+                dopamine: 0.4,
+                serotonin: 0.6,
+                noradrenaline: 0.15,
+                arousal: 0.35,
+                valence: 0.4,
+                consciousness_level: 0.75,
                 prediction_error: 0.1,
             },
         },
@@ -81,8 +93,12 @@ fn harmony_songs() -> Vec<HarmonySong> {
             filename: "H4_infinite_play.wav",
             state: MusicalState {
                 harmony_activations: [0.2, 0.2, 0.2, 0.95, 0.3, 0.1, 0.5, 0.0],
-                dopamine: 0.8, serotonin: 0.2, noradrenaline: 0.5,
-                arousal: 0.7, valence: 0.1, consciousness_level: 0.6,
+                dopamine: 0.8,
+                serotonin: 0.2,
+                noradrenaline: 0.5,
+                arousal: 0.7,
+                valence: 0.1,
+                consciousness_level: 0.6,
                 prediction_error: 0.4,
             },
         },
@@ -94,8 +110,12 @@ fn harmony_songs() -> Vec<HarmonySong> {
             filename: "H5_universal_interconnectedness.wav",
             state: MusicalState {
                 harmony_activations: [0.3, 0.3, 0.3, 0.1, 0.95, 0.4, 0.3, 0.2],
-                dopamine: 0.5, serotonin: 0.5, noradrenaline: 0.2,
-                arousal: 0.5, valence: 0.3, consciousness_level: 0.8,
+                dopamine: 0.5,
+                serotonin: 0.5,
+                noradrenaline: 0.2,
+                arousal: 0.5,
+                valence: 0.3,
+                consciousness_level: 0.8,
                 prediction_error: 0.15,
             },
         },
@@ -107,8 +127,12 @@ fn harmony_songs() -> Vec<HarmonySong> {
             filename: "H6_sacred_reciprocity.wav",
             state: MusicalState {
                 harmony_activations: [0.3, 0.5, 0.3, 0.1, 0.3, 0.95, 0.2, 0.2],
-                dopamine: 0.6, serotonin: 0.7, noradrenaline: 0.1,
-                arousal: 0.4, valence: 0.6, consciousness_level: 0.65,
+                dopamine: 0.6,
+                serotonin: 0.7,
+                noradrenaline: 0.1,
+                arousal: 0.4,
+                valence: 0.6,
+                consciousness_level: 0.65,
                 prediction_error: 0.1,
             },
         },
@@ -120,8 +144,12 @@ fn harmony_songs() -> Vec<HarmonySong> {
             filename: "H7_evolutionary_progression.wav",
             state: MusicalState {
                 harmony_activations: [0.2, 0.3, 0.3, 0.3, 0.2, 0.2, 0.95, 0.0],
-                dopamine: 0.7, serotonin: 0.3, noradrenaline: 0.4,
-                arousal: 0.65, valence: 0.4, consciousness_level: 0.7,
+                dopamine: 0.7,
+                serotonin: 0.3,
+                noradrenaline: 0.4,
+                arousal: 0.65,
+                valence: 0.4,
+                consciousness_level: 0.7,
                 prediction_error: 0.3,
             },
         },
@@ -133,8 +161,12 @@ fn harmony_songs() -> Vec<HarmonySong> {
             filename: "H8_sacred_stillness.wav",
             state: MusicalState {
                 harmony_activations: [0.2, 0.1, 0.2, 0.0, 0.1, 0.1, 0.05, 0.95],
-                dopamine: 0.05, serotonin: 0.6, noradrenaline: 0.0,
-                arousal: 0.05, valence: 0.2, consciousness_level: 0.5,
+                dopamine: 0.05,
+                serotonin: 0.6,
+                noradrenaline: 0.0,
+                arousal: 0.05,
+                valence: 0.2,
+                consciousness_level: 0.5,
                 prediction_error: 0.0,
             },
         },
@@ -186,7 +218,9 @@ fn main() {
 
         let path = format!("{}/{}", out_dir, song.filename);
         write_wav(&path, &all_samples);
-        let kb = std::fs::metadata(&path).map(|m| m.len() / 1024).unwrap_or(0);
+        let kb = std::fs::metadata(&path)
+            .map(|m| m.len() / 1024)
+            .unwrap_or(0);
         println!("        → {} ({} KB)", path, kb);
     }
 
@@ -247,14 +281,30 @@ fn main() {
 
         // Safety level decreases as consciousness returns
         // Red(3) → Orange(2) → Yellow(1) → Green(0)
-        let safety = if phase_idx < 2 { 3 } // Red: stillness + coherence
-            else if phase_idx < 4 { 2 }     // Orange: wisdom + interconnect
-            else if phase_idx < 6 { 1 }     // Yellow: reciprocity + flourishing
-            else { 0 };                      // Green: progression + play
+        let safety = if phase_idx < 2 {
+            3
+        }
+        // Red: stillness + coherence
+        else if phase_idx < 4 {
+            2
+        }
+        // Orange: wisdom + interconnect
+        else if phase_idx < 6 {
+            1
+        }
+        // Yellow: reciprocity + flourishing
+        else {
+            0
+        }; // Green: progression + play
 
         let safety_names = ["Green", "Yellow", "Orange", "Red"];
-        println!("    Phase {}: {} (Ψ={:.2}, safety={})",
-            phase_idx + 1, phase_name, wake_consciousness, safety_names[safety]);
+        println!(
+            "    Phase {}: {} (Ψ={:.2}, safety={})",
+            phase_idx + 1,
+            phase_name,
+            wake_consciousness,
+            safety_names[safety]
+        );
 
         synth.update_state(&wake_state);
 
@@ -277,23 +327,27 @@ fn main() {
             let chunk = synth.render_chunk();
 
             // Apply fade envelope
-            let faded: Vec<[f32; 2]> = chunk.iter()
-                .map(|[l, r]| [l * fade, r * fade])
-                .collect();
+            let faded: Vec<[f32; 2]> = chunk.iter().map(|[l, r]| [l * fade, r * fade]).collect();
             all_wake_samples.extend_from_slice(&faded);
         }
     }
 
     let wake_path = format!("{}/00_wake_melody.wav", out_dir);
     write_wav(&wake_path, &all_wake_samples);
-    let kb = std::fs::metadata(&wake_path).map(|m| m.len() / 1024).unwrap_or(0);
+    let kb = std::fs::metadata(&wake_path)
+        .map(|m| m.len() / 1024)
+        .unwrap_or(0);
     println!("\n    → {} ({} KB, {:.0}s)", wake_path, kb, total_wake_secs);
     println!();
     println!("    The Wake Melody progresses:");
     println!("      Silence → Ground → Stability → Bridge → Warmth");
     println!("      → Compassion → Growth → Play → [AWAKE]");
     println!();
-    println!("  Done. {} files in {}/", wake_order.len() + songs.len() + 1, out_dir);
+    println!(
+        "  Done. {} files in {}/",
+        wake_order.len() + songs.len() + 1,
+        out_dir
+    );
 }
 
 fn write_wav(path: &str, samples: &[[f32; 2]]) {

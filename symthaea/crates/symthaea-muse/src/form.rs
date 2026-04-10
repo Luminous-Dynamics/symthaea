@@ -150,7 +150,11 @@ mod tests {
             ..Default::default()
         };
         let form = plan_form(&state, 12.0);
-        assert_eq!(form.sections.len(), 6, "verse-chorus should have 6 sections");
+        assert_eq!(
+            form.sections.len(),
+            6,
+            "verse-chorus should have 6 sections"
+        );
     }
 
     #[test]
@@ -161,7 +165,10 @@ mod tests {
         };
         let form = plan_form(&state, 9.0);
         assert_eq!(form.sections.len(), 3);
-        assert!(form.sections.iter().all(|s| s.section_type == SectionType::Ambient));
+        assert!(form
+            .sections
+            .iter()
+            .all(|s| s.section_type == SectionType::Ambient));
     }
 
     #[test]
@@ -194,8 +201,16 @@ mod tests {
         let form_low = plan_form(&low, 4.0);
         let form_high = plan_form(&high, 4.0);
         // Both should produce binary; high arousal → higher energy
-        let max_low = form_low.sections.iter().map(|s| s.energy_level).fold(0.0f32, f32::max);
-        let max_high = form_high.sections.iter().map(|s| s.energy_level).fold(0.0f32, f32::max);
+        let max_low = form_low
+            .sections
+            .iter()
+            .map(|s| s.energy_level)
+            .fold(0.0f32, f32::max);
+        let max_high = form_high
+            .sections
+            .iter()
+            .map(|s| s.energy_level)
+            .fold(0.0f32, f32::max);
         assert!(
             max_high > max_low,
             "high arousal energy {max_high} should exceed low {max_low}"

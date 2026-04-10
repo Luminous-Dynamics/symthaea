@@ -91,6 +91,15 @@ impl DesktopHolon {
                 HolonOutbound::PairingVerified { peer_id, .. } => {
                     println!("  [Holon] Pairing verified: peer_id={peer_id}");
                 }
+                HolonOutbound::NavigationEstimate {
+                    position_m,
+                    position_sigma_m,
+                    confidence,
+                } => {
+                    println!(
+                        "  [Holon] Navigation estimate: pos={position_m:?}, sigma={position_sigma_m:.2}m, confidence={confidence:?}"
+                    );
+                }
             }
         }
     }

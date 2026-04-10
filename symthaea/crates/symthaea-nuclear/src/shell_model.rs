@@ -178,10 +178,7 @@ impl ShellModel {
         let threshold = 1e-20; // ignore negligible zero crossings
 
         for i in start..end {
-            if wf[i] * wf[i - 1] < 0.0
-                && wf[i].abs() > threshold
-                && wf[i - 1].abs() > threshold
-            {
+            if wf[i] * wf[i - 1] < 0.0 && wf[i].abs() > threshold && wf[i - 1].abs() > threshold {
                 nodes += 1;
             }
         }
@@ -240,13 +237,7 @@ impl ShellModel {
     /// Find eigenvalue for quantum numbers (n, l, j) using bisection.
     ///
     /// The n-th state with angular momentum l has n-1 nodes in the radial wavefunction.
-    pub fn find_eigenvalue(
-        &self,
-        a_mass: u16,
-        target_nodes: u16,
-        l: u16,
-        j: f64,
-    ) -> NumerovResult {
+    pub fn find_eigenvalue(&self, a_mass: u16, target_nodes: u16, l: u16, j: f64) -> NumerovResult {
         // Energy search range
         let e_min = -self.potential.v0 - 20.0; // Below potential bottom
         let e_max = 0.0; // Bound states have E < 0
@@ -407,7 +398,8 @@ impl ShellModel {
                 .iter()
                 .map(|l| {
                     let x = (e - l.energy_mev) / gamma;
-                    l.degeneracy as f64 * (-0.5 * x * x).exp() / (gamma * (2.0 * std::f64::consts::PI).sqrt())
+                    l.degeneracy as f64 * (-0.5 * x * x).exp()
+                        / (gamma * (2.0 * std::f64::consts::PI).sqrt())
                 })
                 .sum();
 
@@ -485,7 +477,10 @@ mod tests {
 
         let mut found_count = 0;
         for &expected_magic in &expected {
-            if magic.iter().any(|&m| (m as i16 - expected_magic as i16).unsigned_abs() <= 2) {
+            if magic
+                .iter()
+                .any(|&m| (m as i16 - expected_magic as i16).unsigned_abs() <= 2)
+            {
                 found_count += 1;
             }
         }
@@ -506,10 +501,7 @@ mod tests {
         let model = ShellModel::default();
         // 1s1/2 state should converge for any nucleus
         let result = model.find_eigenvalue(40, 0, 0, 0.5);
-        assert!(
-            result.converged,
-            "1s1/2 Numerov should converge for Ca-40"
-        );
+        assert!(result.converged, "1s1/2 Numerov should converge for Ca-40");
         assert!(
             result.energy < 0.0,
             "1s1/2 should be a bound state: E={}",
@@ -526,11 +518,7 @@ mod tests {
 
         // 2s state: should have more nodes than 1s
         let r2 = model.find_eigenvalue(40, 1, 0, 0.5);
-        assert!(
-            r2.nodes >= 1,
-            "2s should have ≥1 nodes, got {}",
-            r2.nodes
-        );
+        assert!(r2.nodes >= 1, "2s should have ≥1 nodes, got {}", r2.nodes);
         // 2s should be less bound (higher energy) than 1s
         assert!(
             r2.energy > r1.energy,

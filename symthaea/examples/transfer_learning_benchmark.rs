@@ -80,10 +80,12 @@ fn run_benchmark() {
         let t_rewards: Vec<f64> = t_metrics.iter().map(|m| m.avg_standing_reward).collect();
         let t_mastery = find_mastery(&t_rewards, mastery_threshold, mastery_streak);
 
-        println!("  Transfer: {:.2}s, final={:.4}, mastery={:?}",
+        println!(
+            "  Transfer: {:.2}s, final={:.4}, mastery={:?}",
             t_time.as_secs_f64(),
             t_rewards.last().unwrap_or(&0.0),
-            t_mastery);
+            t_mastery
+        );
 
         // Random condition
         let r_config = HumanoidConfig {
@@ -99,10 +101,12 @@ fn run_benchmark() {
         let r_rewards: Vec<f64> = r_metrics.iter().map(|m| m.avg_standing_reward).collect();
         let r_mastery = find_mastery(&r_rewards, mastery_threshold, mastery_streak);
 
-        println!("  Random:   {:.2}s, final={:.4}, mastery={:?}",
+        println!(
+            "  Random:   {:.2}s, final={:.4}, mastery={:?}",
             r_time.as_secs_f64(),
             r_rewards.last().unwrap_or(&0.0),
-            r_mastery);
+            r_mastery
+        );
 
         transfer_curves.push(t_rewards);
         random_curves.push(r_rewards);
@@ -114,20 +118,34 @@ fn run_benchmark() {
     // ─── Summary ───
     println!("━━━ Summary ━━━");
 
-    let t_final_mean: f64 = transfer_curves.iter()
+    let t_final_mean: f64 = transfer_curves
+        .iter()
         .map(|c| c.last().unwrap_or(&0.0))
-        .sum::<f64>() / n_seeds as f64;
-    let r_final_mean: f64 = random_curves.iter()
+        .sum::<f64>()
+        / n_seeds as f64;
+    let r_final_mean: f64 = random_curves
+        .iter()
         .map(|c| c.last().unwrap_or(&0.0))
-        .sum::<f64>() / n_seeds as f64;
+        .sum::<f64>()
+        / n_seeds as f64;
 
     let t_mastery_mean = mastery_mean(&transfer_mastery);
     let r_mastery_mean = mastery_mean(&random_mastery);
 
-    println!("  Transfer: final_reward={:.4}, mastery_ep={}", t_final_mean,
-        t_mastery_mean.map(|m| format!("{:.1}", m)).unwrap_or("never".to_string()));
-    println!("  Random:   final_reward={:.4}, mastery_ep={}", r_final_mean,
-        r_mastery_mean.map(|m| format!("{:.1}", m)).unwrap_or("never".to_string()));
+    println!(
+        "  Transfer: final_reward={:.4}, mastery_ep={}",
+        t_final_mean,
+        t_mastery_mean
+            .map(|m| format!("{:.1}", m))
+            .unwrap_or("never".to_string())
+    );
+    println!(
+        "  Random:   final_reward={:.4}, mastery_ep={}",
+        r_final_mean,
+        r_mastery_mean
+            .map(|m| format!("{:.1}", m))
+            .unwrap_or("never".to_string())
+    );
 
     if t_final_mean > r_final_mean {
         let adv = (t_final_mean - r_final_mean) / r_final_mean.max(0.001) * 100.0;
@@ -201,7 +219,10 @@ fn find_mastery(rewards: &[f64], threshold: f64, streak_required: usize) -> Opti
 
 #[cfg(feature = "humanoid")]
 fn mastery_mean(masteries: &[Option<usize>]) -> Option<f64> {
-    let valid: Vec<f64> = masteries.iter().filter_map(|m| m.map(|v| v as f64)).collect();
+    let valid: Vec<f64> = masteries
+        .iter()
+        .filter_map(|m| m.map(|v| v as f64))
+        .collect();
     if valid.is_empty() {
         None
     } else {

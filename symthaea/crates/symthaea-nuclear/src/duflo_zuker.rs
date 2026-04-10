@@ -422,10 +422,6 @@ mod tests {
 
         // DZ10 published RMS is ~506 keV on AME1995
         // On AME2020 (3,555 nuclei including extrapolated) expect ~600-900 keV
-        assert!(
-            rms < 5.0,
-            "DZ10 RMS = {:.3} MeV should be < 5.0 MeV",
-            rms
-        );
+        assert!(rms < 5.0, "DZ10 RMS = {:.3} MeV should be < 5.0 MeV", rms);
     }
 }

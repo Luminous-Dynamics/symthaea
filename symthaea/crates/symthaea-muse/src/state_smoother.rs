@@ -45,13 +45,15 @@ impl StateSmoother {
         }
 
         let a = self.alpha;
-        self.current.consciousness_level += a * (target.consciousness_level - self.current.consciousness_level);
+        self.current.consciousness_level +=
+            a * (target.consciousness_level - self.current.consciousness_level);
         self.current.arousal += a * (target.arousal - self.current.arousal);
         self.current.valence += a * (target.valence - self.current.valence);
         self.current.dopamine += a * (target.dopamine - self.current.dopamine);
         self.current.serotonin += a * (target.serotonin - self.current.serotonin);
         self.current.noradrenaline += a * (target.noradrenaline - self.current.noradrenaline);
-        self.current.prediction_error += a * (target.prediction_error - self.current.prediction_error);
+        self.current.prediction_error +=
+            a * (target.prediction_error - self.current.prediction_error);
 
         for i in 0..8 {
             self.current.harmony_activations[i] +=
@@ -78,7 +80,10 @@ mod tests {
     #[test]
     fn first_call_is_passthrough() {
         let mut sm = StateSmoother::default_smooth();
-        let target = MusicalState { consciousness_level: 0.8, ..Default::default() };
+        let target = MusicalState {
+            consciousness_level: 0.8,
+            ..Default::default()
+        };
         let result = sm.smooth(&target);
         assert_eq!(result.consciousness_level, 0.8);
     }
@@ -86,42 +91,73 @@ mod tests {
     #[test]
     fn subsequent_calls_interpolate() {
         let mut sm = StateSmoother::default_smooth();
-        let low = MusicalState { consciousness_level: 0.2, ..Default::default() };
+        let low = MusicalState {
+            consciousness_level: 0.2,
+            ..Default::default()
+        };
         sm.smooth(&low); // initialize
 
-        let high = MusicalState { consciousness_level: 0.9, ..Default::default() };
+        let high = MusicalState {
+            consciousness_level: 0.9,
+            ..Default::default()
+        };
         let result = sm.smooth(&high);
 
         // Should be between 0.2 and 0.9 (not jump to 0.9)
         assert!(result.consciousness_level > 0.2, "should increase");
-        assert!(result.consciousness_level < 0.9, "should not jump: {}", result.consciousness_level);
+        assert!(
+            result.consciousness_level < 0.9,
+            "should not jump: {}",
+            result.consciousness_level
+        );
     }
 
     #[test]
     fn converges_over_time() {
         let mut sm = StateSmoother::default_smooth();
-        let start = MusicalState { arousal: 0.1, ..Default::default() };
+        let start = MusicalState {
+            arousal: 0.1,
+            ..Default::default()
+        };
         sm.smooth(&start);
 
-        let target = MusicalState { arousal: 0.8, ..Default::default() };
+        let target = MusicalState {
+            arousal: 0.8,
+            ..Default::default()
+        };
         let mut last = 0.1;
         for _ in 0..100 {
             let result = sm.smooth(&target);
-            assert!(result.arousal >= last - 0.001, "should monotonically approach target");
+            assert!(
+                result.arousal >= last - 0.001,
+                "should monotonically approach target"
+            );
             last = result.arousal;
         }
-        assert!((last - 0.8).abs() < 0.05, "should converge to target: {last}");
+        assert!(
+            (last - 0.8).abs() < 0.05,
+            "should converge to target: {last}"
+        );
     }
 
     #[test]
     fn harmonies_smooth() {
         let mut sm = StateSmoother::default_smooth();
-        sm.smooth(&MusicalState { harmony_activations: [0.0; 8], ..Default::default() });
+        sm.smooth(&MusicalState {
+            harmony_activations: [0.0; 8],
+            ..Default::default()
+        });
 
-        let target = MusicalState { harmony_activations: [1.0; 8], ..Default::default() };
+        let target = MusicalState {
+            harmony_activations: [1.0; 8],
+            ..Default::default()
+        };
         let result = sm.smooth(&target);
 
-        assert!(result.harmony_activations[0] > 0.0 && result.harmony_activations[0] < 1.0,
-            "harmonies should interpolate: {}", result.harmony_activations[0]);
+        assert!(
+            result.harmony_activations[0] > 0.0 && result.harmony_activations[0] < 1.0,
+            "harmonies should interpolate: {}",
+            result.harmony_activations[0]
+        );
     }
 }

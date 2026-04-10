@@ -13,7 +13,6 @@
 //! - Huron (2006), Sweet Anticipation
 //! - Narmour (1990), Implication-Realization Model
 
-
 /// Melodic context for making the next note decision.
 pub struct MelodicContext {
     /// Previous note frequency (None if first note).
@@ -89,7 +88,7 @@ pub fn apply_grammar(
     if ctx.phrase_position > 0.85 && !chord_tones.is_empty() {
         let root = chord_tones[0]; // resolve to root
         let leading_tone = root / 2.0f32.powf(1.0 / 12.0); // half step below
-        // If we're close to phrase end, move toward the leading tone
+                                                           // If we're close to phrase end, move toward the leading tone
         if ctx.phrase_position > 0.92 {
             return nearest(root, chord_tones, scale_tones); // final resolution
         }
@@ -143,9 +142,17 @@ fn semitone_distance(a: f32, b: f32) -> f32 {
 }
 
 fn nearest(target: f32, primary: &[f32], fallback: &[f32]) -> f32 {
-    let pool = if primary.is_empty() { fallback } else { primary };
+    let pool = if primary.is_empty() {
+        fallback
+    } else {
+        primary
+    };
     pool.iter()
-        .min_by(|a, b| ((**a - target).abs()).partial_cmp(&((**b - target).abs())).unwrap())
+        .min_by(|a, b| {
+            ((**a - target).abs())
+                .partial_cmp(&((**b - target).abs()))
+                .unwrap()
+        })
         .copied()
         .unwrap_or(target)
 }
@@ -158,18 +165,31 @@ fn preferred_direction(ctx: &MelodicContext, seed: u32) -> i32 {
     } else {
         // Random with slight ascending bias (melodies tend to rise then fall)
         if ctx.phrase_position < 0.5 {
-            if (seed >> 8) % 3 < 2 { 1 } else { -1 } // 67% ascending in first half
+            if (seed >> 8) % 3 < 2 {
+                1
+            } else {
+                -1
+            } // 67% ascending in first half
         } else {
-            if (seed >> 8) % 3 < 2 { -1 } else { 1 } // 67% descending in second half
+            if (seed >> 8) % 3 < 2 {
+                -1
+            } else {
+                1
+            } // 67% descending in second half
         }
     }
 }
 
 fn step_from(freq: f32, direction: i32, scale: &[f32]) -> Option<f32> {
     // Find nearest scale tone to freq, then move one position in direction
-    let idx = scale.iter()
+    let idx = scale
+        .iter()
         .enumerate()
-        .min_by(|(_, a), (_, b)| ((**a - freq).abs()).partial_cmp(&((**b - freq).abs())).unwrap())
+        .min_by(|(_, a), (_, b)| {
+            ((**a - freq).abs())
+                .partial_cmp(&((**b - freq).abs()))
+                .unwrap()
+        })
         .map(|(i, _)| i)?;
 
     let target_idx = (idx as i32 + direction).max(0) as usize;
@@ -181,9 +201,14 @@ fn step_from(freq: f32, direction: i32, scale: &[f32]) -> Option<f32> {
 }
 
 fn skip_from(freq: f32, direction: i32, scale: &[f32]) -> Option<f32> {
-    let idx = scale.iter()
+    let idx = scale
+        .iter()
         .enumerate()
-        .min_by(|(_, a), (_, b)| ((**a - freq).abs()).partial_cmp(&((**b - freq).abs())).unwrap())
+        .min_by(|(_, a), (_, b)| {
+            ((**a - freq).abs())
+                .partial_cmp(&((**b - freq).abs()))
+                .unwrap()
+        })
         .map(|(i, _)| i)?;
 
     let target_idx = (idx as i32 + direction * 2).max(0) as usize; // skip one scale degree
@@ -196,7 +221,8 @@ fn skip_from(freq: f32, direction: i32, scale: &[f32]) -> Option<f32> {
 
 fn nearest_step(from: f32, targets: &[f32], _scale: &[f32]) -> Option<f32> {
     // Among targets, find one that's a step (1-2 scale degrees) from 'from'
-    targets.iter()
+    targets
+        .iter()
         .filter(|&&t| {
             let dist = semitone_distance(from, t).abs();
             dist >= 0.5 && dist <= 4.0 // within a major third
@@ -215,7 +241,9 @@ mod tests {
 
     fn c_major_scale() -> Vec<f32> {
         // C4 to C5
-        vec![261.63, 293.66, 329.63, 349.23, 392.00, 440.00, 493.88, 523.25]
+        vec![
+            261.63, 293.66, 329.63, 349.23, 392.00, 440.00, 493.88, 523.25,
+        ]
     }
 
     fn c_major_chord() -> Vec<f32> {
@@ -227,16 +255,18 @@ mod tests {
         let ctx = MelodicContext::default();
         let result = apply_grammar(300.0, &c_major_chord(), &c_major_scale(), &ctx, 42);
         // Should snap to nearest chord tone (E4 = 329.63 or C4 = 261.63)
-        assert!(c_major_chord().iter().any(|&c| (c - result).abs() < 1.0),
-            "first note should be a chord tone: {result}");
+        assert!(
+            c_major_chord().iter().any(|&c| (c - result).abs() < 1.0),
+            "first note should be a chord tone: {result}"
+        );
     }
 
     #[test]
     fn leap_resolves_by_step() {
         let ctx = MelodicContext {
             prev_freq: Some(523.25), // C5
-            last_direction: 1, // was ascending
-            last_interval: 7.0, // big leap
+            last_direction: 1,       // was ascending
+            last_interval: 7.0,      // big leap
             prev_was_leap: true,
             ..Default::default()
         };
@@ -249,13 +279,16 @@ mod tests {
     fn phrase_ending_resolves() {
         let ctx = MelodicContext {
             prev_freq: Some(493.88), // B4 (leading tone)
-            phrase_position: 0.95, // near end
+            phrase_position: 0.95,   // near end
             ..Default::default()
         };
         let result = apply_grammar(440.0, &c_major_chord(), &c_major_scale(), &ctx, 42);
         // Should resolve to C (root) at phrase end
         let dist_to_root = (result - 261.63).abs().min((result - 523.25).abs());
-        assert!(dist_to_root < 35.0, "phrase end should resolve near root: {result}");
+        assert!(
+            dist_to_root < 35.0,
+            "phrase end should resolve near root: {result}"
+        );
     }
 
     #[test]
@@ -288,12 +321,17 @@ mod tests {
             };
             let next = apply_grammar(prev, &chord, &scale, &ctx, seed * 7919);
             let interval = semitone_distance(prev, next).abs();
-            if interval <= 3.0 { steps += 1; }
+            if interval <= 3.0 {
+                steps += 1;
+            }
             total += 1;
             prev = next;
         }
 
         let step_ratio = steps as f32 / total as f32;
-        assert!(step_ratio > 0.5, "stepwise motion should dominate: {step_ratio:.2} ({steps}/{total})");
+        assert!(
+            step_ratio > 0.5,
+            "stepwise motion should dominate: {step_ratio:.2} ({steps}/{total})"
+        );
     }
 }

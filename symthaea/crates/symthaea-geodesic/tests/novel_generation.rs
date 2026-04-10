@@ -13,10 +13,16 @@ use symthaea_geodesic::program_emitter::emit_expression;
 use symthaea_geodesic::program_memory::ProgramMemory;
 use symthaea_geodesic::tri_oracle::TriOracle;
 
-fn search(target: &ProgramNode, memory: &ProgramMemory, max_steps: usize) -> (ProgramNode, f32, String) {
+fn search(
+    target: &ProgramNode,
+    memory: &ProgramMemory,
+    max_steps: usize,
+) -> (ProgramNode, f32, String) {
     let oracle = TriOracle::with_defaults();
     let target_enc = target.encode();
-    let start = memory.nearest(&target_enc).map(|e| e.node.clone())
+    let start = memory
+        .nearest(&target_enc)
+        .map(|e| e.node.clone())
         .unwrap_or_else(|| ProgramNode::atom("unknown"));
 
     let mut best = start;
@@ -34,7 +40,10 @@ fn search(target: &ProgramNode, memory: &ProgramMemory, max_steps: usize) -> (Pr
     // Then run resonant search to refine further
     for step in 0..max_steps {
         let perturbed = perturb(&best.encode(), sigma, step as u64 + 7);
-        let candidate = memory.nearest(&perturbed).map(|e| e.node.clone()).unwrap_or(best.clone());
+        let candidate = memory
+            .nearest(&perturbed)
+            .map(|e| e.node.clone())
+            .unwrap_or(best.clone());
         let score = oracle.score(&candidate, target).composite;
         if score > best_score {
             best = candidate;
@@ -43,7 +52,9 @@ fn search(target: &ProgramNode, memory: &ProgramMemory, max_steps: usize) -> (Pr
         } else {
             sigma = (sigma * 0.97).max(0.02);
         }
-        if best_score > 0.95 { break; }
+        if best_score > 0.95 {
+            break;
+        }
     }
 
     (best.clone(), best_score, emit_expression(&best))
@@ -63,21 +74,27 @@ fn test_novel_second_largest() {
         ProgramNode::iterate(
             ProgramNode::atom("i = 2"),
             ProgramNode::branch(
-                ProgramNode::apply(ProgramNode::op("GT"),
-                    vec![ProgramNode::atom("arr[i]"), ProgramNode::atom("max1")]),
+                ProgramNode::apply(
+                    ProgramNode::op("GT"),
+                    vec![ProgramNode::atom("arr[i]"), ProgramNode::atom("max1")],
+                ),
                 ProgramNode::Sequence(vec![
                     ProgramNode::atom("max2 = max1"),
                     ProgramNode::atom("max1 = arr[i]"),
                 ]),
                 ProgramNode::branch(
-                    ProgramNode::apply(ProgramNode::op("GT"),
-                        vec![ProgramNode::atom("arr[i]"), ProgramNode::atom("max2")]),
+                    ProgramNode::apply(
+                        ProgramNode::op("GT"),
+                        vec![ProgramNode::atom("arr[i]"), ProgramNode::atom("max2")],
+                    ),
                     ProgramNode::atom("max2 = arr[i]"),
                     ProgramNode::atom("/* skip */"),
                 ),
             ),
-            ProgramNode::apply(ProgramNode::op("LT"),
-                vec![ProgramNode::atom("i"), ProgramNode::atom("len")]),
+            ProgramNode::apply(
+                ProgramNode::op("LT"),
+                vec![ProgramNode::atom("i"), ProgramNode::atom("len")],
+            ),
         ),
         ProgramNode::atom("max2"),
     ]);
@@ -110,11 +127,18 @@ fn test_novel_second_largest() {
 
     // We don't assert a specific score — this test is observational.
     // The result tells us whether the system generates or retrieves.
-    println!("\nVerdict: score={:.4} → {}", score,
-        if is_exact { "GENERATION (exact)" }
-        else if is_close { "GENERATION (approximate)" }
-        else if is_partial { "RETRIEVAL (nearest pattern)" }
-        else { "RETRIEVAL (random nearest)" }
+    println!(
+        "\nVerdict: score={:.4} → {}",
+        score,
+        if is_exact {
+            "GENERATION (exact)"
+        } else if is_close {
+            "GENERATION (approximate)"
+        } else if is_partial {
+            "RETRIEVAL (nearest pattern)"
+        } else {
+            "RETRIEVAL (random nearest)"
+        }
     );
 }
 
@@ -127,8 +151,13 @@ fn test_novel_reverse_array() {
     // Reverse: swap from ends toward middle. Not in memory.
     let target = ProgramNode::Sequence(vec![
         ProgramNode::atom("left = 0"),
-        ProgramNode::apply(ProgramNode::op("SUB"),
-            vec![ProgramNode::atom("right = len"), ProgramNode::typed("1", "INT")]),
+        ProgramNode::apply(
+            ProgramNode::op("SUB"),
+            vec![
+                ProgramNode::atom("right = len"),
+                ProgramNode::typed("1", "INT"),
+            ],
+        ),
         ProgramNode::iterate(
             ProgramNode::atom("/* init */"),
             ProgramNode::Sequence(vec![
@@ -136,8 +165,10 @@ fn test_novel_reverse_array() {
                 ProgramNode::atom("left += 1"),
                 ProgramNode::atom("right -= 1"),
             ]),
-            ProgramNode::apply(ProgramNode::op("LT"),
-                vec![ProgramNode::atom("left"), ProgramNode::atom("right")]),
+            ProgramNode::apply(
+                ProgramNode::op("LT"),
+                vec![ProgramNode::atom("left"), ProgramNode::atom("right")],
+            ),
         ),
     ]);
 
@@ -145,7 +176,14 @@ fn test_novel_reverse_array() {
     println!("Target: reverse_array (loop + swap + two pointers)");
     println!("Found:  {}", code);
     println!("Score:  {:.4}", score);
-    println!("Verdict: {}", if score > 0.7 { "GENERATION" } else { "RETRIEVAL" });
+    println!(
+        "Verdict: {}",
+        if score > 0.7 {
+            "GENERATION"
+        } else {
+            "RETRIEVAL"
+        }
+    );
 }
 
 #[test]
@@ -160,26 +198,36 @@ fn test_novel_binary_search() {
         ProgramNode::iterate(
             ProgramNode::atom("/* init */"),
             ProgramNode::Sequence(vec![
-                ProgramNode::apply(ProgramNode::op("DIV"),
+                ProgramNode::apply(
+                    ProgramNode::op("DIV"),
                     vec![
-                        ProgramNode::apply(ProgramNode::op("ADD"),
-                            vec![ProgramNode::atom("low"), ProgramNode::atom("high")]),
+                        ProgramNode::apply(
+                            ProgramNode::op("ADD"),
+                            vec![ProgramNode::atom("low"), ProgramNode::atom("high")],
+                        ),
                         ProgramNode::typed("2", "INT"),
-                    ]),
+                    ],
+                ),
                 ProgramNode::branch(
-                    ProgramNode::apply(ProgramNode::op("EQ"),
-                        vec![ProgramNode::atom("arr[mid]"), ProgramNode::atom("target")]),
+                    ProgramNode::apply(
+                        ProgramNode::op("EQ"),
+                        vec![ProgramNode::atom("arr[mid]"), ProgramNode::atom("target")],
+                    ),
                     ProgramNode::atom("return mid"),
                     ProgramNode::branch(
-                        ProgramNode::apply(ProgramNode::op("LT"),
-                            vec![ProgramNode::atom("arr[mid]"), ProgramNode::atom("target")]),
+                        ProgramNode::apply(
+                            ProgramNode::op("LT"),
+                            vec![ProgramNode::atom("arr[mid]"), ProgramNode::atom("target")],
+                        ),
                         ProgramNode::atom("low = mid + 1"),
                         ProgramNode::atom("high = mid"),
                     ),
                 ),
             ]),
-            ProgramNode::apply(ProgramNode::op("LT"),
-                vec![ProgramNode::atom("low"), ProgramNode::atom("high")]),
+            ProgramNode::apply(
+                ProgramNode::op("LT"),
+                vec![ProgramNode::atom("low"), ProgramNode::atom("high")],
+            ),
         ),
         ProgramNode::atom("None"),
     ]);
@@ -188,7 +236,14 @@ fn test_novel_binary_search() {
     println!("Target: binary_search (loop + nested branches + mid calc)");
     println!("Found:  {}", code);
     println!("Score:  {:.4}", score);
-    println!("Verdict: {}", if score > 0.7 { "GENERATION" } else { "RETRIEVAL" });
+    println!(
+        "Verdict: {}",
+        if score > 0.7 {
+            "GENERATION"
+        } else {
+            "RETRIEVAL"
+        }
+    );
 }
 
 #[test]
@@ -198,53 +253,88 @@ fn test_novel_vs_known_comparison() {
     let memory = ProgramMemory::basic();
 
     let known = vec![
-        ("add (KNOWN)", ProgramNode::apply(ProgramNode::op("ADD"),
-            vec![ProgramNode::atom("a"), ProgramNode::atom("b")])),
-        ("fibonacci (KNOWN)", ProgramNode::recurse(
-            ProgramNode::branch(
-                ProgramNode::apply(ProgramNode::op("LT"),
-                    vec![ProgramNode::atom("n"), ProgramNode::typed("2", "INT")]),
-                ProgramNode::atom("n"),
-                ProgramNode::apply(ProgramNode::op("ADD"), vec![
-                    ProgramNode::apply(ProgramNode::atom("fib"),
-                        vec![ProgramNode::apply(ProgramNode::op("SUB"),
-                            vec![ProgramNode::atom("n"), ProgramNode::typed("1", "INT")])]),
-                    ProgramNode::apply(ProgramNode::atom("fib"),
-                        vec![ProgramNode::apply(ProgramNode::op("SUB"),
-                            vec![ProgramNode::atom("n"), ProgramNode::typed("2", "INT")])]),
-                ]),
+        (
+            "add (KNOWN)",
+            ProgramNode::apply(
+                ProgramNode::op("ADD"),
+                vec![ProgramNode::atom("a"), ProgramNode::atom("b")],
             ),
-            ProgramNode::atom("fib"),
-        )),
+        ),
+        (
+            "fibonacci (KNOWN)",
+            ProgramNode::recurse(
+                ProgramNode::branch(
+                    ProgramNode::apply(
+                        ProgramNode::op("LT"),
+                        vec![ProgramNode::atom("n"), ProgramNode::typed("2", "INT")],
+                    ),
+                    ProgramNode::atom("n"),
+                    ProgramNode::apply(
+                        ProgramNode::op("ADD"),
+                        vec![
+                            ProgramNode::apply(
+                                ProgramNode::atom("fib"),
+                                vec![ProgramNode::apply(
+                                    ProgramNode::op("SUB"),
+                                    vec![ProgramNode::atom("n"), ProgramNode::typed("1", "INT")],
+                                )],
+                            ),
+                            ProgramNode::apply(
+                                ProgramNode::atom("fib"),
+                                vec![ProgramNode::apply(
+                                    ProgramNode::op("SUB"),
+                                    vec![ProgramNode::atom("n"), ProgramNode::typed("2", "INT")],
+                                )],
+                            ),
+                        ],
+                    ),
+                ),
+                ProgramNode::atom("fib"),
+            ),
+        ),
     ];
 
     let novel = vec![
-        ("min element (NOVEL)", ProgramNode::Sequence(vec![
-            ProgramNode::atom("min = arr[0]"),
-            ProgramNode::iterate(
-                ProgramNode::atom("i = 1"),
-                ProgramNode::branch(
-                    ProgramNode::apply(ProgramNode::op("LT"),
-                        vec![ProgramNode::atom("arr[i]"), ProgramNode::atom("min")]),
-                    ProgramNode::atom("min = arr[i]"),
-                    ProgramNode::atom("/* skip */"),
+        (
+            "min element (NOVEL)",
+            ProgramNode::Sequence(vec![
+                ProgramNode::atom("min = arr[0]"),
+                ProgramNode::iterate(
+                    ProgramNode::atom("i = 1"),
+                    ProgramNode::branch(
+                        ProgramNode::apply(
+                            ProgramNode::op("LT"),
+                            vec![ProgramNode::atom("arr[i]"), ProgramNode::atom("min")],
+                        ),
+                        ProgramNode::atom("min = arr[i]"),
+                        ProgramNode::atom("/* skip */"),
+                    ),
+                    ProgramNode::apply(
+                        ProgramNode::op("LT"),
+                        vec![ProgramNode::atom("i"), ProgramNode::atom("len")],
+                    ),
                 ),
-                ProgramNode::apply(ProgramNode::op("LT"),
-                    vec![ProgramNode::atom("i"), ProgramNode::atom("len")]),
-            ),
-            ProgramNode::atom("min"),
-        ])),
-        ("power (NOVEL)", ProgramNode::Sequence(vec![
-            ProgramNode::atom("result = 1"),
-            ProgramNode::iterate(
-                ProgramNode::atom("i = 0"),
-                ProgramNode::apply(ProgramNode::op("MUL"),
-                    vec![ProgramNode::atom("result"), ProgramNode::atom("base")]),
-                ProgramNode::apply(ProgramNode::op("LT"),
-                    vec![ProgramNode::atom("i"), ProgramNode::atom("exp")]),
-            ),
-            ProgramNode::atom("result"),
-        ])),
+                ProgramNode::atom("min"),
+            ]),
+        ),
+        (
+            "power (NOVEL)",
+            ProgramNode::Sequence(vec![
+                ProgramNode::atom("result = 1"),
+                ProgramNode::iterate(
+                    ProgramNode::atom("i = 0"),
+                    ProgramNode::apply(
+                        ProgramNode::op("MUL"),
+                        vec![ProgramNode::atom("result"), ProgramNode::atom("base")],
+                    ),
+                    ProgramNode::apply(
+                        ProgramNode::op("LT"),
+                        vec![ProgramNode::atom("i"), ProgramNode::atom("exp")],
+                    ),
+                ),
+                ProgramNode::atom("result"),
+            ]),
+        ),
     ];
 
     println!("{:<25} {:>8} {:<30}", "Test", "Score", "Generated");

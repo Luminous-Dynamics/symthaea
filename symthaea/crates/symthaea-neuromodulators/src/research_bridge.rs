@@ -343,7 +343,10 @@ mod tests {
             resp_pgx.peak_concentration,
             resp_default.peak_concentration
         );
-        assert!(resp_pgx.accumulation_warning, "poor CYP2D6 + SSRI should warn");
+        assert!(
+            resp_pgx.accumulation_warning,
+            "poor CYP2D6 + SSRI should warn"
+        );
     }
 
     #[test]
@@ -456,6 +459,9 @@ mod tests {
             deltas.delta_serotonin.abs() < 1e-6,
             "disabled PNI should produce zero serotonin delta"
         );
-        assert!(!deltas.source_pni, "source_pni should be false when disabled");
+        assert!(
+            !deltas.source_pni,
+            "source_pni should be false when disabled"
+        );
     }
 }

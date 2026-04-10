@@ -154,7 +154,11 @@ impl LlmLanguageChannel {
 
             // Strip <think>...</think> blocks from Gemma 4 reasoning model output
             let clean_text = strip_think_tags(&result.text);
-            let result_text = if clean_text.is_empty() { result.text } else { clean_text };
+            let result_text = if clean_text.is_empty() {
+                result.text
+            } else {
+                clean_text
+            };
 
             // Only send if we got meaningful text
             if !result_text.is_empty() && result_text.len() > 3 {

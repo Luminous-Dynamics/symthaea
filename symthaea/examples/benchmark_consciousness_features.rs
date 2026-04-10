@@ -74,11 +74,17 @@ fn print_active_features() {
     println!("Active features:");
 
     let features = [
-        ("structured_bottleneck", cfg!(feature = "structured_bottleneck")),
+        (
+            "structured_bottleneck",
+            cfg!(feature = "structured_bottleneck"),
+        ),
         ("ctc_wiring", cfg!(feature = "ctc_wiring")),
         ("continuous_hot", cfg!(feature = "continuous_hot")),
         ("unified_precision", cfg!(feature = "unified_precision")),
-        ("interoceptive_inference", cfg!(feature = "interoceptive_inference")),
+        (
+            "interoceptive_inference",
+            cfg!(feature = "interoceptive_inference"),
+        ),
         ("england_dissipation", cfg!(feature = "england_dissipation")),
         ("iit4", cfg!(feature = "iit4")),
     ];
@@ -141,13 +147,41 @@ fn eval_discrimination() -> f64 {
 
     // Define qualitatively different states
     let scenarios: Vec<(&str, fn() -> ConsciousnessStateV2, &str)> = vec![
-        ("fully_conscious", fully_conscious_state, "High all components — should be near 1.0"),
-        ("unconscious", unconscious_state, "Low all components — should be near 0.0"),
-        ("binding_impaired", binding_impaired_state, "Low binding only — should reduce C"),
-        ("high_attention_low_phi", high_attention_low_phi_state, "High attention but low Phi"),
-        ("dreaming", dreaming_state, "High binding/workspace but low attention"),
-        ("zombie", zombie_state, "High efficacy but low integration — philosophical zombie"),
-        ("meditative", meditative_state, "High recursion/knowledge, moderate others"),
+        (
+            "fully_conscious",
+            fully_conscious_state,
+            "High all components — should be near 1.0",
+        ),
+        (
+            "unconscious",
+            unconscious_state,
+            "Low all components — should be near 0.0",
+        ),
+        (
+            "binding_impaired",
+            binding_impaired_state,
+            "Low binding only — should reduce C",
+        ),
+        (
+            "high_attention_low_phi",
+            high_attention_low_phi_state,
+            "High attention but low Phi",
+        ),
+        (
+            "dreaming",
+            dreaming_state,
+            "High binding/workspace but low attention",
+        ),
+        (
+            "zombie",
+            zombie_state,
+            "High efficacy but low integration — philosophical zombie",
+        ),
+        (
+            "meditative",
+            meditative_state,
+            "High recursion/knowledge, moderate others",
+        ),
     ];
 
     let mut results = Vec::new();
@@ -198,7 +232,10 @@ fn eval_discrimination() -> f64 {
     }
 
     let discrimination = score / total_checks;
-    println!("  Discrimination score: {:.3} ({}/{} checks passed)", discrimination, score as u32, total_checks as u32);
+    println!(
+        "  Discrimination score: {:.3} ({}/{} checks passed)",
+        discrimination, score as u32, total_checks as u32
+    );
     discrimination
 }
 
@@ -262,9 +299,15 @@ fn eval_theoretical_correctness() -> f64 {
         let c_low_phi = eq2.compute(&state2).consciousness;
 
         let pass = c_high_phi > c_low_phi;
-        if pass { score += 1.0; }
-        println!("  [{}] IIT: High Phi ({:.3}) > Low Phi ({:.3})",
-            if pass { "PASS" } else { "FAIL" }, c_high_phi, c_low_phi);
+        if pass {
+            score += 1.0;
+        }
+        println!(
+            "  [{}] IIT: High Phi ({:.3}) > Low Phi ({:.3})",
+            if pass { "PASS" } else { "FAIL" },
+            c_high_phi,
+            c_low_phi
+        );
     }
 
     // Test 2: GWT predicts workspace access is necessary
@@ -274,9 +317,14 @@ fn eval_theoretical_correctness() -> f64 {
         state.set_core(CoreComponent::Workspace, 0.05);
         let c = eq.compute(&state).consciousness;
         let pass = c < 0.3;
-        if pass { score += 1.0; }
-        println!("  [{}] GWT: No workspace → low C ({:.3} < 0.3)",
-            if pass { "PASS" } else { "FAIL" }, c);
+        if pass {
+            score += 1.0;
+        }
+        println!(
+            "  [{}] GWT: No workspace → low C ({:.3} < 0.3)",
+            if pass { "PASS" } else { "FAIL" },
+            c
+        );
     }
 
     // Test 3: Binding theory predicts synchrony enables consciousness
@@ -286,9 +334,14 @@ fn eval_theoretical_correctness() -> f64 {
         state.set_core(CoreComponent::Binding, 0.05);
         let c = eq.compute(&state).consciousness;
         let pass = c < 0.3;
-        if pass { score += 1.0; }
-        println!("  [{}] Binding: No binding → low C ({:.3} < 0.3)",
-            if pass { "PASS" } else { "FAIL" }, c);
+        if pass {
+            score += 1.0;
+        }
+        println!(
+            "  [{}] Binding: No binding → low C ({:.3} < 0.3)",
+            if pass { "PASS" } else { "FAIL" },
+            c
+        );
     }
 
     // Test 4: HOT theory predicts recursion enriches (with structured_bottleneck: amplifies but doesn't gate)
@@ -304,9 +357,15 @@ fn eval_theoretical_correctness() -> f64 {
         let c_low_r = eq2.compute(&state2).consciousness;
 
         let pass = c_high_r > c_low_r;
-        if pass { score += 1.0; }
-        println!("  [{}] HOT: High recursion ({:.3}) > Low recursion ({:.3})",
-            if pass { "PASS" } else { "FAIL" }, c_high_r, c_low_r);
+        if pass {
+            score += 1.0;
+        }
+        println!(
+            "  [{}] HOT: High recursion ({:.3}) > Low recursion ({:.3})",
+            if pass { "PASS" } else { "FAIL" },
+            c_high_r,
+            c_low_r
+        );
     }
 
     // Test 5: First-order consciousness should be possible (high Phi/B/W, low R)
@@ -325,12 +384,20 @@ fn eval_theoretical_correctness() -> f64 {
 
         // With structured_bottleneck: should still be conscious (>0.2)
         // Without: will collapse due to softmin
-        let threshold = if cfg!(feature = "structured_bottleneck") { 0.2 } else { 0.05 };
+        let threshold = if cfg!(feature = "structured_bottleneck") {
+            0.2
+        } else {
+            0.05
+        };
         let pass = c > threshold;
-        if pass { score += 1.0; }
+        if pass {
+            score += 1.0;
+        }
         println!(
             "  [{}] First-order: Low HOT but high Phi/B/W → C={:.3} (threshold={:.2})",
-            if pass { "PASS" } else { "FAIL" }, c, threshold
+            if pass { "PASS" } else { "FAIL" },
+            c,
+            threshold
         );
     }
 
@@ -343,12 +410,20 @@ fn eval_theoretical_correctness() -> f64 {
 
         // With structured_bottleneck: attention is amplifier, C > 0
         // Without: C ≈ 0 from softmin
-        let threshold = if cfg!(feature = "structured_bottleneck") { 0.1 } else { 0.0 };
+        let threshold = if cfg!(feature = "structured_bottleneck") {
+            0.1
+        } else {
+            0.0
+        };
         let pass = c >= threshold;
-        if pass { score += 1.0; }
+        if pass {
+            score += 1.0;
+        }
         println!(
             "  [{}] AST: Zero attention → C={:.3} (>={:.2})",
-            if pass { "PASS" } else { "FAIL" }, c, threshold
+            if pass { "PASS" } else { "FAIL" },
+            c,
+            threshold
         );
     }
 
@@ -367,9 +442,14 @@ fn eval_theoretical_correctness() -> f64 {
         let rho = result.temporal_continuity;
 
         let pass = rho > 0.5; // temporal memory buffers the drop
-        if pass { score += 1.0; }
-        println!("  [{}] Temporal: After sustained high, sudden drop → rho={:.3} (>0.5)",
-            if pass { "PASS" } else { "FAIL" }, rho);
+        if pass {
+            score += 1.0;
+        }
+        println!(
+            "  [{}] Temporal: After sustained high, sudden drop → rho={:.3} (>0.5)",
+            if pass { "PASS" } else { "FAIL" },
+            rho
+        );
     }
 
     // Test 8: Substrate feasibility gates consciousness
@@ -379,13 +459,21 @@ fn eval_theoretical_correctness() -> f64 {
         state.substrate_feasibility = 0.1;
         let c = eq.compute(&state).consciousness;
         let pass = c < 0.3;
-        if pass { score += 1.0; }
-        println!("  [{}] Substrate: Low feasibility → C={:.3} (<0.3)",
-            if pass { "PASS" } else { "FAIL" }, c);
+        if pass {
+            score += 1.0;
+        }
+        println!(
+            "  [{}] Substrate: Low feasibility → C={:.3} (<0.3)",
+            if pass { "PASS" } else { "FAIL" },
+            c
+        );
     }
 
     let correctness = score / total;
-    println!("  Theoretical correctness: {:.3} ({}/{} passed)", correctness, score as u32, total as u32);
+    println!(
+        "  Theoretical correctness: {:.3} ({}/{} passed)",
+        correctness, score as u32, total as u32
+    );
     correctness
 }
 
@@ -455,10 +543,7 @@ fn eval_structured_bottleneck() {
         let result = eq.compute(&state);
         println!(
             "  {:40} C={:.4}  necessary_min={:.4}  amplifier={:.4}",
-            label,
-            result.consciousness,
-            result.necessary_minimum,
-            result.amplifier_factor,
+            label, result.consciousness, result.necessary_minimum, result.amplifier_factor,
         );
     }
 
@@ -479,10 +564,17 @@ fn eval_structured_bottleneck() {
     if cfg!(feature = "structured_bottleneck") {
         println!("    [structured_bottleneck ON] Amplifier should hurt less than necessary");
         if c_low_amp > c_low_nec * 1.5 {
-            println!("    PASS: Amplifier loss ({:.3}) < necessary loss ({:.3})", c_low_amp, c_low_nec);
+            println!(
+                "    PASS: Amplifier loss ({:.3}) < necessary loss ({:.3})",
+                c_low_amp, c_low_nec
+            );
         } else {
-            println!("    MARGINAL: Amplifier ({:.3}) vs necessary ({:.3}) — ratio: {:.2}x",
-                c_low_amp, c_low_nec, c_low_amp / c_low_nec.max(0.001));
+            println!(
+                "    MARGINAL: Amplifier ({:.3}) vs necessary ({:.3}) — ratio: {:.2}x",
+                c_low_amp,
+                c_low_nec,
+                c_low_amp / c_low_nec.max(0.001)
+            );
         }
     } else {
         println!("    [structured_bottleneck OFF] Both should collapse similarly via softmin");
@@ -509,9 +601,22 @@ fn eval_thermodynamic_features() {
     let entropy = 0.4;
     let prigogine_eff = order / entropy;
     let england_eff = order * entropy;
-    println!("    Prigogine (order/entropy): {:.3} — favors low entropy", prigogine_eff);
-    println!("    England  (order*entropy):  {:.3} — favors productive dissipation", england_eff);
-    println!("    Active mode: {}", if cfg!(feature = "england_dissipation") { "England" } else { "Prigogine" });
+    println!(
+        "    Prigogine (order/entropy): {:.3} — favors low entropy",
+        prigogine_eff
+    );
+    println!(
+        "    England  (order*entropy):  {:.3} — favors productive dissipation",
+        england_eff
+    );
+    println!(
+        "    Active mode: {}",
+        if cfg!(feature = "england_dissipation") {
+            "England"
+        } else {
+            "Prigogine"
+        }
+    );
 }
 
 fn eval_iit4_features() {

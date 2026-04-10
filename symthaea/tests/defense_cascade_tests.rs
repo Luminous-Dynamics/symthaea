@@ -30,17 +30,15 @@ fn test_green_proposes_no_actions() {
 #[test]
 fn test_yellow_proposes_monitoring_only() {
     let actions = propose_defense_actions(SafetyLevel::Yellow, 100);
-    assert!(
-        !actions.is_empty(),
-        "Yellow should propose some actions"
-    );
+    assert!(!actions.is_empty(), "Yellow should propose some actions");
 
     // Yellow actions should be low-severity monitoring
     for action in &actions {
         assert!(
             action.moral_severity < 0.3,
             "Yellow actions should have low severity: {} has {:.2}",
-            action.kind, action.moral_severity
+            action.kind,
+            action.moral_severity
         );
     }
 }
@@ -71,10 +69,7 @@ fn test_orange_proposes_intervention() {
 #[test]
 fn test_red_proposes_emergency_halt() {
     let actions = propose_defense_actions(SafetyLevel::Red, 100);
-    assert!(
-        !actions.is_empty(),
-        "Red should propose emergency actions"
-    );
+    assert!(!actions.is_empty(), "Red should propose emergency actions");
 
     let has_halt = actions
         .iter()
@@ -154,7 +149,8 @@ fn test_all_actions_have_expiry() {
             assert!(
                 action.expires_at > action.proposed_at,
                 "{:?} action {:?} should have expiry > proposed",
-                level, action.kind
+                level,
+                action.kind
             );
         }
     }

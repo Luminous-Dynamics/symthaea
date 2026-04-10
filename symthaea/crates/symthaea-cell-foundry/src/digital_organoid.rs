@@ -90,7 +90,9 @@ pub enum SynapseType {
 }
 
 /// Developmental stage of the organoid (Lancaster et al. 2013).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, serde::Serialize, serde::Deserialize,
+)]
 pub enum DevelopmentalStage {
     /// Days 0-10: mostly stem cells dividing.
     EarlyProliferation,
@@ -471,11 +473,8 @@ impl DigitalOrganoid {
             return 0.0;
         }
 
-        let id_to_idx: std::collections::HashMap<u32, usize> = neurons
-            .iter()
-            .enumerate()
-            .map(|(i, c)| (c.id, i))
-            .collect();
+        let id_to_idx: std::collections::HashMap<u32, usize> =
+            neurons.iter().enumerate().map(|(i, c)| (c.id, i)).collect();
 
         let dim = n.min(64); // cap for performance
 
@@ -486,10 +485,10 @@ impl DigitalOrganoid {
         // Use deterministic bipartitions: even/odd, first/second half,
         // interleaved by 2, and interleaved by 4.
         let partitions: &[fn(usize, usize) -> bool] = &[
-            |i, _dim| i % 2 == 0,              // even / odd
-            |i, dim| i < dim / 2,              // first half / second half
-            |i, _dim| (i / 2) % 2 == 0,        // pairs interleaved
-            |i, _dim| (i / 4) % 2 == 0,        // quads interleaved
+            |i, _dim| i % 2 == 0,       // even / odd
+            |i, dim| i < dim / 2,       // first half / second half
+            |i, _dim| (i / 2) % 2 == 0, // pairs interleaved
+            |i, _dim| (i / 4) % 2 == 0, // quads interleaved
         ];
 
         let mut min_integration = f64::MAX;
@@ -497,9 +496,7 @@ impl DigitalOrganoid {
             let mut cross_weight = 0.0f64;
             let mut total_weight = 0.0f64;
             for syn in &self.synapses {
-                if let (Some(&i), Some(&j)) =
-                    (id_to_idx.get(&syn.pre), id_to_idx.get(&syn.post))
-                {
+                if let (Some(&i), Some(&j)) = (id_to_idx.get(&syn.pre), id_to_idx.get(&syn.post)) {
                     if i < dim && j < dim {
                         let w = (syn.weight * syn.maturity) as f64;
                         total_weight += w;
@@ -527,8 +524,11 @@ impl DigitalOrganoid {
         }
 
         // --- Component 2: Activity factor ---
-        let mean_rate: f64 =
-            neurons[..dim].iter().map(|c| c.firing_rate_hz as f64).sum::<f64>() / dim as f64;
+        let mean_rate: f64 = neurons[..dim]
+            .iter()
+            .map(|c| c.firing_rate_hz as f64)
+            .sum::<f64>()
+            / dim as f64;
         // Sigmoid mapping: half-max at 2 Hz, saturates ~10 Hz
         let activity = mean_rate / (mean_rate + 2.0);
 
@@ -536,10 +536,7 @@ impl DigitalOrganoid {
         let mean_maturity = if self.synapses.is_empty() {
             0.0
         } else {
-            self.synapses
-                .iter()
-                .map(|s| s.maturity as f64)
-                .sum::<f64>()
+            self.synapses.iter().map(|s| s.maturity as f64).sum::<f64>()
                 / self.synapses.len() as f64
         };
 
@@ -579,7 +576,8 @@ impl DigitalOrganoid {
             if !can_divide {
                 continue;
             }
-            if self.rng.gen_bool(rate.min(1.0)) && (current_count + new_cells.len()) < self.max_cells
+            if self.rng.gen_bool(rate.min(1.0))
+                && (current_count + new_cells.len()) < self.max_cells
             {
                 let parent = &self.cells[i];
                 let mut pos = parent.position;
@@ -732,14 +730,16 @@ impl DigitalOrganoid {
                     continue;
                 }
                 let syn1_avg = (neurons[i].3 + neurons[j].3) / 2.0;
-                let prob = synapse_prob_base * (1.0 - d / SYNAPSE_DISTANCE_MAX) as f64
-                    * syn1_avg as f64;
+                let prob =
+                    synapse_prob_base * (1.0 - d / SYNAPSE_DISTANCE_MAX) as f64 * syn1_avg as f64;
                 if !existing.contains(&(neurons[i].0, neurons[j].0))
                     && self.rng.gen_bool(prob.clamp(0.0, 1.0))
                 {
                     let stype = match neurons[i].2 {
                         CellKind::ExcitatoryNeuron => SynapseType::Glutamatergic,
-                        CellKind::InhibitoryNeuron | CellKind::Interneuron => SynapseType::GABAergic,
+                        CellKind::InhibitoryNeuron | CellKind::Interneuron => {
+                            SynapseType::GABAergic
+                        }
                         _ => SynapseType::Cholinergic,
                     };
                     new_synapses.push(Synapse {
@@ -950,11 +950,7 @@ mod tests {
     fn neural_differentiation_after_day_10() {
         let mut org = DigitalOrganoid::new(100, 42);
         org.run_to_day(25);
-        let neuron_count = org
-            .cells()
-            .iter()
-            .filter(|c| c.kind.is_neuron())
-            .count();
+        let neuron_count = org.cells().iter().filter(|c| c.kind.is_neuron()).count();
         assert!(
             neuron_count > 0,
             "should have neurons after day 25, got {}",
@@ -1031,10 +1027,7 @@ mod tests {
     fn phi_starts_near_zero_increases_with_development() {
         let mut org = DigitalOrganoid::new(100, 42);
         let history = org.run_to_day(80);
-        assert!(
-            org.phi_history()[0] < 0.01,
-            "phi should start near 0"
-        );
+        assert!(org.phi_history()[0] < 0.01, "phi should start near 0");
         // Phi should be non-negative throughout
         for phi in org.phi_history() {
             assert!(*phi >= 0.0, "phi should be non-negative: {}", phi);
@@ -1096,14 +1089,38 @@ mod tests {
 
     #[test]
     fn stage_progression_matches_timeline() {
-        assert_eq!(DevelopmentalStage::from_day(0), DevelopmentalStage::EarlyProliferation);
-        assert_eq!(DevelopmentalStage::from_day(9), DevelopmentalStage::EarlyProliferation);
-        assert_eq!(DevelopmentalStage::from_day(10), DevelopmentalStage::NeuralInduction);
-        assert_eq!(DevelopmentalStage::from_day(20), DevelopmentalStage::Patterning);
-        assert_eq!(DevelopmentalStage::from_day(40), DevelopmentalStage::Synaptogenesis);
-        assert_eq!(DevelopmentalStage::from_day(80), DevelopmentalStage::MaturationI);
-        assert_eq!(DevelopmentalStage::from_day(120), DevelopmentalStage::MaturationII);
-        assert_eq!(DevelopmentalStage::from_day(200), DevelopmentalStage::MaturationII);
+        assert_eq!(
+            DevelopmentalStage::from_day(0),
+            DevelopmentalStage::EarlyProliferation
+        );
+        assert_eq!(
+            DevelopmentalStage::from_day(9),
+            DevelopmentalStage::EarlyProliferation
+        );
+        assert_eq!(
+            DevelopmentalStage::from_day(10),
+            DevelopmentalStage::NeuralInduction
+        );
+        assert_eq!(
+            DevelopmentalStage::from_day(20),
+            DevelopmentalStage::Patterning
+        );
+        assert_eq!(
+            DevelopmentalStage::from_day(40),
+            DevelopmentalStage::Synaptogenesis
+        );
+        assert_eq!(
+            DevelopmentalStage::from_day(80),
+            DevelopmentalStage::MaturationI
+        );
+        assert_eq!(
+            DevelopmentalStage::from_day(120),
+            DevelopmentalStage::MaturationII
+        );
+        assert_eq!(
+            DevelopmentalStage::from_day(200),
+            DevelopmentalStage::MaturationII
+        );
     }
 
     #[test]
@@ -1129,10 +1146,7 @@ mod tests {
         org.run_to_day(5);
         org.terminate("ethics test");
         let further = org.run_to_day(100);
-        assert!(
-            further.is_empty(),
-            "should not advance after termination"
-        );
+        assert!(further.is_empty(), "should not advance after termination");
         assert!(org.day() <= 5, "day should not advance past halt");
     }
 

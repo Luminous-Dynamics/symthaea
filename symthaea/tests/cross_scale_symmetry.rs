@@ -175,8 +175,14 @@ fn test_h1_symmetric_vs_asymmetric_binding_harmonic_fraction() {
     // the weighting averages across scales with varying signal energy.
     let sum_sym = fracs_sym.gradient + fracs_sym.curl + fracs_sym.harmonic;
     let sum_asym = fracs_asym.gradient + fracs_asym.curl + fracs_asym.harmonic;
-    assert!(sum_sym <= 1.01, "Symmetric fractions sum {sum_sym} exceeds 1.0");
-    assert!(sum_asym <= 1.01, "Asymmetric fractions sum {sum_asym} exceeds 1.0");
+    assert!(
+        sum_sym <= 1.01,
+        "Symmetric fractions sum {sum_sym} exceeds 1.0"
+    );
+    assert!(
+        sum_asym <= 1.01,
+        "Asymmetric fractions sum {sum_asym} exceeds 1.0"
+    );
 
     // Both should have non-trivial harmonic content (moral manifolds have cycles)
     assert!(
@@ -229,10 +235,10 @@ fn test_h2_harmonic_fraction_modulates_consciousness() {
 
     // Test cases: harmonic fraction → expected consciousness multiplier
     let test_cases = [
-        (0.0, "zero harmonics"),           // Below baseline → dampen
-        (0.33, "equipartition"),           // At baseline → neutral
-        (0.67, "high harmonics"),          // Above baseline → boost
-        (1.0, "pure harmonic"),            // Maximum → maximum boost
+        (0.0, "zero harmonics"),  // Below baseline → dampen
+        (0.33, "equipartition"),  // At baseline → neutral
+        (0.67, "high harmonics"), // Above baseline → boost
+        (1.0, "pure harmonic"),   // Maximum → maximum boost
     ];
 
     println!("=== Hypothesis 2: Harmonic Fraction → Consciousness Modulation ===");
@@ -268,8 +274,16 @@ fn test_h2_harmonic_fraction_modulates_consciousness() {
     );
 
     // Range should be within ±3% as designed
-    assert!(mods[0] >= 0.97, "Minimum mod should be >= 0.97, got {}", mods[0]);
-    assert!(mods[3] <= 1.03, "Maximum mod should be <= 1.03, got {}", mods[3]);
+    assert!(
+        mods[0] >= 0.97,
+        "Minimum mod should be >= 0.97, got {}",
+        mods[0]
+    );
+    assert!(
+        mods[3] <= 1.03,
+        "Maximum mod should be <= 1.03, got {}",
+        mods[3]
+    );
 }
 
 // ═════════════════════════════════════════════════════════════════════════
@@ -285,7 +299,9 @@ fn test_h3_dreaming_state_hodge_profile() {
     add_random_scenarios(&mut topo, 20, 777);
     let assessment = topo.analyze();
 
-    let fracs = assessment.hodge_fractions.expect("Should have Hodge fractions");
+    let fracs = assessment
+        .hodge_fractions
+        .expect("Should have Hodge fractions");
 
     println!("=== Hypothesis 3a: Dreaming State ===");
     println!(
@@ -318,7 +334,9 @@ fn test_h3_focused_attention_hodge_profile() {
     } else {
         println!("=== Hypothesis 3b: Focused Attention ===");
         println!("  Clustered scenarios: too few edges for Hodge decomposition");
-        println!("  (Tight clustering → high similarity → dense Rips complex OR few distinct edges)");
+        println!(
+            "  (Tight clustering → high similarity → dense Rips complex OR few distinct edges)"
+        );
         // This is actually informative: very tight clustering may create a
         // fully-connected complex where β₁=0, meaning the gradient component
         // dominates (hierarchical flow with no cycles).
@@ -334,7 +352,9 @@ fn test_h3_creative_exploration_hodge_profile() {
     add_bound_scenarios(&mut topo, 20, 999);
     let assessment = topo.analyze();
 
-    let fracs = assessment.hodge_fractions.expect("Should have Hodge fractions");
+    let fracs = assessment
+        .hodge_fractions
+        .expect("Should have Hodge fractions");
 
     println!("=== Hypothesis 3c: Creative Exploration ===");
     println!(
@@ -348,14 +368,29 @@ fn test_h3_compare_all_states() {
     // Run all three cognitive states and compare their Hodge profiles.
 
     println!("\n=== Cognitive State Comparison ===\n");
-    println!("{:<25} {:>10} {:>10} {:>10} {:>8}", "State", "Gradient", "Curl", "Harmonic", "Scales");
+    println!(
+        "{:<25} {:>10} {:>10} {:>10} {:>8}",
+        "State", "Gradient", "Curl", "Harmonic", "Scales"
+    );
     println!("{}", "-".repeat(68));
 
     let states: Vec<(&str, Box<dyn Fn(&mut MoralTopology)>)> = vec![
-        ("Dreaming (random)", Box::new(|t: &mut MoralTopology| add_random_scenarios(t, 20, 111))),
-        ("Focused (clustered)", Box::new(|t: &mut MoralTopology| add_clustered_scenarios(t, 20, 222))),
-        ("Creative (bound)", Box::new(|t: &mut MoralTopology| add_bound_scenarios(t, 20, 333))),
-        ("Symmetric (commutative)", Box::new(|t: &mut MoralTopology| add_symmetric_scenarios(t, 20, 444))),
+        (
+            "Dreaming (random)",
+            Box::new(|t: &mut MoralTopology| add_random_scenarios(t, 20, 111)),
+        ),
+        (
+            "Focused (clustered)",
+            Box::new(|t: &mut MoralTopology| add_clustered_scenarios(t, 20, 222)),
+        ),
+        (
+            "Creative (bound)",
+            Box::new(|t: &mut MoralTopology| add_bound_scenarios(t, 20, 333)),
+        ),
+        (
+            "Symmetric (commutative)",
+            Box::new(|t: &mut MoralTopology| add_symmetric_scenarios(t, 20, 444)),
+        ),
     ];
 
     let mut results: Vec<(&str, Option<HodgeFractions>)> = Vec::new();
@@ -402,7 +437,10 @@ fn test_hodge_fractions_persist_across_window_growth() {
     let mut fraction_history: Vec<(usize, HodgeFractions)> = Vec::new();
 
     println!("\n=== Window Growth: Hodge Fraction Evolution ===\n");
-    println!("{:<8} {:>10} {:>10} {:>10} {:>8}", "Window", "Gradient", "Curl", "Harmonic", "Scales");
+    println!(
+        "{:<8} {:>10} {:>10} {:>10} {:>8}",
+        "Window", "Gradient", "Curl", "Harmonic", "Scales"
+    );
     println!("{}", "-".repeat(52));
 
     for i in 0..24 {
@@ -415,7 +453,11 @@ fn test_hodge_fractions_persist_across_window_growth() {
             if let Some(fracs) = assessment.hodge_fractions {
                 println!(
                     "{:<8} {:>10.4} {:>10.4} {:>10.4} {:>8}",
-                    i + 1, fracs.gradient, fracs.curl, fracs.harmonic, fracs.scales_sampled
+                    i + 1,
+                    fracs.gradient,
+                    fracs.curl,
+                    fracs.harmonic,
+                    fracs.scales_sampled
                 );
                 fraction_history.push((i + 1, fracs));
             }
@@ -613,8 +655,7 @@ fn test_multiscale_hodge_sweep_bound_vs_symmetric() {
     println!("\n=== Multi-Scale Hodge: Asymmetric vs Symmetric Binding ===\n");
     println!(
         "{:<7} {:>9} {:>9} {:>9} {:>6} | {:>9} {:>9} {:>9} {:>6}",
-        "Scale", "A:Grad", "A:Curl", "A:Harm", "A:E",
-        "S:Grad", "S:Curl", "S:Harm", "S:E"
+        "Scale", "A:Grad", "A:Curl", "A:Harm", "A:E", "S:Grad", "S:Curl", "S:Harm", "S:E"
     );
     println!("{}", "-".repeat(82));
 
@@ -770,9 +811,16 @@ fn test_vertex_hodge_harmony_coordinates() {
     let num_scales = 15;
     println!(
         "{:<8} {:>8} {:>8} {:>8} | {:>8} {:>8} {:>8} | {:>8} {:>8} {:>8}",
-        "Scale", "H0:Grad", "H0:Curl", "H0:Harm",
-        "H3:Grad", "H3:Curl", "H3:Harm",
-        "H7:Grad", "H7:Curl", "H7:Harm"
+        "Scale",
+        "H0:Grad",
+        "H0:Curl",
+        "H0:Harm",
+        "H3:Grad",
+        "H3:Curl",
+        "H3:Harm",
+        "H7:Grad",
+        "H7:Curl",
+        "H7:Harm"
     );
     println!("{}", "-".repeat(90));
 
@@ -793,8 +841,12 @@ fn test_vertex_hodge_harmony_coordinates() {
 
         for r in &results {
             if let Some((g, _, h)) = r {
-                if *g > 0.01 { found_vertex_gradient = true; }
-                if *h > 0.01 { found_vertex_harmonic = true; }
+                if *g > 0.01 {
+                    found_vertex_gradient = true;
+                }
+                if *h > 0.01 {
+                    found_vertex_harmonic = true;
+                }
             }
         }
 
@@ -897,7 +949,10 @@ fn test_adaptive_rips_ema_tracking() {
     });
 
     // Initially NaN
-    assert!(topo.critical_scale_ema().is_nan(), "Initial EMA should be NaN");
+    assert!(
+        topo.critical_scale_ema().is_nan(),
+        "Initial EMA should be NaN"
+    );
 
     // Add scenarios and analyze
     add_random_scenarios(&mut topo, 12, 7000);
@@ -936,7 +991,10 @@ fn test_hodge_fractions_in_assessment() {
         assert!(fracs.curl >= 0.0 && fracs.curl <= 1.0);
         assert!(fracs.harmonic >= 0.0 && fracs.harmonic <= 1.0);
         // scales_sampled > 0
-        assert!(fracs.scales_sampled > 0, "Should have sampled at least 1 scale");
+        assert!(
+            fracs.scales_sampled > 0,
+            "Should have sampled at least 1 scale"
+        );
         // total_weight > 0
         assert!(fracs.total_weight > 0.0, "Total weight should be positive");
         // critical_scale is either NaN or in [0, 1]
@@ -952,9 +1010,13 @@ fn test_hodge_fractions_in_assessment() {
         }
         println!(
             "Fractions: g={:.4} c={:.4} h={:.4} scales={} weight={:.4} critical={:.4} at_crit={}",
-            fracs.gradient, fracs.curl, fracs.harmonic,
-            fracs.scales_sampled, fracs.total_weight,
-            fracs.critical_scale, fracs.at_criticality,
+            fracs.gradient,
+            fracs.curl,
+            fracs.harmonic,
+            fracs.scales_sampled,
+            fracs.total_weight,
+            fracs.critical_scale,
+            fracs.at_criticality,
         );
     }
 }
@@ -975,7 +1037,10 @@ fn test_consciousness_modulation_homeostasis() {
     let mut dream_interval = 100_usize;
 
     println!("\n=== Homeostatic Loop Simulation (100 cycles) ===\n");
-    println!("{:<6} {:>8} {:>10} {:>12}", "Cycle", "Psi", "Harmonic", "DreamInt");
+    println!(
+        "{:<6} {:>8} {:>10} {:>12}",
+        "Cycle", "Psi", "Harmonic", "DreamInt"
+    );
     println!("{}", "-".repeat(40));
 
     let topology_cadence = 30; // Topology only runs every ~30 cycles
@@ -1005,26 +1070,23 @@ fn test_consciousness_modulation_homeostasis() {
         // Simulate: dreaming heals fragmentation and restores consciousness
         if cycle % dream_interval.max(1) == 0 {
             harmonic = (harmonic - 0.15).max(0.0); // Dream consolidation heals manifold
-            psi = (psi + 0.02).min(1.0);           // Sleep restores consciousness
+            psi = (psi + 0.02).min(1.0); // Sleep restores consciousness
         }
 
         // Simulate: without dreams, fragmentation slowly increases
         harmonic = (harmonic + 0.012).min(1.0);
 
         if cycle % 10 == 0 {
-            println!("{:<6} {:>8.4} {:>10.4} {:>12}", cycle, psi, harmonic, dream_interval);
+            println!(
+                "{:<6} {:>8.4} {:>10.4} {:>12}",
+                cycle, psi, harmonic, dream_interval
+            );
         }
     }
 
     // After 100 cycles, psi should not have collapsed to 0 or diverged to 1
-    assert!(
-        psi > 0.1,
-        "Consciousness should not collapse: psi={psi}"
-    );
-    assert!(
-        psi < 0.95,
-        "Consciousness should not diverge: psi={psi}"
-    );
+    assert!(psi > 0.1, "Consciousness should not collapse: psi={psi}");
+    assert!(psi < 0.95, "Consciousness should not diverge: psi={psi}");
     println!("\nFinal: psi={psi:.4}, harmonic={harmonic:.4}, dream_interval={dream_interval}");
     println!("Homeostasis maintained: psi in ({:.2}, {:.2})", 0.1, 0.95);
 }

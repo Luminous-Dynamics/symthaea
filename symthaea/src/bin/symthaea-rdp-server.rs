@@ -72,10 +72,7 @@ fn main() -> Result<()> {
 
     let cycle_interval = Duration::from_millis(1000 / fps.max(1) as u64);
 
-    info!(
-        "Server running at {} Hz. Waiting for connections...",
-        fps
-    );
+    info!("Server running at {} Hz. Waiting for connections...", fps);
 
     // Main loop.
     let mut cycle: u64 = 0;

@@ -148,7 +148,10 @@ impl ConsciousnessSnapshot {
             .duration_since(std::time::UNIX_EPOCH)
             .map(|d| d.as_secs())
             .unwrap_or(0);
-        if now > 0 && self.timestamp_secs > 0 && now.saturating_sub(self.timestamp_secs) > Self::MAX_AGE_SECS {
+        if now > 0
+            && self.timestamp_secs > 0
+            && now.saturating_sub(self.timestamp_secs) > Self::MAX_AGE_SECS
+        {
             return false;
         }
 
@@ -2582,9 +2585,7 @@ mod tests {
             (deserialized.self_model_accuracy - original.self_model_accuracy).abs() < f64::EPSILON
         );
         assert!((deserialized.coherence - original.coherence).abs() < f64::EPSILON);
-        assert!(
-            (deserialized.affective_valence - original.affective_valence).abs() < f64::EPSILON
-        );
+        assert!((deserialized.affective_valence - original.affective_valence).abs() < f64::EPSILON);
         assert!((deserialized.care_activation - original.care_activation).abs() < f64::EPSILON);
         assert_eq!(deserialized.timestamp_secs, original.timestamp_secs);
     }
@@ -2903,7 +2904,10 @@ mod tests {
         assert_eq!(rt.proposal_id, original.proposal_id);
         assert!((rt.consciousness.phi - 0.7).abs() < f64::EPSILON);
         assert!((rt.alignment.overall_score - 0.85).abs() < f64::EPSILON);
-        assert_eq!(rt.alignment.recommendation, GovernanceRecommendation::StrongSupport);
+        assert_eq!(
+            rt.alignment.recommendation,
+            GovernanceRecommendation::StrongSupport
+        );
         assert_eq!(rt.submitted_at, 1_700_000_000);
         assert!(rt.success);
     }
@@ -3011,7 +3015,10 @@ mod tests {
         // key ordering is non-deterministic across serializations.
         let val1: serde_json::Value = serde_json::from_str(&json1).unwrap();
         let val2: serde_json::Value = serde_json::from_str(&json2).unwrap();
-        assert_eq!(val1, val2, "double round-trip should produce semantically identical JSON");
+        assert_eq!(
+            val1, val2,
+            "double round-trip should produce semantically identical JSON"
+        );
         assert_eq!(rt2.value, VoteValue::StrongNo);
         assert_eq!(rt2.alignment.violations.len(), 2);
         assert_eq!(rt2.timestamp, 0);

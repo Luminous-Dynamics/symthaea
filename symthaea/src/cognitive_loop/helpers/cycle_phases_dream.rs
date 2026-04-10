@@ -45,7 +45,8 @@ impl CognitiveLoopService {
             // Science: Tononi (2015) — consciousness = integrated information = memory salience
             // Narrative→Dream coupling (Conway 2005): self-relevant memories encode preferentially.
             let narrative_salience = self
-                .consciousness.self_model_tier
+                .consciousness
+                .self_model_tier
                 .narrative_self
                 .as_ref()
                 .map(
@@ -211,7 +212,9 @@ impl CognitiveLoopService {
                             // Dream→Narrative coupling: dream insights feed narrative self-model.
                             // Science: Revonsuo (2000) — dreaming enhances threat simulation
                             // and narrative integration of novel experiences.
-                            if let Some(ref mut narrative) = self.consciousness.self_model_tier.narrative_self {
+                            if let Some(ref mut narrative) =
+                                self.consciousness.self_model_tier.narrative_self
+                            {
                                 narrative.process_experience(
                                     hv16_cached,
                                     &format!("dream_insight_{}", result.insights),
@@ -226,13 +229,16 @@ impl CognitiveLoopService {
                             // Science: Walker (2009) — sleep-dependent memory consolidation
                             // strengthens autobiographical narrative structure.
                             // Valence: phi improvement is intrinsically positive.
-                            self.consciousness.master_equation.narrative_coherence.add_episode(
-                                format!(
-                                    "dream_insight_{}_phi{:.3}",
-                                    result.insights, result.best_phi_improvement
-                                ),
-                                (result.best_phi_improvement as f64 * 0.5).clamp(-0.5, 0.5),
-                            );
+                            self.consciousness
+                                .master_equation
+                                .narrative_coherence
+                                .add_episode(
+                                    format!(
+                                        "dream_insight_{}_phi{:.3}",
+                                        result.insights, result.best_phi_improvement
+                                    ),
+                                    (result.best_phi_improvement as f64 * 0.5).clamp(-0.5, 0.5),
+                                );
                         }
                     }
                     Err(e) => {
@@ -400,7 +406,11 @@ impl CognitiveLoopService {
         // Science: Stickgold & Walker (2013) — sleep-dependent memory consolidation;
         //          McClelland et al. (1995) — complementary learning systems theory.
         if let Some(ref mut km) = self.memory.knowledge_manager {
-            let top = self.memory.memory_consol.memory_coordinator.most_replayed(5);
+            let top = self
+                .memory
+                .memory_consol
+                .memory_coordinator
+                .most_replayed(5);
             for (content_hash, replay_count) in &top {
                 if *replay_count >= 3 {
                     let label = format!("episode_0x{:016x}", content_hash);

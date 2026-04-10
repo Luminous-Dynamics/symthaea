@@ -347,8 +347,20 @@ fn dominates(a: &OrganismFitness, b: &OrganismFitness) -> i8 {
     // 4. Phi stability (sustained, not oscillating — consciousness = phi_stability)
     // 5. Threshold consistency
     // Note: -free_energy approximates FE reduction when initial FE varies
-    let a_vals = [a.phi, -a.free_energy, a.prediction_accuracy, a.consciousness, a.threshold_fitness];
-    let b_vals = [b.phi, -b.free_energy, b.prediction_accuracy, b.consciousness, b.threshold_fitness];
+    let a_vals = [
+        a.phi,
+        -a.free_energy,
+        a.prediction_accuracy,
+        a.consciousness,
+        a.threshold_fitness,
+    ];
+    let b_vals = [
+        b.phi,
+        -b.free_energy,
+        b.prediction_accuracy,
+        b.consciousness,
+        b.threshold_fitness,
+    ];
 
     let mut a_better = false;
     let mut b_better = false;
@@ -443,7 +455,7 @@ mod tests {
                     consciousness: i as f64 * 0.3,
                     prediction_accuracy: 0.5,
                     energy_efficiency: 0.5,
-                threshold_fitness: 0.5,
+                    threshold_fitness: 0.5,
                 };
                 org
             })
@@ -475,7 +487,7 @@ mod tests {
                     consciousness: i as f64 * 0.3,
                     prediction_accuracy: 0.5,
                     energy_efficiency: i as f64 * 0.2,
-                threshold_fitness: 0.5,
+                    threshold_fitness: 0.5,
                 };
                 org
             })

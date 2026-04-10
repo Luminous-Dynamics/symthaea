@@ -235,8 +235,8 @@ impl AestheticTracker {
         let delta = score.composite - self.ema;
 
         // Update EMA
-        self.ema = self.ema * (1.0 - self.config.ema_alpha)
-            + score.composite * self.config.ema_alpha;
+        self.ema =
+            self.ema * (1.0 - self.config.ema_alpha) + score.composite * self.config.ema_alpha;
 
         // Dopamine: reward prediction error (positive when exceeding expectation)
         let dopamine_delta = if delta > self.config.reward_threshold {
@@ -326,7 +326,10 @@ mod tests {
         mid.compute_composite();
         high.compute_composite();
         assert!(mid.composite > low.composite, "mid {mid:?} > low {low:?}");
-        assert!(mid.composite > high.composite, "mid {mid:?} > high {high:?}");
+        assert!(
+            mid.composite > high.composite,
+            "mid {mid:?} > high {high:?}"
+        );
     }
 
     #[test]
@@ -380,10 +383,7 @@ mod tests {
             "should reward exceeding EMA: delta={}",
             feedback.dopamine_delta
         );
-        assert!(
-            tracker.expectation() > ema_before,
-            "EMA should increase"
-        );
+        assert!(tracker.expectation() > ema_before, "EMA should increase");
     }
 
     #[test]

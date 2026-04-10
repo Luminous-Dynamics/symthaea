@@ -150,7 +150,10 @@ pub struct TrendHistory {
 
 impl TrendHistory {
     pub fn new() -> Self {
-        Self { snapshots: Vec::new(), max_snapshots: 1000 }
+        Self {
+            snapshots: Vec::new(),
+            max_snapshots: 1000,
+        }
     }
 
     pub fn record(&mut self, snapshot: TrendSnapshot) {
@@ -194,10 +197,18 @@ impl TrendHistory {
             };
         }
         let n = self.snapshots.len() as f32;
-        let c_mean: f32 = self.snapshots.iter().map(|s| s.consciousness_level).sum::<f32>() / n;
-        let c_var: f32 = self.snapshots.iter()
+        let c_mean: f32 = self
+            .snapshots
+            .iter()
+            .map(|s| s.consciousness_level)
+            .sum::<f32>()
+            / n;
+        let c_var: f32 = self
+            .snapshots
+            .iter()
             .map(|s| (s.consciousness_level - c_mean).powi(2))
-            .sum::<f32>() / n;
+            .sum::<f32>()
+            / n;
         let phi_mean: f32 = self.snapshots.iter().map(|s| s.phi).sum::<f32>() / n;
         let harmony_trend = if self.snapshots.len() >= 2 {
             let last = self.snapshots.last().unwrap().harmony_alignment;
@@ -221,7 +232,9 @@ impl TrendHistory {
 }
 
 impl Default for TrendHistory {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 /// A serializable snapshot of the Spore engine state.

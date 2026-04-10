@@ -118,9 +118,18 @@ fn neural_mode_produces_valid_art() {
     let artwork = symthaea_atelier::create_artwork(&config, &snapshot, 42);
 
     assert!(artwork.svg.contains("<svg"), "should produce valid SVG");
-    assert!(artwork.scene.node_count() >= 5, "should have multiple elements");
-    assert!(artwork.aesthetic_score.composite >= 0.0, "score should be non-negative");
-    assert!(artwork.aesthetic_score.composite <= 1.0, "score should be bounded");
+    assert!(
+        artwork.scene.node_count() >= 5,
+        "should have multiple elements"
+    );
+    assert!(
+        artwork.aesthetic_score.composite >= 0.0,
+        "score should be non-negative"
+    );
+    assert!(
+        artwork.aesthetic_score.composite <= 1.0,
+        "score should be bounded"
+    );
 }
 
 /// Test that different cognitive states produce measurably different art.
@@ -134,18 +143,24 @@ fn cognitive_states_differentiate_art() {
 
     let serene = CognitiveSnapshot {
         consciousness_level: 0.9,
-        valence: 0.7, arousal: 0.2,
+        valence: 0.7,
+        arousal: 0.2,
         harmony_activations: [0.8, 0.8, 0.7, 0.2, 0.7, 0.7, 0.5, 0.9],
-        dopamine: 0.5, serotonin: 0.8, noradrenaline: 0.1,
+        dopamine: 0.5,
+        serotonin: 0.8,
+        noradrenaline: 0.1,
         thought_vector: vec![0.1, 0.0, 0.1, -0.1],
         ..CognitiveSnapshot::dormant()
     };
 
     let turbulent = CognitiveSnapshot {
         consciousness_level: 0.5,
-        valence: -0.7, arousal: 0.9,
+        valence: -0.7,
+        arousal: 0.9,
         harmony_activations: [0.2, 0.1, 0.3, 0.9, 0.5, 0.1, 0.8, 0.1],
-        dopamine: 0.3, serotonin: 0.2, noradrenaline: 0.9,
+        dopamine: 0.3,
+        serotonin: 0.2,
+        noradrenaline: 0.9,
         thought_vector: vec![0.8, -0.7, 0.9, -0.5],
         ..CognitiveSnapshot::dormant()
     };
@@ -154,7 +169,8 @@ fn cognitive_states_differentiate_art() {
     let art_turbulent = symthaea_atelier::create_artwork_iterative(&config, &turbulent, 42);
 
     // Scores should differ
-    let score_diff = (art_serene.aesthetic_score.composite - art_turbulent.aesthetic_score.composite).abs();
+    let score_diff =
+        (art_serene.aesthetic_score.composite - art_turbulent.aesthetic_score.composite).abs();
     assert!(
         score_diff > 0.01,
         "states should produce different scores: serene={:.3}, turbulent={:.3}",

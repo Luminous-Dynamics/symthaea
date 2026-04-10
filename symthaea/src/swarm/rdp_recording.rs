@@ -211,8 +211,10 @@ impl SessionPlayer {
 
 #[cfg(test)]
 mod tests {
+    use super::super::rdp_protocol::{
+        ControlMessage, DeltaFrame, DeltaPatch, FullFrame, QuantizedPatch,
+    };
     use super::*;
-    use super::super::rdp_protocol::{ControlMessage, DeltaFrame, DeltaPatch, FullFrame, QuantizedPatch};
 
     fn test_header() -> RecordingHeader {
         RecordingHeader::new("s1", "peer1", 4, 4, 5)
@@ -232,7 +234,9 @@ mod tests {
             timestamp_ms: 0,
             patch_cols: 4,
             patch_rows: 4,
-            patches: vec![QuantizedPatch { values: vec![0; 64] }],
+            patches: vec![QuantizedPatch {
+                values: vec![0; 64],
+            }],
             consciousness_level: 0.5,
             harmony: "present".into(),
         }));
@@ -268,7 +272,11 @@ mod tests {
 
         // Advance 500ms real-time = 1s playback time at 2x.
         let frames = player.advance(500_000);
-        assert_eq!(frames.len(), 2, "At 2x speed, 500ms should yield both frames");
+        assert_eq!(
+            frames.len(),
+            2,
+            "At 2x speed, 500ms should yield both frames"
+        );
     }
 
     #[test]

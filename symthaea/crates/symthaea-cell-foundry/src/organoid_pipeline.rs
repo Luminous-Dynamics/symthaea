@@ -237,11 +237,7 @@ impl OrganoidPipeline {
 
     /// Get the current Phi estimate from the digital organoid.
     pub fn current_phi(&self) -> f64 {
-        self.digital
-            .phi_history()
-            .last()
-            .copied()
-            .unwrap_or(0.0)
+        self.digital.phi_history().last().copied().unwrap_or(0.0)
     }
 
     /// Whether the pipeline has been halted (by ethics or completion).
@@ -256,10 +252,7 @@ impl OrganoidPipeline {
 
     /// Generate a consciousness emergence curve: (day, phi) pairs.
     pub fn phi_curve(&self) -> Vec<(u32, f64)> {
-        self.day_snapshots
-            .iter()
-            .map(|s| (s.day, s.phi))
-            .collect()
+        self.day_snapshots.iter().map(|s| (s.day, s.phi)).collect()
     }
 
     /// Find the first day when Phi exceeded the given threshold.
@@ -283,11 +276,7 @@ impl OrganoidPipeline {
     // -- private --
 
     fn build_result(&self) -> PipelineResult {
-        let final_phi = self
-            .day_snapshots
-            .last()
-            .map(|s| s.phi)
-            .unwrap_or(0.0);
+        let final_phi = self.day_snapshots.last().map(|s| s.phi).unwrap_or(0.0);
         let final_stage = self.digital.stage();
         let metrics = self.digital.metrics();
 

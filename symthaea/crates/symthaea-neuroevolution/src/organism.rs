@@ -238,9 +238,8 @@ impl NeuralOrganism {
         let phi_stability = 1.0 / (1.0 + phi_variance * 10.0);
 
         // Objective 5: Threshold consistency (existing heuristic)
-        let threshold_fit = crate::threshold_genome::evaluate_threshold_fitness(
-            &self.genome.decode_thresholds(),
-        );
+        let threshold_fit =
+            crate::threshold_genome::evaluate_threshold_fitness(&self.genome.decode_thresholds());
 
         let efficiency = 1.0 / (1.0 + mean_fe.abs());
 
@@ -300,9 +299,13 @@ impl NeuralOrganism {
     /// Reset evaluation state for a new fitness round.
 
     /// Get initial FE from evaluation (for FE reduction rate).
-    pub fn initial_fe(&self) -> f64 { self.initial_fe }
+    pub fn initial_fe(&self) -> f64 {
+        self.initial_fe
+    }
     /// Get final FE from evaluation.
-    pub fn final_fe(&self) -> f64 { self.final_fe }
+    pub fn final_fe(&self) -> f64 {
+        self.final_fe
+    }
     pub fn reset_evaluation(&mut self) {
         self.total_free_energy = 0.0;
         self.total_cycles = 0;
@@ -353,7 +356,12 @@ fn compute_phi_proxy(output: &ContinuousHV) -> f32 {
 
     let nf = n as f32;
     let mean: f32 = output.values.iter().sum::<f32>() / nf;
-    let variance: f32 = output.values.iter().map(|v| (v - mean).powi(2)).sum::<f32>() / nf;
+    let variance: f32 = output
+        .values
+        .iter()
+        .map(|v| (v - mean).powi(2))
+        .sum::<f32>()
+        / nf;
     let mean_abs: f32 = output.values.iter().map(|v| v.abs()).sum::<f32>() / nf;
 
     // Component 1: output differentiation × integration
@@ -393,7 +401,9 @@ fn compute_phi_proxy(output: &ContinuousHV) -> f32 {
 /// Compute spectral gap of a symmetric matrix via power iteration.
 /// Returns normalized gap in [0, 1].
 fn spectral_gap_f32(matrix: &[f32], n: usize) -> f32 {
-    if n < 2 { return 0.0; }
+    if n < 2 {
+        return 0.0;
+    }
 
     // Power iteration for dominant eigenvalue
     let mut v = vec![1.0 / (n as f32).sqrt(); n];
@@ -412,7 +422,9 @@ fn spectral_gap_f32(matrix: &[f32], n: usize) -> f32 {
         }
     }
 
-    if lambda1 < 1e-10 { return 0.0; }
+    if lambda1 < 1e-10 {
+        return 0.0;
+    }
 
     // Deflate: A' = A - lambda1 * v * v^T
     let mut deflated = matrix.to_vec();

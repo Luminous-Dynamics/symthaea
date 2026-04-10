@@ -21,10 +21,10 @@ use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 
 use crate::checkpoint::AdamState;
-use symthaea_core::hdc::ContinuousHV;
 use crate::encoder::ThoughtChannels;
 use crate::generator::BrocaGenerator;
 use crate::tokenizer::BpeTokenizer;
+use symthaea_core::hdc::ContinuousHV;
 
 /// A single training pair: thought channels + target text.
 ///

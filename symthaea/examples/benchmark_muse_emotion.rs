@@ -94,7 +94,10 @@ fn main() {
     // ── Define 8 cognitive states spanning the V-A plane ──────────────
     let scenarios = define_scenarios();
 
-    println!("Generating {} scenarios × 30s audio each...\n", scenarios.len());
+    println!(
+        "Generating {} scenarios × 30s audio each...\n",
+        scenarios.len()
+    );
 
     let config = MuseConfig {
         sample_rate: 44100,
@@ -135,7 +138,11 @@ fn main() {
             features.harmonic_ratio,
         );
 
-        all_features.push((scenario.intended_valence, scenario.intended_arousal, features));
+        all_features.push((
+            scenario.intended_valence,
+            scenario.intended_arousal,
+            features,
+        ));
     }
 
     println!();
@@ -147,7 +154,10 @@ fn main() {
     let arousal_rms = correlate(
         "Arousal ↔ RMS Energy",
         &all_features.iter().map(|(_, a, _)| *a).collect::<Vec<_>>(),
-        &all_features.iter().map(|(_, _, f)| f.rms_energy).collect::<Vec<_>>(),
+        &all_features
+            .iter()
+            .map(|(_, _, f)| f.rms_energy)
+            .collect::<Vec<_>>(),
     );
     print_correlation(&arousal_rms);
 
@@ -155,7 +165,10 @@ fn main() {
     let arousal_tempo = correlate(
         "Arousal ↔ Onset Density",
         &all_features.iter().map(|(_, a, _)| *a).collect::<Vec<_>>(),
-        &all_features.iter().map(|(_, _, f)| f.onset_density).collect::<Vec<_>>(),
+        &all_features
+            .iter()
+            .map(|(_, _, f)| f.onset_density)
+            .collect::<Vec<_>>(),
     );
     print_correlation(&arousal_tempo);
 
@@ -163,7 +176,10 @@ fn main() {
     let valence_bright = correlate(
         "Valence ↔ Spectral Centroid",
         &all_features.iter().map(|(v, _, _)| *v).collect::<Vec<_>>(),
-        &all_features.iter().map(|(_, _, f)| f.spectral_centroid).collect::<Vec<_>>(),
+        &all_features
+            .iter()
+            .map(|(_, _, f)| f.spectral_centroid)
+            .collect::<Vec<_>>(),
     );
     print_correlation(&valence_bright);
 
@@ -171,17 +187,26 @@ fn main() {
     let valence_hnr = correlate(
         "Valence ↔ Harmonic Ratio",
         &all_features.iter().map(|(v, _, _)| *v).collect::<Vec<_>>(),
-        &all_features.iter().map(|(_, _, f)| f.harmonic_ratio).collect::<Vec<_>>(),
+        &all_features
+            .iter()
+            .map(|(_, _, f)| f.harmonic_ratio)
+            .collect::<Vec<_>>(),
     );
     print_correlation(&valence_hnr);
 
     // Phi proxy ↔ Spectral flux (expected: negative — higher Phi = smoother)
     // Using consciousness_level as Phi proxy
-    let phi_values: Vec<f32> = scenarios.iter().map(|s| s.state.consciousness_level).collect();
+    let phi_values: Vec<f32> = scenarios
+        .iter()
+        .map(|s| s.state.consciousness_level)
+        .collect();
     let phi_flux = correlate(
         "Phi ↔ Spectral Flux",
         &phi_values,
-        &all_features.iter().map(|(_, _, f)| f.spectral_flux).collect::<Vec<_>>(),
+        &all_features
+            .iter()
+            .map(|(_, _, f)| f.spectral_flux)
+            .collect::<Vec<_>>(),
     );
     print_correlation(&phi_flux);
 
@@ -190,7 +215,10 @@ fn main() {
     let load_zcr = correlate(
         "NE (stress) ↔ Zero-Crossing Rate",
         &load_values,
-        &all_features.iter().map(|(_, _, f)| f.zero_crossing_rate).collect::<Vec<_>>(),
+        &all_features
+            .iter()
+            .map(|(_, _, f)| f.zero_crossing_rate)
+            .collect::<Vec<_>>(),
     );
     print_correlation(&load_zcr);
 
@@ -216,7 +244,9 @@ fn main() {
         println!("  ✓ STRONG: Consciousness state reliably maps to perceived audio emotion.");
         println!("    Synthetic limbic system validated (Koelsch/Vuust/Friston 2019).");
     } else if mean_r2 > 0.2 {
-        println!("  ~ MODERATE: Partial correlation. Some dimensions map well, others need tuning.");
+        println!(
+            "  ~ MODERATE: Partial correlation. Some dimensions map well, others need tuning."
+        );
     } else {
         println!("  ✗ WEAK: Low correlation. The sonification mapping needs revision.");
     }
@@ -390,7 +420,10 @@ fn extract_features(samples: &[f32], sample_rate: u32) -> AudioFeatures {
     let rms_energy = (samples.iter().map(|s| s * s).sum::<f32>() / n as f32).sqrt();
 
     // Zero crossing rate
-    let zc: usize = samples.windows(2).filter(|w| w[0].signum() != w[1].signum()).count();
+    let zc: usize = samples
+        .windows(2)
+        .filter(|w| w[0].signum() != w[1].signum())
+        .count();
     let zero_crossing_rate = zc as f32 / n as f32;
 
     // Spectral centroid (via short-time DFT approximation using zero-crossing)
@@ -522,7 +555,12 @@ fn print_correlation(result: &CorrelationResult) {
     };
     println!(
         "  {:<35} r={}{:.3}  R²={:.4}  [{}]  (n={})",
-        result.name, direction, result.pearson_r.abs(), result.r_squared, strength, result.n_samples
+        result.name,
+        direction,
+        result.pearson_r.abs(),
+        result.r_squared,
+        strength,
+        result.n_samples
     );
 }
 

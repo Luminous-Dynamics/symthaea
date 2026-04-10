@@ -60,10 +60,16 @@ fn compose_genre(genre: Genre, dir: &std::path::Path) {
     let (tempo_lo, tempo_hi) = genre.tempo_range();
     let tempo = (tempo_lo + tempo_hi) / 2.0;
 
-    println!("  Seed: Ψ={:.2} arousal={:.2} valence={:.2}",
-        state.consciousness_level, state.arousal, state.valence);
-    println!("  Tempo: {:.0} BPM | Duration: {:.0}s ({:.1} min)",
-        tempo, duration, duration / 60.0);
+    println!(
+        "  Seed: Ψ={:.2} arousal={:.2} valence={:.2}",
+        state.consciousness_level, state.arousal, state.valence
+    );
+    println!(
+        "  Tempo: {:.0} BPM | Duration: {:.0}s ({:.1} min)",
+        tempo,
+        duration,
+        duration / 60.0
+    );
     println!("  Chunks: {} | Pipeline: all 52 modules\n", total_chunks);
 
     let mut all_samples: Vec<[f32; 2]> = Vec::new();
@@ -99,23 +105,31 @@ fn compose_genre(genre: Genre, dir: &std::path::Path) {
         state.consciousness_level = state.consciousness_level.clamp(0.05, 0.95);
         state.arousal = state.arousal.clamp(0.05, 0.95);
         state.valence = state.valence.clamp(-0.8, 0.8);
-        for h in &mut state.harmony_activations { *h = h.clamp(0.0, 1.0); }
+        for h in &mut state.harmony_activations {
+            *h = h.clamp(0.0, 1.0);
+        }
 
         if chunk_idx % 500 == 0 {
-            println!("  [{:.0}%] Ψ={:.2} a={:.2} v={:.2} notes={}",
-                progress * 100.0, state.consciousness_level, state.arousal,
-                state.valence, synth.generated_notes.len());
+            println!(
+                "  [{:.0}%] Ψ={:.2} a={:.2} v={:.2} notes={}",
+                progress * 100.0,
+                state.consciousness_level,
+                state.arousal,
+                state.valence,
+                synth.generated_notes.len()
+            );
         }
     }
 
     // Auto-master
     println!("\n  Auto-mastering...");
     let master_config = symthaea_muse::auto_master::MasteringConfig::default();
-    let master_result = symthaea_muse::auto_master::auto_master(
-        &mut all_samples, sample_rate, &master_config,
+    let master_result =
+        symthaea_muse::auto_master::auto_master(&mut all_samples, sample_rate, &master_config);
+    println!(
+        "  LUFS: {:.1} → {:.1} (gain {:.1} dB)",
+        master_result.input_lufs, master_result.output_lufs, master_result.gain_applied_db
     );
-    println!("  LUFS: {:.1} → {:.1} (gain {:.1} dB)",
-        master_result.input_lufs, master_result.output_lufs, master_result.gain_applied_db);
 
     // Export WAV
     let wav_path = dir.join(format!("song_{}.wav", slug(genre.name())));
@@ -125,11 +139,19 @@ fn compose_genre(genre: Genre, dir: &std::path::Path) {
 
     // Export MIDI from actual generated notes (not estimated from audio)
     let midi_path = dir.join(format!("song_{}.mid", slug(genre.name())));
-    let time_sig_num = if state.consciousness_level > 0.7 { 7 } else { 4 };
+    let time_sig_num = if state.consciousness_level > 0.7 {
+        7
+    } else {
+        4
+    };
     let time_sig_den = if time_sig_num == 7 { 8 } else { 4 };
     let midi_notes = &synth.generated_notes;
     match midi_export::export_midi(midi_notes, tempo, time_sig_num, time_sig_den, &midi_path) {
-        Ok(()) => println!("  MIDI: {} ({} notes)", midi_path.display(), midi_notes.len()),
+        Ok(()) => println!(
+            "  MIDI: {} ({} notes)",
+            midi_path.display(),
+            midi_notes.len()
+        ),
         Err(e) => println!("  MIDI failed: {e}"),
     }
 
@@ -159,30 +181,44 @@ fn parse_genre(dir: &std::path::Path) -> Genre {
         }
         _ => {
             println!("Unknown genre '{}'. Available:", name);
-            for g in Genre::all() { println!("  {}", slug(g.name())); }
+            for g in Genre::all() {
+                println!("  {}", slug(g.name()));
+            }
             std::process::exit(1);
         }
     }
 }
 
-fn slug(s: &str) -> String { s.to_lowercase().replace(' ', "_") }
+fn slug(s: &str) -> String {
+    s.to_lowercase().replace(' ', "_")
+}
 
 fn write_wav(path: &std::path::Path, audio: &AudioData, sample_rate: u32) {
     use std::io::Write;
-    let stereo = match audio { AudioData::StereoF32(s) => s, _ => return };
+    let stereo = match audio {
+        AudioData::StereoF32(s) => s,
+        _ => return,
+    };
     let data_len = (stereo.len() * 4) as u32;
     let file_len = 36 + data_len;
     let mut f = std::fs::File::create(path).expect("create WAV");
-    f.write_all(b"RIFF").ok(); f.write_all(&file_len.to_le_bytes()).ok();
-    f.write_all(b"WAVE").ok(); f.write_all(b"fmt ").ok();
-    f.write_all(&16u32.to_le_bytes()).ok(); f.write_all(&1u16.to_le_bytes()).ok();
-    f.write_all(&2u16.to_le_bytes()).ok(); f.write_all(&sample_rate.to_le_bytes()).ok();
+    f.write_all(b"RIFF").ok();
+    f.write_all(&file_len.to_le_bytes()).ok();
+    f.write_all(b"WAVE").ok();
+    f.write_all(b"fmt ").ok();
+    f.write_all(&16u32.to_le_bytes()).ok();
+    f.write_all(&1u16.to_le_bytes()).ok();
+    f.write_all(&2u16.to_le_bytes()).ok();
+    f.write_all(&sample_rate.to_le_bytes()).ok();
     f.write_all(&(sample_rate * 4).to_le_bytes()).ok();
-    f.write_all(&4u16.to_le_bytes()).ok(); f.write_all(&16u16.to_le_bytes()).ok();
-    f.write_all(b"data").ok(); f.write_all(&data_len.to_le_bytes()).ok();
+    f.write_all(&4u16.to_le_bytes()).ok();
+    f.write_all(&16u16.to_le_bytes()).ok();
+    f.write_all(b"data").ok();
+    f.write_all(&data_len.to_le_bytes()).ok();
     for s in stereo {
         let l = (s[0] * 32767.0).clamp(-32768.0, 32767.0) as i16;
         let r = (s[1] * 32767.0).clamp(-32768.0, 32767.0) as i16;
-        f.write_all(&l.to_le_bytes()).ok(); f.write_all(&r.to_le_bytes()).ok();
+        f.write_all(&l.to_le_bytes()).ok();
+        f.write_all(&r.to_le_bytes()).ok();
     }
 }

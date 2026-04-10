@@ -1317,7 +1317,10 @@ fn test_integration_harmony_matrix_no_verdict_panic() {
         }
         total_outputs += outputs.len();
     }
-    assert!(total_outputs > 0, "should have processed at least one tension scenario");
+    assert!(
+        total_outputs > 0,
+        "should have processed at least one tension scenario"
+    );
 }
 
 // ── Consciousness-Coupled ───────────────────────────────────────────────────

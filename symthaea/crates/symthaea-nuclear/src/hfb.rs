@@ -118,7 +118,8 @@ impl HfbSolver for PlaceholderHfb {
                 let e = if beta < barrier.saddle_beta2 {
                     beta / barrier.saddle_beta2 * barrier.total_barrier
                 } else {
-                    barrier.total_barrier * (1.0 - (beta - barrier.saddle_beta2) / (1.5 - barrier.saddle_beta2))
+                    barrier.total_barrier
+                        * (1.0 - (beta - barrier.saddle_beta2) / (1.5 - barrier.saddle_beta2))
                 };
                 (beta, e.max(0.0))
             })

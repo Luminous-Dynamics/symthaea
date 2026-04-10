@@ -43,9 +43,9 @@ mod snapshot;
 pub use snapshot::*;
 
 // Research directions
-pub mod pni_coupling;
-pub mod pharmacogenomics;
 pub mod pgx_health_equity;
+pub mod pharmacogenomics;
+pub mod pni_coupling;
 pub mod research_bridge;
 
 /// The four core neuromodulator channels.

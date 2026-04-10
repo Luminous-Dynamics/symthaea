@@ -27,7 +27,6 @@ pub struct UnifiedThermodynamicState {
     // ═══════════════════════════════════════════════════════════════════════
     // Canonical state (reconciled from multiple sources)
     // ═══════════════════════════════════════════════════════════════════════
-
     /// Shannon entropy from ConsciousnessThermodynamicsAnalyzer [0, 1].
     pub canonical_entropy: f64,
     /// Helmholtz free energy, blended from Analyzer + HFE.
@@ -38,7 +37,6 @@ pub struct UnifiedThermodynamicState {
     // ═══════════════════════════════════════════════════════════════════════
     // Dissipative consciousness (Prigogine far-from-equilibrium)
     // ═══════════════════════════════════════════════════════════════════════
-
     /// Entropy production rate dS/dt from DissipativeConsciousness [-1, 1].
     pub entropy_production_rate: f64,
     /// Order parameter √(Φ × coherence) [0, 1].
@@ -57,14 +55,12 @@ pub struct UnifiedThermodynamicState {
     // ═══════════════════════════════════════════════════════════════════════
     // Consciousness thermodynamics analyzer (7D phase state)
     // ═══════════════════════════════════════════════════════════════════════
-
     /// Consciousness phase (Frozen/Normal/Critical/Flow/Chaotic/Unified).
     pub consciousness_phase: ConsciousnessPhase,
 
     // ═══════════════════════════════════════════════════════════════════════
     // Hierarchical free energy (Friston predictive processing)
     // ═══════════════════════════════════════════════════════════════════════
-
     /// Total hierarchical free energy across all levels.
     pub hierarchical_free_energy: f64,
     /// HFE complexity component (KL divergence from prior).
@@ -75,7 +71,6 @@ pub struct UnifiedThermodynamicState {
     // ═══════════════════════════════════════════════════════════════════════
     // Energy budget (SubstrateManager + MetabolismManager)
     // ═══════════════════════════════════════════════════════════════════════
-
     /// Substrate energy per cycle (joules).
     pub energy_per_cycle: f64,
     /// Cumulative energy spent since init (joules).
@@ -86,7 +81,6 @@ pub struct UnifiedThermodynamicState {
     // ═══════════════════════════════════════════════════════════════════════
     // Derived quantities (computed from above, populated later phases)
     // ═══════════════════════════════════════════════════════════════════════
-
     /// Carnot efficiency (Phase 4: 1 - T_cold/T_hot). 0.0 until wired.
     pub carnot_efficiency: f64,
     /// Landauer bound for memory consolidation this cycle (joules). 0.0 until wired.
@@ -151,8 +145,7 @@ impl UnifiedThermodynamicState {
         self.order_parameter = Self::ema(self.order_parameter, order, alpha);
         self.criticality_distance = criticality; // Instant (derived from λ)
         self.lambda_parameter = lambda; // Instant
-        self.dissipation_efficiency =
-            Self::ema(self.dissipation_efficiency, efficiency, alpha);
+        self.dissipation_efficiency = Self::ema(self.dissipation_efficiency, efficiency, alpha);
         // Also update entropy_production_rate from the raw rate
         let _ = entropy_rate; // Captured in entropy_production above
     }
@@ -167,32 +160,33 @@ impl UnifiedThermodynamicState {
     ) {
         let alpha = thresholds::THERMO_UNIFIED_EMA_ALPHA as f64;
         self.canonical_entropy = Self::ema(self.canonical_entropy, entropy, alpha);
-        self.canonical_free_energy =
-            Self::ema(self.canonical_free_energy, free_energy, alpha);
-        self.effective_temperature =
-            Self::ema(self.effective_temperature, temperature, alpha);
+        self.canonical_free_energy = Self::ema(self.canonical_free_energy, free_energy, alpha);
+        self.effective_temperature = Self::ema(self.effective_temperature, temperature, alpha);
         self.consciousness_phase = phase;
     }
 
     /// Update HierarchicalFreeEnergy fields (late consciousness, urgency-gated).
-    pub(crate) fn update_hfe(
-        &mut self,
-        total_fe: f64,
-        complexity: f64,
-        accuracy: f64,
-    ) {
+    pub(crate) fn update_hfe(&mut self, total_fe: f64, complexity: f64, accuracy: f64) {
         let alpha = thresholds::THERMO_UNIFIED_EMA_ALPHA as f64;
-        self.hierarchical_free_energy =
-            Self::ema(self.hierarchical_free_energy, total_fe, alpha);
+        self.hierarchical_free_energy = Self::ema(self.hierarchical_free_energy, total_fe, alpha);
         self.hfe_complexity = Self::ema(self.hfe_complexity, complexity, alpha);
         self.hfe_accuracy = Self::ema(self.hfe_accuracy, accuracy, alpha);
     }
 
     /// Update energy budget fields from SubstrateManager + MetabolismManager.
-    pub(crate) fn update_energy(&mut self, energy_per_cycle: f64, total_spent: f64, metabolic: f32) {
+    pub(crate) fn update_energy(
+        &mut self,
+        energy_per_cycle: f64,
+        total_spent: f64,
+        metabolic: f32,
+    ) {
         self.energy_per_cycle = energy_per_cycle;
         self.total_energy_spent = total_spent;
-        self.metabolic_stress = if metabolic.is_finite() { metabolic } else { self.metabolic_stress };
+        self.metabolic_stress = if metabolic.is_finite() {
+            metabolic
+        } else {
+            self.metabolic_stress
+        };
     }
 }
 

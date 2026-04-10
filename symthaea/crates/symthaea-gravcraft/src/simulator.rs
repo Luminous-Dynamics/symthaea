@@ -84,24 +84,50 @@ impl MetricPerturbationSimulator {
         let v1 = vel;
 
         // k2: derivatives at (pos + 0.5*dt*v1, vel + 0.5*dt*a1)
-        let p2 = [pos[0] + 0.5 * dt * v1[0], pos[1] + 0.5 * dt * v1[1], pos[2] + 0.5 * dt * v1[2]];
-        let u2 = [vel[0] + 0.5 * dt * a1[0], vel[1] + 0.5 * dt * a1[1], vel[2] + 0.5 * dt * a1[2]];
+        let p2 = [
+            pos[0] + 0.5 * dt * v1[0],
+            pos[1] + 0.5 * dt * v1[1],
+            pos[2] + 0.5 * dt * v1[2],
+        ];
+        let u2 = [
+            vel[0] + 0.5 * dt * a1[0],
+            vel[1] + 0.5 * dt * a1[1],
+            vel[2] + 0.5 * dt * a1[2],
+        ];
         let (a2, _) = self.acceleration(p2, u2, cmd);
 
         // k3: derivatives at (pos + 0.5*dt*v2, vel + 0.5*dt*a2)
-        let p3 = [pos[0] + 0.5 * dt * u2[0], pos[1] + 0.5 * dt * u2[1], pos[2] + 0.5 * dt * u2[2]];
-        let u3 = [vel[0] + 0.5 * dt * a2[0], vel[1] + 0.5 * dt * a2[1], vel[2] + 0.5 * dt * a2[2]];
+        let p3 = [
+            pos[0] + 0.5 * dt * u2[0],
+            pos[1] + 0.5 * dt * u2[1],
+            pos[2] + 0.5 * dt * u2[2],
+        ];
+        let u3 = [
+            vel[0] + 0.5 * dt * a2[0],
+            vel[1] + 0.5 * dt * a2[1],
+            vel[2] + 0.5 * dt * a2[2],
+        ];
         let (a3, _) = self.acceleration(p3, u3, cmd);
 
         // k4: derivatives at (pos + dt*v3, vel + dt*a3)
-        let p4 = [pos[0] + dt * u3[0], pos[1] + dt * u3[1], pos[2] + dt * u3[2]];
-        let u4 = [vel[0] + dt * a3[0], vel[1] + dt * a3[1], vel[2] + dt * a3[2]];
+        let p4 = [
+            pos[0] + dt * u3[0],
+            pos[1] + dt * u3[1],
+            pos[2] + dt * u3[2],
+        ];
+        let u4 = [
+            vel[0] + dt * a3[0],
+            vel[1] + dt * a3[1],
+            vel[2] + dt * a3[2],
+        ];
         let (a4, _) = self.acceleration(p4, u4, cmd);
 
         // RK4 combination
         for i in 0..3 {
-            self.state.position[i] = pos[i] + dt / 6.0 * (v1[i] + 2.0 * u2[i] + 2.0 * u3[i] + u4[i]);
-            self.state.velocity[i] = vel[i] + dt / 6.0 * (a1[i] + 2.0 * a2[i] + 2.0 * a3[i] + a4[i]);
+            self.state.position[i] =
+                pos[i] + dt / 6.0 * (v1[i] + 2.0 * u2[i] + 2.0 * u3[i] + u4[i]);
+            self.state.velocity[i] =
+                vel[i] + dt / 6.0 * (a1[i] + 2.0 * a2[i] + 2.0 * a3[i] + a4[i]);
         }
     }
 
@@ -195,9 +221,9 @@ mod tests {
         // Single amplifier pointing forward (+x)
         let cmd = MetricCommand {
             amplifiers: [
-                (0.05, 10.0, 0.0, 0.0),  // Forward
-                (0.0, 0.0, 0.0, 0.0),     // Off
-                (0.0, 0.0, 0.0, 0.0),     // Off
+                (0.05, 10.0, 0.0, 0.0), // Forward
+                (0.0, 0.0, 0.0, 0.0),   // Off
+                (0.0, 0.0, 0.0, 0.0),   // Off
             ],
         };
 
@@ -221,7 +247,11 @@ mod tests {
         let mut sim1 = MetricPerturbationSimulator::default();
         let mut sim2 = MetricPerturbationSimulator::default();
         let cmd = MetricCommand {
-            amplifiers: [(0.03, 8.0, 0.5, 0.1), (0.0, 0.0, 0.0, 0.0), (0.0, 0.0, 0.0, 0.0)],
+            amplifiers: [
+                (0.03, 8.0, 0.5, 0.1),
+                (0.0, 0.0, 0.0, 0.0),
+                (0.0, 0.0, 0.0, 0.0),
+            ],
         };
 
         for _ in 0..10 {
@@ -236,7 +266,11 @@ mod tests {
     fn test_metric_perturbation_reported() {
         let mut sim = MetricPerturbationSimulator::default();
         let cmd = MetricCommand {
-            amplifiers: [(0.05, 10.0, 0.0, 0.0), (0.0, 0.0, 0.0, 0.0), (0.0, 0.0, 0.0, 0.0)],
+            amplifiers: [
+                (0.05, 10.0, 0.0, 0.0),
+                (0.0, 0.0, 0.0, 0.0),
+                (0.0, 0.0, 0.0, 0.0),
+            ],
         };
         sim.step(&cmd, 0.01);
         assert!(
@@ -251,7 +285,11 @@ mod tests {
         let mut sim = MetricPerturbationSimulator::default();
         // First apply metric perturbation
         let cmd = MetricCommand {
-            amplifiers: [(0.05, 10.0, 0.0, 0.0), (0.0, 0.0, 0.0, 0.0), (0.0, 0.0, 0.0, 0.0)],
+            amplifiers: [
+                (0.05, 10.0, 0.0, 0.0),
+                (0.0, 0.0, 0.0, 0.0),
+                (0.0, 0.0, 0.0, 0.0),
+            ],
         };
         sim.step(&cmd, 0.1);
 

@@ -34,7 +34,7 @@ pub(crate) enum DreamPhase {
 /// NREM/REM alternation constants.
 /// Biological 90-min cycle scaled to dream interval (~20 cycles).
 const NREM_DURATION: u32 = 15; // 75% NREM (3:1 ratio matches biology)
-const REM_DURATION: u32 = 5;   // 25% REM
+const REM_DURATION: u32 = 5; // 25% REM
 
 /// Consolidated Cantor dream subsystem.
 ///
@@ -176,12 +176,24 @@ mod tests {
         let phases: Vec<DreamPhase> = (0..25).map(|_| mgr.advance_phase()).collect();
 
         // Count NREM and REM in first 20 cycles (one full period)
-        let nrem_count = phases[..20].iter().filter(|&&p| p == DreamPhase::Nrem).count();
-        let rem_count = phases[..20].iter().filter(|&&p| p == DreamPhase::Rem).count();
+        let nrem_count = phases[..20]
+            .iter()
+            .filter(|&&p| p == DreamPhase::Nrem)
+            .count();
+        let rem_count = phases[..20]
+            .iter()
+            .filter(|&&p| p == DreamPhase::Rem)
+            .count();
 
         // 3:1 ratio: ~15 NREM, ~5 REM (±1 for boundary)
-        assert!(nrem_count >= 14 && nrem_count <= 16, "NREM count {nrem_count} should be ~15");
-        assert!(rem_count >= 4 && rem_count <= 6, "REM count {rem_count} should be ~5");
+        assert!(
+            nrem_count >= 14 && nrem_count <= 16,
+            "NREM count {nrem_count} should be ~15"
+        );
+        assert!(
+            rem_count >= 4 && rem_count <= 6,
+            "REM count {rem_count} should be ~5"
+        );
 
         // Must contain both phases
         assert!(phases.contains(&DreamPhase::Nrem));

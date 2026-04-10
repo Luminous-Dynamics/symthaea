@@ -24,9 +24,9 @@
 //! timbral transitions) minimize surprise while maintaining creativity
 //! via epistemic value (information-seeking) and novelty bonuses.
 
-use symthaea_fep::{ActiveInferenceAgent, ActiveInferenceAgentConfig};
-use symthaea_fep::TemporalDifferenceLearningConfig;
 use symthaea_fep::Observation;
+use symthaea_fep::TemporalDifferenceLearningConfig;
+use symthaea_fep::{ActiveInferenceAgent, ActiveInferenceAgentConfig};
 
 use crate::audio_feedback::AudioFeatures;
 use crate::MusicalState;
@@ -106,18 +106,18 @@ impl MusicalInferenceEngine {
     /// Create a new musical inference engine.
     pub fn new() -> Self {
         let config = ActiveInferenceAgentConfig {
-            state_dim: 16,       // 16D hidden musical state
-            obs_dim: 6,          // 6 audio features
-            num_actions: 8,      // 8 musical actions
+            state_dim: 16,  // 16D hidden musical state
+            obs_dim: 6,     // 6 audio features
+            num_actions: 8, // 8 musical actions
             inference_iterations: 3,
             belief_learning_rate: 0.08,
             planning_horizon: 2,
-            action_temperature: 1.5,  // slightly exploratory
+            action_temperature: 1.5, // slightly exploratory
             enable_model_learning: true,
             enable_td_learning: true,
             td_config: TemporalDifferenceLearningConfig {
-                gamma: 0.95,     // long-horizon value (music has long-range structure)
-                lambda: 0.8,     // eligibility trace for credit assignment
+                gamma: 0.95, // long-horizon value (music has long-range structure)
+                lambda: 0.8, // eligibility trace for credit assignment
                 ..TemporalDifferenceLearningConfig::default()
             },
         };
@@ -141,14 +141,14 @@ impl MusicalInferenceEngine {
         // 1. Construct observation from audio features
         let obs = Observation::new(
             vec![
-                features.spectral_centroid as f64,    // brightness → harmonic content
-                features.rhythm_entropy as f64,        // rhythmic complexity
+                features.spectral_centroid as f64, // brightness → harmonic content
+                features.rhythm_entropy as f64,    // rhythmic complexity
                 (1.0 - features.harmonic_tension) as f64, // consonance (inverse tension)
                 (1.0 - features.spectral_flux) as f64, // timbral stability (inverse flux)
-                features.rms_energy as f64,            // dynamic level
-                features.zero_crossing_rate as f64,    // noisiness
+                features.rms_energy as f64,        // dynamic level
+                features.zero_crossing_rate as f64, // noisiness
             ],
-            self.agent.precision.sensory_precision,    // current precision estimate
+            self.agent.precision.sensory_precision, // current precision estimate
             "music",
         );
 
@@ -193,24 +193,29 @@ impl MusicalInferenceEngine {
         match result.action {
             MusicAction::FollowHarmony => {
                 // Strengthen dominant harmony activation
-                let max_h = state.harmony_activations.iter()
+                let max_h = state
+                    .harmony_activations
+                    .iter()
                     .enumerate()
                     .max_by(|a, b| a.1.partial_cmp(b.1).unwrap())
                     .map(|(i, _)| i)
                     .unwrap_or(0);
-                state.harmony_activations[max_h] = (state.harmony_activations[max_h] + mod_strength).min(1.0);
+                state.harmony_activations[max_h] =
+                    (state.harmony_activations[max_h] + mod_strength).min(1.0);
             }
             MusicAction::ChromaticExplore => {
                 // Increase prediction error (musical surprise)
                 state.prediction_error = (state.prediction_error + mod_strength * 2.0).min(1.0);
                 // Boost InfinitePlay harmony (tension)
-                state.harmony_activations[3] = (state.harmony_activations[3] + mod_strength).min(1.0);
+                state.harmony_activations[3] =
+                    (state.harmony_activations[3] + mod_strength).min(1.0);
             }
             MusicAction::RepeatMotif => {
                 // Decrease prediction error (familiarity)
                 state.prediction_error = (state.prediction_error - mod_strength).max(0.0);
                 // Boost EvolutionaryProgression (development)
-                state.harmony_activations[6] = (state.harmony_activations[6] + mod_strength).min(1.0);
+                state.harmony_activations[6] =
+                    (state.harmony_activations[6] + mod_strength).min(1.0);
             }
             MusicAction::ModulateKey => {
                 // Shift valence (emotional change)
@@ -223,7 +228,8 @@ impl MusicalInferenceEngine {
             }
             MusicAction::ResolveTension => {
                 // Move toward ResonantCoherence
-                state.harmony_activations[0] = (state.harmony_activations[0] + mod_strength * 2.0).min(1.0);
+                state.harmony_activations[0] =
+                    (state.harmony_activations[0] + mod_strength * 2.0).min(1.0);
                 state.prediction_error = (state.prediction_error - mod_strength * 2.0).max(0.0);
                 // Boost serotonin (satisfaction of resolution)
                 state.serotonin = (state.serotonin + mod_strength).min(1.0);
@@ -257,7 +263,10 @@ impl MusicalInferenceEngine {
 
     /// Current free energy (lower = better model of own output).
     pub fn current_free_energy(&self) -> f64 {
-        self.last_result.as_ref().map(|r| r.free_energy).unwrap_or(0.0)
+        self.last_result
+            .as_ref()
+            .map(|r| r.free_energy)
+            .unwrap_or(0.0)
     }
 
     /// Set musical preferences (target observation values).
@@ -311,7 +320,11 @@ mod tests {
         }
 
         // Should select at least 2 different actions over 50 cycles
-        assert!(actions.len() >= 2, "should explore multiple actions, got {}", actions.len());
+        assert!(
+            actions.len() >= 2,
+            "should explore multiple actions, got {}",
+            actions.len()
+        );
     }
 
     #[test]
@@ -322,13 +335,20 @@ mod tests {
         // Test ChromaticExplore: should increase prediction_error
         let result = MusicInferenceResult {
             action: MusicAction::ChromaticExplore,
-            free_energy: 1.0, prediction_error: 0.5, surprise: 0.3,
-            is_surprised: false, learning_rate_mod: 1.0,
-            sensory_precision: 1.0, prior_precision: 1.0,
+            free_energy: 1.0,
+            prediction_error: 0.5,
+            surprise: 0.3,
+            is_surprised: false,
+            learning_rate_mod: 1.0,
+            sensory_precision: 1.0,
+            prior_precision: 1.0,
         };
         let orig_pe = state.prediction_error;
         engine.apply_action(&result, &mut state);
-        assert!(state.prediction_error > orig_pe, "ChromaticExplore should increase PE");
+        assert!(
+            state.prediction_error > orig_pe,
+            "ChromaticExplore should increase PE"
+        );
 
         // Test ResolveTension: should increase coherence harmony
         let resolve = MusicInferenceResult {
@@ -337,7 +357,10 @@ mod tests {
         };
         let orig_h0 = state.harmony_activations[0];
         engine.apply_action(&resolve, &mut state);
-        assert!(state.harmony_activations[0] > orig_h0, "ResolveTension should boost coherence");
+        assert!(
+            state.harmony_activations[0] > orig_h0,
+            "ResolveTension should boost coherence"
+        );
     }
 
     #[test]
@@ -346,18 +369,30 @@ mod tests {
 
         // Feed steady predictable input
         let steady = AudioFeatures {
-            spectral_centroid: 0.4, spectral_flux: 0.05, rhythm_entropy: 0.2,
-            harmonic_tension: 0.1, rms_energy: 0.5, zero_crossing_rate: 0.1,
+            spectral_centroid: 0.4,
+            spectral_flux: 0.05,
+            rhythm_entropy: 0.2,
+            harmonic_tension: 0.1,
+            rms_energy: 0.5,
+            zero_crossing_rate: 0.1,
         };
-        for _ in 0..20 { engine.infer(&steady); }
+        for _ in 0..20 {
+            engine.infer(&steady);
+        }
         let prior_after_steady = engine.last_result().unwrap().prior_precision;
 
         // Then feed surprising input
         let surprise = AudioFeatures {
-            spectral_centroid: 0.9, spectral_flux: 0.8, rhythm_entropy: 0.9,
-            harmonic_tension: 0.8, rms_energy: 0.9, zero_crossing_rate: 0.7,
+            spectral_centroid: 0.9,
+            spectral_flux: 0.8,
+            rhythm_entropy: 0.9,
+            harmonic_tension: 0.8,
+            rms_energy: 0.9,
+            zero_crossing_rate: 0.7,
         };
-        for _ in 0..20 { engine.infer(&surprise); }
+        for _ in 0..20 {
+            engine.infer(&surprise);
+        }
         let sensory_after_surprise = engine.last_result().unwrap().sensory_precision;
 
         // After surprise, sensory precision should increase (pay attention to new input)
@@ -375,14 +410,20 @@ mod tests {
 
         // Feed consistent input — agent should learn to predict it
         let consistent = AudioFeatures {
-            spectral_centroid: 0.5, spectral_flux: 0.1, rhythm_entropy: 0.3,
-            harmonic_tension: 0.2, rms_energy: 0.4, zero_crossing_rate: 0.15,
+            spectral_centroid: 0.5,
+            spectral_flux: 0.1,
+            rhythm_entropy: 0.3,
+            harmonic_tension: 0.2,
+            rms_energy: 0.4,
+            zero_crossing_rate: 0.15,
         };
 
         let mut early_fe = 0.0;
         for i in 0..100 {
             let result = engine.infer(&consistent);
-            if i == 5 { early_fe = result.free_energy; }
+            if i == 5 {
+                early_fe = result.free_energy;
+            }
         }
         let late_fe = engine.current_free_energy();
 
@@ -399,15 +440,24 @@ mod tests {
         // Every action should keep state in valid bounds
         for action_idx in 0..8 {
             let mut state = MusicalState {
-                consciousness_level: 0.95, arousal: 0.95, dopamine: 0.95,
-                serotonin: 0.95, noradrenaline: 0.95, valence: 0.9,
-                harmony_activations: [0.95; 8], prediction_error: 0.95,
+                consciousness_level: 0.95,
+                arousal: 0.95,
+                dopamine: 0.95,
+                serotonin: 0.95,
+                noradrenaline: 0.95,
+                valence: 0.9,
+                harmony_activations: [0.95; 8],
+                prediction_error: 0.95,
             };
             let result = MusicInferenceResult {
                 action: MusicAction::from_index(action_idx),
-                free_energy: 1.0, prediction_error: 0.5, surprise: 0.3,
-                is_surprised: false, learning_rate_mod: 1.0,
-                sensory_precision: 2.0, prior_precision: 2.0,
+                free_energy: 1.0,
+                prediction_error: 0.5,
+                surprise: 0.3,
+                is_surprised: false,
+                learning_rate_mod: 1.0,
+                sensory_precision: 2.0,
+                prior_precision: 2.0,
             };
             engine.apply_action(&result, &mut state);
 

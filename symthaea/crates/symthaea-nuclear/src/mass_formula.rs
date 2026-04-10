@@ -206,7 +206,10 @@ mod tests {
     fn test_pairing_term_signs() {
         let s = semf();
         // Even-even: positive
-        assert!(s.pairing_delta(56, 26) > 0.0, "Even-even should be positive");
+        assert!(
+            s.pairing_delta(56, 26) > 0.0,
+            "Even-even should be positive"
+        );
         // Odd-odd: negative
         assert!(s.pairing_delta(14, 7) < 0.0, "Odd-odd should be negative");
         // Odd A: zero

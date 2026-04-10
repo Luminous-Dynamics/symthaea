@@ -249,7 +249,10 @@ mod tests {
             ("Titanium Ti6Al4V", MaterialCategory::Metal),
             ("Concrete C30", MaterialCategory::Ceramic),
             ("Carbon Fiber T300", MaterialCategory::Composite),
-            ("Bi-Mg(Zn) Metamaterial (Art's Parts)", MaterialCategory::Metamaterial),
+            (
+                "Bi-Mg(Zn) Metamaterial (Art's Parts)",
+                MaterialCategory::Metamaterial,
+            ),
         ];
         let presets = MaterialProperty::presets();
         assert_eq!(presets.len(), expected.len());

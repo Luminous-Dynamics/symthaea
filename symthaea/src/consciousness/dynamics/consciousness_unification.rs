@@ -2105,8 +2105,8 @@ mod tests {
         // Default state has arousal=0.5 (Russell 1980 circumplex: neutral is
         // mid-arousal). Intensity = sqrt(v^2+a^2+d^2)/sqrt(3) ≈ 0.289.
         let state = UnifiedEmotionalState::default();
-        let expected = (0.0_f64.powi(2) + 0.5_f64.powi(2) + 0.0_f64.powi(2)).sqrt()
-            / 3.0_f64.sqrt();
+        let expected =
+            (0.0_f64.powi(2) + 0.5_f64.powi(2) + 0.0_f64.powi(2)).sqrt() / 3.0_f64.sqrt();
         assert!(
             (state.intensity() - expected).abs() < 1e-10,
             "Neutral intensity should reflect mid-arousal baseline, got {}",

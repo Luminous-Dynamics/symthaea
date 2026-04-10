@@ -8,14 +8,14 @@
 
 #[cfg(test)]
 mod tests {
-    use crate::ml_mass::MlMassPredictor;
-    use crate::rprocess::{RProcessConfig, RProcessConditions, RProcessNetwork};
-    use crate::reactor::*;
-    use crate::medical_isotopes::*;
-    use crate::nuclear_forensics::*;
-    use crate::space_nuclear::*;
     use crate::fundamental::*;
     use crate::isotope_properties::*;
+    use crate::medical_isotopes::*;
+    use crate::ml_mass::MlMassPredictor;
+    use crate::nuclear_forensics::*;
+    use crate::reactor::*;
+    use crate::rprocess::{RProcessConditions, RProcessConfig, RProcessNetwork};
+    use crate::space_nuclear::*;
     use std::io::Write;
 
     fn predictor() -> MlMassPredictor {
@@ -28,7 +28,11 @@ mod tests {
 
     #[test]
     fn explore_rprocess() {
-        eprintln!("\n{} R-PROCESS NUCLEOSYNTHESIS {}", "=".repeat(20), "=".repeat(20));
+        eprintln!(
+            "\n{} R-PROCESS NUCLEOSYNTHESIS {}",
+            "=".repeat(20),
+            "=".repeat(20)
+        );
         let mut net = RProcessNetwork::new();
         // "Hot dynamical" NSM ejecta: moderate density, tuned expansion
         // timescale to balance neutron supply against shell quenching.
@@ -53,7 +57,10 @@ mod tests {
         let result = net.simulate(&config);
 
         eprintln!("\n--- Simulation Summary ---");
-        eprintln!("Total mass numbers with material: {}", result.abundances.len());
+        eprintln!(
+            "Total mass numbers with material: {}",
+            result.abundances.len()
+        );
         eprintln!("Waiting points found: {}", result.waiting_points.len());
         eprintln!("Path length: {} steps", result.path.len());
 
@@ -69,15 +76,24 @@ mod tests {
         }
 
         // Shell closure peaks
-        let n82: f64 = result.abundances.iter()
+        let n82: f64 = result
+            .abundances
+            .iter()
             .filter(|m| (125..=135).contains(&m.a))
-            .map(|m| m.abundance).sum();
-        let n126: f64 = result.abundances.iter()
+            .map(|m| m.abundance)
+            .sum();
+        let n126: f64 = result
+            .abundances
+            .iter()
             .filter(|m| (190..=200).contains(&m.a))
-            .map(|m| m.abundance).sum();
-        let rare_earth: f64 = result.abundances.iter()
+            .map(|m| m.abundance)
+            .sum();
+        let rare_earth: f64 = result
+            .abundances
+            .iter()
             .filter(|m| (155..=170).contains(&m.a))
-            .map(|m| m.abundance).sum();
+            .map(|m| m.abundance)
+            .sum();
 
         eprintln!("\n--- Shell Closure Peaks ---");
         eprintln!("A~130 (N=82):      {:.6e}", n82);
@@ -91,7 +107,9 @@ mod tests {
         }
 
         // Heaviest element produced
-        if let Some(heaviest) = result.abundances.iter()
+        if let Some(heaviest) = result
+            .abundances
+            .iter()
             .filter(|m| m.abundance > 1.0e-6)
             .max_by_key(|m| m.a)
         {
@@ -104,7 +122,9 @@ mod tests {
         let tsv_path = format!("{}/rprocess_abundances.tsv", tsv_dir);
         let mut f = std::fs::File::create(&tsv_path).expect("create TSV");
         writeln!(f, "A\tabundance").unwrap();
-        let mut by_a: Vec<_> = result.abundances.iter()
+        let mut by_a: Vec<_> = result
+            .abundances
+            .iter()
             .filter(|m| m.abundance > 1.0e-8)
             .collect();
         by_a.sort_by_key(|m| m.a);
@@ -122,11 +142,22 @@ mod tests {
         let mut chi2 = 0.0_f64;
         let mut n_points = 0usize;
         let mut log_resid_sq_sum = 0.0_f64;
-        eprintln!("{:>6} {:>12} {:>12} {:>8}", "A", "Predicted", "Solar", "Ratio");
+        eprintln!(
+            "{:>6} {:>12} {:>12} {:>8}",
+            "A", "Predicted", "Solar", "Ratio"
+        );
         eprintln!("{}", "-".repeat(44));
         for sc in solar {
-            writeln!(sf, "{}\t{:.6e}\t{:.6e}\t{:.4}", sc.a, sc.predicted, sc.solar, sc.ratio).unwrap();
-            eprintln!("{:>6} {:>12.4e} {:>12.4e} {:>8.3}", sc.a, sc.predicted, sc.solar, sc.ratio);
+            writeln!(
+                sf,
+                "{}\t{:.6e}\t{:.6e}\t{:.4}",
+                sc.a, sc.predicted, sc.solar, sc.ratio
+            )
+            .unwrap();
+            eprintln!(
+                "{:>6} {:>12.4e} {:>12.4e} {:>8.3}",
+                sc.a, sc.predicted, sc.solar, sc.ratio
+            );
             if sc.solar > 0.0 && sc.predicted > 0.0 {
                 let diff = sc.predicted - sc.solar;
                 chi2 += (diff * diff) / sc.solar;
@@ -135,9 +166,15 @@ mod tests {
                 n_points += 1;
             }
         }
-        let rms_log_ratio = if n_points > 0 { (log_resid_sq_sum / n_points as f64).sqrt() } else { 0.0 };
-        eprintln!("\nSolar comparison: {} points, chi2 = {:.4}, RMS(log ratio) = {:.4}",
-                  n_points, chi2, rms_log_ratio);
+        let rms_log_ratio = if n_points > 0 {
+            (log_resid_sq_sum / n_points as f64).sqrt()
+        } else {
+            0.0
+        };
+        eprintln!(
+            "\nSolar comparison: {} points, chi2 = {:.4}, RMS(log ratio) = {:.4}",
+            n_points, chi2, rms_log_ratio
+        );
         eprintln!("Wrote solar comparison to {}", solar_tsv);
     }
 
@@ -161,8 +198,10 @@ mod tests {
         eprintln!("\nTop fission fragments:");
         eprintln!("{:>4} {:>4} {:>8} {:>10}", "Z", "A", "Yield", "BE(MeV)");
         for fp in u235.fragments.iter().take(10) {
-            eprintln!("{:>4} {:>4} {:>8.4} {:>10.4}",
-                fp.z, fp.a, fp.yield_fraction, fp.binding_energy);
+            eprintln!(
+                "{:>4} {:>4} {:>8.4} {:>10.4}",
+                fp.z, fp.a, fp.yield_fraction, fp.binding_energy
+            );
         }
 
         // Pu-239 fission
@@ -175,13 +214,25 @@ mod tests {
 
         // Transmutation analysis for key waste isotopes
         eprintln!("\n--- Waste Transmutation Pathways ---");
-        let targets = [(38, 52, "Sr-90"), (55, 82, "Cs-137"), (53, 76, "I-129"),
-                       (43, 56, "Tc-99"), (94, 145, "Pu-239")];
+        let targets = [
+            (38, 52, "Sr-90"),
+            (55, 82, "Cs-137"),
+            (53, 76, "I-129"),
+            (43, 56, "Tc-99"),
+            (94, 145, "Pu-239"),
+        ];
         for (z, n, name) in targets {
             let chain = transmutation_chain(&pred, z, n, 10);
-            eprintln!("{}: {} steps → {:?}", name, chain.steps.len(),
-                chain.steps.last().map(|s| format!("Z={} N={}", s.z, s.n))
-                    .unwrap_or("stable".into()));
+            eprintln!(
+                "{}: {} steps → {:?}",
+                name,
+                chain.steps.len(),
+                chain
+                    .steps
+                    .last()
+                    .map(|s| format!("Z={} N={}", s.z, s.n))
+                    .unwrap_or("stable".into())
+            );
         }
     }
 
@@ -193,19 +244,26 @@ mod tests {
     fn explore_medical() {
         let pred = predictor();
 
-        eprintln!("\n{} MEDICAL ISOTOPE DISCOVERY {}", "=".repeat(20), "=".repeat(20));
+        eprintln!(
+            "\n{} MEDICAL ISOTOPE DISCOVERY {}",
+            "=".repeat(20),
+            "=".repeat(20)
+        );
 
         let candidates = scan_novel_candidates(&pred);
         eprintln!("Total novel candidates: {}", candidates.len());
 
         // Group by modality
-        let alpha: Vec<_> = candidates.iter()
+        let alpha: Vec<_> = candidates
+            .iter()
             .filter(|c| c.suggested_modality == ClinicalModality::AlphaTherapy)
             .collect();
-        let pet: Vec<_> = candidates.iter()
+        let pet: Vec<_> = candidates
+            .iter()
             .filter(|c| c.suggested_modality == ClinicalModality::PET)
             .collect();
-        let beta: Vec<_> = candidates.iter()
+        let beta: Vec<_> = candidates
+            .iter()
             .filter(|c| c.suggested_modality == ClinicalModality::BetaTherapy)
             .collect();
 
@@ -214,16 +272,22 @@ mod tests {
         eprintln!("  Beta therapy:  {}", beta.len());
 
         // Most promising alpha candidates (lowest uncertainty, right Q range)
-        let mut alpha_sorted: Vec<_> = alpha.iter()
+        let mut alpha_sorted: Vec<_> = alpha
+            .iter()
             .filter(|c| c.q_value > 5.0 && c.q_value < 8.0)
             .collect();
         alpha_sorted.sort_by(|a, b| a.uncertainty.partial_cmp(&b.uncertainty).unwrap());
 
         eprintln!("\n--- Top Alpha Therapy Candidates (Q=5-8 MeV, low uncertainty) ---");
-        eprintln!("{:<8} {:>4} {:>4} {:>8} {:>8} {:>20}", "Symbol", "Z", "A", "Q(MeV)", "σ(MeV)", "Half-life");
+        eprintln!(
+            "{:<8} {:>4} {:>4} {:>8} {:>8} {:>20}",
+            "Symbol", "Z", "A", "Q(MeV)", "σ(MeV)", "Half-life"
+        );
         for c in alpha_sorted.iter().take(15) {
-            eprintln!("{:<8} {:>4} {:>4} {:>8.3} {:>8.3} {:>20}",
-                c.symbol, c.z, c.a, c.q_value, c.uncertainty, c.half_life_category);
+            eprintln!(
+                "{:<8} {:>4} {:>4} {:>8.3} {:>8.3} {:>20}",
+                c.symbol, c.z, c.a, c.q_value, c.uncertainty, c.half_life_category
+            );
         }
 
         // Most promising PET candidates
@@ -231,19 +295,32 @@ mod tests {
         pet_sorted.sort_by(|a, b| a.uncertainty.partial_cmp(&b.uncertainty).unwrap());
 
         eprintln!("\n--- Top PET Imaging Candidates (low uncertainty) ---");
-        eprintln!("{:<8} {:>4} {:>4} {:>8} {:>8} {:>20}", "Symbol", "Z", "A", "Q(MeV)", "σ(MeV)", "Half-life");
+        eprintln!(
+            "{:<8} {:>4} {:>4} {:>8} {:>8} {:>20}",
+            "Symbol", "Z", "A", "Q(MeV)", "σ(MeV)", "Half-life"
+        );
         for c in pet_sorted.iter().take(10) {
-            eprintln!("{:<8} {:>4} {:>4} {:>8.3} {:>8.3} {:>20}",
-                c.symbol, c.z, c.a, c.q_value, c.uncertainty, c.half_life_category);
+            eprintln!(
+                "{:<8} {:>4} {:>4} {:>8.3} {:>8.3} {:>20}",
+                c.symbol, c.z, c.a, c.q_value, c.uncertainty, c.half_life_category
+            );
         }
 
         // Ac-225 production routes
         let routes = analyze_ac225_production(&pred);
         eprintln!("\n--- Ac-225 Production Routes ---");
         for r in &routes {
-            eprintln!("  {}: Q={:.2} MeV (σ={:.2}), {}",
-                r.route_description, r.q_value_ml, r.q_uncertainty,
-                if r.is_exothermic { "exothermic" } else { "endothermic" });
+            eprintln!(
+                "  {}: Q={:.2} MeV (σ={:.2}), {}",
+                r.route_description,
+                r.q_value_ml,
+                r.q_uncertainty,
+                if r.is_exothermic {
+                    "exothermic"
+                } else {
+                    "endothermic"
+                }
+            );
         }
     }
 
@@ -268,10 +345,19 @@ mod tests {
         for (z, n, name) in series {
             let chain = trace_decay_chain(&pred, z, n, 30);
             eprintln!("\n--- {} Decay Chain ---", name);
-            eprintln!("{:>6} {:>4} {:>4} {:>10} {:>12}", "Step", "Z", "A", "Mode", "Q(MeV)");
+            eprintln!(
+                "{:>6} {:>4} {:>4} {:>10} {:>12}",
+                "Step", "Z", "A", "Mode", "Q(MeV)"
+            );
             for (i, step) in chain.steps.iter().enumerate().take(20) {
-                eprintln!("{:>6} {:>4} {:>4} {:>10} {:>12.3}",
-                    i, step.z, step.z + step.n, format!("{:?}", step.decay_mode), step.q_value);
+                eprintln!(
+                    "{:>6} {:>4} {:>4} {:>10} {:>12.3}",
+                    i,
+                    step.z,
+                    step.z + step.n,
+                    format!("{:?}", step.decay_mode),
+                    step.q_value
+                );
             }
             if let Some(last) = chain.steps.last() {
                 eprintln!("  → Terminates at Z={} A={}", last.z, last.z + last.n);
@@ -283,8 +369,12 @@ mod tests {
         let enrichments = [0.007, 0.035, 0.05, 0.20, 0.90, 0.93];
         for e in enrichments {
             let sig = uranium_enrichment_indicator(e);
-            eprintln!("  {:.1}%: U234/U238={:.4e}, U235/U238={:.4e}",
-                e * 100.0, sig.u234_u238_activity, sig.u235_u238_atom);
+            eprintln!(
+                "  {:.1}%: U234/U238={:.4e}, U235/U238={:.4e}",
+                e * 100.0,
+                sig.u234_u238_activity,
+                sig.u235_u238_atom
+            );
         }
     }
 
@@ -296,39 +386,59 @@ mod tests {
     fn explore_space() {
         let pred = predictor();
 
-        eprintln!("\n{} SPACE NUCLEAR APPLICATIONS {}", "=".repeat(20), "=".repeat(20));
+        eprintln!(
+            "\n{} SPACE NUCLEAR APPLICATIONS {}",
+            "=".repeat(20),
+            "=".repeat(20)
+        );
 
         let report = generate_space_nuclear_report(&pred, 15.0);
 
         // RTG fuels ranked by specific power
         eprintln!("\n--- RTG Fuel Ranking (15-year mission) ---");
-        eprintln!("{:<12} {:>10} {:>10} {:>10} {:>8} {:>10}",
-            "Fuel", "W/g", "t½(yr)", "Q(MeV)", "Mode", "15yr W/g");
+        eprintln!(
+            "{:<12} {:>10} {:>10} {:>10} {:>8} {:>10}",
+            "Fuel", "W/g", "t½(yr)", "Q(MeV)", "Mode", "15yr W/g"
+        );
         for f in &report.rtg_known {
             let power_15yr = f.specific_power_wg * (-0.693 * 15.0 / f.half_life_years).exp();
-            eprintln!("{:<12} {:>10.4} {:>10.1} {:>10.2} {:>8} {:>10.4}",
-                f.name, f.specific_power_wg, f.half_life_years, f.q_value_mev,
-                f.decay_mode, power_15yr);
+            eprintln!(
+                "{:<12} {:>10.4} {:>10.1} {:>10.2} {:>8} {:>10.4}",
+                f.name,
+                f.specific_power_wg,
+                f.half_life_years,
+                f.q_value_mev,
+                f.decay_mode,
+                power_15yr
+            );
         }
 
         // Novel RTG candidates
         if !report.rtg_novel.is_empty() {
             eprintln!("\n--- Novel RTG Fuel Candidates ---");
-            eprintln!("{:<12} {:>4} {:>4} {:>10} {:>10}",
-                "Name", "Z", "A", "W/g", "Q(MeV)");
+            eprintln!(
+                "{:<12} {:>4} {:>4} {:>10} {:>10}",
+                "Name", "Z", "A", "W/g", "Q(MeV)"
+            );
             for f in report.rtg_novel.iter().take(10) {
-                eprintln!("{:<12} {:>4} {:>4} {:>10.4} {:>10.2}",
-                    f.name, f.z, f.a, f.specific_power_wg, f.q_value_mev);
+                eprintln!(
+                    "{:<12} {:>4} {:>4} {:>10.4} {:>10.2}",
+                    f.name, f.z, f.a, f.specific_power_wg, f.q_value_mev
+                );
             }
         }
 
         // Shielding materials
         eprintln!("\n--- Cosmic Ray Shielding (ranked by shielding score) ---");
-        eprintln!("{:<20} {:>8} {:>8} {:>10}",
-            "Material", "avg_Z", "avg_A", "Score");
+        eprintln!(
+            "{:<20} {:>8} {:>8} {:>10}",
+            "Material", "avg_Z", "avg_A", "Score"
+        );
         for s in report.shielding.iter().take(8) {
-            eprintln!("{:<20} {:>8.1} {:>8.1} {:>10.3}",
-                s.name, s.avg_z, s.avg_a, s.shielding_score);
+            eprintln!(
+                "{:<20} {:>8.1} {:>8.1} {:>10.3}",
+                s.name, s.avg_z, s.avg_a, s.shielding_score
+            );
         }
     }
 
@@ -340,7 +450,11 @@ mod tests {
     fn explore_fundamental() {
         let pred = predictor();
 
-        eprintln!("\n{} FUNDAMENTAL NUCLEAR SCIENCE {}", "=".repeat(20), "=".repeat(20));
+        eprintln!(
+            "\n{} FUNDAMENTAL NUCLEAR SCIENCE {}",
+            "=".repeat(20),
+            "=".repeat(20)
+        );
 
         // Magic number verification — shell_gap(pred, z, n) measures Δ_n = S_2n(N) - S_2n(N+2)
         // We use a representative Z=50 (tin chain) for neutron shell gaps
@@ -395,12 +509,18 @@ mod tests {
     fn explore_island_of_stability() {
         let pred = predictor();
 
-        eprintln!("\n{} ISLAND OF STABILITY DEEP CHARACTERIZATION {}", "=".repeat(20), "=".repeat(20));
+        eprintln!(
+            "\n{} ISLAND OF STABILITY DEEP CHARACTERIZATION {}",
+            "=".repeat(20),
+            "=".repeat(20)
+        );
 
         // Scan Z=110-120, N=170-190 for the predicted island
         eprintln!("\n--- Binding Energy Landscape (B/A) ---");
-        eprintln!("{:>6} {:>6} {:>6} {:>10} {:>10} {:>10}",
-            "Z", "N", "A", "B/A(MeV)", "σ(MeV)", "S_n(MeV)");
+        eprintln!(
+            "{:>6} {:>6} {:>6} {:>10} {:>10} {:>10}",
+            "Z", "N", "A", "B/A(MeV)", "σ(MeV)", "S_n(MeV)"
+        );
 
         let mut best_ba = 0.0f64;
         let mut best_z = 0u16;
@@ -415,7 +535,9 @@ mod tests {
                 let sn = if n > 1 {
                     let p_prev = pred.predict(z, n - 1);
                     p.binding_energy - p_prev.binding_energy
-                } else { 0.0 };
+                } else {
+                    0.0
+                };
 
                 if ba > best_ba {
                     best_ba = ba;
@@ -425,14 +547,21 @@ mod tests {
 
                 // Only print select values
                 if n % 4 == 0 && z % 2 == 0 {
-                    eprintln!("{:>6} {:>6} {:>6} {:>10.4} {:>10.3} {:>10.3}",
-                        z, n, a, ba, p.uncertainty, sn);
+                    eprintln!(
+                        "{:>6} {:>6} {:>6} {:>10.4} {:>10.3} {:>10.3}",
+                        z, n, a, ba, p.uncertainty, sn
+                    );
                 }
             }
         }
 
-        eprintln!("\nBest B/A in island: Z={} N={} A={} → {:.4} MeV",
-            best_z, best_n, best_z + best_n, best_ba);
+        eprintln!(
+            "\nBest B/A in island: Z={} N={} A={} → {:.4} MeV",
+            best_z,
+            best_n,
+            best_z + best_n,
+            best_ba
+        );
 
         // Alpha decay chains from Oganesson
         eprintln!("\n--- Alpha Decay Chain from Og-294 ---");
@@ -446,12 +575,18 @@ mod tests {
             let q_alpha = if z > 2 && n > 2 {
                 let daughter = pred.predict(z - 2, n - 2);
                 daughter.binding_energy + 28.296 - p.binding_energy
-            } else { 0.0 };
+            } else {
+                0.0
+            };
 
-            eprintln!("  {:>2}. Z={:>3} N={:>3} A={:>3} B/A={:.4} Q_α={:.2} MeV",
-                i, z, n, a, ba, q_alpha);
+            eprintln!(
+                "  {:>2}. Z={:>3} N={:>3} A={:>3} B/A={:.4} Q_α={:.2} MeV",
+                i, z, n, a, ba, q_alpha
+            );
 
-            if q_alpha <= 0.0 || z <= 82 { break; }
+            if q_alpha <= 0.0 || z <= 82 {
+                break;
+            }
             z -= 2;
             n -= 2;
         }

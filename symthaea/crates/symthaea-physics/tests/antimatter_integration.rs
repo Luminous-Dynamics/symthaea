@@ -60,7 +60,8 @@ fn blanket_coherence_is_monotonic() {
 
     // At zero density, blanket should be more intact than at max density
     assert!(
-        results[0].blanket_intact || !results[19].blanket_intact
+        results[0].blanket_intact
+            || !results[19].blanket_intact
             || results[0].permeability <= results[19].permeability + 0.01,
         "Blanket should degrade with energy: p[0]={}, p[19]={}",
         results[0].permeability,
@@ -82,5 +83,9 @@ fn annihilation_physics_self_consistent() {
 
     // Cross-section at 1 km/s should be huge (cold antimatter)
     let sigma = low_energy_cross_section(1000.0);
-    assert!(sigma > 1e-20, "Cold cross-section should be large: {}", sigma);
+    assert!(
+        sigma > 1e-20,
+        "Cold cross-section should be large: {}",
+        sigma
+    );
 }

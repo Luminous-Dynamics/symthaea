@@ -82,24 +82,60 @@ impl ThresholdOverrides {
     /// Count how many thresholds are overridden.
     pub fn active_count(&self) -> usize {
         let mut n = 0;
-        if self.fep_surprise_scale.is_some() { n += 1; }
-        if self.fep_lr_decay.is_some() { n += 1; }
-        if self.dream_base_interval.is_some() { n += 1; }
-        if self.dream_min_interval.is_some() { n += 1; }
-        if self.neuromod_d2_baseline.is_some() { n += 1; }
-        if self.neuromod_ne_phasic_threshold.is_some() { n += 1; }
-        if self.neuromod_arousal_ema_decay.is_some() { n += 1; }
-        if self.homeostasis_recalibrate_high.is_some() { n += 1; }
-        if self.homeostasis_recalibrate_low.is_some() { n += 1; }
-        if self.neuromod_ema_alpha.is_some() { n += 1; }
-        if self.frustration_dampen_threshold.is_some() { n += 1; }
-        if self.engagement_low_threshold.is_some() { n += 1; }
-        if self.flow_exploration_increment.is_some() { n += 1; }
-        if self.coherence_low.is_some() { n += 1; }
-        if self.arousal_trap_threshold.is_some() { n += 1; }
-        if self.self_model_weight_high.is_some() { n += 1; }
-        if self.homeostasis_pull_cruise.is_some() { n += 1; }
-        if self.confidence_crash_threshold.is_some() { n += 1; }
+        if self.fep_surprise_scale.is_some() {
+            n += 1;
+        }
+        if self.fep_lr_decay.is_some() {
+            n += 1;
+        }
+        if self.dream_base_interval.is_some() {
+            n += 1;
+        }
+        if self.dream_min_interval.is_some() {
+            n += 1;
+        }
+        if self.neuromod_d2_baseline.is_some() {
+            n += 1;
+        }
+        if self.neuromod_ne_phasic_threshold.is_some() {
+            n += 1;
+        }
+        if self.neuromod_arousal_ema_decay.is_some() {
+            n += 1;
+        }
+        if self.homeostasis_recalibrate_high.is_some() {
+            n += 1;
+        }
+        if self.homeostasis_recalibrate_low.is_some() {
+            n += 1;
+        }
+        if self.neuromod_ema_alpha.is_some() {
+            n += 1;
+        }
+        if self.frustration_dampen_threshold.is_some() {
+            n += 1;
+        }
+        if self.engagement_low_threshold.is_some() {
+            n += 1;
+        }
+        if self.flow_exploration_increment.is_some() {
+            n += 1;
+        }
+        if self.coherence_low.is_some() {
+            n += 1;
+        }
+        if self.arousal_trap_threshold.is_some() {
+            n += 1;
+        }
+        if self.self_model_weight_high.is_some() {
+            n += 1;
+        }
+        if self.homeostasis_pull_cruise.is_some() {
+            n += 1;
+        }
+        if self.confidence_crash_threshold.is_some() {
+            n += 1;
+        }
         n
     }
 }
@@ -132,7 +168,8 @@ mod tests {
 impl ThresholdOverrides {
     /// FEP surprise → LR boost scale. Fallback: `thresholds::FEP_SURPRISE_SCALE`.
     pub fn fep_surprise_scale(&self) -> f32 {
-        self.fep_surprise_scale.unwrap_or(super::thresholds::FEP_SURPRISE_SCALE)
+        self.fep_surprise_scale
+            .unwrap_or(super::thresholds::FEP_SURPRISE_SCALE)
     }
     /// FEP per-cycle LR decay. Fallback: `thresholds::FEP_LR_DECAY`.
     pub fn fep_lr_decay(&self) -> f32 {
@@ -140,66 +177,82 @@ impl ThresholdOverrides {
     }
     /// Dream consolidation base interval. Fallback: `thresholds::DREAM_BASE_INTERVAL`.
     pub fn dream_base_interval(&self) -> u64 {
-        self.dream_base_interval.unwrap_or(super::thresholds::DREAM_BASE_INTERVAL)
+        self.dream_base_interval
+            .unwrap_or(super::thresholds::DREAM_BASE_INTERVAL)
     }
     /// Dream minimum interval. Fallback: `thresholds::DREAM_MIN_INTERVAL`.
     pub fn dream_min_interval(&self) -> u64 {
-        self.dream_min_interval.unwrap_or(super::thresholds::DREAM_MIN_INTERVAL)
+        self.dream_min_interval
+            .unwrap_or(super::thresholds::DREAM_MIN_INTERVAL)
     }
     /// D2 flexibility baseline. Fallback: `thresholds::NEUROMOD_D2_FLEXIBILITY_BASELINE`.
     pub fn neuromod_d2_baseline(&self) -> f64 {
-        self.neuromod_d2_baseline.unwrap_or(super::thresholds::NEUROMOD_D2_FLEXIBILITY_BASELINE)
+        self.neuromod_d2_baseline
+            .unwrap_or(super::thresholds::NEUROMOD_D2_FLEXIBILITY_BASELINE)
     }
     /// NE phasic burst threshold. Fallback: `thresholds::NEUROMOD_NE_PHASIC_THRESHOLD`.
     pub fn neuromod_ne_phasic_threshold(&self) -> f32 {
-        self.neuromod_ne_phasic_threshold.unwrap_or(super::thresholds::NEUROMOD_NE_PHASIC_THRESHOLD)
+        self.neuromod_ne_phasic_threshold
+            .unwrap_or(super::thresholds::NEUROMOD_NE_PHASIC_THRESHOLD)
     }
     /// Arousal EMA decay. Fallback: `thresholds::NEUROMOD_AROUSAL_EMA_DECAY`.
     pub fn neuromod_arousal_ema_decay(&self) -> f32 {
-        self.neuromod_arousal_ema_decay.unwrap_or(super::thresholds::NEUROMOD_AROUSAL_EMA_DECAY)
+        self.neuromod_arousal_ema_decay
+            .unwrap_or(super::thresholds::NEUROMOD_AROUSAL_EMA_DECAY)
     }
     /// Homeostasis recalibration ceiling. Fallback: `thresholds::HOMEOSTASIS_RECALIBRATE_HIGH`.
     pub fn homeostasis_recalibrate_high(&self) -> f32 {
-        self.homeostasis_recalibrate_high.unwrap_or(super::thresholds::HOMEOSTASIS_RECALIBRATE_HIGH)
+        self.homeostasis_recalibrate_high
+            .unwrap_or(super::thresholds::HOMEOSTASIS_RECALIBRATE_HIGH)
     }
     /// Homeostasis recalibration floor. Fallback: `thresholds::HOMEOSTASIS_RECALIBRATE_LOW`.
     pub fn homeostasis_recalibrate_low(&self) -> f32 {
-        self.homeostasis_recalibrate_low.unwrap_or(super::thresholds::HOMEOSTASIS_RECALIBRATE_LOW)
+        self.homeostasis_recalibrate_low
+            .unwrap_or(super::thresholds::HOMEOSTASIS_RECALIBRATE_LOW)
     }
     /// Neuromodulator EMA alpha. Fallback: `thresholds::NEUROMOD_EMA_ALPHA`.
     pub fn neuromod_ema_alpha(&self) -> f32 {
-        self.neuromod_ema_alpha.unwrap_or(super::thresholds::NEUROMOD_EMA_ALPHA)
+        self.neuromod_ema_alpha
+            .unwrap_or(super::thresholds::NEUROMOD_EMA_ALPHA)
     }
     /// Frustration dampening threshold. Fallback: `thresholds::FRUSTRATION_DAMPEN_THRESHOLD`.
     pub fn frustration_dampen_threshold(&self) -> f64 {
-        self.frustration_dampen_threshold.unwrap_or(super::thresholds::FRUSTRATION_DAMPEN_THRESHOLD)
+        self.frustration_dampen_threshold
+            .unwrap_or(super::thresholds::FRUSTRATION_DAMPEN_THRESHOLD)
     }
     /// Low engagement threshold. Fallback: `thresholds::ENGAGEMENT_LOW_THRESHOLD`.
     pub fn engagement_low_threshold(&self) -> f64 {
-        self.engagement_low_threshold.unwrap_or(super::thresholds::ENGAGEMENT_LOW_THRESHOLD)
+        self.engagement_low_threshold
+            .unwrap_or(super::thresholds::ENGAGEMENT_LOW_THRESHOLD)
     }
     /// Flow exploration increment. Fallback: `thresholds::FLOW_EXPLORATION_INCREMENT`.
     pub fn flow_exploration_increment(&self) -> f32 {
-        self.flow_exploration_increment.unwrap_or(super::thresholds::FLOW_EXPLORATION_INCREMENT)
+        self.flow_exploration_increment
+            .unwrap_or(super::thresholds::FLOW_EXPLORATION_INCREMENT)
     }
     /// Coherence low boundary. Fallback: `thresholds::COHERENCE_LOW`.
     pub fn coherence_low(&self) -> f32 {
-        self.coherence_low.unwrap_or(super::thresholds::COHERENCE_LOW)
+        self.coherence_low
+            .unwrap_or(super::thresholds::COHERENCE_LOW)
     }
     /// Arousal trap threshold. Fallback: `thresholds::AROUSAL_TRAP_DETECT_THRESHOLD`.
     pub fn arousal_trap_threshold(&self) -> f32 {
-        self.arousal_trap_threshold.unwrap_or(super::thresholds::AROUSAL_TRAP_DETECT_THRESHOLD)
+        self.arousal_trap_threshold
+            .unwrap_or(super::thresholds::AROUSAL_TRAP_DETECT_THRESHOLD)
     }
     /// Self-model weight high threshold. Fallback: `thresholds::SELF_MODEL_WEIGHT_HIGH_THRESHOLD`.
     pub fn self_model_weight_high(&self) -> f32 {
-        self.self_model_weight_high.unwrap_or(super::thresholds::SELF_MODEL_WEIGHT_HIGH_THRESHOLD)
+        self.self_model_weight_high
+            .unwrap_or(super::thresholds::SELF_MODEL_WEIGHT_HIGH_THRESHOLD)
     }
     /// Homeostasis pull in cruise. Fallback: `thresholds::HOMEOSTASIS_PULL_CRUISE`.
     pub fn homeostasis_pull_cruise(&self) -> f32 {
-        self.homeostasis_pull_cruise.unwrap_or(super::thresholds::HOMEOSTASIS_PULL_CRUISE)
+        self.homeostasis_pull_cruise
+            .unwrap_or(super::thresholds::HOMEOSTASIS_PULL_CRUISE)
     }
     /// Confidence crash threshold. Fallback: `thresholds::CONFIDENCE_CRASH_THRESHOLD`.
     pub fn confidence_crash_threshold(&self) -> f64 {
-        self.confidence_crash_threshold.unwrap_or(super::thresholds::CONFIDENCE_CRASH_THRESHOLD)
+        self.confidence_crash_threshold
+            .unwrap_or(super::thresholds::CONFIDENCE_CRASH_THRESHOLD)
     }
 }

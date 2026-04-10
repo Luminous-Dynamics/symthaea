@@ -62,6 +62,12 @@ pub enum SomaMessage {
         peer_id: u64,
         pubkey_hex: String,
     },
+    NavigationEstimate {
+        position_m: [f64; 3],
+        position_sigma_m: f32,
+        #[serde(default)]
+        confidence: Option<f32>,
+    },
 }
 
 /// Outbound message to a Soma device (mirrors `symthaea_soma::holon_bridge::HolonInbound`).
@@ -107,6 +113,12 @@ pub struct SomaPeer {
     pub harmony_alignment: f32,
     /// Last trend stability from consciousness vector.
     pub trend_stability: f32,
+    /// Last navigation estimate in meters, when available.
+    pub last_position_m: Option<[f64; 3]>,
+    /// Last one-sigma position uncertainty in meters.
+    pub last_position_sigma_m: Option<f32>,
+    /// Optional publisher confidence hint.
+    pub navigation_confidence: Option<f32>,
     /// QOL trend history accumulated from incoming CVs.
     pub trend_snapshots: VecDeque<PeerQolSnapshot>,
     /// Pending task requests from this device.
@@ -255,6 +267,9 @@ impl HolonReceiver {
                     last_seen_desktop_cycle: desktop_cycle,
                     harmony_alignment: 0.0,
                     trend_stability: 0.0,
+                    last_position_m: None,
+                    last_position_sigma_m: None,
+                    navigation_confidence: None,
                     trend_snapshots: VecDeque::with_capacity(PEER_TREND_CAP),
                     pending_tasks: Vec::new(),
                     knowledge_offers: Vec::new(),
@@ -323,6 +338,15 @@ impl HolonReceiver {
             }
             SomaMessage::PairingVerified { .. } => {
                 // Trust established — peer is already tracked.
+            }
+            SomaMessage::NavigationEstimate {
+                position_m,
+                position_sigma_m,
+                confidence,
+            } => {
+                peer.last_position_m = Some(position_m);
+                peer.last_position_sigma_m = Some(position_sigma_m);
+                peer.navigation_confidence = confidence;
             }
         }
     }
@@ -552,6 +576,25 @@ mod tests {
         let offers = rx.drain_knowledge_offers();
         assert_eq!(offers.len(), 1);
         assert_eq!(offers[0].1, "weather");
+    }
+
+    #[test]
+    fn test_navigation_estimate_updates_peer_state() {
+        let mut rx = HolonReceiver::new();
+        rx.enqueue_message(
+            "phone-1".to_string(),
+            SomaMessage::NavigationEstimate {
+                position_m: [10.0, -2.0, 3.5],
+                position_sigma_m: 4.0,
+                confidence: Some(0.75),
+            },
+        );
+        rx.process_inbound(10);
+
+        let peer = rx.peer("phone-1").unwrap();
+        assert_eq!(peer.last_position_m, Some([10.0, -2.0, 3.5]));
+        assert_eq!(peer.last_position_sigma_m, Some(4.0));
+        assert_eq!(peer.navigation_confidence, Some(0.75));
     }
 
     #[test]

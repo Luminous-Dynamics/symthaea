@@ -19,8 +19,8 @@ mod tests {
     use crate::ml_mass::MlMassPredictor;
 
     const FEATURE_NAMES: &[&str] = &[
-        "Z", "N", "A", "isospin", "pairing", "shell_Z", "shell_N",
-        "coulomb", "surface", "valence", "deform", "radius",
+        "Z", "N", "A", "isospin", "pairing", "shell_Z", "shell_N", "coulomb", "surface", "valence",
+        "deform", "radius",
     ];
 
     const MAGIC_Z: &[f64] = &[2.0, 8.0, 20.0, 28.0, 50.0, 82.0, 114.0, 126.0];
@@ -148,10 +148,7 @@ mod tests {
 
     /// Compute column x_i = feat_a^p, returning None if any value is non-finite.
     fn compute_column(features: &[[f64; 12]], feat_idx: usize, power: f64) -> Option<Vec<f64>> {
-        let col: Vec<f64> = features
-            .iter()
-            .map(|f| f[feat_idx].powf(power))
-            .collect();
+        let col: Vec<f64> = features.iter().map(|f| f[feat_idx].powf(power)).collect();
         if col.iter().all(|v| v.is_finite()) {
             Some(col)
         } else {
@@ -225,10 +222,7 @@ mod tests {
         let rms_residual = (residuals.iter().map(|r| r * r).sum::<f64>() / n_nuclei as f64).sqrt();
 
         eprintln!("\n=== SYMBOLIC REGRESSION ON RF RESIDUALS ===");
-        eprintln!(
-            "Nuclei: {} (measured, Z>=3, N>=3)",
-            n_nuclei
-        );
+        eprintln!("Nuclei: {} (measured, Z>=3, N>=3)", n_nuclei);
         eprintln!("Mean residual: {:.4} MeV", y_mean);
         eprintln!("RMS residual:  {:.4} MeV", rms_residual);
         eprintln!("SS_tot:        {:.2}", ss_tot);
@@ -263,9 +257,7 @@ mod tests {
                         continue; // avoid duplicates
                     }
                     for &p2 in POWERS {
-                        if let Some(col) =
-                            compute_column_2(&features_all, a_idx, p1, b_idx, p2)
-                        {
+                        if let Some(col) = compute_column_2(&features_all, a_idx, p1, b_idx, p2) {
                             if let Some((c0, c1, r2)) = ols_fit(&col, &residuals) {
                                 if r2.is_finite() {
                                     let desc = format!(
@@ -291,7 +283,11 @@ mod tests {
         }
 
         // Sort by R^2 descending
-        results.sort_by(|a, b| b.r_squared.partial_cmp(&a.r_squared).unwrap_or(std::cmp::Ordering::Equal));
+        results.sort_by(|a, b| {
+            b.r_squared
+                .partial_cmp(&a.r_squared)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
 
         // === Top 20 by R^2 ===
         eprintln!("\n--- TOP 20 FORMULAS (by R^2) ---");
@@ -372,7 +368,7 @@ mod tests {
                     0.0
                 })
                 .sum::<f64>())
-                .sqrt();
+            .sqrt();
             let _ = rms_after;
             eprintln!(
                 "Best formula: {} (R^2={:.6})",

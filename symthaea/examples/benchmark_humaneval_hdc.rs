@@ -296,28 +296,58 @@ fn distractor_reversed(canonical: &str) -> String {
 /// Categorize a HumanEval task by its entry point name into rough categories.
 fn categorize_task(entry_point: &str) -> &'static str {
     let name = entry_point.to_lowercase();
-    if name.contains("string") || name.contains("str") || name.contains("char") || name.contains("vowel")
-        || name.contains("palindrome") || name.contains("encode") || name.contains("decode")
-        || name.contains("encrypt") || name.contains("word") || name.contains("letter")
-        || name.contains("bracket") || name.contains("paren")
+    if name.contains("string")
+        || name.contains("str")
+        || name.contains("char")
+        || name.contains("vowel")
+        || name.contains("palindrome")
+        || name.contains("encode")
+        || name.contains("decode")
+        || name.contains("encrypt")
+        || name.contains("word")
+        || name.contains("letter")
+        || name.contains("bracket")
+        || name.contains("paren")
     {
         "string_ops"
-    } else if name.contains("sort") || name.contains("max") || name.contains("min")
-        || name.contains("list") || name.contains("array") || name.contains("filter")
-        || name.contains("remove") || name.contains("unique") || name.contains("reverse")
-        || name.contains("flatten") || name.contains("interleave") || name.contains("zip")
+    } else if name.contains("sort")
+        || name.contains("max")
+        || name.contains("min")
+        || name.contains("list")
+        || name.contains("array")
+        || name.contains("filter")
+        || name.contains("remove")
+        || name.contains("unique")
+        || name.contains("reverse")
+        || name.contains("flatten")
+        || name.contains("interleave")
+        || name.contains("zip")
     {
         "list_ops"
-    } else if name.contains("prime") || name.contains("fib") || name.contains("factorial")
-        || name.contains("gcd") || name.contains("sum") || name.contains("count")
-        || name.contains("digit") || name.contains("even") || name.contains("odd")
-        || name.contains("number") || name.contains("math") || name.contains("median")
-        || name.contains("mean") || name.contains("triangle")
+    } else if name.contains("prime")
+        || name.contains("fib")
+        || name.contains("factorial")
+        || name.contains("gcd")
+        || name.contains("sum")
+        || name.contains("count")
+        || name.contains("digit")
+        || name.contains("even")
+        || name.contains("odd")
+        || name.contains("number")
+        || name.contains("math")
+        || name.contains("median")
+        || name.contains("mean")
+        || name.contains("triangle")
     {
         "math_numeric"
-    } else if name.contains("valid") || name.contains("check") || name.contains("is_")
-        || name.contains("has_") || name.contains("can_") || name.contains("match")
-        || name.contains("correct") || name.contains("monoton")
+    } else if name.contains("valid")
+        || name.contains("check")
+        || name.contains("is_")
+        || name.contains("has_")
+        || name.contains("can_")
+        || name.contains("match")
+        || name.contains("correct")
+        || name.contains("monoton")
     {
         "validation"
     } else {
@@ -467,7 +497,9 @@ fn main() {
         let mut intra_count = 0usize;
         for i in 0..indices.len() {
             for j in (i + 1)..indices.len() {
-                let sim = prompt_hvs[indices[i]].2.similarity(&prompt_hvs[indices[j]].2) as f64;
+                let sim = prompt_hvs[indices[i]]
+                    .2
+                    .similarity(&prompt_hvs[indices[j]].2) as f64;
                 intra_sum += sim;
                 intra_count += 1;
             }
@@ -540,7 +572,11 @@ fn main() {
     for stats in &cluster_analysis {
         println!(
             "  {:<16} n={:<3}  intra={:.4}  inter={:.4}  sep={:+.4}",
-            stats.category, stats.count, stats.avg_intra_similarity, stats.avg_inter_similarity, stats.separation
+            stats.category,
+            stats.count,
+            stats.avg_intra_similarity,
+            stats.avg_inter_similarity,
+            stats.separation
         );
     }
 
@@ -549,7 +585,8 @@ fn main() {
     // --- Save results JSON ---
     let results = BenchmarkResults {
         benchmark: "HumanEval-HDC".to_string(),
-        method: "HDC BinaryHV (16,384-bit, code-token-bundle, bind-pair discrimination)".to_string(),
+        method: "HDC BinaryHV (16,384-bit, code-token-bundle, bind-pair discrimination)"
+            .to_string(),
         total_problems: n,
         discrimination_correct,
         discrimination_accuracy,
@@ -576,6 +613,11 @@ fn main() {
         "\nConclusion: HDC code-token encoding achieves {:.1}% solution discrimination",
         discrimination_accuracy * 100.0
     );
-    println!("on HumanEval (random = {:.1}%).", 100.0 / (N_DISTRACTORS + 1) as f64);
-    println!("Clustering separation indicates whether code with similar purpose groups in HDC space.");
+    println!(
+        "on HumanEval (random = {:.1}%).",
+        100.0 / (N_DISTRACTORS + 1) as f64
+    );
+    println!(
+        "Clustering separation indicates whether code with similar purpose groups in HDC space."
+    );
 }

@@ -4,23 +4,15 @@
 //! Integration tests for Geodesic Code Synthesis.
 //! Tests the full pipeline on real Rust code snippets.
 
-use symthaea_geodesic::execution_oracle::{
-    ComplexityClass, ExecutionOracle, OperationType,
-};
+use symthaea_core::hdc::binary_hv::BinaryHV;
+use symthaea_geodesic::execution_oracle::{ComplexityClass, ExecutionOracle, OperationType};
 use symthaea_geodesic::manifold::ProgramManifold;
 use symthaea_geodesic::manifold_bootstrap::bootstrap_with_topology;
 use symthaea_geodesic::pdg::{NodeKind, ProgramDependenceGraph};
 use symthaea_geodesic::sheaf::{CodeSheaf, LocalSection};
-use symthaea_geodesic::skeleton_synthesis::{
-    build_skeleton_from_topology, SkeletonCombinator,
-};
-use symthaea_geodesic::topology::{
-    BettiNumbers, TopologicalConstraint, TopologicalFingerprint,
-};
-use symthaea_geodesic::{
-    CodeSpec, GeodesicSynthesizer, SynthesisConfig,
-};
-use symthaea_core::hdc::binary_hv::BinaryHV;
+use symthaea_geodesic::skeleton_synthesis::{build_skeleton_from_topology, SkeletonCombinator};
+use symthaea_geodesic::topology::{BettiNumbers, TopologicalConstraint, TopologicalFingerprint};
+use symthaea_geodesic::{CodeSpec, GeodesicSynthesizer, SynthesisConfig};
 
 // ============================================================================
 // Test 1: GCS catches infinite loops
@@ -123,16 +115,12 @@ fn dead_code(x: i32) -> i32 {
     // - beta_0 > 1 (disconnected components — unreachable subgraph), or
     // - beta_2 > 0 (enclosed voids), or
     // - the fingerprint differs from a clean function with no dead code.
-    let has_structural_issue =
-        fingerprint.betti.beta_0 > 1 || fingerprint.betti.beta_2 > 0;
+    let has_structural_issue = fingerprint.betti.beta_0 > 1 || fingerprint.betti.beta_2 > 0;
 
     // At minimum, the PDG has the dead statements as nodes. Even if the
     // parser chains them sequentially (since it's line-level), the return
     // edge to exit creates a divergence point. Verify the return node exists.
-    let has_return = pdg
-        .nodes
-        .iter()
-        .any(|n| n.kind == NodeKind::Return);
+    let has_return = pdg.nodes.iter().any(|n| n.kind == NodeKind::Return);
     assert!(has_return, "PDG should detect the return statement");
 
     // Verify the fingerprint encodes differently from a clean version.
@@ -277,7 +265,9 @@ fn test_gcs_manifold_clusters_by_pattern() {
 
     // --- Sorting functions (loops) ---
     let sort_sources = [
-        ("bubble_sort", r#"
+        (
+            "bubble_sort",
+            r#"
 fn bubble_sort(arr: &mut [i32]) {
     for i in 0..arr.len() {
         for j in 0..arr.len() {
@@ -287,8 +277,11 @@ fn bubble_sort(arr: &mut [i32]) {
         }
     }
 }
-"#),
-        ("selection_sort", r#"
+"#,
+        ),
+        (
+            "selection_sort",
+            r#"
 fn selection_sort(arr: &mut [i32]) {
     for i in 0..arr.len() {
         for j in i..arr.len() {
@@ -298,12 +291,15 @@ fn selection_sort(arr: &mut [i32]) {
         }
     }
 }
-"#),
+"#,
+        ),
     ];
 
     // --- Searching functions (loops) ---
     let search_sources = [
-        ("linear_search", r#"
+        (
+            "linear_search",
+            r#"
 fn linear_search(arr: &[i32], target: i32) -> bool {
     for i in 0..arr.len() {
         if arr[i] == target {
@@ -312,8 +308,11 @@ fn linear_search(arr: &[i32], target: i32) -> bool {
     }
     return false;
 }
-"#),
-        ("find_max", r#"
+"#,
+        ),
+        (
+            "find_max",
+            r#"
 fn find_max(arr: &[i32]) -> i32 {
     let mut max = arr[0];
     for i in 1..arr.len() {
@@ -323,23 +322,30 @@ fn find_max(arr: &[i32]) -> i32 {
     }
     return max;
 }
-"#),
+"#,
+        ),
     ];
 
     // --- Simple functions (no loops) ---
     let simple_sources = [
-        ("add", r#"
+        (
+            "add",
+            r#"
 fn add(a: i32, b: i32) -> i32 {
     let result = a + b;
     return result;
 }
-"#),
-        ("negate", r#"
+"#,
+        ),
+        (
+            "negate",
+            r#"
 fn negate(x: i32) -> i32 {
     let result = -x;
     return result;
 }
-"#),
+"#,
+        ),
     ];
 
     // Bootstrap with topology for richer fingerprints.
@@ -347,13 +353,25 @@ fn negate(x: i32) -> i32 {
         .iter()
         .enumerate()
         .map(|(i, (name, src))| {
-            (name.to_string(), BinaryHV::random(0x50E7_0000 + i as u64), src.to_string())
+            (
+                name.to_string(),
+                BinaryHV::random(0x50E7_0000 + i as u64),
+                src.to_string(),
+            )
         })
         .chain(search_sources.iter().enumerate().map(|(i, (name, src))| {
-            (name.to_string(), BinaryHV::random(0x5EAE_0000 + i as u64), src.to_string())
+            (
+                name.to_string(),
+                BinaryHV::random(0x5EAE_0000 + i as u64),
+                src.to_string(),
+            )
         }))
         .chain(simple_sources.iter().enumerate().map(|(i, (name, src))| {
-            (name.to_string(), BinaryHV::random(0x51F1_0000 + i as u64), src.to_string())
+            (
+                name.to_string(),
+                BinaryHV::random(0x51F1_0000 + i as u64),
+                src.to_string(),
+            )
         }))
         .collect();
 

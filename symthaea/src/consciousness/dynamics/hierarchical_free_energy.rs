@@ -182,8 +182,8 @@ impl HierarchicalLevel {
         // Blanket: closed blanket → trust priors more (0.5-1.0 range)
         let blanket_mod = 0.5 + 0.5 * blanket_factor.clamp(0.0, 1.0);
 
-        self.precision = (base_precision * phi_mod * intero_mod * blanket_mod)
-            .clamp(0.01, 10.0); // Guard bounds
+        self.precision = (base_precision * phi_mod * intero_mod * blanket_mod).clamp(0.01, 10.0);
+        // Guard bounds
     }
 }
 
@@ -285,12 +285,7 @@ impl HierarchicalFreeEnergy {
     /// - Interoceptive factor (valence/arousal modulation)
     /// - Blanket factor (Markov blanket permeability)
     #[cfg(feature = "unified_precision")]
-    pub fn update_precisions(
-        &mut self,
-        phi_factor: f64,
-        intero_factor: f64,
-        blanket_factor: f64,
-    ) {
+    pub fn update_precisions(&mut self, phi_factor: f64, intero_factor: f64, blanket_factor: f64) {
         let decay = self.config.precision_decay;
         // Pre-computed base precisions: decay^0=1.0, decay^1, decay^2, decay^3
         // Avoids repeated powi() on the hot path.

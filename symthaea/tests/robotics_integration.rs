@@ -11,7 +11,9 @@
 //!
 //! Run: `cargo test --features humanoid,helicopter,flight,vehicle --test robotics_integration`
 
-use symthaea::cognitive_loop::motor_bridge::{EmbodimentBridge, EmbodimentPlatform, MotorSafetyLevel};
+use symthaea::cognitive_loop::motor_bridge::{
+    EmbodimentBridge, EmbodimentPlatform, MotorSafetyLevel,
+};
 use symthaea::cognitive_loop::{CognitiveLoopConfig, CognitiveLoopService};
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -29,9 +31,7 @@ fn make_embodied_service(platform: EmbodimentPlatform) -> CognitiveLoopService {
 }
 
 #[cfg(feature = "flight")]
-fn make_multi_embodied_service(
-    platform: EmbodimentPlatform,
-) -> CognitiveLoopService {
+fn make_multi_embodied_service(platform: EmbodimentPlatform) -> CognitiveLoopService {
     let config = CognitiveLoopConfig {
         embodiment_platform: platform,
         embodiment_blend_weight: 0.3,
@@ -111,7 +111,11 @@ fn test_helicopter_cognitive_loop_closure() {
     for i in 0..50 {
         let result = service.cycle("helicopter search and rescue patrol");
         assert!(
-            result.metadata.consciousness.consciousness_level.is_finite(),
+            result
+                .metadata
+                .consciousness
+                .consciousness_level
+                .is_finite(),
             "consciousness NaN at helicopter cycle {i}"
         );
     }
@@ -138,16 +142,17 @@ fn test_flight_cognitive_loop_closure() {
     let mut service = make_embodied_service(EmbodimentPlatform::Quadrotor);
 
     assert!(service.has_embodiment());
-    assert_eq!(
-        service.embodiment_platform(),
-        EmbodimentPlatform::Quadrotor
-    );
+    assert_eq!(service.embodiment_platform(), EmbodimentPlatform::Quadrotor);
 
     // Run 50 cycles
     for i in 0..50 {
         let result = service.cycle("quadrotor hover and stabilize");
         assert!(
-            result.metadata.consciousness.consciousness_level.is_finite(),
+            result
+                .metadata
+                .consciousness
+                .consciousness_level
+                .is_finite(),
             "consciousness NaN at flight cycle {i}"
         );
     }
@@ -177,7 +182,11 @@ fn test_vehicle_cognitive_loop_closure() {
     for i in 0..50 {
         let result = service.cycle("autonomous vehicle lane following");
         assert!(
-            result.metadata.consciousness.consciousness_level.is_finite(),
+            result
+                .metadata
+                .consciousness
+                .consciousness_level
+                .is_finite(),
             "consciousness NaN at vehicle cycle {i}"
         );
     }
@@ -236,14 +245,9 @@ fn test_consciousness_degradation_halts_motors() {
 #[cfg(feature = "flight")]
 #[test]
 fn test_multi_embodiment_fusion() {
-    let mut service = make_multi_embodied_service(
-        EmbodimentPlatform::Quadrotor,
-    );
+    let mut service = make_multi_embodied_service(EmbodimentPlatform::Quadrotor);
 
-    assert!(
-        service.has_embodiment(),
-        "should have embodiment bridge"
-    );
+    assert!(service.has_embodiment(), "should have embodiment bridge");
 
     // Run 50 cycles — both platforms step and fuse proprioceptive HVs
     for i in 0..50 {
@@ -259,10 +263,7 @@ fn test_multi_embodiment_fusion() {
 
     // Primary bridge should have telemetry
     let telem = service.embodiment_telemetry();
-    assert!(
-        telem.total_steps > 0,
-        "bridge should have stepped"
-    );
+    assert!(telem.total_steps > 0, "bridge should have stepped");
     assert!(
         telem.control_effort.is_finite(),
         "bridge control effort should be finite"
@@ -315,7 +316,9 @@ fn test_embodied_long_horizon_stability() {
     );
 
     // Proprioceptive HV should still be valid after 200 cycles
-    let hv = service.last_proprioceptive_hv().expect("proprioceptive HV after 200 cycles");
+    let hv = service
+        .last_proprioceptive_hv()
+        .expect("proprioceptive HV after 200 cycles");
     let magnitude: f32 = hv.as_slice().iter().map(|d| d * d).sum::<f32>().sqrt();
     assert!(
         magnitude.is_finite() && magnitude > 0.0,
@@ -381,7 +384,11 @@ fn test_auv_cognitive_loop_closure() {
     for i in 0..50 {
         let result = service.cycle("auv water quality monitoring");
         assert!(
-            result.metadata.consciousness.consciousness_level.is_finite(),
+            result
+                .metadata
+                .consciousness
+                .consciousness_level
+                .is_finite(),
             "consciousness NaN at AUV cycle {i}"
         );
     }
@@ -414,14 +421,21 @@ fn test_manipulator_cognitive_loop_closure() {
     for i in 0..50 {
         let result = service.cycle("manipulator pick and place operation");
         assert!(
-            result.metadata.consciousness.consciousness_level.is_finite(),
+            result
+                .metadata
+                .consciousness
+                .consciousness_level
+                .is_finite(),
             "consciousness NaN at manipulator cycle {i}"
         );
     }
 
     let telem = service.embodiment_telemetry();
     assert!(telem.total_steps > 0, "manipulator should have stepped");
-    assert_eq!(telem.num_actuators, 8, "manipulator has 8 actuators (7 joints + gripper)");
+    assert_eq!(
+        telem.num_actuators, 8,
+        "manipulator has 8 actuators (7 joints + gripper)"
+    );
     assert!(
         service.last_proprioceptive_hv().is_some(),
         "manipulator proprioceptive HV missing"
@@ -444,14 +458,17 @@ fn test_embodiment_step_interval() {
         learning_threshold: 0.0,
         ..Default::default()
     };
-    let mut service =
-        CognitiveLoopService::new(config).expect("service with step interval 5");
+    let mut service = CognitiveLoopService::new(config).expect("service with step interval 5");
 
     // Run 50 cycles — embodiment should step ~10 times (50 / 5)
     for i in 0..50 {
         let result = service.cycle("interval test");
         assert!(
-            result.metadata.consciousness.consciousness_level.is_finite(),
+            result
+                .metadata
+                .consciousness
+                .consciousness_level
+                .is_finite(),
             "consciousness NaN at cycle {i} with interval=5"
         );
     }
@@ -590,12 +607,18 @@ fn test_cascading_phi_collapse_quadrotor() {
             "Orange" => levels_seen[2] = true,
             "Red" => {
                 levels_seen[3] = true;
-                assert_eq!(result.control_effort, 0.0, "quadrotor Red: effort must be 0");
+                assert_eq!(
+                    result.control_effort, 0.0,
+                    "quadrotor Red: effort must be 0"
+                );
             }
             other => panic!("unexpected safety level: {other}"),
         }
     }
-    assert!(levels_seen.iter().all(|&s| s), "quadrotor cascade must visit all 4 levels");
+    assert!(
+        levels_seen.iter().all(|&s| s),
+        "quadrotor cascade must visit all 4 levels"
+    );
 }
 
 #[cfg(feature = "helicopter")]
@@ -619,12 +642,18 @@ fn test_cascading_phi_collapse_helicopter() {
             "Orange" => levels_seen[2] = true,
             "Red" => {
                 levels_seen[3] = true;
-                assert_eq!(result.control_effort, 0.0, "helicopter Red: effort must be 0");
+                assert_eq!(
+                    result.control_effort, 0.0,
+                    "helicopter Red: effort must be 0"
+                );
             }
             other => panic!("unexpected safety level: {other}"),
         }
     }
-    assert!(levels_seen.iter().all(|&s| s), "helicopter cascade must visit all 4 levels");
+    assert!(
+        levels_seen.iter().all(|&s| s),
+        "helicopter cascade must visit all 4 levels"
+    );
 }
 
 #[cfg(feature = "vehicle")]
@@ -650,7 +679,10 @@ fn test_cascading_phi_collapse_vehicle() {
             other => panic!("unexpected safety level: {other}"),
         }
     }
-    assert!(levels_seen.iter().all(|&s| s), "vehicle cascade must visit all 4 levels");
+    assert!(
+        levels_seen.iter().all(|&s| s),
+        "vehicle cascade must visit all 4 levels"
+    );
 }
 
 #[cfg(feature = "manipulator")]
@@ -676,7 +708,10 @@ fn test_cascading_phi_collapse_manipulator() {
             other => panic!("unexpected safety level: {other}"),
         }
     }
-    assert!(levels_seen.iter().all(|&s| s), "manipulator cascade must visit all 4 levels");
+    assert!(
+        levels_seen.iter().all(|&s| s),
+        "manipulator cascade must visit all 4 levels"
+    );
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -688,10 +723,8 @@ fn test_cascading_phi_collapse_manipulator() {
 #[test]
 fn test_asymmetric_degradation_humanoid_isolated() {
     let genesis = GenesisSeed::from_phrase("asymmetric");
-    let mut healthy_bridge =
-        symthaea::cognitive_loop::motor_bridge::MotorBridge::new(&genesis);
-    let mut failing_bridge =
-        symthaea::cognitive_loop::motor_bridge::MotorBridge::new(&genesis);
+    let mut healthy_bridge = symthaea::cognitive_loop::motor_bridge::MotorBridge::new(&genesis);
+    let mut failing_bridge = symthaea::cognitive_loop::motor_bridge::MotorBridge::new(&genesis);
     let hv = ContinuousHV::random(16384, 42);
 
     // Step healthy at Green, failing at Red
@@ -728,8 +761,7 @@ fn test_asymmetric_degradation_cross_platform() {
     use symthaea_flight::embodiment::FlightEmbodiment;
 
     let genesis = GenesisSeed::from_phrase("asymmetric-cross");
-    let mut humanoid =
-        symthaea::cognitive_loop::motor_bridge::MotorBridge::new(&genesis);
+    let mut humanoid = symthaea::cognitive_loop::motor_bridge::MotorBridge::new(&genesis);
     let mut quadrotor = FlightEmbodiment::new(&genesis);
     let hv = ContinuousHV::random(16384, 42);
 
@@ -761,8 +793,7 @@ fn test_asymmetric_degradation_cross_platform() {
 #[test]
 fn test_rapid_phi_oscillation_humanoid() {
     let genesis = GenesisSeed::from_phrase("oscillation");
-    let mut bridge =
-        symthaea::cognitive_loop::motor_bridge::MotorBridge::new(&genesis);
+    let mut bridge = symthaea::cognitive_loop::motor_bridge::MotorBridge::new(&genesis);
     let hv = ContinuousHV::random(16384, 42);
 
     for i in 0..100 {
@@ -806,7 +837,10 @@ fn test_rapid_phi_oscillation_quadrotor() {
             result.prediction_error.is_finite(),
             "quadrotor oscillation cycle {i}: pred error NaN/Inf"
         );
-        assert!(result.success, "quadrotor oscillation cycle {i}: step failed");
+        assert!(
+            result.success,
+            "quadrotor oscillation cycle {i}: step failed"
+        );
     }
 }
 
@@ -845,14 +879,17 @@ fn test_nan_phi_maps_to_red() {
         MotorSafetyLevel::Red,
         "NaN Phi must map to Red (fail-safe)"
     );
-    assert_eq!(level.motor_gain(), 0.0, "NaN Phi must yield zero motor gain");
+    assert_eq!(
+        level.motor_gain(),
+        0.0,
+        "NaN Phi must yield zero motor gain"
+    );
 }
 
 #[test]
 fn test_nan_phi_humanoid_bridge_no_panic() {
     let genesis = GenesisSeed::from_phrase("nan-test");
-    let mut bridge =
-        symthaea::cognitive_loop::motor_bridge::MotorBridge::new(&genesis);
+    let mut bridge = symthaea::cognitive_loop::motor_bridge::MotorBridge::new(&genesis);
     let hv = ContinuousHV::random(16384, 42);
 
     // First step with valid Phi to initialize
@@ -860,9 +897,19 @@ fn test_nan_phi_humanoid_bridge_no_panic() {
 
     // Now NaN Phi — must not panic, must go Red
     let result = bridge.step(&hv, 0.025, f64::NAN);
-    assert_eq!(result.safety_level, MotorSafetyLevel::Red, "NaN Phi: must be Red");
-    assert_eq!(result.control_effort, 0.0, "NaN Phi: control effort must be 0");
-    assert!(result.prediction_error.is_finite(), "prediction error must stay finite despite NaN Phi");
+    assert_eq!(
+        result.safety_level,
+        MotorSafetyLevel::Red,
+        "NaN Phi: must be Red"
+    );
+    assert_eq!(
+        result.control_effort, 0.0,
+        "NaN Phi: control effort must be 0"
+    );
+    assert!(
+        result.prediction_error.is_finite(),
+        "prediction error must stay finite despite NaN Phi"
+    );
 }
 
 #[cfg(feature = "flight")]
@@ -949,8 +996,7 @@ fn test_negative_phi_maps_to_red() {
 #[test]
 fn test_negative_phi_humanoid_bridge() {
     let genesis = GenesisSeed::from_phrase("negative-phi");
-    let mut bridge =
-        symthaea::cognitive_loop::motor_bridge::MotorBridge::new(&genesis);
+    let mut bridge = symthaea::cognitive_loop::motor_bridge::MotorBridge::new(&genesis);
     let hv = ContinuousHV::random(16384, 42);
 
     let result = bridge.step(&hv, 0.025, -0.5);
@@ -998,8 +1044,7 @@ fn test_phi_near_boundaries() {
 #[test]
 fn test_phi_boundaries_on_humanoid_bridge() {
     let genesis = GenesisSeed::from_phrase("boundary-test");
-    let mut bridge =
-        symthaea::cognitive_loop::motor_bridge::MotorBridge::new(&genesis);
+    let mut bridge = symthaea::cognitive_loop::motor_bridge::MotorBridge::new(&genesis);
     let hv = ContinuousHV::random(16384, 42);
 
     let cases: &[(f64, MotorSafetyLevel, f32)] = &[
@@ -1035,8 +1080,7 @@ fn test_phi_boundaries_on_humanoid_bridge() {
 #[test]
 fn test_recovery_from_red_humanoid() {
     let genesis = GenesisSeed::from_phrase("recovery");
-    let mut bridge =
-        symthaea::cognitive_loop::motor_bridge::MotorBridge::new(&genesis);
+    let mut bridge = symthaea::cognitive_loop::motor_bridge::MotorBridge::new(&genesis);
     let hv = ContinuousHV::random(16384, 42);
 
     // Drive to Red
@@ -1163,14 +1207,16 @@ fn test_infinity_phi() {
 #[test]
 fn test_infinity_phi_humanoid_bridge_no_panic() {
     let genesis = GenesisSeed::from_phrase("inf-test");
-    let mut bridge =
-        symthaea::cognitive_loop::motor_bridge::MotorBridge::new(&genesis);
+    let mut bridge = symthaea::cognitive_loop::motor_bridge::MotorBridge::new(&genesis);
     let hv = ContinuousHV::random(16384, 42);
 
     // Positive infinity — should be Green, no panic
     let result = bridge.step(&hv, 0.025, f64::INFINITY);
     assert_eq!(result.safety_level, MotorSafetyLevel::Green);
-    assert!(result.control_effort.is_finite(), "+INF phi: control effort must be finite");
+    assert!(
+        result.control_effort.is_finite(),
+        "+INF phi: control effort must be finite"
+    );
 
     // Negative infinity — should be Red, no panic
     bridge.reset();
@@ -1226,8 +1272,7 @@ fn test_all_platforms_same_safety_at_same_phi() {
     let genesis = GenesisSeed::from_phrase("consistency-test");
     let hv = ContinuousHV::random(16384, 42);
 
-    let mut humanoid =
-        symthaea::cognitive_loop::motor_bridge::MotorBridge::new(&genesis);
+    let mut humanoid = symthaea::cognitive_loop::motor_bridge::MotorBridge::new(&genesis);
 
     let phis = [0.8, 0.5, 0.2, 0.05, 0.0, -0.5, f64::NAN];
 
@@ -1244,7 +1289,12 @@ fn test_all_platforms_same_safety_at_same_phi() {
     }
 }
 
-#[cfg(all(feature = "flight", feature = "helicopter", feature = "vehicle", feature = "manipulator"))]
+#[cfg(all(
+    feature = "flight",
+    feature = "helicopter",
+    feature = "vehicle",
+    feature = "manipulator"
+))]
 #[test]
 fn test_six_platforms_same_safety_at_same_phi() {
     use symthaea_flight::embodiment::FlightEmbodiment;
@@ -1258,8 +1308,7 @@ fn test_six_platforms_same_safety_at_same_phi() {
     let phis = [0.8, 0.5, 0.2, 0.05, 0.0];
 
     for &phi in &phis {
-        let mut humanoid =
-            symthaea::cognitive_loop::motor_bridge::MotorBridge::new(&genesis);
+        let mut humanoid = symthaea::cognitive_loop::motor_bridge::MotorBridge::new(&genesis);
         let mut flight = FlightEmbodiment::new(&genesis);
         let mut heli = HelicopterEmbodiment::new(&genesis);
         let mut vehicle = VehicleEmbodiment::new(&genesis);
@@ -1274,19 +1323,47 @@ fn test_six_platforms_same_safety_at_same_phi() {
         let v = vehicle.step(&hv, 0.005, phi);
         let m = manip.step(&hv, 0.002, phi);
 
-        assert_eq!(format!("{:?}", h.safety_level), expected_name, "humanoid phi={phi}");
-        assert_eq!(format!("{:?}", f.safety_level), expected_name, "flight phi={phi}");
-        assert_eq!(format!("{:?}", he.safety_level), expected_name, "helicopter phi={phi}");
-        assert_eq!(format!("{:?}", v.safety_level), expected_name, "vehicle phi={phi}");
-        assert_eq!(format!("{:?}", m.safety_level), expected_name, "manipulator phi={phi}");
+        assert_eq!(
+            format!("{:?}", h.safety_level),
+            expected_name,
+            "humanoid phi={phi}"
+        );
+        assert_eq!(
+            format!("{:?}", f.safety_level),
+            expected_name,
+            "flight phi={phi}"
+        );
+        assert_eq!(
+            format!("{:?}", he.safety_level),
+            expected_name,
+            "helicopter phi={phi}"
+        );
+        assert_eq!(
+            format!("{:?}", v.safety_level),
+            expected_name,
+            "vehicle phi={phi}"
+        );
+        assert_eq!(
+            format!("{:?}", m.safety_level),
+            expected_name,
+            "manipulator phi={phi}"
+        );
 
         // All motor gains must match
         let gain = expected.motor_gain();
         assert_eq!(h.safety_level.motor_gain(), gain, "humanoid gain phi={phi}");
         assert_eq!(f.safety_level.motor_gain(), gain, "flight gain phi={phi}");
-        assert_eq!(he.safety_level.motor_gain(), gain, "helicopter gain phi={phi}");
+        assert_eq!(
+            he.safety_level.motor_gain(),
+            gain,
+            "helicopter gain phi={phi}"
+        );
         assert_eq!(v.safety_level.motor_gain(), gain, "vehicle gain phi={phi}");
-        assert_eq!(m.safety_level.motor_gain(), gain, "manipulator gain phi={phi}");
+        assert_eq!(
+            m.safety_level.motor_gain(),
+            gain,
+            "manipulator gain phi={phi}"
+        );
     }
 }
 
@@ -1299,8 +1376,7 @@ fn test_six_platforms_same_safety_at_same_phi() {
 #[test]
 fn test_zero_dt_humanoid_no_panic() {
     let genesis = GenesisSeed::from_phrase("zero-dt");
-    let mut bridge =
-        symthaea::cognitive_loop::motor_bridge::MotorBridge::new(&genesis);
+    let mut bridge = symthaea::cognitive_loop::motor_bridge::MotorBridge::new(&genesis);
     let hv = ContinuousHV::random(16384, 42);
 
     let result = bridge.step(&hv, 0.0, 0.7);
@@ -1326,7 +1402,10 @@ fn test_zero_dt_quadrotor_no_panic() {
     let hv = ContinuousHV::random(16384, 42);
 
     let result = bridge.step(&hv, 0.0, 0.7);
-    assert!(result.control_effort.is_finite(), "quadrotor dt=0: effort finite");
+    assert!(
+        result.control_effort.is_finite(),
+        "quadrotor dt=0: effort finite"
+    );
     assert!(result.success, "quadrotor dt=0: must not fail");
 }
 
@@ -1340,7 +1419,10 @@ fn test_zero_dt_helicopter_no_panic() {
     let hv = ContinuousHV::random(16384, 42);
 
     let result = bridge.step(&hv, 0.0, 0.7);
-    assert!(result.control_effort.is_finite(), "helicopter dt=0: effort finite");
+    assert!(
+        result.control_effort.is_finite(),
+        "helicopter dt=0: effort finite"
+    );
 }
 
 #[cfg(feature = "vehicle")]
@@ -1353,7 +1435,10 @@ fn test_zero_dt_vehicle_no_panic() {
     let hv = ContinuousHV::random(16384, 42);
 
     let result = bridge.step(&hv, 0.0, 0.7);
-    assert!(result.control_effort.is_finite(), "vehicle dt=0: effort finite");
+    assert!(
+        result.control_effort.is_finite(),
+        "vehicle dt=0: effort finite"
+    );
 }
 
 #[cfg(feature = "manipulator")]
@@ -1366,7 +1451,10 @@ fn test_zero_dt_manipulator_no_panic() {
     let hv = ContinuousHV::random(16384, 42);
 
     let result = bridge.step(&hv, 0.0, 0.7);
-    assert!(result.control_effort.is_finite(), "manipulator dt=0: effort finite");
+    assert!(
+        result.control_effort.is_finite(),
+        "manipulator dt=0: effort finite"
+    );
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1378,15 +1466,19 @@ fn test_zero_dt_manipulator_no_panic() {
 #[test]
 fn test_large_dt_humanoid_no_overflow() {
     let genesis = GenesisSeed::from_phrase("large-dt");
-    let mut bridge =
-        symthaea::cognitive_loop::motor_bridge::MotorBridge::new(&genesis);
+    let mut bridge = symthaea::cognitive_loop::motor_bridge::MotorBridge::new(&genesis);
     let hv = ContinuousHV::random(16384, 42);
 
     let result = bridge.step(&hv, 1000.0, 0.7);
     // Physics may go wild, but we must not panic or produce NaN in safety
     assert!(
-        [MotorSafetyLevel::Green, MotorSafetyLevel::Yellow, MotorSafetyLevel::Orange, MotorSafetyLevel::Red]
-            .contains(&result.safety_level),
+        [
+            MotorSafetyLevel::Green,
+            MotorSafetyLevel::Yellow,
+            MotorSafetyLevel::Orange,
+            MotorSafetyLevel::Red
+        ]
+        .contains(&result.safety_level),
         "large dt: safety level must be valid"
     );
     // Control effort and prediction error should be finite (no NaN from overflow)
@@ -1423,7 +1515,10 @@ fn test_large_dt_helicopter_no_overflow() {
     let hv = ContinuousHV::random(16384, 42);
 
     let result = bridge.step(&hv, 1000.0, 0.7);
-    assert!(!result.control_effort.is_nan(), "helicopter large dt: no NaN");
+    assert!(
+        !result.control_effort.is_nan(),
+        "helicopter large dt: no NaN"
+    );
 }
 
 #[cfg(feature = "vehicle")]
@@ -1449,8 +1544,7 @@ fn test_large_dt_vehicle_no_overflow() {
 #[test]
 fn test_sustained_red_humanoid_1000_cycles() {
     let genesis = GenesisSeed::from_phrase("sustained-red");
-    let mut bridge =
-        symthaea::cognitive_loop::motor_bridge::MotorBridge::new(&genesis);
+    let mut bridge = symthaea::cognitive_loop::motor_bridge::MotorBridge::new(&genesis);
     let hv = ContinuousHV::random(16384, 42);
 
     for i in 0..1000 {
@@ -1518,8 +1612,7 @@ fn test_sustained_red_helicopter_1000_cycles() {
 #[test]
 fn test_safety_override_escalates_to_red() {
     let genesis = GenesisSeed::from_phrase("override-test");
-    let mut bridge =
-        symthaea::cognitive_loop::motor_bridge::MotorBridge::new(&genesis);
+    let mut bridge = symthaea::cognitive_loop::motor_bridge::MotorBridge::new(&genesis);
     let hv = ContinuousHV::random(16384, 42);
 
     // Without override, phi=0.8 -> Green
@@ -1549,8 +1642,7 @@ fn test_safety_override_escalates_to_red() {
 #[test]
 fn test_safety_override_does_not_downgrade() {
     let genesis = GenesisSeed::from_phrase("override-no-downgrade");
-    let mut bridge =
-        symthaea::cognitive_loop::motor_bridge::MotorBridge::new(&genesis);
+    let mut bridge = symthaea::cognitive_loop::motor_bridge::MotorBridge::new(&genesis);
     let hv = ContinuousHV::random(16384, 42);
 
     // Override to Yellow, phi=0.05 -> Red. max(Red, Yellow) = Red.
@@ -1598,8 +1690,7 @@ fn test_safety_override_quadrotor() {
 #[test]
 fn test_gradual_phi_ramp_100_steps() {
     let genesis = GenesisSeed::from_phrase("ramp-up");
-    let mut bridge =
-        symthaea::cognitive_loop::motor_bridge::MotorBridge::new(&genesis);
+    let mut bridge = symthaea::cognitive_loop::motor_bridge::MotorBridge::new(&genesis);
     let hv = ContinuousHV::random(16384, 42);
 
     for i in 0..=100 {
@@ -1640,8 +1731,7 @@ fn test_gradual_phi_ramp_100_steps() {
 #[test]
 fn test_reset_after_sustained_red_restores_clean_state() {
     let genesis = GenesisSeed::from_phrase("reset-after-red");
-    let mut bridge =
-        symthaea::cognitive_loop::motor_bridge::MotorBridge::new(&genesis);
+    let mut bridge = symthaea::cognitive_loop::motor_bridge::MotorBridge::new(&genesis);
     let hv = ContinuousHV::random(16384, 42);
 
     // 100 cycles at Red
@@ -1760,9 +1850,19 @@ fn test_motor_gain_monotonically_decreases_with_severity() {
         assert!(
             gains[i] > gains[i + 1],
             "motor_gain must decrease: {:?}={} vs {:?}={}",
-            [MotorSafetyLevel::Green, MotorSafetyLevel::Yellow, MotorSafetyLevel::Orange, MotorSafetyLevel::Red][i],
+            [
+                MotorSafetyLevel::Green,
+                MotorSafetyLevel::Yellow,
+                MotorSafetyLevel::Orange,
+                MotorSafetyLevel::Red
+            ][i],
             gains[i],
-            [MotorSafetyLevel::Green, MotorSafetyLevel::Yellow, MotorSafetyLevel::Orange, MotorSafetyLevel::Red][i + 1],
+            [
+                MotorSafetyLevel::Green,
+                MotorSafetyLevel::Yellow,
+                MotorSafetyLevel::Orange,
+                MotorSafetyLevel::Red
+            ][i + 1],
             gains[i + 1],
         );
     }
@@ -1778,8 +1878,7 @@ fn test_motor_gain_monotonically_decreases_with_severity() {
 #[test]
 fn test_prediction_error_bounded_under_rapid_transitions() {
     let genesis = GenesisSeed::from_phrase("pred-error-bound");
-    let mut bridge =
-        symthaea::cognitive_loop::motor_bridge::MotorBridge::new(&genesis);
+    let mut bridge = symthaea::cognitive_loop::motor_bridge::MotorBridge::new(&genesis);
     let hv = ContinuousHV::random(16384, 42);
 
     // Alternate between full authority and shutdown every cycle
@@ -1824,8 +1923,8 @@ fn test_prediction_error_bounded_under_rapid_transitions() {
 #[test]
 fn test_motor_safety_level_from_phi_comprehensive() {
     let phi_values: Vec<f64> = vec![
-        -0.1, 0.0, 0.05, 0.1, 0.100001, 0.15, 0.2, 0.3, 0.300001,
-        0.35, 0.4, 0.5, 0.6, 0.600001, 0.65, 0.7, 0.8, 0.9, 1.0, 1.5,
+        -0.1, 0.0, 0.05, 0.1, 0.100001, 0.15, 0.2, 0.3, 0.300001, 0.35, 0.4, 0.5, 0.6, 0.600001,
+        0.65, 0.7, 0.8, 0.9, 1.0, 1.5,
     ];
 
     let expected = vec![
@@ -1873,8 +1972,10 @@ fn test_motor_safety_level_gain_monotonicity() {
         assert!(
             window[0].motor_gain() > window[1].motor_gain(),
             "{:?} gain ({}) must be > {:?} gain ({})",
-            window[0], window[0].motor_gain(),
-            window[1], window[1].motor_gain(),
+            window[0],
+            window[0].motor_gain(),
+            window[1],
+            window[1].motor_gain(),
         );
     }
 }
@@ -1882,10 +1983,26 @@ fn test_motor_safety_level_gain_monotonicity() {
 /// Red must produce exactly 0.0 gain (motors off), Green exactly 1.0.
 #[test]
 fn test_motor_safety_level_boundary_gains() {
-    assert_eq!(MotorSafetyLevel::Green.motor_gain(), 1.0, "Green must be full authority");
-    assert_eq!(MotorSafetyLevel::Red.motor_gain(), 0.0, "Red must be motors off");
-    assert_eq!(MotorSafetyLevel::Yellow.motor_gain(), 0.6, "Yellow must be 0.6");
-    assert_eq!(MotorSafetyLevel::Orange.motor_gain(), 0.3, "Orange must be 0.3");
+    assert_eq!(
+        MotorSafetyLevel::Green.motor_gain(),
+        1.0,
+        "Green must be full authority"
+    );
+    assert_eq!(
+        MotorSafetyLevel::Red.motor_gain(),
+        0.0,
+        "Red must be motors off"
+    );
+    assert_eq!(
+        MotorSafetyLevel::Yellow.motor_gain(),
+        0.6,
+        "Yellow must be 0.6"
+    );
+    assert_eq!(
+        MotorSafetyLevel::Orange.motor_gain(),
+        0.3,
+        "Orange must be 0.3"
+    );
 }
 
 /// Phi exactly at boundary values must resolve to the lower tier.
@@ -1893,17 +2010,35 @@ fn test_motor_safety_level_boundary_gains() {
 #[test]
 fn test_motor_safety_level_exact_boundaries() {
     // At boundaries, phi is NOT greater than threshold, so falls to lower tier
-    assert_eq!(MotorSafetyLevel::from_phi(0.1), MotorSafetyLevel::Red,
-        "phi=0.1: not > 0.1 so Red");
-    assert_eq!(MotorSafetyLevel::from_phi(0.3), MotorSafetyLevel::Orange,
-        "phi=0.3: not > 0.3 so Orange");
-    assert_eq!(MotorSafetyLevel::from_phi(0.6), MotorSafetyLevel::Yellow,
-        "phi=0.6: not > 0.6 so Yellow");
+    assert_eq!(
+        MotorSafetyLevel::from_phi(0.1),
+        MotorSafetyLevel::Red,
+        "phi=0.1: not > 0.1 so Red"
+    );
+    assert_eq!(
+        MotorSafetyLevel::from_phi(0.3),
+        MotorSafetyLevel::Orange,
+        "phi=0.3: not > 0.3 so Orange"
+    );
+    assert_eq!(
+        MotorSafetyLevel::from_phi(0.6),
+        MotorSafetyLevel::Yellow,
+        "phi=0.6: not > 0.6 so Yellow"
+    );
 
     // Just above boundaries
-    assert_eq!(MotorSafetyLevel::from_phi(0.100001), MotorSafetyLevel::Orange);
-    assert_eq!(MotorSafetyLevel::from_phi(0.300001), MotorSafetyLevel::Yellow);
-    assert_eq!(MotorSafetyLevel::from_phi(0.600001), MotorSafetyLevel::Green);
+    assert_eq!(
+        MotorSafetyLevel::from_phi(0.100001),
+        MotorSafetyLevel::Orange
+    );
+    assert_eq!(
+        MotorSafetyLevel::from_phi(0.300001),
+        MotorSafetyLevel::Yellow
+    );
+    assert_eq!(
+        MotorSafetyLevel::from_phi(0.600001),
+        MotorSafetyLevel::Green
+    );
 }
 
 /// Sweep 1000 phi values in [0, 1] and verify from_phi + motor_gain are correct.
@@ -1924,8 +2059,10 @@ fn test_motor_safety_level_dense_sweep() {
         } else {
             MotorSafetyLevel::Red
         };
-        assert_eq!(level, expected,
-            "dense sweep at phi={phi:.3}: expected {expected:?}, got {level:?}");
+        assert_eq!(
+            level, expected,
+            "dense sweep at phi={phi:.3}: expected {expected:?}, got {level:?}"
+        );
 
         // Verify gain is in expected set
         assert!(
@@ -1978,7 +2115,11 @@ fn collect_safety_cascade_from_service(
 
         // Verify consciousness stays finite
         assert!(
-            cycle_result.metadata.consciousness.consciousness_level.is_finite(),
+            cycle_result
+                .metadata
+                .consciousness
+                .consciousness_level
+                .is_finite(),
             "{platform:?}: consciousness NaN"
         );
     }
@@ -2134,7 +2275,10 @@ fn test_all_safety_levels_consistent_direct_helicopter() {
             expected_names[i]
         );
         if level_name == "Red" {
-            assert_eq!(result.control_effort, 0.0, "helicopter Red: effort must be 0");
+            assert_eq!(
+                result.control_effort, 0.0,
+                "helicopter Red: effort must be 0"
+            );
         }
     }
 }
@@ -2231,16 +2375,24 @@ fn test_safety_override_cross_platform_humanoid() {
     // Set override to Red — motor gain must be 0 even at high Phi
     bridge.set_safety_override(MotorSafetyLevel::Red);
     let result = bridge.step(&hv, 0.025, 0.8);
-    assert_eq!(result.safety_level, MotorSafetyLevel::Red,
-        "humanoid: Red override must win over high Phi");
-    assert_eq!(result.control_effort, 0.0,
-        "humanoid: Red override must zero motor effort");
+    assert_eq!(
+        result.safety_level,
+        MotorSafetyLevel::Red,
+        "humanoid: Red override must win over high Phi"
+    );
+    assert_eq!(
+        result.control_effort, 0.0,
+        "humanoid: Red override must zero motor effort"
+    );
 
     // Clear override — should resume Phi-based
     bridge.clear_safety_override();
     let result = bridge.step(&hv, 0.025, 0.8);
-    assert_eq!(result.safety_level, MotorSafetyLevel::Green,
-        "humanoid: clearing override must resume Phi-based safety");
+    assert_eq!(
+        result.safety_level,
+        MotorSafetyLevel::Green,
+        "humanoid: clearing override must resume Phi-based safety"
+    );
 }
 
 #[cfg(feature = "flight")]
@@ -2257,15 +2409,23 @@ fn test_safety_override_cross_platform_flight() {
 
     bridge.set_safety_override(FlightSafety::Red);
     let result = bridge.step(&hv, 0.002, 0.8);
-    assert_eq!(format!("{:?}", result.safety_level), "Red",
-        "flight: Red override must win over high Phi");
-    assert_eq!(result.control_effort, 0.0,
-        "flight: Red override must zero motor effort");
+    assert_eq!(
+        format!("{:?}", result.safety_level),
+        "Red",
+        "flight: Red override must win over high Phi"
+    );
+    assert_eq!(
+        result.control_effort, 0.0,
+        "flight: Red override must zero motor effort"
+    );
 
     bridge.clear_safety_override();
     let result = bridge.step(&hv, 0.002, 0.8);
-    assert_eq!(format!("{:?}", result.safety_level), "Green",
-        "flight: clearing override must resume Phi-based safety");
+    assert_eq!(
+        format!("{:?}", result.safety_level),
+        "Green",
+        "flight: clearing override must resume Phi-based safety"
+    );
 }
 
 #[cfg(feature = "helicopter")]
@@ -2282,21 +2442,29 @@ fn test_safety_override_cross_platform_helicopter() {
 
     bridge.set_safety_override(HeliSafety::Red);
     let result = bridge.step(&hv, 1.0 / 300.0, 0.8);
-    assert_eq!(format!("{:?}", result.safety_level), "Red",
-        "helicopter: Red override must win over high Phi");
-    assert_eq!(result.control_effort, 0.0,
-        "helicopter: Red override must zero motor effort");
+    assert_eq!(
+        format!("{:?}", result.safety_level),
+        "Red",
+        "helicopter: Red override must win over high Phi"
+    );
+    assert_eq!(
+        result.control_effort, 0.0,
+        "helicopter: Red override must zero motor effort"
+    );
 
     bridge.clear_safety_override();
     let result = bridge.step(&hv, 1.0 / 300.0, 0.8);
-    assert_eq!(format!("{:?}", result.safety_level), "Green",
-        "helicopter: clearing override must resume Phi-based safety");
+    assert_eq!(
+        format!("{:?}", result.safety_level),
+        "Green",
+        "helicopter: clearing override must resume Phi-based safety"
+    );
 }
 
 #[cfg(feature = "vehicle")]
 #[test]
 fn test_safety_override_cross_platform_vehicle() {
-    use symthaea_vehicle::embodiment::{VehicleEmbodiment, MotorSafetyLevel as VehicleSafety};
+    use symthaea_vehicle::embodiment::{MotorSafetyLevel as VehicleSafety, VehicleEmbodiment};
 
     let genesis = GenesisSeed::from_phrase("override-test");
     let mut bridge = VehicleEmbodiment::new(&genesis);
@@ -2307,19 +2475,27 @@ fn test_safety_override_cross_platform_vehicle() {
 
     bridge.set_safety_override(VehicleSafety::Red);
     let result = bridge.step(&hv, 0.005, 0.8);
-    assert_eq!(format!("{:?}", result.safety_level), "Red",
-        "vehicle: Red override must win over high Phi");
+    assert_eq!(
+        format!("{:?}", result.safety_level),
+        "Red",
+        "vehicle: Red override must win over high Phi"
+    );
 
     bridge.clear_safety_override();
     let result = bridge.step(&hv, 0.005, 0.8);
-    assert_eq!(format!("{:?}", result.safety_level), "Green",
-        "vehicle: clearing override must resume Phi-based safety");
+    assert_eq!(
+        format!("{:?}", result.safety_level),
+        "Green",
+        "vehicle: clearing override must resume Phi-based safety"
+    );
 }
 
 #[cfg(feature = "manipulator")]
 #[test]
 fn test_safety_override_cross_platform_manipulator() {
-    use symthaea_manipulator::embodiment::{ManipulatorEmbodiment, MotorSafetyLevel as ManipSafety};
+    use symthaea_manipulator::embodiment::{
+        ManipulatorEmbodiment, MotorSafetyLevel as ManipSafety,
+    };
 
     let genesis = GenesisSeed::from_phrase("override-test");
     let mut bridge = ManipulatorEmbodiment::new(&genesis);
@@ -2330,13 +2506,19 @@ fn test_safety_override_cross_platform_manipulator() {
 
     bridge.set_safety_override(ManipSafety::Red);
     let result = bridge.step(&hv, 0.002, 0.8);
-    assert_eq!(format!("{:?}", result.safety_level), "Red",
-        "manipulator: Red override must win over high Phi");
+    assert_eq!(
+        format!("{:?}", result.safety_level),
+        "Red",
+        "manipulator: Red override must win over high Phi"
+    );
 
     bridge.clear_safety_override();
     let result = bridge.step(&hv, 0.002, 0.8);
-    assert_eq!(format!("{:?}", result.safety_level), "Green",
-        "manipulator: clearing override must resume Phi-based safety");
+    assert_eq!(
+        format!("{:?}", result.safety_level),
+        "Green",
+        "manipulator: clearing override must resume Phi-based safety"
+    );
 }
 
 #[cfg(feature = "auv")]
@@ -2353,15 +2535,23 @@ fn test_safety_override_cross_platform_auv() {
 
     bridge.set_safety_override(AuvSafety::Red);
     let result = bridge.step(&hv, 0.01, 0.8);
-    assert_eq!(format!("{:?}", result.safety_level), "Red",
-        "auv: Red override must win over high Phi");
-    assert_eq!(result.control_effort, 0.0,
-        "auv: Red override must zero motor effort");
+    assert_eq!(
+        format!("{:?}", result.safety_level),
+        "Red",
+        "auv: Red override must win over high Phi"
+    );
+    assert_eq!(
+        result.control_effort, 0.0,
+        "auv: Red override must zero motor effort"
+    );
 
     bridge.clear_safety_override();
     let result = bridge.step(&hv, 0.01, 0.8);
-    assert_eq!(format!("{:?}", result.safety_level), "Green",
-        "auv: clearing override must resume Phi-based safety");
+    assert_eq!(
+        format!("{:?}", result.safety_level),
+        "Green",
+        "auv: clearing override must resume Phi-based safety"
+    );
 }
 
 // ── Layer 2c: Cross-platform identical Phi cascade via direct bridges ───────
@@ -2390,8 +2580,7 @@ fn test_cross_platform_identical_phi_collapse_direct() {
     let phi_sequence: Vec<f64> = (0..=10).map(|i| 0.8 - (i as f64) * 0.09).collect();
 
     // Collect safety levels from each platform
-    let mut humanoid_bridge =
-        symthaea::cognitive_loop::motor_bridge::MotorBridge::new(&genesis);
+    let mut humanoid_bridge = symthaea::cognitive_loop::motor_bridge::MotorBridge::new(&genesis);
     let mut flight_bridge = FlightEmbodiment::new(&genesis);
     let mut heli_bridge = HelicopterEmbodiment::new(&genesis);
     let mut vehicle_bridge = VehicleEmbodiment::new(&genesis);
@@ -2430,7 +2619,10 @@ fn test_cross_platform_identical_phi_collapse_direct() {
         if expected == MotorSafetyLevel::Red {
             assert_eq!(h.control_effort, 0.0, "phi={phi}: humanoid Red effort != 0");
             assert_eq!(f.control_effort, 0.0, "phi={phi}: flight Red effort != 0");
-            assert_eq!(heli.control_effort, 0.0, "phi={phi}: helicopter Red effort != 0");
+            assert_eq!(
+                heli.control_effort, 0.0,
+                "phi={phi}: helicopter Red effort != 0"
+            );
             // Vehicle and manipulator may have non-zero effort at Red depending on
             // implementation; the critical invariant is safety_level == Red
         }

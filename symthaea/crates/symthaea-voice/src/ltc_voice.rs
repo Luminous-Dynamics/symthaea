@@ -88,7 +88,8 @@ impl LtcVoice {
             // Build cognitive state WITH phoneme identity encoded
             // The key insight: each phoneme must produce a DIFFERENT input vector
             // so the LTC evolves toward different formant targets
-            let (target_f1, target_f2, _target_f3, _) = crate::formants::formant_target_pub(phoneme.ipa);
+            let (target_f1, target_f2, _target_f3, _) =
+                crate::formants::formant_target_pub(phoneme.ipa);
 
             let cognitive_state = symthaea_vocal_tract::encoder::VoiceCognitiveState {
                 // Encode phoneme identity via formant targets normalized to [0,1]
@@ -176,9 +177,8 @@ impl LtcVoice {
 fn phoneme_source_type(ipa: &str) -> symthaea_vocal_tract::types::SourceType {
     use symthaea_vocal_tract::types::SourceType;
     match ipa {
-        "iː" | "i" | "ɪ" | "ɛ" | "æ" | "ɑ" | "ɑː" | "ɒ" | "ɔ" | "ɔː"
-        | "ʌ" | "ʊ" | "uː" | "u" | "ə" | "ɜː" | "eɪ" | "aɪ" | "oʊ" | "aʊ"
-            => SourceType::Vowel,
+        "iː" | "i" | "ɪ" | "ɛ" | "æ" | "ɑ" | "ɑː" | "ɒ" | "ɔ" | "ɔː" | "ʌ" | "ʊ" | "uː" | "u"
+        | "ə" | "ɜː" | "eɪ" | "aɪ" | "oʊ" | "aʊ" => SourceType::Vowel,
         "m" | "n" | "ŋ" => SourceType::Nasal,
         "l" | "ɹ" | "w" | "j" => SourceType::Liquid,
         "p" | "b" | "t" | "d" | "k" | "ɡ" => SourceType::Stop,
@@ -199,10 +199,19 @@ mod tests {
         let genesis = GenesisSeed::from_phrase("symthaea-voice-test");
         let mut voice = LtcVoice::new(&genesis);
         let phonemes = g2p::text_to_phonemes("hello");
-        let prosody = VoiceProsody { arousal: 0.5, valence: 0.3, consciousness: 0.7, serotonin: 0.5 };
+        let prosody = VoiceProsody {
+            arousal: 0.5,
+            valence: 0.3,
+            consciousness: 0.7,
+            serotonin: 0.5,
+        };
         let frames = voice.phonemes_to_frames(&phonemes, &prosody, 44100);
         assert!(!frames.is_empty(), "should produce frames");
-        assert!(frames.len() > 20, "should produce many frames: {}", frames.len());
+        assert!(
+            frames.len() > 20,
+            "should produce many frames: {}",
+            frames.len()
+        );
     }
 
     #[test]
@@ -214,10 +223,14 @@ mod tests {
         let frames = voice.phonemes_to_frames(&phonemes, &prosody, 44100);
 
         // Check F1 smoothness: max frame-to-frame jump should be small
-        let max_f1_jump: f32 = frames.windows(2)
+        let max_f1_jump: f32 = frames
+            .windows(2)
             .map(|w| (w[1].f1 - w[0].f1).abs())
             .fold(0.0, f32::max);
-        assert!(max_f1_jump < 200.0, "F1 should be smooth: max jump = {max_f1_jump} Hz");
+        assert!(
+            max_f1_jump < 200.0,
+            "F1 should be smooth: max jump = {max_f1_jump} Hz"
+        );
     }
 
     #[test]
@@ -226,15 +239,31 @@ mod tests {
         let phonemes = g2p::text_to_phonemes("hello");
 
         let mut calm = LtcVoice::new(&genesis);
-        let calm_frames = calm.phonemes_to_frames(&phonemes,
-            &VoiceProsody { arousal: 0.1, ..Default::default() }, 44100);
+        let calm_frames = calm.phonemes_to_frames(
+            &phonemes,
+            &VoiceProsody {
+                arousal: 0.1,
+                ..Default::default()
+            },
+            44100,
+        );
 
         let mut excited = LtcVoice::new(&genesis);
-        let excited_frames = excited.phonemes_to_frames(&phonemes,
-            &VoiceProsody { arousal: 0.9, ..Default::default() }, 44100);
+        let excited_frames = excited.phonemes_to_frames(
+            &phonemes,
+            &VoiceProsody {
+                arousal: 0.9,
+                ..Default::default()
+            },
+            44100,
+        );
 
         // Excited should be shorter (faster rate)
-        assert!(excited_frames.len() < calm_frames.len(),
-            "excited ({}) should be shorter than calm ({})", excited_frames.len(), calm_frames.len());
+        assert!(
+            excited_frames.len() < calm_frames.len(),
+            "excited ({}) should be shorter than calm ({})",
+            excited_frames.len(),
+            calm_frames.len()
+        );
     }
 }

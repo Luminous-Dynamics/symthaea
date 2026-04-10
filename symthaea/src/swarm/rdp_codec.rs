@@ -256,9 +256,7 @@ impl HybridCodec {
                     row * TILE_SIZE,
                     TILE_SIZE,
                 );
-                patches.push(QuantizedPatch {
-                    values: tile_bytes,
-                });
+                patches.push(QuantizedPatch { values: tile_bytes });
             }
         }
 
@@ -316,14 +314,16 @@ impl HybridCodec {
 
 /// Generate a deterministic position basis HV for a tile index.
 fn generate_position_hv(index: usize, seed: u64) -> ContinuousHV {
-    let combined = seed.wrapping_add(index as u64).wrapping_mul(0x517cc1b727220a95);
+    let combined = seed
+        .wrapping_add(index as u64)
+        .wrapping_mul(0x517cc1b727220a95);
     let mut values = vec![0.0f32; TILE_HDC_DIM];
     let mut state = combined;
     for v in values.iter_mut() {
         let hash = blake3::hash(&state.to_le_bytes());
         let bytes = hash.as_bytes();
-        let u = u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]) as f32
-            / u32::MAX as f32;
+        let u =
+            u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]) as f32 / u32::MAX as f32;
         *v = (u - 0.5) * 2.0;
         state = state.wrapping_add(1);
     }
@@ -413,7 +413,7 @@ fn encode_tile_hdc(
             3 => mean_g,
             4 => mean_b,
             5 => edge_density,
-            6 => mean_lum * contrast, // interaction term
+            6 => mean_lum * contrast,     // interaction term
             _ => (mean_r - mean_b).abs(), // color difference
         };
         values[i] = position_hv.values[i] * feature_weight;
@@ -450,9 +450,8 @@ fn classify_tile_content(
             if offset + 3 >= pixels.len() {
                 break;
             }
-            let lum = (pixels[offset] as u32 + pixels[offset + 1] as u32
-                + pixels[offset + 2] as u32)
-                / 3;
+            let lum =
+                (pixels[offset] as u32 + pixels[offset + 1] as u32 + pixels[offset + 2] as u32) / 3;
             unique_lum_bins[(lum * 15 / 255).min(15) as usize] = true;
             pixel_count += 1;
 
@@ -460,9 +459,9 @@ fn classify_tile_content(
             if dx > 0 {
                 let prev = (y * img_width + x - 1) * 4;
                 if prev + 3 < pixels.len() {
-                    let prev_lum = (pixels[prev] as i32 + pixels[prev + 1] as i32
-                        + pixels[prev + 2] as i32)
-                        / 3;
+                    let prev_lum =
+                        (pixels[prev] as i32 + pixels[prev + 1] as i32 + pixels[prev + 2] as i32)
+                            / 3;
                     if (lum as i32 - prev_lum).unsigned_abs() > 30 {
                         edge_count += 1;
                     }
@@ -625,7 +624,7 @@ mod tests {
         assert_eq!(full.patch_cols, 4); // 256/64 = 4
         assert_eq!(full.patch_rows, 4);
         assert_eq!(full.patches.len(), 16); // 4×4 grid
-        // Each tile is 64×64 = 4096 grayscale bytes.
+                                            // Each tile is 64×64 = 4096 grayscale bytes.
         assert_eq!(full.patches[0].values.len(), TILE_SIZE * TILE_SIZE);
     }
 

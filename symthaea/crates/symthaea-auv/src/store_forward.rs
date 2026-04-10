@@ -6,9 +6,9 @@
 //! When submerged, the AUV cannot transmit to the Mycelix DHT. Readings
 //! are buffered in a circular buffer and batch-submitted on surfacing.
 
-use std::collections::VecDeque;
-use serde::{Deserialize, Serialize};
 use crate::types::ChemicalReadings;
+use serde::{Deserialize, Serialize};
+use std::collections::VecDeque;
 
 /// A buffered reading waiting for transmission.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -137,7 +137,10 @@ mod tests {
         assert_eq!(buf.total_collected(), 5);
         // Oldest should be dropped
         let readings = buf.drain_for_transmission();
-        assert!((readings[0].timestamp - 2.0).abs() < 1e-10, "Oldest should be t=2.0");
+        assert!(
+            (readings[0].timestamp - 2.0).abs() < 1e-10,
+            "Oldest should be t=2.0"
+        );
     }
 
     #[test]

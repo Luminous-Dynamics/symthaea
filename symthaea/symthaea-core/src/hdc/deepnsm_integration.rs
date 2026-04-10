@@ -112,15 +112,13 @@ impl DeepNSMCorpus {
         let context_lower = context.to_lowercase();
         let context_words: Vec<&str> = context_lower.split_whitespace().collect();
 
-        entries
-            .iter()
-            .max_by_key(|e| {
-                let usage_lower = e.usage.to_lowercase();
-                context_words
-                    .iter()
-                    .filter(|w| usage_lower.contains(**w))
-                    .count()
-            })
+        entries.iter().max_by_key(|e| {
+            let usage_lower = e.usage.to_lowercase();
+            context_words
+                .iter()
+                .filter(|w| usage_lower.contains(**w))
+                .count()
+        })
     }
 
     /// Number of explications in the corpus.
@@ -213,10 +211,14 @@ mod tests {
             encoding: None,
         });
 
-        let financial = corpus.best_match("bank", "I deposited money at the bank").unwrap();
+        let financial = corpus
+            .best_match("bank", "I deposited money at the bank")
+            .unwrap();
         assert!(financial.usage.contains("financial"));
 
-        let river = corpus.best_match("bank", "The river bank was muddy from water").unwrap();
+        let river = corpus
+            .best_match("bank", "The river bank was muddy from water")
+            .unwrap();
         assert!(river.usage.contains("river"));
     }
 
@@ -232,7 +234,9 @@ mod tests {
         let primitives = vec!["FEEL".to_string(), "GOOD".to_string()];
         // Simple lookup that generates a deterministic HV per prime
         let hv = DeepNSMCorpus::encode_explication(&primitives, |prime| {
-            let seed = prime.bytes().fold(0u64, |acc, b| acc.wrapping_mul(31).wrapping_add(b as u64));
+            let seed = prime
+                .bytes()
+                .fold(0u64, |acc, b| acc.wrapping_mul(31).wrapping_add(b as u64));
             Some(BinaryHV::random(seed))
         });
         assert_eq!(BinaryHV::DIM, HDC_DIMENSION);

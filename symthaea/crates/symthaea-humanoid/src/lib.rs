@@ -64,13 +64,13 @@ pub use controller::{ControllerCheckpoint, HumanoidController};
 pub use encoder::HumanoidHdcEncoder;
 pub use fep_agent::{ActiveInferenceHumanoidAgent, HumanoidFepConfig};
 pub use gait::GaitAnalyzer;
+pub use morphology::HumanoidMorphology;
 pub use perturbations::{HumanoidPerturbation, PerturbationSchedule};
 pub use reward::{clearance_reward, cot_efficiency_reward, episode_reward, standing_reward};
 #[cfg(feature = "mujoco")]
 pub use simulator::MuJoCoHumanoidSimulator;
 pub use simulator::{HumanoidPhysicsSimulator, SimpleHumanoidSimulator};
 pub use training::HumanoidTrainer;
-pub use morphology::HumanoidMorphology;
 pub use types::*;
 
 #[cfg(test)]

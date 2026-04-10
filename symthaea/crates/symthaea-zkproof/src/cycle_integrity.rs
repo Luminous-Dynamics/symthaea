@@ -33,8 +33,8 @@
 //! - Moral reasoning chain
 //! - Internal prediction errors or quality metrics
 
-use sha2::{Digest, Sha256};
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 
 /// A cycle integrity proof — proves the cognitive loop ran correctly.
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -187,7 +187,10 @@ pub fn verify_cycle_proof(proof: &CycleIntegrityProof) -> Result<(), String> {
         return Err("Chain commitment mismatch".to_string());
     }
     if !verify_consciousness_range(proof) {
-        return Err(format!("Consciousness level out of range: {}", proof.consciousness_level));
+        return Err(format!(
+            "Consciousness level out of range: {}",
+            proof.consciousness_level
+        ));
     }
     if !verify_moral_verdict(proof) {
         return Err(format!("Invalid moral verdict: {}", proof.moral_verdict));
@@ -227,8 +230,10 @@ mod tests {
     fn test_chain_commitment_deterministic() {
         let p1 = sample_proof();
         let p2 = sample_proof();
-        assert_eq!(p1.chain_commitment, p2.chain_commitment,
-            "same inputs must produce same chain commitment");
+        assert_eq!(
+            p1.chain_commitment, p2.chain_commitment,
+            "same inputs must produce same chain commitment"
+        );
     }
 
     #[test]
@@ -260,12 +265,22 @@ mod tests {
     #[test]
     fn test_different_inputs_different_commitments() {
         let p1 = generate_cycle_proof(
-            b"perception_A", b"dynamics_A", b"feedback_A", b"output_A",
-            3.0, "Allow", 1,
+            b"perception_A",
+            b"dynamics_A",
+            b"feedback_A",
+            b"output_A",
+            3.0,
+            "Allow",
+            1,
         );
         let p2 = generate_cycle_proof(
-            b"perception_B", b"dynamics_B", b"feedback_B", b"output_B",
-            4.0, "Warn", 2,
+            b"perception_B",
+            b"dynamics_B",
+            b"feedback_B",
+            b"output_B",
+            4.0,
+            "Warn",
+            2,
         );
         assert_ne!(p1.chain_commitment, p2.chain_commitment);
         assert_ne!(p1.perception_commitment, p2.perception_commitment);
@@ -274,11 +289,12 @@ mod tests {
     #[test]
     fn test_moral_verdicts_accepted() {
         for verdict in &["Allow", "Warn", "Caution", "Veto"] {
-            let proof = generate_cycle_proof(
-                b"p", b"d", b"f", b"o", 1.0, verdict, 1,
+            let proof = generate_cycle_proof(b"p", b"d", b"f", b"o", 1.0, verdict, 1);
+            assert!(
+                verify_moral_verdict(&proof),
+                "verdict '{}' should be accepted",
+                verdict
             );
-            assert!(verify_moral_verdict(&proof),
-                "verdict '{}' should be accepted", verdict);
         }
     }
 

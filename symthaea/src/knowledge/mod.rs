@@ -29,23 +29,23 @@
 //! behind `enable_knowledge_engine` in `CognitiveLoopConfig`.
 
 pub mod adaptive_ontology;
+#[cfg(feature = "epistemic")]
+pub mod adversarial_epistemics;
 pub mod causal_bridge;
 pub mod causal_reasoning_bridge;
+#[cfg(feature = "epistemic")]
+pub mod claim_priority;
 pub mod encoding;
 pub mod extraction;
 pub mod graph;
+#[cfg(feature = "epistemic")]
+pub mod hdc_retrieval;
 pub mod llm_extraction;
 pub mod manager;
 pub mod persistence;
 pub mod reasoning_context;
 #[cfg(feature = "self_schema")]
 pub mod self_schema;
-#[cfg(feature = "epistemic")]
-pub mod claim_priority;
-#[cfg(feature = "epistemic")]
-pub mod adversarial_epistemics;
-#[cfg(feature = "epistemic")]
-pub mod hdc_retrieval;
 
 pub use adaptive_ontology::{AdaptiveOntology, PrimitiveUsage};
 pub use causal_bridge::CausalKnowledgeBridge;

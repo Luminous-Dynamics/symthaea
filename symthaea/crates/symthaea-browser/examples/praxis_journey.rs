@@ -40,13 +40,29 @@ async fn observe(page: &chromiumoxide::Page) -> PageObservation {
             if let Ok(json_str) = val.into_value::<String>() {
                 if let Ok(items) = serde_json::from_str::<Vec<serde_json::Value>>(&json_str) {
                     for item in &items {
-                        let role = item.get("role").and_then(|v| v.as_str()).unwrap_or("").to_string();
-                        let name = item.get("name").and_then(|v| v.as_str()).unwrap_or("").to_string();
-                        let value = item.get("value").and_then(|v| v.as_str()).map(|s| s.to_string());
+                        let role = item
+                            .get("role")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("")
+                            .to_string();
+                        let name = item
+                            .get("name")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("")
+                            .to_string();
+                        let value = item
+                            .get("value")
+                            .and_then(|v| v.as_str())
+                            .map(|s| s.to_string());
                         if !name.is_empty() {
                             elements.push(AccessibleElement {
-                                backend_node_id: -1, role, name, value,
-                                description: None, focused: false, disabled: false,
+                                backend_node_id: -1,
+                                role,
+                                name,
+                                value,
+                                description: None,
+                                focused: false,
+                                disabled: false,
                             });
                         }
                     }
@@ -54,7 +70,12 @@ async fn observe(page: &chromiumoxide::Page) -> PageObservation {
             }
         }
 
-        return PageObservation { url, title, elements, focused_element: None };
+        return PageObservation {
+            url,
+            title,
+            elements,
+            focused_element: None,
+        };
     }
 
     let response = ax_result.unwrap();
@@ -88,7 +109,13 @@ async fn observe(page: &chromiumoxide::Page) -> PageObservation {
         // BackendNodeId is a newtype; use Debug to extract the inner value
         let backend_node_id = node
             .backend_dom_node_id
-            .map(|id| format!("{id:?}").trim_start_matches("BackendNodeId(").trim_end_matches(')').parse::<i64>().unwrap_or(-1))
+            .map(|id| {
+                format!("{id:?}")
+                    .trim_start_matches("BackendNodeId(")
+                    .trim_end_matches(')')
+                    .parse::<i64>()
+                    .unwrap_or(-1)
+            })
             .unwrap_or(-1);
 
         elements.push(AccessibleElement {
@@ -119,9 +146,7 @@ async fn main() {
         .await
         .expect("Connect to Chrome on :9222 — start with: chromium --headless=new --no-sandbox --remote-debugging-port=9222");
 
-    tokio::spawn(async move {
-        while handler.next().await.is_some() {}
-    });
+    tokio::spawn(async move { while handler.next().await.is_some() {} });
 
     let page = browser.new_page("about:blank").await.expect("New page");
 
@@ -149,9 +174,7 @@ async fn main() {
     .await
     .expect("Set localStorage");
 
-    page.goto("http://localhost:8107/")
-        .await
-        .expect("Reload");
+    page.goto("http://localhost:8107/").await.expect("Reload");
     tokio::time::sleep(std::time::Duration::from_secs(6)).await;
 
     let obs = observe(&page).await;

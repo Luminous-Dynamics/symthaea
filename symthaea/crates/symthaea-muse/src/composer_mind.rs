@@ -11,8 +11,8 @@
 //! 2. **Long-range memory**: opening theme stored for recapitulation
 //! 3. **Free composition**: Symthaea chooses her own emotional trajectory
 
-use crate::{Note, MusicalState};
 use crate::creative_agency::QualityTier;
+use crate::{MusicalState, Note};
 
 /// A compositional goal — what the music should become.
 #[derive(Debug, Clone)]
@@ -111,9 +111,15 @@ impl FormMemory {
         self.best_phrase.as_ref().map(|(n, _)| n.as_slice())
     }
 
-    pub fn current_section(&self) -> SectionArc { self.current_section }
-    pub fn bars_elapsed(&self) -> f32 { self.bars_elapsed }
-    pub fn reset(&mut self) { *self = Self::new(); }
+    pub fn current_section(&self) -> SectionArc {
+        self.current_section
+    }
+    pub fn bars_elapsed(&self) -> f32 {
+        self.bars_elapsed
+    }
+    pub fn reset(&mut self) {
+        *self = Self::new();
+    }
 }
 
 /// The composer mind: plans goals and manages form.
@@ -218,7 +224,9 @@ impl ComposerMind {
 
     /// Get the most urgent active goal.
     pub fn primary_goal(&self) -> Option<&CompositionGoal> {
-        self.goals.iter().max_by(|a, b| a.urgency.partial_cmp(&b.urgency).unwrap())
+        self.goals
+            .iter()
+            .max_by(|a, b| a.urgency.partial_cmp(&b.urgency).unwrap())
     }
 
     /// Apply compositional goals to the musical state.
@@ -276,7 +284,9 @@ impl ComposerMind {
 
     /// Should we recapitulate now? (Bring back opening theme)
     pub fn should_recapitulate(&self) -> bool {
-        self.goals.iter().any(|g| g.target == GoalTarget::Recapitulate && g.bars_remaining < 4.0)
+        self.goals
+            .iter()
+            .any(|g| g.target == GoalTarget::Recapitulate && g.bars_remaining < 4.0)
     }
 
     /// Get the opening theme notes for recapitulation.
@@ -288,8 +298,12 @@ impl ComposerMind {
         }
     }
 
-    pub fn active_goal_count(&self) -> usize { self.goals.len() }
-    pub fn section(&self) -> SectionArc { self.memory.current_section() }
+    pub fn active_goal_count(&self) -> usize {
+        self.goals.len()
+    }
+    pub fn section(&self) -> SectionArc {
+        self.memory.current_section()
+    }
 
     pub fn reset(&mut self) {
         self.goals.clear();
@@ -302,11 +316,7 @@ impl ComposerMind {
 /// Instead of hardcoded consciousness trajectories, the system
 /// evolves its own state based on compositional goals and aesthetic
 /// feedback. Call this each bar to let Symthaea guide herself.
-pub fn free_compose_step(
-    state: &mut MusicalState,
-    composer: &mut ComposerMind,
-    beauty_ema: f32,
-) {
+pub fn free_compose_step(state: &mut MusicalState, composer: &mut ComposerMind, beauty_ema: f32) {
     // Advance form
     let _new_goals = composer.advance_bar(state);
 
@@ -348,11 +358,17 @@ mod tests {
         let state = MusicalState::default();
 
         // Record an opening theme
-        let theme = vec![Note { frequency: 440.0, start_time: 0.0, duration: 0.5, velocity: 0.7 }];
+        let theme = vec![Note {
+            frequency: 440.0,
+            start_time: 0.0,
+            duration: 0.5,
+            velocity: 0.7,
+        }];
         mind.memory.record_phrase(&theme, 0.8);
 
         // Advance to recapitulation section
-        for _ in 0..14 { // sections: expo(4) + dev(4) + climax(4) + recap starts at 12
+        for _ in 0..14 {
+            // sections: expo(4) + dev(4) + climax(4) + recap starts at 12
             mind.advance_bar(&state);
         }
 
@@ -369,7 +385,10 @@ mod tests {
             urgency: 1.0,
         });
 
-        let mut state = MusicalState { arousal: 0.5, ..Default::default() };
+        let mut state = MusicalState {
+            arousal: 0.5,
+            ..Default::default()
+        };
         mind.shape_state(&mut state);
         assert!(state.arousal > 0.5, "climax should increase arousal");
     }
@@ -383,7 +402,10 @@ mod tests {
             urgency: 0.8,
         });
 
-        let mut state = MusicalState { arousal: 0.7, ..Default::default() };
+        let mut state = MusicalState {
+            arousal: 0.7,
+            ..Default::default()
+        };
         mind.shape_state(&mut state);
         assert!(state.arousal < 0.7, "fade should decrease arousal");
     }
@@ -391,9 +413,19 @@ mod tests {
     #[test]
     fn best_phrase_tracked() {
         let mut mem = FormMemory::new();
-        let phrase1 = vec![Note { frequency: 440.0, start_time: 0.0, duration: 0.5, velocity: 0.7 }];
+        let phrase1 = vec![Note {
+            frequency: 440.0,
+            start_time: 0.0,
+            duration: 0.5,
+            velocity: 0.7,
+        }];
         mem.record_phrase(&phrase1, 0.6);
-        let phrase2 = vec![Note { frequency: 523.25, start_time: 0.0, duration: 0.5, velocity: 0.7 }];
+        let phrase2 = vec![Note {
+            frequency: 523.25,
+            start_time: 0.0,
+            duration: 0.5,
+            velocity: 0.7,
+        }];
         mem.record_phrase(&phrase2, 0.9);
 
         assert!((mem.best_phrase().unwrap()[0].frequency - 523.25).abs() < 1.0);
@@ -401,11 +433,17 @@ mod tests {
 
     #[test]
     fn free_compose_responds_to_beauty() {
-        let mut state = MusicalState { consciousness_level: 0.5, ..Default::default() };
+        let mut state = MusicalState {
+            consciousness_level: 0.5,
+            ..Default::default()
+        };
         let mut composer = ComposerMind::new();
 
         // Low beauty should increase exploration
         free_compose_step(&mut state, &mut composer, 0.2);
-        assert!(state.prediction_error > 0.0, "should explore when beauty is low");
+        assert!(
+            state.prediction_error > 0.0,
+            "should explore when beauty is low"
+        );
     }
 }

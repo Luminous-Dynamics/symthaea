@@ -36,13 +36,13 @@ fn main() {
 
 #[cfg(feature = "humanoid")]
 fn run_study() {
+    use symthaea_core::genesis::GenesisSeed;
+    use symthaea_core::hdc::{ContinuousHV, HDC_DIMENSION};
     use symthaea_humanoid::controller::HumanoidController;
     use symthaea_humanoid::encoder::HumanoidHdcEncoder;
     use symthaea_humanoid::simulator::{HumanoidPhysicsSimulator, SimpleHumanoidSimulator};
     use symthaea_humanoid::training::HumanoidTrainer;
     use symthaea_humanoid::types::{HumanoidCommand, HumanoidConfig, HumanoidState, HumanoidTask};
-    use symthaea_core::genesis::GenesisSeed;
-    use symthaea_core::hdc::{ContinuousHV, HDC_DIMENSION};
 
     println!("╔══════════════════════════════════════════════════════════════╗");
     println!("║  HDC Noise Robustness Study                                 ║");
@@ -65,9 +65,17 @@ fn run_study() {
     let mut trainer = HumanoidTrainer::new(config.clone());
     let metrics = trainer.train();
 
-    let baseline_reward: f64 = metrics.iter().rev().take(5)
-        .map(|m| m.avg_standing_reward).sum::<f64>() / 5.0;
-    println!("  Baseline standing reward (last 5 episodes): {:.4}", baseline_reward);
+    let baseline_reward: f64 = metrics
+        .iter()
+        .rev()
+        .take(5)
+        .map(|m| m.avg_standing_reward)
+        .sum::<f64>()
+        / 5.0;
+    println!(
+        "  Baseline standing reward (last 5 episodes): {:.4}",
+        baseline_reward
+    );
     println!();
 
     // ─── Phase 2: Noise sweep ───
@@ -76,7 +84,10 @@ fn run_study() {
     let steps_per_eval = 500; // Shorter eval for speed
 
     println!("━━━ Phase 2: HDC Encoding Noise Sweep ━━━");
-    println!("{:>8} {:>12} {:>12} {:>12}", "Noise%", "StandReward", "HeadHeight", "Uprightness");
+    println!(
+        "{:>8} {:>12} {:>12} {:>12}",
+        "Noise%", "StandReward", "HeadHeight", "Uprightness"
+    );
 
     let mut hdc_results = Vec::new();
 
@@ -132,8 +143,13 @@ fn run_study() {
         let mean_height = total_height / eval_episodes as f64;
         let mean_upright = total_upright / eval_episodes as f64;
 
-        println!("{:>7.0}% {:>12.4} {:>12.4} {:>12.4}",
-            noise * 100.0, mean_reward, mean_height, mean_upright);
+        println!(
+            "{:>7.0}% {:>12.4} {:>12.4} {:>12.4}",
+            noise * 100.0,
+            mean_reward,
+            mean_height,
+            mean_upright
+        );
 
         hdc_results.push((noise, mean_reward, mean_height, mean_upright));
     }
@@ -141,7 +157,10 @@ fn run_study() {
     // ─── Phase 3: Weight noise sweep ───
     println!();
     println!("━━━ Phase 3: Output Weight Noise Sweep ━━━");
-    println!("{:>8} {:>12} {:>12} {:>12}", "Noise%", "StandReward", "HeadHeight", "Uprightness");
+    println!(
+        "{:>8} {:>12} {:>12} {:>12}",
+        "Noise%", "StandReward", "HeadHeight", "Uprightness"
+    );
 
     let mut weight_results = Vec::new();
 
@@ -189,8 +208,13 @@ fn run_study() {
         let mean_height = total_height / eval_episodes as f64;
         let mean_upright = total_upright / eval_episodes as f64;
 
-        println!("{:>7.0}% {:>12.4} {:>12.4} {:>12.4}",
-            noise * 100.0, mean_reward, mean_height, mean_upright);
+        println!(
+            "{:>7.0}% {:>12.4} {:>12.4} {:>12.4}",
+            noise * 100.0,
+            mean_reward,
+            mean_height,
+            mean_upright
+        );
 
         weight_results.push((noise, mean_reward, mean_height, mean_upright));
     }
@@ -198,13 +222,25 @@ fn run_study() {
     // ─── Summary ───
     println!();
     println!("━━━ Summary: HDC vs Weight Noise ━━━");
-    println!("{:>8} {:>15} {:>15} {:>10}", "Noise%", "HDC_Reward", "Weight_Reward", "HDC_Adv");
+    println!(
+        "{:>8} {:>15} {:>15} {:>10}",
+        "Noise%", "HDC_Reward", "Weight_Reward", "HDC_Adv"
+    );
     for i in 0..noise_levels.len() {
         let (n, hr, _, _) = hdc_results[i];
         let (_, wr, _, _) = weight_results[i];
-        let adv = if wr > 0.01 { (hr - wr) / wr * 100.0 } else { 0.0 };
-        println!("{:>7.0}% {:>15.4} {:>15.4} {:>9.1}%",
-            n * 100.0, hr, wr, adv);
+        let adv = if wr > 0.01 {
+            (hr - wr) / wr * 100.0
+        } else {
+            0.0
+        };
+        println!(
+            "{:>7.0}% {:>15.4} {:>15.4} {:>9.1}%",
+            n * 100.0,
+            hr,
+            wr,
+            adv
+        );
     }
 
     // ─── CSV output ───
@@ -214,13 +250,25 @@ fn run_study() {
     for i in 0..noise_levels.len() {
         let (n, hr, hh, hu) = hdc_results[i];
         let (_, wr, wh, wu) = weight_results[i];
-        println!("{:.0},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6}",
-            n * 100.0, hr, hh, hu, wr, wh, wu);
+        println!(
+            "{:.0},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6}",
+            n * 100.0,
+            hr,
+            hh,
+            hu,
+            wr,
+            wh,
+            wu
+        );
     }
 }
 
 #[cfg(feature = "humanoid")]
-fn corrupt_hv(hv: &symthaea_core::hdc::ContinuousHV, noise_level: f64, seed: u64) -> symthaea_core::hdc::ContinuousHV {
+fn corrupt_hv(
+    hv: &symthaea_core::hdc::ContinuousHV,
+    noise_level: f64,
+    seed: u64,
+) -> symthaea_core::hdc::ContinuousHV {
     let values = hv.as_slice();
     let dim = values.len();
     let mut result = vec![0.0f32; dim];
@@ -266,8 +314,11 @@ fn corrupt_controller_weights(
 #[cfg(feature = "humanoid")]
 fn standing_reward(state: &symthaea_humanoid::types::HumanoidState) -> f64 {
     // Simplified standing reward: head height tolerance × uprightness
-    let head_tol = if state.head_height >= 1.2 { 1.0 }
-        else { (state.head_height / 1.2).max(0.0) };
+    let head_tol = if state.head_height >= 1.2 {
+        1.0
+    } else {
+        (state.head_height / 1.2).max(0.0)
+    };
     let upright = state.torso_vertical[2].max(0.0);
     head_tol * upright
 }

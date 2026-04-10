@@ -115,8 +115,11 @@ pub fn extract_common_features(
     let symmetry = if mean < 0.01 {
         0.0
     } else {
-        let variance: f32 =
-            harmony_activations.iter().map(|r| (r - mean).powi(2)).sum::<f32>() / 8.0;
+        let variance: f32 = harmony_activations
+            .iter()
+            .map(|r| (r - mean).powi(2))
+            .sum::<f32>()
+            / 8.0;
         let cv = variance.sqrt() / mean;
         (1.0 - cv).clamp(0.0, 1.0)
     };
@@ -197,8 +200,13 @@ mod tests {
         // Perfectly uniform harmonies → high symmetry
         let uniform = extract_common_features(&[0.8; 8], 0.7, 0.5, 0.3, 0.5);
         // One spike → low symmetry
-        let spiked =
-            extract_common_features(&[1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], 0.7, 0.5, 0.3, 0.5);
+        let spiked = extract_common_features(
+            &[1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+            0.7,
+            0.5,
+            0.3,
+            0.5,
+        );
         assert!(
             uniform.symmetry > spiked.symmetry,
             "uniform {} > spiked {}",

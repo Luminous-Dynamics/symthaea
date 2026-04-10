@@ -27,26 +27,34 @@ fn main() {
 #[cfg(feature = "neuroevolution")]
 fn main() {
     use symthaea::cognitive_loop::{CognitiveLoopConfig, CognitiveLoopService};
-    use symthaea_neuroevolution::{
-        NeuralGenome, ThresholdPhenotype,
-        threshold_genome::{decode_thresholds, evaluate_threshold_fitness},
-    };
     use symthaea_core::genesis::GenesisSeed;
+    use symthaea_neuroevolution::{
+        threshold_genome::{decode_thresholds, evaluate_threshold_fitness},
+        NeuralGenome, ThresholdPhenotype,
+    };
 
-    let pop_size: usize = std::env::var("POP_SIZE").ok()
-        .and_then(|s| s.parse().ok()).unwrap_or(10);
-    let generations: usize = std::env::var("GENERATIONS").ok()
-        .and_then(|s| s.parse().ok()).unwrap_or(8);
-    let eval_cycles: usize = std::env::var("EVAL_CYCLES").ok()
-        .and_then(|s| s.parse().ok()).unwrap_or(30);
+    let pop_size: usize = std::env::var("POP_SIZE")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(10);
+    let generations: usize = std::env::var("GENERATIONS")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(8);
+    let eval_cycles: usize = std::env::var("EVAL_CYCLES")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(30);
 
     let total_cls_cycles = pop_size * generations * eval_cycles;
     let est_minutes = total_cls_cycles / 60; // ~1 sec/cycle
 
     println!("═══════════════════════════════════════════════════════════════");
     println!("  CLS-in-the-Loop Threshold Evolution");
-    println!("  {} pop × {} gen × {} cycles = {} total (~{} min)",
-        pop_size, generations, eval_cycles, total_cls_cycles, est_minutes);
+    println!(
+        "  {} pop × {} gen × {} cycles = {} total (~{} min)",
+        pop_size, generations, eval_cycles, total_cls_cycles, est_minutes
+    );
     println!("  Override: POP_SIZE, GENERATIONS, EVAL_CYCLES env vars");
     println!("═══════════════════════════════════════════════════════════════\n");
 
@@ -80,12 +88,18 @@ fn main() {
 
     let defaults = ThresholdPhenotype::default();
     let default_fitness = evaluate_with_cls(&defaults, &inputs, eval_cycles);
-    println!("  Default baseline: Φ={:.4}  FE-red={:.4}  pred={:.4}  stab={:.4}\n",
-        default_fitness.mean_phi, default_fitness.fe_reduction,
-        default_fitness.pred_accuracy, default_fitness.phi_stability);
+    println!(
+        "  Default baseline: Φ={:.4}  FE-red={:.4}  pred={:.4}  stab={:.4}\n",
+        default_fitness.mean_phi,
+        default_fitness.fe_reduction,
+        default_fitness.pred_accuracy,
+        default_fitness.phi_stability
+    );
 
-    println!("{:>4}  {:>8}  {:>8}  {:>8}  {:>8}  {:>8}  {:>8}",
-        "Gen", "Best Φ", "Mean Φ", "FE-red", "Pred", "Stab", "Thresh");
+    println!(
+        "{:>4}  {:>8}  {:>8}  {:>8}  {:>8}  {:>8}  {:>8}",
+        "Gen", "Best Φ", "Mean Φ", "FE-red", "Pred", "Stab", "Thresh"
+    );
     println!("{}", "-".repeat(62));
 
     let mut rng_state: u64 = 42;
@@ -99,21 +113,30 @@ fn main() {
         }
 
         // Sort by composite
-        population.sort_by(|a, b|
-            b.1.composite().partial_cmp(&a.1.composite())
-                .unwrap_or(std::cmp::Ordering::Equal));
+        population.sort_by(|a, b| {
+            b.1.composite()
+                .partial_cmp(&a.1.composite())
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
 
         let best = &population[0].1;
         let mean_phi: f64 = population.iter().map(|p| p.1.mean_phi).sum::<f64>() / pop_size as f64;
 
-        println!("{:>4}  {:>8.4}  {:>8.4}  {:>8.4}  {:>8.4}  {:>8.4}  {:>8.4}",
-            gen, best.mean_phi, mean_phi, best.fe_reduction,
-            best.pred_accuracy, best.phi_stability, best.threshold_consistency);
+        println!(
+            "{:>4}  {:>8.4}  {:>8.4}  {:>8.4}  {:>8.4}  {:>8.4}  {:>8.4}",
+            gen,
+            best.mean_phi,
+            mean_phi,
+            best.fe_reduction,
+            best.pred_accuracy,
+            best.phi_stability,
+            best.threshold_consistency
+        );
 
         // Elitism: keep top 30%
         let elite_count = (pop_size * 3 / 10).max(2);
-        let mut next_gen: Vec<(NeuralGenome, ClsFitness)> = population[..elite_count]
-            .iter().cloned().collect();
+        let mut next_gen: Vec<(NeuralGenome, ClsFitness)> =
+            population[..elite_count].iter().cloned().collect();
 
         // Fill with mutated offspring from tournament selection
         while next_gen.len() < pop_size {
@@ -124,10 +147,15 @@ fn main() {
             let i2 = rng_state as usize % population.len();
             rng_state = xorshift(rng_state);
             let i3 = rng_state as usize % population.len();
-            let parent_idx = [i1, i2, i3].into_iter()
-                .max_by(|&a, &b| population[a].1.composite()
-                    .partial_cmp(&population[b].1.composite())
-                    .unwrap_or(std::cmp::Ordering::Equal))
+            let parent_idx = [i1, i2, i3]
+                .into_iter()
+                .max_by(|&a, &b| {
+                    population[a]
+                        .1
+                        .composite()
+                        .partial_cmp(&population[b].1.composite())
+                        .unwrap_or(std::cmp::Ordering::Equal)
+                })
                 .unwrap();
 
             // Mutate threshold region only (bytes 50-80)
@@ -153,24 +181,71 @@ fn main() {
     println!("  Final Best vs Defaults");
     println!("═══════════════════════════════════════════════════════════════\n");
 
-    println!("  {:>20}  {:>10}  {:>10}  {:>8}", "Metric", "Default", "Evolved", "Delta");
+    println!(
+        "  {:>20}  {:>10}  {:>10}  {:>8}",
+        "Metric", "Default", "Evolved", "Delta"
+    );
     println!("  {}", "-".repeat(52));
     cmp_row("Mean Φ", default_fitness.mean_phi, best_fitness.mean_phi);
-    cmp_row("FE reduction", default_fitness.fe_reduction, best_fitness.fe_reduction);
-    cmp_row("Pred accuracy", default_fitness.pred_accuracy, best_fitness.pred_accuracy);
-    cmp_row("Phi stability", default_fitness.phi_stability, best_fitness.phi_stability);
+    cmp_row(
+        "FE reduction",
+        default_fitness.fe_reduction,
+        best_fitness.fe_reduction,
+    );
+    cmp_row(
+        "Pred accuracy",
+        default_fitness.pred_accuracy,
+        best_fitness.pred_accuracy,
+    );
+    cmp_row(
+        "Phi stability",
+        default_fitness.phi_stability,
+        best_fitness.phi_stability,
+    );
 
     println!("\n  Evolved thresholds:");
     let d = ThresholdPhenotype::default();
-    thresh_row("fep_surprise_scale", best_pheno.fep_surprise_scale, d.fep_surprise_scale);
+    thresh_row(
+        "fep_surprise_scale",
+        best_pheno.fep_surprise_scale,
+        d.fep_surprise_scale,
+    );
     thresh_row("fep_lr_decay", best_pheno.fep_lr_decay, d.fep_lr_decay);
-    thresh_row("neuromod_d2_baseline", best_pheno.neuromod_d2_baseline as f32, d.neuromod_d2_baseline as f32);
-    thresh_row("ne_phasic_threshold", best_pheno.neuromod_ne_phasic_threshold, d.neuromod_ne_phasic_threshold);
-    thresh_row("arousal_ema_decay", best_pheno.neuromod_arousal_ema_decay, d.neuromod_arousal_ema_decay);
-    thresh_row("homeostasis_high", best_pheno.homeostasis_recalibrate_high, d.homeostasis_recalibrate_high);
-    thresh_row("homeostasis_low", best_pheno.homeostasis_recalibrate_low, d.homeostasis_recalibrate_low);
-    thresh_row("self_model_weight_high", best_pheno.self_model_weight_high, d.self_model_weight_high);
-    thresh_row("homeostasis_pull_cruise", best_pheno.homeostasis_pull_cruise, d.homeostasis_pull_cruise);
+    thresh_row(
+        "neuromod_d2_baseline",
+        best_pheno.neuromod_d2_baseline as f32,
+        d.neuromod_d2_baseline as f32,
+    );
+    thresh_row(
+        "ne_phasic_threshold",
+        best_pheno.neuromod_ne_phasic_threshold,
+        d.neuromod_ne_phasic_threshold,
+    );
+    thresh_row(
+        "arousal_ema_decay",
+        best_pheno.neuromod_arousal_ema_decay,
+        d.neuromod_arousal_ema_decay,
+    );
+    thresh_row(
+        "homeostasis_high",
+        best_pheno.homeostasis_recalibrate_high,
+        d.homeostasis_recalibrate_high,
+    );
+    thresh_row(
+        "homeostasis_low",
+        best_pheno.homeostasis_recalibrate_low,
+        d.homeostasis_recalibrate_low,
+    );
+    thresh_row(
+        "self_model_weight_high",
+        best_pheno.self_model_weight_high,
+        d.self_model_weight_high,
+    );
+    thresh_row(
+        "homeostasis_pull_cruise",
+        best_pheno.homeostasis_pull_cruise,
+        d.homeostasis_pull_cruise,
+    );
 }
 
 #[cfg(feature = "neuroevolution")]
@@ -211,7 +286,9 @@ fn evaluate_with_cls(
     };
 
     // Apply threshold overrides
-    service.threshold_overrides_mut().apply_from_phenotype(phenotype);
+    service
+        .threshold_overrides_mut()
+        .apply_from_phenotype(phenotype);
 
     let mut phi_values = Vec::with_capacity(cycles);
     let mut pe_values = Vec::with_capacity(cycles);
@@ -228,11 +305,13 @@ fn evaluate_with_cls(
     let mean_phi = phi_values.iter().sum::<f64>() / n;
 
     // FE reduction: are prediction errors decreasing?
-    let first_quarter: f64 = pe_values[..cycles/4].iter().sum::<f64>() / (cycles/4) as f64;
-    let last_quarter: f64 = pe_values[3*cycles/4..].iter().sum::<f64>() / (cycles/4) as f64;
+    let first_quarter: f64 = pe_values[..cycles / 4].iter().sum::<f64>() / (cycles / 4) as f64;
+    let last_quarter: f64 = pe_values[3 * cycles / 4..].iter().sum::<f64>() / (cycles / 4) as f64;
     let fe_reduction = if first_quarter > 1e-6 {
         ((first_quarter - last_quarter) / first_quarter).clamp(-1.0, 1.0)
-    } else { 0.0 };
+    } else {
+        0.0
+    };
 
     // Prediction accuracy: 1 - mean PE (normalized)
     let mean_pe: f64 = pe_values.iter().sum::<f64>() / n;
@@ -241,8 +320,14 @@ fn evaluate_with_cls(
     // Phi stability: 1 / (1 + 10 * variance)
     let phi_var = if cycles > 1 {
         let phi_mean = mean_phi;
-        phi_values.iter().map(|&p| (p - phi_mean).powi(2)).sum::<f64>() / (n - 1.0)
-    } else { 0.0 };
+        phi_values
+            .iter()
+            .map(|&p| (p - phi_mean).powi(2))
+            .sum::<f64>()
+            / (n - 1.0)
+    } else {
+        0.0
+    };
     let phi_stability = 1.0 / (1.0 + 10.0 * phi_var);
 
     ClsFitness {
@@ -264,14 +349,26 @@ fn xorshift(mut state: u64) -> u64 {
 
 #[cfg(feature = "neuroevolution")]
 fn cmp_row(name: &str, default: f64, evolved: f64) {
-    let delta = if default.abs() > 1e-6 { (evolved - default) / default * 100.0 } else { 0.0 };
-    println!("  {:>20}  {:>10.4}  {:>10.4}  {:>+7.1}%", name, default, evolved, delta);
+    let delta = if default.abs() > 1e-6 {
+        (evolved - default) / default * 100.0
+    } else {
+        0.0
+    };
+    println!(
+        "  {:>20}  {:>10.4}  {:>10.4}  {:>+7.1}%",
+        name, default, evolved, delta
+    );
 }
 
 #[cfg(feature = "neuroevolution")]
 fn thresh_row(name: &str, evolved: f32, default: f32) {
     let delta = if default.abs() > 1e-6 {
         ((evolved - default) / default * 100.0) as i32
-    } else { 0 };
-    println!("    {:>25}  {:>8.3}  (default: {:.3}, {:>+4}%)", name, evolved, default, delta);
+    } else {
+        0
+    };
+    println!(
+        "    {:>25}  {:>8.3}  (default: {:.3}, {:>+4}%)",
+        name, evolved, default, delta
+    );
 }

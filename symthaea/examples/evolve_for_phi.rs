@@ -24,12 +24,11 @@ fn main() {
 
 #[cfg(feature = "neuroevolution")]
 fn main() {
-    use symthaea_neuroevolution::{
-        FepFitnessBridge, FepFitnessConfig, FitnessWeights, InputStrategy,
-        NeuralGenome, NeuralOrganism,
-        threshold_genome::evaluate_threshold_fitness,
-    };
     use symthaea_core::genesis::GenesisSeed;
+    use symthaea_neuroevolution::{
+        threshold_genome::evaluate_threshold_fitness, FepFitnessBridge, FepFitnessConfig,
+        FitnessWeights, InputStrategy, NeuralGenome, NeuralOrganism,
+    };
 
     const POP_SIZE: usize = 20;
     const GENERATIONS: usize = 15;
@@ -38,8 +37,10 @@ fn main() {
 
     println!("═══════════════════════════════════════════════════════════════");
     println!("  Phi-Directed Threshold Evolution");
-    println!("  {} organisms × {} generations × {} eval cycles",
-        POP_SIZE, GENERATIONS, EVAL_STEPS);
+    println!(
+        "  {} organisms × {} generations × {} eval cycles",
+        POP_SIZE, GENERATIONS, EVAL_STEPS
+    );
     println!("  5 Pareto objectives: Phi, FE-reduction, pred-acc, stability, consistency");
     println!("═══════════════════════════════════════════════════════════════\n");
 
@@ -70,8 +71,10 @@ fn main() {
         })
         .collect();
 
-    println!("{:>4}  {:>8}  {:>8}  {:>8}  {:>8}  {:>8}  {:>8}",
-        "Gen", "Best Φ", "Mean Φ", "FE-red", "Pred", "Stab", "Thresh");
+    println!(
+        "{:>4}  {:>8}  {:>8}  {:>8}  {:>8}  {:>8}  {:>8}",
+        "Gen", "Best Φ", "Mean Φ", "FE-red", "Pred", "Stab", "Thresh"
+    );
     println!("{}", "-".repeat(70));
 
     for gen in 0..GENERATIONS {
@@ -79,31 +82,43 @@ fn main() {
         bridge.evaluate_population(&mut population);
 
         // Sort by composite (for display)
-        population.sort_by(|a, b|
-            b.fitness.composite.partial_cmp(&a.fitness.composite)
-                .unwrap_or(std::cmp::Ordering::Equal));
+        population.sort_by(|a, b| {
+            b.fitness
+                .composite
+                .partial_cmp(&a.fitness.composite)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
 
         let best = &population[0].fitness;
         let mean_phi: f64 = population.iter().map(|o| o.fitness.phi).sum::<f64>() / POP_SIZE as f64;
 
         // FE reduction: compute from stored initial/final FE
         let best_fe_red = if population[0].initial_fe().abs() > 1e-10 {
-            ((population[0].initial_fe() - population[0].final_fe()) / population[0].initial_fe().abs())
-                .clamp(-1.0, 1.0)
+            ((population[0].initial_fe() - population[0].final_fe())
+                / population[0].initial_fe().abs())
+            .clamp(-1.0, 1.0)
         } else {
             0.0
         };
 
-        println!("{:>4}  {:>8.4}  {:>8.4}  {:>8.4}  {:>8.4}  {:>8.4}  {:>8.4}",
-            gen, best.phi, mean_phi, best_fe_red,
-            best.prediction_accuracy, best.consciousness, best.threshold_fitness);
+        println!(
+            "{:>4}  {:>8.4}  {:>8.4}  {:>8.4}  {:>8.4}  {:>8.4}  {:>8.4}",
+            gen,
+            best.phi,
+            mean_phi,
+            best_fe_red,
+            best.prediction_accuracy,
+            best.consciousness,
+            best.threshold_fitness
+        );
 
         // Pareto sort
         let fronts = FepFitnessBridge::pareto_sort(&population);
 
         // Elitism: keep Pareto front 0
         let elite_indices = &fronts[0];
-        let mut next_gen: Vec<NeuralOrganism> = elite_indices.iter()
+        let mut next_gen: Vec<NeuralOrganism> = elite_indices
+            .iter()
             .map(|&i| population[i].clone())
             .collect();
 
@@ -133,9 +148,12 @@ fn main() {
 
     // Final evaluation
     bridge.evaluate_population(&mut population);
-    population.sort_by(|a, b|
-        b.fitness.composite.partial_cmp(&a.fitness.composite)
-            .unwrap_or(std::cmp::Ordering::Equal));
+    population.sort_by(|a, b| {
+        b.fitness
+            .composite
+            .partial_cmp(&a.fitness.composite)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
 
     println!("\n═══════════════════════════════════════════════════════════════");
     println!("  Final Pareto Front");
@@ -145,13 +163,16 @@ fn main() {
     let front0 = &fronts[0];
 
     println!("  {} organisms on Pareto front 0\n", front0.len());
-    println!("  {:>4}  {:>8}  {:>8}  {:>8}  {:>8}  {:>8}",
-        "Rank", "Phi", "FE", "Pred", "Stab", "Thresh");
+    println!(
+        "  {:>4}  {:>8}  {:>8}  {:>8}  {:>8}  {:>8}",
+        "Rank", "Phi", "FE", "Pred", "Stab", "Thresh"
+    );
     for (rank, &idx) in front0.iter().enumerate().take(10) {
         let f = &population[idx].fitness;
-        println!("  {:>4}  {:>8.4}  {:>8.4}  {:>8.4}  {:>8.4}  {:>8.4}",
-            rank, f.phi, f.free_energy, f.prediction_accuracy,
-            f.consciousness, f.threshold_fitness);
+        println!(
+            "  {:>4}  {:>8.4}  {:>8.4}  {:>8.4}  {:>8.4}  {:>8.4}",
+            rank, f.phi, f.free_energy, f.prediction_accuracy, f.consciousness, f.threshold_fitness
+        );
     }
 
     // Best organism's thresholds
@@ -160,39 +181,97 @@ fn main() {
     let defaults = symthaea_neuroevolution::ThresholdPhenotype::default();
 
     println!("\n  Best organism's evolved thresholds vs defaults:");
-    println!("  {:>30}  {:>8}  {:>8}  {:>6}",
-        "Threshold", "Evolved", "Default", "Delta");
+    println!(
+        "  {:>30}  {:>8}  {:>8}  {:>6}",
+        "Threshold", "Evolved", "Default", "Delta"
+    );
     println!("  {}", "-".repeat(58));
 
     macro_rules! row {
         ($name:expr, $evolved:expr, $default:expr) => {
             let delta = if ($default as f64).abs() > 1e-6 {
                 (($evolved as f64 - $default as f64) / $default as f64 * 100.0) as i32
-            } else { 0 };
-            println!("  {:>30}  {:>8.3}  {:>8.3}  {:>+5}%",
-                $name, $evolved, $default, delta);
+            } else {
+                0
+            };
+            println!(
+                "  {:>30}  {:>8.3}  {:>8.3}  {:>+5}%",
+                $name, $evolved, $default, delta
+            );
         };
     }
 
-    row!("fep_surprise_scale", thresholds.fep_surprise_scale, defaults.fep_surprise_scale);
-    row!("fep_lr_decay", thresholds.fep_lr_decay, defaults.fep_lr_decay);
-    row!("neuromod_d2_baseline", thresholds.neuromod_d2_baseline, defaults.neuromod_d2_baseline);
-    row!("neuromod_ne_phasic_thresh", thresholds.neuromod_ne_phasic_threshold, defaults.neuromod_ne_phasic_threshold);
-    row!("arousal_ema_decay", thresholds.neuromod_arousal_ema_decay, defaults.neuromod_arousal_ema_decay);
-    row!("homeostasis_high", thresholds.homeostasis_recalibrate_high, defaults.homeostasis_recalibrate_high);
-    row!("homeostasis_low", thresholds.homeostasis_recalibrate_low, defaults.homeostasis_recalibrate_low);
-    row!("frustration_dampen", thresholds.frustration_dampen_threshold, defaults.frustration_dampen_threshold);
-    row!("self_model_weight_high", thresholds.self_model_weight_high, defaults.self_model_weight_high);
-    row!("homeostasis_pull_cruise", thresholds.homeostasis_pull_cruise, defaults.homeostasis_pull_cruise);
+    row!(
+        "fep_surprise_scale",
+        thresholds.fep_surprise_scale,
+        defaults.fep_surprise_scale
+    );
+    row!(
+        "fep_lr_decay",
+        thresholds.fep_lr_decay,
+        defaults.fep_lr_decay
+    );
+    row!(
+        "neuromod_d2_baseline",
+        thresholds.neuromod_d2_baseline,
+        defaults.neuromod_d2_baseline
+    );
+    row!(
+        "neuromod_ne_phasic_thresh",
+        thresholds.neuromod_ne_phasic_threshold,
+        defaults.neuromod_ne_phasic_threshold
+    );
+    row!(
+        "arousal_ema_decay",
+        thresholds.neuromod_arousal_ema_decay,
+        defaults.neuromod_arousal_ema_decay
+    );
+    row!(
+        "homeostasis_high",
+        thresholds.homeostasis_recalibrate_high,
+        defaults.homeostasis_recalibrate_high
+    );
+    row!(
+        "homeostasis_low",
+        thresholds.homeostasis_recalibrate_low,
+        defaults.homeostasis_recalibrate_low
+    );
+    row!(
+        "frustration_dampen",
+        thresholds.frustration_dampen_threshold,
+        defaults.frustration_dampen_threshold
+    );
+    row!(
+        "self_model_weight_high",
+        thresholds.self_model_weight_high,
+        defaults.self_model_weight_high
+    );
+    row!(
+        "homeostasis_pull_cruise",
+        thresholds.homeostasis_pull_cruise,
+        defaults.homeostasis_pull_cruise
+    );
 
     // Goodhart check: verify the winner isn't catatonic
     let best_f = &best.fitness;
     println!("\n  Goodhart's Law check:");
     println!("    Phi:              {:.4} (target: maximize)", best_f.phi);
-    println!("    FE:               {:.4} (must be finite, decreasing)", best_f.free_energy);
-    println!("    Pred accuracy:    {:.4} (must be > 0)", best_f.prediction_accuracy);
-    println!("    Phi stability:    {:.4} (must be > 0.5 = not oscillating)", best_f.consciousness);
-    println!("    Threshold fit:    {:.4} (must be > 0.6 = internally consistent)", best_f.threshold_fitness);
+    println!(
+        "    FE:               {:.4} (must be finite, decreasing)",
+        best_f.free_energy
+    );
+    println!(
+        "    Pred accuracy:    {:.4} (must be > 0)",
+        best_f.prediction_accuracy
+    );
+    println!(
+        "    Phi stability:    {:.4} (must be > 0.5 = not oscillating)",
+        best_f.consciousness
+    );
+    println!(
+        "    Threshold fit:    {:.4} (must be > 0.6 = internally consistent)",
+        best_f.threshold_fitness
+    );
 
     let is_healthy = best_f.phi > 0.0
         && best_f.free_energy.is_finite()

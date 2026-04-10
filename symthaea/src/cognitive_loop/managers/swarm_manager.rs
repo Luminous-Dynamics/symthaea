@@ -44,6 +44,13 @@ pub enum SwarmEvent {
         valence: f64,
         arousal: f64,
     },
+    /// Peer navigation estimate shared through the swarm service.
+    PeerNavigationUpdate {
+        peer_id: String,
+        position_m: [f64; 3],
+        position_sigma_m: f64,
+        confidence: Option<f64>,
+    },
     /// Affective sync broadcast from a peer.
     AffectiveSync {
         peer_id: String,
@@ -261,6 +268,10 @@ pub struct SwarmTelemetry {
     pub mean_peer_phi: f64,
     /// Affective contagion strength this cycle.
     pub affective_contagion: f64,
+    /// Number of peers currently reporting usable navigation.
+    pub navigation_ready_peers: usize,
+    /// Mean peer-reported navigation sigma in meters.
+    pub mean_peer_navigation_sigma_m: f64,
     /// Federated learning trust confidence.
     pub federated_confidence: f64,
     /// Number of anomaly events since last telemetry.
@@ -312,6 +323,8 @@ pub struct SwarmManager {
     connectivity_ema: f64,
     /// Per-peer last known Φ. Bounded at MAX_TRACKED_PEERS.
     peer_phi: Vec<(String, f64)>,
+    /// Per-peer last known navigation sigma.
+    peer_navigation_sigma: Vec<(String, f64)>,
 
     // ── Affective contagion ─────────────────────────────────────────────
     /// Accumulated valence shift from peer affective sync.
@@ -432,6 +445,7 @@ impl Default for SwarmManager {
             expected_peers: 10, // default expectation, reconfigurable
             connectivity_ema: 0.0,
             peer_phi: Vec::new(),
+            peer_navigation_sigma: Vec::new(),
             affective_valence_acc: 0.0,
             affective_arousal_acc: 0.0,
             affective_count: 0,
@@ -580,6 +594,25 @@ impl SwarmManager {
         }
         let sum: f64 = self.peer_phi.iter().map(|(_, phi)| phi).sum();
         sum / self.peer_phi.len() as f64
+    }
+
+    pub fn mean_peer_navigation_sigma_m(&self) -> f64 {
+        if self.peer_navigation_sigma.is_empty() {
+            return 0.0;
+        }
+        let sum: f64 = self
+            .peer_navigation_sigma
+            .iter()
+            .map(|(_, sigma)| sigma)
+            .sum();
+        sum / self.peer_navigation_sigma.len() as f64
+    }
+
+    pub fn navigation_ready_peers(&self) -> usize {
+        self.peer_navigation_sigma
+            .iter()
+            .filter(|(_, sigma)| sigma.is_finite() && *sigma <= 25.0)
+            .count()
     }
 
     // ── FHE Collective Wisdom API ──────────────────────────────────────
@@ -755,6 +788,7 @@ impl SwarmManager {
                 SwarmEvent::PeerLeft { peer_id } => {
                     self.connected_peers = self.connected_peers.saturating_sub(1);
                     self.peer_phi.retain(|(id, _)| id != &peer_id);
+                    self.peer_navigation_sigma.retain(|(id, _)| id != &peer_id);
                 }
                 SwarmEvent::ConsciousnessUpdate { peer_id, phi, .. } => {
                     let phi = if phi.is_finite() {
@@ -766,6 +800,26 @@ impl SwarmManager {
                         entry.1 = phi;
                     } else if self.peer_phi.len() < Self::MAX_TRACKED_PEERS {
                         self.peer_phi.push((peer_id, phi));
+                    }
+                }
+                SwarmEvent::PeerNavigationUpdate {
+                    peer_id,
+                    position_sigma_m,
+                    ..
+                } => {
+                    let sigma = if position_sigma_m.is_finite() {
+                        position_sigma_m.clamp(0.0, 1.0e9)
+                    } else {
+                        1.0e9
+                    };
+                    if let Some(entry) = self
+                        .peer_navigation_sigma
+                        .iter_mut()
+                        .find(|(id, _)| id == &peer_id)
+                    {
+                        entry.1 = sigma;
+                    } else if self.peer_navigation_sigma.len() < Self::MAX_TRACKED_PEERS {
+                        self.peer_navigation_sigma.push((peer_id, sigma));
                     }
                 }
                 SwarmEvent::AffectiveSync {
@@ -1003,13 +1057,31 @@ impl SwarmManager {
                 }
 
                 SwarmEvent::DistressSignal {
-                    prediction_error, energy_depletion, safety_level,
-                    allostatic_load, consciousness_level, ..
+                    prediction_error,
+                    energy_depletion,
+                    safety_level,
+                    allostatic_load,
+                    consciousness_level,
+                    ..
                 } => {
-                    let pe = if prediction_error.is_finite() { prediction_error.clamp(0.0, 1.0) } else { 0.0 };
-                    let energy = if energy_depletion.is_finite() { energy_depletion.clamp(0.0, 1.0) } else { 0.0 };
-                    let load = if allostatic_load.is_finite() { allostatic_load.clamp(0.0, 1.0) } else { 0.0 };
-                    let severity = energy * 0.4 + load * 0.3 + pe * 0.2
+                    let pe = if prediction_error.is_finite() {
+                        prediction_error.clamp(0.0, 1.0)
+                    } else {
+                        0.0
+                    };
+                    let energy = if energy_depletion.is_finite() {
+                        energy_depletion.clamp(0.0, 1.0)
+                    } else {
+                        0.0
+                    };
+                    let load = if allostatic_load.is_finite() {
+                        allostatic_load.clamp(0.0, 1.0)
+                    } else {
+                        0.0
+                    };
+                    let severity = energy * 0.4
+                        + load * 0.3
+                        + pe * 0.2
                         + (1.0 - consciousness_level.clamp(0.0, 1.0)) * 0.1;
                     if safety_level >= 3 && energy > 0.9 {
                         self.affective_arousal_acc += 0.15 * severity as f64;
@@ -1021,8 +1093,16 @@ impl SwarmManager {
                     self.distress_signals_received += 1;
                 }
                 #[cfg(feature = "hypervisor")]
-                SwarmEvent::SupervisoryHeartbeat { supervisor_id, aggregated_phi, .. } => {
-                    let phi = if aggregated_phi.is_finite() { aggregated_phi.clamp(0.0, 1.0) } else { 0.0 };
+                SwarmEvent::SupervisoryHeartbeat {
+                    supervisor_id,
+                    aggregated_phi,
+                    ..
+                } => {
+                    let phi = if aggregated_phi.is_finite() {
+                        aggregated_phi.clamp(0.0, 1.0)
+                    } else {
+                        0.0
+                    };
                     let virt_id = format!("supervisor:{supervisor_id}");
                     if let Some(entry) = self.peer_phi.iter_mut().find(|(id, _)| id == &virt_id) {
                         entry.1 = phi;
@@ -1032,7 +1112,11 @@ impl SwarmManager {
                 }
                 #[cfg(feature = "hypervisor")]
                 SwarmEvent::SupervisoryEscalation { severity, .. } => {
-                    let sev = if severity.is_finite() { severity.clamp(0.0, 1.0) } else { 0.0 };
+                    let sev = if severity.is_finite() {
+                        severity.clamp(0.0, 1.0)
+                    } else {
+                        0.0
+                    };
                     self.affective_arousal_acc += 0.1 * sev as f64;
                     self.affective_valence_acc -= 0.05 * sev as f64;
                 }
@@ -1086,6 +1170,8 @@ impl SwarmManager {
             connectivity_ema: self.connectivity_ema,
             mean_peer_phi: self.mean_peer_phi(),
             affective_contagion: affective_mag,
+            navigation_ready_peers: self.navigation_ready_peers(),
+            mean_peer_navigation_sigma_m: self.mean_peer_navigation_sigma_m(),
             federated_confidence: self.federated_confidence,
             anomaly_count: self.anomaly_streak,
             verified_peers: self.verified_peers,
@@ -1321,6 +1407,19 @@ pub fn convert_affective_sync(peer_id: &str, sync: &crate::swarm::AffectiveSync)
         valence: (sync.valence as f64).clamp(-1.0, 1.0),
         arousal: (sync.arousal as f64).clamp(0.0, 1.0),
         intensity: (sync.dominance.abs() as f64).clamp(0.0, 1.0),
+    }
+}
+
+/// Convert a peer navigation estimate into a cognitive-layer swarm event.
+pub fn convert_navigation_estimate(
+    peer_id: &str,
+    estimate: &positioning::PeerEstimate3D,
+) -> SwarmEvent {
+    SwarmEvent::PeerNavigationUpdate {
+        peer_id: peer_id.to_string(),
+        position_m: estimate.estimate.mean,
+        position_sigma_m: estimate.estimate.diagonal_sigma_m(),
+        confidence: estimate.confidence,
     }
 }
 
@@ -1601,6 +1700,23 @@ mod tests {
     }
 
     #[test]
+    fn test_navigation_updates_populate_telemetry() {
+        let mut sm = SwarmManager::default();
+        sm.inject_event(SwarmEvent::PeerNavigationUpdate {
+            peer_id: "nav-peer".into(),
+            position_m: [10.0, 0.0, 0.0],
+            position_sigma_m: 4.0,
+            confidence: Some(0.8),
+        });
+
+        sm.process(&CycleSnapshot::default());
+
+        let telem = sm.telemetry();
+        assert_eq!(telem.navigation_ready_peers, 1);
+        assert!((telem.mean_peer_navigation_sigma_m - 4.0).abs() < 1e-6);
+    }
+
+    #[test]
     fn test_peer_leave_decrements() {
         let mut sm = SwarmManager::default();
         sm.inject_event(SwarmEvent::PeerJoined {
@@ -1749,6 +1865,30 @@ mod tests {
                 assert!((intensity - 0.8).abs() < 1e-6);
             }
             other => panic!("Expected AffectiveSync, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_convert_navigation_estimate() {
+        let estimate = positioning::PeerEstimate3D {
+            peer_id: "peer-9".into(),
+            estimate: positioning::GaussianEstimate3D::from_diagonal_sigma([1.0, 2.0, 3.0], 6.0),
+            confidence: Some(0.7),
+        };
+
+        match convert_navigation_estimate("peer-9", &estimate) {
+            SwarmEvent::PeerNavigationUpdate {
+                peer_id,
+                position_m,
+                position_sigma_m,
+                confidence,
+            } => {
+                assert_eq!(peer_id, "peer-9");
+                assert_eq!(position_m, [1.0, 2.0, 3.0]);
+                assert!((position_sigma_m - 6.0).abs() < 1e-6);
+                assert_eq!(confidence, Some(0.7));
+            }
+            other => panic!("Expected PeerNavigationUpdate, got {:?}", other),
         }
     }
 

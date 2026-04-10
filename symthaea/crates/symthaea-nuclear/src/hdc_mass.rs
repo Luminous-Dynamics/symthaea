@@ -44,7 +44,7 @@ const N_HEADS: usize = 1;
 const N_EVOLVE_STEPS: usize = 3;
 
 /// Evolution time steps (different timescales for multi-scale features).
-const EVOLVE_DTS: [f32; N_EVOLVE_STEPS] = [0.1, 1.0, 10.0];
+const EVOLVE_DTS: [f32; N_EVOLVE_STEPS] = [0.01, 0.1, 1.0];
 
 /// HDC+LTC nuclear mass predictor with multi-head GLU decoder.
 ///
@@ -85,7 +85,7 @@ impl HdcMassPredictor {
 
         let mut w_gates = Vec::with_capacity(N_HEADS);
         let mut w_values = Vec::with_capacity(N_HEADS);
-        let mut scales = vec![100.0; N_HEADS];
+        let mut scales = vec![10.0; N_HEADS];
         let mut biases = vec![0.0; N_HEADS];
 
         for h in 0..N_HEADS {
@@ -94,8 +94,8 @@ impl HdcMassPredictor {
             let mut wg = vec![0.0f32; HDC_DIMENSION];
             let mut wv = vec![0.0f32; HDC_DIMENSION];
             for i in 0..HDC_DIMENSION {
-                wg[i] = gate_init.values[i] * 0.01;
-                wv[i] = value_init.values[i] * 0.01;
+                wg[i] = gate_init.values[i] * 0.1;
+                wv[i] = value_init.values[i] * 0.1;
             }
             w_gates.push(wg);
             w_values.push(wv);
@@ -127,7 +127,7 @@ impl HdcMassPredictor {
         self.encoder.encode(&NuclearState {
             z,
             n,
-            binding_energy: 0.0,   // Unknown — this is what we predict
+            binding_energy: 0.0, // Unknown — this is what we predict
             shell_correction: 0.0,
             deformation: beta2,
         })
@@ -137,8 +137,10 @@ impl HdcMassPredictor {
     fn forward(&self, z: u16, n: u16) -> (f64, f64, f64) {
         let input_hv = self.encode_input(z, n);
 
-        // Multi-scale CfC evolution: evolve at 3 timescales, bundle states
+        // Multi-scale CfC evolution: evolve at 3 timescales
+        // Fix: seed neuron state from input (not zero) so gradients flow
         let mut neuron = self.neuron.clone();
+        neuron.set_state(input_hv.clone());
         for &dt in &EVOLVE_DTS {
             neuron.evolve_closed_form(dt, &input_hv);
         }
@@ -147,10 +149,18 @@ impl HdcMassPredictor {
         // Multi-head GLU decode: each head computes its own correction
         let mut total_correction = 0.0;
         for h in 0..N_HEADS {
-            let gate_dot: f64 = state.values.iter().zip(self.w_gates[h].iter())
-                .map(|(&s, &g)| s as f64 * g as f64).sum();
-            let value_dot: f64 = state.values.iter().zip(self.w_values[h].iter())
-                .map(|(&s, &v)| s as f64 * v as f64).sum();
+            let gate_dot: f64 = state
+                .values
+                .iter()
+                .zip(self.w_gates[h].iter())
+                .map(|(&s, &g)| s as f64 * g as f64)
+                .sum();
+            let value_dot: f64 = state
+                .values
+                .iter()
+                .zip(self.w_values[h].iter())
+                .map(|(&s, &v)| s as f64 * v as f64)
+                .sum();
 
             let gate = 1.0 / (1.0 + (-gate_dot.clamp(-20.0, 20.0)).exp());
             let head_correction = gate * (value_dot * self.scales[h] + self.biases[h]);
@@ -165,8 +175,8 @@ impl HdcMassPredictor {
 
     /// Train on a set of measured nuclei with isotope chain ordering.
     pub fn train(&mut self, nuclei: &[MeasuredNucleus], epochs: usize) {
-        let lr = 0.0005; // Tuned for single-head + multi-scale
-        let lr_neuron = 0.0002;
+        let lr = 0.005; // 10× increase to escape zero basin
+        let lr_neuron = 0.002;
         let n = nuclei.len();
 
         // Sort by (Z, N) for isotope chain sequential training
@@ -200,10 +210,18 @@ impl HdcMassPredictor {
                 let mut head_value_dots = vec![0.0; N_HEADS];
 
                 for h in 0..N_HEADS {
-                    let gate_dot: f64 = state.values.iter().zip(self.w_gates[h].iter())
-                        .map(|(&s, &g)| s as f64 * g as f64).sum();
-                    let value_dot: f64 = state.values.iter().zip(self.w_values[h].iter())
-                        .map(|(&s, &v)| s as f64 * v as f64).sum();
+                    let gate_dot: f64 = state
+                        .values
+                        .iter()
+                        .zip(self.w_gates[h].iter())
+                        .map(|(&s, &g)| s as f64 * g as f64)
+                        .sum();
+                    let value_dot: f64 = state
+                        .values
+                        .iter()
+                        .zip(self.w_values[h].iter())
+                        .map(|(&s, &v)| s as f64 * v as f64)
+                        .sum();
 
                     let gate = 1.0 / (1.0 + (-gate_dot.clamp(-20.0, 20.0)).exp());
                     let value = value_dot * self.scales[h] + self.biases[h];
@@ -369,8 +387,14 @@ impl HdcMassPredictor {
             let mut w_gates = Vec::with_capacity(N_HEADS);
             let mut w_values = Vec::with_capacity(N_HEADS);
             for h in 0..N_HEADS {
-                let gi = ContinuousHV::random(HDC_DIMENSION, 0xDA7E_0001 + fold as u64 * 100 + h as u64 * 7919);
-                let vi = ContinuousHV::random(HDC_DIMENSION, 0xFA1E_0002 + fold as u64 * 100 + h as u64 * 6263);
+                let gi = ContinuousHV::random(
+                    HDC_DIMENSION,
+                    0xDA7E_0001 + fold as u64 * 100 + h as u64 * 7919,
+                );
+                let vi = ContinuousHV::random(
+                    HDC_DIMENSION,
+                    0xFA1E_0002 + fold as u64 * 100 + h as u64 * 6263,
+                );
                 let mut wg = vec![0.0f32; HDC_DIMENSION];
                 let mut wv = vec![0.0f32; HDC_DIMENSION];
                 for i in 0..HDC_DIMENSION {
@@ -462,10 +486,8 @@ mod tests {
             rf_errors.push((rf_pred.binding_energy - nuc.binding_energy_mev).powi(2));
         }
 
-        let hdc_rms =
-            (hdc_errors.iter().sum::<f64>() / hdc_errors.len() as f64).sqrt();
-        let rf_rms =
-            (rf_errors.iter().sum::<f64>() / rf_errors.len() as f64).sqrt();
+        let hdc_rms = (hdc_errors.iter().sum::<f64>() / hdc_errors.len() as f64).sqrt();
+        let rf_rms = (rf_errors.iter().sum::<f64>() / rf_errors.len() as f64).sqrt();
 
         eprintln!(
             "HDC RMS: {:.2} MeV, RF RMS: {:.2} MeV (ratio: {:.2})",

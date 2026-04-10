@@ -24,10 +24,10 @@
 
 use std::sync::Arc;
 
-use symthaea_core::hdc::unified_hv::ContinuousHV;
 use symthaea_core::hdc::hdc_ltc_unified::{
     HdcLtcUnifiedNetwork, UnifiedActivation, UnifiedConfig, UnifiedNetworkConfig,
 };
+use symthaea_core::hdc::unified_hv::ContinuousHV;
 use symthaea_core::hdc::HDC_DIMENSION;
 
 use super::harmony_basis::HarmonyBasis;
@@ -82,8 +82,10 @@ const NUM_TENSION_FEATURES: usize = 2;
 const NUM_SURFACE_FEATURES: usize = 3;
 
 /// Total features: 171 base + 3 structural + 2 tension + 3 surface = 179.
-const NUM_SPINOZIST_FEATURES: usize =
-    NUM_BASE_SPINOZIST_FEATURES + NUM_STRUCTURAL_FEATURES + NUM_TENSION_FEATURES + NUM_SURFACE_FEATURES;
+const NUM_SPINOZIST_FEATURES: usize = NUM_BASE_SPINOZIST_FEATURES
+    + NUM_STRUCTURAL_FEATURES
+    + NUM_TENSION_FEATURES
+    + NUM_SURFACE_FEATURES;
 
 /// Internals for Spinozist affect-space encoding.
 ///
@@ -298,11 +300,7 @@ impl CfcMoralClassifier {
         let fingerprint = MoralFingerprint::from_coords(coords);
         let fluctuatio = FluctuatioAnimi::from_fingerprint(&fingerprint);
         features.push(fluctuatio.max_tension);
-        let max_pair_tension = fluctuatio
-            .tensions
-            .first()
-            .map(|t| t.2)
-            .unwrap_or(0.0);
+        let max_pair_tension = fluctuatio.tensions.first().map(|t| t.2).unwrap_or(0.0);
         features.push(max_pair_tension);
 
         // Surface features from TextHdcEncoder (3 features: similarity to Good/Bad/Neutral prototypes)
@@ -381,9 +379,8 @@ impl CfcMoralClassifier {
                 if counts[i] > 0 {
                     let norm: f32 = accum[i].iter().map(|x| x * x).sum::<f32>().sqrt();
                     if norm > 0.0 {
-                        protos[i] = ContinuousHV::from_vec(
-                            accum[i].iter().map(|x| x / norm).collect(),
-                        );
+                        protos[i] =
+                            ContinuousHV::from_vec(accum[i].iter().map(|x| x / norm).collect());
                     }
                 }
             }
@@ -429,14 +426,9 @@ impl CfcMoralClassifier {
                         let layer_len = layer.len();
                         for (n_idx, neuron) in layer.iter_mut().enumerate() {
                             if n_idx == correct_idx % layer_len {
-                                neuron
-                                    .contrastive_update(&correct_proto, &wrong_proto, lr);
+                                neuron.contrastive_update(&correct_proto, &wrong_proto, lr);
                             } else if n_idx == predicted_idx % layer_len {
-                                neuron.contrastive_update(
-                                    &wrong_proto,
-                                    &correct_proto,
-                                    lr * 0.5,
-                                );
+                                neuron.contrastive_update(&wrong_proto, &correct_proto, lr * 0.5);
                             }
                         }
                     }
@@ -444,8 +436,7 @@ impl CfcMoralClassifier {
                     // Also update hidden layer with a smaller learning rate
                     if let Some(hidden) = self.network.layer_mut(0) {
                         for neuron in hidden.iter_mut() {
-                            neuron
-                                .contrastive_update(&correct_proto, &wrong_proto, lr * 0.1);
+                            neuron.contrastive_update(&correct_proto, &wrong_proto, lr * 0.1);
                         }
                     }
                 }
@@ -474,7 +465,11 @@ impl CfcMoralClassifier {
 
         // Find best and second-best
         let mut indices: Vec<usize> = (0..3).collect();
-        indices.sort_by(|&a, &b| sims[b].partial_cmp(&sims[a]).unwrap_or(std::cmp::Ordering::Equal));
+        indices.sort_by(|&a, &b| {
+            sims[b]
+                .partial_cmp(&sims[a])
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
 
         let best_idx = indices[0];
         let margin = (sims[indices[0]] - sims[indices[1]]).max(0.0).min(1.0);
@@ -531,8 +526,11 @@ impl CfcMoralClassifier {
         let sims: Vec<f32> = protos.iter().map(|p| output.similarity(p)).collect();
 
         let mut indices: Vec<usize> = (0..3).collect();
-        indices
-            .sort_by(|&a, &b| sims[b].partial_cmp(&sims[a]).unwrap_or(std::cmp::Ordering::Equal));
+        indices.sort_by(|&a, &b| {
+            sims[b]
+                .partial_cmp(&sims[a])
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
 
         let best_idx = indices[0];
         let margin = (sims[indices[0]] - sims[indices[1]]).max(0.0).min(1.0);
@@ -628,16 +626,25 @@ mod tests {
         let mut clf = CfcMoralClassifier::new(basis, 4096);
 
         let samples = vec![
-            ("helping others is kind and generous".to_string(), MoralLabel::Good),
+            (
+                "helping others is kind and generous".to_string(),
+                MoralLabel::Good,
+            ),
             ("caring for the sick is noble".to_string(), MoralLabel::Good),
             ("sharing food with the hungry".to_string(), MoralLabel::Good),
             ("volunteering at shelters".to_string(), MoralLabel::Good),
-            ("stealing from the poor is cruel".to_string(), MoralLabel::Bad),
+            (
+                "stealing from the poor is cruel".to_string(),
+                MoralLabel::Bad,
+            ),
             ("bullying children is wrong".to_string(), MoralLabel::Bad),
             ("lying to exploit people".to_string(), MoralLabel::Bad),
             ("murdering innocents is evil".to_string(), MoralLabel::Bad),
             ("walking to the store".to_string(), MoralLabel::Neutral),
-            ("the weather is cloudy today".to_string(), MoralLabel::Neutral),
+            (
+                "the weather is cloudy today".to_string(),
+                MoralLabel::Neutral,
+            ),
             ("reading a book at home".to_string(), MoralLabel::Neutral),
             ("eating lunch at noon".to_string(), MoralLabel::Neutral),
         ];
@@ -651,7 +658,10 @@ mod tests {
         // and classification produces a valid result.
         let (verdict, confidence) = clf.classify("helping kind generous caring love");
         assert!(
-            matches!(verdict, MoralVerdict::Good | MoralVerdict::Bad | MoralVerdict::Neutral),
+            matches!(
+                verdict,
+                MoralVerdict::Good | MoralVerdict::Bad | MoralVerdict::Neutral
+            ),
             "Should produce a valid verdict"
         );
         assert!(confidence >= 0.0, "confidence should be non-negative");
@@ -673,16 +683,25 @@ mod tests {
         let mut clf = CfcMoralClassifier::new(basis, 4096);
 
         let samples = vec![
-            ("helping others is kind and generous".to_string(), MoralLabel::Good),
+            (
+                "helping others is kind and generous".to_string(),
+                MoralLabel::Good,
+            ),
             ("caring for the sick is noble".to_string(), MoralLabel::Good),
             ("sharing food with the hungry".to_string(), MoralLabel::Good),
             ("volunteering at shelters".to_string(), MoralLabel::Good),
-            ("stealing from the poor is cruel".to_string(), MoralLabel::Bad),
+            (
+                "stealing from the poor is cruel".to_string(),
+                MoralLabel::Bad,
+            ),
             ("bullying children is wrong".to_string(), MoralLabel::Bad),
             ("lying to exploit people".to_string(), MoralLabel::Bad),
             ("murdering innocents is evil".to_string(), MoralLabel::Bad),
             ("walking to the store".to_string(), MoralLabel::Neutral),
-            ("the weather is cloudy today".to_string(), MoralLabel::Neutral),
+            (
+                "the weather is cloudy today".to_string(),
+                MoralLabel::Neutral,
+            ),
             ("reading a book at home".to_string(), MoralLabel::Neutral),
             ("eating lunch at noon".to_string(), MoralLabel::Neutral),
         ];

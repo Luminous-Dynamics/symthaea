@@ -9,7 +9,7 @@
 //! rhythmic idioms, tension-resolution arcs. These patterns cannot be
 //! captured by rules alone.
 
-use midly::{Smf, TrackEventKind, MidiMessage, MetaMessage};
+use midly::{MetaMessage, MidiMessage, Smf, TrackEventKind};
 use std::path::Path;
 
 /// A single note extracted from MIDI.
@@ -67,10 +67,8 @@ const CONTEXT_LEN: usize = 8;
 
 /// Parse a MIDI file and extract the monophonic melody.
 pub fn parse_midi(path: &Path) -> Result<ExtractedMelody, String> {
-    let data = std::fs::read(path)
-        .map_err(|e| format!("read error: {e}"))?;
-    let smf = Smf::parse(&data)
-        .map_err(|e| format!("MIDI parse error: {e}"))?;
+    let data = std::fs::read(path).map_err(|e| format!("read error: {e}"))?;
+    let smf = Smf::parse(&data).map_err(|e| format!("MIDI parse error: {e}"))?;
 
     let ticks_per_beat = match smf.header.timing {
         midly::Timing::Metrical(tpb) => tpb.as_int(),
@@ -84,7 +82,8 @@ pub fn parse_midi(path: &Path) -> Result<ExtractedMelody, String> {
 
     for track in &smf.tracks {
         let mut abs_tick: u64 = 0;
-        let mut pending: std::collections::HashMap<u8, (u64, u8)> = std::collections::HashMap::new();
+        let mut pending: std::collections::HashMap<u8, (u64, u8)> =
+            std::collections::HashMap::new();
 
         for event in track {
             abs_tick += event.delta.as_int() as u64;
@@ -152,7 +151,8 @@ pub fn parse_midi(path: &Path) -> Result<ExtractedMelody, String> {
         tempo_bpm,
         key,
         minor,
-        source: path.file_name()
+        source: path
+            .file_name()
             .map(|f| f.to_string_lossy().to_string())
             .unwrap_or_default(),
     })
@@ -160,7 +160,9 @@ pub fn parse_midi(path: &Path) -> Result<ExtractedMelody, String> {
 
 /// Skyline algorithm: extract monophonic melody (highest note per onset).
 fn skyline_extract(notes: &[MidiNote]) -> Vec<MidiNote> {
-    if notes.is_empty() { return Vec::new(); }
+    if notes.is_empty() {
+        return Vec::new();
+    }
 
     let mut melody: Vec<MidiNote> = Vec::new();
     let mut i = 0;
@@ -206,9 +208,9 @@ pub fn melody_to_training_pairs(melody: &ExtractedMelody) -> Vec<MelodyTrainingP
     // Detect phrase boundaries (rests > 1 beat)
     let mut phrase_starts: Vec<usize> = vec![0];
     for i in 1..notes.len() {
-        let gap = notes[i].onset_tick.saturating_sub(
-            notes[i-1].onset_tick + notes[i-1].duration_ticks
-        );
+        let gap = notes[i]
+            .onset_tick
+            .saturating_sub(notes[i - 1].onset_tick + notes[i - 1].duration_ticks);
         if gap as f32 / tpb > 1.0 {
             phrase_starts.push(i);
         }
@@ -234,12 +236,14 @@ pub fn melody_to_training_pairs(melody: &ExtractedMelody) -> Vec<MelodyTrainingP
         let beat_position = (notes[target_idx].onset_tick as f32 / tpb) % 4.0;
 
         // Phrase position
-        let phrase_start = phrase_starts.iter()
+        let phrase_start = phrase_starts
+            .iter()
             .rev()
             .find(|&&s| s <= target_idx)
             .copied()
             .unwrap_or(0);
-        let next_phrase = phrase_starts.iter()
+        let next_phrase = phrase_starts
+            .iter()
             .find(|&&s| s > target_idx)
             .copied()
             .unwrap_or(notes.len());
@@ -294,7 +298,11 @@ pub fn load_training_data(dir: &Path) -> Vec<MelodyTrainingPair> {
     let mut file_count = 0;
     for entry in entries.flatten() {
         let path = entry.path();
-        if path.extension().map(|e| e == "mid" || e == "midi").unwrap_or(false) {
+        if path
+            .extension()
+            .map(|e| e == "mid" || e == "midi")
+            .unwrap_or(false)
+        {
             match parse_midi(&path) {
                 Ok(melody) => {
                     if melody.notes.len() >= CONTEXT_LEN + 2 {
@@ -315,7 +323,10 @@ pub fn load_training_data(dir: &Path) -> Vec<MelodyTrainingPair> {
         }
     }
 
-    println!("  Loaded {file_count} MIDI files → {} training pairs (with augmentation)", all_pairs.len());
+    println!(
+        "  Loaded {file_count} MIDI files → {} training pairs (with augmentation)",
+        all_pairs.len()
+    );
     all_pairs
 }
 
@@ -366,18 +377,25 @@ pub struct TrainingStats {
     pub total_pairs: usize,
     pub mean_interval: f32,
     pub std_interval: f32,
-    pub stepwise_ratio: f32,  // fraction of intervals ≤ 2 semitones
+    pub stepwise_ratio: f32, // fraction of intervals ≤ 2 semitones
     pub mean_duration: f32,
 }
 
 pub fn compute_stats(pairs: &[MelodyTrainingPair]) -> TrainingStats {
     if pairs.is_empty() {
-        return TrainingStats { total_pairs: 0, mean_interval: 0.0, std_interval: 0.0, stepwise_ratio: 0.0, mean_duration: 0.0 };
+        return TrainingStats {
+            total_pairs: 0,
+            mean_interval: 0.0,
+            std_interval: 0.0,
+            stepwise_ratio: 0.0,
+            mean_duration: 0.0,
+        };
     }
 
     let intervals: Vec<f32> = pairs.iter().map(|p| p.target_interval).collect();
     let mean_iv = intervals.iter().sum::<f32>() / intervals.len() as f32;
-    let var_iv = intervals.iter().map(|i| (i - mean_iv).powi(2)).sum::<f32>() / intervals.len() as f32;
+    let var_iv =
+        intervals.iter().map(|i| (i - mean_iv).powi(2)).sum::<f32>() / intervals.len() as f32;
     let stepwise = intervals.iter().filter(|i| i.abs() <= 2.0).count();
 
     let mean_dur = pairs.iter().map(|p| p.target_duration).sum::<f32>() / pairs.len() as f32;
@@ -451,9 +469,24 @@ mod tests {
     #[test]
     fn skyline_picks_highest() {
         let notes = vec![
-            MidiNote { pitch: 60, onset_tick: 0, duration_ticks: 480, velocity: 80 },
-            MidiNote { pitch: 72, onset_tick: 0, duration_ticks: 480, velocity: 80 }, // higher
-            MidiNote { pitch: 64, onset_tick: 480, duration_ticks: 480, velocity: 80 },
+            MidiNote {
+                pitch: 60,
+                onset_tick: 0,
+                duration_ticks: 480,
+                velocity: 80,
+            },
+            MidiNote {
+                pitch: 72,
+                onset_tick: 0,
+                duration_ticks: 480,
+                velocity: 80,
+            }, // higher
+            MidiNote {
+                pitch: 64,
+                onset_tick: 480,
+                duration_ticks: 480,
+                velocity: 80,
+            },
         ];
         let melody = skyline_extract(&notes);
         assert_eq!(melody.len(), 2);

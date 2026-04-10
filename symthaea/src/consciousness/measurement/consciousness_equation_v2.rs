@@ -887,10 +887,7 @@ impl ConsciousnessEquationV2 {
     /// Get the consciousness level from the most recent computation.
     /// Returns 0.0 if no computation has been performed yet.
     pub fn last_consciousness(&self) -> f64 {
-        self.history
-            .back()
-            .map(|r| r.consciousness)
-            .unwrap_or(0.0)
+        self.history.back().map(|r| r.consciousness).unwrap_or(0.0)
     }
 }
 

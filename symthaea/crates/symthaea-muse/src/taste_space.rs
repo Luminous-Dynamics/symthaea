@@ -50,12 +50,12 @@ impl TastePoint {
             target_steps_pct: 30.0 + self.stepwise_preference * 35.0,   // 30-65%
             target_thirds_pct: 8.0 + self.harmonic_richness * 15.0,     // 8-23%
             target_leaps_pct: 5.0 + (1.0 - self.stepwise_preference) * 20.0, // 5-25%
-            target_ascending_pct: 50.0, // always balanced
+            target_ascending_pct: 50.0,                                 // always balanced
             min_unique_pitches: (10.0 + self.range_width * 20.0) as usize, // 10-30
-            max_top_note_pct: 8.0 + (1.0 - self.range_width) * 15.0,  // 8-23%
-            target_pitch_range: 8.0 + self.range_width * 16.0,         // 8-24 semitones
-            target_mean_midi: 52.0 + self.register_height * 24.0,      // 52-76 (E3-E5)
-            min_velocity_range: 20.0 + self.dynamic_preference * 80.0, // 20-100
+            max_top_note_pct: 8.0 + (1.0 - self.range_width) * 15.0,    // 8-23%
+            target_pitch_range: 8.0 + self.range_width * 16.0,          // 8-24 semitones
+            target_mean_midi: 52.0 + self.register_height * 24.0,       // 52-76 (E3-E5)
+            min_velocity_range: 20.0 + self.dynamic_preference * 80.0,  // 20-100
         }
     }
 
@@ -201,14 +201,21 @@ impl TastePoint {
     /// Blend multiple taste points with weights.
     pub fn blend_multi(points: &[(&TastePoint, f32)]) -> Self {
         let total_weight: f32 = points.iter().map(|(_, w)| w).sum();
-        if total_weight < 0.001 { return Self::tristan(); }
+        if total_weight < 0.001 {
+            return Self::tristan();
+        }
 
         let mut result = Self {
-            repetition_affinity: 0.0, stepwise_preference: 0.0,
-            harmonic_richness: 0.0, dynamic_preference: 0.0,
-            register_height: 0.0, range_width: 0.0,
-            tempo_preference: 0.0, rhythmic_complexity: 0.0,
-            brightness: 0.0, intensity: 0.0,
+            repetition_affinity: 0.0,
+            stepwise_preference: 0.0,
+            harmonic_richness: 0.0,
+            dynamic_preference: 0.0,
+            register_height: 0.0,
+            range_width: 0.0,
+            tempo_preference: 0.0,
+            rhythmic_complexity: 0.0,
+            brightness: 0.0,
+            intensity: 0.0,
         };
 
         for (point, weight) in points {
@@ -290,7 +297,10 @@ mod tests {
     fn distance_different_nonzero() {
         let a = TastePoint::metal();
         let b = TastePoint::ambient();
-        assert!(a.distance(&b) > 0.5, "metal and ambient should be far apart");
+        assert!(
+            a.distance(&b) > 0.5,
+            "metal and ambient should be far apart"
+        );
     }
 
     #[test]

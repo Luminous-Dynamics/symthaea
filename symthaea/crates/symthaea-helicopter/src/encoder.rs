@@ -19,47 +19,47 @@ use crate::types::{HelicopterState, NUM_STATE_CHANNELS};
 
 /// Sensor ranges for normalization to [0, 1].
 const CHANNEL_RANGES: [[f32; 2]; NUM_STATE_CHANNELS] = [
-    [-500.0, 500.0],  // pos_x (meters, SAR search area)
-    [-500.0, 500.0],  // pos_y
-    [0.0, 200.0],     // pos_z (altitude: ground to 200m)
-    [-1.0, 1.0],      // quat_w
-    [-1.0, 1.0],      // quat_x
-    [-1.0, 1.0],      // quat_y
-    [-1.0, 1.0],      // quat_z
-    [-50.0, 50.0],    // vel_x (m/s, max ~180 km/h)
-    [-50.0, 50.0],    // vel_y
-    [-30.0, 30.0],    // vel_z (climb/descent rate)
-    [-5.0, 5.0],      // angvel_x (rad/s)
-    [-5.0, 5.0],      // angvel_y
-    [-5.0, 5.0],      // angvel_z
-    [0.0, 6000.0],    // main_rotor_rpm
-    [0.0, 4000.0],    // tail_rotor_rpm
-    [-0.3, 0.3],      // collective_pitch (rad)
-    [-0.2, 0.2],      // cyclic_lon_feedback (rad)
-    [-0.2, 0.2],      // cyclic_lat_feedback (rad)
+    [-500.0, 500.0], // pos_x (meters, SAR search area)
+    [-500.0, 500.0], // pos_y
+    [0.0, 200.0],    // pos_z (altitude: ground to 200m)
+    [-1.0, 1.0],     // quat_w
+    [-1.0, 1.0],     // quat_x
+    [-1.0, 1.0],     // quat_y
+    [-1.0, 1.0],     // quat_z
+    [-50.0, 50.0],   // vel_x (m/s, max ~180 km/h)
+    [-50.0, 50.0],   // vel_y
+    [-30.0, 30.0],   // vel_z (climb/descent rate)
+    [-5.0, 5.0],     // angvel_x (rad/s)
+    [-5.0, 5.0],     // angvel_y
+    [-5.0, 5.0],     // angvel_z
+    [0.0, 6000.0],   // main_rotor_rpm
+    [0.0, 4000.0],   // tail_rotor_rpm
+    [-0.3, 0.3],     // collective_pitch (rad)
+    [-0.2, 0.2],     // cyclic_lon_feedback (rad)
+    [-0.2, 0.2],     // cyclic_lat_feedback (rad)
 ];
 
 /// Semantic channel weights for encoding importance.
 /// Balance-critical and altitude channels are boosted.
 const CHANNEL_WEIGHTS: [f32; NUM_STATE_CHANNELS] = [
-    1.0,  // pos_x
-    1.0,  // pos_y
-    2.0,  // pos_z (altitude — critical for SAR)
-    1.5,  // quat_w (orientation — balance)
-    1.5,  // quat_x
-    1.5,  // quat_y
-    1.5,  // quat_z
-    1.0,  // vel_x
-    1.0,  // vel_y
-    1.5,  // vel_z (climb rate — critical)
-    1.5,  // angvel_x (angular velocity — stability)
-    1.5,  // angvel_y
-    1.5,  // angvel_z
-    2.0,  // main_rotor_rpm (rotor state — critical)
-    1.5,  // tail_rotor_rpm (yaw stability)
-    1.0,  // collective_pitch
-    0.8,  // cyclic_lon_feedback
-    0.8,  // cyclic_lat_feedback
+    1.0, // pos_x
+    1.0, // pos_y
+    2.0, // pos_z (altitude — critical for SAR)
+    1.5, // quat_w (orientation — balance)
+    1.5, // quat_x
+    1.5, // quat_y
+    1.5, // quat_z
+    1.0, // vel_x
+    1.0, // vel_y
+    1.5, // vel_z (climb rate — critical)
+    1.5, // angvel_x (angular velocity — stability)
+    1.5, // angvel_y
+    1.5, // angvel_z
+    2.0, // main_rotor_rpm (rotor state — critical)
+    1.5, // tail_rotor_rpm (yaw stability)
+    1.0, // collective_pitch
+    0.8, // cyclic_lon_feedback
+    0.8, // cyclic_lat_feedback
 ];
 
 /// HDC encoder for helicopter sensor state.
@@ -84,33 +84,15 @@ impl HelicopterHdcEncoder {
         let dim = symthaea_core::hdc::HDC_DIMENSION;
 
         let base_vectors: Vec<ContinuousHV> = (0..NUM_STATE_CHANNELS)
-            .map(|i| {
-                ContinuousHV::from_genesis(
-                    genesis,
-                    &format!("helicopter::channel::{i}"),
-                    dim,
-                )
-            })
+            .map(|i| ContinuousHV::from_genesis(genesis, &format!("helicopter::channel::{i}"), dim))
             .collect();
 
         let level_vectors: Vec<ContinuousHV> = (0..num_levels)
-            .map(|i| {
-                ContinuousHV::from_genesis(
-                    genesis,
-                    &format!("helicopter::level::{i}"),
-                    dim,
-                )
-            })
+            .map(|i| ContinuousHV::from_genesis(genesis, &format!("helicopter::level::{i}"), dim))
             .collect();
 
         let deriv_base_vectors: Vec<ContinuousHV> = (0..NUM_STATE_CHANNELS)
-            .map(|i| {
-                ContinuousHV::from_genesis(
-                    genesis,
-                    &format!("helicopter::deriv::{i}"),
-                    dim,
-                )
-            })
+            .map(|i| ContinuousHV::from_genesis(genesis, &format!("helicopter::deriv::{i}"), dim))
             .collect();
 
         Self {

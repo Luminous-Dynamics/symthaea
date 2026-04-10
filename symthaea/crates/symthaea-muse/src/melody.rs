@@ -51,8 +51,8 @@ pub fn generate_melody(
         let duration = (base_note_dur * dur_factor).max(0.05);
 
         // Velocity from consciousness + dopamine
-        let velocity = (0.3 + state.consciousness_level * 0.4 + state.dopamine * 0.2)
-            .clamp(0.1, 1.0);
+        let velocity =
+            (0.3 + state.consciousness_level * 0.4 + state.dopamine * 0.2).clamp(0.1, 1.0);
 
         // Rest probability: SacredStillness increases rests
         let rest_prob = state.harmony_activations[7] * 0.4;

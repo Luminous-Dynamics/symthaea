@@ -13,9 +13,9 @@
 //! - Track 3: Harmony/chords (channel 2)
 //! - Track 4: Drums (channel 9, GM standard)
 
+use crate::Note;
 use std::io::Write;
 use std::path::Path;
-use crate::Note;
 
 const TICKS_PER_BEAT: u16 = 480;
 
@@ -31,9 +31,9 @@ struct MidiEvent {
 enum MidiEventType {
     NoteOn { note: u8, velocity: u8 },
     NoteOff { note: u8 },
-    Tempo(u32),         // microseconds per beat
+    Tempo(u32),            // microseconds per beat
     TimeSignature(u8, u8), // numerator, denominator power of 2
-    ProgramChange(u8),  // GM instrument number
+    ProgramChange(u8),     // GM instrument number
 }
 
 /// MIDI track with events.
@@ -119,8 +119,16 @@ pub fn export_midi_voices(
         name: "Tempo".into(),
         channel: 0,
         events: vec![
-            MidiEvent { tick: 0, channel: 0, event_type: MidiEventType::Tempo(usec_per_beat) },
-            MidiEvent { tick: 0, channel: 0, event_type: MidiEventType::TimeSignature(time_sig_num, time_sig_den) },
+            MidiEvent {
+                tick: 0,
+                channel: 0,
+                event_type: MidiEventType::Tempo(usec_per_beat),
+            },
+            MidiEvent {
+                tick: 0,
+                channel: 0,
+                event_type: MidiEventType::TimeSignature(time_sig_num, time_sig_den),
+            },
         ],
     };
 
@@ -132,24 +140,40 @@ pub fn export_midi_voices(
     let harmony_track = notes_to_track("Harmony", 2, 48, &harmony_refs, tempo_bpm);
 
     // Drums on channel 9
-    let mut drum_track = Track { name: "Drums".into(), channel: 9, events: Vec::new() };
+    let mut drum_track = Track {
+        name: "Drums".into(),
+        channel: 9,
+        events: Vec::new(),
+    };
     drum_track.events.push(MidiEvent {
-        tick: 0, channel: 9,
+        tick: 0,
+        channel: 9,
         event_type: MidiEventType::ProgramChange(0), // GM drums
     });
     for &(time, note, vel) in drum_hits {
         let tick = secs_to_ticks(time, tempo_bpm);
         drum_track.events.push(MidiEvent {
-            tick, channel: 9,
-            event_type: MidiEventType::NoteOn { note, velocity: vel },
+            tick,
+            channel: 9,
+            event_type: MidiEventType::NoteOn {
+                note,
+                velocity: vel,
+            },
         });
         drum_track.events.push(MidiEvent {
-            tick: tick + 120, channel: 9, // short duration
+            tick: tick + 120,
+            channel: 9, // short duration
             event_type: MidiEventType::NoteOff { note },
         });
     }
 
-    let tracks = vec![tempo_track, lead_track, bass_track, harmony_track, drum_track];
+    let tracks = vec![
+        tempo_track,
+        lead_track,
+        bass_track,
+        harmony_track,
+        drum_track,
+    ];
     write_midi_file(output_path, &tracks)
 }
 
@@ -158,7 +182,8 @@ fn notes_to_track(name: &str, channel: u8, program: u8, notes: &[&Note], tempo_b
 
     // Program change
     events.push(MidiEvent {
-        tick: 0, channel,
+        tick: 0,
+        channel,
         event_type: MidiEventType::ProgramChange(program),
     });
 
@@ -169,11 +194,16 @@ fn notes_to_track(name: &str, channel: u8, program: u8, notes: &[&Note], tempo_b
         let duration_ticks = secs_to_ticks(note.duration, tempo_bpm).max(1);
 
         events.push(MidiEvent {
-            tick: start_tick, channel,
-            event_type: MidiEventType::NoteOn { note: midi_note, velocity },
+            tick: start_tick,
+            channel,
+            event_type: MidiEventType::NoteOn {
+                note: midi_note,
+                velocity,
+            },
         });
         events.push(MidiEvent {
-            tick: start_tick + duration_ticks, channel,
+            tick: start_tick + duration_ticks,
+            channel,
             event_type: MidiEventType::NoteOff { note: midi_note },
         });
     }
@@ -181,25 +211,33 @@ fn notes_to_track(name: &str, channel: u8, program: u8, notes: &[&Note], tempo_b
     // Sort by tick
     events.sort_by_key(|e| e.tick);
 
-    Track { name: name.into(), channel, events }
+    Track {
+        name: name.into(),
+        channel,
+        events,
+    }
 }
 
 fn write_midi_file(path: &Path, tracks: &[Track]) -> Result<(), String> {
-    let mut file = std::fs::File::create(path)
-        .map_err(|e| format!("create MIDI file: {e}"))?;
+    let mut file = std::fs::File::create(path).map_err(|e| format!("create MIDI file: {e}"))?;
 
     // Header: MThd
     file.write_all(b"MThd").map_err(|e| e.to_string())?;
-    file.write_all(&6u32.to_be_bytes()).map_err(|e| e.to_string())?; // chunk length
-    file.write_all(&1u16.to_be_bytes()).map_err(|e| e.to_string())?; // format 1
-    file.write_all(&(tracks.len() as u16).to_be_bytes()).map_err(|e| e.to_string())?;
-    file.write_all(&TICKS_PER_BEAT.to_be_bytes()).map_err(|e| e.to_string())?;
+    file.write_all(&6u32.to_be_bytes())
+        .map_err(|e| e.to_string())?; // chunk length
+    file.write_all(&1u16.to_be_bytes())
+        .map_err(|e| e.to_string())?; // format 1
+    file.write_all(&(tracks.len() as u16).to_be_bytes())
+        .map_err(|e| e.to_string())?;
+    file.write_all(&TICKS_PER_BEAT.to_be_bytes())
+        .map_err(|e| e.to_string())?;
 
     // Tracks
     for track in tracks {
         let track_data = encode_track(track);
         file.write_all(b"MTrk").map_err(|e| e.to_string())?;
-        file.write_all(&(track_data.len() as u32).to_be_bytes()).map_err(|e| e.to_string())?;
+        file.write_all(&(track_data.len() as u32).to_be_bytes())
+            .map_err(|e| e.to_string())?;
         file.write_all(&track_data).map_err(|e| e.to_string())?;
     }
 
@@ -213,7 +251,8 @@ fn encode_track(track: &Track) -> Vec<u8> {
     // Track name meta event
     let name_bytes = track.name.as_bytes();
     write_vlq(&mut data, 0); // delta = 0
-    data.push(0xFF); data.push(0x03); // track name
+    data.push(0xFF);
+    data.push(0x03); // track name
     write_vlq(&mut data, name_bytes.len() as u32);
     data.extend_from_slice(name_bytes);
 
@@ -234,21 +273,29 @@ fn encode_track(track: &Track) -> Vec<u8> {
                 data.push(0); // velocity 0
             }
             MidiEventType::Tempo(usec) => {
-                data.push(0xFF); data.push(0x51); data.push(0x03);
+                data.push(0xFF);
+                data.push(0x51);
+                data.push(0x03);
                 data.push((usec >> 16) as u8);
                 data.push((usec >> 8) as u8);
                 data.push(*usec as u8);
             }
             MidiEventType::TimeSignature(num, den) => {
-                data.push(0xFF); data.push(0x58); data.push(0x04);
+                data.push(0xFF);
+                data.push(0x58);
+                data.push(0x04);
                 data.push(*num);
                 // Denominator as power of 2
                 let den_pow = match den {
-                    2 => 1, 4 => 2, 8 => 3, 16 => 4, _ => 2,
+                    2 => 1,
+                    4 => 2,
+                    8 => 3,
+                    16 => 4,
+                    _ => 2,
                 };
                 data.push(den_pow);
                 data.push(24); // MIDI clocks per metronome click
-                data.push(8);  // 32nd notes per quarter
+                data.push(8); // 32nd notes per quarter
             }
             MidiEventType::ProgramChange(program) => {
                 data.push(0xC0 | (event.channel & 0x0F));
@@ -259,7 +306,9 @@ fn encode_track(track: &Track) -> Vec<u8> {
 
     // End of track
     write_vlq(&mut data, 0);
-    data.push(0xFF); data.push(0x2F); data.push(0x00);
+    data.push(0xFF);
+    data.push(0x2F);
+    data.push(0x00);
 
     data
 }
@@ -330,9 +379,24 @@ mod tests {
     #[test]
     fn export_creates_file() {
         let notes = vec![
-            Note { frequency: 261.63, start_time: 0.0, duration: 0.5, velocity: 0.7 },
-            Note { frequency: 329.63, start_time: 0.5, duration: 0.5, velocity: 0.6 },
-            Note { frequency: 392.00, start_time: 1.0, duration: 0.5, velocity: 0.8 },
+            Note {
+                frequency: 261.63,
+                start_time: 0.0,
+                duration: 0.5,
+                velocity: 0.7,
+            },
+            Note {
+                frequency: 329.63,
+                start_time: 0.5,
+                duration: 0.5,
+                velocity: 0.6,
+            },
+            Note {
+                frequency: 392.00,
+                start_time: 1.0,
+                duration: 0.5,
+                velocity: 0.8,
+            },
         ];
         let path = std::path::PathBuf::from("/tmp/test_export.mid");
         let result = export_midi(&notes, 120.0, 4, 4, &path);

@@ -15,7 +15,11 @@ fn main() {
 
     println!("=== TurboQuant HDC Compression Benchmark ===");
     println!("Dimension: {HDC_DIMENSION}");
-    println!("Original size: {} bytes ({:.1} KB)", HDC_DIMENSION * 4, HDC_DIMENSION as f64 * 4.0 / 1024.0);
+    println!(
+        "Original size: {} bytes ({:.1} KB)",
+        HDC_DIMENSION * 4,
+        HDC_DIMENSION as f64 * 4.0 / 1024.0
+    );
     println!();
 
     // Generate test vectors
@@ -41,7 +45,10 @@ fn main() {
 
         // Decompression throughput
         let start = Instant::now();
-        let decompressed: Vec<ContinuousHV> = compressed.iter().map(|c| compressor.decompress(c)).collect();
+        let decompressed: Vec<ContinuousHV> = compressed
+            .iter()
+            .map(|c| compressor.decompress(c))
+            .collect();
         let decompress_elapsed = start.elapsed();
 
         // Fidelity: cosine similarity between original and reconstructed
@@ -65,14 +72,20 @@ fn main() {
         let decompress_rate = n_vectors as f64 / decompress_elapsed.as_secs_f64();
 
         println!("{bits}-bit PolarQuant:");
-        println!("  Ratio:        {ratio:.1}x ({:.1} KB → {:.1} KB per vector)",
+        println!(
+            "  Ratio:        {ratio:.1}x ({:.1} KB → {:.1} KB per vector)",
             HDC_DIMENSION as f64 * 4.0 / 1024.0,
-            compressed_bytes as f64 / n_vectors as f64 / 1024.0);
+            compressed_bytes as f64 / n_vectors as f64 / 1024.0
+        );
         println!("  Cosine sim:   mean={sim_mean:.6}  min={sim_min:.6}");
-        println!("  Compress:     {compress_rate:.0} vectors/sec ({:.1} us/vector)",
-            compress_elapsed.as_micros() as f64 / n_vectors as f64);
-        println!("  Decompress:   {decompress_rate:.0} vectors/sec ({:.1} us/vector)",
-            decompress_elapsed.as_micros() as f64 / n_vectors as f64);
+        println!(
+            "  Compress:     {compress_rate:.0} vectors/sec ({:.1} us/vector)",
+            compress_elapsed.as_micros() as f64 / n_vectors as f64
+        );
+        println!(
+            "  Decompress:   {decompress_rate:.0} vectors/sec ({:.1} us/vector)",
+            decompress_elapsed.as_micros() as f64 / n_vectors as f64
+        );
         println!();
     }
 
@@ -85,8 +98,11 @@ fn main() {
     println!("=== Episodic Memory Impact (4-bit, {n_memories} memories) ===");
     println!("  Uncompressed: {uncompressed_mb:.1} MB");
     println!("  Compressed:   {compressed_mb:.1} MB");
-    println!("  Savings:      {:.1} MB ({:.0}%)", uncompressed_mb - compressed_mb,
-        (1.0 - compressed_mb / uncompressed_mb) * 100.0);
+    println!(
+        "  Savings:      {:.1} MB ({:.0}%)",
+        uncompressed_mb - compressed_mb,
+        (1.0 - compressed_mb / uncompressed_mb) * 100.0
+    );
 }
 
 #[cfg(not(feature = "turbo-quant"))]

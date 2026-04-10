@@ -174,7 +174,9 @@ pub fn index_file(manifold: &mut ProgramManifold, path: &Path, source: &str) -> 
 fn extract_function_source(source: &str, name: &str) -> Option<String> {
     let pattern = format!("fn {name}(");
     let alt_pattern = format!("fn {name}<");
-    let start = source.find(&pattern).or_else(|| source.find(&alt_pattern))?;
+    let start = source
+        .find(&pattern)
+        .or_else(|| source.find(&alt_pattern))?;
 
     // Walk back to find `pub` or line start
     let line_start = source[..start].rfind('\n').map(|p| p + 1).unwrap_or(0);

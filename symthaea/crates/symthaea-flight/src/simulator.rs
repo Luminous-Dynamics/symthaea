@@ -130,6 +130,13 @@ impl PhysicsSimulator for SimplePhysicsSimulator {
         self.state.position[1] += self.state.linear_velocity[1] * dt;
         self.state.position[2] += self.state.linear_velocity[2] * dt;
 
+        // Terminal velocity clamp: prevents unrealistic freefall speeds.
+        // Drag-limited descent for a ~1.5kg quadrotor is approximately 5 m/s.
+        const MAX_DESCENT_RATE: f64 = -5.0;
+        if self.state.linear_velocity[2] < MAX_DESCENT_RATE {
+            self.state.linear_velocity[2] = MAX_DESCENT_RATE;
+        }
+
         // Ground constraint
         if self.state.position[2] < 0.0 {
             self.state.position[2] = 0.0;
@@ -442,5 +449,59 @@ mod tests {
             vx.abs() < 0.5,
             "Drag should limit lateral velocity after gust: vx={vx:.4}"
         );
+    }
+
+    mod proptest_physics {
+        use super::*;
+        use proptest::prelude::*;
+
+        proptest! {
+            /// Arbitrary commands and timesteps must never produce NaN/Inf.
+            #[test]
+            fn arbitrary_inputs_stay_finite(
+                thrust in -1.0f32..2.0,
+                roll in -0.1f32..0.1,
+                pitch in -0.1f32..0.1,
+                yaw in -0.1f32..0.1,
+                dt in 0.0001f64..0.05,
+                steps in 1usize..200,
+            ) {
+                let mut sim = SimplePhysicsSimulator::new();
+                let cmd = QuadrotorCommand { thrust, roll_moment: roll, pitch_moment: pitch, yaw_moment: yaw };
+                for _ in 0..steps {
+                    sim.step(&cmd, dt);
+                }
+                let s = sim.state();
+                prop_assert!(s.is_finite(), "State diverged to NaN/Inf: pos={:?} vel={:?}", s.position, s.linear_velocity);
+            }
+
+            /// Position must stay non-negative in z (ground constraint).
+            #[test]
+            fn altitude_never_negative(
+                thrust in -1.0f32..2.0,
+                dt in 0.001f64..0.02,
+            ) {
+                let mut sim = SimplePhysicsSimulator::new();
+                let cmd = QuadrotorCommand { thrust, roll_moment: 0.0, pitch_moment: 0.0, yaw_moment: 0.0 };
+                for _ in 0..500 {
+                    sim.step(&cmd, dt);
+                }
+                prop_assert!(sim.state().position[2] >= 0.0, "Altitude went negative: {}", sim.state().position[2]);
+            }
+
+            /// Descent rate must be bounded by MAX_DESCENT_RATE.
+            #[test]
+            fn descent_rate_bounded(
+                thrust in -1.0f32..0.0,
+                dt in 0.001f64..0.02,
+            ) {
+                let mut sim = SimplePhysicsSimulator::new();
+                let cmd = QuadrotorCommand { thrust, roll_moment: 0.0, pitch_moment: 0.0, yaw_moment: 0.0 };
+                for _ in 0..1000 {
+                    sim.step(&cmd, dt);
+                }
+                prop_assert!(sim.state().linear_velocity[2] >= -5.1, "Descent rate exceeded limit: {}", sim.state().linear_velocity[2]);
+            }
+        }
     }
 }

@@ -24,13 +24,18 @@ fn main() {
         crossover_rate: 0.7,
     };
 
-    println!("Population: {} | Generations: {} | 10s render per eval\n",
-        config.population_size, config.max_generations);
+    println!(
+        "Population: {} | Generations: {} | 10s render per eval\n",
+        config.population_size, config.max_generations
+    );
 
     let result = symthaea_muse::param_tuner::evolve_taste(&config);
 
     println!("\n╔══════════════════════════════════════════════════════════════╗");
-    println!("║  Best taste score: {:.1}/100                                ║", result.best_fitness);
+    println!(
+        "║  Best taste score: {:.1}/100                                ║",
+        result.best_fitness
+    );
     println!("╚══════════════════════════════════════════════════════════════╝\n");
 
     println!("Optimal parameters:");

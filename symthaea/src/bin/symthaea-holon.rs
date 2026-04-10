@@ -82,7 +82,8 @@ fn generate_auth_token() -> String {
 async fn main() -> Result<()> {
     tracing_subscriber::fmt()
         .with_env_filter(
-            std::env::var("RUST_LOG").unwrap_or_else(|_| "symthaea_holon=info,symthaea=warn".into()),
+            std::env::var("RUST_LOG")
+                .unwrap_or_else(|_| "symthaea_holon=info,symthaea=warn".into()),
         )
         .init();
 
@@ -96,9 +97,13 @@ async fn main() -> Result<()> {
         .unwrap_or(20);
     let listen = std::env::var("HOLON_LISTEN").unwrap_or_else(|_| "127.0.0.1".into());
     let insecure_allow_unauth = env_truthy("HOLON_INSECURE_ALLOW_UNAUTH");
-    let configured_token = std::env::var("HOLON_TOKEN")
-        .ok()
-        .and_then(|t| if t.trim().is_empty() { None } else { Some(t) });
+    let configured_token = std::env::var("HOLON_TOKEN").ok().and_then(|t| {
+        if t.trim().is_empty() {
+            None
+        } else {
+            Some(t)
+        }
+    });
 
     let addr = format!("{}:{}", listen, port);
     let cycle_interval = std::time::Duration::from_micros(1_000_000 / cycle_hz as u64);
@@ -197,12 +202,10 @@ async fn main() -> Result<()> {
 
             // Update HTTP state with latest consciousness metrics.
             http_state.set_consciousness(cls.consciousness_level());
-            http_state
-                .peer_count
-                .store(
-                    cls.holon_soma_peer_count() as u32,
-                    std::sync::atomic::Ordering::Relaxed,
-                );
+            http_state.peer_count.store(
+                cls.holon_soma_peer_count() as u32,
+                std::sync::atomic::Ordering::Relaxed,
+            );
 
             // Update telemetry JSON for dashboard (every 10 cycles to avoid lock churn).
             if cycle % 10 == 0 {
@@ -219,35 +222,30 @@ async fn main() -> Result<()> {
                         // Try real Broca generation if ssm_language feature is enabled.
                         #[cfg(feature = "ssm_language")]
                         {
-                            cls.holon_broca_generate(&payload)
-                                .unwrap_or_else(|| {
-                                    format!(
-                                        "[Broca gated @ CL={:.2}] {}",
-                                        cls.consciousness_level(),
-                                        payload,
-                                    )
-                                })
+                            cls.holon_broca_generate(&payload).unwrap_or_else(|| {
+                                format!(
+                                    "[Broca gated @ CL={:.2}] {}",
+                                    cls.consciousness_level(),
+                                    payload,
+                                )
+                            })
                         }
                         #[cfg(not(feature = "ssm_language"))]
                         {
-                            format!(
-                                "[Broca unavailable — enable ssm_language] {}",
-                                payload,
-                            )
+                            format!("[Broca unavailable — enable ssm_language] {}", payload,)
                         }
                     }
                     "converse" => {
                         // Converse uses same Broca path with the user's text as context.
                         #[cfg(feature = "ssm_language")]
                         {
-                            cls.holon_broca_generate(&payload)
-                                .unwrap_or_else(|| {
-                                    format!(
-                                        "[Converse gated @ CL={:.2}] {}",
-                                        cls.consciousness_level(),
-                                        payload,
-                                    )
-                                })
+                            cls.holon_broca_generate(&payload).unwrap_or_else(|| {
+                                format!(
+                                    "[Converse gated @ CL={:.2}] {}",
+                                    cls.consciousness_level(),
+                                    payload,
+                                )
+                            })
                         }
                         #[cfg(not(feature = "ssm_language"))]
                         {
@@ -275,10 +273,7 @@ async fn main() -> Result<()> {
                 // Also push to HTTP outbound for polling via /holon/inbound.
                 http_state.push_outbound(vec![
                     symthaea::consciousness::holon_receiver::HolonResponse::LanguageOutput {
-                        text: format!(
-                            "[{}] Response queued for device {}",
-                            task_type, device_id
-                        ),
+                        text: format!("[{}] Response queued for device {}", task_type, device_id),
                     },
                 ]);
             }

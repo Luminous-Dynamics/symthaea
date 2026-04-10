@@ -372,11 +372,11 @@ pub mod native_similarity; // O(1) XOR+popcount similarity search (consciousness
 pub mod number_theory;
 pub mod numeric_tower; // Unified numeric tower (N -> Z -> Q -> R) with auto-promotion
 pub mod optimization; // Optimization: gradient descent, Nelder-Mead, L-BFGS
-pub mod power_flow; // DC Optimal Power Flow: B·θ=P solver, OPF, N-1 contingency, PTDF
 #[cfg(feature = "parallel")]
 pub mod parallel_hv; // Rayon parallel batch operations (7x faster on 8 cores)
 #[cfg(test)]
 mod phi_feedback_integration_tests;
+pub mod power_flow; // DC Optimal Power Flow: B·θ=P solver, OPF, N-1 contingency, PTDF
 pub mod primitive_dashboard; // Real-time primitive usage monitoring
 pub mod primitive_system; // Ontological primitives system with 7 semantic domains
 pub mod program_algebra; // HDC program algebra — hyperdimensional IR for code
@@ -424,9 +424,9 @@ pub mod glasser_parcellation; // Glasser atlas 360→12 CorticalRegion mapping
 pub mod hemodynamic; // HRF convolution for BOLD signal comparison
 
 // Track 6: Language module dependencies
+pub mod deepnsm_integration; // DeepNSM corpus: 44K NSM explication triplets for grounding
 pub mod full_stack_consciousness; // Full stack: Understanding + ActiveInference + Memory + Counterfactuals
 pub mod grounded_understanding; // True understanding via semantic primes + embodiment
-pub mod deepnsm_integration; // DeepNSM corpus: 44K NSM explication triplets for grounding
 pub mod unified_conscious_being;
 pub mod unified_understanding; // Complete understanding pipeline (predictive + narrative + ToM)
 pub mod universal_semantics; // Universal semantic primes (Wierzbicka) // Complete unified being: A+B+C+D+E+F integration

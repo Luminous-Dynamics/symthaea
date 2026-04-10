@@ -49,7 +49,9 @@ pub enum HealMethod {
 /// This runs in WASM — no network access needed.
 pub fn heal_package(broken_name: &str) -> Option<HealResult> {
     let name = broken_name.trim().to_lowercase();
-    if name.is_empty() { return None; }
+    if name.is_empty() {
+        return None;
+    }
 
     // Strategy 1: Alias lookup (exact match on a known mapping)
     if let Some(nixpkg) = aliases::lookup_alias(&name) {
@@ -75,7 +77,10 @@ pub fn heal_package(broken_name: &str) -> Option<HealResult> {
                 replacement: nixpkg.to_string(),
                 method: HealMethod::NameSimilarity,
                 confidence: similarity * 0.85,
-                reason: format!("'{}' looks similar to '{}' (nixpkg: {})", broken_name, alias, nixpkg),
+                reason: format!(
+                    "'{}' looks similar to '{}' (nixpkg: {})",
+                    broken_name, alias, nixpkg
+                ),
             });
         }
     }
@@ -107,7 +112,8 @@ pub fn heal_package(broken_name: &str) -> Option<HealResult> {
 
 /// Try to heal a list of broken packages. Returns fixes for each.
 pub fn heal_packages(broken_names: &[String]) -> Vec<HealResult> {
-    broken_names.iter()
+    broken_names
+        .iter()
         .filter_map(|name| heal_package(name))
         .collect()
 }
@@ -138,10 +144,14 @@ fn name_similarity(a: &str, b: &str) -> f32 {
     let a_chars: Vec<char> = a.chars().collect();
     let b_chars: Vec<char> = b.chars().collect();
     let max_len = a_chars.len().max(b_chars.len()) as f32;
-    if max_len == 0.0 { return 1.0; }
+    if max_len == 0.0 {
+        return 1.0;
+    }
 
     // Common prefix length
-    let prefix_len = a_chars.iter().zip(&b_chars)
+    let prefix_len = a_chars
+        .iter()
+        .zip(&b_chars)
         .take_while(|(a, b)| a == b)
         .count() as f32;
 
@@ -172,7 +182,10 @@ fn try_common_renames(name: &str, original: &str) -> Option<HealResult> {
             replacement: nixpkg.to_string(),
             method: HealMethod::NameSimilarity,
             confidence: 0.7,
-            reason: format!("'{}' may have been renamed to '{}' (hyphen removed)", original, nixpkg),
+            reason: format!(
+                "'{}' may have been renamed to '{}' (hyphen removed)",
+                original, nixpkg
+            ),
         });
     }
 
@@ -184,7 +197,10 @@ fn try_common_renames(name: &str, original: &str) -> Option<HealResult> {
             replacement: nixpkg.to_string(),
             method: HealMethod::NameSimilarity,
             confidence: 0.7,
-            reason: format!("'{}' may have moved to binary package '{}'", original, nixpkg),
+            reason: format!(
+                "'{}' may have moved to binary package '{}'",
+                original, nixpkg
+            ),
         });
     }
 
@@ -223,8 +239,11 @@ mod tests {
         let result = heal_package("firefo");
         assert!(result.is_some(), "Should heal 'firefo'");
         let r = result.unwrap();
-        assert!(r.replacement.contains("firefox") || r.replacement.contains("fire"),
-            "Expected firefox-related, got: {}", r.replacement);
+        assert!(
+            r.replacement.contains("firefox") || r.replacement.contains("fire"),
+            "Expected firefox-related, got: {}",
+            r.replacement
+        );
     }
 
     #[test]
@@ -240,7 +259,11 @@ mod tests {
         let result = heal_package("xyzzy12345nonexistent");
         // May or may not find something — but if it does, confidence should be low
         if let Some(r) = result {
-            assert!(r.confidence < 0.7, "Gibberish should have low confidence: {}", r.confidence);
+            assert!(
+                r.confidence < 0.7,
+                "Gibberish should have low confidence: {}",
+                r.confidence
+            );
         }
     }
 
@@ -274,6 +297,10 @@ mod tests {
     #[test]
     fn name_similarity_prefix() {
         let sim = name_similarity("fire", "firefox");
-        assert!(sim > 0.5, "Common prefix should give high similarity: {}", sim);
+        assert!(
+            sim > 0.5,
+            "Common prefix should give high similarity: {}",
+            sim
+        );
     }
 }

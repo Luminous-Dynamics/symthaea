@@ -19,7 +19,9 @@ use crate::{AestheticFeedback, AestheticScore};
 /// C=red(0), C#=orange(30), D=yellow(60), D#=yellow-green(90),
 /// E=green(120), F=cyan(150), F#=blue(180), G=blue-violet(210),
 /// G#=violet(240), A=purple(270), A#=magenta(300), B=rose(330).
-const SCRIABIN_HUE: [f32; 12] = [0.0, 30.0, 60.0, 90.0, 120.0, 150.0, 180.0, 210.0, 240.0, 270.0, 300.0, 330.0];
+const SCRIABIN_HUE: [f32; 12] = [
+    0.0, 30.0, 60.0, 90.0, 120.0, 150.0, 180.0, 210.0, 240.0, 270.0, 300.0, 330.0,
+];
 
 /// Texture parameters derived from timbral analysis.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -381,7 +383,10 @@ mod tests {
     #[test]
     fn c4_maps_to_red() {
         let hue = pitch_to_hue(261.63); // C4
-        assert!(hue < 5.0 || hue > 355.0, "C4 should be red (near 0), got {hue}");
+        assert!(
+            hue < 5.0 || hue > 355.0,
+            "C4 should be red (near 0), got {hue}"
+        );
     }
 
     #[test]
@@ -406,8 +411,8 @@ mod tests {
     fn pitch_to_hue_monotonic_within_octave() {
         // Within a single octave, hues should progress through the spectrum
         let freqs = [
-            261.63, 277.18, 293.66, 311.13, 329.63, 349.23, 369.99, 392.00, 415.30, 440.00,
-            466.16, 493.88,
+            261.63, 277.18, 293.66, 311.13, 329.63, 349.23, 369.99, 392.00, 415.30, 440.00, 466.16,
+            493.88,
         ];
         let hues: Vec<f32> = freqs.iter().map(|&f| pitch_to_hue(f)).collect();
         // Each should be approximately 30 degrees apart
@@ -428,7 +433,10 @@ mod tests {
         let c5 = pitch_to_hue(523.25);
         let diff = (c4 - c5).abs();
         let circular_diff = diff.min(360.0 - diff);
-        assert!(circular_diff < 2.0, "C4 and C5 should map to same hue, circular_diff={circular_diff}");
+        assert!(
+            circular_diff < 2.0,
+            "C4 and C5 should map to same hue, circular_diff={circular_diff}"
+        );
     }
 
     #[test]
@@ -447,7 +455,10 @@ mod tests {
         let bright = timbre_to_texture(&[1.0, 0.0, 0.0, 1.0]);
         let dull = timbre_to_texture(&[0.0, 1.0, 1.0, 0.0]);
         assert!(bright.warmth < dull.warmth, "bright should be cooler");
-        assert!(bright.roughness < dull.roughness, "bright should be smoother");
+        assert!(
+            bright.roughness < dull.roughness,
+            "bright should be smoother"
+        );
     }
 
     #[test]
@@ -495,13 +506,16 @@ mod tests {
     #[test]
     fn synesthetic_frame_extraction() {
         let notes = vec![
-            (261.63, 0.8, 0.0, 0.5),   // C4 first beat
-            (329.63, 0.6, 0.0, 0.5),   // E4 first beat
-            (392.00, 0.7, 0.75, 0.5),  // G4 second beat
+            (261.63, 0.8, 0.0, 0.5),  // C4 first beat
+            (329.63, 0.6, 0.0, 0.5),  // E4 first beat
+            (392.00, 0.7, 0.75, 0.5), // G4 second beat
         ];
         let frames = extract_synesthetic_features(&notes, 120.0, 1.5);
         assert!(!frames.is_empty());
-        assert!(frames[0].lightness > 0.15, "should have non-silent first beat");
+        assert!(
+            frames[0].lightness > 0.15,
+            "should have non-silent first beat"
+        );
     }
 
     #[test]
@@ -571,29 +585,43 @@ mod tests {
     fn warm_music_warm_visuals_coherent() {
         // Low pitch (warm hue) + positive valence = high coherence
         let frames = vec![SynestheticFrame {
-            hue: 30.0,       // warm (orange)
+            hue: 30.0, // warm (orange)
             lightness: 0.7,
-            texture: TextureParams { grain_size: 0.5, roughness: 0.3, warmth: 0.8 },
+            texture: TextureParams {
+                grain_size: 0.5,
+                roughness: 0.3,
+                warmth: 0.8,
+            },
             motion: 0.6,
             time: 0.0,
         }];
         let score = coherence_score(&frames, 0.7, 0.6, 0.5);
-        assert!(score > 0.6, "warm music + warm visuals should be coherent: {score}");
+        assert!(
+            score > 0.6,
+            "warm music + warm visuals should be coherent: {score}"
+        );
     }
 
     #[test]
     fn cool_music_warm_visuals_incoherent() {
         // High pitch (cool hue) + positive valence = mismatch
         let frames = vec![SynestheticFrame {
-            hue: 270.0,      // cool (violet)
+            hue: 270.0, // cool (violet)
             lightness: 0.3,
-            texture: TextureParams { grain_size: 0.8, roughness: 0.7, warmth: 0.2 },
+            texture: TextureParams {
+                grain_size: 0.8,
+                roughness: 0.7,
+                warmth: 0.2,
+            },
             motion: 0.2,
             time: 0.0,
         }];
         let score = coherence_score(&frames, 0.8, 0.8, 0.8);
         // Mismatch: cool music but very warm/active visuals
-        assert!(score < 0.7, "cool music + hot visuals should be less coherent: {score}");
+        assert!(
+            score < 0.7,
+            "cool music + hot visuals should be less coherent: {score}"
+        );
     }
 
     #[test]
@@ -609,7 +637,11 @@ mod tests {
                 let frames = vec![SynestheticFrame {
                     hue,
                     lightness: 0.5,
-                    texture: TextureParams { grain_size: 0.5, roughness: 0.5, warmth: 0.5 },
+                    texture: TextureParams {
+                        grain_size: 0.5,
+                        roughness: 0.5,
+                        warmth: 0.5,
+                    },
                     motion: 0.5,
                     time: 0.0,
                 }];
@@ -628,8 +660,12 @@ mod tests {
         let frames = vec![SynestheticFrame {
             hue: 60.0,
             lightness: 0.8,
-            texture: TextureParams { grain_size: 0.3, roughness: 0.2, warmth: 0.6 },
-            motion: 0.9,  // very fast
+            texture: TextureParams {
+                grain_size: 0.3,
+                roughness: 0.2,
+                warmth: 0.6,
+            },
+            motion: 0.9, // very fast
             time: 0.0,
         }];
         let high_arousal = coherence_score(&frames, 0.3, 0.9, 0.7);

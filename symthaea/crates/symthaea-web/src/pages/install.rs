@@ -8,13 +8,13 @@ use leptos::prelude::*;
 use wasm_bindgen::JsCast;
 use wasm_bindgen_futures::JsFuture;
 
-use symthaea_app_db::{AppDatabase, AppEntry, MatchQuality, AppCategory};
-use symthaea_app_db::config_gen;
-use symthaea_app_db::validation;
 use crate::components::glass_panel::GlassPanel;
 use crate::i18n::{self, Lang};
 use crate::pages::remote_install::RemoteInstallPanel;
 use crate::worker::EngineWorker;
+use symthaea_app_db::config_gen;
+use symthaea_app_db::validation;
+use symthaea_app_db::{AppCategory, AppDatabase, AppEntry, MatchQuality};
 
 // ═══════════════════════════════════════════════════════
 // LocalStorage persistence helpers
@@ -58,15 +58,21 @@ fn detect_hardware() -> HardwareInfo {
     };
 
     let screen_w = js_sys::Reflect::get(&window, &"innerWidth".into())
-        .ok().and_then(|v| v.as_f64()).unwrap_or(0.0);
+        .ok()
+        .and_then(|v| v.as_f64())
+        .unwrap_or(0.0);
     let screen_h = js_sys::Reflect::get(&window, &"innerHeight".into())
-        .ok().and_then(|v| v.as_f64()).unwrap_or(0.0);
+        .ok()
+        .and_then(|v| v.as_f64())
+        .unwrap_or(0.0);
     info.screen_width = screen_w as u32;
     info.screen_height = screen_h as u32;
 
     // Memory: try deviceMemory API → performance.memory → CPU-based estimate
     info.memory_gb = js_sys::Reflect::get(&navigator, &"deviceMemory".into())
-        .ok().and_then(|v| v.as_f64()).filter(|&m| m > 0.0);
+        .ok()
+        .and_then(|v| v.as_f64())
+        .filter(|&m| m > 0.0);
     if info.memory_gb.is_none() {
         if let Ok(perf) = js_sys::Reflect::get(&window, &"performance".into()) {
             if let Ok(mem) = js_sys::Reflect::get(&perf, &"memory".into()) {
@@ -74,8 +80,17 @@ fn detect_hardware() -> HardwareInfo {
                     if let Ok(heap_limit) = js_sys::Reflect::get(&mem, &"jsHeapSizeLimit".into()) {
                         if let Some(limit) = heap_limit.as_f64() {
                             let gb = limit / (1024.0 * 1024.0 * 1024.0);
-                            info.memory_gb = Some(if gb > 3.5 { 32.0 } else if gb > 1.8 { 16.0 }
-                                else if gb > 0.9 { 8.0 } else if gb > 0.45 { 4.0 } else { 2.0 });
+                            info.memory_gb = Some(if gb > 3.5 {
+                                32.0
+                            } else if gb > 1.8 {
+                                16.0
+                            } else if gb > 0.9 {
+                                8.0
+                            } else if gb > 0.45 {
+                                4.0
+                            } else {
+                                2.0
+                            });
                         }
                     }
                 }
@@ -85,28 +100,41 @@ fn detect_hardware() -> HardwareInfo {
     // Last resort: estimate from CPU cores (rough heuristic, better than 0)
     if info.memory_gb.is_none() || info.memory_gb == Some(0.0) {
         let cores = info.cpu_cores;
-        info.memory_gb = Some(if cores >= 16 { 32.0 } else if cores >= 8 { 16.0 }
-            else if cores >= 4 { 8.0 } else { 4.0 });
+        info.memory_gb = Some(if cores >= 16 {
+            32.0
+        } else if cores >= 8 {
+            16.0
+        } else if cores >= 4 {
+            8.0
+        } else {
+            4.0
+        });
     }
 
     // GPU via WebGL
     let document = window.document().unwrap();
     if let Ok(canvas) = document.create_element("canvas") {
         let canvas: web_sys::HtmlCanvasElement = canvas.dyn_into().unwrap();
-        let gl_ctx = canvas.get_context("webgl2").ok().flatten()
+        let gl_ctx = canvas
+            .get_context("webgl2")
+            .ok()
+            .flatten()
             .or_else(|| canvas.get_context("webgl").ok().flatten());
         if let Some(gl) = gl_ctx {
             let get_ext = js_sys::Reflect::get(&gl, &"getExtension".into()).ok();
             if let Some(f) = get_ext.and_then(|v| v.dyn_ref::<js_sys::Function>().cloned()) {
                 if let Ok(ext) = f.call1(&gl, &"WEBGL_debug_renderer_info".into()) {
                     if !ext.is_null() && !ext.is_undefined() {
-                        let gp = js_sys::Reflect::get(&gl, &"getParameter".into()).ok()
+                        let gp = js_sys::Reflect::get(&gl, &"getParameter".into())
+                            .ok()
                             .and_then(|v| v.dyn_ref::<js_sys::Function>().cloned());
                         if let Some(gp) = gp {
-                            if let Ok(v) = gp.call1(&gl, &wasm_bindgen::JsValue::from_f64(37445.0)) {
+                            if let Ok(v) = gp.call1(&gl, &wasm_bindgen::JsValue::from_f64(37445.0))
+                            {
                                 info.gpu_vendor = v.as_string().unwrap_or_default();
                             }
-                            if let Ok(v) = gp.call1(&gl, &wasm_bindgen::JsValue::from_f64(37446.0)) {
+                            if let Ok(v) = gp.call1(&gl, &wasm_bindgen::JsValue::from_f64(37446.0))
+                            {
                                 info.gpu_renderer = v.as_string().unwrap_or_default();
                             }
                         }
@@ -119,11 +147,25 @@ fn detect_hardware() -> HardwareInfo {
 }
 
 fn gpu_short(r: &str) -> String {
-    let r = r.replace("ANGLE (", "").replace(")", "").replace("/PCIe/SSE2", "")
-        .replace(" Direct3D11 vs_5_0 ps_5_0", "").replace("GeForce ", "")
-        .replace("Mesa ", "").replace("Intel(R) ", "Intel ").replace("(R)", "");
-    let r = if let Some(p) = r.find(", OpenGL") { r[..p].to_string() } else { r.to_string() };
-    let r = if let Some(p) = r.find(", Vulkan") { r[..p].to_string() } else { r };
+    let r = r
+        .replace("ANGLE (", "")
+        .replace(")", "")
+        .replace("/PCIe/SSE2", "")
+        .replace(" Direct3D11 vs_5_0 ps_5_0", "")
+        .replace("GeForce ", "")
+        .replace("Mesa ", "")
+        .replace("Intel(R) ", "Intel ")
+        .replace("(R)", "");
+    let r = if let Some(p) = r.find(", OpenGL") {
+        r[..p].to_string()
+    } else {
+        r.to_string()
+    };
+    let r = if let Some(p) = r.find(", Vulkan") {
+        r[..p].to_string()
+    } else {
+        r
+    };
     r.trim().chars().take(45).collect()
 }
 
@@ -131,7 +173,11 @@ fn gpu_short(r: &str) -> String {
 /// "Google Inc. (Intel)" → "intel", "Google Inc. (NVIDIA)" → "nvidia"
 fn normalize_gpu_vendor(vendor: &str, renderer: &str) -> String {
     let combined = format!("{} {}", vendor, renderer).to_lowercase();
-    if combined.contains("nvidia") || combined.contains("geforce") || combined.contains("rtx") || combined.contains("gtx") {
+    if combined.contains("nvidia")
+        || combined.contains("geforce")
+        || combined.contains("rtx")
+        || combined.contains("gtx")
+    {
         "nvidia".into()
     } else if combined.contains("amd") || combined.contains("radeon") || combined.contains("ati") {
         "amd".into()
@@ -145,9 +191,8 @@ fn normalize_gpu_vendor(vendor: &str, renderer: &str) -> String {
 /// Auto-detect timezone from browser via Intl API.
 /// Uses Function::new_no_args instead of eval() for safety.
 fn detect_timezone() -> String {
-    let f = js_sys::Function::new_no_args(
-        "return Intl.DateTimeFormat().resolvedOptions().timeZone",
-    );
+    let f =
+        js_sys::Function::new_no_args("return Intl.DateTimeFormat().resolvedOptions().timeZone");
     let tz = f
         .call0(&wasm_bindgen::JsValue::NULL)
         .ok()
@@ -169,7 +214,13 @@ fn detect_keyboard() -> String {
         .and_then(|v| v.as_string())
         .map(|lang| {
             // Map browser language to keyboard layout
-            match lang.split('-').last().unwrap_or("us").to_lowercase().as_str() {
+            match lang
+                .split('-')
+                .last()
+                .unwrap_or("us")
+                .to_lowercase()
+                .as_str()
+            {
                 "za" => "us", // South Africa uses US layout
                 "gb" | "uk" => "gb",
                 "de" | "at" => "de",
@@ -185,7 +236,8 @@ fn detect_keyboard() -> String {
                 "fi" => "fi",
                 "nl" | "be" => "us", // most Dutch speakers use US
                 _ => "us",
-            }.to_string()
+            }
+            .to_string()
         })
         .unwrap_or_else(|| "us".into())
 }
@@ -282,8 +334,15 @@ fn detect_locale() -> String {
 }
 
 fn detect_os(p: &str) -> &'static str {
-    if p.contains("Win") { "Windows" } else if p.contains("Mac") { "macOS" }
-    else if p.contains("Linux") { "Linux" } else { "Unknown" }
+    if p.contains("Win") {
+        "Windows"
+    } else if p.contains("Mac") {
+        "macOS"
+    } else if p.contains("Linux") {
+        "Linux"
+    } else {
+        "Unknown"
+    }
 }
 
 /// Trigger a file download in the browser.
@@ -340,10 +399,15 @@ fn emoji_for_category(cat: AppCategory) -> &'static str {
 
 /// Generate a random fun hostname.
 fn random_hostname() -> String {
-    let adjectives = ["swift", "calm", "bright", "cosmic", "lunar", "solar", "ocean", "forest", "crystal", "aurora",
-        "jade", "amber", "sage", "coral", "onyx", "pearl", "raven", "frost", "ember", "willow"];
-    let nouns = ["fox", "owl", "wolf", "bear", "hawk", "lynx", "orca", "pine", "oak", "fern",
-        "moss", "reef", "peak", "glen", "vale", "dale", "cove", "mesa", "dune", "isle"];
+    let adjectives = [
+        "swift", "calm", "bright", "cosmic", "lunar", "solar", "ocean", "forest", "crystal",
+        "aurora", "jade", "amber", "sage", "coral", "onyx", "pearl", "raven", "frost", "ember",
+        "willow",
+    ];
+    let nouns = [
+        "fox", "owl", "wolf", "bear", "hawk", "lynx", "orca", "pine", "oak", "fern", "moss",
+        "reef", "peak", "glen", "vale", "dale", "cove", "mesa", "dune", "isle",
+    ];
     let now = js_sys::Date::now() as u64;
     let adj = adjectives[(now % adjectives.len() as u64) as usize];
     let noun = nouns[((now / 7) % nouns.len() as u64) as usize];
@@ -703,7 +767,9 @@ fn AppSelectionGrid(
     app_category: RwSignal<String>,
 ) -> impl IntoView {
     let db = AppDatabase::new();
-    let all_entries: Vec<&'static AppEntry> = db.entries().iter()
+    let all_entries: Vec<&'static AppEntry> = db
+        .entries()
+        .iter()
         .filter(|e| match os {
             "Windows" => !e.windows_names.is_empty() || !e.winget_ids.is_empty(),
             "macOS" => !e.macos_names.is_empty() || !e.brew_names.is_empty(),
@@ -912,7 +978,9 @@ fn AppPastePanel() -> impl IntoView {
 
     let do_match = move || {
         let text = paste_text.get();
-        if text.trim().is_empty() { return; }
+        if text.trim().is_empty() {
+            return;
+        }
 
         // Try worker first (SporeEngine WASM), fall back to local AppDatabase
         if let Some(ref engine) = engine {
@@ -921,7 +989,11 @@ fn AppPastePanel() -> impl IntoView {
                 set_matching.set(true);
                 wasm_bindgen_futures::spawn_local(async move {
                     let params = js_sys::Object::new();
-                    let _ = js_sys::Reflect::set(&params, &"text".into(), &wasm_bindgen::JsValue::from_str(&text));
+                    let _ = js_sys::Reflect::set(
+                        &params,
+                        &"text".into(),
+                        &wasm_bindgen::JsValue::from_str(&text),
+                    );
                     let promise = engine.send("matchAppList", &params.into());
                     match JsFuture::from(promise).await {
                         Ok(result) => {
@@ -1025,11 +1097,17 @@ Examples:
 /// Parse a JsValue migration report from the worker.
 fn parse_migration_report(val: &wasm_bindgen::JsValue) -> MigrationReport {
     let total = js_sys::Reflect::get(val, &"total_apps".into())
-        .ok().and_then(|v| v.as_f64()).unwrap_or(0.0) as usize;
+        .ok()
+        .and_then(|v| v.as_f64())
+        .unwrap_or(0.0) as usize;
     let readiness = js_sys::Reflect::get(val, &"readiness_score".into())
-        .ok().and_then(|v| v.as_f64()).unwrap_or(0.0);
+        .ok()
+        .and_then(|v| v.as_f64())
+        .unwrap_or(0.0);
     let summary = js_sys::Reflect::get(val, &"summary".into())
-        .ok().and_then(|v| v.as_string()).unwrap_or_default();
+        .ok()
+        .and_then(|v| v.as_string())
+        .unwrap_or_default();
 
     let mut matched = Vec::new();
     if let Ok(arr) = js_sys::Reflect::get(val, &"matched".into()) {
@@ -1038,11 +1116,17 @@ fn parse_migration_report(val: &wasm_bindgen::JsValue) -> MigrationReport {
             for i in 0..arr.length() {
                 let item = arr.get(i);
                 let src = js_sys::Reflect::get(&item, &"source_name".into())
-                    .ok().and_then(|v| v.as_string()).unwrap_or_default();
+                    .ok()
+                    .and_then(|v| v.as_string())
+                    .unwrap_or_default();
                 let nix = js_sys::Reflect::get(&item, &"nix_package".into())
-                    .ok().and_then(|v| v.as_string()).unwrap_or_default();
+                    .ok()
+                    .and_then(|v| v.as_string())
+                    .unwrap_or_default();
                 let cat = js_sys::Reflect::get(&item, &"category".into())
-                    .ok().and_then(|v| v.as_string()).unwrap_or_default();
+                    .ok()
+                    .and_then(|v| v.as_string())
+                    .unwrap_or_default();
                 matched.push((src, nix, cat));
             }
         }
@@ -1072,7 +1156,14 @@ fn parse_migration_report(val: &wasm_bindgen::JsValue) -> MigrationReport {
         }
     }
 
-    MigrationReport { total_apps: total, matched, unmatched, readiness_score: readiness, summary, bundles }
+    MigrationReport {
+        total_apps: total,
+        matched,
+        unmatched,
+        readiness_score: readiness,
+        summary,
+        bundles,
+    }
 }
 
 /// Fallback: match apps using the local AppDatabase (no worker needed).
@@ -1082,13 +1173,25 @@ fn local_match_apps(text: &str) -> MigrationReport {
     let report = db.match_list(&names);
     MigrationReport {
         total_apps: report.total_apps,
-        matched: report.matched.iter().map(|m| {
-            (m.source_name.clone(), m.entry.primary.display_name.to_string(), format!("{:?}", m.entry.category))
-        }).collect(),
+        matched: report
+            .matched
+            .iter()
+            .map(|m| {
+                (
+                    m.source_name.clone(),
+                    m.entry.primary.display_name.to_string(),
+                    format!("{:?}", m.entry.category),
+                )
+            })
+            .collect(),
         unmatched: report.unmatched.clone(),
         readiness_score: report.readiness_score as f64,
         summary: report.summary.clone(),
-        bundles: report.suggested_bundles.iter().map(|b| b.name.to_string()).collect(),
+        bundles: report
+            .suggested_bundles
+            .iter()
+            .map(|b| b.name.to_string())
+            .collect(),
     }
 }
 
@@ -1143,9 +1246,15 @@ fn ConverseMode(
         let gv = gpu_vendor.clone();
         let gm = gpu_model.clone();
         Effect::new(move |_| {
-            if initialized.get() { return; }
-            let Some(ref engine) = engine else { return; };
-            if !engine.is_available() { return; }
+            if initialized.get() {
+                return;
+            }
+            let Some(ref engine) = engine else {
+                return;
+            };
+            if !engine.is_available() {
+                return;
+            }
 
             let engine = engine.clone();
             let gv = gv.clone();
@@ -1164,7 +1273,11 @@ fn ConverseMode(
                 });
                 let hw_val = wasm_bindgen::JsValue::from_str(&hw.to_string());
                 let _ = js_sys::Reflect::set(&params, &"hardware".into(), &hw_val);
-                let _ = js_sys::Reflect::set(&params, &"migration".into(), &wasm_bindgen::JsValue::from_str("{}"));
+                let _ = js_sys::Reflect::set(
+                    &params,
+                    &"migration".into(),
+                    &wasm_bindgen::JsValue::from_str("{}"),
+                );
 
                 let promise = engine.send("sovereignInit", &params.into());
                 match JsFuture::from(promise).await {
@@ -1172,13 +1285,21 @@ fn ConverseMode(
                         let msg_text = js_sys::Reflect::get(&result, &"message".into())
                             .ok().and_then(|v| v.as_string())
                             .unwrap_or_else(|| "Hello! I'm Symthaea. Tell me what you need from your NixOS system and I'll configure it for you.".into());
-                        let config_preview = js_sys::Reflect::get(&result, &"config_preview".into())
-                            .ok().and_then(|v| v.as_string());
+                        let config_preview =
+                            js_sys::Reflect::get(&result, &"config_preview".into())
+                                .ok()
+                                .and_then(|v| v.as_string());
 
-                        set_messages.update(|msgs| msgs.push(ConverseChatMsg {
-                            id: 0, is_user: false, text: msg_text, config_preview,
-                            decisions: Vec::new(), ready_to_deploy: false,
-                        }));
+                        set_messages.update(|msgs| {
+                            msgs.push(ConverseChatMsg {
+                                id: 0,
+                                is_user: false,
+                                text: msg_text,
+                                config_preview,
+                                decisions: Vec::new(),
+                                ready_to_deploy: false,
+                            })
+                        });
                     }
                     Err(e) => {
                         let err_msg = format!("{:?}", e);
@@ -1199,15 +1320,23 @@ fn ConverseMode(
     let on_submit = move |ev: web_sys::SubmitEvent| {
         ev.prevent_default();
         let text = input_value.get();
-        if text.trim().is_empty() || is_thinking.get() { return; }
+        if text.trim().is_empty() || is_thinking.get() {
+            return;
+        }
 
         // Add user message
         let user_id = next_id.get();
         set_next_id.set(user_id + 1);
-        set_messages.update(|msgs| msgs.push(ConverseChatMsg {
-            id: user_id, is_user: true, text: text.clone(),
-            config_preview: None, decisions: Vec::new(), ready_to_deploy: false,
-        }));
+        set_messages.update(|msgs| {
+            msgs.push(ConverseChatMsg {
+                id: user_id,
+                is_user: true,
+                text: text.clone(),
+                config_preview: None,
+                decisions: Vec::new(),
+                ready_to_deploy: false,
+            })
+        });
         set_input_value.set(String::new());
         set_is_thinking.set(true);
 
@@ -1228,7 +1357,11 @@ fn ConverseMode(
 
         wasm_bindgen_futures::spawn_local(async move {
             let params = js_sys::Object::new();
-            let _ = js_sys::Reflect::set(&params, &"message".into(), &wasm_bindgen::JsValue::from_str(&text));
+            let _ = js_sys::Reflect::set(
+                &params,
+                &"message".into(),
+                &wasm_bindgen::JsValue::from_str(&text),
+            );
             let promise = engine.send("sovereignChat", &params.into());
 
             let reply_id = next_id.get_untracked();
@@ -1237,12 +1370,18 @@ fn ConverseMode(
             match JsFuture::from(promise).await {
                 Ok(result) => {
                     let msg_text = js_sys::Reflect::get(&result, &"message".into())
-                        .ok().and_then(|v| v.as_string())
-                        .unwrap_or_else(|| "I understand. Let me think about the best configuration...".into());
+                        .ok()
+                        .and_then(|v| v.as_string())
+                        .unwrap_or_else(|| {
+                            "I understand. Let me think about the best configuration...".into()
+                        });
                     let config_preview = js_sys::Reflect::get(&result, &"config_preview".into())
-                        .ok().and_then(|v| v.as_string());
+                        .ok()
+                        .and_then(|v| v.as_string());
                     let is_ready = js_sys::Reflect::get(&result, &"ready_to_deploy".into())
-                        .ok().and_then(|v| v.as_bool()).unwrap_or(false);
+                        .ok()
+                        .and_then(|v| v.as_bool())
+                        .unwrap_or(false);
 
                     // Parse decisions
                     let mut decisions = Vec::new();
@@ -1252,13 +1391,21 @@ fn ConverseMode(
                             for i in 0..arr.length() {
                                 let d = arr.get(i);
                                 let opt = js_sys::Reflect::get(&d, &"option".into())
-                                    .ok().and_then(|v| v.as_string()).unwrap_or_default();
+                                    .ok()
+                                    .and_then(|v| v.as_string())
+                                    .unwrap_or_default();
                                 let val = js_sys::Reflect::get(&d, &"value".into())
-                                    .ok().and_then(|v| v.as_string()).unwrap_or_default();
+                                    .ok()
+                                    .and_then(|v| v.as_string())
+                                    .unwrap_or_default();
                                 let reason = js_sys::Reflect::get(&d, &"reasoning".into())
-                                    .ok().and_then(|v| v.as_string()).unwrap_or_default();
+                                    .ok()
+                                    .and_then(|v| v.as_string())
+                                    .unwrap_or_default();
                                 let conf = js_sys::Reflect::get(&d, &"confidence".into())
-                                    .ok().and_then(|v| v.as_f64()).unwrap_or(0.0);
+                                    .ok()
+                                    .and_then(|v| v.as_f64())
+                                    .unwrap_or(0.0);
                                 decisions.push((opt, val, reason, conf));
                             }
                         }
@@ -1272,17 +1419,28 @@ fn ConverseMode(
                         }
                     }
 
-                    set_messages.update(|msgs| msgs.push(ConverseChatMsg {
-                        id: reply_id, is_user: false, text: msg_text, config_preview,
-                        decisions, ready_to_deploy: is_ready,
-                    }));
+                    set_messages.update(|msgs| {
+                        msgs.push(ConverseChatMsg {
+                            id: reply_id,
+                            is_user: false,
+                            text: msg_text,
+                            config_preview,
+                            decisions,
+                            ready_to_deploy: is_ready,
+                        })
+                    });
                 }
                 Err(e) => {
-                    set_messages.update(|msgs| msgs.push(ConverseChatMsg {
-                        id: reply_id, is_user: false,
-                        text: format!("Sorry, I had trouble processing that: {:?}", e),
-                        config_preview: None, decisions: Vec::new(), ready_to_deploy: false,
-                    }));
+                    set_messages.update(|msgs| {
+                        msgs.push(ConverseChatMsg {
+                            id: reply_id,
+                            is_user: false,
+                            text: format!("Sorry, I had trouble processing that: {:?}", e),
+                            config_preview: None,
+                            decisions: Vec::new(),
+                            ready_to_deploy: false,
+                        })
+                    });
                 }
             }
             set_is_thinking.set(false);
@@ -1440,7 +1598,12 @@ fn format_converse_text(text: &str) -> String {
         if let Some(end) = result[start + 2..].find("**") {
             let bold_text = &result[start + 2..start + 2 + end];
             let replacement = format!("<strong>{}</strong>", bold_text);
-            result = format!("{}{}{}", &result[..start], replacement, &result[start + 2 + end + 2..]);
+            result = format!(
+                "{}{}{}",
+                &result[..start],
+                replacement,
+                &result[start + 2 + end + 2..]
+            );
         } else {
             break;
         }
@@ -1469,12 +1632,24 @@ fn category_tab_key(cat: AppCategory) -> &'static str {
         AppCategory::Email | AppCategory::Communication => "communication",
         AppCategory::Office | AppCategory::Notes => "office",
         AppCategory::Editor | AppCategory::IDE => "editor",
-        AppCategory::Terminal | AppCategory::VersionControl | AppCategory::Container | AppCategory::DevTools => "dev",
-        AppCategory::Creative2D | AppCategory::Creative3D | AppCategory::Photo | AppCategory::Audio | AppCategory::Video => "creative",
+        AppCategory::Terminal
+        | AppCategory::VersionControl
+        | AppCategory::Container
+        | AppCategory::DevTools => "dev",
+        AppCategory::Creative2D
+        | AppCategory::Creative3D
+        | AppCategory::Photo
+        | AppCategory::Audio
+        | AppCategory::Video => "creative",
         AppCategory::Gaming | AppCategory::GamingTools => "gaming",
         AppCategory::Streaming | AppCategory::MediaPlayer => "media",
-        AppCategory::FileManager | AppCategory::Archive | AppCategory::Security | AppCategory::VPN
-        | AppCategory::Backup | AppCategory::SystemUtil | AppCategory::Virtualization => "system",
+        AppCategory::FileManager
+        | AppCategory::Archive
+        | AppCategory::Security
+        | AppCategory::VPN
+        | AppCategory::Backup
+        | AppCategory::SystemUtil
+        | AppCategory::Virtualization => "system",
         AppCategory::Science | AppCategory::Finance => "other",
     }
 }
@@ -1528,88 +1703,136 @@ pub fn InstallPage() -> impl IntoView {
     let is_nvidia = real_gpu_vendor == "nvidia";
 
     let device_mem_exact = js_sys::Reflect::get(
-        &web_sys::window().unwrap().navigator(), &"deviceMemory".into()
-    ).ok().and_then(|v| v.as_f64()).filter(|&m| m > 0.0).is_some();
-    let mem_text: &'static str = Box::leak(hardware.memory_gb.filter(|&m| m > 0.0).map(|m| {
-        if device_mem_exact { format!("{}GB", m as u32) } else { format!("~{}GB", m as u32) }
-    }).unwrap_or_default().into_boxed_str());
+        &web_sys::window().unwrap().navigator(),
+        &"deviceMemory".into(),
+    )
+    .ok()
+    .and_then(|v| v.as_f64())
+    .filter(|&m| m > 0.0)
+    .is_some();
+    let mem_text: &'static str = Box::leak(
+        hardware
+            .memory_gb
+            .filter(|&m| m > 0.0)
+            .map(|m| {
+                if device_mem_exact {
+                    format!("{}GB", m as u32)
+                } else {
+                    format!("~{}GB", m as u32)
+                }
+            })
+            .unwrap_or_default()
+            .into_boxed_str(),
+    );
 
     // Language — restored from localStorage, fallback to browser detection
     let lang: RwSignal<Lang> = RwSignal::new(
         load_from_storage("si_lang")
             .map(|code| Lang::from_code(&code))
-            .unwrap_or_else(i18n::detect_browser_lang)
+            .unwrap_or_else(i18n::detect_browser_lang),
     );
 
     // Install mode: "" = not chosen, "express", "custom"
-    let mode: RwSignal<String> = RwSignal::new(
-        load_from_storage("si_mode").unwrap_or_default()
-    );
+    let mode: RwSignal<String> = RwSignal::new(load_from_storage("si_mode").unwrap_or_default());
 
     // Wizard step (1-5, step 6 = completion state)
     let step: RwSignal<u32> = RwSignal::new(
-        load_from_storage("si_step").and_then(|v| v.parse().ok()).unwrap_or(1)
+        load_from_storage("si_step")
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(1),
     );
 
     // App category filter for Step 3
     let app_category: RwSignal<String> = RwSignal::new("all".to_string());
 
     // System basics — auto-detected with user override, restored from localStorage (#1, #2, #3, #11)
-    let hostname = RwSignal::new(
-        load_from_storage("si_hostname").unwrap_or_else(|| "nixos".to_string())
-    );
-    let username = RwSignal::new(
-        load_from_storage("si_username").unwrap_or_else(|| "user".to_string())
-    );
-    let timezone = RwSignal::new(
-        load_from_storage("si_timezone").unwrap_or_else(detect_timezone)
-    );
-    let keyboard = RwSignal::new(
-        load_from_storage("si_keyboard").unwrap_or_else(detect_keyboard)
-    );
+    let hostname =
+        RwSignal::new(load_from_storage("si_hostname").unwrap_or_else(|| "nixos".to_string()));
+    let username =
+        RwSignal::new(load_from_storage("si_username").unwrap_or_else(|| "user".to_string()));
+    let timezone = RwSignal::new(load_from_storage("si_timezone").unwrap_or_else(detect_timezone));
+    let keyboard = RwSignal::new(load_from_storage("si_keyboard").unwrap_or_else(detect_keyboard));
 
-    let locale = RwSignal::new(
-        load_from_storage("si_locale").unwrap_or_else(detect_locale)
-    );
+    let locale = RwSignal::new(load_from_storage("si_locale").unwrap_or_else(detect_locale));
 
     // Desktop & security — restored from localStorage
-    let selected_desktop = RwSignal::new(
-        load_from_storage("si_desktop").unwrap_or_else(|| "gnome".to_string())
-    );
+    let selected_desktop =
+        RwSignal::new(load_from_storage("si_desktop").unwrap_or_else(|| "gnome".to_string()));
     let encrypt_disk = RwSignal::new(
-        load_from_storage("si_encrypt").map(|v| v == "true").unwrap_or(false)
+        load_from_storage("si_encrypt")
+            .map(|v| v == "true")
+            .unwrap_or(false),
     );
     let secure_boot = RwSignal::new(
-        load_from_storage("si_secureboot").map(|v| v == "true").unwrap_or(false)
+        load_from_storage("si_secureboot")
+            .map(|v| v == "true")
+            .unwrap_or(false),
     );
     let tpm_unlock = RwSignal::new(
-        load_from_storage("si_tpm").map(|v| v == "true").unwrap_or(false)
+        load_from_storage("si_tpm")
+            .map(|v| v == "true")
+            .unwrap_or(false),
     );
     let fido2_unlock = RwSignal::new(
-        load_from_storage("si_fido2").map(|v| v == "true").unwrap_or(false)
+        load_from_storage("si_fido2")
+            .map(|v| v == "true")
+            .unwrap_or(false),
     );
-    let disk_layout = RwSignal::new(
-        load_from_storage("si_disk_layout").unwrap_or_else(|| {
-            if encrypt_disk.get_untracked() { "single-luks".to_string() } else { "single".to_string() }
-        })
-    );
-    let filesystem = RwSignal::new(
-        load_from_storage("si_filesystem").unwrap_or_else(|| "btrfs".to_string())
-    );
+    let disk_layout = RwSignal::new(load_from_storage("si_disk_layout").unwrap_or_else(|| {
+        if encrypt_disk.get_untracked() {
+            "single-luks".to_string()
+        } else {
+            "single".to_string()
+        }
+    }));
+    let filesystem =
+        RwSignal::new(load_from_storage("si_filesystem").unwrap_or_else(|| "btrfs".to_string()));
 
     // New user options — restored from localStorage
-    let swap_gb = RwSignal::new(load_from_storage("si_swap").and_then(|v| v.parse().ok()).unwrap_or(8u32));
+    let swap_gb = RwSignal::new(
+        load_from_storage("si_swap")
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(8u32),
+    );
     let shell = RwSignal::new(load_from_storage("si_shell").unwrap_or_else(|| "bash".into()));
-    let bluetooth = RwSignal::new(load_from_storage("si_bluetooth").map(|v| v == "true").unwrap_or(true));
-    let printing = RwSignal::new(load_from_storage("si_printing").map(|v| v == "true").unwrap_or(false));
+    let bluetooth = RwSignal::new(
+        load_from_storage("si_bluetooth")
+            .map(|v| v == "true")
+            .unwrap_or(true),
+    );
+    let printing = RwSignal::new(
+        load_from_storage("si_printing")
+            .map(|v| v == "true")
+            .unwrap_or(false),
+    );
     let kernel = RwSignal::new(load_from_storage("si_kernel").unwrap_or_else(|| "default".into()));
-    let is_laptop = RwSignal::new(load_from_storage("si_laptop").map(|v| v == "true").unwrap_or(false));
-    let home_manager = RwSignal::new(load_from_storage("si_homemanager").map(|v| v == "true").unwrap_or(false));
-    let symthaea_edition = RwSignal::new(load_from_storage("si_symthaea").map(|v| v == "true").unwrap_or(false));
-    let mycelix_edition = RwSignal::new(load_from_storage("si_mycelix").map(|v| v == "true").unwrap_or(false));
+    let is_laptop = RwSignal::new(
+        load_from_storage("si_laptop")
+            .map(|v| v == "true")
+            .unwrap_or(false),
+    );
+    let home_manager = RwSignal::new(
+        load_from_storage("si_homemanager")
+            .map(|v| v == "true")
+            .unwrap_or(false),
+    );
+    let symthaea_edition = RwSignal::new(
+        load_from_storage("si_symthaea")
+            .map(|v| v == "true")
+            .unwrap_or(false),
+    );
+    let mycelix_edition = RwSignal::new(
+        load_from_storage("si_mycelix")
+            .map(|v| v == "true")
+            .unwrap_or(false),
+    );
 
     // Auto-login option
-    let auto_login = RwSignal::new(load_from_storage("si_autologin").map(|v| v == "true").unwrap_or(false));
+    let auto_login = RwSignal::new(
+        load_from_storage("si_autologin")
+            .map(|v| v == "true")
+            .unwrap_or(false),
+    );
 
     // Extra users (comma-separated string)
     let extra_users_str = RwSignal::new(load_from_storage("si_extra_users").unwrap_or_default());
@@ -1622,11 +1845,9 @@ pub fn InstallPage() -> impl IntoView {
     let selected_apps = RwSignal::new(
         load_from_storage("si_apps")
             .and_then(|v| serde_json::from_str::<Vec<String>>(&v).ok())
-            .unwrap_or_default()
+            .unwrap_or_default(),
     );
-    let custom_pkgs = RwSignal::new(
-        load_from_storage("si_custom_pkgs").unwrap_or_default()
-    );
+    let custom_pkgs = RwSignal::new(load_from_storage("si_custom_pkgs").unwrap_or_default());
 
     // Nixpkgs search state
     let nix_search_query = RwSignal::new(String::new());
@@ -1652,7 +1873,10 @@ pub fn InstallPage() -> impl IntoView {
         save_to_storage("si_disk_layout", &disk_layout.get());
         save_to_storage("si_filesystem", &filesystem.get());
         save_to_storage("si_locale", &locale.get());
-        save_to_storage("si_apps", &serde_json::to_string(&selected_apps.get()).unwrap_or_default());
+        save_to_storage(
+            "si_apps",
+            &serde_json::to_string(&selected_apps.get()).unwrap_or_default(),
+        );
         save_to_storage("si_custom_pkgs", &custom_pkgs.get());
         save_to_storage("si_swap", &swap_gb.get().to_string());
         save_to_storage("si_shell", &shell.get());
@@ -1682,7 +1906,8 @@ pub fn InstallPage() -> impl IntoView {
                 }
             });
             let _ = window.set_timeout_with_callback_and_timeout_and_arguments_0(
-                cb.as_ref().unchecked_ref(), 100
+                cb.as_ref().unchecked_ref(),
+                100,
             );
             cb.forget();
         }
@@ -1718,7 +1943,9 @@ pub fn InstallPage() -> impl IntoView {
 
                     if token.is_none() {
                         token = window
-                            .prompt_with_message("Enter sovereign-scan token (printed by `sovereign-scan --serve`):")
+                            .prompt_with_message(
+                                "Enter sovereign-scan token (printed by `sovereign-scan --serve`):",
+                            )
                             .ok()
                             .flatten()
                             .filter(|t| !t.trim().is_empty());
@@ -1752,37 +1979,61 @@ pub fn InstallPage() -> impl IntoView {
                         ws.set_onopen(Some(onopen.as_ref().unchecked_ref()));
                         onopen.forget();
 
-                        let onmessage = wasm_bindgen::closure::Closure::<dyn Fn(web_sys::MessageEvent)>::new(move |e: web_sys::MessageEvent| {
-                            if let Some(text) = e.data().as_string() {
-                                if let Ok(msg) = serde_json::from_str::<serde_json::Value>(&text) {
-                                    if msg.get("type").and_then(|v| v.as_str()) == Some("error") {
-                                        set_status.set("Scanner auth failed. Check the token and restart sovereign-scan.".into());
-                                        return;
-                                    }
-                                    if msg.get("type").and_then(|v| v.as_str()) == Some("scan_result") {
-                                        if let Some(data) = msg.get("data") {
-                                            if let Some(apps) = data.get("installed_apps").and_then(|v| v.as_array()) {
-                                                let mut found = Vec::new();
-                                                for app in apps {
-                                                    if let Some(name) = app.get("canonical_name").and_then(|v| v.as_str()) {
-                                                        found.push(name.to_string());
+                        let onmessage = wasm_bindgen::closure::Closure::<
+                            dyn Fn(web_sys::MessageEvent),
+                        >::new(
+                            move |e: web_sys::MessageEvent| {
+                                if let Some(text) = e.data().as_string() {
+                                    if let Ok(msg) =
+                                        serde_json::from_str::<serde_json::Value>(&text)
+                                    {
+                                        if msg.get("type").and_then(|v| v.as_str()) == Some("error")
+                                        {
+                                            set_status.set("Scanner auth failed. Check the token and restart sovereign-scan.".into());
+                                            return;
+                                        }
+                                        if msg.get("type").and_then(|v| v.as_str())
+                                            == Some("scan_result")
+                                        {
+                                            if let Some(data) = msg.get("data") {
+                                                if let Some(apps) = data
+                                                    .get("installed_apps")
+                                                    .and_then(|v| v.as_array())
+                                                {
+                                                    let mut found = Vec::new();
+                                                    for app in apps {
+                                                        if let Some(name) = app
+                                                            .get("canonical_name")
+                                                            .and_then(|v| v.as_str())
+                                                        {
+                                                            found.push(name.to_string());
+                                                        }
                                                     }
+                                                    let count = found.len();
+                                                    selected.update(|s| {
+                                                        for name in found {
+                                                            if !s.contains(&name) {
+                                                                s.push(name);
+                                                            }
+                                                        }
+                                                    });
+                                                    set_status.set(format!(
+                                                        "{count} apps detected and selected"
+                                                    ));
                                                 }
-                                                let count = found.len();
-                                                selected.update(|s| {
-                                                    for name in found { if !s.contains(&name) { s.push(name); } }
-                                                });
-                                                set_status.set(format!("{count} apps detected and selected"));
                                             }
                                         }
                                     }
                                 }
-                            }
-                        });
+                            },
+                        );
                         ws_clone.set_onmessage(Some(onmessage.as_ref().unchecked_ref()));
                         onmessage.forget();
                         let onerror = wasm_bindgen::closure::Closure::<dyn Fn()>::new(move || {
-                            set_status.set("Scanner not found. Run: sovereign-scan --serve (copy token).".into());
+                            set_status.set(
+                                "Scanner not found. Run: sovereign-scan --serve (copy token)."
+                                    .into(),
+                            );
                         });
                         ws.set_onerror(Some(onerror.as_ref().unchecked_ref()));
                         onerror.forget();
@@ -1800,9 +2051,13 @@ pub fn InstallPage() -> impl IntoView {
     let gpu_driver = Signal::derive({
         let gv = gpu_vendor_str.clone();
         move || {
-            if gv.contains("nvidia") { "nvidia".to_string() }
-            else if gv.contains("amd") || gv.contains("ati") { "amdgpu".to_string() }
-            else { "modesetting".to_string() }
+            if gv.contains("nvidia") {
+                "nvidia".to_string()
+            } else if gv.contains("amd") || gv.contains("ati") {
+                "amdgpu".to_string()
+            } else {
+                "modesetting".to_string()
+            }
         }
     });
 
@@ -1814,7 +2069,7 @@ pub fn InstallPage() -> impl IntoView {
     let profiles: RwSignal<Vec<(String, String)>> = RwSignal::new(
         load_from_storage("si_profiles")
             .and_then(|v| serde_json::from_str::<Vec<(String, String)>>(&v).ok())
-            .unwrap_or_default()
+            .unwrap_or_default(),
     );
     let profile_name: RwSignal<String> = RwSignal::new(String::new());
 
@@ -1829,7 +2084,9 @@ pub fn InstallPage() -> impl IntoView {
 
     // Parse custom packages from comma-separated string
     let parse_custom_pkgs = move || -> Vec<String> {
-        custom_pkgs.get().split(',')
+        custom_pkgs
+            .get()
+            .split(',')
             .map(|s| s.trim().to_string())
             .filter(|s| !s.is_empty())
             .collect()
@@ -1837,7 +2094,9 @@ pub fn InstallPage() -> impl IntoView {
 
     // Parse extra users from comma-separated string
     let parse_extra_users = move || -> Vec<String> {
-        extra_users_str.get().split(',')
+        extra_users_str
+            .get()
+            .split(',')
             .map(|s| s.trim().to_lowercase().replace(' ', ""))
             .filter(|s| !s.is_empty())
             .collect()
@@ -1888,19 +2147,32 @@ pub fn InstallPage() -> impl IntoView {
     // Generate config helper (used by "Next" on step 4 and Generate button)
     let do_generate = move || {
         let hw = config_gen::HardwareProfile {
-            gpu_vendor: sig_gv.get_value(), gpu_model: sig_gm.get_value(),
-            cpu_cores: hw_cores, memory_gb: hw_mem, has_wifi: true,
+            gpu_vendor: sig_gv.get_value(),
+            gpu_model: sig_gm.get_value(),
+            cpu_cores: hw_cores,
+            memory_gb: hw_mem,
+            has_wifi: true,
             chromebook: false,
         };
         let choices = config_gen::UserChoices {
-            hostname: hostname.get(), username: username.get(), desktop: selected_desktop.get(),
-            encryption: encrypt_disk.get(), secure_boot: secure_boot.get(),
-            tpm2_unlock: tpm_unlock.get(), fido2_unlock: fido2_unlock.get(), timezone: timezone.get(),
-            keyboard: keyboard.get(), locale: locale.get(),
+            hostname: hostname.get(),
+            username: username.get(),
+            desktop: selected_desktop.get(),
+            encryption: encrypt_disk.get(),
+            secure_boot: secure_boot.get(),
+            tpm2_unlock: tpm_unlock.get(),
+            fido2_unlock: fido2_unlock.get(),
+            timezone: timezone.get(),
+            keyboard: keyboard.get(),
+            locale: locale.get(),
             custom_packages: parse_custom_pkgs(),
             filesystem: filesystem.get(),
-            swap_gb: swap_gb.get(), shell: shell.get(), bluetooth: bluetooth.get(),
-            printing: printing.get(), kernel: kernel.get(), is_laptop: is_laptop.get(),
+            swap_gb: swap_gb.get(),
+            shell: shell.get(),
+            bluetooth: bluetooth.get(),
+            printing: printing.get(),
+            kernel: kernel.get(),
+            is_laptop: is_laptop.get(),
             home_manager: home_manager.get(),
             symthaea_edition: symthaea_edition.get(),
             mycelix_edition: mycelix_edition.get(),

@@ -1,5 +1,4 @@
 #![deny(unsafe_code)]
-
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
@@ -444,7 +443,9 @@ impl HodgeDecomposition {
     /// Topologically-protected global resonance modes.
     pub fn harmonic_fraction(&self) -> f64 {
         let total = self.total_energy();
-        if total < 1e-15 { return 0.0; }
+        if total < 1e-15 {
+            return 0.0;
+        }
         Self::norm_sq(&self.harmonic) / total
     }
 
@@ -452,7 +453,9 @@ impl HodgeDecomposition {
     /// Hierarchical, feed-forward information transfer.
     pub fn gradient_fraction(&self) -> f64 {
         let total = self.total_energy();
-        if total < 1e-15 { return 0.0; }
+        if total < 1e-15 {
+            return 0.0;
+        }
         Self::norm_sq(&self.exact) / total
     }
 
@@ -460,13 +463,19 @@ impl HodgeDecomposition {
     /// Recurrent, rotational information cycling.
     pub fn curl_fraction(&self) -> f64 {
         let total = self.total_energy();
-        if total < 1e-15 { return 0.0; }
+        if total < 1e-15 {
+            return 0.0;
+        }
         Self::norm_sq(&self.coexact) / total
     }
 
     /// All three fractions: (gradient, curl, harmonic). Sum ≈ 1.0.
     pub fn fractions(&self) -> (f64, f64, f64) {
-        (self.gradient_fraction(), self.curl_fraction(), self.harmonic_fraction())
+        (
+            self.gradient_fraction(),
+            self.curl_fraction(),
+            self.harmonic_fraction(),
+        )
     }
 }
 

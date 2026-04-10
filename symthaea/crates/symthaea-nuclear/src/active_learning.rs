@@ -117,9 +117,8 @@ mod tests {
                 let uncertainty = p.uncertainty;
                 let neighbors = count_unmeasured_neighbors(z, n, &measured);
                 let shell_bonus = shell_proximity(z, n);
-                let score = uncertainty
-                    * (1.0 + (neighbors as f64 + 1.0).ln())
-                    * (1.0 + 0.2 * shell_bonus);
+                let score =
+                    uncertainty * (1.0 + (neighbors as f64 + 1.0).ln()) * (1.0 + 0.2 * shell_bonus);
 
                 candidates.push((z, n, p.binding_energy, uncertainty, score, neighbors));
             }
@@ -147,8 +146,7 @@ mod tests {
             );
 
             let uncertainties: Vec<f64> = candidates.iter().map(|c| c.3).collect();
-            let mean_unc =
-                uncertainties.iter().sum::<f64>() / uncertainties.len() as f64;
+            let mean_unc = uncertainties.iter().sum::<f64>() / uncertainties.len() as f64;
             eprintln!("Mean uncertainty: {:.4} MeV", mean_unc);
         }
 

@@ -104,7 +104,9 @@ fn try_gpu() -> Option<Backend> {
     #[cfg(feature = "cuda")]
     {
         // candle-core with CUDA feature
-        if std::env::var("CUDA_VISIBLE_DEVICES").is_ok() || std::path::Path::new("/dev/nvidia0").exists() {
+        if std::env::var("CUDA_VISIBLE_DEVICES").is_ok()
+            || std::path::Path::new("/dev/nvidia0").exists()
+        {
             println!("  CUDA device detected");
             return Some(Backend::Gpu {
                 device_name: "CUDA GPU".to_string(),
@@ -166,13 +168,9 @@ fn generate_training_data() -> Vec<TrainingPair> {
                     let comp = compose(&config, &state, 42);
 
                     let samples: Vec<f32> = match &comp.audio {
-                        AudioData::StereoF32(s) => {
-                            s.iter().map(|p| (p[0] + p[1]) * 0.5).collect()
-                        }
+                        AudioData::StereoF32(s) => s.iter().map(|p| (p[0] + p[1]) * 0.5).collect(),
                         AudioData::F32(s) => s.clone(),
-                        AudioData::I16(s) => {
-                            s.iter().map(|&x| x as f32 / 32768.0).collect()
-                        }
+                        AudioData::I16(s) => s.iter().map(|&x| x as f32 / 32768.0).collect(),
                     };
 
                     if samples.len() >= 256 {

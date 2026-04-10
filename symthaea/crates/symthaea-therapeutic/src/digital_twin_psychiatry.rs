@@ -76,16 +76,10 @@ const REMISSION_THRESHOLD: f32 = 0.2;
 pub enum PsychiatricCondition {
     /// Major Depressive Disorder.
     /// Science: Belmaker & Agam (2008) — monoamine depletion model.
-    MajorDepression {
-        severity: f32,
-        duration_weeks: u32,
-    },
+    MajorDepression { severity: f32, duration_weeks: u32 },
     /// Generalized Anxiety Disorder.
     /// Science: Nuss (2015) — GABAergic deficit model.
-    GeneralizedAnxiety {
-        severity: f32,
-        panic_frequency: f32,
-    },
+    GeneralizedAnxiety { severity: f32, panic_frequency: f32 },
     /// Post-Traumatic Stress Disorder.
     /// Science: Yehuda et al. (2015) — HPA axis dysregulation.
     PTSD {
@@ -295,13 +289,13 @@ impl DigitalTwinPsychiatry {
             PsychiatricCondition::MajorDepression { severity, .. } => {
                 let s = severity.clamp(0.0, 1.0);
                 NeuromodProfile {
-                    serotonin_baseline: 0.5 - 0.2 * s,    // low 5-HT
-                    dopamine_baseline: 0.5 - 0.1 * s,     // reduced DA
+                    serotonin_baseline: 0.5 - 0.2 * s, // low 5-HT
+                    dopamine_baseline: 0.5 - 0.1 * s,  // reduced DA
                     noradrenaline_baseline: 0.45,
                     gaba_baseline: 0.45,
                     glutamate_baseline: 0.55,
-                    cortisol_baseline: 0.3 + 0.4 * s,     // elevated HPA
-                    phi_baseline: 0.5 - 0.2 * s as f64,   // reduced integration
+                    cortisol_baseline: 0.3 + 0.4 * s, // elevated HPA
+                    phi_baseline: 0.5 - 0.2 * s as f64, // reduced integration
                     allostatic_load: 0.2 + 0.3 * s,
                 }
             }
@@ -318,7 +312,10 @@ impl DigitalTwinPsychiatry {
                     allostatic_load: 0.2 + 0.2 * s,
                 }
             }
-            PsychiatricCondition::PTSD { severity, dissociation_risk } => {
+            PsychiatricCondition::PTSD {
+                severity,
+                dissociation_risk,
+            } => {
                 let s = severity.clamp(0.0, 1.0);
                 let d = dissociation_risk.clamp(0.0, 1.0);
                 NeuromodProfile {
@@ -328,45 +325,43 @@ impl DigitalTwinPsychiatry {
                     gaba_baseline: 0.4,
                     glutamate_baseline: 0.6,
                     cortisol_baseline: 0.3 + 0.5 * s,
-                    phi_baseline: 0.4 - 0.15 * d as f64,   // dissociation fragments Phi
+                    phi_baseline: 0.4 - 0.15 * d as f64, // dissociation fragments Phi
                     allostatic_load: 0.3 + 0.4 * s,
                 }
             }
-            PsychiatricCondition::Bipolar { current_phase, .. } => {
-                match current_phase {
-                    BipolarPhase::Depressive => NeuromodProfile {
-                        serotonin_baseline: 0.3,
-                        dopamine_baseline: 0.3,
-                        noradrenaline_baseline: 0.35,
-                        gaba_baseline: 0.45,
-                        glutamate_baseline: 0.5,
-                        cortisol_baseline: 0.6,
-                        phi_baseline: 0.3,
-                        allostatic_load: 0.5,
-                    },
-                    BipolarPhase::Manic | BipolarPhase::Hypomanic => NeuromodProfile {
-                        serotonin_baseline: 0.6,
-                        dopamine_baseline: 0.9,
-                        noradrenaline_baseline: 0.85,
-                        gaba_baseline: 0.3,
-                        glutamate_baseline: 0.7,
-                        cortisol_baseline: 0.5,
-                        phi_baseline: 0.65,
-                        allostatic_load: 0.4,
-                    },
-                    BipolarPhase::Euthymic => NeuromodProfile::default(),
-                    BipolarPhase::Mixed => NeuromodProfile {
-                        serotonin_baseline: 0.35,
-                        dopamine_baseline: 0.7,
-                        noradrenaline_baseline: 0.8,
-                        gaba_baseline: 0.3,
-                        glutamate_baseline: 0.65,
-                        cortisol_baseline: 0.65,
-                        phi_baseline: 0.35,
-                        allostatic_load: 0.55,
-                    },
-                }
-            }
+            PsychiatricCondition::Bipolar { current_phase, .. } => match current_phase {
+                BipolarPhase::Depressive => NeuromodProfile {
+                    serotonin_baseline: 0.3,
+                    dopamine_baseline: 0.3,
+                    noradrenaline_baseline: 0.35,
+                    gaba_baseline: 0.45,
+                    glutamate_baseline: 0.5,
+                    cortisol_baseline: 0.6,
+                    phi_baseline: 0.3,
+                    allostatic_load: 0.5,
+                },
+                BipolarPhase::Manic | BipolarPhase::Hypomanic => NeuromodProfile {
+                    serotonin_baseline: 0.6,
+                    dopamine_baseline: 0.9,
+                    noradrenaline_baseline: 0.85,
+                    gaba_baseline: 0.3,
+                    glutamate_baseline: 0.7,
+                    cortisol_baseline: 0.5,
+                    phi_baseline: 0.65,
+                    allostatic_load: 0.4,
+                },
+                BipolarPhase::Euthymic => NeuromodProfile::default(),
+                BipolarPhase::Mixed => NeuromodProfile {
+                    serotonin_baseline: 0.35,
+                    dopamine_baseline: 0.7,
+                    noradrenaline_baseline: 0.8,
+                    gaba_baseline: 0.3,
+                    glutamate_baseline: 0.65,
+                    cortisol_baseline: 0.65,
+                    phi_baseline: 0.35,
+                    allostatic_load: 0.55,
+                },
+            },
             PsychiatricCondition::OCD { severity, .. } => {
                 let s = severity.clamp(0.0, 1.0);
                 NeuromodProfile {
@@ -374,32 +369,38 @@ impl DigitalTwinPsychiatry {
                     dopamine_baseline: 0.5,
                     noradrenaline_baseline: 0.55,
                     gaba_baseline: 0.45,
-                    glutamate_baseline: 0.5 + 0.2 * s,  // glutamate excess
+                    glutamate_baseline: 0.5 + 0.2 * s, // glutamate excess
                     cortisol_baseline: 0.4 + 0.2 * s,
                     phi_baseline: 0.45,
                     allostatic_load: 0.25 + 0.2 * s,
                 }
             }
-            PsychiatricCondition::Schizophrenia { positive_symptoms, negative_symptoms } => {
+            PsychiatricCondition::Schizophrenia {
+                positive_symptoms,
+                negative_symptoms,
+            } => {
                 let pos = positive_symptoms.clamp(0.0, 1.0);
                 let neg = negative_symptoms.clamp(0.0, 1.0);
                 NeuromodProfile {
                     serotonin_baseline: 0.45,
-                    dopamine_baseline: 0.5 + 0.4 * pos,   // mesolimbic DA excess
+                    dopamine_baseline: 0.5 + 0.4 * pos, // mesolimbic DA excess
                     noradrenaline_baseline: 0.55,
-                    gaba_baseline: 0.5 - 0.2 * pos,       // GABAergic deficit
+                    gaba_baseline: 0.5 - 0.2 * pos, // GABAergic deficit
                     glutamate_baseline: 0.5 + 0.15 * pos,
                     cortisol_baseline: 0.5,
                     phi_baseline: 0.5 - 0.15 * (pos + neg) as f64 / 2.0, // disrupted integration
                     allostatic_load: 0.3 + 0.2 * (pos + neg) / 2.0,
                 }
             }
-            PsychiatricCondition::ADHD { inattention, hyperactivity } => {
+            PsychiatricCondition::ADHD {
+                inattention,
+                hyperactivity,
+            } => {
                 let i = inattention.clamp(0.0, 1.0);
                 let h = hyperactivity.clamp(0.0, 1.0);
                 NeuromodProfile {
                     serotonin_baseline: 0.45,
-                    dopamine_baseline: 0.5 - 0.2 * i,     // prefrontal DA deficit
+                    dopamine_baseline: 0.5 - 0.2 * i, // prefrontal DA deficit
                     noradrenaline_baseline: 0.5 - 0.1 * i, // NE deficit
                     gaba_baseline: 0.45,
                     glutamate_baseline: 0.55,
@@ -468,8 +469,8 @@ impl DigitalTwinPsychiatry {
                         0.0
                     };
                     current_severity = (baseline_severity - symptom_reduction).max(0.0);
-                    current_phi = self.neuromod_profile.phi_baseline
-                        + 0.1 * progress as f64 * dose as f64;
+                    current_phi =
+                        self.neuromod_profile.phi_baseline + 0.1 * progress as f64 * dose as f64;
                 }
                 DrugClass::SNRI => {
                     // Similar to SSRI with added NE component
@@ -498,8 +499,8 @@ impl DigitalTwinPsychiatry {
                         0.0
                     };
                     current_severity = (baseline_severity - symptom_reduction).max(0.0);
-                    current_phi = self.neuromod_profile.phi_baseline
-                        + 0.08 * progress as f64 * dose as f64;
+                    current_phi =
+                        self.neuromod_profile.phi_baseline + 0.08 * progress as f64 * dose as f64;
                 }
                 DrugClass::Benzodiazepine => {
                     // Immediate GABA boost with tolerance onset
@@ -529,8 +530,8 @@ impl DigitalTwinPsychiatry {
                     // Acute: 5-HT2A agonism → entropy spike → neuroplasticity
                     if day == 1 {
                         // Acute session
-                        current_5ht = (self.neuromod_profile.serotonin_baseline + 0.4 * dose)
-                            .min(1.0);
+                        current_5ht =
+                            (self.neuromod_profile.serotonin_baseline + 0.4 * dose).min(1.0);
                         current_phi = self.neuromod_profile.phi_baseline
                             + PSYCHEDELIC_PHI_SPIKE * dose as f64;
                         consciousness_state = ConsciousnessState::Psychedelic;
@@ -538,10 +539,10 @@ impl DigitalTwinPsychiatry {
                     } else {
                         // Post-acute neuroplasticity window
                         let plasticity_decay = (-0.1 * (day - 1) as f32).exp();
-                        current_5ht = self.neuromod_profile.serotonin_baseline
-                            + 0.1 * plasticity_decay;
-                        current_phi = self.neuromod_profile.phi_baseline
-                            + 0.15 * plasticity_decay as f64;
+                        current_5ht =
+                            self.neuromod_profile.serotonin_baseline + 0.1 * plasticity_decay;
+                        current_phi =
+                            self.neuromod_profile.phi_baseline + 0.15 * plasticity_decay as f64;
                         consciousness_state = if plasticity_decay > 0.5 {
                             ConsciousnessState::Elevated
                         } else {
@@ -638,14 +639,17 @@ impl DigitalTwinPsychiatry {
             .last()
             .map_or(baseline_severity, |m| m.symptom_severity);
         let severity_reduction = (baseline_severity - final_severity) / baseline_severity.max(0.01);
-        let final_phi = measurements.last().map_or(
-            self.neuromod_profile.phi_baseline,
-            |m| m.phi,
-        );
+        let final_phi = measurements
+            .last()
+            .map_or(self.neuromod_profile.phi_baseline, |m| m.phi);
 
         let time_to_response = measurements.iter().find_map(|m| {
             let red = (baseline_severity - m.symptom_severity) / baseline_severity.max(0.01);
-            if red >= RESPONSE_THRESHOLD { Some(m.day) } else { None }
+            if red >= RESPONSE_THRESHOLD {
+                Some(m.day)
+            } else {
+                None
+            }
         });
 
         let side_effect_burden = if measurements.is_empty() {
@@ -685,17 +689,10 @@ impl DigitalTwinPsychiatry {
     // -----------------------------------------------------------------------
 
     /// Compare completed trials and rank by efficacy.
-    pub fn compare_treatments(
-        &self,
-        trials: &[&VirtualDrugTrial],
-    ) -> TreatmentComparison {
+    pub fn compare_treatments(&self, trials: &[&VirtualDrugTrial]) -> TreatmentComparison {
         let mut ranked: Vec<(String, TrialOutcome)> = trials
             .iter()
-            .filter_map(|t| {
-                t.outcome
-                    .as_ref()
-                    .map(|o| (t.drug_name.clone(), o.clone()))
-            })
+            .filter_map(|t| t.outcome.as_ref().map(|o| (t.drug_name.clone(), o.clone())))
             .collect();
 
         // Sort by: remission first, then response, then lowest severity
@@ -851,12 +848,11 @@ mod tests {
 
     #[test]
     fn test_depression_profile_low_serotonin() {
-        let profile = DigitalTwinPsychiatry::condition_profile(
-            &PsychiatricCondition::MajorDepression {
+        let profile =
+            DigitalTwinPsychiatry::condition_profile(&PsychiatricCondition::MajorDepression {
                 severity: 0.8,
                 duration_weeks: 12,
-            },
-        );
+            });
         assert!(
             profile.serotonin_baseline < 0.5,
             "depression should have low 5-HT"
@@ -873,24 +869,25 @@ mod tests {
 
     #[test]
     fn test_anxiety_profile_low_gaba() {
-        let profile = DigitalTwinPsychiatry::condition_profile(
-            &PsychiatricCondition::GeneralizedAnxiety {
+        let profile =
+            DigitalTwinPsychiatry::condition_profile(&PsychiatricCondition::GeneralizedAnxiety {
                 severity: 0.7,
                 panic_frequency: 0.3,
-            },
-        );
+            });
         assert!(profile.gaba_baseline < 0.5, "GAD should have low GABA");
-        assert!(profile.noradrenaline_baseline > 0.5, "GAD should have high NE");
+        assert!(
+            profile.noradrenaline_baseline > 0.5,
+            "GAD should have high NE"
+        );
     }
 
     #[test]
     fn test_schizophrenia_profile_high_dopamine() {
-        let profile = DigitalTwinPsychiatry::condition_profile(
-            &PsychiatricCondition::Schizophrenia {
+        let profile =
+            DigitalTwinPsychiatry::condition_profile(&PsychiatricCondition::Schizophrenia {
                 positive_symptoms: 0.8,
                 negative_symptoms: 0.4,
-            },
-        );
+            });
         assert!(
             profile.dopamine_baseline > 0.7,
             "schizophrenia should have high mesolimbic DA"
@@ -899,12 +896,10 @@ mod tests {
 
     #[test]
     fn test_adhd_profile_low_dopamine() {
-        let profile = DigitalTwinPsychiatry::condition_profile(
-            &PsychiatricCondition::ADHD {
-                inattention: 0.8,
-                hyperactivity: 0.5,
-            },
-        );
+        let profile = DigitalTwinPsychiatry::condition_profile(&PsychiatricCondition::ADHD {
+            inattention: 0.8,
+            hyperactivity: 0.5,
+        });
         assert!(profile.dopamine_baseline < 0.4, "ADHD should have low DA");
     }
 
@@ -939,11 +934,10 @@ mod tests {
 
     #[test]
     fn test_benzo_immediate_then_tolerance() {
-        let mut twin =
-            DigitalTwinPsychiatry::new(PsychiatricCondition::GeneralizedAnxiety {
-                severity: 0.7,
-                panic_frequency: 0.5,
-            });
+        let mut twin = DigitalTwinPsychiatry::new(PsychiatricCondition::GeneralizedAnxiety {
+            severity: 0.7,
+            panic_frequency: 0.5,
+        });
 
         let trial = twin.run_virtual_trial("Alprazolam", DrugClass::Benzodiazepine, 1.0, 28);
 
@@ -986,10 +980,7 @@ mod tests {
 
         // Day 7: elevated but returning
         let day7 = &trial.measurements[6];
-        assert!(
-            day7.phi < day1.phi,
-            "Phi should decay after acute session"
-        );
+        assert!(day7.phi < day1.phi, "Phi should decay after acute session");
     }
 
     #[test]
@@ -1070,7 +1061,11 @@ mod tests {
             "best drug should be identified"
         );
         assert!(
-            !comparison.fastest_response.is_empty() || comparison.ranked_drugs.iter().all(|(_, o)| o.time_to_response_days.is_none()),
+            !comparison.fastest_response.is_empty()
+                || comparison
+                    .ranked_drugs
+                    .iter()
+                    .all(|(_, o)| o.time_to_response_days.is_none()),
             "fastest response should be set if any trial responded"
         );
     }
@@ -1097,12 +1092,10 @@ mod tests {
 
     #[test]
     fn test_ptsd_high_allostatic_load() {
-        let profile = DigitalTwinPsychiatry::condition_profile(
-            &PsychiatricCondition::PTSD {
-                severity: 0.9,
-                dissociation_risk: 0.5,
-            },
-        );
+        let profile = DigitalTwinPsychiatry::condition_profile(&PsychiatricCondition::PTSD {
+            severity: 0.9,
+            dissociation_risk: 0.5,
+        });
         assert!(
             profile.allostatic_load > 0.5,
             "severe PTSD should have high allostatic load"
@@ -1115,18 +1108,14 @@ mod tests {
 
     #[test]
     fn test_bipolar_phase_profiles_differ() {
-        let depressive = DigitalTwinPsychiatry::condition_profile(
-            &PsychiatricCondition::Bipolar {
-                current_phase: BipolarPhase::Depressive,
-                cycle_days: 30,
-            },
-        );
-        let manic = DigitalTwinPsychiatry::condition_profile(
-            &PsychiatricCondition::Bipolar {
-                current_phase: BipolarPhase::Manic,
-                cycle_days: 30,
-            },
-        );
+        let depressive = DigitalTwinPsychiatry::condition_profile(&PsychiatricCondition::Bipolar {
+            current_phase: BipolarPhase::Depressive,
+            cycle_days: 30,
+        });
+        let manic = DigitalTwinPsychiatry::condition_profile(&PsychiatricCondition::Bipolar {
+            current_phase: BipolarPhase::Manic,
+            cycle_days: 30,
+        });
 
         assert!(
             manic.dopamine_baseline > depressive.dopamine_baseline,

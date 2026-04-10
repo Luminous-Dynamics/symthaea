@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 #[cfg(feature = "creative")]
 use symthaea_aesthetic::{AestheticConfig, AestheticFeedback, AestheticScore, AestheticTracker};
 #[cfg(feature = "creative")]
-use symthaea_atelier::{AtelierConfig, AtelierStyle, Artwork};
+use symthaea_atelier::{Artwork, AtelierConfig, AtelierStyle};
 #[cfg(feature = "creative")]
 use symthaea_canvas::CognitiveSnapshot;
 #[cfg(feature = "creative")]
@@ -187,8 +187,7 @@ impl CreativeManager {
                     self.seed_counter,
                 );
                 let score = artwork.aesthetic_score;
-                let feedback =
-                    self.tracker.process(&score, &snap.harmony_activations);
+                let feedback = self.tracker.process(&score, &snap.harmony_activations);
                 output.artwork_svg = Some(artwork.svg);
                 output.feedback = feedback;
                 modality_name = "visual";
@@ -210,23 +209,23 @@ impl CreativeManager {
 
                 // Score music using harmony alignment as a proxy
                 let music_score = score_composition(&composition, snap);
-                let feedback =
-                    self.tracker.process(&music_score, &snap.harmony_activations);
+                let feedback = self
+                    .tracker
+                    .process(&music_score, &snap.harmony_activations);
                 output.music_samples = Some(match &composition.audio {
-                        symthaea_muse::AudioData::I16(v) => v.clone(),
-                        symthaea_muse::AudioData::F32(v) => v.iter().map(|s| (*s * 32767.0) as i16).collect(),
-                        symthaea_muse::AudioData::StereoF32(v) => v.iter().map(|s| ((s[0] + s[1]) * 0.5 * 32767.0) as i16).collect(),
-                    });
+                    symthaea_muse::AudioData::I16(v) => v.clone(),
+                    symthaea_muse::AudioData::F32(v) => {
+                        v.iter().map(|s| (*s * 32767.0) as i16).collect()
+                    }
+                    symthaea_muse::AudioData::StereoF32(v) => v
+                        .iter()
+                        .map(|s| ((s[0] + s[1]) * 0.5 * 32767.0) as i16)
+                        .collect(),
+                });
                 output.feedback = feedback;
                 modality_name = "music";
 
-                self.record_telemetry(
-                    &music_score,
-                    &feedback,
-                    modality_name,
-                    1,
-                    start.elapsed(),
-                );
+                self.record_telemetry(&music_score, &feedback, modality_name, 1, start.elapsed());
 
                 self.next_modality = CreativeModality::Synesthetic;
             }
@@ -241,8 +240,7 @@ impl CreativeManager {
                     .iter()
                     .map(|n| (n.frequency, n.velocity, n.start_time, n.duration))
                     .collect();
-                let tempo =
-                    symthaea_muse::rhythm::compute_tempo(&self.muse_config, &musical_state);
+                let tempo = symthaea_muse::rhythm::compute_tempo(&self.muse_config, &musical_state);
                 let syn_frames = symthaea_aesthetic::synesthesia::extract_synesthetic_features(
                     &note_tuples,
                     tempo,
@@ -276,18 +274,26 @@ impl CreativeManager {
                 // Blend scores from both modalities
                 let music_score = score_composition(&composition, snap);
                 let visual_score = artwork.aesthetic_score;
-                let music_fb = self.tracker.process(&music_score, &snap.harmony_activations);
-                let visual_fb = self.tracker.process(&visual_score, &snap.harmony_activations);
-                let blended = symthaea_aesthetic::synesthesia::blend_feedbacks(
-                    &[music_fb, visual_fb],
-                );
+                let music_fb = self
+                    .tracker
+                    .process(&music_score, &snap.harmony_activations);
+                let visual_fb = self
+                    .tracker
+                    .process(&visual_score, &snap.harmony_activations);
+                let blended =
+                    symthaea_aesthetic::synesthesia::blend_feedbacks(&[music_fb, visual_fb]);
 
                 output.artwork_svg = Some(artwork.svg);
                 output.music_samples = Some(match &composition.audio {
-                        symthaea_muse::AudioData::I16(v) => v.clone(),
-                        symthaea_muse::AudioData::F32(v) => v.iter().map(|s| (*s * 32767.0) as i16).collect(),
-                        symthaea_muse::AudioData::StereoF32(v) => v.iter().map(|s| ((s[0] + s[1]) * 0.5 * 32767.0) as i16).collect(),
-                    });
+                    symthaea_muse::AudioData::I16(v) => v.clone(),
+                    symthaea_muse::AudioData::F32(v) => {
+                        v.iter().map(|s| (*s * 32767.0) as i16).collect()
+                    }
+                    symthaea_muse::AudioData::StereoF32(v) => v
+                        .iter()
+                        .map(|s| ((s[0] + s[1]) * 0.5 * 32767.0) as i16)
+                        .collect(),
+                });
                 output.feedback = blended;
                 modality_name = "synesthetic";
 
@@ -300,8 +306,11 @@ impl CreativeManager {
                     composite: (music_score.composite + visual_score.composite) / 2.0,
                 };
                 self.record_telemetry(
-                    &combined, &blended, modality_name,
-                    artwork.generation_cycles + 1, start.elapsed(),
+                    &combined,
+                    &blended,
+                    modality_name,
+                    artwork.generation_cycles + 1,
+                    start.elapsed(),
                 );
 
                 self.next_modality = CreativeModality::LivePerformance;
@@ -323,9 +332,8 @@ impl CreativeManager {
 
                 if !notes.is_empty() {
                     // Choreography from live notes
-                    let dance = symthaea_muse::choreography::choreograph(
-                        &notes, &musical_state, 4.0,
-                    );
+                    let dance =
+                        symthaea_muse::choreography::choreograph(&notes, &musical_state, 4.0);
                     output.dance_keyframes = Some(dance.keyframes);
 
                     // Synesthetic modulation (correct tuple order)
@@ -333,10 +341,11 @@ impl CreativeManager {
                         .iter()
                         .map(|n| (n.frequency, n.velocity, n.start_time, n.duration))
                         .collect();
-                    let syn_frames =
-                        symthaea_aesthetic::synesthesia::extract_synesthetic_features(
-                            &note_tuples, stream.tempo(), 4.0,
-                        );
+                    let syn_frames = symthaea_aesthetic::synesthesia::extract_synesthetic_features(
+                        &note_tuples,
+                        stream.tempo(),
+                        4.0,
+                    );
 
                     let mut syn_snap = snap.clone();
                     if let Some(frame) = syn_frames.first() {
@@ -346,20 +355,25 @@ impl CreativeManager {
                     }
 
                     let artwork = symthaea_atelier::create_artwork(
-                        &self.atelier_config, &syn_snap,
+                        &self.atelier_config,
+                        &syn_snap,
                         self.seed_counter + stream.notes_generated(),
                     );
 
                     let visual_score = artwork.aesthetic_score;
-                    let feedback =
-                        self.tracker.process(&visual_score, &snap.harmony_activations);
+                    let feedback = self
+                        .tracker
+                        .process(&visual_score, &snap.harmony_activations);
                     output.artwork_svg = Some(artwork.svg);
                     output.feedback = feedback;
                     modality_name = "live-performance";
 
                     self.record_telemetry(
-                        &visual_score, &feedback, modality_name,
-                        notes.len(), start.elapsed(),
+                        &visual_score,
+                        &feedback,
+                        modality_name,
+                        notes.len(),
+                        start.elapsed(),
                     );
                 } else {
                     modality_name = "live-performance";
@@ -469,7 +483,11 @@ fn score_composition(comp: &Composition, snap: &CognitiveSnapshot) -> AestheticS
     };
 
     // Complexity: pitch diversity
-    let mut unique_pitches: Vec<f32> = comp.notes.iter().map(|n| (n.frequency * 10.0).round()).collect();
+    let mut unique_pitches: Vec<f32> = comp
+        .notes
+        .iter()
+        .map(|n| (n.frequency * 10.0).round())
+        .collect();
     unique_pitches.sort_by(|a, b| a.partial_cmp(b).unwrap());
     unique_pitches.dedup();
     let complexity = if comp.notes.is_empty() {

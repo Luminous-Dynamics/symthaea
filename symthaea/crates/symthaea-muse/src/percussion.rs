@@ -41,7 +41,7 @@ fn render_kick(sr: f32, velocity: f32) -> Vec<f32> {
     for i in 0..n {
         let t = i as f32 / sr;
         let env = (-t * 20.0).exp(); // fast decay
-        // Frequency sweep: 150Hz → 50Hz
+                                     // Frequency sweep: 150Hz → 50Hz
         let freq = 50.0 + 100.0 * (-t * 30.0).exp();
         let phase = std::f32::consts::TAU * freq * t;
         let sample = phase.sin() * env * velocity * 0.8;
@@ -100,22 +100,48 @@ pub fn generate_pattern(bpm: f32, consciousness: f32, arousal: f32) -> Vec<DrumH
     let mut hits = Vec::new();
 
     // Kick on beats 1 and 3
-    hits.push(DrumHit { drum: DrumType::Kick, time: 0.0, velocity: 0.8 });
-    hits.push(DrumHit { drum: DrumType::Kick, time: beat_dur * 2.0, velocity: 0.7 });
+    hits.push(DrumHit {
+        drum: DrumType::Kick,
+        time: 0.0,
+        velocity: 0.8,
+    });
+    hits.push(DrumHit {
+        drum: DrumType::Kick,
+        time: beat_dur * 2.0,
+        velocity: 0.7,
+    });
 
     // Snare on beats 2 and 4
     if consciousness > 0.3 {
-        hits.push(DrumHit { drum: DrumType::Snare, time: beat_dur, velocity: 0.6 });
-        hits.push(DrumHit { drum: DrumType::Snare, time: beat_dur * 3.0, velocity: 0.65 });
+        hits.push(DrumHit {
+            drum: DrumType::Snare,
+            time: beat_dur,
+            velocity: 0.6,
+        });
+        hits.push(DrumHit {
+            drum: DrumType::Snare,
+            time: beat_dur * 3.0,
+            velocity: 0.65,
+        });
     }
 
     // Hi-hats: density from arousal
     if consciousness > 0.5 {
-        let subdivisions = if arousal > 0.7 { 8 } else if arousal > 0.4 { 4 } else { 2 };
+        let subdivisions = if arousal > 0.7 {
+            8
+        } else if arousal > 0.4 {
+            4
+        } else {
+            2
+        };
         let step = beat_dur * 4.0 / subdivisions as f32;
         for i in 0..subdivisions {
             let vel = if i % 2 == 0 { 0.4 } else { 0.25 };
-            hits.push(DrumHit { drum: DrumType::HiHat, time: step * i as f32, velocity: vel });
+            hits.push(DrumHit {
+                drum: DrumType::HiHat,
+                time: step * i as f32,
+                velocity: vel,
+            });
         }
     }
 
@@ -128,19 +154,37 @@ mod tests {
 
     #[test]
     fn kick_renders() {
-        let hit = DrumHit { drum: DrumType::Kick, time: 0.0, velocity: 0.8 };
+        let hit = DrumHit {
+            drum: DrumType::Kick,
+            time: 0.0,
+            velocity: 0.8,
+        };
         let buf = render_drum(&hit, 44100);
         assert!(!buf.is_empty());
-        assert!(buf.iter().any(|&s| s.abs() > 0.01), "kick should have signal");
+        assert!(
+            buf.iter().any(|&s| s.abs() > 0.01),
+            "kick should have signal"
+        );
         // Last quarter should be quieter than first quarter (decay)
-        let first_rms: f32 = (buf[..buf.len()/4].iter().map(|s| s*s).sum::<f32>() / (buf.len()/4) as f32).sqrt();
-        let last_rms: f32 = (buf[3*buf.len()/4..].iter().map(|s| s*s).sum::<f32>() / (buf.len()/4) as f32).sqrt();
-        assert!(last_rms < first_rms, "kick should decay: first={first_rms:.4}, last={last_rms:.4}");
+        let first_rms: f32 = (buf[..buf.len() / 4].iter().map(|s| s * s).sum::<f32>()
+            / (buf.len() / 4) as f32)
+            .sqrt();
+        let last_rms: f32 = (buf[3 * buf.len() / 4..].iter().map(|s| s * s).sum::<f32>()
+            / (buf.len() / 4) as f32)
+            .sqrt();
+        assert!(
+            last_rms < first_rms,
+            "kick should decay: first={first_rms:.4}, last={last_rms:.4}"
+        );
     }
 
     #[test]
     fn snare_has_noise() {
-        let hit = DrumHit { drum: DrumType::Snare, time: 0.0, velocity: 0.7 };
+        let hit = DrumHit {
+            drum: DrumType::Snare,
+            time: 0.0,
+            velocity: 0.7,
+        };
         let buf = render_drum(&hit, 44100);
         // Snare should have variance (noise component)
         let mean: f32 = buf.iter().sum::<f32>() / buf.len() as f32;
@@ -150,22 +194,36 @@ mod tests {
 
     #[test]
     fn hihat_is_short() {
-        let hit = DrumHit { drum: DrumType::HiHat, time: 0.0, velocity: 0.5 };
+        let hit = DrumHit {
+            drum: DrumType::HiHat,
+            time: 0.0,
+            velocity: 0.5,
+        };
         let buf = render_drum(&hit, 44100);
-        assert!(buf.len() < 3000, "hihat should be short: {} samples", buf.len());
+        assert!(
+            buf.len() < 3000,
+            "hihat should be short: {} samples",
+            buf.len()
+        );
     }
 
     #[test]
     fn pattern_density_scales_with_arousal() {
         let calm = generate_pattern(120.0, 0.8, 0.2);
         let excited = generate_pattern(120.0, 0.8, 0.9);
-        assert!(excited.len() > calm.len(), "high arousal should produce denser pattern");
+        assert!(
+            excited.len() > calm.len(),
+            "high arousal should produce denser pattern"
+        );
     }
 
     #[test]
     fn low_consciousness_sparse_pattern() {
         let low = generate_pattern(120.0, 0.2, 0.5);
         let high = generate_pattern(120.0, 0.8, 0.5);
-        assert!(low.len() < high.len(), "low consciousness should produce sparse pattern");
+        assert!(
+            low.len() < high.len(),
+            "low consciousness should produce sparse pattern"
+        );
     }
 }

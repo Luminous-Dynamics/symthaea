@@ -235,48 +235,101 @@ pub struct TransmutationChain {
 /// Known long-lived fission products (Z, N, half-life description).
 const LONG_LIVED_FP: &[(u16, u16, &str)] = &[
     (55, 82, "Cs-137 (30.2 yr)"),  // Cs-137: Z=55, N=82
-    (38, 52, "Sr-90  (28.8 yr)"),   // Sr-90:  Z=38, N=52
-    (43, 56, "Tc-99  (2.1e5 yr)"),  // Tc-99:  Z=43, N=56
-    (53, 76, "I-129  (1.6e7 yr)"),  // I-129:  Z=53, N=76
+    (38, 52, "Sr-90  (28.8 yr)"),  // Sr-90:  Z=38, N=52
+    (43, 56, "Tc-99  (2.1e5 yr)"), // Tc-99:  Z=43, N=56
+    (53, 76, "I-129  (1.6e7 yr)"), // I-129:  Z=53, N=76
 ];
 
 /// Known stable isotopes used as transmutation endpoints.
 /// Format: (Z, N) — a subset of relevant ones for fission product chains.
 const STABLE_ENDPOINTS: &[(u16, u16)] = &[
     // Ruthenium isotopes (Tc-99 chain endpoint)
-    (44, 56),  // Ru-100
-    (44, 57),  // Ru-101
-    (44, 58),  // Ru-102
+    (44, 56), // Ru-100
+    (44, 57), // Ru-101
+    (44, 58), // Ru-102
     // Xenon isotopes (I-129 chain)
-    (54, 76),  // Xe-130
-    (54, 77),  // Xe-131
-    (54, 78),  // Xe-132
+    (54, 76), // Xe-130
+    (54, 77), // Xe-131
+    (54, 78), // Xe-132
     // Barium isotopes (Cs-137 chain)
-    (56, 82),  // Ba-138
-    (56, 83),  // Ba-139 (short-lived, decays to stable La-139)
+    (56, 82), // Ba-138
+    (56, 83), // Ba-139 (short-lived, decays to stable La-139)
     // Zirconium/Yttrium (Sr-90 chain)
-    (40, 52),  // Zr-92
-    (40, 51),  // Zr-91
-    (39, 51),  // Y-90 → Zr-90 (beta decay, short-lived intermediate)
+    (40, 52), // Zr-92
+    (40, 51), // Zr-91
+    (39, 51), // Y-90 → Zr-90 (beta decay, short-lived intermediate)
 ];
 
 /// Element symbol lookup (Z=1..60 covers fission product region).
 fn element_symbol(z: u16) -> &'static str {
     match z {
-        1 => "H", 2 => "He", 3 => "Li", 4 => "Be", 5 => "B",
-        6 => "C", 7 => "N", 8 => "O", 9 => "F", 10 => "Ne",
-        11 => "Na", 12 => "Mg", 13 => "Al", 14 => "Si", 15 => "P",
-        16 => "S", 17 => "Cl", 18 => "Ar", 19 => "K", 20 => "Ca",
-        21 => "Sc", 22 => "Ti", 23 => "V", 24 => "Cr", 25 => "Mn",
-        26 => "Fe", 27 => "Co", 28 => "Ni", 29 => "Cu", 30 => "Zn",
-        31 => "Ga", 32 => "Ge", 33 => "As", 34 => "Se", 35 => "Br",
-        36 => "Kr", 37 => "Rb", 38 => "Sr", 39 => "Y", 40 => "Zr",
-        41 => "Nb", 42 => "Mo", 43 => "Tc", 44 => "Ru", 45 => "Rh",
-        46 => "Pd", 47 => "Ag", 48 => "Cd", 49 => "In", 50 => "Sn",
-        51 => "Sb", 52 => "Te", 53 => "I", 54 => "Xe", 55 => "Cs",
-        56 => "Ba", 57 => "La", 58 => "Ce", 59 => "Pr", 60 => "Nd",
-        90 => "Th", 91 => "Pa", 92 => "U", 93 => "Np", 94 => "Pu",
-        95 => "Am", 96 => "Cm",
+        1 => "H",
+        2 => "He",
+        3 => "Li",
+        4 => "Be",
+        5 => "B",
+        6 => "C",
+        7 => "N",
+        8 => "O",
+        9 => "F",
+        10 => "Ne",
+        11 => "Na",
+        12 => "Mg",
+        13 => "Al",
+        14 => "Si",
+        15 => "P",
+        16 => "S",
+        17 => "Cl",
+        18 => "Ar",
+        19 => "K",
+        20 => "Ca",
+        21 => "Sc",
+        22 => "Ti",
+        23 => "V",
+        24 => "Cr",
+        25 => "Mn",
+        26 => "Fe",
+        27 => "Co",
+        28 => "Ni",
+        29 => "Cu",
+        30 => "Zn",
+        31 => "Ga",
+        32 => "Ge",
+        33 => "As",
+        34 => "Se",
+        35 => "Br",
+        36 => "Kr",
+        37 => "Rb",
+        38 => "Sr",
+        39 => "Y",
+        40 => "Zr",
+        41 => "Nb",
+        42 => "Mo",
+        43 => "Tc",
+        44 => "Ru",
+        45 => "Rh",
+        46 => "Pd",
+        47 => "Ag",
+        48 => "Cd",
+        49 => "In",
+        50 => "Sn",
+        51 => "Sb",
+        52 => "Te",
+        53 => "I",
+        54 => "Xe",
+        55 => "Cs",
+        56 => "Ba",
+        57 => "La",
+        58 => "Ce",
+        59 => "Pr",
+        60 => "Nd",
+        90 => "Th",
+        91 => "Pa",
+        92 => "U",
+        93 => "Np",
+        94 => "Pu",
+        95 => "Am",
+        96 => "Cm",
         _ => "??",
     }
 }
@@ -612,8 +665,7 @@ pub fn decay_heat_curve(operating_time_s: f64) -> DecayHeatCurve {
             let t = 10.0_f64.powf(log_t);
 
             // Way-Wigner formula
-            let power_fraction =
-                0.0622 * (t.powf(-0.2) - (t + operating_time_s).powf(-0.2));
+            let power_fraction = 0.0622 * (t.powf(-0.2) - (t + operating_time_s).powf(-0.2));
 
             // Clamp to physical range
             let power_fraction = power_fraction.max(0.0).min(1.0);
@@ -674,7 +726,10 @@ mod tests {
             "Peak masses: light={}, heavy={}",
             result.peak_light, result.peak_heavy
         );
-        println!("\n{:>4} {:>4} {:>4}  {:>8}  {:>10}", "A", "Z", "N", "Yield%", "BE (MeV)");
+        println!(
+            "\n{:>4} {:>4} {:>4}  {:>8}  {:>10}",
+            "A", "Z", "N", "Yield%", "BE (MeV)"
+        );
         println!("{}", "-".repeat(45));
 
         for frag in &result.fragments {
@@ -745,14 +800,8 @@ mod tests {
         println!("Pu-239: {:.1} MeV", pu239_tke);
         println!("Cf-252: {:.1} MeV", cf252_tke);
 
-        assert!(
-            pu239_tke > u235_tke,
-            "Pu-239 TKE should exceed U-235 TKE"
-        );
-        assert!(
-            cf252_tke > pu239_tke,
-            "Cf-252 TKE should exceed Pu-239 TKE"
-        );
+        assert!(pu239_tke > u235_tke, "Pu-239 TKE should exceed U-235 TKE");
+        assert!(cf252_tke > pu239_tke, "Cf-252 TKE should exceed Pu-239 TKE");
     }
 
     #[test]
@@ -769,7 +818,10 @@ mod tests {
 
         println!("\n=== Yield Peaks (U-235) ===");
         println!("Highest yield: A={} (Y={:.3})", top1.a, top1.yield_fraction);
-        println!("Second highest: A={} (Y={:.3})", top2.a, top2.yield_fraction);
+        println!(
+            "Second highest: A={} (Y={:.3})",
+            top2.a, top2.yield_fraction
+        );
 
         // The two highest-yield fragments should be in the light and heavy humps
         let (a_lo, a_hi) = if top1.a < top2.a {
@@ -908,7 +960,8 @@ mod tests {
         for step in &chain.steps {
             let stable_mark = if step.is_stable { " [STABLE]" } else { "" };
             println!(
-                "  {} S_n={:.2} MeV{}", step.element, step.separation_energy_mev, stable_mark
+                "  {} S_n={:.2} MeV{}",
+                step.element, step.separation_energy_mev, stable_mark
             );
         }
 
@@ -996,10 +1049,7 @@ mod tests {
             th_cycle.fertile_sn_mev > 0.0,
             "Th-232 S_n should be positive"
         );
-        assert!(
-            u_cycle.fertile_sn_mev > 0.0,
-            "U-238 S_n should be positive"
-        );
+        assert!(u_cycle.fertile_sn_mev > 0.0, "U-238 S_n should be positive");
 
         // Both bred fissile isotopes should release energy
         assert!(
@@ -1041,10 +1091,7 @@ mod tests {
         let curve = decay_heat_curve(operating_time);
 
         println!("\n=== Decay Heat Curve (1 year operation) ===");
-        println!(
-            "{:>12}  {:>12}  {:>12}",
-            "Time", "P/P0 (%)", "MW/GW(th)"
-        );
+        println!("{:>12}  {:>12}  {:>12}", "Time", "P/P0 (%)", "MW/GW(th)");
         println!("{}", "-".repeat(40));
 
         for pt in &curve.points {
@@ -1113,8 +1160,8 @@ mod tests {
     #[test]
     fn test_decay_heat_longer_operation_higher_initial() {
         // Longer operation time -> higher initial decay heat
-        let p_short = decay_heat_at(10.0, 1e5);   // ~1 day operation
-        let p_long = decay_heat_at(10.0, 1e8);    // ~3 years operation
+        let p_short = decay_heat_at(10.0, 1e5); // ~1 day operation
+        let p_long = decay_heat_at(10.0, 1e8); // ~3 years operation
 
         println!("\n=== Operating Time Effect on Decay Heat ===");
         println!("Short operation (1 day),  at t=10s: {:.6}", p_short);
@@ -1167,7 +1214,10 @@ mod tests {
         for fuel in &fuels {
             println!(
                 "   {}: BE/A={:.3}, barrier={:.1} MeV, Q={:.0} MeV",
-                fuel.name, fuel.be_per_nucleon, fuel.fission_barrier_mev, fuel.energy_per_fission_mev
+                fuel.name,
+                fuel.be_per_nucleon,
+                fuel.fission_barrier_mev,
+                fuel.energy_per_fission_mev
             );
         }
 
@@ -1193,7 +1243,12 @@ mod tests {
             (3.15e7, "1 year"),
         ] {
             let p = decay_heat_at(t, operating_time);
-            println!("   {}: {:.4}% ({:.2} MW/GWth)", label, p * 100.0, p * 1000.0);
+            println!(
+                "   {}: {:.4}% ({:.2} MW/GWth)",
+                label,
+                p * 100.0,
+                p * 1000.0
+            );
         }
     }
 }

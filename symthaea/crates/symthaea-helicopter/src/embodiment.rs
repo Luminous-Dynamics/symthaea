@@ -133,9 +133,15 @@ impl HelicopterEmbodiment {
         self.last_prediction_error = 0.0;
     }
 
-    pub fn safety_level(&self) -> MotorSafetyLevel { self.current_safety }
-    pub fn total_steps(&self) -> usize { self.total_steps }
-    pub fn last_perception(&self) -> Option<&ContinuousHV> { self.last_perception.as_ref() }
+    pub fn safety_level(&self) -> MotorSafetyLevel {
+        self.current_safety
+    }
+    pub fn total_steps(&self) -> usize {
+        self.total_steps
+    }
+    pub fn last_perception(&self) -> Option<&ContinuousHV> {
+        self.last_perception.as_ref()
+    }
 
     /// Telemetry summary.
     pub fn telemetry(&self) -> EmbodimentTelemetry {

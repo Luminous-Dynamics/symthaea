@@ -375,8 +375,7 @@ impl ConsciousnessGenome {
                     id: new_id,
                     tau: 0.5 + rng.gen::<f64>() * 0.5,
                     bias: 0.0,
-                    activation: ActivationType::ALL
-                        [rng.gen_range(0..ActivationType::ALL.len())],
+                    activation: ActivationType::ALL[rng.gen_range(0..ActivationType::ALL.len())],
                     layer: NeuronLayer::Hidden,
                 });
 
@@ -521,11 +520,8 @@ impl ConsciousnessGenome {
 
     fn compute_profile_inner(&self) -> ConsciousnessProfile {
         let n_neurons = self.neuron_params.len();
-        let enabled_connections: Vec<&ConnectionGene> = self
-            .network_topology
-            .iter()
-            .filter(|c| c.enabled)
-            .collect();
+        let enabled_connections: Vec<&ConnectionGene> =
+            self.network_topology.iter().filter(|c| c.enabled).collect();
         let n_edges = enabled_connections.len();
 
         if n_neurons < 2 || n_edges == 0 {
@@ -570,8 +566,14 @@ impl ConsciousnessGenome {
         let backward_count = enabled_connections
             .iter()
             .filter(|c| {
-                let from_layer = id_to_layer.get(&c.from_id).copied().unwrap_or(NeuronLayer::Input);
-                let to_layer = id_to_layer.get(&c.to_id).copied().unwrap_or(NeuronLayer::Input);
+                let from_layer = id_to_layer
+                    .get(&c.from_id)
+                    .copied()
+                    .unwrap_or(NeuronLayer::Input);
+                let to_layer = id_to_layer
+                    .get(&c.to_id)
+                    .copied()
+                    .unwrap_or(NeuronLayer::Input);
                 layer_order(from_layer) >= layer_order(to_layer)
             })
             .count();
@@ -722,11 +724,7 @@ impl ConsciousnessGenome {
     ///
     /// Groups neurons by layer and computes fraction of within-group edges.
     /// Newman & Girvan (2004).
-    fn approximate_modularity(
-        &self,
-        connections: &[&ConnectionGene],
-        _n_neurons: usize,
-    ) -> f64 {
+    fn approximate_modularity(&self, connections: &[&ConnectionGene], _n_neurons: usize) -> f64 {
         if connections.is_empty() {
             return 0.0;
         }
@@ -881,10 +879,7 @@ impl ConsciousnessSpecies {
     ///
     /// Uses sequential assignment: each organism joins the nearest existing
     /// species (if within threshold) or founds a new one.
-    pub fn speciate(
-        organisms: &mut [ConsciousnessGenome],
-        threshold: f64,
-    ) -> Vec<Self> {
+    pub fn speciate(organisms: &mut [ConsciousnessGenome], threshold: f64) -> Vec<Self> {
         let mut species: Vec<ConsciousnessSpecies> = Vec::new();
         let mut next_species_id = 0;
 
@@ -1072,8 +1067,11 @@ pub fn run_evolution(config: EvolutionConfig) -> EvolutionaryLandscape {
     // Initialize population
     let mut population: Vec<ConsciousnessGenome> = (0..config.population_size)
         .map(|i| {
-            let genome =
-                ConsciousnessGenome::random(config.input_size, config.output_size, config.seed + i as u64);
+            let genome = ConsciousnessGenome::random(
+                config.input_size,
+                config.output_size,
+                config.seed + i as u64,
+            );
             // Count innovations used
             if let Some(max_innov) = genome.network_topology.iter().map(|c| c.innovation).max() {
                 if max_innov >= innovation_counter {
@@ -1089,10 +1087,7 @@ pub fn run_evolution(config: EvolutionConfig) -> EvolutionaryLandscape {
         let mut fitnesses: Vec<f64> = Vec::with_capacity(population.len());
         for genome in &mut population {
             let task_score = 0.5; // Neutral task score (consciousness is primary)
-            let parent_phi = genome
-                .lineage
-                .last()
-                .map(|_| 0.0); // Simplified: no parent tracking in this runner
+            let parent_phi = genome.lineage.last().map(|_| 0.0); // Simplified: no parent tracking in this runner
             let fitness = evaluator.evaluate(genome, task_score, parent_phi);
             fitnesses.push(fitness);
         }
@@ -1190,7 +1185,11 @@ mod tests {
         let mut genome = ConsciousnessGenome::random(4, 2, 42);
         let profile = genome.compute_consciousness_profile();
 
-        assert!(profile.phi >= 0.0 && profile.phi <= 1.0, "phi out of range: {}", profile.phi);
+        assert!(
+            profile.phi >= 0.0 && profile.phi <= 1.0,
+            "phi out of range: {}",
+            profile.phi
+        );
         assert!(
             profile.complexity >= 0.0 && profile.complexity <= 1.0,
             "complexity out of range: {}",
@@ -1280,9 +1279,15 @@ mod tests {
         let fitness = evaluator.evaluate(&mut genome, 1.0, None);
 
         if profile.phi < 0.9 {
-            assert_eq!(fitness, 0.0, "below-threshold Phi should produce zero fitness");
+            assert_eq!(
+                fitness, 0.0,
+                "below-threshold Phi should produce zero fitness"
+            );
         } else {
-            assert!(fitness > 0.0, "above-threshold should produce positive fitness");
+            assert!(
+                fitness > 0.0,
+                "above-threshold should produce positive fitness"
+            );
         }
     }
 
@@ -1357,8 +1362,16 @@ mod tests {
 
         let landscape = run_evolution(config);
 
-        assert_eq!(landscape.generation_stats.len(), 10, "should have 10 generations");
-        assert_eq!(landscape.phi_trajectory.len(), 10, "should have 10 phi values");
+        assert_eq!(
+            landscape.generation_stats.len(),
+            10,
+            "should have 10 generations"
+        );
+        assert_eq!(
+            landscape.phi_trajectory.len(),
+            10,
+            "should have 10 phi values"
+        );
 
         // Mean Phi should be non-negative throughout
         for phi in &landscape.phi_trajectory {
@@ -1400,7 +1413,10 @@ mod tests {
             d_ab,
             d_ba
         );
-        assert!(d_ab > 0.0, "distance between different profiles should be positive");
+        assert!(
+            d_ab > 0.0,
+            "distance between different profiles should be positive"
+        );
     }
 
     #[test]
@@ -1469,7 +1485,10 @@ mod tests {
         let landscape = run_evolution(config);
 
         assert!(!landscape.generation_stats.is_empty(), "should have stats");
-        assert!(!landscape.phi_trajectory.is_empty(), "should have phi trajectory");
+        assert!(
+            !landscape.phi_trajectory.is_empty(),
+            "should have phi trajectory"
+        );
         assert!(
             !landscape.species_history.is_empty(),
             "should have species history"

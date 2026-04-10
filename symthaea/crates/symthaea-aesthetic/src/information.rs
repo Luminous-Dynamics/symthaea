@@ -136,14 +136,8 @@ mod tests {
         let b_uni = information_balance(&uniform);
 
         // Moderate should beat both extremes
-        assert!(
-            b_mod > b_peak,
-            "moderate {b_mod} > peaked {b_peak}"
-        );
-        assert!(
-            b_mod > b_uni,
-            "moderate {b_mod} > uniform {b_uni}"
-        );
+        assert!(b_mod > b_peak, "moderate {b_mod} > peaked {b_peak}");
+        assert!(b_mod > b_uni, "moderate {b_mod} > uniform {b_uni}");
         assert!(b_mod > 0.3, "moderate balance = {b_mod}");
     }
 
@@ -177,7 +171,10 @@ mod tests {
             vec![0.25; 4],
         ] {
             let e = shannon_entropy_normalized(&vals);
-            assert!(e >= 0.0 && e <= 1.0, "entropy {e} out of bounds for {vals:?}");
+            assert!(
+                e >= 0.0 && e <= 1.0,
+                "entropy {e} out of bounds for {vals:?}"
+            );
         }
     }
 }

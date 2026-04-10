@@ -102,7 +102,7 @@ pub enum RelayState {
     Connecting,
     Connected,
     Probing,
-    Ready,         // Hardware probed, disks discovered
+    Ready, // Hardware probed, disks discovered
     Installing,
     Reconnecting(u32), // attempt number (1-3)
     Complete,
@@ -160,17 +160,17 @@ fn partition_color(fs_type: &str, label: &str) -> &'static str {
     let lower_label = label.to_lowercase();
     let lower_fs = fs_type.to_lowercase();
     if lower_fs == "vfat" && (lower_label.contains("efi") || lower_label.contains("boot")) {
-        "rgba(100, 149, 237, 0.7)"  // blue - EFI
+        "rgba(100, 149, 237, 0.7)" // blue - EFI
     } else if lower_fs == "ntfs" || lower_label.contains("windows") {
-        "rgba(232, 167, 71, 0.7)"   // orange - Windows
+        "rgba(232, 167, 71, 0.7)" // orange - Windows
     } else if lower_fs == "ext4" || lower_fs == "btrfs" || lower_fs == "xfs" || lower_fs == "zfs" {
-        "rgba(90, 184, 160, 0.7)"   // teal - Linux
+        "rgba(90, 184, 160, 0.7)" // teal - Linux
     } else if lower_fs == "swap" {
-        "rgba(180, 120, 200, 0.5)"  // purple - swap
+        "rgba(180, 120, 200, 0.5)" // purple - swap
     } else if lower_fs.is_empty() {
-        "rgba(126, 200, 160, 0.3)"  // light green - unformatted
+        "rgba(126, 200, 160, 0.3)" // light green - unformatted
     } else {
-        "rgba(150, 150, 150, 0.5)"  // gray - other
+        "rgba(150, 150, 150, 0.5)" // gray - other
     }
 }
 
@@ -217,7 +217,11 @@ fn PartitionBar(
             let width_pct = (p.size_bytes as f64 / total as f64 * 100.0).max(2.0);
             let color = partition_color(&p.fs_type, &p.label);
             let display_label = if p.label.is_empty() {
-                if p.fs_type.is_empty() { p.name.clone() } else { p.fs_type.clone() }
+                if p.fs_type.is_empty() {
+                    p.name.clone()
+                } else {
+                    p.fs_type.clone()
+                }
             } else {
                 p.label.clone()
             };
@@ -232,8 +236,16 @@ fn PartitionBar(
         .iter()
         .map(|p| {
             let color = partition_color(&p.fs_type, &p.label);
-            let display_label = if p.label.is_empty() { p.name.clone() } else { p.label.clone() };
-            let fs = if p.fs_type.is_empty() { "unknown".to_string() } else { p.fs_type.clone() };
+            let display_label = if p.label.is_empty() {
+                p.name.clone()
+            } else {
+                p.label.clone()
+            };
+            let fs = if p.fs_type.is_empty() {
+                "unknown".to_string()
+            } else {
+                p.fs_type.clone()
+            };
             let size = human_size(p.size_bytes);
             (color, format!("{} ({}, {})", display_label, fs, size))
         })
@@ -339,13 +351,15 @@ pub fn RemoteInstallPanel(
     let (install_log, set_install_log) = signal(restored_log);
 
     let progress = RwSignal::new(InstallProgress {
-        stage: String::new(), percentage: 0, phase: String::new(), message: String::new(),
+        stage: String::new(),
+        percentage: 0,
+        phase: String::new(),
+        message: String::new(),
     });
 
     // Resume detection (Phase 4.3): check if a previous install was in progress
-    let previous_install_in_progress = RwSignal::new(
-        load_from_storage("si_install_in_progress").as_deref() == Some("true")
-    );
+    let previous_install_in_progress =
+        RwSignal::new(load_from_storage("si_install_in_progress").as_deref() == Some("true"));
 
     // Connection form — direct to ISO mode
     // User enters the target machine's IP and the relay token from console output.
@@ -415,20 +429,28 @@ pub fn RemoteInstallPanel(
         // Only write every 10 updates to reduce localStorage thrashing
         if log_write_counter.get() % 10 == 0 {
             let log = install_log.get();
-            save_to_storage("si_install_log", &serde_json::to_string(&log).unwrap_or_default());
+            save_to_storage(
+                "si_install_log",
+                &serde_json::to_string(&log).unwrap_or_default(),
+            );
         }
     };
     // Force-persist: always writes regardless of counter (use on completion/error)
     let persist_log_force = move || {
         let log = install_log.get();
-        save_to_storage("si_install_log", &serde_json::to_string(&log).unwrap_or_default());
+        save_to_storage(
+            "si_install_log",
+            &serde_json::to_string(&log).unwrap_or_default(),
+        );
     };
 
     // ── Connect to relay ──
     let connect_inner = move |is_reconnect: bool| {
         let addr = target_addr.get();
         if addr.trim().is_empty() {
-            relay_state.set(RelayState::Failed("Enter the target machine's IP address".into()));
+            relay_state.set(RelayState::Failed(
+                "Enter the target machine's IP address".into(),
+            ));
             return;
         }
         save_to_storage("si_target_addr", &addr);
@@ -442,8 +464,15 @@ pub fn RemoteInstallPanel(
         save_to_storage("si_relay_url", &url);
         let token = relay_token.get();
         if token.is_empty() {
-            relay_state.set(RelayState::Failed("Auth token is required. Copy it from the relay's console output.".into()));
-            set_install_log.update(|l| l.push("Error: Auth token is required. Copy it from the relay's console output.".into()));
+            relay_state.set(RelayState::Failed(
+                "Auth token is required. Copy it from the relay's console output.".into(),
+            ));
+            set_install_log.update(|l| {
+                l.push(
+                    "Error: Auth token is required. Copy it from the relay's console output."
+                        .into(),
+                )
+            });
             return;
         }
         save_to_session("si_relay_token", &token);
@@ -465,7 +494,8 @@ pub fn RemoteInstallPanel(
                 if is_reconnect {
                     // Reconnect failed at WebSocket creation — will be retried by schedule_reconnect
                     relay_state.set(RelayState::Failed(
-                        "Reconnect failed. The install may still be running on the target machine.".into(),
+                        "Reconnect failed. The install may still be running on the target machine."
+                            .into(),
                     ));
                 } else {
                     relay_state.set(RelayState::Failed("WebSocket creation failed".into()));
@@ -492,7 +522,8 @@ pub fn RemoteInstallPanel(
                 // On reconnect, check install status instead of starting fresh
                 reconnect_attempts.set(0);
                 relay_state.set(RelayState::Installing);
-                set_install_log.update(|l| l.push("Reconnected. Checking install status...".into()));
+                set_install_log
+                    .update(|l| l.push("Reconnected. Checking install status...".into()));
                 persist_log();
                 let status = serde_json::json!({"action": "status"});
                 let _ = ws_for_open.send_with_str(&status.to_string());
@@ -512,226 +543,382 @@ pub fn RemoteInstallPanel(
 
         // onmessage — route all relay messages
         let ws_for_msg = ws.clone();
-        let onmessage = wasm_bindgen::closure::Closure::<dyn Fn(web_sys::MessageEvent)>::new(move |e: web_sys::MessageEvent| {
-            let Some(text) = e.data().as_string() else { return };
-            // Parse as typed RelayResponse first, fall back to Value for complex nested data
-            let Ok(msg) = serde_json::from_str::<serde_json::Value>(&text) else { return };
-            let typed: Option<RelayResponse> = serde_json::from_str(&text).ok();
-            let msg_type = typed.as_ref().map(|t| t.msg_type.as_str()).unwrap_or(
-                msg.get("type").and_then(|v| v.as_str()).unwrap_or("")
-            );
+        let onmessage = wasm_bindgen::closure::Closure::<dyn Fn(web_sys::MessageEvent)>::new(
+            move |e: web_sys::MessageEvent| {
+                let Some(text) = e.data().as_string() else {
+                    return;
+                };
+                // Parse as typed RelayResponse first, fall back to Value for complex nested data
+                let Ok(msg) = serde_json::from_str::<serde_json::Value>(&text) else {
+                    return;
+                };
+                let typed: Option<RelayResponse> = serde_json::from_str(&text).ok();
+                let msg_type = typed
+                    .as_ref()
+                    .map(|t| t.msg_type.as_str())
+                    .unwrap_or(msg.get("type").and_then(|v| v.as_str()).unwrap_or(""));
 
-            match msg_type {
-                "connected" => {
-                    relay_state.set(RelayState::Probing);
-                    set_install_log.update(|l| l.push("SSH connected. Probing hardware...".into()));
-                    persist_log();
-                    // Auto-probe hardware
-                    let probe = serde_json::json!({"action": "probe_hardware"});
-                    let _ = ws_for_msg.send_with_str(&probe.to_string());
-                }
-
-                "hardware_probe" => {
-                    if let Some(data_str) = msg.get("data").and_then(|v| v.as_str()) {
-                        if let Ok(data) = serde_json::from_str::<serde_json::Value>(data_str) {
-                            // Parse hardware
-                            let mut hw = RemoteHardware::default();
-                            if let Some(gpu) = data.get("gpu") {
-                                hw.gpu_vendor = gpu.get("vendor").and_then(|v| v.as_str()).unwrap_or("").into();
-                                hw.gpu_model = gpu.get("model").and_then(|v| v.as_str()).unwrap_or("").into();
-                                hw.gpu_hybrid = gpu.get("hybrid").and_then(|v| v.as_bool()).unwrap_or(false);
-                            }
-                            hw.tpm2 = data.get("tpm2_available").and_then(|v| v.as_bool()).unwrap_or(false);
-                            hw.secure_boot = data.get("secure_boot").and_then(|v| v.as_bool()).unwrap_or(false);
-                            hw.setup_mode = data.get("setup_mode").and_then(|v| v.as_bool()).unwrap_or(false);
-                            hw.efi = data.get("efi_available").and_then(|v| v.as_bool()).unwrap_or(false);
-                            hw.arch = data.get("arch").and_then(|v| v.as_str()).unwrap_or("x86_64").into();
-                            if let Some(wifi) = data.get("wifi") {
-                                hw.wifi_available = wifi.get("available").and_then(|v| v.as_bool()).unwrap_or(false);
-                                hw.wifi_interface = wifi.get("interface").and_then(|v| v.as_str()).unwrap_or("").into();
-                            }
-                            if let Some(safety) = data.get("safety") {
-                                hw.safety_level = safety.get("level").and_then(|v| v.as_str()).unwrap_or("clear").into();
-                                hw.safety_message = safety.get("message").and_then(|v| v.as_str()).unwrap_or("").into();
-                            }
-                            if let Some(oses) = data.get("detected_os").and_then(|v| v.as_array()) {
-                                hw.detected_os = oses.iter()
-                                    .filter_map(|o| o.get("name").and_then(|v| v.as_str()).map(String::from))
-                                    .collect();
-                            }
-                            if let Some(cb) = data.get("chromebook") {
-                                hw.chromebook = cb.get("detected").and_then(|v| v.as_bool()).unwrap_or(false);
-                            }
-                            remote_hw.set(hw);
-                        }
+                match msg_type {
+                    "connected" => {
+                        relay_state.set(RelayState::Probing);
+                        set_install_log
+                            .update(|l| l.push("SSH connected. Probing hardware...".into()));
+                        persist_log();
+                        // Auto-probe hardware
+                        let probe = serde_json::json!({"action": "probe_hardware"});
+                        let _ = ws_for_msg.send_with_str(&probe.to_string());
                     }
-                    set_install_log.update(|l| l.push("Hardware probed. Discovering disks...".into()));
-                    persist_log();
-                    // Auto-discover disks
-                    let discover = serde_json::json!({"action": "discover_disks"});
-                    let _ = ws_for_msg.send_with_str(&discover.to_string());
-                }
 
-                "disks" => {
-                    if let Some(data_str) = msg.get("data").and_then(|v| v.as_str()) {
-                        if let Ok(arr) = serde_json::from_str::<Vec<serde_json::Value>>(data_str) {
-                            let disk_list: Vec<DiskInfo> = arr.iter().filter_map(|d| {
-                                let name = d.get("name")?.as_str()?.to_string();
-                                // size may be string or number (lsblk -b returns numbers)
-                                let size_bytes = match d.get("size") {
-                                    Some(v) if v.is_u64() => v.as_u64().unwrap_or(0),
-                                    Some(v) => v.as_str().unwrap_or("0").parse::<u64>().unwrap_or(0),
-                                    None => 0,
-                                };
-                                let model = d.get("model").and_then(|v| v.as_str()).unwrap_or("Unknown").to_string();
-                                let transport = d.get("transport").and_then(|v| v.as_str()).unwrap_or("unknown").to_string();
-                                // Parse partition children from lsblk JSON
-                                let partitions = d.get("children")
-                                    .and_then(|c| c.as_array())
-                                    .map(|children| {
-                                        children.iter().filter_map(|child| {
-                                            let pname = child.get("name")?.as_str()?.to_string();
-                                            let psize = match child.get("size") {
-                                                Some(v) if v.is_u64() => v.as_u64().unwrap_or(0),
-                                                Some(v) => v.as_str().unwrap_or("0").parse::<u64>().unwrap_or(0),
-                                                None => 0,
-                                            };
-                                            let fs_type = child.get("fstype")
-                                                .and_then(|v| v.as_str())
-                                                .unwrap_or("")
-                                                .to_string();
-                                            let label = child.get("label")
-                                                .and_then(|v| v.as_str())
-                                                .unwrap_or("")
-                                                .to_string();
-                                            let mount = child.get("mountpoint")
-                                                .or_else(|| child.get("mountpoints"))
-                                                .and_then(|v| {
-                                                    if let Some(s) = v.as_str() { Some(s.to_string()) }
-                                                    else if let Some(arr) = v.as_array() {
-                                                        arr.first().and_then(|m| m.as_str()).map(String::from)
-                                                    } else { None }
-                                                })
-                                                .unwrap_or_default();
-                                            Some(PartitionInfo { name: pname, size_bytes: psize, fs_type, label, mount })
-                                        }).collect::<Vec<_>>()
+                    "hardware_probe" => {
+                        if let Some(data_str) = msg.get("data").and_then(|v| v.as_str()) {
+                            if let Ok(data) = serde_json::from_str::<serde_json::Value>(data_str) {
+                                // Parse hardware
+                                let mut hw = RemoteHardware::default();
+                                if let Some(gpu) = data.get("gpu") {
+                                    hw.gpu_vendor = gpu
+                                        .get("vendor")
+                                        .and_then(|v| v.as_str())
+                                        .unwrap_or("")
+                                        .into();
+                                    hw.gpu_model = gpu
+                                        .get("model")
+                                        .and_then(|v| v.as_str())
+                                        .unwrap_or("")
+                                        .into();
+                                    hw.gpu_hybrid = gpu
+                                        .get("hybrid")
+                                        .and_then(|v| v.as_bool())
+                                        .unwrap_or(false);
+                                }
+                                hw.tpm2 = data
+                                    .get("tpm2_available")
+                                    .and_then(|v| v.as_bool())
+                                    .unwrap_or(false);
+                                hw.secure_boot = data
+                                    .get("secure_boot")
+                                    .and_then(|v| v.as_bool())
+                                    .unwrap_or(false);
+                                hw.setup_mode = data
+                                    .get("setup_mode")
+                                    .and_then(|v| v.as_bool())
+                                    .unwrap_or(false);
+                                hw.efi = data
+                                    .get("efi_available")
+                                    .and_then(|v| v.as_bool())
+                                    .unwrap_or(false);
+                                hw.arch = data
+                                    .get("arch")
+                                    .and_then(|v| v.as_str())
+                                    .unwrap_or("x86_64")
+                                    .into();
+                                if let Some(wifi) = data.get("wifi") {
+                                    hw.wifi_available = wifi
+                                        .get("available")
+                                        .and_then(|v| v.as_bool())
+                                        .unwrap_or(false);
+                                    hw.wifi_interface = wifi
+                                        .get("interface")
+                                        .and_then(|v| v.as_str())
+                                        .unwrap_or("")
+                                        .into();
+                                }
+                                if let Some(safety) = data.get("safety") {
+                                    hw.safety_level = safety
+                                        .get("level")
+                                        .and_then(|v| v.as_str())
+                                        .unwrap_or("clear")
+                                        .into();
+                                    hw.safety_message = safety
+                                        .get("message")
+                                        .and_then(|v| v.as_str())
+                                        .unwrap_or("")
+                                        .into();
+                                }
+                                if let Some(oses) =
+                                    data.get("detected_os").and_then(|v| v.as_array())
+                                {
+                                    hw.detected_os = oses
+                                        .iter()
+                                        .filter_map(|o| {
+                                            o.get("name").and_then(|v| v.as_str()).map(String::from)
+                                        })
+                                        .collect();
+                                }
+                                if let Some(cb) = data.get("chromebook") {
+                                    hw.chromebook = cb
+                                        .get("detected")
+                                        .and_then(|v| v.as_bool())
+                                        .unwrap_or(false);
+                                }
+                                remote_hw.set(hw);
+                            }
+                        }
+                        set_install_log
+                            .update(|l| l.push("Hardware probed. Discovering disks...".into()));
+                        persist_log();
+                        // Auto-discover disks
+                        let discover = serde_json::json!({"action": "discover_disks"});
+                        let _ = ws_for_msg.send_with_str(&discover.to_string());
+                    }
+
+                    "disks" => {
+                        if let Some(data_str) = msg.get("data").and_then(|v| v.as_str()) {
+                            if let Ok(arr) =
+                                serde_json::from_str::<Vec<serde_json::Value>>(data_str)
+                            {
+                                let disk_list: Vec<DiskInfo> = arr
+                                    .iter()
+                                    .filter_map(|d| {
+                                        let name = d.get("name")?.as_str()?.to_string();
+                                        // size may be string or number (lsblk -b returns numbers)
+                                        let size_bytes = match d.get("size") {
+                                            Some(v) if v.is_u64() => v.as_u64().unwrap_or(0),
+                                            Some(v) => v
+                                                .as_str()
+                                                .unwrap_or("0")
+                                                .parse::<u64>()
+                                                .unwrap_or(0),
+                                            None => 0,
+                                        };
+                                        let model = d
+                                            .get("model")
+                                            .and_then(|v| v.as_str())
+                                            .unwrap_or("Unknown")
+                                            .to_string();
+                                        let transport = d
+                                            .get("transport")
+                                            .and_then(|v| v.as_str())
+                                            .unwrap_or("unknown")
+                                            .to_string();
+                                        // Parse partition children from lsblk JSON
+                                        let partitions = d
+                                            .get("children")
+                                            .and_then(|c| c.as_array())
+                                            .map(|children| {
+                                                children
+                                                    .iter()
+                                                    .filter_map(|child| {
+                                                        let pname = child
+                                                            .get("name")?
+                                                            .as_str()?
+                                                            .to_string();
+                                                        let psize = match child.get("size") {
+                                                            Some(v) if v.is_u64() => {
+                                                                v.as_u64().unwrap_or(0)
+                                                            }
+                                                            Some(v) => v
+                                                                .as_str()
+                                                                .unwrap_or("0")
+                                                                .parse::<u64>()
+                                                                .unwrap_or(0),
+                                                            None => 0,
+                                                        };
+                                                        let fs_type = child
+                                                            .get("fstype")
+                                                            .and_then(|v| v.as_str())
+                                                            .unwrap_or("")
+                                                            .to_string();
+                                                        let label = child
+                                                            .get("label")
+                                                            .and_then(|v| v.as_str())
+                                                            .unwrap_or("")
+                                                            .to_string();
+                                                        let mount = child
+                                                            .get("mountpoint")
+                                                            .or_else(|| child.get("mountpoints"))
+                                                            .and_then(|v| {
+                                                                if let Some(s) = v.as_str() {
+                                                                    Some(s.to_string())
+                                                                } else if let Some(arr) =
+                                                                    v.as_array()
+                                                                {
+                                                                    arr.first()
+                                                                        .and_then(|m| m.as_str())
+                                                                        .map(String::from)
+                                                                } else {
+                                                                    None
+                                                                }
+                                                            })
+                                                            .unwrap_or_default();
+                                                        Some(PartitionInfo {
+                                                            name: pname,
+                                                            size_bytes: psize,
+                                                            fs_type,
+                                                            label,
+                                                            mount,
+                                                        })
+                                                    })
+                                                    .collect::<Vec<_>>()
+                                            })
+                                            .unwrap_or_default();
+                                        Some(DiskInfo {
+                                            name,
+                                            size_bytes,
+                                            model,
+                                            transport,
+                                            partitions,
+                                        })
                                     })
-                                    .unwrap_or_default();
-                                Some(DiskInfo { name, size_bytes, model, transport, partitions })
-                            }).collect();
+                                    .collect();
 
-                            if disk_list.len() == 1 {
-                                selected_disk.set(disk_list[0].name.clone());
+                                if disk_list.len() == 1 {
+                                    selected_disk.set(disk_list[0].name.clone());
+                                }
+                                disks.set(disk_list);
                             }
-                            disks.set(disk_list);
                         }
+                        relay_state.set(RelayState::Ready);
+                        set_install_log.update(|l| l.push("Ready to install.".into()));
+                        persist_log();
                     }
-                    relay_state.set(RelayState::Ready);
-                    set_install_log.update(|l| l.push("Ready to install.".into()));
-                    persist_log();
-                }
 
-                "progress" => {
-                    let t = typed.as_ref();
-                    let stage = t.and_then(|t| t.stage.clone()).unwrap_or_default();
-                    let pct = t.and_then(|t| t.percentage).unwrap_or(0) as u32;
-                    let phase = t.and_then(|t| t.phase.clone()).unwrap_or_default();
-                    let message = t.and_then(|t| t.message.clone()).unwrap_or_default();
-                    progress.set(InstallProgress { stage: stage.clone(), percentage: pct, phase, message });
-                    set_install_log.update(|l| l.push(format!("[{}%] {}", pct, stage)));
-                    persist_log();
-                }
-
-                "output" => {
-                    let line_opt = typed.as_ref().and_then(|t| t.data.as_deref())
-                        .or_else(|| msg.get("data").and_then(|v| v.as_str()));
-                    if let Some(line) = line_opt {
-                        if !line.trim().is_empty() {
-                            set_install_log.update(|l| {
-                                l.push(line.to_string());
-                                // Cap at 1000 lines to prevent memory exhaustion from relay flooding
-                                if l.len() > 1000 { l.drain(..200); }
-                            });
-                            persist_log();
-                        }
-                    }
-                }
-
-                "exit" => {
-                    let code = typed.as_ref().and_then(|t| t.code).unwrap_or(-1);
-                    if code == 0 {
-                        relay_state.set(RelayState::Complete);
+                    "progress" => {
+                        let t = typed.as_ref();
+                        let stage = t.and_then(|t| t.stage.clone()).unwrap_or_default();
+                        let pct = t.and_then(|t| t.percentage).unwrap_or(0) as u32;
+                        let phase = t.and_then(|t| t.phase.clone()).unwrap_or_default();
+                        let message = t.and_then(|t| t.message.clone()).unwrap_or_default();
                         progress.set(InstallProgress {
-                            stage: "Complete".into(), percentage: 100,
-                            phase: "FirstBreath".into(), message: "NixOS installed successfully!".into(),
+                            stage: stage.clone(),
+                            percentage: pct,
+                            phase,
+                            message,
                         });
-                        set_install_log.update(|l| l.push("Installation complete! Reboot to start NixOS.".into()));
-                        // Clear in-progress flag (Phase 4.3)
-                        remove_from_storage("si_install_in_progress");
-                        previous_install_in_progress.set(false);
-                    } else {
-                        relay_state.set(RelayState::Failed(format!("Install exited with code {code}")));
-                        set_install_log.update(|l| l.push(format!("Installation failed (exit code {code})")));
-                        remove_from_storage("si_install_in_progress");
-                        previous_install_in_progress.set(false);
+                        set_install_log.update(|l| l.push(format!("[{}%] {}", pct, stage)));
+                        persist_log();
                     }
-                    persist_log_force();
-                }
 
-                "data_preserved" => {
-                    let detail = msg.get("data").and_then(|v| v.as_str()).unwrap_or("Backup complete");
-                    backup_status.set(Some(detail.to_string()));
-                    backup_complete.set(true);
-                    set_install_log.update(|l| l.push(format!("Backup: {detail}")));
-                    persist_log();
-                }
+                    "output" => {
+                        let line_opt = typed
+                            .as_ref()
+                            .and_then(|t| t.data.as_deref())
+                            .or_else(|| msg.get("data").and_then(|v| v.as_str()));
+                        if let Some(line) = line_opt {
+                            if !line.trim().is_empty() {
+                                set_install_log.update(|l| {
+                                    l.push(line.to_string());
+                                    // Cap at 1000 lines to prevent memory exhaustion from relay flooding
+                                    if l.len() > 1000 {
+                                        l.drain(..200);
+                                    }
+                                });
+                                persist_log();
+                            }
+                        }
+                    }
 
-                "app_scan" => {
-                    let data = msg.get("data").and_then(|v| v.as_str()).unwrap_or("");
-                    scan_data.update(|existing| {
-                        let prev = existing.clone().unwrap_or_default();
-                        *existing = Some(format!("{}--- Installed Apps ---\n{}", if prev.is_empty() { String::new() } else { format!("{prev}\n") }, data));
-                    });
-                    set_install_log.update(|l| l.push("App scan complete.".into()));
-                    persist_log();
-                }
+                    "exit" => {
+                        let code = typed.as_ref().and_then(|t| t.code).unwrap_or(-1);
+                        if code == 0 {
+                            relay_state.set(RelayState::Complete);
+                            progress.set(InstallProgress {
+                                stage: "Complete".into(),
+                                percentage: 100,
+                                phase: "FirstBreath".into(),
+                                message: "NixOS installed successfully!".into(),
+                            });
+                            set_install_log.update(|l| {
+                                l.push("Installation complete! Reboot to start NixOS.".into())
+                            });
+                            // Clear in-progress flag (Phase 4.3)
+                            remove_from_storage("si_install_in_progress");
+                            previous_install_in_progress.set(false);
+                        } else {
+                            relay_state.set(RelayState::Failed(format!(
+                                "Install exited with code {code}"
+                            )));
+                            set_install_log.update(|l| {
+                                l.push(format!("Installation failed (exit code {code})"))
+                            });
+                            remove_from_storage("si_install_in_progress");
+                            previous_install_in_progress.set(false);
+                        }
+                        persist_log_force();
+                    }
 
-                "deep_scan" => {
-                    let data = msg.get("data").and_then(|v| v.as_str()).unwrap_or("");
-                    scan_data.update(|existing| {
-                        let prev = existing.clone().unwrap_or_default();
-                        *existing = Some(format!("{}--- Deep Scan (configs, keys, dev envs) ---\n{}", if prev.is_empty() { String::new() } else { format!("{prev}\n") }, data));
-                    });
-                    set_install_log.update(|l| l.push("Deep scan complete.".into()));
-                    persist_log();
-                }
+                    "data_preserved" => {
+                        let detail = msg
+                            .get("data")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("Backup complete");
+                        backup_status.set(Some(detail.to_string()));
+                        backup_complete.set(true);
+                        set_install_log.update(|l| l.push(format!("Backup: {detail}")));
+                        persist_log();
+                    }
 
-                "error" => {
-                    let err = msg.get("message").and_then(|v| v.as_str()).unwrap_or("Unknown error");
-                    relay_state.set(RelayState::Failed(err.to_string()));
-                    set_install_log.update(|l| l.push(format!("Error: {err}")));
-                    persist_log();
-                }
+                    "app_scan" => {
+                        let data = msg.get("data").and_then(|v| v.as_str()).unwrap_or("");
+                        scan_data.update(|existing| {
+                            let prev = existing.clone().unwrap_or_default();
+                            *existing = Some(format!(
+                                "{}--- Installed Apps ---\n{}",
+                                if prev.is_empty() {
+                                    String::new()
+                                } else {
+                                    format!("{prev}\n")
+                                },
+                                data
+                            ));
+                        });
+                        set_install_log.update(|l| l.push("App scan complete.".into()));
+                        persist_log();
+                    }
 
-                _ => {}
-            }
-        });
+                    "deep_scan" => {
+                        let data = msg.get("data").and_then(|v| v.as_str()).unwrap_or("");
+                        scan_data.update(|existing| {
+                            let prev = existing.clone().unwrap_or_default();
+                            *existing = Some(format!(
+                                "{}--- Deep Scan (configs, keys, dev envs) ---\n{}",
+                                if prev.is_empty() {
+                                    String::new()
+                                } else {
+                                    format!("{prev}\n")
+                                },
+                                data
+                            ));
+                        });
+                        set_install_log.update(|l| l.push("Deep scan complete.".into()));
+                        persist_log();
+                    }
+
+                    "error" => {
+                        let err = msg
+                            .get("message")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("Unknown error");
+                        relay_state.set(RelayState::Failed(err.to_string()));
+                        set_install_log.update(|l| l.push(format!("Error: {err}")));
+                        persist_log();
+                    }
+
+                    _ => {}
+                }
+            },
+        );
         ws.set_onmessage(Some(onmessage.as_ref().unchecked_ref()));
         onmessage.forget();
 
         // onerror — if installing, attempt reconnect (Phase 4.1)
         let onerror = wasm_bindgen::closure::Closure::<dyn Fn()>::new(move || {
             let current = relay_state.get();
-            let was_installing = matches!(current, RelayState::Installing | RelayState::Reconnecting(_));
+            let was_installing = matches!(
+                current,
+                RelayState::Installing | RelayState::Reconnecting(_)
+            );
             if was_installing {
                 let attempts = reconnect_attempts.get();
                 if attempts < 3 {
                     let next = attempts + 1;
                     reconnect_attempts.set(next);
                     relay_state.set(RelayState::Reconnecting(next));
-                    set_install_log.update(|l| l.push(
-                        format!("Connection lost. Reconnecting... (attempt {}/3)", next)
-                    ));
+                    set_install_log.update(|l| {
+                        l.push(format!(
+                            "Connection lost. Reconnecting... (attempt {}/3)",
+                            next
+                        ))
+                    });
                     persist_log();
                     // Schedule reconnect after 2^attempt seconds
                     let delay_ms = (1u32 << next) * 1000;
@@ -739,19 +926,20 @@ pub fn RemoteInstallPanel(
                         // Reload to trigger resume flow (Phase 4.3)
                         let _ = web_sys::window().unwrap().location().reload();
                     });
-                    let _ = web_sys::window().unwrap().set_timeout_with_callback_and_timeout_and_arguments_0(
-                        cb.as_ref().unchecked_ref(),
-                        delay_ms as i32,
-                    );
+                    let _ = web_sys::window()
+                        .unwrap()
+                        .set_timeout_with_callback_and_timeout_and_arguments_0(
+                            cb.as_ref().unchecked_ref(),
+                            delay_ms as i32,
+                        );
                     cb.forget();
                 } else {
                     relay_state.set(RelayState::Failed(
                         "Connection lost. The install may still be running on the target machine. \
-                         Check the target's console or reconnect manually.".into(),
+                         Check the target's console or reconnect manually."
+                            .into(),
                     ));
-                    set_install_log.update(|l| l.push(
-                        "All reconnect attempts failed.".into()
-                    ));
+                    set_install_log.update(|l| l.push("All reconnect attempts failed.".into()));
                     persist_log();
                 }
             } else {
@@ -767,35 +955,42 @@ pub fn RemoteInstallPanel(
         // onclose — handle clean close during install (Phase 4.1)
         let onclose = wasm_bindgen::closure::Closure::<dyn Fn()>::new(move || {
             let current = relay_state.get();
-            let was_installing = matches!(current, RelayState::Installing | RelayState::Reconnecting(_));
+            let was_installing = matches!(
+                current,
+                RelayState::Installing | RelayState::Reconnecting(_)
+            );
             if was_installing {
                 let attempts = reconnect_attempts.get();
                 if attempts < 3 {
                     let next = attempts + 1;
                     reconnect_attempts.set(next);
                     relay_state.set(RelayState::Reconnecting(next));
-                    set_install_log.update(|l| l.push(
-                        format!("Connection closed. Reconnecting... (attempt {}/3)", next)
-                    ));
+                    set_install_log.update(|l| {
+                        l.push(format!(
+                            "Connection closed. Reconnecting... (attempt {}/3)",
+                            next
+                        ))
+                    });
                     persist_log();
                     let delay_ms = (1u32 << next) * 1000;
                     let cb = wasm_bindgen::closure::Closure::<dyn Fn()>::new(move || {
                         // Reload to trigger resume flow (Phase 4.3)
                         let _ = web_sys::window().unwrap().location().reload();
                     });
-                    let _ = web_sys::window().unwrap().set_timeout_with_callback_and_timeout_and_arguments_0(
-                        cb.as_ref().unchecked_ref(),
-                        delay_ms as i32,
-                    );
+                    let _ = web_sys::window()
+                        .unwrap()
+                        .set_timeout_with_callback_and_timeout_and_arguments_0(
+                            cb.as_ref().unchecked_ref(),
+                            delay_ms as i32,
+                        );
                     cb.forget();
                 } else {
                     relay_state.set(RelayState::Failed(
                         "Connection lost. The install may still be running on the target machine. \
-                         Check the target's console or reconnect manually.".into(),
+                         Check the target's console or reconnect manually."
+                            .into(),
                     ));
-                    set_install_log.update(|l| l.push(
-                        "All reconnect attempts failed.".into()
-                    ));
+                    set_install_log.update(|l| l.push("All reconnect attempts failed.".into()));
                     persist_log_force();
                 }
             }
@@ -849,10 +1044,14 @@ pub fn RemoteInstallPanel(
 
     let start_scan = move || {
         // Don't scan if already connected or have URL params
-        if relay_state.get() == RelayState::Connected { return; }
+        if relay_state.get() == RelayState::Connected {
+            return;
+        }
         if let Some(window) = web_sys::window() {
             if let Ok(search) = window.location().search() {
-                if search.contains("target=") { return; }
+                if search.contains("target=") {
+                    return;
+                }
             }
         }
 
@@ -926,7 +1125,10 @@ pub fn RemoteInstallPanel(
                         set_target_addr.set(ip);
                         scanning_network.set(false);
                         // Clean up
-                        let _ = js_sys::Reflect::delete_property(&window, &"__sovereign_discovered".into());
+                        let _ = js_sys::Reflect::delete_property(
+                            &window,
+                            &"__sovereign_discovered".into(),
+                        );
                         return;
                     }
                 }
@@ -936,7 +1138,8 @@ pub fn RemoteInstallPanel(
         });
         let window = web_sys::window().unwrap();
         let _ = window.set_timeout_with_callback_and_timeout_and_arguments_0(
-            cb.as_ref().unchecked_ref(), 5000
+            cb.as_ref().unchecked_ref(),
+            5000,
         );
         cb.forget();
     };
@@ -955,7 +1158,9 @@ pub fn RemoteInstallPanel(
     // ── Start install ──
     let start_install = move || {
         let disk = selected_disk.get();
-        if disk.is_empty() { return; }
+        if disk.is_empty() {
+            return;
+        }
 
         relay_state.set(RelayState::Installing);
         reconnect_attempts.set(0);

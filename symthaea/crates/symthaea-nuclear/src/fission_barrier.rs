@@ -90,8 +90,14 @@ fn shell_correction_at_beta(z: u16, n: u16, beta2: f64) -> f64 {
     let magic_z = [2.0, 8.0, 20.0, 28.0, 50.0, 82.0, 114.0, 126.0];
     let magic_n = [2.0, 8.0, 20.0, 28.0, 50.0, 82.0, 126.0, 184.0];
 
-    let dz = magic_z.iter().map(|&m| (z_f - m).abs()).fold(f64::INFINITY, f64::min);
-    let dn = magic_n.iter().map(|&m| (n_f - m).abs()).fold(f64::INFINITY, f64::min);
+    let dz = magic_z
+        .iter()
+        .map(|&m| (z_f - m).abs())
+        .fold(f64::INFINITY, f64::min);
+    let dn = magic_n
+        .iter()
+        .map(|&m| (n_f - m).abs())
+        .fold(f64::INFINITY, f64::min);
 
     // Shell correction magnitude (negative near magic, zero far from magic)
     let shell_magnitude = -6.0 * (-0.15 * (dz + dn)).exp();
@@ -220,7 +226,9 @@ mod tests {
             assert!(
                 result.total_barrier >= 0.0,
                 "Z={} N={}: barrier = {} should be >= 0",
-                z, n, result.total_barrier
+                z,
+                n,
+                result.total_barrier
             );
         }
     }

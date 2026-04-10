@@ -26,7 +26,9 @@
 //! - Rhythm coherence (timing regularity relative to target)
 //! - Penalize exact copies (novelty bonus for creative interpolation)
 
-use crate::{midi_loader, neural_melody::NeuralMelody, pitch, rhythm, MuseConfig, MusicalState, Note};
+use crate::{
+    midi_loader, neural_melody::NeuralMelody, pitch, rhythm, MuseConfig, MusicalState, Note,
+};
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
 use std::path::Path;
@@ -144,8 +146,8 @@ pub fn train_projections(
 
     // Initialize: weights = [3.0, 2.0, 2.0], biases = [0.0, 0.0, 0.0]
     let mut projections: Vec<ContinuousHV> = vec![
-        ContinuousHV::from_values(vec![3.0, 2.0, 2.0]),  // weights
-        ContinuousHV::from_values(vec![0.0, 0.0, 0.0]),  // biases
+        ContinuousHV::from_values(vec![3.0, 2.0, 2.0]), // weights
+        ContinuousHV::from_values(vec![0.0, 0.0, 0.0]), // biases
     ];
 
     let mut rng = StdRng::seed_from_u64(config.seed);
@@ -164,8 +166,7 @@ pub fn train_projections(
 
         // Generate perturbations and evaluate fitness
         let mut fitnesses = Vec::with_capacity(config.population_size);
-        let mut perturbations: Vec<Vec<ContinuousHV>> =
-            Vec::with_capacity(config.population_size);
+        let mut perturbations: Vec<Vec<ContinuousHV>> = Vec::with_capacity(config.population_size);
 
         for _ in 0..config.population_size {
             // Perturb each projection vector
@@ -228,14 +229,12 @@ pub fn train_projections(
             for dim_idx in 0..projections[proj_idx].values.len() {
                 let mut gradient = 0.0f32;
                 for (pop_idx, advantage) in advantages.iter().enumerate() {
-                    let delta =
-                        perturbations[pop_idx][proj_idx].values[dim_idx]
-                            - projections[proj_idx].values[dim_idx];
+                    let delta = perturbations[pop_idx][proj_idx].values[dim_idx]
+                        - projections[proj_idx].values[dim_idx];
                     gradient += advantage * delta;
                 }
                 gradient /= (config.population_size as f32) * config.noise_sigma;
-                projections[proj_idx].values[dim_idx] +=
-                    config.learning_rate * gradient;
+                projections[proj_idx].values[dim_idx] += config.learning_rate * gradient;
             }
         }
 
@@ -257,10 +256,7 @@ pub fn train_projections(
     }
 
     // Extract projection values for serialization
-    let proj_values: Vec<Vec<f32>> = projections
-        .iter()
-        .map(|p| p.values.clone())
-        .collect();
+    let proj_values: Vec<Vec<f32>> = projections.iter().map(|p| p.values.clone()).collect();
 
     TrainingResult {
         fitness_trajectory,
@@ -305,17 +301,31 @@ fn pitch_contour_correlation(a: &[Note], b: &[Note]) -> f32 {
     }
 
     // Extract contour direction sequences
-    let contour_a: Vec<f32> = a.windows(2).map(|w| {
-        if w[1].frequency > w[0].frequency { 1.0 }
-        else if w[1].frequency < w[0].frequency { -1.0 }
-        else { 0.0 }
-    }).collect();
+    let contour_a: Vec<f32> = a
+        .windows(2)
+        .map(|w| {
+            if w[1].frequency > w[0].frequency {
+                1.0
+            } else if w[1].frequency < w[0].frequency {
+                -1.0
+            } else {
+                0.0
+            }
+        })
+        .collect();
 
-    let contour_b: Vec<f32> = b.windows(2).map(|w| {
-        if w[1].frequency > w[0].frequency { 1.0 }
-        else if w[1].frequency < w[0].frequency { -1.0 }
-        else { 0.0 }
-    }).collect();
+    let contour_b: Vec<f32> = b
+        .windows(2)
+        .map(|w| {
+            if w[1].frequency > w[0].frequency {
+                1.0
+            } else if w[1].frequency < w[0].frequency {
+                -1.0
+            } else {
+                0.0
+            }
+        })
+        .collect();
 
     let min_len = contour_a.len().min(contour_b.len());
     if min_len == 0 {
@@ -397,8 +407,14 @@ fn rhythm_coherence(a: &[Note], b: &[Note]) -> f32 {
     }
 
     // Compare inter-onset interval distributions
-    let ioi_a: Vec<f32> = a.windows(2).map(|w| w[1].start_time - w[0].start_time).collect();
-    let ioi_b: Vec<f32> = b.windows(2).map(|w| w[1].start_time - w[0].start_time).collect();
+    let ioi_a: Vec<f32> = a
+        .windows(2)
+        .map(|w| w[1].start_time - w[0].start_time)
+        .collect();
+    let ioi_b: Vec<f32> = b
+        .windows(2)
+        .map(|w| w[1].start_time - w[0].start_time)
+        .collect();
 
     // Quantize to beat fractions and compare
     let mean_a = ioi_a.iter().sum::<f32>() / ioi_a.len() as f32;
@@ -459,10 +475,14 @@ pub fn save_projections(projections: &[Vec<f32>], path: &Path) -> std::io::Resul
     // Simple JSON format: array of arrays
     let mut json = String::from("[");
     for (i, proj) in projections.iter().enumerate() {
-        if i > 0 { json.push(','); }
+        if i > 0 {
+            json.push(',');
+        }
         json.push('[');
         for (j, &v) in proj.iter().enumerate() {
-            if j > 0 { json.push(','); }
+            if j > 0 {
+                json.push(',');
+            }
             json.push_str(&format!("{v}"));
         }
         json.push(']');
@@ -543,7 +563,10 @@ mod tests {
         let different = make_notes(&[500.0, 600.0, 700.0, 800.0]);
         let novel = novelty_bonus(&different, &a);
         // Exact copy should score lower than something different
-        assert!(exact_copy < 0.5, "exact copy should be penalized: {exact_copy}");
+        assert!(
+            exact_copy < 0.5,
+            "exact copy should be penalized: {exact_copy}"
+        );
     }
 
     #[test]
