@@ -149,6 +149,19 @@ fn main() {
             search_claims,
             claim_count,
         ])
+        .setup(|app| {
+            // Force webview to fill window on Wayland (WebKitGTK sizing workaround)
+            use tauri::Manager;
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.set_resizable(true);
+                let size = window.inner_size().unwrap_or_default();
+                let _ = window.set_size(tauri::Size::Physical(tauri::PhysicalSize::new(
+                    size.width.max(1024),
+                    size.height.max(768),
+                )));
+            }
+            Ok(())
+        })
         .run(tauri::generate_context!())
         .expect("error running Prism");
 }
