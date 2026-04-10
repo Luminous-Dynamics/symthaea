@@ -150,15 +150,33 @@ fn main() {
             claim_count,
         ])
         .setup(|app| {
-            // Force webview to fill window on Wayland (WebKitGTK sizing workaround)
+            // WebKitGTK on Wayland: webview doesn't fill window.
+            // Workaround: inject JS to force body/html to window.innerWidth,
+            // and trigger a resize after a short delay.
             use tauri::Manager;
+            use tauri::Emitter;
             if let Some(window) = app.get_webview_window("main") {
-                let _ = window.set_resizable(true);
-                let size = window.inner_size().unwrap_or_default();
-                let _ = window.set_size(tauri::Size::Physical(tauri::PhysicalSize::new(
-                    size.width.max(1024),
-                    size.height.max(768),
-                )));
+                let w = window.clone();
+                std::thread::spawn(move || {
+                    std::thread::sleep(std::time::Duration::from_millis(500));
+                    let _ = w.eval(
+                        "document.documentElement.style.width='100vw';\
+                         document.body.style.width='100vw';\
+                         document.body.style.margin='0';\
+                         document.body.style.overflow='hidden auto';\
+                         window.dispatchEvent(new Event('resize'));"
+                    );
+                    // Toggle size to force WebKitGTK relayout
+                    if let Ok(size) = w.inner_size() {
+                        let _ = w.set_size(tauri::Size::Physical(tauri::PhysicalSize::new(
+                            size.width - 1, size.height,
+                        )));
+                        std::thread::sleep(std::time::Duration::from_millis(100));
+                        let _ = w.set_size(tauri::Size::Physical(tauri::PhysicalSize::new(
+                            size.width, size.height,
+                        )));
+                    }
+                });
             }
             Ok(())
         })

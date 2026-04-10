@@ -1,6 +1,6 @@
 /* Prism — 8 Harmony Themes + Spectral Vector Visualizer */
 
-/* Reset: ensure full-width in all webview contexts (Tauri, PWA, browser) */
+/* Reset: ensure full-width in all contexts */
 html, body {
     width: 100%;
     margin: 0;
