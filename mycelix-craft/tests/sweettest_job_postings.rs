@@ -101,13 +101,13 @@ async fn test_create_and_list_job_postings() {
         .call(&alice.zome("job_postings_coordinator"), "create_job_posting", input)
         .await;
 
-    let postings: Vec<(ActionHash, JobPosting)> = conductor
+    let postings: Vec<JobPosting> = conductor
         .call(&alice.zome("job_postings_coordinator"), "list_all_open_postings", ())
         .await;
 
     assert_eq!(postings.len(), 1);
-    assert_eq!(postings[0].1.title, "Rust Developer");
-    assert!(postings[0].1.remote_ok);
+    assert_eq!(postings[0].title, "Rust Developer");
+    assert!(postings[0].remote_ok);
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -162,7 +162,7 @@ async fn test_search_jobs_by_skill() {
         .await;
 
     // Search for rust jobs
-    let rust_results: Vec<(ActionHash, JobPosting)> = conductor
+    let rust_results: Vec<JobPosting> = conductor
         .call(
             &alice.zome("job_postings_coordinator"),
             "search_jobs_by_skill",
@@ -171,10 +171,10 @@ async fn test_search_jobs_by_skill() {
         .await;
 
     assert_eq!(rust_results.len(), 1);
-    assert_eq!(rust_results[0].1.title, "Rust Dev");
+    assert_eq!(rust_results[0].title, "Rust Dev");
 
     // Search for python jobs
-    let python_results: Vec<(ActionHash, JobPosting)> = conductor
+    let python_results: Vec<JobPosting> = conductor
         .call(
             &alice.zome("job_postings_coordinator"),
             "search_jobs_by_skill",
@@ -183,7 +183,7 @@ async fn test_search_jobs_by_skill() {
         .await;
 
     assert_eq!(python_results.len(), 1);
-    assert_eq!(python_results[0].1.title, "Python Dev");
+    assert_eq!(python_results[0].title, "Python Dev");
 }
 
 // ---------------------------------------------------------------------------
