@@ -85,6 +85,7 @@ exclude = [
     "crates/symtropy-gravcraft-demo",
     "crates/symtropy-holochain-relay",
     "crates/symtropy-lightyear",
+    "crates/symthaea-bevy-brain",
 ]
 
 [lints.clippy]
