@@ -921,6 +921,38 @@ impl CognitiveLoopService {
                         Some(Box::new(AuvBridgeAdapter(inner))
                             as Box<dyn super::motor_bridge::EmbodimentBridge>)
                     }
+                    #[cfg(feature = "exoskeleton")]
+                    EmbodimentPlatform::Exoskeleton => {
+                        let genesis = config.genesis_phrase.as_ref()
+                            .map(|p| symthaea_core::genesis::GenesisSeed::from_phrase(p))
+                            .unwrap_or_else(|| symthaea_core::genesis::GenesisSeed::from_phrase("default"));
+                        Some(Box::new(symthaea_exoskeleton::embodiment::ExoskeletonEmbodiment::new(&genesis))
+                            as Box<dyn super::motor_bridge::EmbodimentBridge>)
+                    }
+                    #[cfg(feature = "surgical")]
+                    EmbodimentPlatform::Surgical => {
+                        let genesis = config.genesis_phrase.as_ref()
+                            .map(|p| symthaea_core::genesis::GenesisSeed::from_phrase(p))
+                            .unwrap_or_else(|| symthaea_core::genesis::GenesisSeed::from_phrase("default"));
+                        Some(Box::new(symthaea_surgical::embodiment::SurgicalEmbodiment::new(&genesis))
+                            as Box<dyn super::motor_bridge::EmbodimentBridge>)
+                    }
+                    #[cfg(feature = "orbital")]
+                    EmbodimentPlatform::Orbital => {
+                        let genesis = config.genesis_phrase.as_ref()
+                            .map(|p| symthaea_core::genesis::GenesisSeed::from_phrase(p))
+                            .unwrap_or_else(|| symthaea_core::genesis::GenesisSeed::from_phrase("default"));
+                        Some(Box::new(symthaea_orbital::embodiment::OrbitalEmbodiment::new(&genesis))
+                            as Box<dyn super::motor_bridge::EmbodimentBridge>)
+                    }
+                    #[cfg(feature = "quadruped")]
+                    EmbodimentPlatform::Quadruped => {
+                        let genesis = config.genesis_phrase.as_ref()
+                            .map(|p| symthaea_core::genesis::GenesisSeed::from_phrase(p))
+                            .unwrap_or_else(|| symthaea_core::genesis::GenesisSeed::from_phrase("default"));
+                        Some(Box::new(symthaea_quadruped::embodiment::QuadrupedEmbodiment::new(&genesis))
+                            as Box<dyn super::motor_bridge::EmbodimentBridge>)
+                    }
                     _ => None,
                 }
             };

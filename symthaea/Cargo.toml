@@ -37,10 +37,11 @@ members = [
     "crates/symthaea-vocal-tract",
     "crates/symthaea-voice",
     "crates/symthaea-vehicle",
-    "crates/symthaea-exoskeleton",
-    "crates/symthaea-surgical",
-    "crates/symthaea-orbital",
-    "crates/symthaea-quadruped",
+    # New platforms (uncomment after creating crates):
+    # "crates/symthaea-exoskeleton",
+    # "crates/symthaea-surgical",
+    # "crates/symthaea-orbital",
+    # "crates/symthaea-quadruped",
     "crates/symthaea-browser",
     "crates/symthaea-hal",
     "crates/symthaea-ssm",
@@ -274,6 +275,11 @@ symthaea-auv = { path = "crates/symthaea-auv", optional = true }
 
 # Symthaea Manipulator - HDC-LTC consciousness-coupled industrial arm control
 symthaea-manipulator = { path = "crates/symthaea-manipulator", optional = true }
+# New platforms (uncomment after creating crates with scripts/new-platform.sh):
+# symthaea-exoskeleton = { path = "crates/symthaea-exoskeleton", optional = true }
+# symthaea-surgical = { path = "crates/symthaea-surgical", optional = true }
+# symthaea-orbital = { path = "crates/symthaea-orbital", optional = true }
+# symthaea-quadruped = { path = "crates/symthaea-quadruped", optional = true }
 
 # Symthaea HAL - Hardware abstraction layer (PCA9685 servo, I2C sensors, safety)
 symthaea-hal = { path = "crates/symthaea-hal", optional = true }
@@ -615,6 +621,11 @@ vehicle = ["dep:symthaea-vehicle"]         # HDC-LTC autonomous vehicle control 
 browser-agent = ["dep:symthaea-browser"]  # Consciousness-driven browser agent via CDP + HDC encoding
 auv = ["dep:symthaea-auv"]                 # HDC-LTC autonomous underwater vehicle control
 manipulator = ["dep:symthaea-manipulator"] # HDC-LTC consciousness-coupled industrial arm control
+# New platforms (uncomment after creating crates):
+# exoskeleton = ["dep:symthaea-exoskeleton"]
+# surgical = ["dep:symthaea-surgical"]
+# orbital = ["dep:symthaea-orbital"]
+# quadruped = ["dep:symthaea-quadruped"]
 hal = ["dep:symthaea-hal", "humanoid"]    # Hardware abstraction layer (PCA9685 servos, I2C sensors, safety interlocks)
 ssm-power = ["dep:symthaea-ssm", "mesh", "school_learning"]  # Diagonal SSM sensor integration (power stream)
 ssm-power-hal = ["ssm-power", "hal", "symthaea-hal/linux", "dep:linux-embedded-hal"]

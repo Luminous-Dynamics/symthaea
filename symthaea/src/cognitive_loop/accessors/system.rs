@@ -561,6 +561,22 @@ impl CognitiveLoopService {
                     let inner = crate::auv::embodiment::AuvEmbodiment::new(&genesis);
                     Some(Box::new(super::super::constructor::AuvBridgeAdapter(inner)))
                 }
+                #[cfg(feature = "exoskeleton")]
+                EmbodimentPlatform::Exoskeleton => {
+                    Some(Box::new(symthaea_exoskeleton::embodiment::ExoskeletonEmbodiment::new(&genesis)))
+                }
+                #[cfg(feature = "surgical")]
+                EmbodimentPlatform::Surgical => {
+                    Some(Box::new(symthaea_surgical::embodiment::SurgicalEmbodiment::new(&genesis)))
+                }
+                #[cfg(feature = "orbital")]
+                EmbodimentPlatform::Orbital => {
+                    Some(Box::new(symthaea_orbital::embodiment::OrbitalEmbodiment::new(&genesis)))
+                }
+                #[cfg(feature = "quadruped")]
+                EmbodimentPlatform::Quadruped => {
+                    Some(Box::new(symthaea_quadruped::embodiment::QuadrupedEmbodiment::new(&genesis)))
+                }
                 _ => None,
             };
 
