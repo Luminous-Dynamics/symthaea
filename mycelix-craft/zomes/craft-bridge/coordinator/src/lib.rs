@@ -110,3 +110,40 @@ pub fn broadcast_event(event: CraftEventEntry) -> ExternResult<Record> {
     get(event_hash, GetOptions::default())?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Failed to store event".into())))
 }
+
+// ---------------------------------------------------------------------------
+// Consciousness credential stub (required by gate_civic/gate_consciousness)
+// ---------------------------------------------------------------------------
+
+/// Bootstrap consciousness credential for the Craft cluster.
+///
+/// Required by `gate_civic()` which calls `get_consciousness_credential`
+/// on the bridge zome. Returns a bootstrap credential with default scores.
+/// In production, this would fetch from the identity cluster via OtherRole.
+#[hdk_extern]
+pub fn get_consciousness_credential(
+    did: String,
+) -> ExternResult<bridge::ConsciousnessCredential> {
+    let now_us = sys_time()?.as_micros() as u64;
+    let actual_did = if did.is_empty() {
+        format!("did:mycelix:{}", agent_info()?.agent_initial_pubkey)
+    } else {
+        did
+    };
+    Ok(bridge::bootstrap_credential(actual_did, 0.5, now_us))
+}
+
+/// Refresh stub — delegates to get_consciousness_credential.
+#[hdk_extern]
+pub fn refresh_consciousness_credential(
+    did: String,
+) -> ExternResult<bridge::ConsciousnessCredential> {
+    get_consciousness_credential(did)
+}
+
+/// Governance gate audit log (best-effort, called by gate_civic).
+#[hdk_extern]
+pub fn log_governance_gate(_input: bridge::GateAuditInput) -> ExternResult<()> {
+    // Best-effort audit — no-op for now
+    Ok(())
+}
