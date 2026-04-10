@@ -26,6 +26,7 @@
 //! 10. Epoch evaluation (milestone checks)
 
 pub mod agent;
+pub mod civic_dimensions;
 pub mod biosphere;
 pub mod cascade;
 pub mod config;
