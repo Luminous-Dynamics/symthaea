@@ -11,9 +11,11 @@ categories = ["data-structures", "science"]
 [features]
 default = ["serde"]
 serde = ["dep:serde"]
+hdc = ["dep:blake3"]
 
 [dependencies]
 serde = { version = "1", features = ["derive"], optional = true }
+blake3 = { version = "1", optional = true }
 
 [dev-dependencies]
 serde_json = "1"

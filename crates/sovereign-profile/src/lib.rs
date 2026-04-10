@@ -36,6 +36,8 @@
 
 pub mod compat;
 pub mod decay;
+#[cfg(feature = "hdc")]
+pub mod hdc;
 pub mod i18n;
 pub mod weights;
 
