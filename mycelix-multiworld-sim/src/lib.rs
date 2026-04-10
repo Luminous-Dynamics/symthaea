@@ -33,6 +33,7 @@ pub mod currency;
 pub mod governance_hardening;
 pub mod sanctions;
 pub mod peer_recognition;
+pub mod proposals;
 pub mod scoring_bridge;
 pub mod biosphere;
 pub mod cascade;
@@ -3548,6 +3549,39 @@ impl MultiWorldSimulator {
             // Phase 7: Governance
             self.tick_governance();
 
+
+            // Phase 7.25: Proposal Governance — factions propose, citizens vote
+            {
+                let tick = self.current_tick;
+                for world in &mut self.worlds {
+                    let factions_snapshot: Vec<crate::factions::Faction> = self.faction_engine
+                        .factions.iter()
+                        .cloned()
+                        .collect();
+                    let mut next_id = (tick * 100) as u32;
+                    let mut new_proposals = proposals::generate_proposals(
+                        &factions_snapshot,
+                        &world.policy_state,
+                        tick,
+                        &mut next_id,
+                        &mut self.rng,
+                    );
+                    for proposal in &mut new_proposals {
+                        proposals::tally_votes(
+                            proposal,
+                            &mut world.agents,
+                            &factions_snapshot,
+                            tick,
+                            &mut self.rng,
+                        );
+                        let adults = world.agents.iter().filter(|a| a.is_alive()).count();
+                        let status = proposals::resolve_proposal(proposal, adults);
+                        if status == proposals::ProposalStatus::Passed {
+                            proposals::execute_proposal(proposal, &mut world.policy_state);
+                        }
+                    }
+                }
+            }
             // Phase 7.5: Graduated Sanctions (Ostrom Principle 5, Zosh et al. 2025)
             for world in &mut self.worlds {
                 let oppression = world.governance.oppression_index;
@@ -4203,7 +4237,7 @@ impl Default for World {
             knowledge: knowledge::WorldKnowledge::new(),
             economy: economy::WorldEconomy::new(),
             harmony: harmony::HarmonyTracker::new(),
-            governance: governance::WorldGovernance::new(), metabolism_state: crate::metabolism::MetabolismState::default(), currency_state: crate::currency::WorldCurrencyState::default(),
+            governance: governance::WorldGovernance::new(), metabolism_state: crate::metabolism::MetabolismState::default(), currency_state: crate::currency::WorldCurrencyState::default(), policy_state: crate::proposals::PolicyState::default(),
             power_generation_kw: 0.0,
             power_demand_kw: 0.0,
             narrative_identity: crate::world::NarrativeIdentity::default(),
