@@ -227,14 +227,25 @@ impl WorldGovernance {
         let tier_dist = world.tier_distribution();
         let eligible_fraction = self.eligible_voter_fraction(&tier_dist);
 
+        // MYCEL-blended eligible fraction: 50% consciousness tier + 50% MYCEL score
+        // This makes soulbound reputation matter for governance, not just raw Phi.
+        let mycel_eligible = {
+            let pop = world.population().max(1) as f64;
+            let mycel_voters = world.agents.iter()
+                .filter(|a| a.is_alive() && a.mycel_score >= 0.3)
+                .count() as f64;
+            mycel_voters / pop
+        };
+        let effective_eligible = eligible_fraction * 0.5 + mycel_eligible * 0.5;
+
         // --- Check for amendments (every review period) ---
         if amendment_enabled
             && current_tick > 0
             && current_tick % AMENDMENT_REVIEW_PERIOD == 0
-            && eligible_fraction > 0.3
+            && effective_eligible > 0.3
         {
-            // Amendment probability depends on eligible voter fraction and stability
-            let amendment_prob = eligible_fraction * (1.0 - self.stability_score * 0.5);
+            // Amendment probability depends on MYCEL-blended eligible fraction and stability
+            let amendment_prob = effective_eligible * (1.0 - self.stability_score * 0.5);
             if rng.bernoulli(amendment_prob.clamp(0.0, 0.8)) {
                 self.amendment_count += 1;
                 self.amendments_this_period += 1;
