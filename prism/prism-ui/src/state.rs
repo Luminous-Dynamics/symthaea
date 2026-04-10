@@ -82,6 +82,9 @@ pub struct BrowserState {
     set_history_cursor: WriteSignal<usize>,
     /// True while navigating via back/forward (suppresses push).
     navigating_history: StoredValue<bool>,
+    /// Generation counter to discard stale external search results.
+    pub search_generation: ReadSignal<u64>,
+    pub set_search_generation: WriteSignal<u64>,
 }
 
 impl BrowserState {
@@ -112,6 +115,7 @@ impl BrowserState {
         let history = StoredValue::new(vec![initial_entry]);
         let (history_cursor, set_history_cursor) = signal(0usize);
         let navigating_history = StoredValue::new(false);
+        let (search_generation, set_search_generation) = signal(0u64);
 
         Self {
             current_url, set_current_url,
@@ -124,6 +128,7 @@ impl BrowserState {
             search_mode, set_search_mode,
             history, history_cursor, set_history_cursor,
             navigating_history,
+            search_generation, set_search_generation,
         }
     }
 

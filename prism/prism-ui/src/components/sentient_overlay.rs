@@ -19,9 +19,9 @@ const MAX_ANNOTATIONS: usize = 10;
 /// Scan page text for sentences that match known claims.
 /// Returns the HTML with epistemic annotations injected.
 pub fn annotate_html(html: &str, engine: &SearchEngine) -> String {
-    // Extract visible text from the sanitized HTML for scanning
-    let dom = prism_dom::parse_html(html);
-    let text = dom.extract_visible_text();
+    // Extract visible text via tag stripping (avoids full DOM re-parse since
+    // the HTML was already parsed and sanitized in engine.rs)
+    let text = strip_tags(html);
 
     if text.len() < 50 {
         return html.to_string();
@@ -111,6 +111,21 @@ pub fn annotate_html(html: &str, engine: &SearchEngine) -> String {
     } else {
         html.to_string()
     }
+}
+
+/// Strip HTML tags to extract visible text (lightweight alternative to full DOM parse).
+fn strip_tags(html: &str) -> String {
+    let mut result = String::with_capacity(html.len() / 2);
+    let mut in_tag = false;
+    for ch in html.chars() {
+        match ch {
+            '<' => in_tag = true,
+            '>' => { in_tag = false; result.push(' '); }
+            _ if !in_tag => result.push(ch),
+            _ => {}
+        }
+    }
+    result
 }
 
 /// Split text into sentences (simple heuristic).

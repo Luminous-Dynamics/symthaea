@@ -57,19 +57,18 @@ fn sanitize_html(html: &str) -> String {
 /// CORS proxy URL. Routes external fetches through the local proxy
 /// to bypass browser same-origin restrictions.
 /// Falls back to direct fetch if proxy is not running.
-fn proxy_url(url: &str) -> String {
+fn proxy_url(target: &str) -> String {
     // Try proxy at :8131 (same host as the app)
-    // The WASM app detects its own origin and constructs the proxy URL
     if let Some(window) = web_sys::window() {
         if let Ok(origin) = window.location().origin() {
-            // Replace the port with 8131
-            if let Some(base) = origin.rsplit_once(':') {
-                return format!("{}:8131/proxy?url={}", base.0, url);
+            if let Ok(parsed) = url::Url::parse(&origin) {
+                let scheme = parsed.scheme();
+                let host = parsed.host_str().unwrap_or("127.0.0.1");
+                return format!("{}://{}:8131/proxy?url={}", scheme, host, target);
             }
         }
     }
-    // Fallback: try localhost proxy
-    format!("http://127.0.0.1:8131/proxy?url={}", url)
+    format!("http://127.0.0.1:8131/proxy?url={}", target)
 }
 
 pub fn is_url(input: &str) -> bool {
@@ -182,15 +181,16 @@ fn search_query(query: &str, state: &BrowserState, engine: &SearchEngine) {
     state.set_threat_count.set(0);
     state.push_history(&url, &title, &view);
 
-    // Signal loading for web-augmented modes
-    if mode != SearchMode::Basic {
-        state.set_loading.set(true);
-    }
-
     // Advanced/Paradigm: augment with web sources in background
     if mode == SearchMode::Basic {
         return;
     }
+
+    // Increment generation to invalidate any in-flight searches
+    state.set_search_generation.update(|g| *g += 1);
+    let this_generation = state.search_generation.get_untracked();
+    let search_gen = state.search_generation;
+    state.set_loading.set(true);
 
     let query_owned = query.to_string();
     let set_view = state.set_view;
@@ -249,6 +249,12 @@ fn search_query(query: &str, state: &BrowserState, engine: &SearchEngine) {
 
         // Limit to top 20
         merged.truncate(20);
+
+        // Discard stale results if a newer search was started
+        if search_gen.get_untracked() != this_generation {
+            log::info!("Discarding stale search results (generation {})", this_generation);
+            return;
+        }
 
         set_view.set(PageView::Search {
             query: query_owned,

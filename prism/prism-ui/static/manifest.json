@@ -3,6 +3,7 @@
   "short_name": "Prism",
   "description": "Epistemic search browser. Every result carries an evidence level.",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
   "background_color": "#0d1a24",
   "theme_color": "#0d1a24",

@@ -127,3 +127,141 @@ pub type TabId = u32;
 
 /// Unique identifier for a search query.
 pub type QueryId = u64;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn content_zone_default_is_local() {
+        assert_eq!(ContentZone::default(), ContentZone::Local);
+    }
+
+    #[test]
+    fn safety_level_ordering() {
+        assert!(SafetyLevel::Green < SafetyLevel::Yellow);
+        assert!(SafetyLevel::Yellow < SafetyLevel::Orange);
+        assert!(SafetyLevel::Orange < SafetyLevel::Red);
+        assert!(SafetyLevel::Green < SafetyLevel::Red);
+    }
+
+    #[test]
+    fn safety_level_max() {
+        assert_eq!(SafetyLevel::Green.max(SafetyLevel::Orange), SafetyLevel::Orange);
+        assert_eq!(SafetyLevel::Red.max(SafetyLevel::Yellow), SafetyLevel::Red);
+    }
+
+    #[test]
+    fn rank_score_weights() {
+        let result = SearchResult {
+            content: "test".into(),
+            sources: vec![],
+            empirical_level: EmpiricalLevel::E4,
+            normative_level: NormativeLevel::N1,
+            materiality_level: MaterialityLevel::M2,
+            query_similarity: 1.0,
+            author_reputation: 1.0,
+            age_days: 0,
+            tags: vec![],
+        };
+        // Max everything: 0.4*1.0 + 0.3*1.0 + 0.2*1.0 + 0.1*1.0 = 1.0
+        let score = result.rank_score();
+        assert!((score - 1.0).abs() < 0.01, "max score should be ~1.0, got {}", score);
+    }
+
+    #[test]
+    fn rank_score_zero() {
+        let result = SearchResult {
+            content: "test".into(),
+            sources: vec![],
+            empirical_level: EmpiricalLevel::E0,
+            normative_level: NormativeLevel::N0,
+            materiality_level: MaterialityLevel::M0,
+            query_similarity: 0.0,
+            author_reputation: 0.0,
+            age_days: 365_000, // very old
+            tags: vec![],
+        };
+        let score = result.rank_score();
+        assert!(score < 0.01, "min score should be near 0, got {}", score);
+    }
+
+    #[test]
+    fn rank_score_freshness_decay() {
+        let fresh = SearchResult {
+            content: "test".into(),
+            sources: vec![],
+            empirical_level: EmpiricalLevel::E2,
+            normative_level: NormativeLevel::N1,
+            materiality_level: MaterialityLevel::M1,
+            query_similarity: 0.5,
+            author_reputation: 0.5,
+            age_days: 0,
+            tags: vec![],
+        };
+        let mut stale = fresh.clone();
+        stale.age_days = 3650; // 10 years
+        assert!(fresh.rank_score() > stale.rank_score());
+    }
+
+    #[test]
+    fn search_result_serde_roundtrip() {
+        let result = SearchResult {
+            content: "Ocean acidification reduces shell formation".into(),
+            sources: vec!["NOAA".into(), "doi:10.1234".into()],
+            empirical_level: EmpiricalLevel::E3,
+            normative_level: NormativeLevel::N2,
+            materiality_level: MaterialityLevel::M3,
+            query_similarity: 0.87,
+            author_reputation: 0.92,
+            age_days: 42,
+            tags: vec!["climate".into(), "ocean".into()],
+        };
+        let json = serde_json::to_string(&result).unwrap();
+        let restored: SearchResult = serde_json::from_str(&json).unwrap();
+        assert_eq!(result, restored);
+    }
+
+    #[test]
+    fn content_zone_serde_roundtrip() {
+        for zone in [ContentZone::Private, ContentZone::Local, ContentZone::Public] {
+            let json = serde_json::to_string(&zone).unwrap();
+            let restored: ContentZone = serde_json::from_str(&json).unwrap();
+            assert_eq!(zone, restored);
+        }
+    }
+
+    #[test]
+    fn safety_level_serde_roundtrip() {
+        for level in [SafetyLevel::Green, SafetyLevel::Yellow, SafetyLevel::Orange, SafetyLevel::Red] {
+            let json = serde_json::to_string(&level).unwrap();
+            let restored: SafetyLevel = serde_json::from_str(&json).unwrap();
+            assert_eq!(level, restored);
+        }
+    }
+
+    #[test]
+    fn threat_type_variants_are_distinct() {
+        let threats = [
+            ThreatType::Adversarial,
+            ThreatType::Harmful,
+            ThreatType::Deceptive,
+            ThreatType::Boundary,
+            ThreatType::Incoherent,
+            ThreatType::Overload,
+            ThreatType::Unknown,
+        ];
+        // All 7 variants should be unique
+        let set: std::collections::HashSet<_> = threats.iter().collect();
+        assert_eq!(set.len(), 7);
+    }
+
+    #[test]
+    fn node_tier_serde_roundtrip() {
+        for tier in [NodeTier::Light, NodeTier::Relay, NodeTier::Archive] {
+            let json = serde_json::to_string(&tier).unwrap();
+            let restored: NodeTier = serde_json::from_str(&json).unwrap();
+            assert_eq!(tier, restored);
+        }
+    }
+}

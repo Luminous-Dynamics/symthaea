@@ -10,3 +10,6 @@ serde = { workspace = true }
 url = { workspace = true }
 thiserror = { workspace = true }
 mycelix-claim-types = { path = "../../crates/mycelix-claim-types" }
+
+[dev-dependencies]
+serde_json = { workspace = true }
