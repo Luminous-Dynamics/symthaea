@@ -86,13 +86,14 @@ fn WelcomePage() -> impl IntoView {
                         let q = query.to_string();
                         view! {
                             <li>
-                                <span class="example-query"
+                                <button class="example-query"
+                                   type="button"
                                    on:click=move |_| {
                                        crate::engine::trigger_search(&q);
                                    }
                                 >
-                                    <strong>{query}</strong>
-                                </span>
+                                    {query}
+                                </button>
                                 " — "{desc}
                             </li>
                         }

@@ -522,16 +522,22 @@ body {
 }
 .welcome .tagline { color: var(--content-text-secondary); font-size: 1.1em; margin-bottom: 32px; }
 .welcome .try-section { text-align: left; max-width: 500px; margin: 0 auto; }
-.example-query {
+button.example-query {
+    background: none;
+    border: none;
+    font: inherit;
     color: var(--prism-accent);
-    text-decoration: none;
     cursor: pointer;
     padding: 2px 0;
     border-bottom: 1px dashed var(--prism-accent);
     transition: opacity 0.15s;
+    text-align: left;
+    display: inline;
+    font-weight: 700;
+    -webkit-tap-highlight-color: rgba(74, 236, 216, 0.2);
 }
-.example-query:hover { opacity: 0.8; }
-.example-query:active { opacity: 0.6; }
+button.example-query:hover { opacity: 0.8; }
+button.example-query:active { opacity: 0.6; }
 
 /* ── Sentient Overlay (Voice of the People) ── */
 

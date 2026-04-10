@@ -106,17 +106,17 @@ pub fn App() -> impl IntoView {
         state_gear.set_view.set(PageView::Settings);
     };
 
+    let loading_display = move || if engine_ready.get() { "none" } else { "flex" };
+    let app_display = move || if engine_ready.get() { "block" } else { "none" };
+
     view! {
-        <Show
-            when=move || engine_ready.get()
-            fallback=|| view! {
-                <div class="loading-screen">
-                    <img src="/static/prism-loading.jpg" alt="Prism" class="loading-prism" />
-                    <span class="brand">"Prism"</span>
-                    <p>"Loading epistemic index\u{2026}"</p>
-                </div>
-            }
-        >
+        <div class="loading-screen" style:display=loading_display>
+            <img src="/static/prism-loading.jpg" alt="Prism" class="loading-prism" />
+            <span class="brand">"Prism"</span>
+            <p>"Loading epistemic index\u{2026}"</p>
+        </div>
+
+        <div style:display=app_display>
             <div class="chrome">
                 <div class="chrome-top">
                     <span class="brand-icon" inner_html=PRISM_ICON_MINI></span>
@@ -136,6 +136,6 @@ pub fn App() -> impl IntoView {
             <div class="content-viewport">
                 <ContentRouter />
             </div>
-        </Show>
+        </div>
     }
 }
