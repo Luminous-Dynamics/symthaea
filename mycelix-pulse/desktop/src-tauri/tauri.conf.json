@@ -1,0 +1,44 @@
+{
+  "productName": "Mycelix Pulse",
+  "version": "0.1.0",
+  "identifier": "com.mycelix.mail",
+  "build": {
+    "beforeDevCommand": "cd ../../apps/leptos && env -u NO_COLOR RUSTC_WRAPPER= SCCACHE_DISABLE=1 ~/.cargo/bin/trunk serve --address 127.0.0.1 --port 1420",
+    "beforeBuildCommand": "cd ../../apps/leptos && env -u NO_COLOR RUSTC_WRAPPER= SCCACHE_DISABLE=1 ~/.cargo/bin/trunk build --release",
+    "devUrl": "http://127.0.0.1:8117",
+    "frontendDist": "http://127.0.0.1:8117"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "Mycelix Pulse",
+        "width": 1280,
+        "height": 860,
+        "minWidth": 900,
+        "minHeight": 640,
+        "center": true,
+        "resizable": true,
+        "visible": true,
+        "zoomHotkeysEnabled": false
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; connect-src 'self' ws://localhost:8888 wss://mail-conductor.luminousdynamics.io http://localhost:8117 https://mail.mycelix.net; img-src 'self' data: blob: https:; worker-src 'self' blob:"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "category": "Productivity",
+    "icon": [
+      "icons/icon-32.png",
+      "icons/icon-128.png",
+      "icons/icon-256.png",
+      "icons/icon-512.png",
+      "icons/icon.ico",
+      "icons/icon.png"
+    ],
+    "shortDescription": "Mycelix Pulse desktop shell",
+    "longDescription": "Tauri v2 desktop wrapper for Mycelix Pulse — decentralized encrypted communication on Holochain."
+  }
+}
