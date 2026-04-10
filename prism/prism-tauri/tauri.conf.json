@@ -1,18 +1,18 @@
 {
   "$schema": "https://raw.githubusercontent.com/nicovell3/tauri/refs/heads/v2/packages/tauri-cli/schema.json",
-  "productName": "Symthaea Prism",
+  "productName": "Mycelix Prism",
   "version": "0.2.0",
   "identifier": "net.mycelix.prism",
   "build": {
-    "frontendDist": "../plexus-ui/dist",
+    "frontendDist": "../prism-ui/dist",
     "devUrl": "http://localhost:8130",
-    "beforeDevCommand": "cd ../plexus-ui && trunk serve --port 8130",
-    "beforeBuildCommand": "cd ../plexus-ui && trunk build --release"
+    "beforeDevCommand": "cd ../prism-ui && trunk serve --port 8130",
+    "beforeBuildCommand": "cd ../prism-ui && trunk build --release"
   },
   "app": {
     "windows": [
       {
-        "title": "Symthaea Prism",
+        "title": "Mycelix Prism",
         "width": 1024,
         "height": 768,
         "resizable": true,

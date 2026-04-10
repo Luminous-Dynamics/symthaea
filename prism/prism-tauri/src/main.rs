@@ -54,9 +54,13 @@ async fn fetch_url(
     url: String,
     state: State<'_, Mutex<PrismState>>,
 ) -> Result<FetchResult, String> {
-    let state = state.lock().map_err(|e| format!("Lock error: {}", e))?;
+    // Clone the client before dropping the lock (reqwest::Client is cheaply cloneable)
+    let client = {
+        let s = state.lock().map_err(|e| format!("Lock error: {}", e))?;
+        s.client.clone()
+    };
 
-    let response = state.client
+    let response = client
         .get(&url)
         .send()
         .await
@@ -70,12 +74,14 @@ async fn fetch_url(
     // Sanitize
     let clean = ammonia::clean(&html);
 
-    // Security analysis
+    // Security analysis (re-acquire lock for reflex arc)
     let parsed_url = url::Url::parse(&url).map_err(|e| format!("Bad URL: {}", e))?;
     let dom = parse_html(&html);
     let title = dom.title().unwrap_or_else(|| "Untitled".to_string());
-    let pre = state.reflex.pre_fetch(&parsed_url, false, false);
-    let post = state.reflex.post_parse(&dom, &pre);
+
+    let s = state.lock().map_err(|e| format!("Lock error: {}", e))?;
+    let pre = s.reflex.pre_fetch(&parsed_url, false, false);
+    let post = s.reflex.post_parse(&dom, &pre);
     let consent = ConsentStore::new();
     let zone = consent.resolve_zone(post.zone, parsed_url.host_str().unwrap_or(""));
 
@@ -98,14 +104,17 @@ fn search_claims(
     let state = state.lock().map_err(|e| format!("Lock error: {}", e))?;
     let results = state.search.search(&query, top_k);
 
-    Ok(results.into_iter().map(|r| SearchResultJson {
-        content: r.content,
-        sources: r.sources,
-        empirical_level: format!("{:?}", r.empirical_level),
-        query_similarity: r.query_similarity,
-        author_reputation: r.author_reputation,
-        tags: r.tags,
-        rank_score: r.rank_score(),
+    Ok(results.into_iter().map(|r| {
+        let score = r.rank_score();
+        SearchResultJson {
+            content: r.content,
+            sources: r.sources,
+            empirical_level: format!("{:?}", r.empirical_level),
+            query_similarity: r.query_similarity,
+            author_reputation: r.author_reputation,
+            tags: r.tags,
+            rank_score: score,
+        }
     }).collect())
 }
 
@@ -120,7 +129,7 @@ fn main() {
     env_logger::init();
 
     let prism_state = PrismState {
-        search: SearchEngine::with_seed_claims(),
+        search: SearchEngine::with_core_claims(),
         reflex: ReflexArc::new(),
         client: reqwest::Client::builder()
             .user_agent("Prism/0.2 (Tauri; +https://mycelix.net)")
