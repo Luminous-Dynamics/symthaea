@@ -37,6 +37,17 @@ pub use consciousness_profile::{
 #[cfg(feature = "hdk")]
 pub use consciousness_profile::gate_consciousness;
 
+// 8D Sovereign Profile — anti-tyranny civic identity (replacing 4D ConsciousnessProfile)
+pub mod sovereign_gate;
+pub use sovereign_profile::{
+    CivicRequirement, CivicTier, SovereignCredential, SovereignDimension, SovereignProfile,
+    civic_requirement_basic, civic_requirement_constitutional, civic_requirement_guardian,
+    civic_requirement_proposal, civic_requirement_voting,
+};
+pub use sovereign_profile::weights::DimensionWeights;
+#[cfg(feature = "hdk")]
+pub use sovereign_gate::gate_civic;
+
 pub mod offline_credential;
 pub mod sub_passport;
 
