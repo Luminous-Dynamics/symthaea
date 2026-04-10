@@ -4,10 +4,10 @@
   "version": "0.2.0",
   "identifier": "net.mycelix.prism",
   "build": {
-    "frontendDist": "../prism-ui/dist",
+    "frontendDist": "http://localhost:8130",
     "devUrl": "http://localhost:8130",
-    "beforeDevCommand": "cd ../prism-ui && trunk serve --port 8130",
-    "beforeBuildCommand": "cd ../prism-ui && trunk build --release"
+    "beforeDevCommand": "",
+    "beforeBuildCommand": ""
   },
   "app": {
     "windows": [
