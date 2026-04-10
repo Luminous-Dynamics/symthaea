@@ -15,23 +15,24 @@ use crate::state::{BrowserState, PageView};
 use prism_search::SearchEngine;
 use prism_reflex::ReflexArc;
 
-/// Try to fetch the precomputed index from /static/prism-index.bin.
-/// Falls back to computing from scratch if fetch fails.
-async fn load_search_engine() -> SearchEngine {
-    match gloo_net::http::Request::get("/static/prism-index.bin").send().await {
-        Ok(resp) if resp.ok() => {
-            match resp.binary().await {
-                Ok(bytes) => {
-                    log::info!("Loaded precomputed index ({} bytes)", bytes.len());
-                    return SearchEngine::from_precomputed(&bytes);
-                }
-                Err(e) => log::info!("Index fetch body error: {e}, computing from scratch"),
-            }
-        }
-        Ok(resp) => log::info!("Index fetch returned {}, computing from scratch", resp.status()),
-        Err(e) => log::info!("Index fetch failed: {e}, computing from scratch"),
+/// Fetch a precomputed index file, returning None on any failure.
+async fn fetch_index(path: &str) -> Option<SearchEngine> {
+    let resp = gloo_net::http::Request::get(path).send().await.ok()?;
+    if !resp.ok() { return None; }
+    let bytes = resp.binary().await.ok()?;
+    log::info!("Loaded index from {} ({} bytes)", path, bytes.len());
+    Some(SearchEngine::from_precomputed(&bytes))
+}
+
+/// Two-phase index loading:
+/// 1. Fetch core index (436 KB, ~189 curated claims) — instant
+/// 2. Fetch full index (22 MB, ~10K claims) in background — merges when ready
+async fn load_core_engine() -> SearchEngine {
+    if let Some(engine) = fetch_index("/static/prism-index-core.bin").await {
+        return engine;
     }
-    SearchEngine::with_seed_claims()
+    log::info!("Core index unavailable, computing from curated claims");
+    SearchEngine::with_core_claims()
 }
 
 const PRISM_ICON_MINI: &str = r##"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="24" height="24"><defs><linearGradient id="pg" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#2DD4BF" stop-opacity="0.3"/><stop offset="100%" stop-color="#050507" stop-opacity="0.6"/></linearGradient></defs><polygon points="256,80 400,380 112,380" fill="url(#pg)" stroke="#2DD4BF" stroke-width="12"/><line x1="256" y1="80" x2="256" y2="380" stroke="#2DD4BF" stroke-width="8" opacity="0.9"/><circle cx="256" cy="460" r="16" fill="#2DD4BF" opacity="0.8"/></svg>"##;
@@ -47,15 +48,31 @@ pub fn App() -> impl IntoView {
     provide_context(state.clone());
     provide_context(reflex);
 
-    // Load search engine asynchronously (fetch precomputed index, fallback to compute)
-    // We provide the context synchronously with a placeholder, then replace it when ready.
+    // Two-phase index loading:
+    // Phase 1: Fetch core index (436 KB) — app becomes usable in <1s
+    // Phase 2: Fetch full index (22 MB) in background — merges silently
     let engine_cell: StoredValue<Option<SearchEngine>> = StoredValue::new(None);
     provide_context(engine_cell);
 
     wasm_bindgen_futures::spawn_local(async move {
-        let engine = load_search_engine().await;
-        engine_cell.set_value(Some(engine));
+        // Phase 1: core index (instant)
+        let core = load_core_engine().await;
+        let core_count = core.claim_count();
+        engine_cell.set_value(Some(core));
         set_engine_ready.set(true);
+        log::info!("Phase 1: {} core claims ready", core_count);
+
+        // Phase 2: full index (background)
+        if let Some(full) = fetch_index("/static/prism-index.bin").await {
+            let full_count = full.claim_count();
+            engine_cell.update_value(|opt| {
+                if let Some(engine) = opt {
+                    engine.merge(full);
+                    log::info!("Phase 2: merged to {} total claims", engine.claim_count());
+                }
+            });
+            let _ = full_count; // suppress unused warning
+        }
     });
 
     // Load persisted settings on mount

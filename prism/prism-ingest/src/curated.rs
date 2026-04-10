@@ -166,4 +166,37 @@ const RAW: &[(&str, prism_common::EmpiricalLevel, &[&str], &[&str])] = &[
     // ── Oceanography ──
     ("The thermohaline circulation is a global ocean current system driven by differences in water density temperature and salinity", E4, &["Physical Oceanography"], &["oceanography", "currents"]),
     ("Coral reefs support approximately 25 percent of all marine species despite covering less than 1 percent of the ocean floor", E4, &["NOAA"], &["oceanography", "ecology"]),
+
+    // ── Networking & Internet ──
+    ("DNS translates human-readable domain names into IP addresses using a hierarchical distributed database", E4, &["IETF RFC 1035"], &["networking", "dns"]),
+    ("HTTP/2 multiplexes multiple requests over a single TCP connection eliminating head-of-line blocking", E4, &["IETF RFC 7540"], &["networking", "http"]),
+    ("TLS provides encryption authentication and integrity for internet communications using certificate authorities", E4, &["IETF RFC 8446"], &["networking", "security"]),
+    ("BGP is the routing protocol that enables autonomous systems on the internet to exchange reachability information", E4, &["IETF RFC 4271"], &["networking", "routing"]),
+
+    // ── Nutrition & Food Science ──
+    ("Vitamin D is synthesized in the skin when exposed to ultraviolet B radiation from sunlight", E4, &["NIH"], &["nutrition", "health"]),
+    ("Fermentation is a metabolic process where microorganisms convert sugars into acids gases or alcohol", E4, &["Food Science"], &["nutrition", "fermentation"]),
+    ("The human gut microbiome contains approximately 100 trillion microorganisms that influence digestion and immunity", E3, &["Nature 2012"], &["nutrition", "microbiome"]),
+
+    // ── Environmental Science ──
+    ("The ozone layer absorbs approximately 97 to 99 percent of incoming ultraviolet radiation from the sun", E4, &["NASA"], &["environment", "atmosphere"]),
+    ("Microplastics have been found in every ocean basin and in organisms from plankton to whales", E4, &["Science 2020"], &["environment", "pollution"]),
+    ("Permafrost in the Arctic contains approximately 1500 billion tonnes of organic carbon twice the amount in the atmosphere", E3, &["IPCC"], &["environment", "climate"]),
+
+    // ── Music Theory ──
+    ("The chromatic scale consists of twelve equally spaced semitones within each octave", E4, &["Music Theory"], &["music", "theory"]),
+    ("A Fourier transform decomposes any sound wave into a combination of simple sinusoidal frequencies", E4, &["Mathematics"], &["music", "physics"]),
+
+    // ── Linguistics ──
+    ("There are approximately 7000 languages spoken in the world today with nearly half considered endangered", E3, &["UNESCO"], &["linguistics", "languages"]),
+    ("Noam Chomsky proposed that humans have an innate language acquisition device that enables grammar learning", E3, &["Chomsky 1965"], &["linguistics", "cognition"]),
+
+    // ── Space Exploration ──
+    ("The International Space Station orbits Earth at approximately 408 kilometers altitude completing one orbit every 90 minutes", E4, &["NASA"], &["space", "iss"]),
+    ("The Voyager 1 spacecraft launched in 1977 is the most distant human-made object from Earth", E4, &["NASA"], &["space", "exploration"]),
+    ("The James Webb Space Telescope observes in infrared wavelengths from the Sun-Earth L2 Lagrange point", E4, &["NASA"], &["space", "telescope"]),
+
+    // ── Geology ──
+    ("Plate tectonics describes the movement of Earths lithospheric plates driven by convection in the mantle", E4, &["USGS"], &["geology", "tectonics"]),
+    ("The Ring of Fire is a horseshoe-shaped zone around the Pacific Ocean where 75 percent of volcanic eruptions occur", E4, &["USGS"], &["geology", "volcanoes"]),
 ];

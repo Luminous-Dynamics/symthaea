@@ -54,6 +54,16 @@ fn passes_quality(content: &str) -> bool {
     true
 }
 
+/// Load curated claims only (high-quality, ~90 claims).
+pub fn curated_claims() -> Vec<RawClaim> {
+    curated::curated_claims().into_iter().filter(|c| passes_quality(&c.content)).collect()
+}
+
+/// Load mycelix JSON claims only (~100-200 claims).
+pub fn mycelix_claims() -> Vec<RawClaim> {
+    mycelix::load_mycelix_claims().into_iter().filter(|c| passes_quality(&c.content)).collect()
+}
+
 /// Load all claims from all sources, deduplicated and quality-filtered.
 pub fn load_all_claims() -> Vec<RawClaim> {
     let mut claims = Vec::new();

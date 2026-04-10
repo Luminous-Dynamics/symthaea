@@ -104,6 +104,61 @@ impl SearchEngine {
         engine
     }
 
+    /// Build index from curated + mycelix claims only (no Wikidata).
+    /// Produces a small index (~200 claims) suitable for instant mobile loading.
+    pub fn with_core_claims() -> Self {
+        let mut engine = Self::new();
+        let mut all_claims = Vec::new();
+        all_claims.extend(prism_ingest::curated_claims());
+        all_claims.extend(prism_ingest::mycelix_claims());
+
+        for claim in &all_claims {
+            let lowered = claim.content.to_lowercase();
+            let words: std::collections::HashSet<&str> = lowered
+                .split(|c: char| !c.is_alphanumeric())
+                .filter(|w| w.len() >= 2 && !is_stop_word(w))
+                .collect();
+            for word in words {
+                *engine.word_df.entry(word.to_string()).or_insert(0) += 1;
+            }
+        }
+
+        let n_docs = all_claims.len() as f32;
+        for claim in all_claims {
+            let hv = encode_text_idf(&claim.content, &engine.word_df, n_docs);
+            engine.claims.push(ClaimEntry {
+                content: claim.content,
+                sources: claim.sources,
+                empirical_level: claim.empirical_level,
+                normative_level: claim.normative_level,
+                materiality_level: claim.materiality_level,
+                tags: claim.tags,
+            });
+            engine.vectors.push(hv);
+        }
+
+        log::info!("Core index loaded {} claims", engine.claims.len());
+        engine
+    }
+
+    /// Merge another engine's claims into this one (for lazy-loading).
+    pub fn merge(&mut self, other: Self) {
+        for (claim, vector) in other.claims.into_iter().zip(other.vectors) {
+            let prefix: String = claim.content.chars().take(80).collect::<String>().to_lowercase();
+            let is_dup = self.claims.iter().any(|c| {
+                c.content.chars().take(80).collect::<String>().to_lowercase() == prefix
+            });
+            if !is_dup {
+                self.claims.push(claim);
+                self.vectors.push(vector);
+            }
+        }
+        // Merge word_df
+        for (word, count) in other.word_df {
+            *self.word_df.entry(word).or_insert(0) += count;
+        }
+    }
+
     /// Add a claim to the index.
     pub fn add_claim(
         &mut self,
