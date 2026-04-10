@@ -28,6 +28,7 @@
 pub mod agent;
 pub mod civic_dimensions;
 pub mod metabolism;
+pub mod wound_healing;
 pub mod scoring_bridge;
 pub mod biosphere;
 pub mod cascade;
