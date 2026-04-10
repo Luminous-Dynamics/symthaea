@@ -49,6 +49,41 @@ export type {
   ClusterCatalog,
 } from "./sovereignty";
 
+// 8D Sovereign Profile (replaces 4D ConsciousnessProfile)
+export {
+  combinedScore as sovereignCombinedScore,
+  civicTier,
+  civicTierFromScore,
+  meetsRequirement,
+  decayScore,
+  halfLifeDays,
+  daysUntilThreshold,
+  profileToArray,
+  sovereignFromLegacy,
+  legacyCombinedScore,
+  SOVEREIGN_DIMENSIONS,
+  CIVIC_TIERS,
+  TIER_THRESHOLDS,
+  TIER_VOTE_WEIGHT_BP,
+  WEIGHTS_GOVERNANCE,
+  WEIGHTS_EQUAL,
+  WEIGHTS_ENERGY,
+  WEIGHTS_KNOWLEDGE,
+  WEIGHTS_CARE,
+  DIMENSION_LABELS,
+  LAMBDA_MIN,
+  LAMBDA_MAX,
+} from "./sovereign-profile";
+export type {
+  SovereignProfile,
+  SovereignDimension,
+  CivicTier,
+  DimensionWeights,
+  CivicRequirement,
+  SovereignCredential,
+  DimensionLabel,
+} from "./sovereign-profile";
+
 // Common types
 export type {
   BridgeDirection,
