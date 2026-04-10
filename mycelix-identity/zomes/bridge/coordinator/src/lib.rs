@@ -1671,14 +1671,40 @@ fn collect_thermodynamic_yield(did: &str) -> f64 {
 }
 
 /// Collect semantic resonance from federated learning (hyperfeel HV similarity).
-/// Collect semantic resonance from federated learning (hyperfeel HV similarity).
 ///
-/// NOTE: mycelix-core FL DNA is NOT yet a role in the unified hApp.
-/// Returns 0.0 — identity bridge falls back to community_score as proxy.
+/// Calls the core-FL DNA's `get_agent_semantic_resonance` extern which computes
+/// Hamming similarity between the agent's training HV and the community
+/// consensus HV. Returns 0.0 if the core_fl role is unavailable or the agent
+/// hasn't participated in any training rounds.
 fn collect_semantic_resonance() -> f64 {
-    // core_fl role needs to be added to mycelix-unified-happ.yaml before this works.
-    // The h_fl zome has get_agent_semantic_resonance() ready.
-    0.0
+    // Fetch latest completed FL round (best-effort)
+    let round: u32 = match call(
+        CallTargetCell::OtherRole("core_fl".into()),
+        ZomeName::new("h_fl"),
+        FunctionName::new("get_latest_completed_round"),
+        None,
+        (),
+    ) {
+        Ok(ZomeCallResponse::Ok(result)) => result.decode::<u32>().unwrap_or(0),
+        _ => return 0.0, // core-FL DNA not available
+    };
+
+    if round == 0 {
+        return 0.0;
+    }
+
+    match call(
+        CallTargetCell::OtherRole("core_fl".into()),
+        ZomeName::new("h_fl"),
+        FunctionName::new("get_agent_semantic_resonance"),
+        None,
+        round,
+    ) {
+        Ok(ZomeCallResponse::Ok(result)) => {
+            result.decode::<f64>().unwrap_or(0.0).clamp(0.0, 1.0)
+        }
+        _ => 0.0,
+    }
 }
 
 /// Collect economic velocity from finance cluster (TEND zome).

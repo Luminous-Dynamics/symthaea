@@ -4,7 +4,7 @@
 #
 # When all DNAs are installed as separate roles within the same hApp,
 # zomes can call between clusters using:
-#   call(CallTargetCell::OtherRole("identity"/"hearth"/"commons_land"/"commons_care"/"civic"/"finance"/"governance"/"energy"/...), zome, fn, None, payload)
+#   call(CallTargetCell::OtherRole("identity"/"hearth"/"commons_land"/"commons_care"/"civic"/"finance"/"governance"/"energy"/"core_fl"/...), zome, fn, None, payload)
 #
 # This is the deployment manifest for environments that need
 # cross-cluster integration (e.g., justice enforcement freezing
@@ -231,6 +231,17 @@ roles:
       deferred: false
     dna:
       path: ../../mycelix-craft/dna/mycelix_craft.dna
+      modifiers:
+        network_seed: ~
+        properties: ~
+      clone_limit: 0
+
+  - name: core_fl
+    provisioning:
+      strategy: create
+      deferred: false
+    dna:
+      path: ../../mycelix-core/dna/mycelix_core.dna
       modifiers:
         network_seed: ~
         properties: ~
