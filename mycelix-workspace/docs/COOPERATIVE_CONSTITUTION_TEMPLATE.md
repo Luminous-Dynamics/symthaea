@@ -100,7 +100,7 @@
 
 7.2. Price reports are voluntary and weighted by **historical accuracy** (EMA), not by member status or financial contribution.
 
-7.3. The **Roodepoort Resilience Basket** (or equivalent community basket) provides a composite index of local purchasing power. Basket composition is approved by governance.
+7.3. The **Community Essentials Basket** (or equivalent community basket) provides a composite index of local purchasing power. Basket composition is approved by governance.
 
 7.4. If the basket index shows weekly volatility exceeding 20%, the system may automatically adjust TEND credit limits to protect community stability.
 

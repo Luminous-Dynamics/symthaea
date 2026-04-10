@@ -1,5 +1,4 @@
 #![deny(unsafe_code)]
-
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
@@ -79,7 +78,7 @@ pub struct PriceReport {
     /// Price in TEND units (e.g., 0.15 = "15 minutes of labor")
     pub price_tend: f64,
 
-    /// Evidence or source (e.g., "Pick n Pay Roodepoort, 2026-03-14")
+    /// Evidence or source (e.g., "Local Market, 2026-03-14")
     pub evidence: String,
 
     /// DID of the reporter
@@ -125,7 +124,7 @@ pub struct PriceConsensus {
 #[hdk_entry_helper]
 #[derive(Clone, PartialEq)]
 pub struct BasketDefinition {
-    /// Basket name (e.g., "Roodepoort Essential Goods")
+    /// Basket name (e.g., "Community Essential Goods")
     pub name: String,
 
     /// Items in the basket with weights (must sum to ~1.0)

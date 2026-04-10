@@ -268,10 +268,10 @@ mod tests {
     #[test]
     fn test_mqtt_custom_topic() {
         let config = MqttConfig {
-            topic_root: "community/roodepoort".into(),
+            topic_root: "community/example".into(),
             ..Default::default()
         };
-        assert_eq!(config.tx_topic(), "community/roodepoort/tx");
-        assert_eq!(config.rx_topic(), "community/roodepoort/rx/#");
+        assert_eq!(config.tx_topic(), "community/example/tx");
+        assert_eq!(config.rx_topic(), "community/example/rx/#");
     }
 }

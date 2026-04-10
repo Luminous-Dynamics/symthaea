@@ -12,7 +12,7 @@ Open the Observatory in your browser:
 
 The **Resilience Dashboard** (`/resilience`) shows all 11 domains at a glance with live status indicators. Green = connected to DHT, yellow = demo mode.
 
-> **Demo mode**: If no conductor is running, the Observatory uses simulated Roodepoort data. All features work — data just isn't saved. Use demo mode for training before going live.
+> **Demo mode**: If no conductor is running, the Observatory uses simulated community data. All features work — data just isn't saved. Use demo mode for training before going live.
 
 ---
 
@@ -199,7 +199,7 @@ Shared knowledge graph for community claims and local expertise.
 
 1. Go to `/knowledge`
 2. Click **"+ Submit Claim"**
-3. Enter: title, content (the claim itself), confidence level (0-100%), and tags (comma-separated, e.g., "water, gardening, Roodepoort")
+3. Enter: title, content (the claim itself), confidence level (0-100%), and tags (comma-separated, e.g., "water, gardening, community")
 4. Click **Submit**
 
 Claims are stored on the DHT and searchable by the whole community. The **Graph Stats** panel shows total claims, connections, and domains tracked.

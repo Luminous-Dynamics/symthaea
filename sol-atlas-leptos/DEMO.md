@@ -48,7 +48,7 @@ Scrub the timeline from Year 0 to Year 300:
 ## Grid Stress Overlay (FEP)
 
 16 major population centers show **allostatic load** — a measure of grid fragility from Symthaea's Free Energy Principle (FEP) engine:
-- **Johannesburg / Cape Town**: High stress (Eskom crisis, 0.7-0.8 load)
+- **High-stress regions**: Elevated demand, aging infrastructure (0.7-0.8 load)
 - **Lagos / Cairo**: High stress (growing demand, limited infrastructure)
 - **Tokyo / Seoul**: Low stress (diversified, well-maintained grid)
 

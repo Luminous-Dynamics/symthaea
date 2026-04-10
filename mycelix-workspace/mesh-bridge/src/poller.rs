@@ -323,7 +323,7 @@ async fn poll_tend(
     cipher: Option<&XChaCha20Poly1305>,
 ) -> usize {
     let input = match encode_extern_io(serde_json::json!({
-        "dao_did": "roodepoort-resilience",
+        "dao_did": "example-community",
         "limit": MAX_ENTRIES_PER_DOMAIN
     })) {
         Ok(i) => i,
@@ -1093,7 +1093,7 @@ mod tests {
             hours: 1.0,
             service_description: "Fixed tap".into(),
             service_category: "Maintenance".into(),
-            dao_did: "roodepoort".into(),
+            dao_did: "example-community".into(),
         };
         let data = bincode::serialize(&tend).unwrap();
         let payload = RelayPayload::new(RelayType::TendExchange, origin, data);

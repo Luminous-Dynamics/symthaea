@@ -118,7 +118,7 @@ async fn test_price_report_and_consensus() {
             ReportPriceInput {
                 item: "bread_750g".into(),
                 price_tend: 0.15,
-                evidence: "Pick n Pay Roodepoort, 2026-03-14".into(),
+                evidence: "Local Market, 2026-03-14".into(),
             },
         )
         .await;
@@ -134,7 +134,7 @@ async fn test_price_report_and_consensus() {
             ReportPriceInput {
                 item: "bread_750g".into(),
                 price_tend: 0.17,
-                evidence: "Shoprite Roodepoort, 2026-03-14".into(),
+                evidence: "Community Store, 2026-03-14".into(),
             },
         )
         .await;
@@ -186,7 +186,7 @@ async fn test_consensus_requires_min_reporters() {
             ReportPriceInput {
                 item: "diesel_1l".into(),
                 price_tend: 1.5,
-                evidence: "Engen Roodepoort".into(),
+                evidence: "Fuel Station".into(),
             },
         )
         .await;
@@ -436,7 +436,7 @@ async fn test_basket_definition_and_index() {
             "price_oracle",
             "define_basket",
             DefineBasketInput {
-                name: "Roodepoort Essentials".into(),
+                name: "Community Essentials".into(),
                 items: vec![
                     BasketItemInput {
                         item: "bread_750g".into(),
@@ -458,12 +458,12 @@ async fn test_basket_definition_and_index() {
             "price_oracle",
             "get_basket_index",
             GetBasketIndexInput {
-                basket_name: "Roodepoort Essentials".into(),
+                basket_name: "Community Essentials".into(),
             },
         )
         .await;
 
-    assert_eq!(index.basket_name, "Roodepoort Essentials");
+    assert_eq!(index.basket_name, "Community Essentials");
     assert_eq!(index.item_prices.len(), 2);
     assert!(
         index.index > 0.0,

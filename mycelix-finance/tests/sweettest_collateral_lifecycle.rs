@@ -36,20 +36,13 @@
 
 use holochain::sweettest::*;
 use std::path::PathBuf;
+use finance_wire_types::{
+    AssetType, DepositCollateralInput, RegisterCollateralInput, UpdateCollateralHealthInput,
+};
 
 // ============================================================================
 // Mirror types — collateral registration
 // ============================================================================
-
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-pub enum AssetType {
-    RealEstate,
-    Vehicle,
-    Cryptocurrency,
-    EnergyAsset,
-    Equipment,
-    Other(String),
-}
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub enum CollateralStatus {
@@ -57,16 +50,6 @@ pub enum CollateralStatus {
     Pledged,
     Frozen,
     Released,
-}
-
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-pub struct RegisterCollateralInput {
-    pub owner_did: String,
-    pub source_happ: String,
-    pub asset_type: AssetType,
-    pub asset_id: String,
-    pub value_estimate: u64,
-    pub currency: String,
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -91,34 +74,6 @@ pub struct CreateCovenantInput {
 // ============================================================================
 // Mirror types — collateral health (LTV)
 // ============================================================================
-
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-pub struct UpdateCollateralHealthInput {
-    pub collateral_id: String,
-    pub obligation_amount: u64,
-}
-
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-pub struct CollateralHealth {
-    pub collateral_id: String,
-    pub current_value: u64,
-    pub obligation_amount: u64,
-    pub ltv_ratio: f64,
-    pub status: String,
-    pub computed_at: holochain::prelude::Timestamp,
-}
-
-// ============================================================================
-// Mirror types — deposit collateral
-// ============================================================================
-
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-pub struct DepositCollateralInput {
-    pub depositor_did: String,
-    pub collateral_type: String,
-    pub collateral_amount: u64,
-    pub oracle_rate: f64,
-}
 
 // ============================================================================
 // Mirror types — price oracle
@@ -386,8 +341,8 @@ async fn test_covenant_release_unblocks_collateral() {
         )
         .await;
 
-    let collateral_id = extract_entry_field(&collateral_record, "id")
-        .expect("Collateral should have 'id'");
+    let collateral_id =
+        extract_entry_field(&collateral_record, "id").expect("Collateral should have 'id'");
 
     // Create covenant
     let covenant_input = CreateCovenantInput {
@@ -405,8 +360,8 @@ async fn test_covenant_release_unblocks_collateral() {
         )
         .await;
 
-    let covenant_id = extract_entry_field(&covenant_record, "id")
-        .expect("Covenant should have 'id'");
+    let covenant_id =
+        extract_entry_field(&covenant_record, "id").expect("Covenant should have 'id'");
 
     // Release the covenant
     let _released: ::holochain::prelude::Record = conductor
@@ -563,8 +518,8 @@ async fn test_collateral_health_computation() {
         )
         .await;
 
-    let collateral_id = extract_entry_field(&collateral_record, "id")
-        .expect("Collateral should have 'id'");
+    let collateral_id =
+        extract_entry_field(&collateral_record, "id").expect("Collateral should have 'id'");
 
     // Compute health with a moderate obligation (oracle returns 0 in
     // isolated test since price_oracle has no data, so LTV will be Infinity
@@ -589,7 +544,10 @@ async fn test_collateral_health_computation() {
             // status will be "Liquidation"
             if let Some(status) = extract_entry_field(&record, "status") {
                 assert!(
-                    status == "Liquidation" || status == "Healthy" || status == "Warning" || status == "MarginCall",
+                    status == "Liquidation"
+                        || status == "Healthy"
+                        || status == "Warning"
+                        || status == "MarginCall",
                     "Health status should be a valid LTV status, got: {}",
                     status,
                 );
@@ -632,7 +590,7 @@ async fn test_energy_certificate_registration() {
     let alice_did = format!("did:mycelix:{}", alice.agent_pubkey());
 
     let cert_input = RegisterEnergyCertificateInput {
-        project_id: "proj-solar-roodepoort".to_string(),
+        project_id: "proj-solar-community".to_string(),
         source: "Solar".to_string(),
         kwh_produced: 10_000.0,
         period_start: holochain::prelude::Timestamp::from_micros(1_700_000_000_000_000),
@@ -887,11 +845,7 @@ async fn test_fiat_bridge_deposit() {
     };
 
     let result: Result<::holochain::prelude::Record, _> = conductor
-        .call_fallible(
-            &alice.zome("finance_bridge"),
-            "deposit_fiat",
-            fiat_input,
-        )
+        .call_fallible(&alice.zome("finance_bridge"), "deposit_fiat", fiat_input)
         .await;
 
     match result {
@@ -956,11 +910,7 @@ async fn test_fiat_bridge_rejects_zero_amount() {
     };
 
     let result: Result<::holochain::prelude::Record, _> = conductor
-        .call_fallible(
-            &alice.zome("finance_bridge"),
-            "deposit_fiat",
-            fiat_input,
-        )
+        .call_fallible(&alice.zome("finance_bridge"), "deposit_fiat", fiat_input)
         .await;
 
     assert!(
@@ -1000,11 +950,7 @@ async fn test_fiat_bridge_rejects_invalid_exchange_rate() {
     };
 
     let result: Result<::holochain::prelude::Record, _> = conductor
-        .call_fallible(
-            &alice.zome("finance_bridge"),
-            "deposit_fiat",
-            fiat_input,
-        )
+        .call_fallible(&alice.zome("finance_bridge"), "deposit_fiat", fiat_input)
         .await;
 
     assert!(
@@ -1052,8 +998,8 @@ async fn test_covenant_blocks_pledge_and_freeze() {
         )
         .await;
 
-    let collateral_id = extract_entry_field(&collateral_record, "id")
-        .expect("Collateral should have 'id'");
+    let collateral_id =
+        extract_entry_field(&collateral_record, "id").expect("Collateral should have 'id'");
 
     // Create covenant
     let covenant_input = CreateCovenantInput {

@@ -392,7 +392,7 @@ mod tests {
             hours: 2.5,
             service_description: "Fixed plumbing".into(),
             service_category: "Maintenance".into(),
-            dao_did: "roodepoort".into(),
+            dao_did: "example-community".into(),
         };
         let bytes = bincode::serialize(&relay).unwrap();
         let decoded: TendRelay = bincode::deserialize(&bytes).unwrap();
@@ -471,7 +471,7 @@ mod tests {
             hours: 3.5,
             service_description: "Repaired solar panel".into(),
             service_category: "Maintenance".into(),
-            dao_did: "roodepoort-resilience".into(),
+            dao_did: "example-community".into(),
         };
         let tend_data = bincode::serialize(&tend).unwrap();
         let tend_payload = RelayPayload::new(RelayType::TendExchange, origin, tend_data);

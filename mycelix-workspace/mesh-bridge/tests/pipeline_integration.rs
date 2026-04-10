@@ -46,7 +46,7 @@ async fn test_tend_exchange_pipeline() {
         hours: 2.0,
         service_description: "Fixed leaking roof".into(),
         service_category: "Construction".into(),
-        dao_did: "roodepoort-resilience".into(),
+        dao_did: "example-community".into(),
     };
     let data = bincode::serialize(&tend).unwrap();
     let payload = RelayPayload::new(RelayType::TendExchange, origin, data);
@@ -60,7 +60,7 @@ async fn test_tend_exchange_pipeline() {
     assert_eq!(inner.receiver_did, "nomsa.did");
     assert!((inner.hours - 2.0).abs() < f32::EPSILON);
     assert_eq!(inner.service_category, "Construction");
-    assert_eq!(inner.dao_did, "roodepoort-resilience");
+    assert_eq!(inner.dao_did, "example-community");
 }
 
 #[tokio::test]
@@ -132,7 +132,7 @@ async fn test_multiple_payloads_interleaved() {
         hours: 0.5,
         service_description: "Tutoring".into(),
         service_category: "Education".into(),
-        dao_did: "roodepoort".into(),
+        dao_did: "example-community".into(),
     };
     let tend_data = bincode::serialize(&tend).unwrap();
     let tend_payload = RelayPayload::new(RelayType::TendExchange, origin, tend_data);

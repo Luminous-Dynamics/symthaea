@@ -1,11 +1,10 @@
 #![cfg(test)]
-
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! # "Day in the Life" — Narrative Integration Test
 //!
-//! Simulates a realistic day in the Mycelix community of Roodepoort, South
+//! Simulates a realistic day in a Mycelix community,
 //! Africa, exercising all major finance subsystems together in a coherent
 //! scenario. This proves the system works as a whole rather than in isolation.
 //!
@@ -37,174 +36,16 @@
 //! cargo test --release --test sweettest_day_in_the_life -- --ignored --test-threads=1
 //! ```
 
+use finance_leptos_types::{ContributionType, ExchangeStatus, ServiceCategory};
+use finance_wire_types::{
+    ApplyDemurrageInput, BalanceInfo, CommonsPool, ContributeToCommonsInput, CreateCommonsPoolInput,
+    DemurrageResult, ExchangeRecord, FeeTierResponse, FinanceBridgeHealth, GetBalanceInput,
+    InitializeMemberInput, MemberMycelState, RecognitionEvent, RecognizeMemberInput,
+    RecordExchangeInput, RegisterCollateralInput, SapBalanceResponse, UpdateCollateralHealthInput,
+    AssetType, CollateralHealth,
+};
 use holochain::sweettest::*;
 use std::path::PathBuf;
-
-// ============================================================================
-// Mirror types — TEND (time exchange)
-// ============================================================================
-
-#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
-pub enum ServiceCategory {
-    CareWork,
-    HomeServices,
-    FoodServices,
-    Transportation,
-    Education,
-    GeneralAssistance,
-    Administrative,
-    Creative,
-    TechSupport,
-    Wellness,
-    Gardening,
-    Custom(String),
-}
-
-#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
-pub enum ExchangeStatus {
-    Proposed,
-    Confirmed,
-    Disputed,
-    Cancelled,
-    Resolved,
-}
-
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-pub struct RecordExchangeInput {
-    pub receiver_did: String,
-    pub hours: f32,
-    pub service_description: String,
-    pub service_category: ServiceCategory,
-    pub cultural_alias: Option<String>,
-    pub dao_did: String,
-    pub service_date: Option<holochain::prelude::Timestamp>,
-}
-
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-pub struct ExchangeRecord {
-    pub id: String,
-    pub provider_did: String,
-    pub receiver_did: String,
-    pub hours: f32,
-    pub service_description: String,
-    pub service_category: ServiceCategory,
-    pub status: ExchangeStatus,
-    pub timestamp: holochain::prelude::Timestamp,
-}
-
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-pub struct GetBalanceInput {
-    pub member_did: String,
-    pub dao_did: String,
-}
-
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-pub struct BalanceInfo {
-    pub member_did: String,
-    pub dao_did: String,
-    pub balance: i32,
-    pub can_provide: bool,
-    pub can_receive: bool,
-    pub total_provided: f32,
-    pub total_received: f32,
-    pub exchange_count: u32,
-}
-
-// ============================================================================
-// Mirror types — Recognition (MYCEL)
-// ============================================================================
-
-#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
-pub enum ContributionType {
-    Technical,
-    Community,
-    Care,
-    Governance,
-    Creative,
-    Education,
-    General,
-}
-
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-pub struct InitializeMemberInput {
-    pub member_did: String,
-    pub is_apprentice: bool,
-    pub mentor_did: Option<String>,
-}
-
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-pub struct MemberMycelState {
-    pub member_did: String,
-    pub mycel_score: f64,
-    pub participation: f64,
-    pub recognition: f64,
-    pub validation: f64,
-    pub longevity: f64,
-    pub active_months: u32,
-    pub is_apprentice: bool,
-    pub mentor_did: Option<String>,
-    pub recognitions_given_this_cycle: u32,
-    pub current_cycle_id: String,
-    pub last_updated: holochain::prelude::Timestamp,
-}
-
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-pub struct RecognizeMemberInput {
-    pub recipient_did: String,
-    pub contribution_type: ContributionType,
-    pub cycle_id: String,
-}
-
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-pub struct RecognitionEvent {
-    pub recognizer_did: String,
-    pub recipient_did: String,
-    pub weight: f64,
-    pub contribution_type: ContributionType,
-    pub cycle_id: String,
-    pub recognizer_mycel: f64,
-    pub timestamp: holochain::prelude::Timestamp,
-}
-
-// ============================================================================
-// Mirror types — Collateral & Bridge
-// ============================================================================
-
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-pub enum AssetType {
-    RealEstate,
-    Vehicle,
-    Cryptocurrency,
-    EnergyAsset,
-    Equipment,
-    Other(String),
-}
-
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-pub struct RegisterCollateralInput {
-    pub owner_did: String,
-    pub source_happ: String,
-    pub asset_type: AssetType,
-    pub asset_id: String,
-    pub value_estimate: u64,
-    pub currency: String,
-}
-
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-pub struct UpdateCollateralHealthInput {
-    pub collateral_id: String,
-    pub obligation_amount: u64,
-}
-
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-pub struct CollateralHealth {
-    pub collateral_id: String,
-    pub current_value: u64,
-    pub obligation_amount: u64,
-    pub ltv_ratio: f64,
-    pub status: String,
-    pub computed_at: holochain::prelude::Timestamp,
-}
 
 // ============================================================================
 // Mirror types — Energy Certificate
@@ -263,78 +104,6 @@ pub struct ConsensusResult {
     pub signal_integrity: f64,
 }
 
-// ============================================================================
-// Mirror types — Commons Pool (Treasury)
-// ============================================================================
-
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-pub struct CreateCommonsPoolInput {
-    pub dao_did: String,
-}
-
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-pub struct CommonsPool {
-    pub id: String,
-    pub dao_did: String,
-    pub inalienable_reserve: u64,
-    pub available_balance: u64,
-    pub demurrage_exempt: bool,
-    pub created_at: holochain::prelude::Timestamp,
-    pub last_activity: holochain::prelude::Timestamp,
-}
-
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-pub struct ContributeToCommonsInput {
-    pub commons_pool_id: String,
-    pub contributor_did: String,
-    pub amount: u64,
-}
-
-// ============================================================================
-// Mirror types — Payments (SAP balance, demurrage)
-// ============================================================================
-
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-pub struct SapBalanceResponse {
-    pub member_did: String,
-    pub raw_balance: u64,
-    pub effective_balance: u64,
-    pub pending_demurrage: u64,
-    pub last_demurrage_at: holochain::prelude::Timestamp,
-}
-
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-pub struct ApplyDemurrageInput {
-    pub member_did: String,
-    pub local_commons_pool_id: Option<String>,
-    pub regional_commons_pool_id: Option<String>,
-    pub global_commons_pool_id: Option<String>,
-}
-
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-pub struct DemurrageResult {
-    pub deducted: u64,
-    pub redistributed: bool,
-}
-
-// ============================================================================
-// Mirror types — Bridge Health & Fee Tier
-// ============================================================================
-
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-pub struct FinanceBridgeHealth {
-    pub healthy: bool,
-    pub agent: String,
-    pub zomes: Vec<String>,
-}
-
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-pub struct FeeTierResponse {
-    pub member_did: String,
-    pub mycel_score: f64,
-    pub tier_name: String,
-    pub base_fee_rate: f64,
-}
 
 // ============================================================================
 // DNA path helper
@@ -386,7 +155,7 @@ fn extract_entry_field(record: &holochain::prelude::Record, field: &str) -> Opti
 // Main narrative test
 // ============================================================================
 
-/// A full day in the Mycelix community of Roodepoort.
+/// A full day in a Mycelix community.
 ///
 /// Three community members exercise the entire finance stack:
 /// TEND timebank, energy certificates, agricultural assets, collateral,
@@ -395,7 +164,7 @@ fn extract_entry_field(record: &holochain::prelude::Record, field: &str) -> Opti
 /// the system's coherence under realistic usage.
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "requires Holochain conductor (nix develop)"]
-async fn day_in_the_life_roodepoort() {
+async fn day_in_the_life_community() {
     // ── Setup: Three community members ──────────────────────────────
     //
     // Thandi (solar farmer), Sipho (community gardener), Naledi (steward).
@@ -426,7 +195,7 @@ async fn day_in_the_life_roodepoort() {
     let sipho_did = format!("did:mycelix:{}", sipho.agent_pubkey());
     let naledi_did = format!("did:mycelix:{}", naledi.agent_pubkey());
 
-    let dao_did = "did:mycelix:dao:roodepoort".to_string();
+    let dao_did = "did:mycelix:dao:example-community".to_string();
 
     println!("Community members:");
     println!("  Thandi (solar farmer): {}", thandi_did);
@@ -444,7 +213,8 @@ async fn day_in_the_life_roodepoort() {
     let exchange_input = RecordExchangeInput {
         receiver_did: thandi_did.clone(),
         hours: 3.0,
-        service_description: "Eldercare for Thandi's grandmother — morning routine, medication, breakfast".into(),
+        service_description:
+            "Eldercare for Thandi's grandmother — morning routine, medication, breakfast".into(),
         service_category: ServiceCategory::CareWork,
         cultural_alias: Some("Ubuntu care".into()),
         dao_did: dao_did.clone(),
@@ -648,7 +418,7 @@ async fn day_in_the_life_roodepoort() {
             ReportPriceInput {
                 item: "bread_750g".into(),
                 price_tend: 0.15,
-                evidence: "Shoprite Roodepoort, 2026-03-19".into(),
+                evidence: "Community Store, 2026-03-19".into(),
             },
         )
         .await;
@@ -662,7 +432,7 @@ async fn day_in_the_life_roodepoort() {
             ReportPriceInput {
                 item: "bread_750g".into(),
                 price_tend: 0.16,
-                evidence: "Pick n Pay Roodepoort, 2026-03-19".into(),
+                evidence: "Local Market, 2026-03-19".into(),
             },
         )
         .await;
@@ -703,7 +473,7 @@ async fn day_in_the_life_roodepoort() {
 
     // ── 15:00 Afternoon: Commons pool & treasury ────────────────────
     //
-    // Naledi creates a commons pool for Roodepoort and contributes
+    // Naledi creates a commons pool for the community and contributes
     // 2,000 SAP from the community treasury (25% inalienable reserve).
 
     println!("\n=== 15:00 Afternoon: Treasury — Commons Pool ===");
@@ -718,13 +488,16 @@ async fn day_in_the_life_roodepoort() {
         )
         .await;
 
-    let pool: CommonsPool =
-        decode_entry(&pool_record).expect("Failed to decode CommonsPool");
+    let pool: CommonsPool = decode_entry(&pool_record).expect("Failed to decode CommonsPool");
     assert!(!pool.id.is_empty(), "Pool should have an ID");
-    assert!(pool.demurrage_exempt, "Commons pool must be demurrage exempt");
+    assert!(
+        pool.demurrage_exempt.unwrap_or(false),
+        "Commons pool must be demurrage exempt"
+    );
     println!(
         "  OK: Commons pool created (id: {}, demurrage_exempt={})",
-        pool.id, pool.demurrage_exempt
+        pool.id,
+        pool.demurrage_exempt.unwrap_or(false)
     );
 
     // Naledi contributes 2,000 SAP
@@ -828,10 +601,14 @@ async fn day_in_the_life_roodepoort() {
         sipho_mycel.mycel_score, 0.3,
         "Full member initial MYCEL should be 0.3"
     );
-    assert!(!sipho_mycel.is_apprentice, "Sipho should not be an apprentice");
+    assert!(
+        !sipho_mycel.is_apprentice.unwrap_or(false),
+        "Sipho should not be an apprentice"
+    );
     println!(
         "  OK: Members initialized (Sipho MYCEL: {}, apprentice: {})",
-        sipho_mycel.mycel_score, sipho_mycel.is_apprentice
+        sipho_mycel.mycel_score,
+        sipho_mycel.is_apprentice.unwrap_or(false)
     );
 
     // Naledi recognizes Sipho for eldercare
@@ -1029,7 +806,7 @@ async fn day_in_the_life_roodepoort() {
     // ── Summary ─────────────────────────────────────────────────────
 
     println!("\n=== Day Complete ===");
-    println!("Community of Roodepoort operated successfully for one day.");
+    println!("Community operated successfully for one day.");
     println!("Subsystems exercised:");
     println!("  - TEND timebank: 3h eldercare exchange (Proposed)");
     println!("  - Energy certificates: 50 kWh solar registered");
@@ -1069,7 +846,11 @@ async fn smoke_test_finance_bridge_health() {
     let mut health: Option<FinanceBridgeHealth> = None;
     for attempt in 0..5 {
         match conductor
-            .call_fallible::<_, FinanceBridgeHealth>(&agent.zome("finance_bridge"), "health_check", ())
+            .call_fallible::<_, FinanceBridgeHealth>(
+                &agent.zome("finance_bridge"),
+                "health_check",
+                (),
+            )
             .await
         {
             Ok(h) => {
@@ -1090,7 +871,8 @@ async fn smoke_test_finance_bridge_health() {
             }
         }
     }
-    let health = health.expect("health_check failed after 5 retries (conductor may need more time)");
+    let health =
+        health.expect("health_check failed after 5 retries (conductor may need more time)");
 
     assert!(health.healthy, "Bridge should be healthy");
     assert!(

@@ -177,7 +177,7 @@ We present a novel cross-border payment architecture that gates financial operat
 - Wire ZK balance proofs into HTLC settlement (prove solvency at claim time)
 - HDC commitment schemes (binding via XOR, hiding via permutation)
 - Conductor integration test with resolved upstream bug
-- Community deployment in Roodepoort Resilience Network
+- Community deployment in pilot resilience network
 - Formal security analysis of HDC-FHE properties
 
 ### 7. Conclusion

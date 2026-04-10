@@ -200,7 +200,7 @@ async fn test_full_bridge_pipeline() {
     <CdtTrfTxInf>
       <PmtId><EndToEndId>TX-ZAR-001</EndToEndId></PmtId>
       <InstdAmt Ccy="ZAR">5000.00</InstdAmt>
-      <Dbtr><Nm>Roodepoort Resilience Cooperative</Nm></Dbtr>
+      <Dbtr><Nm>Mycelix Community Cooperative</Nm></Dbtr>
       <DbtrAgt><FinInstnId><BICFI>ABORZA001</BICFI></FinInstnId></DbtrAgt>
       <Cdtr><Nm>Food Cooperative Johannesburg</Nm></Cdtr>
       <CdtrAgt><FinInstnId><BICFI>NEDBZAJJ</BICFI></FinInstnId></CdtrAgt>
@@ -220,7 +220,7 @@ async fn test_full_bridge_pipeline() {
 
     // 2. Map to Mycelix operations
     let mut registry = symthaea_iso20022::DidRegistry::new();
-    registry.register_bic("ABORZA001", "did:mycelix:roodepoort-resilience");
+    registry.register_bic("ABORZA001", "did:mycelix:example-community");
     registry.register_bic("NEDBZAJJ", "did:mycelix:food-coop-jhb");
     let rate = symthaea_iso20022::RateSource::community_only(0.1);
     let mapping = symthaea_iso20022::map_to_mycelix(&instruction, &registry, &rate);
@@ -256,7 +256,7 @@ async fn test_full_bridge_pipeline() {
     if connect_result.is_ok() {
         let fin = FinanceDispatcher::new(conductor.clone());
         let result = fin
-            .query_tend_balance("did:mycelix:roodepoort-resilience")
+            .query_tend_balance("did:mycelix:example-community")
             .await;
         println!("5. TEND balance query result: {:?}", result);
     } else {

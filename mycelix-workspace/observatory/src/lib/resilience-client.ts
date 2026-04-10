@@ -995,7 +995,7 @@ export async function updateStockLevel(
     id: `sl-${Date.now()}`,
     item_id: itemHash,
     quantity,
-    location: 'Roodepoort Community Store',
+    location: 'Community Supply Point',
     recorded_by: 'self.did',
     recorded_at: Date.now(),
     notes,
@@ -1322,9 +1322,9 @@ function mockRequests(): ServiceRequest[] {
 
 function mockPlots(): FoodPlot[] {
   return [
-    { id: 'plot-001', owner_did: 'sipho.did', name: 'Sipho\'s backyard', location: 'Florida, Roodepoort', area_sqm: 45, plot_type: 'Raised beds', created_at: Date.now() - 2592000000 },
+    { id: 'plot-001', owner_did: 'sipho.did', name: 'Sipho\'s backyard', location: 'District A', area_sqm: 45, plot_type: 'Raised beds', created_at: Date.now() - 2592000000 },
     { id: 'plot-002', owner_did: 'community.did', name: 'Ontdekkers Park community garden', location: 'Ontdekkers Rd', area_sqm: 200, plot_type: 'Open field', created_at: Date.now() - 5184000000 },
-    { id: 'plot-003', owner_did: 'fatima.did', name: 'Fatima\'s tunnel', location: 'Horison, Roodepoort', area_sqm: 30, plot_type: 'Greenhouse tunnel', created_at: Date.now() - 1296000000 },
+    { id: 'plot-003', owner_did: 'fatima.did', name: 'Fatima\'s tunnel', location: 'District B', area_sqm: 30, plot_type: 'Greenhouse tunnel', created_at: Date.now() - 1296000000 },
   ];
 }
 
@@ -1392,7 +1392,7 @@ function mockNutrientSummary(): NutrientSummary {
 function mockOffers(): AidOffer[] {
   return [
     { id: 'ao-001', provider_did: 'thandi.did', title: 'Elder home visit', description: 'Weekly check-in on elderly neighbors, medication reminders', category: 'Care', hours_available: 2, recurring: true, created_at: Date.now() - 604800000 },
-    { id: 'ao-002', provider_did: 'james.did', title: 'Lift share (Roodepoort-JHB CBD)', description: 'Daily commute, can take 3 passengers', category: 'Transport', hours_available: 1, recurring: true, created_at: Date.now() - 432000000 },
+    { id: 'ao-002', provider_did: 'james.did', title: 'Lift share (local commute)', description: 'Daily commute, can take 3 passengers', category: 'Transport', hours_available: 1, recurring: true, created_at: Date.now() - 432000000 },
     { id: 'ao-003', provider_did: 'noma.did', title: 'Bulk cooking for families in need', description: 'Prepare nutritious meals for 10+ people', category: 'Food', hours_available: 4, recurring: false, created_at: Date.now() - 259200000 },
   ];
 }
@@ -1414,8 +1414,8 @@ function mockAidRequest(title: string, description: string, category: string, ur
 
 function mockChannels(): EmergencyChannel[] {
   return [
-    { id: 'ch-001', name: 'Roodepoort General', description: 'Community-wide emergency channel', created_by: 'admin.did', created_at: Date.now() - 2592000000, member_count: 156 },
-    { id: 'ch-002', name: 'Load Shedding Alerts', description: 'Real-time Eskom schedule updates', created_by: 'admin.did', created_at: Date.now() - 2592000000, member_count: 89 },
+    { id: 'ch-001', name: 'Community General', description: 'Community-wide emergency channel', created_by: 'admin.did', created_at: Date.now() - 2592000000, member_count: 156 },
+    { id: 'ch-002', name: 'Load Shedding Alerts', description: 'Real-time grid status updates', created_by: 'admin.did', created_at: Date.now() - 2592000000, member_count: 89 },
     { id: 'ch-003', name: 'Water Supply', description: 'Rand Water and Joburg Water alerts', created_by: 'admin.did', created_at: Date.now() - 1296000000, member_count: 67 },
   ];
 }
@@ -1431,7 +1431,7 @@ function mockMessage(channelId: string, content: string, priority: EmergencyPrio
 function mockMessages(channelId: string): EmergencyMessage[] {
   if (channelId === 'ch-002') {
     return [
-      { id: 'msg-001', sender_did: 'eskom.did', channel_id: channelId, content: 'Stage 4 load shedding from 16:00-20:30. Roodepoort affected areas: Florida, Horison, Constantia Kloof.', priority: 'Immediate', sent_at: Date.now() - 3600000, synced: true },
+      { id: 'msg-001', sender_did: 'grid-operator.did', channel_id: channelId, content: 'Stage 4 load shedding from 16:00-20:30. Affected areas: District A, District B, District C.', priority: 'Immediate', sent_at: Date.now() - 3600000, synced: true },
       { id: 'msg-002', sender_did: 'admin.did', channel_id: channelId, content: 'Community kitchen at Ontdekkers Park open during outage. Hot meals available.', priority: 'Priority', sent_at: Date.now() - 1800000, synced: true },
     ];
   }
@@ -1512,10 +1512,10 @@ function mockVolatility(basketName: string): VolatilityResult {
 
 function mockCareCircles(): CareCircle[] {
   return [
-    { id: 'cc-001', name: 'Sector 7 Neighbourhood Watch', description: 'Community safety and mutual support for Sector 7 residents', circle_type: 'Neighbourhood', location: 'Sector 7, Roodepoort', max_members: 50, member_count: 34, created_at: Date.now() - 7776000000 },
-    { id: 'cc-002', name: 'Florida Lake Gardeners', description: 'Shared gardening knowledge and seed exchange around Florida Lake', circle_type: 'Neighbourhood', location: 'Florida, Roodepoort', max_members: 30, member_count: 18, created_at: Date.now() - 5184000000 },
-    { id: 'cc-003', name: 'Roodepoort First Responders', description: 'Workplace first-aid trained volunteers for emergency response', circle_type: 'Workplace', location: 'Roodepoort CBD', max_members: 20, member_count: 12, created_at: Date.now() - 2592000000 },
-    { id: 'cc-004', name: "St. Mark's Care Network", description: 'Faith-based elder care and food distribution', circle_type: 'Faith', location: 'Horison, Roodepoort', max_members: 40, member_count: 27, created_at: Date.now() - 10368000000 },
+    { id: 'cc-001', name: 'Sector 7 Neighbourhood Watch', description: 'Community safety and mutual support for Sector 7 residents', circle_type: 'Neighbourhood', location: 'Sector 7', max_members: 50, member_count: 34, created_at: Date.now() - 7776000000 },
+    { id: 'cc-002', name: 'Florida Lake Gardeners', description: 'Shared gardening knowledge and seed exchange around Florida Lake', circle_type: 'Neighbourhood', location: 'District A', max_members: 30, member_count: 18, created_at: Date.now() - 5184000000 },
+    { id: 'cc-003', name: 'Community First Responders', description: 'Workplace first-aid trained volunteers for emergency response', circle_type: 'Workplace', location: 'Town Centre', max_members: 20, member_count: 12, created_at: Date.now() - 2592000000 },
+    { id: 'cc-004', name: "St. Mark's Care Network", description: 'Faith-based elder care and food distribution', circle_type: 'Faith', location: 'District B', max_members: 40, member_count: 27, created_at: Date.now() - 10368000000 },
   ];
 }
 
@@ -1582,8 +1582,8 @@ function mockLowStockItems(): LowStockItem[] {
 
 function mockStockLevels(itemId: string): StockLevel[] {
   return [
-    { id: 'sl-001', item_id: itemId, quantity: 35, location: 'Roodepoort Community Store', recorded_by: 'thandi.did', recorded_at: Date.now() - 172800000, notes: 'Monthly count' },
-    { id: 'sl-002', item_id: itemId, quantity: 30, location: 'Roodepoort Community Store', recorded_by: 'sipho.did', recorded_at: Date.now() - 604800000, notes: 'After distribution' },
+    { id: 'sl-001', item_id: itemId, quantity: 35, location: 'Community Supply Point', recorded_by: 'thandi.did', recorded_at: Date.now() - 172800000, notes: 'Monthly count' },
+    { id: 'sl-002', item_id: itemId, quantity: 30, location: 'Community Supply Point', recorded_by: 'sipho.did', recorded_at: Date.now() - 604800000, notes: 'After distribution' },
   ];
 }
 
@@ -1623,7 +1623,7 @@ function mockEmergencyPlan(hearthId: string): EmergencyPlan {
     contacts: [
       { name: 'Thandi Mokoena', phone: '+27 72 345 6789', relationship: 'Neighbour' },
       { name: 'Sipho Nkosi', phone: '+27 83 456 7890', relationship: 'Community Leader' },
-      { name: 'Fatima Patel', phone: '+27 61 567 8901', relationship: 'First Responder', email: 'fatima@roodepoort-responders.org' },
+      { name: 'Fatima Patel', phone: '+27 61 567 8901', relationship: 'First Responder', email: 'fatima@community-responders.org' },
     ],
     meeting_points: [
       'Ontdekkers Park main entrance',
@@ -1655,10 +1655,10 @@ function mockSharedResources(hearthId: string): SharedResource[] {
 
 function mockKnowledgeClaims(): KnowledgeClaim[] {
   return [
-    { id: 'kc-001', author_did: 'sipho.did', content: 'Companion planting tomatoes with basil reduces aphid damage by approximately 40% in Roodepoort clay soils', tags: ['food-production', 'gardening', 'pest-control'], confidence: 0.85, e_score: 3, n_score: 1, m_score: 2, created_at: Date.now() - 2592000000 },
-    { id: 'kc-002', author_did: 'thandi.did', content: 'Boiling water for 3 minutes at Roodepoort altitude is sufficient to eliminate E. coli and most waterborne pathogens', tags: ['water-safety', 'health', 'purification'], confidence: 0.95, e_score: 4, n_score: 1, m_score: 3, created_at: Date.now() - 5184000000 },
+    { id: 'kc-001', author_did: 'sipho.did', content: 'Companion planting tomatoes with basil reduces aphid damage by approximately 40% in local clay soils', tags: ['food-production', 'gardening', 'pest-control'], confidence: 0.85, e_score: 3, n_score: 1, m_score: 2, created_at: Date.now() - 2592000000 },
+    { id: 'kc-002', author_did: 'thandi.did', content: 'Boiling water for 3 minutes at local altitude is sufficient to eliminate E. coli and most waterborne pathogens', tags: ['water-safety', 'health', 'purification'], confidence: 0.95, e_score: 4, n_score: 1, m_score: 3, created_at: Date.now() - 5184000000 },
     { id: 'kc-003', author_did: 'fatima.did', content: 'Direct pressure with a clean cloth for 10 minutes stops most wound bleeding; tourniquets only for limb-threatening haemorrhage', tags: ['first-aid', 'emergency', 'health'], confidence: 0.92, e_score: 4, n_score: 2, m_score: 3, created_at: Date.now() - 7776000000 },
-    { id: 'kc-004', author_did: 'james.did', content: 'Roodepoort loam soil pH averages 5.8-6.2; adding wood ash raises pH by ~0.5 per 1kg/m2 application', tags: ['food-production', 'soil', 'gardening'], confidence: 0.78, e_score: 2, n_score: 0, m_score: 2, created_at: Date.now() - 1296000000 },
+    { id: 'kc-004', author_did: 'james.did', content: 'Local loam soil pH averages 5.8-6.2; adding wood ash raises pH by ~0.5 per 1kg/m2 application', tags: ['food-production', 'soil', 'gardening'], confidence: 0.78, e_score: 2, n_score: 0, m_score: 2, created_at: Date.now() - 1296000000 },
     { id: 'kc-005', author_did: 'nomsa.did', content: 'Load-shedding schedules follow 2-hour blocks; keeping a charged power bank and LPG stove covers essential needs during Stage 4', tags: ['energy', 'load-shedding', 'preparedness'], confidence: 0.88, e_score: 3, n_score: 1, m_score: 2, created_at: Date.now() - 864000000 },
     { id: 'kc-006', author_did: 'grace.did', content: 'Florida Lake water is not potable without filtration; heavy metal levels exceed SANS 241 limits after summer rains', tags: ['water-safety', 'contamination', 'florida-lake'], confidence: 0.90, e_score: 3, n_score: 1, m_score: 3, created_at: Date.now() - 3456000000 },
   ];
