@@ -10,7 +10,6 @@ use hdk::prelude::*;
 use justice_arbitration_integrity::*;
 use mycelix_bridge_common::{
     civic_requirement_proposal, civic_requirement_voting, GovernanceEligibility,
-    GovernanceRequirement,
 };
 use mycelix_zome_helpers::{get_latest_record};
 
@@ -18,7 +17,7 @@ fn require_consciousness(
     requirement: &mycelix_bridge_common::CivicRequirement,
     action_name: &str,
 ) -> ExternResult<GovernanceEligibility> {
-    { let legacy = mycelix_bridge_common::sovereign_gate::governance_requirement_from_civic(requirement); mycelix_zome_helpers::require_consciousness("civic_bridge", &legacy, action_name) }
+    mycelix_zome_helpers::require_civic("civic_bridge", requirement, action_name)
 }
 
 /// Create an arbitration panel for a case

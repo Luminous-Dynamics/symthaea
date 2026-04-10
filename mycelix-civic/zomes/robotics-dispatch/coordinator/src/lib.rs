@@ -21,10 +21,14 @@
 //! permanent entrenchment of emergency authority.
 
 use hdk::prelude::*;
-use mycelix_bridge_common::{
-    consciousness_profile::require_consciousness,
-    validation::{civic_requirement_basic, civic_requirement_proposal},
-};
+use mycelix_bridge_common::{civic_requirement_basic, civic_requirement_proposal};
+
+fn require_consciousness(
+    requirement: &mycelix_bridge_common::CivicRequirement,
+    action_name: &str,
+) -> ExternResult<mycelix_bridge_common::GovernanceEligibility> {
+    mycelix_zome_helpers::require_civic("civic_bridge", requirement, action_name)
+}
 
 use robotics_dispatch_integrity::*;
 

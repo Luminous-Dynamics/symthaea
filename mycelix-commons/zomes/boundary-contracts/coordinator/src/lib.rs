@@ -11,7 +11,7 @@
 
 use boundary_contracts_integrity::*;
 use hdk::prelude::*;
-use mycelix_bridge_common::civic_requirement_basic;
+use mycelix_bridge_common::{civic_requirement_basic, civic_requirement_proposal};
 use mycelix_zome_helpers::records_from_links;
 
 // =============================================================================
@@ -208,7 +208,7 @@ fn require_consciousness(
     requirement: &mycelix_bridge_common::CivicRequirement,
     action_name: &str,
 ) -> ExternResult<mycelix_bridge_common::GovernanceEligibility> {
-    { let legacy = mycelix_bridge_common::sovereign_gate::governance_requirement_from_civic(requirement); mycelix_zome_helpers::require_consciousness("commons_bridge", &legacy, action_name) }
+    mycelix_zome_helpers::require_civic("commons_bridge", requirement, action_name)
 }
 
 fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
@@ -222,14 +222,7 @@ fn ensure_anchor(anchor_str: &str) -> ExternResult<EntryHash> {
     anchor_hash(anchor_str)
 }
 
-/// Governance requirement for proposing contracts: Participant tier + identity >= 0.25.
-fn civic_requirement_proposal() -> mycelix_bridge_common::GovernanceRequirement {
-    mycelix_bridge_common::GovernanceRequirement {
-        min_tier: mycelix_bridge_common::ConsciousnessTier::Participant,
-        min_identity: Some(0.25),
-        min_community: None,
-    }
-}
+//// civic_requirement_proposal() is now imported from bridge-common (CivicRequirement type)
 
 // =============================================================================
 // Contract Lifecycle

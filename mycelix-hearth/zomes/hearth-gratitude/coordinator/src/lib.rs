@@ -11,7 +11,6 @@ use hearth_gratitude_integrity::*;
 use hearth_types::*;
 use mycelix_bridge_common::{
     civic_requirement_basic, civic_requirement_proposal, GovernanceEligibility,
-    GovernanceRequirement,
 };
 
 // ============================================================================
@@ -22,7 +21,7 @@ fn require_consciousness(
     requirement: &mycelix_bridge_common::CivicRequirement,
     action_name: &str,
 ) -> ExternResult<GovernanceEligibility> {
-    { let legacy = mycelix_bridge_common::sovereign_gate::governance_requirement_from_civic(requirement); mycelix_zome_helpers::require_consciousness("hearth_bridge", &legacy, action_name) }
+    mycelix_zome_helpers::require_civic("hearth_bridge", requirement, action_name)
 }
 
 // ============================================================================

@@ -13,7 +13,6 @@ use mutualaid_requests_integrity::{
 };
 use mycelix_bridge_common::{
     gate_civic, civic_requirement_basic, civic_requirement_proposal, GovernanceEligibility,
-    GovernanceRequirement,
 };
 
 /// Input for creating a new aid request

@@ -34,7 +34,10 @@
 //! use [`anchor_hash_of`] with a caller-provided serializable entry.
 
 use hdk::prelude::*;
-use mycelix_bridge_common::{GovernanceEligibility, GovernanceRequirement, gate_consciousness};
+use mycelix_bridge_common::{
+    GovernanceEligibility, GovernanceRequirement, gate_consciousness,
+    sovereign_gate::{CivicRequirement, gate_civic},
+};
 
 // ============================================================================
 // Anchor Hashing
@@ -286,6 +289,19 @@ pub fn require_consciousness(
     action_name: &str,
 ) -> ExternResult<GovernanceEligibility> {
     gate_consciousness(bridge_zome, requirement, action_name)
+}
+
+/// Civic gating — 8D replacement for `require_consciousness`.
+///
+/// Drop-in successor that accepts `CivicRequirement` directly, eliminating
+/// the per-zome conversion shim. Delegates to `gate_civic()` which handles
+/// backward compatibility internally.
+pub fn require_civic(
+    bridge_zome: &str,
+    requirement: &CivicRequirement,
+    action_name: &str,
+) -> ExternResult<GovernanceEligibility> {
+    gate_civic(bridge_zome, requirement, action_name)
 }
 
 // ============================================================================

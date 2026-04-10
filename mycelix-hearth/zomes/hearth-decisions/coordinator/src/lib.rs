@@ -11,7 +11,7 @@ use hearth_decisions_integrity::*;
 use hearth_types::*;
 use mycelix_bridge_common::{
     civic_requirement_basic, civic_requirement_proposal, civic_requirement_voting,
-    GovernanceEligibility, GovernanceRequirement,
+    GovernanceEligibility,
 };
 
 // ============================================================================
@@ -154,8 +154,8 @@ fn can_finalize(decision_type: &DecisionType, role: &MemberRole) -> bool {
 // Consciousness Gating
 // ============================================================================
 
-/// Map a decision type to its governance requirement.
-fn requirement_for_decision_type(dt: &DecisionType) -> GovernanceRequirement {
+/// Map a decision type to its civic requirement.
+fn requirement_for_decision_type(dt: &DecisionType) -> mycelix_bridge_common::CivicRequirement {
     match dt {
         DecisionType::MajorityVote => civic_requirement_basic(),
         DecisionType::ElderDecision | DecisionType::GuardianDecision => civic_requirement_proposal(),
@@ -167,7 +167,7 @@ fn require_consciousness(
     requirement: &mycelix_bridge_common::CivicRequirement,
     action_name: &str,
 ) -> ExternResult<GovernanceEligibility> {
-    { let legacy = mycelix_bridge_common::sovereign_gate::governance_requirement_from_civic(requirement); mycelix_zome_helpers::require_consciousness("hearth_bridge", &legacy, action_name) }
+    mycelix_zome_helpers::require_civic("hearth_bridge", requirement, action_name)
 }
 
 /// Compose role-based vote weight with consciousness-based progressive weight.
@@ -2020,18 +2020,18 @@ mod tests {
 
     #[test]
     fn requirement_for_decision_type_mapping() {
-        use mycelix_bridge_common::ConsciousnessTier;
+        use mycelix_bridge_common::sovereign_gate::CivicTier;
 
         let req_majority = requirement_for_decision_type(&DecisionType::MajorityVote);
-        assert_eq!(req_majority.min_tier, ConsciousnessTier::Participant);
+        assert_eq!(req_majority.min_tier, CivicTier::Participant);
 
         let req_elder = requirement_for_decision_type(&DecisionType::ElderDecision);
-        assert_eq!(req_elder.min_tier, ConsciousnessTier::Participant);
+        assert_eq!(req_elder.min_tier, CivicTier::Participant);
 
         let req_guardian = requirement_for_decision_type(&DecisionType::GuardianDecision);
-        assert_eq!(req_guardian.min_tier, ConsciousnessTier::Participant);
+        assert_eq!(req_guardian.min_tier, CivicTier::Participant);
 
         let req_consensus = requirement_for_decision_type(&DecisionType::Consensus);
-        assert_eq!(req_consensus.min_tier, ConsciousnessTier::Citizen);
+        assert_eq!(req_consensus.min_tier, CivicTier::Citizen);
     }
 }

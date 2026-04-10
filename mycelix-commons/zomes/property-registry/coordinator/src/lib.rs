@@ -6,17 +6,15 @@ use commons_types::batch::links_to_records;
 use hdk::prelude::*;
 use mycelix_bridge_common::{
     civic_requirement_constitutional, civic_requirement_proposal, civic_requirement_voting,
-    sovereign_gate::governance_requirement_from_civic, CivicRequirement,
 };
 use mycelix_zome_helpers::get_latest_record;
 use property_registry_integrity::*;
 
 fn require_consciousness(
-    requirement: &CivicRequirement,
+    requirement: &mycelix_bridge_common::CivicRequirement,
     action_name: &str,
 ) -> ExternResult<mycelix_bridge_common::GovernanceEligibility> {
-    let legacy = governance_requirement_from_civic(requirement);
-    mycelix_zome_helpers::require_consciousness("commons_bridge", &legacy, action_name)
+    mycelix_zome_helpers::require_civic("commons_bridge", requirement, action_name)
 }
 
 /// Get or create an anchor entry and return its EntryHash for use as link base.

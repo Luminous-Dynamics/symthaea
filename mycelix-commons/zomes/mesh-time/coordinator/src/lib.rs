@@ -4,7 +4,7 @@
 use hdk::prelude::*;
 use mesh_time_integrity::*;
 use mycelix_bridge_common::{
-    gate_civic, civic_requirement_basic, GovernanceEligibility, GovernanceRequirement,
+    gate_civic, civic_requirement_basic, GovernanceEligibility,
 };
 
 fn require_consciousness(

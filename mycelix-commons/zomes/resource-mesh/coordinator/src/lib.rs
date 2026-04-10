@@ -5,7 +5,7 @@ use hdk::prelude::*;
 use resource_mesh_integrity::*;
 use mycelix_bridge_common::{
     gate_civic, civic_requirement_basic, civic_requirement_voting,
-    GovernanceEligibility, GovernanceRequirement,
+    GovernanceEligibility,
 };
 
 fn require_consciousness(

@@ -3,7 +3,7 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 use hdk::prelude::*;
 use mycelix_bridge_common::{
-    civic_requirement_basic, civic_requirement_voting, GovernanceEligibility, GovernanceRequirement,
+    civic_requirement_basic, civic_requirement_voting, GovernanceEligibility,
 };
 use name_registry_integrity::*;
 
@@ -11,7 +11,7 @@ fn require_consciousness(
     requirement: &mycelix_bridge_common::CivicRequirement,
     action_name: &str,
 ) -> ExternResult<GovernanceEligibility> {
-    { let legacy = mycelix_bridge_common::sovereign_gate::governance_requirement_from_civic(requirement); mycelix_zome_helpers::require_consciousness("identity_bridge", &legacy, action_name) }
+    mycelix_zome_helpers::require_civic("identity_bridge", requirement, action_name)
 }
 
 /// Helper to get an anchor entry hash

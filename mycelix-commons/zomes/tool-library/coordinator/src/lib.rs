@@ -10,7 +10,7 @@ use hdk::prelude::*;
 use tool_library_integrity::*;
 use mycelix_bridge_common::{
     gate_civic, civic_requirement_basic, civic_requirement_proposal,
-    GovernanceEligibility, GovernanceRequirement,
+    GovernanceEligibility,
 };
 
 fn require_consciousness(
