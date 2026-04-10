@@ -123,7 +123,7 @@ async fn test_set_and_get_profile() {
         avatar_url: None,
     };
 
-    let _hash: ActionHash = conductor
+    let _: () = conductor
         .call(&alice.zome("craft_graph"), "set_profile", input)
         .await;
 
@@ -278,7 +278,7 @@ async fn test_skill_endorsement_round_trip() {
         evidence: Some("https://github.com/alice/craft".into()),
     };
 
-    let _hash: ActionHash = bob_conductor
+    let _: () = bob_conductor
         .call(&bob.zome("craft_graph"), "endorse_skill", endorsement)
         .await;
 
