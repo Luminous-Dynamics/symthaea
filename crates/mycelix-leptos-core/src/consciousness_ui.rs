@@ -22,13 +22,13 @@ pub fn init_consciousness_ui() {
 
     Effect::new(move |_| {
         let profile = consciousness.profile.get();
-        let warmth = profile.combined_score();
+        let warmth = crate::consciousness::combined_score(&profile);
         let energy = thermo.device_energy.get();
         let torpor = thermo.torpor_level.get();
 
         // Base consciousness values
         set_css_var("--consciousness-warmth", &format!("{:.3}", warmth));
-        set_css_var("--consciousness-bond-glow", &format!("{:.3}", profile.community));
+        set_css_var("--consciousness-bond-glow", &format!("{:.3}", profile.semantic_resonance));
 
         // Animation speed: consciousness drives intent, energy constrains capacity
         let anim_speed = (0.5 + warmth * 0.5) * energy * (1.0 - torpor * 0.8);
@@ -40,7 +40,7 @@ pub fn init_consciousness_ui() {
 
         // Glow intensity: consciousness * energy * network health
         let network = thermo.network_health.get();
-        let glow = profile.community * energy * network;
+        let glow = profile.semantic_resonance * energy * network;
         set_css_var("--effective-glow", &format!("{:.3}", glow));
     });
 }

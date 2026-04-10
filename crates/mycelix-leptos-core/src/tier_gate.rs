@@ -1,20 +1,20 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-//! Consciousness tier gating component.
+//! Civic tier gating component (8D Sovereign Profile).
 //!
 //! Shows children when the user meets the required tier, or shows
-//! a growth progress view when they don't. Uses CSS display toggling
-//! so children are rendered once.
+//! a growth progress view with the 8-dimensional breakdown when
+//! they don't. Uses CSS display toggling so children are rendered once.
 
 use leptos::prelude::*;
 use personal_leptos_types::TrustTier;
-use crate::consciousness::use_consciousness;
+use crate::consciousness::{use_consciousness, combined_score, SovereignDimension, DIMENSION_LABELS};
 
-/// Gate content behind a minimum consciousness tier.
+/// Gate content behind a minimum civic tier.
 ///
 /// When the user's tier is below `min_tier`, shows a progress bar
-/// with the 4D dimension breakdown and growth distance.
+/// with the 8D dimension breakdown and growth distance.
 #[component]
 pub fn TierGate(
     min_tier: TrustTier,
@@ -40,9 +40,11 @@ pub fn TierGate(
         >
             {move || {
                 let profile = consciousness.profile.get();
-                let score = profile.combined_score();
+                let score = combined_score(&profile);
                 let needed = min_tier.min_score();
-                let gap = needed - score;
+                let gap = (needed - score).max(0.0);
+                let pct = if needed > 0.0 { (score / needed * 100.0).min(100.0) } else { 100.0 };
+
                 view! {
                     <div class="gate-message">
                         <span class="gate-action">{action.clone()}</span>
@@ -56,18 +58,32 @@ pub fn TierGate(
                         <div class="growth-bar">
                             <div
                                 class="growth-fill"
-                                style=format!("width: {}%", (score / needed * 100.0).min(100.0))
+                                style=format!("width: {pct:.0}%")
                             ></div>
                         </div>
                         <span class="growth-label">
-                            {format!("{:.0}% of the way \u{2014} grow {:.2} more", score / needed * 100.0, gap)}
+                            {format!("{pct:.0}% of the way \u{2014} grow {gap:.2} more")}
                         </span>
                     </div>
-                    <div class="gate-dimensions">
-                        <span class="dim">{format!("identity: {:.2}", profile.identity)}</span>
-                        <span class="dim">{format!("reputation: {:.2}", profile.reputation)}</span>
-                        <span class="dim">{format!("community: {:.2}", profile.community)}</span>
-                        <span class="dim">{format!("engagement: {:.2}", profile.engagement)}</span>
+                    <div class="gate-dimensions gate-dimensions-8d">
+                        {SovereignDimension::ALL.iter().map(|dim| {
+                            let val = profile.get(*dim);
+                            let label = &DIMENSION_LABELS[dim.index()];
+                            let bar_width = (val * 100.0).clamp(0.0, 100.0);
+                            view! {
+                                <div class="dim-row" title={label.description_en}>
+                                    <span class="dim-icon">{label.icon}</span>
+                                    <span class="dim-name">{label.name_en}</span>
+                                    <div class="dim-bar">
+                                        <div
+                                            class="dim-fill"
+                                            style=format!("width: {bar_width:.0}%")
+                                        ></div>
+                                    </div>
+                                    <span class="dim-value">{format!("{val:.0}%")}</span>
+                                </div>
+                            }
+                        }).collect::<Vec<_>>()}
                     </div>
                 }
             }}
