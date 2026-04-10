@@ -835,6 +835,7 @@ impl MultiWorldSimulator {
                 .count();
             let worker_ratio = working as f64 / world.population().max(1) as f64;
 
+            let care_eff = world.policy_state.care_effectiveness;
             let (events, summary) = PsychNeedsEngine::tick_needs(
                 &mut world,
                 self.current_tick,
@@ -843,7 +844,7 @@ impl MultiWorldSimulator {
                 mean_tech,
                 governance_stability,
                 worker_ratio,
-                self.config.policy.care_effectiveness,
+                care_eff,
                 self.config.policy.deep_space_isolation_mult,
                 &mut self.rng,
             );
@@ -989,7 +990,7 @@ impl MultiWorldSimulator {
                 (world.infrastructure_level * 50.0).max(1.0); // map 0-1 to 0-50
 
             // Phase 1b: resource_priority biases sector productivity
-            match self.config.policy.resource_priority {
+            match world.policy_state.resource_priority {
                 config::ResourcePriority::Industrial => {
                     world.economy.technology_multiplier[0] *= 1.5; // engineering
                     world.economy.technology_multiplier[7] *= 1.3; // logistics
@@ -1186,7 +1187,7 @@ impl MultiWorldSimulator {
 
                                 // Phase 1c: trade_openness scales all trade
                                 let mut amount = (ss_i - ss_j) * 10.0 * window_efficiency
-                                    * self.config.policy.trade_openness;
+                                    * self.worlds[i].policy_state.trade_openness;
 
                                 // Kessler degradation: reduce trade volume for Earth routes
                                 if leo_access < 1.0 {
@@ -1462,8 +1463,18 @@ impl MultiWorldSimulator {
                 let dest_name = self.worlds[ti].name.clone();
                 let from_name = self.worlds[fi].name.clone();
                 let mut moved = 0;
+                // Ethics-modulated refugee selection (Phase 2d):
+                // Consequentialist agents flee more readily (outcome-seeking).
+                // Relational agents resist leaving (community bonds hold them).
                 let ids: Vec<u64> = self.worlds[fi].agents.iter()
-                    .filter(|a| a.is_alive() && a.needs.affect.net_conatus() < -0.05)
+                    .filter(|a| {
+                        if !a.is_alive() { return false; }
+                        let conatus = a.needs.affect.net_conatus();
+                        let flee_threshold = -0.05
+                            + a.ethics.relational * 0.08
+                            - a.ethics.consequentialist * 0.05;
+                        conatus < flee_threshold
+                    })
                     .take(count)
                     .map(|a| a.id)
                     .collect();
@@ -2006,7 +2017,7 @@ impl MultiWorldSimulator {
             {
                 // Base 3% + science bonus. Fires even at starting science level.
                 // Phase 1e: exploration_investment multiplies probability
-                let explore_mult = 1.0 + self.config.policy.exploration_investment * 5.0;
+                let explore_mult = 1.0 + world.policy_state.exploration_investment * 5.0;
                 let exploration_prob = (0.03 + (world.knowledge.technology_levels[4] - 1.0).max(0.0) * 0.05) * explore_mult;
                 if self.rng.bernoulli(exploration_prob.min(0.25)) {
                     world.explorations_completed += 1;
@@ -2563,7 +2574,7 @@ impl MultiWorldSimulator {
                 .tick(&self.worlds, self.current_tick, &mut self.rng, &policy);
 
         // Phase 1d: defense_spending reduces disaster severity
-        let defense_mult = 1.0 - (self.config.policy.defense_spending * 2.0).min(0.5);
+        let defense_mult = 1.0 - (self.worlds.first().map(|w| w.policy_state.defense_spending).unwrap_or(0.0) * 2.0).min(0.5);
 
         for (effects, world_id, event) in disaster_results {
             // Dead Loop #8 fix: Cultural memory reduces disaster damage.
@@ -2802,6 +2813,12 @@ impl MultiWorldSimulator {
                         for agent in world.agents.iter_mut().filter(|a| a.is_alive()) {
                             agent.trauma_level = (agent.trauma_level + trauma_inc).min(1.0);
                             if trauma_inc > 0.05 { agent.wounds.push(wound_healing::WoundState::new(trauma_inc.min(0.5), wound_healing::WoundOrigin::Disaster, self.current_tick)); }
+                            // Trauma shifts ethical orientation (Phase 3b):
+                            // Suffering makes agents crave rules-as-safety (deontological ↑)
+                            // and distrust pure outcome-thinking (consequentialist ↓).
+                            // Effect proportional to trauma severity (Janoff-Bulman 1992).
+                            agent.ethics.deontological = (agent.ethics.deontological + trauma_inc * 0.01).min(1.0);
+                            agent.ethics.consequentialist = (agent.ethics.consequentialist - trauma_inc * 0.005).max(0.05);
                         }
                     }
                 }
@@ -3126,7 +3143,7 @@ impl MultiWorldSimulator {
             for i in 0..world_count {
                 let mut world = std::mem::take(&mut self.worlds[i]);
                 // Birth policy modifies pair bond rate (C: Scenario Mode)
-                let birth_mult = match self.config.policy.birth_policy {
+                let birth_mult = match world.policy_state.birth_policy {
                     config::BirthPolicy::ProNatal => 1.5,
                     config::BirthPolicy::PopulationControl => 0.5,
                     config::BirthPolicy::ReplacementOnly => {
