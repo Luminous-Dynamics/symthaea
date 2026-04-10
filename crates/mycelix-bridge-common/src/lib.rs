@@ -16,6 +16,7 @@
 
 pub mod constitutional_envelope;
 pub mod scoring_model;
+pub mod model_governance;
 pub mod shadow_evaluation;
 pub mod consciousness_thresholds;
 pub mod consciousness_zkp;
