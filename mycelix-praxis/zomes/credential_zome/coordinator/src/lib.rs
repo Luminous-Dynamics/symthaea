@@ -67,9 +67,9 @@ pub enum MaterialityLevel {
 #[hdk_extern]
 pub fn issue_credential(input: IssueCredentialInput) -> ExternResult<ActionHash> {
     // Trust tier gate: requires Steward tier to issue credentials
-    mycelix_bridge_common::gate_consciousness(
+    mycelix_bridge_common::gate_civic(
         "edunet_bridge",
-        &mycelix_bridge_common::requirement_for_constitutional(),
+        &mycelix_bridge_common::civic_requirement_constitutional(),
         "issue_credential",
     )?;
 

@@ -23,9 +23,9 @@ use dao_integrity::{
 #[hdk_extern]
 pub fn create_proposal(input: CreateProposalInput) -> ExternResult<ActionHash> {
     // Trust tier gate: requires Participant tier with identity >= 0.25
-    mycelix_bridge_common::gate_consciousness(
+    mycelix_bridge_common::gate_civic(
         "edunet_bridge",
-        &mycelix_bridge_common::requirement_for_proposal(),
+        &mycelix_bridge_common::civic_requirement_proposal(),
         "create_proposal",
     )?;
 
@@ -104,9 +104,9 @@ pub fn create_proposal(input: CreateProposalInput) -> ExternResult<ActionHash> {
 #[hdk_extern]
 pub fn cast_vote(input: CastVoteInput) -> ExternResult<ActionHash> {
     // Trust tier gate: requires Citizen tier with identity >= 0.5
-    mycelix_bridge_common::gate_consciousness(
+    mycelix_bridge_common::gate_civic(
         "edunet_bridge",
-        &mycelix_bridge_common::requirement_for_voting(),
+        &mycelix_bridge_common::civic_requirement_voting(),
         "cast_vote",
     )?;
 

@@ -142,9 +142,9 @@ pub fn dispatch_call(input: DispatchInput) -> ExternResult<DispatchResult> {
 #[hdk_extern]
 pub fn query_praxis(query: EdunetQueryEntry) -> ExternResult<Record> {
     // Require at least Participant tier to submit queries
-    mycelix_bridge_common::gate_consciousness(
+    mycelix_bridge_common::gate_civic(
         "praxis_bridge",
-        &mycelix_bridge_common::requirement_for_basic(),
+        &mycelix_bridge_common::civic_requirement_basic(),
         "query_praxis",
     )?;
 
@@ -234,9 +234,9 @@ pub fn query_praxis(query: EdunetQueryEntry) -> ExternResult<Record> {
 #[hdk_extern]
 pub fn resolve_query(input: ResolveQueryInput) -> ExternResult<Record> {
     // Require Citizen tier to resolve queries (modifies existing data)
-    mycelix_bridge_common::gate_consciousness(
+    mycelix_bridge_common::gate_civic(
         "praxis_bridge",
-        &mycelix_bridge_common::requirement_for_voting(),
+        &mycelix_bridge_common::civic_requirement_voting(),
         "resolve_query",
     )?;
 
@@ -285,9 +285,9 @@ pub struct BridgeEventSignal {
 #[hdk_extern]
 pub fn broadcast_event(event: EdunetEventEntry) -> ExternResult<Record> {
     // Require at least Participant tier to broadcast events
-    mycelix_bridge_common::gate_consciousness(
+    mycelix_bridge_common::gate_civic(
         "praxis_bridge",
-        &mycelix_bridge_common::requirement_for_basic(),
+        &mycelix_bridge_common::civic_requirement_basic(),
         "broadcast_event",
     )?;
 

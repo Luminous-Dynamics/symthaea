@@ -118,9 +118,9 @@ pub fn weighted_mean(gradients: &[Vec<f32>], weights: &[f32]) -> Result<Vec<f32>
 #[hdk_extern]
 pub fn create_round(round: FlRound) -> ExternResult<ActionHash> {
     // Trust tier gate: requires Steward tier to create FL rounds
-    mycelix_bridge_common::gate_consciousness(
+    mycelix_bridge_common::gate_civic(
         "edunet_bridge",
-        &mycelix_bridge_common::requirement_for_constitutional(),
+        &mycelix_bridge_common::civic_requirement_constitutional(),
         "create_round",
     )?;
 

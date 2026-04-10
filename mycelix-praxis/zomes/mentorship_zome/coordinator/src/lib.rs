@@ -83,9 +83,9 @@ pub struct CompleteMentorshipInput {
 #[hdk_extern]
 pub fn register_as_mentor(input: MentorProfile) -> ExternResult<ActionHash> {
     // Consciousness gate: must be at least Participant
-    mycelix_bridge_common::gate_consciousness(
+    mycelix_bridge_common::gate_civic(
         "mentorship_zome",
-        &mycelix_bridge_common::requirement_for_basic(),
+        &mycelix_bridge_common::civic_requirement_basic(),
         "register_as_mentor",
     )?;
 
@@ -114,9 +114,9 @@ pub fn register_as_mentor(input: MentorProfile) -> ExternResult<ActionHash> {
 #[hdk_extern]
 pub fn register_as_mentee(input: MenteeProfile) -> ExternResult<ActionHash> {
     // Consciousness gate: must be at least Participant
-    mycelix_bridge_common::gate_consciousness(
+    mycelix_bridge_common::gate_civic(
         "mentorship_zome",
-        &mycelix_bridge_common::requirement_for_basic(),
+        &mycelix_bridge_common::civic_requirement_basic(),
         "register_as_mentee",
     )?;
 
@@ -181,9 +181,9 @@ pub fn get_all_mentors(_: ()) -> ExternResult<Vec<Record>> {
 #[hdk_extern]
 pub fn propose_mentorship(input: ProposeMentorshipInput) -> ExternResult<ActionHash> {
     // Consciousness gate
-    mycelix_bridge_common::gate_consciousness(
+    mycelix_bridge_common::gate_civic(
         "mentorship_zome",
-        &mycelix_bridge_common::requirement_for_basic(),
+        &mycelix_bridge_common::civic_requirement_basic(),
         "propose_mentorship",
     )?;
 
@@ -253,9 +253,9 @@ pub fn propose_mentorship(input: ProposeMentorshipInput) -> ExternResult<ActionH
 #[hdk_extern]
 pub fn accept_mentorship(mentorship_hash: ActionHash) -> ExternResult<ActionHash> {
     // Consciousness gate
-    mycelix_bridge_common::gate_consciousness(
+    mycelix_bridge_common::gate_civic(
         "mentorship_zome",
-        &mycelix_bridge_common::requirement_for_basic(),
+        &mycelix_bridge_common::civic_requirement_basic(),
         "accept_mentorship",
     )?;
 
@@ -285,9 +285,9 @@ pub fn accept_mentorship(mentorship_hash: ActionHash) -> ExternResult<ActionHash
 #[hdk_extern]
 pub fn record_session(input: MentorshipSession) -> ExternResult<ActionHash> {
     // Consciousness gate
-    mycelix_bridge_common::gate_consciousness(
+    mycelix_bridge_common::gate_civic(
         "mentorship_zome",
-        &mycelix_bridge_common::requirement_for_basic(),
+        &mycelix_bridge_common::civic_requirement_basic(),
         "record_session",
     )?;
 
@@ -336,9 +336,9 @@ pub fn get_mentorship_sessions(mentorship_hash: ActionHash) -> ExternResult<Vec<
 #[hdk_extern]
 pub fn complete_mentorship(input: CompleteMentorshipInput) -> ExternResult<ActionHash> {
     // Consciousness gate: Citizen tier for completing (writes ratings)
-    mycelix_bridge_common::gate_consciousness(
+    mycelix_bridge_common::gate_civic(
         "mentorship_zome",
-        &mycelix_bridge_common::requirement_for_voting(),
+        &mycelix_bridge_common::civic_requirement_voting(),
         "complete_mentorship",
     )?;
 

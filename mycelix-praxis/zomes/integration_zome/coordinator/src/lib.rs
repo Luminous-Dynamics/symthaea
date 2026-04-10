@@ -2478,9 +2478,9 @@ pub struct PublishToCraftInput {
 #[hdk_extern]
 pub fn publish_to_craft(input: PublishToCraftInput) -> ExternResult<()> {
     // Gate: Citizen tier minimum for cross-cluster publishing
-    mycelix_bridge_common::gate_consciousness(
+    mycelix_bridge_common::gate_civic(
         "edunet_bridge",
-        &mycelix_bridge_common::requirement_for_voting(),
+        &mycelix_bridge_common::civic_requirement_voting(),
         "publish_to_craft",
     )?;
 

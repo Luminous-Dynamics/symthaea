@@ -391,9 +391,9 @@ pub fn freeze_streak(_: ()) -> ExternResult<Record> {
 #[hdk_extern]
 pub fn create_badge_definition(input: CreateBadgeInput) -> ExternResult<Record> {
     // Trust tier gate: requires Steward tier to create badge definitions
-    mycelix_bridge_common::gate_consciousness(
+    mycelix_bridge_common::gate_civic(
         "edunet_bridge",
-        &mycelix_bridge_common::requirement_for_constitutional(),
+        &mycelix_bridge_common::civic_requirement_constitutional(),
         "create_badge_definition",
     )?;
 

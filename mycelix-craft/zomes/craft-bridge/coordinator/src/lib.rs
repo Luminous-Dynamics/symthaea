@@ -51,9 +51,9 @@ fn ensure_anchor(text: &str) -> ExternResult<ActionHash> {
 #[hdk_extern]
 pub fn dispatch_call(input: bridge::DispatchInput) -> ExternResult<bridge::DispatchResult> {
     // Consciousness gate: Participant tier (≥0.3 combined)
-    bridge::gate_consciousness(
+    bridge::gate_civic(
         "craft_bridge",
-        &bridge::requirement_for_basic(),
+        &bridge::civic_requirement_basic(),
         "dispatch_call",
     )?;
 
@@ -76,9 +76,9 @@ pub fn dispatch_call(input: bridge::DispatchInput) -> ExternResult<bridge::Dispa
 #[hdk_extern]
 pub fn query_craft(query: CraftQueryEntry) -> ExternResult<Record> {
     // Consciousness gate
-    bridge::gate_consciousness(
+    bridge::gate_civic(
         "craft_bridge",
-        &bridge::requirement_for_basic(),
+        &bridge::civic_requirement_basic(),
         "query_craft",
     )?;
 
@@ -96,9 +96,9 @@ pub fn query_craft(query: CraftQueryEntry) -> ExternResult<Record> {
 /// Requires Citizen tier (voting) — events are community actions.
 #[hdk_extern]
 pub fn broadcast_event(event: CraftEventEntry) -> ExternResult<Record> {
-    bridge::gate_consciousness(
+    bridge::gate_civic(
         "craft_bridge",
-        &bridge::requirement_for_voting(),
+        &bridge::civic_requirement_voting(),
         "broadcast_event",
     )?;
 

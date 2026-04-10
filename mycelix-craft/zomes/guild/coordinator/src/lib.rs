@@ -102,9 +102,9 @@ fn get_my_role_in_guild(guild_id: &ActionHash) -> ExternResult<Option<(ActionHas
 #[hdk_extern]
 pub fn create_guild(input: CreateGuildInput) -> ExternResult<ActionHash> {
     // Consciousness gate: Citizen tier (≥0.4 combined) + identity ≥0.25
-    bridge::gate_consciousness(
+    bridge::gate_civic(
         "craft_bridge",
-        &bridge::requirement_for_voting(),
+        &bridge::civic_requirement_voting(),
         "create_guild",
     )?;
 
@@ -194,9 +194,9 @@ pub fn join_guild(guild_id: ActionHash) -> ExternResult<ActionHash> {
 #[hdk_extern]
 pub fn promote_member(input: PromoteMemberInput) -> ExternResult<ActionHash> {
     // Consciousness gate: Steward tier (≥0.6 combined) + identity ≥0.5 + community ≥0.3
-    bridge::gate_consciousness(
+    bridge::gate_civic(
         "craft_bridge",
-        &bridge::requirement_for_constitutional(),
+        &bridge::civic_requirement_constitutional(),
         "promote_member",
     )?;
 
@@ -238,9 +238,9 @@ pub fn promote_member(input: PromoteMemberInput) -> ExternResult<ActionHash> {
 #[hdk_extern]
 pub fn create_certification_path(input: CreateCertificationPathInput) -> ExternResult<ActionHash> {
     // Consciousness gate: Steward tier (≥0.6 combined) + identity ≥0.5 + community ≥0.3
-    bridge::gate_consciousness(
+    bridge::gate_civic(
         "craft_bridge",
-        &bridge::requirement_for_constitutional(),
+        &bridge::civic_requirement_constitutional(),
         "create_certification_path",
     )?;
 
@@ -274,9 +274,9 @@ pub fn create_certification_path(input: CreateCertificationPathInput) -> ExternR
 #[hdk_extern]
 pub fn establish_federation(input: EstablishFederationInput) -> ExternResult<ActionHash> {
     // Consciousness gate: Guardian tier (≥0.8 combined) + identity ≥0.7 + community ≥0.5
-    bridge::gate_consciousness(
+    bridge::gate_civic(
         "craft_bridge",
-        &bridge::requirement_for_guardian(),
+        &bridge::civic_requirement_guardian(),
         "establish_federation",
     )?;
 
