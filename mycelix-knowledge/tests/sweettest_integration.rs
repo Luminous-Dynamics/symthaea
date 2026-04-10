@@ -13,13 +13,19 @@
 //! # Ensure the DNA bundle exists
 //! ls mycelix-knowledge/dna/mycelix_knowledge.dna
 //!
+//! # Or point tests at a freshly packed bundle
+//! export MYCELIX_KNOWLEDGE_DNA_PATH=/path/to/mycelix_knowledge.dna
+//!
 //! # Run tests (requires Holochain conductor via nix develop)
 //! cargo test --test sweettest_integration -- --ignored
 //! ```
 
-use holochain::sweettest::*;
+use holochain::conductor::conductor::InstallAppCommonFlags;
 use holochain::prelude::*;
-use std::path::PathBuf;
+use holochain::sweettest::*;
+use std::path::{Path, PathBuf};
+use std::time::Duration;
+use std::time::SystemTime;
 
 // ============================================================================
 // Mirror types (avoids importing zome crates / duplicate symbols)
@@ -71,6 +77,75 @@ pub struct Claim {
     pub created: Timestamp,
     pub updated: Timestamp,
     pub version: u32,
+}
+
+/// Mirror of claims coordinator::UpdateClaimInput
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct UpdateClaimInput {
+    pub claim_id: String,
+    pub content: Option<String>,
+    pub classification: Option<EpistemicPosition>,
+    pub sources: Option<Vec<String>>,
+    pub tags: Option<Vec<String>>,
+    pub confidence: Option<f64>,
+    pub expires: Option<Timestamp>,
+}
+
+/// Mirror of claims coordinator::SearchClaimsInput
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct SearchClaimsInput {
+    pub query: String,
+    pub limit: Option<u32>,
+}
+
+/// Mirror of claims coordinator::SearchHitClassification
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct SearchHitClassification {
+    pub empirical: f64,
+    pub normative: f64,
+    pub materiality: f64,
+}
+
+/// Mirror of claims coordinator::ClaimSearchHit
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct ClaimSearchHit {
+    pub id: String,
+    pub content: String,
+    pub classification: SearchHitClassification,
+    pub author: String,
+    pub sources: Vec<String>,
+    pub tags: Vec<String>,
+    pub claim_type: ClaimType,
+    pub version: u32,
+    pub updated_micros: i64,
+    pub match_score: f64,
+}
+
+/// Mirror of claims coordinator::ClaimIndexStatsInput
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct ClaimIndexStatsInput {
+    pub claim_id: String,
+    pub tags: Vec<String>,
+}
+
+/// Mirror of claims coordinator::IndexLinkCount
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct IndexLinkCount {
+    pub anchor: String,
+    pub total_links: u32,
+    pub current_links: u32,
+}
+
+/// Mirror of claims coordinator::ClaimIndexStats
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct ClaimIndexStats {
+    pub claim_id: String,
+    pub version: u32,
+    pub all_claims: IndexLinkCount,
+    pub claim_id_index: IndexLinkCount,
+    pub author_index: IndexLinkCount,
+    pub type_index: IndexLinkCount,
+    pub tag_indexes: Vec<IndexLinkCount>,
 }
 
 /// Mirror of claims_integrity::EvidenceType
@@ -480,18 +555,188 @@ pub struct UpdateAuthorReputationInput {
 // Test Utilities
 // ============================================================================
 
-/// Path to the pre-built DNA bundle
+fn repo_root() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..")
+}
+
+fn bundle_path(env_var: &str, default_file_name: &str) -> PathBuf {
+    std::env::var_os(env_var)
+        .map(PathBuf::from)
+        .unwrap_or_else(|| repo_root().join("dna").join(default_file_name))
+}
+
+/// Path to the pre-built full Knowledge DNA bundle.
 fn dna_path() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("..")
-        .join("dna")
-        .join("mycelix_knowledge.dna")
+    bundle_path("MYCELIX_KNOWLEDGE_DNA_PATH", "mycelix_knowledge.dna")
+}
+
+/// Path to the pre-built claims-only DNA bundle used by targeted claim tests.
+fn claims_dna_path() -> PathBuf {
+    bundle_path(
+        "MYCELIX_KNOWLEDGE_CLAIMS_DNA_PATH",
+        "mycelix_claims_sweettest.dna",
+    )
+}
+
+async fn load_bundle(path: PathBuf, source_paths: &[PathBuf], repack_hint: &str) -> DnaFile {
+    assert_bundle_is_current(&path, source_paths);
+
+    SweetDnaFile::from_bundle(&path)
+        .await
+        .unwrap_or_else(|error| {
+            panic!(
+                "Failed to load DNA bundle at {}: {error}. {}",
+                path.display(),
+                repack_hint
+            )
+        })
 }
 
 async fn load_dna() -> DnaFile {
-    SweetDnaFile::from_bundle(&dna_path())
+    let root = repo_root();
+    load_bundle(
+        dna_path(),
+        &[
+            root.join("zomes"),
+            root.join("dna.yaml"),
+            root.join("dna").join("dna.yaml"),
+        ],
+        "Repack with `hc dna pack dna/` or set MYCELIX_KNOWLEDGE_DNA_PATH to a current bundle.",
+    )
+    .await
+}
+
+async fn load_claims_dna() -> DnaFile {
+    let root = repo_root();
+    load_bundle(
+        claims_dna_path(),
+        &[
+            root.join("zomes").join("claims"),
+            root.join("dna").join("claims_sweettest").join("dna.yaml"),
+        ],
+        "Repack with `hc dna pack dna/claims_sweettest/` or set MYCELIX_KNOWLEDGE_CLAIMS_DNA_PATH to a current claims-only bundle.",
+    )
+    .await
+}
+
+async fn load_diagnostic_dna() -> DnaFile {
+    let root = repo_root();
+    let path = std::env::var_os("MYCELIX_KNOWLEDGE_DIAGNOSTIC_DNA_PATH")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| {
+            panic!(
+                "MYCELIX_KNOWLEDGE_DIAGNOSTIC_DNA_PATH must point at a packed diagnostic DNA bundle"
+            )
+        });
+    let manifest_path = path
+        .parent()
+        .map(|dir| dir.join("dna.yaml"))
+        .unwrap_or_else(|| root.join("dna").join("dna.yaml"));
+
+    load_bundle(
+        path,
+        &[root.join("zomes"), manifest_path, root.join("dna.yaml")],
+        "Set MYCELIX_KNOWLEDGE_DIAGNOSTIC_DNA_PATH to a fresh packed diagnostic bundle.",
+    )
+    .await
+}
+
+fn assert_bundle_is_current(bundle_path: &Path, source_paths: &[PathBuf]) {
+    let bundle_mtime = file_mtime(bundle_path).unwrap_or_else(|error| {
+        panic!(
+            "Failed to read DNA bundle metadata at {}: {error}",
+            bundle_path.display()
+        )
+    });
+
+    let latest_source_mtime = source_paths
+        .iter()
+        .filter_map(|path| latest_relevant_mtime(path))
+        .max()
+        .unwrap_or(bundle_mtime);
+
+    if bundle_mtime < latest_source_mtime {
+        panic!(
+            "DNA bundle at {} is older than the current zome or DNA sources. Repack it with `hc dna pack dna/` or point MYCELIX_KNOWLEDGE_DNA_PATH at a fresh bundle.",
+            bundle_path.display()
+        );
+    }
+}
+
+fn latest_relevant_mtime(path: &Path) -> Option<SystemTime> {
+    if path.is_file() {
+        return file_mtime(path).ok();
+    }
+
+    let mut latest: Option<SystemTime> = None;
+    let entries = std::fs::read_dir(path).ok()?;
+
+    for entry in entries.flatten() {
+        let child = entry.path();
+        let child_mtime = latest_relevant_mtime(&child);
+        latest = match (latest, child_mtime) {
+            (Some(current), Some(candidate)) => Some(current.max(candidate)),
+            (None, Some(candidate)) => Some(candidate),
+            (current, None) => current,
+        };
+    }
+
+    latest
+}
+
+fn file_mtime(path: &Path) -> std::io::Result<SystemTime> {
+    std::fs::metadata(path)?.modified()
+}
+
+async fn step_timeout<F, T>(label: &str, future: F) -> T
+where
+    F: std::future::Future<Output = T>,
+{
+    let timeout_secs = std::env::var("SWEETTEST_STEP_TIMEOUT_SECS")
+        .ok()
+        .and_then(|value| value.parse::<u64>().ok())
+        .unwrap_or(90);
+    eprintln!("[sweettest] begin: {label}");
+    let result = tokio::time::timeout(Duration::from_secs(timeout_secs), future)
         .await
-        .expect("Failed to load DNA bundle - run 'hc dna pack dna/' first")
+        .unwrap_or_else(|_| panic!("Timed out after {timeout_secs}s while waiting for: {label}"));
+    eprintln!("[sweettest] done: {label}");
+    result
+}
+
+async fn setup_single_cell_app(app_id: &str) -> (SweetConductor, SweetCell, AgentPubKey) {
+    let conductor = step_timeout(
+        "SweetConductor::from_standard_config",
+        SweetConductor::from_standard_config(),
+    )
+    .await;
+    let dna = step_timeout("load_claims_dna", load_claims_dna()).await;
+    setup_single_cell_app_with_dna(conductor, app_id, dna).await
+}
+
+async fn setup_single_cell_app_with_dna(
+    mut conductor: SweetConductor,
+    app_id: &str,
+    dna: DnaFile,
+) -> (SweetConductor, SweetCell, AgentPubKey) {
+    let dna_hash = dna.dna_hash().clone();
+    let dnas = [dna.clone()];
+    let agent = step_timeout(
+        "SweetConductor::install_app",
+        conductor.install_app(app_id, None, &dnas, None),
+    )
+    .await
+    .unwrap();
+    step_timeout(
+        "SweetConductor::enable_app",
+        conductor.enable_app(app_id.to_string()),
+    )
+    .await
+    .unwrap();
+    let cell = conductor
+        .get_sweet_cell(CellId::new(dna_hash, agent.clone()))
+        .unwrap();
+    (conductor, cell, agent)
 }
 
 /// Decode an entry from a Record into a concrete type via MessagePack deserialization.
@@ -506,7 +751,13 @@ fn decode_entry<T: serde::de::DeserializeOwned>(record: &Record) -> Option<T> {
 }
 
 /// Helper to create a test claim
-fn make_test_claim(id: &str, content: &str, author: &str, tags: Vec<String>, now: Timestamp) -> Claim {
+fn make_test_claim(
+    id: &str,
+    content: &str,
+    author: &str,
+    tags: Vec<String>,
+    now: Timestamp,
+) -> Claim {
     Claim {
         id: id.to_string(),
         content: content.to_string(),
@@ -566,7 +817,11 @@ mod claims_tests {
 
         // Get claim by ID
         let retrieved: Option<Record> = conductor
-            .call(&cell.zome("claims"), "get_claim", "claim-test-001".to_string())
+            .call(
+                &cell.zome("claims"),
+                "get_claim",
+                "claim-test-001".to_string(),
+            )
             .await;
 
         assert!(retrieved.is_some(), "Should find claim by ID");
@@ -602,7 +857,11 @@ mod claims_tests {
 
         // Get by author
         let claims: Vec<Record> = conductor
-            .call(&cell.zome("claims"), "get_claims_by_author", author_did.clone())
+            .call(
+                &cell.zome("claims"),
+                "get_claims_by_author",
+                author_did.clone(),
+            )
             .await;
 
         assert!(claims.len() >= 3, "Should find at least 3 claims by author");
@@ -634,10 +893,283 @@ mod claims_tests {
 
         // Get by tag
         let claims: Vec<Record> = conductor
-            .call(&cell.zome("claims"), "get_claims_by_tag", "energy".to_string())
+            .call(
+                &cell.zome("claims"),
+                "get_claims_by_tag",
+                "energy".to_string(),
+            )
             .await;
 
         assert!(!claims.is_empty(), "Should find claim by tag");
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore]
+    async fn test_update_claim_reindexes_tags_and_returns_latest_record() {
+        let (conductor, cell, agent) = setup_single_cell_app("test-app").await;
+
+        let now = Timestamp::now();
+        let author_did = format!("did:mycelix:{}", agent);
+
+        let claim = make_test_claim(
+            "claim-update-001",
+            "Solar energy can stabilize the grid",
+            &author_did,
+            vec!["energy".to_string(), "solar".to_string()],
+            now,
+        );
+
+        let _: Record = step_timeout(
+            "claims.submit_claim",
+            conductor.call(&cell.zome("claims"), "submit_claim", claim),
+        )
+        .await;
+
+        let updated: Record = step_timeout(
+            "claims.update_claim",
+            conductor.call(
+                &cell.zome("claims"),
+                "update_claim",
+                UpdateClaimInput {
+                    claim_id: "claim-update-001".to_string(),
+                    content: Some("Distributed solar improves grid resilience".to_string()),
+                    classification: None,
+                    sources: None,
+                    tags: Some(vec!["renewable".to_string(), "grid".to_string()]),
+                    confidence: None,
+                    expires: None,
+                },
+            ),
+        )
+        .await;
+
+        let updated_claim: Claim = decode_entry(&updated).expect("Failed to decode updated claim");
+        assert_eq!(updated_claim.version, 2);
+        assert_eq!(
+            updated_claim.content,
+            "Distributed solar improves grid resilience"
+        );
+        assert_eq!(
+            updated_claim.tags,
+            vec!["renewable".to_string(), "grid".to_string()]
+        );
+
+        let fetched_latest: Option<Record> = step_timeout(
+            "claims.get_claim.latest",
+            conductor.call(
+                &cell.zome("claims"),
+                "get_claim",
+                "claim-update-001".to_string(),
+            ),
+        )
+        .await;
+        let fetched_latest = fetched_latest.expect("Expected latest claim record");
+        let fetched_latest: Claim =
+            decode_entry(&fetched_latest).expect("Failed to decode fetched latest claim");
+        assert_eq!(fetched_latest.version, 2);
+        assert_eq!(
+            fetched_latest.content,
+            "Distributed solar improves grid resilience"
+        );
+
+        let old_tag_results: Vec<Record> = step_timeout(
+            "claims.get_claims_by_tag.old",
+            conductor.call(
+                &cell.zome("claims"),
+                "get_claims_by_tag",
+                "energy".to_string(),
+            ),
+        )
+        .await;
+        assert!(
+            old_tag_results.is_empty(),
+            "Old tag should not surface stale claim versions"
+        );
+
+        let new_tag_results: Vec<Record> = step_timeout(
+            "claims.get_claims_by_tag.new",
+            conductor.call(
+                &cell.zome("claims"),
+                "get_claims_by_tag",
+                "renewable".to_string(),
+            ),
+        )
+        .await;
+        assert_eq!(
+            new_tag_results.len(),
+            1,
+            "New tag should resolve latest claim"
+        );
+
+        let latest_claim: Claim =
+            decode_entry(&new_tag_results[0]).expect("Failed to decode latest");
+        assert_eq!(latest_claim.version, 2);
+        assert_eq!(
+            latest_claim.content,
+            "Distributed solar improves grid resilience"
+        );
+
+        let index_stats: ClaimIndexStats = step_timeout(
+            "claims.get_claim_index_stats",
+            conductor.call(
+                &cell.zome("claims"),
+                "get_claim_index_stats",
+                ClaimIndexStatsInput {
+                    claim_id: "claim-update-001".to_string(),
+                    tags: vec!["energy".to_string(), "renewable".to_string()],
+                },
+            ),
+        )
+        .await;
+        assert_eq!(index_stats.version, 2);
+        assert_eq!(index_stats.all_claims.total_links, 1);
+        assert_eq!(index_stats.all_claims.current_links, 1);
+        assert_eq!(index_stats.claim_id_index.total_links, 1);
+        assert_eq!(index_stats.claim_id_index.current_links, 1);
+        assert_eq!(index_stats.author_index.total_links, 1);
+        assert_eq!(index_stats.author_index.current_links, 1);
+        assert_eq!(index_stats.type_index.total_links, 1);
+        assert_eq!(index_stats.type_index.current_links, 1);
+        assert_eq!(index_stats.tag_indexes.len(), 2);
+        assert_eq!(index_stats.tag_indexes[0].anchor, "tag:energy");
+        assert_eq!(index_stats.tag_indexes[0].total_links, 0);
+        assert_eq!(index_stats.tag_indexes[0].current_links, 0);
+        assert_eq!(index_stats.tag_indexes[1].anchor, "tag:renewable");
+        assert_eq!(index_stats.tag_indexes[1].total_links, 1);
+        assert_eq!(index_stats.tag_indexes[1].current_links, 1);
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore]
+    async fn test_search_claims_returns_latest_typed_hits() {
+        let (conductor, cell, agent) = setup_single_cell_app("test-app").await;
+
+        let now = Timestamp::now();
+        let author_did = format!("did:mycelix:{}", agent);
+
+        let claim = make_test_claim(
+            "claim-search-001",
+            "Community solar reduces energy costs",
+            &author_did,
+            vec!["solar".to_string(), "energy".to_string()],
+            now,
+        );
+
+        let _: Record = step_timeout(
+            "claims.submit_claim.search",
+            conductor.call(&cell.zome("claims"), "submit_claim", claim),
+        )
+        .await;
+
+        let _: Record = step_timeout(
+            "claims.update_claim.search",
+            conductor.call(
+                &cell.zome("claims"),
+                "update_claim",
+                UpdateClaimInput {
+                    claim_id: "claim-search-001".to_string(),
+                    content: Some("Community solar improves grid resilience".to_string()),
+                    classification: None,
+                    sources: None,
+                    tags: Some(vec!["grid".to_string(), "resilience".to_string()]),
+                    confidence: None,
+                    expires: None,
+                },
+            ),
+        )
+        .await;
+
+        let hits: Vec<ClaimSearchHit> = step_timeout(
+            "claims.search_claims",
+            conductor.call(
+                &cell.zome("claims"),
+                "search_claims",
+                SearchClaimsInput {
+                    query: "grid resilience".to_string(),
+                    limit: Some(5),
+                },
+            ),
+        )
+        .await;
+
+        assert!(!hits.is_empty(), "Search should return typed claim hits");
+        assert_eq!(hits[0].id, "claim-search-001");
+        assert_eq!(hits[0].version, 2);
+        assert_eq!(hits[0].content, "Community solar improves grid resilience");
+        assert!(hits[0].match_score > 0.5);
+        assert_eq!(
+            hits[0].tags,
+            vec!["grid".to_string(), "resilience".to_string()]
+        );
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore]
+    async fn test_diagnostic_bundle_install_only() {
+        let conductor = step_timeout(
+            "SweetConductor::from_standard_config",
+            SweetConductor::from_standard_config(),
+        )
+        .await;
+        let dna = step_timeout("load_diagnostic_dna", load_diagnostic_dna()).await;
+
+        let _ = setup_single_cell_app_with_dna(conductor, "diagnostic-app", dna).await;
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore]
+    async fn test_diagnostic_bundle_submit_claim_smoke() {
+        let conductor = step_timeout(
+            "SweetConductor::from_standard_config",
+            SweetConductor::from_standard_config(),
+        )
+        .await;
+        let dna = step_timeout("load_diagnostic_dna", load_diagnostic_dna()).await;
+        let (conductor, cell, agent) =
+            setup_single_cell_app_with_dna(conductor, "diagnostic-app", dna).await;
+
+        let now = Timestamp::now();
+        let author_did = format!("did:mycelix:{}", agent);
+        let claim = make_test_claim(
+            "diagnostic-claim-001",
+            "Diagnostic claim for bundle smoke testing",
+            &author_did,
+            vec!["diagnostic".to_string()],
+            now,
+        );
+
+        let _: Record = step_timeout(
+            "claims.submit_claim",
+            conductor.call(&cell.zome("claims"), "submit_claim", claim),
+        )
+        .await;
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore]
+    async fn test_diagnostic_bundle_install_ignore_genesis() {
+        let mut conductor = step_timeout(
+            "SweetConductor::from_standard_config",
+            SweetConductor::from_standard_config(),
+        )
+        .await;
+        let dna = step_timeout("load_diagnostic_dna", load_diagnostic_dna()).await;
+        let dnas = [dna];
+
+        let _agent = step_timeout(
+            "SweetConductor::install_app.ignore_genesis",
+            conductor.install_app(
+                "diagnostic-app",
+                None,
+                &dnas,
+                Some(InstallAppCommonFlags {
+                    defer_memproofs: false,
+                    ignore_genesis_failure: true,
+                }),
+            ),
+        )
+        .await
+        .unwrap();
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -827,7 +1359,10 @@ mod graph_tests {
             )
             .await;
 
-        assert!(outgoing.len() >= 2, "Should have at least 2 outgoing relationships");
+        assert!(
+            outgoing.len() >= 2,
+            "Should have at least 2 outgoing relationships"
+        );
 
         // Get incoming to B
         let incoming: Vec<Record> = conductor
@@ -838,7 +1373,10 @@ mod graph_tests {
             )
             .await;
 
-        assert!(!incoming.is_empty(), "Should have incoming relationships to B");
+        assert!(
+            !incoming.is_empty(),
+            "Should have incoming relationships to B"
+        );
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -915,7 +1453,10 @@ mod graph_tests {
             .await;
 
         // Stats should return valid counts (may be 0 on fresh conductor)
-        assert!(stats.relationship_count >= 0, "Relationship count should be non-negative");
+        assert!(
+            stats.relationship_count >= 0,
+            "Relationship count should be non-negative"
+        );
     }
 }
 
@@ -978,7 +1519,10 @@ mod inference_tests {
             .await;
 
         let score: CredibilityScore = decode_entry(&score_record).expect("Failed to decode");
-        assert!(score.score >= 0.0 && score.score <= 1.0, "Score must be 0-1");
+        assert!(
+            score.score >= 0.0 && score.score <= 1.0,
+            "Score must be 0-1"
+        );
         assert!(
             score.components.accuracy >= 0.0 && score.components.accuracy <= 1.0,
             "Component scores must be 0-1"
@@ -1006,11 +1550,17 @@ mod inference_tests {
             .call(&cell.zome("inference"), "detect_patterns", input)
             .await;
 
-        assert!(!patterns.is_empty(), "Should detect at least one pattern from 3 claims");
+        assert!(
+            !patterns.is_empty(),
+            "Should detect at least one pattern from 3 claims"
+        );
 
         let pattern: Pattern = decode_entry(&patterns[0]).expect("Failed to decode pattern");
         assert_eq!(pattern.pattern_type, PatternType::Cluster);
-        assert!(pattern.strength > 0.0, "Pattern strength should be positive");
+        assert!(
+            pattern.strength > 0.0,
+            "Pattern strength should be positive"
+        );
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -1034,7 +1584,10 @@ mod inference_tests {
 
         let reputation: AuthorReputation = decode_entry(&rep_record).expect("Failed to decode");
         assert_eq!(reputation.author_did, author_did);
-        assert_eq!(reputation.overall_score, 0.5, "New author should have neutral reputation");
+        assert_eq!(
+            reputation.overall_score, 0.5,
+            "New author should have neutral reputation"
+        );
 
         // Update reputation
         let update_input = UpdateAuthorReputationInput {
@@ -1181,7 +1734,10 @@ mod bridge_tests {
             )
             .await;
 
-        assert!(claims.len() >= 2, "Should find at least 2 claims from justice hApp");
+        assert!(
+            claims.len() >= 2,
+            "Should find at least 2 claims from justice hApp"
+        );
     }
 }
 
@@ -1329,6 +1885,9 @@ mod lifecycle_tests {
             )
             .await;
 
-        assert!(!outgoing.is_empty(), "Claim should have outgoing relationships");
+        assert!(
+            !outgoing.is_empty(),
+            "Claim should have outgoing relationships"
+        );
     }
 }

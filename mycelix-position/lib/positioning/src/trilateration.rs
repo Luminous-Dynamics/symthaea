@@ -61,14 +61,22 @@ pub enum TrilaterationError {
 impl std::fmt::Display for TrilaterationError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::InsufficientAnchors { have, need } =>
-                write!(f, "Need {} anchors, have {}", need, have),
+            Self::InsufficientAnchors { have, need } => {
+                write!(f, "Need {} anchors, have {}", need, have)
+            }
             Self::LengthMismatch => write!(f, "Input arrays have different lengths"),
             Self::DegenerateGeometry => write!(f, "Anchors are nearly collinear"),
-            Self::DidNotConverge { iterations, residual } =>
-                write!(f, "Did not converge after {} iterations (residual: {:.3}m)", iterations, residual),
-            Self::InvalidRange { index, value } =>
-                write!(f, "Invalid range at index {}: {}", index, value),
+            Self::DidNotConverge {
+                iterations,
+                residual,
+            } => write!(
+                f,
+                "Did not converge after {} iterations (residual: {:.3}m)",
+                iterations, residual
+            ),
+            Self::InvalidRange { index, value } => {
+                write!(f, "Invalid range at index {}: {}", index, value)
+            }
         }
     }
 }
@@ -128,7 +136,7 @@ pub fn trilaterate_3d(
 
         // Compute residuals and Jacobian
         let mut jtw_j = [[0.0_f64; 3]; 3]; // J^T W J (3×3)
-        let mut jtw_r = [0.0_f64; 3];       // J^T W r (3×1)
+        let mut jtw_r = [0.0_f64; 3]; // J^T W r (3×1)
         let mut sum_sq_residual = 0.0;
 
         for i in 0..n {
@@ -177,7 +185,10 @@ pub fn trilaterate_3d(
     }
 
     if iterations == MAX_ITERATIONS && residual_rms > 1.0 {
-        return Err(TrilaterationError::DidNotConverge { iterations, residual: residual_rms });
+        return Err(TrilaterationError::DidNotConverge {
+            iterations,
+            residual: residual_rms,
+        });
     }
 
     // Compute covariance: C = (J^T W J)^{-1}
@@ -187,7 +198,9 @@ pub fn trilaterate_3d(
         let dy = pos[1] - anchors[i][1];
         let dz = pos[2] - anchors[i][2];
         let dist = (dx * dx + dy * dy + dz * dz).sqrt();
-        if dist < 1e-10 { continue; }
+        if dist < 1e-10 {
+            continue;
+        }
         let j_row = [dx / dist, dy / dist, dz / dist];
         for a in 0..3 {
             for b in 0..3 {
@@ -202,9 +215,15 @@ pub fn trilaterate_3d(
     Ok(PositionEstimate {
         position: pos,
         covariance: [
-            covariance[0][0], covariance[0][1], covariance[0][2],
-            covariance[1][0], covariance[1][1], covariance[1][2],
-            covariance[2][0], covariance[2][1], covariance[2][2],
+            covariance[0][0],
+            covariance[0][1],
+            covariance[0][2],
+            covariance[1][0],
+            covariance[1][1],
+            covariance[1][2],
+            covariance[2][0],
+            covariance[2][1],
+            covariance[2][2],
         ],
         sigma_m: sigma,
         anchor_count: n,
@@ -259,7 +278,9 @@ pub fn trilaterate_2d(
             let dx = pos[0] - anchors[i][0];
             let dy = pos[1] - anchors[i][1];
             let dist = (dx * dx + dy * dy).sqrt();
-            if dist < 1e-10 { continue; }
+            if dist < 1e-10 {
+                continue;
+            }
 
             let residual = dist - ranges[i];
             sum_sq += weights[i] * residual * residual;
@@ -298,7 +319,9 @@ pub fn trilaterate_2d(
         let dx = pos[0] - anchors[i][0];
         let dy = pos[1] - anchors[i][1];
         let dist = (dx * dx + dy * dy).sqrt();
-        if dist < 1e-10 { continue; }
+        if dist < 1e-10 {
+            continue;
+        }
         let j_row = [dx / dist, dy / dist];
         for a in 0..2 {
             for b in 0..2 {
@@ -309,8 +332,10 @@ pub fn trilaterate_2d(
     let det = jtw_j_final[0][0] * jtw_j_final[1][1] - jtw_j_final[0][1] * jtw_j_final[1][0];
     let cov = if det.abs() > 1e-20 {
         [
-            jtw_j_final[1][1] / det, -jtw_j_final[0][1] / det,
-            -jtw_j_final[1][0] / det, jtw_j_final[0][0] / det,
+            jtw_j_final[1][1] / det,
+            -jtw_j_final[0][1] / det,
+            -jtw_j_final[1][0] / det,
+            jtw_j_final[0][0] / det,
         ]
     } else {
         [1e6, 0.0, 0.0, 1e6]
@@ -342,8 +367,8 @@ fn solve_3x3(a: &[[f64; 3]; 3], b: &[f64; 3]) -> Option<[f64; 3]> {
 
 fn invert_3x3(m: &[[f64; 3]; 3]) -> Option<[[f64; 3]; 3]> {
     let det = m[0][0] * (m[1][1] * m[2][2] - m[1][2] * m[2][1])
-            - m[0][1] * (m[1][0] * m[2][2] - m[1][2] * m[2][0])
-            + m[0][2] * (m[1][0] * m[2][1] - m[1][1] * m[2][0]);
+        - m[0][1] * (m[1][0] * m[2][2] - m[1][2] * m[2][0])
+        + m[0][2] * (m[1][0] * m[2][1] - m[1][1] * m[2][0]);
     if det.abs() < 1e-30 {
         return None;
     }
@@ -406,12 +431,15 @@ mod tests {
             [0.0, 0.0, 100.0],
             [100.0, 100.0, 0.0],
         ];
-        let ranges: Vec<f64> = anchors.iter().map(|a| {
-            let dx: f64 = a[0] - target[0];
-            let dy: f64 = a[1] - target[1];
-            let dz: f64 = a[2] - target[2];
-            (dx*dx + dy*dy + dz*dz).sqrt()
-        }).collect();
+        let ranges: Vec<f64> = anchors
+            .iter()
+            .map(|a| {
+                let dx: f64 = a[0] - target[0];
+                let dy: f64 = a[1] - target[1];
+                let dz: f64 = a[2] - target[2];
+                (dx * dx + dy * dy + dz * dz).sqrt()
+            })
+            .collect();
         let sigmas = vec![1.0; 5];
         let trusts = vec![1.0; 5];
 
@@ -429,33 +457,47 @@ mod tests {
             [0.0, 100.0, 0.0],
             [0.0, 0.0, 100.0],
             [-100.0, 0.0, 0.0],
-            [50.0, 50.0, 50.0],  // Bad anchor
+            [50.0, 50.0, 50.0], // Bad anchor
         ];
-        let mut ranges = vec![100.0, 100.0, 100.0, 100.0, 200.0]; // Last one is wrong
+        let ranges = vec![100.0, 100.0, 100.0, 100.0, 200.0]; // Last one is wrong
         let sigmas = vec![1.0; 5];
         let trusts = vec![1.0, 1.0, 1.0, 1.0, 0.01]; // Low trust on bad anchor
 
         let est = trilaterate_3d(&anchors, &ranges, &sigmas, &trusts).unwrap();
         // Should still be near origin despite bad measurement
-        let error = (est.position[0].powi(2) + est.position[1].powi(2) + est.position[2].powi(2)).sqrt();
-        assert!(error < 10.0, "Error {} too large with low-trust bad anchor", error);
+        let error =
+            (est.position[0].powi(2) + est.position[1].powi(2) + est.position[2].powi(2)).sqrt();
+        assert!(
+            error < 10.0,
+            "Error {} too large with low-trust bad anchor",
+            error
+        );
 
         // With high trust on bad anchor, error should be larger
         let trusts_high = vec![1.0, 1.0, 1.0, 1.0, 1.0];
         let est_high = trilaterate_3d(&anchors, &ranges, &sigmas, &trusts_high).unwrap();
-        let error_high = (est_high.position[0].powi(2) + est_high.position[1].powi(2) + est_high.position[2].powi(2)).sqrt();
-        assert!(error_high > error, "High trust on bad anchor should give worse result");
+        let error_high = (est_high.position[0].powi(2)
+            + est_high.position[1].powi(2)
+            + est_high.position[2].powi(2))
+        .sqrt();
+        assert!(
+            error_high > error,
+            "High trust on bad anchor should give worse result"
+        );
     }
 
     #[test]
     fn trilaterate_2d_basic() {
         let anchors: [[f64; 2]; 3] = [[0.0, 0.0], [100.0, 0.0], [50.0, 86.6]]; // equilateral triangle
         let target: [f64; 2] = [40.0, 30.0];
-        let ranges: Vec<f64> = anchors.iter().map(|a| {
-            let dx: f64 = a[0] - target[0];
-            let dy: f64 = a[1] - target[1];
-            (dx.powi(2) + dy.powi(2)).sqrt()
-        }).collect();
+        let ranges: Vec<f64> = anchors
+            .iter()
+            .map(|a| {
+                let dx: f64 = a[0] - target[0];
+                let dy: f64 = a[1] - target[1];
+                (dx.powi(2) + dy.powi(2)).sqrt()
+            })
+            .collect();
         let sigmas = vec![1.0; 3];
         let trusts = vec![1.0; 3];
 
@@ -472,7 +514,10 @@ mod tests {
             &[1.0, 1.0, 1.0],
             &[1.0, 1.0, 1.0],
         );
-        assert!(matches!(result, Err(TrilaterationError::InsufficientAnchors { .. })));
+        assert!(matches!(
+            result,
+            Err(TrilaterationError::InsufficientAnchors { .. })
+        ));
     }
 
     #[test]
@@ -483,18 +528,24 @@ mod tests {
             &[1.0, 1.0],
             &[1.0, 1.0],
         );
-        assert!(matches!(result, Err(TrilaterationError::InsufficientAnchors { .. })));
+        assert!(matches!(
+            result,
+            Err(TrilaterationError::InsufficientAnchors { .. })
+        ));
     }
 
     #[test]
     fn negative_range_rejected() {
         let result = trilaterate_3d(
-            &[[0.0;3], [1.0,0.0,0.0], [0.0,1.0,0.0], [0.0,0.0,1.0]],
+            &[[0.0; 3], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]],
             &[1.0, -1.0, 1.0, 1.0],
             &[1.0; 4],
             &[1.0; 4],
         );
-        assert!(matches!(result, Err(TrilaterationError::InvalidRange { index: 1, .. })));
+        assert!(matches!(
+            result,
+            Err(TrilaterationError::InvalidRange { index: 1, .. })
+        ));
     }
 
     #[test]
@@ -506,7 +557,7 @@ mod tests {
             [-100.0, 0.0, 0.0],
         ];
         let ranges = [100.0, 100.0, 100.0, 100.0];
-        let est = trilaterate_3d(&anchors, &ranges, &[1.0;4], &[1.0;4]).unwrap();
+        let est = trilaterate_3d(&anchors, &ranges, &[1.0; 4], &[1.0; 4]).unwrap();
         // Diagonal elements should be positive
         assert!(est.covariance[0] > 0.0); // C[0][0]
         assert!(est.covariance[4] > 0.0); // C[1][1]

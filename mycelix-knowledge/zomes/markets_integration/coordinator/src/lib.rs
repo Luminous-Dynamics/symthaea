@@ -214,12 +214,7 @@ pub fn request_verification_market(
         (),
     )?;
 
-    create_link(
-        agent,
-        action_hash.clone(),
-        LinkTypes::AgentToRequest,
-        (),
-    )?;
+    create_link(agent, action_hash.clone(), LinkTypes::AgentToRequest, ())?;
 
     // Send bridge event to Epistemic Markets via signal
     let event = MarketsIntegrationEvent::VerificationRequested {
@@ -231,10 +226,17 @@ pub fn request_verification_market(
         deadline,
     };
 
-    emit_signal(serde_json::to_value(&event)
-        .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Failed to serialize event: {}", e))))?)?;
+    emit_signal(serde_json::to_value(&event).map_err(|e| {
+        wasm_error!(WasmErrorInner::Guest(format!(
+            "Failed to serialize event: {}",
+            e
+        )))
+    })?)?;
 
-    debug!("Emitted VerificationRequested event for claim {}", input.claim_id);
+    debug!(
+        "Emitted VerificationRequested event for claim {}",
+        input.claim_id
+    );
 
     Ok(action_hash)
 }
@@ -303,17 +305,18 @@ pub fn on_market_created(input: MarketCreatedInput) -> ExternResult<ActionHash> 
         }
     }
 
-    let original_record = found_record
-        .ok_or(wasm_error!(WasmErrorInner::Guest(format!(
-            "Request not found: {}",
-            input.request_id
-        ))))?;
+    let original_record = found_record.ok_or(wasm_error!(WasmErrorInner::Guest(format!(
+        "Request not found: {}",
+        input.request_id
+    ))))?;
 
     let original_request: VerificationMarketRequest = original_record
         .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid request entry".into())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Invalid request entry".into()
+        )))?;
 
     // Update request status to MarketCreated
     let updated_request = VerificationMarketRequest {
@@ -362,8 +365,12 @@ pub fn on_market_created(input: MarketCreatedInput) -> ExternResult<ActionHash> 
         question: input.question,
     };
 
-    emit_signal(serde_json::to_value(&event)
-        .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Failed to serialize event: {}", e))))?)?;
+    emit_signal(serde_json::to_value(&event).map_err(|e| {
+        wasm_error!(WasmErrorInner::Guest(format!(
+            "Failed to serialize event: {}",
+            e
+        )))
+    })?)?;
 
     Ok(updated_hash)
 }
@@ -434,20 +441,31 @@ pub fn on_verification_market_resolved(input: MarketResolvedInput) -> ExternResu
         )?;
 
         let claim_record: Option<Record> = match claim_response {
-            ZomeCallResponse::Ok(bytes) => bytes.decode()
-                .map_err(|e| wasm_error!(WasmErrorInner::Guest(
-                    format!("Failed to decode claim {} from claims zome: {}", input.claim_id, e)
-                )))?,
+            ZomeCallResponse::Ok(bytes) => bytes.decode().map_err(|e| {
+                wasm_error!(WasmErrorInner::Guest(format!(
+                    "Failed to decode claim {} from claims zome: {}",
+                    input.claim_id, e
+                )))
+            })?,
             ZomeCallResponse::NetworkError(e) => {
-                debug!("Cross-zome call to claims::get_claim failed (network) for claim {}: {:?}", input.claim_id, e);
+                debug!(
+                    "Cross-zome call to claims::get_claim failed (network) for claim {}: {:?}",
+                    input.claim_id, e
+                );
                 None
             }
             ZomeCallResponse::Unauthorized(_, _, _, _) => {
-                debug!("Unauthorized to call claims::get_claim for claim {}", input.claim_id);
+                debug!(
+                    "Unauthorized to call claims::get_claim for claim {}",
+                    input.claim_id
+                );
                 None
             }
             other => {
-                debug!("Unexpected response from claims::get_claim for claim {}: {:?}", input.claim_id, other);
+                debug!(
+                    "Unexpected response from claims::get_claim for claim {}: {:?}",
+                    input.claim_id, other
+                );
                 None
             }
         };
@@ -457,10 +475,22 @@ pub fn on_verification_market_resolved(input: MarketResolvedInput) -> ExternResu
                 let entry_bytes = app_entry.bytes();
                 if let Ok(claim_data) = serde_json::from_slice::<serde_json::Value>(&entry_bytes) {
                     // Extract current epistemic values
-                    let classification = claim_data.get("classification").cloned().unwrap_or_default();
-                    let current_e = classification.get("empirical").and_then(|v| v.as_f64()).unwrap_or(0.5);
-                    let current_n = classification.get("normative").and_then(|v| v.as_f64()).unwrap_or(0.5);
-                    let current_m = classification.get("mythic").and_then(|v| v.as_f64()).unwrap_or(0.5);
+                    let classification = claim_data
+                        .get("classification")
+                        .cloned()
+                        .unwrap_or_default();
+                    let current_e = classification
+                        .get("empirical")
+                        .and_then(|v| v.as_f64())
+                        .unwrap_or(0.5);
+                    let current_n = classification
+                        .get("normative")
+                        .and_then(|v| v.as_f64())
+                        .unwrap_or(0.5);
+                    let current_m = classification
+                        .get("mythic")
+                        .and_then(|v| v.as_f64())
+                        .unwrap_or(0.5);
 
                     // Boost empirical position based on successful verification
                     let new_epistemic = EpistemicPosition {
@@ -539,8 +569,12 @@ pub fn on_verification_market_resolved(input: MarketResolvedInput) -> ExternResu
                                 new_epistemic,
                             };
 
-                            emit_signal(serde_json::to_value(&event)
-                                .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Failed to serialize event: {}", e))))?)?;
+                            emit_signal(serde_json::to_value(&event).map_err(|e| {
+                                wasm_error!(WasmErrorInner::Guest(format!(
+                                    "Failed to serialize event: {}",
+                                    e
+                                )))
+                            })?)?;
                         }
                         ZomeCallResponse::NetworkError(e) => {
                             debug!(
@@ -580,9 +614,10 @@ pub fn on_verification_market_resolved(input: MarketResolvedInput) -> ExternResu
         confidence: f64,
     }
 
-    // Try to parse claim_id as an ActionHash for DKG callback
-    // The DKG uses ActionHash internally; claim_id may be an encoded hash
-    if let Ok(claim_action_hash) = ActionHash::try_from(input.claim_id.as_bytes().to_vec()) {
+    // Try to parse claim_id as an encoded ActionHash for DKG callback.
+    // Not every claim_id is an action hash, so skip the callback when it is not.
+    if let Ok(claim_action_hash_b64) = ActionHashB64::from_b64_str(&input.claim_id) {
+        let claim_action_hash = ActionHash::from(claim_action_hash_b64);
         let dkg_input = DkgMarketResolvedInput {
             market_id: input.market_id.clone(),
             claim_hash: claim_action_hash,
@@ -632,11 +667,7 @@ pub fn register_claim_in_prediction(input: RegisterClaimInput) -> ExternResult<A
     let now = sys_time()?;
 
     let reference = ClaimAsMarketEvidence {
-        id: format!(
-            "came_{}_{}",
-            input.claim_id,
-            now.as_micros()
-        ),
+        id: format!("came_{}_{}", input.claim_id, now.as_micros()),
         claim_id: input.claim_id.clone(),
         market_id: input.market_id,
         prediction_id: input.prediction_id,
@@ -729,7 +760,10 @@ pub fn get_claim_markets(claim_id: String) -> ExternResult<Vec<MarketSummary>> {
 
     // Get claims used as evidence
     let evidence_links = get_links(
-        LinkQuery::try_new(anchor_hash(&claim_anchor)?, LinkTypes::ClaimUsedInPrediction)?,
+        LinkQuery::try_new(
+            anchor_hash(&claim_anchor)?,
+            LinkTypes::ClaimUsedInPrediction,
+        )?,
         GetStrategy::default(),
     )?;
 
@@ -744,7 +778,10 @@ pub fn get_claim_markets(claim_id: String) -> ExternResult<Vec<MarketSummary>> {
                 {
                     summaries.push(MarketSummary {
                         market_id: reference.market_id,
-                        question: format!("Prediction {} references this claim", reference.prediction_id),
+                        question: format!(
+                            "Prediction {} references this claim",
+                            reference.prediction_id
+                        ),
                         relationship: MarketRelationship::ClaimUsedAsEvidence,
                         status: "Active".to_string(),
                         current_probability: None,
@@ -764,7 +801,10 @@ pub fn get_claim_evidence(claim_id: String) -> ExternResult<Vec<Record>> {
     let claim_anchor = format!("claim:{}", claim_id);
 
     let links = get_links(
-        LinkQuery::try_new(anchor_hash(&claim_anchor)?, LinkTypes::ClaimToMarketEvidence)?,
+        LinkQuery::try_new(
+            anchor_hash(&claim_anchor)?,
+            LinkTypes::ClaimToMarketEvidence,
+        )?,
         GetStrategy::default(),
     )?;
 
@@ -841,7 +881,10 @@ pub fn get_market_value_assessment(claim_id: String) -> ExternResult<Option<Reco
     let claim_anchor = format!("claim:{}", claim_id);
 
     let links = get_links(
-        LinkQuery::try_new(anchor_hash(&claim_anchor)?, LinkTypes::ClaimToValueAssessment)?,
+        LinkQuery::try_new(
+            anchor_hash(&claim_anchor)?,
+            LinkTypes::ClaimToValueAssessment,
+        )?,
         GetStrategy::default(),
     )?;
 

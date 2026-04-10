@@ -1406,9 +1406,8 @@ pub fn verify_derived_credential(
         }
         CredentialRevocationStatus::Active => {}
         CredentialRevocationStatus::Unknown => {
-            errors.push(
-                "Original credential revocation status could not be determined".to_string(),
-            );
+            errors
+                .push("Original credential revocation status could not be determined".to_string());
         }
     }
 
@@ -2077,9 +2076,9 @@ pub fn verify_selective_disclosure(
     let domain_tag = mycelix_zkp_core::domain::tag_identity_disclosure();
 
     // 1. Verify original credential exists
-    let credential_record = get_credential(input.credential_id.clone())?.ok_or(
-        wasm_error!(WasmErrorInner::Guest("Original credential not found".into())),
-    )?;
+    let credential_record = get_credential(input.credential_id.clone())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Original credential not found".into())
+    ))?;
 
     let vc: VerifiableCredential = credential_record
         .entry()
@@ -2126,8 +2125,7 @@ pub fn verify_selective_disclosure(
     // The proof was generated with ZTML:Identity:SelectiveDisclosure:v1
     // Full STARK verification will be wired once AIR circuits are ready.
     // For now, structural validation + domain tag binding.
-    let proof_valid = !input.proof_bytes.is_empty()
-        && input.data_commitment.len() == 32;
+    let proof_valid = !input.proof_bytes.is_empty() && input.data_commitment.len() == 32;
 
     Ok(ZkDisclosureResult {
         satisfied: proof_valid,
@@ -2625,11 +2623,11 @@ mod tests {
                     (false, format!("suspended_until_{}", until), Some(r))
                 }
                 // SECURITY: Fail-closed — unknown revocation status treated as invalid
-        CredentialRevocationStatus::Unknown => (
-            false,
-            "unknown".to_string(),
-            Some("Revocation status could not be determined".to_string()),
-        ),
+                CredentialRevocationStatus::Unknown => (
+                    false,
+                    "unknown".to_string(),
+                    Some("Revocation status could not be determined".to_string()),
+                ),
             };
             assert_eq!(is_valid, expected_valid, "valid for {}", status_type);
             assert_eq!(status_type, expected_type);

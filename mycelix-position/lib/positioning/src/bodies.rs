@@ -78,9 +78,15 @@ pub trait CelestialBody {
 pub struct Earth;
 
 impl CelestialBody for Earth {
-    fn name(&self) -> &str { "Earth" }
-    fn equatorial_radius_m(&self) -> f64 { 6_378_137.0 }
-    fn polar_radius_m(&self) -> f64 { 6_356_752.314245 }
+    fn name(&self) -> &str {
+        "Earth"
+    }
+    fn equatorial_radius_m(&self) -> f64 {
+        6_378_137.0
+    }
+    fn polar_radius_m(&self) -> f64 {
+        6_356_752.314245
+    }
 }
 
 // ============================================================================
@@ -91,9 +97,15 @@ impl CelestialBody for Earth {
 pub struct Moon;
 
 impl CelestialBody for Moon {
-    fn name(&self) -> &str { "Moon" }
-    fn equatorial_radius_m(&self) -> f64 { 1_737_400.0 }
-    fn polar_radius_m(&self) -> f64 { 1_737_400.0 } // Sphere approximation
+    fn name(&self) -> &str {
+        "Moon"
+    }
+    fn equatorial_radius_m(&self) -> f64 {
+        1_737_400.0
+    }
+    fn polar_radius_m(&self) -> f64 {
+        1_737_400.0
+    } // Sphere approximation
 }
 
 // ============================================================================
@@ -104,9 +116,15 @@ impl CelestialBody for Moon {
 pub struct Mars;
 
 impl CelestialBody for Mars {
-    fn name(&self) -> &str { "Mars" }
-    fn equatorial_radius_m(&self) -> f64 { 3_396_190.0 }
-    fn polar_radius_m(&self) -> f64 { 3_376_200.0 }
+    fn name(&self) -> &str {
+        "Mars"
+    }
+    fn equatorial_radius_m(&self) -> f64 {
+        3_396_190.0
+    }
+    fn polar_radius_m(&self) -> f64 {
+        3_376_200.0
+    }
 }
 
 // ============================================================================
@@ -134,11 +152,11 @@ mod tests {
     fn earth_geodetic_cartesian_roundtrip() {
         let e = Earth;
         let cases = [
-            (0.0, 0.0, 0.0),           // Equator, prime meridian
-            (90.0, 0.0, 0.0),          // North pole
-            (-33.9, 18.4, 100.0),      // Cape Town
-            (28.6, -80.6, 5.0),        // Cape Canaveral
-            (-1.0, -78.5, 2800.0),     // Ecuador highlands (spaceport!)
+            (0.0, 0.0, 0.0),       // Equator, prime meridian
+            (90.0, 0.0, 0.0),      // North pole
+            (-33.9, 18.4, 100.0),  // Cape Town
+            (28.6, -80.6, 5.0),    // Cape Canaveral
+            (-1.0, -78.5, 2800.0), // Ecuador highlands (spaceport!)
         ];
         for (lat, lon, alt) in cases {
             let xyz = e.geodetic_to_cartesian(lat, lon, alt);

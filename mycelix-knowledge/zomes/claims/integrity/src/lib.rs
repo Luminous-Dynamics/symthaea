@@ -328,9 +328,7 @@ impl EpistemicClassification {
     pub fn code(&self) -> String {
         format!(
             "E{}N{}M{}",
-            self.empirical as u8,
-            self.normative as u8,
-            self.materiality as u8
+            self.empirical as u8, self.normative as u8, self.materiality as u8
         )
     }
 
@@ -729,6 +727,7 @@ pub enum EntryTypes {
 
 #[hdk_link_types]
 pub enum LinkTypes {
+    AllClaimsIndex,
     AuthorToClaim,
     AuthorToClassifiedClaim,
     ClaimToEvidence,
@@ -760,11 +759,19 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
             OpEntry::CreateEntry { app_entry, action } => match app_entry {
                 EntryTypes::Anchor(_) => Ok(ValidateCallbackResult::Valid),
                 EntryTypes::Claim(claim) => validate_create_claim(action, claim),
-                EntryTypes::ClassifiedClaim(claim) => validate_create_classified_claim(action, claim),
-                EntryTypes::ClassificationVote(vote) => validate_create_classification_vote(action, vote),
-                EntryTypes::ClassificationConsensus(consensus) => validate_create_classification_consensus(action, consensus),
+                EntryTypes::ClassifiedClaim(claim) => {
+                    validate_create_classified_claim(action, claim)
+                }
+                EntryTypes::ClassificationVote(vote) => {
+                    validate_create_classification_vote(action, vote)
+                }
+                EntryTypes::ClassificationConsensus(consensus) => {
+                    validate_create_classification_consensus(action, consensus)
+                }
                 EntryTypes::Evidence(evidence) => validate_create_evidence(action, evidence),
-                EntryTypes::ClaimChallenge(challenge) => validate_create_challenge(action, challenge),
+                EntryTypes::ClaimChallenge(challenge) => {
+                    validate_create_challenge(action, challenge)
+                }
                 EntryTypes::ClaimMarketLink(link) => validate_create_market_link(action, link),
                 EntryTypes::ClaimDependency(dep) => validate_create_dependency(action, dep),
             },
@@ -775,16 +782,24 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 original_entry_hash: _,
             } => match app_entry {
                 EntryTypes::Anchor(_) => Ok(ValidateCallbackResult::Valid),
-                EntryTypes::Claim(claim) => validate_update_claim(action, claim, original_action_hash),
-                EntryTypes::ClassifiedClaim(claim) => validate_update_classified_claim(action, claim, original_action_hash),
+                EntryTypes::Claim(claim) => {
+                    validate_update_claim(action, claim, original_action_hash)
+                }
+                EntryTypes::ClassifiedClaim(claim) => {
+                    validate_update_classified_claim(action, claim, original_action_hash)
+                }
                 EntryTypes::ClassificationVote(_) => Ok(ValidateCallbackResult::Invalid(
                     "Classification votes cannot be updated".into(),
                 )),
-                EntryTypes::ClassificationConsensus(consensus) => validate_update_classification_consensus(action, consensus),
+                EntryTypes::ClassificationConsensus(consensus) => {
+                    validate_update_classification_consensus(action, consensus)
+                }
                 EntryTypes::Evidence(_) => Ok(ValidateCallbackResult::Invalid(
                     "Evidence cannot be updated".into(),
                 )),
-                EntryTypes::ClaimChallenge(challenge) => validate_update_challenge(action, challenge),
+                EntryTypes::ClaimChallenge(challenge) => {
+                    validate_update_challenge(action, challenge)
+                }
                 EntryTypes::ClaimMarketLink(link) => validate_update_market_link(action, link),
                 EntryTypes::ClaimDependency(dep) => validate_update_dependency(action, dep),
             },
@@ -797,6 +812,7 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
             tag: _,
             action: _,
         } => match link_type {
+            LinkTypes::AllClaimsIndex => Ok(ValidateCallbackResult::Valid),
             LinkTypes::AuthorToClaim => Ok(ValidateCallbackResult::Valid),
             LinkTypes::AuthorToClassifiedClaim => Ok(ValidateCallbackResult::Valid),
             LinkTypes::ClaimToEvidence => Ok(ValidateCallbackResult::Valid),
@@ -954,7 +970,10 @@ fn validate_update_claim(
 }
 
 /// Validate evidence creation
-fn validate_create_evidence(_action: Create, evidence: Evidence) -> ExternResult<ValidateCallbackResult> {
+fn validate_create_evidence(
+    _action: Create,
+    evidence: Evidence,
+) -> ExternResult<ValidateCallbackResult> {
     // Validate strength range
     if evidence.strength < 0.0 || evidence.strength > 1.0 {
         return Ok(ValidateCallbackResult::Invalid(
@@ -980,7 +999,10 @@ fn validate_create_evidence(_action: Create, evidence: Evidence) -> ExternResult
 }
 
 /// Validate challenge creation
-fn validate_create_challenge(_action: Create, challenge: ClaimChallenge) -> ExternResult<ValidateCallbackResult> {
+fn validate_create_challenge(
+    _action: Create,
+    challenge: ClaimChallenge,
+) -> ExternResult<ValidateCallbackResult> {
     // Validate challenger is a DID
     if !challenge.challenger.starts_with("did:") {
         return Ok(ValidateCallbackResult::Invalid(
@@ -1006,13 +1028,19 @@ fn validate_create_challenge(_action: Create, challenge: ClaimChallenge) -> Exte
 }
 
 /// Validate challenge update
-fn validate_update_challenge(_action: Update, _challenge: ClaimChallenge) -> ExternResult<ValidateCallbackResult> {
+fn validate_update_challenge(
+    _action: Update,
+    _challenge: ClaimChallenge,
+) -> ExternResult<ValidateCallbackResult> {
     // Status updates are allowed
     Ok(ValidateCallbackResult::Valid)
 }
 
 /// Validate market link creation
-fn validate_create_market_link(_action: Create, link: ClaimMarketLink) -> ExternResult<ValidateCallbackResult> {
+fn validate_create_market_link(
+    _action: Create,
+    link: ClaimMarketLink,
+) -> ExternResult<ValidateCallbackResult> {
     // Validate claim_id not empty
     if link.claim_id.is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
@@ -1031,13 +1059,19 @@ fn validate_create_market_link(_action: Create, link: ClaimMarketLink) -> Extern
 }
 
 /// Validate market link update
-fn validate_update_market_link(_action: Update, _link: ClaimMarketLink) -> ExternResult<ValidateCallbackResult> {
+fn validate_update_market_link(
+    _action: Update,
+    _link: ClaimMarketLink,
+) -> ExternResult<ValidateCallbackResult> {
     // Status updates are allowed
     Ok(ValidateCallbackResult::Valid)
 }
 
 /// Validate dependency creation
-fn validate_create_dependency(_action: Create, dep: ClaimDependency) -> ExternResult<ValidateCallbackResult> {
+fn validate_create_dependency(
+    _action: Create,
+    dep: ClaimDependency,
+) -> ExternResult<ValidateCallbackResult> {
     // Validate weight range
     if dep.weight < 0.0 || dep.weight > 1.0 {
         return Ok(ValidateCallbackResult::Invalid(
@@ -1056,7 +1090,10 @@ fn validate_create_dependency(_action: Create, dep: ClaimDependency) -> ExternRe
 }
 
 /// Validate dependency update
-fn validate_update_dependency(_action: Update, dep: ClaimDependency) -> ExternResult<ValidateCallbackResult> {
+fn validate_update_dependency(
+    _action: Update,
+    dep: ClaimDependency,
+) -> ExternResult<ValidateCallbackResult> {
     // Validate weight range
     if dep.weight < 0.0 || dep.weight > 1.0 {
         return Ok(ValidateCallbackResult::Invalid(
@@ -1373,7 +1410,13 @@ mod tests {
 
     #[test]
     fn test_empirical_level_roundtrip() {
-        for level in [EmpiricalLevel::E0, EmpiricalLevel::E1, EmpiricalLevel::E2, EmpiricalLevel::E3, EmpiricalLevel::E4] {
+        for level in [
+            EmpiricalLevel::E0,
+            EmpiricalLevel::E1,
+            EmpiricalLevel::E2,
+            EmpiricalLevel::E3,
+            EmpiricalLevel::E4,
+        ] {
             let continuous = level.to_continuous();
             let back = EmpiricalLevel::from_continuous(continuous);
             assert_eq!(level, back);
@@ -1399,7 +1442,12 @@ mod tests {
 
     #[test]
     fn test_normative_level_roundtrip() {
-        for level in [NormativeLevel::N0, NormativeLevel::N1, NormativeLevel::N2, NormativeLevel::N3] {
+        for level in [
+            NormativeLevel::N0,
+            NormativeLevel::N1,
+            NormativeLevel::N2,
+            NormativeLevel::N3,
+        ] {
             let continuous = level.to_continuous();
             let back = NormativeLevel::from_continuous(continuous);
             assert_eq!(level, back);
@@ -1417,7 +1465,12 @@ mod tests {
 
     #[test]
     fn test_materiality_level_roundtrip() {
-        for level in [MaterialityLevel::M0, MaterialityLevel::M1, MaterialityLevel::M2, MaterialityLevel::M3] {
+        for level in [
+            MaterialityLevel::M0,
+            MaterialityLevel::M1,
+            MaterialityLevel::M2,
+            MaterialityLevel::M3,
+        ] {
             let continuous = level.to_continuous();
             let back = MaterialityLevel::from_continuous(continuous);
             assert_eq!(level, back);
@@ -1428,57 +1481,142 @@ mod tests {
 
     #[test]
     fn test_epistemic_classification_code() {
-        let ec = EpistemicClassification::new(EmpiricalLevel::E2, NormativeLevel::N1, MaterialityLevel::M2);
+        let ec = EpistemicClassification::new(
+            EmpiricalLevel::E2,
+            NormativeLevel::N1,
+            MaterialityLevel::M2,
+        );
         assert_eq!(ec.code(), "E2N1M2");
     }
 
     #[test]
     fn test_epistemic_classification_overall_strength() {
         // E4=1.0, N3=1.0, M3=1.0 -> max strength
-        let max_ec = EpistemicClassification::new(EmpiricalLevel::E4, NormativeLevel::N3, MaterialityLevel::M3);
+        let max_ec = EpistemicClassification::new(
+            EmpiricalLevel::E4,
+            NormativeLevel::N3,
+            MaterialityLevel::M3,
+        );
         assert!((max_ec.overall_strength() - 1.0).abs() < 0.01);
 
         // E0=0.0, N0=0.0, M0=0.0 -> min strength
-        let min_ec = EpistemicClassification::new(EmpiricalLevel::E0, NormativeLevel::N0, MaterialityLevel::M0);
+        let min_ec = EpistemicClassification::new(
+            EmpiricalLevel::E0,
+            NormativeLevel::N0,
+            MaterialityLevel::M0,
+        );
         assert!((min_ec.overall_strength() - 0.0).abs() < 0.01);
     }
 
     #[test]
     fn test_epistemic_classification_weighted_average() {
         // E=50%, N=30%, M=20%
-        let ec = EpistemicClassification::new(EmpiricalLevel::E4, NormativeLevel::N0, MaterialityLevel::M0);
+        let ec = EpistemicClassification::new(
+            EmpiricalLevel::E4,
+            NormativeLevel::N0,
+            MaterialityLevel::M0,
+        );
         // E4=1.0 * 0.5 + N0=0.0 * 0.3 + M0=0.0 * 0.2 = 0.5
         assert!((ec.overall_strength() - 0.5).abs() < 0.01);
     }
 
     #[test]
     fn test_epistemic_classification_is_verified() {
-        assert!(!EpistemicClassification::new(EmpiricalLevel::E0, NormativeLevel::N0, MaterialityLevel::M0).is_verified());
-        assert!(!EpistemicClassification::new(EmpiricalLevel::E1, NormativeLevel::N0, MaterialityLevel::M0).is_verified());
-        assert!(EpistemicClassification::new(EmpiricalLevel::E2, NormativeLevel::N0, MaterialityLevel::M0).is_verified());
-        assert!(EpistemicClassification::new(EmpiricalLevel::E3, NormativeLevel::N0, MaterialityLevel::M0).is_verified());
-        assert!(EpistemicClassification::new(EmpiricalLevel::E4, NormativeLevel::N0, MaterialityLevel::M0).is_verified());
+        assert!(!EpistemicClassification::new(
+            EmpiricalLevel::E0,
+            NormativeLevel::N0,
+            MaterialityLevel::M0
+        )
+        .is_verified());
+        assert!(!EpistemicClassification::new(
+            EmpiricalLevel::E1,
+            NormativeLevel::N0,
+            MaterialityLevel::M0
+        )
+        .is_verified());
+        assert!(EpistemicClassification::new(
+            EmpiricalLevel::E2,
+            NormativeLevel::N0,
+            MaterialityLevel::M0
+        )
+        .is_verified());
+        assert!(EpistemicClassification::new(
+            EmpiricalLevel::E3,
+            NormativeLevel::N0,
+            MaterialityLevel::M0
+        )
+        .is_verified());
+        assert!(EpistemicClassification::new(
+            EmpiricalLevel::E4,
+            NormativeLevel::N0,
+            MaterialityLevel::M0
+        )
+        .is_verified());
     }
 
     #[test]
     fn test_epistemic_classification_has_consensus() {
-        assert!(!EpistemicClassification::new(EmpiricalLevel::E0, NormativeLevel::N0, MaterialityLevel::M0).has_consensus());
-        assert!(!EpistemicClassification::new(EmpiricalLevel::E0, NormativeLevel::N1, MaterialityLevel::M0).has_consensus());
-        assert!(EpistemicClassification::new(EmpiricalLevel::E0, NormativeLevel::N2, MaterialityLevel::M0).has_consensus());
-        assert!(EpistemicClassification::new(EmpiricalLevel::E0, NormativeLevel::N3, MaterialityLevel::M0).has_consensus());
+        assert!(!EpistemicClassification::new(
+            EmpiricalLevel::E0,
+            NormativeLevel::N0,
+            MaterialityLevel::M0
+        )
+        .has_consensus());
+        assert!(!EpistemicClassification::new(
+            EmpiricalLevel::E0,
+            NormativeLevel::N1,
+            MaterialityLevel::M0
+        )
+        .has_consensus());
+        assert!(EpistemicClassification::new(
+            EmpiricalLevel::E0,
+            NormativeLevel::N2,
+            MaterialityLevel::M0
+        )
+        .has_consensus());
+        assert!(EpistemicClassification::new(
+            EmpiricalLevel::E0,
+            NormativeLevel::N3,
+            MaterialityLevel::M0
+        )
+        .has_consensus());
     }
 
     #[test]
     fn test_epistemic_classification_is_practical() {
-        assert!(!EpistemicClassification::new(EmpiricalLevel::E0, NormativeLevel::N0, MaterialityLevel::M0).is_practical());
-        assert!(!EpistemicClassification::new(EmpiricalLevel::E0, NormativeLevel::N0, MaterialityLevel::M1).is_practical());
-        assert!(EpistemicClassification::new(EmpiricalLevel::E0, NormativeLevel::N0, MaterialityLevel::M2).is_practical());
-        assert!(EpistemicClassification::new(EmpiricalLevel::E0, NormativeLevel::N0, MaterialityLevel::M3).is_practical());
+        assert!(!EpistemicClassification::new(
+            EmpiricalLevel::E0,
+            NormativeLevel::N0,
+            MaterialityLevel::M0
+        )
+        .is_practical());
+        assert!(!EpistemicClassification::new(
+            EmpiricalLevel::E0,
+            NormativeLevel::N0,
+            MaterialityLevel::M1
+        )
+        .is_practical());
+        assert!(EpistemicClassification::new(
+            EmpiricalLevel::E0,
+            NormativeLevel::N0,
+            MaterialityLevel::M2
+        )
+        .is_practical());
+        assert!(EpistemicClassification::new(
+            EmpiricalLevel::E0,
+            NormativeLevel::N0,
+            MaterialityLevel::M3
+        )
+        .is_practical());
     }
 
     #[test]
     fn test_epistemic_legacy_roundtrip() {
-        let ec = EpistemicClassification::new(EmpiricalLevel::E2, NormativeLevel::N1, MaterialityLevel::M2);
+        let ec = EpistemicClassification::new(
+            EmpiricalLevel::E2,
+            NormativeLevel::N1,
+            MaterialityLevel::M2,
+        );
         let legacy = ec.to_legacy();
         let back = EpistemicClassification::from_legacy(&legacy);
         assert_eq!(ec.empirical, back.empirical);
@@ -1496,10 +1634,16 @@ mod tests {
             love_alignment: 0.9,
         };
         let ec = EpistemicClassification::with_harmonic(
-            EmpiricalLevel::E3, NormativeLevel::N2, MaterialityLevel::M2, h,
+            EmpiricalLevel::E3,
+            NormativeLevel::N2,
+            MaterialityLevel::M2,
+            h,
         );
         assert!(ec.harmonic.is_some());
-        assert_eq!(ec.harmonic.as_ref().unwrap().primary_harmony, Harmony::EcologicalSymbiosis);
+        assert_eq!(
+            ec.harmonic.as_ref().unwrap().primary_harmony,
+            Harmony::EcologicalSymbiosis
+        );
     }
 
     // ===== Claim Validation Tests =====
@@ -1516,9 +1660,14 @@ mod tests {
     #[test]
     fn test_claim_type_variants() {
         let types = vec![
-            ClaimType::Fact, ClaimType::Opinion, ClaimType::Prediction,
-            ClaimType::Hypothesis, ClaimType::Definition, ClaimType::Historical,
-            ClaimType::Normative, ClaimType::Narrative,
+            ClaimType::Fact,
+            ClaimType::Opinion,
+            ClaimType::Prediction,
+            ClaimType::Hypothesis,
+            ClaimType::Definition,
+            ClaimType::Historical,
+            ClaimType::Normative,
+            ClaimType::Narrative,
         ];
         assert_eq!(types.len(), 8);
     }
@@ -1566,7 +1715,10 @@ mod tests {
         let legacy = claim.to_legacy();
         let back = ClassifiedClaim::from_legacy(&legacy);
         assert_eq!(claim.id, back.id);
-        assert_eq!(claim.classification.empirical, back.classification.empirical);
+        assert_eq!(
+            claim.classification.empirical,
+            back.classification.empirical
+        );
     }
 
     // ===== Evidence Tests =====
@@ -1583,8 +1735,12 @@ mod tests {
     #[test]
     fn test_evidence_type_variants() {
         let types = vec![
-            EvidenceType::Observation, EvidenceType::Experiment, EvidenceType::Statistical,
-            EvidenceType::Expert, EvidenceType::Document, EvidenceType::CrossReference,
+            EvidenceType::Observation,
+            EvidenceType::Experiment,
+            EvidenceType::Statistical,
+            EvidenceType::Expert,
+            EvidenceType::Document,
+            EvidenceType::CrossReference,
             EvidenceType::Logical,
         ];
         assert_eq!(types.len(), 7);
@@ -1624,9 +1780,12 @@ mod tests {
     #[test]
     fn test_dependency_type_variants() {
         let types = vec![
-            DependencyType::LogicalEntailment, DependencyType::EvidentialSupport,
-            DependencyType::Premise, DependencyType::Refinement,
-            DependencyType::Contradiction, DependencyType::Correlation,
+            DependencyType::LogicalEntailment,
+            DependencyType::EvidentialSupport,
+            DependencyType::Premise,
+            DependencyType::Refinement,
+            DependencyType::Contradiction,
+            DependencyType::Correlation,
         ];
         assert_eq!(types.len(), 6);
     }
@@ -1634,7 +1793,8 @@ mod tests {
     #[test]
     fn test_influence_direction_variants() {
         let dirs = vec![
-            InfluenceDirection::Positive, InfluenceDirection::Negative,
+            InfluenceDirection::Positive,
+            InfluenceDirection::Negative,
             InfluenceDirection::Bidirectional,
         ];
         assert_eq!(dirs.len(), 3);
@@ -1645,8 +1805,10 @@ mod tests {
     #[test]
     fn test_challenge_status_variants() {
         let statuses = vec![
-            ChallengeStatus::Pending, ChallengeStatus::UnderReview,
-            ChallengeStatus::Accepted, ChallengeStatus::Rejected,
+            ChallengeStatus::Pending,
+            ChallengeStatus::UnderReview,
+            ChallengeStatus::Accepted,
+            ChallengeStatus::Rejected,
             ChallengeStatus::Withdrawn,
         ];
         assert_eq!(statuses.len(), 5);
@@ -1736,7 +1898,11 @@ mod tests {
 
         let weighted_e = weighted_sum / total_k;
         // Result should be closer to E2 than E4, showing K-trust dilutes coordinated low-trust votes
-        assert!(weighted_e < 2.0, "K-trust weighted result should be below E2, got {}", weighted_e);
+        assert!(
+            weighted_e < 2.0,
+            "K-trust weighted result should be below E2, got {}",
+            weighted_e
+        );
     }
 
     #[test]
@@ -1771,12 +1937,21 @@ mod tests {
     #[test]
     fn test_conflicting_attestations_produce_low_agreement() {
         // If attesters disagree strongly, agreement should be low
-        let votes_e = vec![EmpiricalLevel::E0, EmpiricalLevel::E4, EmpiricalLevel::E1, EmpiricalLevel::E3];
+        let votes_e = vec![
+            EmpiricalLevel::E0,
+            EmpiricalLevel::E4,
+            EmpiricalLevel::E1,
+            EmpiricalLevel::E3,
+        ];
         let values: Vec<f64> = votes_e.iter().map(|e| e.to_continuous()).collect();
         let mean = values.iter().sum::<f64>() / values.len() as f64;
         let variance = values.iter().map(|v| (v - mean).powi(2)).sum::<f64>() / values.len() as f64;
         // High variance indicates disagreement
-        assert!(variance > 0.1, "Conflicting votes should produce high variance: {}", variance);
+        assert!(
+            variance > 0.1,
+            "Conflicting votes should produce high variance: {}",
+            variance
+        );
     }
 
     // ===== Harmony Tests =====
@@ -1784,12 +1959,18 @@ mod tests {
     #[test]
     fn test_all_harmony_variants() {
         let harmonies = vec![
-            Harmony::PanSentientFlourishing, Harmony::IntegralWisdom,
-            Harmony::ResonantCoherence, Harmony::EmergentJustice,
-            Harmony::CreativeExpression, Harmony::EmbodiedPresence,
-            Harmony::RelationalDepth, Harmony::EcologicalSymbiosis,
-            Harmony::TemporalWisdom, Harmony::MysteryEmbracing,
-            Harmony::PlayfulBecoming, Harmony::UnifiedDiversity,
+            Harmony::PanSentientFlourishing,
+            Harmony::IntegralWisdom,
+            Harmony::ResonantCoherence,
+            Harmony::EmergentJustice,
+            Harmony::CreativeExpression,
+            Harmony::EmbodiedPresence,
+            Harmony::RelationalDepth,
+            Harmony::EcologicalSymbiosis,
+            Harmony::TemporalWisdom,
+            Harmony::MysteryEmbracing,
+            Harmony::PlayfulBecoming,
+            Harmony::UnifiedDiversity,
         ];
         assert_eq!(harmonies.len(), 12);
         // Each harmony should have a non-empty name
@@ -1840,21 +2021,37 @@ mod tests {
 
     #[test]
     fn test_empirical_level_descriptions_non_empty() {
-        for level in [EmpiricalLevel::E0, EmpiricalLevel::E1, EmpiricalLevel::E2, EmpiricalLevel::E3, EmpiricalLevel::E4] {
+        for level in [
+            EmpiricalLevel::E0,
+            EmpiricalLevel::E1,
+            EmpiricalLevel::E2,
+            EmpiricalLevel::E3,
+            EmpiricalLevel::E4,
+        ] {
             assert!(!level.description().is_empty());
         }
     }
 
     #[test]
     fn test_normative_level_descriptions_non_empty() {
-        for level in [NormativeLevel::N0, NormativeLevel::N1, NormativeLevel::N2, NormativeLevel::N3] {
+        for level in [
+            NormativeLevel::N0,
+            NormativeLevel::N1,
+            NormativeLevel::N2,
+            NormativeLevel::N3,
+        ] {
             assert!(!level.description().is_empty());
         }
     }
 
     #[test]
     fn test_materiality_level_descriptions_non_empty() {
-        for level in [MaterialityLevel::M0, MaterialityLevel::M1, MaterialityLevel::M2, MaterialityLevel::M3] {
+        for level in [
+            MaterialityLevel::M0,
+            MaterialityLevel::M1,
+            MaterialityLevel::M2,
+            MaterialityLevel::M3,
+        ] {
             assert!(!level.description().is_empty());
         }
     }
@@ -1962,8 +2159,8 @@ mod tests {
         // All sybil votes are identical -- a detection heuristic
         let sybil_votes: Vec<f64> = vec![4.0; 20]; // 20 identical E4 votes
         let mean = sybil_votes.iter().sum::<f64>() / sybil_votes.len() as f64;
-        let variance = sybil_votes.iter().map(|v| (v - mean).powi(2)).sum::<f64>()
-            / sybil_votes.len() as f64;
+        let variance =
+            sybil_votes.iter().map(|v| (v - mean).powi(2)).sum::<f64>() / sybil_votes.len() as f64;
         assert!(
             variance < f64::EPSILON,
             "Zero variance among votes is a sybil detection signal"
@@ -2004,7 +2201,11 @@ mod tests {
         total_k += high_trust_vote.1;
 
         let weighted_e = weighted_sum / total_k;
-        assert!(weighted_e < 2.0, "K-trust weighted result should be below E2, got {}", weighted_e);
+        assert!(
+            weighted_e < 2.0,
+            "K-trust weighted result should be below E2, got {}",
+            weighted_e
+        );
     }
 
     // --- Confidence Gaming: Build reputation then flip ---
@@ -2018,7 +2219,10 @@ mod tests {
         let claims_authored = verified_true + verified_false;
 
         let historical_accuracy = verified_true as f64 / (verified_true + verified_false) as f64;
-        assert!(historical_accuracy < 1.0, "False claims should reduce accuracy");
+        assert!(
+            historical_accuracy < 1.0,
+            "False claims should reduce accuracy"
+        );
         assert!(historical_accuracy > 0.85);
 
         // Using the reputation formula from inference coordinator
@@ -2039,7 +2243,7 @@ mod tests {
         // Attester voting E3-E4 consistently then suddenly votes E0
         let recent_votes: Vec<f64> = vec![
             3.0, 4.0, 3.0, 4.0, 3.0, // consistent high
-            0.0, 0.0, 0.0,             // sudden flip
+            0.0, 0.0, 0.0, // sudden flip
         ];
         let window = 5;
         let recent_mean = recent_votes[recent_votes.len() - 3..].iter().sum::<f64>() / 3.0;
@@ -2062,7 +2266,11 @@ mod tests {
         let k_after_3_false = initial_k_trust * false_claim_decay.powi(3);
 
         assert!(k_after_1_false < initial_k_trust);
-        assert!(k_after_3_false < 0.5, "3 false claims should halve trust, got {}", k_after_3_false);
+        assert!(
+            k_after_3_false < 0.5,
+            "3 false claims should halve trust, got {}",
+            k_after_3_false
+        );
     }
 
     // --- Circular Citation Detection ---
@@ -2084,17 +2292,20 @@ mod tests {
         };
 
         // Detect cycle: B depends on A, and A depends on B
-        assert_eq!(dep_a_to_b.dependency_claim_id, dep_b_to_a.dependent_claim_id);
-        assert_eq!(dep_b_to_a.dependency_claim_id, dep_a_to_b.dependent_claim_id);
+        assert_eq!(
+            dep_a_to_b.dependency_claim_id,
+            dep_b_to_a.dependent_claim_id
+        );
+        assert_eq!(
+            dep_b_to_a.dependency_claim_id,
+            dep_a_to_b.dependent_claim_id
+        );
     }
 
     #[test]
     fn test_circular_citation_three_node_cycle() {
         // A -> B -> C -> A
-        let deps: Vec<(&str, &str)> = vec![
-            ("claim-A", "claim-B"),
-            ("claim-B", "claim-C"),
-        ];
+        let deps: Vec<(&str, &str)> = vec![("claim-A", "claim-B"), ("claim-B", "claim-C")];
 
         // BFS cycle detection (mirrors would_create_cycle from coordinator)
         fn has_cycle(deps: &[(&str, &str)], from: &str, to: &str) -> bool {
@@ -2167,7 +2378,8 @@ mod tests {
 
         let coord_weighted = coordinated_count as f64 * coordinated_vote * coordinated_k;
         let legit_weighted = legitimate_count as f64 * legitimate_vote * legitimate_k;
-        let total_k = coordinated_count as f64 * coordinated_k + legitimate_count as f64 * legitimate_k;
+        let total_k =
+            coordinated_count as f64 * coordinated_k + legitimate_count as f64 * legitimate_k;
 
         let weighted_result = (coord_weighted + legit_weighted) / total_k;
         assert!(
@@ -2210,7 +2422,10 @@ mod tests {
             is_final: false,
         };
         assert_eq!(consensus.vote_count, 1);
-        assert!(!consensus.is_final, "Single-vote consensus should not be final");
+        assert!(
+            !consensus.is_final,
+            "Single-vote consensus should not be final"
+        );
     }
 
     #[test]
@@ -2230,16 +2445,29 @@ mod tests {
             is_final: false,
         };
         let avg_k = consensus.total_k_trust / consensus.vote_count as f64;
-        assert!(avg_k < 0.01, "Average K-trust of {:.4} indicates sybil pattern", avg_k);
+        assert!(
+            avg_k < 0.01,
+            "Average K-trust of {:.4} indicates sybil pattern",
+            avg_k
+        );
     }
 
     #[test]
     fn test_conflicting_attestations_produce_high_variance() {
-        let votes_e = vec![EmpiricalLevel::E0, EmpiricalLevel::E4, EmpiricalLevel::E1, EmpiricalLevel::E3];
+        let votes_e = vec![
+            EmpiricalLevel::E0,
+            EmpiricalLevel::E4,
+            EmpiricalLevel::E1,
+            EmpiricalLevel::E3,
+        ];
         let values: Vec<f64> = votes_e.iter().map(|e| e.to_continuous()).collect();
         let mean = values.iter().sum::<f64>() / values.len() as f64;
         let variance = values.iter().map(|v| (v - mean).powi(2)).sum::<f64>() / values.len() as f64;
-        assert!(variance > 0.1, "Conflicting votes should produce high variance: {}", variance);
+        assert!(
+            variance > 0.1,
+            "Conflicting votes should produce high variance: {}",
+            variance
+        );
     }
 
     // --- Temporal Attack: Old claim contradicted by new evidence ---
@@ -2348,32 +2576,50 @@ mod tests {
             InfluenceDirection::Bidirectional => 0.5,
         };
         let weighted_contribution = 0.9 * dep.weight * influence_factor;
-        assert!(weighted_contribution < 0.0, "Negative influence should be negative: {}", weighted_contribution);
+        assert!(
+            weighted_contribution < 0.0,
+            "Negative influence should be negative: {}",
+            weighted_contribution
+        );
     }
 
     #[test]
     fn test_cascade_max_depth_prevents_deep_attack() {
         let max_depth: u32 = 10;
         let chain_depth = 15;
-        assert!(chain_depth > max_depth, "Deep chains beyond {} should be truncated", max_depth);
+        assert!(
+            chain_depth > max_depth,
+            "Deep chains beyond {} should be truncated",
+            max_depth
+        );
     }
 
     #[test]
     fn test_cascade_max_updates_prevents_flood_attack() {
         let max_updates: usize = 100;
         let attacker_dependents = 500;
-        assert!(attacker_dependents > max_updates, "Flood capped at {}", max_updates);
+        assert!(
+            attacker_dependents > max_updates,
+            "Flood capped at {}",
+            max_updates
+        );
     }
 
     #[test]
     fn test_inactive_dependency_excluded_from_cascade() {
-        let dep = ClaimDependency { active: false, ..adv_dependency() };
+        let dep = ClaimDependency {
+            active: false,
+            ..adv_dependency()
+        };
         assert!(!dep.active);
     }
 
     #[test]
     fn test_zero_weight_dependency_has_no_influence() {
-        let dep = ClaimDependency { weight: 0.0, ..adv_dependency() };
+        let dep = ClaimDependency {
+            weight: 0.0,
+            ..adv_dependency()
+        };
         let contribution = 0.9 * dep.weight;
         assert!(contribution.abs() < f64::EPSILON);
     }
@@ -2394,7 +2640,11 @@ mod tests {
             voted_at: adv_timestamp(),
         };
         let ratio = vote.confidence / vote.voter_k_trust;
-        assert!(ratio > 10.0, "Confidence/K-trust ratio of {:.0}x is suspicious", ratio);
+        assert!(
+            ratio > 10.0,
+            "Confidence/K-trust ratio of {:.0}x is suspicious",
+            ratio
+        );
     }
 
     #[test]

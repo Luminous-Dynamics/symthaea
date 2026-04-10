@@ -14,10 +14,12 @@
 //! Heading is integrated from the gyroscope rotation rate, corrected by
 //! magnetometer when available.
 //!
-//! # Accuracy
+//! # Practical Envelope
 //!
-//! Without magnetometer: 10-15m error after 5 minutes of walking (~1-3°/min gyro drift)
-//! With magnetometer: 5-10m error after 30 minutes (heading locked to magnetic north)
+//! This is a bounded fallback, not a long-duration navigation solution.
+//! In commodity-phone conditions it is most useful for tens of seconds to a
+//! few minutes between stronger external fixes. Beyond that, heading and
+//! stride errors dominate.
 //!
 //! # References
 //!
@@ -27,8 +29,6 @@
 
 use serde::{Deserialize, Serialize};
 
-/// Standard gravity (m/s²).
-const G: f64 = 9.80665;
 /// Standard atmosphere (hPa) for barometric altitude.
 const P0_HPA: f64 = 1013.25;
 
@@ -72,17 +72,20 @@ pub struct PdrConfig {
     pub drift_per_step_mag_m: f64,
     /// Minimum accelerometer variance to detect walking.
     pub walk_threshold: f64,
+    /// Maximum complementary-filter gain applied to magnetometer corrections.
+    pub mag_max_correction_gain: f64,
 }
 
 impl Default for PdrConfig {
     fn default() -> Self {
         Self {
-            default_stride_m: 0.71,      // Average adult walking stride
-            weinberg_k: 0.42,            // Weinberg 2002 constant
-            gyro_drift_rate: 0.001,      // ~0.06°/s typical MEMS gyro
-            drift_per_step_m: 0.15,      // ~15cm drift per step without mag
-            drift_per_step_mag_m: 0.05,  // ~5cm drift per step with mag
-            walk_threshold: 1.5,         // m/s² accel variance threshold
+            default_stride_m: 0.71,     // Average adult walking stride
+            weinberg_k: 0.42,           // Weinberg 2002 constant
+            gyro_drift_rate: 0.0025,    // Conservative commodity MEMS drift
+            drift_per_step_m: 0.25,     // ~25cm drift per step without mag
+            drift_per_step_mag_m: 0.10, // ~10cm drift per step with mag
+            walk_threshold: 1.5,        // m/s² accel variance threshold
+            mag_max_correction_gain: 0.15,
         }
     }
 }
@@ -166,7 +169,8 @@ impl PedestrianDeadReckoning {
 
         // 6. Update altitude from barometer
         if barometer_hpa > 100.0 {
-            self.altitude_m = barometric_altitude(barometer_hpa as f64, self.reference_pressure_hpa);
+            self.altitude_m =
+                barometric_altitude(barometer_hpa as f64, self.reference_pressure_hpa);
         }
     }
 
@@ -176,10 +180,14 @@ impl PedestrianDeadReckoning {
     /// - `magnetic_heading_deg`: Magnetic north heading (0-360°)
     /// - `accuracy_deg`: Heading accuracy (typically 5-15°)
     pub fn correct_heading(&mut self, magnetic_heading_deg: f32, accuracy_deg: f32) {
-        if accuracy_deg > 45.0 { return; } // Too noisy
+        if accuracy_deg > 45.0 {
+            return;
+        } // Too noisy
         let mag_rad = (magnetic_heading_deg as f64).to_radians();
-        // Blend: 70% gyro + 30% magnetometer (complementary filter)
-        let alpha = 0.3;
+        // Indoor magnetometers are often badly distorted, so keep the correction
+        // gain modest and let the reported accuracy modulate how strongly we trust it.
+        let quality = ((45.0 - accuracy_deg as f64) / 40.0).clamp(0.0, 1.0);
+        let alpha = (self.config.mag_max_correction_gain * quality).max(0.02);
         // Handle angle wrapping
         let diff = angle_diff(self.heading_rad, mag_rad);
         self.heading_rad += alpha * diff;
@@ -245,9 +253,13 @@ pub fn barometric_altitude(pressure_hpa: f64, reference_hpa: f64) -> f64 {
 fn angle_diff(a: f64, b: f64) -> f64 {
     let diff = b - a;
     let pi = std::f64::consts::PI;
-    if diff > pi { diff - 2.0 * pi }
-    else if diff < -pi { diff + 2.0 * pi }
-    else { diff }
+    if diff > pi {
+        diff - 2.0 * pi
+    } else if diff < -pi {
+        diff + 2.0 * pi
+    } else {
+        diff
+    }
 }
 
 // ============================================================================
@@ -262,13 +274,17 @@ mod tests {
     fn walk_straight_north() {
         let mut pdr = PedestrianDeadReckoning::new(PdrConfig::default());
         pdr.set_heading(0.0); // North
-        // Walk 10 steps
+                              // Walk 10 steps
         for _ in 0..10 {
             pdr.step(10.5, 0.0, 0.0, 1, 0.5);
         }
         let pos = pdr.get_position();
         assert!(pos[0].abs() < 0.01, "Should not drift east: {}", pos[0]);
-        assert!((pos[1] - 7.1).abs() < 1.0, "Should be ~7.1m north: {}", pos[1]);
+        assert!(
+            (pos[1] - 7.1).abs() < 1.0,
+            "Should be ~7.1m north: {}",
+            pos[1]
+        );
         assert_eq!(pdr.total_steps(), 10);
     }
 
@@ -280,7 +296,11 @@ mod tests {
             pdr.step(10.5, 0.0, 0.0, 1, 0.5);
         }
         let pos = pdr.get_position();
-        assert!((pos[0] - 7.1).abs() < 1.0, "Should be ~7.1m east: {}", pos[0]);
+        assert!(
+            (pos[0] - 7.1).abs() < 1.0,
+            "Should be ~7.1m east: {}",
+            pos[0]
+        );
         assert!(pos[1].abs() < 0.01, "Should not drift north: {}", pos[1]);
     }
 
@@ -291,16 +311,24 @@ mod tests {
 
         // Walk north
         pdr.set_heading(0.0);
-        for _ in 0..steps_per_side { pdr.step(10.5, 0.0, 0.0, 1, 0.5); }
+        for _ in 0..steps_per_side {
+            pdr.step(10.5, 0.0, 0.0, 1, 0.5);
+        }
         // Walk east
         pdr.set_heading(90.0);
-        for _ in 0..steps_per_side { pdr.step(10.5, 0.0, 0.0, 1, 0.5); }
+        for _ in 0..steps_per_side {
+            pdr.step(10.5, 0.0, 0.0, 1, 0.5);
+        }
         // Walk south
         pdr.set_heading(180.0);
-        for _ in 0..steps_per_side { pdr.step(10.5, 0.0, 0.0, 1, 0.5); }
+        for _ in 0..steps_per_side {
+            pdr.step(10.5, 0.0, 0.0, 1, 0.5);
+        }
         // Walk west
         pdr.set_heading(270.0);
-        for _ in 0..steps_per_side { pdr.step(10.5, 0.0, 0.0, 1, 0.5); }
+        for _ in 0..steps_per_side {
+            pdr.step(10.5, 0.0, 0.0, 1, 0.5);
+        }
 
         let pos = pdr.get_position();
         let error = (pos[0].powi(2) + pos[1].powi(2)).sqrt();
@@ -314,7 +342,11 @@ mod tests {
         pdr.set_heading(0.0);
         // Rotate 90° (π/2 rad) over 1 second at π/2 rad/s
         pdr.step(9.8, std::f64::consts::FRAC_PI_2 as f32, 0.0, 0, 1.0);
-        assert!((pdr.get_heading_deg() - 90.0).abs() < 1.0, "Heading: {}", pdr.get_heading_deg());
+        assert!(
+            (pdr.get_heading_deg() - 90.0).abs() < 1.0,
+            "Heading: {}",
+            pdr.get_heading_deg()
+        );
     }
 
     #[test]
@@ -325,9 +357,17 @@ mod tests {
         pdr.heading_rad = 10.0_f64.to_radians();
         // Magnetometer says true heading is 0°
         pdr.correct_heading(0.0, 5.0);
-        // Should blend toward 0° (30% correction)
-        assert!(pdr.get_heading_deg() < 10.0, "Should correct: {}", pdr.get_heading_deg());
-        assert!(pdr.get_heading_deg() > 0.0, "Should not overcorrect: {}", pdr.get_heading_deg());
+        // Should blend toward 0° without fully trusting the magnetometer
+        assert!(
+            pdr.get_heading_deg() < 10.0,
+            "Should correct: {}",
+            pdr.get_heading_deg()
+        );
+        assert!(
+            pdr.get_heading_deg() > 0.0,
+            "Should not overcorrect: {}",
+            pdr.get_heading_deg()
+        );
         assert!(pdr.mag_correction_active);
     }
 
@@ -338,7 +378,10 @@ mod tests {
         for _ in 0..100 {
             pdr.step(10.5, 0.0, 0.0, 1, 0.5);
         }
-        assert!(pdr.get_drift_estimate() > 10.0, "100 steps should accumulate drift");
+        assert!(
+            pdr.get_drift_estimate() > 10.0,
+            "100 steps should accumulate drift"
+        );
     }
 
     #[test]
@@ -351,14 +394,20 @@ mod tests {
             pdr_no_mag.step(10.5, 0.0, 0.0, 1, 0.5);
             pdr_mag.step(10.5, 0.0, 0.0, 1, 0.5);
         }
-        assert!(pdr_mag.get_drift_estimate() < pdr_no_mag.get_drift_estimate(),
-            "Magnetometer should reduce drift: {} vs {}", pdr_mag.get_drift_estimate(), pdr_no_mag.get_drift_estimate());
+        assert!(
+            pdr_mag.get_drift_estimate() < pdr_no_mag.get_drift_estimate(),
+            "Magnetometer should reduce drift: {} vs {}",
+            pdr_mag.get_drift_estimate(),
+            pdr_no_mag.get_drift_estimate()
+        );
     }
 
     #[test]
     fn reset_clears_drift() {
         let mut pdr = PedestrianDeadReckoning::new(PdrConfig::default());
-        for _ in 0..50 { pdr.step(10.5, 0.0, 0.0, 1, 0.5); }
+        for _ in 0..50 {
+            pdr.step(10.5, 0.0, 0.0, 1, 0.5);
+        }
         assert!(pdr.get_drift_estimate() > 0.0);
         pdr.reset_to_origin();
         assert_eq!(pdr.get_drift_estimate(), 0.0);

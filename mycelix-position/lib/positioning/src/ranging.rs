@@ -3,8 +3,8 @@
 //! Ranging models: convert raw sensor data to distance + uncertainty.
 //!
 //! Each model maps a physical measurement (RSSI, time-of-flight, etc.)
-//! to a range estimate with Gaussian uncertainty. The trilateration
-//! algorithm uses these uncertainties as inverse-variance weights.
+//! to a range estimate with an explicit uncertainty model. These are
+//! first-pass envelopes for fusion, not guarantees of field accuracy.
 
 use serde::{Deserialize, Serialize};
 
@@ -36,8 +36,14 @@ pub enum RangingMethod {
     ManualSurvey,
     /// Meshtastic hop-count estimate (σ ≈ 500-2000 m)
     MeshtasticHops,
-    /// BLE Channel Sounding (Bluetooth 6.0, σ ≈ 0.01-0.30 m)
+    /// BLE Channel Sounding (Bluetooth 6.0, σ often ≈ 0.2-1.0 m on commodity devices)
     BleChannelSounding,
+    /// Acoustic time-of-flight through water or air in low-visibility environments.
+    AcousticTimeOfFlight,
+    /// Optical time-of-flight or laser ranging.
+    OpticalTimeOfFlight,
+    /// Deep-space RF round-trip timing.
+    DeepSpaceRadioRtt,
 }
 
 // ============================================================================
@@ -67,7 +73,11 @@ pub fn rssi_to_range(rssi_dbm: f64, ref_rssi_dbm: f64, path_loss_exponent: f64) 
     // Empirical: σ ≈ 0.2 * d for indoor, 0.1 * d for outdoor
     let sigma_fraction = 0.1 + 0.05 * (path_loss_exponent - 2.0);
     let sigma = (distance * sigma_fraction).max(0.5);
-    RangeEstimate { distance_m: distance.max(0.1), sigma_m: sigma, method: RangingMethod::RssiPathLoss }
+    RangeEstimate {
+        distance_m: distance.max(0.1),
+        sigma_m: sigma,
+        method: RangingMethod::RssiPathLoss,
+    }
 }
 
 // ============================================================================
@@ -87,7 +97,11 @@ pub fn lora_toa_to_range(toa_ns: f64, bandwidth_hz: f64) -> RangeEstimate {
     // Practical accuracy much better due to correlation: ~50-200m
     let time_resolution_s = 1.0 / bandwidth_hz;
     let sigma = (C_M_S * time_resolution_s * 0.1).max(50.0); // min 50m
-    RangeEstimate { distance_m: distance.max(0.0), sigma_m: sigma, method: RangingMethod::LoRaToA }
+    RangeEstimate {
+        distance_m: distance.max(0.0),
+        sigma_m: sigma,
+        method: RangingMethod::LoRaToA,
+    }
 }
 
 // ============================================================================
@@ -105,7 +119,11 @@ pub fn uwb_tof_to_range(tof_ns: f64) -> RangeEstimate {
     let distance = C_M_S * tof_ns * 1e-9;
     // UWB achieves 10-30 cm accuracy in line-of-sight
     let sigma = 0.10 + distance * 0.002; // 10 cm base + 0.2% of range
-    RangeEstimate { distance_m: distance.max(0.0), sigma_m: sigma.max(0.05), method: RangingMethod::UltraWideband }
+    RangeEstimate {
+        distance_m: distance.max(0.0),
+        sigma_m: sigma.max(0.05),
+        method: RangingMethod::UltraWideband,
+    }
 }
 
 // ============================================================================
@@ -120,7 +138,11 @@ pub fn wifi_rtt_to_range(rtt_ns: f64) -> RangeEstimate {
     let distance = C_M_S * rtt_ns * 1e-9 / 2.0;
     // WiFi RTT: typically 1-3m accuracy
     let sigma = 1.0 + distance * 0.01;
-    RangeEstimate { distance_m: distance.max(0.0), sigma_m: sigma.max(0.5), method: RangingMethod::WifiRtt }
+    RangeEstimate {
+        distance_m: distance.max(0.0),
+        sigma_m: sigma.max(0.5),
+        method: RangingMethod::WifiRtt,
+    }
 }
 
 // ============================================================================
@@ -142,28 +164,91 @@ pub fn manual_survey(distance_m: f64, instrument_accuracy_m: f64) -> RangeEstima
 
 /// Estimate distance from BLE Channel Sounding phase measurement.
 ///
-/// BLE Channel Sounding (Bluetooth 6.0, Android 16+) uses channel impulse
-/// response to measure distance with centimeter accuracy. The distance is
-/// derived from the round-trip phase shift across multiple BLE channels.
+/// BLE Channel Sounding (Bluetooth 6.0, Android 16+) combines phase-based
+/// ranging and round-trip timing, but indoor multipath on commodity devices
+/// can easily push uncertainty into the decimeter-to-meter regime.
 ///
 /// # Parameters
 /// - `round_trip_time_ns`: Round-trip time in nanoseconds (from Channel Sounding)
 ///
 /// # Accuracy
-/// - Line-of-sight: 1-5 cm
-/// - Non-line-of-sight: 10-30 cm
+/// - Favorable line-of-sight: roughly 0.2-0.5 m
+/// - Cluttered indoor / NLOS: often worse than 1 m
 ///
 /// # References
 /// - Bluetooth SIG Core Specification v6.0 (2024)
 /// - Nordic Semiconductor Channel Sounding documentation
 pub fn ble_channel_sounding_to_range(round_trip_time_ns: f64) -> RangeEstimate {
     let distance = C_M_S * round_trip_time_ns * 1e-9 / 2.0;
-    // BLE CS achieves 1-5 cm in LOS, worse in NLOS
-    let sigma = 0.02 + distance * 0.001; // 2cm base + 0.1% of range
+    // Conservative envelope for commodity hardware in real environments.
+    let sigma = 0.25 + distance * 0.025;
     RangeEstimate {
         distance_m: distance.max(0.0),
-        sigma_m: sigma.max(0.01),
+        sigma_m: sigma.max(0.20),
         method: RangingMethod::BleChannelSounding,
+    }
+}
+
+// ============================================================================
+// ACOUSTIC TIME-OF-FLIGHT
+// ============================================================================
+
+/// Estimate distance from an acoustic time-of-flight measurement.
+///
+/// Suitable for underwater acoustics and cave environments where RF is poor
+/// and line-of-sight optical links may be unavailable.
+///
+/// `sound_speed_m_s` should be environment-specific:
+/// - air in caves: roughly 330-350 m/s depending on temperature/humidity
+/// - seawater: roughly 1450-1550 m/s depending on salinity/temperature/pressure
+pub fn acoustic_tof_to_range(
+    round_trip_time_s: f64,
+    sound_speed_m_s: f64,
+    timing_sigma_s: f64,
+) -> RangeEstimate {
+    let sound_speed_m_s = sound_speed_m_s.max(1.0);
+    let distance = sound_speed_m_s * round_trip_time_s.max(0.0) / 2.0;
+    let sigma = (sound_speed_m_s * timing_sigma_s.max(1e-6) / 2.0).max(0.05);
+    RangeEstimate {
+        distance_m: distance,
+        sigma_m: sigma,
+        method: RangingMethod::AcousticTimeOfFlight,
+    }
+}
+
+// ============================================================================
+// OPTICAL / LASER TIME-OF-FLIGHT
+// ============================================================================
+
+/// Estimate distance from an optical or laser round-trip timing measurement.
+///
+/// `clock_sigma_ns` represents aggregate timing uncertainty from clocks,
+/// timestamping electronics, and detection jitter.
+pub fn optical_tof_to_range(round_trip_time_ns: f64, clock_sigma_ns: f64) -> RangeEstimate {
+    let distance = C_M_S * round_trip_time_ns * 1e-9 / 2.0;
+    let sigma = (C_M_S * clock_sigma_ns.max(0.001) * 1e-9 / 2.0).max(0.001);
+    RangeEstimate {
+        distance_m: distance.max(0.0),
+        sigma_m: sigma,
+        method: RangingMethod::OpticalTimeOfFlight,
+    }
+}
+
+// ============================================================================
+// DEEP-SPACE RF RTT
+// ============================================================================
+
+/// Estimate distance from RF round-trip timing with a known turnaround jitter.
+pub fn deep_space_radio_rtt_to_range(
+    round_trip_time_ns: f64,
+    turnaround_jitter_ns: f64,
+) -> RangeEstimate {
+    let distance = C_M_S * round_trip_time_ns * 1e-9 / 2.0;
+    let sigma = (C_M_S * turnaround_jitter_ns.max(1.0) * 1e-9 / 2.0).max(0.5);
+    RangeEstimate {
+        distance_m: distance.max(0.0),
+        sigma_m: sigma,
+        method: RangingMethod::DeepSpaceRadioRtt,
     }
 }
 
@@ -199,7 +284,10 @@ mod tests {
     #[test]
     fn rssi_at_reference_distance() {
         let est = rssi_to_range(-50.0, -50.0, 2.0);
-        assert!((est.distance_m - 1.0).abs() < 0.1, "At ref RSSI, distance should be ~1m");
+        assert!(
+            (est.distance_m - 1.0).abs() < 0.1,
+            "At ref RSSI, distance should be ~1m"
+        );
     }
 
     #[test]
@@ -248,11 +336,15 @@ mod tests {
     }
 
     #[test]
-    fn ble_channel_sounding_centimeter_accuracy() {
+    fn ble_channel_sounding_uses_conservative_sigma() {
         // 10m: round trip = 2 * 10 / c = 66.7 ns
         let est = ble_channel_sounding_to_range(66.7);
         assert!((est.distance_m - 10.0).abs() < 0.1);
-        assert!(est.sigma_m < 0.1, "BLE CS should be sub-10cm: {}", est.sigma_m);
+        assert!(
+            est.sigma_m >= 0.2,
+            "BLE CS should not be modeled as cm-class: {}",
+            est.sigma_m
+        );
         assert_eq!(est.method, RangingMethod::BleChannelSounding);
     }
 
@@ -261,7 +353,50 @@ mod tests {
         // 1m: round trip = 6.67 ns
         let est = ble_channel_sounding_to_range(6.67);
         assert!((est.distance_m - 1.0).abs() < 0.01);
-        assert!(est.sigma_m < 0.05, "Short range BLE CS: {}", est.sigma_m);
+        assert!(
+            est.sigma_m >= 0.2,
+            "Short range BLE CS should still stay conservative: {}",
+            est.sigma_m
+        );
+    }
+
+    #[test]
+    fn optical_tof_supports_sub_meter_sigma() {
+        let est = optical_tof_to_range(66.7, 0.02);
+        assert!((est.distance_m - 10.0).abs() < 0.1);
+        assert!(
+            est.sigma_m < 0.01,
+            "Optical timing should support cm/mm-class sigma"
+        );
+    }
+
+    #[test]
+    fn acoustic_tof_supports_underwater_ranges() {
+        let est = acoustic_tof_to_range(0.0267, 1500.0, 0.0001);
+        assert!(
+            (est.distance_m - 20.0).abs() < 0.2,
+            "Acoustic range: {}",
+            est.distance_m
+        );
+        assert!(est.sigma_m >= 0.05);
+        assert_eq!(est.method, RangingMethod::AcousticTimeOfFlight);
+    }
+
+    #[test]
+    fn acoustic_tof_supports_cave_air_ranges() {
+        let est = acoustic_tof_to_range(0.0583, 343.0, 0.0002);
+        assert!(
+            (est.distance_m - 10.0).abs() < 0.2,
+            "Acoustic cave range: {}",
+            est.distance_m
+        );
+    }
+
+    #[test]
+    fn deep_space_radio_rtt_has_coarser_sigma() {
+        let est = deep_space_radio_rtt_to_range(66.7, 10.0);
+        assert!((est.distance_m - 10.0).abs() < 0.1);
+        assert!(est.sigma_m >= 0.5);
     }
 
     #[test]
@@ -270,6 +405,7 @@ mod tests {
         assert!(lora_toa_to_range(0.1, 125_000.0).distance_m >= 0.0);
         assert!(uwb_tof_to_range(0.1).distance_m >= 0.0);
         assert!(wifi_rtt_to_range(0.1).distance_m >= 0.0);
+        assert!(acoustic_tof_to_range(0.1, 1500.0, 0.001).distance_m >= 0.0);
         assert!(manual_survey(0.0, 1.0).distance_m >= 0.0);
         assert!(meshtastic_hops_to_range(0, 2000.0).distance_m >= 0.0);
     }

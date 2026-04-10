@@ -3,16 +3,15 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 use hdk::prelude::*;
 use mycelix_bridge_common::{
-    requirement_for_basic, requirement_for_voting, GovernanceEligibility,
-    GovernanceRequirement,
+    civic_requirement_basic, civic_requirement_voting, GovernanceEligibility, GovernanceRequirement,
 };
 use web_of_trust_integrity::*;
 
 fn require_consciousness(
-    requirement: &GovernanceRequirement,
+    requirement: &mycelix_bridge_common::CivicRequirement,
     action_name: &str,
 ) -> ExternResult<GovernanceEligibility> {
-    mycelix_zome_helpers::require_consciousness("identity_bridge", requirement, action_name)
+    { let legacy = mycelix_bridge_common::sovereign_gate::governance_requirement_from_civic(requirement); mycelix_zome_helpers::require_consciousness("identity_bridge", &legacy, action_name) }
 }
 
 /// Helper to get an anchor entry hash
@@ -29,7 +28,7 @@ fn ensure_anchor(anchor_str: &str) -> ExternResult<EntryHash> {
 /// Attest trust to another agent (Citizen+).
 #[hdk_extern]
 pub fn attest_trust(attestation: TrustAttestation) -> ExternResult<Record> {
-    let _eligibility = require_consciousness(&requirement_for_voting(), "attest_trust")?;
+    let _eligibility = require_consciousness(&civic_requirement_voting(), "attest_trust")?;
 
     let action_hash = create_entry(&EntryTypes::TrustAttestation(attestation.clone()))?;
     let agent = agent_info()?.agent_initial_pubkey;
@@ -68,7 +67,7 @@ pub fn attest_trust(attestation: TrustAttestation) -> ExternResult<Record> {
 /// Revoke a trust attestation (attestor only).
 #[hdk_extern]
 pub fn revoke_trust(revocation: TrustRevocation) -> ExternResult<Record> {
-    let _eligibility = require_consciousness(&requirement_for_basic(), "revoke_trust")?;
+    let _eligibility = require_consciousness(&civic_requirement_basic(), "revoke_trust")?;
 
     // Verify caller is the attestor
     let attestation_record = get(revocation.attestation_hash.clone(), GetOptions::default())?

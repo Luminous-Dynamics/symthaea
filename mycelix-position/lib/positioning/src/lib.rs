@@ -21,15 +21,31 @@
 //! - [`kalman`] — Extended Kalman Filter for continuous tracking
 
 pub mod bodies;
-pub mod dead_reckoning;
-pub mod ranging;
-pub mod trilateration;
 pub mod coverage;
+pub mod dead_reckoning;
+pub mod fusion;
 pub mod kalman;
+pub mod measurements;
+pub mod navigation_runtime;
+pub mod ranging;
+pub mod space_navigation;
+pub mod trilateration;
 
-pub use bodies::{CelestialBody, Earth, Moon, Mars};
-pub use trilateration::{PositionEstimate, TrilaterationError, trilaterate_3d, trilaterate_2d};
-pub use ranging::{RangeEstimate, RangingMethod};
+pub use bodies::{CelestialBody, Earth, Mars, Moon};
 pub use coverage::{gdop, pdop, CoveragePoint};
-pub use kalman::{PositionFilter, FilterConfig, FilterState};
-pub use dead_reckoning::{PedestrianDeadReckoning, PdrConfig, barometric_altitude};
+pub use dead_reckoning::{barometric_altitude, PdrConfig, PedestrianDeadReckoning};
+pub use fusion::{
+    covariance_intersection_3d, GaussianEstimate3D, PeerEstimate3D, PeerFusion3D,
+    PublishableEstimate3D,
+};
+pub use kalman::{FilterConfig, FilterState, PositionFilter};
+pub use measurements::{
+    Measurement, MeasurementModality, MeasurementProvenance, MeasurementValue, ReferenceFrame,
+};
+pub use navigation_runtime::{
+    confidence_from_sigma, fix_age_s, DomainNavigator, MeasurementRouter, MeasurementRoutingPolicy,
+    MeasurementRoutingStats, NavigationFailoverMode, NavigationHealth,
+};
+pub use ranging::{RangeEstimate, RangingMethod};
+pub use space_navigation::{SpaceNavigationEstimate, SpaceNavigationEstimator};
+pub use trilateration::{trilaterate_2d, trilaterate_3d, PositionEstimate, TrilaterationError};

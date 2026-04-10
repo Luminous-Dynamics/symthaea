@@ -105,26 +105,19 @@ fn auto_create_mfa_state(did: &str, agent_pub_key: &AgentPubKey) -> ExternResult
                     .to_string()
             )))
         }
-        ZomeCallResponse::NetworkError(err) => {
-            Err(wasm_error!(WasmErrorInner::Guest(format!(
-                "MFA initialization failed: network error ({}). \
+        ZomeCallResponse::NetworkError(err) => Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "MFA initialization failed: network error ({}). \
                  DID creation requires MFA to be available.",
-                err
-            ))))
-        }
-        ZomeCallResponse::CountersigningSession(err) => {
-            Err(wasm_error!(WasmErrorInner::Guest(format!(
-                "MFA initialization failed: countersigning error ({}).",
-                err
-            ))))
-        }
-        ZomeCallResponse::AuthenticationFailed(_, _) => {
-            Err(wasm_error!(WasmErrorInner::Guest(
-                "MFA initialization failed: authentication failed. \
+            err
+        )))),
+        ZomeCallResponse::CountersigningSession(err) => Err(wasm_error!(WasmErrorInner::Guest(
+            format!("MFA initialization failed: countersigning error ({}).", err)
+        ))),
+        ZomeCallResponse::AuthenticationFailed(_, _) => Err(wasm_error!(WasmErrorInner::Guest(
+            "MFA initialization failed: authentication failed. \
                  DID creation requires MFA to be available."
-                    .to_string()
-            )))
-        }
+                .to_string()
+        ))),
     }
 }
 

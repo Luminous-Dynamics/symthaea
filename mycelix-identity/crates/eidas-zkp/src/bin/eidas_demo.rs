@@ -67,8 +67,17 @@ fn main() {
     // ── Step 3: Verifier checks presentation ──
     println!("Step 3: VERIFIER checks presentation");
 
-    let claims = presentation.credential_subject.claims.as_object().unwrap();
-    let sd = presentation.proof.selective_disclosure.as_ref().unwrap();
+    let disclosed_credential = &presentation.verifiable_credential[0];
+    let claims = disclosed_credential
+        .credential_subject
+        .claims
+        .as_object()
+        .unwrap();
+    let sd = disclosed_credential
+        .proof
+        .selective_disclosure
+        .as_ref()
+        .unwrap();
 
     println!("  Disclosed claims:");
     for (key, value) in claims {
@@ -77,11 +86,20 @@ fn main() {
 
     println!("  ZKP-proven claims:");
     for claim in &sd.proven_claims {
-        println!("    🔒 {}: {} (proof: {})", claim.claim_key, claim.description, claim.proof_type);
+        println!(
+            "    🔒 {}: {} (proof: {})",
+            claim.claim_key, claim.description, claim.proof_type
+        );
     }
 
     println!("  Hidden claims (NOT in presentation):");
-    let all_keys = ["givenName", "familyName", "dateOfBirth", "nationality", "age"];
+    let all_keys = [
+        "givenName",
+        "familyName",
+        "dateOfBirth",
+        "nationality",
+        "age",
+    ];
     for key in &all_keys {
         if !claims.contains_key(*key) && !sd.proven_claims.iter().any(|p| p.claim_key == *key) {
             println!("    ✗ {} — not disclosed, not proven", key);
@@ -90,7 +108,14 @@ fn main() {
 
     println!();
     println!("  Verification result:");
-    println!("    Cryptosuite: {} ✓", presentation.proof.cryptosuite);
+    println!(
+        "    Credential cryptosuite: {} ✓",
+        disclosed_credential.proof.cryptosuite
+    );
+    println!(
+        "    Holder auth cryptosuite: {} ✓",
+        presentation.proof.cryptosuite
+    );
     println!("    Proof purpose: {} ✓", presentation.proof.proof_purpose);
     println!("    Post-quantum: Dilithium5 signature ✓");
     println!("    Data minimization: only nationality visible ✓");
@@ -107,7 +132,7 @@ fn main() {
     println!("║  ✓ Unlinkability (different presentation per verifier)      ║");
     println!("║  ✓ Post-quantum readiness (Dilithium5 / ML-DSA-87)         ║");
     println!("║  ✓ W3C VC 2.0 compliant (DataIntegrityProof)               ║");
-    println!("║  ✓ Cryptosuite: dastark-2026 (binary-field STARK + PQ)     ║");
+    println!("║  ✓ Credential: dastark-2026 / Presentation: dilithium5-2026║");
     println!("╠══════════════════════════════════════════════════════════════╣");
     println!("║  Market: $102B projected (2030)                             ║");
     println!("║  Deadline: EU Member States must issue EUDI Wallets by 2026 ║");
