@@ -280,3 +280,63 @@ pub const COLONIAL_NET_GROWTH_RATE: f64 = 0.02;
 /// "Beachhead bottleneck" — risk of demographic failure for small founding pop
 /// Probability of colony failure increases sharply below 50 adults
 pub const BEACHHEAD_BOTTLENECK_THRESHOLD: usize = 50;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn solar_cycle_matches_schwabe() {
+        assert_eq!(SOLAR_CYCLE_MONTHS, 132, "11 years × 12 months");
+    }
+
+    #[test]
+    fn spe_rates_derived_correctly() {
+        let computed = SPE_TOTAL_EVENTS_1976_2017 as f64 / SPE_CATALOG_YEARS;
+        assert!((computed - SPE_MEAN_PER_YEAR).abs() < 0.01,
+            "SPE_MEAN_PER_YEAR should be {computed}, got {SPE_MEAN_PER_YEAR}");
+    }
+
+    #[test]
+    fn eclss_mtbfs_are_positive_and_ordered() {
+        assert!(ECLSS_O2_GEN_MTBF_MONTHS > 0.0);
+        assert!(ECLSS_WATER_MTBF_MONTHS > 0.0);
+        assert!(ECLSS_CO2_MTBF_MONTHS > 0.0);
+        assert!(ECLSS_THERMAL_MTBF_MONTHS > 0.0);
+        // Thermal should be most reliable (longest MTBF)
+        assert!(ECLSS_THERMAL_MTBF_MONTHS >= ECLSS_CO2_MTBF_MONTHS);
+    }
+
+    #[test]
+    fn crop_yields_are_positive() {
+        for (name, days, yield_rate, fraction) in CROP_YIELDS {
+            assert!(*days > 0.0, "{name} growth days must be positive");
+            assert!(*yield_rate > 0.0, "{name} yield must be positive");
+            assert!(*fraction > 0.0 && *fraction <= 1.0,
+                "{name} edible fraction must be in (0, 1]: {fraction}");
+        }
+    }
+
+    #[test]
+    fn mars_temperatures_are_ordered() {
+        assert!(MARS_TEMP_MIN_K < MARS_TEMP_MEAN_K);
+        assert!(MARS_TEMP_MEAN_K < MARS_TEMP_MAX_K);
+        assert!(MARS_TEMP_MIN_K > 100.0, "Mars doesn't go below 100K");
+        assert!(MARS_TEMP_MAX_K < 350.0, "Mars doesn't exceed 350K");
+    }
+
+    #[test]
+    fn mvp_rule_ordering() {
+        assert!(MVP_50_500_RULE_SHORT_TERM < MVP_50_500_RULE_LONG_TERM);
+        assert_eq!(MVP_50_500_RULE_SHORT_TERM, 50);
+        assert_eq!(MVP_50_500_RULE_LONG_TERM, 500);
+    }
+
+    #[test]
+    fn derived_rates_are_consistent() {
+        // O2 production rate should match BPC data
+        let derived = BPC_O2_KG_PER_1200_DAYS * 1000.0 / (1200.0 * BPC_AREA_M2);
+        assert!((derived - O2_PRODUCTION_G_M2_DAY).abs() < 0.1,
+            "O2 rate mismatch: computed {derived}, stored {O2_PRODUCTION_G_M2_DAY}");
+    }
+}

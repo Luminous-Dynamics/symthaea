@@ -611,3 +611,113 @@ impl NarrativeEngine {
         out
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn generate_character_name_is_deterministic() {
+        let a = generate_character_name("Mars", "engineer", 3);
+        let b = generate_character_name("Mars", "engineer", 3);
+        assert_eq!(a, b, "Same inputs should produce same name");
+    }
+
+    #[test]
+    fn generate_character_name_varies_by_input() {
+        let a = generate_character_name("Mars", "engineer", 1);
+        let b = generate_character_name("Europa", "medic", 2);
+        assert_ne!(a, b, "Different inputs should produce different names");
+    }
+
+    #[test]
+    fn narrative_engine_new_is_empty() {
+        let engine = NarrativeEngine::new();
+        assert!(engine.events.is_empty());
+        assert!(engine.cultural_memories.is_empty());
+    }
+
+    #[test]
+    fn remember_stores_cultural_memory() {
+        let mut engine = NarrativeEngine::new();
+        engine.remember(
+            "Great Quake".into(), Some("Moon".into()), 100,
+            CulturalLesson { preparedness: 0.2, risk_shift: -0.1, cohesion: 0.15 },
+        );
+        assert_eq!(engine.cultural_memories.len(), 1);
+        assert_eq!(engine.cultural_memories[0].name, "Great Quake");
+        assert!((engine.cultural_memories[0].strength - 1.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn decay_memories_reduces_strength() {
+        let mut engine = NarrativeEngine::new();
+        engine.remember(
+            "Event".into(), None, 0,
+            CulturalLesson::default(),
+        );
+        let initial = engine.cultural_memories[0].strength;
+        for _ in 0..100 {
+            engine.decay_memories();
+        }
+        assert!(engine.cultural_memories[0].strength < initial,
+            "Strength should decay over 100 ticks");
+        assert!(engine.cultural_memories[0].strength > 0.01,
+            "Should not be pruned after only 100 ticks");
+    }
+
+    #[test]
+    fn decay_memories_prunes_weak_memories() {
+        let mut engine = NarrativeEngine::new();
+        engine.remember("Ancient".into(), None, 0, CulturalLesson::default());
+        // Force strength below threshold
+        engine.cultural_memories[0].strength = 0.005;
+        engine.decay_memories();
+        assert!(engine.cultural_memories.is_empty(),
+            "Memory below 0.01 threshold should be pruned");
+    }
+
+    #[test]
+    fn cultural_lesson_for_filters_by_world() {
+        let mut engine = NarrativeEngine::new();
+        engine.remember(
+            "Mars Quake".into(), Some("Mars".into()), 10,
+            CulturalLesson { preparedness: 0.2, risk_shift: 0.0, cohesion: 0.0 },
+        );
+        engine.remember(
+            "Global Pandemic".into(), None, 20,
+            CulturalLesson { preparedness: 0.0, risk_shift: -0.1, cohesion: 0.0 },
+        );
+
+        let mars_lesson = engine.cultural_lesson_for(Some("Mars"));
+        assert!(mars_lesson.preparedness > 0.0, "Mars should get its own memory");
+        assert!(mars_lesson.risk_shift < 0.0, "Mars should also get global memory");
+
+        let moon_lesson = engine.cultural_lesson_for(Some("Moon"));
+        assert!((moon_lesson.preparedness - 0.0).abs() < 1e-10,
+            "Moon should not get Mars-specific memory");
+        assert!(moon_lesson.risk_shift < 0.0, "Moon should get global memory");
+    }
+
+    #[test]
+    fn format_history_produces_output() {
+        let mut engine = NarrativeEngine::new();
+        engine.events.push(NarrativeEvent {
+            tick: 10,
+            year: 10.0 / 12.0,
+            world: Some("Luna".into()),
+            crisis: "Moonquake magnitude 5.2".into(),
+            response: "Emergency shelters activated".into(),
+            outcome: "Minor structural damage".into(),
+            severity: 2,
+            joy: 0.1,
+            sadness: 0.6,
+            desire: 0.3,
+            care: 0.5,
+            character: None,
+        });
+        let history = engine.format_history();
+        assert!(!history.is_empty(), "History should produce non-empty output");
+        assert!(history.contains("Moonquake"), "History should contain crisis description");
+    }
+}

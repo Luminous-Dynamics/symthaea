@@ -139,6 +139,9 @@ const GOV_CONSCIOUSNESS_PENALTY_UNSTABLE: f64 = 0.002;
 /// Top-level multi-world civilization simulator.
 pub struct MultiWorldSimulator {
     pub config: SimulationConfig,
+    /// Tunable simulation parameters (spoilage, radiation, psychology, etc.).
+    /// All fields have published-source defaults. Override via TOML scenario files.
+    pub params: constants::SimulationParams,
     pub worlds: Vec<World>,
     pub current_tick: u32,
     pub current_epoch: EpochId,
@@ -215,6 +218,7 @@ impl MultiWorldSimulator {
         let rng = StochasticEngine::new(config.seed);
         Self {
             config,
+            params: constants::SimulationParams::default(),
             worlds: Vec::new(),
             current_tick: 0,
             current_epoch: 0,
@@ -256,6 +260,13 @@ impl MultiWorldSimulator {
     }
 
     /// Enable JSONL telemetry output to a file.
+    /// Set custom simulation parameters (spoilage, radiation, psychology, etc.).
+    /// Call before `run()`.
+    pub fn with_params(mut self, params: constants::SimulationParams) -> Self {
+        self.params = params;
+        self
+    }
+
     pub fn enable_jsonl_output(&mut self, path: std::path::PathBuf) {
         self.jsonl_output_path = Some(path);
     }
@@ -902,13 +913,13 @@ impl MultiWorldSimulator {
                         production *= 1.5;
                     }
                     // #2: Resource spoilage — entropy is real.
-                    // NASA ISS: water recovery 90% (not 100%), O2 leaks ~1%/month.
+                    // Rates from SimulationParams (override via TOML scenarios).
                     let spoilage_rate = match *name {
-                        "food" => 0.03,      // 3%/month — perishable
-                        "water" => 0.005,    // 0.5%/month — contamination
-                        "materials" => 0.01, // 1%/month — radiation embrittlement
-                        "energy" => 0.15,    // 15%/month — storage/transmission loss
-                        "oxygen" => 0.005,   // 0.5%/month — seal leakage
+                        "food" => self.params.spoilage_food,
+                        "water" => self.params.spoilage_water,
+                        "materials" => self.params.spoilage_materials,
+                        "energy" => self.params.spoilage_energy,
+                        "oxygen" => self.params.spoilage_oxygen,
                         _ => 0.01,
                     };
                     let spoilage = stock.current * spoilage_rate;

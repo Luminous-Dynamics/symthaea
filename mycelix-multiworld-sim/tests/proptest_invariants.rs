@@ -27,7 +27,7 @@ fn arb_policy() -> impl Strategy<Value = PolicyConfig> {
         any::<bool>(),        // migration_enabled
         1..6u32,              // migration_max_per_cycle
         any::<bool>(),        // education_enabled
-        any::<bool>(),        // consciousness_gating_enabled
+        any::<bool>(),        // trust_weighted_governance
         any::<bool>(),        // faction_enabled
         any::<bool>(),        // amendment_enabled
     )
@@ -40,7 +40,7 @@ fn arb_policy() -> impl Strategy<Value = PolicyConfig> {
                 migration_enabled,
                 migration_max_per_cycle,
                 education_enabled,
-                consciousness_gating_enabled,
+                trust_weighted_governance,
                 faction_enabled,
                 amendment_enabled,
             )| {
@@ -52,7 +52,7 @@ fn arb_policy() -> impl Strategy<Value = PolicyConfig> {
                     migration_enabled,
                     migration_max_per_cycle,
                     education_enabled,
-                    consciousness_gating_enabled,
+                    trust_weighted_governance,
                     faction_enabled,
                     amendment_enabled,
                     // Keep these fixed to reduce state space while still covering
@@ -256,13 +256,168 @@ proptest! {
             prop_assert!(gov.oppression_index >= 0.0 && gov.oppression_index <= 1.0,
                 "World {} oppression_index out of [0,1]: {}",
                 world.name, gov.oppression_index);
-            for (i, threshold) in gov.consciousness_gating_threshold.iter().enumerate() {
+            for (i, threshold) in gov.trust_depth_threshold.iter().enumerate() {
                 prop_assert!(!threshold.is_nan(),
-                    "World {} gating threshold[{}] is NaN", world.name, i);
+                    "World {} trust_depth_threshold[{}] is NaN", world.name, i);
                 prop_assert!(*threshold >= 0.0 && *threshold <= 1.0,
-                    "World {} gating threshold[{}] out of [0,1]: {}",
+                    "World {} trust_depth_threshold[{}] out of [0,1]: {}",
                     world.name, i, threshold);
             }
         }
     }
+}
+
+// ---------------------------------------------------------------------------
+// Long-duration property tests (50-year runs)
+// Catches late-stage emergent bugs invisible to the 5-year short tests.
+// Fewer cases (8) since each run takes longer.
+// ---------------------------------------------------------------------------
+
+/// Build a 50-year simulation config for long-duration testing.
+fn arb_long_sim() -> impl Strategy<Value = SimulationConfig> {
+    (0..10_000u64, arb_policy()).prop_map(|(seed, policy)| {
+        SimulationConfig {
+            total_ticks: 600, // 50 years
+            seed,
+            initial_worlds: vec![
+                WorldSeedConfig {
+                    name: "Earth".into(),
+                    location: "Earth".into(),
+                    founding_tick: 0,
+                    initial_population: 100,
+                    initial_resources: 1.0,
+                },
+                WorldSeedConfig {
+                    name: "Artemis Base".into(),
+                    location: "Moon".into(),
+                    founding_tick: 0,
+                    initial_population: 20,
+                    initial_resources: 0.3,
+                },
+            ],
+            epoch_configs: vec![EpochConfig {
+                id: 0,
+                name: "Foundation".into(),
+                start_tick: 0,
+                end_tick: 600,
+                population_trigger: None,
+                self_sufficiency_trigger: None,
+            }],
+            policy,
+        }
+    })
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(8))]
+
+    /// All short-run invariants must hold over 50 years.
+    #[test]
+    fn long_run_invariants_hold(config in arb_long_sim()) {
+        let mut sim = MultiWorldSimulator::new(config);
+        let report = sim.run();
+
+        // Population non-negative
+        for world in &sim.worlds {
+            for agent in &world.agents {
+                prop_assert!(agent.health >= 0.0,
+                    "Agent {} health negative after 50yr: {}", agent.id, agent.health);
+            }
+        }
+
+        // Resources bounded
+        for world in &sim.worlds {
+            for name in world.resources.resource_names() {
+                let stock = world.resources.get(name).unwrap();
+                prop_assert!(!stock.current.is_nan(),
+                    "World {} resource {} NaN after 50yr", world.name, name);
+                prop_assert!(stock.current >= 0.0,
+                    "World {} resource {} negative after 50yr: {}",
+                    world.name, name, stock.current);
+            }
+        }
+
+        // CVS bounded
+        prop_assert!(report.final_cvs >= 0.0 && report.final_cvs <= 1.0,
+            "CVS out of bounds after 50yr: {}", report.final_cvs);
+
+        // Phi bounded
+        for world in &sim.worlds {
+            let mean = world.mean_phi();
+            prop_assert!(!mean.is_nan() && mean >= 0.0 && mean <= 1.0,
+                "World {} mean_phi out of bounds after 50yr: {}", world.name, mean);
+        }
+
+        // Governance stable
+        for world in &sim.worlds {
+            prop_assert!(!world.governance.oppression_index.is_nan(),
+                "Oppression NaN after 50yr in {}", world.name);
+            prop_assert!(world.governance.oppression_index >= 0.0
+                && world.governance.oppression_index <= 1.0,
+                "Oppression out of [0,1] after 50yr in {}: {}",
+                world.name, world.governance.oppression_index);
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Outcome plausibility tests (deterministic, 100-year)
+// Verify the simulation produces reasonable outcomes, not just valid ones.
+// ---------------------------------------------------------------------------
+
+#[test]
+fn outcome_plausibility_100_years() {
+    let config = SimulationConfig {
+        total_ticks: 1200, // 100 years
+        seed: 42,
+        initial_worlds: vec![
+            WorldSeedConfig {
+                name: "Earth".into(),
+                location: "Earth".into(),
+                founding_tick: 0,
+                initial_population: 200,
+                initial_resources: 1.0,
+            },
+            WorldSeedConfig {
+                name: "Artemis Base".into(),
+                location: "Moon".into(),
+                founding_tick: 0,
+                initial_population: 30,
+                initial_resources: 0.3,
+            },
+        ],
+        epoch_configs: vec![EpochConfig {
+            id: 0,
+            name: "Foundation".into(),
+            start_tick: 0,
+            end_tick: 1200,
+            population_trigger: None,
+            self_sufficiency_trigger: None,
+        }],
+        policy: PolicyConfig::default(),
+    };
+
+    let mut sim = MultiWorldSimulator::new(config);
+    let report = sim.run();
+
+    // Population should grow from initial 230 but stay bounded
+    assert!(report.final_population >= 100,
+        "Population should survive 100yr: {}", report.final_population);
+    assert!(report.final_population <= 100_000,
+        "Population should be bounded after 100yr: {}", report.final_population);
+
+    // Consciousness should develop
+    let max_phi: f64 = sim.worlds.iter()
+        .map(|w| w.mean_phi())
+        .fold(0.0f64, f64::max);
+    assert!(max_phi > 0.05,
+        "Some consciousness should develop over 100yr: max_phi={max_phi}");
+
+    // CVS should be computed and positive
+    assert!(report.final_cvs > 0.0 && report.final_cvs <= 1.0,
+        "CVS should be positive and bounded: {}", report.final_cvs);
+
+    // Simulation should have experienced some disasters
+    assert!(report.total_disasters > 0,
+        "100yr sim should have disasters: {}", report.total_disasters);
 }
