@@ -860,4 +860,55 @@ mod tests {
             );
         }
     }
+
+    /// Discovery experiment: run the full pipeline on multiple sequences and
+    /// print what the engine actually finds.
+    #[test]
+    fn test_discovery_report() {
+        let mut engine = ConjectureEngine::with_config(RegressorConfig {
+            population_size: 200,
+            generations: 80,
+            max_depth: 4,
+            max_complexity: 15,
+            lambda: 0.001,
+            seed: 42,
+            ..RegressorConfig::default()
+        });
+
+        // Feed multiple sequences
+        engine.observe(observe_fibonacci_ratios(30));
+        engine.observe(observe_perm_det_ratio(5));
+        engine.observe(observe_partitions(20));
+
+        // Simple known sequence: triangular numbers T(n) = n(n+1)/2
+        let triangular: Vec<(f64, f64)> = (1..=25)
+            .map(|n| (n as f64, (n * (n + 1) / 2) as f64))
+            .collect();
+        engine.observe(ObservedSequence::new("triangular(n)", MathDomain::Combinatorics, triangular));
+
+        // Run discovery
+        engine.generate_conjectures(3);
+        engine.verify_numerical();
+
+        // Print the report
+        eprintln!("\n{}\n", engine.report());
+
+        // Print detailed results per sequence
+        for seq_name in &["fibonacci_ratio(n)", "perm_det_ratio(n)", "triangular(n)", "partition_count(n)"] {
+            if let Some(best) = engine.best_for(seq_name) {
+                eprintln!("DISCOVERY: {} ≈ {}", seq_name, best.formula_str);
+                eprintln!("  MSE={:.2e}, complexity={}, confidence={:.2}, status={:?}",
+                    best.training_mse, best.complexity, best.confidence, best.status);
+                // Evaluate at a few points
+                for n in [1.0, 5.0, 10.0, 20.0] {
+                    let predicted = best.formula.eval(&[("n", n)]);
+                    eprintln!("  f({}) = {:.6}", n, predicted);
+                }
+                eprintln!();
+            }
+        }
+
+        // At minimum, the engine should have generated some conjectures
+        assert!(!engine.conjectures.is_empty(), "should generate at least one conjecture");
+    }
 }
