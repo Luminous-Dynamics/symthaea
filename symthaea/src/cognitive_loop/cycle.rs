@@ -231,7 +231,7 @@ impl CognitiveLoopService {
             // the attention boost factor. High Phi → broad exploratory attention
             // (0.8), low Phi → narrow conservative focus (0.2).
             // Science: Luck et al. (1997) — arousal/ACh modulates V1/V4 gain.
-            let phi = self.carryover.history.consciousness_level;
+            let phi = self.carryover.history.consciousness_level as f32;
             let phi_boost = 0.2 + 0.6 * phi.clamp(0.0, 1.0);
             bridge.set_attention_boost(phi_boost);
         }
