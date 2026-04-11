@@ -349,6 +349,10 @@ pub mod code_algebra;
 #[cfg(feature = "code_generation")]
 pub mod code_memory;
 
+/// Bridge between BinaryHV and ContinuousHV for unified code synthesis pipeline.
+#[cfg(feature = "code_generation")]
+pub mod hv_bridge;
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // LOCAL MODULES - Moral Reasoning
 // ═══════════════════════════════════════════════════════════════════════════════

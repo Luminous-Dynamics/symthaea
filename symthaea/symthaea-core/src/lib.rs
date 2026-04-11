@@ -79,3 +79,7 @@ pub mod phi_engine;
 pub mod physics;
 /// Shared temporal prediction trait for O(1) CfC-based forecasting.
 pub mod temporal;
+/// Unified code synthesis trait for cross-backend code generation.
+#[cfg(feature = "synthesis-trait")]
+#[allow(missing_docs)]
+pub mod synthesis_trait;

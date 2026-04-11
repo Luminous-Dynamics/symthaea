@@ -139,5 +139,6 @@ complex_cfc = []                             # Complex-valued CfC neuron with na
 _scaling_study = []                          # Gate for scaling_study_demo example
 epistemic = []                               # Epistemic substrate profiles and knowledge validation
 neural_validation = []                       # TRIBE v2 fMRI comparison: cortical activation maps, Glasser parcellation, HRF
+synthesis-trait = []                         # Unified CodeSynthesisBackend trait for cross-backend code generation
 
 # full-databases removed: aggregate never referenced (enable individual features: qdrant, datalog, lance, duck)

@@ -36,9 +36,11 @@ pub struct CodeHDEncoder {
     role_vectors: HashMap<EntityKind, ContinuousHV>,
     /// Relation vectors: how things connect
     relation_vectors: HashMap<Relation, ContinuousHV>,
-    /// Position vectors for encoding sequence order
+    /// Position vectors for encoding sequence order (coarse + fine granularity)
     position_vectors: Vec<ContinuousHV>,
-    /// Maximum number of position vectors to pre-generate
+    /// Coarse (module-level) position vectors for hierarchical encoding
+    coarse_position_vectors: Vec<ContinuousHV>,
+    /// Maximum position vectors per level (coarse × fine = max entities)
     max_positions: usize,
 }
 
@@ -50,6 +52,7 @@ impl CodeHDEncoder {
             role_vectors: HashMap::new(),
             relation_vectors: HashMap::new(),
             position_vectors: Vec::new(),
+            coarse_position_vectors: Vec::new(),
             max_positions: 256,
         };
         encoder.init_role_vectors();
@@ -134,11 +137,22 @@ impl CodeHDEncoder {
         }
     }
 
-    /// Initialize position vectors for sequence encoding
+    /// Initialize position vectors for hierarchical sequence encoding.
+    ///
+    /// Two levels: coarse (module/group) and fine (entity within group).
+    /// Combined via binding: `pos(i) = coarse(i / 256) ⊗ fine(i % 256)`.
+    /// Effective capacity: 256 × 256 = 65,536 unique positions.
     fn init_position_vectors(&mut self) {
+        // Fine-grained positions (entity-level, 0..255)
         for i in 0..self.max_positions {
             let seed = (i as u64 + 1000) * 1_618_033_989;
             self.position_vectors
+                .push(ContinuousHV::random(self.dim, seed));
+        }
+        // Coarse positions (module/group-level, 0..255)
+        for i in 0..self.max_positions {
+            let seed = (i as u64 + 5000) * 2_718_281_829;
+            self.coarse_position_vectors
                 .push(ContinuousHV::random(self.dim, seed));
         }
     }
@@ -231,7 +245,7 @@ impl CodeHDEncoder {
             .map(|(i, child)| {
                 let child_hv = self.encode_entity(child);
                 let pos_hv = self.position_vector(i);
-                child_hv.bind(pos_hv)
+                child_hv.bind(&pos_hv)
             })
             .collect();
 
@@ -300,7 +314,7 @@ impl CodeHDEncoder {
                 };
                 // Bind with position to preserve order
                 let pos = self.position_vector(i);
-                entity_hv.bind(pos)
+                entity_hv.bind(&pos)
             })
             .collect();
 
@@ -377,9 +391,23 @@ impl CodeHDEncoder {
     // Helpers
     // ========================================================================
 
-    /// Get position vector at index (wraps around if exceeds max)
-    fn position_vector(&self, index: usize) -> &ContinuousHV {
-        &self.position_vectors[index % self.max_positions]
+    /// Get position vector at index using hierarchical encoding.
+    ///
+    /// For index < 256: returns the fine-grained position directly (backward compatible).
+    /// For index >= 256: composes coarse(index / 256) ⊗ fine(index % 256),
+    /// giving 65,536 unique positions without pre-allocating more vectors.
+    fn position_vector(&self, index: usize) -> std::borrow::Cow<'_, ContinuousHV> {
+        if index < self.max_positions {
+            // Fast path: direct lookup (backward compatible)
+            std::borrow::Cow::Borrowed(&self.position_vectors[index])
+        } else {
+            // Hierarchical: bind coarse and fine position vectors
+            let coarse_idx = (index / self.max_positions) % self.max_positions;
+            let fine_idx = index % self.max_positions;
+            let composed = self.coarse_position_vectors[coarse_idx]
+                .bind(&self.position_vectors[fine_idx]);
+            std::borrow::Cow::Owned(composed)
+        }
     }
 
     /// Get the role vector for an entity kind
@@ -552,6 +580,56 @@ mod tests {
         // Diff should be non-zero (something changed)
         let magnitude: f32 = diff_hv.values.iter().map(|v| v * v).sum::<f32>().sqrt();
         assert!(magnitude > 0.0);
+    }
+
+    #[test]
+    fn test_hierarchical_position_encoding() {
+        let encoder = CodeHDEncoder::new(512);
+
+        // Positions < 256 should return fine-grained directly (backward compat)
+        let pos_0 = encoder.position_vector(0);
+        let pos_100 = encoder.position_vector(100);
+        let pos_255 = encoder.position_vector(255);
+
+        // These should all be different
+        assert!(pos_0.similarity(&pos_100) < 0.5);
+        assert!(pos_0.similarity(&pos_255) < 0.5);
+
+        // Positions >= 256 should use hierarchical encoding
+        let pos_256 = encoder.position_vector(256);
+        let pos_300 = encoder.position_vector(300);
+        let pos_512 = encoder.position_vector(512);
+
+        // Hierarchical positions should be different from each other
+        assert!(pos_256.similarity(&pos_300) < 0.5);
+        assert!(pos_256.similarity(&pos_512) < 0.5);
+
+        // Hierarchical positions should be different from fine-grained
+        assert!(pos_0.similarity(&pos_256) < 0.5);
+
+        // Position 256 (coarse=1, fine=0) should differ from position 0 (fine=0 only)
+        // because the coarse vector binding changes the result
+        assert!(pos_0.similarity(&pos_256) < 0.9);
+    }
+
+    #[test]
+    fn test_large_module_position_uniqueness() {
+        let encoder = CodeHDEncoder::new(512);
+
+        // Verify positions across a 500-entity module remain distinguishable
+        let positions: Vec<_> = (0..500).map(|i| encoder.position_vector(i).into_owned()).collect();
+
+        // Sample pairs should have low similarity (high-D random vectors are quasi-orthogonal)
+        let sim_0_300 = positions[0].similarity(&positions[300]);
+        let sim_100_400 = positions[100].similarity(&positions[400]);
+        assert!(
+            sim_0_300.abs() < 0.3,
+            "Position 0 vs 300 too similar: {sim_0_300}"
+        );
+        assert!(
+            sim_100_400.abs() < 0.3,
+            "Position 100 vs 400 too similar: {sim_100_400}"
+        );
     }
 
     #[test]
