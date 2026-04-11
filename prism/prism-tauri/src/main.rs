@@ -155,11 +155,13 @@ fn main() {
         .setup(|app| {
             use tauri::Manager;
 
-            // Background: load the search index without blocking the UI
-            let state = app.state::<Mutex<PrismState>>().clone();
+            // Background: load the search index without blocking the UI.
+            // Use app.handle() which is 'static and cloneable.
+            let handle = app.handle().clone();
             std::thread::spawn(move || {
                 let engine = SearchEngine::with_core_claims();
                 let count = engine.claim_count();
+                let state = handle.state::<Mutex<PrismState>>();
                 if let Ok(mut s) = state.lock() {
                     s.search = engine;
                 }
