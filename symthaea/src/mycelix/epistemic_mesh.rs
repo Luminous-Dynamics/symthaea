@@ -22,7 +22,7 @@ use super::gis::IgnoranceType;
 
 /// Escalation tier for proposals touching collective blind spots.
 ///
-/// Maps to `ConsciousnessTier` in mycelix-bridge-common when crossing
+/// Maps to `CivicTier` in mycelix-bridge-common when crossing
 /// the bridge boundary.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum EscalationTier {

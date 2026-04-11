@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Civic Bridge Coordinator Zome
+#![allow(deprecated)] // Uses legacy ConsciousnessCredential/Tier for fallback path
 //!
 //! Unified cross-domain dispatch for the Civic cluster.
 //! Provides three integration patterns:

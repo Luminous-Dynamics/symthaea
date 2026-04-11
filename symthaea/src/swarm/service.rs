@@ -453,7 +453,13 @@ impl NetworkService {
         estimate: &E,
         confidence: Option<f64>,
     ) -> PeerEstimate3D {
-        let peer_estimate = estimate.peer_estimate(self.local_navigation_peer_id(), confidence);
+        let peer_estimate = positioning::PeerEstimate3D {
+            peer_id: self.local_navigation_peer_id().to_string(),
+            estimate: estimate.clone(),
+            trust_weight: 1.0,
+            timestamp_us: 0,
+            confidence: confidence.unwrap_or(1.0),
+        };
         self.publish_local_navigation(peer_estimate.estimate.clone());
         peer_estimate
     }

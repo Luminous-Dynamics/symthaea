@@ -16,7 +16,7 @@
 //!   byzantine-fl        Poisoned gradients → TrimmedMean filters them
 //!   emergency-abuse     4th emergency blocked by MAX_EMERGENCY_SESSIONS
 
-use mycelix_bridge_common::{ConsciousnessProfile, ConsciousnessTier};
+use mycelix_bridge_common::{ConsciousnessProfile, CivicTier};
 use mycelix_bridge_common::consciousness_thresholds::ConsciousnessThresholds;
 use mycelix_fl::defenses::{Defense, TrimmedMean};
 use mycelix_fl::types::{DefenseConfig, Gradient};
@@ -124,19 +124,19 @@ fn assert_anti_tyranny_invariants(gov: &WorldGovernance) -> Result<(), String> {
 fn scenario_tier_boundaries(_seed: u64, _ticks: u32) -> Result<(), String> {
     // Verify canonical tier boundaries (the 0.2→0.3 bug that motivated this work)
     let tests = [
-        (0.0, ConsciousnessTier::Observer),
-        (0.29, ConsciousnessTier::Observer),
-        (0.30, ConsciousnessTier::Participant),
-        (0.39, ConsciousnessTier::Participant),
-        (0.40, ConsciousnessTier::Citizen),
-        (0.59, ConsciousnessTier::Citizen),
-        (0.60, ConsciousnessTier::Steward),
-        (0.79, ConsciousnessTier::Steward),
-        (0.80, ConsciousnessTier::Guardian),
-        (1.0, ConsciousnessTier::Guardian),
+        (0.0, CivicTier::Observer),
+        (0.29, CivicTier::Observer),
+        (0.30, CivicTier::Participant),
+        (0.39, CivicTier::Participant),
+        (0.40, CivicTier::Citizen),
+        (0.59, CivicTier::Citizen),
+        (0.60, CivicTier::Steward),
+        (0.79, CivicTier::Steward),
+        (0.80, CivicTier::Guardian),
+        (1.0, CivicTier::Guardian),
     ];
     for (score, expected) in &tests {
-        let actual = ConsciousnessTier::from_score(*score);
+        let actual = CivicTier::from_score(*score);
         if actual != *expected {
             return Err(format!(
                 "score={}: expected {:?}, got {:?}",

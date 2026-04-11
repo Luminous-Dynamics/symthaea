@@ -81,8 +81,8 @@ impl DomainModule for TemplateDomain {
         ]
     }
 
-    fn min_tier(&self) -> ConsciousnessTier {
-        ConsciousnessTier::Participant
+    fn min_tier(&self) -> CivicTier {
+        CivicTier::Participant
     }
 
     fn key_context(&self) -> &'static [u8] {

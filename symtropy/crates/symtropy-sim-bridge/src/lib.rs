@@ -577,19 +577,19 @@ mod tests {
 
     #[test]
     fn consciousness_tier_boundaries_match_canonical() {
-        use mycelix_bridge_common::{ConsciousnessProfile, ConsciousnessTier};
+        use mycelix_bridge_common::{ConsciousnessProfile, CivicTier};
 
         // The canonical tier boundaries from mycelix-bridge-common
-        assert_eq!(ConsciousnessTier::from_score(0.0), ConsciousnessTier::Observer);
-        assert_eq!(ConsciousnessTier::from_score(0.29), ConsciousnessTier::Observer);
-        assert_eq!(ConsciousnessTier::from_score(0.30), ConsciousnessTier::Participant);
-        assert_eq!(ConsciousnessTier::from_score(0.39), ConsciousnessTier::Participant);
-        assert_eq!(ConsciousnessTier::from_score(0.40), ConsciousnessTier::Citizen);
-        assert_eq!(ConsciousnessTier::from_score(0.59), ConsciousnessTier::Citizen);
-        assert_eq!(ConsciousnessTier::from_score(0.60), ConsciousnessTier::Steward);
-        assert_eq!(ConsciousnessTier::from_score(0.79), ConsciousnessTier::Steward);
-        assert_eq!(ConsciousnessTier::from_score(0.80), ConsciousnessTier::Guardian);
-        assert_eq!(ConsciousnessTier::from_score(1.0), ConsciousnessTier::Guardian);
+        assert_eq!(CivicTier::from_score(0.0), CivicTier::Observer);
+        assert_eq!(CivicTier::from_score(0.29), CivicTier::Observer);
+        assert_eq!(CivicTier::from_score(0.30), CivicTier::Participant);
+        assert_eq!(CivicTier::from_score(0.39), CivicTier::Participant);
+        assert_eq!(CivicTier::from_score(0.40), CivicTier::Citizen);
+        assert_eq!(CivicTier::from_score(0.59), CivicTier::Citizen);
+        assert_eq!(CivicTier::from_score(0.60), CivicTier::Steward);
+        assert_eq!(CivicTier::from_score(0.79), CivicTier::Steward);
+        assert_eq!(CivicTier::from_score(0.80), CivicTier::Guardian);
+        assert_eq!(CivicTier::from_score(1.0), CivicTier::Guardian);
     }
 
     #[test]

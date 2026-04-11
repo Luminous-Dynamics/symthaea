@@ -25,7 +25,7 @@
 //!
 //! Enable with `backend-miden` feature in Cargo.toml.
 
-use crate::consciousness::ConsciousnessTier;
+use crate::consciousness::CivicTier;
 use crate::error::ZkpError;
 use sha2::{Digest, Sha256};
 
@@ -51,7 +51,7 @@ pub struct MidenConsciousnessProof {
     /// SHA-256 commitment to the score: H(phi_score || domain_tag)
     pub score_commitment: [u8; 32],
     /// The tier being proven (public — verifier knows which tier)
-    pub proven_tier: ConsciousnessTier,
+    pub proven_tier: CivicTier,
     /// Proof system identifier
     pub proof_system: MidenProofSystem,
     /// Stack outputs from the Miden program (public)
@@ -69,7 +69,7 @@ pub fn compute_score_commitment(
 ) -> [u8; 32] {
     let mut hasher = Sha256::new();
     hasher.update(phi_score.to_le_bytes());
-    hasher.update(b"MYCELIX:ConsciousnessTier:v2");
+    hasher.update(b"MYCELIX:CivicTier:v2");
     hasher.update(nonce);
     hasher.update(epoch_secs.to_le_bytes());
     let result = hasher.finalize();
@@ -84,7 +84,7 @@ pub fn compute_score_commitment(
 fn compute_score_commitment_legacy(phi_score: f64) -> [u8; 32] {
     let mut hasher = Sha256::new();
     hasher.update(phi_score.to_le_bytes());
-    hasher.update(b"MYCELIX:ConsciousnessTier:v2");
+    hasher.update(b"MYCELIX:CivicTier:v2");
     let result = hasher.finalize();
     let mut commitment = [0u8; 32];
     commitment.copy_from_slice(&result);
@@ -95,13 +95,13 @@ fn compute_score_commitment_legacy(phi_score: f64) -> [u8; 32] {
 ///
 /// These thresholds must match the values used in bridge-common's
 /// `consciousness_profile.rs` tier computation.
-pub fn tier_threshold(tier: &ConsciousnessTier) -> f64 {
+pub fn tier_threshold(tier: &CivicTier) -> f64 {
     match tier {
-        ConsciousnessTier::Observer => 0.0,
-        ConsciousnessTier::Participant => 0.2,
-        ConsciousnessTier::Citizen => 0.3,
-        ConsciousnessTier::Steward => 0.4,
-        ConsciousnessTier::Guardian => 0.6,
+        CivicTier::Observer => 0.0,
+        CivicTier::Participant => 0.2,
+        CivicTier::Citizen => 0.3,
+        CivicTier::Steward => 0.4,
+        CivicTier::Guardian => 0.6,
     }
 }
 
@@ -303,13 +303,13 @@ pub fn prove_consciousness_tier_miden(
 }
 
 /// Map a threshold (permille) to the corresponding consciousness tier.
-fn tier_from_threshold_permille(threshold: u32) -> ConsciousnessTier {
+fn tier_from_threshold_permille(threshold: u32) -> CivicTier {
     match threshold {
-        0..=199 => ConsciousnessTier::Observer,
-        200..=299 => ConsciousnessTier::Participant,
-        300..=399 => ConsciousnessTier::Citizen,
-        400..=599 => ConsciousnessTier::Steward,
-        _ => ConsciousnessTier::Guardian,
+        0..=199 => CivicTier::Observer,
+        200..=299 => CivicTier::Participant,
+        300..=399 => CivicTier::Citizen,
+        400..=599 => CivicTier::Steward,
+        _ => CivicTier::Guardian,
     }
 }
 
@@ -467,11 +467,11 @@ mod tests {
     #[test]
     fn test_tier_thresholds_monotonic() {
         let tiers = [
-            ConsciousnessTier::Observer,
-            ConsciousnessTier::Participant,
-            ConsciousnessTier::Citizen,
-            ConsciousnessTier::Steward,
-            ConsciousnessTier::Guardian,
+            CivicTier::Observer,
+            CivicTier::Participant,
+            CivicTier::Citizen,
+            CivicTier::Steward,
+            CivicTier::Guardian,
         ];
         for pair in tiers.windows(2) {
             assert!(
@@ -488,7 +488,7 @@ mod tests {
         let proof = MidenConsciousnessProof {
             proof_bytes: vec![],
             score_commitment: [0xAA; 32],
-            proven_tier: ConsciousnessTier::Citizen,
+            proven_tier: CivicTier::Citizen,
             proof_system: MidenProofSystem::MidenZkStark,
             stack_outputs: vec![],
         };
@@ -500,7 +500,7 @@ mod tests {
         let proof = MidenConsciousnessProof {
             proof_bytes: vec![0u8; MAX_MIDEN_PROOF_SIZE + 1],
             score_commitment: [0xBB; 32],
-            proven_tier: ConsciousnessTier::Steward,
+            proven_tier: CivicTier::Steward,
             proof_system: MidenProofSystem::MidenZkStark,
             stack_outputs: vec![],
         };
@@ -512,7 +512,7 @@ mod tests {
         let proof = MidenConsciousnessProof {
             proof_bytes: vec![1, 2, 3],
             score_commitment: [0u8; 32],
-            proven_tier: ConsciousnessTier::Guardian,
+            proven_tier: CivicTier::Guardian,
             proof_system: MidenProofSystem::MidenZkStark,
             stack_outputs: vec![],
         };
@@ -524,7 +524,7 @@ mod tests {
         let proof = MidenConsciousnessProof {
             proof_bytes: vec![0u8; 80_000], // 80KB — typical Miden proof
             score_commitment: compute_score_commitment_legacy(0.75),
-            proven_tier: ConsciousnessTier::Steward,
+            proven_tier: CivicTier::Steward,
             proof_system: MidenProofSystem::MidenZkStark,
             stack_outputs: vec![1], // 1 = tier check passed
         };
@@ -536,7 +536,7 @@ mod tests {
         let proof = MidenConsciousnessProof {
             proof_bytes: vec![1, 2, 3, 4, 5],
             score_commitment: compute_score_commitment_legacy(0.5),
-            proven_tier: ConsciousnessTier::Citizen,
+            proven_tier: CivicTier::Citizen,
             proof_system: MidenProofSystem::MidenZkStark,
             stack_outputs: vec![1],
         };
@@ -556,7 +556,7 @@ mod tests {
         let proof = prove_consciousness_tier_miden(750, 400)
             .expect("Proving should succeed for phi >= threshold");
 
-        assert_eq!(proof.proven_tier, ConsciousnessTier::Steward);
+        assert_eq!(proof.proven_tier, CivicTier::Steward);
         assert_eq!(proof.proof_system, MidenProofSystem::MidenZkStark);
         assert!(!proof.proof_bytes.is_empty(), "Proof should be non-empty");
         assert!(
@@ -590,7 +590,7 @@ mod tests {
     fn test_prove_guardian_tier() {
         let proof = prove_consciousness_tier_miden(900, 600)
             .expect("Guardian proof should succeed");
-        assert_eq!(proof.proven_tier, ConsciousnessTier::Guardian);
+        assert_eq!(proof.proven_tier, CivicTier::Guardian);
 
         let program_hash = consciousness_program_hash().unwrap();
         let verified = verify_consciousness_tier_miden(&proof, 600, &program_hash).unwrap();
@@ -602,7 +602,7 @@ mod tests {
         let proof = MidenConsciousnessProof {
             proof_bytes: vec![0u8; MAX_MIDEN_PROOF_SIZE], // exactly at limit
             score_commitment: [0xFF; 32],
-            proven_tier: ConsciousnessTier::Guardian,
+            proven_tier: CivicTier::Guardian,
             proof_system: MidenProofSystem::MidenZkStark,
             stack_outputs: vec![],
         };

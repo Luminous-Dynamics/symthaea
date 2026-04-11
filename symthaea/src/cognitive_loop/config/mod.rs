@@ -958,7 +958,7 @@ impl CognitiveLoopConfig {
     ) -> Self {
         let capability = crate::domain::PlatformCapabilityProfile::for_platform(platform);
         let mut config = Self {
-            domain_profile: if capability.supports_domain(domain_profile.kind) {
+            domain_profile: if capability.supports_domain(&domain_profile.kind) {
                 domain_profile
             } else {
                 capability.preferred_domain_profile()

@@ -89,7 +89,7 @@ pub struct EntryTypeDeclaration {
 
 /// Consciousness tier required for a cluster.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
-pub enum ConsciousnessTier {
+pub enum CivicTier {
     Observer = 0,
     Participant = 1,
     Citizen = 2,
@@ -97,7 +97,7 @@ pub enum ConsciousnessTier {
     Guardian = 4,
 }
 
-impl ConsciousnessTier {
+impl CivicTier {
     pub fn label(&self) -> &'static str {
         match self {
             Self::Observer => "Observer",
@@ -127,7 +127,7 @@ pub struct ClusterManifest {
     /// Short description.
     pub description: String,
     /// Minimum consciousness tier to access.
-    pub min_tier: ConsciousnessTier,
+    pub min_tier: CivicTier,
     /// Holochain hApp role name.
     pub happ_role: String,
     /// Zome names in this cluster.
@@ -168,7 +168,7 @@ pub struct ExternalFrontendManifest {
     /// Glow/accent CSS color.
     pub color_glow: String,
     /// Minimum consciousness tier.
-    pub min_tier: ConsciousnessTier,
+    pub min_tier: CivicTier,
     /// URL where the frontend is hosted.
     pub frontend_url: String,
     /// Clusters this extension requires.
@@ -254,7 +254,7 @@ mod tests {
             bio_name: "Test".to_string(),
             version: "0.1.0".to_string(),
             description: "test cluster".to_string(),
-            min_tier: ConsciousnessTier::Participant,
+            min_tier: CivicTier::Participant,
             happ_role: id.to_string(),
             zomes: vec!["test_zome".to_string()],
             dependencies: deps,
@@ -268,10 +268,10 @@ mod tests {
 
     #[test]
     fn consciousness_tier_ordering() {
-        assert!(ConsciousnessTier::Observer < ConsciousnessTier::Participant);
-        assert!(ConsciousnessTier::Participant < ConsciousnessTier::Citizen);
-        assert!(ConsciousnessTier::Citizen < ConsciousnessTier::Steward);
-        assert!(ConsciousnessTier::Steward < ConsciousnessTier::Guardian);
+        assert!(CivicTier::Observer < CivicTier::Participant);
+        assert!(CivicTier::Participant < CivicTier::Citizen);
+        assert!(CivicTier::Citizen < CivicTier::Steward);
+        assert!(CivicTier::Steward < CivicTier::Guardian);
     }
 
     #[test]
@@ -342,7 +342,7 @@ mod tests {
             bio_name: "Cultivation".to_string(),
             color_primary: "#22C55E".to_string(),
             color_glow: "#86EFAC".to_string(),
-            min_tier: ConsciousnessTier::Participant,
+            min_tier: CivicTier::Participant,
             frontend_url: "https://garden.example.com".to_string(),
             required_clusters: vec!["commons".to_string()],
             optional_clusters: vec![],
@@ -352,7 +352,7 @@ mod tests {
         let json = serde_json::to_string(&ext).unwrap();
         let back: ExternalFrontendManifest = serde_json::from_str(&json).unwrap();
         assert_eq!(back.id, "garden");
-        assert_eq!(back.min_tier, ConsciousnessTier::Participant);
+        assert_eq!(back.min_tier, CivicTier::Participant);
     }
 
     #[test]

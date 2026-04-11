@@ -1418,8 +1418,8 @@ pub fn convert_navigation_estimate(
     SwarmEvent::PeerNavigationUpdate {
         peer_id: peer_id.to_string(),
         position_m: estimate.estimate.mean,
-        position_sigma_m: estimate.estimate.diagonal_sigma_m(),
-        confidence: estimate.confidence,
+        position_sigma_m: estimate.estimate.uncertainty(),
+        confidence: Some(estimate.confidence),
     }
 }
 

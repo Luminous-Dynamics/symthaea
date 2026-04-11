@@ -32,7 +32,7 @@ pub type EdunetEventEntry = BridgeEventEntry;
 
 /// Trust tier alias — maps to the shared consciousness tier system.
 /// Observer → Participant → Citizen → Steward → Guardian
-// Note: ConsciousnessTier lives in mycelix-bridge-common (coordinator dep).
+// Note: CivicTier lives in mycelix-bridge-common (coordinator dep).
 // Re-exported here as documentation; coordinator zome provides the runtime gating.
 pub type TrustTier = u8;
 

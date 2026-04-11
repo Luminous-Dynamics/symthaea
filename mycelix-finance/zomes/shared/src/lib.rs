@@ -1,3 +1,4 @@
+#![allow(deprecated)] // Uses legacy ConsciousnessCredential for backward-compat bridge
 #![deny(unsafe_code)]
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
@@ -1511,7 +1512,7 @@ mod tests {
             decay_reputation, evaluate_governance, requirement_for_basic,
             requirement_for_constitutional, requirement_for_guardian, requirement_for_proposal,
             requirement_for_voting, ConsciousnessCredential, ConsciousnessProfile,
-            ConsciousnessTier, GovernanceRequirement,
+            CivicTier, GovernanceRequirement,
         };
 
         // --- Tier thresholds from combined score ---
@@ -1525,7 +1526,7 @@ mod tests {
                 engagement: 0.1,
             };
             // combined = 0.1*0.25 + 0.1*0.25 + 0.1*0.30 + 0.1*0.20 = 0.10
-            assert_eq!(profile.tier(), ConsciousnessTier::Observer);
+            assert_eq!(profile.tier(), CivicTier::Observer);
         }
 
         #[test]
@@ -1538,7 +1539,7 @@ mod tests {
                 engagement: 0.3,
             };
             // combined = 0.3
-            assert_eq!(profile.tier(), ConsciousnessTier::Participant);
+            assert_eq!(profile.tier(), CivicTier::Participant);
         }
 
         #[test]
@@ -1549,7 +1550,7 @@ mod tests {
                 community: 0.4,
                 engagement: 0.4,
             };
-            assert_eq!(profile.tier(), ConsciousnessTier::Citizen);
+            assert_eq!(profile.tier(), CivicTier::Citizen);
         }
 
         #[test]
@@ -1560,7 +1561,7 @@ mod tests {
                 community: 0.6,
                 engagement: 0.6,
             };
-            assert_eq!(profile.tier(), ConsciousnessTier::Steward);
+            assert_eq!(profile.tier(), CivicTier::Steward);
         }
 
         #[test]
@@ -1571,18 +1572,18 @@ mod tests {
                 community: 0.8,
                 engagement: 0.8,
             };
-            assert_eq!(profile.tier(), ConsciousnessTier::Guardian);
+            assert_eq!(profile.tier(), CivicTier::Guardian);
         }
 
-        // --- ConsciousnessTier::min_score ---
+        // --- CivicTier::min_score ---
 
         #[test]
         fn test_tier_min_scores() {
-            assert!((ConsciousnessTier::Observer.min_score() - 0.0).abs() < f64::EPSILON);
-            assert!((ConsciousnessTier::Participant.min_score() - 0.3).abs() < f64::EPSILON);
-            assert!((ConsciousnessTier::Citizen.min_score() - 0.4).abs() < f64::EPSILON);
-            assert!((ConsciousnessTier::Steward.min_score() - 0.6).abs() < f64::EPSILON);
-            assert!((ConsciousnessTier::Guardian.min_score() - 0.8).abs() < f64::EPSILON);
+            assert!((CivicTier::Observer.min_score() - 0.0).abs() < f64::EPSILON);
+            assert!((CivicTier::Participant.min_score() - 0.3).abs() < f64::EPSILON);
+            assert!((CivicTier::Citizen.min_score() - 0.4).abs() < f64::EPSILON);
+            assert!((CivicTier::Steward.min_score() - 0.6).abs() < f64::EPSILON);
+            assert!((CivicTier::Guardian.min_score() - 0.8).abs() < f64::EPSILON);
         }
 
         // --- Combined score calculation ---
@@ -1625,11 +1626,11 @@ mod tests {
 
         #[test]
         fn test_vote_weight_bp_by_tier() {
-            assert_eq!(ConsciousnessTier::Observer.vote_weight_bp(), 0);
-            assert_eq!(ConsciousnessTier::Participant.vote_weight_bp(), 5000);
-            assert_eq!(ConsciousnessTier::Citizen.vote_weight_bp(), 7500);
-            assert_eq!(ConsciousnessTier::Steward.vote_weight_bp(), 10000);
-            assert_eq!(ConsciousnessTier::Guardian.vote_weight_bp(), 10000);
+            assert_eq!(CivicTier::Observer.vote_weight_bp(), 0);
+            assert_eq!(CivicTier::Participant.vote_weight_bp(), 5000);
+            assert_eq!(CivicTier::Citizen.vote_weight_bp(), 7500);
+            assert_eq!(CivicTier::Steward.vote_weight_bp(), 10000);
+            assert_eq!(CivicTier::Guardian.vote_weight_bp(), 10000);
         }
 
         #[test]
@@ -1672,23 +1673,23 @@ mod tests {
         #[test]
         fn test_governance_requirement_tiers() {
             let basic = civic_requirement_basic();
-            assert_eq!(basic.min_tier, ConsciousnessTier::Participant);
+            assert_eq!(basic.min_tier, CivicTier::Participant);
             assert!(basic.min_identity.is_none());
 
             let proposal = civic_requirement_proposal();
-            assert_eq!(proposal.min_tier, ConsciousnessTier::Participant);
+            assert_eq!(proposal.min_tier, CivicTier::Participant);
             assert_eq!(proposal.min_identity, Some(0.25));
 
             let voting = civic_requirement_voting();
-            assert_eq!(voting.min_tier, ConsciousnessTier::Citizen);
+            assert_eq!(voting.min_tier, CivicTier::Citizen);
 
             let constitutional = civic_requirement_constitutional();
-            assert_eq!(constitutional.min_tier, ConsciousnessTier::Steward);
+            assert_eq!(constitutional.min_tier, CivicTier::Steward);
             assert_eq!(constitutional.min_identity, Some(0.5));
             assert_eq!(constitutional.min_community, Some(0.3));
 
             let guardian = civic_requirement_guardian();
-            assert_eq!(guardian.min_tier, ConsciousnessTier::Guardian);
+            assert_eq!(guardian.min_tier, CivicTier::Guardian);
             assert_eq!(guardian.min_identity, Some(0.7));
             assert_eq!(guardian.min_community, Some(0.5));
         }
@@ -1707,17 +1708,17 @@ mod tests {
             assert_eq!(profile.combined_score(), 0.4);
 
             // Without hysteresis, from_score gives Citizen
-            assert_eq!(profile.tier(), ConsciousnessTier::Citizen);
+            assert_eq!(profile.tier(), CivicTier::Citizen);
 
             // With hysteresis, if currently Citizen, we stay Citizen (no demotion
             // because score is not below threshold - margin)
-            let tier = profile.tier_with_hysteresis(ConsciousnessTier::Citizen);
-            assert_eq!(tier, ConsciousnessTier::Citizen);
+            let tier = profile.tier_with_hysteresis(CivicTier::Citizen);
+            assert_eq!(tier, CivicTier::Citizen);
 
             // With hysteresis, if currently Participant, we stay Participant
             // (promotion requires threshold + margin = 0.45)
-            let tier = profile.tier_with_hysteresis(ConsciousnessTier::Participant);
-            assert_eq!(tier, ConsciousnessTier::Participant);
+            let tier = profile.tier_with_hysteresis(CivicTier::Participant);
+            assert_eq!(tier, CivicTier::Participant);
         }
 
         #[test]
@@ -1730,8 +1731,8 @@ mod tests {
                 engagement: 0.5,
             };
             // combined = 0.5, which is >= 0.45 (Citizen + margin)
-            let tier = profile.tier_with_hysteresis(ConsciousnessTier::Participant);
-            assert!(tier >= ConsciousnessTier::Citizen);
+            let tier = profile.tier_with_hysteresis(CivicTier::Participant);
+            assert!(tier >= CivicTier::Citizen);
         }
 
         // --- Profile validation ---
@@ -1799,7 +1800,7 @@ mod tests {
             assert_eq!(zero.community, 0.0);
             assert_eq!(zero.engagement, 0.0);
             assert!(zero.is_valid());
-            assert_eq!(zero.tier(), ConsciousnessTier::Observer);
+            assert_eq!(zero.tier(), CivicTier::Observer);
             assert_eq!(zero.combined_score(), 0.0);
         }
 
@@ -1907,17 +1908,17 @@ mod tests {
                 !result.eligible,
                 "Observer should be rejected for basic ops"
             );
-            assert_eq!(result.tier, ConsciousnessTier::Observer);
+            assert_eq!(result.tier, CivicTier::Observer);
         }
 
         // --- Tier ordering ---
 
         #[test]
         fn test_tier_ordering() {
-            assert!(ConsciousnessTier::Observer < ConsciousnessTier::Participant);
-            assert!(ConsciousnessTier::Participant < ConsciousnessTier::Citizen);
-            assert!(ConsciousnessTier::Citizen < ConsciousnessTier::Steward);
-            assert!(ConsciousnessTier::Steward < ConsciousnessTier::Guardian);
+            assert!(CivicTier::Observer < CivicTier::Participant);
+            assert!(CivicTier::Participant < CivicTier::Citizen);
+            assert!(CivicTier::Citizen < CivicTier::Steward);
+            assert!(CivicTier::Steward < CivicTier::Guardian);
         }
 
         // --- Tier degrade / upgrade ---
@@ -1925,36 +1926,36 @@ mod tests {
         #[test]
         fn test_tier_degrade() {
             assert_eq!(
-                ConsciousnessTier::Guardian.degrade(1),
-                ConsciousnessTier::Steward
+                CivicTier::Guardian.degrade(1),
+                CivicTier::Steward
             );
             assert_eq!(
-                ConsciousnessTier::Guardian.degrade(4),
-                ConsciousnessTier::Observer
+                CivicTier::Guardian.degrade(4),
+                CivicTier::Observer
             );
             assert_eq!(
-                ConsciousnessTier::Observer.degrade(1),
-                ConsciousnessTier::Observer
+                CivicTier::Observer.degrade(1),
+                CivicTier::Observer
             );
             assert_eq!(
-                ConsciousnessTier::Citizen.degrade(2),
-                ConsciousnessTier::Observer
+                CivicTier::Citizen.degrade(2),
+                CivicTier::Observer
             );
         }
 
         #[test]
         fn test_tier_upgrade_capped() {
             assert_eq!(
-                ConsciousnessTier::Observer.upgrade_capped(ConsciousnessTier::Guardian),
-                ConsciousnessTier::Participant
+                CivicTier::Observer.upgrade_capped(CivicTier::Guardian),
+                CivicTier::Participant
             );
             assert_eq!(
-                ConsciousnessTier::Steward.upgrade_capped(ConsciousnessTier::Steward),
-                ConsciousnessTier::Steward
+                CivicTier::Steward.upgrade_capped(CivicTier::Steward),
+                CivicTier::Steward
             );
             assert_eq!(
-                ConsciousnessTier::Observer.upgrade_capped(ConsciousnessTier::Participant),
-                ConsciousnessTier::Participant
+                CivicTier::Observer.upgrade_capped(CivicTier::Participant),
+                CivicTier::Participant
             );
         }
     }

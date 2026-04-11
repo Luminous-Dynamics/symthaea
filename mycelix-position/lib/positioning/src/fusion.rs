@@ -4,6 +4,12 @@
 
 use serde::{Deserialize, Serialize};
 
+/// Helper for accepting both scalar and array sigma.
+pub struct SigmaInput(pub [f64; 3]);
+impl From<[f64; 3]> for SigmaInput { fn from(v: [f64; 3]) -> Self { Self(v) } }
+impl From<f64> for SigmaInput { fn from(v: f64) -> Self { Self([v, v, v]) } }
+impl From<f32> for SigmaInput { fn from(v: f32) -> Self { Self([v as f64, v as f64, v as f64]) } }
+
 /// 3D Gaussian estimate with mean and covariance diagonal.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GaussianEstimate3D {
@@ -16,8 +22,9 @@ pub struct GaussianEstimate3D {
 
 impl GaussianEstimate3D {
     pub fn new(mean: [f64; 3], cov: [f64; 3]) -> Self { Self { mean, covariance_diag: cov, covariance: cov } }
-    pub fn from_diagonal_sigma(mean: [f64; 3], sigma: [f64; 3]) -> Self {
-        let c = [sigma[0]*sigma[0], sigma[1]*sigma[1], sigma[2]*sigma[2]];
+    pub fn from_diagonal_sigma(mean: [f64; 3], sigma: impl Into<SigmaInput>) -> Self {
+        let s: SigmaInput = sigma.into();
+        let c = [s.0[0]*s.0[0], s.0[1]*s.0[1], s.0[2]*s.0[2]];
         Self { mean, covariance_diag: c, covariance: c }
     }
     pub fn uncertainty(&self) -> f64 { (self.covariance_diag.iter().sum::<f64>() / 3.0).sqrt() }

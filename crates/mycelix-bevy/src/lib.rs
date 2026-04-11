@@ -35,7 +35,7 @@ use bevy_app::prelude::*;
 use bevy_color::Color;
 use bevy_ecs::prelude::*;
 use bevy_log::info;
-use mycelix_cluster_manifest::{BridgeDirection, ConsciousnessTier, DataSensitivity};
+use mycelix_cluster_manifest::{BridgeDirection, CivicTier, DataSensitivity};
 
 // ---------------------------------------------------------------------------
 // Plugin
@@ -76,7 +76,7 @@ pub struct ConsciousnessResource {
     /// Domain-specific engagement (0.0-1.0).
     pub engagement: f64,
     /// Derived trust tier.
-    pub tier: ConsciousnessTier,
+    pub tier: CivicTier,
 }
 
 impl Default for ConsciousnessResource {
@@ -86,7 +86,7 @@ impl Default for ConsciousnessResource {
             reputation: 0.0,
             community: 0.0,
             engagement: 0.0,
-            tier: ConsciousnessTier::Observer,
+            tier: CivicTier::Observer,
         }
     }
 }
@@ -102,20 +102,20 @@ impl ConsciousnessResource {
     pub fn recompute_tier(&mut self) {
         let score = self.combined_score();
         self.tier = if score >= 0.8 {
-            ConsciousnessTier::Guardian
+            CivicTier::Guardian
         } else if score >= 0.6 {
-            ConsciousnessTier::Steward
+            CivicTier::Steward
         } else if score >= 0.4 {
-            ConsciousnessTier::Citizen
+            CivicTier::Citizen
         } else if score >= 0.3 {
-            ConsciousnessTier::Participant
+            CivicTier::Participant
         } else {
-            ConsciousnessTier::Observer
+            CivicTier::Observer
         };
     }
 
     /// Check if the current tier meets a minimum requirement.
-    pub fn meets_tier(&self, required: ConsciousnessTier) -> bool {
+    pub fn meets_tier(&self, required: CivicTier) -> bool {
         self.tier >= required
     }
 }

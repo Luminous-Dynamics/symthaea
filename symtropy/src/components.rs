@@ -107,7 +107,7 @@ pub struct FusionCore {
 #[cfg(feature = "mycelix")]
 pub use mycelix_bridge_common::{
     ConsciousnessProfile as MycelixConsciousnessProfile,
-    ConsciousnessTier as MycelixTier,
+    CivicTier as MycelixTier,
     consciousness_thresholds::ConsciousnessThresholds,
 };
 #[cfg(feature = "mycelix")]

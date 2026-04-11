@@ -1,3 +1,4 @@
+#![allow(deprecated)] // Tests use legacy ConsciousnessCredential/Tier for backward-compat bridge testing
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
@@ -56,7 +57,7 @@ struct ConsciousnessProfile {
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq, PartialOrd, Ord)]
-enum ConsciousnessTier {
+enum CivicTier {
     Observer,
     Participant,
     Citizen,
@@ -68,7 +69,7 @@ enum ConsciousnessTier {
 struct ConsciousnessCredential {
     did: String,
     profile: ConsciousnessProfile,
-    tier: ConsciousnessTier,
+    tier: CivicTier,
     issued_at: u64,
     expires_at: u64,
     issuer: String,
@@ -283,7 +284,7 @@ async fn test_full_credential_flow() {
 
             // Whether this succeeds depends on the credential's tier.
             // With just DID + MFA, tier should be at least Participant.
-            if credential.tier >= ConsciousnessTier::Participant {
+            if credential.tier >= CivicTier::Participant {
                 assert!(
                     register_result.is_ok(),
                     "Participant+ tier should pass proposal gate: {:?}",

@@ -1,3 +1,4 @@
+#![allow(deprecated)] // Tests use legacy ConsciousnessCredential/Tier for backward-compat bridge testing
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
@@ -307,7 +308,7 @@ struct ConsciousnessProfile {
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq, PartialOrd, Ord)]
-enum ConsciousnessTier {
+enum CivicTier {
     Observer,
     Participant,
     Citizen,
@@ -319,7 +320,7 @@ enum ConsciousnessTier {
 struct ConsciousnessCredential {
     did: String,
     profile: ConsciousnessProfile,
-    tier: ConsciousnessTier,
+    tier: CivicTier,
     issued_at: u64,
     expires_at: u64,
     issuer: String,
@@ -792,7 +793,7 @@ async fn test_consciousness_credential_happy_path() {
             .await;
 
         // If the credential has sufficient tier, registration should succeed
-        if credential.tier >= ConsciousnessTier::Participant {
+        if credential.tier >= CivicTier::Participant {
             assert!(
                 register_result.is_ok(),
                 "Property registration should succeed with {:?} tier credential: {:?}",
@@ -898,7 +899,7 @@ async fn test_consciousness_tier_escalation() {
             voted_at: Timestamp,
         }
 
-        if credential.tier == ConsciousnessTier::Observer {
+        if credential.tier == CivicTier::Observer {
             let vote = Vote {
                 proposal_hash: ActionHash::from_raw_36(vec![0xDD; 36]),
                 voter: AgentPubKey::from_raw_36(vec![0xEE; 36]),
@@ -922,7 +923,7 @@ async fn test_consciousness_tier_escalation() {
         }
 
         // Step 5: If tier is Participant or higher, basic proposals should work
-        if credential.tier >= ConsciousnessTier::Participant {
+        if credential.tier >= CivicTier::Participant {
             let property_input = RegisterPropertyInput {
                 name: "Tier Test Property".to_string(),
                 description: "Tests Participant tier access".to_string(),

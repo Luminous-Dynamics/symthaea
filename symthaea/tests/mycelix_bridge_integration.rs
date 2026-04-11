@@ -1,3 +1,4 @@
+#![allow(deprecated)] // Tests use legacy ConsciousnessCredential/Tier for backward-compat bridge testing
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
@@ -19,7 +20,7 @@ use mycelix_bridge_common::consciousness_profile::{
 use mycelix_bridge_common::consciousness_profile::{
     evaluate_governance, requirement_for_basic, requirement_for_constitutional,
     requirement_for_guardian, requirement_for_proposal, requirement_for_voting,
-    ConsciousnessCredential, ConsciousnessProfile, ConsciousnessTier, ReputationState,
+    ConsciousnessCredential, ConsciousnessProfile, CivicTier, ReputationState,
     REPUTATION_DECAY_PER_DAY,
 };
 
@@ -31,7 +32,7 @@ fn fresh_credential(profile: ConsciousnessProfile) -> ConsciousnessCredential {
     ConsciousnessCredential {
         did: "did:mycelix:test-agent".to_string(),
         profile,
-        tier: ConsciousnessTier::Observer, // tier is re-derived in evaluate_governance
+        tier: CivicTier::Observer, // tier is re-derived in evaluate_governance
         issued_at: NOW - 1_000_000,
         expires_at: NOW + 86_400_000_000, // +24h
         issuer: "did:mycelix:test-bridge".to_string(),
@@ -49,7 +50,7 @@ fn test_governance_thresholds_basic() {
     let req = requirement_for_basic();
     assert_eq!(
         req.min_tier,
-        ConsciousnessTier::Participant,
+        CivicTier::Participant,
         "Basic governance requires Participant tier"
     );
     assert!(
@@ -65,7 +66,7 @@ fn test_governance_thresholds_basic() {
 #[test]
 fn test_governance_thresholds_proposal() {
     let req = requirement_for_proposal();
-    assert_eq!(req.min_tier, ConsciousnessTier::Participant);
+    assert_eq!(req.min_tier, CivicTier::Participant);
     assert_eq!(
         req.min_identity,
         Some(0.25),
@@ -79,7 +80,7 @@ fn test_governance_thresholds_voting() {
     let req = requirement_for_voting();
     assert_eq!(
         req.min_tier,
-        ConsciousnessTier::Citizen,
+        CivicTier::Citizen,
         "Voting requires Citizen tier"
     );
     assert_eq!(req.min_identity, Some(0.25));
@@ -91,7 +92,7 @@ fn test_governance_thresholds_constitutional() {
     let req = requirement_for_constitutional();
     assert_eq!(
         req.min_tier,
-        ConsciousnessTier::Steward,
+        CivicTier::Steward,
         "Constitutional changes require Steward tier"
     );
     assert_eq!(
@@ -109,7 +110,7 @@ fn test_governance_thresholds_constitutional() {
 #[test]
 fn test_governance_thresholds_guardian() {
     let req = requirement_for_guardian();
-    assert_eq!(req.min_tier, ConsciousnessTier::Guardian);
+    assert_eq!(req.min_tier, CivicTier::Guardian);
     assert_eq!(req.min_identity, Some(0.7));
     assert_eq!(req.min_community, Some(0.5));
 }
@@ -122,52 +123,52 @@ fn test_governance_thresholds_guardian() {
 fn test_consciousness_tier_from_score() {
     // Observer: score < 0.3
     assert_eq!(
-        ConsciousnessTier::from_score(0.0),
-        ConsciousnessTier::Observer
+        CivicTier::from_score(0.0),
+        CivicTier::Observer
     );
     assert_eq!(
-        ConsciousnessTier::from_score(0.29),
-        ConsciousnessTier::Observer
+        CivicTier::from_score(0.29),
+        CivicTier::Observer
     );
 
     // Participant: 0.3 <= score < 0.4
     assert_eq!(
-        ConsciousnessTier::from_score(0.3),
-        ConsciousnessTier::Participant
+        CivicTier::from_score(0.3),
+        CivicTier::Participant
     );
     assert_eq!(
-        ConsciousnessTier::from_score(0.39),
-        ConsciousnessTier::Participant
+        CivicTier::from_score(0.39),
+        CivicTier::Participant
     );
 
     // Citizen: 0.4 <= score < 0.6
     assert_eq!(
-        ConsciousnessTier::from_score(0.4),
-        ConsciousnessTier::Citizen
+        CivicTier::from_score(0.4),
+        CivicTier::Citizen
     );
     assert_eq!(
-        ConsciousnessTier::from_score(0.59),
-        ConsciousnessTier::Citizen
+        CivicTier::from_score(0.59),
+        CivicTier::Citizen
     );
 
     // Steward: 0.6 <= score < 0.8
     assert_eq!(
-        ConsciousnessTier::from_score(0.6),
-        ConsciousnessTier::Steward
+        CivicTier::from_score(0.6),
+        CivicTier::Steward
     );
     assert_eq!(
-        ConsciousnessTier::from_score(0.79),
-        ConsciousnessTier::Steward
+        CivicTier::from_score(0.79),
+        CivicTier::Steward
     );
 
     // Guardian: score >= 0.8
     assert_eq!(
-        ConsciousnessTier::from_score(0.8),
-        ConsciousnessTier::Guardian
+        CivicTier::from_score(0.8),
+        CivicTier::Guardian
     );
     assert_eq!(
-        ConsciousnessTier::from_score(1.0),
-        ConsciousnessTier::Guardian
+        CivicTier::from_score(1.0),
+        CivicTier::Guardian
     );
 }
 
@@ -233,7 +234,7 @@ fn test_evaluate_governance_accepts_eligible() {
         "Eligible agent should have vote weight > 0"
     );
     assert!(
-        result.tier >= ConsciousnessTier::Participant,
+        result.tier >= CivicTier::Participant,
         "Tier should be at least Participant"
     );
 }
@@ -264,7 +265,7 @@ fn test_evaluate_governance_rejects_below_threshold() {
         result.weight_bp, 0,
         "Rejected agent should have zero vote weight"
     );
-    assert_eq!(result.tier, ConsciousnessTier::Observer);
+    assert_eq!(result.tier, CivicTier::Observer);
     assert!(
         !result.reasons.is_empty(),
         "Should provide rejection reason"
@@ -298,11 +299,11 @@ fn test_evaluate_governance_rejects_missing_identity() {
 #[test]
 fn test_tier_vote_weight_monotonic() {
     let tiers = [
-        ConsciousnessTier::Observer,
-        ConsciousnessTier::Participant,
-        ConsciousnessTier::Citizen,
-        ConsciousnessTier::Steward,
-        ConsciousnessTier::Guardian,
+        CivicTier::Observer,
+        CivicTier::Participant,
+        CivicTier::Citizen,
+        CivicTier::Steward,
+        CivicTier::Guardian,
     ];
 
     for window in tiers.windows(2) {
@@ -319,10 +320,10 @@ fn test_tier_vote_weight_monotonic() {
     }
 
     // Observer specifically has zero weight
-    assert_eq!(ConsciousnessTier::Observer.vote_weight_bp(), 0);
+    assert_eq!(CivicTier::Observer.vote_weight_bp(), 0);
     // Guardian and Steward both have max weight
-    assert_eq!(ConsciousnessTier::Guardian.vote_weight_bp(), 10000);
-    assert_eq!(ConsciousnessTier::Steward.vote_weight_bp(), 10000);
+    assert_eq!(CivicTier::Guardian.vote_weight_bp(), 10000);
+    assert_eq!(CivicTier::Steward.vote_weight_bp(), 10000);
 }
 
 // ============================================================================
@@ -384,7 +385,7 @@ fn test_from_unified_consciousness_bridge() {
     // Verify tier derivation
     let expected_combined = 0.25 * 0.8 + 0.25 * 0.6 + 0.30 * 0.9 + 0.20 * 0.72;
     let tier = profile.tier();
-    let expected_tier = ConsciousnessTier::from_score(expected_combined);
+    let expected_tier = CivicTier::from_score(expected_combined);
     assert_eq!(tier, expected_tier);
 }
 

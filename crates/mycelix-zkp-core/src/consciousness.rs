@@ -34,7 +34,7 @@ pub mod thresholds {
 
 /// Consciousness tier names for human-readable output.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub enum ConsciousnessTier {
+pub enum CivicTier {
     Observer,    // < 0.2
     Participant, // >= 0.2
     Citizen,     // >= 0.3
@@ -42,15 +42,15 @@ pub enum ConsciousnessTier {
     Guardian,    // >= 0.6
 }
 
-impl ConsciousnessTier {
+impl CivicTier {
     /// Minimum Φ threshold for this tier.
     pub fn min_phi(&self) -> f64 {
         match self {
-            ConsciousnessTier::Observer => 0.0,
-            ConsciousnessTier::Participant => thresholds::BASIC,
-            ConsciousnessTier::Citizen => thresholds::PROPOSAL,
-            ConsciousnessTier::Steward => thresholds::VOTING,
-            ConsciousnessTier::Guardian => thresholds::CONSTITUTIONAL,
+            CivicTier::Observer => 0.0,
+            CivicTier::Participant => thresholds::BASIC,
+            CivicTier::Citizen => thresholds::PROPOSAL,
+            CivicTier::Steward => thresholds::VOTING,
+            CivicTier::Guardian => thresholds::CONSTITUTIONAL,
         }
     }
 
@@ -67,7 +67,7 @@ pub struct ConsciousnessProofRequest {
     /// The actual consciousness score (private — never revealed).
     pub phi_score: f64,
     /// The tier to prove eligibility for (public).
-    pub required_tier: ConsciousnessTier,
+    pub required_tier: CivicTier,
     /// Agent DID (for commitment binding).
     pub agent_did: String,
     /// Random nonce for replay prevention (32 bytes).
@@ -90,7 +90,7 @@ pub struct ConsciousnessProofResult {
     /// Binds: agent_did + score + domain_tag + nonce + epoch_secs.
     pub score_commitment: [u8; 32],
     /// Which tier was proven.
-    pub proven_tier: ConsciousnessTier,
+    pub proven_tier: CivicTier,
     /// Domain tag.
     pub domain_tag: String,
     /// Whether the proof was generated (false if score < threshold).
@@ -180,7 +180,7 @@ pub fn prove_consciousness_tier(
 #[cfg(feature = "backend-winterfell")]
 pub fn verify_consciousness_tier(
     proof_bytes: &[u8],
-    required_tier: &ConsciousnessTier,
+    required_tier: &CivicTier,
     score_commitment: &[u8; 32],
     proof_epoch_secs: u64,
     current_epoch_secs: u64,
@@ -242,7 +242,7 @@ mod tests {
     fn test_prove_voting_tier() {
         let request = ConsciousnessProofRequest {
             phi_score: 0.55, // Above voting threshold (0.4)
-            required_tier: ConsciousnessTier::Steward,
+            required_tier: CivicTier::Steward,
             agent_did: "did:mycelix:test_agent".to_string(),
             nonce: test_nonce(1),
             epoch_secs: test_epoch(),
@@ -263,7 +263,7 @@ mod tests {
         // Verify the proof (current time = same epoch)
         let valid = verify_consciousness_tier(
             &result.proof_bytes,
-            &ConsciousnessTier::Steward,
+            &CivicTier::Steward,
             &result.score_commitment,
             result.epoch_secs,
             test_epoch(),
@@ -277,7 +277,7 @@ mod tests {
     fn test_below_threshold_not_eligible() {
         let request = ConsciousnessProofRequest {
             phi_score: 0.15, // Below basic threshold (0.2)
-            required_tier: ConsciousnessTier::Participant,
+            required_tier: CivicTier::Participant,
             agent_did: "did:mycelix:low_phi".to_string(),
             nonce: test_nonce(2),
             epoch_secs: test_epoch(),
@@ -293,7 +293,7 @@ mod tests {
     fn test_constitutional_tier() {
         let request = ConsciousnessProofRequest {
             phi_score: 0.75, // Above constitutional threshold (0.6)
-            required_tier: ConsciousnessTier::Guardian,
+            required_tier: CivicTier::Guardian,
             agent_did: "did:mycelix:guardian".to_string(),
             nonce: test_nonce(3),
             epoch_secs: test_epoch(),
@@ -304,7 +304,7 @@ mod tests {
 
         let valid = verify_consciousness_tier(
             &result.proof_bytes,
-            &ConsciousnessTier::Guardian,
+            &CivicTier::Guardian,
             &result.score_commitment,
             result.epoch_secs,
             test_epoch(),
@@ -319,7 +319,7 @@ mod tests {
         // Prove Participant (0.2) but verify against Guardian (0.6)
         let request = ConsciousnessProofRequest {
             phi_score: 0.25,
-            required_tier: ConsciousnessTier::Participant,
+            required_tier: CivicTier::Participant,
             agent_did: "did:mycelix:participant".to_string(),
             nonce: test_nonce(4),
             epoch_secs: test_epoch(),
@@ -331,7 +331,7 @@ mod tests {
         // But verifying against Guardian should fail
         let valid = verify_consciousness_tier(
             &result.proof_bytes,
-            &ConsciousnessTier::Guardian,
+            &CivicTier::Guardian,
             &result.score_commitment,
             result.epoch_secs,
             test_epoch(),
@@ -345,14 +345,14 @@ mod tests {
     fn test_different_nonces_produce_different_commitments() {
         let req1 = ConsciousnessProofRequest {
             phi_score: 0.55,
-            required_tier: ConsciousnessTier::Steward,
+            required_tier: CivicTier::Steward,
             agent_did: "did:mycelix:same_agent".to_string(),
             nonce: test_nonce(10),
             epoch_secs: test_epoch(),
         };
         let req2 = ConsciousnessProofRequest {
             phi_score: 0.55,
-            required_tier: ConsciousnessTier::Steward,
+            required_tier: CivicTier::Steward,
             agent_did: "did:mycelix:same_agent".to_string(),
             nonce: test_nonce(11), // Different nonce
             epoch_secs: test_epoch(),
@@ -372,7 +372,7 @@ mod tests {
     fn test_expired_proof_rejected() {
         let request = ConsciousnessProofRequest {
             phi_score: 0.55,
-            required_tier: ConsciousnessTier::Steward,
+            required_tier: CivicTier::Steward,
             agent_did: "did:mycelix:test".to_string(),
             nonce: test_nonce(20),
             epoch_secs: test_epoch(),
@@ -385,7 +385,7 @@ mod tests {
         let stale_time = test_epoch() + PROOF_VALIDITY_SECS + 3600;
         let err = verify_consciousness_tier(
             &result.proof_bytes,
-            &ConsciousnessTier::Steward,
+            &CivicTier::Steward,
             &result.score_commitment,
             result.epoch_secs,
             stale_time,
@@ -398,7 +398,7 @@ mod tests {
     fn test_future_proof_rejected() {
         let request = ConsciousnessProofRequest {
             phi_score: 0.55,
-            required_tier: ConsciousnessTier::Steward,
+            required_tier: CivicTier::Steward,
             agent_did: "did:mycelix:test".to_string(),
             nonce: test_nonce(21),
             epoch_secs: test_epoch() + 600, // 10 minutes in the future
@@ -410,7 +410,7 @@ mod tests {
         // Verify with "current" time that is 10 minutes before the proof epoch
         let err = verify_consciousness_tier(
             &result.proof_bytes,
-            &ConsciousnessTier::Steward,
+            &CivicTier::Steward,
             &result.score_commitment,
             result.epoch_secs,
             test_epoch(), // 10 min before proof epoch
@@ -420,9 +420,9 @@ mod tests {
 
     #[test]
     fn test_tier_thresholds() {
-        assert_eq!(ConsciousnessTier::Participant.threshold_scaled(), 2000);
-        assert_eq!(ConsciousnessTier::Citizen.threshold_scaled(), 3000);
-        assert_eq!(ConsciousnessTier::Steward.threshold_scaled(), 4000);
-        assert_eq!(ConsciousnessTier::Guardian.threshold_scaled(), 6000);
+        assert_eq!(CivicTier::Participant.threshold_scaled(), 2000);
+        assert_eq!(CivicTier::Citizen.threshold_scaled(), 3000);
+        assert_eq!(CivicTier::Steward.threshold_scaled(), 4000);
+        assert_eq!(CivicTier::Guardian.threshold_scaled(), 6000);
     }
 }

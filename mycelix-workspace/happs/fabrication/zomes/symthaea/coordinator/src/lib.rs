@@ -1328,7 +1328,7 @@ fn extract_primary_category(bindings: &[SerializedBinding]) -> String {
 /// more creative/exploratory parametric generation; lower consciousness uses
 /// proven templates with tighter constraints.
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq)]
-pub enum ConsciousnessTier {
+pub enum CivicTier {
     /// Tier 0: Minimal awareness — strict templates only
     Reflexive,
     /// Tier 1: Pattern recognition — template + minor variations
@@ -1341,7 +1341,7 @@ pub enum ConsciousnessTier {
     Transcendent,
 }
 
-impl ConsciousnessTier {
+impl CivicTier {
     /// Classify a consciousness score [0.0, 1.0] into a tier
     pub fn from_score(score: f32) -> Self {
         match score {
@@ -1415,7 +1415,7 @@ pub struct ConsciousnessGatedParams {
 /// based on Symthaea's current consciousness state.
 fn consciousness_gated_params(consciousness_score: f32) -> ConsciousnessGatedParams {
     let score = consciousness_score.clamp(0.0, 1.0);
-    let tier = ConsciousnessTier::from_score(score);
+    let tier = CivicTier::from_score(score);
     ConsciousnessGatedParams {
         tier: format!("{:?}", tier),
         consciousness_score: score,
@@ -1423,7 +1423,7 @@ fn consciousness_gated_params(consciousness_score: f32) -> ConsciousnessGatedPar
         exploration_width: tier.exploration_width(),
         search_threshold: tier.search_threshold(),
         min_confidence: tier.min_confidence(),
-        creative_features_enabled: matches!(tier, ConsciousnessTier::Creative | ConsciousnessTier::Transcendent),
+        creative_features_enabled: matches!(tier, CivicTier::Creative | CivicTier::Transcendent),
     }
 }
 
@@ -1793,8 +1793,8 @@ mod tests {
 
     #[test]
     fn test_consciousness_tier_reflexive() {
-        let tier = ConsciousnessTier::from_score(0.1);
-        assert_eq!(tier, ConsciousnessTier::Reflexive);
+        let tier = CivicTier::from_score(0.1);
+        assert_eq!(tier, CivicTier::Reflexive);
         assert_eq!(tier.max_csg_depth(), 1);
         assert_eq!(tier.exploration_width(), 1);
         assert!(tier.search_threshold() > 0.85);
@@ -1802,8 +1802,8 @@ mod tests {
 
     #[test]
     fn test_consciousness_tier_creative() {
-        let tier = ConsciousnessTier::from_score(0.75);
-        assert_eq!(tier, ConsciousnessTier::Creative);
+        let tier = CivicTier::from_score(0.75);
+        assert_eq!(tier, CivicTier::Creative);
         assert_eq!(tier.max_csg_depth(), 8);
         assert_eq!(tier.exploration_width(), 8);
         assert!(tier.search_threshold() < 0.6);
@@ -1811,8 +1811,8 @@ mod tests {
 
     #[test]
     fn test_consciousness_tier_transcendent() {
-        let tier = ConsciousnessTier::from_score(0.95);
-        assert_eq!(tier, ConsciousnessTier::Transcendent);
+        let tier = CivicTier::from_score(0.95);
+        assert_eq!(tier, CivicTier::Transcendent);
         assert_eq!(tier.max_csg_depth(), 16);
         assert!(tier.min_confidence() < 0.2, "Transcendent should accept low confidence");
     }
@@ -1846,7 +1846,7 @@ mod tests {
         // As consciousness increases, exploration should increase
         let scores = [0.0, 0.2, 0.4, 0.6, 0.8, 1.0];
         let widths: Vec<usize> = scores.iter().map(|s| {
-            ConsciousnessTier::from_score(*s).exploration_width()
+            CivicTier::from_score(*s).exploration_width()
         }).collect();
         for w in widths.windows(2) {
             assert!(w[1] >= w[0], "exploration_width should be monotonically non-decreasing");

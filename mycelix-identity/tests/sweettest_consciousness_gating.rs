@@ -1,3 +1,4 @@
+#![allow(deprecated)] // Tests use legacy ConsciousnessCredential/Tier for backward-compat bridge testing
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
@@ -59,7 +60,7 @@ impl ConsciousnessProfile {
 }
 
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
-pub enum ConsciousnessTier {
+pub enum CivicTier {
     Observer,
     Participant,
     Citizen,
@@ -71,7 +72,7 @@ pub enum ConsciousnessTier {
 pub struct ConsciousnessCredential {
     pub did: String,
     pub profile: ConsciousnessProfile,
-    pub tier: ConsciousnessTier,
+    pub tier: CivicTier,
     pub issued_at: u64,
     pub expires_at: u64,
     pub issuer: String,
@@ -559,7 +560,7 @@ async fn test_fresh_did_gets_observer_tier() {
     // which maps to Observer tier
     assert_eq!(
         credential.tier,
-        ConsciousnessTier::Observer,
+        CivicTier::Observer,
         "Fresh DID with no identity data should be Observer tier"
     );
 
@@ -604,15 +605,15 @@ async fn test_tier_matches_combined_score() {
 
     let score = credential.profile.combined_score();
     let expected_tier = if score >= 0.8 {
-        ConsciousnessTier::Guardian
+        CivicTier::Guardian
     } else if score >= 0.6 {
-        ConsciousnessTier::Steward
+        CivicTier::Steward
     } else if score >= 0.4 {
-        ConsciousnessTier::Citizen
+        CivicTier::Citizen
     } else if score >= 0.3 {
-        ConsciousnessTier::Participant
+        CivicTier::Participant
     } else {
-        ConsciousnessTier::Observer
+        CivicTier::Observer
     };
 
     assert_eq!(

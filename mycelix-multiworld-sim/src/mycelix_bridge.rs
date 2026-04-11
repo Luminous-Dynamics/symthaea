@@ -12,9 +12,8 @@
 
 // Re-export the types the sim needs
 pub use mycelix_bridge_common::earth_colony_protocol::PlanetaryBody;
-pub use mycelix_bridge_common::consciousness_profile::{
-    ConsciousnessProfile,
-};
+pub use mycelix_bridge_common::consciousness_profile::ConsciousnessProfile;
+pub use mycelix_bridge_common::sovereign_gate::CivicTier;
 // consciousness_sync is behind the "federated" feature gate in bridge-common.
 // Stub types for downstream compatibility until federated module is restored.
 #[derive(Debug, Clone, Default)]

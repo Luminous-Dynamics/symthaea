@@ -45,7 +45,7 @@ pub mod types;
 
 // Re-exports
 pub use backend::ProofBackend;
-pub use consciousness::{ConsciousnessProofRequest, ConsciousnessProofResult, ConsciousnessTier};
+pub use consciousness::{ConsciousnessProofRequest, ConsciousnessProofResult, CivicTier};
 #[cfg(feature = "dilithium")]
 pub use dilithium::DilithiumKeypair;
 pub use domain::DomainTag;

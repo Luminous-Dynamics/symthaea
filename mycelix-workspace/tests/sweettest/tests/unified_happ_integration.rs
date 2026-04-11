@@ -1,3 +1,4 @@
+#![allow(deprecated)] // Tests use legacy ConsciousnessCredential/Tier for backward-compat bridge testing
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
@@ -240,7 +241,7 @@ async fn test_identity_resolution_available() {
 #[cfg(test)]
 mod pure_rust {
     use mycelix_bridge_common::consciousness_profile::{
-        ConsciousnessProfile, ConsciousnessTier, ReputationState,
+        ConsciousnessProfile, CivicTier, ReputationState,
         REPUTATION_BLACKLIST_THRESHOLD, REPUTATION_DECAY_PER_DAY,
         REPUTATION_RESTORATION_INTERACTIONS, REPUTATION_SLASH_FACTOR,
     };
@@ -328,14 +329,14 @@ mod pure_rust {
     fn test_consciousness_tier_progression_with_hysteresis() {
         // Progress through tiers: Observer → Participant → Citizen → Steward → Guardian
         let scores = [
-            (0.0, ConsciousnessTier::Observer),
-            (0.36, ConsciousnessTier::Participant),   // >= 0.3 + 0.05 margin for promote
-            (0.46, ConsciousnessTier::Citizen),        // >= 0.4 + 0.05 margin
-            (0.66, ConsciousnessTier::Steward),        // >= 0.6 + 0.05 margin
-            (0.86, ConsciousnessTier::Guardian),       // >= 0.8 + 0.05 margin
+            (0.0, CivicTier::Observer),
+            (0.36, CivicTier::Participant),   // >= 0.3 + 0.05 margin for promote
+            (0.46, CivicTier::Citizen),        // >= 0.4 + 0.05 margin
+            (0.66, CivicTier::Steward),        // >= 0.6 + 0.05 margin
+            (0.86, CivicTier::Guardian),       // >= 0.8 + 0.05 margin
         ];
 
-        let mut current_tier = ConsciousnessTier::Observer;
+        let mut current_tier = CivicTier::Observer;
         for (score, expected_tier) in &scores {
             // Build a profile where combined_score = score
             // combined = identity*0.25 + reputation*0.25 + community*0.30 + engagement*0.20
@@ -353,18 +354,18 @@ mod pure_rust {
                 score
             );
 
-            let tier = ConsciousnessTier::from_score(*score);
+            let tier = CivicTier::from_score(*score);
             // For non-hysteresis, check basic progression
             if *score >= 0.8 {
-                assert_eq!(tier, ConsciousnessTier::Guardian);
+                assert_eq!(tier, CivicTier::Guardian);
             } else if *score >= 0.6 {
-                assert_eq!(tier, ConsciousnessTier::Steward);
+                assert_eq!(tier, CivicTier::Steward);
             } else if *score >= 0.4 {
-                assert_eq!(tier, ConsciousnessTier::Citizen);
+                assert_eq!(tier, CivicTier::Citizen);
             } else if *score >= 0.3 {
-                assert_eq!(tier, ConsciousnessTier::Participant);
+                assert_eq!(tier, CivicTier::Participant);
             } else {
-                assert_eq!(tier, ConsciousnessTier::Observer);
+                assert_eq!(tier, CivicTier::Observer);
             }
 
             // With hysteresis, using previous tier as context
@@ -386,10 +387,10 @@ mod pure_rust {
             community: 0.37,
             engagement: 0.37,
         };
-        let tier = profile_boundary.tier_with_hysteresis(ConsciousnessTier::Citizen);
+        let tier = profile_boundary.tier_with_hysteresis(CivicTier::Citizen);
         assert_eq!(
             tier,
-            ConsciousnessTier::Citizen,
+            CivicTier::Citizen,
             "Score 0.37 should NOT cause demotion from Citizen (demote threshold is 0.35)"
         );
 
@@ -401,10 +402,10 @@ mod pure_rust {
             community: 0.57,
             engagement: 0.57,
         };
-        let tier = profile_steward.tier_with_hysteresis(ConsciousnessTier::Steward);
+        let tier = profile_steward.tier_with_hysteresis(CivicTier::Steward);
         assert_eq!(
             tier,
-            ConsciousnessTier::Steward,
+            CivicTier::Steward,
             "Score 0.57 should NOT cause demotion from Steward (demote threshold is 0.55)"
         );
 
@@ -416,10 +417,10 @@ mod pure_rust {
             community: 0.77,
             engagement: 0.77,
         };
-        let tier = profile_guardian.tier_with_hysteresis(ConsciousnessTier::Guardian);
+        let tier = profile_guardian.tier_with_hysteresis(CivicTier::Guardian);
         assert_eq!(
             tier,
-            ConsciousnessTier::Guardian,
+            CivicTier::Guardian,
             "Score 0.77 should NOT cause demotion from Guardian (demote threshold is 0.75)"
         );
     }

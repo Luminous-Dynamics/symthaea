@@ -1,3 +1,4 @@
+#![allow(deprecated)] // Tests use legacy ConsciousnessCredential/Tier for backward-compat bridge testing
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
@@ -119,7 +120,7 @@ impl ConsciousnessProfile {
 #[derive(
     Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash,
 )]
-enum ConsciousnessTier {
+enum CivicTier {
     Observer,
     Participant,
     Citizen,
@@ -127,7 +128,7 @@ enum ConsciousnessTier {
     Guardian,
 }
 
-impl ConsciousnessTier {
+impl CivicTier {
     fn from_score(score: f64) -> Self {
         if score >= 0.8 {
             Self::Guardian
@@ -147,7 +148,7 @@ impl ConsciousnessTier {
 struct ConsciousnessCredential {
     did: String,
     profile: ConsciousnessProfile,
-    tier: ConsciousnessTier,
+    tier: CivicTier,
     issued_at: u64,
     expires_at: u64,
     issuer: String,
@@ -161,7 +162,7 @@ struct ConsciousnessCredential {
 struct GovernanceEligibility {
     eligible: bool,
     weight_bp: u32,
-    tier: ConsciousnessTier,
+    tier: CivicTier,
     profile: ConsciousnessProfile,
     reasons: Vec<String>,
 }
@@ -362,7 +363,7 @@ fn make_bootstrap_credential(
             community: 0.0,
             engagement: 0.0,
         },
-        tier: ConsciousnessTier::Participant,
+        tier: CivicTier::Participant,
         issued_at: now_us,
         expires_at: now_us.saturating_add(BOOTSTRAP_TTL_US),
         issuer: "did:mycelix:bootstrap".to_string(),
@@ -373,13 +374,13 @@ fn make_bootstrap_credential(
 /// Bootstrap credentials are capped at Participant -- anything higher is rejected.
 fn evaluate_bootstrap_for_tier(
     cred: &ConsciousnessCredential,
-    required_tier: ConsciousnessTier,
+    required_tier: CivicTier,
     now_us: u64,
 ) -> bool {
     if is_expired(cred, now_us) {
         return false;
     }
-    if required_tier > ConsciousnessTier::Participant {
+    if required_tier > CivicTier::Participant {
         return false;
     }
     true
@@ -390,7 +391,7 @@ fn evaluate_bootstrap_for_tier(
 /// Strategy: always log rejections and high-tier actions; sample ~10%
 /// of basic/proposal approvals using action-salted hash of the agent key.
 fn should_audit_decision(
-    min_tier: ConsciousnessTier,
+    min_tier: CivicTier,
     eligible: bool,
     agent_hash: &[u8],
     action_name: &str,
@@ -399,8 +400,8 @@ fn should_audit_decision(
         return true;
     }
     match min_tier {
-        ConsciousnessTier::Steward | ConsciousnessTier::Guardian => true,
-        ConsciousnessTier::Citizen => true,
+        CivicTier::Steward | CivicTier::Guardian => true,
+        CivicTier::Citizen => true,
         _ => {
             let sample_byte = agent_hash.last().copied().unwrap_or(0);
             let salt: u8 = action_name
@@ -562,7 +563,7 @@ async fn test_credential_issuance_serialization_roundtrip() {
             }
 
             // Verify tier matches combined score
-            let expected_tier = ConsciousnessTier::from_score(p.combined_score());
+            let expected_tier = CivicTier::from_score(p.combined_score());
             assert_eq!(
                 credential.tier, expected_tier,
                 "Tier must match combined score {:.3}",
@@ -712,7 +713,7 @@ async fn test_cross_cluster_gate_sufficient_vs_insufficient() {
         .await;
 
     if let Ok(ref cred) = alice_credential {
-        if cred.tier >= ConsciousnessTier::Participant {
+        if cred.tier >= CivicTier::Participant {
             assert!(
                 alice_result.is_ok(),
                 "Alice (tier {:?}, score {:.3}) should pass Participant gate: {:?}",
@@ -847,7 +848,7 @@ async fn test_credential_expiry_and_grace_period() {
         );
 
         // -- Part C: Gated action succeeds with fresh credential --
-        if cred.tier >= ConsciousnessTier::Participant {
+        if cred.tier >= CivicTier::Participant {
             let property_input = RegisterPropertyInput {
                 name: "Expiry Test Property".to_string(),
                 description: "Should succeed with fresh credential".to_string(),
@@ -938,7 +939,7 @@ async fn test_bootstrap_credential_flow() {
 
     assert_eq!(
         cred.tier,
-        ConsciousnessTier::Participant,
+        CivicTier::Participant,
         "Bootstrap capped at Participant"
     );
     assert_eq!(
@@ -972,25 +973,25 @@ async fn test_bootstrap_credential_flow() {
 
     // Participant tier: should pass
     assert!(
-        evaluate_bootstrap_for_tier(&cred, ConsciousnessTier::Participant, now),
+        evaluate_bootstrap_for_tier(&cred, CivicTier::Participant, now),
         "Bootstrap should pass Participant gate"
     );
     assert!(
-        evaluate_bootstrap_for_tier(&cred, ConsciousnessTier::Observer, now),
+        evaluate_bootstrap_for_tier(&cred, CivicTier::Observer, now),
         "Bootstrap should pass Observer gate"
     );
 
     // Citizen and above: should fail (bootstrap capped at Participant)
     assert!(
-        !evaluate_bootstrap_for_tier(&cred, ConsciousnessTier::Citizen, now),
+        !evaluate_bootstrap_for_tier(&cred, CivicTier::Citizen, now),
         "Bootstrap should NOT pass Citizen (voting) gate"
     );
     assert!(
-        !evaluate_bootstrap_for_tier(&cred, ConsciousnessTier::Steward, now),
+        !evaluate_bootstrap_for_tier(&cred, CivicTier::Steward, now),
         "Bootstrap should NOT pass Steward (constitutional) gate"
     );
     assert!(
-        !evaluate_bootstrap_for_tier(&cred, ConsciousnessTier::Guardian, now),
+        !evaluate_bootstrap_for_tier(&cred, CivicTier::Guardian, now),
         "Bootstrap should NOT pass Guardian (emergency powers) gate"
     );
 
@@ -998,11 +999,11 @@ async fn test_bootstrap_credential_flow() {
 
     let after_expiry = now + BOOTSTRAP_TTL_US + 1;
     assert!(
-        !evaluate_bootstrap_for_tier(&cred, ConsciousnessTier::Participant, after_expiry),
+        !evaluate_bootstrap_for_tier(&cred, CivicTier::Participant, after_expiry),
         "Expired bootstrap credential should be rejected"
     );
     assert!(
-        !evaluate_bootstrap_for_tier(&cred, ConsciousnessTier::Observer, after_expiry),
+        !evaluate_bootstrap_for_tier(&cred, CivicTier::Observer, after_expiry),
         "Expired bootstrap should be rejected even for Observer"
     );
 
@@ -1036,11 +1037,11 @@ async fn test_audit_trail_gate_decisions() {
     // -- Part A: Rejections are ALWAYS audited, regardless of tier --
 
     for tier in [
-        ConsciousnessTier::Observer,
-        ConsciousnessTier::Participant,
-        ConsciousnessTier::Citizen,
-        ConsciousnessTier::Steward,
-        ConsciousnessTier::Guardian,
+        CivicTier::Observer,
+        CivicTier::Participant,
+        CivicTier::Citizen,
+        CivicTier::Steward,
+        CivicTier::Guardian,
     ] {
         assert!(
             should_audit_decision(tier.clone(), false, &agent_bytes, "any_action"),
@@ -1053,7 +1054,7 @@ async fn test_audit_trail_gate_decisions() {
 
     assert!(
         should_audit_decision(
-            ConsciousnessTier::Steward,
+            CivicTier::Steward,
             true,
             &agent_bytes,
             "amend_constitution"
@@ -1062,7 +1063,7 @@ async fn test_audit_trail_gate_decisions() {
     );
     assert!(
         should_audit_decision(
-            ConsciousnessTier::Guardian,
+            CivicTier::Guardian,
             true,
             &agent_bytes,
             "emergency_override"
@@ -1071,7 +1072,7 @@ async fn test_audit_trail_gate_decisions() {
     );
     assert!(
         should_audit_decision(
-            ConsciousnessTier::Citizen,
+            CivicTier::Citizen,
             true,
             &agent_bytes,
             "cast_vote"
@@ -1087,7 +1088,7 @@ async fn test_audit_trail_gate_decisions() {
         let mut test_bytes = agent_bytes.clone();
         *test_bytes.last_mut().unwrap() = last_byte;
         if should_audit_decision(
-            ConsciousnessTier::Participant,
+            CivicTier::Participant,
             true,
             &test_bytes,
             "register_property",
@@ -1095,7 +1096,7 @@ async fn test_audit_trail_gate_decisions() {
             participant_audited += 1;
         }
         if should_audit_decision(
-            ConsciousnessTier::Observer,
+            CivicTier::Observer,
             true,
             &test_bytes,
             "view_data",
@@ -1127,7 +1128,7 @@ async fn test_audit_trail_gate_decisions() {
         let mut test_bytes = agent_bytes.clone();
         *test_bytes.last_mut().unwrap() = last_byte;
         if should_audit_decision(
-            ConsciousnessTier::Participant,
+            CivicTier::Participant,
             true,
             &test_bytes,
             "action_alpha",
@@ -1135,7 +1136,7 @@ async fn test_audit_trail_gate_decisions() {
             set_a.insert(last_byte);
         }
         if should_audit_decision(
-            ConsciousnessTier::Participant,
+            CivicTier::Participant,
             true,
             &test_bytes,
             "action_beta",
