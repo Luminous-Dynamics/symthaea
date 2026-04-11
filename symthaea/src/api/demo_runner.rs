@@ -65,6 +65,29 @@ impl DemoRunner {
         self.vision_enabled = false;
     }
 
+    /// Enable Iroh P2P swarm and spawn inbound accept loop.
+    ///
+    /// Call this once after construction, before the demo router is built.
+    /// Silently degrades to local-only if attestation fails or the feature is disabled.
+    #[cfg(all(feature = "identity", feature = "swarm"))]
+    pub async fn enable_p2p(&mut self) {
+        match self.service.enable_network_attestation().await {
+            Ok(()) => {
+                tracing::info!("Demo: Iroh P2P swarm active");
+                if let Some(svc) = self.service.network_service().cloned() {
+                    let node_id = svc.node_id();
+                    if !node_id.is_empty() {
+                        tracing::info!("Demo: Iroh node ID (for peer bootstrap): {}", node_id);
+                    }
+                    tokio::spawn(svc.accept_connections());
+                }
+            }
+            Err(e) => {
+                tracing::warn!(error = %e, "Demo: P2P disabled — running local-only");
+            }
+        }
+    }
+
     /// Set the text input for the next cycle.
     pub fn set_input(&mut self, text: &str) {
         self.current_input = text.to_string();

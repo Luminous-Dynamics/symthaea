@@ -174,12 +174,23 @@ async fn main() -> Result<()> {
         match cls.enable_network_attestation().await {
             Ok(()) => {
                 info!("Iroh P2P swarm active — Ed25519 attestation enabled");
+                holon_http_state
+                    .iroh_active
+                    .store(true, std::sync::atomic::Ordering::Relaxed);
                 // Spawn the inbound connection accept loop.
                 // Peers who connect to us are registered and their SwarmEvents
                 // flow into the CLS via the NetworkServiceBridge spawned above.
                 if let Some(service) = cls.network_service().cloned() {
                     tokio::spawn(service.accept_connections());
                     info!("Iroh: inbound connection listener active");
+                    // Log node ID so other instances can bootstrap to us.
+                    let node_id = cls
+                        .network_service()
+                        .map(|s| s.node_id())
+                        .unwrap_or_default();
+                    if !node_id.is_empty() {
+                        info!("Iroh node ID (for peer bootstrap): {}", node_id);
+                    }
                 }
             }
             Err(e) => {
@@ -216,6 +227,46 @@ async fn main() -> Result<()> {
             }
         }
     });
+
+    // Wire mesh bridge: DualLayerMesh ↔ CognitivLoop via MeshBridgeHandle/Actor.
+    // Feature-gated: only compiled when the `mesh` feature is enabled.
+    // The actor runs as an async tokio task; the handle is passed to the blocking loop.
+    #[cfg(feature = "mesh")]
+    let (mut mesh_bridge_handle, mesh_outbound_rx) = {
+        use symthaea::swarm::mesh::bridge::MeshBridgeHandle;
+        use symthaea::swarm::mesh::{DualLayerMesh, MeshReceiver};
+
+        // Derive a stable node_id from our Iroh public key, or fall back to pid-seeded bytes.
+        let node_id_bytes: [u8; 32] = cls
+            .network_service()
+            .and_then(|svc| {
+                let hex = svc.node_id();
+                if hex.len() >= 64 {
+                    let mut bytes = [0u8; 32];
+                    for (i, b) in bytes.iter_mut().enumerate() {
+                        *b = u8::from_str_radix(&hex[i * 2..i * 2 + 2], 16).unwrap_or(0);
+                    }
+                    Some(bytes)
+                } else {
+                    None
+                }
+            })
+            .unwrap_or_else(|| {
+                let mut b = [0u8; 32];
+                let pid = std::process::id().to_le_bytes();
+                b[..4].copy_from_slice(&pid);
+                b
+            });
+
+        let (handle, actor) = MeshBridgeHandle::new(64, 128);
+        let mesh = DualLayerMesh::new(node_id_bytes);
+        let receiver = MeshReceiver::new();
+        tokio::spawn(actor.run(mesh, receiver));
+        info!("Mesh bridge active — MeshBridgeActor spawned");
+
+        let outbound_rx = cls.take_mesh_outbound_rx();
+        (handle, outbound_rx)
+    };
 
     // Run cognitive loop on a blocking thread (CLS is !Send due to internal state).
     info!(
@@ -308,6 +359,42 @@ async fn main() -> Result<()> {
                         text: format!("[{}] Response queued for device {}", task_type, device_id),
                     },
                 ]);
+            }
+
+            // Drain mesh bridge — forward CLS outbound packets and receive inbound wisdom.
+            #[cfg(feature = "mesh")]
+            {
+                use symthaea::cognitive_loop::managers::swarm_manager::SwarmEvent;
+
+                // Inbound: wisdom from mesh peers → SwarmEvent for the CLS.
+                let inbound = mesh_bridge_handle.drain_inbox();
+                if !inbound.is_empty() {
+                    let swarm_tx = cls.swarm_event_sender();
+                    for pkt in inbound {
+                        let peer_id = pkt
+                            .source_id
+                            .iter()
+                            .map(|b| format!("{:02x}", b))
+                            .collect::<String>();
+                        let _ = swarm_tx.send(SwarmEvent::ConsciousnessUpdate {
+                            peer_id,
+                            phi: pkt.phi as f64,
+                            valence: 0.0,
+                            arousal: 0.0,
+                        });
+                    }
+                }
+
+                // Outbound: CLS-generated mesh packets → bridge actor → radio.
+                if let Some(ref rx) = mesh_outbound_rx {
+                    let mut packets = Vec::new();
+                    while let Ok(pkt) = rx.try_recv() {
+                        packets.push(pkt);
+                    }
+                    if !packets.is_empty() {
+                        mesh_bridge_handle.flush_outbox(packets);
+                    }
+                }
             }
 
             cycle += 1;

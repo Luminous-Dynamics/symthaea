@@ -227,12 +227,13 @@ pub fn create_demo_router() -> Result<Router, Box<dyn std::error::Error>> {
     create_demo_router_with_config(ApiConfig::default())
 }
 
-/// Create a demo router with custom security configuration.
-pub fn create_demo_router_with_config(
+/// Internal router builder — accepts a pre-built, already-Arc-wrapped runner.
+/// Separated from `create_demo_router_with_config` so `serve_demo_with_config`
+/// can do async P2P init on the runner *before* it is wrapped in Mutex.
+fn build_demo_router(
+    runner: Arc<Mutex<demo_runner::DemoRunner>>,
     config: ApiConfig,
 ) -> Result<Router, Box<dyn std::error::Error>> {
-    let runner = demo_runner::DemoRunner::new()?;
-    let runner = Arc::new(Mutex::new(runner));
     let state = Arc::new(AppState::new_with_config(&config));
     let cors = build_cors_layer(&config);
 
@@ -289,6 +290,14 @@ pub fn create_demo_router_with_config(
     Ok(app)
 }
 
+/// Create a demo router with custom security configuration.
+pub fn create_demo_router_with_config(
+    config: ApiConfig,
+) -> Result<Router, Box<dyn std::error::Error>> {
+    let runner = Arc::new(Mutex::new(demo_runner::DemoRunner::new()?));
+    build_demo_router(runner, config)
+}
+
 /// Start the demo server with WebSocket and static file serving.
 pub async fn serve_demo(addr: &str) -> Result<(), Box<dyn std::error::Error>> {
     serve_demo_with_config(addr, ApiConfig::default()).await
@@ -299,7 +308,11 @@ pub async fn serve_demo_with_config(
     addr: &str,
     config: ApiConfig,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let app = create_demo_router_with_config(config)?;
+    // Build runner before wrapping so we can do async P2P init.
+    let mut runner = demo_runner::DemoRunner::new()?;
+    #[cfg(all(feature = "identity", feature = "swarm"))]
+    runner.enable_p2p().await;
+    let app = build_demo_router(Arc::new(Mutex::new(runner)), config)?;
     let listener = tokio::net::TcpListener::bind(addr).await?;
     println!("Symthaea Demo running at http://{}", addr);
     println!("  Live visualization: http://{}", addr);

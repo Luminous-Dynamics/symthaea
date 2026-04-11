@@ -1016,6 +1016,7 @@ impl NetworkService {
                 }
                 Err(e) => {
                     tracing::debug!(error = %e, "accept_connections: inbound connection error — continuing");
+                    tokio::time::sleep(std::time::Duration::from_millis(100)).await;
                     continue;
                 }
             };

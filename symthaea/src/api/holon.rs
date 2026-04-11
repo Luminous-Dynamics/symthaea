@@ -44,6 +44,8 @@ pub struct HolonHttpState {
     pub consciousness_level: std::sync::atomic::AtomicU32, // f32 bits
     /// Number of connected Soma peers.
     pub peer_count: std::sync::atomic::AtomicU32,
+    /// Whether Iroh P2P swarm is active (set to true after enable_network_attestation succeeds).
+    pub iroh_active: std::sync::atomic::AtomicBool,
     /// Latest collective QOL summary JSON (updated by consciousness loop).
     pub telemetry_json: std::sync::Mutex<String>,
 }
@@ -56,6 +58,7 @@ impl HolonHttpState {
             outbound: std::sync::Mutex::new(Vec::new()),
             consciousness_level: std::sync::atomic::AtomicU32::new(0.0f32.to_bits()),
             peer_count: std::sync::atomic::AtomicU32::new(0),
+            iroh_active: std::sync::atomic::AtomicBool::new(false),
             telemetry_json: std::sync::Mutex::new("{}".to_string()),
         }
     }
@@ -425,6 +428,9 @@ struct StatusResponse {
     consciousness: f32,
     has_tts: bool,
     has_broca: bool,
+    swarm_peers: u32,
+    iroh_active: bool,
+    federation_enabled: bool,
 }
 
 async fn holon_status(State(state): State<SharedHolonState>) -> Json<StatusResponse> {
@@ -433,6 +439,13 @@ async fn holon_status(State(state): State<SharedHolonState>) -> Json<StatusRespo
         consciousness: state.get_consciousness(),
         has_tts: cfg!(feature = "voice-tts"),
         has_broca: cfg!(feature = "ssm_language"),
+        swarm_peers: state
+            .peer_count
+            .load(std::sync::atomic::Ordering::Relaxed),
+        iroh_active: state
+            .iroh_active
+            .load(std::sync::atomic::Ordering::Relaxed),
+        federation_enabled: cfg!(feature = "swarm"),
     })
 }
 
