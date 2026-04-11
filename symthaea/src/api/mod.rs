@@ -39,7 +39,7 @@ use axum::{
     extract::{ws::WebSocketUpgrade, Request, State},
     http::{HeaderMap, Method, StatusCode},
     middleware,
-    response::Response,
+    response::{IntoResponse, Response},
     routing::{get, post},
     Router,
 };
@@ -260,6 +260,49 @@ fn build_demo_router(
         // Health
         .route("/health", get(handlers::health_check))
         .route("/v1/health", get(handlers::health_check));
+
+    // Iroh P2P ticket endpoint — returns JSON EndpointAddr for peer bootstrap.
+    // GET /v1/iroh/node-addr → {"node_id": "<hex>", "ticket": "<json-endpoint-addr>"}
+    let ticket_runner = runner.clone();
+    let app = app.route(
+        "/v1/iroh/node-addr",
+        get(move || {
+            let runner = ticket_runner.clone();
+            async move {
+                let guard = runner.lock().await;
+                let node_id = guard.iroh_node_id();
+                #[cfg(all(feature = "identity", feature = "swarm"))]
+                {
+                    match guard.iroh_ticket() {
+                        Some(Ok(ticket)) => (
+                            StatusCode::OK,
+                            axum::Json(serde_json::json!({
+                                "node_id": node_id,
+                                "ticket": ticket,
+                            })),
+                        )
+                            .into_response(),
+                        Some(Err(e)) => (StatusCode::INTERNAL_SERVER_ERROR, e).into_response(),
+                        None => (
+                            StatusCode::SERVICE_UNAVAILABLE,
+                            "P2P not initialised — start with swarm+identity features",
+                        )
+                            .into_response(),
+                    }
+                }
+                #[cfg(not(all(feature = "identity", feature = "swarm")))]
+                (
+                    StatusCode::NOT_IMPLEMENTED,
+                    axum::Json(serde_json::json!({
+                        "node_id": node_id,
+                        "ticket": null,
+                        "note": "swarm+identity features not enabled",
+                    })),
+                )
+                    .into_response()
+            }
+        }),
+    );
 
     // WebSocket route — captures the runner Arc (clone per-request for Fn trait)
     let ws_runner = runner.clone();

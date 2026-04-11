@@ -626,6 +626,7 @@ impl NetworkService {
                 .insert(peer_id.clone(), peer_info.clone());
             let peer_count = self.peers.read().len();
             self.stats.write().connected_peers = peer_count;
+            #[cfg(feature = "api_module")]
             crate::api::metrics::global()
                 .set_gauge("swarm_peers_connected", peer_count as f64);
 
@@ -1020,6 +1021,7 @@ impl NetworkService {
                 }
                 Err(e) => {
                     tracing::debug!(error = %e, "accept_connections: inbound connection error — continuing");
+                    #[cfg(feature = "api_module")]
                     crate::api::metrics::global().increment("iroh_handshakes_failed_total");
                     tokio::time::sleep(std::time::Duration::from_millis(100)).await;
                     continue;
@@ -1047,6 +1049,7 @@ impl NetworkService {
             self.peers.write().insert(peer_id.clone(), peer_info.clone());
             let peer_count = self.peers.read().len();
             self.stats.write().connected_peers = peer_count;
+            #[cfg(feature = "api_module")]
             crate::api::metrics::global()
                 .set_gauge("swarm_peers_connected", peer_count as f64);
 

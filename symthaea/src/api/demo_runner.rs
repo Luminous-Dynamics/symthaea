@@ -88,6 +88,26 @@ impl DemoRunner {
         }
     }
 
+    /// Return the Iroh node's JSON-serialised EndpointAddr ticket (for peer bootstrap).
+    ///
+    /// Returns `None` when the `swarm` + `identity` features are not enabled or P2P
+    /// has not been initialised. Returns `Some(Err(...))` if the node is initialised
+    /// but ticket creation fails (e.g. endpoint not yet bound).
+    #[cfg(all(feature = "identity", feature = "swarm"))]
+    pub fn iroh_ticket(&self) -> Option<Result<String, String>> {
+        self.service
+            .network_service()
+            .map(|svc| svc.create_ticket().map_err(|e| e.to_string()))
+    }
+
+    /// Node ID (hex-encoded EndpointId public key) — available without the full ticket.
+    pub fn iroh_node_id(&self) -> String {
+        self.service
+            .network_service()
+            .map(|svc| svc.node_id())
+            .unwrap_or_default()
+    }
+
     /// Set the text input for the next cycle.
     pub fn set_input(&mut self, text: &str) {
         self.current_input = text.to_string();
