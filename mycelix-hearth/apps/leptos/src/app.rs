@@ -63,6 +63,8 @@ fn AppInner() -> impl IntoView {
             <a href="#main-content" class="skip-to-content">"skip to content"</a>
             <Nav />
             <DevPanel />
+            // Ambient campfire — persistent warmth from the founding ceremony
+            <crate::components::HearthFlame mode=crate::components::FlameMode::Ambient />
             <main id="main-content" class="main-content heartbeat" role="main" aria-label="hearth content">
                 <Routes fallback=|| view! { <p class="not-found">"you’ve wandered off the path"</p> }>
                     <Route path=path!("/") view=HomePage />

@@ -12,6 +12,7 @@
 //! Campfire flames flicker in the background throughout.
 
 use leptos::prelude::*;
+use crate::components::{HearthFlame, FlameMode};
 
 /// Which stage of the founding ceremony we're in.
 #[derive(Clone, Copy, PartialEq)]
@@ -90,24 +91,7 @@ pub fn FoundingCeremony() -> impl IntoView {
     view! {
         <div class="founding-ceremony">
             // ── Campfire Flames Background ──
-            <div class="campfire-container" aria-hidden="true">
-                <div class="flame flame-1" />
-                <div class="flame flame-2" />
-                <div class="flame flame-3" />
-                <div class="flame flame-4" />
-                <div class="flame flame-5" />
-                <div class="ember-particles">
-                    <div class="ember e1" />
-                    <div class="ember e2" />
-                    <div class="ember e3" />
-                    <div class="ember e4" />
-                    <div class="ember e5" />
-                    <div class="ember e6" />
-                    <div class="ember e7" />
-                    <div class="ember e8" />
-                </div>
-                <div class="campfire-glow" />
-            </div>
+            <HearthFlame mode=FlameMode::Full />
 
             // ── Stage Content ──
             <div class="ceremony-content">
