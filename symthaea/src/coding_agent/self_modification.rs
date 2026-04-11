@@ -260,21 +260,22 @@ impl FixRuleGenerator {
                 cluster.successful_fixes += 1;
             }
 
-            // Track strategy success
+            // Track strategy success — compute count before mutable borrow
+            let strategy_count = cluster
+                .tried_strategies
+                .iter()
+                .filter(|(s, _)| s == fix_strategy)
+                .count() as f32;
+
             if let Some(entry) = cluster
                 .tried_strategies
                 .iter_mut()
                 .find(|(s, _)| s == fix_strategy)
             {
-                let count = cluster
-                    .tried_strategies
-                    .iter()
-                    .filter(|(s, _)| s == fix_strategy)
-                    .count() as f32;
                 entry.1 = if success {
-                    (entry.1 * count + 1.0) / (count + 1.0)
+                    (entry.1 * strategy_count + 1.0) / (strategy_count + 1.0)
                 } else {
-                    (entry.1 * count) / (count + 1.0)
+                    (entry.1 * strategy_count) / (strategy_count + 1.0)
                 };
             } else {
                 cluster.tried_strategies.push((
@@ -346,9 +347,10 @@ impl FixRuleGenerator {
             .collect();
 
         for cluster_idx in ready_clusters {
-            let cluster = &self.clusters[cluster_idx];
+            // Clone cluster data to avoid borrowing self.clusters while calling &mut self
+            let cluster = self.clusters[cluster_idx].clone();
 
-            if let Some(rule) = self.hypothesize_rule(cluster) {
+            if let Some(rule) = self.hypothesize_rule(&cluster) {
                 let rule_id = rule.id.clone();
                 self.events.push(RuleEvent::Generated {
                     rule_id: rule_id.clone(),
