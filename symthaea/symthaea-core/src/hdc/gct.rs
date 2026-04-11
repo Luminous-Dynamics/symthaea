@@ -435,6 +435,54 @@ pub fn sample_permanent_boundary(n: usize, n_samples: usize, seed: u64) -> Vec<V
     result
 }
 
+// ── Plethysm (correct GCT partition triples) ────────────────────────────────
+//
+// The GCT obstruction conjecture requires computing plethysm coefficients,
+// NOT same-weight LR coefficients. The relevant computation:
+//
+//   S^λ(S^μ(V)) = ⊕_ν a_{λ,μ}^ν · S^ν(V)
+//
+// where a_{λ,μ}^ν is the plethysm coefficient. These are MUCH harder than LR:
+// - No tableau-based combinatorial formula exists (unlike LR)
+// - Best known algorithms are recursive on the symmetric function ring
+// - Computational complexity is at least exponential in |λ|
+//
+// The correct GCT test: for the permanent perm_m (symmetric group S_m),
+// the relevant representation is the m-fold tensor product of the standard
+// representation, projected onto the symmetric/alternating parts.
+// The obstruction is: does the irrep V_λ appear in the coordinate ring
+// of the orbit closure of det_n but NOT in that of perm_m?
+//
+// Implementation roadmap:
+// 1. Implement symmetric function arithmetic (Schur basis)
+// 2. Implement plethysm via the recurrence: p_k ∘ s_μ = s_{μ expanded by k}
+// 3. Decompose plethysm results into Schur function coefficients
+// 4. Compare decompositions of perm_m and det_n orbit closures
+//
+// References:
+// - Loehr & Remmel (2011) — "A computational and combinatorial exposé of plethystic calculus"
+// - Bürgisser, Ikenmeyer & Panova (2019) — "No occurrence obstructions in geometric complexity theory"
+//   (shows that occurrence obstructions alone are insufficient — need MULTIPLICITY obstructions)
+//
+// Status: STUB — requires significant mathematical implementation
+
+/// Placeholder for plethysm coefficient computation.
+///
+/// Returns `None` until the symmetric function arithmetic is implemented.
+/// When complete, this will compute a_{λ,μ}^ν — the multiplicity of S^ν(V)
+/// in the plethysm S^λ(S^μ(V)).
+pub fn plethysm_coefficient(
+    _lambda: &[usize],
+    _mu: &[usize],
+    _nu: &[usize],
+) -> Option<u64> {
+    // TODO: Implement via symmetric function power-sum / Schur function conversion
+    // 1. Express s_μ in power-sum basis: s_μ = Σ χ^μ(ρ)/z_ρ · p_ρ
+    // 2. Apply plethysm: s_λ[s_μ] = s_λ[Σ ...] using the substitution rule
+    // 3. Re-expand in Schur basis to read off coefficient of s_ν
+    None
+}
+
 // ── HDC encoding of GCT objects ─────────────────────────────────────────────
 
 const HDC_DIM: usize = 256;
