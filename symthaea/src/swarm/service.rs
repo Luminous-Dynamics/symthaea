@@ -455,10 +455,10 @@ impl NetworkService {
     ) -> PeerEstimate3D {
         let peer_estimate = positioning::PeerEstimate3D {
             peer_id: self.local_navigation_peer_id().to_string(),
-            estimate: estimate.clone(),
+            estimate: estimate.estimate().clone(),
             trust_weight: 1.0,
-            timestamp_us: 0,
-            confidence: confidence.unwrap_or(1.0),
+            timestamp_us: estimate.timestamp_us(),
+            confidence: confidence.unwrap_or(estimate.confidence()),
         };
         self.publish_local_navigation(peer_estimate.estimate.clone());
         peer_estimate
@@ -502,33 +502,37 @@ impl NetworkService {
         estimate: &E,
         confidence: Option<f64>,
     ) {
-        self.receive_navigation_estimate(
-            peer_id,
-            estimate.peer_estimate(peer_id.to_string(), confidence),
-        );
+        let peer_est = positioning::PeerEstimate3D {
+            peer_id: peer_id.to_string(),
+            estimate: estimate.estimate().clone(),
+            trust_weight: 1.0,
+            timestamp_us: estimate.timestamp_us(),
+            confidence: confidence.unwrap_or(estimate.confidence()),
+        };
+        self.receive_navigation_estimate(peer_id, peer_est);
     }
 
     /// Build a conservative fused navigation estimate from local + peer states.
     pub fn fused_navigation_estimate(&self) -> Option<GaussianEstimate3D> {
-        let local = self.local_navigation.read().clone()?;
+        let _local = self.local_navigation.read().clone()?;
         let peers = self.peer_navigation.read();
-        let mut fusion = PeerFusion3D::new(local);
+        let mut fusion = PeerFusion3D::new(32);
         for peer in peers.values() {
             fusion.upsert_peer(peer.clone());
         }
-        Some(fusion.fused_estimate())
+        fusion.fused_estimate()
     }
 
     /// Snapshot current local, peer, and fused navigation state.
     pub fn navigation_state_snapshot(&self) -> NavigationStateSnapshot {
         let local = self.local_navigation.read().clone();
         let peers: Vec<PeerEstimate3D> = self.peer_navigation.read().values().cloned().collect();
-        let fused = if let Some(local_estimate) = local.clone() {
-            let mut fusion = PeerFusion3D::new(local_estimate);
+        let fused = if let Some(_local_estimate) = local.clone() {
+            let mut fusion = PeerFusion3D::new(32);
             for peer in &peers {
                 fusion.upsert_peer(peer.clone());
             }
-            Some(fusion.fused_estimate())
+            fusion.fused_estimate()
         } else {
             None
         };

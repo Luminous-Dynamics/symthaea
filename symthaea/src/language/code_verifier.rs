@@ -23,8 +23,47 @@ use symthaea_core::hdc::ContinuousHV;
 use super::code_parser::{CodeDiagnostic, DiagnosticSeverity, ParsedCode};
 use crate::hdc::code_encoder::CodeHDEncoder;
 
-/// Default similarity threshold for verification to pass
-const DEFAULT_VERIFICATION_THRESHOLD: f32 = 0.1;
+/// Default similarity threshold for verification to pass.
+///
+/// Previously 0.1 (accepted code with ~10% semantic similarity — far too permissive).
+/// Raised to 0.7 to ensure generated code meaningfully matches intent in HDC space.
+const DEFAULT_VERIFICATION_THRESHOLD: f32 = 0.7;
+
+/// Verification policy controlling how strictly generated code is judged.
+///
+/// Different contexts warrant different thresholds:
+/// - Standard: general code generation (0.7)
+/// - SafetyCritical: code with side effects, unsafe, or deployment targets (0.85)
+/// - Exploratory: creative/experimental generation where novelty is valued (0.5)
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum VerificationPolicy {
+    /// General-purpose verification (threshold: 0.7)
+    Standard,
+    /// Strict verification for safety-critical code (threshold: 0.85)
+    SafetyCritical,
+    /// Relaxed verification for exploratory/creative generation (threshold: 0.5)
+    Exploratory,
+    /// Custom threshold for specialized use cases
+    Custom(f32),
+}
+
+impl VerificationPolicy {
+    /// Get the similarity threshold for this policy
+    pub fn threshold(&self) -> f32 {
+        match self {
+            Self::Standard => 0.7,
+            Self::SafetyCritical => 0.85,
+            Self::Exploratory => 0.5,
+            Self::Custom(t) => *t,
+        }
+    }
+}
+
+impl Default for VerificationPolicy {
+    fn default() -> Self {
+        Self::Standard
+    }
+}
 
 /// Result of verifying generated code against intent
 #[derive(Debug, Clone)]
@@ -77,20 +116,36 @@ pub struct CodeVerifier {
     encoder: CodeHDEncoder,
     /// Minimum similarity for verification to pass
     threshold: f32,
+    /// Active verification policy
+    policy: VerificationPolicy,
 }
 
 impl CodeVerifier {
-    /// Create a new verifier with the given encoder
+    /// Create a new verifier with the given encoder (uses Standard policy, threshold 0.7)
     pub fn new(encoder: CodeHDEncoder) -> Self {
         Self {
             encoder,
             threshold: DEFAULT_VERIFICATION_THRESHOLD,
+            policy: VerificationPolicy::Standard,
         }
     }
 
-    /// Create with a custom threshold
+    /// Create with a specific verification policy
+    pub fn with_policy(encoder: CodeHDEncoder, policy: VerificationPolicy) -> Self {
+        Self {
+            encoder,
+            threshold: policy.threshold(),
+            policy,
+        }
+    }
+
+    /// Create with a custom threshold (legacy API — prefer `with_policy`)
     pub fn with_threshold(encoder: CodeHDEncoder, threshold: f32) -> Self {
-        Self { encoder, threshold }
+        Self {
+            encoder,
+            threshold,
+            policy: VerificationPolicy::Custom(threshold),
+        }
     }
 
     /// Get the current threshold
@@ -98,9 +153,21 @@ impl CodeVerifier {
         self.threshold
     }
 
+    /// Get the active verification policy
+    pub fn policy(&self) -> VerificationPolicy {
+        self.policy
+    }
+
     /// Set a new threshold
     pub fn set_threshold(&mut self, threshold: f32) {
         self.threshold = threshold;
+        self.policy = VerificationPolicy::Custom(threshold);
+    }
+
+    /// Set a new verification policy
+    pub fn set_policy(&mut self, policy: VerificationPolicy) {
+        self.policy = policy;
+        self.threshold = policy.threshold();
     }
 
     /// Verify that generated code matches intent in HDC space
@@ -309,6 +376,40 @@ mod tests {
 
         verifier.set_threshold(0.5);
         assert!((verifier.threshold() - 0.5).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_default_threshold_is_strict() {
+        // Verify we're using 0.7, not the old 0.1
+        assert!((DEFAULT_VERIFICATION_THRESHOLD - 0.7).abs() < 1e-6);
+        let verifier = CodeVerifier::new(CodeHDEncoder::new(512));
+        assert!((verifier.threshold() - 0.7).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_verification_policy_thresholds() {
+        assert!((VerificationPolicy::Standard.threshold() - 0.7).abs() < 1e-6);
+        assert!((VerificationPolicy::SafetyCritical.threshold() - 0.85).abs() < 1e-6);
+        assert!((VerificationPolicy::Exploratory.threshold() - 0.5).abs() < 1e-6);
+        assert!((VerificationPolicy::Custom(0.3).threshold() - 0.3).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_verifier_with_policy() {
+        let verifier =
+            CodeVerifier::with_policy(CodeHDEncoder::new(512), VerificationPolicy::SafetyCritical);
+        assert!((verifier.threshold() - 0.85).abs() < 1e-6);
+        assert_eq!(verifier.policy(), VerificationPolicy::SafetyCritical);
+    }
+
+    #[test]
+    fn test_set_policy_updates_threshold() {
+        let mut verifier = CodeVerifier::new(CodeHDEncoder::new(512));
+        assert!((verifier.threshold() - 0.7).abs() < 1e-6);
+
+        verifier.set_policy(VerificationPolicy::Exploratory);
+        assert!((verifier.threshold() - 0.5).abs() < 1e-6);
+        assert_eq!(verifier.policy(), VerificationPolicy::Exploratory);
     }
 
     #[test]
