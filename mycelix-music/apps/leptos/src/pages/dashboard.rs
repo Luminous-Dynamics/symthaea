@@ -3,7 +3,7 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 
 use leptos::prelude::*;
-use mycelix_leptos_core::StatCard;
+use mycelix_leptos_core::{StatCard, SovereignRadar, SovereignRadarSize};
 
 #[component]
 pub fn DashboardPage() -> impl IntoView {
@@ -34,6 +34,11 @@ pub fn DashboardPage() -> impl IntoView {
                     "Settlement batches aggregate your plays into a single on-chain transaction, "
                     "minimizing gas fees while ensuring you get paid for every play."
                 </p>
+            </section>
+
+            <section class="sovereign-section">
+                <h2>"Civic Profile"</h2>
+                <SovereignRadar size=SovereignRadarSize::Small />
             </section>
 
             <section class="verification-section">

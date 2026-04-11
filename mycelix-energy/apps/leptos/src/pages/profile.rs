@@ -3,6 +3,7 @@
 
 use leptos::prelude::*;
 use mycelix_leptos_core::consciousness::use_consciousness;
+use mycelix_leptos_core::SovereignRadar;
 use crate::context::use_energy_context;
 
 #[component]
@@ -19,13 +20,8 @@ pub fn ProfilePage() -> impl IntoView {
             <h1>"Energy Profile"</h1>
 
             <div class="profile-section">
-                <h2>"Consciousness"</h2>
-                <div class="dashboard-grid">
-                    <div class="dash-card">
-                        <span class="dash-label">"Tier"</span>
-                        <span class="dash-value">{move || consciousness.tier.get().label()}</span>
-                    </div>
-                </div>
+                <h2>"Sovereign Profile"</h2>
+                <SovereignRadar />
             </div>
 
             <div class="profile-section">

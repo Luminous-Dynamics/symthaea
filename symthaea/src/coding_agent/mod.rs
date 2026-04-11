@@ -45,6 +45,10 @@ mod geodesic_gate;
 pub mod magi_code_bridge;
 mod planning;
 mod prompts;
+/// Code self-modification — generates new auto-fix rules from error patterns.
+/// Closes the recursive self-improvement loop: observe failures → hypothesize
+/// fixes → validate → integrate → permanently improve.
+pub mod self_modification;
 /// Self-test generation — agent writes its own #[test] modules.
 pub mod test_generation;
 
