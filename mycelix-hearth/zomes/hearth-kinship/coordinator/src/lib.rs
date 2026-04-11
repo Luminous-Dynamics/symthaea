@@ -838,6 +838,18 @@ fn propose_auto_recovery(hearth_hash: &ActionHash) -> ExternResult<()> {
         });
     }
 
+    // Mark self-recovery as superseded by social recovery (best-effort).
+    // Self-recovery remains available as a fallback.
+    let agent = agent_info()?.agent_initial_pubkey;
+    let did = format!("did:mycelix:{}", agent);
+    let _ = call(
+        CallTargetCell::OtherRole(RoleName::from("identity")),
+        ZomeName::new("recovery"),
+        FunctionName::new("mark_self_recovery_superseded"),
+        None,
+        did,
+    );
+
     Ok(())
 }
 

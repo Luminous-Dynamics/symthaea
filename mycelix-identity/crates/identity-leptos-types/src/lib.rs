@@ -281,11 +281,108 @@ impl MfaStateView {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RecoveryConfigView {
     pub did: String,
+    #[serde(alias = "trustee_dids")]
     pub trustees: Vec<String>,
     pub threshold: u32,
     pub time_lock_secs: u64,
     pub active: bool,
     pub created: i64,
+}
+
+// =============================================================================
+// Progressive Recovery Types
+// =============================================================================
+
+/// Verification anchor type for the frontend.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum VerificationAnchorType {
+    Phone,
+    Email,
+    Passkey,
+    Device,
+    Biometric,
+}
+
+impl VerificationAnchorType {
+    pub fn label(&self) -> &'static str {
+        match self {
+            Self::Phone => "Phone Number",
+            Self::Email => "Email Address",
+            Self::Passkey => "Passkey",
+            Self::Device => "Device",
+            Self::Biometric => "Biometric",
+        }
+    }
+
+    pub fn icon(&self) -> &'static str {
+        match self {
+            Self::Phone => "\u{1F4F1}",
+            Self::Email => "\u{1F4E7}",
+            Self::Passkey => "\u{1F511}",
+            Self::Device => "\u{1F4BB}",
+            Self::Biometric => "\u{1F9EC}",
+        }
+    }
+}
+
+/// A verification anchor as displayed in the frontend.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VerificationAnchorView {
+    pub anchor_type: VerificationAnchorType,
+    pub enrolled_at: i64,
+    pub masked_identifier: String,
+}
+
+/// Self-recovery configuration for the frontend.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SelfRecoveryConfigView {
+    pub did: String,
+    pub anchors: Vec<VerificationAnchorView>,
+    pub anchor_threshold: u32,
+    pub time_lock_secs: u64,
+    pub active: bool,
+    pub superseded_by_social: bool,
+    pub created: i64,
+}
+
+/// Unified recovery strength indicator.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum RecoveryTier {
+    None,
+    Pending,
+    SelfRecovery { anchor_count: u32 },
+    SocialRecovery { trustee_count: u32, threshold: u32 },
+}
+
+impl RecoveryTier {
+    pub fn label(&self) -> &'static str {
+        match self {
+            Self::None => "Unprotected",
+            Self::Pending => "Setup Needed",
+            Self::SelfRecovery { .. } => "Self-Recovery",
+            Self::SocialRecovery { .. } => "Social Recovery",
+        }
+    }
+
+    pub fn strength(&self) -> f64 {
+        match self {
+            Self::None => 0.0,
+            Self::Pending => 0.15,
+            Self::SelfRecovery { anchor_count } => {
+                0.3 + (*anchor_count as f64 * 0.15).min(0.3)
+            }
+            Self::SocialRecovery { .. } => 0.9,
+        }
+    }
+
+    pub fn css_color(&self) -> &'static str {
+        match self {
+            Self::None => "#ff4444",
+            Self::Pending => "#ffaa44",
+            Self::SelfRecovery { .. } => "#44aaff",
+            Self::SocialRecovery { .. } => "#44ff88",
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
