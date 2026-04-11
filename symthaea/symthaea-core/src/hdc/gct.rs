@@ -283,8 +283,10 @@ pub fn check_obstruction_conjecture(perm_size: usize, det_size: usize) -> Obstru
     let mut obstructions_found = 0usize;
     let mut total_tested = 0usize;
 
-    // Enumerate small partition triples up to size perm_size
-    let max_n = perm_size.min(4); // keep tractable
+    // Enumerate small partition triples up to size perm_size.
+    // LR coefficient computation has a size guard (lambda.size() <= 6),
+    // so max_n=6 is safe. Beyond 6, the LR function returns 0 for all.
+    let max_n = perm_size.min(6); // keep tractable
     let partitions = enumerate_partitions(max_n);
 
     for lambda in &partitions {
