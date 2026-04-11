@@ -596,6 +596,14 @@ impl CognitiveLoopService {
                     };
                     self.muse_manager.inject_safety(safety_u8);
 
+                    // Inject aesthetic identity: long-term harmony bias from the
+                    // AestheticTracker into generation, so Symthaea develops a
+                    // signature sound over hundreds of compositions.
+                    #[cfg(feature = "creative")]
+                    if let Some(ref cm) = self.sensorimotor.motor_rendering.creative_manager {
+                        self.muse_manager.inject_harmony_bias(cm.harmony_bias());
+                    }
+
                     if self.muse_manager.should_run(cycle_num, urgency_u8) {
                         run_subsystem!(self.muse_manager, "muse_manager", snapshot);
                     }
@@ -1214,6 +1222,23 @@ impl CognitiveLoopService {
         // Swarm→Neuromod: peer connectivity → oxytocin, anomalies → NE
         // (Zak 2012, Arnsten 2009, Crockett 2009, Schultz 1997)
         self.apply_swarm_neuromod();
+
+        // Swarm→Exploration: peer mean phi modulates local curiosity drive.
+        // Low mesh phi → peers are struggling → increase exploration (diverge to find solutions).
+        // High mesh phi → collective coherence → deepen focus (converge on shared understanding).
+        // (Bak 1996 — SOC: systems at criticality explore more; Kauffman 1993 — fitness landscape search)
+        if let Some(svc) = self.network_service() {
+            let peer_count = svc.peer_count();
+            if peer_count > 0 {
+                let mean_phi = svc.network_mean_phi();
+                // Neutral point: 0.5 phi. Below → boost exploration, above → dampen.
+                let deviation = 0.5 - mean_phi; // positive when peers struggling
+                let exploration_delta = (deviation * 0.15).clamp(-0.05, 0.10) as f32;
+                if exploration_delta.abs() > 0.001 {
+                    self.adjust_exploration("swarm_peer_phi", exploration_delta);
+                }
+            }
+        }
 
         // Fabrication→Neuromod: Cincinnati anomaly → NE, print success → DA,
         // emergency → NE+5-HT, quality trend → 5-HT, PoGF → oxytocin
@@ -2032,8 +2057,46 @@ impl CognitiveLoopService {
                             None
                         }
                     }
-                    // Arithmetic, Unknown, and structured-input types (Logic, CSP, DE)
-                    // fall back to statistics when numbers are available
+                    MathProblemType::DifferentialEquation => {
+                        if numbers.len() >= 3 {
+                            // Interpret as: [t_start, t_end, y0_0, y0_1, ...]
+                            let t_start = numbers[0];
+                            let t_end = numbers[1];
+                            let y0 = &numbers[2..];
+                            Some(self.math_service.solve_ode(
+                                |_t, y| y.to_vec(), // identity RHS as fallback
+                                (t_start, t_end),
+                                y0,
+                                100,
+                            ))
+                        } else if !numbers.is_empty() {
+                            Some(self.math_service.compute_statistics(&numbers))
+                        } else {
+                            None
+                        }
+                    }
+                    MathProblemType::Logic => {
+                        // Route to tautology checker with a simple proposition
+                        // (structured logic queries need richer input parsing)
+                        if !numbers.is_empty() {
+                            Some(self.math_service.compute_statistics(&numbers))
+                        } else {
+                            None
+                        }
+                    }
+                    MathProblemType::ConstraintSatisfaction => {
+                        // CSP needs structured input (domains, constraints) — fall back
+                        // to statistics for now; full CSP routing needs text→CSP parser
+                        if !numbers.is_empty() {
+                            Some(self.math_service.compute_statistics(&numbers))
+                        } else {
+                            None
+                        }
+                    }
+                    MathProblemType::Chemistry => {
+                        Some(self.math_service.compute_chemistry(input))
+                    }
+                    // Arithmetic, Unknown — safe fallback to statistics
                     _ => {
                         if !numbers.is_empty() {
                             Some(self.math_service.compute_statistics(&numbers))
