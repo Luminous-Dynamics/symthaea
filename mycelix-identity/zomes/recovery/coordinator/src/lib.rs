@@ -1081,3 +1081,396 @@ pub fn get_trustee_responsibilities(trustee_did: String) -> ExternResult<Vec<Rec
 
     Ok(configs)
 }
+
+// =============================================================================
+// PROGRESSIVE RECOVERY — Self-Recovery Functions
+// =============================================================================
+
+/// Input for creating self-recovery config.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct CreateSelfRecoveryInput {
+    pub did: String,
+}
+
+/// Auto-create a self-recovery config for a new DID.
+///
+/// Called by `create_did()` — gives every user a recovery fallback from Day 0.
+/// Starts with zero anchors (user enrolls them progressively) and a conservative
+/// 7-day time lock.
+#[hdk_extern]
+pub fn create_self_recovery(input: CreateSelfRecoveryInput) -> ExternResult<Record> {
+    if !input.did.starts_with("did:mycelix:") {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Invalid DID format".into()
+        )));
+    }
+
+    let agent = agent_info()?.agent_initial_pubkey;
+    let now = sys_time()?;
+
+    let config = SelfRecoveryConfig {
+        did: input.did.clone(),
+        owner: agent,
+        anchors: vec![],
+        anchor_threshold: 1, // Will be meaningful once anchors are enrolled
+        time_lock: SELF_RECOVERY_DEFAULT_TIME_LOCK, // 7 days
+        active: true,
+        superseded_by_social: false,
+        created: now,
+        updated: now,
+    };
+
+    let action_hash = create_entry(&EntryTypes::SelfRecoveryConfig(config.clone()))?;
+    let did_hash = string_to_entry_hash(&input.did);
+    create_link(
+        did_hash,
+        action_hash.clone(),
+        LinkTypes::DidToSelfRecoveryConfig,
+        LinkTag::new("self_recovery"),
+    )?;
+
+    get(action_hash, GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Failed to get created self-recovery config".into()
+        )))
+}
+
+/// Input for adding a verification anchor.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct AddVerificationAnchorInput {
+    pub did: String,
+    pub anchor: VerificationAnchor,
+}
+
+/// Add a verification anchor to self-recovery config.
+///
+/// Called when a user verifies a phone number, email, passkey, or device.
+/// Updates the self-recovery time lock based on anchor count:
+/// - 1 anchor: 14 days
+/// - 2 anchors: 7 days
+/// - 3+ anchors: 72 hours (minimum)
+#[hdk_extern]
+pub fn add_verification_anchor(input: AddVerificationAnchorInput) -> ExternResult<Record> {
+    let did_hash = string_to_entry_hash(&input.did);
+    let links = get_links(
+        LinkQuery::try_new(did_hash, LinkTypes::DidToSelfRecoveryConfig)?,
+        GetStrategy::default(),
+    )?;
+
+    let link = links.first().ok_or(wasm_error!(WasmErrorInner::Guest(
+        "No self-recovery config found for this DID".into()
+    )))?;
+    let original_hash = ActionHash::try_from(link.target.clone())
+        .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
+
+    let record = get(original_hash.clone(), GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Self-recovery config record not found".into()
+        )))?;
+
+    let mut config: SelfRecoveryConfig = record
+        .entry()
+        .to_app_option()
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Failed to decode self-recovery config".into()
+        )))?;
+
+    // Verify caller is owner
+    let agent = agent_info()?.agent_initial_pubkey;
+    if config.owner != agent {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Only the DID owner can add verification anchors".into()
+        )));
+    }
+
+    // Add the anchor
+    config.anchors.push(input.anchor);
+    config.updated = sys_time()?;
+
+    // Adjust time lock based on anchor count (more anchors = shorter lock)
+    config.time_lock = match config.anchors.len() {
+        0 => SELF_RECOVERY_DEFAULT_TIME_LOCK,        // 7 days (shouldn't reach here)
+        1 => 14 * 24 * 3600,                          // 14 days
+        2 => SELF_RECOVERY_DEFAULT_TIME_LOCK,         // 7 days
+        _ => SELF_RECOVERY_MIN_TIME_LOCK,             // 72 hours
+    };
+
+    // Adjust threshold: require majority of anchors
+    config.anchor_threshold = ((config.anchors.len() as f64 * 0.5).ceil() as u32).max(1);
+
+    let new_hash = update_entry(original_hash, &config)?;
+    get(new_hash, GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Failed to get updated self-recovery config".into()
+        )))
+}
+
+/// Get self-recovery config for a DID.
+#[hdk_extern]
+pub fn get_self_recovery_config(did: String) -> ExternResult<Option<Record>> {
+    let did_hash = string_to_entry_hash(&did);
+    let links = get_links(
+        LinkQuery::try_new(did_hash, LinkTypes::DidToSelfRecoveryConfig)?,
+        GetStrategy::default(),
+    )?;
+
+    match links.first() {
+        Some(link) => {
+            let hash = ActionHash::try_from(link.target.clone())
+                .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
+            get(hash, GetOptions::default())
+        }
+        None => Ok(None),
+    }
+}
+
+/// Mark self-recovery as superseded by social recovery.
+///
+/// Called by the Hearth auto-recovery when social recovery is configured.
+/// Self-recovery remains available as a fallback.
+#[hdk_extern]
+pub fn mark_self_recovery_superseded(did: String) -> ExternResult<()> {
+    let did_hash = string_to_entry_hash(&did);
+    let links = get_links(
+        LinkQuery::try_new(did_hash, LinkTypes::DidToSelfRecoveryConfig)?,
+        GetStrategy::default(),
+    )?;
+
+    if let Some(link) = links.first() {
+        let hash = ActionHash::try_from(link.target.clone())
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
+
+        if let Some(record) = get(hash.clone(), GetOptions::default())? {
+            let mut config: SelfRecoveryConfig = record
+                .entry()
+                .to_app_option()
+                .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+                .ok_or(wasm_error!(WasmErrorInner::Guest(
+                    "Failed to decode config".into()
+                )))?;
+
+            config.superseded_by_social = true;
+            config.updated = sys_time()?;
+            update_entry(hash, &config)?;
+        }
+    }
+
+    Ok(())
+}
+
+/// Input for initiating self-recovery.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct InitiateSelfRecoveryInput {
+    pub did: String,
+    pub new_agent: AgentPubKey,
+    pub reason: String,
+    /// Initial verified anchor (must match one in the config)
+    pub initial_anchor: VerificationAnchor,
+}
+
+/// Initiate a self-recovery request.
+///
+/// Requires proving control of at least one verification anchor.
+/// The request enters a time-locked waiting period before it can execute.
+#[hdk_extern]
+pub fn initiate_self_recovery(input: InitiateSelfRecoveryInput) -> ExternResult<Record> {
+    // Fetch self-recovery config
+    let config_record = get_self_recovery_config(input.did.clone())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "No self-recovery config found".into()
+        )))?;
+
+    let config: SelfRecoveryConfig = config_record
+        .entry()
+        .to_app_option()
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Failed to decode config".into()
+        )))?;
+
+    if !config.active {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Self-recovery is not active for this DID".into()
+        )));
+    }
+
+    if config.anchors.is_empty() {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Cannot initiate self-recovery without enrolled verification anchors".into()
+        )));
+    }
+
+    // Verify the initial anchor matches one in the config
+    if !config.anchors.contains(&input.initial_anchor) {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Verification anchor does not match any enrolled anchor".into()
+        )));
+    }
+
+    let now = sys_time()?;
+    let request_id = format!(
+        "self-recovery-{}-{}",
+        input.did.chars().skip(12).take(8).collect::<String>(),
+        now.as_micros()
+    );
+
+    let request = SelfRecoveryRequest {
+        id: request_id,
+        did: input.did.clone(),
+        new_agent: input.new_agent,
+        verified_anchors: vec![input.initial_anchor],
+        status: RecoveryStatus::Pending,
+        created: now,
+        time_lock_expires: None, // Set when anchor threshold met
+        reason: input.reason,
+    };
+
+    let action_hash = create_entry(&EntryTypes::SelfRecoveryRequest(request))?;
+    let did_hash = string_to_entry_hash(&input.did);
+    create_link(
+        did_hash,
+        action_hash.clone(),
+        LinkTypes::DidToSelfRecoveryRequest,
+        LinkTag::new("self_recovery_request"),
+    )?;
+
+    get(action_hash, GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Failed to get created self-recovery request".into()
+        )))
+}
+
+/// Input for verifying an additional anchor during self-recovery.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct VerifySelfRecoveryAnchorInput {
+    pub request_action_hash: ActionHash,
+    pub anchor: VerificationAnchor,
+}
+
+/// Verify an additional anchor on an active self-recovery request.
+///
+/// When the anchor threshold is met, the request transitions to Approved
+/// and the time lock countdown begins.
+#[hdk_extern]
+pub fn verify_self_recovery_anchor(
+    input: VerifySelfRecoveryAnchorInput,
+) -> ExternResult<Record> {
+    let record = get(input.request_action_hash.clone(), GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Self-recovery request not found".into()
+        )))?;
+
+    let mut request: SelfRecoveryRequest = record
+        .entry()
+        .to_app_option()
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Failed to decode request".into()
+        )))?;
+
+    if request.status != RecoveryStatus::Pending {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Can only verify anchors on pending requests".into()
+        )));
+    }
+
+    // Get the config to check threshold
+    let config_record = get_self_recovery_config(request.did.clone())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Self-recovery config not found".into()
+        )))?;
+    let config: SelfRecoveryConfig = config_record
+        .entry()
+        .to_app_option()
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Failed to decode config".into()
+        )))?;
+
+    // Verify anchor matches config
+    if !config.anchors.contains(&input.anchor) {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Anchor does not match any enrolled anchor".into()
+        )));
+    }
+
+    // Don't double-count
+    if !request.verified_anchors.contains(&input.anchor) {
+        request.verified_anchors.push(input.anchor);
+    }
+
+    // Check if threshold met → transition to Approved
+    if request.verified_anchors.len() as u32 >= config.anchor_threshold {
+        request.status = RecoveryStatus::Approved;
+        let now = sys_time()?;
+        let expires = Timestamp::from_micros(
+            now.as_micros() + (config.time_lock as i64 * 1_000_000),
+        );
+        request.time_lock_expires = Some(expires);
+    }
+
+    let new_hash = update_entry(input.request_action_hash, &request)?;
+    get(new_hash, GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Failed to get updated request".into()
+        )))
+}
+
+/// Execute a self-recovery request after time lock expires.
+///
+/// Completes the identity rotation — same effect as social recovery execution.
+#[hdk_extern]
+pub fn execute_self_recovery(request_action_hash: ActionHash) -> ExternResult<Record> {
+    let record = get(request_action_hash.clone(), GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Self-recovery request not found".into()
+        )))?;
+
+    let mut request: SelfRecoveryRequest = record
+        .entry()
+        .to_app_option()
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Failed to decode request".into()
+        )))?;
+
+    // Must be Approved (time lock set)
+    if request.status != RecoveryStatus::Approved {
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Cannot execute self-recovery in {:?} status (must be Approved)",
+            request.status
+        ))));
+    }
+
+    // Check time lock has expired
+    let now = sys_time()?;
+    let expires = request.time_lock_expires.ok_or(wasm_error!(
+        WasmErrorInner::Guest("No time lock expiry set".into())
+    ))?;
+    if now < expires {
+        let remaining_secs = (expires.as_micros() - now.as_micros()) / 1_000_000;
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Time lock has not expired — {} seconds remaining",
+            remaining_secs
+        ))));
+    }
+
+    // Execute: mark as completed
+    request.status = RecoveryStatus::Completed;
+    let new_hash = update_entry(request_action_hash, &request)?;
+
+    // Cross-zome call to DID registry to rotate the key
+    let _ = call(
+        CallTargetCell::Local,
+        ZomeName::new("did_registry"),
+        FunctionName::new("claim_recovered_did"),
+        None,
+        request.did.clone(),
+    );
+
+    get(new_hash, GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Failed to get completed request".into()
+        )))
+}

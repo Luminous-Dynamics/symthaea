@@ -73,6 +73,38 @@ struct CreateMfaStateInput {
 
 /// Auto-create MFA state for a newly created DID
 /// This sets up the initial PrimaryKeyPair factor automatically
+/// Auto-create self-recovery config for a new DID (best-effort).
+///
+/// Unlike MFA (fail-closed), self-recovery creation is best-effort — a DID
+/// without recovery is better than no DID at all. The user can enroll
+/// verification anchors (phone, email, passkey) progressively.
+fn auto_create_self_recovery(did: &str) -> ExternResult<()> {
+    #[derive(Serialize, Deserialize, Debug)]
+    struct CreateSelfRecoveryInput {
+        did: String,
+    }
+    let input = CreateSelfRecoveryInput {
+        did: did.to_string(),
+    };
+    let response = call(
+        CallTargetCell::Local,
+        ZomeName::new("recovery"),
+        FunctionName::new("create_self_recovery"),
+        None,
+        input,
+    )?;
+    match response {
+        ZomeCallResponse::Ok(_) => {
+            debug!("Self-recovery auto-created for {}", did);
+            Ok(())
+        }
+        other => Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Self-recovery creation failed: {:?}",
+            other
+        )))),
+    }
+}
+
 fn auto_create_mfa_state(did: &str, agent_pub_key: &AgentPubKey) -> ExternResult<()> {
     // Create primary key hash from agent pub key
     // Using the agent's public key as the initial factor
@@ -232,6 +264,13 @@ pub fn create_did() -> ExternResult<Record> {
     // Auto-create MFA state for the new DID (fail-closed: MFA is required)
     // This registers the primary key pair as the initial authentication factor
     auto_create_mfa_state(&did_id, &agent_pub_key)?;
+
+    // Auto-create progressive self-recovery (best-effort: don't block DID creation)
+    // This gives every user a recovery fallback from Day 0, even before they
+    // join a Hearth or add social recovery guardians.
+    if let Err(e) = auto_create_self_recovery(&did_id) {
+        debug!("Self-recovery auto-creation failed (DID created without recovery): {:?}", e);
+    }
 
     // Broadcast DidCreated event to bridge for ecosystem-wide awareness
     let payload = serde_json::json!({
