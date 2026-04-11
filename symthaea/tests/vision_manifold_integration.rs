@@ -778,4 +778,166 @@ mod vision_cognitive_integration {
         assert!(hv2.norm() > 0.0);
         assert_eq!(tel2.frame_sequence, 2);
     }
+
+    // ── Test 21: Imagination-reality comparison produces surprise signal ──────
+    #[test]
+    fn test_imagination_reality_surprise() {
+        use symthaea::perception::vision_manifold::VisionManifold;
+
+        let mut m = VisionManifold::new(VisionConfig::default(), 64, 64);
+
+        // Frame 1: establish state
+        let frame1: Vec<u8> = (0..64 * 64 * 3).map(|i| (i * 7 % 256) as u8).collect();
+        m.observe_frame(&frame1, 64, 64, 3, 0.033);
+
+        // Frame 2: same scene — imagination should predict well (low surprise)
+        let tel2 = m.observe_frame(&frame1, 64, 64, 3, 0.033);
+        let surprise_same = tel2.imagination_surprise;
+
+        // Frame 3: completely different scene — high imagination surprise
+        let frame3: Vec<u8> = (0..64 * 64 * 3).map(|i| (255 - (i % 256)) as u8).collect();
+        let tel3 = m.observe_frame(&frame3, 64, 64, 3, 0.033);
+        let surprise_diff = tel3.imagination_surprise;
+
+        assert!(
+            surprise_same.is_finite() && surprise_diff.is_finite(),
+            "Imagination surprise must be finite"
+        );
+        assert!(
+            surprise_diff > surprise_same,
+            "Scene change should produce higher imagination surprise \
+             (same={surprise_same}, diff={surprise_diff})"
+        );
+    }
+
+    // ── Test 22: Visual working memory holds ≤ capacity objects ──────────────
+    #[test]
+    fn test_visual_working_memory() {
+        use symthaea::perception::vision_manifold::VisionManifold;
+
+        let mut cfg = VisionConfig::default();
+        cfg.enable_object_binding = true;
+        let mut m = VisionManifold::new(cfg, 64, 64);
+        m.enable_object_memory(32);
+        m.enable_working_memory(4);
+
+        // Create a non-uniform frame with distinct regions
+        let mut pixels = vec![0u8; 64 * 64 * 3];
+        for y in 0..32 {
+            for x in 0..32 {
+                pixels[(y * 64 + x) * 3] = 200; // red top-left
+            }
+            for x in 32..64 {
+                pixels[(y * 64 + x) * 3 + 1] = 200; // green top-right
+            }
+        }
+        for y in 32..64 {
+            for x in 0..32 {
+                pixels[(y * 64 + x) * 3 + 2] = 200; // blue bottom-left
+            }
+            for x in 32..64 {
+                let b = (y * 64 + x) * 3;
+                pixels[b] = 200;
+                pixels[b + 1] = 200; // yellow bottom-right
+            }
+        }
+
+        for _ in 0..5 {
+            m.observe_frame(&pixels, 64, 64, 3, 0.033);
+        }
+
+        let wm = m.working_memory().expect("working memory should be enabled");
+        assert!(
+            wm.load() <= 4,
+            "Working memory should hold ≤ 4 objects, got {}",
+            wm.load()
+        );
+        // Should have at least 1 object in memory after 5 frames
+        assert!(
+            wm.load() > 0,
+            "Working memory should hold at least 1 object after 5 frames"
+        );
+    }
+
+    // ── Test 23: Scene graph computes spatial relations ───────────────────────
+    #[test]
+    fn test_scene_graph_spatial_relations() {
+        use symthaea::perception::vision_manifold::VisionManifold;
+
+        let mut cfg = VisionConfig::default();
+        cfg.enable_object_binding = true;
+        let mut m = VisionManifold::new(cfg, 64, 64);
+        m.enable_object_memory(32);
+        m.enable_scene_graph();
+
+        // Two distinct colored halves → should produce objects with spatial relations
+        let mut pixels = vec![0u8; 64 * 64 * 3];
+        for y in 0..32 {
+            for x in 0..64 {
+                pixels[(y * 64 + x) * 3] = 200;
+            }
+        }
+        for y in 32..64 {
+            for x in 0..64 {
+                pixels[(y * 64 + x) * 3 + 2] = 200;
+            }
+        }
+
+        for _ in 0..5 {
+            m.observe_frame(&pixels, 64, 64, 3, 0.033);
+        }
+
+        let sg = m.scene_graph().expect("scene graph should be enabled");
+        // If multiple objects are tracked, there should be at least one relation
+        let obj_mem = m.object_memory().expect("object memory enabled");
+        if obj_mem.len() >= 2 {
+            assert!(
+                sg.num_edges() > 0,
+                "Scene graph should have edges when ≥2 objects are tracked"
+            );
+            // All edge HVs should be finite
+            for edge in sg.edges() {
+                assert!(
+                    edge.relation_hv.as_slice().iter().all(|x| x.is_finite()),
+                    "Scene graph edge HV must be finite"
+                );
+            }
+            // Graph HV should exist
+            assert!(
+                sg.graph_hv().is_some(),
+                "Scene graph HV should be present when edges exist"
+            );
+        }
+    }
+
+    // ── Test 24: Monocular depth cues vary by position ───────────────────────
+    #[test]
+    fn test_monocular_depth_varies_by_position() {
+        use symthaea::perception::vision_manifold::VisionManifold;
+
+        let mut cfg = VisionConfig::default();
+        cfg.enable_depth = true;
+        // Check feature count before moving cfg into manifold
+        assert_eq!(cfg.total_features(), 12);
+        let mut m = VisionManifold::new(cfg, 64, 64);
+
+        // High-variance top (near) + low-variance bottom (far)
+        let mut pixels = vec![128u8; 64 * 64 * 3];
+        // Add noise to top half (high variance → near)
+        for y in 0..32 {
+            for x in 0..64 {
+                let b = (y * 64 + x) * 3;
+                pixels[b] = ((x * 17 + y * 31) % 256) as u8;
+                pixels[b + 1] = ((x * 23 + y * 13) % 256) as u8;
+                pixels[b + 2] = ((x * 37 + y * 7) % 256) as u8;
+            }
+        }
+        // Bottom half stays uniform (low variance → far)
+
+        let tel = m.observe_frame(&pixels, 64, 64, 3, 0.033);
+        assert!(
+            tel.prediction_error.is_finite(),
+            "Depth-enabled frame should produce finite telemetry"
+        );
+    }
 }

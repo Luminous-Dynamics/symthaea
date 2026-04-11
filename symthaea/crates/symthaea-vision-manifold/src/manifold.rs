@@ -74,6 +74,14 @@ pub struct VisionManifold {
     next_track_id: u64,
     /// Last object tracking result.
     last_tracking_result: Option<ObjectTrackingResult>,
+    /// Visual working memory (bounded attentional spotlight, ~4 objects).
+    working_memory: Option<VisualWorkingMemory>,
+    /// Visual scene graph (spatial relations between tracked objects).
+    scene_graph: Option<VisualSceneGraph>,
+    /// Last dream-ahead prediction (1 step) for imagination-reality comparison.
+    last_imagination: Option<ContinuousHV>,
+    /// Imagination surprise: how much reality diverged from prediction.
+    imagination_surprise: f32,
     /// Last scene recognition match (if any).
     last_scene_match: Option<SceneMatch>,
     /// Minimum coherence required to store a scene landmark (default 0.7).
@@ -137,6 +145,10 @@ impl VisionManifold {
             object_memory: None, // Enabled externally via enable_object_memory()
             next_track_id: 0,
             last_tracking_result: None,
+            working_memory: None, // Enabled externally via enable_working_memory()
+            scene_graph: None,    // Enabled externally via enable_scene_graph()
+            last_imagination: None,
+            imagination_surprise: 0.0,
             last_scene_match: None,
             scene_store_coherence_threshold: 0.7,
             scene_store_error_threshold: 0.1,
@@ -213,6 +225,9 @@ impl VisionManifold {
         //
         // P4-E: Foveation feedback — each hypothesis's saliency is computed from
         // the attention/surprise map (mean over member patches).
+        // Saved hypotheses for downstream use (working memory, scene graph).
+        let mut saved_hypotheses: Vec<crate::types::ObjectHypothesis> = Vec::new();
+
         let bound_frame_hv = if self.config.enable_object_binding && patch_hvs.len() >= 2 {
             let grid = self.encoder.grid_for(width, height);
             let mut hypotheses = Self::cluster_patches(&patch_hvs, &grid);
@@ -226,9 +241,10 @@ impl VisionManifold {
                     .map(|&idx| attention.values.get(idx).copied().unwrap_or(0.0))
                     .sum();
                 hyp.saliency = if !hyp.patch_indices.is_empty() {
-                    sum / hyp.patch_indices.len() as f32
+                    // Ensure minimum saliency for tracked objects (novelty baseline)
+                    (sum / hyp.patch_indices.len() as f32).max(0.05)
                 } else {
-                    0.0
+                    0.05
                 };
             }
 
@@ -237,6 +253,9 @@ impl VisionManifold {
                 self.last_tracking_result =
                     Some(obj_mem.update(&hypotheses, self.frame_count, &mut self.next_track_id));
             }
+
+            // Save hypotheses (with saliency) for working memory + scene graph
+            saved_hypotheses = hypotheses.clone();
 
             if !hypotheses.is_empty() {
                 let row_basis = self.encoder.row_basis();
@@ -258,6 +277,22 @@ impl VisionManifold {
             frame_hv
         };
 
+        // P5-A: Imagination-reality comparison — compare what we imagined
+        // (dream_ahead(1) from last frame) with what we actually see now.
+        // High divergence = temporal surprise: reality violated our mental model.
+        // Buckner & Carroll (2007): prospective memory drives surprise-based learning.
+        if let Some(ref imagined) = self.last_imagination {
+            self.imagination_surprise =
+                (1.0 - bound_frame_hv.similarity(imagined).clamp(-1.0, 1.0)).max(0.0);
+        }
+        // Generate next imagination: predict what we'll see one step ahead.
+        // Stored for comparison on the NEXT frame.
+        self.last_imagination = if self.frame_count > 0 {
+            Some(self.predict_horizon(&bound_frame_hv, dt))
+        } else {
+            None
+        };
+
         let t1 = Instant::now();
         self.observe_encoded(&bound_frame_hv, &patch_hvs, dt);
 
@@ -268,6 +303,20 @@ impl VisionManifold {
             self.surprise
                 .inject_cross_scale_error(&cross_scale_patch_errors, 0.3);
         }
+
+        // P5-B: Update visual working memory (bounded attentional spotlight).
+        // P5-C: Update scene graph (spatial relations between tracked objects).
+        // Uses saved_hypotheses from the object binding step (with saliency filled).
+        if let Some(ref obj_mem) = self.object_memory {
+            let tracks = obj_mem.tracks();
+            if let Some(ref mut wm) = self.working_memory {
+                wm.update(tracks, &saved_hypotheses, self.frame_count);
+            }
+            if let Some(ref mut sg) = self.scene_graph {
+                sg.update(tracks);
+            }
+        }
+
         let evolve_us = t1.elapsed().as_micros() as u64;
 
         // Preserve training_triggered/training_loss set by observe_encoded
@@ -293,6 +342,15 @@ impl VisionManifold {
                 .last_scene_match
                 .as_ref()
                 .map_or(0.0, |m| m.similarity),
+            imagination_surprise: self.imagination_surprise,
+            working_memory_load: self
+                .working_memory
+                .as_ref()
+                .map_or(0, |wm| wm.load()),
+            scene_graph_edges: self
+                .scene_graph
+                .as_ref()
+                .map_or(0, |sg| sg.num_edges()),
         };
 
         self.telemetry.clone()
@@ -331,6 +389,9 @@ impl VisionManifold {
                 .last_scene_match
                 .as_ref()
                 .map_or(0.0, |m| m.similarity),
+            imagination_surprise: self.imagination_surprise,
+            working_memory_load: self.working_memory.as_ref().map_or(0, |wm| wm.load()),
+            scene_graph_edges: self.scene_graph.as_ref().map_or(0, |sg| sg.num_edges()),
         };
         self.telemetry.clone()
     }
@@ -754,6 +815,40 @@ impl VisionManifold {
         self.object_memory.as_ref()
     }
 
+    /// Enable visual working memory with given capacity (default: 4 objects).
+    ///
+    /// Requires `enable_object_memory()` to be active — working memory tracks
+    /// which of the known objects are currently attended.
+    pub fn enable_working_memory(&mut self, capacity: usize) {
+        self.working_memory = Some(VisualWorkingMemory::new(capacity));
+    }
+
+    /// Access visual working memory.
+    pub fn working_memory(&self) -> Option<&VisualWorkingMemory> {
+        self.working_memory.as_ref()
+    }
+
+    /// Enable the visual scene graph for relational reasoning.
+    ///
+    /// Requires `enable_object_memory()` to be active — the scene graph
+    /// computes relations between tracked objects.
+    pub fn enable_scene_graph(&mut self) {
+        self.scene_graph = Some(VisualSceneGraph::new(
+            self.config.hdc_dim,
+            self.config.seed,
+        ));
+    }
+
+    /// Access the visual scene graph.
+    pub fn scene_graph(&self) -> Option<&VisualSceneGraph> {
+        self.scene_graph.as_ref()
+    }
+
+    /// Current imagination surprise (imagination-reality divergence).
+    pub fn imagination_surprise(&self) -> f32 {
+        self.imagination_surprise
+    }
+
     /// Access the underlying config.
     pub fn config(&self) -> &VisionConfig {
         &self.config
@@ -1018,8 +1113,16 @@ impl VisionManifold {
         if let Some(ref mut obj_mem) = self.object_memory {
             obj_mem.clear();
         }
+        if let Some(ref mut wm) = self.working_memory {
+            wm.clear();
+        }
+        if let Some(ref mut sg) = self.scene_graph {
+            sg.clear();
+        }
         self.next_track_id = 0;
         self.last_tracking_result = None;
+        self.last_imagination = None;
+        self.imagination_surprise = 0.0;
         self.last_scene_match = None;
     }
 }
@@ -1320,6 +1423,293 @@ impl ObjectMemory {
     /// Clear all tracks.
     pub fn clear(&mut self) {
         self.tracks.clear();
+    }
+}
+
+/// Visual working memory with bounded capacity (Cowan 2001: ~4 objects).
+///
+/// Holds the N most salient tracked objects. When a new object exceeds the
+/// weakest held object's saliency, it evicts and replaces. This gives the
+/// system a bounded attentional spotlight — it can only "think about" a
+/// few visual objects at once, like biological vision.
+pub struct VisualWorkingMemory {
+    slots: Vec<WorkingMemorySlot>,
+    capacity: usize,
+    /// Exponential decay rate per frame (default: 0.95 = 5% decay/frame).
+    decay_rate: f32,
+}
+
+/// A single slot in visual working memory.
+#[derive(Debug, Clone)]
+pub struct WorkingMemorySlot {
+    /// Track ID of the held object.
+    pub track_id: u64,
+    /// Object HV (snapshot from when it entered working memory).
+    pub hv: ContinuousHV,
+    /// Current saliency (decays over time).
+    pub saliency: f32,
+    /// Grid centroid row.
+    pub centroid_row: usize,
+    /// Grid centroid col.
+    pub centroid_col: usize,
+    /// Frame at which this object entered working memory.
+    pub entered_at_frame: u64,
+}
+
+impl VisualWorkingMemory {
+    /// Create working memory with the given capacity (default: 4).
+    pub fn new(capacity: usize) -> Self {
+        Self {
+            slots: Vec::with_capacity(capacity),
+            capacity,
+            decay_rate: 0.95,
+        }
+    }
+
+    /// Update working memory from the current frame's tracked objects.
+    ///
+    /// 1. Decay all existing slots' saliency.
+    /// 2. Refresh saliency for objects still being tracked.
+    /// 3. Admit new high-saliency objects if they beat the weakest slot.
+    /// 4. Evict slots that have decayed below threshold (0.01).
+    pub fn update(
+        &mut self,
+        tracks: &[TrackedObject],
+        hypotheses: &[crate::types::ObjectHypothesis],
+        current_frame: u64,
+    ) {
+        // 1. Decay all saliency
+        for slot in &mut self.slots {
+            slot.saliency *= self.decay_rate;
+        }
+
+        // 2. Refresh tracked objects already in working memory
+        for slot in &mut self.slots {
+            if let Some(hyp) = hypotheses.iter().find(|h| {
+                tracks
+                    .iter()
+                    .any(|t| t.track_id == slot.track_id && t.centroid_row == h.centroid_row && t.centroid_col == h.centroid_col)
+            }) {
+                slot.saliency = slot.saliency.max(hyp.saliency);
+                slot.centroid_row = hyp.centroid_row;
+                slot.centroid_col = hyp.centroid_col;
+            }
+        }
+
+        // 3. Consider new objects for admission
+        for track in tracks {
+            if self.slots.iter().any(|s| s.track_id == track.track_id) {
+                continue; // already held
+            }
+            let saliency = hypotheses
+                .iter()
+                .find(|h| h.centroid_row == track.centroid_row && h.centroid_col == track.centroid_col)
+                .map(|h| h.saliency)
+                .unwrap_or(0.0);
+
+            if self.slots.len() < self.capacity {
+                self.slots.push(WorkingMemorySlot {
+                    track_id: track.track_id,
+                    hv: track.identity_hv.clone(),
+                    saliency,
+                    centroid_row: track.centroid_row,
+                    centroid_col: track.centroid_col,
+                    entered_at_frame: current_frame,
+                });
+            } else if let Some(weakest) = self.slots.iter().enumerate().min_by(|a, b| {
+                a.1.saliency
+                    .partial_cmp(&b.1.saliency)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            }) {
+                if saliency > weakest.1.saliency {
+                    let idx = weakest.0;
+                    self.slots[idx] = WorkingMemorySlot {
+                        track_id: track.track_id,
+                        hv: track.identity_hv.clone(),
+                        saliency,
+                        centroid_row: track.centroid_row,
+                        centroid_col: track.centroid_col,
+                        entered_at_frame: current_frame,
+                    };
+                }
+            }
+        }
+
+        // 4. Evict dead slots
+        self.slots.retain(|s| s.saliency > 0.01);
+    }
+
+    /// Currently held objects.
+    pub fn slots(&self) -> &[WorkingMemorySlot] {
+        &self.slots
+    }
+
+    /// Number of objects currently in working memory.
+    pub fn load(&self) -> usize {
+        self.slots.len()
+    }
+
+    /// Capacity.
+    pub fn capacity(&self) -> usize {
+        self.capacity
+    }
+
+    /// Clear working memory.
+    pub fn clear(&mut self) {
+        self.slots.clear();
+    }
+
+    /// Bundle all held object HVs into a single working-memory HV.
+    ///
+    /// The cognitive loop can use this as a "what am I attending to" signal.
+    pub fn bundle_attended(&self) -> Option<ContinuousHV> {
+        if self.slots.is_empty() {
+            return None;
+        }
+        let refs: Vec<&ContinuousHV> = self.slots.iter().map(|s| &s.hv).collect();
+        let weights: Vec<f32> = self.slots.iter().map(|s| s.saliency).collect();
+        Some(ContinuousHV::weighted_bundle(&refs, &weights).normalize())
+    }
+}
+
+/// Visual scene graph: spatial relations between tracked objects.
+///
+/// From `TrackedObject` positions, computes pairwise spatial relations
+/// (above/below/left/right/near/far/overlapping) and encodes each as an
+/// HDC relational triple: `subject_hv ⊗ relation_basis_hv ⊗ object_hv`.
+///
+/// The full scene graph HV bundles all edges — the cognitive loop can
+/// probe it to answer relational queries like "what is above the red object?"
+pub struct VisualSceneGraph {
+    /// Pre-generated basis HVs for each spatial relation.
+    relation_bases: Vec<(crate::types::SpatialRelation, ContinuousHV)>,
+    /// Current edges.
+    edges: Vec<crate::types::SceneGraphEdge>,
+    /// HDC dimension.
+    hdc_dim: usize,
+    /// Bundled scene graph HV (all edges combined).
+    graph_hv: Option<ContinuousHV>,
+    /// Grid proximity threshold for "Near" (in grid cells).
+    near_threshold: usize,
+}
+
+impl VisualSceneGraph {
+    /// Create a new scene graph with relation basis HVs.
+    pub fn new(hdc_dim: usize, seed: u64) -> Self {
+        let relation_bases = crate::types::SpatialRelation::ALL
+            .iter()
+            .enumerate()
+            .map(|(i, &rel)| {
+                let hv = ContinuousHV::random(hdc_dim, seed + 900_000 + i as u64);
+                (rel, hv)
+            })
+            .collect();
+        Self {
+            relation_bases,
+            edges: Vec::new(),
+            hdc_dim,
+            graph_hv: None,
+            near_threshold: 2,
+        }
+    }
+
+    /// Compute spatial relations between all tracked objects.
+    pub fn update(&mut self, tracks: &[TrackedObject]) {
+        self.edges.clear();
+
+        for (i, a) in tracks.iter().enumerate() {
+            for b in tracks.iter().skip(i + 1) {
+                let dr = a.centroid_row as i32 - b.centroid_row as i32;
+                let dc = a.centroid_col as i32 - b.centroid_col as i32;
+                let dist = ((dr * dr + dc * dc) as f32).sqrt();
+
+                let relations = self.classify_relation(dr, dc, dist);
+                for rel in relations {
+                    let rel_basis = self.relation_basis(rel);
+                    let edge_hv = a.identity_hv.bind(rel_basis).bind(&b.identity_hv);
+                    self.edges.push(crate::types::SceneGraphEdge {
+                        subject_id: a.track_id,
+                        object_id: b.track_id,
+                        relation: rel,
+                        relation_hv: edge_hv,
+                    });
+                }
+            }
+        }
+
+        // Bundle all edge HVs into a unified scene graph representation
+        if !self.edges.is_empty() {
+            let refs: Vec<&ContinuousHV> = self.edges.iter().map(|e| &e.relation_hv).collect();
+            self.graph_hv = Some(ContinuousHV::bundle(&refs).normalize());
+        } else {
+            self.graph_hv = None;
+        }
+    }
+
+    /// Classify spatial relations between two objects.
+    fn classify_relation(
+        &self,
+        dr: i32,
+        dc: i32,
+        dist: f32,
+    ) -> Vec<crate::types::SpatialRelation> {
+        use crate::types::SpatialRelation;
+        let mut rels = Vec::new();
+        let near = self.near_threshold as f32;
+
+        if dist < near * 0.5 {
+            rels.push(SpatialRelation::Overlapping);
+        } else if dist < near {
+            rels.push(SpatialRelation::Near);
+        } else {
+            rels.push(SpatialRelation::Far);
+        }
+
+        // Vertical relation (threshold: 1 grid cell)
+        if dr < -1 {
+            rels.push(SpatialRelation::Above);
+        } else if dr > 1 {
+            rels.push(SpatialRelation::Below);
+        }
+
+        // Horizontal relation
+        if dc < -1 {
+            rels.push(SpatialRelation::LeftOf);
+        } else if dc > 1 {
+            rels.push(SpatialRelation::RightOf);
+        }
+
+        rels
+    }
+
+    /// Get the basis HV for a spatial relation.
+    fn relation_basis(&self, rel: crate::types::SpatialRelation) -> &ContinuousHV {
+        self.relation_bases
+            .iter()
+            .find(|(r, _)| *r == rel)
+            .map(|(_, hv)| hv)
+            .expect("all relations pre-generated")
+    }
+
+    /// Current scene graph edges.
+    pub fn edges(&self) -> &[crate::types::SceneGraphEdge] {
+        &self.edges
+    }
+
+    /// Bundled scene graph HV (all relational triples combined).
+    pub fn graph_hv(&self) -> Option<&ContinuousHV> {
+        self.graph_hv.as_ref()
+    }
+
+    /// Number of edges in the scene graph.
+    pub fn num_edges(&self) -> usize {
+        self.edges.len()
+    }
+
+    /// Clear the scene graph.
+    pub fn clear(&mut self) {
+        self.edges.clear();
+        self.graph_hv = None;
     }
 }
 

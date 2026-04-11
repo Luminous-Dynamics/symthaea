@@ -371,6 +371,17 @@ pub struct VisionTelemetry {
     /// Cosine similarity of the scene recognition match (0.0 if no match).
     #[serde(default)]
     pub scene_recognition_similarity: f32,
+    /// Temporal imagination surprise: prediction error between dream_ahead(1)
+    /// and actual observation. 0 = perfect prediction, 1 = maximum surprise.
+    /// Only populated when imagination comparison is active on the bridge.
+    #[serde(default)]
+    pub imagination_surprise: f32,
+    /// Number of objects currently held in visual working memory.
+    #[serde(default)]
+    pub working_memory_load: usize,
+    /// Number of spatial relations in the scene graph.
+    #[serde(default)]
+    pub scene_graph_edges: usize,
 }
 
 /// Per-patch spatial attention/surprise map.
@@ -567,6 +578,47 @@ pub struct ObjectHypothesis {
     pub saliency: f32,
     /// Object HV: bundle of all member patch HVs (normalized).
     pub hv: symthaea_core::hdc::ContinuousHV,
+}
+
+/// Spatial relation between two objects in the scene graph.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum SpatialRelation {
+    Above,
+    Below,
+    LeftOf,
+    RightOf,
+    Near,
+    Far,
+    Overlapping,
+}
+
+impl SpatialRelation {
+    /// All supported relations.
+    pub const ALL: [Self; 7] = [
+        Self::Above,
+        Self::Below,
+        Self::LeftOf,
+        Self::RightOf,
+        Self::Near,
+        Self::Far,
+        Self::Overlapping,
+    ];
+}
+
+/// An edge in the visual scene graph: subject → relation → object.
+///
+/// Encoded in HDC as `relation_hv = subject_hv ⊗ relation_basis ⊗ object_hv`,
+/// giving a holographic relational triple the cognitive loop can reason over.
+#[derive(Debug, Clone)]
+pub struct SceneGraphEdge {
+    /// Track ID of the subject object.
+    pub subject_id: u64,
+    /// Track ID of the object.
+    pub object_id: u64,
+    /// Spatial relation (e.g., Above, LeftOf, Near).
+    pub relation: SpatialRelation,
+    /// HDC encoding of this relational triple.
+    pub relation_hv: symthaea_core::hdc::ContinuousHV,
 }
 
 /// Per-scale health metrics for multi-scale encoders.

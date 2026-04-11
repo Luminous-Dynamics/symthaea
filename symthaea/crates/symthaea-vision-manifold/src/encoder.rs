@@ -408,10 +408,25 @@ impl PatchHdcEncoder {
             }
         }
 
-        // Depth channel: neutral stub (0.5 = unknown distance) when no sensor data.
-        // A depth-aware caller can supply real values via observe_frame_with_depth().
+        // Depth channel: monocular depth cues when no sensor data is available.
+        //
+        // Two cues combined (Cutting & Vishton 1995):
+        // 1. **Texture gradient** — variance decreases with distance (Gibson 1950):
+        //    `texture_depth = 1.0 - variance` (low variance → far away)
+        // 2. **Relative vertical position** — objects lower in frame are closer
+        //    (perspective assumption for ground-plane scenes):
+        //    `position_depth = patch_y / frame_height` (0 = top/far, 1 = bottom/near)
+        //
+        // Final depth = 0.6 * texture + 0.4 * position (texture-dominant blend).
+        // Values in [0, 1]: 0 = near, 1 = far.
         if self.config.enable_depth {
-            features.push(0.5);
+            let texture_depth = (1.0 - variance).clamp(0.0, 1.0);
+            let frame_height = (width as f32 / self.config.patch_size as f32)
+                .max(1.0)
+                * self.config.patch_size as f32;
+            let position_depth = 1.0 - (patch_y as f32 / frame_height.max(1.0)).clamp(0.0, 1.0);
+            let depth = (0.6 * texture_depth + 0.4 * position_depth).clamp(0.0, 1.0);
+            features.push(depth);
         }
 
         features
