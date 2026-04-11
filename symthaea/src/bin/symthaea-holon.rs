@@ -125,7 +125,17 @@ async fn main() -> Result<()> {
     }
 
     info!("Initializing CognitiveLoopService...");
-    let cls = CognitiveLoopService::new(CognitiveLoopConfig::default())?;
+    // Enable federated learning coordinator — spawned at CLS construction if swarm feature
+    // is available. Timeout-guarded (config.timeout_ms) so dead peers don't hang.
+    let holon_config = {
+        let mut c = CognitiveLoopConfig::default();
+        #[cfg(feature = "swarm")]
+        {
+            c.federation_enabled = true;
+        }
+        c
+    };
+    let mut cls = CognitiveLoopService::new(holon_config)?;
 
     // Extract the Holon inbound sender for the HTTP layer.
     let holon_tx = cls.holon_inbound_sender();
@@ -155,6 +165,28 @@ async fn main() -> Result<()> {
             tracing::error!("Holon HTTP server error: {}", e);
         }
     });
+
+    // Wire Iroh P2P — creates NetworkService, initializes Ed25519 attestation,
+    // spawns NetworkServiceBridge so SwarmEvents flow into the CLS each cycle.
+    // Feature-gated: only compiled when both `identity` and `swarm` are enabled.
+    #[cfg(all(feature = "identity", feature = "swarm"))]
+    {
+        match cls.enable_network_attestation().await {
+            Ok(()) => {
+                info!("Iroh P2P swarm active — Ed25519 attestation enabled");
+                // Spawn the inbound connection accept loop.
+                // Peers who connect to us are registered and their SwarmEvents
+                // flow into the CLS via the NetworkServiceBridge spawned above.
+                if let Some(service) = cls.network_service().cloned() {
+                    tokio::spawn(service.accept_connections());
+                    info!("Iroh: inbound connection listener active");
+                }
+            }
+            Err(e) => {
+                warn!(error = %e, "P2P networking disabled — running local-only");
+            }
+        }
+    }
 
     // Advertise Holon via mDNS so Soma can auto-discover on LAN.
     // Uses avahi-publish if available (NixOS has avahi by default).

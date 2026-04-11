@@ -194,6 +194,11 @@ pub struct NetworkService {
     /// Whether the service is running
     running: Arc<std::sync::atomic::AtomicBool>,
 
+    /// Attestation manager stored after `initialize_attestation()`.
+    /// Used by `accept_connections()` to respond to inbound trust challenges.
+    #[cfg(feature = "identity")]
+    attestation: Option<Arc<parking_lot::RwLock<crate::swarm::attestation::AttestationManager>>>,
+
     /// Latest local navigation estimate, if the runtime has published one.
     local_navigation: Arc<RwLock<Option<GaussianEstimate3D>>>,
 
@@ -226,6 +231,8 @@ impl NetworkService {
             peer_navigation: Arc::new(RwLock::new(HashMap::new())),
             #[cfg(feature = "pqc-handshake")]
             pqc_manager: None, // Stub: no PQC without swarm
+            #[cfg(feature = "identity")]
+            attestation: None,
         })
     }
 
@@ -248,6 +255,8 @@ impl NetworkService {
             config: config.clone(),
             iroh: Some(iroh),
             handshake: Arc::new(RwLock::new(HybridHandshake::new(config))),
+            #[cfg(feature = "identity")]
+            attestation: None,
             peers: Arc::new(RwLock::new(HashMap::new())),
             peer_consciousness: Arc::new(RwLock::new(HashMap::new())),
             consciousness_tx,
@@ -373,6 +382,9 @@ impl NetworkService {
         if let Some(ref mut iroh) = self.iroh {
             iroh.set_attestation(mgr.clone());
         }
+
+        // Store locally so accept_connections() can respond to inbound challenges
+        self.attestation = Some(mgr.clone());
 
         Ok(mgr)
     }
@@ -945,6 +957,142 @@ impl NetworkService {
         _signing_material: &[u8],
     ) -> SwarmResult<()> {
         Ok(())
+    }
+
+    /// Accept inbound Iroh QUIC connections and register them as peers.
+    ///
+    /// Spawn this as a `tokio::task` after calling `enable_network_attestation()`.
+    /// It runs forever (until the endpoint closes) accepting new peers.
+    ///
+    /// For each accepted connection:
+    /// - Checks the peer count limit
+    /// - If attestation is available, acts as the **handshake responder**
+    ///   (signs the challenger's nonce with our Ed25519 key)
+    /// - Otherwise registers with `LocalTrust` (QUIC NodeId already verified)
+    /// - Emits `PeerEvent::Connected` so the CLS SwarmManager picks it up
+    ///
+    /// This method consumes an `Arc<Self>` so it can be moved into a task:
+    /// ```rust,ignore
+    /// if let Some(svc) = cls.network_service().cloned() {
+    ///     tokio::spawn(svc.accept_connections());
+    /// }
+    /// ```
+    pub async fn accept_connections(self: Arc<Self>) {
+        #[cfg(not(feature = "swarm"))]
+        {
+            tracing::debug!("accept_connections: swarm feature not enabled — no-op");
+        }
+
+        #[cfg(feature = "swarm")]
+        loop {
+            // Stop if the service was shut down
+            if !self.running.load(std::sync::atomic::Ordering::Relaxed) {
+                break;
+            }
+
+            let iroh = match self.iroh.as_ref() {
+                Some(n) => n,
+                None => {
+                    tracing::warn!("accept_connections: IrohNode not initialized");
+                    break;
+                }
+            };
+
+            // Peer limit check before accepting
+            {
+                let count = self.peers.read().len();
+                if count >= self.config.max_peers {
+                    // Back off briefly to avoid spin-looping at the limit
+                    tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+                    continue;
+                }
+            }
+
+            let (peer_id, channel) = match iroh.accept_incoming().await {
+                Ok(pair) => pair,
+                Err(SwarmError::Internal(msg)) if msg.contains("closed") => {
+                    tracing::info!("accept_connections: endpoint closed — exiting");
+                    break;
+                }
+                Err(e) => {
+                    tracing::debug!(error = %e, "accept_connections: inbound connection error — continuing");
+                    continue;
+                }
+            };
+
+            // Responder-side handshake: the outbound peer sends us a TrustChallenge;
+            // we must sign their nonce with our Ed25519 key and reply.
+            let trust_level = self
+                .run_inbound_handshake(&peer_id, &channel)
+                .await
+                .unwrap_or_else(|e| {
+                    tracing::warn!(
+                        peer = %&peer_id[..peer_id.len().min(16)],
+                        error = %e,
+                        "Inbound handshake failed — using LocalTrust (QUIC NodeId already verified)"
+                    );
+                    TrustLevel::LocalTrust
+                });
+
+            // Register peer
+            let mut peer_info = PeerInfo::new(&peer_id);
+            peer_info.trust_level = trust_level;
+            peer_info.state = ConnectionState::Connected;
+            self.peers.write().insert(peer_id.clone(), peer_info.clone());
+            self.stats.write().connected_peers = self.peers.read().len();
+
+            let _ = self.peer_event_tx.send(PeerEvent::Connected(peer_info));
+
+            tracing::info!(
+                peer = %&peer_id[..peer_id.len().min(16)],
+                trust = ?trust_level,
+                "Inbound peer registered"
+            );
+
+            let _ = channel; // channel is already stored in IrohNode.connections
+        }
+    }
+
+    /// Responder side of the trust handshake for inbound connections.
+    ///
+    /// If attestation is available and handshake is required, calls
+    /// `respond_to_handshake()` with our Ed25519 signing key.
+    /// Otherwise returns `LocalTrust` immediately (QUIC NodeId authentication suffices).
+    #[cfg(feature = "swarm")]
+    async fn run_inbound_handshake(
+        &self,
+        peer_id: &str,
+        channel: &super::iroh::IrohChannel,
+    ) -> SwarmResult<TrustLevel> {
+        if !self.config.require_handshake {
+            return Ok(TrustLevel::LocalTrust);
+        }
+
+        #[cfg(feature = "identity")]
+        if let Some(ref attestation) = self.attestation {
+            // Clone keys out of the read lock so we don't hold a RwLockReadGuard
+            // across the .await point inside respond_to_handshake.
+            let agent_key = attestation.read().public_key_hex().to_string();
+            let signing_key = attestation.read().signing_key().clone();
+            let trust = self
+                .respond_to_handshake(peer_id, channel, &agent_key, &signing_key)
+                .await
+                .map(|()| TrustLevel::Verified(0.8))?;
+            return Ok(trust);
+        }
+
+        // No attestation set: QUIC NodeId is sufficient for LocalTrust
+        Ok(TrustLevel::LocalTrust)
+    }
+
+    /// Stub for non-swarm builds.
+    #[cfg(not(feature = "swarm"))]
+    async fn run_inbound_handshake(
+        &self,
+        _peer_id: &str,
+        _channel: &super::iroh::IrohChannel,
+    ) -> SwarmResult<TrustLevel> {
+        Ok(TrustLevel::LocalTrust)
     }
 
     /// Broadcast our consciousness state to all connected peers
@@ -1663,7 +1811,9 @@ mod tests {
         let estimate = PeerEstimate3D {
             peer_id: "peer-nav".to_string(),
             estimate: GaussianEstimate3D::from_diagonal_sigma([10.0, 0.0, 0.0], 3.0),
-            confidence: Some(0.8),
+            confidence: 0.8,
+            trust_weight: 1.0,
+            timestamp_us: 0,
         };
         service.receive_navigation_estimate("peer-nav", estimate.clone());
 
@@ -1699,7 +1849,9 @@ mod tests {
             PeerEstimate3D {
                 peer_id: "peer-nav".to_string(),
                 estimate: GaussianEstimate3D::from_diagonal_sigma([8.0, 0.0, 0.0], 3.0),
-                confidence: Some(0.8),
+                confidence: 0.8,
+                trust_weight: 1.0,
+                timestamp_us: 0,
             },
         );
 
@@ -1729,7 +1881,7 @@ mod tests {
             .get_peer_navigation("peer-generic")
             .expect("generic peer navigation");
         assert_eq!(stored.estimate.mean, [9.0, 0.0, 0.0]);
-        assert_eq!(stored.confidence, Some(0.6));
+        assert!((stored.confidence - 0.6).abs() < 1e-10);
     }
 
     #[tokio::test]

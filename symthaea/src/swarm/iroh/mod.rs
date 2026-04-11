@@ -387,6 +387,61 @@ impl IrohNode {
         Ok(channel)
     }
 
+    /// Accept a single inbound QUIC connection (stub without `swarm` feature).
+    #[cfg(not(feature = "swarm"))]
+    pub async fn accept_incoming(&self) -> SwarmResult<(String, IrohChannel)> {
+        Err(SwarmError::FeatureNotEnabled {
+            feature: "swarm".to_string(),
+        })
+    }
+
+    /// Accept a single inbound QUIC connection from a peer that connected to us.
+    ///
+    /// Iroh 0.97 two-step accept protocol:
+    /// 1. `endpoint.accept().await` → `Option<Incoming>` (waits for next inbound)
+    /// 2. `incoming.accept()` → `Accepting` future (begins QUIC handshake)
+    /// 3. `accepting.await` → `Connection<HandshakeCompleted>` (QUIC handshake done)
+    /// 4. `connection.remote_id()` → `EndpointId` (peer's Ed25519 public key, verified)
+    ///
+    /// Returns the peer ID string and the live `IrohChannel`.  Returns
+    /// `SwarmError::Internal` if the endpoint is closed (returns `None`).
+    #[cfg(feature = "swarm")]
+    pub async fn accept_incoming(&self) -> SwarmResult<(String, IrohChannel)> {
+        let endpoint = self.endpoint.as_ref().ok_or(SwarmError::NotInitialized)?;
+
+        // Wait for the next inbound connection request
+        let incoming = endpoint.accept().await.ok_or_else(|| {
+            SwarmError::Internal("Iroh endpoint closed — no more inbound connections".to_string())
+        })?;
+
+        // Accept and begin QUIC handshake
+        let accepting = incoming.accept().map_err(|e| {
+            SwarmError::Internal(format!("Failed to accept inbound connection: {e}"))
+        })?;
+
+        // Await handshake completion; connection is fully established
+        let connection = accepting.await.map_err(|e| {
+            SwarmError::Internal(format!("Inbound QUIC handshake failed: {e}"))
+        })?;
+
+        // remote_id() is available on Connection<HandshakeCompleted> — cryptographically verified
+        let peer_id = connection.remote_id().to_string();
+
+        let channel = IrohChannel::new(peer_id.clone(), connection);
+
+        // Register in our connection pool
+        self.connections
+            .write()
+            .insert(peer_id.clone(), channel.clone());
+
+        tracing::info!(
+            peer = %&peer_id[..peer_id.len().min(16)],
+            "Inbound QUIC connection accepted"
+        );
+
+        Ok((peer_id, channel))
+    }
+
     /// Shutdown the node
     pub async fn shutdown(self) {
         // Close all connections
