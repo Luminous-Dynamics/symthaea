@@ -98,13 +98,37 @@ const NORMALIZE_PAGE_RENDERING_JS: &str = r#"
   try {
     window.__MYCELIX_DESKTOP = true;
 
-    // Desktop-specific CSS
+    // Desktop-specific CSS — fixes webkit2gtk viewport bug
+    // webkit2gtk miscalculates 'inset: 0' on fixed-position elements.
+    // Override all fixed overlays to use explicit 100vw/100vh dimensions.
     const fix = document.createElement('style');
     fix.id = '__mycelix_desktop_fix';
     fix.textContent = `
       .bottom-nav { display: none !important; }
       .navbar { display: none !important; }
-      .app-layout { height: 100vh !important; }
+      .app-layout { height: 100vh !important; width: 100vw !important; }
+      /* Force all fixed overlays to full viewport */
+      .welcome-overlay, .conductor-overlay, .cmd-palette-container,
+      .keyboard-overlay, .pwa-overlay, .tour-overlay {
+        position: fixed !important;
+        left: 0 !important; top: 0 !important;
+        width: 100vw !important; height: 100vh !important;
+        right: auto !important; bottom: auto !important;
+      }
+      /* Ensure modals inside overlays are properly sized */
+      .welcome-modal {
+        width: 520px !important;
+        max-width: 90vw !important;
+        min-width: 320px !important;
+      }
+      /* Force sidebar to exact width */
+      .sidebar {
+        width: 240px !important; min-width: 240px !important;
+        max-width: 240px !important; flex: 0 0 240px !important;
+      }
+      .main-content {
+        flex: 1 1 0% !important; min-width: 0 !important;
+      }
     `;
     document.head.appendChild(fix);
   } catch (_) {}

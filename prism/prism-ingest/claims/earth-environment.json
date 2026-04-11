@@ -1,0 +1,22 @@
+[
+  {"claim": "The water cycle continuously moves water between oceans atmosphere land and living organisms through evaporation precipitation and runoff", "level": "E4", "sources": ["USGS"], "tags": ["earth-science", "water"]},
+  {"claim": "The carbon cycle describes the movement of carbon between the atmosphere biosphere oceans and geosphere", "level": "E4", "sources": ["Earth Science"], "tags": ["earth-science", "carbon"]},
+  {"claim": "Earthquakes occur when tectonic stress along fault lines exceeds the frictional strength of rocks causing sudden displacement", "level": "E4", "sources": ["USGS"], "tags": ["geology", "seismology"]},
+  {"claim": "The Richter scale measures earthquake magnitude logarithmically so each whole number increase represents a tenfold increase in amplitude", "level": "E4", "sources": ["USGS"], "tags": ["geology", "seismology"]},
+  {"claim": "Glaciers contain about 69 percent of the world fresh water and their melting contributes significantly to sea level rise", "level": "E4", "sources": ["NSIDC"], "tags": ["climate", "glaciology"]},
+  {"claim": "The nitrogen cycle converts atmospheric nitrogen into forms usable by living organisms through fixation nitrification and denitrification", "level": "E4", "sources": ["Ecology"], "tags": ["ecology", "biogeochemistry"]},
+  {"claim": "Wetlands act as natural water filters absorbing pollutants and excess nutrients while providing habitat for diverse species", "level": "E4", "sources": ["EPA"], "tags": ["ecology", "wetlands"]},
+  {"claim": "Ocean currents are driven by wind temperature and salinity differences distributing heat around the globe and influencing climate", "level": "E4", "sources": ["Oceanography"], "tags": ["oceanography", "climate"]},
+  {"claim": "Volcanic eruptions can cool global temperatures by injecting sulfur dioxide into the stratosphere where it forms reflective aerosols", "level": "E4", "sources": ["Volcanology"], "tags": ["geology", "climate"]},
+  {"claim": "The ozone hole over Antarctica forms each spring due to chlorofluorocarbon-derived chlorine destroying stratospheric ozone", "level": "E4", "sources": ["NASA"], "tags": ["environment", "atmosphere"]},
+  {"claim": "Deforestation contributes approximately 10 percent of global greenhouse gas emissions through loss of carbon storage", "level": "E4", "sources": ["IPCC"], "tags": ["climate", "ecology"]},
+  {"claim": "Coral bleaching occurs when stressed corals expel their symbiotic algae primarily due to elevated water temperatures", "level": "E4", "sources": ["NOAA"], "tags": ["ecology", "ocean"]},
+  {"claim": "Keystone species have disproportionately large effects on their ecosystem relative to their abundance", "level": "E4", "sources": ["Paine 1969"], "tags": ["ecology", "biodiversity"]},
+  {"claim": "Invasive species are non-native organisms that cause ecological or economic harm in their introduced environment", "level": "E4", "sources": ["Ecology"], "tags": ["ecology", "biodiversity"]},
+  {"claim": "The Amazon rainforest produces approximately 6 percent of the world oxygen and stores an estimated 150 to 200 billion tonnes of carbon", "level": "E3", "sources": ["WWF"], "tags": ["ecology", "climate"]},
+  {"claim": "Acid rain forms when sulfur dioxide and nitrogen oxides react with water vapor in the atmosphere producing sulfuric and nitric acids", "level": "E4", "sources": ["EPA"], "tags": ["environment", "pollution"]},
+  {"claim": "Groundwater provides drinking water for approximately half the world population and supports 40 percent of irrigated agriculture", "level": "E4", "sources": ["UNESCO"], "tags": ["water", "resources"]},
+  {"claim": "Mangrove forests protect coastlines from storms sequester carbon and provide nursery habitat for many marine species", "level": "E4", "sources": ["IUCN"], "tags": ["ecology", "coastal"]},
+  {"claim": "Soil takes hundreds to thousands of years to form but can be lost to erosion in a single generation of poor land management", "level": "E4", "sources": ["FAO"], "tags": ["agriculture", "environment"]},
+  {"claim": "Urban heat islands cause cities to be several degrees warmer than surrounding rural areas due to heat-absorbing surfaces and waste heat", "level": "E4", "sources": ["EPA"], "tags": ["environment", "climate"]}
+]

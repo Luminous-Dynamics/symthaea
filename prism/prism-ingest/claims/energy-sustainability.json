@@ -1,0 +1,17 @@
+[
+  {"claim": "Wind power capacity has grown exponentially with global installed capacity exceeding 900 GW as of 2023", "level": "E4", "sources": ["GWEC"], "tags": ["energy", "wind"]},
+  {"claim": "Battery storage costs have declined over 90 percent since 2010 enabling wider adoption of intermittent renewable energy", "level": "E4", "sources": ["BNEF"], "tags": ["energy", "storage"]},
+  {"claim": "Geothermal energy harnesses heat from within the Earth providing reliable baseload power with minimal emissions", "level": "E4", "sources": ["DOE"], "tags": ["energy", "geothermal"]},
+  {"claim": "Small modular reactors are nuclear fission reactors with power output under 300 MW designed for factory fabrication and flexible deployment", "level": "E3", "sources": ["IAEA"], "tags": ["energy", "nuclear"]},
+  {"claim": "Green hydrogen produced by electrolysis using renewable electricity could decarbonize hard-to-electrify sectors like steel and shipping", "level": "E3", "sources": ["IEA"], "tags": ["energy", "hydrogen"]},
+  {"claim": "The levelized cost of solar photovoltaic electricity is now lower than new coal or gas power in most regions of the world", "level": "E4", "sources": ["Lazard 2023"], "tags": ["energy", "solar"]},
+  {"claim": "Nuclear fusion could provide virtually unlimited clean energy but sustaining the required plasma conditions remains an engineering challenge", "level": "E3", "sources": ["ITER"], "tags": ["energy", "fusion"]},
+  {"claim": "Pumped hydroelectric storage accounts for over 90 percent of global grid-scale energy storage capacity", "level": "E4", "sources": ["IHA"], "tags": ["energy", "storage"]},
+  {"claim": "Building energy efficiency improvements including insulation and heat pumps can reduce heating energy consumption by 50 to 80 percent", "level": "E4", "sources": ["IEA"], "tags": ["energy", "efficiency"]},
+  {"claim": "The circular economy aims to eliminate waste by designing products for reuse repair remanufacturing and recycling", "level": "E3", "sources": ["Ellen MacArthur Foundation"], "tags": ["sustainability", "economics"]},
+  {"claim": "Life cycle assessment evaluates the environmental impact of a product through all stages from raw material extraction to disposal", "level": "E4", "sources": ["ISO 14040"], "tags": ["sustainability", "methodology"]},
+  {"claim": "Electric vehicles produce zero direct emissions and have lower lifetime emissions than internal combustion vehicles in most electricity grids", "level": "E4", "sources": ["ICCT"], "tags": ["energy", "transport"]},
+  {"claim": "Offshore wind farms can generate more consistent power than onshore due to stronger and more reliable wind conditions at sea", "level": "E4", "sources": ["Wind Energy"], "tags": ["energy", "wind"]},
+  {"claim": "Carbon capture and storage technology removes CO2 from industrial emissions or the atmosphere and stores it underground", "level": "E3", "sources": ["IPCC"], "tags": ["energy", "climate"]},
+  {"claim": "Passive house design reduces heating and cooling energy by up to 90 percent through superinsulation and heat recovery ventilation", "level": "E4", "sources": ["PHI"], "tags": ["sustainability", "architecture"]}
+]

@@ -19,11 +19,15 @@ pub fn ContentRouter() -> impl IntoView {
     let search_engine = expect_context::<StoredValue<Option<SearchEngine>>>();
 
     move || {
-        if state.loading.get() {
-            return view! { <div class="loading">"Loading..."</div> }.into_any();
+        let current_view = state.view.get();
+
+        // Show full-page loading only for URL navigation, not search augmentation.
+        // Search results show an inline loading banner via SearchResultsPage.
+        if state.loading.get() && !matches!(current_view, PageView::Search { .. }) {
+            return view! { <div class="loading">"Loading\u{2026}"</div> }.into_any();
         }
 
-        match state.view.get() {
+        match current_view {
             PageView::Welcome => view! { <WelcomePage /> }.into_any(),
             PageView::Search { query, results } => {
                 view! { <SearchResultsPage query=query.clone() results=results.clone() /> }.into_any()

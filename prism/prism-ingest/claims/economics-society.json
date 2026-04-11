@@ -1,0 +1,22 @@
+[
+  {"claim": "Supply and demand interact to determine market prices with equilibrium occurring where quantity supplied equals quantity demanded", "level": "E4", "sources": ["Economics"], "tags": ["economics", "markets"]},
+  {"claim": "Compound interest causes exponential growth of savings over time making early investing significantly more powerful than late investing", "level": "E4", "sources": ["Finance"], "tags": ["economics", "finance"]},
+  {"claim": "The prisoner dilemma demonstrates how individually rational decisions can lead to collectively suboptimal outcomes", "level": "E4", "sources": ["Nash 1950"], "tags": ["economics", "game-theory"]},
+  {"claim": "Externalities are costs or benefits that affect parties not directly involved in a transaction such as pollution or education", "level": "E4", "sources": ["Economics"], "tags": ["economics", "policy"]},
+  {"claim": "Central banks control monetary policy through interest rates and money supply to manage inflation and employment", "level": "E4", "sources": ["Economics"], "tags": ["economics", "monetary"]},
+  {"claim": "Purchasing power parity adjusts GDP comparisons between countries to account for differences in local price levels", "level": "E4", "sources": ["Economics"], "tags": ["economics", "measurement"]},
+  {"claim": "The demographic transition describes how societies move from high birth and death rates to low birth and death rates as they develop", "level": "E4", "sources": ["Demography"], "tags": ["sociology", "demographics"]},
+  {"claim": "Social media algorithms optimize for engagement which can amplify polarizing content and create filter bubbles", "level": "E3", "sources": ["Social Science"], "tags": ["sociology", "technology"]},
+  {"claim": "Universal basic income provides unconditional cash payments to all citizens regardless of employment or income status", "level": "E2", "sources": ["Economics"], "tags": ["economics", "policy"]},
+  {"claim": "Behavioral economics studies how psychological cognitive and emotional factors influence economic decisions", "level": "E4", "sources": ["Thaler Sunstein 2008"], "tags": ["economics", "psychology"]},
+  {"claim": "The rule of law requires that all persons institutions and entities are accountable to laws that are publicly promulgated and equally enforced", "level": "E4", "sources": ["UN"], "tags": ["law", "governance"]},
+  {"claim": "Intellectual property law protects creations of the mind including patents copyrights trademarks and trade secrets", "level": "E4", "sources": ["WIPO"], "tags": ["law", "intellectual-property"]},
+  {"claim": "Global wealth inequality means the richest 10 percent of the world population owns approximately 76 percent of total wealth", "level": "E3", "sources": ["Credit Suisse 2021"], "tags": ["economics", "inequality"]},
+  {"claim": "Cooperative enterprises are owned and democratically controlled by their members distributing profits equitably", "level": "E4", "sources": ["ICA"], "tags": ["economics", "cooperatives"]},
+  {"claim": "Network effects occur when a product or service becomes more valuable as more people use it", "level": "E4", "sources": ["Economics"], "tags": ["economics", "technology"]},
+  {"claim": "Gross National Happiness measures development through psychological wellbeing health education and ecological diversity rather than GDP alone", "level": "E3", "sources": ["Bhutan"], "tags": ["economics", "measurement"]},
+  {"claim": "The commons refers to shared resources managed collectively by a community rather than owned privately or by the state", "level": "E4", "sources": ["Ostrom 1990"], "tags": ["economics", "commons"]},
+  {"claim": "Participatory budgeting allows citizens to directly decide how to allocate a portion of public budgets", "level": "E3", "sources": ["Porto Alegre 1989"], "tags": ["governance", "democracy"]},
+  {"claim": "Restorative justice focuses on repairing harm through dialogue between victims offenders and community rather than punishment alone", "level": "E3", "sources": ["Criminology"], "tags": ["law", "justice"]},
+  {"claim": "Open source software development has produced critical infrastructure including Linux the Apache web server and the Python programming language", "level": "E4", "sources": ["OSI"], "tags": ["technology", "commons"]}
+]

@@ -1,0 +1,17 @@
+[
+  {"claim": "Regular aerobic exercise reduces the risk of cardiovascular disease type 2 diabetes and several types of cancer", "level": "E4", "sources": ["WHO"], "tags": ["health", "exercise"]},
+  {"claim": "Sleep deprivation increases the risk of obesity diabetes cardiovascular disease and impaired cognitive function", "level": "E4", "sources": ["Walker 2017"], "tags": ["health", "sleep"]},
+  {"claim": "Chronic stress elevates cortisol levels which can suppress immune function increase inflammation and impair memory", "level": "E4", "sources": ["Sapolsky 2004"], "tags": ["health", "stress"]},
+  {"claim": "Omega-3 fatty acids found in fish and certain plants reduce inflammation and support cardiovascular and brain health", "level": "E3", "sources": ["NIH"], "tags": ["nutrition", "health"]},
+  {"claim": "Dietary fiber promotes digestive health feeds beneficial gut bacteria and helps regulate blood sugar levels", "level": "E4", "sources": ["Nutrition Science"], "tags": ["nutrition", "digestion"]},
+  {"claim": "Excessive sugar consumption is associated with obesity type 2 diabetes tooth decay and non-alcoholic fatty liver disease", "level": "E4", "sources": ["WHO"], "tags": ["nutrition", "health"]},
+  {"claim": "Iron deficiency is the most common nutritional deficiency worldwide affecting approximately 2 billion people", "level": "E4", "sources": ["WHO"], "tags": ["nutrition", "public-health"]},
+  {"claim": "Probiotics are live microorganisms that when consumed in adequate amounts confer health benefits to the host", "level": "E3", "sources": ["WHO"], "tags": ["nutrition", "microbiome"]},
+  {"claim": "Ultraprocessed foods are associated with increased risk of obesity cardiovascular disease and mortality in epidemiological studies", "level": "E3", "sources": ["Monteiro 2019"], "tags": ["nutrition", "health"]},
+  {"claim": "Adequate hydration is essential for temperature regulation nutrient transport and cognitive function", "level": "E4", "sources": ["Physiology"], "tags": ["nutrition", "health"]},
+  {"claim": "Vaccination has eradicated smallpox and nearly eliminated polio saving millions of lives globally", "level": "E4", "sources": ["WHO"], "tags": ["health", "public-health"]},
+  {"claim": "Hand washing with soap reduces the transmission of diarrheal diseases by approximately 30 percent", "level": "E4", "sources": ["WHO"], "tags": ["health", "hygiene"]},
+  {"claim": "Air pollution causes approximately 7 million premature deaths annually worldwide according to the World Health Organization", "level": "E4", "sources": ["WHO"], "tags": ["health", "environment"]},
+  {"claim": "Resistance training preserves bone density muscle mass and metabolic health particularly important during aging", "level": "E4", "sources": ["ACSM"], "tags": ["health", "exercise"]},
+  {"claim": "Maternal nutrition during pregnancy directly affects fetal development and can influence health outcomes throughout the child life", "level": "E4", "sources": ["Obstetrics"], "tags": ["health", "nutrition"]}
+]

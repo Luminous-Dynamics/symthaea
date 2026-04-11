@@ -1,0 +1,22 @@
+[
+  {"claim": "Chemical elements are pure substances consisting of atoms with the same number of protons in their nuclei", "level": "E4", "sources": ["Chemistry"], "tags": ["chemistry", "elements"]},
+  {"claim": "Isotopes are atoms of the same element with different numbers of neutrons leading to different atomic masses", "level": "E4", "sources": ["Chemistry"], "tags": ["chemistry", "nuclear"]},
+  {"claim": "Electronegativity measures an atom tendency to attract shared electrons in a chemical bond", "level": "E4", "sources": ["Pauling 1932"], "tags": ["chemistry", "bonding"]},
+  {"claim": "Oxidation-reduction reactions involve the transfer of electrons between chemical species", "level": "E4", "sources": ["Chemistry"], "tags": ["chemistry", "reactions"]},
+  {"claim": "Le Chatelier principle states that a system in equilibrium will shift to counteract any imposed change in conditions", "level": "E4", "sources": ["Le Chatelier 1884"], "tags": ["chemistry", "equilibrium"]},
+  {"claim": "Polymers are large molecules composed of repeating structural units called monomers linked by covalent bonds", "level": "E4", "sources": ["Chemistry"], "tags": ["chemistry", "polymers"]},
+  {"claim": "Entropy in chemistry measures the degree of disorder in a system and tends to increase in spontaneous processes", "level": "E4", "sources": ["Thermodynamics"], "tags": ["chemistry", "thermodynamics"]},
+  {"claim": "Enzymes are biological catalysts that dramatically increase reaction rates by lowering activation energy", "level": "E4", "sources": ["Biochemistry"], "tags": ["chemistry", "biochemistry"]},
+  {"claim": "The mole is the SI unit representing approximately 6.022 times 10 to the 23rd particles of a substance", "level": "E4", "sources": ["IUPAC"], "tags": ["chemistry", "measurement"]},
+  {"claim": "Carbon can form four covalent bonds and create long stable chains making it the basis of organic chemistry", "level": "E4", "sources": ["Organic Chemistry"], "tags": ["chemistry", "organic"]},
+  {"claim": "Semiconductors have electrical conductivity between conductors and insulators and form the basis of modern electronics", "level": "E4", "sources": ["Materials Science"], "tags": ["materials", "electronics"]},
+  {"claim": "Silicon is the most widely used semiconductor material due to its abundance and well-understood fabrication processes", "level": "E4", "sources": ["Materials Science"], "tags": ["materials", "electronics"]},
+  {"claim": "Lithium-ion batteries store energy through the movement of lithium ions between cathode and anode during charging and discharging", "level": "E4", "sources": ["Goodenough 1980"], "tags": ["materials", "energy"]},
+  {"claim": "Carbon nanotubes are cylindrical molecules with extraordinary strength and unique electrical properties", "level": "E4", "sources": ["Iijima 1991"], "tags": ["materials", "nanotechnology"]},
+  {"claim": "Shape-memory alloys can return to a predetermined shape when heated after being deformed", "level": "E4", "sources": ["Materials Science"], "tags": ["materials", "metallurgy"]},
+  {"claim": "Rare earth elements are critical for modern technology including magnets batteries and electronic displays", "level": "E4", "sources": ["USGS"], "tags": ["materials", "resources"]},
+  {"claim": "Perovskite solar cells have achieved over 25 percent efficiency in laboratory settings approaching silicon performance", "level": "E3", "sources": ["Solar Energy Research"], "tags": ["materials", "energy"]},
+  {"claim": "Hydrogen bonding between water molecules explains many of water unusual properties including its high boiling point", "level": "E4", "sources": ["Chemistry"], "tags": ["chemistry", "water"]},
+  {"claim": "Radioactive decay is a spontaneous nuclear process where unstable atoms emit radiation to reach a more stable state", "level": "E4", "sources": ["Nuclear Physics"], "tags": ["chemistry", "nuclear"]},
+  {"claim": "Chromatography separates mixtures based on differential interactions between mobile and stationary phases", "level": "E4", "sources": ["Analytical Chemistry"], "tags": ["chemistry", "analysis"]}
+]

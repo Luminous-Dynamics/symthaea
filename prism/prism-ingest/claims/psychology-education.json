@@ -1,0 +1,22 @@
+[
+  {"claim": "Long-term potentiation is a persistent strengthening of synaptic connections that underlies learning and memory formation", "level": "E4", "sources": ["Bliss Lomo 1973"], "tags": ["psychology", "neuroscience"]},
+  {"claim": "The prefrontal cortex is responsible for executive functions including planning decision-making and impulse control", "level": "E4", "sources": ["Neuroscience"], "tags": ["psychology", "neuroscience"]},
+  {"claim": "Confirmation bias is the tendency to search for interpret and recall information that confirms pre-existing beliefs", "level": "E4", "sources": ["Wason 1960"], "tags": ["psychology", "cognition"]},
+  {"claim": "Flow state is a mental state of complete absorption in an activity characterized by focused attention and intrinsic motivation", "level": "E3", "sources": ["Csikszentmihalyi 1990"], "tags": ["psychology", "motivation"]},
+  {"claim": "Attachment theory describes how early bonds between children and caregivers shape emotional development and future relationships", "level": "E4", "sources": ["Bowlby 1969"], "tags": ["psychology", "development"]},
+  {"claim": "The bystander effect describes how individuals are less likely to help in an emergency when other people are present", "level": "E4", "sources": ["Darley Latane 1968"], "tags": ["psychology", "social"]},
+  {"claim": "Cognitive load theory explains how working memory limitations affect learning and should inform instructional design", "level": "E3", "sources": ["Sweller 1988"], "tags": ["education", "cognition"]},
+  {"claim": "Growth mindset is the belief that abilities can be developed through effort and learning leading to greater resilience", "level": "E3", "sources": ["Dweck 2006"], "tags": ["education", "motivation"]},
+  {"claim": "Interleaving practice mixing different problem types during study improves long-term retention compared to blocking by topic", "level": "E3", "sources": ["Rohrer 2015"], "tags": ["education", "learning"]},
+  {"claim": "Elaborative interrogation asking why and how questions while studying strengthens understanding and memory", "level": "E3", "sources": ["Dunlosky 2013"], "tags": ["education", "learning"]},
+  {"claim": "The testing effect demonstrates that retrieving information from memory strengthens it more than additional study time", "level": "E4", "sources": ["Roediger 2006"], "tags": ["education", "learning"]},
+  {"claim": "Dual process theory distinguishes between fast intuitive System 1 thinking and slow deliberative System 2 thinking", "level": "E3", "sources": ["Kahneman 2011"], "tags": ["psychology", "cognition"]},
+  {"claim": "Neurogenesis the formation of new neurons occurs in the adult hippocampus and is influenced by exercise and learning", "level": "E3", "sources": ["Eriksson 1998"], "tags": ["psychology", "neuroscience"]},
+  {"claim": "Mindfulness meditation has been shown to reduce symptoms of anxiety depression and chronic pain in clinical studies", "level": "E3", "sources": ["Kabat-Zinn 2003"], "tags": ["psychology", "health"]},
+  {"claim": "The spacing effect shows that distributed practice over time produces better long-term retention than concentrated study sessions", "level": "E4", "sources": ["Cepeda 2006"], "tags": ["education", "learning"]},
+  {"claim": "Emotional intelligence includes the ability to perceive understand manage and use emotions in oneself and others", "level": "E3", "sources": ["Salovey Mayer 1990"], "tags": ["psychology", "social"]},
+  {"claim": "Scaffolding in education provides temporary structured support that is gradually removed as the learner develops competence", "level": "E3", "sources": ["Bruner 1976"], "tags": ["education", "pedagogy"]},
+  {"claim": "The Mozart effect the claim that listening to Mozart improves intelligence has been largely debunked by subsequent research", "level": "E4", "sources": ["Chabris 1999"], "tags": ["psychology", "cognition"]},
+  {"claim": "Post-traumatic growth describes positive psychological change experienced as a result of struggling with highly challenging life crises", "level": "E3", "sources": ["Tedeschi Calhoun 2004"], "tags": ["psychology", "resilience"]},
+  {"claim": "Executive function develops throughout childhood and adolescence with the prefrontal cortex not fully maturing until the mid-twenties", "level": "E4", "sources": ["Developmental Psychology"], "tags": ["psychology", "development"]}
+]

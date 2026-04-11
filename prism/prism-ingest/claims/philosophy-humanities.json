@@ -1,0 +1,22 @@
+[
+  {"claim": "The scientific method involves forming hypotheses designing experiments collecting data and drawing conclusions through systematic observation", "level": "E4", "sources": ["Philosophy of Science"], "tags": ["philosophy", "epistemology"]},
+  {"claim": "Falsifiability proposed by Karl Popper requires that scientific theories must be capable of being proven wrong through observation", "level": "E4", "sources": ["Popper 1959"], "tags": ["philosophy", "epistemology"]},
+  {"claim": "The is-ought problem identified by David Hume states that descriptive facts about the world cannot logically justify normative ethical claims", "level": "E4", "sources": ["Hume 1739"], "tags": ["philosophy", "ethics"]},
+  {"claim": "Utilitarianism evaluates the morality of actions based on their consequences seeking to maximize overall wellbeing or happiness", "level": "E4", "sources": ["Mill 1863"], "tags": ["philosophy", "ethics"]},
+  {"claim": "Deontological ethics judges actions by whether they conform to moral rules or duties regardless of their consequences", "level": "E4", "sources": ["Kant 1785"], "tags": ["philosophy", "ethics"]},
+  {"claim": "Virtue ethics focuses on the character of the moral agent rather than rules or consequences emphasizing practical wisdom", "level": "E4", "sources": ["Aristotle"], "tags": ["philosophy", "ethics"]},
+  {"claim": "The mind-body problem asks how mental states relate to physical brain states and whether consciousness can be reduced to neural activity", "level": "E4", "sources": ["Philosophy of Mind"], "tags": ["philosophy", "consciousness"]},
+  {"claim": "Phenomenology studies the structures of conscious experience as lived and experienced from the first-person perspective", "level": "E4", "sources": ["Husserl 1913"], "tags": ["philosophy", "consciousness"]},
+  {"claim": "Existentialism emphasizes individual freedom responsibility and the search for meaning in a universe without inherent purpose", "level": "E4", "sources": ["Sartre 1943"], "tags": ["philosophy", "existentialism"]},
+  {"claim": "The Socratic method uses guided questioning to stimulate critical thinking and illuminate ideas through dialogue", "level": "E4", "sources": ["Plato"], "tags": ["philosophy", "pedagogy"]},
+  {"claim": "Occam razor recommends preferring the simplest explanation among competing hypotheses that equally account for the evidence", "level": "E4", "sources": ["William of Ockham"], "tags": ["philosophy", "epistemology"]},
+  {"claim": "Thomas Kuhn argued that science progresses through paradigm shifts where established frameworks are replaced by fundamentally new ones", "level": "E4", "sources": ["Kuhn 1962"], "tags": ["philosophy", "epistemology"]},
+  {"claim": "The Sapir-Whorf hypothesis proposes that the structure of a language influences how its speakers perceive and think about the world", "level": "E2", "sources": ["Linguistics"], "tags": ["linguistics", "cognition"]},
+  {"claim": "Critical thinking involves analyzing evaluating and constructing arguments using evidence logic and reasoning rather than appeals to authority", "level": "E4", "sources": ["Philosophy"], "tags": ["philosophy", "epistemology"]},
+  {"claim": "The precautionary principle holds that the burden of proof for potentially harmful actions falls on those proposing the action", "level": "E3", "sources": ["Environmental Ethics"], "tags": ["philosophy", "ethics"]},
+  {"claim": "Information asymmetry occurs when one party in a transaction has more relevant knowledge than the other creating potential for exploitation", "level": "E4", "sources": ["Akerlof 1970"], "tags": ["economics", "information"]},
+  {"claim": "The tragedy of the anticommons occurs when too many parties hold rights of exclusion preventing efficient use of a resource", "level": "E3", "sources": ["Heller 1998"], "tags": ["philosophy", "commons"]},
+  {"claim": "Ubuntu is an African philosophical concept meaning I am because we are emphasizing communal bonds and shared humanity", "level": "E3", "sources": ["Tutu 1999"], "tags": ["philosophy", "ethics"]},
+  {"claim": "Epistemic humility is the recognition that our knowledge is always incomplete and our beliefs may be wrong", "level": "E4", "sources": ["Epistemology"], "tags": ["philosophy", "epistemology"]},
+  {"claim": "The veil of ignorance thought experiment asks what principles of justice people would choose if they did not know their own position in society", "level": "E4", "sources": ["Rawls 1971"], "tags": ["philosophy", "ethics"]}
+]

@@ -199,4 +199,60 @@ const RAW: &[(&str, prism_common::EmpiricalLevel, &[&str], &[&str])] = &[
     // ── Geology ──
     ("Plate tectonics describes the movement of Earths lithospheric plates driven by convection in the mantle", E4, &["USGS"], &["geology", "tectonics"]),
     ("The Ring of Fire is a horseshoe-shaped zone around the Pacific Ocean where 75 percent of volcanic eruptions occur", E4, &["USGS"], &["geology", "volcanoes"]),
+    ("Diamonds form under extreme pressure and temperature at depths of 150 to 200 kilometers in the Earth mantle", E4, &["Geology"], &["geology", "minerals"]),
+
+    // ── Artificial Intelligence ──
+    ("Neural networks are computational models inspired by biological neurons that learn through adjusting connection weights", E4, &["Computer Science"], &["ai", "machine-learning"]),
+    ("Large language models are trained on massive text corpora and generate text by predicting the most likely next token", E4, &["AI Research"], &["ai", "nlp"]),
+    ("Reinforcement learning trains agents through trial and error using rewards and penalties to optimize behavior", E4, &["Sutton Barto 2018"], &["ai", "machine-learning"]),
+    ("The Turing test proposes that machine intelligence can be evaluated by whether a human cannot distinguish it from another human", E4, &["Turing 1950"], &["ai", "philosophy"]),
+    ("Transformer architecture uses self-attention mechanisms to process entire sequences in parallel rather than sequentially", E4, &["Vaswani 2017"], &["ai", "architecture"]),
+    ("Backpropagation is the algorithm used to train neural networks by computing gradients of the loss function through the chain rule", E4, &["Rumelhart 1986"], &["ai", "machine-learning"]),
+    ("Generative adversarial networks consist of two competing neural networks that improve each other through adversarial training", E4, &["Goodfellow 2014"], &["ai", "machine-learning"]),
+    ("AI alignment is the challenge of ensuring artificial intelligence systems behave in ways consistent with human values", E3, &["AI Safety Research"], &["ai", "alignment"]),
+
+    // ── Chemistry ──
+    ("The periodic table organizes chemical elements by atomic number revealing recurring patterns in their properties", E4, &["IUPAC"], &["chemistry", "elements"]),
+    ("Water has a uniquely high specific heat capacity which stabilizes temperatures on Earth", E4, &["Chemistry"], &["chemistry", "water"]),
+    ("Covalent bonds form when atoms share electron pairs while ionic bonds form through electron transfer", E4, &["Chemistry"], &["chemistry", "bonding"]),
+    ("The pH scale measures acidity and alkalinity on a logarithmic scale from 0 to 14 with 7 being neutral", E4, &["Chemistry"], &["chemistry", "acid-base"]),
+    ("Catalysts increase the rate of chemical reactions by lowering the activation energy without being consumed", E4, &["Chemistry"], &["chemistry", "catalysis"]),
+
+    // ── Evolution ──
+    ("Natural selection acts on heritable variation in traits that affect reproductive success in a given environment", E4, &["Darwin 1859"], &["biology", "evolution"]),
+    ("All life on Earth shares a last universal common ancestor that lived approximately 3.5 to 4 billion years ago", E4, &["Molecular Biology"], &["biology", "evolution"]),
+    ("Genetic drift causes random changes in allele frequency that are most significant in small populations", E4, &["Population Genetics"], &["biology", "evolution"]),
+    ("Horizontal gene transfer allows organisms to acquire genes from other species without traditional reproduction", E4, &["Microbiology"], &["biology", "evolution"]),
+
+    // ── Education ──
+    ("Spaced repetition distributes learning over time producing stronger and longer-lasting memories than massed practice", E4, &["Ebbinghaus 1885"], &["education", "learning"]),
+    ("The zone of proximal development describes the gap between what a learner can do alone and with guidance", E3, &["Vygotsky 1978"], &["education", "learning"]),
+    ("Bloom taxonomy classifies educational objectives into six levels from remembering to creating", E4, &["Bloom 1956"], &["education", "pedagogy"]),
+    ("Active recall testing strengthens memory more effectively than passive rereading", E4, &["Roediger 2006"], &["education", "learning"]),
+    ("Metacognition the ability to think about ones own thinking is a strong predictor of academic achievement", E3, &["Flavell 1979"], &["education", "cognition"]),
+
+    // ── Sociology ──
+    ("Social capital refers to the networks of relationships among people that enable society to function effectively", E3, &["Putnam 2000"], &["sociology", "community"]),
+    ("The Gini coefficient measures income inequality on a scale from 0 perfect equality to 1 maximum inequality", E4, &["Economics"], &["sociology", "inequality"]),
+    ("Urbanization has increased from 30 percent of world population in 1950 to over 55 percent in 2020", E4, &["UN"], &["sociology", "demographics"]),
+
+    // ── Human Rights ──
+    ("The right to privacy is recognized in article 12 of the Universal Declaration of Human Rights", E4, &["UN UDHR"], &["rights", "privacy"]),
+    ("Free and open source software protects user freedom through licenses that guarantee access to source code", E4, &["FSF"], &["rights", "software"]),
+    ("Data sovereignty means individuals and communities control their own data rather than centralized platforms", E3, &["Digital Rights"], &["rights", "data"]),
+
+    // ── Art & Culture ──
+    ("The golden ratio approximately 1.618 appears frequently in art architecture and natural phenomena", E3, &["Mathematics"], &["art", "mathematics"]),
+    ("Perspective drawing uses vanishing points to create the illusion of depth on a two-dimensional surface", E4, &["Art History"], &["art", "technique"]),
+    ("Synesthesia is a neurological phenomenon where stimulation of one sense triggers automatic experiences in another", E3, &["Neuroscience"], &["art", "perception"]),
+
+    // ── Water Science ──
+    ("Less than 1 percent of Earths total water is accessible fresh water in lakes rivers and shallow groundwater", E4, &["USGS"], &["water", "resources"]),
+    ("Desalination removes salt from seawater but requires significant energy currently 3 to 4 kWh per cubic meter", E4, &["Water Engineering"], &["water", "technology"]),
+
+    // ── Statistics ──
+    ("Bayes theorem describes how to update the probability of a hypothesis given new evidence", E4, &["Mathematics"], &["statistics", "probability"]),
+    ("The central limit theorem states that the sampling distribution of the mean approaches normal distribution regardless of population shape", E4, &["Statistics"], &["statistics", "probability"]),
+    ("Correlation does not imply causation because two variables can be associated without one causing the other", E4, &["Statistics"], &["statistics", "methodology"]),
+    ("P-values represent the probability of obtaining results at least as extreme as observed assuming the null hypothesis is true", E4, &["Fisher 1925"], &["statistics", "methodology"]),
 ];

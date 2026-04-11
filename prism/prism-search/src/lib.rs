@@ -111,12 +111,13 @@ impl SearchEngine {
         engine
     }
 
-    /// Build index from curated + mycelix claims only (no Wikidata).
-    /// Produces a small index (~200 claims) suitable for instant mobile loading.
+    /// Build index from curated + pipeline + mycelix claims (no Wikidata).
+    /// Produces the core index suitable for mobile loading.
     pub fn with_core_claims() -> Self {
         let mut engine = Self::new();
         let mut all_claims = Vec::new();
         all_claims.extend(prism_ingest::curated_claims());
+        all_claims.extend(prism_ingest::pipeline_claims());
         all_claims.extend(prism_ingest::mycelix_claims());
 
         for claim in &all_claims {

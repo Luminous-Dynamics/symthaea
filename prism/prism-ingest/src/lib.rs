@@ -8,6 +8,7 @@
 
 pub mod curated;
 pub mod mycelix;
+pub mod pipeline;
 pub mod wikidata_claims;
 
 use prism_common::{EmpiricalLevel, NormativeLevel, MaterialityLevel};
@@ -54,9 +55,14 @@ fn passes_quality(content: &str) -> bool {
     true
 }
 
-/// Load curated claims only (high-quality, ~90 claims).
+/// Load curated claims only (high-quality, ~140 claims).
 pub fn curated_claims() -> Vec<RawClaim> {
     curated::curated_claims().into_iter().filter(|c| passes_quality(&c.content)).collect()
+}
+
+/// Load pipeline claims from JSON files (~400+ claims).
+pub fn pipeline_claims() -> Vec<RawClaim> {
+    pipeline::load_pipeline_claims().into_iter().filter(|c| passes_quality(&c.content)).collect()
 }
 
 /// Load mycelix JSON claims only (~100-200 claims).
@@ -79,6 +85,9 @@ pub fn load_all_claims() -> Vec<RawClaim> {
 
     // Curated (highest quality, loaded first)
     for c in curated::curated_claims() { add(c); }
+
+    // Pipeline (bulk JSON claims, second priority)
+    for c in pipeline::load_pipeline_claims() { add(c); }
 
     // Mycelix-knowledge
     for c in mycelix::load_mycelix_claims() { add(c); }
