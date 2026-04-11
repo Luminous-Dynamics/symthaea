@@ -359,7 +359,7 @@ mod tests {
         let bench = ChemistryBenchmark;
         let config = BenchmarkConfig {
             trials_per_condition: 2,
-            label: "test".to_string(),
+            label: Some("test".to_string()),
             ..Default::default()
         };
         let result = bench.run(&config);

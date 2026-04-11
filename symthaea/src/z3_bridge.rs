@@ -384,7 +384,7 @@ impl Z3Bridge {
         }
 
         // Build SMTLIB2
-        let mut decls: Vec<String> = variables
+        let decls: Vec<String> = variables
             .iter()
             .enumerate()
             .map(|(i, &v)| format!("(declare-const x{i} Int)\n(assert (= x{i} {v}))"))

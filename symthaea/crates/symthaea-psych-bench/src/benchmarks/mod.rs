@@ -34,7 +34,8 @@ pub mod sustained_attention;
 pub mod tombench;
 pub mod worm;
 
-#[cfg(any(feature = "nuclear-benchmarks", feature = "materials-benchmarks"))]
+// Science benchmarks: always-on modules (ode_chaos, chemistry) +
+// feature-gated modules (nuclear_physics, materials_design).
 pub mod science;
 
 #[cfg(feature = "neural_validation")]

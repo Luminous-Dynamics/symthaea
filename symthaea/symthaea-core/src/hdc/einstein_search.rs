@@ -199,12 +199,18 @@ pub fn hdc_bind_crossover(a: &MetricTensor, b: &MetricTensor, seed: u64) -> Metr
     // Decode flat upper-triangular back to full symmetric metric
     let mut decoded = MetricTensor::decode_flat(&result_flat, n);
 
-    // Ensure positive definiteness (may be violated by XOR)
-    let min_diag = (0..n).map(|i| decoded.g(i, i)).fold(f64::INFINITY, f64::min);
-    if min_diag < 0.1 {
-        let shift = 0.1 - min_diag + 1e-6;
-        for i in 0..n {
-            *decoded.g_mut(i, i) += shift;
+    // Ensure positive definiteness via Gershgorin shift.
+    // XOR(x,x) = 0 decodes to -range, producing large negative off-diagonals
+    // when parent metrics share values. A diagonal-only shift is insufficient;
+    // we need the diagonal to dominate the off-diagonal row sums.
+    for i in 0..n {
+        let off_diag_sum: f64 = (0..n)
+            .filter(|&j| j != i)
+            .map(|j| decoded.g(i, j).abs())
+            .sum();
+        let needed = off_diag_sum + 0.1; // Gershgorin: λ_min ≥ diag - off_diag_sum
+        if decoded.g(i, i) < needed {
+            *decoded.g_mut(i, i) = needed;
         }
     }
 
