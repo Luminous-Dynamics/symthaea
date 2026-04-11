@@ -57,7 +57,7 @@ pub fn ContentRouter() -> impl IntoView {
                     <iframe
                         class="fullpage-iframe"
                         src=url.clone()
-                        sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox"
+                        sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
                     ></iframe>
                 }.into_any()
             }

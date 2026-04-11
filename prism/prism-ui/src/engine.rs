@@ -89,27 +89,29 @@ fn sanitize_html(html: &str, base_url: Option<&url::Url>) -> String {
 /// Rewrite links in sanitized HTML to route through the Prism proxy.
 /// Converts absolute href="https://example.com/foo" to href="javascript:void(0)"
 /// with a data attribute, so the click handler can navigate within Prism.
-fn rewrite_links_for_proxy(html: &str, source_host: &str) -> String {
-    // Simple regex-free approach: replace href="http(s)://" with proxy-routed links.
-    // For images: rewrite src to go through proxy for cross-origin loading.
-    let mut result = html.to_string();
+fn rewrite_links_for_proxy(html: &str, _source_host: &str) -> String {
+    // Rewrite image src="https://..." to src="/proxy?url=https://..."
+    // so cross-origin images load through our same-origin proxy.
+    let mut output = String::with_capacity(html.len());
+    let mut remaining = html;
 
-    // Rewrite image sources to proxy through our server
-    // Match src="https://..." and src="http://..."
-    let mut output = String::with_capacity(result.len());
-    let mut remaining = result.as_str();
     while let Some(idx) = remaining.find("src=\"http") {
         output.push_str(&remaining[..idx]);
-        output.push_str("src=\"/proxy?url=");
-        remaining = &remaining[idx + 5..]; // skip 'src="'
-        if let Some(end) = remaining.find('"') {
-            output.push_str(&remaining[..end]);
+        let after_src = &remaining[idx + 5..]; // skip 'src="'
+        if let Some(end) = after_src.find('"') {
+            let url = &after_src[..end];
+            output.push_str("src=\"/proxy?url=");
+            output.push_str(url);
             output.push('"');
-            remaining = &remaining[end + 1..];
+            remaining = &after_src[end + 1..];
+        } else {
+            // Malformed: no closing quote. Preserve as-is and stop rewriting.
+            output.push_str(&remaining[idx..]);
+            remaining = "";
+            break;
         }
     }
     output.push_str(remaining);
-
     output
 }
 
@@ -203,7 +205,16 @@ pub fn process_input(
         return;
     }
 
-    if input == "prism://welcome" || input.starts_with("prism://") && !input.contains("search") {
+    // Handle prism://search?q= — re-execute the search query
+    if input.starts_with("prism://search?q=") {
+        let query = input.trim_start_matches("prism://search?q=");
+        if !query.is_empty() {
+            search_query(query, state, search_engine);
+        }
+        return;
+    }
+
+    if input == "prism://welcome" || input.starts_with("prism://") {
         let view = PageView::Welcome;
         state.set_current_url.set(input.to_string());
         state.set_page_title.set("Prism".to_string());
