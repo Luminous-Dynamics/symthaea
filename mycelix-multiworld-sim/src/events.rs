@@ -83,6 +83,16 @@ pub enum CivEventType {
     ResontiaInfrastructureBuilt,
     /// Resontia evacuation event (population moved to vaults).
     ResontiaEvacuation,
+    /// Moral dilemma: disaster forced an ethical choice (save many vs protect vulnerable).
+    MoralDilemma,
+    /// Ethical crisis: sustained conflict between dominant ethical orientations.
+    EthicalCrisis,
+    /// Ethical synthesis: opposing frameworks resolved into a new hybrid orientation.
+    EthicalSynthesis,
+    /// Ethical fork: population split along ethical lines (triggers world split consideration).
+    EthicalFork,
+    /// Ethics shift: population mean ethical orientation drifted significantly from founding.
+    EthicsShift,
 }
 
 impl CivEvent {

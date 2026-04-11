@@ -58,17 +58,8 @@ fn sanitize_html(html: &str) -> String {
 /// to bypass browser same-origin restrictions.
 /// Falls back to direct fetch if proxy is not running.
 fn proxy_url(target: &str) -> String {
-    // Try proxy at :8131 (same host as the app)
-    if let Some(window) = web_sys::window() {
-        if let Ok(origin) = window.location().origin() {
-            if let Ok(parsed) = url::Url::parse(&origin) {
-                let scheme = parsed.scheme();
-                let host = parsed.host_str().unwrap_or("127.0.0.1");
-                return format!("{}://{}:8131/proxy?url={}", scheme, host, target);
-            }
-        }
-    }
-    format!("http://127.0.0.1:8131/proxy?url={}", target)
+    // Same-origin: proxy routes served by prism-serve on the same port.
+    format!("/proxy?url={}", target)
 }
 
 pub fn is_url(input: &str) -> bool {

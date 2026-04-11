@@ -713,6 +713,20 @@ button.example-query:active { opacity: 0.6; }
     font-size: 12px;
     color: var(--content-text-secondary);
 }
+.overlay-surprise {
+    font-size: 11px;
+    color: var(--e2-color);
+    font-style: italic;
+}
+.overlay-confident {
+    font-size: 11px;
+    color: var(--e4-color);
+}
+.overlay-uncertain {
+    font-size: 11px;
+    color: var(--chrome-text-dim);
+    font-style: italic;
+}
 
 .overlay-page-text {
     font-size: 14px;

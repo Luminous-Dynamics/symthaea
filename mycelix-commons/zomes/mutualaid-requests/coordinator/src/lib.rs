@@ -159,8 +159,6 @@ fn get_offerer_anchor(did: &str) -> ExternResult<EntryHash> {
     Ok(entry_hash)
 }
 
-    gate_civic("commons_bridge", requirement, action_name)
-
 /// Create a new aid request
 #[hdk_extern]
 pub fn create_request(input: CreateRequestInput) -> ExternResult<RequestWithHash> {

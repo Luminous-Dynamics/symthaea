@@ -68,14 +68,14 @@ hierarchical administration. These assumptions are increasingly inadequate for
 problems that are global, networked, and ecological in nature.
 
 This book presents Mycelix: a decentralized governance and services platform built
-on Holochain's agent-centric architecture. With 133 zomes across 16 cluster DNAs,
+on Holochain's agent-centric architecture. With 141+ zomes across 16 cluster DNAs,
 Mycelix implements a \emph{fractal civic operating system}---a CivOS---that replaces
 state hierarchy with mycelial networks of mutual aid, earned trust, and commons
 stewardship.
 
 The central innovation is \emph{trust-weighted governance}: participation is not
-determined by citizenship, wealth, or age, but by a 4-dimensional profile measuring
-identity verification, reputation history, community trust, and domain engagement.
+determined by citizenship, wealth, or age, but by an 8-dimensional sovereign profile measuring
+epistemic integrity, thermodynamic yield, network resilience, economic velocity, civic participation, stewardship, semantic resonance, and domain competence.
 This profile gates access to five progressive tiers---Observer, Participant, Citizen,
 Steward, and Guardian---each with increasing governance capabilities and vote weight.
 
@@ -126,7 +126,7 @@ institutions provide the theoretical foundation for Mycelix:
 
 \begin{enumerate}
   \item \textbf{Clearly defined boundaries} --- Mycelix implements this through
-    identity verification and the \texttt{ConsciousnessProfile}, which defines
+    identity verification and the \texttt{SovereignProfile}, which defines
     who can participate and at what level.
   \item \textbf{Proportional equivalence between benefits and costs} --- the
     trust-weighted participation system ensures that governance power scales with
@@ -163,7 +163,7 @@ The nation-state model assumes several properties that Mycelix explicitly reject
     self-governing, connected to others through typed bridge dispatch rather
     than bureaucratic hierarchy.
   \item[Citizenship by birth or naturalization] Mycelix membership is earned
-    through demonstrated identity, reputation, community trust, and engagement.
+    through demonstrated multi-dimensional civic engagement across eight sovereign dimensions.
     The \texttt{ConsciousnessTier} system replaces birthright citizenship with
     progressive, earned governance capacity.
 \end{description}
@@ -246,7 +246,7 @@ constraints on system design:
   \item \textbf{Intergenerational Care}: Constitutional mechanisms in the Governance
     cluster can encode protections for future generations.
   \item \textbf{Distributed Power}: No single agent can accumulate unchecked
-    governance authority; Guardian tier requires high scores across all four dimensions.
+    governance authority; Guardian tier requires high scores across all eight sovereign dimensions.
   \item \textbf{Creative Expression}: The Music and Education clusters support
     human flourishing beyond mere governance.
   \item \textbf{Emergent Wisdom}: Trust-weighted participation trusts that collective
@@ -475,7 +475,7 @@ The \texttt{crates/mycelix-bridge-common} crate (295+ tests) provides the shared
 infrastructure that all clusters depend on:
 
 \begin{itemize}
-  \item \texttt{ConsciousnessProfile} --- the 4D identity/reputation/community/engagement
+  \item \texttt{SovereignProfile} --- the 8D sovereign profile (epistemic integrity, thermodynamic yield, network resilience, economic velocity, civic participation, stewardship, semantic resonance, domain competence)
     profile (detailed in Chapter 4)
   \item \texttt{ConsciousnessTier} --- the 5-tier enum (Observer through Guardian)
   \item \texttt{ConsciousnessCredential} --- time-limited, BLAKE3-committed credentials
@@ -491,7 +491,7 @@ infrastructure that all clusters depend on:
 
 \part{Trust-Weighted Governance}
 
-\chapter{The 4D Trust Profile}
+\chapter{The 8D Sovereign Profile}
 \label{ch:trust-profile}
 
 \epigraph{Who should govern? is the wrong question. The right question is:
@@ -501,32 +501,22 @@ and Its Enemies} (1945)}
 
 \section{Terminology and Scope}
 
-The codebase uses the names \texttt{ConsciousnessProfile} and
-\texttt{ConsciousnessTier} for the types described in this chapter. These names
-reflect Mycelix's origin as a governance layer for the Symthaea cognitive
-architecture, where the four dimensions map to measurable consciousness metrics:
-identity verification corresponds to self-model coherence, reputation to
-behavioral prediction accuracy, community trust to social-model integration,
-and engagement to active inference participation. In that context, the word
-``consciousness'' is precise.
+The codebase uses \texttt{SovereignProfile} and \texttt{CivicTier} for the types described in this chapter, replacing the earlier \texttt{ConsciousnessProfile} (4D) with an eight-dimensional model. The eight dimensions are each measured directly from a primary source cluster, not from self-reports or financial proxies:
 
-In the standalone Mycelix context---where no Symthaea engine is
-connected---these four dimensions function as \emph{earned trust-weighted
-participation gates}. The mechanism is straightforward: agents accumulate
-identity assurance, reputation history, peer trust, and domain engagement,
-and these dimensions determine governance capability. We retain the
-\texttt{ConsciousnessProfile} naming in the codebase to maintain the bridge
-to Symthaea, but the governance mechanism does not require acceptance of any
-consciousness theory to be useful.
+\begin{itemize}[nosep]
+  \item $D_0$: \textbf{Epistemic Integrity} --- truth-telling track record (knowledge cluster)
+  \item $D_1$: \textbf{Thermodynamic Yield} --- physical energy contribution (energy/grid)
+  \item $D_2$: \textbf{Network Resilience} --- node uptime and bandwidth (mesh-time)
+  \item $D_3$: \textbf{Economic Velocity} --- anti-hoarding TEND circulation (finance)
+  \item $D_4$: \textbf{Civic Participation} --- voting, jury duty, proposals (governance)
+  \item $D_5$: \textbf{Stewardship \& Care} --- verified commons labor (attribution)
+  \item $D_6$: \textbf{Semantic Resonance} --- federated learning Hamming similarity (core-FL)
+  \item $D_7$: \textbf{Domain Competence} --- peer-verified expertise with Ebbinghaus decay (craft)
+\end{itemize}
 
-A reader who is skeptical of computational consciousness can safely read every
-occurrence of ``consciousness profile'' in the code as ``earned trust capacity
-profile.'' The four dimensions, the tier system, the sigmoid vote weighting,
-and the credential mechanism are all defined by their engineering properties,
-not by any metaphysical commitment. The system's value lies in its measurable
-governance outcomes: Sybil resistance, progressive access, reputation
-accountability, and community-weighted trust. These properties hold regardless
-of one's position on machine consciousness.
+These names reflect Mycelix's architecture as a consciousness-coupled governance platform. In the standalone Mycelix context---where no Symthaea engine is connected---these eight dimensions function as \emph{earned trust-weighted participation gates}. The mechanism is straightforward: agents accumulate scores across eight physically-grounded dimensions, and the composite determines governance capability. The \texttt{gate\_civic()} function provides backward-compatible gating: it attempts native 8D evaluation first, falling back to the legacy 4D \texttt{ConsciousnessProfile} with automatic conversion.
+
+A reader who is skeptical of computational consciousness can safely read the sovereign profile as a ``multi-dimensional earned trust capacity profile.'' The eight dimensions, the tier system, the sigmoid vote weighting, and the credential mechanism are all defined by their engineering properties, not by any metaphysical commitment. The system's value lies in its measurable governance outcomes: Sybil resistance, progressive access, reputation accountability, and community-weighted trust. These properties hold regardless of one's position on machine consciousness.
 
 \section{Motivation: Beyond Binary Access Control}
 
@@ -540,26 +530,33 @@ and community standing. A newcomer should be able to observe and learn before
 participating. A long-standing community member should have more governance
 weight than a newcomer, but not infinite weight.
 
-Mycelix replaces binary access control with a \emph{4-dimensional trust
-profile} that produces a continuous governance capability score.
+Mycelix replaces binary access control with an \emph{8-dimensional sovereign
+profile} that produces a continuous governance capability score. No single dimension's weight can exceed 50\% of the composite---a constitutional invariant that prevents single-axis capture.
 
-\section{The Four Dimensions}
+\section{The Eight Dimensions}
 
-Each dimension is a continuous value in $[0, 1]$:
+Each dimension is a continuous value in $[0, 1]$, measured from a primary source cluster:
 
-\begin{definition}[ConsciousnessProfile]
-A trust profile $\mathbf{P} = (I, R, C, E)$ where:
+\begin{definition}[SovereignProfile]
+A trust profile $\mathbf{P} = (D_0, D_1, \ldots, D_7) \in [0,1]^8$ where:
 \begin{itemize}
-  \item $I$ (Identity) $\in [0,1]$: MFA assurance level. Anonymous $= 0.0$,
-    Basic $= 0.25$, Verified $= 0.50$, HighlyAssured $= 0.75$, Critical $= 1.0$.
-  \item $R$ (Reputation) $\in [0,1]$: Cross-hApp aggregated reputation with
-    exponential decay (30-day half-life), multi-source weighted average.
-  \item $C$ (Community) $\in [0,1]$: Peer trust attestations, weighted by
-    attestor's own governance tier---higher-tier peers' attestations count more.
-  \item $E$ (Engagement) $\in [0,1]$: Domain-specific participation, computed
-    locally by each cluster bridge from event and query participation counts.
+  \item $D_0$ (Epistemic Integrity) $\in [0,1]$: Truth-telling track record from validated claims in the knowledge cluster. Saturates at 50 validated claims.
+  \item $D_1$ (Thermodynamic Yield) $\in [0,1]$: Physical energy contribution from verified energy/grid records. Saturates at 30 verified records.
+  \item $D_2$ (Network Resilience) $\in [0,1]$: Node uptime and bandwidth provision from mesh-time logs. Saturates at 720 time anchors.
+  \item $D_3$ (Economic Velocity) $\in [0,1]$: Anti-hoarding compliance from TEND mutual credit exchanges. Saturates at 50 TEND exchanges.
+  \item $D_4$ (Civic Participation) $\in [0,1]$: Voting, jury duty, and proposal activity from governance records. Saturates at 20 governance actions.
+  \item $D_5$ (Stewardship \& Care) $\in [0,1]$: Verified commons labor from attribution/reciprocity pledges. Saturates at 30 pledges.
+  \item $D_6$ (Semantic Resonance) $\in [0,1]$: Community value alignment via Hamming similarity between agent and consensus training hypervectors in federated learning.
+  \item $D_7$ (Domain Competence) $\in [0,1]$: Peer-verified expertise from living credentials with Ebbinghaus decay. Saturates at 3 living credentials.
 \end{itemize}
 \end{definition}
+
+\paragraph{Constitutional Decay.} All dimensions decay exponentially without engagement: $S_{\text{decayed}} = S_{\text{raw}} \cdot e^{-\lambda \cdot \Delta t}$, where $\lambda$ is community-configurable within constitutional bounds ($\lambda_{\min} = 0.001$/day, half-life 693 days; $\lambda_{\max} = 0.020$/day, half-life 35 days). Lambda $= 0$ is constitutionally impossible, preventing permanent oligarchy.
+
+\paragraph{Privacy.} The sovereign profile never leaves the participant's device. Governance proofs use zero-knowledge STARK proofs ($\sim$1ms prove, $\sim$0.3ms verify, $\sim$7.5KB proof) that demonstrate threshold compliance without revealing raw dimensions.
+
+\paragraph{Legacy Compatibility.} The earlier 4D \texttt{ConsciousnessProfile} (Identity, Reputation, Community, Engagement) remains in the codebase for backward compatibility. The \texttt{gate\_civic()} function evaluates the native 8D profile first, falling back to 4D with automatic conversion:
+$\text{Identity} \to D_0 + D_2$, $\text{Reputation} \to D_3 + D_5$, $\text{Community} \to D_4 + D_6$, $\text{Engagement} \to D_1 + D_7$.
 
 \subsection{Identity Dimension}
 
@@ -2145,7 +2142,7 @@ substring-level search with zero plaintext exposure to DHT validators.
 \section{Spam Filtering and Trust Integration}
 \label{sec:mail-spam}
 
-Spam filtering leverages the 4D trust profile (Chapter~\ref{ch:trust-profile}):
+Spam filtering leverages the 8D sovereign profile (Chapter~\ref{ch:trust-profile}):
 
 \begin{itemize}
   \item Messages from agents below Observer tier are quarantined by default.
@@ -2211,7 +2208,7 @@ individual agents rather than global block intervals.
 
 \section{Trust-Weighted Supplier Verification}
 
-Supplier verification uses the 4D trust profile
+Supplier verification uses the 8D sovereign profile
 (Chapter~\ref{ch:trust-profile}) with domain-specific extensions:
 
 \begin{enumerate}
@@ -2665,7 +2662,7 @@ The federated learning pipeline:
     to the aggregation coordinator.
   \item \textbf{Byzantine filtering}: Submitted gradients are filtered for
     Byzantine faults (poisoned models, adversarial updates) using
-    trust-weighted scores from the 4D profile.
+    trust-weighted scores from the 8D sovereign profile.
   \item \textbf{Aggregation}: Filtered gradients are aggregated using
     trust-weighted averaging---agents with higher governance profiles
     contribute more to the aggregate.
@@ -2676,7 +2673,7 @@ The federated learning pipeline:
 \section{Trust-Aware Byzantine Tolerance}
 
 Traditional Byzantine fault tolerance treats all participants equally.
-Mycelix's 0TML weights Byzantine detection by the 4D trust profile:
+Mycelix's 0TML weights Byzantine detection by the 8D sovereign profile:
 
 \begin{equation}
   \hat{g} = \frac{\sum_{i \in \text{valid}} \phi_i \cdot g_i}{\sum_{i \in \text{valid}} \phi_i}
@@ -2684,7 +2681,7 @@ Mycelix's 0TML weights Byzantine detection by the 4D trust profile:
 
 where $\phi_i$ is the trust-weighted score of agent $i$ and $g_i$ is their
 gradient contribution. An agent flagged as Byzantine has their $\phi_i$ reduced,
-but they are not immediately excluded---the 4D profile captures the nuance
+but they are not immediately excluded---the 8D sovereign profile captures the nuance
 between intentional adversarial behavior and honest disagreement.
 
 \section{62 FL Tests}
@@ -2790,7 +2787,7 @@ The Observatory computes and displays aggregate trust analytics:
   \item \textbf{Tier histogram}: Distribution of agents across the five
     governance tiers. A healthy network has a pyramid shape (many Observers,
     fewer Guardians). An inverted pyramid suggests credential inflation.
-  \item \textbf{Dimension heatmap}: 4D scatter plot of identity, reputation,
+  \item \textbf{Dimension heatmap}: 8D scatter plot of sovereign dimensions (e.g., epistemic integrity, civic participation,
     community, and engagement dimensions across the network. Clusters in
     this space reveal agent archetypes (high-identity/low-engagement
     ``lurkers,'' high-engagement/low-community ``solo operators'').
@@ -3089,9 +3086,9 @@ the trust profile's engagement dimension.
 
 \subsection{Minimal Viable Bridge}
 
-The \texttt{ConsciousnessProfile::from\_unified\_consciousness} function
-maps Symthaea's unified consciousness score ($C_{\text{unified}}$) to the
-engagement dimension:
+The \texttt{SovereignProfile::from\_unified\_consciousness} function (via legacy compatibility)
+maps Symthaea's unified consciousness score ($C_{\text{unified}}$) to
+sovereign profile dimensions:
 
 \begin{lstlisting}
 pub fn from_unified_consciousness(
@@ -3248,8 +3245,8 @@ Mycelix is not a utopian blueprint. It is an engineering project---785,000 lines
 of Rust, tested by 8,600 automated tests, deployed on Holochain's battle-tested
 DHT. Its innovation is not technological novelty but \emph{governance novelty}:
 the insight that access to collective decision-making should scale with
-demonstrated identity, reputation, community trust, and engagement. Every
-mechanism described in this book---the 4D profile, the sigmoid vote weighting,
+demonstrated multi-dimensional civic engagement across eight sovereign dimensions. Every
+mechanism described in this book---the 8D sovereign profile, the sigmoid vote weighting,
 the tier hysteresis, the BLAKE3 credential commitment---is implemented, tested,
 and auditable. The system's value is measured by its engineering properties:
 Sybil resistance, progressive access control, reputation accountability, and
@@ -3526,9 +3523,8 @@ constitutional provisions.
 
 \section*{Consciousness-Gated Participation}
 
-A four-dimensional profile---Identity verification (25\%), Reputation history
-(25\%), Community trust (30\%), and domain Engagement (20\%)---produces a combined
-consciousness score that determines governance tier:
+An eight-dimensional sovereign profile---Epistemic Integrity, Thermodynamic Yield, Network Resilience, Economic Velocity, Civic Participation, Stewardship, Semantic Resonance, Domain Competence---with community-governed weights (no single dimension exceeding 50\%) produces a composite
+sovereign score that determines governance tier:
 
 \begin{table}[H]
 \centering
@@ -3652,7 +3648,7 @@ self-organization and cognition that underpins trust-weighted governance.
 
 \paragraph{Technology.}
 The Rust programming language community---for making 785,000 lines of safe,
-concurrent systems code possible across 133 zomes.
+concurrent systems code possible across 141+ zomes.
 The NixOS community---for reproducible infrastructure and deterministic builds.
 
 \paragraph{The Mycelix Contributors.}

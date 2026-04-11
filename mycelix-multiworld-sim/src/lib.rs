@@ -224,6 +224,10 @@ pub struct MultiWorldSimulator {
     pub jsonl_output_path: Option<std::path::PathBuf>,
     /// CSV time-series recorder for scientific analysis (None = disabled).
     csv_recorder: Option<csv_output::CsvRecorder>,
+    /// Founding ethical orientation means per world (computed on first call).
+    founding_ethics: std::collections::HashMap<u32, [f64; 4]>,
+    /// Previous ethics std-dev per world (for synthesis detection).
+    prev_ethics_stddev: std::collections::HashMap<u32, f64>,
 }
 
 impl MultiWorldSimulator {
@@ -272,6 +276,8 @@ impl MultiWorldSimulator {
             ),
             jsonl_output_path: None,
             csv_recorder: None,
+            founding_ethics: std::collections::HashMap::new(),
+            prev_ethics_stddev: std::collections::HashMap::new(),
         }
     }
 
@@ -2324,6 +2330,173 @@ impl MultiWorldSimulator {
         );
     }
 
+    /// Phase 8.05: Ethical dynamics — moral dilemmas, ethics drift, and synthesis.
+    ///
+    /// 1. Moral dilemma detection (every 12 ticks): when a disaster-affected world
+    ///    has closely split ethical orientations, the community faces a genuine dilemma.
+    /// 2. Ethics shift detection (every 60 ticks): compares current mean ethics to
+    ///    the founding population's orientation, flagging significant drift.
+    /// 3. Ethical synthesis detection (every 60 ticks): when a recently resolved
+    ///    faction conflict coincides with decreased ethical diversity, the community
+    ///    has forged a new shared understanding.
+    fn tick_ethical_dynamics(&mut self) {
+        let tick = self.current_tick;
+        let dimension_names = ["deontological", "consequentialist", "virtue_care", "relational"];
+
+        // ── 1. Moral Dilemma Detection (every 12 ticks = annually) ──────────
+        if tick % 12 == 0 {
+            for world in &self.worlds {
+                let pop = world.population();
+                if pop <= 50 {
+                    continue;
+                }
+
+                // Check if this world has an active disaster this tick
+                let has_disaster = self
+                    .disaster_engine
+                    .active_disasters
+                    .iter()
+                    .any(|d| d.world_id == Some(world.id) || d.world_id.is_none());
+                if !has_disaster {
+                    continue;
+                }
+
+                let mean = agent::EthicalOrientation::mean_of(&world.agents);
+                let vals = mean.as_vec();
+
+                // Find the two highest dimensions
+                let mut indexed: Vec<(usize, f64)> =
+                    vals.iter().enumerate().map(|(i, &v)| (i, v)).collect();
+                indexed.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+
+                let (idx_a, score_a) = indexed[0];
+                let (idx_b, score_b) = indexed[1];
+
+                // If the top two are within 0.15, the community is genuinely split
+                if (score_a - score_b).abs() < 0.15 {
+                    let desc = format!(
+                        "{}: MORAL DILEMMA — {} ({:.2}) vs {} ({:.2}) on disaster response",
+                        world.name,
+                        dimension_names[idx_a],
+                        score_a,
+                        dimension_names[idx_b],
+                        score_b,
+                    );
+                    self.events.push(CivEvent::new(
+                        tick,
+                        Some(world.id),
+                        CivEventType::MoralDilemma,
+                        desc,
+                    ));
+                }
+            }
+        }
+
+        // ── 2. Ethics Shift Detection (every 60 ticks = 5 years) ────────────
+        if tick % 60 == 0 {
+            for world in &self.worlds {
+                let mean = agent::EthicalOrientation::mean_of(&world.agents);
+                let current = mean.as_vec();
+
+                // Store founding ethics on first encounter
+                let founding = self
+                    .founding_ethics
+                    .entry(world.id)
+                    .or_insert(current)
+                    .clone();
+
+                // Skip if this is the first call (founding == current)
+                if founding == current {
+                    continue;
+                }
+
+                for (dim_idx, dim_name) in dimension_names.iter().enumerate() {
+                    let shift = current[dim_idx] - founding[dim_idx];
+                    if shift.abs() > 0.15 {
+                        let direction = if shift > 0.0 { "increased" } else { "decreased" };
+                        let desc = format!(
+                            "{}: ETHICS SHIFT — {} moved from {:.2} to {:.2} ({})",
+                            world.name, dim_name, founding[dim_idx], current[dim_idx], direction,
+                        );
+                        self.events.push(CivEvent::new(
+                            tick,
+                            Some(world.id),
+                            CivEventType::EthicsShift,
+                            desc,
+                        ));
+                    }
+                }
+            }
+        }
+
+        // ── 3. Ethical Synthesis Detection (every 60 ticks) ─────────────────
+        if tick % 60 == 0 {
+            for world in &self.worlds {
+                // Check for recently resolved conflicts in this world
+                let world_factions: Vec<u32> = self
+                    .faction_engine
+                    .factions
+                    .iter()
+                    .filter(|f| f.world_id == world.id)
+                    .map(|f| f.id)
+                    .collect();
+
+                let has_recent_resolution = self.faction_engine.conflicts.iter().any(|c| {
+                    if let Some(rt) = c.resolved_tick {
+                        // Resolved in the last 60 ticks (since last check)
+                        rt > tick.saturating_sub(60)
+                            && rt <= tick
+                            && (world_factions.contains(&c.faction_a)
+                                || world_factions.contains(&c.faction_b))
+                    } else {
+                        false
+                    }
+                });
+
+                if !has_recent_resolution {
+                    continue;
+                }
+
+                // Compute current ethics std-dev across the population
+                let living: Vec<_> = world.agents.iter().filter(|a| a.is_alive()).collect();
+                if living.is_empty() {
+                    continue;
+                }
+                let mean = agent::EthicalOrientation::mean_of(&world.agents);
+                let mean_v = mean.as_vec();
+                let n = living.len() as f64;
+                let variance: f64 = living
+                    .iter()
+                    .map(|a| {
+                        let v = a.ethics.as_vec();
+                        (0..4).map(|i| (v[i] - mean_v[i]).powi(2)).sum::<f64>()
+                    })
+                    .sum::<f64>()
+                    / (n * 4.0);
+                let stddev = variance.sqrt();
+
+                let prev_stddev = self.prev_ethics_stddev.get(&world.id).copied();
+                self.prev_ethics_stddev.insert(world.id, stddev);
+
+                // If diversity decreased since last check, synthesis occurred
+                if let Some(prev) = prev_stddev {
+                    if stddev < prev {
+                        let desc = format!(
+                            "{}: ETHICAL SYNTHESIS — post-conflict convergence, ethical diversity decreased",
+                            world.name,
+                        );
+                        self.events.push(CivEvent::new(
+                            tick,
+                            Some(world.id),
+                            CivEventType::EthicalSynthesis,
+                            desc,
+                        ));
+                    }
+                }
+            }
+        }
+    }
+
     fn tick_harmony_scoring(&mut self) {
         // Phase 8.5: Score Eight Harmonies using all accumulated data.
         let tick = self.current_tick;
@@ -3641,6 +3814,9 @@ impl MultiWorldSimulator {
 
             // Phase 8: Consciousness
             self.tick_consciousness();
+
+            // Phase 8.05: Ethical dynamics (moral dilemmas, drift, synthesis)
+            self.tick_ethical_dynamics();
 
             // Phase 8.1: Dead Loop #7 fix — Consciousness ↔ Governance feedback.
             // Stable governance creates space for consciousness growth.

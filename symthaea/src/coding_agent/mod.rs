@@ -41,6 +41,8 @@ pub mod error_knowledge;
 mod experience;
 mod generation;
 mod geodesic_gate;
+/// MAGI Loop bridge for self-improving code generation predictions.
+pub mod magi_code_bridge;
 mod planning;
 mod prompts;
 

@@ -415,16 +415,9 @@ fn strip_html_tags(html: &str) -> String {
 }
 
 fn get_proxy_base() -> String {
-    if let Some(window) = web_sys::window() {
-        if let Ok(origin) = window.location().origin() {
-            if let Ok(url) = url::Url::parse(&origin) {
-                let scheme = url.scheme();
-                let host = url.host_str().unwrap_or("127.0.0.1");
-                return format!("{}://{}:8131", scheme, host);
-            }
-        }
-    }
-    "http://127.0.0.1:8131".to_string()
+    // Same-origin: proxy routes are now served by prism-serve on the same port.
+    // No separate :8131 proxy needed.
+    String::new()
 }
 
 fn get_local_storage_item(key: &str) -> Option<String> {

@@ -3,11 +3,7 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 use hdk::prelude::*;
 use mesh_time_integrity::*;
-use mycelix_bridge_common::{
-    gate_civic, civic_requirement_basic, GovernanceEligibility,
-};
-
-    gate_civic("commons_bridge", requirement, action_name)
+use mycelix_bridge_common::civic_requirement_basic;
 
 /// Helper to get an anchor entry hash
 fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {

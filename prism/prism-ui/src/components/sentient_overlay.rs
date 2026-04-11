@@ -1,13 +1,15 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
-//! Sentient Overlay — the Voice of the People.
+//! Sentient Overlay — consciousness-aware epistemic annotation.
 //!
-//! When viewing a fetched page, scans the page text for sentences that
-//! match known claims in the search index. Matching sentences get
-//! highlighted with their epistemic level (E0-E4), source, and trust score.
+//! Two-phase analysis:
+//! 1. Fast HDC search: match page sentences against knowledge base (synchronous, sub-ms)
+//! 2. Spore reasoning: feed matched sentences through the consciousness kernel
+//!    for prediction error, confidence weighting, and epistemic honesty (async, batched)
 //!
-//! This transforms every webpage into an epistemically annotated document.
+//! Phase 2 runs asynchronously in batches of BATCH_SIZE sentences,
+//! yielding to the browser event loop between batches to avoid freezing.
 
 use leptos::prelude::*;
 use prism_common::{EmpiricalLevel, SearchResult};
@@ -15,102 +17,135 @@ use prism_search::SearchEngine;
 
 const MAX_SEARCH_CALLS: usize = 50;
 const MAX_ANNOTATIONS: usize = 10;
+/// Sentences processed per async batch before yielding to the event loop.
+const SPORE_BATCH_SIZE: usize = 3;
+
+/// An annotation enriched with Spore consciousness data.
+struct SporeAnnotation {
+    sentence: String,
+    result: SearchResult,
+    /// Spore's prediction error for this sentence (surprise signal).
+    prediction_error: f32,
+    /// Spore's consciousness level when processing this sentence.
+    consciousness: f32,
+}
 
 /// Scan page text for sentences that match known claims.
 /// Returns the HTML with epistemic annotations injected.
+///
+/// This is the synchronous fast path (HDC-only). The Spore-enriched
+/// overlay is rendered by the `ThinkingOverlay` component below.
 pub fn annotate_html(html: &str, engine: &SearchEngine) -> String {
-    // Extract visible text via tag stripping (avoids full DOM re-parse since
-    // the HTML was already parsed and sanitized in engine.rs)
     let text = strip_tags(html);
-
     if text.len() < 50 {
         return html.to_string();
     }
 
-    // Split text into sentences
     let sentences = split_sentences(&text);
+    let annotations = collect_hdc_annotations(&sentences, engine);
 
-    // Find matching claims for each sentence (capped for performance)
-    let mut annotations: Vec<(String, Option<SearchResult>)> = Vec::new();
-    let mut search_calls = 0;
-    let mut match_count = 0;
-    for sentence in &sentences {
-        if sentence.len() < 30 {
-            continue;
-        }
-        if search_calls >= MAX_SEARCH_CALLS || match_count >= MAX_ANNOTATIONS {
-            break;
-        }
-        search_calls += 1;
-        let results = engine.search(sentence, 1);
-        if let Some(top) = results.first() {
-            if top.query_similarity > 0.15 {
-                annotations.push((sentence.clone(), Some(top.clone())));
-                match_count += 1;
-            }
-        }
-    }
-
-    // If no annotations found, return original
     if annotations.is_empty() {
         return html.to_string();
     }
 
-    // Build annotation summary to append after the content
-    let mut overlay_html = String::new();
-    overlay_html.push_str(r#"<div class="sentient-overlay-section">"#);
-    overlay_html.push_str(r#"<h3 class="overlay-title">Epistemic Analysis</h3>"#);
-    overlay_html.push_str(r#"<p class="overlay-subtitle">Prism found claims in the knowledge base that relate to this page:</p>"#);
+    let overlay_html = render_annotations(&annotations, None);
+    format!("{}\n{}", html, overlay_html)
+}
 
-    let mut found = 0;
-    for (sentence, annotation) in &annotations {
-        if let Some(result) = annotation {
-            found += 1;
-            let e_class = match result.empirical_level {
-                EmpiricalLevel::E4 => "e4",
-                EmpiricalLevel::E3 => "e3",
-                EmpiricalLevel::E2 => "e2",
-                EmpiricalLevel::E1 => "e1",
-                EmpiricalLevel::E0 => "e0",
-            };
-            let e_label = match result.empirical_level {
-                EmpiricalLevel::E4 => "E4 Established",
-                EmpiricalLevel::E3 => "E3 Replicated",
-                EmpiricalLevel::E2 => "E2 Tested",
-                EmpiricalLevel::E1 => "E1 Preliminary",
-                EmpiricalLevel::E0 => "E0 Unverified",
-            };
-            let source = result.sources.first().map(|s| s.as_str()).unwrap_or("—");
-            let sim_pct = (result.query_similarity * 100.0) as u32;
+/// Collect HDC-matched annotations from the search engine (fast, synchronous).
+fn collect_hdc_annotations(
+    sentences: &[String],
+    engine: &SearchEngine,
+) -> Vec<(String, SearchResult)> {
+    let mut annotations = Vec::new();
+    let mut search_calls = 0;
 
-            overlay_html.push_str(&format!(
-                r##"<div class="overlay-claim">
-                    <div class="overlay-match">
-                        <span class="e-badge {e_class}">{e_label}</span>
-                        <span class="overlay-sim">{sim_pct}% match</span>
-                    </div>
-                    <div class="overlay-page-text">"{sentence_short}"</div>
-                    <div class="overlay-claim-text">{claim}</div>
-                    <div class="overlay-source">{source}</div>
-                </div>"##,
-                e_class = e_class,
-                e_label = e_label,
-                sim_pct = sim_pct,
-                sentence_short = &sentence[..sentence.len().min(100)],
-                claim = result.content,
-                source = source,
-            ));
+    for sentence in sentences {
+        if sentence.len() < 30 { continue; }
+        if search_calls >= MAX_SEARCH_CALLS || annotations.len() >= MAX_ANNOTATIONS { break; }
+
+        search_calls += 1;
+        if let Some(top) = engine.search(sentence, 1).into_iter().next() {
+            if top.query_similarity > 0.15 {
+                annotations.push((sentence.clone(), top));
+            }
         }
     }
+    annotations
+}
 
-    overlay_html.push_str("</div>");
+/// Render annotations as HTML. If Spore data is available, includes
+/// consciousness-weighted confidence and surprise indicators.
+fn render_annotations(
+    annotations: &[(String, SearchResult)],
+    spore_data: Option<&[SporeAnnotation]>,
+) -> String {
+    let mut html = String::new();
+    html.push_str(r#"<div class="sentient-overlay-section">"#);
+    html.push_str(r#"<h3 class="overlay-title">Epistemic Analysis</h3>"#);
 
-    if found > 0 {
-        // Append the overlay section after the page content
-        format!("{}\n{}", html, overlay_html)
+    if spore_data.is_some() {
+        html.push_str(r#"<p class="overlay-subtitle">Consciousness-grounded analysis of this page:</p>"#);
     } else {
-        html.to_string()
+        html.push_str(r#"<p class="overlay-subtitle">Prism found claims in the knowledge base that relate to this page:</p>"#);
     }
+
+    for (i, (sentence, result)) in annotations.iter().enumerate() {
+        let e_class = match result.empirical_level {
+            EmpiricalLevel::E4 => "e4",
+            EmpiricalLevel::E3 => "e3",
+            EmpiricalLevel::E2 => "e2",
+            EmpiricalLevel::E1 => "e1",
+            EmpiricalLevel::E0 => "e0",
+        };
+        let e_label = match result.empirical_level {
+            EmpiricalLevel::E4 => "E4 Established",
+            EmpiricalLevel::E3 => "E3 Replicated",
+            EmpiricalLevel::E2 => "E2 Tested",
+            EmpiricalLevel::E1 => "E1 Preliminary",
+            EmpiricalLevel::E0 => "E0 Unverified",
+        };
+        let source = result.sources.first().map(|s| s.as_str()).unwrap_or("\u{2014}");
+        let sim_pct = (result.query_similarity * 100.0) as u32;
+
+        // Spore enrichment: show consciousness confidence and surprise
+        let spore_note = spore_data
+            .and_then(|data| data.get(i))
+            .map(|sa| {
+                let conf_pct = (sa.consciousness * 100.0) as u32;
+                if sa.prediction_error > 0.5 {
+                    format!(r#"<span class="overlay-surprise">{}% {} surprising</span>"#, conf_pct, "\u{03A8} \u{00B7}")
+                } else if sa.consciousness > 0.4 {
+                    format!(r#"<span class="overlay-confident">{}% {} confident</span>"#, conf_pct, "\u{03A8} \u{00B7}")
+                } else {
+                    format!(r#"<span class="overlay-uncertain">{}% {} uncertain</span>"#, conf_pct, "\u{03A8} \u{00B7}")
+                }
+            })
+            .unwrap_or_default();
+
+        html.push_str(&format!(
+            r##"<div class="overlay-claim">
+                <div class="overlay-match">
+                    <span class="e-badge {e_class}">{e_label}</span>
+                    <span class="overlay-sim">{sim_pct}% match</span>
+                    {spore_note}
+                </div>
+                <div class="overlay-page-text">"{sentence_short}"</div>
+                <div class="overlay-claim-text">{claim}</div>
+                <div class="overlay-source">{source}</div>
+            </div>"##,
+            e_class = e_class,
+            e_label = e_label,
+            sim_pct = sim_pct,
+            spore_note = spore_note,
+            sentence_short = &sentence[..sentence.len().min(100)],
+            claim = result.content,
+            source = source,
+        ));
+    }
+
+    html.push_str("</div>");
+    html
 }
 
 /// Strip HTML tags to extract visible text (lightweight alternative to full DOM parse).

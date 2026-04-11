@@ -5713,6 +5713,64 @@ The negative finding---the anti-correlation of $\lambda_2$ with true $\Phi$ (Cha
 \part{Future}
 
 % ========================================================================
+\chapter{The Symtropy Engine: Consciousness-Physics Simulation}
+\label{ch:symtropy}
+% ========================================================================
+
+While Symthaea implements consciousness as a cognitive architecture and Mycelix implements it as a governance framework, a third question remains: what happens when consciousness \textit{modulates physics itself}? The Symtropy engine explores this question through multi-agent simulation where an integration variable ($\Phi$) directly shapes rigid body dynamics.
+
+\section{Five Coupling Channels}
+
+An agent $i$ at time $t$ has state $S_i = (x_i, v_i, \omega_i, \Phi_i, E_i, h_i, \sigma_i, \pi_i)$ where $\Phi_i \in [0,1]$ is the integration variable, $E_i$ is energy, $h_i \in [0,1]^8$ is the harmony activation vector, $\sigma_i$ is prediction error, and $\pi_i = 1/(1+\sigma_i)$ is motor precision. Five channels couple $\Phi$ to physics:
+
+\begin{enumerate}[nosep]
+  \item \textbf{Force Modulation}: Applied force scales by a 4-tier safety function $\times$ motor precision.
+  \item \textbf{Energy Budget}: Energy depletes through movement, consciousness maintenance (Landauer-bounded), and collisions. Cooperation reduces costs through epistemic offloading.
+  \item \textbf{Sanctuary Zones}: High-harmony regions dampen collision impulses by up to 90\%.
+  \item \textbf{Harmony Fields}: $1/r^{D-1}$ falloff fields (dimension-correct), where resonance (cosine similarity of harmony vectors) reduces friction.
+  \item \textbf{Prediction Error Feedback}: Collisions spike prediction error, reducing motor precision temporarily \citep{adams2013}.
+\end{enumerate}
+
+Energy is strictly conserved. Cooperation does not generate energy---it reduces expenditure through epistemic offloading (prediction error decays 10\% faster when resonant agents are nearby). Solo survival: $\sim$4 minutes. With offloading: $\sim$6 minutes.
+
+\section{Key Experimental Findings}
+
+Across 2,200+ simulation runs with 14 experimental conditions:
+
+\paragraph{Consciousness theory is interchangeable.} IIT-inspired $\Phi$, Shannon entropy, random scalars, and constant values produce statistically identical clustering ($5.57 \pm 0.48$ vs $5.65 \pm 0.83$ vs $5.57 \pm 0.48$, 20 seeds each). Only the $\Phi = 0$ condition differs ($7.50 \pm 3.41$). The conscious/unconscious distinction matters for social organization; the choice between consciousness theories does not.
+
+\paragraph{Cooperation is thermodynamically necessary.} Under strict energy conservation, agents that minimize variational free energy form spatial clusters 35\% tighter than unconscious agents. The FEP gradient is the clustering mechanism; epistemic offloading is the survival mechanism. Neither alone is sufficient.
+
+\paragraph{Biological scaling emerges.} Per-capita energy consumption follows a power law $E_{pc} \propto N^{\beta}$ with $\beta = -0.178$ ($R^2 = 0.60$). This matches the $\beta = -0.19$ measured across 168 eusocial insect species \citep{hou2010}. The isolated control gives $\beta = 0.000$ exactly, matching \citet{waters2010}. Neither parameter was calibrated to biological data.
+
+\paragraph{Consciousness energy threshold matches clinical data.} Gradually depleting agent energy reveals a functional consciousness threshold at 45\% of maximum capacity. This matches the 42\% identified by \citet{stender2015} as the boundary between vegetative and minimally conscious states (131 patients, 88\% classification accuracy).
+
+\paragraph{Phase transition in cooperation.} A sharp phase transition at 0.20~J/tick maintenance pressure separates cooperative (100\% survival) and collapsed regimes, with bistable dynamics above threshold. The spatial lottery (proximity to energy wells) determines the outcome---characteristic of first-order phase transitions.
+
+\paragraph{Higher-dimensional integration is costlier.} HDC 16,384D thought vectors produce 4$\times$ higher $\Phi$ ($0.374 \pm 0.094$ vs $0.090 \pm 0.013$) but at a survival cost: $9.0/12$ alive vs $11.1/12$.
+
+\section{Anti-Tyranny Governance Simulation}
+
+The Symtropy engine extends to governance simulation. A 300-year multi-world simulation (5 seeds, 50 agents per world) tested the constitutional invariants described in Chapter~\ref{ch:governance}:
+
+\begin{itemize}[nosep]
+  \item Zero Guardian vetoes attempted across 300 years (deterrence effect)
+  \item 100\% survival across all seeds
+  \item Hostile Guardian scenario (84 veto attempts over 50 years): 100\% community override success
+  \item Governance authority evolved from Mission Control through Local Sovereignty to Federation
+\end{itemize}
+
+The veto override mechanism (67\% supermajority, 48-hour window) proved so effective as a deterrent that it was never invoked during normal governance. This is the strongest form of constitutional success: the constraint prevents the behavior it targets without ever being exercised.
+
+\section{Implications}
+
+The metric independence result is a universality finding: the macro-pattern depends on the thermodynamic cost structure, not the internal state metric. This parallels Prigogine's dissipative structures \citep{prigogine1977}: the pattern depends on the physics, not the medium.
+
+The biological matches were not engineered---they emerged from the thermodynamic cost structure of information-processing cooperation. This suggests the same scaling laws governing ant colony metabolism also constrain artificial agents under energy scarcity.
+
+The engine, all experiments, and all data are open-source (AGPL-3.0). Results are reproducible via \texttt{cargo run --example}.
+
+% ========================================================================
 \chapter{Open Questions}
 \label{ch:open}
 \label{ch:stewardship} % Retained for cross-references
@@ -6194,6 +6252,31 @@ S.~Lin, J.~Hilton, and O.~Evans.
 L.~R.~Squire.
 \newblock Memory systems of the brain: A brief history and current perspective.
 \newblock \textit{Neurobiology of Learning and Memory}, 82(3):171--177, 2004.
+
+\bibitem[Adams et~al.(2013)]{adams2013}
+R.~A.~Adams, S.~Shipp, and K.~J.~Friston.
+\newblock Predictions not commands: active inference in the motor system.
+\newblock \textit{Brain Structure and Function}, 218(3):611--643, 2013.
+
+\bibitem[Hou et~al.(2010)]{hou2010}
+C.~Hou, M.~Kaspari, H.~B.~Vander~Zanden, and J.~F.~Gillooly.
+\newblock Energetic basis of colonial living in social insects.
+\newblock \textit{Proceedings of the National Academy of Sciences}, 107(8):3634--3638, 2010.
+
+\bibitem[Waters et~al.(2010)]{waters2010}
+J.~S.~Waters, A.~Ochs, B.~J.~Fewell, and J.~F.~Harrison.
+\newblock Allometric scaling of metabolism, growth, and activity in whole colonies of the seed-harvester ant \textit{Pogonomyrmex californicus}.
+\newblock \textit{The American Naturalist}, 176(4):501--510, 2010.
+
+\bibitem[Stender et~al.(2015)]{stender2015}
+J.~Stender, R.~Kupers, A.~Rodell, A.~Thibaut, C.~Chatelle, M.~A.~Bruno, M.~Gejl, C.~Bernard, R.~Hustinx, S.~Laureys, and A.~Gjedde.
+\newblock Quantitative rates of brain glucose metabolism distinguish minimally conscious from vegetative state patients.
+\newblock \textit{Journal of Cerebral Blood Flow \& Metabolism}, 35(1):58--65, 2015.
+
+\bibitem[Prigogine and Nicolis(1977)]{prigogine1977}
+I.~Prigogine and G.~Nicolis.
+\newblock \textit{Self-Organization in Nonequilibrium Systems: From Dissipative Structures to Order through Fluctuations}.
+\newblock Wiley, 1977.
 
 \end{thebibliography}
 

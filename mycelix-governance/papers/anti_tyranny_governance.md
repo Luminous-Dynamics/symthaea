@@ -23,12 +23,18 @@ Our framework applies a thermodynamic principle: **every governance power must h
 
 ### 2.1 Consciousness-Integrated Voting
 
-The Mycelix governance system gates participation on a four-dimensional consciousness profile:
+The Mycelix governance system gates participation on an eight-dimensional sovereign profile, where each dimension is measured from a primary source cluster:
 
-- **Identity** (25%): Multi-factor authentication assurance level
-- **Reputation** (25%): Cross-application reputation with 30-day exponential decay
-- **Community** (30%): Peer trust attestations weighted by attestor tier
-- **Engagement** (20%): Domain-specific participation metrics
+- **D0: Epistemic Integrity**: Truth-telling track record (knowledge cluster)
+- **D1: Thermodynamic Yield**: Physical energy contribution (energy/grid)
+- **D2: Network Resilience**: Node uptime and bandwidth (mesh-time)
+- **D3: Economic Velocity**: Anti-hoarding TEND circulation (finance)
+- **D4: Civic Participation**: Voting, jury duty, proposals (governance)
+- **D5: Stewardship & Care**: Verified commons labor (attribution)
+- **D6: Semantic Resonance**: FL Hamming consensus alignment (core-FL)
+- **D7: Domain Competence**: Peer-verified expertise with Ebbinghaus decay (craft)
+
+No single dimension's weight can exceed 50% (constitutional invariant). All dimensions decay exponentially without engagement ($\lambda_{min}$ = 0.001/day, $\lambda_{max}$ = 0.020/day; $\lambda$ = 0 is constitutionally impossible).
 
 Combined scores map to five tiers: Observer (< 0.3), Participant (>= 0.3), Citizen (>= 0.4), Steward (>= 0.6), and Guardian (>= 0.8). Voting weight is a composite of Phi score (30%), K-vector trust (25%), stake (20%, capped), participation history (15%), and domain reputation (10%).
 
@@ -181,7 +187,7 @@ In an interstellar context where light-speed communication delays make centraliz
 
 **DAO Governance Frameworks.** Compound Governor (2020) introduced time-locked execution and proposal thresholds but lacks veto override mechanisms. MolochDAO's "ragequit" (2019) allows minority exit but not minority protection within the system. Optimism's Security Council uses a multi-sig veto similar to our Guardian veto but without the 80% community override — creating the exact philosopher-king vulnerability we address. Aragon Court (2020) introduces dispute resolution but relies on staked jurors rather than consciousness-weighted participation.
 
-**Mechanism Design.** Lalley and Weyl's quadratic voting (2018) addresses vote-buying through convex cost functions. Our system incorporates quadratic voting for resource allocation while using consciousness-weighted voting for governance decisions. Buterin's "Moving beyond coin voting governance" (2021) identifies the limitations of stake-weighted voting — our multi-dimensional consciousness profile (identity, reputation, community, engagement) directly addresses his critique.
+**Mechanism Design.** Lalley and Weyl's quadratic voting (2018) addresses vote-buying through convex cost functions. Our system incorporates quadratic voting for resource allocation while using consciousness-weighted voting for governance decisions. Buterin's "Moving beyond coin voting governance" (2021) identifies the limitations of stake-weighted voting — our multi-dimensional sovereign profile (eight physically-grounded dimensions) directly addresses his critique.
 
 **Byzantine Fault Tolerance.** Classical BFT (Castro and Liskov, 1999) tolerates f < n/3 adversarial nodes. Our governance system tolerates a stronger adversary: a single Guardian with maximum consciousness score and council membership. The 80% override threshold is analogous to a 4/5 quorum requirement, exceeding traditional BFT bounds.
 

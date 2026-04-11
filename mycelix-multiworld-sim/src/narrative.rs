@@ -467,6 +467,31 @@ impl NarrativeEngine {
                  desc.clone(),
                  "Lights flickered. Robots froze mid-task. The colony held its breath".into(),
                  "Humans stepped into the hazardous modules their machines had protected them from".to_string())
+            } else if desc.contains("MORAL DILEMMA") {
+                (3,
+                 desc.clone(),
+                 "The colony gathered in emergency session — two valid paths, one community".into(),
+                 "The weight of the choice would echo through generations".to_string())
+            } else if desc.contains("ETHICS SHIFT") {
+                (2,
+                 desc.clone(),
+                 "Old certainties gave way as the community's values quietly transformed".into(),
+                 "The colony that emerged was not the one that had been founded".to_string())
+            } else if desc.contains("ETHICAL SYNTHESIS") {
+                (3,
+                 desc.clone(),
+                 "From the ashes of conflict, a new moral understanding crystallized".into(),
+                 "Former adversaries found they had built something neither could have imagined alone".to_string())
+            } else if desc.contains("ETHICAL FORK") {
+                (4,
+                 desc.clone(),
+                 "The fracture ran too deep — two visions of the good life could not share one home".into(),
+                 "A new colony was born from conviction, not convenience".to_string())
+            } else if desc.contains("ETHICAL CRISIS") {
+                (3,
+                 desc.clone(),
+                 "Competing moral frameworks tore at the colony's consensus — governance ground to a halt".into(),
+                 "The question was no longer what to do, but who we are".to_string())
             } else {
                 continue; // Skip events we don't narrate
             };
@@ -486,6 +511,7 @@ impl NarrativeEngine {
                 let role = if desc.contains("PROJECT") { "engineer" }
                     else if desc.contains("EXPLORATION") { "scientist" }
                     else if desc.contains("INDEPENDENCE") { "leader" }
+                    else if desc.contains("MORAL DILEMMA") || desc.contains("ETHICAL") { "ethicist" }
                     else { "citizen" };
                 Some(generate_character_name(world_name, role, (year / 25.0) as u16))
             } else { None };

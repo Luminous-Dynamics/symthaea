@@ -9,11 +9,8 @@
 use hdk::prelude::*;
 use tool_library_integrity::*;
 use mycelix_bridge_common::{
-    gate_civic, civic_requirement_basic, civic_requirement_proposal,
-    GovernanceEligibility,
+    civic_requirement_basic, civic_requirement_proposal,
 };
-
-    gate_civic("commons_bridge", requirement, action_name)
 
 /// Helper to get an anchor entry hash.
 fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
