@@ -17,10 +17,70 @@ use symthaea_core::hdc::ContinuousHV;
 use crate::manifold::VisionManifold;
 use crate::types::{SalientRegion, VisionConfig, VisionTelemetry};
 
+/// Top-down cognitive signal that modulates where the visual system looks.
+///
+/// When set on a `VisionBridge`, the cognitive loop's current goal influences
+/// *which* patches receive extra attention. This implements active, goal-directed
+/// vision: patches with high similarity to `task_hv` are boosted, so Symthaea
+/// becomes literally more sensitive to what she is cognitively focused on.
+///
+/// # Biological Analogy
+///
+/// Visual attention in primates is bidirectionally coupled: bottom-up surprise
+/// (Itti & Koch 2001) and top-down task relevance (Desimone & Duncan 1995) jointly
+/// modulate V1/V4/IT firing rates. This struct provides the top-down signal.
+///
+/// # Example
+///
+/// ```ignore
+/// // Symthaea is searching for something red
+/// let goal = CognitiveGoalSignal {
+///     task_hv: Some(red_concept_hv),
+///     task_gain: 0.5,
+/// };
+/// bridge.set_goal_signal(goal);
+/// // Now red patches will be boosted in addition to bottom-up surprise
+/// ```
+#[derive(Debug, Clone, Default)]
+pub struct CognitiveGoalSignal {
+    /// Task hypervector: encoding of the current cognitive goal or attended concept.
+    ///
+    /// Patches with positive cosine similarity to this vector receive an additional
+    /// boost of `task_gain * similarity`. Set to `None` for purely bottom-up attention.
+    pub task_hv: Option<ContinuousHV>,
+    /// Gain applied to task-relevant patches (default: 0.4).
+    ///
+    /// Scales the per-patch task-similarity boost. Reasonable range: 0.1–1.0.
+    /// Higher values make top-down attention dominate over bottom-up surprise.
+    pub task_gain: f32,
+}
+
+impl CognitiveGoalSignal {
+    /// Create a new goal signal with the given task HV and default gain (0.4).
+    pub fn new(task_hv: ContinuousHV) -> Self {
+        Self {
+            task_hv: Some(task_hv),
+            task_gain: 0.4,
+        }
+    }
+
+    /// Create a goal signal with explicit gain.
+    pub fn with_gain(task_hv: ContinuousHV, gain: f32) -> Self {
+        Self {
+            task_hv: Some(task_hv),
+            task_gain: gain.max(0.0),
+        }
+    }
+}
+
 /// Bridge from vision manifold output to cognitive loop input.
 ///
 /// Wraps a `VisionManifold` and adds attention-modulated boosting so that
 /// the output HV emphasizes surprising (high free-energy) regions.
+///
+/// Optionally accepts a [`CognitiveGoalSignal`] for top-down task modulation:
+/// patches similar to the cognitive goal vector receive extra boost, implementing
+/// active, goal-directed perception.
 ///
 /// # Usage
 ///
@@ -32,6 +92,8 @@ use crate::types::{SalientRegion, VisionConfig, VisionTelemetry};
 pub struct VisionBridge {
     manifold: VisionManifold,
     attention_boost: f32,
+    /// Optional top-down cognitive goal for task-directed attention.
+    goal_signal: CognitiveGoalSignal,
 }
 
 impl VisionBridge {
@@ -45,6 +107,7 @@ impl VisionBridge {
         Self {
             manifold,
             attention_boost: 0.3,
+            goal_signal: CognitiveGoalSignal::default(),
         }
     }
 
@@ -53,6 +116,7 @@ impl VisionBridge {
         Self {
             manifold,
             attention_boost: 0.3,
+            goal_signal: CognitiveGoalSignal::default(),
         }
     }
 
@@ -61,6 +125,50 @@ impl VisionBridge {
     /// Higher values make surprising regions more prominent in the output HV.
     pub fn set_attention_boost(&mut self, boost: f32) {
         self.attention_boost = boost.max(0.0);
+    }
+
+    /// Set a top-down cognitive goal signal for task-directed attention.
+    ///
+    /// Patches with high cosine similarity to `signal.task_hv` receive an
+    /// additional boost in `apply_attention_boost()`, on top of the bottom-up
+    /// surprise boost. This closes the top-down → vision pathway:
+    /// what Symthaea thinks about shapes what she literally notices.
+    ///
+    /// Call with `CognitiveGoalSignal::default()` or `clear_goal_signal()` to
+    /// return to purely bottom-up attention.
+    pub fn set_goal_signal(&mut self, signal: CognitiveGoalSignal) {
+        self.goal_signal = signal;
+    }
+
+    /// Clear the cognitive goal signal, returning to purely bottom-up attention.
+    pub fn clear_goal_signal(&mut self) {
+        self.goal_signal = CognitiveGoalSignal::default();
+    }
+
+    /// Apply ventral recognition feedback to suppress surprise at a patch.
+    ///
+    /// Called after collecting `FoveationResult`s from the foveation manager.
+    /// High-confidence recognition dampens the dorsal surprise map so the
+    /// system doesn't re-foveate the same region repeatedly
+    /// (biological analog: you don't re-read "STOP" on every frame).
+    ///
+    /// Confidence → dampening factor mapping:
+    /// - ≥ 0.7 (high): factor = 0.1 — strong suppression ("I know what this is")
+    /// - 0.4–0.7 (medium): factor = 0.4 — moderate suppression
+    /// - < 0.4 (low): factor = 0.8 — gentle suppression ("worth another look")
+    ///
+    /// # Arguments
+    /// * `row`, `col` — Grid coordinates of the recognized patch.
+    /// * `recognition_confidence` — Confidence from ventral pipeline (0.0–1.0).
+    pub fn dampen_patch_surprise(&mut self, row: usize, col: usize, recognition_confidence: f32) {
+        let factor = if recognition_confidence >= 0.7 {
+            0.1 // Strong recognition: nearly silence this patch
+        } else if recognition_confidence >= 0.4 {
+            0.4 // Medium confidence: moderate suppression
+        } else {
+            0.8 // Low confidence: gentle suppression — still worth re-examining
+        };
+        self.manifold.surprise_map_mut().dampen(row, col, factor);
     }
 
     /// Process a raw frame and return a ContinuousHV ready for `cycle_with_hv()`.
@@ -108,19 +216,30 @@ impl VisionBridge {
 
     /// Apply attention boost to the manifold state based on combined surprise.
     ///
-    /// Combines appearance surprise (from the SurpriseMap) and motion saliency
-    /// (from the MotionField) via element-wise max, then scales the state HV
-    /// so that dimensions corresponding to high-signal patches receive a boost
-    /// of `1.0 + attention_boost * normalized_signal`.
+    /// Combines three signals via element-wise max / additive blend:
+    /// 1. **Bottom-up surprise** (SurpriseMap): unexpected change drives saliency.
+    /// 2. **Motion saliency** (MotionField): moving regions receive extra boost.
+    /// 3. **Top-down task relevance** (CognitiveGoalSignal): patches with high
+    ///    cosine similarity to the current `task_hv` receive `task_gain * similarity`
+    ///    additional boost, implementing goal-directed active perception.
+    ///
+    /// Each patch's dimensions in the state HV are scaled by:
+    /// ```text
+    /// scale = 1.0 + attention_boost * normalized_saliency + task_gain * task_similarity
+    /// ```
     fn apply_attention_boost(&self) -> ContinuousHV {
         let state = self.manifold.state();
         let surprise_map = self.manifold.surprise_map();
         let motion_saliency = self.manifold.motion_saliency();
+        let patch_hvs = self.manifold.last_patch_hvs();
         let max_surprise = surprise_map.max_surprise();
         let max_motion = motion_saliency.iter().copied().fold(0.0f32, f32::max);
         let max_signal = max_surprise.max(max_motion);
 
-        if max_signal < 1e-6 || self.attention_boost < 1e-6 {
+        let has_task = self.goal_signal.task_hv.is_some() && self.goal_signal.task_gain > 1e-6;
+        let has_saliency = max_signal >= 1e-6 && self.attention_boost >= 1e-6;
+
+        if !has_saliency && !has_task {
             return state.clone();
         }
 
@@ -138,11 +257,35 @@ impl VisionBridge {
         let mut boosted = state_slice.to_vec();
 
         for (patch_idx, &appearance_surprise) in attention.values.iter().enumerate() {
-            // Combine appearance surprise and motion saliency (element-wise max)
+            // ── Bottom-up signal: appearance surprise + motion saliency ──────────
             let motion = motion_saliency.get(patch_idx).copied().unwrap_or(0.0);
             let combined = appearance_surprise.max(motion);
-            let normalized = combined / max_signal;
-            let scale = 1.0 + self.attention_boost * normalized;
+            let bottom_up_boost = if has_saliency && max_signal > 1e-6 {
+                self.attention_boost * (combined / max_signal)
+            } else {
+                0.0
+            };
+
+            // ── Top-down signal: cosine similarity to current task_hv ─────────
+            // Only computed when a goal is set and per-patch HVs are available.
+            let top_down_boost = if has_task {
+                if let Some(ref task_hv) = self.goal_signal.task_hv {
+                    if let Some(patch_hv) = patch_hvs.get(patch_idx) {
+                        // Clamp to [0, 1]: only positive alignment earns boost.
+                        // Negative similarity (anti-correlated) does not suppress.
+                        let sim = task_hv.similarity(patch_hv).max(0.0);
+                        self.goal_signal.task_gain * sim
+                    } else {
+                        0.0
+                    }
+                } else {
+                    0.0
+                }
+            } else {
+                0.0
+            };
+
+            let scale = 1.0 + bottom_up_boost + top_down_boost;
             let start = patch_idx * dims_per_patch;
             let end = (start + dims_per_patch).min(dim);
             for d in start..end {
@@ -440,6 +583,155 @@ mod tests {
         let (hv, tel) = bridge.process_frame_with_telemetry(&frame, 64, 64, 3, 0.033);
         assert!(hv.norm() > 0.0);
         assert_eq!(tel.frame_sequence, 1);
+    }
+
+    // === CognitiveGoalSignal Tests ===
+
+    #[test]
+    fn test_goal_signal_default_is_none() {
+        let cfg = VisionConfig::default();
+        let bridge = VisionBridge::new(cfg, 64, 64);
+        assert!(bridge.goal_signal.task_hv.is_none());
+    }
+
+    #[test]
+    fn test_goal_signal_changes_output() {
+        // The top-down boost is per-patch: scale[i] += task_gain * cos_sim(patch_i, task_hv).
+        // In 16,384D, random HVs are nearly orthogonal (sim ≈ 0), so we must use an
+        // *actual* patch HV as the task vector to guarantee non-trivial similarity.
+        // Here we use patch[0] from bridge_goal as the task vector — on the next frame
+        // that patch gets scale ≈ 2.0 while all others stay at 1.0, which must change
+        // the output.
+        let cfg = VisionConfig::default();
+        let mut bridge_base = VisionBridge::new(cfg.clone(), 64, 64);
+        let mut bridge_goal = VisionBridge::new(cfg, 64, 64);
+
+        // A colorful gradient frame so patches have varied content.
+        let frame: Vec<u8> = (0..64u32 * 64)
+            .flat_map(|i| {
+                let v = (i % 128 + 32) as u8;
+                vec![v, 255 - v, 128u8]
+            })
+            .collect();
+
+        // Warm both bridges identically.
+        bridge_base.process_frame(&frame, 64, 64, 3, 0.033);
+        bridge_goal.process_frame(&frame, 64, 64, 3, 0.033);
+
+        // Use patch[0] from bridge_goal as the goal: maximally correlated with itself.
+        // On the *next* frame that patch receives scale ≈ 1 + task_gain while others don't.
+        let task_hv = bridge_goal
+            .manifold()
+            .last_patch_hvs()
+            .first()
+            .cloned()
+            .expect("Should have patch HVs after first frame");
+
+        bridge_goal.set_goal_signal(CognitiveGoalSignal::with_gain(task_hv, 2.0));
+
+        // Process a second identical frame — same content so same surprise, but the
+        // goal signal boosts patch[0] dimensions in bridge_goal only.
+        let hv_base = bridge_base.process_frame(&frame, 64, 64, 3, 0.033);
+        let hv_goal = bridge_goal.process_frame(&frame, 64, 64, 3, 0.033);
+
+        let sim = hv_base.similarity(&hv_goal);
+        assert!(
+            sim < 1.0 - 1e-4,
+            "Goal signal should change output: sim={sim}"
+        );
+    }
+
+    #[test]
+    fn test_clear_goal_signal() {
+        let cfg = VisionConfig::default();
+        let mut bridge = VisionBridge::new(cfg, 64, 64);
+
+        let task_hv = ContinuousHV::random(16_384, 99);
+        bridge.set_goal_signal(CognitiveGoalSignal::new(task_hv));
+        assert!(bridge.goal_signal.task_hv.is_some());
+
+        bridge.clear_goal_signal();
+        assert!(bridge.goal_signal.task_hv.is_none());
+    }
+
+    // === Ventral→Dorsal Dampening Tests ===
+
+    #[test]
+    fn test_dampen_high_confidence_strong_suppression() {
+        let cfg = VisionConfig::default();
+        let mut bridge = VisionBridge::new(cfg, 64, 64);
+
+        // Generate surprise by processing two different frames
+        let frame_a = solid_gray_frame(64, 64, 50);
+        let frame_b = solid_gray_frame(64, 64, 200);
+        bridge.process_frame(&frame_a, 64, 64, 1, 0.033);
+        bridge.process_frame(&frame_b, 64, 64, 1, 0.033);
+
+        // Get surprise before dampening
+        let before = bridge.manifold().surprise_map().max_surprise();
+
+        // High confidence recognition: should strongly dampen
+        bridge.dampen_patch_surprise(0, 0, 0.9);
+
+        // Surprise at (0,0) should be reduced
+        let _after = bridge.manifold().surprise_map().max_surprise();
+        // max may be at a different patch — check via the attention map
+        let attention = bridge.manifold().surprise_map().attention_map();
+        let surprise_at_00 = attention.at(0, 0);
+
+        assert!(
+            before >= 0.0,
+            "Before dampening surprise should be non-negative"
+        );
+        // The patch at (0,0) should have very low surprise after high-confidence recognition
+        assert!(
+            surprise_at_00 < before || surprise_at_00 < 0.1,
+            "High confidence should strongly dampen surprise at (0,0): value={surprise_at_00}"
+        );
+    }
+
+    #[test]
+    fn test_dampen_low_confidence_gentle_suppression() {
+        let cfg = VisionConfig::default();
+        let mut bridge = VisionBridge::new(cfg, 64, 64);
+
+        let frame_a = solid_gray_frame(64, 64, 50);
+        let frame_b = solid_gray_frame(64, 64, 200);
+        bridge.process_frame(&frame_a, 64, 64, 1, 0.033);
+        bridge.process_frame(&frame_b, 64, 64, 1, 0.033);
+
+        let attention_before = bridge.manifold().surprise_map().attention_map();
+        let surprise_before = attention_before.at(0, 0);
+
+        // Low confidence: gentle dampening (factor = 0.8)
+        bridge.dampen_patch_surprise(0, 0, 0.2);
+
+        let attention_after = bridge.manifold().surprise_map().attention_map();
+        let surprise_after = attention_after.at(0, 0);
+
+        // Should be reduced by ~20% (factor 0.8)
+        if surprise_before > 1e-6 {
+            assert!(
+                surprise_after < surprise_before,
+                "Even low confidence should reduce surprise: before={surprise_before}, after={surprise_after}"
+            );
+            let ratio = surprise_after / surprise_before;
+            assert!(
+                (ratio - 0.8).abs() < 0.01,
+                "Low confidence factor should be ~0.8, got ratio={ratio}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_dampen_out_of_bounds_is_noop() {
+        let cfg = VisionConfig::default();
+        let mut bridge = VisionBridge::new(cfg, 64, 64);
+        let frame = gradient_frame(64, 64);
+        bridge.process_frame(&frame, 64, 64, 1, 0.033);
+
+        // Should not panic on out-of-bounds coordinates
+        bridge.dampen_patch_surprise(999, 999, 0.9);
     }
 
     // === Cross-Manifold Predictor Tests ===

@@ -22,6 +22,17 @@ pub struct VisionConfig {
     pub enable_motion: bool,
     /// Enable color features (mean_cb, mean_cr from YCbCr). Default: true.
     pub enable_color: bool,
+    /// Enable opponent color features (rg_opponent, by_opponent). Default: true.
+    ///
+    /// Models V1 double-opponent cells: red–green and blue–yellow channels.
+    /// These capture color contrast in a perceptually meaningful basis and
+    /// directly improve saliency detection for color-distinctive regions
+    /// (e.g., a red apple on a green table).
+    ///
+    /// Adds 2 features when enabled. Values mapped to [0, 1]:
+    /// - `rg_opponent = (mean_r - mean_g + 1.0) / 2.0`
+    /// - `by_opponent = (mean_b - 0.5*(mean_r + mean_g) + 1.0) / 2.0`
+    pub enable_opponent_color: bool,
     /// Base time constant for CfC dynamics in seconds (default: 0.5).
     ///
     /// Valid range: (0.001, 100.0). Controls how quickly the manifold state
@@ -60,7 +71,7 @@ pub struct VisionConfig {
 }
 
 impl VisionConfig {
-    /// Total number of features per patch (base + motion + color).
+    /// Total number of features per patch (base + motion + color + opponent).
     pub fn total_features(&self) -> usize {
         let mut n = self.num_features;
         if self.enable_motion {
@@ -68,6 +79,9 @@ impl VisionConfig {
         }
         if self.enable_color {
             n += 2; // mean_cb, mean_cr
+        }
+        if self.enable_opponent_color {
+            n += 2; // rg_opponent, by_opponent (V1 double-opponent cells)
         }
         n
     }
@@ -154,6 +168,7 @@ impl Default for VisionConfig {
             num_features: 5,
             enable_motion: true,
             enable_color: true,
+            enable_opponent_color: true,
             tau_base: 0.5,
             surprise_threshold: 0.3,
             surprise_decay: 0.9,
@@ -527,7 +542,8 @@ mod tests {
         assert_eq!(cfg.num_levels, 32);
         assert!(cfg.enable_motion);
         assert!(cfg.enable_color);
-        assert_eq!(cfg.total_features(), 9); // 5 base + 2 motion + 2 color
+        assert!(cfg.enable_opponent_color);
+        assert_eq!(cfg.total_features(), 11); // 5 base + 2 motion + 2 color + 2 opponent
         assert!((cfg.input_blend - 0.7).abs() < 1e-6);
         assert!(!cfg.enable_predictive_hierarchy);
     }
@@ -589,7 +605,10 @@ mod tests {
     #[test]
     fn test_total_features_combinations() {
         let mut cfg = VisionConfig::default();
-        assert_eq!(cfg.total_features(), 9);
+        assert_eq!(cfg.total_features(), 11); // 5 base + 2 motion + 2 color + 2 opponent
+
+        cfg.enable_opponent_color = false;
+        assert_eq!(cfg.total_features(), 9); // 5 + 2 motion + 2 color
 
         cfg.enable_motion = false;
         assert_eq!(cfg.total_features(), 7); // 5 + 2 color
@@ -599,6 +618,9 @@ mod tests {
 
         cfg.enable_motion = true;
         assert_eq!(cfg.total_features(), 7); // 5 + 2 motion
+
+        cfg.enable_opponent_color = true;
+        assert_eq!(cfg.total_features(), 9); // 5 + 2 motion + 2 opponent
     }
 
     #[test]

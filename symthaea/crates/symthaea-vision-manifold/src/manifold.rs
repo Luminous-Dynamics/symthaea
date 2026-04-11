@@ -422,6 +422,15 @@ impl VisionManifold {
         self.trainer.total_steps()
     }
 
+    /// Per-patch HDC vectors from the last encoded frame.
+    ///
+    /// Each element is the 16,384D HV for one patch position (in row-major order).
+    /// Used by `VisionBridge` for per-patch task-attention scoring.
+    /// Empty before the first frame is observed.
+    pub fn last_patch_hvs(&self) -> &[ContinuousHV] {
+        &self.last_patch_hvs
+    }
+
     /// Per-patch motion magnitudes from the last frame.
     ///
     /// Each value is the Euclidean magnitude of the motion vector at that patch.

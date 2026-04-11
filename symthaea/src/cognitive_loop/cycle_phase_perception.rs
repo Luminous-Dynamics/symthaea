@@ -274,6 +274,20 @@ impl CognitiveLoopService {
                             "Foveation recognition"
                         );
                     }
+
+                    // Win 2: Ventral→Dorsal feedback — recognized patches dampen
+                    // dorsal surprise so the system stops re-foveating known regions.
+                    if let Some(ref mut bridge) =
+                        self.sensorimotor.vision_sensory.vision_bridge
+                    {
+                        for result in &collected {
+                            bridge.dampen_patch_surprise(
+                                result.grid_row,
+                                result.grid_col,
+                                result.confidence,
+                            );
+                        }
+                    }
                 }
             }
             collected

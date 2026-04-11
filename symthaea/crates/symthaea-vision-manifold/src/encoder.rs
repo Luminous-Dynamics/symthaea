@@ -385,6 +385,29 @@ impl PatchHdcEncoder {
             }
         }
 
+        // Opponent color features: model V1 double-opponent cells (Hubel & Wiesel 1968).
+        //
+        // Red–green (R–G) and blue–yellow (B–Y) opponent channels capture color
+        // contrast in a perceptually meaningful basis. Values are mapped from
+        // [-1, 1] to [0, 1] so they fit the feature quantizer.
+        //
+        //   rg = 0.5 means pure achromatic (R ≈ G)
+        //   rg > 0.5 means red bias; rg < 0.5 means green bias
+        //   by = 0.5 means achromatic; by > 0.5 means blue bias; by < 0.5 means yellow bias
+        if self.config.enable_opponent_color {
+            if channels >= 3 {
+                // mean_r / mean_g / mean_b are already normalized to [0, 1]
+                let rg = (mean_r - mean_g + 1.0) / 2.0; // [0, 1]
+                let by = (mean_b - 0.5 * (mean_r + mean_g) + 1.0) / 2.0; // [0, 1]
+                features.push(rg.clamp(0.0, 1.0));
+                features.push(by.clamp(0.0, 1.0));
+            } else {
+                // Grayscale: opponent channels are neutral
+                features.push(0.5);
+                features.push(0.5);
+            }
+        }
+
         features
     }
 
@@ -1192,8 +1215,8 @@ mod tests {
         let mut cfg = VisionConfig::default();
         cfg.enable_motion = false;
         let enc = PatchHdcEncoder::new(&cfg, 64, 64);
-        // Without motion, total features = 5 + 2 color = 7
-        assert_eq!(enc.feature_weights().len(), 7);
+        // Without motion: 5 base + 2 color + 2 opponent = 9
+        assert_eq!(enc.feature_weights().len(), 9);
     }
 
     // === Color Features ===
@@ -1223,8 +1246,8 @@ mod tests {
         let mut cfg = VisionConfig::default();
         cfg.enable_color = false;
         let enc = PatchHdcEncoder::new(&cfg, 64, 64);
-        // Without color, total features = 5 + 2 motion = 7
-        assert_eq!(enc.feature_weights().len(), 7);
+        // Without YCbCr: 5 base + 2 motion + 2 opponent = 9
+        assert_eq!(enc.feature_weights().len(), 9);
     }
 
     #[test]
@@ -1232,9 +1255,94 @@ mod tests {
         let mut cfg = VisionConfig::default();
         cfg.enable_motion = false;
         cfg.enable_color = false;
+        cfg.enable_opponent_color = false;
         let enc = PatchHdcEncoder::new(&cfg, 64, 64);
         // Base only = 5
         assert_eq!(enc.feature_weights().len(), 5);
+    }
+
+    // === Opponent Color Features ===
+
+    #[test]
+    fn test_opponent_color_feature_count() {
+        let cfg = VisionConfig::default();
+        let enc = PatchHdcEncoder::new(&cfg, 64, 64);
+        // Default: 5 base + 2 motion + 2 color + 2 opponent = 11
+        assert_eq!(enc.feature_weights().len(), 11);
+    }
+
+    #[test]
+    fn test_opponent_color_disabled() {
+        let mut cfg = VisionConfig::default();
+        cfg.enable_opponent_color = false;
+        let enc = PatchHdcEncoder::new(&cfg, 64, 64);
+        // Without opponent: 5 + 2 motion + 2 color = 9
+        assert_eq!(enc.feature_weights().len(), 9);
+    }
+
+    #[test]
+    fn test_opponent_red_vs_green_discrimination() {
+        let cfg = VisionConfig::default();
+        let mut enc = PatchHdcEncoder::new(&cfg, 64, 64);
+
+        // Pure red frame: high rg_opponent (R >> G)
+        let red_frame: Vec<u8> = (0..64 * 64).flat_map(|_| vec![255u8, 0, 0]).collect();
+        let (hv_red, _) = enc.encode_frame(&red_frame, 64, 64, 3);
+        enc.prev_patch_lum.clear();
+
+        // Pure green frame: low rg_opponent (G >> R)
+        let green_frame: Vec<u8> = (0..64 * 64).flat_map(|_| vec![0u8, 255, 0]).collect();
+        let (hv_green, _) = enc.encode_frame(&green_frame, 64, 64, 3);
+
+        // Opponent channels should make red and green clearly distinct
+        let sim = hv_red.similarity(&hv_green);
+        assert!(
+            sim < 0.9,
+            "Red and green should be distinguishable via opponent channels: sim={sim}"
+        );
+    }
+
+    #[test]
+    fn test_opponent_blue_vs_yellow_discrimination() {
+        let cfg = VisionConfig::default();
+        let mut enc = PatchHdcEncoder::new(&cfg, 64, 64);
+
+        // Pure blue frame: high by_opponent
+        let blue_frame: Vec<u8> = (0..64 * 64).flat_map(|_| vec![0u8, 0, 255]).collect();
+        let (hv_blue, _) = enc.encode_frame(&blue_frame, 64, 64, 3);
+        enc.prev_patch_lum.clear();
+
+        // Yellow = R+G full, B=0: low by_opponent
+        let yellow_frame: Vec<u8> = (0..64 * 64).flat_map(|_| vec![255u8, 255, 0]).collect();
+        let (hv_yellow, _) = enc.encode_frame(&yellow_frame, 64, 64, 3);
+
+        let sim = hv_blue.similarity(&hv_yellow);
+        assert!(
+            sim < 0.9,
+            "Blue and yellow should be distinguishable via opponent channels: sim={sim}"
+        );
+    }
+
+    #[test]
+    fn test_opponent_achromatic_is_neutral() {
+        // Gray frame should produce neutral (≈0.5) opponent values.
+        // With opponent channels, gray should not look like red or blue.
+        let cfg = VisionConfig::default();
+        let mut enc = PatchHdcEncoder::new(&cfg, 64, 64);
+
+        let gray_frame: Vec<u8> = (0..64 * 64).flat_map(|_| vec![128u8, 128, 128]).collect();
+        let (hv_gray, _) = enc.encode_frame(&gray_frame, 64, 64, 3);
+        enc.prev_patch_lum.clear();
+
+        let red_frame: Vec<u8> = (0..64 * 64).flat_map(|_| vec![255u8, 0, 0]).collect();
+        let (hv_red, _) = enc.encode_frame(&red_frame, 64, 64, 3);
+
+        // Gray and red should be distinguishable
+        let sim = hv_gray.similarity(&hv_red);
+        assert!(
+            sim < 0.98,
+            "Achromatic gray should differ from pure red: sim={sim}"
+        );
     }
 
     // === Attention-Weighted Encoding ===
