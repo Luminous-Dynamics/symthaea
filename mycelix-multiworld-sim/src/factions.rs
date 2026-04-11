@@ -454,8 +454,20 @@ impl FactionEngine {
                 continue;
             }
 
-            // Intensity decays 0.01 per tick
-            conflict.intensity -= 0.01;
+            // Ethics-modulated conflict decay rate:
+            // Base: 0.01/tick. Virtue/care and relational societies heal faster.
+            // Deontological societies sustain conflicts longer (rigid principles).
+            let world_opt = self.factions.iter()
+                .find(|f| f.id == conflict.faction_a)
+                .and_then(|f| worlds.iter().find(|w| w.id == f.world_id));
+            let ethics_decay = if let Some(w) = world_opt {
+                let me = crate::agent::EthicalOrientation::mean_of(&w.agents);
+                0.01 + me.virtue_care * 0.008 + me.relational * 0.006
+                    - me.deontological * 0.004
+            } else {
+                0.01
+            };
+            conflict.intensity -= ethics_decay;
             conflict.intensity = conflict.intensity.max(0.0);
 
             // Track max intensity

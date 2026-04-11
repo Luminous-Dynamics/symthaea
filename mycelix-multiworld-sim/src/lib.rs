@@ -1011,6 +1011,10 @@ impl MultiWorldSimulator {
             let energy_avail = world.resources.stock_level("energy");
             world.economy.tick_production_extended(scaling, energy_avail);
 
+            // Ethics-modulated resource efficiency
+            let mean_ethics = agent::EthicalOrientation::mean_of(&world.agents);
+            world.economy.apply_ethics_efficiency(&mean_ethics);
+
             // Hard energy constraint: when energy stock is depleted, only essential
             // sectors (agriculture=1, medicine=2) continue at full capacity.
             // All other sectors drop to 10%. This makes outer-system energy gates
@@ -2628,7 +2632,22 @@ impl MultiWorldSimulator {
                     // colonies lose up to 50% fewer people to disasters. Mean Phi acts
                     // as a collective awareness multiplier for evacuation efficiency.
                     let mean_phi = world.mean_phi();
-                    let mut effective_loss = effects.population_loss_fraction * cascade_mult * (1.0 - mean_phi * 0.5);
+                    // Ethics-modulated disaster resilience (distinct from consciousness):
+                    // Virtue/care: mutual aid reduces casualties (people carry each other)
+                    // Relational: community-first response (Ubuntu: no one left behind)
+                    // Deontological: orderly evacuation protocols reduce panic
+                    // Consequentialist: triage efficiency costs (some sacrificed for many)
+                    let disaster_ethics = agent::EthicalOrientation::mean_of(&world.agents);
+                    let ethics_resilience = (
+                        disaster_ethics.virtue_care * 0.07
+                        + disaster_ethics.relational * 0.06
+                        + disaster_ethics.deontological * 0.04
+                        - disaster_ethics.consequentialist * 0.03
+                    ).clamp(-0.03, 0.12);
+                    let mut effective_loss = effects.population_loss_fraction
+                        * cascade_mult
+                        * (1.0 - mean_phi * 0.5)
+                        * (1.0 - ethics_resilience);
 
                     // Resontia Earth-hardening: vaults reduce Earth casualties.
                     // Compute mitigation inline to avoid borrow conflicts.

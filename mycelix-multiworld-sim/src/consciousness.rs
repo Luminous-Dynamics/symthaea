@@ -166,6 +166,24 @@ impl ConsciousnessEngine {
             agent.consciousness.epistemic_confidence =
                 (agent.consciousness.epistemic_confidence + agent.education_level * 0.001)
                     .min(1.0);
+
+            // Ethics-consciousness coupling: each ethical orientation accelerates
+            // growth in a DIFFERENT consciousness dimension. This creates distinct
+            // phi profiles without changing overall phi magnitude — the composition
+            // shifts, not the level. Inspired by Symthaea's moral algebra insight
+            // that consciousness gates morality, and morality shapes consciousness.
+            // Virtue/care → care_activation (compassion practiced becomes embodied)
+            // Relational → harmonic_alignment (Ubuntu resonance with community)
+            // Deontological → coherence (principled consistency strengthens integration)
+            // Consequentialist → epistemic_confidence (evidence-based → calibrated belief)
+            agent.consciousness.care_activation =
+                (agent.consciousness.care_activation + agent.ethics.virtue_care * 0.0007).min(1.0);
+            agent.consciousness.harmonic_alignment =
+                (agent.consciousness.harmonic_alignment + agent.ethics.relational * 0.0007).min(1.0);
+            agent.consciousness.coherence =
+                (agent.consciousness.coherence + agent.ethics.deontological * 0.0005).min(1.0);
+            agent.consciousness.epistemic_confidence =
+                (agent.consciousness.epistemic_confidence + agent.ethics.consequentialist * 0.0005).min(1.0);
         }
 
         // --- Collective computation ---

@@ -283,6 +283,25 @@ impl WorldEconomy {
         }
     }
 
+    /// Apply ethics-based resource efficiency modifier to total production.
+    /// Called after tick_production with the world's mean ethical orientation.
+    /// Relational societies share resources more effectively (Ubuntu surplus flows).
+    /// Virtue/care societies reduce waste through stewardship.
+    /// Consequentialist societies extract efficiently but create waste externalities.
+    /// Deontological societies add bureaucratic overhead but ensure fair distribution.
+    pub fn apply_ethics_efficiency(&mut self, mean_ethics: &crate::agent::EthicalOrientation) {
+        let modifier = 1.0
+            + mean_ethics.relational * 0.05
+            + mean_ethics.virtue_care * 0.03
+            - mean_ethics.consequentialist * 0.025
+            - mean_ethics.deontological * 0.02;
+        let modifier = modifier.clamp(0.85, 1.15);
+        self.total_production *= modifier;
+        for output in &mut self.sector_output {
+            *output *= modifier;
+        }
+    }
+
     /// Fix 3: Update prices based on supply/demand imbalance.
     ///
     /// `price[s] = 1.0 + (demand[s] - supply[s]) / supply[s].max(1.0)`

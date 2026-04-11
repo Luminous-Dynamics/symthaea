@@ -332,6 +332,19 @@ impl EthicalOrientation {
                 + rng.next_gaussian(0.0, 0.08)).clamp(0.05, 1.0),
         }
     }
+
+
+    /// Compute mean ethical orientation across a population of agents.
+    pub fn mean_of(agents: &[CivAgent]) -> Self {
+        let living: Vec<_> = agents.iter().filter(|a| a.is_alive()).collect();
+        let n = living.len().max(1) as f64;
+        Self {
+            deontological: living.iter().map(|a| a.ethics.deontological).sum::<f64>() / n,
+            consequentialist: living.iter().map(|a| a.ethics.consequentialist).sum::<f64>() / n,
+            virtue_care: living.iter().map(|a| a.ethics.virtue_care).sum::<f64>() / n,
+            relational: living.iter().map(|a| a.ethics.relational).sum::<f64>() / n,
+        }
+    }
 }
 
 /// A single agent in the civilization simulation.

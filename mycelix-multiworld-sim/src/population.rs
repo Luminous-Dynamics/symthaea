@@ -201,6 +201,26 @@ impl PopulationEngine {
                 // Trauma increases mortality: rate *= (1 + trauma * 0.3)
                 rate *= 1.0 + a.trauma_level * 0.3;
 
+                // Ethics-modulated mortality (context-dependent tradeoffs):
+                // Under HIGH stress: care/relational orientations protect (mutual aid,
+                // community resilience). Consequentialist orientation hurts (triage/burnout).
+                // Under LOW stress: consequentialist/deontological protect (efficient
+                // self-care, steady routines). Care orientation slightly costs (self-neglect).
+                // Ref: Holt-Lunstad (2010) social relationships reduce mortality 50%;
+                //      Becker (1960) rational health optimization.
+                let ethics_mortality_mod = if a.needs.allostatic_load > 0.5 {
+                    // Crisis mode: care networks save lives
+                    1.0 - a.ethics.virtue_care * 0.07
+                        - a.ethics.relational * 0.06
+                        + a.ethics.consequentialist * 0.03
+                } else {
+                    // Normal mode: efficiency and routines optimize health
+                    1.0 - a.ethics.consequentialist * 0.05
+                        - a.ethics.deontological * 0.04
+                        + a.ethics.virtue_care * 0.01
+                };
+                rate *= ethics_mortality_mod.clamp(0.7, 1.3);
+
                 // Resource scarcity multiplier
                 if let Some(food) = world.resources.get("food") {
                     let ratio = food.current / food.capacity.max(1.0);
@@ -316,7 +336,15 @@ impl PopulationEngine {
                 if let Some(&idx) = id_map.get(fem_id) {
                     let fem = &world.agents[idx];
                     let base_fertility = fem.fertility(current_tick);
-                    let p = base_fertility * nutrition_modifier * cultural_modifier * fem.health;
+                    // Ethics-modulated fertility (Lesthaeghe 2014 demographic transition):
+                    // Relational: community family support networks boost fertility (+9%)
+                    // Virtue/care: caregiving orientation supports child-rearing (+6%)
+                    // Consequentialist: cost-benefit calculus reduces fertility (-6%)
+                    let ethics_fertility = 1.0
+                        + fem.ethics.relational * 0.09
+                        + fem.ethics.virtue_care * 0.06
+                        - fem.ethics.consequentialist * 0.06;
+                    let p = base_fertility * nutrition_modifier * cultural_modifier * fem.health * ethics_fertility;
 
                     if rng.bernoulli(p) {
                         let child_sex = if rng.bernoulli(0.5) {
