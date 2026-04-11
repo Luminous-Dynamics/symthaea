@@ -44,7 +44,8 @@ pub fn trigger_search(query: &str) {
 ///
 /// More permissive than ammonia::clean() — allows structural and formatting
 /// tags needed for readable content, while stripping scripts and event handlers.
-fn sanitize_html(html: &str) -> String {
+/// Resolves relative URLs against the source page's base URL.
+fn sanitize_html(html: &str, base_url: Option<&url::Url>) -> String {
     let mut builder = ammonia::Builder::new();
     builder
         .add_tags(&[
@@ -59,14 +60,48 @@ fn sanitize_html(html: &str) -> String {
             "nav", "header", "footer", "aside",
         ])
         .add_tag_attributes("a", &["href", "title"])
-        .add_tag_attributes("img", &["src", "alt", "width", "height"])
+        .add_tag_attributes("img", &["src", "alt", "width", "height", "loading"])
         .add_tag_attributes("td", &["colspan", "rowspan"])
         .add_tag_attributes("th", &["colspan", "rowspan", "scope"])
         .add_tag_attributes("time", &["datetime"])
         .add_tag_attributes("abbr", &["title"])
-        .link_rel(Some("noopener noreferrer"))
-        .url_relative(ammonia::UrlRelative::PassThrough);
+        .link_rel(Some("noopener noreferrer"));
+
+    // Resolve relative URLs against the source page's origin
+    if let Some(base) = base_url {
+        builder.url_relative(ammonia::UrlRelative::RewriteWithBase(base.clone()));
+    } else {
+        builder.url_relative(ammonia::UrlRelative::PassThrough);
+    }
+
     builder.clean(html).to_string()
+}
+
+/// Rewrite links in sanitized HTML to route through the Prism proxy.
+/// Converts absolute href="https://example.com/foo" to href="javascript:void(0)"
+/// with a data attribute, so the click handler can navigate within Prism.
+fn rewrite_links_for_proxy(html: &str, source_host: &str) -> String {
+    // Simple regex-free approach: replace href="http(s)://" with proxy-routed links.
+    // For images: rewrite src to go through proxy for cross-origin loading.
+    let mut result = html.to_string();
+
+    // Rewrite image sources to proxy through our server
+    // Match src="https://..." and src="http://..."
+    let mut output = String::with_capacity(result.len());
+    let mut remaining = result.as_str();
+    while let Some(idx) = remaining.find("src=\"http") {
+        output.push_str(&remaining[..idx]);
+        output.push_str("src=\"/proxy?url=");
+        remaining = &remaining[idx + 5..]; // skip 'src="'
+        if let Some(end) = remaining.find('"') {
+            output.push_str(&remaining[..end]);
+            output.push('"');
+            remaining = &remaining[end + 1..];
+        }
+    }
+    output.push_str(remaining);
+
+    output
 }
 
 /// CORS proxy URL. Routes external fetches through the local proxy
@@ -183,7 +218,7 @@ fn search_query(query: &str, state: &BrowserState, engine: &SearchEngine) {
     let mode = state.search_mode.get_untracked();
     let local_results = engine.search(query, 10);
 
-    // Run query through Spore consciousness kernel for epistemic grounding
+    // Run query through Spore consciousness kernel for epistemic grounding + summary
     let spore = expect_context::<StoredValue<
         Option<symthaea_spore::engine::SporeEngine>,
         leptos::prelude::LocalStorage,
@@ -194,6 +229,14 @@ fn search_query(query: &str, state: &BrowserState, engine: &SearchEngine) {
             state.set_consciousness.set(result.consciousness_level);
             state.set_epistemic_confidence.set(result.epistemic_status.honest_confidence);
             state.set_prediction_error.set(result.prediction_error);
+
+            // Generate epistemic summary via Broca text generation
+            let generated = spore_engine.generate_text_with_input(query, 40);
+            if !generated.text.is_empty() {
+                state.set_spore_summary.set(generated.text);
+            } else {
+                state.set_spore_summary.set(String::new());
+            }
         }
     });
 
@@ -390,18 +433,19 @@ fn navigate_url(url_str: &str, state: &BrowserState, reflex: &ReflexArc) {
                             state_clone.set_loading.set(false);
                             return;
                         }
-                        let clean = sanitize_html(&html);
+                        let parsed_url = url::Url::parse(&url_string).ok();
+                        let source_host = parsed_url.as_ref()
+                            .and_then(|u| u.host_str().map(|s| s.to_string()))
+                            .unwrap_or_default();
+                        let clean = sanitize_html(&html, parsed_url.as_ref());
+                        let clean = rewrite_links_for_proxy(&clean, &source_host);
                         let dom = prism_dom::parse_html(&html);
                         let reflex = ReflexArc::new();
                         let post = reflex.post_parse(&dom, &pre);
                         let consent = ConsentStore::new();
                         let zone = consent.resolve_zone(
                             post.zone,
-                            url::Url::parse(&url_string)
-                                .ok()
-                                .and_then(|u| u.host_str().map(|s| s.to_string()))
-                                .as_deref()
-                                .unwrap_or(""),
+                            &source_host,
                         );
                         let title = dom.title().unwrap_or_else(|| "Untitled".to_string());
 

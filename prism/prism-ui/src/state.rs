@@ -114,6 +114,9 @@ pub struct BrowserState {
     /// Prediction error from last Spore cycle (surprise signal).
     pub prediction_error: ReadSignal<f32>,
     pub set_prediction_error: WriteSignal<f32>,
+    /// Spore-generated epistemic summary for the current search.
+    pub spore_summary: ReadSignal<String>,
+    pub set_spore_summary: WriteSignal<String>,
     /// Open tabs.
     pub tabs: ReadSignal<Vec<Tab>>,
     pub set_tabs: WriteSignal<Vec<Tab>>,
@@ -158,6 +161,7 @@ impl BrowserState {
         let (consciousness, set_consciousness) = signal(0.0f32);
         let (epistemic_confidence, set_epistemic_confidence) = signal(0.0f32);
         let (prediction_error, set_prediction_error) = signal(0.0f32);
+        let (spore_summary, set_spore_summary) = signal(String::new());
 
         let initial_tab = Tab {
             id: 1,
@@ -188,6 +192,7 @@ impl BrowserState {
             consciousness, set_consciousness,
             epistemic_confidence, set_epistemic_confidence,
             prediction_error, set_prediction_error,
+            spore_summary, set_spore_summary,
             tabs, set_tabs,
             active_tab, set_active_tab,
             next_tab_id,

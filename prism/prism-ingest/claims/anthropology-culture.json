@@ -1,0 +1,12 @@
+[
+  {"claim": "All modern humans are descended from a common ancestral population that lived in Africa approximately 200000 to 300000 years ago", "level": "E4", "sources": ["Paleoanthropology"], "tags": ["anthropology", "evolution"]},
+  {"claim": "Language is a uniquely human capacity that emerged at least 50000 years ago enabling complex social organization and cultural transmission", "level": "E3", "sources": ["Linguistics"], "tags": ["anthropology", "language"]},
+  {"claim": "Cultural relativism holds that cultures should be understood on their own terms rather than judged by the standards of another culture", "level": "E4", "sources": ["Boas 1911"], "tags": ["anthropology", "culture"]},
+  {"claim": "Gift economies based on reciprocal exchange of goods and services exist in many societies as alternatives to market-based economics", "level": "E4", "sources": ["Mauss 1925"], "tags": ["anthropology", "economics"]},
+  {"claim": "Oral traditions have preserved knowledge histories and cultural values across generations in societies without writing systems", "level": "E4", "sources": ["Anthropology"], "tags": ["anthropology", "culture"]},
+  {"claim": "The Sapiens cognitive revolution approximately 70000 years ago enabled humans to cooperate in large groups through shared myths and narratives", "level": "E3", "sources": ["Harari 2015"], "tags": ["anthropology", "evolution"]},
+  {"claim": "Indigenous peoples manage approximately 80 percent of the world remaining biodiversity through traditional ecological knowledge", "level": "E3", "sources": ["World Bank"], "tags": ["anthropology", "ecology"]},
+  {"claim": "Music is a cultural universal found in every known human society and appears to predate language in human evolution", "level": "E3", "sources": ["Ethnomusicology"], "tags": ["anthropology", "music"]},
+  {"claim": "The concept of human rights as universal and inalienable emerged from multiple cultural traditions not exclusively from Western Enlightenment thought", "level": "E3", "sources": ["Human Rights Studies"], "tags": ["anthropology", "rights"]},
+  {"claim": "Archaeological evidence shows that humans have engaged in long-distance trade networks for at least 300000 years", "level": "E4", "sources": ["Archaeology"], "tags": ["anthropology", "trade"]}
+]

@@ -1,0 +1,12 @@
+[
+  {"claim": "Regenerative agriculture aims to restore soil health increase biodiversity and sequester carbon through practices like cover cropping and rotational grazing", "level": "E3", "sources": ["Agricultural Science"], "tags": ["agriculture", "sustainability"]},
+  {"claim": "Vertical farming grows crops in stacked indoor layers using controlled environment agriculture reducing water use by up to 95 percent", "level": "E3", "sources": ["Agricultural Technology"], "tags": ["agriculture", "technology"]},
+  {"claim": "Agroforestry integrates trees and shrubs into crop and livestock farming systems improving biodiversity and soil health", "level": "E4", "sources": ["FAO"], "tags": ["agriculture", "ecology"]},
+  {"claim": "The global food system accounts for approximately 26 percent of global greenhouse gas emissions including production transport and waste", "level": "E3", "sources": ["Poore Nemecek 2018"], "tags": ["agriculture", "climate"]},
+  {"claim": "Precision agriculture uses GPS sensors and data analytics to optimize crop inputs reducing waste and environmental impact", "level": "E4", "sources": ["Agricultural Engineering"], "tags": ["agriculture", "technology"]},
+  {"claim": "Food sovereignty is the right of peoples to define their own food systems rather than having them determined by international market forces", "level": "E3", "sources": ["La Via Campesina"], "tags": ["agriculture", "rights"]},
+  {"claim": "Composting converts organic waste into nutrient-rich soil amendment diverting material from landfills and reducing methane emissions", "level": "E4", "sources": ["Environmental Science"], "tags": ["agriculture", "sustainability"]},
+  {"claim": "Seed banks preserve genetic diversity of crop species providing insurance against crop failures and resources for breeding new varieties", "level": "E4", "sources": ["Svalbard Global Seed Vault"], "tags": ["agriculture", "biodiversity"]},
+  {"claim": "Aquaponics combines fish farming with hydroponic plant cultivation in a symbiotic system where fish waste fertilizes the plants", "level": "E4", "sources": ["Agricultural Science"], "tags": ["agriculture", "technology"]},
+  {"claim": "Indigenous food systems developed over millennia are often more biodiverse resilient and nutritionally complete than industrial monocultures", "level": "E3", "sources": ["FAO"], "tags": ["agriculture", "indigenous"]}
+]

@@ -1,0 +1,12 @@
+[
+  {"claim": "Biomimicry designs solutions by emulating patterns strategies and structures found in nature", "level": "E3", "sources": ["Benyus 1997"], "tags": ["design", "biomimicry"]},
+  {"claim": "Universal design creates products and environments usable by all people to the greatest extent possible without adaptation", "level": "E4", "sources": ["Mace 1997"], "tags": ["design", "accessibility"]},
+  {"claim": "The Bauhaus school founded in 1919 unified art craft and technology influencing modern architecture and industrial design", "level": "E4", "sources": ["Art History"], "tags": ["architecture", "history"]},
+  {"claim": "Geodesic domes distribute structural stress evenly across their surface allowing large spans with minimal material", "level": "E4", "sources": ["Fuller 1954"], "tags": ["architecture", "engineering"]},
+  {"claim": "Vernacular architecture uses local materials and traditions adapted to climate and culture rather than imported styles", "level": "E4", "sources": ["Architecture"], "tags": ["architecture", "culture"]},
+  {"claim": "Green building certification systems like LEED and BREEAM evaluate environmental performance of buildings across multiple criteria", "level": "E4", "sources": ["USGBC"], "tags": ["architecture", "sustainability"]},
+  {"claim": "Parametric design uses algorithms to generate complex forms that respond to environmental and structural constraints", "level": "E3", "sources": ["Architecture"], "tags": ["design", "computation"]},
+  {"claim": "Mass timber construction using cross-laminated timber sequesters carbon and can replace concrete and steel in mid-rise buildings", "level": "E3", "sources": ["Structural Engineering"], "tags": ["architecture", "sustainability"]},
+  {"claim": "Biophilic design incorporates natural elements like daylight plants and water features to improve occupant health and productivity", "level": "E3", "sources": ["Kellert 2005"], "tags": ["design", "health"]},
+  {"claim": "The circular economy in construction aims to design buildings for disassembly so materials can be reused at end of life", "level": "E3", "sources": ["Architecture"], "tags": ["architecture", "sustainability"]}
+]

@@ -1,0 +1,14 @@
+[
+  {"claim": "The printing press invented by Gutenberg around 1440 democratized access to information and accelerated the spread of ideas across Europe", "level": "E4", "sources": ["Media History"], "tags": ["communication", "history"]},
+  {"claim": "Media literacy is the ability to critically analyze and evaluate media messages including identifying bias misinformation and propaganda techniques", "level": "E4", "sources": ["UNESCO"], "tags": ["communication", "education"]},
+  {"claim": "The attention economy describes competition for human attention as a scarce resource in an information-rich world", "level": "E3", "sources": ["Simon 1971"], "tags": ["communication", "economics"]},
+  {"claim": "Filter bubbles occur when algorithms personalize content so users primarily see information that reinforces existing beliefs", "level": "E3", "sources": ["Pariser 2011"], "tags": ["communication", "technology"]},
+  {"claim": "The Streisand effect describes how attempts to suppress information online often increase its visibility", "level": "E4", "sources": ["Internet Culture"], "tags": ["communication", "internet"]},
+  {"claim": "Misinformation spreads faster and farther than accurate information on social media platforms according to multiple studies", "level": "E3", "sources": ["Vosoughi 2018"], "tags": ["communication", "misinformation"]},
+  {"claim": "Fact-checking organizations verify claims against evidence and rate them on accuracy scales helping combat misinformation", "level": "E4", "sources": ["IFCN"], "tags": ["communication", "epistemology"]},
+  {"claim": "Net neutrality is the principle that internet service providers must treat all data equally without discriminating by user site or content", "level": "E4", "sources": ["Telecommunications"], "tags": ["communication", "internet"]},
+  {"claim": "Deepfake technology uses AI to create realistic fake video and audio content raising concerns about trust and authentication", "level": "E4", "sources": ["AI Research"], "tags": ["communication", "ai"]},
+  {"claim": "Public interest journalism serves as a watchdog on power holding governments and institutions accountable through investigative reporting", "level": "E4", "sources": ["Journalism"], "tags": ["communication", "democracy"]},
+  {"claim": "Digital preservation ensures that electronic records and cultural heritage remain accessible as technology formats become obsolete", "level": "E4", "sources": ["Library Science"], "tags": ["communication", "preservation"]},
+  {"claim": "The right to be forgotten allows individuals to request removal of personal information from search engines and databases under certain conditions", "level": "E4", "sources": ["GDPR"], "tags": ["communication", "privacy"]}
+]

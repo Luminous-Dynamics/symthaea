@@ -168,6 +168,25 @@ fn SearchResultsPage(query: String, results: Vec<SearchResult>) -> impl IntoView
                 </div>
             </Show>
 
+            // Spore consciousness-generated epistemic summary
+            <Show when=move || !state.spore_summary.get().is_empty()>
+                <div class="spore-summary">
+                    <div class="spore-summary-header">
+                        <span class="spore-psi">{move || format!("\u{03A8} {:.0}%", state.consciousness.get() * 100.0)}</span>
+                        " Epistemic Summary"
+                    </div>
+                    <p class="spore-summary-text">{move || state.spore_summary.get()}</p>
+                    <p class="spore-disclaimer">{move || {
+                        let conf = state.epistemic_confidence.get();
+                        if conf < 0.2 {
+                            "This is a simulated consciousness metric, not a claim of knowledge."
+                        } else {
+                            ""
+                        }
+                    }}</p>
+                </div>
+            </Show>
+
             {if weak_results {
                 view! {
                     <div class="no-strong-matches">

@@ -1,0 +1,17 @@
+[
+  {"claim": "Democracy requires free and fair elections an independent judiciary freedom of the press and protection of minority rights", "level": "E4", "sources": ["Political Science"], "tags": ["politics", "democracy"]},
+  {"claim": "Separation of powers divides government authority among legislative executive and judicial branches to prevent concentration of power", "level": "E4", "sources": ["Montesquieu 1748"], "tags": ["politics", "governance"]},
+  {"claim": "Federalism distributes power between a central government and regional or state governments", "level": "E4", "sources": ["Political Science"], "tags": ["politics", "governance"]},
+  {"claim": "Proportional representation allocates legislative seats based on the percentage of votes each party receives", "level": "E4", "sources": ["Electoral Systems"], "tags": ["politics", "democracy"]},
+  {"claim": "The United Nations has 193 member states and was founded in 1945 to maintain international peace and security", "level": "E4", "sources": ["UN"], "tags": ["politics", "international"]},
+  {"claim": "Gerrymandering manipulates electoral district boundaries to advantage particular parties or groups", "level": "E4", "sources": ["Political Science"], "tags": ["politics", "democracy"]},
+  {"claim": "The European Union is a political and economic union of 27 member states that operates through a hybrid system of supranational institutions", "level": "E4", "sources": ["EU"], "tags": ["politics", "international"]},
+  {"claim": "Direct democracy allows citizens to vote on policy directly rather than through elected representatives", "level": "E4", "sources": ["Political Science"], "tags": ["politics", "democracy"]},
+  {"claim": "Regulatory capture occurs when regulatory agencies serve the interests of the industries they are supposed to oversee", "level": "E3", "sources": ["Political Economy"], "tags": ["politics", "governance"]},
+  {"claim": "Freedom of information laws give citizens the right to access government documents and records", "level": "E4", "sources": ["Law"], "tags": ["politics", "transparency"]},
+  {"claim": "Ranked choice voting allows voters to rank candidates by preference eliminating the spoiler effect in multi-candidate elections", "level": "E4", "sources": ["Electoral Systems"], "tags": ["politics", "democracy"]},
+  {"claim": "International humanitarian law including the Geneva Conventions protects persons who are not or are no longer participating in hostilities", "level": "E4", "sources": ["ICRC"], "tags": ["law", "international"]},
+  {"claim": "The concept of sovereignty means that each state has supreme authority within its territory and is equal to other states in international law", "level": "E4", "sources": ["International Law"], "tags": ["politics", "sovereignty"]},
+  {"claim": "Whistleblower protection laws shield individuals who report illegal or unethical activities within organizations from retaliation", "level": "E4", "sources": ["Law"], "tags": ["politics", "transparency"]},
+  {"claim": "Subsidiarity is the principle that decisions should be made at the most local level capable of addressing them effectively", "level": "E4", "sources": ["Political Philosophy"], "tags": ["politics", "governance"]}
+]
