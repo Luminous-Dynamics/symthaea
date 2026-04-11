@@ -8,7 +8,7 @@
 
 pub mod types;
 
-use portal_domain_trait::{ColorFamily, ConsciousnessTier, DomainModule, NavItem};
+use portal_domain_trait::{ColorFamily, CivicTier, DomainModule, NavItem};
 
 pub struct MailDomain;
 
@@ -25,7 +25,7 @@ impl DomainModule for MailDomain {
         ]
     }
 
-    fn min_tier(&self) -> ConsciousnessTier { ConsciousnessTier::Participant }
+    fn min_tier(&self) -> CivicTier { CivicTier::Participant }
     fn key_context(&self) -> &'static [u8] { b"mycelix-mail-v1" }
     fn happ_role(&self) -> &'static str { "mail" }
     fn zomes(&self) -> &'static [&'static str] { &["mail_messages", "trust", "contacts", "profiles"] }

@@ -13,7 +13,7 @@
 // Re-export the types the sim needs
 pub use mycelix_bridge_common::earth_colony_protocol::PlanetaryBody;
 pub use mycelix_bridge_common::consciousness_profile::{
-    ConsciousnessProfile, ConsciousnessTier,
+    ConsciousnessProfile,
 };
 // consciousness_sync is behind the "federated" feature gate in bridge-common.
 // Stub types for downstream compatibility until federated module is restored.
@@ -113,12 +113,12 @@ mod tests {
     fn test_consciousness_profile_tiers() {
         // Low engagement agent = Observer
         let low = agent_to_profile(0.1, 0.8, 0, false, 20.0);
-        assert_eq!(ConsciousnessTier::from_score(low.combined_score()), ConsciousnessTier::Observer);
+        assert_eq!(CivicTier::from_score(low.combined_score()), CivicTier::Observer);
 
         // High engagement agent = Citizen or above
         let high = agent_to_profile(0.8, 4.0, 1, true, 160.0);
-        let tier = ConsciousnessTier::from_score(high.combined_score());
-        assert!(tier as u8 >= ConsciousnessTier::Citizen as u8,
+        let tier = CivicTier::from_score(high.combined_score());
+        assert!(tier as u8 >= CivicTier::Citizen as u8,
             "High agent should be Citizen+, got {:?} (score: {:.3})",
             tier, high.combined_score());
     }

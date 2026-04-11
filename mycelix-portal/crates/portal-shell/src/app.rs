@@ -6,7 +6,7 @@
 //! The portal IS the orb. Domains orbit it. You zoom into aspects of yourself.
 
 use leptos::prelude::*;
-use portal_domain_trait::ConsciousnessTier;
+use portal_domain_trait::CivicTier;
 
 use crate::background::HomeostasisBackground;
 use crate::identity::{ConductorStatus, PortalIdentity, VaultState};
@@ -53,7 +53,7 @@ pub struct OrbitalDomain {
     pub bio_name: &'static str,
     pub color: &'static str,
     pub glow: &'static str,
-    pub min_tier: ConsciousnessTier,
+    pub min_tier: CivicTier,
     /// Angle offset in the orbital ring (radians)
     pub angle: f64,
     /// Activity level (0.0-1.0) — drives glow intensity
@@ -120,67 +120,67 @@ pub fn App() -> impl IntoView {
         OrbitalDomain {
             id: "health", name: "Health", bio_name: "Homeostasis",
             color: "#0D7377", glow: "#06D6C8",
-            min_tier: ConsciousnessTier::Participant,
+            min_tier: CivicTier::Participant,
             angle: 0.0, activity: 0.8,
         },
         OrbitalDomain {
             id: "governance", name: "Governance", bio_name: "Consensus",
             color: "#7C3AED", glow: "#A78BFA",
-            min_tier: ConsciousnessTier::Citizen,
+            min_tier: CivicTier::Citizen,
             angle: std::f64::consts::TAU / 11.0, activity: 0.4,
         },
         OrbitalDomain {
             id: "praxis", name: "Education", bio_name: "Growth",
             color: "#2563EB", glow: "#60A5FA",
-            min_tier: ConsciousnessTier::Participant,
+            min_tier: CivicTier::Participant,
             angle: 2.0 * std::f64::consts::TAU / 11.0, activity: 0.3,
         },
         OrbitalDomain {
             id: "finance", name: "Finance", bio_name: "Metabolism",
             color: "#D97706", glow: "#FBBF24",
-            min_tier: ConsciousnessTier::Citizen,
+            min_tier: CivicTier::Citizen,
             angle: 3.0 * std::f64::consts::TAU / 11.0, activity: 0.6,
         },
         OrbitalDomain {
             id: "commons", name: "Commons", bio_name: "Mutualism",
             color: "#059669", glow: "#34D399",
-            min_tier: ConsciousnessTier::Citizen,
+            min_tier: CivicTier::Citizen,
             angle: 4.0 * std::f64::consts::TAU / 11.0, activity: 0.2,
         },
         OrbitalDomain {
             id: "hearth", name: "Hearth", bio_name: "Kinship",
             color: "#DB2777", glow: "#F472B6",
-            min_tier: ConsciousnessTier::Participant,
+            min_tier: CivicTier::Participant,
             angle: 5.0 * std::f64::consts::TAU / 11.0, activity: 0.5,
         },
         OrbitalDomain {
             id: "knowledge", name: "Knowledge", bio_name: "Noosphere",
             color: "#0891B2", glow: "#22D3EE",
-            min_tier: ConsciousnessTier::Steward,
+            min_tier: CivicTier::Steward,
             angle: 6.0 * std::f64::consts::TAU / 11.0, activity: 0.1,
         },
         OrbitalDomain {
             id: "space", name: "Space", bio_name: "Cosmos",
             color: "#4F46E5", glow: "#818CF8",
-            min_tier: ConsciousnessTier::Guardian,
+            min_tier: CivicTier::Guardian,
             angle: 7.0 * std::f64::consts::TAU / 11.0, activity: 0.05,
         },
         OrbitalDomain {
             id: "lucid", name: "LUCID", bio_name: "Inner Eye",
             color: "#8B5CF6", glow: "#C4B5FD",
-            min_tier: ConsciousnessTier::Participant,
+            min_tier: CivicTier::Participant,
             angle: 8.0 * std::f64::consts::TAU / 11.0, activity: 0.45,
         },
         OrbitalDomain {
             id: "mail", name: "Mail", bio_name: "Signal Stream",
             color: "#DC2626", glow: "#FCA5A5",
-            min_tier: ConsciousnessTier::Participant,
+            min_tier: CivicTier::Participant,
             angle: 9.0 * std::f64::consts::TAU / 11.0, activity: 0.7,
         },
         OrbitalDomain {
             id: "admin", name: "System", bio_name: "Nervous System",
             color: "#475569", glow: "#94A3B8",
-            min_tier: ConsciousnessTier::Guardian,
+            min_tier: CivicTier::Guardian,
             angle: 10.0 * std::f64::consts::TAU / 11.0, activity: 0.15,
         },
     ];
@@ -306,7 +306,7 @@ pub fn App() -> impl IntoView {
                                 }).collect::<Vec<_>>()}
                             </div>
                             <div class="stream-domains">
-                                {domains.iter().filter(|d| d.min_tier <= ConsciousnessTier::from_score(consciousness.get_untracked())).map(|d| {
+                                {domains.iter().filter(|d| d.min_tier <= CivicTier::from_score(consciousness.get_untracked())).map(|d| {
                                     let id = d.id;
                                     view! {
                                         <button class="stream-domain-chip" style=format!("border-color: {}", d.color)
@@ -328,7 +328,7 @@ pub fn App() -> impl IntoView {
                             <div class="garden-plots">
                                 {domains.iter().map(|d| {
                                     let id = d.id;
-                                    let accessible = d.min_tier <= ConsciousnessTier::from_score(consciousness.get_untracked());
+                                    let accessible = d.min_tier <= CivicTier::from_score(consciousness.get_untracked());
                                     let activity = d.activity;
                                     view! {
                                         <button
@@ -352,7 +352,7 @@ pub fn App() -> impl IntoView {
                                 <span class="pulse-score">{format!("{:.0}%", consciousness.get() * 100.0)}</span>
                             </div>
                             <div class="pulse-vitals">
-                                {domains.iter().filter(|d| d.activity > 0.3 && d.min_tier <= ConsciousnessTier::from_score(consciousness.get_untracked())).map(|d| {
+                                {domains.iter().filter(|d| d.activity > 0.3 && d.min_tier <= CivicTier::from_score(consciousness.get_untracked())).map(|d| {
                                     let id = d.id;
                                     view! {
                                         <button class="pulse-vital" style=format!("color: {}", d.glow)
@@ -385,7 +385,7 @@ pub fn App() -> impl IntoView {
                                     let radius = 180.0;
                                     let x = radius * d.angle.cos();
                                     let y = radius * d.angle.sin();
-                                    let opacity = if d.min_tier <= ConsciousnessTier::from_score(consciousness.get_untracked()) {
+                                    let opacity = if d.min_tier <= CivicTier::from_score(consciousness.get_untracked()) {
                                         0.15 + d.activity * 0.3
                                     } else { 0.03 };
                                     view! {
@@ -406,7 +406,7 @@ pub fn App() -> impl IntoView {
                                     let angle = d.angle;
                                     let activity = d.activity;
                                     let name = d.name;
-                                    let accessible = d.min_tier <= ConsciousnessTier::from_score(consciousness.get_untracked());
+                                    let accessible = d.min_tier <= CivicTier::from_score(consciousness.get_untracked());
                                     // Compute position with JS-compatible math
                                     let radius = 180.0;
                                     let x = radius * angle.cos();

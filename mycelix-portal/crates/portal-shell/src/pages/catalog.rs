@@ -7,7 +7,7 @@
 //! where communities choose which aspects of sovereignty to activate.
 
 use leptos::prelude::*;
-use portal_domain_trait::{ConsciousnessTier, DomainModule, DomainRegistry};
+use portal_domain_trait::{CivicTier, DomainModule, DomainRegistry};
 
 /// Cluster catalog overview — rendered when user navigates to the catalog.
 #[component]
@@ -79,7 +79,7 @@ struct ClusterCardData {
     description: &'static str,
     color: &'static str,
     glow: &'static str,
-    min_tier: ConsciousnessTier,
+    min_tier: CivicTier,
     zome_count: usize,
     entry_type_count: usize,
     dependencies: Vec<DepInfo>,

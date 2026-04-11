@@ -10,10 +10,10 @@
 //!
 //! No changes to the portal shell needed.
 
-/// Consciousness tier — mirrors mycelix-bridge-common::ConsciousnessTier.
+/// Consciousness tier — Civic tier for domain access gating.
 /// Duplicated here to avoid depending on HDK in the portal.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub enum ConsciousnessTier {
+pub enum CivicTier {
     /// Score < 0.3 — can see Identity, Personal
     Observer = 0,
     /// Score >= 0.3 — can see Health, Praxis, Hearth
@@ -26,7 +26,7 @@ pub enum ConsciousnessTier {
     Guardian = 4,
 }
 
-impl ConsciousnessTier {
+impl CivicTier {
     pub fn from_score(score: f64) -> Self {
         if score >= 0.8 { Self::Guardian }
         else if score >= 0.6 { Self::Steward }
@@ -91,7 +91,7 @@ pub trait DomainModule {
 
     /// Minimum consciousness tier to see this domain.
     /// Domains below the user's tier appear as dim locked nodes.
-    fn min_tier(&self) -> ConsciousnessTier;
+    fn min_tier(&self) -> CivicTier;
 
     /// HKDF context bytes for deriving the domain-specific key.
     /// Must be unique per domain and stable across versions.
@@ -120,7 +120,7 @@ impl DomainRegistry {
     }
 
     /// Get domains visible at a given tier.
-    pub fn visible_at(&self, tier: ConsciousnessTier) -> Vec<&dyn DomainModule> {
+    pub fn visible_at(&self, tier: CivicTier) -> Vec<&dyn DomainModule> {
         self.domains.iter()
             .filter(|d| d.min_tier() <= tier)
             .map(|d| d.as_ref())

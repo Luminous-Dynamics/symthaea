@@ -6,7 +6,7 @@
 pub mod master_key;
 
 use leptos::prelude::*;
-use portal_domain_trait::ConsciousnessTier;
+use portal_domain_trait::CivicTier;
 use std::cell::RefCell;
 use std::rc::Rc;
 use send_wrapper::SendWrapper;
@@ -38,7 +38,7 @@ pub struct PortalIdentity {
     /// Consciousness profile combined score (0.0-1.0)
     pub consciousness_score: RwSignal<f64>,
     /// Derived tier
-    pub tier: Memo<ConsciousnessTier>,
+    pub tier: Memo<CivicTier>,
     /// Which domain keys have been derived this session
     pub active_domains: RwSignal<Vec<String>>,
     /// Holochain conductor connection status
@@ -59,7 +59,7 @@ impl PortalIdentity {
     pub fn new() -> Self {
         let consciousness_score = RwSignal::new(0.35); // Default: Participant
         let tier = Memo::new(move |_| {
-            ConsciousnessTier::from_score(consciousness_score.get())
+            CivicTier::from_score(consciousness_score.get())
         });
 
         let vault = if master_key::has_stored_master() {

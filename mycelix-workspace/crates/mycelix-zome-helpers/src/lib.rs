@@ -34,6 +34,7 @@
 //! use [`anchor_hash_of`] with a caller-provided serializable entry.
 
 use hdk::prelude::*;
+#[allow(deprecated)] // require_consciousness kept for backward compat
 use mycelix_bridge_common::{
     GovernanceEligibility, GovernanceRequirement, gate_consciousness,
     sovereign_gate::{CivicRequirement, gate_civic},

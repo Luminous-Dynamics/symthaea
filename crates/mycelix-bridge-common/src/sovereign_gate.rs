@@ -20,6 +20,7 @@ pub use sovereign_profile::compat::{LegacyProfile, LegacyTier};
 pub use sovereign_profile::weights::DimensionWeights;
 pub use sovereign_profile::i18n;
 
+#[allow(deprecated)] // Needed for backward-compatible fallback path
 use crate::consciousness_profile::{
     ConsciousnessCredential, ConsciousnessTier, GovernanceEligibility, GovernanceRequirement,
 };

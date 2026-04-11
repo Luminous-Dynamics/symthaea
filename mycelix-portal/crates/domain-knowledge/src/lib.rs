@@ -4,7 +4,7 @@
 
 pub mod types;
 
-use portal_domain_trait::{ColorFamily, ConsciousnessTier, DomainModule, NavItem};
+use portal_domain_trait::{ColorFamily, CivicTier, DomainModule, NavItem};
 
 pub struct KnowledgeDomain;
 
@@ -22,7 +22,7 @@ impl DomainModule for KnowledgeDomain {
         ]
     }
 
-    fn min_tier(&self) -> ConsciousnessTier { ConsciousnessTier::Steward }
+    fn min_tier(&self) -> CivicTier { CivicTier::Steward }
     fn key_context(&self) -> &'static [u8] { b"mycelix-knowledge-v1" }
     fn happ_role(&self) -> &'static str { "knowledge" }
 

@@ -317,6 +317,10 @@ impl Default for ConsciousnessProfile {
 /// Stored on the agent's source chain. Governance zomes validate locally
 /// by checking issuer and expiry — no cross-cluster call needed at
 /// governance time.
+///
+/// **Deprecated**: Use `sovereign_gate::SovereignCredential` (8D) instead.
+/// This 4D type is retained for backward compatibility during the migration.
+#[deprecated(since = "0.9.0", note = "Use sovereign_gate::SovereignCredential (8D) instead")]
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ConsciousnessCredential {
     /// Agent's DID (e.g., "did:mycelix:<pubkey>").
@@ -487,8 +491,10 @@ impl ConsciousnessCredential {
 
 /// Governance tiers derived from combined consciousness score.
 ///
-/// Mirrors the TrustTier concept from the identity cluster, but defined
-/// here as the canonical shared definition across all clusters.
+/// **Deprecated**: Use `sovereign_gate::CivicTier` instead. The 5 tiers
+/// are identical (Observer→Guardian), but CivicTier is the canonical type
+/// for the 8D sovereign profile system.
+#[deprecated(since = "0.9.0", note = "Use sovereign_gate::CivicTier instead")]
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum ConsciousnessTier {
     /// combined < 0.3 — can read, no governance participation
@@ -629,6 +635,9 @@ impl ConsciousnessTier {
 /// The `min_tier` is always checked. Optional per-dimension minimums
 /// add additional requirements (e.g., constitutional changes require
 /// minimum identity verification AND community trust).
+///
+/// **Deprecated**: Use `sovereign_gate::CivicRequirement` (8D) instead.
+#[deprecated(since = "0.9.0", note = "Use sovereign_gate::CivicRequirement (8D) instead")]
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct GovernanceRequirement {
     /// Minimum consciousness tier required.
@@ -1050,9 +1059,9 @@ pub fn requirement_for_guardian() -> GovernanceRequirement {
 /// Fetch the calling agent's consciousness credential via the specified bridge
 /// zome and evaluate it against a governance requirement.
 ///
-/// This is the shared implementation of `require_consciousness()` — every
-/// coordinator keeps a thin 3-line wrapper that passes its cluster's bridge
-/// zome name (e.g., `"commons_bridge"`, `"civic_bridge"`, `"hearth_bridge"`).
+/// **Deprecated**: Use `sovereign_gate::gate_civic()` instead. This function
+/// is retained as the fallback path for bridges that don't yet support
+/// native `SovereignCredential` issuance.
 ///
 /// Steps:
 /// 1. `agent_info()` → derive DID
@@ -1060,6 +1069,7 @@ pub fn requirement_for_guardian() -> GovernanceRequirement {
 /// 3. `evaluate_governance()` (pure)
 /// 4. `should_audit()` → best-effort `log_governance_gate` if sampled
 /// 5. Reject with `WasmError` if ineligible
+#[deprecated(since = "0.9.0", note = "Use sovereign_gate::gate_civic() instead")]
 #[cfg(feature = "hdk")]
 pub fn gate_consciousness(
     bridge_zome: &str,

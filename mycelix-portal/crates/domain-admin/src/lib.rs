@@ -8,7 +8,7 @@
 
 pub mod types;
 
-use portal_domain_trait::{ColorFamily, ConsciousnessTier, DomainModule, NavItem};
+use portal_domain_trait::{ColorFamily, CivicTier, DomainModule, NavItem};
 
 pub struct AdminDomain;
 
@@ -26,7 +26,7 @@ impl DomainModule for AdminDomain {
         ]
     }
 
-    fn min_tier(&self) -> ConsciousnessTier { ConsciousnessTier::Guardian }
+    fn min_tier(&self) -> CivicTier { CivicTier::Guardian }
     fn key_context(&self) -> &'static [u8] { b"mycelix-admin-v1" }
     fn happ_role(&self) -> &'static str { "admin" }
     fn zomes(&self) -> &'static [&'static str] { &[] }

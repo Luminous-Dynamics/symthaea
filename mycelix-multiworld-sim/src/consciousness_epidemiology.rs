@@ -37,7 +37,7 @@ const INCIDENCE_HISTORY_CAP: usize = 2000;
 const NUM_TIERS: usize = 5;
 
 // ---------------------------------------------------------------------------
-// ConsciousnessTier
+// CivicTier
 // ---------------------------------------------------------------------------
 
 /// Consciousness tier — epidemic compartment analogues.
@@ -45,7 +45,7 @@ const NUM_TIERS: usize = 5;
 /// Ordered from least to most conscious. The spread dynamics model
 /// how agents transition upward (and sometimes regress downward).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
-pub enum ConsciousnessTier {
+pub enum CivicTier {
     /// No active consciousness practice; baseline.
     Dormant,
     /// Beginning to question; first exposure.
@@ -58,7 +58,7 @@ pub enum ConsciousnessTier {
     Transcendent,
 }
 
-impl ConsciousnessTier {
+impl CivicTier {
     /// Numeric index (0-4).
     pub fn as_index(&self) -> usize {
         match self {
@@ -93,7 +93,7 @@ impl ConsciousnessTier {
     }
 
     /// All tiers in ascending order.
-    pub const ALL: [ConsciousnessTier; NUM_TIERS] = [
+    pub const ALL: [CivicTier; NUM_TIERS] = [
         Self::Dormant,
         Self::Awakening,
         Self::Aware,
@@ -110,7 +110,7 @@ impl ConsciousnessTier {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EpiAgent {
     pub id: usize,
-    pub tier: ConsciousnessTier,
+    pub tier: CivicTier,
     /// Individual phi value within the tier's range.
     pub phi: f64,
     /// Openness to consciousness shift [0, 1].
@@ -124,7 +124,7 @@ pub struct EpiAgent {
     /// Indices of higher-tier contacts acting as mentors.
     pub mentors: Vec<usize>,
     /// High-water mark of consciousness tier ever reached.
-    pub ever_reached_max: ConsciousnessTier,
+    pub ever_reached_max: CivicTier,
 }
 
 // ---------------------------------------------------------------------------
@@ -226,7 +226,7 @@ pub struct EpidemicReport {
     /// Effective R0 at the end of the run.
     pub r0_effective: f64,
     /// Tier with the highest population at the peak of advancement.
-    pub peak_tier: ConsciousnessTier,
+    pub peak_tier: CivicTier,
     /// Tick at which the highest mean phi was observed.
     pub peak_tick: u32,
     /// Fraction of population that ever reached Aware+.
@@ -290,14 +290,14 @@ impl ConsciousnessEpidemic {
             let influence_radius = 0.2 + 0.8 * epidemic.rand_f64();
             epidemic.agents.push(EpiAgent {
                 id: i,
-                tier: ConsciousnessTier::Dormant,
+                tier: CivicTier::Dormant,
                 phi: 0.05,
                 susceptibility,
                 influence_radius,
                 contacts: Vec::new(),
                 tier_duration: 0,
                 mentors: Vec::new(),
-                ever_reached_max: ConsciousnessTier::Dormant,
+                ever_reached_max: CivicTier::Dormant,
             });
         }
 
@@ -325,9 +325,9 @@ impl ConsciousnessEpidemic {
             .map(|_| epidemic.rand_usize(num_agents))
             .collect();
         for idx in seed_indices {
-            epidemic.agents[idx].tier = ConsciousnessTier::Awakening;
+            epidemic.agents[idx].tier = CivicTier::Awakening;
             epidemic.agents[idx].phi = 0.15;
-            epidemic.agents[idx].ever_reached_max = ConsciousnessTier::Awakening;
+            epidemic.agents[idx].ever_reached_max = CivicTier::Awakening;
         }
 
         // Recount compartments after seeding
@@ -345,7 +345,7 @@ impl ConsciousnessEpidemic {
         }
 
         // Snapshot current tiers for read-during-write safety
-        let tiers: Vec<ConsciousnessTier> = self.agents.iter().map(|a| a.tier).collect();
+        let tiers: Vec<CivicTier> = self.agents.iter().map(|a| a.tier).collect();
 
         // Effective contact rate (media campaign boost)
         let effective_contact_rate = if let Some((remaining, boost)) = &mut self.media_campaign_active
@@ -404,7 +404,7 @@ impl ConsciousnessEpidemic {
                 let total_prob = (base_prob * (1.0 + mentor_boost)).min(1.0);
 
                 if self.rand_f64() < total_prob {
-                    new_tiers[i] = ConsciousnessTier::from_index(next_tier_idx);
+                    new_tiers[i] = CivicTier::from_index(next_tier_idx);
                     self.state.transition_rates[current_idx][next_tier_idx] += 1.0;
                 }
             }
@@ -413,7 +413,7 @@ impl ConsciousnessEpidemic {
             // Isolated agents (few higher-tier contacts) may regress
             if current_idx > 0 && higher_contacts == 0 {
                 if self.rand_f64() < self.model.regression_rate {
-                    new_tiers[i] = ConsciousnessTier::from_index(current_idx - 1);
+                    new_tiers[i] = CivicTier::from_index(current_idx - 1);
                     self.state.transition_rates[current_idx][current_idx - 1] += 1.0;
                 }
             }
@@ -489,7 +489,7 @@ impl ConsciousnessEpidemic {
                 for i in 0..n {
                     if self.agents[i].tier.as_index() > 0 && self.rand_f64() < regression_spike {
                         let old_idx = self.agents[i].tier.as_index();
-                        self.agents[i].tier = ConsciousnessTier::from_index(old_idx - 1);
+                        self.agents[i].tier = CivicTier::from_index(old_idx - 1);
                         self.agents[i].tier_duration = 0;
                     }
                 }
@@ -556,8 +556,8 @@ impl ConsciousnessEpidemic {
             .enumerate()
             .rev()
             .find(|(_, &count)| count > 0)
-            .map(|(i, _)| ConsciousnessTier::from_index(i))
-            .unwrap_or(ConsciousnessTier::Dormant);
+            .map(|(i, _)| CivicTier::from_index(i))
+            .unwrap_or(CivicTier::Dormant);
 
         EpidemicReport {
             r0_effective: self.compute_r0(),
@@ -588,7 +588,7 @@ impl ConsciousnessEpidemic {
         let ever_aware = self
             .agents
             .iter()
-            .filter(|a| a.ever_reached_max.as_index() >= ConsciousnessTier::Aware.as_index())
+            .filter(|a| a.ever_reached_max.as_index() >= CivicTier::Aware.as_index())
             .count();
         self.state.attack_rate = ever_aware as f64 / n as f64;
     }
@@ -623,7 +623,7 @@ impl ConsciousnessEpidemic {
         }
 
         // Collect agents by tier for mentor assignment
-        let tiers: Vec<ConsciousnessTier> = self.agents.iter().map(|a| a.tier).collect();
+        let tiers: Vec<CivicTier> = self.agents.iter().map(|a| a.tier).collect();
 
         let mut assigned = 0;
         let mut attempts = 0;
@@ -719,9 +719,9 @@ mod tests {
 
         // Seed more awakening agents for reliable contact
         for i in 0..50 {
-            epi.agents[i].tier = ConsciousnessTier::Awakening;
+            epi.agents[i].tier = CivicTier::Awakening;
             epi.agents[i].phi = 0.2;
-            epi.agents[i].ever_reached_max = ConsciousnessTier::Awakening;
+            epi.agents[i].ever_reached_max = CivicTier::Awakening;
         }
         epi.recount_compartments();
 
@@ -754,9 +754,9 @@ mod tests {
 
         // Seed 10% Awakening
         for i in 0..30 {
-            epi.agents[i].tier = ConsciousnessTier::Awakening;
+            epi.agents[i].tier = CivicTier::Awakening;
             epi.agents[i].phi = 0.2;
-            epi.agents[i].ever_reached_max = ConsciousnessTier::Awakening;
+            epi.agents[i].ever_reached_max = CivicTier::Awakening;
         }
         epi.recount_compartments();
 
@@ -784,9 +784,9 @@ mod tests {
 
         // Seed a few Awakening
         for i in 0..6 {
-            epi.agents[i].tier = ConsciousnessTier::Awakening;
+            epi.agents[i].tier = CivicTier::Awakening;
             epi.agents[i].phi = 0.2;
-            epi.agents[i].ever_reached_max = ConsciousnessTier::Awakening;
+            epi.agents[i].ever_reached_max = CivicTier::Awakening;
         }
         epi.recount_compartments();
 
@@ -817,11 +817,11 @@ mod tests {
 
         // Only 1 Awakening agent — can't satisfy threshold=10
         for a in &mut epi.agents {
-            a.tier = ConsciousnessTier::Dormant;
-            a.ever_reached_max = ConsciousnessTier::Dormant;
+            a.tier = CivicTier::Dormant;
+            a.ever_reached_max = CivicTier::Dormant;
         }
-        epi.agents[0].tier = ConsciousnessTier::Awakening;
-        epi.agents[0].ever_reached_max = ConsciousnessTier::Awakening;
+        epi.agents[0].tier = CivicTier::Awakening;
+        epi.agents[0].ever_reached_max = CivicTier::Awakening;
         epi.recount_compartments();
 
         epi.run(20);
@@ -859,12 +859,12 @@ mod tests {
 
             // Seed both identically
             for i in 0..20 {
-                control.agents[i].tier = ConsciousnessTier::Awakening;
+                control.agents[i].tier = CivicTier::Awakening;
                 control.agents[i].phi = 0.2;
-                control.agents[i].ever_reached_max = ConsciousnessTier::Awakening;
-                mentored.agents[i].tier = ConsciousnessTier::Awakening;
+                control.agents[i].ever_reached_max = CivicTier::Awakening;
+                mentored.agents[i].tier = CivicTier::Awakening;
                 mentored.agents[i].phi = 0.2;
-                mentored.agents[i].ever_reached_max = ConsciousnessTier::Awakening;
+                mentored.agents[i].ever_reached_max = CivicTier::Awakening;
             }
             control.recount_compartments();
             mentored.recount_compartments();
@@ -902,9 +902,9 @@ mod tests {
 
         // Start all agents at Awakening
         for a in &mut epi.agents {
-            a.tier = ConsciousnessTier::Awakening;
+            a.tier = CivicTier::Awakening;
             a.phi = 0.2;
-            a.ever_reached_max = ConsciousnessTier::Awakening;
+            a.ever_reached_max = CivicTier::Awakening;
         }
         epi.recount_compartments();
 
@@ -942,9 +942,9 @@ mod tests {
         // Control group
         let mut control = ConsciousnessEpidemic::new(200, 42, model.clone());
         for i in 0..20 {
-            control.agents[i].tier = ConsciousnessTier::Awakening;
+            control.agents[i].tier = CivicTier::Awakening;
             control.agents[i].phi = 0.2;
-            control.agents[i].ever_reached_max = ConsciousnessTier::Awakening;
+            control.agents[i].ever_reached_max = CivicTier::Awakening;
         }
         control.recount_compartments();
         control.run(50);
@@ -952,9 +952,9 @@ mod tests {
         // Education group
         let mut educated = ConsciousnessEpidemic::new(200, 42, model);
         for i in 0..20 {
-            educated.agents[i].tier = ConsciousnessTier::Awakening;
+            educated.agents[i].tier = CivicTier::Awakening;
             educated.agents[i].phi = 0.2;
-            educated.agents[i].ever_reached_max = ConsciousnessTier::Awakening;
+            educated.agents[i].ever_reached_max = CivicTier::Awakening;
         }
         educated.recount_compartments();
         educated.inject_intervention(Intervention::Education { boost: 3.0 });
@@ -982,9 +982,9 @@ mod tests {
 
         // Start most agents at Awakening
         for a in &mut epi.agents {
-            a.tier = ConsciousnessTier::Awakening;
+            a.tier = CivicTier::Awakening;
             a.phi = 0.2;
-            a.ever_reached_max = ConsciousnessTier::Awakening;
+            a.ever_reached_max = CivicTier::Awakening;
         }
         epi.recount_compartments();
         let pre_dormant = epi.state.compartments[0];
@@ -1015,9 +1015,9 @@ mod tests {
 
         // Seed generously
         for i in 0..40 {
-            epi.agents[i].tier = ConsciousnessTier::Awakening;
+            epi.agents[i].tier = CivicTier::Awakening;
             epi.agents[i].phi = 0.2;
-            epi.agents[i].ever_reached_max = ConsciousnessTier::Awakening;
+            epi.agents[i].ever_reached_max = CivicTier::Awakening;
         }
         epi.recount_compartments();
 
@@ -1041,9 +1041,9 @@ mod tests {
 
         // Seed some Awakening
         for i in 0..10 {
-            epi.agents[i].tier = ConsciousnessTier::Awakening;
+            epi.agents[i].tier = CivicTier::Awakening;
             epi.agents[i].phi = 0.2;
-            epi.agents[i].ever_reached_max = ConsciousnessTier::Awakening;
+            epi.agents[i].ever_reached_max = CivicTier::Awakening;
         }
         epi.recount_compartments();
 
@@ -1073,7 +1073,7 @@ mod tests {
     #[test]
     fn test_tier_phi_ranges_are_contiguous() {
         let mut prev_hi = 0.0;
-        for tier in &ConsciousnessTier::ALL {
+        for tier in &CivicTier::ALL {
             let (lo, hi) = tier.phi_range();
             assert!(
                 (lo - prev_hi).abs() < 1e-10,

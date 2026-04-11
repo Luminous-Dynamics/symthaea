@@ -14,7 +14,8 @@
 //! 4. Map to tier via [`constitutional_envelope::score_to_tier`]
 //! 5. Convert tier to voting weight [0.0, 1.0]
 
-use mycelix_bridge_common::constitutional_envelope::{apply_decay, score_to_tier};
+use mycelix_bridge_common::constitutional_envelope::apply_decay;
+use mycelix_bridge_common::sovereign_gate::CivicTier;
 use mycelix_bridge_common::scoring_model::ModelDescriptor;
 
 use crate::agent::CivAgent;
@@ -98,7 +99,7 @@ impl ScoringModelGovernance {
         let decayed = apply_decay(raw_score, self.lambda(), elapsed_days);
 
         // Map to tier
-        let tier = score_to_tier(decayed);
+        let tier = CivicTier::from_score(decayed);
 
         // Convert tier to voting weight [0.0, 1.0]
         tier_to_vote_weight(tier)
@@ -122,7 +123,7 @@ impl ScoringModelGovernance {
 
         let raw_score = self.descriptor.compute_score(&dim_values);
         let decayed_score = apply_decay(raw_score, self.lambda(), elapsed_days);
-        let tier = score_to_tier(decayed_score);
+        let tier = CivicTier::from_score(decayed_score);
         let vote_weight = if agent.is_alive() && agent.age_years(current_tick) >= 15.0 {
             tier_to_vote_weight(tier)
         } else {
@@ -149,7 +150,7 @@ pub struct AgentScoringResult {
     pub dimensions: Vec<f64>,
     pub raw_score: f64,
     pub decayed_score: f64,
-    pub tier: mycelix_bridge_common::consciousness_profile::ConsciousnessTier,
+    pub tier: mycelix_bridge_common::sovereign_gate::CivicTier,
     pub vote_weight: f64,
 }
 
@@ -162,15 +163,15 @@ pub struct AgentScoringResult {
 /// - Steward: 0.85
 /// - Guardian: 1.0
 fn tier_to_vote_weight(
-    tier: mycelix_bridge_common::consciousness_profile::ConsciousnessTier,
+    tier: mycelix_bridge_common::sovereign_gate::CivicTier,
 ) -> f64 {
-    use mycelix_bridge_common::consciousness_profile::ConsciousnessTier;
+    use mycelix_bridge_common::sovereign_gate::CivicTier;
     match tier {
-        ConsciousnessTier::Observer => 0.0,
-        ConsciousnessTier::Participant => 0.3,
-        ConsciousnessTier::Citizen => 0.6,
-        ConsciousnessTier::Steward => 0.85,
-        ConsciousnessTier::Guardian => 1.0,
+        CivicTier::Observer => 0.0,
+        CivicTier::Participant => 0.3,
+        CivicTier::Citizen => 0.6,
+        CivicTier::Steward => 0.85,
+        CivicTier::Guardian => 1.0,
     }
 }
 
@@ -208,7 +209,7 @@ mod tests {
     use super::*;
     use crate::agent::{BiologicalSex, ConsciousnessState, SkillVector};
     use crate::needs::PsychologicalNeeds;
-    use mycelix_bridge_common::consciousness_profile::ConsciousnessTier;
+    use mycelix_bridge_common::sovereign_gate::CivicTier;
     use mycelix_bridge_common::scoring_model::{
         Canonical4D, MinimalCivic, ScoringModel, Sovereign8D,
     };

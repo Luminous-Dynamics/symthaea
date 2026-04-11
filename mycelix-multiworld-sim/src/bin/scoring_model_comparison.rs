@@ -24,7 +24,7 @@ use mycelix_multiworld_sim::{
     scoring_bridge::{builtin_scoring_models, ScoringModelGovernance},
 };
 
-use mycelix_bridge_common::consciousness_profile::ConsciousnessTier;
+use mycelix_bridge_common::sovereign_gate::CivicTier;
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
@@ -181,11 +181,11 @@ fn evaluate_population(
         weights.push(result.vote_weight);
 
         let tier_idx = match result.tier {
-            ConsciousnessTier::Observer => 0,
-            ConsciousnessTier::Participant => 1,
-            ConsciousnessTier::Citizen => 2,
-            ConsciousnessTier::Steward => 3,
-            ConsciousnessTier::Guardian => 4,
+            CivicTier::Observer => 0,
+            CivicTier::Participant => 1,
+            CivicTier::Citizen => 2,
+            CivicTier::Steward => 3,
+            CivicTier::Guardian => 4,
         };
         tier_counts[tier_idx] += 1;
 

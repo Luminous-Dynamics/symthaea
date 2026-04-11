@@ -5,7 +5,7 @@
 pub mod types;
 
 use portal_domain_trait::{
-    ColorFamily, ConsciousnessTier, DomainModule, NavItem,
+    ColorFamily, CivicTier, DomainModule, NavItem,
 };
 
 pub struct FinanceDomain;
@@ -27,7 +27,7 @@ impl DomainModule for FinanceDomain {
         ]
     }
 
-    fn min_tier(&self) -> ConsciousnessTier { ConsciousnessTier::Citizen }
+    fn min_tier(&self) -> CivicTier { CivicTier::Citizen }
     fn key_context(&self) -> &'static [u8] { b"mycelix-finance-v1" }
     fn happ_role(&self) -> &'static str { "finance" }
 

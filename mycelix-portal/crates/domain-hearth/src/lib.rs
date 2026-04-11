@@ -4,7 +4,7 @@
 
 pub mod types;
 
-use portal_domain_trait::{ColorFamily, ConsciousnessTier, DomainModule, NavItem};
+use portal_domain_trait::{ColorFamily, CivicTier, DomainModule, NavItem};
 
 pub struct HearthDomain;
 
@@ -24,7 +24,7 @@ impl DomainModule for HearthDomain {
         ]
     }
 
-    fn min_tier(&self) -> ConsciousnessTier { ConsciousnessTier::Participant }
+    fn min_tier(&self) -> CivicTier { CivicTier::Participant }
     fn key_context(&self) -> &'static [u8] { b"mycelix-hearth-v1" }
     fn happ_role(&self) -> &'static str { "hearth" }
 

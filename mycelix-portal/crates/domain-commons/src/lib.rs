@@ -8,7 +8,7 @@
 pub mod types;
 
 use portal_domain_trait::{
-    ColorFamily, ConsciousnessTier, DomainModule, NavItem,
+    ColorFamily, CivicTier, DomainModule, NavItem,
 };
 
 pub struct CommonsDomain;
@@ -33,7 +33,7 @@ impl DomainModule for CommonsDomain {
         ]
     }
 
-    fn min_tier(&self) -> ConsciousnessTier { ConsciousnessTier::Citizen }
+    fn min_tier(&self) -> CivicTier { CivicTier::Citizen }
     fn key_context(&self) -> &'static [u8] { b"mycelix-commons-v1" }
     fn happ_role(&self) -> &'static str { "commons" }
 
