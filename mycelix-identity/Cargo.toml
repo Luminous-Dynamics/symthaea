@@ -78,6 +78,7 @@ mycelix-zome-helpers = { path = "../mycelix-workspace/crates/mycelix-zome-helper
 
 # ZKP verification for selective disclosure
 mycelix-zkp-core = { path = "../crates/mycelix-zkp-core" }
+# getrandom 0.2 pulled in by rand_core — needs "custom" for WASM
 
 [profile.dev]
 opt-level = "z"
