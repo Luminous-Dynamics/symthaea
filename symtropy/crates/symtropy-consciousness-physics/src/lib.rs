@@ -43,6 +43,8 @@ pub mod sanctuary;
 pub mod simple_field;
 pub mod spatial_hash;
 pub mod thermodynamics;
+#[cfg(feature = "wasm")]
+pub mod wasm_bindings;
 
 pub use coupling::{ConsciousnessField, EntityConsciousness};
 pub use simple_field::{SimpleCoupledField, SimpleEntity};

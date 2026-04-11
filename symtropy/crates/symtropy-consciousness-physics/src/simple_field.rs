@@ -37,7 +37,7 @@ use nalgebra::SVector;
 use symtropy_math::Point;
 
 use crate::energy::EnergyBudget;
-use crate::harmony_field::{HarmonyField, HarmonySource};
+use crate::harmony_field::{HarmonyField, HarmonySource, NUM_HARMONIES};
 use crate::safety::SafetyTier;
 use crate::sanctuary::{SanctuaryConditions, SanctuaryZone};
 use crate::thermodynamics::{ThermodynamicConstants, ThermodynamicLedger};
@@ -53,8 +53,8 @@ pub struct SimpleEntity {
     pub safety_tier: SafetyTier,
     /// Energy budget (persistent, depletes through actions).
     pub energy: EnergyBudget,
-    /// Harmony activations [0, 1] for each of 8 harmony dimensions.
-    pub harmony_activations: [f64; 8],
+    /// Harmony activations [0, 1] for each of the 9 harmony dimensions.
+    pub harmony_activations: [f64; NUM_HARMONIES],
     /// Prediction error from unexpected collisions.
     pub prediction_error: f64,
     /// Motor precision = 1 / (1 + prediction_error).
@@ -69,7 +69,7 @@ impl SimpleEntity {
             metric: 0.5,
             safety_tier: SafetyTier::Yellow,
             energy: EnergyBudget::new(max_energy),
-            harmony_activations: [0.0; 8],
+            harmony_activations: [0.0; NUM_HARMONIES],
             prediction_error: 0.0,
             motor_precision: 1.0,
             prediction_decay: 0.05,
@@ -307,7 +307,7 @@ impl<const D: usize> PhysicsCallback<D> for SimpleCoupledField<D> {
         }
         let harmonies = self.entities.get(&body)
             .map(|e| e.harmony_activations)
-            .unwrap_or([0.0; 8]);
+            .unwrap_or([0.0; NUM_HARMONIES]);
         let point = Point(*contact_point);
         self.harmony_field.friction_multiplier(&point, &harmonies)
     }

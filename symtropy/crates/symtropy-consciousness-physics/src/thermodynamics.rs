@@ -21,6 +21,45 @@
 /// Ref: Landauer (1961), "Irreversibility and Heat Generation"
 pub const LANDAUER_BOUND_310K: f64 = 2.87e-21; // Joules per bit
 
+/// Body (baseline) temperature for consciousness clarity calculations.
+/// At or below this temperature, no penalty applies.
+pub const BODY_TEMPERATURE_K: f64 = 310.0;
+
+/// Sigmoid midpoint for temperature-consciousness coupling.
+/// Penalty reaches 0.55 at this temperature (halfway between baseline and max reduction).
+pub const TEMP_SIGMOID_MIDPOINT_K: f64 = 360.0;
+
+/// Sigmoid steepness for temperature-consciousness coupling.
+/// At 0.1/K the transition spans ~100K (310K → 410K).
+pub const TEMP_SIGMOID_STEEPNESS: f64 = 0.1;
+
+/// Minimum consciousness clarity under extreme heat (asymptotic floor).
+pub const TEMP_CLARITY_FLOOR: f64 = 0.1;
+
+/// Smooth temperature-to-consciousness clarity penalty.
+///
+/// Returns a multiplier in [TEMP_CLARITY_FLOOR, 1.0]:
+/// - At body temperature (310K): ≈ 0.994 (essentially no penalty)
+/// - At midpoint (360K): 0.55 (half capacity)
+/// - At fever peak (410K+): ≈ 0.106 (near floor)
+///
+/// Uses a logistic sigmoid centred at TEMP_SIGMOID_MIDPOINT_K so the
+/// penalty is **continuous and differentiable** — no binary step at any
+/// temperature, which previously caused a Dirac-like jump at 311K.
+///
+/// Formula: `FLOOR + (1 - FLOOR) / (1 + exp(k * (T - T_mid)))`
+///
+/// # References
+/// - Somjen et al. (2001) — cortical activity suppressed above 42°C
+/// - Kiyatkin (2010) — brain temperature and neural activity review
+#[inline]
+pub fn smooth_temperature_penalty(temperature_k: f64) -> f64 {
+    let exponent = TEMP_SIGMOID_STEEPNESS * (temperature_k - TEMP_SIGMOID_MIDPOINT_K);
+    let sigmoid = 1.0 / (1.0 + exponent.exp());
+    (TEMP_CLARITY_FLOOR + (1.0 - TEMP_CLARITY_FLOOR) * sigmoid)
+        .clamp(TEMP_CLARITY_FLOOR, 1.0)
+}
+
 /// Default energy per cognitive operation (empirical estimate).
 /// Cortical synapses operate at ~16.6× Landauer limit.
 /// Ref: Laughlin & Sejnowski (2003)
@@ -384,5 +423,85 @@ mod tests {
         // Our constant: ~4.8×10^-20 J/op (much lower — Landauer-based, not metabolic)
         assert!(ENERGY_PER_COGNITIVE_OP > 0.0);
         assert!(ENERGY_PER_COGNITIVE_OP < 1e-15); // Not absurdly large
+    }
+
+    // ── smooth_temperature_penalty ────────────────────────────────────────────
+
+    #[test]
+    fn penalty_at_body_temp_is_near_one() {
+        let p = smooth_temperature_penalty(BODY_TEMPERATURE_K);
+        assert!(
+            p > 0.98,
+            "penalty at body temp ({BODY_TEMPERATURE_K}K) should be ≈1.0, got {p}"
+        );
+    }
+
+    #[test]
+    fn penalty_at_midpoint_is_half() {
+        let p = smooth_temperature_penalty(TEMP_SIGMOID_MIDPOINT_K);
+        // sigmoid(0) = 0.5 → penalty = FLOOR + (1-FLOOR)*0.5 = 0.1 + 0.45 = 0.55
+        assert!(
+            (p - 0.55).abs() < 1e-10,
+            "penalty at midpoint should be 0.55, got {p}"
+        );
+    }
+
+    #[test]
+    fn penalty_at_410k_near_floor() {
+        let p = smooth_temperature_penalty(410.0);
+        assert!(
+            p < 0.15,
+            "penalty at 410K should be near floor ({TEMP_CLARITY_FLOOR}), got {p}"
+        );
+        assert!(p >= TEMP_CLARITY_FLOOR, "penalty should not go below floor");
+    }
+
+    #[test]
+    fn penalty_is_strictly_decreasing() {
+        // Sample 10 points from 310K to 420K — each must be less than the previous.
+        let mut prev = smooth_temperature_penalty(310.0);
+        for t in (320..=420).step_by(10) {
+            let curr = smooth_temperature_penalty(t as f64);
+            assert!(
+                curr < prev,
+                "penalty should decrease: penalty({t}K)={curr} ≥ prev={prev}"
+            );
+            prev = curr;
+        }
+    }
+
+    #[test]
+    fn penalty_is_smooth_no_kink_at_body_temp() {
+        // Finite-difference test: derivative should be continuous around 310K.
+        // If there were a kink (binary switch), the derivative would jump.
+        let eps = 1.0;
+        let t = BODY_TEMPERATURE_K;
+        let d_before = smooth_temperature_penalty(t) - smooth_temperature_penalty(t - eps);
+        let d_after = smooth_temperature_penalty(t + eps) - smooth_temperature_penalty(t);
+        assert!(
+            (d_before - d_after).abs() < 0.01,
+            "derivative should be continuous at body temp: d_before={d_before}, d_after={d_after}"
+        );
+    }
+
+    #[test]
+    fn penalty_clamps_at_floor() {
+        // At extreme temperatures (1000K), penalty must not go below floor.
+        let p = smooth_temperature_penalty(1000.0);
+        assert!(
+            (p - TEMP_CLARITY_FLOOR).abs() < 1e-6,
+            "extreme temp should clamp to floor {TEMP_CLARITY_FLOOR}, got {p}"
+        );
+    }
+
+    #[test]
+    fn penalty_monotonic_cold() {
+        // Below body temperature, penalty should be ≥ body_temp penalty (no super-clarity).
+        let p_cold = smooth_temperature_penalty(280.0);
+        let p_body = smooth_temperature_penalty(BODY_TEMPERATURE_K);
+        assert!(
+            p_cold >= p_body,
+            "cold temp penalty {p_cold} should be ≥ body temp penalty {p_body}"
+        );
     }
 }

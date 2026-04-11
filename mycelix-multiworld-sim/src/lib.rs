@@ -2345,6 +2345,7 @@ impl MultiWorldSimulator {
 
         // ── 1. Moral Dilemma Detection (every 12 ticks = annually) ──────────
         if tick % 12 == 0 {
+            let mut moral_memory_queue: Vec<(u32, crate::world::MoralMemory)> = Vec::new();
             for world in &self.worlds {
                 let pop = world.population();
                 if pop <= 50 {
@@ -2386,8 +2387,24 @@ impl MultiWorldSimulator {
                         tick,
                         Some(world.id),
                         CivEventType::MoralDilemma,
-                        desc,
+                        desc.clone(),
                     ));
+
+                    // Queue moral memory for deferred push (can't mutate during & borrow)
+                    moral_memory_queue.push((world.id, crate::world::MoralMemory {
+                        tick,
+                        ethics_at_crisis: mean.as_vec(),
+                        lesson_dimension: idx_a,
+                        description: desc,
+                    }));
+                }
+            }
+            // Apply deferred moral memories
+            for (wid, mem) in moral_memory_queue {
+                if let Some(w) = self.worlds.iter_mut().find(|w| w.id == wid) {
+                    if w.moral_memories.len() < 10 {
+                        w.moral_memories.push(mem);
+                    }
                 }
             }
         }
@@ -3011,12 +3028,33 @@ impl MultiWorldSimulator {
                         for agent in world.agents.iter_mut().filter(|a| a.is_alive()) {
                             agent.trauma_level = (agent.trauma_level + trauma_inc).min(1.0);
                             if trauma_inc > 0.05 { agent.wounds.push(wound_healing::WoundState::new(trauma_inc.min(0.5), wound_healing::WoundOrigin::Disaster, self.current_tick)); }
-                            // Trauma shifts ethical orientation (Phase 3b):
-                            // Suffering makes agents crave rules-as-safety (deontological ↑)
-                            // and distrust pure outcome-thinking (consequentialist ↓).
-                            // Effect proportional to trauma severity (Janoff-Bulman 1992).
-                            agent.ethics.deontological = (agent.ethics.deontological + trauma_inc * 0.01).min(1.0);
-                            agent.ethics.consequentialist = (agent.ethics.consequentialist - trauma_inc * 0.005).max(0.05);
+                            // Crisis ethical reorientation (replaces gentle Phase 3b nudge):
+                            // When trauma exceeds 0.4, agents undergo wholesale ethical
+                            // shift — not a nudge. Direction depends on crisis type:
+                            // - Population loss (violence/disaster) → deontological (crave order)
+                            // - Resource scarcity → consequentialist (survival calculus)
+                            // - Isolation/morale → relational (crave community)
+                            // Ref: Weimar hyperinflation→authoritarianism; war→duty ethics
+                            if agent.trauma_level > 0.4 {
+                                let shift = (trauma_inc * 0.15).min(0.08); // substantial but bounded
+                                if effects.population_loss_fraction > 0.01 {
+                                    // Violence/death → crave rules and order
+                                    agent.ethics.deontological = (agent.ethics.deontological + shift).min(1.0);
+                                    agent.ethics.consequentialist = (agent.ethics.consequentialist - shift * 0.5).max(0.05);
+                                } else if effects.allostatic_load_increase > 0.03 {
+                                    // Resource stress → survival calculus
+                                    agent.ethics.consequentialist = (agent.ethics.consequentialist + shift).min(1.0);
+                                    agent.ethics.virtue_care = (agent.ethics.virtue_care - shift * 0.3).max(0.05);
+                                } else if effects.morale_impact < -0.02 {
+                                    // Isolation/morale collapse → crave community
+                                    agent.ethics.relational = (agent.ethics.relational + shift).min(1.0);
+                                    agent.ethics.deontological = (agent.ethics.deontological - shift * 0.3).max(0.05);
+                                }
+                            } else {
+                                // Below crisis threshold: gentle drift (original Phase 3b)
+                                agent.ethics.deontological = (agent.ethics.deontological + trauma_inc * 0.01).min(1.0);
+                                agent.ethics.consequentialist = (agent.ethics.consequentialist - trauma_inc * 0.005).max(0.05);
+                            }
                         }
                     }
                 }
@@ -3818,6 +3856,51 @@ impl MultiWorldSimulator {
             // Phase 8.05: Ethical dynamics (moral dilemmas, drift, synthesis)
             self.tick_ethical_dynamics();
 
+            // Phase 8.06: Institutional ethics persistence + socialization.
+            // Institutional ethics = slow EMA of population mean (alpha=0.02).
+            // New citizens drift toward institutional ethics at 0.0002/tick.
+            // Moral memories resist drift away from crisis orientations.
+            for world in &mut self.worlds {
+                // Update institutional ethics as EMA of current population
+                let pop_mean = agent::EthicalOrientation::mean_of(&world.agents);
+                let alpha = 0.02;
+                world.institutional_ethics.deontological += (pop_mean.deontological - world.institutional_ethics.deontological) * alpha;
+                world.institutional_ethics.consequentialist += (pop_mean.consequentialist - world.institutional_ethics.consequentialist) * alpha;
+                world.institutional_ethics.virtue_care += (pop_mean.virtue_care - world.institutional_ethics.virtue_care) * alpha;
+                world.institutional_ethics.relational += (pop_mean.relational - world.institutional_ethics.relational) * alpha;
+
+                // Socialization: agents drift toward institutional ethics
+                let inst = world.institutional_ethics.as_vec();
+                for agent in world.agents.iter_mut().filter(|a| a.is_alive()) {
+                    let ag = agent.ethics.as_vec();
+                    for d in 0..4 {
+                        let delta = (inst[d] - ag[d]) * 0.0002;
+                        agent.ethics.modify_with_sacred_resistance(d, delta);
+                    }
+                }
+
+                // Moral memory antibodies: resist drift away from crisis orientations
+                let tick = self.current_tick;
+                for mem in &world.moral_memories {
+                    let strength = mem.strength(tick);
+                    if strength <= 0.0 { continue; }
+                    // If population is drifting away from the lesson dimension,
+                    // apply resistance proportional to memory strength
+                    let current_val = pop_mean.as_vec()[mem.lesson_dimension];
+                    let crisis_val = mem.ethics_at_crisis[mem.lesson_dimension];
+                    if current_val < crisis_val - 0.1 {
+                        // Drifting away from the lesson — resist
+                        let correction = (crisis_val - current_val) * 0.001 * strength;
+                        for agent in world.agents.iter_mut().filter(|a| a.is_alive()) {
+                            agent.ethics.modify_with_sacred_resistance(mem.lesson_dimension, correction);
+                        }
+                    }
+                }
+
+                // Prune expired memories (> 600 ticks old)
+                world.moral_memories.retain(|m| m.strength(tick) > 0.0);
+            }
+
             // Phase 8.1: Dead Loop #7 fix — Consciousness ↔ Governance feedback.
             // Stable governance creates space for consciousness growth.
             // Unstable governance (fear, uncertainty) suppresses growth.
@@ -4482,6 +4565,8 @@ impl Default for World {
             fleet: crate::robotics::RoboticFleet::default(),
             diplomatic_relations: std::collections::HashMap::new(),
             zones: Vec::new(),
+            moral_memories: Vec::new(),
+            institutional_ethics: crate::agent::EthicalOrientation::default(),
         }
     }
 }

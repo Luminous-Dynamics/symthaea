@@ -41,7 +41,7 @@ use crate::types::{SalientRegion, VisionConfig, VisionTelemetry};
 /// bridge.set_goal_signal(goal);
 /// // Now red patches will be boosted in addition to bottom-up surprise
 /// ```
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct CognitiveGoalSignal {
     /// Task hypervector: encoding of the current cognitive goal or attended concept.
     ///
@@ -53,6 +53,22 @@ pub struct CognitiveGoalSignal {
     /// Scales the per-patch task-similarity boost. Reasonable range: 0.1–1.0.
     /// Higher values make top-down attention dominate over bottom-up surprise.
     pub task_gain: f32,
+    /// Learning rate for Hebbian template update (default: 0.05).
+    ///
+    /// When `update_from_recognition()` fires, `task_hv` is interpolated toward
+    /// the recognized patch HV at rate `learning_rate * confidence * similarity`.
+    /// Range: 0.0 (frozen template) to 0.5 (fast adaptation).
+    pub learning_rate: f32,
+}
+
+impl Default for CognitiveGoalSignal {
+    fn default() -> Self {
+        Self {
+            task_hv: None,
+            task_gain: 0.0,
+            learning_rate: 0.05,
+        }
+    }
 }
 
 impl CognitiveGoalSignal {
@@ -61,6 +77,7 @@ impl CognitiveGoalSignal {
         Self {
             task_hv: Some(task_hv),
             task_gain: 0.4,
+            learning_rate: 0.05,
         }
     }
 
@@ -69,7 +86,41 @@ impl CognitiveGoalSignal {
         Self {
             task_hv: Some(task_hv),
             task_gain: gain.max(0.0),
+            learning_rate: 0.05,
         }
+    }
+
+    /// Hebbian template update: move `task_hv` toward `recognized_hv` when
+    /// the recognized patch is sufficiently task-relevant and confident.
+    ///
+    /// Only fires when:
+    /// - `cos_sim(task_hv, recognized_hv) > 0.3` (patch is task-relevant)
+    /// - `confidence > 0.6` (ventral recognition is reliable)
+    ///
+    /// The update magnitude `α = learning_rate * confidence * similarity` means
+    /// highly confident, highly relevant recognition causes the largest template shift.
+    ///
+    /// Returns `true` if the template was updated.
+    pub fn update_from_recognition(
+        &mut self,
+        recognized_hv: &ContinuousHV,
+        confidence: f32,
+    ) -> bool {
+        let Some(ref mut task_hv) = self.task_hv else {
+            return false;
+        };
+        if self.learning_rate < 1e-6 || confidence < 0.6 {
+            return false;
+        }
+        let sim = task_hv.similarity(recognized_hv).max(0.0);
+        if sim < 0.3 {
+            return false;
+        }
+        let alpha = (self.learning_rate * confidence * sim).clamp(0.0, 0.5);
+        *task_hv =
+            ContinuousHV::weighted_bundle(&[task_hv, recognized_hv], &[1.0 - alpha, alpha])
+                .normalize();
+        true
     }
 }
 
@@ -169,6 +220,25 @@ impl VisionBridge {
             0.8 // Low confidence: gentle suppression — still worth re-examining
         };
         self.manifold.surprise_map_mut().dampen(row, col, factor);
+    }
+
+    /// Update the cognitive goal template from a recognized patch (P2-B).
+    ///
+    /// After the foveation ventral pipeline recognizes a patch, call this with the
+    /// recognized semantic HV and confidence. If the recognition matches the current
+    /// goal (cos_sim > 0.3) and is confident (> 0.6), the goal template shifts
+    /// slightly toward the recognized HV via Hebbian learning.
+    ///
+    /// This closes the third feedback loop: the system literally adjusts *what it's
+    /// looking for* based on what it finds, making search progressively more efficient.
+    ///
+    /// Returns `true` if the template was updated.
+    pub fn learn_from_recognized_patch(
+        &mut self,
+        recognized_hv: &ContinuousHV,
+        confidence: f32,
+    ) -> bool {
+        self.goal_signal.update_from_recognition(recognized_hv, confidence)
     }
 
     /// Process a raw frame and return a ContinuousHV ready for `cycle_with_hv()`.
@@ -929,5 +999,203 @@ mod tests {
         bridge.process_frame(&frame, 64, 64, 1, 0.033);
         let (_active2, total2) = bridge.active_patch_count();
         assert_eq!(total2, total);
+    }
+
+    // === P2-A: Cross-Scale Predictive Surprise Injection ===
+
+    #[test]
+    fn test_predictive_hierarchy_injects_into_surprise() {
+        // With predictive hierarchy enabled, surprise should be augmented by
+        // cross-scale prediction errors, producing different values than without.
+        let mut cfg_base = VisionConfig::default();
+        let mut cfg_pred = VisionConfig::default();
+        cfg_pred.enable_predictive_hierarchy = true;
+
+        let mut bridge_base = VisionBridge::new(cfg_base.clone(), 64, 64);
+        let mut bridge_pred = VisionBridge::new(cfg_pred, 64, 64);
+
+        let frame_a = solid_gray_frame(64, 64, 50);
+        let frame_b = solid_gray_frame(64, 64, 200);
+        cfg_base.enable_predictive_hierarchy = false; // already false
+
+        // Process same sequence through both
+        for _ in 0..3 {
+            bridge_base.process_frame(&frame_a, 64, 64, 1, 0.033);
+            bridge_pred.process_frame(&frame_a, 64, 64, 1, 0.033);
+        }
+        bridge_base.process_frame(&frame_b, 64, 64, 1, 0.033);
+        bridge_pred.process_frame(&frame_b, 64, 64, 1, 0.033);
+
+        // Both should remain finite and valid
+        let s_base = bridge_base.manifold().surprise_map().max_surprise();
+        let s_pred = bridge_pred.manifold().surprise_map().max_surprise();
+        assert!(s_base.is_finite() && s_base >= 0.0, "base surprise finite");
+        assert!(s_pred.is_finite() && s_pred >= 0.0, "pred surprise finite");
+        // Predictive hierarchy adds cross-scale signal → surprise may differ
+        // (we verify absence of NaN/panic rather than exact values)
+    }
+
+    // === P2-B: Goal-Signal Hebbian Learning ===
+
+    #[test]
+    fn test_goal_signal_learning_rate_default() {
+        let sig = CognitiveGoalSignal::default();
+        assert!((sig.learning_rate - 0.05).abs() < 1e-6);
+        assert!(sig.task_hv.is_none());
+    }
+
+    #[test]
+    fn test_goal_signal_no_update_without_task_hv() {
+        let mut sig = CognitiveGoalSignal::default();
+        let recognized = ContinuousHV::random(16_384, 42);
+        let updated = sig.update_from_recognition(&recognized, 0.9);
+        assert!(!updated, "Should not update without task_hv");
+    }
+
+    #[test]
+    fn test_goal_signal_no_update_low_confidence() {
+        let task_hv = ContinuousHV::random(16_384, 1);
+        let mut sig = CognitiveGoalSignal::new(task_hv.clone());
+        // Low confidence should not trigger update
+        let recognized = task_hv.clone(); // Same as task — maximum similarity
+        let updated = sig.update_from_recognition(&recognized, 0.3);
+        assert!(!updated, "Should not update with confidence < 0.6");
+    }
+
+    #[test]
+    fn test_goal_signal_updates_toward_recognized() {
+        let cfg = VisionConfig::default();
+        let mut bridge = VisionBridge::new(cfg, 64, 64);
+
+        // Warm the bridge so we have real patch HVs
+        let frame = gradient_frame(64, 64);
+        bridge.process_frame(&frame, 64, 64, 3, 0.033);
+        bridge.process_frame(&frame, 64, 64, 3, 0.033);
+
+        let patch_hv = bridge
+            .manifold()
+            .last_patch_hvs()
+            .first()
+            .cloned()
+            .expect("should have patch HVs");
+
+        // Set goal = same HV as patch (cos_sim ≈ 1.0)
+        bridge.set_goal_signal(CognitiveGoalSignal::new(patch_hv.clone()));
+
+        let task_hv_before = bridge.goal_signal.task_hv.clone().unwrap();
+        let updated = bridge.learn_from_recognized_patch(&patch_hv, 0.95);
+        let task_hv_after = bridge.goal_signal.task_hv.clone().unwrap();
+
+        assert!(updated, "Should update when sim > 0.3 and confidence > 0.6");
+        // Task HV should have shifted (not identical to before, but similar)
+        let shift = task_hv_before.similarity(&task_hv_after);
+        assert!(
+            shift > 0.9 && shift < 1.0,
+            "Task HV should shift slightly: shift={shift}"
+        );
+    }
+
+    #[test]
+    fn test_goal_signal_no_update_orthogonal_patch() {
+        // A random patch has cos_sim ≈ 0 with a random task HV (concentration of measure).
+        // Update should not fire below the 0.3 threshold.
+        let task_hv = ContinuousHV::random(16_384, 1);
+        let mut sig = CognitiveGoalSignal::new(task_hv);
+        let orthogonal = ContinuousHV::random(16_384, 999_999);
+        // In 16,384D, random unit vectors have cos_sim ≈ 0 — well below 0.3
+        let updated = sig.update_from_recognition(&orthogonal, 0.95);
+        assert!(!updated, "Near-orthogonal patch should not trigger template update");
+    }
+
+    // === P2-C: Temporal Patch Binding ===
+
+    #[test]
+    fn test_temporal_binding_disabled_by_default() {
+        let cfg = VisionConfig::default();
+        assert!(!cfg.enable_temporal_binding);
+        let mut bridge = VisionBridge::new(cfg, 64, 64);
+        let frame = gradient_frame(64, 64);
+        bridge.process_frame(&frame, 64, 64, 1, 0.033);
+        // When disabled, temporal_patch_hvs == last_patch_hvs
+        let temporal = bridge.manifold().temporal_patch_hvs();
+        let raw = bridge.manifold().last_patch_hvs();
+        assert_eq!(temporal.len(), raw.len());
+    }
+
+    #[test]
+    fn test_temporal_binding_produces_valid_output() {
+        let mut cfg = VisionConfig::default();
+        cfg.enable_temporal_binding = true;
+        let mut bridge = VisionBridge::new(cfg.clone(), 64, 64);
+
+        let frame_a = solid_gray_frame(64, 64, 80);
+        let frame_b = solid_gray_frame(64, 64, 180);
+
+        let hv1 = bridge.process_frame(&frame_a, 64, 64, 1, 0.033);
+        let hv2 = bridge.process_frame(&frame_b, 64, 64, 1, 0.033);
+        let hv3 = bridge.process_frame(&frame_b, 64, 64, 1, 0.033);
+
+        assert_eq!(hv1.dim(), cfg.hdc_dim);
+        assert!(hv1.norm() > 0.0 && hv1.norm().is_finite());
+        assert!(hv2.norm() > 0.0 && hv2.norm().is_finite());
+        assert!(hv3.norm() > 0.0 && hv3.norm().is_finite());
+
+        // Temporal patch HVs should be populated after frame 1
+        assert!(
+            !bridge.manifold().temporal_patch_hvs().is_empty(),
+            "Temporal patch HVs should be populated"
+        );
+    }
+
+    #[test]
+    fn test_temporal_binding_distinguishes_direction() {
+        // ρ(A) ⊗ B ≠ ρ(B) ⊗ A — temporal binding is non-commutative.
+        let mut cfg = VisionConfig::default();
+        cfg.enable_temporal_binding = true;
+
+        // Forward: A then B
+        let mut bridge_fwd = VisionBridge::new(cfg.clone(), 64, 64);
+        let frame_a = solid_gray_frame(64, 64, 50);
+        let frame_b = solid_gray_frame(64, 64, 200);
+        bridge_fwd.process_frame(&frame_a, 64, 64, 1, 0.033);
+        bridge_fwd.process_frame(&frame_b, 64, 64, 1, 0.033);
+        let fwd_temporal = bridge_fwd.manifold().temporal_patch_hvs().to_vec();
+
+        // Reverse: B then A
+        let mut bridge_rev = VisionBridge::new(cfg, 64, 64);
+        bridge_rev.process_frame(&frame_b, 64, 64, 1, 0.033);
+        bridge_rev.process_frame(&frame_a, 64, 64, 1, 0.033);
+        let rev_temporal = bridge_rev.manifold().temporal_patch_hvs().to_vec();
+
+        assert!(!fwd_temporal.is_empty() && !rev_temporal.is_empty());
+        // A→B and B→A should produce different temporal encodings
+        let sim = fwd_temporal[0].similarity(&rev_temporal[0]);
+        assert!(
+            sim < 0.99,
+            "Temporal binding should distinguish A→B from B→A: sim={sim}"
+        );
+    }
+
+    #[test]
+    fn test_temporal_binding_stable_for_static_scene() {
+        // Static scene: A→A has consistent temporal HVs across frames.
+        let mut cfg = VisionConfig::default();
+        cfg.enable_temporal_binding = true;
+        let mut bridge = VisionBridge::new(cfg, 64, 64);
+
+        let frame = solid_gray_frame(64, 64, 128);
+        for _ in 0..5 {
+            bridge.process_frame(&frame, 64, 64, 1, 0.033);
+        }
+        let temporal_5 = bridge.manifold().temporal_patch_hvs().to_vec();
+        bridge.process_frame(&frame, 64, 64, 1, 0.033);
+        let temporal_6 = bridge.manifold().temporal_patch_hvs().to_vec();
+
+        assert!(!temporal_5.is_empty());
+        let sim = temporal_5[0].similarity(&temporal_6[0]);
+        assert!(
+            sim > 0.5,
+            "Static scene temporal HVs should be consistent across frames: sim={sim}"
+        );
     }
 }

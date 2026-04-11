@@ -117,6 +117,14 @@ pub struct CognitiveLoopConfig {
     #[serde(default)]
     pub memory_db_path: Option<String>,
 
+    /// Path to persist aesthetic identity (AestheticTracker EMA + harmony bias) across sessions.
+    ///
+    /// When `Some`, the CreativeManager saves and loads this file on construction/drop,
+    /// so Symthaea's taste develops cumulatively over months rather than resetting each session.
+    /// When `None`, defaults to `.claude/aesthetic_memory.json`.
+    #[serde(default)]
+    pub aesthetic_memory_path: Option<String>,
+
     /// Path to the DuckDB database for the epistemic auditor (audit trail).
     /// When `Some`, consciousness telemetry is buffered and periodically flushed
     /// to DuckDB for retrospective analysis. When `None`, no auditor overhead.
@@ -740,6 +748,7 @@ impl Default for CognitiveLoopConfig {
             episodic_replay_training: true,
             memory_graduation: true,
             memory_db_path: None,
+            aesthetic_memory_path: None,
             epistemic_auditor_db_path: None,
             episodic_replay_config: crate::memory::episodic_replay::EpisodicReplayConfig::default(),
             enable_surprise_exploration: true,
@@ -1328,7 +1337,7 @@ impl CognitiveLoopConfig {
 #[allow(clippy::field_reassign_with_default)]
 mod tests {
     use super::*;
-    use crate::domain::{DomainKind, DomainProfile};
+    use crate::domain::DomainProfile;
     use symthaea_core::embodiment::EmbodimentPlatform;
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -1420,21 +1429,21 @@ mod tests {
     }
 
     #[test]
-    fn config_domain_defaults_to_surface_urban() {
+    fn config_domain_defaults_to_empty() {
         let c = CognitiveLoopConfig::default();
-        assert_eq!(c.domain_profile.kind, DomainKind::SurfaceUrban);
+        assert_eq!(c.domain_profile.kind, "");
     }
 
     #[test]
     fn config_for_domain_overrides_default_domain() {
         let c = CognitiveLoopConfig::for_domain(DomainProfile::underwater());
-        assert_eq!(c.domain_profile.kind, DomainKind::Underwater);
+        assert_eq!(c.domain_profile.kind, "underwater");
     }
 
     #[test]
     fn config_for_platform_uses_platform_preferred_domain() {
         let c = CognitiveLoopConfig::for_platform(EmbodimentPlatform::Auv);
-        assert_eq!(c.domain_profile.kind, DomainKind::Underwater);
+        assert_eq!(c.domain_profile.kind, "underwater");
         #[cfg(feature = "humanoid")]
         assert_eq!(c.embodiment_platform, EmbodimentPlatform::Auv);
     }
@@ -1445,7 +1454,7 @@ mod tests {
             EmbodimentPlatform::Auv,
             DomainProfile::deep_space(),
         );
-        assert_eq!(c.domain_profile.kind, DomainKind::Underwater);
+        assert_eq!(c.domain_profile.kind, "underwater");
     }
 
     #[test]

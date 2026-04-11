@@ -37,8 +37,8 @@ use symthaea_core::hdc::hdc_ltc_unified::{
 /// attention, recurrence, embodiment, knowledge).
 const NUM_COMPONENTS: usize = 7;
 
-/// Number of harmonies.
-const NUM_HARMONIES: usize = 8;
+/// Number of harmonies (mirrors harmony_field::NUM_HARMONIES).
+const NUM_HARMONIES: usize = 9;
 
 /// HDC dimension for state vectors.
 const HDC_DIM: usize = 16_384;
@@ -227,7 +227,7 @@ mod tests {
     fn phi_in_valid_range() {
         let mut ctx = HdcConsciousnessContext::new(42);
         let inputs = [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5];
-        let harmony = [0.5; 8];
+        let harmony = [0.5; NUM_HARMONIES];
 
         // Step a few times to build state.
         for _ in 0..10 {
@@ -244,7 +244,7 @@ mod tests {
         let mut ctx_b = HdcConsciousnessContext::new(99);
 
         let inputs = [0.7; 7];
-        let harmony = [0.5; 8];
+        let harmony = [0.5; NUM_HARMONIES];
 
         for _ in 0..5 {
             ctx_a.step(&inputs, &harmony, 0.016);
@@ -263,7 +263,7 @@ mod tests {
     fn zero_inputs_low_phi() {
         let mut ctx = HdcConsciousnessContext::new(42);
         let inputs = [0.0; 7];
-        let harmony = [0.0; 8];
+        let harmony = [0.0; NUM_HARMONIES];
 
         for _ in 0..10 {
             ctx.step(&inputs, &harmony, 0.016);
@@ -277,7 +277,7 @@ mod tests {
     #[test]
     fn temporal_memory() {
         let mut ctx = HdcConsciousnessContext::new(42);
-        let harmony = [0.5; 8];
+        let harmony = [0.5; NUM_HARMONIES];
 
         // Step with high inputs.
         for _ in 0..20 {
@@ -339,7 +339,7 @@ mod tests {
     #[test]
     fn phi_responds_to_input_changes() {
         let mut ctx = HdcConsciousnessContext::new(42);
-        let harmony = [0.5; 8];
+        let harmony = [0.5; NUM_HARMONIES];
 
         // Step with high inputs
         for _ in 0..30 {
@@ -366,7 +366,7 @@ mod tests {
         // After stepping, should be self-similar
         let mut ctx2 = HdcConsciousnessContext::new(42);
         let inputs = [0.5; 7];
-        let harmony = [0.5; 8];
+        let harmony = [0.5; NUM_HARMONIES];
         for _ in 0..5 {
             ctx2.step(&inputs, &harmony, 0.016);
         }

@@ -243,7 +243,7 @@ fn epa_3d<const D: usize>(
         let (face_idx, _) = faces
             .iter()
             .enumerate()
-            .min_by(|(_, a), (_, b)| a.distance.partial_cmp(&b.distance).unwrap())?;
+            .min_by(|(_, a), (_, b)| a.distance.total_cmp(&b.distance))?;
 
         let closest_normal = faces[face_idx].normal;
         let closest_dist = faces[face_idx].distance;
@@ -300,7 +300,7 @@ fn epa_3d<const D: usize>(
     let (_, best) = faces
         .iter()
         .enumerate()
-        .min_by(|(_, a), (_, b)| a.distance.partial_cmp(&b.distance).unwrap())?;
+        .min_by(|(_, a), (_, b)| a.distance.total_cmp(&b.distance))?;
 
     Some(EpaResult {
         normal: best.normal,
@@ -500,7 +500,7 @@ fn epa_nd<const D: usize>(
         let (face_idx, _) = facets
             .iter()
             .enumerate()
-            .min_by(|(_, a), (_, b)| a.distance.partial_cmp(&b.distance).unwrap())?;
+            .min_by(|(_, a), (_, b)| a.distance.total_cmp(&b.distance))?;
 
         let closest_normal = facets[face_idx].normal;
         let closest_dist = facets[face_idx].distance;
@@ -568,7 +568,7 @@ fn epa_nd<const D: usize>(
     // Max iterations — return best
     let best = facets
         .iter()
-        .min_by(|a, b| a.distance.partial_cmp(&b.distance).unwrap())?;
+        .min_by(|a, b| a.distance.total_cmp(&b.distance))?;
     Some(EpaResult {
         normal: best.normal,
         depth: best.distance,

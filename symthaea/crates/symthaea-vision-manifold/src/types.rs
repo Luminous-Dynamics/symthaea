@@ -59,9 +59,22 @@ pub struct VisionConfig {
     /// Enable the predictive coding hierarchy in `observe_frame()` (default: false).
     ///
     /// When enabled, a two-level predictive coding hierarchy (Rao & Ballard 1999)
-    /// processes each frame: coarse scale predicts fine scale, and prediction errors
-    /// modulate the surprise map. Adds ~2x compute cost per frame.
+    /// processes each frame: coarse scale predicts fine scale, and cross-scale
+    /// prediction errors are injected into the surprise map as additional free-energy
+    /// signal. Adds ~2x compute cost per frame.
     pub enable_predictive_hierarchy: bool,
+    /// Enable temporal patch binding in CfC equilibrium (default: false).
+    ///
+    /// When enabled, consecutive patch HVs are bound with cyclic permutation:
+    /// `temporal_patch[i] = ρ(prev_patch[i]) ⊗ curr_patch[i]`
+    ///
+    /// This gives the manifold temporal identity — the same object at the same
+    /// location across frames produces consistent HVs even under minor appearance
+    /// variation. Non-commutativity (`A⊗B ≠ B⊗A`) encodes temporal direction.
+    ///
+    /// Reference: Plate (1995) holographic reduced representations;
+    /// Kanerva (2009) hyperdimensional computing.
+    pub enable_temporal_binding: bool,
     /// Learning configuration for adaptive encoding weights.
     pub learning: LearningConfig,
     /// Multi-scale configuration for spatial pyramid encoding.
@@ -175,6 +188,7 @@ impl Default for VisionConfig {
             seed: 42_000,
             input_blend: 0.7,
             enable_predictive_hierarchy: false,
+            enable_temporal_binding: false,
             learning: LearningConfig::default(),
             multi_scale: MultiScaleConfig::default(),
             training: TrainingConfig::default(),

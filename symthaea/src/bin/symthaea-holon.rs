@@ -228,6 +228,57 @@ async fn main() -> Result<()> {
         }
     });
 
+    // Wire Mycelix governance dispatch — connects the consciousness loop's crisis detector
+    // to the Mycelix emergency-incidents zome via a bounded sync channel.
+    // Feature-gated: requires both `mycelix` (for MycelixBridge) and `safety-agents`
+    // (for drain_pending_crisis_events). MockTransport consumer thread logs each dispatch.
+    #[cfg(all(feature = "mycelix", feature = "safety-agents"))]
+    let mycelix_bridge = {
+        use symthaea::consciousness::mycelix_bridge::{GovernanceDispatchCommand, MycelixBridge};
+
+        let (dispatch_tx, dispatch_rx) = MycelixBridge::create_governance_channel();
+        let mut bridge = MycelixBridge::new("holon-daemon");
+        bridge.set_governance_dispatch_tx(dispatch_tx);
+
+        // MockTransport consumer: log each dispatched command.
+        // Replace with HolochainTransport in a separate binary for real conductor calls.
+        // (serde 1.0.203/1.0.228 conflict prevents holochain_client in this workspace)
+        std::thread::spawn(move || {
+            for cmd in dispatch_rx {
+                let label = match &cmd {
+                    GovernanceDispatchCommand::SubmitProposal { correlation_id, .. } => {
+                        format!("SubmitProposal(cid={})", correlation_id)
+                    }
+                    GovernanceDispatchCommand::CastVote { correlation_id, .. } => {
+                        format!("CastVote(cid={})", correlation_id)
+                    }
+                    GovernanceDispatchCommand::QueryActiveProposals => {
+                        "QueryActiveProposals".to_string()
+                    }
+                    GovernanceDispatchCommand::EvaluateAsset { correlation_id, .. } => {
+                        format!("EvaluateAsset(cid={})", correlation_id)
+                    }
+                    GovernanceDispatchCommand::DeclareCrisis {
+                        correlation_id,
+                        severity,
+                        crisis_type,
+                        confidence,
+                        ..
+                    } => {
+                        format!(
+                            "DeclareCrisis(cid={}, severity={}, type={}, confidence={:.2})",
+                            correlation_id, severity, crisis_type, confidence
+                        )
+                    }
+                };
+                tracing::info!("Governance dispatch (MockTransport): {}", label);
+            }
+        });
+
+        info!("Mycelix governance dispatch active (MockTransport)");
+        bridge
+    };
+
     // Wire mesh bridge: DualLayerMesh ↔ CognitivLoop via MeshBridgeHandle/Actor.
     // Feature-gated: only compiled when the `mesh` feature is enabled.
     // The actor runs as an async tokio task; the handle is passed to the blocking loop.
@@ -359,6 +410,17 @@ async fn main() -> Result<()> {
                         text: format!("[{}] Response queued for device {}", task_type, device_id),
                     },
                 ]);
+            }
+
+            // Drain civic crisis events and dispatch to Mycelix governance cluster.
+            // GovernanceManager (interval 37) queues CivicCrisisEvents in the CLS;
+            // we forward them to the MycelixBridge which sends via governance_dispatch_tx.
+            #[cfg(all(feature = "mycelix", feature = "safety-agents"))]
+            {
+                let crisis_events = cls.drain_pending_crisis_events();
+                for event in crisis_events {
+                    mycelix_bridge.dispatch_crisis(&event);
+                }
             }
 
             // Drain mesh bridge — forward CLS outbound packets and receive inbound wisdom.

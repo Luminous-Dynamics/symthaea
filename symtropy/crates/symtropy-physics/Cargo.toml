@@ -13,6 +13,12 @@ readme = "README.md"
 all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
 
+[features]
+## Snap all body forces and velocities to Q16.16 fixed-point before and after
+## each integration step, ensuring bit-identical simulation across machines for
+## peer-to-peer multiplayer and deterministic replay files.
+deterministic-net = []
+
 [dependencies]
 symtropy-math = { version = "0.1.0", path = "../symtropy-math" }
 nalgebra = "0.34"

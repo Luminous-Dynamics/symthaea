@@ -10,22 +10,43 @@
 //! and other physics parameters.
 //!
 //! # Field Properties
-//! - Each of the 8 harmonies creates a radial field around the entity
-//! - Field strength falls off as 1/r² (like electromagnetic fields)
+//! - Each of the 9 harmonies creates a radial field around the entity
+//! - Field strength falls off as 1/r^(D-1) (dimension-correct, Plummer-softened)
 //! - Overlapping fields interact: resonance (aligned) vs interference (opposed)
 //! - Physical effects: resonant fields reduce friction, dissonant increase impulse
+//! - Harmony 9 (index 8): Emotional Contagion — social emotion spreading via
+//!   proximity-weighted CEMI coupling (McFadden 2020, Dunbar 2012)
 
+use nalgebra::SVector;
 use symtropy_math::Point;
 
-/// Number of harmonies in the Eight Harmonies system.
-pub const NUM_HARMONIES: usize = 8;
+/// Number of harmonies in the Nine Harmonies system (Eight + Emotional Contagion).
+pub const NUM_HARMONIES: usize = 9;
+
+/// Index of the Emotional Contagion harmony (ninth dimension, zero-indexed).
+///
+/// Emotional contagion is the social spread of affective states via proximity.
+/// Dunbar (2012): synchronized emotional states bind social groups.
+/// McFadden (2020): EM field coupling creates temporal coherence across minds.
+/// High activation → strong social emotional influence on and from neighbors.
+pub const EMOTIONAL_CONTAGION_IDX: usize = 8;
+
+/// Rate of emotional contagion transfer: fraction per second toward social mean.
+pub const EMOTIONAL_CONTAGION_RATE: f64 = 0.15;
+
+/// Decay rate of emotional activation per second when no social contact.
+pub const EMOTIONAL_CONTAGION_DECAY: f64 = 0.05;
+
+/// Maximum radius for emotional contagion influence (world units).
+pub const EMOTIONAL_CONTAGION_RADIUS: f64 = 20.0;
 
 /// A harmony field source: an entity emitting harmony activations.
 #[derive(Debug, Clone)]
 pub struct HarmonySource<const D: usize> {
     /// Position of the source entity.
     pub position: Point<D>,
-    /// Harmony activations [0.0, 1.0] for each of the 8 harmonies.
+    /// Harmony activations [0.0, 1.0] for each of the 9 harmonies.
+    /// Index 8 = Emotional Contagion.
     pub activations: [f64; NUM_HARMONIES],
     /// Field strength multiplier (scales with consciousness level).
     pub strength: f64,
@@ -224,6 +245,60 @@ impl<const D: usize> Default for HarmonyField<D> {
     }
 }
 
+/// Compute the updated emotional contagion value for a single entity after one tick.
+///
+/// Implements social emotion spreading via proximity-weighted EM field coupling
+/// (McFadden's CEMI theory). Nearby high-Φ entities share their emotional state;
+/// the receiver drifts toward the social mean at a rate proportional to their
+/// own Φ (consciousness gates emotional receptivity). In isolation, emotion
+/// decays toward zero at `EMOTIONAL_CONTAGION_DECAY`.
+///
+/// # Parameters
+/// - `position`: this entity's position as a nalgebra SVector
+/// - `current_emotion`: entity's current `harmony[EMOTIONAL_CONTAGION_IDX]`
+/// - `phi`: entity's consciousness level [0, 1] — gates reception sensitivity
+/// - `sources`: (position, emotion, source_phi) tuples of *other* nearby entities
+/// - `dt`: simulation time step in seconds
+///
+/// # Returns
+/// New emotion value clamped to [0, 1].
+pub fn contagion_update<const D: usize>(
+    position: &SVector<f64, D>,
+    current_emotion: f64,
+    phi: f64,
+    sources: &[(SVector<f64, D>, f64, f64)],
+    dt: f64,
+) -> f64 {
+    let mut total_weight = 0.0f64;
+    let mut weighted_emotion = 0.0f64;
+
+    for (src_pos, src_emotion, src_phi) in sources {
+        let dist = (src_pos - position).norm();
+        if dist < 1e-6 || dist > EMOTIONAL_CONTAGION_RADIUS {
+            continue;
+        }
+        // Social field: sender's Φ amplifies their emotional broadcast strength.
+        // 1/r falloff within the social radius (softer than EM 1/r² — social
+        // emotion attenuates less steeply than physical fields).
+        let weight = src_phi / dist.max(1.0);
+        weighted_emotion += src_emotion * weight;
+        total_weight += weight;
+    }
+
+    if total_weight > 1e-10 {
+        let social_mean = weighted_emotion / total_weight;
+        // Receiver's Φ gates how strongly they are influenced.
+        // A zombie (Φ≈0) is immune to social emotion — no consciousness, no contagion.
+        let reception = phi.clamp(0.0, 1.0);
+        let drift = (social_mean - current_emotion) * EMOTIONAL_CONTAGION_RATE * reception * dt;
+        (current_emotion + drift).clamp(0.0, 1.0)
+    } else {
+        // Social isolation: decay toward zero
+        let decay = current_emotion * EMOTIONAL_CONTAGION_DECAY * dt;
+        (current_emotion - decay).max(0.0)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -274,16 +349,16 @@ mod tests {
 
     #[test]
     fn resonance_aligned() {
-        let a = [1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0];
-        let b = [1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0];
+        let a = [1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0];
+        let b = [1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0];
         let res = HarmonyField::<3>::resonance(&a, &b);
         assert!((res - 1.0).abs() < 1e-10, "identical harmonies should resonate");
     }
 
     #[test]
     fn resonance_opposed() {
-        let a = [1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
-        let b = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0];
+        let a = [1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
+        let b = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0];
         let res = HarmonyField::<3>::resonance(&a, &b);
         assert!((res - 0.0).abs() < 1e-10, "orthogonal harmonies = zero resonance");
     }
@@ -346,7 +421,7 @@ mod tests {
         let mut field = HarmonyField::<4>::new();
         let source = HarmonySource {
             position: Point::origin(),
-            activations: [0.5; 8],
+            activations: [0.5; NUM_HARMONIES],
             strength: 5.0,
             radius: 50.0,
             created_at: 0.0,
@@ -355,5 +430,72 @@ mod tests {
         field.sources.push(source);
         let sample = field.sample(&Point::new([3.0, 0.0, 0.0, 0.0]));
         assert!(sample[0] > 0.0);
+    }
+
+    // ── Emotional Contagion (harmony index 8) tests ──────────────────────────
+
+    #[test]
+    fn contagion_spreads_toward_social_mean() {
+        // Entity at origin with emotion=0.0, nearby high-emotion agent at (5, 0)
+        let pos = nalgebra::SVector::<f64, 2>::from([0.0, 0.0]);
+        let sources = vec![(
+            nalgebra::SVector::<f64, 2>::from([5.0, 0.0]),
+            0.8,  // src_emotion
+            0.9,  // src_phi (high consciousness = strong broadcast)
+        )];
+        let new_val = contagion_update(&pos, 0.0, 0.8, &sources, 1.0);
+        assert!(new_val > 0.0, "emotion should spread from nearby agent, got {new_val}");
+        assert!(new_val < 0.8, "should not fully equalise in one tick");
+    }
+
+    #[test]
+    fn contagion_decay_in_isolation() {
+        // Entity with emotion=0.6, no neighbors → decays toward zero
+        let pos = nalgebra::SVector::<f64, 2>::from([0.0, 0.0]);
+        let new_val = contagion_update(&pos, 0.6, 0.8, &[], 1.0);
+        assert!(new_val < 0.6, "isolated emotion should decay, got {new_val}");
+        assert!(new_val > 0.0, "should not decay to zero in one tick");
+    }
+
+    #[test]
+    fn contagion_low_phi_reduces_reception() {
+        // Zombie entity (phi≈0) should barely receive contagion
+        let pos = nalgebra::SVector::<f64, 2>::from([0.0, 0.0]);
+        let sources = vec![(
+            nalgebra::SVector::<f64, 2>::from([3.0, 0.0]),
+            1.0,  // src_emotion
+            0.9,  // src_phi
+        )];
+        let zombie_val = contagion_update(&pos, 0.0, 0.0, &sources, 1.0);
+        let conscious_val = contagion_update(&pos, 0.0, 0.9, &sources, 1.0);
+        assert!(zombie_val < conscious_val,
+            "low-phi entity should receive less contagion: zombie={zombie_val:.4} vs conscious={conscious_val:.4}");
+    }
+
+    #[test]
+    fn contagion_zero_beyond_radius() {
+        // Source outside EMOTIONAL_CONTAGION_RADIUS → no transfer
+        let pos = nalgebra::SVector::<f64, 2>::from([0.0, 0.0]);
+        let sources = vec![(
+            nalgebra::SVector::<f64, 2>::from([EMOTIONAL_CONTAGION_RADIUS + 5.0, 0.0]),
+            1.0,  // src_emotion
+            1.0,  // src_phi
+        )];
+        let new_val = contagion_update(&pos, 0.0, 1.0, &sources, 1.0);
+        assert_eq!(new_val, 0.0, "out-of-radius source should have no effect");
+    }
+
+    #[test]
+    fn contagion_output_stays_in_unit_interval() {
+        // Stress test: extreme inputs should not escape [0, 1]
+        let pos = nalgebra::SVector::<f64, 2>::from([0.0, 0.0]);
+        let sources = vec![
+            (nalgebra::SVector::<f64, 2>::from([1.0, 0.0]), 1.0, 1.0),
+            (nalgebra::SVector::<f64, 2>::from([2.0, 0.0]), 1.0, 1.0),
+        ];
+        // Very large dt should still clamp output
+        let new_val = contagion_update(&pos, 0.0, 1.0, &sources, 100.0);
+        assert!(new_val >= 0.0 && new_val <= 1.0,
+            "output must be in [0,1], got {new_val}");
     }
 }

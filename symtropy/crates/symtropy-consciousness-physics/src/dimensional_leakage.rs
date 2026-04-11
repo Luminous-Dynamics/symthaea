@@ -24,21 +24,28 @@
 //!
 //! 1. Leakage rate scales with local energy density (hotter = leaks more)
 //! 2. Leakage is directional along W axis
-//! 3. 3D observers see energy vanish (sink) or appear (source)
+//! 3. D-dimensional observers see energy vanish (sink) or appear (source)
 //! 4. Entropy increases locally near leakage points
-//! 5. The pattern of leakage encodes the geometry of the 4th dimension
+//! 5. The pattern of leakage encodes the geometry of the extra dimension
 
-/// A point in the 4th dimension where energy leaks between branes.
+use nalgebra::SVector;
+
+/// A point in the extra dimension where energy leaks between branes.
+///
+/// Generic over the dimensionality D of the physics space. In 3D physics
+/// this models a classical Randall-Sundrum brane sink/source. In 4D physics
+/// the leakage operates in the full 4-dimensional space.
 #[derive(Debug, Clone)]
-pub struct LeakagePoint {
-    /// Position in 3D space where the leakage manifests.
-    pub position: [f64; 3],
-    /// W-coordinate of the leak (distance along 4th dimension).
+pub struct LeakagePoint<const D: usize> {
+    /// Position in D-dimensional space where the leakage manifests.
+    pub position: SVector<f64, D>,
+    /// W-coordinate of the leak (distance along the extra dimension).
     pub w_depth: f64,
     /// Leakage rate: Joules per tick flowing through this point.
-    /// Positive = energy entering 3D (source). Negative = energy leaving (sink).
+    /// Positive = energy entering the simulation (source).
+    /// Negative = energy leaving the simulation (sink).
     pub flow_rate: f64,
-    /// Radius of effect in 3D space.
+    /// Radius of effect in D-dimensional space.
     pub radius: f64,
     /// Whether this leak is currently active.
     pub active: bool,
@@ -46,9 +53,9 @@ pub struct LeakagePoint {
     pub total_transferred: f64,
 }
 
-impl LeakagePoint {
-    /// Create an energy sink (energy leaves 3D → 4D bulk).
-    pub fn sink(position: [f64; 3], w_depth: f64, rate: f64, radius: f64) -> Self {
+impl<const D: usize> LeakagePoint<D> {
+    /// Create an energy sink (energy leaves simulation → extra dimension).
+    pub fn sink(position: SVector<f64, D>, w_depth: f64, rate: f64, radius: f64) -> Self {
         Self {
             position,
             w_depth,
@@ -59,8 +66,8 @@ impl LeakagePoint {
         }
     }
 
-    /// Create an energy source (energy enters 3D from 4D bulk).
-    pub fn source(position: [f64; 3], w_depth: f64, rate: f64, radius: f64) -> Self {
+    /// Create an energy source (energy enters simulation from extra dimension).
+    pub fn source(position: SVector<f64, D>, w_depth: f64, rate: f64, radius: f64) -> Self {
         Self {
             position,
             w_depth,
@@ -71,22 +78,19 @@ impl LeakagePoint {
         }
     }
 
-    /// Distance from a 3D position to this leakage point.
-    pub fn distance_3d(&self, pos: &[f64; 3]) -> f64 {
-        let dx = pos[0] - self.position[0];
-        let dy = pos[1] - self.position[1];
-        let dz = pos[2] - self.position[2];
-        (dx * dx + dy * dy + dz * dz).sqrt()
+    /// Distance from a D-dimensional position to this leakage point.
+    pub fn distance(&self, pos: &SVector<f64, D>) -> f64 {
+        (pos - self.position).norm()
     }
 
-    /// Energy effect on an agent at the given 3D position.
+    /// Energy effect on an agent at the given position.
     /// Returns Joules per tick (positive = gaining, negative = losing).
     /// Falls off as 1/r² from the leakage point (like gravity).
-    pub fn effect_at(&self, pos: &[f64; 3]) -> f64 {
+    pub fn effect_at(&self, pos: &SVector<f64, D>) -> f64 {
         if !self.active {
             return 0.0;
         }
-        let dist = self.distance_3d(pos);
+        let dist = self.distance(pos);
         if dist >= self.radius {
             return 0.0;
         }
@@ -99,21 +103,21 @@ impl LeakagePoint {
 /// The dimensional leakage system: manages all leakage points and
 /// tracks the energy balance between dimensions.
 #[derive(Debug, Clone)]
-pub struct DimensionalLeakage {
+pub struct DimensionalLeakage<const D: usize> {
     /// All leakage points in the world.
-    pub points: Vec<LeakagePoint>,
-    /// Total energy that has leaked OUT of 3D (into the bulk).
+    pub points: Vec<LeakagePoint<D>>,
+    /// Total energy that has leaked OUT of the simulation (into the bulk).
     pub total_leaked_out: f64,
-    /// Total energy that has leaked INTO 3D (from the bulk).
+    /// Total energy that has leaked INTO the simulation (from the bulk).
     pub total_leaked_in: f64,
-    /// The apparent conservation violation as seen by 3D observers.
-    /// This is the "dark energy" — energy unaccounted for in 3D.
+    /// The apparent conservation violation as seen by simulation observers.
+    /// This is the "dark energy" — energy unaccounted for in the simulation.
     pub apparent_violation: f64,
     /// Whether leakage is enabled.
     pub enabled: bool,
 }
 
-impl DimensionalLeakage {
+impl<const D: usize> DimensionalLeakage<D> {
     pub fn new() -> Self {
         Self {
             points: Vec::new(),
@@ -125,17 +129,17 @@ impl DimensionalLeakage {
     }
 
     /// Add a leakage point.
-    pub fn add_point(&mut self, point: LeakagePoint) {
+    pub fn add_point(&mut self, point: LeakagePoint<D>) {
         self.points.push(point);
     }
 
-    /// Create a standard configuration: one sink and one source
-    /// at different 3D positions, simulating energy flowing through
-    /// the 4th dimension from one location to another.
+    /// Create a standard wormhole configuration: one sink and one source at
+    /// different positions, simulating energy flowing through the extra
+    /// dimension from one location to another.
     pub fn create_wormhole(
         &mut self,
-        entry: [f64; 3],
-        exit: [f64; 3],
+        entry: SVector<f64, D>,
+        exit: SVector<f64, D>,
         rate: f64,
         radius: f64,
     ) {
@@ -144,8 +148,8 @@ impl DimensionalLeakage {
         self.enabled = true;
     }
 
-    /// Total energy effect at a 3D position from all leakage points.
-    pub fn total_effect_at(&self, pos: &[f64; 3]) -> f64 {
+    /// Total energy effect at a D-dimensional position from all leakage points.
+    pub fn total_effect_at(&self, pos: &SVector<f64, D>) -> f64 {
         if !self.enabled {
             return 0.0;
         }
@@ -159,8 +163,8 @@ impl DimensionalLeakage {
         }
         for point in &mut self.points {
             if point.active {
-                // The flow_rate represents energy per tick at unit distance
-                // Total throughput scales with the integral of 1/r² over the radius
+                // The flow_rate represents energy per tick at unit distance.
+                // Total throughput scales with the integral of 1/r² over the radius.
                 let throughput = point.flow_rate.abs() * point.radius.min(10.0);
                 point.total_transferred += throughput;
 
@@ -178,21 +182,21 @@ impl DimensionalLeakage {
     ///
     /// An agent expecting energy conservation sees energy appear/disappear.
     /// The magnitude of the apparent violation IS the prediction error.
-    /// This is irreducible — no 3D model can explain it.
-    pub fn prediction_error_at(&self, pos: &[f64; 3]) -> f64 {
+    /// This is irreducible — no D-dimensional model can explain it.
+    pub fn prediction_error_at(&self, pos: &SVector<f64, D>) -> f64 {
         self.total_effect_at(pos).abs()
     }
 
-    /// Whether any leakage point is near a position.
-    pub fn near_leakage(&self, pos: &[f64; 3], threshold: f64) -> bool {
-        self.points.iter().any(|p| p.distance_3d(pos) < threshold)
+    /// Whether any leakage point is within `threshold` of a position.
+    pub fn near_leakage(&self, pos: &SVector<f64, D>, threshold: f64) -> bool {
+        self.points.iter().any(|p| p.distance(pos) < threshold)
     }
 
     /// Entropy increase rate at a position due to dimensional leakage.
     ///
     /// Per Jacobson (1995): spacetime thermodynamics implies energy
     /// flow through dimensional boundaries increases local entropy.
-    pub fn local_entropy_increase(&self, pos: &[f64; 3]) -> f64 {
+    pub fn local_entropy_increase(&self, pos: &SVector<f64, D>) -> f64 {
         if !self.enabled {
             return 0.0;
         }
@@ -201,7 +205,7 @@ impl DimensionalLeakage {
     }
 }
 
-impl Default for DimensionalLeakage {
+impl<const D: usize> Default for DimensionalLeakage<D> {
     fn default() -> Self {
         Self::new()
     }
@@ -211,80 +215,84 @@ impl Default for DimensionalLeakage {
 mod tests {
     use super::*;
 
+    fn vec3(x: f64, y: f64, z: f64) -> SVector<f64, 3> {
+        SVector::from([x, y, z])
+    }
+
     #[test]
     fn sink_drains_energy() {
-        let sink = LeakagePoint::sink([0.0, 0.0, 0.0], 1.0, 0.5, 50.0);
-        let effect = sink.effect_at(&[5.0, 0.0, 0.0]); // 5 units away
+        let sink = LeakagePoint::sink(vec3(0.0, 0.0, 0.0), 1.0, 0.5, 50.0);
+        let effect = sink.effect_at(&vec3(5.0, 0.0, 0.0));
         assert!(effect < 0.0, "sink should drain energy, got {}", effect);
     }
 
     #[test]
     fn source_provides_energy() {
-        let source = LeakagePoint::source([0.0, 0.0, 0.0], 1.0, 0.5, 50.0);
-        let effect = source.effect_at(&[5.0, 0.0, 0.0]);
+        let source = LeakagePoint::source(vec3(0.0, 0.0, 0.0), 1.0, 0.5, 50.0);
+        let effect = source.effect_at(&vec3(5.0, 0.0, 0.0));
         assert!(effect > 0.0, "source should provide energy, got {}", effect);
     }
 
     #[test]
     fn effect_falls_off_with_distance() {
-        let sink = LeakagePoint::sink([0.0, 0.0, 0.0], 1.0, 1.0, 100.0);
-        let near = sink.effect_at(&[2.0, 0.0, 0.0]).abs();
-        let far = sink.effect_at(&[10.0, 0.0, 0.0]).abs();
+        let sink = LeakagePoint::sink(vec3(0.0, 0.0, 0.0), 1.0, 1.0, 100.0);
+        let near = sink.effect_at(&vec3(2.0, 0.0, 0.0)).abs();
+        let far = sink.effect_at(&vec3(10.0, 0.0, 0.0)).abs();
         assert!(near > far, "effect should decrease with distance");
     }
 
     #[test]
     fn no_effect_outside_radius() {
-        let sink = LeakagePoint::sink([0.0, 0.0, 0.0], 1.0, 1.0, 10.0);
-        let effect = sink.effect_at(&[20.0, 0.0, 0.0]);
+        let sink = LeakagePoint::sink(vec3(0.0, 0.0, 0.0), 1.0, 1.0, 10.0);
+        let effect = sink.effect_at(&vec3(20.0, 0.0, 0.0));
         assert_eq!(effect, 0.0, "no effect outside radius");
     }
 
     #[test]
-    fn wormhole_conserves_in_4d() {
-        let mut leakage = DimensionalLeakage::new();
-        leakage.create_wormhole([0.0, 0.0, 0.0], [50.0, 0.0, 0.0], 1.0, 20.0);
+    fn wormhole_conserves_in_extra_dimension() {
+        let mut leakage = DimensionalLeakage::<3>::new();
+        leakage.create_wormhole(vec3(0.0, 0.0, 0.0), vec3(50.0, 0.0, 0.0), 1.0, 20.0);
 
         // Near entry (sink): energy drains
-        let at_entry = leakage.total_effect_at(&[1.0, 0.0, 0.0]);
+        let at_entry = leakage.total_effect_at(&vec3(1.0, 0.0, 0.0));
         assert!(at_entry < 0.0, "entry should drain");
 
         // Near exit (source): energy appears
-        let at_exit = leakage.total_effect_at(&[51.0, 0.0, 0.0]);
+        let at_exit = leakage.total_effect_at(&vec3(51.0, 0.0, 0.0));
         assert!(at_exit > 0.0, "exit should provide");
     }
 
     #[test]
     fn prediction_error_nonzero_near_leakage() {
-        let mut leakage = DimensionalLeakage::new();
-        leakage.create_wormhole([0.0, 0.0, 0.0], [100.0, 0.0, 0.0], 1.0, 30.0);
+        let mut leakage = DimensionalLeakage::<3>::new();
+        leakage.create_wormhole(vec3(0.0, 0.0, 0.0), vec3(100.0, 0.0, 0.0), 1.0, 30.0);
 
-        let pe_near = leakage.prediction_error_at(&[5.0, 0.0, 0.0]);
-        let pe_far = leakage.prediction_error_at(&[200.0, 0.0, 0.0]);
+        let pe_near = leakage.prediction_error_at(&vec3(5.0, 0.0, 0.0));
+        let pe_far = leakage.prediction_error_at(&vec3(200.0, 0.0, 0.0));
         assert!(pe_near > pe_far, "prediction error higher near leakage");
     }
 
     #[test]
     fn entropy_increases_near_leakage() {
-        let mut leakage = DimensionalLeakage::new();
-        leakage.create_wormhole([0.0, 0.0, 0.0], [100.0, 0.0, 0.0], 1.0, 30.0);
+        let mut leakage = DimensionalLeakage::<3>::new();
+        leakage.create_wormhole(vec3(0.0, 0.0, 0.0), vec3(100.0, 0.0, 0.0), 1.0, 30.0);
 
-        let entropy_near = leakage.local_entropy_increase(&[5.0, 0.0, 0.0]);
-        let entropy_far = leakage.local_entropy_increase(&[200.0, 0.0, 0.0]);
+        let entropy_near = leakage.local_entropy_increase(&vec3(5.0, 0.0, 0.0));
+        let entropy_far = leakage.local_entropy_increase(&vec3(200.0, 0.0, 0.0));
         assert!(entropy_near > entropy_far, "entropy increases near leakage");
     }
 
     #[test]
     fn disabled_leakage_no_effect() {
-        let leakage = DimensionalLeakage::new(); // enabled = false
-        let effect = leakage.total_effect_at(&[0.0, 0.0, 0.0]);
+        let leakage = DimensionalLeakage::<3>::new(); // enabled = false
+        let effect = leakage.total_effect_at(&vec3(0.0, 0.0, 0.0));
         assert_eq!(effect, 0.0);
     }
 
     #[test]
     fn tick_accumulates_totals() {
-        let mut leakage = DimensionalLeakage::new();
-        leakage.create_wormhole([0.0, 0.0, 0.0], [100.0, 0.0, 0.0], 1.0, 20.0);
+        let mut leakage = DimensionalLeakage::<3>::new();
+        leakage.create_wormhole(vec3(0.0, 0.0, 0.0), vec3(100.0, 0.0, 0.0), 1.0, 20.0);
 
         leakage.tick();
         assert!(leakage.total_leaked_out > 0.0);
@@ -293,5 +301,29 @@ mod tests {
         leakage.tick();
         let after_two = leakage.total_leaked_out;
         assert!(after_two > 0.0, "should accumulate over ticks");
+    }
+
+    #[test]
+    fn works_in_4d() {
+        let origin = SVector::<f64, 4>::from([0.0, 0.0, 0.0, 0.0]);
+        let far = SVector::<f64, 4>::from([50.0, 0.0, 0.0, 0.0]);
+        let mut leakage = DimensionalLeakage::<4>::new();
+        leakage.create_wormhole(origin, far, 1.0, 20.0);
+
+        let near_pos = SVector::<f64, 4>::from([1.0, 0.0, 0.0, 0.0]);
+        let at_entry = leakage.total_effect_at(&near_pos);
+        assert!(at_entry < 0.0, "4D entry should drain energy");
+    }
+
+    #[test]
+    fn works_in_2d() {
+        let origin = SVector::<f64, 2>::from([0.0, 0.0]);
+        let far = SVector::<f64, 2>::from([50.0, 0.0]);
+        let mut leakage = DimensionalLeakage::<2>::new();
+        leakage.create_wormhole(origin, far, 1.0, 20.0);
+
+        let near_pos = SVector::<f64, 2>::from([1.0, 0.0]);
+        let at_entry = leakage.total_effect_at(&near_pos);
+        assert!(at_entry < 0.0, "2D entry should drain energy");
     }
 }

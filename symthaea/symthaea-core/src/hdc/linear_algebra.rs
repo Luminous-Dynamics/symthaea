@@ -1112,6 +1112,224 @@ impl LinearAlgebraEngine {
     }
 }
 
+// ─── Conjugate Gradient ──────────────────────────────────────────────────────
+
+/// Matrix-vector product: y = A * x
+fn mat_vec_mul(a: &[Vec<f64>], x: &[f64]) -> Vec<f64> {
+    a.iter()
+        .map(|row| row.iter().zip(x.iter()).map(|(aij, xj)| aij * xj).sum())
+        .collect()
+}
+
+/// Dot product of two vectors.
+fn dot(a: &[f64], b: &[f64]) -> f64 {
+    a.iter().zip(b.iter()).map(|(ai, bi)| ai * bi).sum()
+}
+
+/// L2 norm of a vector.
+fn vec_norm(v: &[f64]) -> f64 {
+    dot(v, v).sqrt()
+}
+
+/// Conjugate Gradient iterative solver for symmetric positive-definite Ax = b.
+///
+/// O(n√κ) iterations vs O(n³) for direct methods. Requires A to be SPD.
+///
+/// # Algorithm (Hestenes & Stiefel 1952)
+///
+/// r₀ = b - A·x₀ (x₀ = 0)
+/// p₀ = r₀
+/// for k = 0, 1, ...:
+///   α_k = ⟨r_k, r_k⟩ / ⟨p_k, A·p_k⟩
+///   x_{k+1} = x_k + α_k · p_k
+///   r_{k+1} = r_k - α_k · A · p_k
+///   β_k = ⟨r_{k+1}, r_{k+1}⟩ / ⟨r_k, r_k⟩
+///   p_{k+1} = r_{k+1} + β_k · p_k
+/// Stop when ‖r_k‖ < tol
+pub fn conjugate_gradient(
+    a: &[Vec<f64>],
+    b: &[f64],
+    tol: f64,
+    max_iter: usize,
+) -> Result<Vec<f64>, String> {
+    let n = b.len();
+    if a.len() != n || a.iter().any(|row| row.len() != n) {
+        return Err("conjugate_gradient: matrix dimensions do not match b".to_string());
+    }
+
+    let mut x = vec![0.0f64; n];
+    let mut r = b.to_vec(); // r₀ = b - A*0 = b
+    let mut p = r.clone();
+    let mut r_dot = dot(&r, &r);
+
+    for _ in 0..max_iter {
+        if r_dot.sqrt() < tol {
+            return Ok(x);
+        }
+        let ap = mat_vec_mul(a, &p);
+        let p_ap = dot(&p, &ap);
+        if p_ap.abs() < 1e-300 {
+            break;
+        }
+        let alpha = r_dot / p_ap;
+
+        // x_{k+1} = x_k + α_k * p_k
+        for i in 0..n {
+            x[i] += alpha * p[i];
+        }
+        // r_{k+1} = r_k - α_k * A * p_k
+        for i in 0..n {
+            r[i] -= alpha * ap[i];
+        }
+
+        let r_dot_new = dot(&r, &r);
+        let beta = r_dot_new / r_dot;
+        r_dot = r_dot_new;
+
+        // p_{k+1} = r_{k+1} + β_k * p_k
+        for i in 0..n {
+            p[i] = r[i] + beta * p[i];
+        }
+    }
+
+    if r_dot.sqrt() < tol {
+        Ok(x)
+    } else {
+        Err(format!(
+            "conjugate_gradient: did not converge (residual = {:.2e})",
+            r_dot.sqrt()
+        ))
+    }
+}
+
+/// Preconditioned Conjugate Gradient with Jacobi (diagonal) preconditioner.
+///
+/// M = diag(A), solve M⁻¹Ax = M⁻¹b. Improves convergence on diagonally
+/// dominant systems by equilibrating the eigenvalue spread.
+pub fn preconditioned_conjugate_gradient(
+    a: &[Vec<f64>],
+    b: &[f64],
+    tol: f64,
+    max_iter: usize,
+) -> Result<Vec<f64>, String> {
+    let n = b.len();
+    if a.len() != n || a.iter().any(|row| row.len() != n) {
+        return Err("preconditioned_cg: matrix dimensions do not match b".to_string());
+    }
+
+    // Jacobi preconditioner: M_inv[i] = 1/a[i][i]
+    let m_inv: Vec<f64> = (0..n)
+        .map(|i| {
+            let d = a[i][i];
+            if d.abs() > 1e-15 { 1.0 / d } else { 1.0 }
+        })
+        .collect();
+
+    let mut x = vec![0.0f64; n];
+    let mut r = b.to_vec(); // r₀ = b - A*0 = b
+    // z = M⁻¹ * r
+    let mut z: Vec<f64> = r.iter().zip(m_inv.iter()).map(|(ri, mi)| ri * mi).collect();
+    let mut p = z.clone();
+    let mut rz = dot(&r, &z);
+
+    for _ in 0..max_iter {
+        if vec_norm(&r) < tol {
+            return Ok(x);
+        }
+        let ap = mat_vec_mul(a, &p);
+        let p_ap = dot(&p, &ap);
+        if p_ap.abs() < 1e-300 {
+            break;
+        }
+        let alpha = rz / p_ap;
+
+        for i in 0..n {
+            x[i] += alpha * p[i];
+        }
+        for i in 0..n {
+            r[i] -= alpha * ap[i];
+        }
+
+        z = r.iter().zip(m_inv.iter()).map(|(ri, mi)| ri * mi).collect();
+        let rz_new = dot(&r, &z);
+        let beta = rz_new / rz;
+        rz = rz_new;
+
+        for i in 0..n {
+            p[i] = z[i] + beta * p[i];
+        }
+    }
+
+    if vec_norm(&r) < tol {
+        Ok(x)
+    } else {
+        Err(format!(
+            "preconditioned_cg: did not converge (residual = {:.2e})",
+            vec_norm(&r)
+        ))
+    }
+}
+
+/// Estimate condition number via power iteration (ratio of largest to smallest eigenvalue).
+///
+/// Uses `iterations` power iteration steps for both max and min eigenvalue estimates.
+pub fn condition_number_estimate(a: &[Vec<f64>], iterations: usize) -> f64 {
+    let n = a.len();
+    if n == 0 {
+        return 1.0;
+    }
+
+    // Estimate largest eigenvalue (power iteration)
+    let mut v = vec![1.0f64; n];
+    let mut lambda_max = 1.0f64;
+    for _ in 0..iterations {
+        let av = mat_vec_mul(a, &v);
+        let norm = vec_norm(&av);
+        if norm < 1e-15 {
+            break;
+        }
+        lambda_max = norm;
+        v = av.iter().map(|&x| x / norm).collect();
+    }
+
+    // Estimate smallest eigenvalue via inverse iteration (shift-invert approximation)
+    // Use the deflated matrix A - lambda_max * I and find its most-negative eigenvalue
+    // Simplified: use the Rayleigh quotient on A * v for a near-null vector
+    let mut v2 = vec![1.0f64; n];
+    // Make v2 orthogonal to v (the dominant eigenvector)
+    let proj: f64 = dot(&v2, &v);
+    for i in 0..n {
+        v2[i] -= proj * v[i];
+    }
+    let norm2 = vec_norm(&v2);
+    if norm2 > 1e-10 {
+        for x in &mut v2 {
+            *x /= norm2;
+        }
+    } else {
+        // Fallback: use a simple unit vector orthogonal to v
+        v2 = vec![0.0; n];
+        if n > 1 {
+            v2[1] = 1.0;
+            let proj2: f64 = dot(&v2, &v);
+            for i in 0..n {
+                v2[i] -= proj2 * v[i];
+            }
+            let n2 = vec_norm(&v2);
+            if n2 > 1e-10 {
+                for x in &mut v2 {
+                    *x /= n2;
+                }
+            }
+        }
+    }
+
+    let av2 = mat_vec_mul(a, &v2);
+    let lambda_min = dot(&v2, &av2).abs().max(1e-15);
+
+    (lambda_max / lambda_min).max(1.0)
+}
+
 // ─── Tests ───────────────────────────────────────────────────────────────────
 
 #[cfg(test)]
@@ -2133,5 +2351,85 @@ mod tests {
                 assert!(approx_eq(result.get(i, j), a.get(i, j)));
             }
         }
+    }
+
+    // ── Conjugate Gradient ───────────────────────────────────────────────
+
+    #[test]
+    fn test_cg_solves_spd_system() {
+        // Solve: [4 1; 1 3] * x = [1; 2]
+        // Solution: x = [1/11, 7/11]
+        let a = vec![vec![4.0, 1.0], vec![1.0, 3.0]];
+        let b = vec![1.0, 2.0];
+        let x = conjugate_gradient(&a, &b, 1e-10, 100).unwrap();
+        assert_eq!(x.len(), 2);
+        // Check A*x = b
+        let ax = mat_vec_mul(&a, &x);
+        for (ai, bi) in ax.iter().zip(b.iter()) {
+            assert!((ai - bi).abs() < 1e-8, "A*x[{}] = {} != {}", 0, ai, bi);
+        }
+    }
+
+    #[test]
+    fn test_cg_10x10_spd() {
+        // Build a diagonally dominant SPD matrix
+        let n = 10;
+        let mut a = vec![vec![0.0f64; n]; n];
+        for i in 0..n {
+            a[i][i] = 4.0;
+            if i > 0 { a[i][i - 1] = -1.0; }
+            if i < n - 1 { a[i][i + 1] = -1.0; }
+        }
+        let b: Vec<f64> = (0..n).map(|i| i as f64 + 1.0).collect();
+        let x = conjugate_gradient(&a, &b, 1e-8, 1000).unwrap();
+        let ax = mat_vec_mul(&a, &x);
+        for (ai, bi) in ax.iter().zip(b.iter()) {
+            assert!((ai - bi).abs() < 1e-6, "Residual too large: {} vs {}", ai, bi);
+        }
+    }
+
+    #[test]
+    fn test_cg_matches_direct_solve() {
+        // 3x3 SPD system — compare CG with expected solution
+        let a = vec![
+            vec![6.0, 2.0, 1.0],
+            vec![2.0, 5.0, 2.0],
+            vec![1.0, 2.0, 4.0],
+        ];
+        let b = vec![9.0, 9.0, 7.0];
+        let x_cg = conjugate_gradient(&a, &b, 1e-10, 200).unwrap();
+        let ax = mat_vec_mul(&a, &x_cg);
+        for (ai, bi) in ax.iter().zip(b.iter()) {
+            assert!((ai - bi).abs() < 1e-7, "CG residual: {} vs {}", ai, bi);
+        }
+    }
+
+    #[test]
+    fn test_preconditioned_cg_converges() {
+        let n = 8;
+        let mut a = vec![vec![0.0f64; n]; n];
+        for i in 0..n {
+            a[i][i] = (i + 2) as f64 * 2.0; // varying diagonal (tests preconditioning)
+            if i > 0 { a[i][i - 1] = -0.5; }
+            if i < n - 1 { a[i][i + 1] = -0.5; }
+        }
+        let b: Vec<f64> = vec![1.0; n];
+        let x_pcg = preconditioned_conjugate_gradient(&a, &b, 1e-8, 500).unwrap();
+        let ax = mat_vec_mul(&a, &x_pcg);
+        for (ai, bi) in ax.iter().zip(b.iter()) {
+            assert!((ai - bi).abs() < 1e-6, "PCG residual: {} vs {}", ai, bi);
+        }
+    }
+
+    #[test]
+    fn test_condition_number_estimate_identity() {
+        // Identity matrix has condition number 1
+        let n = 4;
+        let a: Vec<Vec<f64>> = (0..n)
+            .map(|i| (0..n).map(|j| if i == j { 1.0 } else { 0.0 }).collect())
+            .collect();
+        let cond = condition_number_estimate(&a, 50);
+        assert!(cond >= 1.0, "Condition number must be >= 1: {}", cond);
+        assert!(cond < 10.0, "Identity condition number should be near 1: {}", cond);
     }
 }

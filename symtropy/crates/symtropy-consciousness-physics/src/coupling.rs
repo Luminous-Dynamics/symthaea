@@ -125,9 +125,9 @@ pub struct EntityConsciousness {
     pub safety_tier: SafetyTier,
     /// Energy budget (refreshed each tick based on Φ).
     pub energy: EnergyBudget,
-    /// Harmony activations [0.0, 1.0] for each of the 8 harmonies.
-    /// Index 7 = Sacred Stillness.
-    pub harmony_activations: [f64; 8],
+    /// Harmony activations [0.0, 1.0] for each of the 9 harmonies.
+    /// Index 7 = Sacred Stillness, Index 8 = Emotional Contagion.
+    pub harmony_activations: [f64; crate::harmony_field::NUM_HARMONIES],
     /// Prediction error from unexpected collisions [0.0, ∞).
     /// Decays over time (habituation). High values reduce motor precision.
     /// Ref: Adams, Shipp & Friston (2013) — motor commands are proprioceptive predictions.
@@ -150,7 +150,7 @@ impl EntityConsciousness {
             result: None,
             safety_tier: SafetyTier::Green,
             energy: EnergyBudget::new(max_energy),
-            harmony_activations: [0.0; 8],
+            harmony_activations: [0.0; crate::harmony_field::NUM_HARMONIES],
             prediction_error: 0.0,
             motor_precision: 1.0,
             prediction_decay: 0.05, // ~20 ticks to recover
@@ -194,7 +194,7 @@ impl EntityConsciousness {
         self.harmony_activations[7]
     }
 
-    /// Total harmony energy (sum of all 8 activations).
+    /// Total harmony energy (sum of all 9 activations).
     pub fn total_harmony_energy(&self) -> f64 {
         self.harmony_activations.iter().sum()
     }
@@ -308,22 +308,19 @@ impl<const D: usize> ConsciousnessField<D> {
     ) {
         if let Some(entity) = self.entities.get_mut(&handle) {
             // Temperature-consciousness feedback: excessive heat reduces clarity.
-            // At body temperature (310K), no penalty. At 410K+, inputs scaled to 10%.
-            let temp_penalty = ((1.0 - (entity.energy.temperature - 310.0) / 100.0)
-                .clamp(0.1, 1.0)) as f64;
-            let effective_inputs = if temp_penalty < 0.99 {
-                ConsciousnessInputs {
-                    phi: inputs.phi * temp_penalty,
-                    broadcast: inputs.broadcast * temp_penalty,
-                    working_memory: inputs.working_memory * temp_penalty,
-                    attention: inputs.attention * temp_penalty,
-                    recurrence: inputs.recurrence,  // temporal structure unaffected
-                    embodiment: inputs.embodiment,   // body awareness unaffected
-                    knowledge: inputs.knowledge,     // stored knowledge unaffected
-                    synchrony: inputs.synchrony * temp_penalty,
-                }
-            } else {
-                inputs.clone()
+            // Smooth sigmoid from body temperature (310K) → impaired at 360K → floor at 410K+.
+            // No binary threshold — the penalty is differentiable at every temperature.
+            // Ref: Somjen et al. (2001), Kiyatkin (2010) — see thermodynamics::smooth_temperature_penalty.
+            let temp_penalty = crate::thermodynamics::smooth_temperature_penalty(entity.energy.temperature);
+            let effective_inputs = ConsciousnessInputs {
+                phi: inputs.phi * temp_penalty,
+                broadcast: inputs.broadcast * temp_penalty,
+                working_memory: inputs.working_memory * temp_penalty,
+                attention: inputs.attention * temp_penalty,
+                recurrence: inputs.recurrence,  // temporal structure unaffected
+                embodiment: inputs.embodiment,   // body awareness unaffected
+                knowledge: inputs.knowledge,     // stored knowledge unaffected
+                synchrony: inputs.synchrony * temp_penalty,
             };
 
             let phi_before = entity.phi();
@@ -503,6 +500,53 @@ impl<const D: usize> ConsciousnessField<D> {
         }
     }
 
+    /// Spread emotional contagion (Harmony dimension 9, index 8) across all entities.
+    ///
+    /// Call once per tick after all `update_entity()` calls have completed.
+    /// Entities near high-Φ neighbors drift their emotional activation toward
+    /// the social mean; isolated entities decay toward zero.
+    ///
+    /// Physics: implements McFadden's CEMI theory — EM field synchrony creates
+    /// shared emotional states. Dunbar (2012): social laughter/emotion is the
+    /// primate grooming equivalent for large groups.
+    ///
+    /// `positions`: current positions of all registered entities
+    /// `dt`: simulation time step in seconds
+    pub fn spread_emotional_contagion(
+        &mut self,
+        positions: &[(BodyHandle, symtropy_math::Point<D>)],
+        dt: f64,
+    ) {
+        use crate::harmony_field::{EMOTIONAL_CONTAGION_IDX, contagion_update};
+
+        // Snapshot: (position_as_svector, emotion, phi) for all entities
+        let sources: Vec<(SVector<f64, D>, f64, f64)> = positions
+            .iter()
+            .filter_map(|(h, pos)| {
+                self.entities.get(h).map(|e| {
+                    (pos.0, e.harmony_activations[EMOTIONAL_CONTAGION_IDX], e.phi())
+                })
+            })
+            .collect();
+
+        // Apply to each entity (self excluded from its own sources)
+        for (handle, pos) in positions {
+            let self_pos = pos.0;
+            if let Some(entity) = self.entities.get_mut(handle) {
+                let own_emotion = entity.harmony_activations[EMOTIONAL_CONTAGION_IDX];
+                let own_phi = entity.phi();
+                // Filter out self (near-zero distance)
+                let others: Vec<_> = sources
+                    .iter()
+                    .filter(|(p, _, _)| (p - self_pos).norm() > 1e-6)
+                    .cloned()
+                    .collect();
+                entity.harmony_activations[EMOTIONAL_CONTAGION_IDX] =
+                    contagion_update(&self_pos, own_emotion, own_phi, &others, dt);
+            }
+        }
+    }
+
     /// Apply dimensional leakage effects to entity energy budgets.
     ///
     /// Leakage sinks drain energy; leakage sources inject energy. This couples
@@ -512,8 +556,8 @@ impl<const D: usize> ConsciousnessField<D> {
     /// Only active when `leakage.enabled` is true.
     pub fn apply_dimensional_leakage(
         &mut self,
-        leakage: &crate::dimensional_leakage::DimensionalLeakage,
-        positions: &[(BodyHandle, [f64; 3])],
+        leakage: &crate::dimensional_leakage::DimensionalLeakage<D>,
+        positions: &[(BodyHandle, SVector<f64, D>)],
     ) {
         if !leakage.enabled {
             return;
@@ -610,7 +654,7 @@ impl<const D: usize> PhysicsCallback<D> for ConsciousnessField<D> {
             .entities
             .get(&body)
             .map(|e| e.harmony_activations)
-            .unwrap_or([0.0; 8]);
+            .unwrap_or([0.0; crate::harmony_field::NUM_HARMONIES]);
         let point = symtropy_math::Point(*contact_point);
         self.harmony_field.friction_multiplier(&point, &entity_harmonies)
     }
@@ -767,7 +811,7 @@ mod tests {
 
         // Set high stillness to activate sanctuary
         field.entities.get_mut(&h).unwrap().harmony_activations = [
-            0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.9, // index 7 = Sacred Stillness = 0.9
+            0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.9, 0.0, // index 7 = Sacred Stillness = 0.9
         ];
         // Manually set phi high enough for sanctuary (phi > 0.3 required)
         // We need to update the entity AND ensure the resulting phi is high enough
@@ -897,8 +941,8 @@ mod tests {
         field.register(h1, 100.0, 10.0);
 
         // Set aligned harmonies (Sacred Stillness)
-        field.entities.get_mut(&h0).unwrap().harmony_activations = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0];
-        field.entities.get_mut(&h1).unwrap().harmony_activations = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0];
+        field.entities.get_mut(&h0).unwrap().harmony_activations = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0];
+        field.entities.get_mut(&h1).unwrap().harmony_activations = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0];
 
         field.update_entity(h0, &test_inputs(0.8), symtropy_math::Point::origin());
         field.update_entity(h1, &test_inputs(0.8), symtropy_math::Point::new([5.0, 0.0, 0.0]));
@@ -932,11 +976,11 @@ mod tests {
         let energy_before = field.entities.get(&h).unwrap().energy.available;
 
         let mut leakage = DimensionalLeakage::new();
-        leakage.add_point(LeakagePoint::sink([0.0, 0.0, 0.0], 1.0, 5.0, 50.0));
+        leakage.add_point(LeakagePoint::sink(nalgebra::SVector::from([0.0, 0.0, 0.0]), 1.0, 5.0, 50.0));
         leakage.enabled = true;
 
         // Entity at origin, sink at origin → should drain energy
-        field.apply_dimensional_leakage(&leakage, &[(h, [1.0, 0.0, 0.0])]);
+        field.apply_dimensional_leakage(&leakage, &[(h, nalgebra::SVector::from([1.0, 0.0, 0.0]))]);
 
         let energy_after = field.entities.get(&h).unwrap().energy.available;
         assert!(
@@ -956,10 +1000,10 @@ mod tests {
         let energy_before = field.entities.get(&h).unwrap().energy.available;
 
         let mut leakage = DimensionalLeakage::new();
-        leakage.add_point(LeakagePoint::sink([0.0, 0.0, 0.0], 1.0, 5.0, 50.0));
+        leakage.add_point(LeakagePoint::sink(nalgebra::SVector::from([0.0, 0.0, 0.0]), 1.0, 5.0, 50.0));
         // NOT enabled
 
-        field.apply_dimensional_leakage(&leakage, &[(h, [0.0, 0.0, 0.0])]);
+        field.apply_dimensional_leakage(&leakage, &[(h, nalgebra::SVector::from([0.0, 0.0, 0.0]))]);
 
         let energy_after = field.entities.get(&h).unwrap().energy.available;
         assert!(
@@ -979,6 +1023,90 @@ mod tests {
             (mult - 1.0).abs() < 1e-10,
             "without harmony sources, friction should be neutral (1.0), got {}",
             mult
+        );
+    }
+
+    // ── Emotional Contagion integration tests ────────────────────────────────
+
+    #[test]
+    fn emotional_contagion_spreads_between_nearby_entities() {
+        use crate::harmony_field::EMOTIONAL_CONTAGION_IDX;
+
+        let mut field = ConsciousnessField::<3>::new();
+        let emitter = BodyHandle(0);
+        let receiver = BodyHandle(1);
+        field.register(emitter, 100.0, 10.0);
+        field.register(receiver, 100.0, 10.0);
+
+        // Emitter has high emotion; receiver has none
+        field.entities.get_mut(&emitter).unwrap().harmony_activations[EMOTIONAL_CONTAGION_IDX] = 0.9;
+        field.entities.get_mut(&receiver).unwrap().harmony_activations[EMOTIONAL_CONTAGION_IDX] = 0.0;
+
+        // Give emitter some Φ so it broadcasts
+        field.update_entity(emitter, &test_inputs(0.9), symtropy_math::Point::origin());
+        field.update_entity(receiver, &test_inputs(0.8), symtropy_math::Point::new([5.0, 0.0, 0.0]));
+        // Re-set after update_entity (which doesn't touch harmony_activations[8])
+        field.entities.get_mut(&emitter).unwrap().harmony_activations[EMOTIONAL_CONTAGION_IDX] = 0.9;
+
+        let positions = vec![
+            (emitter, symtropy_math::Point::new([0.0, 0.0, 0.0])),
+            (receiver, symtropy_math::Point::new([5.0, 0.0, 0.0])),
+        ];
+        field.spread_emotional_contagion(&positions, 1.0);
+
+        let receiver_emotion = field.entities.get(&receiver).unwrap()
+            .harmony_activations[EMOTIONAL_CONTAGION_IDX];
+        assert!(
+            receiver_emotion > 0.0,
+            "nearby receiver should catch emotion, got {receiver_emotion}"
+        );
+    }
+
+    #[test]
+    fn emotional_contagion_decays_in_isolation() {
+        use crate::harmony_field::EMOTIONAL_CONTAGION_IDX;
+
+        let mut field = ConsciousnessField::<3>::new();
+        let h = BodyHandle(0);
+        field.register(h, 100.0, 10.0);
+        field.entities.get_mut(&h).unwrap().harmony_activations[EMOTIONAL_CONTAGION_IDX] = 0.8;
+
+        // Single entity — no neighbors to spread from
+        let positions = vec![(h, symtropy_math::Point::<3>::origin())];
+        field.spread_emotional_contagion(&positions, 1.0);
+
+        let emotion = field.entities.get(&h).unwrap().harmony_activations[EMOTIONAL_CONTAGION_IDX];
+        assert!(
+            emotion < 0.8,
+            "isolated entity emotion should decay, got {emotion}"
+        );
+    }
+
+    #[test]
+    fn emotional_contagion_does_not_affect_other_harmony_dims() {
+        use crate::harmony_field::EMOTIONAL_CONTAGION_IDX;
+
+        let mut field = ConsciousnessField::<3>::new();
+        let emitter = BodyHandle(0);
+        let receiver = BodyHandle(1);
+        field.register(emitter, 100.0, 10.0);
+        field.register(receiver, 100.0, 10.0);
+
+        // Set non-contagion harmonies
+        field.entities.get_mut(&receiver).unwrap().harmony_activations[3] = 0.7;
+        field.entities.get_mut(&emitter).unwrap().harmony_activations[EMOTIONAL_CONTAGION_IDX] = 0.9;
+
+        let positions = vec![
+            (emitter, symtropy_math::Point::new([0.0, 0.0, 0.0])),
+            (receiver, symtropy_math::Point::new([3.0, 0.0, 0.0])),
+        ];
+        field.spread_emotional_contagion(&positions, 1.0);
+
+        // harmony[3] on receiver should be untouched
+        let h3 = field.entities.get(&receiver).unwrap().harmony_activations[3];
+        assert!(
+            (h3 - 0.7).abs() < 1e-10,
+            "contagion must only affect index {EMOTIONAL_CONTAGION_IDX}, not index 3 (got {h3})"
         );
     }
 }

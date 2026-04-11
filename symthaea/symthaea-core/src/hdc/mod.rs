@@ -388,6 +388,26 @@ pub mod real_arithmetic;
 pub mod root_finding; // Root finding: bisection, Newton-Raphson, Brent
 pub mod sparse_hv; // Sparse HDC for memory-efficient low-density vectors
 pub mod statistics; // Statistics & probability: distributions, hypothesis testing, Bayesian inference
+
+// ── New Math Domains (April 2026) ────────────────────────────────────────────
+pub mod algebraic_combinatorics; // Symmetric functions, Schur polynomials, Young tableaux, RSK
+pub mod algebraic_geometry;      // Varieties, Bezout, elliptic curve group law, rational points
+pub mod category_theory;         // Functors, natural transformations, adjunctions, Yoneda, monads
+pub mod chemistry;               // Periodic table, stoichiometry, thermochemistry, kinetics
+pub mod combinatorics;           // Generating functions, Burnside/Polya, Stirling, Ramsey, matroids
+pub mod complex_analysis;        // Cauchy, residues, conformal maps, power series, Mobius transforms
+pub mod functional_analysis;     // Banach/Hilbert spaces, bounded operators, spectral theorem
+pub mod game_theory;             // Nash equilibria, minimax, Shapley, VCG, Sprague-Grundy
+pub mod information_geometry;    // Fisher info, natural gradient, KL divergence, stat manifolds
+pub mod lie_theory;              // Lie algebras, exponential map, root systems, representations
+pub mod measure_probability;     // Measure spaces, martingales, Brownian motion, Ito calculus
+pub mod polynomial_algebra;      // Groebner bases, Buchberger, ideal membership, resultants
+pub mod tactics;                 // Proof tactics: ring, omega, induct, norm_num, cases
+
+// ── Einstein Manifold Search (Phase 6) ───────────────────────────────────────
+pub mod riemannian_geometry; // MetricTensor, Riemann/Ricci tensors, Ricci flow, Einstein condition
+pub mod ricci_flow;          // Normalized Ricci flow evolution, singularity detection, convergence
+pub mod einstein_search;     // HDC-guided moduli space search for exotic Einstein metrics on S⁴
 pub mod ucl_cross_domain_frames; // UCL cross-domain semantic frames (TRADE, CONFLICT, FEEDBACK_LOOP, etc.) // Thread-local memory pools for BinaryHV/ContinuousHV (10-100x faster allocation)
 
 // Property-based tests for HDC invariants

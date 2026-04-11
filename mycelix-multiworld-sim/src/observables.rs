@@ -369,6 +369,8 @@ mod tests {
             fleet: crate::robotics::RoboticFleet::default(),
             diplomatic_relations: std::collections::HashMap::new(),
             zones: Vec::new(),
+            moral_memories: Vec::new(),
+            institutional_ethics: crate::agent::EthicalOrientation::default(),
         };
         for i in 0..pop {
             let agent = CivAgent {

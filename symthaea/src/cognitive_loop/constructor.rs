@@ -959,7 +959,9 @@ impl CognitiveLoopService {
 
             super::sensorimotor_execution::SensoriMotorExecution::new(
                 vision_sensory,
-                super::motor_rendering_manager::MotorRenderingManager::new(),
+                super::motor_rendering_manager::MotorRenderingManager::new_with_aesthetic_path(
+                    config.aesthetic_memory_path.as_deref().map(std::path::PathBuf::from),
+                ),
                 somatic_bridge_instance,
                 Some(pain_sender),
                 thermal_bridge_instance,
@@ -1474,6 +1476,8 @@ impl CognitiveLoopService {
             swarm_manager: super::managers::SwarmManager::default(),
             #[cfg(feature = "muse")]
             muse_manager: super::managers::MuseManager::new(),
+            #[cfg(feature = "muse")]
+            music_publisher: super::managers::MusicPublisher::new(),
             holon_receiver: crate::consciousness::holon_receiver::HolonReceiver::new(),
             holon_inbound_rx: std::sync::Mutex::new(Some(holon_inbound_rx)),
             holon_inbound_tx,
@@ -1643,6 +1647,14 @@ impl CognitiveLoopService {
             #[cfg(feature = "vision-manifold")]
             vision_manager: super::managers::VisionManager::default(),
             security_telemetry: crate::swarm::SecurityTelemetry::default(),
+            #[cfg(feature = "scientific_method")]
+            scientific_method_engine: {
+                let mut engine = crate::scientific_method::ScientificMethodEngine::new();
+                // Seed with a standing "input is coherent" hypothesis (id 0).
+                // Its posterior drifts each cycle based on prediction error.
+                engine.hypothesize("Input representations are coherent and consistent", 0.5);
+                engine
+            },
             // embodiment_bridge, last_proprioceptive_hv, embodiment_telemetry moved to sensorimotor_built
             resonant_speech: crate::resonant_speech::ResonantSpeech::new(),
             streaming_inference: if enable_streaming_inference {
@@ -1811,7 +1823,7 @@ impl CognitiveLoopService {
 #[allow(clippy::field_reassign_with_default)]
 mod tests {
     use super::*;
-    use crate::domain::{DomainKind, DomainProfile};
+    use crate::domain::DomainProfile;
 
     // ── Default construction ──────────────────────────────────────────
 
@@ -1883,7 +1895,7 @@ mod tests {
         let service = CognitiveLoopService::new(config).unwrap();
         assert_eq!(
             service.spectrum_manager.domain_profile().kind,
-            DomainKind::Underwater
+            "underwater"
         );
     }
 

@@ -44,6 +44,12 @@ pub struct MotorRenderingManager {
 impl MotorRenderingManager {
     /// Create a new MotorRenderingManager with default (empty) state.
     pub fn new() -> Self {
+        Self::new_with_aesthetic_path(None)
+    }
+
+    /// Create a new MotorRenderingManager, forwarding an optional aesthetic memory path
+    /// to the CreativeManager. When `None`, CreativeManager uses its default path.
+    pub fn new_with_aesthetic_path(aesthetic_path: Option<std::path::PathBuf>) -> Self {
         Self {
             output_bridge: None,
             pending_request: None,
@@ -54,7 +60,7 @@ impl MotorRenderingManager {
             #[cfg(feature = "canvas")]
             last_canvas_svg: None,
             #[cfg(feature = "creative")]
-            creative_manager: Some(super::creative_bridge::CreativeManager::new()),
+            creative_manager: Some(super::creative_bridge::CreativeManager::new_with_path(aesthetic_path)),
         }
     }
 }

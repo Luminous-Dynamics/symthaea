@@ -201,6 +201,184 @@ pub fn find_pairs<const D: usize>(bodies: &[RigidBody<D>]) -> Vec<BroadphasePair
     else { Lbvh::build(bodies).query_pairs(bodies) }
 }
 
+// ---------------------------------------------------------------------------
+// Incremental broadphase: cache static/kinematic AABBs across frames
+// ---------------------------------------------------------------------------
+
+/// Pre-computed broadphase descriptor for a single body (AABB + sphere + filter).
+///
+/// Decoupled from `RigidBody<D>` so it can be cached without holding references.
+/// Stores both the AABB (for static-cache queries) and the bounding sphere center
+/// and radius (for dynamic–dynamic sphere-distance test, matching `find_pairs_brute`).
+#[derive(Clone, Debug)]
+pub struct BpEntry<const D: usize> {
+    pub handle: BodyHandle,
+    pub aabb: Aabb<D>,
+    /// World-space bounding sphere center.
+    pub sphere_center: SVector<f64, D>,
+    /// Bounding sphere radius.
+    pub sphere_radius: f64,
+    pub body_type: BodyType,
+    pub collision_group: u32,
+    pub collision_mask: u32,
+}
+
+impl<const D: usize> BpEntry<D> {
+    pub fn from_body(body: &RigidBody<D>) -> Self {
+        let (c_local, r) = body.collider.bounding_sphere();
+        let c_world = body.transform.transform_point(&c_local).0;
+        BpEntry {
+            handle: body.handle,
+            aabb: Aabb::from_sphere(&c_world, r),
+            sphere_center: c_world,
+            sphere_radius: r,
+            body_type: body.body_type,
+            collision_group: body.collision_group,
+            collision_mask: body.collision_mask,
+        }
+    }
+}
+
+/// Cached broadphase state for Static and Kinematic bodies.
+///
+/// Rebuilt only when a static/kinematic body is added or removed (`dirty` flag).
+/// This avoids including immovable geometry in the per-frame LBVH rebuild,
+/// which is O(n log n) in the total body count.
+///
+/// For scenes with many static bodies (terrain, walls) and few dynamic bodies,
+/// this typically halves or better the broadphase cost.
+pub struct StaticBroadphase<const D: usize> {
+    entries: Vec<BpEntry<D>>,
+}
+
+impl<const D: usize> StaticBroadphase<D> {
+    pub fn new() -> Self {
+        Self { entries: Vec::new() }
+    }
+
+    /// Rebuild the cache from all bodies in the world.
+    ///
+    /// Call this when `static_tree_dirty` is set on `PhysicsWorld`.
+    pub fn rebuild(&mut self, bodies: &[RigidBody<D>]) {
+        self.entries = bodies
+            .iter()
+            .filter(|b| b.body_type == BodyType::Static || b.body_type == BodyType::Kinematic)
+            .map(BpEntry::from_body)
+            .collect();
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Enumerate pairs between a dynamic entry and all cached static entries.
+    ///
+    /// Uses sphere-distance test (same as `find_pairs_brute`) for exact equivalence.
+    fn query_against<'a>(
+        &'a self,
+        dyn_entry: &'a BpEntry<D>,
+    ) -> impl Iterator<Item = BroadphasePair> + 'a {
+        self.entries.iter().filter_map(move |s| {
+            let group_ok = (dyn_entry.collision_group & s.collision_mask != 0)
+                && (s.collision_group & dyn_entry.collision_mask != 0);
+            if group_ok {
+                let dist = (dyn_entry.sphere_center - s.sphere_center).norm();
+                if dist <= dyn_entry.sphere_radius + s.sphere_radius {
+                    let (ha, hb) = (dyn_entry.handle, s.handle);
+                    let pair = if ha < hb {
+                        BroadphasePair(ha, hb)
+                    } else {
+                        BroadphasePair(hb, ha)
+                    };
+                    return Some(pair);
+                }
+            }
+            None
+        })
+    }
+}
+
+impl<const D: usize> Default for StaticBroadphase<D> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Find all potentially colliding pairs using the incremental static cache.
+///
+/// Separates the body list into dynamic and non-dynamic entries:
+/// - Dynamic–dynamic: brute-force O(n_dyn²), acceptable for typical games
+///   where the number of actively moving bodies is small.
+/// - Dynamic–static: linear scan against the prebuilt `StaticBroadphase`.
+///   For large static geometry this avoids re-packing static bodies into the
+///   LBVH every frame.
+///
+/// For very large dynamic counts (≥ BRUTE_FORCE_THRESHOLD) the existing
+/// `find_pairs` (full LBVH over all bodies) is called instead, since it is
+/// superior at scale.
+pub fn find_pairs_incremental<const D: usize>(
+    bodies: &[RigidBody<D>],
+    static_bp: &StaticBroadphase<D>,
+) -> Vec<BroadphasePair> {
+    // Fast paths
+    if bodies.is_empty() {
+        return Vec::new();
+    }
+    if static_bp.is_empty() {
+        // No static cache: identical to the standard path.
+        return find_pairs(bodies);
+    }
+
+    // Compute AABB entries for dynamic bodies only
+    let dynamic: Vec<BpEntry<D>> = bodies
+        .iter()
+        .filter(|b| b.body_type == BodyType::Dynamic)
+        .map(BpEntry::from_body)
+        .collect();
+
+    // For large dynamic counts fall back to the full LBVH path which is more
+    // efficient at scale. The static cache saves rebuilding the full tree.
+    if dynamic.len() >= BRUTE_FORCE_THRESHOLD {
+        return find_pairs(bodies);
+    }
+
+    let mut pairs = Vec::new();
+
+    // Dynamic–dynamic pairs (brute force, sphere distance test matching find_pairs_brute)
+    for i in 0..dynamic.len() {
+        for j in (i + 1)..dynamic.len() {
+            let a = &dynamic[i];
+            let b = &dynamic[j];
+            let group_ok = (a.collision_group & b.collision_mask != 0)
+                && (b.collision_group & a.collision_mask != 0);
+            if group_ok {
+                let dist = (a.sphere_center - b.sphere_center).norm();
+                if dist <= a.sphere_radius + b.sphere_radius {
+                    let (ha, hb) = (a.handle, b.handle);
+                    if ha < hb {
+                        pairs.push(BroadphasePair(ha, hb));
+                    } else {
+                        pairs.push(BroadphasePair(hb, ha));
+                    }
+                }
+            }
+        }
+    }
+
+    // Dynamic–static pairs (linear scan against cached static AABB entries)
+    for dyn_entry in &dynamic {
+        pairs.extend(static_bp.query_against(dyn_entry));
+    }
+
+    pairs.sort_unstable_by_key(|p| (p.0, p.1));
+    pairs.dedup();
+    pairs
+}
+
 fn find_pairs_brute<const D: usize>(bodies: &[RigidBody<D>]) -> Vec<BroadphasePair> {
     let mut pairs = Vec::new();
     for i in 0..bodies.len() {
@@ -323,5 +501,78 @@ mod tests {
         let c = Aabb::<2> { min: SVector::from([5.0, 5.0]), max: SVector::from([6.0, 6.0]) };
         assert!(a.overlaps(&b));
         assert!(!a.overlaps(&c));
+    }
+
+    // --- Incremental broadphase tests ---
+
+    #[test]
+    fn incremental_dynamic_static_detected() {
+        let bodies = vec![
+            RigidBody::<3>::static_body(BodyHandle(0), Point::origin(), Box::new(Sphere::unit())),
+            RigidBody::<3>::dynamic_sphere(BodyHandle(1), Point::new([1.5, 0.0, 0.0]), 1.0, 1.0),
+        ];
+        let mut static_bp = super::StaticBroadphase::new();
+        static_bp.rebuild(&bodies);
+
+        let pairs = super::find_pairs_incremental(&bodies, &static_bp);
+        assert_eq!(pairs.len(), 1);
+        let p = pairs[0];
+        assert!((p.0 == BodyHandle(0) && p.1 == BodyHandle(1))
+            || (p.0 == BodyHandle(1) && p.1 == BodyHandle(0)));
+    }
+
+    #[test]
+    fn incremental_static_static_not_produced() {
+        let bodies = vec![
+            RigidBody::<3>::static_body(BodyHandle(0), Point::origin(), Box::new(Sphere::unit())),
+            RigidBody::<3>::static_body(BodyHandle(1), Point::new([0.5, 0.0, 0.0]), Box::new(Sphere::unit())),
+        ];
+        let mut static_bp = super::StaticBroadphase::new();
+        static_bp.rebuild(&bodies);
+
+        let pairs = super::find_pairs_incremental(&bodies, &static_bp);
+        assert!(pairs.is_empty(), "static–static must never collide");
+    }
+
+    #[test]
+    fn incremental_matches_standard_find_pairs() {
+        let bodies = vec![
+            RigidBody::<3>::static_body(BodyHandle(0), Point::new([0.0, 0.0, 0.0]), Box::new(Sphere::unit())),
+            RigidBody::<3>::dynamic_sphere(BodyHandle(1), Point::new([1.5, 0.0, 0.0]), 1.0, 1.0),
+            RigidBody::<3>::dynamic_sphere(BodyHandle(2), Point::new([0.0, 1.5, 0.0]), 1.0, 1.0),
+            RigidBody::<3>::dynamic_sphere(BodyHandle(3), Point::new([10.0, 0.0, 0.0]), 1.0, 1.0),
+        ];
+        let mut static_bp = super::StaticBroadphase::new();
+        static_bp.rebuild(&bodies);
+
+        let mut incremental = super::find_pairs_incremental(&bodies, &static_bp);
+        let mut standard = find_pairs(&bodies);
+        incremental.sort_by_key(|p| (p.0, p.1));
+        standard.sort_by_key(|p| (p.0, p.1));
+        assert_eq!(incremental, standard, "incremental must match standard broadphase");
+    }
+
+    #[test]
+    fn incremental_no_static_degrades_to_standard() {
+        let bodies = vec![
+            RigidBody::<3>::dynamic_sphere(BodyHandle(0), Point::new([0.0, 0.0, 0.0]), 1.0, 1.0),
+            RigidBody::<3>::dynamic_sphere(BodyHandle(1), Point::new([1.5, 0.0, 0.0]), 1.0, 1.0),
+        ];
+        let empty_bp = super::StaticBroadphase::<3>::new(); // no rebuild
+        let pairs = super::find_pairs_incremental(&bodies, &empty_bp);
+        assert_eq!(pairs.len(), 1);
+    }
+
+    #[test]
+    fn static_broadphase_rebuild_updates_cache() {
+        let bodies = vec![
+            RigidBody::<3>::static_body(BodyHandle(0), Point::origin(), Box::new(Sphere::unit())),
+            RigidBody::<3>::dynamic_sphere(BodyHandle(1), Point::new([1.5, 0.0, 0.0]), 1.0, 1.0),
+        ];
+        let mut static_bp = super::StaticBroadphase::<3>::new();
+        assert_eq!(static_bp.len(), 0);
+
+        static_bp.rebuild(&bodies);
+        assert_eq!(static_bp.len(), 1, "should cache the one static body");
     }
 }

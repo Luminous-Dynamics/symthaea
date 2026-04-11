@@ -128,18 +128,21 @@ fn claim_count(state: State<'_, Mutex<PrismState>>) -> Result<usize, String> {
 fn main() {
     env_logger::init();
 
+    // Build search index in a background thread to avoid blocking app launch.
+    // The Mutex<PrismState> is populated immediately with an empty engine,
+    // then swapped to the full engine once indexing completes.
     let prism_state = PrismState {
-        search: SearchEngine::with_core_claims(),
+        search: SearchEngine::new(), // empty — loads fast
         reflex: ReflexArc::new(),
         client: reqwest::Client::builder()
-            .user_agent("Prism/0.2 (Tauri; +https://mycelix.net)")
+            .user_agent("Prism/0.3 (Tauri; +https://mycelix.net)")
             .redirect(reqwest::redirect::Policy::limited(10))
             .timeout(std::time::Duration::from_secs(30))
             .build()
             .expect("HTTP client"),
     };
 
-    log::info!("Prism desktop starting ({} claims indexed)", prism_state.search.claim_count());
+    log::info!("Prism desktop starting (indexing in background)");
 
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
@@ -150,15 +153,24 @@ fn main() {
             claim_count,
         ])
         .setup(|app| {
-            // WebKitGTK on Wayland: webview doesn't fill window.
-            // Workaround: inject JS to force body/html to window.innerWidth,
-            // and trigger a resize after a short delay.
             use tauri::Manager;
-            use tauri::Emitter;
+
+            // Background: load the search index without blocking the UI
+            let state = app.state::<Mutex<PrismState>>().clone();
+            std::thread::spawn(move || {
+                let engine = SearchEngine::with_core_claims();
+                let count = engine.claim_count();
+                if let Ok(mut s) = state.lock() {
+                    s.search = engine;
+                }
+                log::info!("Search index loaded: {} claims", count);
+            });
+
+            // WebKitGTK layout fix (reduced delay)
             if let Some(window) = app.get_webview_window("main") {
                 let w = window.clone();
                 std::thread::spawn(move || {
-                    std::thread::sleep(std::time::Duration::from_millis(500));
+                    std::thread::sleep(std::time::Duration::from_millis(200));
                     let _ = w.eval(
                         "document.documentElement.style.width='100vw';\
                          document.body.style.width='100vw';\
@@ -166,12 +178,11 @@ fn main() {
                          document.body.style.overflow='hidden auto';\
                          window.dispatchEvent(new Event('resize'));"
                     );
-                    // Toggle size to force WebKitGTK relayout
                     if let Ok(size) = w.inner_size() {
                         let _ = w.set_size(tauri::Size::Physical(tauri::PhysicalSize::new(
                             size.width - 1, size.height,
                         )));
-                        std::thread::sleep(std::time::Duration::from_millis(100));
+                        std::thread::sleep(std::time::Duration::from_millis(50));
                         let _ = w.set_size(tauri::Size::Physical(tauri::PhysicalSize::new(
                             size.width, size.height,
                         )));

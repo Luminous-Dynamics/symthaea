@@ -19,6 +19,42 @@ use mycelix_bridge_entry_types::{
 #[derive(Clone, PartialEq)]
 pub struct Anchor(pub String);
 
+/// A consciousness-driven composition stored on the DHT.
+///
+/// Created when Symthaea's cognitive loop triggers music generation.
+/// The harmony_activations, valence/arousal, and phi_score record the
+/// exact cognitive state that produced this composition.
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct ConsciousCompositionEntry {
+    /// Schema version for forward-compatibility
+    pub schema_version: u8,
+    /// The agent whose consciousness triggered this composition
+    pub composer_agent: AgentPubKey,
+    /// Eight Harmonies activation vector at composition time [0,1]^8
+    pub harmony_activations: Vec<f32>,
+    /// Valence at composition time [-1, 1]
+    pub valence: f32,
+    /// Arousal at composition time [0, 1]
+    pub arousal: f32,
+    /// Integrated Information (Phi) score at composition time [0, 1]
+    pub phi_score: f32,
+    /// Narrative tags from the active episode (e.g. ["discovery", "rising"])
+    pub narrative_tags: Vec<String>,
+    /// Derived tempo BPM (for playback reference)
+    pub tempo_bpm: f32,
+    /// Derived scale name (e.g. "minor", "maqam_rast")
+    pub scale_name: String,
+    /// Total duration in seconds
+    pub duration_secs: f32,
+    /// Number of notes generated
+    pub note_count: u32,
+    /// Composite aesthetic quality score [0, 1]
+    pub quality_score: f32,
+    /// Timestamp of composition
+    pub composed_at: Timestamp,
+}
+
 /// Type alias for bridge query entries
 pub type MusicQueryEntry = BridgeQueryEntry;
 
@@ -32,6 +68,7 @@ pub enum EntryTypes {
     Query(BridgeQueryEntry),
     Event(BridgeEventEntry),
     CachedCredential(CachedCredentialEntry),
+    ConsciousComposition(ConsciousCompositionEntry),
 }
 
 #[hdk_link_types]
@@ -47,6 +84,10 @@ pub enum LinkTypes {
     DispatchRateLimit,
     /// Agent → cached consciousness credential
     AgentToCredentialCache,
+    /// All consciousness-driven compositions (global index)
+    AllConsciousCompositions,
+    /// Agent → their consciousness compositions
+    AgentToConsciousComposition,
 }
 
 #[hdk_extern]
@@ -67,12 +108,14 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
             EntryTypes::Query(query) => validate_query(&query),
             EntryTypes::Event(event) => validate_event(&event),
             EntryTypes::CachedCredential(cred) => validate_credential_cache(&cred),
+            EntryTypes::ConsciousComposition(comp) => validate_conscious_composition(&comp),
         },
         FlatOp::StoreEntry(OpEntry::UpdateEntry { app_entry, .. }) => match app_entry {
             EntryTypes::Anchor(_) => Ok(ValidateCallbackResult::Valid),
             EntryTypes::Query(query) => validate_query(&query),
             EntryTypes::Event(event) => validate_event(&event),
             EntryTypes::CachedCredential(cred) => validate_credential_cache(&cred),
+            EntryTypes::ConsciousComposition(comp) => validate_conscious_composition(&comp),
         },
         FlatOp::StoreEntry(_) => Ok(ValidateCallbackResult::Valid),
         FlatOp::RegisterUpdate(update) => {
@@ -128,4 +171,47 @@ fn validate_credential_cache(cred: &CachedCredentialEntry) -> ExternResult<Valid
         Ok(()) => Ok(ValidateCallbackResult::Valid),
         Err(msg) => Ok(ValidateCallbackResult::Invalid(msg)),
     }
+}
+
+fn validate_conscious_composition(
+    comp: &ConsciousCompositionEntry,
+) -> ExternResult<ValidateCallbackResult> {
+    if comp.harmony_activations.len() != 8 {
+        return Ok(ValidateCallbackResult::Invalid(format!(
+            "harmony_activations must have 8 elements, got {}",
+            comp.harmony_activations.len()
+        )));
+    }
+    for (i, &v) in comp.harmony_activations.iter().enumerate() {
+        if !(0.0..=1.0).contains(&v) {
+            return Ok(ValidateCallbackResult::Invalid(format!(
+                "harmony_activations[{}] = {} is out of [0, 1]",
+                i, v
+            )));
+        }
+    }
+    if !(-1.0..=1.0).contains(&comp.valence) {
+        return Ok(ValidateCallbackResult::Invalid(format!(
+            "valence {} is out of [-1, 1]",
+            comp.valence
+        )));
+    }
+    if !(0.0..=1.0).contains(&comp.arousal) {
+        return Ok(ValidateCallbackResult::Invalid(format!(
+            "arousal {} is out of [0, 1]",
+            comp.arousal
+        )));
+    }
+    if !(0.0..=1.0).contains(&comp.phi_score) {
+        return Ok(ValidateCallbackResult::Invalid(format!(
+            "phi_score {} is out of [0, 1]",
+            comp.phi_score
+        )));
+    }
+    if comp.duration_secs <= 0.0 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "duration_secs must be positive".into(),
+        ));
+    }
+    Ok(ValidateCallbackResult::Valid)
 }

@@ -541,6 +541,430 @@ impl DifferentialEquationsEngine {
     }
 }
 
+// ─── RK45 (Dormand-Prince) ────────────────────────────────────────────────────
+
+/// Adaptive step-size IVP result (RK45).
+#[derive(Debug, Clone)]
+pub struct RK45Result {
+    /// Final state vector.
+    pub y_final: Vec<f64>,
+    /// Total steps taken (accepted + rejected).
+    pub steps_taken: usize,
+    /// Number of rejected steps (step halved due to error).
+    pub rejected_steps: usize,
+    /// Achieved local error estimate at termination.
+    pub error_estimate: f64,
+    /// Whether the integration reached t_end within tolerance.
+    pub converged: bool,
+}
+
+impl DifferentialEquationsEngine {
+    /// Solve an IVP using the Dormand-Prince RK45 embedded pair.
+    ///
+    /// Adaptive step control: the embedded 4th/5th order pair gives a
+    /// local error estimate.  Step grows/shrinks by `(tol/err)^(1/5)`,
+    /// clamped to `[h_min, h_max]`.
+    ///
+    /// Dormand-Prince Butcher tableau (DOPRI5 — Hairer et al. 1993):
+    /// c2=1/5, c3=3/10, c4=4/5, c5=8/9, c6=1, c7=1
+    pub fn solve_rk45(
+        system: &ODESystem,
+        t0: f64,
+        t_end: f64,
+        y0: &[f64],
+        tol: f64,
+    ) -> RK45Result {
+        // Dormand-Prince coefficients (a-matrix, b5, b4)
+        let a21 = 1.0 / 5.0;
+        let a31 = 3.0 / 40.0;
+        let a32 = 9.0 / 40.0;
+        let a41 = 44.0 / 45.0;
+        let a42 = -56.0 / 15.0;
+        let a43 = 32.0 / 9.0;
+        let a51 = 19372.0 / 6561.0;
+        let a52 = -25360.0 / 2187.0;
+        let a53 = 64448.0 / 6561.0;
+        let a54 = -212.0 / 729.0;
+        let a61 = 9017.0 / 3168.0;
+        let a62 = -355.0 / 33.0;
+        let a63 = 46732.0 / 5247.0;
+        let a64 = 49.0 / 176.0;
+        let a65 = -5103.0 / 18656.0;
+
+        // 5th-order weights (b)
+        let b1 = 35.0 / 384.0;
+        let b3 = 500.0 / 1113.0;
+        let b4 = 125.0 / 192.0;
+        let b5 = -2187.0 / 6784.0;
+        let b6 = 11.0 / 84.0;
+
+        // 4th-order weights (b*) for error estimate
+        let e1 = 71.0 / 57600.0;
+        let e3 = -71.0 / 16695.0;
+        let e4 = 71.0 / 1920.0;
+        let e5 = -17253.0 / 339200.0;
+        let e6 = 22.0 / 525.0;
+        let e7 = -1.0 / 40.0;
+
+        let dim = system.dim;
+        let mut t = t0;
+        let mut y = y0.to_vec();
+        let mut h = (t_end - t0) / 100.0; // initial step
+        let h_min = 1e-12;
+        let h_max = (t_end - t0) / 10.0;
+        let tol = tol.max(1e-12);
+
+        let mut steps_taken = 0usize;
+        let mut rejected = 0usize;
+        let mut error_estimate = 0.0;
+        let max_steps = 100_000;
+
+        while t < t_end && steps_taken < max_steps {
+            if t + h > t_end {
+                h = t_end - t;
+            }
+
+            // Stage evaluations
+            let k1 = (system.f)(t, &y);
+            let y2: Vec<f64> = (0..dim).map(|i| y[i] + h * a21 * k1[i]).collect();
+            let k2 = (system.f)(t + h / 5.0, &y2);
+            let y3: Vec<f64> =
+                (0..dim).map(|i| y[i] + h * (a31 * k1[i] + a32 * k2[i])).collect();
+            let k3 = (system.f)(t + 3.0 * h / 10.0, &y3);
+            let y4: Vec<f64> = (0..dim)
+                .map(|i| y[i] + h * (a41 * k1[i] + a42 * k2[i] + a43 * k3[i]))
+                .collect();
+            let k4 = (system.f)(t + 4.0 * h / 5.0, &y4);
+            let y5: Vec<f64> = (0..dim)
+                .map(|i| {
+                    y[i] + h * (a51 * k1[i] + a52 * k2[i] + a53 * k3[i] + a54 * k4[i])
+                })
+                .collect();
+            let k5 = (system.f)(t + 8.0 * h / 9.0, &y5);
+            let y6: Vec<f64> = (0..dim)
+                .map(|i| {
+                    y[i]
+                        + h * (a61 * k1[i]
+                            + a62 * k2[i]
+                            + a63 * k3[i]
+                            + a64 * k4[i]
+                            + a65 * k5[i])
+                })
+                .collect();
+            let k6 = (system.f)(t + h, &y6);
+
+            // 5th-order solution
+            let y_new: Vec<f64> = (0..dim)
+                .map(|i| {
+                    y[i] + h * (b1 * k1[i] + b3 * k3[i] + b4 * k4[i] + b5 * k5[i] + b6 * k6[i])
+                })
+                .collect();
+
+            // 7th stage (for error estimate only)
+            let k7 = (system.f)(t + h, &y_new);
+
+            // Error estimate (difference between 4th and 5th order)
+            let err: f64 = (0..dim)
+                .map(|i| {
+                    let e = h
+                        * (e1 * k1[i]
+                            + e3 * k3[i]
+                            + e4 * k4[i]
+                            + e5 * k5[i]
+                            + e6 * k6[i]
+                            + e7 * k7[i]);
+                    let sc = tol * (1.0 + y[i].abs().max(y_new[i].abs()));
+                    (e / sc).powi(2)
+                })
+                .sum::<f64>()
+                .sqrt()
+                / (dim as f64).sqrt();
+
+            error_estimate = err;
+
+            if err <= 1.0 {
+                // Accept step
+                t += h;
+                y = y_new;
+                steps_taken += 1;
+                // Grow step
+                let factor = 0.9 * err.powf(-0.2);
+                h = (h * factor.min(5.0)).min(h_max);
+            } else {
+                // Reject step, shrink
+                rejected += 1;
+                let factor = 0.9 * err.powf(-0.2);
+                h = (h * factor.max(0.1)).max(h_min);
+                if h < h_min {
+                    break;
+                }
+            }
+        }
+
+        RK45Result {
+            y_final: y,
+            steps_taken,
+            rejected_steps: rejected,
+            error_estimate,
+            converged: (t - t_end).abs() < 1e-10 || t >= t_end,
+        }
+    }
+
+    /// Implicit Euler (backward Euler) for stiff ODEs via fixed-point iteration.
+    ///
+    /// Solves y_{n+1} = y_n + h * f(t_{n+1}, y_{n+1}) by iterating:
+    ///   y^(k+1) = y_n + h * f(t_{n+1}, y^(k))
+    /// Converges when h * L < 1 where L is the Lipschitz constant.
+    pub fn solve_implicit_euler(
+        system: &ODESystem,
+        t0: f64,
+        t_end: f64,
+        y0: &[f64],
+        n_steps: usize,
+        fp_iters: usize,
+    ) -> ODEResult {
+        let dim = system.dim;
+        let h = (t_end - t0) / n_steps as f64;
+        let mut t_values = Vec::with_capacity(n_steps + 1);
+        let mut y_values = Vec::with_capacity(n_steps + 1);
+        let mut y = y0.to_vec();
+        t_values.push(t0);
+        y_values.push(y.clone());
+
+        for step in 0..n_steps {
+            let t_next = t0 + (step + 1) as f64 * h;
+            // Fixed-point iteration: y* = y + h*f(t_next, y*)
+            let mut y_next = y.clone();
+            for _ in 0..fp_iters {
+                let fy = (system.f)(t_next, &y_next);
+                y_next = (0..dim).map(|i| y[i] + h * fy[i]).collect();
+            }
+            y = y_next;
+            t_values.push(t_next);
+            y_values.push(y.clone());
+        }
+
+        let state_hash: u64 = y.iter().fold(0u64, |acc, &v| {
+            acc.wrapping_add(v.to_bits())
+        });
+        let base = BinaryHV::random(seed_from_name("IMPLICIT_EULER"));
+        let state_hv = BinaryHV::random(seed_from_name(&format!("IE_STATE_{}", state_hash)));
+        let encoding = base.bind(&state_hv);
+        let phi = 1.0 / (1.0 + y.iter().map(|v| v.abs()).sum::<f64>() / dim as f64);
+
+        ODEResult {
+            t_values,
+            y_values,
+            method: ODEMethod::RK4, // reuse enum (no implicit variant yet)
+            steps: n_steps,
+            phi,
+            encoding,
+        }
+    }
+}
+
+// ─── Stochastic Differential Equations ───────────────────────────────────────
+
+/// Result of an SDE simulation.
+#[derive(Debug, Clone)]
+pub struct SDEResult {
+    /// Time grid.
+    pub t_values: Vec<f64>,
+    /// Sample path of the SDE.
+    pub y_values: Vec<f64>,
+    /// Sample mean at final time (from multiple paths if run_ensemble was called).
+    pub mean_final: f64,
+    /// Sample variance at final time.
+    pub variance_final: f64,
+    /// Number of paths simulated (1 for single path).
+    pub n_paths: usize,
+}
+
+/// Stochastic Differential Equations via Euler-Maruyama.
+///
+/// Solves dX = f(X,t) dt + g(X,t) dW where dW ~ N(0, dt).
+pub struct SDEEngine;
+
+impl SDEEngine {
+    /// Simulate a single path of the SDE: dX = f(X,t)dt + g(X,t)dW.
+    ///
+    /// Uses the Euler-Maruyama scheme:
+    ///   X_{n+1} = X_n + f(X_n, t_n)*h + g(X_n, t_n)*sqrt(h)*Z_n
+    /// where Z_n ~ N(0,1) via Box-Muller transform from an LCG PRNG.
+    pub fn euler_maruyama(
+        drift: fn(f64, f64) -> f64,
+        diffusion: fn(f64, f64) -> f64,
+        x0: f64,
+        t0: f64,
+        t_end: f64,
+        n_steps: usize,
+        seed: u64,
+    ) -> SDEResult {
+        let h = (t_end - t0) / n_steps as f64;
+        let sqrt_h = h.sqrt();
+        let mut t_values = Vec::with_capacity(n_steps + 1);
+        let mut y_values = Vec::with_capacity(n_steps + 1);
+        let mut x = x0;
+        let mut rng = seed;
+        t_values.push(t0);
+        y_values.push(x);
+
+        for step in 0..n_steps {
+            let t = t0 + step as f64 * h;
+            let z = Self::normal_sample(&mut rng);
+            x += drift(x, t) * h + diffusion(x, t) * sqrt_h * z;
+            t_values.push(t + h);
+            y_values.push(x);
+        }
+
+        SDEResult {
+            mean_final: x,
+            variance_final: 0.0,
+            t_values,
+            y_values,
+            n_paths: 1,
+        }
+    }
+
+    /// Simulate an ensemble of paths and return mean + variance at t_end.
+    pub fn ensemble(
+        drift: fn(f64, f64) -> f64,
+        diffusion: fn(f64, f64) -> f64,
+        x0: f64,
+        t0: f64,
+        t_end: f64,
+        n_steps: usize,
+        n_paths: usize,
+        seed: u64,
+    ) -> SDEResult {
+        let mut finals = Vec::with_capacity(n_paths);
+        let h = (t_end - t0) / n_steps as f64;
+        let sqrt_h = h.sqrt();
+
+        for path in 0..n_paths {
+            let mut x = x0;
+            let mut rng = seed.wrapping_add(path as u64 * 1_000_003);
+            for step in 0..n_steps {
+                let t = t0 + step as f64 * h;
+                let z = Self::normal_sample(&mut rng);
+                x += drift(x, t) * h + diffusion(x, t) * sqrt_h * z;
+            }
+            finals.push(x);
+        }
+
+        let mean = finals.iter().sum::<f64>() / n_paths as f64;
+        let variance = finals.iter().map(|&v| (v - mean).powi(2)).sum::<f64>() / n_paths as f64;
+
+        SDEResult {
+            mean_final: mean,
+            variance_final: variance,
+            t_values: vec![t0, t_end],
+            y_values: vec![x0, mean],
+            n_paths,
+        }
+    }
+
+    /// Ornstein-Uhlenbeck process: dX = θ(μ-X)dt + σdW.
+    /// Analytical mean: E[X(t)] = μ + (x0-μ)*exp(-θ*t)
+    /// Analytical variance: σ²/(2θ) * (1 - exp(-2θt))
+    pub fn ornstein_uhlenbeck(
+        theta: f64,
+        mu: f64,
+        sigma: f64,
+        x0: f64,
+        t_end: f64,
+        n_steps: usize,
+        n_paths: usize,
+        seed: u64,
+    ) -> SDEResult {
+        let drift = |x: f64, _t: f64| theta * (mu - x);
+        let diffusion = |_x: f64, _t: f64| sigma;
+        // Can't use closures directly with fn pointers — use helper
+        // Instead, simulate inline:
+        let h = t_end / n_steps as f64;
+        let sqrt_h = h.sqrt();
+        let mut finals = Vec::with_capacity(n_paths);
+
+        for path in 0..n_paths {
+            let mut x = x0;
+            let mut rng = seed.wrapping_add(path as u64 * 999_983);
+            for step in 0..n_steps {
+                let _t = step as f64 * h;
+                let z = Self::normal_sample(&mut rng);
+                x += drift(x, _t) * h + diffusion(x, _t) * sqrt_h * z;
+            }
+            finals.push(x);
+        }
+
+        let mean = finals.iter().sum::<f64>() / n_paths as f64;
+        let variance = finals.iter().map(|&v| (v - mean).powi(2)).sum::<f64>() / n_paths as f64;
+        SDEResult {
+            mean_final: mean,
+            variance_final: variance,
+            t_values: vec![0.0, t_end],
+            y_values: vec![x0, mean],
+            n_paths,
+        }
+    }
+
+    /// Geometric Brownian Motion: dS = μS dt + σS dW.
+    /// Used in Black-Scholes model.  Analytical solution:
+    ///   S(t) = S₀ * exp((μ - σ²/2)*t + σ*W(t))
+    pub fn geometric_brownian_motion(
+        mu: f64,
+        sigma: f64,
+        s0: f64,
+        t_end: f64,
+        n_steps: usize,
+        seed: u64,
+    ) -> SDEResult {
+        let h = t_end / n_steps as f64;
+        let sqrt_h = h.sqrt();
+        let mut t_values = Vec::with_capacity(n_steps + 1);
+        let mut y_values = Vec::with_capacity(n_steps + 1);
+        let mut s = s0;
+        let mut rng = seed;
+        t_values.push(0.0);
+        y_values.push(s);
+
+        for step in 0..n_steps {
+            let z = Self::normal_sample(&mut rng);
+            // Euler-Maruyama for GBM: dS = μS dt + σS dW
+            s += mu * s * h + sigma * s * sqrt_h * z;
+            s = s.max(1e-300); // keep positive
+            t_values.push((step + 1) as f64 * h);
+            y_values.push(s);
+        }
+
+        SDEResult {
+            mean_final: s,
+            variance_final: 0.0,
+            t_values,
+            y_values,
+            n_paths: 1,
+        }
+    }
+
+    /// Box-Muller transform: generates N(0,1) sample from LCG uniform samples.
+    fn normal_sample(rng: &mut u64) -> f64 {
+        let u1 = Self::lcg_next(rng);
+        let u2 = Self::lcg_next(rng);
+        // Box-Muller: Z = sqrt(-2 ln U1) * cos(2π U2)
+        let r = (-2.0 * u1.ln()).sqrt();
+        r * (2.0 * std::f64::consts::PI * u2).cos()
+    }
+
+    /// Linear congruential generator → uniform (0,1).
+    fn lcg_next(state: &mut u64) -> f64 {
+        *state = state
+            .wrapping_mul(6_364_136_223_846_793_005)
+            .wrapping_add(1_442_695_040_888_963_407);
+        // Map to (0,1) avoiding exact 0
+        let bits = (*state >> 11) as f64;
+        (bits + 0.5) / (1u64 << 53) as f64
+    }
+}
+
 // ─── Tests ────────────────────────────────────────────────────────────────────
 
 #[cfg(test)]
@@ -910,5 +1334,104 @@ mod tests {
         let sys = ODESystem { f: decay, dim: 1 };
         let result = DifferentialEquationsEngine::solve_ivp(&sys, 0.0, 1.0, &[1.0], 500);
         assert!(result.phi > 0.0, "Phi must be positive for a valid solve");
+    }
+
+    // ── RK45 tests ────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_rk45_exponential_convergence() {
+        // dy/dt = y, y(0) = 1 → y(1) = e ≈ 2.71828
+        fn exp_rhs(_t: f64, y: &[f64]) -> Vec<f64> {
+            vec![y[0]]
+        }
+        let sys = ODESystem { f: exp_rhs, dim: 1 };
+        let result = DifferentialEquationsEngine::solve_rk45(&sys, 0.0, 1.0, &[1.0], 1e-8);
+        assert!(result.converged, "RK45 should converge");
+        let err = (result.y_final[0] - std::f64::consts::E).abs();
+        assert!(err < 1e-7, "RK45 exponential error should be < 1e-7, got {}", err);
+    }
+
+    #[test]
+    fn test_rk45_adaptive_fewer_steps_than_rk4() {
+        // On smooth problem RK45 should use fewer evaluations than fixed RK4 at same accuracy
+        fn harm(_t: f64, y: &[f64]) -> Vec<f64> {
+            vec![y[1], -y[0]]
+        }
+        let sys = ODESystem { f: harm, dim: 2 };
+        let rk45 = DifferentialEquationsEngine::solve_rk45(&sys, 0.0, 10.0, &[1.0, 0.0], 1e-6);
+        assert!(rk45.converged, "RK45 harmonic oscillator should converge");
+        assert!(rk45.steps_taken < 5000, "RK45 should adapt step size efficiently");
+    }
+
+    #[test]
+    fn test_rk45_rejected_steps_finite() {
+        fn stiff(_t: f64, y: &[f64]) -> Vec<f64> {
+            vec![-50.0 * y[0]]
+        }
+        let sys = ODESystem { f: stiff, dim: 1 };
+        let result = DifferentialEquationsEngine::solve_rk45(&sys, 0.0, 1.0, &[1.0], 1e-6);
+        // May or may not converge on stiff problem but should not panic
+        assert!(result.rejected_steps < 100_000, "Should not loop infinitely");
+    }
+
+    #[test]
+    fn test_implicit_euler_decay() {
+        // dy/dt = -y → y(t) = exp(-t)
+        fn decay(_t: f64, y: &[f64]) -> Vec<f64> {
+            vec![-y[0]]
+        }
+        let sys = ODESystem { f: decay, dim: 1 };
+        let result = DifferentialEquationsEngine::solve_implicit_euler(&sys, 0.0, 1.0, &[1.0], 1000, 5);
+        let final_y = result.final_state()[0];
+        let expected = (-1.0f64).exp();
+        assert!(
+            (final_y - expected).abs() < 0.01,
+            "Implicit Euler decay: got {:.6}, expected {:.6}",
+            final_y, expected
+        );
+    }
+
+    // ── SDE tests ─────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_em_brownian_motion_zero_drift() {
+        // dX = 0*dt + 1*dW → X(t) has E[X(t)] = 0
+        fn zero_drift(_x: f64, _t: f64) -> f64 { 0.0 }
+        fn unit_diffusion(_x: f64, _t: f64) -> f64 { 1.0 }
+        let result = SDEEngine::ensemble(zero_drift, unit_diffusion, 0.0, 0.0, 1.0, 1000, 500, 42);
+        assert!(result.mean_final.abs() < 0.15, "BM mean should be near 0, got {}", result.mean_final);
+    }
+
+    #[test]
+    fn test_em_exponential_growth() {
+        // dX = X dt + 0 dW → X(t) = X₀ * e^t (no noise)
+        fn growth(x: f64, _t: f64) -> f64 { x }
+        fn no_noise(_x: f64, _t: f64) -> f64 { 0.0 }
+        let result = SDEEngine::euler_maruyama(growth, no_noise, 1.0, 0.0, 1.0, 10000, 123);
+        let expected = std::f64::consts::E;
+        assert!(
+            (result.y_final.last().unwrap_or(&0.0) - expected).abs() < 0.01,
+            "EM with no noise should match ODE solution"
+        );
+    }
+
+    #[test]
+    fn test_ou_process_mean_reversion() {
+        // OU process with θ=2, μ=5: should converge toward μ=5 from x0=0
+        let result = SDEEngine::ornstein_uhlenbeck(2.0, 5.0, 0.5, 0.0, 5.0, 5000, 1000, 99);
+        assert!(
+            result.mean_final > 3.0 && result.mean_final < 7.0,
+            "OU process mean at t=5 should be near μ=5, got {}",
+            result.mean_final
+        );
+    }
+
+    #[test]
+    fn test_gbm_positive() {
+        let result = SDEEngine::geometric_brownian_motion(0.05, 0.2, 100.0, 1.0, 252, 77);
+        assert!(
+            result.y_values.iter().all(|&v| v > 0.0),
+            "GBM should stay positive"
+        );
     }
 }

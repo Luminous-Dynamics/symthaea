@@ -156,6 +156,17 @@ pub struct AffectState {
     /// Consensus: trust and reciprocity in collective governance [0, 1].
     /// High when governance is stable and agent participates; low during crises.
     pub consent: f64,
+    /// Moral guilt: rises when revealed ethics diverge from stated values [0, 1].
+    /// "I believe in care but I acted selfishly under pressure."
+    /// Suppresses further consequentialist drift (guilt restrains hypocrisy).
+    /// Ref: Tangney & Dearing (2002) — guilt as moral self-regulation.
+    #[serde(default)]
+    pub guilt: f64,
+    /// Moral outrage: rises when witnessing violations of one's sacred value [0, 1].
+    /// Amplifies commitment to sacred dimension + increases deontological resolve.
+    /// Ref: Haidt (2003) — outrage as moral enforcement emotion.
+    #[serde(default)]
+    pub outrage: f64,
 }
 
 impl AffectState {
@@ -222,7 +233,7 @@ impl AffectState {
             + care_activation * 0.2;
         let consent = consent_raw.clamp(0.0, 1.0);
 
-        Self { joy, sadness, desire, care, harm, consent }
+        Self { joy, sadness, desire, care, harm, consent, guilt: 0.0, outrage: 0.0 }
     }
 
     /// Blend new computed state with previous state (emotional momentum).
@@ -243,6 +254,8 @@ impl AffectState {
             } else {
                 previous.consent * (1.0 - alpha * 0.5) + self.consent * (alpha * 0.5)
             },
+            guilt: previous.guilt * (1.0 - alpha * 0.5) + self.guilt * (alpha * 0.5),
+            outrage: previous.outrage * (1.0 - alpha * 0.5) + self.outrage * (alpha * 0.5),
         }
     }
 
@@ -621,6 +634,8 @@ mod tests {
             fleet: crate::robotics::RoboticFleet::default(),
             diplomatic_relations: std::collections::HashMap::new(),
             zones: Vec::new(),
+            moral_memories: Vec::new(),
+            institutional_ethics: crate::agent::EthicalOrientation::default(),
         }
     }
 

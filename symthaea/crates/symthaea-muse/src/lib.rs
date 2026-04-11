@@ -325,6 +325,8 @@ pub struct Note {
 
 // ─── Top-Level API ───────────────────────────────────────────────────────────
 
+pub use arc::compose_with_arc;
+
 /// Generate a musical composition from a cognitive state.
 ///
 /// Pipeline: plan song form → generate per-section melodies (with key shifts
@@ -604,6 +606,8 @@ mod tests {
 }
 
 pub mod arc;
+pub mod creative_bench;
+pub mod narrative_bridge;
 pub mod ablation;
 pub mod aesthetic_listener;
 pub mod ambient_drone;

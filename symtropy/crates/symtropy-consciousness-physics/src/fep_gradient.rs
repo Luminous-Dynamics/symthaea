@@ -18,7 +18,7 @@
 //! on the variational free energy landscape.
 
 use nalgebra::SVector;
-use crate::harmony_field::HarmonyField;
+use crate::harmony_field::{HarmonyField, NUM_HARMONIES};
 
 /// Compute the preferred movement direction for an agent to minimize free energy.
 ///
@@ -35,8 +35,8 @@ use crate::harmony_field::HarmonyField;
 pub fn free_energy_gradient<const D: usize>(
     position: &SVector<f64, D>,
     energy_fraction: f64,
-    harmony: &[f64; 8],
-    nearby_agents: &[(SVector<f64, D>, [f64; 8])],
+    harmony: &[f64; NUM_HARMONIES],
+    nearby_agents: &[(SVector<f64, D>, [f64; NUM_HARMONIES])],
     energy_wells: &[(SVector<f64, D>, f64)],
     danger_source: Option<&SVector<f64, D>>,
     danger_level: f64,
@@ -56,8 +56,8 @@ pub fn free_energy_gradient_phi<const D: usize>(
     position: &SVector<f64, D>,
     energy_fraction: f64,
     phi: Option<f64>,
-    harmony: &[f64; 8],
-    nearby_agents: &[(SVector<f64, D>, [f64; 8])],
+    harmony: &[f64; NUM_HARMONIES],
+    nearby_agents: &[(SVector<f64, D>, [f64; NUM_HARMONIES])],
     energy_wells: &[(SVector<f64, D>, f64)],
     danger_source: Option<&SVector<f64, D>>,
     danger_level: f64,
@@ -252,8 +252,8 @@ pub fn free_energy_gradient_learned<const D: usize>(
     position: &SVector<f64, D>,
     energy_fraction: f64,
     phi: Option<f64>,
-    harmony: &[f64; 8],
-    nearby_agents: &[(SVector<f64, D>, [f64; 8])],
+    harmony: &[f64; NUM_HARMONIES],
+    nearby_agents: &[(SVector<f64, D>, [f64; NUM_HARMONIES])],
     energy_wells: &[(SVector<f64, D>, f64)],
     danger_source: Option<&SVector<f64, D>>,
     danger_level: f64,
@@ -398,7 +398,7 @@ mod tests {
     #[test]
     fn low_energy_seeks_wells() {
         let pos = SVector::from([0.0, 0.0]);
-        let harmony = [0.5; 8];
+        let harmony = [0.5; NUM_HARMONIES];
         let wells = vec![
             (SVector::from([50.0, 0.0]), 1.0), // well to the right
         ];
@@ -414,7 +414,7 @@ mod tests {
     #[test]
     fn full_energy_ignores_wells() {
         let pos = SVector::from([0.0, 0.0]);
-        let harmony = [0.5; 8];
+        let harmony = [0.5; NUM_HARMONIES];
         let wells = vec![
             (SVector::from([50.0, 0.0]), 1.0),
         ];
@@ -430,7 +430,7 @@ mod tests {
     #[test]
     fn flees_from_danger() {
         let pos = SVector::from([0.0, 0.0]);
-        let harmony = [0.5; 8];
+        let harmony = [0.5; NUM_HARMONIES];
         let danger = SVector::from([50.0, 0.0]); // danger to the right
 
         let dir = free_energy_gradient(
@@ -444,8 +444,8 @@ mod tests {
     #[test]
     fn seeks_resonant_partner_when_low_energy() {
         let pos = SVector::from([0.0, 0.0]);
-        let harmony = [0.8, 0.2, 0.1, 0.1, 0.1, 0.1, 0.1, 0.8];
-        let partner_harmony = [0.8, 0.2, 0.1, 0.1, 0.1, 0.1, 0.1, 0.8]; // same = high resonance
+        let harmony = [0.8, 0.2, 0.1, 0.1, 0.1, 0.1, 0.1, 0.8, 0.0];
+        let partner_harmony = [0.8, 0.2, 0.1, 0.1, 0.1, 0.1, 0.1, 0.8, 0.0]; // same = high resonance
         let agents = vec![
             (SVector::from([30.0, 0.0]), partner_harmony),
         ];
@@ -460,8 +460,8 @@ mod tests {
     #[test]
     fn does_not_seek_dissonant_agent() {
         let pos = SVector::from([0.0, 0.0]);
-        let harmony = [0.9, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
-        let other_harmony = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.9]; // orthogonal
+        let harmony = [0.9, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
+        let other_harmony = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.9, 0.0]; // orthogonal
         let agents = vec![
             (SVector::from([30.0, 0.0]), other_harmony),
         ];
@@ -491,7 +491,7 @@ mod tests {
     #[test]
     fn gradient_is_unit_or_zero() {
         let pos = SVector::from([0.0, 0.0]);
-        let harmony = [0.5; 8];
+        let harmony = [0.5; NUM_HARMONIES];
         let wells = vec![(SVector::from([50.0, 30.0]), 1.0)];
 
         let dir = free_energy_gradient(

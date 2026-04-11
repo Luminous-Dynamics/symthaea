@@ -8,7 +8,7 @@
 //! must arrive at the same place at the same time.
 
 use nalgebra::SVector;
-use crate::harmony_field::HarmonyField;
+use crate::harmony_field::{HarmonyField, NUM_HARMONIES};
 
 /// A prey entity that requires complementary agents to capture.
 #[derive(Debug, Clone)]
@@ -67,7 +67,7 @@ impl<const D: usize> Prey<D> {
 ///
 /// Returns the indices of the successful pair, or None.
 pub fn check_complementary_hunt(
-    agents_at_prey: &[(usize, [f64; 8])], // (agent_index, harmony_profile)
+    agents_at_prey: &[(usize, [f64; NUM_HARMONIES])], // (agent_index, harmony_profile)
     driver_channel: usize,
     ambusher_channel: usize,
     capability_threshold: f64,
@@ -117,17 +117,17 @@ mod tests {
     #[test]
     fn complementary_hunt_requires_both_types() {
         // Only drivers present — should fail
-        let agents = vec![(0, [0.9, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1])];
+        let agents = vec![(0, [0.9, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.0])];
         assert!(check_complementary_hunt(&agents, 0, 2, 0.6, 0.3).is_none());
 
         // Only ambushers present — should fail
-        let agents = vec![(0, [0.1, 0.1, 0.9, 0.1, 0.1, 0.1, 0.1, 0.1])];
+        let agents = vec![(0, [0.1, 0.1, 0.9, 0.1, 0.1, 0.1, 0.1, 0.1, 0.0])];
         assert!(check_complementary_hunt(&agents, 0, 2, 0.6, 0.3).is_none());
 
         // Both types present with low resonance — should succeed
         let agents = vec![
-            (0, [0.9, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1]), // driver
-            (1, [0.1, 0.1, 0.9, 0.1, 0.1, 0.1, 0.1, 0.1]), // ambusher
+            (0, [0.9, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.0]), // driver
+            (1, [0.1, 0.1, 0.9, 0.1, 0.1, 0.1, 0.1, 0.1, 0.0]), // ambusher
         ];
         let result = check_complementary_hunt(&agents, 0, 2, 0.6, 0.3);
         assert!(result.is_some());
@@ -140,8 +140,8 @@ mod tests {
     fn similar_agents_cannot_hunt() {
         // Two agents with similar profiles (high resonance) — should fail
         let agents = vec![
-            (0, [0.8, 0.3, 0.7, 0.2, 0.3, 0.2, 0.2, 0.6]),
-            (1, [0.7, 0.4, 0.8, 0.1, 0.4, 0.3, 0.3, 0.5]),
+            (0, [0.8, 0.3, 0.7, 0.2, 0.3, 0.2, 0.2, 0.6, 0.0]),
+            (1, [0.7, 0.4, 0.8, 0.1, 0.4, 0.3, 0.3, 0.5, 0.0]),
         ];
         // Both have high harmony[0] AND harmony[2], but resonance is high
         let result = check_complementary_hunt(&agents, 0, 2, 0.6, 0.3);

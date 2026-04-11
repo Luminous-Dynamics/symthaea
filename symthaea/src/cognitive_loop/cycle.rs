@@ -629,6 +629,37 @@ impl CognitiveLoopService {
         }
 
         // ═══════════════════════════════════════════════════════════════════
+        // PHASE 3.7: SCIENTIFIC METHOD
+        // observe → hypothesize → predict → test → update_beliefs
+        // Bayesian belief updates accumulate across cycles.
+        // Science: Popper (1959), Bayes (1763), Jaynes (2003)
+        // ═══════════════════════════════════════════════════════════════════
+        #[cfg(feature = "scientific_method")]
+        {
+            // Observation: prediction error encodes how surprising the current
+            // input is relative to the system's internal model.
+            let pe = dynamics.core.prediction_error as f64;
+            let phi = feedback.consciousness.consciousness_level;
+            self.scientific_method_engine.observe(
+                vec![pe, phi],
+                "prediction_error_and_consciousness",
+            );
+
+            // Predict what the standing hypothesis (id 0) expects.
+            let predicted = self.scientific_method_engine.predict(0);
+
+            // The "observed value" for coherence is 1 − prediction_error (clipped
+            // to [0, 1]): low PE means high coherence, confirming the hypothesis.
+            let observed_coherence = (1.0 - pe).clamp(0.0, 1.0);
+
+            // Test and update Bayesian posterior.
+            self.scientific_method_engine.test_hypothesis(0, observed_coherence, predicted);
+
+            // Batch-recompute lifecycle status for all hypotheses.
+            self.scientific_method_engine.update_beliefs();
+        }
+
+        // ═══════════════════════════════════════════════════════════════════
         // PHASE 4: OUTPUT
         // Metadata assembly, telemetry, CycleResult construction
         // ═══════════════════════════════════════════════════════════════════

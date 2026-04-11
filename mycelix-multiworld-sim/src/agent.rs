@@ -289,6 +289,31 @@ impl EthicalOrientation {
         names[max_idx]
     }
 
+    /// Sacred dimension: the agent's highest ethical commitment.
+    /// This dimension resists modification by 80% — it is non-negotiable.
+    /// Violating a sacred value triggers moral outrage (Tetlock 2003).
+    /// Returns (dimension_index, value).
+    pub fn sacred_dimension(&self) -> (usize, f64) {
+        let vals = [self.deontological, self.consequentialist, self.virtue_care, self.relational];
+        let (idx, &val) = vals.iter().enumerate()
+            .max_by(|a, b| a.1.partial_cmp(b.1).unwrap_or(std::cmp::Ordering::Equal))
+            .unwrap();
+        (idx, val)
+    }
+
+    /// Apply a modification to a specific dimension, respecting sacred resistance.
+    /// Sacred dimension resists 80% of the change. Others accept fully.
+    pub fn modify_with_sacred_resistance(&mut self, dim: usize, delta: f64) {
+        let (sacred_idx, _) = self.sacred_dimension();
+        let effective = if dim == sacred_idx { delta * 0.2 } else { delta };
+        match dim {
+            0 => self.deontological = (self.deontological + effective).clamp(0.05, 1.0),
+            1 => self.consequentialist = (self.consequentialist + effective).clamp(0.05, 1.0),
+            2 => self.virtue_care = (self.virtue_care + effective).clamp(0.05, 1.0),
+            _ => self.relational = (self.relational + effective).clamp(0.05, 1.0),
+        }
+    }
+
     /// Ethical affinity for a sector (0..7).
     /// Sectors: 0=engineering, 1=agriculture, 2=medicine, 3=governance,
     ///          4=science, 5=education, 6=art_culture, 7=logistics
@@ -313,15 +338,20 @@ impl EthicalOrientation {
         [self.deontological, self.consequentialist, self.virtue_care, self.relational]
     }
 
-    /// Inherit from two parents with Gaussian noise (intergenerational transmission).
-    /// Children's ethics are the midpoint of parents + noise, modeling both
-    /// cultural inheritance and individual variation (Harris 1998).
+    /// Inherit from two parents with noise and occasional rebellion.
+    ///
+    /// Base: midpoint of parents + Gaussian noise (Harris 1998).
+    /// Rebellion: with probability 15%, child INVERTS one dimension
+    /// (1.0 - midpoint), modeling Mannheim's generational theory.
+    /// Baby boomers rejected parents' deontological conformity;
+    /// their children reacted with relational communitarianism.
+    /// This creates oscillating ethical dynamics across generations.
     pub fn inherit(
         parent_a: &EthicalOrientation,
         parent_b: &EthicalOrientation,
         rng: &mut crate::stochastic::StochasticEngine,
     ) -> Self {
-        Self {
+        let mut child = Self {
             deontological: ((parent_a.deontological + parent_b.deontological) * 0.5
                 + rng.next_gaussian(0.0, 0.08)).clamp(0.05, 1.0),
             consequentialist: ((parent_a.consequentialist + parent_b.consequentialist) * 0.5
@@ -330,9 +360,44 @@ impl EthicalOrientation {
                 + rng.next_gaussian(0.0, 0.08)).clamp(0.05, 1.0),
             relational: ((parent_a.relational + parent_b.relational) * 0.5
                 + rng.next_gaussian(0.0, 0.08)).clamp(0.05, 1.0),
+        };
+        // Generational rebellion: 15% chance to invert ONE dimension.
+        // The child defines themselves in opposition to their parents'
+        // strongest ethical commitment — a universal pattern across cultures.
+        if rng.next_f64() < 0.15 {
+            let rebel_dim = (rng.next_u64() % 4) as usize;
+            let vals = [child.deontological, child.consequentialist, child.virtue_care, child.relational];
+            let inverted = (1.0 - vals[rebel_dim]).clamp(0.05, 1.0);
+            match rebel_dim {
+                0 => child.deontological = inverted,
+                1 => child.consequentialist = inverted,
+                2 => child.virtue_care = inverted,
+                _ => child.relational = inverted,
+            }
         }
+        child
     }
 
+
+    /// Revealed ethics: what the agent ACTUALLY does under stress.
+    /// Under low stress, revealed ≈ stated. Under high stress, all agents
+    /// drift toward consequentialism (survival calculus overrides principles).
+    /// Gap between stated and revealed = moral hypocrisy (Batson 2008).
+    ///
+    /// This should be used for actual decision points (mortality, fertility,
+    /// migration) instead of raw `self` when stress-sensitivity matters.
+    pub fn revealed(&self, allostatic_load: f64) -> Self {
+        let stress = allostatic_load.clamp(0.0, 1.0);
+        // Below 0.3 stress: revealed = stated (principles hold)
+        // Above 0.6 stress: strong consequentialist drift (survival mode)
+        let drift = ((stress - 0.3) / 0.3).clamp(0.0, 1.0) * 0.3;
+        Self {
+            deontological: (self.deontological - drift * 0.2).max(0.05),
+            consequentialist: (self.consequentialist + drift).min(1.0),
+            virtue_care: (self.virtue_care - drift * 0.15).max(0.05),
+            relational: (self.relational - drift * 0.1).max(0.05),
+        }
+    }
 
     /// Compute mean ethical orientation across a population of agents.
     pub fn mean_of(agents: &[CivAgent]) -> Self {

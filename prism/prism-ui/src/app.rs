@@ -80,8 +80,8 @@ pub fn App() -> impl IntoView {
         // The 23MB download + merge blocks the main thread and causes UI lag.
         // Defer to idle callback so the search bar remains responsive.
         wasm_bindgen_futures::spawn_local(async move {
-            // Small yield to let the UI settle before starting the big download
-            gloo_timers::future::TimeoutFuture::new(2_000).await;
+            // Brief yield to let the UI settle before starting the big download
+            gloo_timers::future::TimeoutFuture::new(500).await;
 
             if let Some(full) = fetch_index("/static/prism-index.bin").await {
                 engine_cell.update_value(|opt| {

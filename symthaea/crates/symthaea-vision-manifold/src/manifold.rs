@@ -46,6 +46,9 @@ pub struct VisionManifold {
     last_prediction: Option<ContinuousHV>,
     last_frame_hv: Option<ContinuousHV>,
     last_patch_hvs: Vec<ContinuousHV>,
+    /// Temporally-bound patch HVs: `ρ(prev_patch[i]) ⊗ curr_patch[i]`.
+    /// Populated only when `config.enable_temporal_binding` is true.
+    temporal_patch_hvs: Vec<ContinuousHV>,
     surprise: SurpriseMap,
     motion_field: MotionField,
     /// Per-patch motion magnitudes from the last frame.
@@ -111,6 +114,7 @@ impl VisionManifold {
             last_prediction: None,
             last_frame_hv: None,
             last_patch_hvs: Vec::new(),
+            temporal_patch_hvs: Vec::new(),
             surprise,
             motion_field,
             motion_saliency: Vec::new(),
@@ -178,15 +182,25 @@ impl VisionManifold {
         };
 
         // Optionally process through predictive coding hierarchy
-        let cross_scale_prediction_error = if let Some(ref mut predictive) = self.predictive {
-            let output = predictive.process_frame_with_feedback(pixels, width, height, channels);
-            output.prediction_error
-        } else {
-            0.0
-        };
+        let (cross_scale_prediction_error, cross_scale_patch_errors) =
+            if let Some(ref mut predictive) = self.predictive {
+                let output =
+                    predictive.process_frame_with_feedback(pixels, width, height, channels);
+                (output.prediction_error, output.patch_prediction_errors)
+            } else {
+                (0.0, vec![])
+            };
 
         let t1 = Instant::now();
         self.observe_encoded(&frame_hv, &patch_hvs, dt);
+
+        // P2-A: Inject cross-scale prediction errors into the surprise map.
+        // After observe_encoded() has accumulated temporal surprise, blend in
+        // the spatial-scale inconsistency signal (coarse fails to predict fine).
+        if !cross_scale_patch_errors.is_empty() {
+            self.surprise
+                .inject_cross_scale_error(&cross_scale_patch_errors, 0.3);
+        }
         let evolve_us = t1.elapsed().as_micros() as u64;
 
         // Preserve training_triggered/training_loss set by observe_encoded
@@ -259,13 +273,39 @@ impl VisionManifold {
             self.refine_from_attention();
         }
 
+        // P2-C: Temporal patch binding — encode cross-frame identity via ρ(prev) ⊗ curr.
+        // Non-commutativity encodes temporal direction: seeing A then B ≠ seeing B then A.
+        let effective_frame_hv;
+        if self.config.enable_temporal_binding && !self.last_patch_hvs.is_empty() {
+            // ρ(prev[i]) ⊗ curr[i] — non-commutative temporal identity per patch
+            self.temporal_patch_hvs = self
+                .last_patch_hvs
+                .iter()
+                .zip(patch_hvs.iter())
+                .map(|(prev, curr)| prev.bind_temporal(curr))
+                .collect();
+
+            // Bundle temporal patches with equal weights, then blend with raw frame HV:
+            // 70% temporal identity + 30% raw appearance.
+            let n = self.temporal_patch_hvs.len();
+            let temporal_refs: Vec<&ContinuousHV> = self.temporal_patch_hvs.iter().collect();
+            let equal_weights = vec![1.0f32; n];
+            let temporal_bundle =
+                ContinuousHV::weighted_bundle(&temporal_refs, &equal_weights).normalize();
+            effective_frame_hv =
+                ContinuousHV::weighted_bundle(&[&temporal_bundle, frame_hv], &[0.7, 0.3]);
+        } else {
+            self.temporal_patch_hvs = patch_hvs.to_vec();
+            effective_frame_hv = frame_hv.clone();
+        }
+
         // Evolve CfC state: state' = x_inf + (state - x_inf) * exp(-dt/τ)
-        let x_inf = self.equilibrium(frame_hv);
+        let x_inf = self.equilibrium(&effective_frame_hv);
         let sigma = self.gating(dt);
         self.state.lerp_in_place(&x_inf, 1.0 - sigma, sigma);
 
-        // Compute coherence (state-frame alignment)
-        self.coherence = self.state.similarity(frame_hv).max(0.0);
+        // Compute coherence (state-effective-frame alignment)
+        self.coherence = self.state.similarity(&effective_frame_hv).max(0.0);
 
         // Predict next frame (one dt ahead) for next cycle's error computation
         self.last_prediction = Some(self.predict_horizon(frame_hv, dt));
@@ -429,6 +469,15 @@ impl VisionManifold {
     /// Empty before the first frame is observed.
     pub fn last_patch_hvs(&self) -> &[ContinuousHV] {
         &self.last_patch_hvs
+    }
+
+    /// Temporally-bound patch HVs: `ρ(prev_patch[i]) ⊗ curr_patch[i]`.
+    ///
+    /// Only meaningful when `VisionConfig::enable_temporal_binding` is true.
+    /// When disabled, returns the same vectors as `last_patch_hvs()`.
+    /// Empty before the first frame.
+    pub fn temporal_patch_hvs(&self) -> &[ContinuousHV] {
+        &self.temporal_patch_hvs
     }
 
     /// Per-patch motion magnitudes from the last frame.
@@ -709,6 +758,7 @@ impl VisionManifold {
         self.last_prediction = None;
         self.last_frame_hv = None;
         self.last_patch_hvs.clear();
+        self.temporal_patch_hvs.clear();
         self.surprise.reset();
         self.motion_saliency.clear();
         self.last_motion_vectors.clear();

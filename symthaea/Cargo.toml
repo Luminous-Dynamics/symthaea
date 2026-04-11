@@ -398,7 +398,7 @@ prism-common = { path = "../prism/prism-common", optional = true }
 prism-search = { path = "../prism/prism-search", optional = true }
 
 # Web Research & Epistemic Verification (Track 6)
-reqwest = { version = "0.13", features = ["json", "rustls"], default-features = false }
+reqwest = { version = "0.13", features = ["json", "multipart", "rustls"], default-features = false }
 scraper = "0.25"
 # html2text removed: scraper is used for HTML parsing, html2text never imported
 
@@ -872,6 +872,11 @@ required-features = ["demo"]
 name = "symthaea-demo"
 path = "src/bin/symthaea-demo.rs"
 required-features = ["api_module"]
+
+[[bin]]
+name = "symthaea-watch"
+path = "src/bin/symthaea-watch.rs"
+required-features = ["api_module", "service"]
 
 [[bin]]
 name = "symthaea-multi-embodiment-demo"

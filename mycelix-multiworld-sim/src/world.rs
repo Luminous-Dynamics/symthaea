@@ -14,6 +14,30 @@ use crate::stochastic::StochasticEngine;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
+/// A collective moral memory: records the ethical state during a crisis.
+/// Future ethical drift away from this memory's orientation is resisted.
+/// Models "never again" dynamics and cultural antibodies.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MoralMemory {
+    /// Tick when the crisis occurred.
+    pub tick: u32,
+    /// Mean ethical orientation at the time of the crisis.
+    pub ethics_at_crisis: [f64; 4],
+    /// Which dimension was most stressed (the "lesson learned").
+    pub lesson_dimension: usize,
+    /// Description for narrative purposes.
+    pub description: String,
+}
+
+impl MoralMemory {
+    /// How strongly this memory resists drift, based on age.
+    /// Fresh memories are strong (1.0); decays to 0 over 600 ticks (50 years).
+    pub fn strength(&self, current_tick: u32) -> f64 {
+        let age = current_tick.saturating_sub(self.tick) as f64;
+        (1.0 - age / 600.0).max(0.0)
+    }
+}
+
 // ============================================================================
 // NASA BVAD Calibration Reference (Baseline Values and Assumptions Doc, 2018)
 // ============================================================================
@@ -546,6 +570,19 @@ pub struct World {
     #[serde(default)]
     pub governance: WorldGovernance,
 
+    /// Collective moral memories: "never again" antibodies from past crises.
+    /// Each memory records the ethical state during a moral crisis.
+    /// Future drift AWAY from a memory's orientation is resisted.
+    /// Decays over 600 ticks (50 years). Max 10 memories.
+    #[serde(default)]
+    pub moral_memories: Vec<MoralMemory>,
+
+    /// Institutional ethics: the ethical orientation encoded in laws/customs/norms.
+    /// Persists beyond individual lifespans. Updated as slow EMA of governing agents.
+    /// New citizens are socialized toward institutional ethics at 0.0002/tick.
+    #[serde(default)]
+    pub institutional_ethics: crate::agent::EthicalOrientation,
+
     /// Metabolism cycle state (4-phase governance rhythm).
     #[serde(default)]
     pub metabolism_state: crate::metabolism::MetabolismState,
@@ -724,6 +761,8 @@ impl World {
             fleet: crate::robotics::RoboticFleet::default(),
             diplomatic_relations: HashMap::new(),
             zones: Vec::new(),
+            moral_memories: Vec::new(),
+            institutional_ethics: crate::agent::EthicalOrientation::default(),
         }
     }
 }
@@ -994,6 +1033,8 @@ mod tests {
             fleet: crate::robotics::RoboticFleet::default(),
             diplomatic_relations: HashMap::new(),
             zones: Vec::new(),
+            moral_memories: Vec::new(),
+            institutional_ethics: crate::agent::EthicalOrientation::default(),
         };
 
         for i in 0..n {

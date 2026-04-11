@@ -54,10 +54,11 @@ impl MaterialsDesignBenchmark {
 
         let steel = MaterialProperty::steel_a36();
         let aluminum = MaterialProperty::aluminum_6061();
-        let concrete = MaterialProperty::concrete_normal();
+        let concrete = MaterialProperty::concrete_c30();
 
         // ── 1. Young's modulus ordering ───────────────────────────────────
-        // Steel A36: 200 GPa, Aluminum 6061: 68.9 GPa, Concrete: ~30 GPa
+        // Steel A36: 200 GPa, Aluminum 6061: 69 GPa, Concrete C30: 30 GPa.
+        // Reflects the well-known engineering stiffness hierarchy.
         let youngs_modulus_ordering = if steel.youngs_modulus_gpa > aluminum.youngs_modulus_gpa
             && aluminum.youngs_modulus_gpa > concrete.youngs_modulus_gpa
         {
@@ -66,38 +67,37 @@ impl MaterialsDesignBenchmark {
             0.0
         };
 
-        // ── 2. HDC similarity: steel vs stainless > steel vs concrete ─────
-        let stainless = MaterialProperty::stainless_steel_316();
-        let steel_results = db.search_similar(&steel, 5);
-        // Find rank of stainless steel and concrete in results from steel query.
-        let stainless_rank = steel_results
+        // ── 2. HDC similarity: steel vs titanium > steel vs concrete ──────
+        // Both steel and titanium are Metals; concrete is a Ceramic.
+        // The HDC encoder captures this category distinction: metals should
+        // cluster together, away from ceramics.
+        let steel_results = db.search_similar(&steel, 6);
+        // Find rank of titanium (Metal) and concrete (Ceramic) in results.
+        let titanium_rank = steel_results
             .iter()
-            .position(|r| r.material.name.contains("Stainless"))
+            .position(|r| r.material.name.contains("Titanium"))
             .unwrap_or(usize::MAX);
         let concrete_rank = steel_results
             .iter()
             .position(|r| r.material.name.contains("Concrete"))
             .unwrap_or(usize::MAX);
-        // Stainless should appear closer (lower rank) than concrete.
-        let metal_similarity_correct = if stainless_rank < concrete_rank { 1.0 } else { 0.0 };
-
-        // Also verify raw similarity: steel should be most similar to stainless.
-        let _ = stainless; // consumed above
-        let metal_similarity_correct = if db.len() >= 2 {
-            metal_similarity_correct
+        // Titanium (same category: Metal) should rank closer than concrete (Ceramic).
+        let metal_similarity_correct = if db.len() >= 4 && titanium_rank < concrete_rank {
+            1.0
         } else {
             0.0
         };
 
         // ── 3. Density ordering: steel > aluminum ─────────────────────────
+        // Steel A36: 7850 kg/m³, Aluminum 6061: 2700 kg/m³.
         let density_ordering =
             if steel.density_kg_m3 > aluminum.density_kg_m3 { 1.0 } else { 0.0 };
 
         // ── 4. Category filter: metal query never returns ceramics ─────────
         let metal_results = db.constrained_search(
             &steel,
-            5,
             |m| m.category == MaterialCategory::Metal,
+            10,
         );
         let category_filter_correct =
             if metal_results.iter().all(|r| r.material.category == MaterialCategory::Metal) {
@@ -232,8 +232,8 @@ mod tests {
         let query = MaterialProperty::steel_a36();
         let results = db.constrained_search(
             &query,
-            10,
             |m| m.category == MaterialCategory::Metal,
+            10,
         );
         for r in &results {
             assert_eq!(

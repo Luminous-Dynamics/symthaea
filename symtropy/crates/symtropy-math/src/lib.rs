@@ -25,6 +25,7 @@
 
 pub mod bivector;
 pub mod capsule;
+pub mod compound;
 pub mod convex_hull;
 pub mod halfspace;
 pub mod hyperbox;
@@ -37,6 +38,7 @@ pub mod transform;
 
 pub use bivector::Bivector;
 pub use capsule::Capsule;
+pub use compound::CompoundShape;
 pub use convex_hull::ConvexHull;
 pub use halfspace::HalfSpace;
 pub use hyperbox::HyperBox;

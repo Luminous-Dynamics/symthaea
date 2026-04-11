@@ -1,0 +1,22 @@
+[package]
+name = "mycelix_mail_integrity"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+# Empty workspace to prevent being included in parent workspace
+[workspace]
+
+[dependencies]
+# Holochain 0.6 - Integrity zomes use hdi
+hdi = "0.7.0"
+serde = { version = "1.0", features = ["derive"] }
+holochain_serialized_bytes = "0.0.56"
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+overflow-checks = true

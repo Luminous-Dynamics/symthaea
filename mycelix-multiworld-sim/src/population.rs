@@ -201,23 +201,20 @@ impl PopulationEngine {
                 // Trauma increases mortality: rate *= (1 + trauma * 0.3)
                 rate *= 1.0 + a.trauma_level * 0.3;
 
-                // Ethics-modulated mortality (context-dependent tradeoffs):
-                // Under HIGH stress: care/relational orientations protect (mutual aid,
-                // community resilience). Consequentialist orientation hurts (triage/burnout).
-                // Under LOW stress: consequentialist/deontological protect (efficient
-                // self-care, steady routines). Care orientation slightly costs (self-neglect).
-                // Ref: Holt-Lunstad (2010) social relationships reduce mortality 50%;
-                //      Becker (1960) rational health optimization.
+                // Ethics-modulated mortality using REVEALED ethics (moral hypocrisy):
+                // Under stress, agents drift consequentialist regardless of stated values.
+                // This means care-oriented agents lose some protection under extreme stress
+                // because their revealed behavior shifts toward survival calculus.
+                // Ref: Holt-Lunstad (2010), Becker (1960), Batson (2008) moral hypocrisy.
+                let revealed = a.ethics.revealed(a.needs.allostatic_load);
                 let ethics_mortality_mod = if a.needs.allostatic_load > 0.5 {
-                    // Crisis mode: care networks save lives
-                    1.0 - a.ethics.virtue_care * 0.07
-                        - a.ethics.relational * 0.06
-                        + a.ethics.consequentialist * 0.03
+                    1.0 - revealed.virtue_care * 0.07
+                        - revealed.relational * 0.06
+                        + revealed.consequentialist * 0.03
                 } else {
-                    // Normal mode: efficiency and routines optimize health
-                    1.0 - a.ethics.consequentialist * 0.05
-                        - a.ethics.deontological * 0.04
-                        + a.ethics.virtue_care * 0.01
+                    1.0 - revealed.consequentialist * 0.05
+                        - revealed.deontological * 0.04
+                        + revealed.virtue_care * 0.01
                 };
                 rate *= ethics_mortality_mod.clamp(0.7, 1.3);
 
@@ -738,6 +735,8 @@ mod tests {
             fleet: crate::robotics::RoboticFleet::default(),
             diplomatic_relations: std::collections::HashMap::new(),
             zones: Vec::new(),
+            moral_memories: Vec::new(),
+            institutional_ethics: crate::agent::EthicalOrientation::default(),
         };
 
         let mut rng = StochasticEngine::new(42);

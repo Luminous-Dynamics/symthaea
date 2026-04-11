@@ -13,15 +13,32 @@ readme = "README.md"
 all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
 
+# cdylib needed by wasm-bindgen to produce a .wasm module for browsers.
+# rlib retains the normal Rust library interface for native builds and tests.
+[lib]
+crate-type = ["cdylib", "rlib"]
+
 [dependencies]
 symtropy-math = { version = "0.1.0", path = "../symtropy-math" }
 symtropy-physics = { version = "0.1.0", path = "../symtropy-physics" }
 symthaea-consciousness-equation = { version = "0.1.0", path = "../../../symthaea/crates/symthaea-consciousness-equation" }
 nalgebra = "0.34"
 
+# WASM / browser demo — activated by the `wasm` feature
+wasm-bindgen = { version = "0.2", optional = true }
+serde = { version = "1.0", features = ["derive"], optional = true }
+serde_json = { version = "1.0", optional = true }
+console_error_panic_hook = { version = "0.1", optional = true }
+
 [features]
 default = []
 consciousness-curvature = []
+consciousness-hdc = []
+# Enables wasm-bindgen exports for the browser research demo.
+# Build: cargo build -p symtropy-consciousness-physics --target wasm32-unknown-unknown --features wasm
+# Then: ~/.cargo/bin/wasm-bindgen target/wasm32-unknown-unknown/release/symtropy_consciousness_physics.wasm \
+#         --out-dir www/pkg --target web --no-typescript
+wasm = ["dep:wasm-bindgen", "dep:serde", "dep:serde_json", "dep:console_error_panic_hook"]
 
 [dev-dependencies]
 proptest = "1.4"

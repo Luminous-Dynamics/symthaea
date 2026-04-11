@@ -740,6 +740,11 @@ pub struct CognitiveLoopService {
     #[cfg(feature = "muse")]
     pub(crate) muse_manager: managers::MuseManager,
 
+    /// Music Publisher: Background uploader — drains CompositionExports from
+    /// muse_manager and POSTs WAV files to the Mycelix-Music HTTP API.
+    #[cfg(feature = "muse")]
+    pub(crate) music_publisher: managers::MusicPublisher,
+
     /// Holon Receiver: Desktop-side bridge accepting Soma WebSocket connections.
     /// Processes inbound SomaMessages (heartbeats, CVs, tasks, knowledge) and
     /// routes them to SwarmManager (peers), ReasoningManager (tasks), KnowledgeManager (offers).
@@ -941,6 +946,13 @@ pub struct CognitiveLoopService {
 
     /// Aggregate security telemetry for the crypto/swarm stack.
     pub(crate) security_telemetry: crate::swarm::SecurityTelemetry,
+
+    /// Scientific-method engine: observe → hypothesize → predict → test → update_beliefs.
+    /// Accumulates Bayesian belief updates across cycles. Feature-gated behind
+    /// `scientific_method`. The engine is seeded with a standing "input is coherent"
+    /// hypothesis (id 0) whose posterior drifts with prediction error.
+    #[cfg(feature = "scientific_method")]
+    pub(crate) scientific_method_engine: crate::scientific_method::ScientificMethodEngine,
     // embodiment_bridge, last_proprioceptive_hv, embodiment_telemetry moved to sensorimotor_execution
 }
 

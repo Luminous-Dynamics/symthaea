@@ -122,6 +122,7 @@ impl PredictiveCodingHierarchy {
             coarse_hv,
             prediction_error: self.prediction_error,
             error_ema: self.error_ema,
+            patch_prediction_errors: vec![],
         }
     }
 
@@ -252,6 +253,7 @@ impl PredictiveCodingHierarchy {
             coarse_hv,
             prediction_error: self.prediction_error,
             error_ema: self.error_ema,
+            patch_prediction_errors: attention,
         }
     }
 
@@ -259,7 +261,8 @@ impl PredictiveCodingHierarchy {
     ///
     /// Fine patches that are poorly predicted by their corresponding coarse
     /// patch receive high attention (1 - cosine_similarity).
-    fn compute_patch_attention(all_patches: &[Vec<ContinuousHV>]) -> Vec<f32> {
+    /// Now public so callers can inject the result into a `SurpriseMap`.
+    pub fn compute_patch_attention(all_patches: &[Vec<ContinuousHV>]) -> Vec<f32> {
         if all_patches.len() < 2 {
             return vec![];
         }
@@ -303,6 +306,13 @@ pub struct PredictiveOutput {
     pub prediction_error: f32,
     /// Exponential moving average of prediction error.
     pub error_ema: f32,
+    /// Per-patch cross-scale prediction error (1 - cos_sim(fine_patch, predicted_from_coarse)).
+    ///
+    /// Length = number of fine-scale patches. Each entry is in [0.0, ~1.5].
+    /// High values indicate regions where the coarse encoding fails to capture
+    /// the fine-grained structure — these are true free-energy hotspots.
+    /// Empty until the second frame (no prediction on first frame).
+    pub patch_prediction_errors: Vec<f32>,
 }
 
 #[cfg(test)]

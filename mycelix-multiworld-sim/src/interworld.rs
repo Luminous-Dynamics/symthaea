@@ -648,6 +648,8 @@ impl InterWorldEngine {
             fleet: crate::robotics::RoboticFleet::default(),
             diplomatic_relations: std::collections::HashMap::new(),
             zones: Vec::new(),
+            moral_memories: Vec::new(),
+            institutional_ethics: crate::agent::EthicalOrientation::default(),
         };
 
         // Establish trade route with parent (assume Moon-Earth-class delay).
@@ -804,6 +806,8 @@ mod tests {
             fleet: crate::robotics::RoboticFleet::default(),
             diplomatic_relations: std::collections::HashMap::new(),
             zones: Vec::new(),
+            moral_memories: Vec::new(),
+            institutional_ethics: crate::agent::EthicalOrientation::default(),
         };
         for i in 0..n {
             let birth_tick = 0; // born at tick 0, so at TEST_TICK they are 30 years old

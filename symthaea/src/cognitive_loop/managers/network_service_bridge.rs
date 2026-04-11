@@ -711,7 +711,9 @@ mod tests {
                 PeerEstimate3D {
                     peer_id: "p3".into(),
                     estimate: GaussianEstimate3D::from_diagonal_sigma([1.0, 0.0, 0.0], 5.0),
-                    confidence: Some(0.8),
+                    confidence: 0.8,
+                    trust_weight: 1.0,
+                    timestamp_us: 0,
                 },
             ))
             .unwrap();

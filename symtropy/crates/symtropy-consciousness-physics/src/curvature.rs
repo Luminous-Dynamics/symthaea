@@ -131,6 +131,57 @@ impl<const D: usize> ConformalMetric<D> {
         let d = D as f64;
         -2.0 * (d - 1.0) * (sigma_laplacian + (d - 1.0) * sigma_gradient.norm_squared())
     }
+
+    /// Integrate geodesic velocity correction using 4th-order Runge-Kutta.
+    ///
+    /// Solves the geodesic ODE for the velocity correction over timestep `dt`:
+    ///
+    /// ```text
+    /// dv/dt = a(v) = -2(v · ∇σ)v + |v|² ∇σ
+    /// ```
+    ///
+    /// The gradient `sigma_gradient` is held constant over the step (valid for
+    /// small dt where the harmony field changes slowly relative to the physics
+    /// tick). This gives O(dt⁴) local truncation error vs O(dt²) for Euler,
+    /// making fast-moving bodies in steep harmony gradients numerically stable.
+    ///
+    /// The integrated correction `Δv = v_new − v` is clamped to
+    /// `MAX_GEODESIC_ACCEL × dt` to prevent runaway under very large gradients.
+    ///
+    /// # Returns
+    /// Updated velocity after one RK4 geodesic step.
+    pub fn geodesic_rk4_step(
+        &self,
+        velocity: &SVector<f64, D>,
+        sigma_gradient: &SVector<f64, D>,
+        dt: f64,
+    ) -> SVector<f64, D> {
+        // Geodesic acceleration: a(v) = |v|²∇σ - 2(v·∇σ)v
+        // (same formula as geodesic_correction but without clamping — we clamp the final delta)
+        let accel = |v: &SVector<f64, D>| -> SVector<f64, D> {
+            let v_dot_grad = v.dot(sigma_gradient);
+            sigma_gradient * v.norm_squared() - v * (2.0 * v_dot_grad)
+        };
+
+        // Classical RK4 for dv/dt = accel(v), treating ∇σ as constant over dt.
+        let k1 = accel(velocity);
+        let k2 = accel(&(velocity + k1 * (dt * 0.5)));
+        let k3 = accel(&(velocity + k2 * (dt * 0.5)));
+        let k4 = accel(&(velocity + k3 * dt));
+
+        let delta_v = (k1 + k2 * 2.0 + k3 * 2.0 + k4) * (dt / 6.0);
+
+        // Clamp |Δv| ≤ MAX_GEODESIC_ACCEL × dt to match the Euler safety guarantee.
+        let max_delta = MAX_GEODESIC_ACCEL * dt.abs();
+        let delta_mag = delta_v.norm();
+        let clamped_delta = if delta_mag > max_delta && delta_mag > 1e-30 {
+            delta_v * (max_delta / delta_mag)
+        } else {
+            delta_v
+        };
+
+        velocity + clamped_delta
+    }
 }
 
 impl<const D: usize> Default for ConformalMetric<D> {
@@ -230,5 +281,115 @@ mod tests {
         let correction = metric.geodesic_correction(&v, &grad);
         // |v|² = 9, v·∇σ = 0 → a = 9 * (0,1,0,0) = (0,9,0,0)
         assert!((correction[1] - 9.0).abs() < 1e-10);
+    }
+
+    // ── geodesic_rk4_step ─────────────────────────────────────────────────────
+
+    #[test]
+    fn rk4_zero_gradient_returns_unchanged_velocity() {
+        let metric = ConformalMetric::<2>::new();
+        let v = SVector::from([10.0, 5.0]);
+        let zero_grad = SVector::from([0.0, 0.0]);
+        let v_new = metric.geodesic_rk4_step(&v, &zero_grad, 0.016);
+        assert!((v_new - v).norm() < 1e-12, "zero gradient = no velocity change");
+    }
+
+    #[test]
+    fn rk4_zero_velocity_returns_unchanged_velocity() {
+        let metric = ConformalMetric::<2>::new();
+        let v = SVector::from([0.0, 0.0]);
+        let grad = SVector::from([1.0, 0.5]);
+        let v_new = metric.geodesic_rk4_step(&v, &grad, 0.016);
+        // a(v=0) = |0|²∇σ - 2*(0·∇σ)*0 = 0 → no change
+        assert!((v_new - v).norm() < 1e-12, "zero velocity = no geodesic change");
+    }
+
+    #[test]
+    fn rk4_converges_to_euler_at_small_dt() {
+        // Use a weak gradient so the raw correction stays well below MAX_GEODESIC_ACCEL
+        // and the clamp never fires — both methods should then agree to O(dt²).
+        // v = [3, 0], grad = [0, 0.5] → raw accel = 9 * [0, 0.5] = [0, 4.5] < 50.
+        let metric = ConformalMetric::<2>::new();
+        let v = SVector::from([3.0, 0.0]);
+        let grad = SVector::from([0.0, 0.5]);
+
+        let dt = 0.001; // small enough that O(dt²) ≈ 1e-6
+
+        let euler = v + metric.geodesic_correction(&v, &grad) * dt;
+        let rk4 = metric.geodesic_rk4_step(&v, &grad, dt);
+        let diff = (euler - rk4).norm();
+        assert!(
+            diff < 1e-4,
+            "small dt without clamping: euler and rk4 should agree to O(dt²), diff={diff}"
+        );
+    }
+
+    #[test]
+    fn rk4_correction_is_bounded_for_large_dt() {
+        // For a typical physics tick (dt=0.016), the integrated correction must stay
+        // within MAX_GEODESIC_ACCEL * dt regardless of gradient steepness.
+        let metric = ConformalMetric::<2>::new();
+        let v = SVector::from([10.0, 0.0]);
+        let grad = SVector::from([0.0, 1.0]);
+        let dt_large = 0.016;
+
+        let rk4_large = metric.geodesic_rk4_step(&v, &grad, dt_large);
+        let delta = (rk4_large - v).norm();
+        assert!(delta > 1e-6, "rk4 should produce a nonzero correction for nonzero v and grad");
+        assert!(delta <= MAX_GEODESIC_ACCEL * dt_large + 1e-10, "rk4 delta should be clamped");
+    }
+
+    #[test]
+    fn rk4_clamps_large_correction() {
+        let metric = ConformalMetric::<2>::new();
+        // Extremely fast body in a very steep gradient.
+        let v = SVector::from([1000.0, 0.0]);
+        let grad = SVector::from([0.0, 100.0]);
+        let dt = 0.016;
+        let v_new = metric.geodesic_rk4_step(&v, &grad, dt);
+        let delta = (v_new - v).norm();
+        assert!(
+            delta <= MAX_GEODESIC_ACCEL * dt + 1e-10,
+            "delta {delta} exceeds MAX_GEODESIC_ACCEL * dt = {}",
+            MAX_GEODESIC_ACCEL * dt
+        );
+    }
+
+    #[test]
+    fn rk4_direction_deflects_toward_gradient() {
+        // Body moving in +x, gradient in +y → should acquire +y velocity component.
+        let metric = ConformalMetric::<2>::new();
+        let v = SVector::from([10.0, 0.0]);
+        let grad = SVector::from([0.0, 1.0]);
+        let v_new = metric.geodesic_rk4_step(&v, &grad, 0.016);
+        assert!(
+            v_new[1] > 0.0,
+            "body perpendicular to gradient should acquire velocity in gradient direction"
+        );
+        assert!(
+            v_new[0] > 0.0,
+            "forward velocity should still be positive after small dt"
+        );
+    }
+
+    #[test]
+    fn rk4_3d_consistency() {
+        let metric = ConformalMetric::<3>::new();
+        let v = SVector::from([5.0, 0.0, 0.0]);
+        let grad = SVector::from([0.0, 0.0, 1.0]);
+        let v_new = metric.geodesic_rk4_step(&v, &grad, 0.016);
+        // Should acquire +z component (gradient direction)
+        assert!(v_new[2] > 0.0, "3D: should acquire velocity in gradient direction");
+        // x component should be approximately preserved for small dt
+        assert!((v_new[0] - 5.0).abs() < 1.0, "x velocity should be approximately preserved");
+    }
+
+    #[test]
+    fn rk4_4d_no_panic() {
+        let metric = ConformalMetric::<4>::new();
+        let v = SVector::from([3.0, 1.0, 0.0, 0.0]);
+        let grad = SVector::from([0.0, 0.0, 1.0, 0.5]);
+        let v_new = metric.geodesic_rk4_step(&v, &grad, 0.016);
+        assert!(v_new.norm().is_finite(), "4D rk4 step should produce finite velocity");
     }
 }

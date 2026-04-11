@@ -404,3 +404,238 @@ pub(crate) fn soft_clip(x: f32) -> f32 {
         x
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{MuseConfig, MusicalState, Note, OutputFormat};
+    use crate::voice::{Arrangement, Voice, VoiceRole};
+
+    fn one_note_arrangement(freq: f32) -> Arrangement {
+        let note = Note {
+            frequency: freq,
+            start_time: 0.0,
+            duration: 0.5,
+            velocity: 0.8,
+        };
+        Arrangement {
+            voices: vec![Voice {
+                role: VoiceRole::Lead,
+                notes: vec![note],
+                pitch_range: (130.0, 1000.0),
+                volume: 1.0,
+                pan: 0.0,
+            }],
+        }
+    }
+
+    // ─── soft_clip ────────────────────────────────────────────────────────────
+
+    #[test]
+    fn soft_clip_identity_in_range() {
+        for x in [-0.9f32, -0.5, 0.0, 0.5, 0.9] {
+            assert!((soft_clip(x) - x).abs() < 1e-6, "soft_clip({x}) should be identity");
+        }
+    }
+
+    #[test]
+    fn soft_clip_bounded() {
+        for x in [-10.0f32, -2.0, 2.0, 10.0] {
+            let y = soft_clip(x);
+            assert!(y > -1.5 && y < 1.5, "soft_clip({x}) = {y} exceeds bounds");
+        }
+    }
+
+    #[test]
+    fn soft_clip_monotone_in_linear_region() {
+        // soft_clip is linear (identity) in [-1, 1] — verify monotone there
+        let mut prev = soft_clip(-1.0);
+        for i in 1..=20 {
+            let x = -1.0 + i as f32 * 0.1;
+            let y = soft_clip(x);
+            assert!(y >= prev - 1e-6, "soft_clip not monotone at {x}: {y} < {prev}");
+            prev = y;
+        }
+    }
+
+    // ─── ADSR envelope ────────────────────────────────────────────────────────
+
+    #[test]
+    fn adsr_from_default_state() {
+        let state = MusicalState::default();
+        let adsr = compute_adsr(&state);
+        assert!(adsr.attack > 0.0);
+        assert!(adsr.sustain > 0.0 && adsr.sustain <= 1.0);
+        assert!(adsr.release > 0.0);
+    }
+
+    #[test]
+    fn envelope_attack_phase() {
+        let state = MusicalState::default();
+        let adsr = compute_adsr(&state);
+        let y = envelope(&adsr, adsr.attack * 0.5, 1.0);
+        assert!(y > 0.0 && y < 1.0, "mid-attack should be between 0 and 1: {y}");
+    }
+
+    #[test]
+    fn envelope_sustain_plateau() {
+        let state = MusicalState::default();
+        let adsr = compute_adsr(&state);
+        let t_sustain = adsr.attack + adsr.decay + 0.01;
+        let y = envelope(&adsr, t_sustain, t_sustain + 0.1);
+        assert!(
+            (y - adsr.sustain).abs() < 0.05,
+            "sustain phase should be near sustain level {}: got {y}",
+            adsr.sustain
+        );
+    }
+
+    #[test]
+    fn high_arousal_faster_attack() {
+        let calm = MusicalState { arousal: 0.1, ..MusicalState::default() };
+        let excited = MusicalState { arousal: 0.9, ..MusicalState::default() };
+        let adsr_calm = compute_adsr(&calm);
+        let adsr_excited = compute_adsr(&excited);
+        assert!(
+            adsr_excited.attack < adsr_calm.attack,
+            "high arousal should have faster attack: {} < {}",
+            adsr_excited.attack,
+            adsr_calm.attack
+        );
+    }
+
+    // ─── render_arrangement ───────────────────────────────────────────────────
+
+    #[test]
+    fn render_produces_samples() {
+        let arr = one_note_arrangement(440.0);
+        let config = MuseConfig { duration_secs: 1.0, ..Default::default() };
+        let state = MusicalState::default();
+        let audio = render_arrangement(&arr, 44100, 44100, &state, &config);
+        assert!(!audio.is_empty());
+    }
+
+    #[test]
+    fn render_stereo_format() {
+        let arr = one_note_arrangement(261.63);
+        let config = MuseConfig {
+            duration_secs: 0.5,
+            output_format: OutputFormat::StereoF32,
+            ..Default::default()
+        };
+        let state = MusicalState::default();
+        let audio = render_arrangement(&arr, 44100, 22050, &state, &config);
+        assert!(matches!(audio, AudioData::StereoF32(_)), "expected StereoF32");
+    }
+
+    #[test]
+    fn render_mono16_format() {
+        let arr = one_note_arrangement(330.0);
+        let config = MuseConfig {
+            duration_secs: 0.5,
+            output_format: OutputFormat::Mono16,
+            ..Default::default()
+        };
+        let state = MusicalState::default();
+        let audio = render_arrangement(&arr, 44100, 22050, &state, &config);
+        assert!(matches!(audio, AudioData::I16(_)), "expected Mono16 (I16)");
+    }
+
+    #[test]
+    fn render_no_nan_inf() {
+        let arr = one_note_arrangement(440.0);
+        let config = MuseConfig {
+            duration_secs: 1.0,
+            output_format: OutputFormat::StereoF32,
+            num_partials: 8,
+            max_fm_depth: 3.0,
+            ..Default::default()
+        };
+        let state = MusicalState {
+            harmony_activations: [0.8; 8],
+            consciousness_level: 0.9,
+            ..MusicalState::default()
+        };
+        let audio = render_arrangement(&arr, 44100, 44100, &state, &config);
+        if let AudioData::StereoF32(samples) = audio {
+            for (i, s) in samples.iter().enumerate() {
+                assert!(s[0].is_finite(), "left NaN/Inf at sample {i}: {}", s[0]);
+                assert!(s[1].is_finite(), "right NaN/Inf at sample {i}: {}", s[1]);
+            }
+        }
+    }
+
+    #[test]
+    fn render_horror_config_no_panic() {
+        let arr = one_note_arrangement(110.0);
+        let config = MuseConfig {
+            duration_secs: 0.5,
+            ..MuseConfig::horror()
+        };
+        let state = MusicalState::default();
+        let audio = render_arrangement(&arr, 44100, 22050, &state, &config);
+        assert!(!audio.is_empty());
+    }
+
+    #[test]
+    fn render_fm_depth_affects_output() {
+        let arr = one_note_arrangement(440.0);
+        let state = MusicalState::default();
+        let samples = 22050;
+
+        let clean = MuseConfig {
+            duration_secs: 0.5,
+            output_format: OutputFormat::MonoF32,
+            max_fm_depth: 0.0,
+            ..Default::default()
+        };
+        let fm = MuseConfig {
+            duration_secs: 0.5,
+            output_format: OutputFormat::MonoF32,
+            max_fm_depth: 5.0,
+            ..Default::default()
+        };
+
+        let clean_audio = render_arrangement(&arr, 44100, samples, &state, &clean);
+        let fm_audio = render_arrangement(&arr, 44100, samples, &state, &fm);
+
+        // FM-modulated output should differ from clean
+        if let (AudioData::F32(c), AudioData::F32(f)) = (clean_audio, fm_audio) {
+            let diff: f32 = c.iter().zip(f.iter()).map(|(a, b)| (a - b).abs()).sum();
+            assert!(diff > 0.1, "FM depth should change the output (diff = {diff})");
+        }
+    }
+
+    #[test]
+    fn render_partials_affect_timbre() {
+        let arr = one_note_arrangement(220.0);
+        let state = MusicalState::default();
+        let n = 22050;
+
+        let thin = MuseConfig {
+            duration_secs: 0.5,
+            output_format: OutputFormat::MonoF32,
+            num_partials: 1,
+            ..Default::default()
+        };
+        let rich = MuseConfig {
+            duration_secs: 0.5,
+            output_format: OutputFormat::MonoF32,
+            num_partials: 16,
+            ..Default::default()
+        };
+
+        let thin_audio = render_arrangement(&arr, 44100, n, &state, &thin);
+        let rich_audio = render_arrangement(&arr, 44100, n, &state, &rich);
+
+        if let (AudioData::F32(t), AudioData::F32(r)) = (thin_audio, rich_audio) {
+            // Rich should have higher RMS (more partials = more energy)
+            let rms = |v: &[f32]| (v.iter().map(|x| x * x).sum::<f32>() / v.len() as f32).sqrt();
+            assert!(
+                rms(&r) > rms(&t),
+                "rich ({} partials) should have higher RMS than thin (1 partial)",
+                rich.num_partials
+            );
+        }
+    }
+}

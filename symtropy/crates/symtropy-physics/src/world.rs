@@ -15,6 +15,17 @@ use crate::contact::{CollisionEvent, ContactCache, ContactManifold};
 use crate::constraint::Constraint;
 use crate::gjk;
 use crate::integrator;
+use crate::manifold_gen;
+
+/// Quantize a float to Q16.16 fixed-point (range ±32768, resolution 1/65536).
+///
+/// Used by the `deterministic-net` feature to guarantee bit-identical simulation
+/// across heterogeneous hardware for P2P multiplayer and replay files.
+#[cfg(feature = "deterministic-net")]
+#[inline]
+fn quantize_q16_16(v: f64) -> f64 {
+    (v * 65536.0).round() / 65536.0
+}
 
 /// Callback trait for consciousness-physics coupling.
 ///
@@ -75,13 +86,23 @@ pub struct PhysicsWorld<const D: usize> {
     pub sleep_ticks: u32,
     /// Penetration slop (small overlap allowed to prevent jitter).
     pub slop: f64,
-    /// Baumgarte stabilization factor.
+    /// Baumgarte stabilization factor (TGS Soft position-bias coefficient).
+    ///
+    /// Used as `bias = baumgarte * (depth - slop).max(0) / dt` in TGS Soft.
+    /// Typical values: 0.1–0.4. Default: 0.2.
     pub baumgarte: f64,
+    /// Constraint compliance (softness). 0.0 = rigid (default). Higher values
+    /// make contacts softer (spring-like). Applied as `α = compliance / dt²`.
+    pub compliance: f64,
     /// NetId → BodyHandle mapping for cross-machine replay determinism.
     net_id_map: BTreeMap<NetId, BodyHandle>,
     /// BodyHandle → Vec index for O(1) body lookup.
     handle_to_index: HashMap<BodyHandle, usize>,
     next_handle: usize,
+    /// Cached broadphase data for Static/Kinematic bodies (rebuilt only on add/remove).
+    static_broadphase: broadphase::StaticBroadphase<D>,
+    /// Set to true when a static or kinematic body is added or removed.
+    static_tree_dirty: bool,
 }
 
 impl<const D: usize> PhysicsWorld<D> {
@@ -99,11 +120,14 @@ impl<const D: usize> PhysicsWorld<D> {
             solver_iterations: 4,
             slop: 0.01,
             baumgarte: 0.2,
+            compliance: 0.0,
             sleep_threshold: 0.5,
             sleep_ticks: 60, // ~1 second at 64Hz
             net_id_map: BTreeMap::new(),
             handle_to_index: HashMap::new(),
             next_handle: 0,
+            static_broadphase: broadphase::StaticBroadphase::new(),
+            static_tree_dirty: false,
         }
     }
 
@@ -124,8 +148,12 @@ impl<const D: usize> PhysicsWorld<D> {
 
     /// Add a dynamic body with a custom collider.
     pub fn add_body(&mut self, mut body: RigidBody<D>) -> BodyHandle {
+        use crate::body::BodyType;
         let handle = self.allocate_handle();
         body.handle = handle;
+        if body.body_type == BodyType::Static || body.body_type == BodyType::Kinematic {
+            self.static_tree_dirty = true;
+        }
         let idx = self.bodies.len();
         self.bodies.push(body);
         self.handle_to_index.insert(handle, idx);
@@ -205,15 +233,39 @@ impl<const D: usize> PhysicsWorld<D> {
         std::mem::swap(&mut self.contact_cache, &mut self.prev_cache);
         self.contact_cache.begin_frame();
 
+        // 0b. Rebuild static broadphase cache if bodies have been added/removed.
+        if self.static_tree_dirty {
+            self.static_broadphase.rebuild(&self.bodies);
+            self.static_tree_dirty = false;
+        }
+
         // 1. Integrate all bodies (skip sleeping)
+        #[cfg(feature = "deterministic-net")]
+        for body in &mut self.bodies {
+            // Snap accumulated forces to Q16.16 before integration for
+            // bit-identical simulation across platforms (P2P / replay).
+            if !body.sleeping {
+                for i in 0..D {
+                    body.force_accumulator[i] = quantize_q16_16(body.force_accumulator[i]);
+                }
+            }
+        }
         for body in &mut self.bodies {
             if !body.sleeping {
                 integrator::integrate(body, &self.gravity, dt);
             }
         }
+        #[cfg(feature = "deterministic-net")]
+        for body in &mut self.bodies {
+            // Snap positions and velocities after integration.
+            for i in 0..D {
+                body.transform.translation.0[i] = quantize_q16_16(body.transform.translation.0[i]);
+                body.linear_velocity[i] = quantize_q16_16(body.linear_velocity[i]);
+            }
+        }
 
-        // 2. Broadphase: find potentially colliding pairs
-        let pairs = broadphase::find_pairs(&self.bodies);
+        // 2. Broadphase: find potentially colliding pairs (incremental static cache)
+        let pairs = broadphase::find_pairs_incremental(&self.bodies, &self.static_broadphase);
 
         // 3. Narrowphase: GJK for each pair
         self.contacts.clear();
@@ -266,14 +318,18 @@ impl<const D: usize> PhysicsWorld<D> {
                         &result.simplex,
                     ) {
                         if epa_result.depth > 0.0 {
-                            let (_, ra) = self.bodies[a].collider.bounding_sphere();
-                            self.contacts.push(ContactManifold::single(
+                            // Multi-point manifold: contact perturbation for stable stacking
+                            let manifold = manifold_gen::generate_contact_manifold(
+                                self.bodies[a].collider.as_ref(),
+                                &pos_a,
+                                self.bodies[b].collider.as_ref(),
+                                &pos_b,
+                                epa_result.normal,
+                                epa_result.depth,
                                 pair.0,
                                 pair.1,
-                                epa_result.normal,
-                                pos_a + epa_result.normal * ra,
-                                epa_result.depth,
-                            ));
+                            );
+                            self.contacts.push(manifold);
                         }
                     }
                 }
@@ -292,13 +348,34 @@ impl<const D: usize> PhysicsWorld<D> {
             .flat_map(|island| island.contact_indices.iter().copied())
             .collect();
 
-        // 5. Resolve collisions for active islands only
+        // 5a. Warm-start: apply previous-frame impulse ONCE before the solver loop.
+        //     (The old code accidentally applied warm-starting N times per frame.)
+        for &ci in &active_contact_indices {
+            if ci < self.contacts.len() {
+                self.warm_start_contact(ci);
+            }
+        }
+
+        // 5b. TGS Soft velocity solver: position-correction bias folded into impulse.
+        //     Each iteration accumulates per-point lambda; write updated manifold back.
         for _ in 0..self.solver_iterations {
             for &ci in &active_contact_indices {
                 if ci < self.contacts.len() {
                     let contact = self.contacts[ci].clone();
-                    self.resolve_contact(contact, dt, &mut callback);
+                    let updated = self.resolve_contact(contact, dt, &mut callback);
+                    self.contacts[ci] = updated;
                 }
+            }
+        }
+
+        // 5c. After the solve, cache per-manifold total impulse for next frame's warm-start.
+        for &ci in &active_contact_indices {
+            if ci < self.contacts.len() {
+                let c = &self.contacts[ci];
+                let total_lambda: f64 = c.points.iter().map(|p| p.lambda).sum();
+                self.contact_cache.store(
+                    c.body_a, c.body_b, c.point(), total_lambda, 0.0,
+                );
             }
         }
 
@@ -351,92 +428,141 @@ impl<const D: usize> PhysicsWorld<D> {
         }
     }
 
-    /// Resolve a single contact with optional consciousness modulation.
+    /// Warm-start a single contact from the previous frame's impulse cache.
+    ///
+    /// Called ONCE per contact before the solver loop. Distributes the cached
+    /// total impulse evenly across all contact points and initialises `lambda`.
+    fn warm_start_contact(&mut self, ci: usize) {
+        let contact = self.contacts[ci].clone();
+        let (idx_a, idx_b) = self.find_body_indices(contact.body_a, contact.body_b);
+        let (Some(a), Some(b)) = (idx_a, idx_b) else { return; };
+
+        let primary_pt = contact.primary_point().position;
+        let cached_total = self.prev_cache
+            .lookup(contact.body_a, contact.body_b, &primary_pt)
+            .map(|c| c.normal_impulse * 0.8) // 80% of previous frame
+            .unwrap_or(0.0);
+
+        if cached_total > 1e-15 {
+            let n_pts = contact.points.len().max(1) as f64;
+            let per_pt = cached_total / n_pts;
+
+            // Apply warm-start impulse
+            let impulse = contact.normal * cached_total;
+            integrator::apply_impulse(&mut self.bodies[a], &(-impulse));
+            integrator::apply_impulse(&mut self.bodies[b], &impulse);
+
+            // Seed lambda so TGS Soft starts from warm-start value
+            for pt in &mut self.contacts[ci].points {
+                pt.lambda = per_pt;
+            }
+        }
+    }
+
+    /// Resolve a single contact using TGS Soft (Temporal Gauss-Seidel with compliance).
+    ///
+    /// Replaces Baumgarte stabilisation: position correction is folded into a
+    /// "bias velocity" `bias = baumgarte * (depth - slop).max(0) / dt`, which is
+    /// added to the velocity constraint. Lambda clamping ensures contacts only push
+    /// (never pull), eliminating ghost-acceleration artefacts.
+    ///
+    /// Returns the updated manifold so accumulated lambdas persist across iterations.
     fn resolve_contact(
         &mut self,
-        contact: ContactManifold<D>,
-        _dt: f64,
+        mut contact: ContactManifold<D>,
+        dt: f64,
         callback: &mut Option<&mut dyn PhysicsCallback<D>>,
-    ) {
+    ) -> ContactManifold<D> {
         let (idx_a, idx_b) = self.find_body_indices(contact.body_a, contact.body_b);
         let (Some(a), Some(b)) = (idx_a, idx_b) else {
-            return;
+            return contact;
         };
 
         let inv_mass_a = self.bodies[a].inv_mass;
         let inv_mass_b = self.bodies[b].inv_mass;
         let total_inv_mass = inv_mass_a + inv_mass_b;
         if total_inv_mass < 1e-15 {
-            return;
+            return contact;
         }
 
-        // Position correction (Baumgarte stabilization)
-        let correction_mag = (contact.depth() - self.slop).max(0.0) * self.baumgarte;
-        let correction = contact.normal * correction_mag;
+        // Compliance: α = compliance / dt² (adds softness to the constraint)
+        let alpha = self.compliance / (dt * dt).max(1e-20);
+        let safe_dt = dt.max(1e-10);
 
-        if self.bodies[a].is_dynamic() {
-            integrator::separate(&mut self.bodies[a], &(-correction * (inv_mass_a / total_inv_mass)));
+        let baumgarte = self.baumgarte;
+        let slop = self.slop;
+
+        // ─── TGS Soft: per-point velocity+position constraint ───
+        let mut total_normal_impulse = 0.0_f64;
+
+        for pt in &mut contact.points {
+            let v_rel_n = {
+                let va = self.bodies[a].linear_velocity;
+                let vb = self.bodies[b].linear_velocity;
+                (va - vb).dot(&contact.normal)
+            };
+
+            // Position-correction bias (replaces Baumgarte teleport)
+            let bias = (pt.depth - slop).max(0.0) * baumgarte / safe_dt;
+
+            // TGS Soft impulse: Δλ = (-v_rel·n + bias) / (w_a + w_b + α)
+            let denom = total_inv_mass + alpha;
+            let delta_lambda = (-v_rel_n + bias) / denom;
+
+            // Clamp: accumulated normal impulse must stay ≥ 0 (no pulling)
+            let new_lambda = (pt.lambda + delta_lambda).max(0.0);
+            let actual_delta = new_lambda - pt.lambda;
+            pt.lambda = new_lambda;
+
+            if actual_delta.abs() > 1e-15 {
+                // ═══ CONSCIOUSNESS MODULATION: sanctuary + harmony fields ═══
+                let modulated_delta = if let Some(ref cb) = callback {
+                    cb.modulate_impulse(actual_delta, &pt.position)
+                } else {
+                    actual_delta
+                };
+
+                let impulse = contact.normal * modulated_delta;
+                integrator::apply_impulse(&mut self.bodies[a], &(-impulse));
+                integrator::apply_impulse(&mut self.bodies[b], &impulse);
+                total_normal_impulse += modulated_delta.abs();
+            }
         }
-        if self.bodies[b].is_dynamic() {
-            integrator::separate(&mut self.bodies[b], &(correction * (inv_mass_b / total_inv_mass)));
-        }
 
-        // Warm-starting: apply cached impulse from previous frame as initial guess
-        let contact_pt = contact.point();
-        if let Some(cached) = self.prev_cache.lookup(contact.body_a, contact.body_b, &contact_pt) {
-            let warm_impulse = contact.normal * (cached.normal_impulse * 0.8); // 80% damped
-            integrator::apply_impulse(&mut self.bodies[a], &(-warm_impulse));
-            integrator::apply_impulse(&mut self.bodies[b], &warm_impulse);
-        }
-
-        // Normal velocity resolution
-        let relative_vel = self.bodies[b].linear_velocity - self.bodies[a].linear_velocity;
-        let restitution = (self.bodies[a].restitution + self.bodies[b].restitution) * 0.5;
-
-        let mut j = contact.impulse_magnitude(&relative_vel, inv_mass_a, inv_mass_b, restitution);
-
-        // ═══ CONSCIOUSNESS MODULATION ═══
-        // Modulate impulse via sanctuary zones and harmony fields
-        if let Some(ref cb) = callback {
-            j = cb.modulate_impulse(j, &contact.point());
-        }
-
-        if j > 0.0 {
-            let impulse = contact.normal * j;
-            integrator::apply_impulse(&mut self.bodies[a], &(-impulse));
-            integrator::apply_impulse(&mut self.bodies[b], &impulse);
-
-            // Coulomb friction with consciousness-modulated coefficient
+        // ─── Coulomb friction (once per manifold, based on total normal impulse) ───
+        if total_normal_impulse > 1e-15 {
+            let primary_pt = contact.point();
             let v_rel = self.bodies[b].linear_velocity - self.bodies[a].linear_velocity;
             let v_n = contact.normal * v_rel.dot(&contact.normal);
             let v_t = v_rel - v_n;
             let v_t_mag = v_t.norm();
+
             if v_t_mag > 1e-10 {
                 let tangent = v_t / v_t_mag;
                 let mut mu = (self.bodies[a].friction * self.bodies[b].friction).sqrt();
 
                 // ═══ HARMONY FIELD FRICTION MODULATION ═══
                 if let Some(ref cb) = callback {
-                    mu *= cb.friction_multiplier(&contact.point(), contact.body_a);
+                    mu *= cb.friction_multiplier(&primary_pt, contact.body_a);
                 }
 
                 let j_t_desired = -v_t_mag / total_inv_mass;
-                let j_t = j_t_desired.clamp(-mu * j, mu * j);
+                let j_t = j_t_desired.clamp(-mu * total_normal_impulse, mu * total_normal_impulse);
                 let friction_impulse = tangent * j_t;
                 integrator::apply_impulse(&mut self.bodies[a], &(-friction_impulse));
                 integrator::apply_impulse(&mut self.bodies[b], &friction_impulse);
 
-                // Record friction dissipation
+                // Record friction dissipation for consciousness energy budget
                 if let Some(ref mut cb) = callback {
                     cb.record_dissipation(j_t.abs() * 0.1);
                 }
             }
 
-            // Emit collision event and notify consciousness callback
+            // ─── Emit collision event ───
             let event = CollisionEvent {
                 body_a: contact.body_a,
                 body_b: contact.body_b,
-                impulse: j,
+                impulse: total_normal_impulse,
                 normal: contact.normal,
                 depth: contact.depth(),
             };
@@ -448,13 +574,12 @@ impl<const D: usize> PhysicsWorld<D> {
 
             self.collision_events.push(event);
 
-            // Cache impulse for warm-starting next frame
-            self.contact_cache.store(contact.body_a, contact.body_b, contact_pt, j, 0.0);
-
-            // Wake both bodies on collision
+            // Wake both bodies
             self.bodies[a].wake();
             self.bodies[b].wake();
         }
+
+        contact
     }
 
     /// Try analytical HalfSpace contact. Returns None if neither body is a HalfSpace.

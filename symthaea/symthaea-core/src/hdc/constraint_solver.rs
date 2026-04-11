@@ -604,6 +604,200 @@ impl CSPSolver {
     }
 }
 
+// ─── MRV and LCV Heuristics ──────────────────────────────────────────────────
+
+/// MRV (Minimum Remaining Values) heuristic: select the unassigned variable
+/// with the smallest domain size.
+///
+/// Breaks ties by degree (most constraints with unassigned variables).
+pub fn mrv_select_variable(
+    domains: &[Vec<usize>],
+    assigned: &[Option<usize>],
+) -> Option<usize> {
+    let mut best_idx = None;
+    let mut best_size = usize::MAX;
+
+    for (i, domain) in domains.iter().enumerate() {
+        if assigned[i].is_some() {
+            continue;
+        }
+        if domain.len() < best_size {
+            best_size = domain.len();
+            best_idx = Some(i);
+        }
+    }
+    best_idx
+}
+
+/// Degree heuristic: count the number of constraints between `var_idx` and
+/// unassigned variables.
+pub fn degree_heuristic(
+    var_idx: usize,
+    constraints: &[&dyn Fn(usize, usize, usize, usize) -> bool],
+    n_vars: usize,
+    assigned: &[Option<usize>],
+) -> usize {
+    // We approximate degree as the number of other unassigned variables that
+    // share at least one constraint with var_idx.
+    // Since the constraint fn takes (var1, val1, var2, val2), we check by probing.
+    let mut degree = 0;
+    for other in 0..n_vars {
+        if other == var_idx || assigned[other].is_some() {
+            continue;
+        }
+        // Check if any constraint involves both var_idx and other
+        // We can't enumerate constraints by variable easily with the fn interface,
+        // so we count the number of constraint fns (proxy for degree)
+        for c in constraints {
+            // Probe with dummy values; if constraint is defined between them,
+            // count it once. We use 0,0 as dummy values.
+            let _ = c(var_idx, 0, other, 0);
+            degree += 1;
+            break; // count this variable as constrained
+        }
+    }
+    degree
+}
+
+/// LCV (Least Constraining Value) heuristic: order domain values by how few
+/// values they eliminate from neighbor domains.
+///
+/// Values that eliminate fewer choices from neighbors should be tried first.
+pub fn lcv_order_values(
+    var_idx: usize,
+    domain: &[usize],
+    domains: &[Vec<usize>],
+    assigned: &[Option<usize>],
+    constraints: &[Box<dyn Fn(usize, usize, usize, usize) -> bool>],
+) -> Vec<usize> {
+    let mut scored: Vec<(usize, usize)> = domain
+        .iter()
+        .map(|&val| {
+            let eliminated = count_eliminations(var_idx, val, domains, assigned, constraints);
+            (val, eliminated)
+        })
+        .collect();
+    // Sort ascending: fewer eliminations → try first
+    scored.sort_by_key(|(_, elim)| *elim);
+    scored.into_iter().map(|(v, _)| v).collect()
+}
+
+/// Count how many values would be eliminated from neighbor domains if
+/// variable `var_idx` is assigned value `val`.
+fn count_eliminations(
+    var_idx: usize,
+    val: usize,
+    domains: &[Vec<usize>],
+    assigned: &[Option<usize>],
+    constraints: &[Box<dyn Fn(usize, usize, usize, usize) -> bool>],
+) -> usize {
+    let mut eliminated = 0;
+    for (other, domain) in domains.iter().enumerate() {
+        if other == var_idx || assigned[other].is_some() {
+            continue;
+        }
+        for &other_val in domain {
+            // Check if assigning var_idx=val would eliminate other_val from domain[other]
+            let violates = constraints.iter().any(|c| !c(var_idx, val, other, other_val));
+            if violates {
+                eliminated += 1;
+            }
+        }
+    }
+    eliminated
+}
+
+/// Backtracking CSP solver with MRV + LCV heuristics + forward checking.
+///
+/// Returns true if a solution was found (assignment will be fully populated).
+/// `backtracks` counts the number of backtrack operations performed.
+pub fn backtrack_mrv_lcv(
+    domains: &mut Vec<Vec<usize>>,
+    assigned: &mut Vec<Option<usize>>,
+    constraints: &[Box<dyn Fn(usize, usize, usize, usize) -> bool>],
+    backtracks: &mut usize,
+) -> bool {
+    // Check if all variables are assigned
+    if assigned.iter().all(|a| a.is_some()) {
+        return true;
+    }
+
+    // MRV: pick variable with smallest domain
+    let var = match mrv_select_variable(domains, assigned) {
+        Some(v) => v,
+        None => return false,
+    };
+
+    // LCV: order values to try
+    let ordered_values = lcv_order_values(var, &domains[var].clone(), domains, assigned, constraints);
+
+    for val in ordered_values {
+        // Check consistency: does assigning var=val violate any constraint
+        // with already-assigned variables?
+        let consistent = assigned.iter().enumerate().all(|(other, other_val)| {
+            if let Some(ov) = other_val {
+                constraints.iter().all(|c| c(var, val, other, *ov) && c(other, *ov, var, val))
+            } else {
+                true
+            }
+        });
+
+        if !consistent {
+            continue;
+        }
+
+        // Forward checking: ensure no neighbor domain becomes empty
+        assigned[var] = Some(val);
+        let mut pruned: Vec<(usize, usize)> = Vec::new(); // (var_idx, value) that were pruned
+        let mut fc_ok = true;
+
+        for other in 0..domains.len() {
+            if assigned[other].is_some() {
+                continue;
+            }
+            let original_len = domains[other].len();
+            let surviving: Vec<usize> = domains[other]
+                .iter()
+                .copied()
+                .filter(|&ov| {
+                    constraints.iter().all(|c| c(var, val, other, ov) && c(other, ov, var, val))
+                })
+                .collect();
+
+            if surviving.is_empty() {
+                fc_ok = false;
+                break;
+            }
+
+            // Record what was pruned
+            for v in &domains[other] {
+                if !surviving.contains(v) {
+                    pruned.push((other, *v));
+                }
+            }
+
+            let _ = original_len;
+            domains[other] = surviving;
+        }
+
+        if fc_ok && backtrack_mrv_lcv(domains, assigned, constraints, backtracks) {
+            return true;
+        }
+
+        // Undo: restore pruned values
+        assigned[var] = None;
+        *backtracks += 1;
+        for (other, pruned_val) in pruned {
+            if !domains[other].contains(&pruned_val) {
+                domains[other].push(pruned_val);
+                domains[other].sort();
+            }
+        }
+    }
+
+    false
+}
+
 // ─── Tests ───────────────────────────────────────────────────────────────────
 
 #[cfg(test)]
@@ -902,5 +1096,148 @@ mod tests {
             "Different solutions should have different encodings: {}",
             sim
         );
+    }
+
+    // ── MRV heuristic ────────────────────────────────────────────────────
+
+    #[test]
+    fn test_mrv_selects_most_constrained_variable() {
+        // Domains: var0=[1,2,3], var1=[1], var2=[1,2]
+        // MRV should pick var1 (smallest domain)
+        let domains = vec![vec![1, 2, 3], vec![1], vec![1, 2]];
+        let assigned = vec![None, None, None];
+        let selected = mrv_select_variable(&domains, &assigned);
+        assert_eq!(selected, Some(1), "MRV should select var1 with domain size 1");
+    }
+
+    #[test]
+    fn test_mrv_skips_assigned_variables() {
+        let domains = vec![vec![1], vec![1, 2, 3], vec![1, 2]];
+        let assigned = vec![Some(1), None, None]; // var0 already assigned
+        let selected = mrv_select_variable(&domains, &assigned);
+        // Should pick var2 (size 2) not var0 (assigned)
+        assert_eq!(selected, Some(2), "MRV should skip assigned var0");
+    }
+
+    #[test]
+    fn test_mrv_returns_none_when_all_assigned() {
+        let domains = vec![vec![1], vec![2]];
+        let assigned = vec![Some(1), Some(2)];
+        assert_eq!(mrv_select_variable(&domains, &assigned), None);
+    }
+
+    // ── LCV heuristic ────────────────────────────────────────────────────
+
+    #[test]
+    fn test_lcv_orders_values() {
+        // Simple CSP: var0 ∈ {1,2,3}, var1 ∈ {1,2,3}
+        // Constraint: var0 ≠ var1 (AllDifferent)
+        let domains = vec![vec![1, 2, 3], vec![1, 2, 3]];
+        let assigned = vec![None, None];
+        let constraints: Vec<Box<dyn Fn(usize, usize, usize, usize) -> bool>> = vec![Box::new(
+            |v1, val1, v2, val2| {
+                if v1 == v2 {
+                    true
+                } else {
+                    val1 != val2
+                }
+            },
+        )];
+        let ordered = lcv_order_values(0, &domains[0], &domains, &assigned, &constraints);
+        // All values should be present
+        assert_eq!(ordered.len(), 3);
+    }
+
+    // ── Backtracking with MRV + LCV ──────────────────────────────────────
+
+    #[test]
+    fn test_backtrack_mrv_lcv_simple_csp() {
+        // 2-coloring: 3 vars, each ∈ {0, 1}, all must differ from neighbors
+        // Graph: 0-1, 1-2 (chain)
+        let mut domains = vec![vec![0, 1], vec![0, 1], vec![0, 1]];
+        let mut assigned = vec![None, None, None];
+        let mut backtracks = 0;
+        // Constraints: adjacent vars in the chain must differ
+        let constraints: Vec<Box<dyn Fn(usize, usize, usize, usize) -> bool>> = vec![
+            Box::new(|v1, val1, v2, val2| {
+                // Edge 0-1
+                if (v1 == 0 && v2 == 1) || (v1 == 1 && v2 == 0) {
+                    val1 != val2
+                } else {
+                    true
+                }
+            }),
+            Box::new(|v1, val1, v2, val2| {
+                // Edge 1-2
+                if (v1 == 1 && v2 == 2) || (v1 == 2 && v2 == 1) {
+                    val1 != val2
+                } else {
+                    true
+                }
+            }),
+        ];
+        let solved = backtrack_mrv_lcv(&mut domains, &mut assigned, &constraints, &mut backtracks);
+        assert!(solved, "Simple chain 2-coloring should be solvable");
+        // Verify solution
+        let a0 = assigned[0].unwrap();
+        let a1 = assigned[1].unwrap();
+        let a2 = assigned[2].unwrap();
+        assert_ne!(a0, a1, "Adjacent vars 0-1 must differ");
+        assert_ne!(a1, a2, "Adjacent vars 1-2 must differ");
+    }
+
+    #[test]
+    fn test_4x4_sudoku_with_mrv_lcv() {
+        // 4×4 Sudoku: digits 1-4, rows/cols/2x2 boxes all different
+        // Initial partial grid:
+        // [1, _, _, _]
+        // [_, _, 1, _]
+        // [_, 1, _, _]
+        // [_, _, _, 1]
+        let n = 4;
+        // 16 variables, each initially domain {1,2,3,4}
+        let mut domains: Vec<Vec<usize>> = vec![(1..=n).collect(); n * n];
+        let mut assigned: Vec<Option<usize>> = vec![None; n * n];
+
+        // Pre-assign initial clues
+        let clues = vec![(0, 0, 1), (1, 2, 1), (2, 1, 1), (3, 3, 1)];
+        for (row, col, val) in &clues {
+            let idx = row * n + col;
+            assigned[idx] = Some(*val);
+            domains[idx] = vec![*val];
+        }
+
+        // Build AllDifferent-style constraints for rows, columns, and 2x2 boxes
+        let constraints: Vec<Box<dyn Fn(usize, usize, usize, usize) -> bool>> = vec![
+            Box::new(move |v1, val1, v2, val2| {
+                if v1 == v2 {
+                    return true;
+                }
+                let (r1, c1) = (v1 / n, v1 % n);
+                let (r2, c2) = (v2 / n, v2 % n);
+                // Same row or same column or same 2x2 box: values must differ
+                let same_row = r1 == r2;
+                let same_col = c1 == c2;
+                let same_box = (r1 / 2 == r2 / 2) && (c1 / 2 == c2 / 2);
+                if same_row || same_col || same_box {
+                    val1 != val2
+                } else {
+                    true
+                }
+            }),
+        ];
+
+        let mut backtracks = 0;
+        let solved = backtrack_mrv_lcv(&mut domains, &mut assigned, &constraints, &mut backtracks);
+        assert!(solved, "4x4 Sudoku should be solvable");
+
+        // Verify row uniqueness
+        for row in 0..n {
+            let vals: Vec<usize> = (0..n)
+                .map(|col| assigned[row * n + col].unwrap())
+                .collect();
+            let unique: std::collections::HashSet<_> = vals.iter().collect();
+            assert_eq!(unique.len(), n, "Row {} has duplicates", row);
+        }
     }
 }

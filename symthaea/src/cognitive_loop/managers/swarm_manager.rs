@@ -1873,7 +1873,9 @@ mod tests {
         let estimate = positioning::PeerEstimate3D {
             peer_id: "peer-9".into(),
             estimate: positioning::GaussianEstimate3D::from_diagonal_sigma([1.0, 2.0, 3.0], 6.0),
-            confidence: Some(0.7),
+            confidence: 0.7,
+            trust_weight: 1.0,
+            timestamp_us: 0,
         };
 
         match convert_navigation_estimate("peer-9", &estimate) {

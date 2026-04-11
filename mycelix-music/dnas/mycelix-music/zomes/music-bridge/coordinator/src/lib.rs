@@ -371,6 +371,268 @@ pub fn health_check(_: ()) -> ExternResult<BridgeHealth> {
 }
 
 // ============================================================================
+// Consciousness Composition
+// ============================================================================
+
+/// Input from Symthaea's cognitive loop — the cognitive state that triggered
+/// this composition request.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ConsciousnessTrigger {
+    /// Eight Harmonies activation vector [0,1]^8 from MusicalState
+    pub harmony_activations: Vec<f32>,
+    /// Valence from Russell's circumplex model [-1, 1]
+    pub valence: f32,
+    /// Arousal from Russell's circumplex model [0, 1]
+    pub arousal: f32,
+    /// Integrated Information (Phi) consciousness score [0, 1]
+    pub phi_score: f32,
+    /// Narrative episode tags active at composition time
+    pub narrative_tags: Vec<String>,
+    /// Requested duration in seconds (clamped to [4, 120])
+    pub duration_secs: Option<f32>,
+}
+
+/// Result returned to the caller
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ConsciousCompositionResult {
+    /// DHT record of the stored composition metadata
+    pub action_hash: ActionHash,
+    /// Derived tempo BPM
+    pub tempo_bpm: f32,
+    /// Scale name used
+    pub scale_name: String,
+    /// Number of notes generated (estimated from duration/density)
+    pub note_count: u32,
+    /// Composite quality score
+    pub quality_score: f32,
+    /// Signal was emitted to UI clients
+    pub signal_emitted: bool,
+}
+
+/// Minimum Phi score required to trigger a consciousness composition.
+/// Below this threshold, consciousness is not sufficiently integrated
+/// to produce a meaningful piece — a neutral ambient tone would mask the lack.
+const MIN_PHI_FOR_COMPOSITION: f32 = 0.3;
+
+/// Map VA + harmonies to musical parameter summary (WASM-compatible, no heavy synthesis).
+///
+/// Full audio synthesis lives in symthaea-muse (native Rust); in the Holochain
+/// WASM context we store only composition *metadata* on the DHT and emit a
+/// signal so frontends can request the actual audio via a native service.
+fn derive_musical_params(trigger: &ConsciousnessTrigger) -> (f32, String, u32, f32) {
+    // Tempo: high arousal → faster. Range [60, 160] BPM.
+    let arousal = trigger.arousal.clamp(0.0, 1.0);
+    let valence = trigger.valence.clamp(-1.0, 1.0);
+    let tempo_bpm = 60.0 + arousal * 100.0;
+
+    // Scale: negative valence → minor; extreme arousal + harmonies guide mode
+    let ha = &trigger.harmony_activations;
+    let dominant_harmony = ha
+        .iter()
+        .enumerate()
+        .max_by(|a, b| a.1.partial_cmp(b.1).unwrap_or(std::cmp::Ordering::Equal))
+        .map(|(i, _)| i)
+        .unwrap_or(0);
+
+    let scale_name = if valence < -0.3 {
+        match dominant_harmony {
+            2 => "phrygian".to_string(),       // IntegralWisdom → ancient depth
+            4 => "maqam_hijaz".to_string(),    // EthicalPresence → Middle Eastern tension
+            _ => "minor".to_string(),
+        }
+    } else if valence > 0.3 {
+        match dominant_harmony {
+            0 => "lydian".to_string(),         // InfinitePlay → bright, floating
+            1 => "major".to_string(),          // UniversalInterconnectedness → grounded joy
+            6 => "raga_yaman".to_string(),     // RegenerativeHarmony → flourishing
+            _ => "major".to_string(),
+        }
+    } else {
+        match dominant_harmony {
+            3 => "dorian".to_string(),         // SovereignPresence → modal, balanced
+            5 => "mixolydian".to_string(),     // CollectiveWisdom → folk-like
+            7 => "gamelan_slendro".to_string(),// SacredStillness → meditative
+            _ => "dorian".to_string(),
+        }
+    };
+
+    // Note count estimate: density scales with arousal and phi
+    let duration = trigger.duration_secs.unwrap_or(8.0).clamp(4.0, 120.0);
+    let density = 0.3 + arousal * 0.5 + trigger.phi_score * 0.2;
+    let note_count = (duration * density * 4.0) as u32;
+
+    // Quality: composite heuristic from phi, harmony breadth, va balance
+    let harmony_sum: f32 = ha.iter().sum::<f32>() / 8.0;
+    let va_balance = 1.0 - (valence.abs() * 0.3 + (arousal - 0.5).abs() * 0.3);
+    let quality_score = (trigger.phi_score * 0.4 + harmony_sum * 0.3 + va_balance * 0.3)
+        .clamp(0.0, 1.0);
+
+    (tempo_bpm, scale_name, note_count.max(4), quality_score)
+}
+
+/// Compose a piece of music from Symthaea's current cognitive state.
+///
+/// This is the consciousness→music bridge entry point. When Symthaea's creative
+/// manager detects sufficient integration (Phi > 0.3), it calls this zome
+/// function to record the composition decision on the DHT and notify connected
+/// UI frontends via a signal.
+///
+/// The heavy audio synthesis is done by `symthaea-muse` in native Rust;
+/// this function stores the composition *parameters* and emits a signal
+/// so the Music UI can request audio from the local Symthaea service.
+///
+/// Requires Observer+ consciousness tier (lowest tier — consciousness speaks freely).
+#[hdk_extern]
+pub fn compose_from_consciousness(
+    trigger: ConsciousnessTrigger,
+) -> ExternResult<ConsciousCompositionResult> {
+    // Validate harmony dimensions
+    if trigger.harmony_activations.len() != 8 {
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "harmony_activations must have 8 elements, got {}",
+            trigger.harmony_activations.len()
+        ))));
+    }
+
+    // Minimum consciousness threshold
+    if trigger.phi_score < MIN_PHI_FOR_COMPOSITION {
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Phi score {:.3} below minimum {:.3} for consciousness composition",
+            trigger.phi_score, MIN_PHI_FOR_COMPOSITION
+        ))));
+    }
+
+    // Gate: Observer+ (no tier restriction — consciousness speaks)
+    mycelix_bridge_common::gate_civic(
+        "music_bridge",
+        &mycelix_bridge_common::civic_requirement_basic(),
+        "compose_from_consciousness",
+    )?;
+
+    let agent = agent_info()?.agent_initial_pubkey;
+    let now = sys_time()?;
+    let duration = trigger.duration_secs.unwrap_or(8.0).clamp(4.0, 120.0);
+
+    let (tempo_bpm, scale_name, note_count, quality_score) = derive_musical_params(&trigger);
+
+    let entry = ConsciousCompositionEntry {
+        schema_version: 1,
+        composer_agent: agent.clone(),
+        harmony_activations: trigger.harmony_activations.clone(),
+        valence: trigger.valence.clamp(-1.0, 1.0),
+        arousal: trigger.arousal.clamp(0.0, 1.0),
+        phi_score: trigger.phi_score.clamp(0.0, 1.0),
+        narrative_tags: trigger.narrative_tags.clone(),
+        tempo_bpm,
+        scale_name: scale_name.clone(),
+        duration_secs: duration,
+        note_count,
+        quality_score,
+        composed_at: now,
+    };
+
+    let action_hash = create_entry(&EntryTypes::ConsciousComposition(entry))?;
+
+    // Index: global
+    let all_anchor = ensure_anchor("all_conscious_compositions")?;
+    create_link(
+        all_anchor,
+        action_hash.clone(),
+        LinkTypes::AllConsciousCompositions,
+        (),
+    )?;
+
+    // Index: per-agent
+    let agent_anchor = ensure_anchor(&format!("agent_compositions:{}", agent))?;
+    create_link(
+        agent_anchor,
+        action_hash.clone(),
+        LinkTypes::AgentToConsciousComposition,
+        (),
+    )?;
+
+    // Signal to connected UIs: "a new consciousness composition is available,
+    // request audio from the local Symthaea service"
+    #[derive(Serialize, Deserialize, Debug)]
+    struct ConsciousCompositionSignal {
+        signal_type: String,
+        action_hash: ActionHash,
+        tempo_bpm: f32,
+        scale_name: String,
+        note_count: u32,
+        quality_score: f32,
+        phi_score: f32,
+        valence: f32,
+        arousal: f32,
+        narrative_tags: Vec<String>,
+    }
+
+    let signal = ConsciousCompositionSignal {
+        signal_type: "consciousness_composition".to_string(),
+        action_hash: action_hash.clone(),
+        tempo_bpm,
+        scale_name: scale_name.clone(),
+        note_count,
+        quality_score,
+        phi_score: trigger.phi_score,
+        valence: trigger.valence,
+        arousal: trigger.arousal,
+        narrative_tags: trigger.narrative_tags,
+    };
+
+    let signal_emitted = emit_signal(&signal).is_ok();
+
+    Ok(ConsciousCompositionResult {
+        action_hash,
+        tempo_bpm,
+        scale_name,
+        note_count,
+        quality_score,
+        signal_emitted,
+    })
+}
+
+/// Get all consciousness compositions (paginated via DHT link queries)
+#[hdk_extern]
+pub fn get_conscious_compositions(_: ()) -> ExternResult<Vec<Record>> {
+    let all_anchor = anchor_hash("all_conscious_compositions")?;
+    let links = get_links(
+        LinkQuery::try_new(all_anchor, LinkTypes::AllConsciousCompositions)?,
+        GetStrategy::Local,
+    )?;
+
+    let mut records = Vec::new();
+    for link in links {
+        if let Some(action_hash) = link.target.into_action_hash() {
+            if let Ok(Some(record)) = get_latest_record(action_hash) {
+                records.push(record);
+            }
+        }
+    }
+    Ok(records)
+}
+
+/// Get consciousness compositions for a specific agent
+#[hdk_extern]
+pub fn get_agent_compositions(agent: AgentPubKey) -> ExternResult<Vec<Record>> {
+    let agent_anchor = anchor_hash(&format!("agent_compositions:{}", agent))?;
+    let links = get_links(
+        LinkQuery::try_new(agent_anchor, LinkTypes::AgentToConsciousComposition)?,
+        GetStrategy::Local,
+    )?;
+
+    let mut records = Vec::new();
+    for link in links {
+        if let Some(action_hash) = link.target.into_action_hash() {
+            if let Ok(Some(record)) = get_latest_record(action_hash) {
+                records.push(record);
+            }
+        }
+    }
+    Ok(records)
+}
+
+// ============================================================================
 // Cross-Cluster Dispatch
 // ============================================================================
 

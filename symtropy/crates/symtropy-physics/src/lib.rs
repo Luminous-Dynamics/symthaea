@@ -24,6 +24,7 @@ pub mod gjk;
 pub mod integrator;
 pub mod island;
 pub mod joints;
+pub mod manifold_gen;
 pub mod raycast;
 pub mod replay;
 pub mod world;

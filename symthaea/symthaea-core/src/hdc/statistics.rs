@@ -949,6 +949,246 @@ fn sample_gamma(alpha: f64, beta: f64, rng: &mut Xorshift64) -> f64 {
     }
 }
 
+// ─── Bootstrap ───────────────────────────────────────────────────────────────
+
+/// LCG PRNG for reproducible bootstrap resampling.
+///
+/// next = (6364136223846793005 * seed + 1442695040888963407) mod 2^64
+#[inline]
+fn lcg_next(seed: u64) -> u64 {
+    seed.wrapping_mul(6_364_136_223_846_793_005)
+        .wrapping_add(1_442_695_040_888_963_407)
+}
+
+/// Draw n samples with replacement from `data` using LCG with given seed.
+fn bootstrap_resample(data: &[f64], n: usize, seed: u64) -> Vec<f64> {
+    let mut s = seed;
+    let len = data.len();
+    (0..n)
+        .map(|_| {
+            s = lcg_next(s);
+            data[(s as usize) % len]
+        })
+        .collect()
+}
+
+/// Percentile of sorted data (linear interpolation).
+fn percentile_sorted(sorted: &[f64], p: f64) -> f64 {
+    if sorted.is_empty() {
+        return f64::NAN;
+    }
+    let idx = p * (sorted.len() - 1) as f64;
+    let lo = idx.floor() as usize;
+    let hi = idx.ceil() as usize;
+    if lo == hi {
+        sorted[lo]
+    } else {
+        sorted[lo] + (idx - lo as f64) * (sorted[hi] - sorted[lo])
+    }
+}
+
+/// Non-parametric bootstrap confidence interval for the mean.
+///
+/// Resamples with replacement `n_bootstrap` times, returns `(lower, upper)` at
+/// the given confidence level using the percentile method.
+pub fn bootstrap_mean_ci(
+    data: &[f64],
+    n_bootstrap: usize,
+    confidence: f64,
+    seed: u64,
+) -> (f64, f64) {
+    bootstrap_statistic_ci(data, |d| mean(d), n_bootstrap, confidence, seed)
+}
+
+/// Non-parametric bootstrap CI for the standard deviation.
+pub fn bootstrap_std_ci(
+    data: &[f64],
+    n_bootstrap: usize,
+    confidence: f64,
+    seed: u64,
+) -> (f64, f64) {
+    bootstrap_statistic_ci(data, |d| std_dev(d), n_bootstrap, confidence, seed)
+}
+
+/// Non-parametric bootstrap CI for the median.
+pub fn bootstrap_median_ci(
+    data: &[f64],
+    n_bootstrap: usize,
+    confidence: f64,
+    seed: u64,
+) -> (f64, f64) {
+    bootstrap_statistic_ci(data, |d| median(d), n_bootstrap, confidence, seed)
+}
+
+/// Generic non-parametric bootstrap CI for any statistic.
+pub fn bootstrap_statistic_ci<F>(
+    data: &[f64],
+    stat: F,
+    n_bootstrap: usize,
+    confidence: f64,
+    seed: u64,
+) -> (f64, f64)
+where
+    F: Fn(&[f64]) -> f64,
+{
+    let n = data.len();
+    let mut bootstrap_stats: Vec<f64> = (0..n_bootstrap)
+        .map(|i| {
+            let s = lcg_next(seed.wrapping_add(i as u64));
+            let sample = bootstrap_resample(data, n, s);
+            stat(&sample)
+        })
+        .collect();
+    bootstrap_stats.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+
+    let alpha = 1.0 - confidence;
+    let lo = percentile_sorted(&bootstrap_stats, alpha / 2.0);
+    let hi = percentile_sorted(&bootstrap_stats, 1.0 - alpha / 2.0);
+    (lo, hi)
+}
+
+/// Parametric bootstrap: fit Normal to data, return bootstrap distribution of the mean.
+pub fn parametric_bootstrap_normal(
+    mu: f64,
+    sigma: f64,
+    n: usize,
+    n_bootstrap: usize,
+    seed: u64,
+) -> Vec<f64> {
+    let mut rng = Xorshift64::new(seed);
+    let dist = Distribution::Normal { mu, sigma };
+    (0..n_bootstrap)
+        .map(|_| {
+            let samples: Vec<f64> = (0..n).map(|_| dist.sample(&mut rng)).collect();
+            mean(&samples)
+        })
+        .collect()
+}
+
+// ─── AR(1) Model ─────────────────────────────────────────────────────────────
+
+/// First-order autoregressive model: x_t = μ + φ(x_{t-1} - μ) + σε_t
+#[derive(Debug, Clone)]
+pub struct AR1Model {
+    /// Autoregressive coefficient (|φ| < 1 for stationarity).
+    pub phi: f64,
+    /// Innovation standard deviation.
+    pub sigma: f64,
+    /// Process mean.
+    pub mean: f64,
+}
+
+impl AR1Model {
+    /// Fit AR(1) via Yule-Walker equations.
+    ///
+    /// φ = cov(x_t, x_{t-1}) / var(x_t)
+    /// σ = std(x_t) * sqrt(1 - φ²)
+    pub fn fit(data: &[f64]) -> Self {
+        if data.len() < 2 {
+            return Self { phi: 0.0, sigma: 1.0, mean: 0.0 };
+        }
+        let mu = mean(data);
+        let n = data.len();
+
+        // Compute lag-0 variance and lag-1 covariance
+        let var: f64 = data.iter().map(|&x| (x - mu).powi(2)).sum::<f64>() / n as f64;
+        let cov: f64 = data[..n - 1]
+            .iter()
+            .zip(data[1..].iter())
+            .map(|(&a, &b)| (a - mu) * (b - mu))
+            .sum::<f64>()
+            / (n - 1) as f64;
+
+        let phi = if var > 1e-15 { cov / var } else { 0.0 };
+        let sigma = var.sqrt() * (1.0 - phi * phi).max(0.0).sqrt();
+
+        Self { phi, sigma, mean: mu }
+    }
+
+    /// Predict next value: x_{t+1} = μ + φ(x_t - μ)
+    pub fn predict_next(&self, current: f64) -> f64 {
+        self.mean + self.phi * (current - self.mean)
+    }
+
+    /// Multi-step forecast (exponential decay toward mean).
+    pub fn forecast(&self, current: f64, steps: usize) -> Vec<f64> {
+        let mut result = Vec::with_capacity(steps);
+        let mut x = current;
+        for _ in 0..steps {
+            x = self.predict_next(x);
+            result.push(x);
+        }
+        result
+    }
+
+    /// True if the process is stationary (|φ| < 1).
+    pub fn is_stationary(&self) -> bool {
+        self.phi.abs() < 1.0
+    }
+
+    /// Autocorrelation at lag k: ρ(k) = φ^k
+    pub fn acf(&self, lag: usize) -> f64 {
+        self.phi.powi(lag as i32)
+    }
+
+    /// Simulate n observations from the AR(1) process.
+    pub fn simulate(&self, n: usize, seed: u64) -> Vec<f64> {
+        let mut rng = Xorshift64::new(seed);
+        let mut result = Vec::with_capacity(n);
+        let mut x = self.mean;
+        for _ in 0..n {
+            let eps = rng.next_standard_normal();
+            x = self.mean + self.phi * (x - self.mean) + self.sigma * eps;
+            result.push(x);
+        }
+        result
+    }
+}
+
+// ─── Distribution Fitting (MLE) ──────────────────────────────────────────────
+
+/// MLE estimate for Normal distribution: (μ̂, σ̂)
+pub fn fit_normal_mle(data: &[f64]) -> (f64, f64) {
+    let mu = mean(data);
+    let sigma = std_dev(data);
+    (mu, sigma)
+}
+
+/// MLE estimate for Exponential distribution: λ̂ = 1/mean
+pub fn fit_exponential_mle(data: &[f64]) -> f64 {
+    let m = mean(data);
+    if m > 1e-15 { 1.0 / m } else { 1.0 }
+}
+
+/// MLE estimate for Gamma via moment matching.
+///
+/// k̂ = mean² / var,  θ̂ = var / mean
+pub fn fit_gamma_mle(data: &[f64]) -> (f64, f64) {
+    let m = mean(data);
+    let v = variance(data);
+    if m < 1e-15 || v < 1e-15 {
+        return (1.0, 1.0);
+    }
+    let k = m * m / v;
+    let theta = v / m;
+    (k, theta)
+}
+
+/// MLE estimate for Poisson distribution: λ̂ = mean
+pub fn fit_poisson_mle(data: &[f64]) -> f64 {
+    mean(data)
+}
+
+/// Akaike Information Criterion: AIC = -2 * log_likelihood + 2 * k
+pub fn aic(log_likelihood: f64, n_params: usize) -> f64 {
+    -2.0 * log_likelihood + 2.0 * n_params as f64
+}
+
+/// Bayesian Information Criterion: BIC = -2 * log_likelihood + k * ln(n)
+pub fn bic(log_likelihood: f64, n_params: usize, n: usize) -> f64 {
+    -2.0 * log_likelihood + n_params as f64 * (n as f64).ln()
+}
+
 // ─── Tests ───────────────────────────────────────────────────────────────────
 
 #[cfg(test)]
@@ -1363,5 +1603,120 @@ mod tests {
         for _ in 0..100 {
             assert_eq!(rng1.next_u64(), rng2.next_u64());
         }
+    }
+
+    // ── Bootstrap CI ─────────────────────────────────────────────────────
+
+    #[test]
+    fn test_bootstrap_mean_ci_contains_true_mean() {
+        // Data from N(5, 1) — CI should contain 5.0
+        let data: Vec<f64> = vec![4.8, 5.1, 5.0, 4.9, 5.2, 5.0, 4.9, 5.1, 5.3, 4.7,
+                                   5.1, 4.8, 5.0, 5.2, 4.9, 5.0, 5.1, 4.8, 5.3, 5.0];
+        let (lo, hi) = bootstrap_mean_ci(&data, 1000, 0.95, 42);
+        assert!(
+            lo < 5.0 && hi > 5.0,
+            "Bootstrap 95% CI ({:.3}, {:.3}) should contain 5.0",
+            lo, hi
+        );
+    }
+
+    #[test]
+    fn test_bootstrap_median_ci_width() {
+        let data: Vec<f64> = (1..=20).map(|i| i as f64).collect();
+        let (lo, hi) = bootstrap_median_ci(&data, 500, 0.95, 99);
+        assert!(hi > lo, "CI should have positive width");
+        assert!(lo > 0.0 && hi < 22.0, "CI should be in reasonable range");
+    }
+
+    // ── AR(1) Model ──────────────────────────────────────────────────────
+
+    #[test]
+    fn test_ar1_stationarity() {
+        // phi = 0.5 → stationary
+        let m = AR1Model { phi: 0.5, sigma: 1.0, mean: 0.0 };
+        assert!(m.is_stationary());
+        // phi = 1.1 → non-stationary
+        let m2 = AR1Model { phi: 1.1, sigma: 1.0, mean: 0.0 };
+        assert!(!m2.is_stationary());
+    }
+
+    #[test]
+    fn test_ar1_acf_matches_phi_power() {
+        let m = AR1Model { phi: 0.7, sigma: 1.0, mean: 0.0 };
+        for lag in 0..5 {
+            let expected = 0.7f64.powi(lag as i32);
+            assert!(
+                (m.acf(lag) - expected).abs() < 1e-10,
+                "ACF at lag {} = {} != {}",
+                lag, m.acf(lag), expected
+            );
+        }
+    }
+
+    #[test]
+    fn test_ar1_fit_recovers_phi() {
+        // Simulate AR(1) with phi=0.6 and fit
+        let m = AR1Model { phi: 0.6, sigma: 0.5, mean: 2.0 };
+        let data = m.simulate(2000, 1234);
+        let fitted = AR1Model::fit(&data);
+        assert!(
+            (fitted.phi - 0.6).abs() < 0.05,
+            "Fitted phi {} should be near 0.6",
+            fitted.phi
+        );
+    }
+
+    #[test]
+    fn test_ar1_forecast_decays_to_mean() {
+        let m = AR1Model { phi: 0.5, sigma: 1.0, mean: 10.0 };
+        let forecast = m.forecast(20.0, 20);
+        // After many steps, should converge to mean
+        let last = *forecast.last().unwrap();
+        assert!(
+            (last - 10.0).abs() < 1.0,
+            "Long-run forecast {} should be near mean 10.0",
+            last
+        );
+    }
+
+    // ── MLE Fitting ──────────────────────────────────────────────────────
+
+    #[test]
+    fn test_fit_normal_mle_recovers_params() {
+        let data: Vec<f64> = vec![2.8, 3.1, 3.0, 2.9, 3.2, 3.0, 2.9, 3.1, 3.0, 2.95];
+        let (mu, sigma) = fit_normal_mle(&data);
+        assert!((mu - 3.0).abs() < 0.1, "MLE mu {} should be near 3.0", mu);
+        assert!(sigma > 0.0, "MLE sigma should be positive");
+    }
+
+    #[test]
+    fn test_fit_exponential_mle() {
+        // lambda = 2.0, mean = 0.5
+        let data: Vec<f64> = vec![0.3, 0.6, 0.4, 0.5, 0.7, 0.45, 0.55, 0.5, 0.35, 0.6];
+        let lambda = fit_exponential_mle(&data);
+        assert!(lambda > 0.0, "lambda must be positive");
+        // Should be near 2.0
+        assert!((lambda - 2.0).abs() < 0.5, "lambda {} should be near 2.0", lambda);
+    }
+
+    #[test]
+    fn test_fit_gamma_moment_matching() {
+        // k=2, theta=3 → mean=6, var=18
+        // Moment matching: k = mean²/var = 36/18 = 2
+        let data: Vec<f64> = vec![4.0, 6.0, 7.0, 5.0, 8.0, 6.0, 5.5, 7.0, 6.5, 5.0];
+        let (k, theta) = fit_gamma_mle(&data);
+        assert!(k > 0.0 && theta > 0.0, "Gamma params must be positive");
+    }
+
+    #[test]
+    fn test_aic_bic_ordering() {
+        // Higher log-likelihood → lower AIC/BIC
+        let ll_good = -50.0;
+        let ll_bad = -100.0;
+        let n = 100;
+        assert!(aic(ll_good, 2) < aic(ll_bad, 2));
+        assert!(bic(ll_good, 2, n) < bic(ll_bad, 2, n));
+        // More params → higher BIC (penalty)
+        assert!(bic(ll_good, 5, n) > bic(ll_good, 2, n));
     }
 }

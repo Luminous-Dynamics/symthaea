@@ -16,6 +16,9 @@ pub struct ContactPoint<const D: usize> {
     pub position: SVector<f64, D>,
     /// Penetration depth at this point (positive = overlapping).
     pub depth: f64,
+    /// Accumulated normal impulse this frame (TGS Soft solver state).
+    /// Initialised to 0.0 each frame; warm-started from the previous frame's cache.
+    pub lambda: f64,
 }
 
 /// Collision event emitted when two bodies collide.
@@ -66,7 +69,7 @@ impl<const D: usize> ContactManifold<D> {
         depth: f64,
     ) -> Self {
         let mut points = ArrayVec::new();
-        points.push(ContactPoint { position: point, depth });
+        points.push(ContactPoint { position: point, depth, lambda: 0.0 });
         Self {
             body_a,
             body_b,
@@ -79,7 +82,7 @@ impl<const D: usize> ContactManifold<D> {
     pub fn primary_point(&self) -> &ContactPoint<D> {
         self.points
             .iter()
-            .max_by(|a, b| a.depth.partial_cmp(&b.depth).unwrap())
+            .max_by(|a, b| a.depth.total_cmp(&b.depth))
             .unwrap_or(&self.points[0])
     }
 
@@ -192,7 +195,7 @@ impl<const D: usize> ContactCache<D> {
             .min_by(|a, b| {
                 let da = (a.point - point).norm();
                 let db = (b.point - point).norm();
-                da.partial_cmp(&db).unwrap()
+                da.total_cmp(&db)
             })
     }
 
@@ -240,6 +243,7 @@ mod tests {
         m.points.push(ContactPoint {
             position: SVector::from([2.0, 0.0, 0.0]),
             depth: 0.7,
+            lambda: 0.0,
         });
         assert_eq!(m.points.len(), 2);
         assert!((m.depth() - 0.7).abs() < 1e-12, "primary should be deepest");

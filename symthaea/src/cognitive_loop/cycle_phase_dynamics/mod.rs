@@ -599,6 +599,32 @@ impl CognitiveLoopService {
                     if self.muse_manager.should_run(cycle_num, urgency_u8) {
                         run_subsystem!(self.muse_manager, "muse_manager", snapshot);
                     }
+
+                    // Poll for completed CompositionExports and hand off to the
+                    // background MusicPublisher.  Runs every cycle (cheap: just
+                    // a VecDeque::pop_front + mpsc::Sender::send).
+                    #[cfg(feature = "muse")]
+                    {
+                        while let Some(export) = self.muse_manager.take_next_export() {
+                            self.music_publisher.submit(export);
+                        }
+                        // Drain upload results (best-effort logging; non-blocking).
+                        for result in self.music_publisher.drain_results() {
+                            if result.success {
+                                log::debug!(
+                                    "[music-publisher] uploaded {:?} → CID {:?}",
+                                    result.title,
+                                    result.cid
+                                );
+                            } else {
+                                log::warn!(
+                                    "[music-publisher] upload failed for {:?}: {:?}",
+                                    result.title,
+                                    result.error
+                                );
+                            }
+                        }
+                    }
                 }
 
                 // ── Thermodynamic Manager (interval 43, co-prime) ─────

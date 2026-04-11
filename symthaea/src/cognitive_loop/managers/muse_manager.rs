@@ -34,6 +34,27 @@ use serde::{Deserialize, Serialize};
 use symthaea_muse::streaming::StreamingSynth;
 use symthaea_muse::{MuseConfig, MusicalState};
 
+// ─── Composition Export ───────────────────────────────────────────────────────
+
+/// A completed composition ready for publication.
+///
+/// Accumulates ~`MUSE_EXPORT_SECS` seconds of stereo PCM, then encodes to WAV.
+/// Callers drain this via `take_next_export()` and publish to the Mycelix-Music
+/// DHT via `MusicPublisher`.
+#[derive(Debug)]
+pub struct CompositionExport {
+    /// WAV-encoded stereo audio (32-bit float, 44100 Hz).
+    pub wav_bytes: Vec<u8>,
+    /// Auto-generated title: "Symthaea-YYYY-MM-DD-HH:MM:SS".
+    pub title: String,
+    /// Duration of this composition in seconds.
+    pub duration_secs: f32,
+    /// Cognitive state that drove this composition.
+    pub musical_state: MusicalState,
+    /// Unix timestamp (seconds) when this was completed.
+    pub timestamp_secs: u64,
+}
+
 // ─── Named Constants ──────────────────────────────────────────────────────────
 
 /// Manager fires every cycle for continuous audio.
@@ -49,6 +70,13 @@ pub const MUSE_SAMPLE_RATE: u32 = 44100;
 
 /// Chunk duration in milliseconds (~32ms for 31Hz cognitive loop).
 pub const MUSE_CHUNK_MS: u32 = 32;
+
+/// Seconds of audio to accumulate before creating a CompositionExport.
+/// At 31Hz cognitive loop, 8 seconds ≈ 248 cycles.
+pub const MUSE_EXPORT_SECS: f32 = 8.0;
+
+/// Maximum number of pending exports in the queue before oldest is dropped.
+pub const MUSE_EXPORT_QUEUE_CAPACITY: usize = 4;
 
 /// Fade-to-silence duration when safety level is Red (ms).
 pub const MUSE_SILENCE_FADE_MS: u32 = 200;
@@ -147,6 +175,17 @@ pub struct MuseManager {
     #[cfg(feature = "muse-live")]
     live_output: Option<symthaea_muse::live_output::LiveMuseOutput>,
 
+    // ── Composition accumulation & export ─────────────────────────────
+    /// Stereo samples accumulated toward the next CompositionExport.
+    accumulated_samples: Vec<[f32; 2]>,
+    /// Total samples needed before emitting an export (MUSE_EXPORT_SECS × sample_rate).
+    export_target_samples: usize,
+    /// Queue of completed compositions waiting for publication.
+    /// Capacity-bounded at MUSE_EXPORT_QUEUE_CAPACITY; oldest is dropped when full.
+    pending_exports: std::collections::VecDeque<CompositionExport>,
+    /// Monotonic export counter for title generation.
+    export_count: u64,
+
     // ── Telemetry ─────────────────────────────────────────────────────
     underruns: u64,
 }
@@ -168,6 +207,7 @@ impl MuseManager {
         let mut synth = StreamingSynth::new(config.clone(), MUSE_SAMPLE_RATE);
         synth.set_chunk_duration_ms(MUSE_CHUNK_MS);
 
+        let export_target_samples = (MUSE_EXPORT_SECS * MUSE_SAMPLE_RATE as f32) as usize;
         Self {
             synth,
             last_musical_state: MusicalState::default(),
@@ -183,6 +223,10 @@ impl MuseManager {
             #[cfg(feature = "muse-live")]
             live_output: symthaea_muse::live_output::LiveMuseOutput::new(config).ok(),
             fade_level: 1.0,
+            accumulated_samples: Vec::with_capacity(export_target_samples),
+            export_target_samples,
+            pending_exports: std::collections::VecDeque::new(),
+            export_count: 0,
             underruns: 0,
         }
     }
@@ -230,6 +274,19 @@ impl MuseManager {
     /// Get the current MusicalState driving synthesis.
     pub fn musical_state(&self) -> &MusicalState {
         &self.last_musical_state
+    }
+
+    /// Drain the next completed CompositionExport, if any.
+    ///
+    /// Callers poll this each cycle (or less frequently) and pass the result to
+    /// `MusicPublisher::submit()` for background upload to the Mycelix-Music DHT.
+    pub fn take_next_export(&mut self) -> Option<CompositionExport> {
+        self.pending_exports.pop_front()
+    }
+
+    /// Number of exports queued and waiting for publication.
+    pub fn pending_export_count(&self) -> usize {
+        self.pending_exports.len()
     }
 
     /// Get current telemetry.
@@ -373,6 +430,44 @@ impl Default for MuseManager {
     }
 }
 
+impl MuseManager {
+    /// Encode interleaved stereo f32 PCM as a minimal RIFF/WAV file.
+    ///
+    /// Uses IEEE float format (format code 3), 32-bit, stereo.
+    /// No external dependencies — pure byte construction.
+    fn encode_wav_f32_stereo(samples: &[[f32; 2]], sample_rate: u32) -> Vec<u8> {
+        const NUM_CHANNELS: u16 = 2;
+        const BITS_PER_SAMPLE: u16 = 32;
+        let byte_rate = sample_rate * NUM_CHANNELS as u32 * (BITS_PER_SAMPLE as u32 / 8);
+        let block_align: u16 = NUM_CHANNELS * (BITS_PER_SAMPLE / 8);
+        let data_size = (samples.len() * NUM_CHANNELS as usize * 4) as u32;
+        let file_size = 36u32 + data_size;
+
+        let mut out = Vec::with_capacity(44 + data_size as usize);
+        // RIFF header
+        out.extend_from_slice(b"RIFF");
+        out.extend_from_slice(&file_size.to_le_bytes());
+        out.extend_from_slice(b"WAVE");
+        // fmt chunk — IEEE float PCM (format code 3)
+        out.extend_from_slice(b"fmt ");
+        out.extend_from_slice(&16u32.to_le_bytes()); // chunk size (no extension)
+        out.extend_from_slice(&3u16.to_le_bytes());  // IEEE float
+        out.extend_from_slice(&NUM_CHANNELS.to_le_bytes());
+        out.extend_from_slice(&sample_rate.to_le_bytes());
+        out.extend_from_slice(&byte_rate.to_le_bytes());
+        out.extend_from_slice(&block_align.to_le_bytes());
+        out.extend_from_slice(&BITS_PER_SAMPLE.to_le_bytes());
+        // data chunk
+        out.extend_from_slice(b"data");
+        out.extend_from_slice(&data_size.to_le_bytes());
+        for [l, r] in samples {
+            out.extend_from_slice(&l.to_le_bytes());
+            out.extend_from_slice(&r.to_le_bytes());
+        }
+        out
+    }
+}
+
 impl CognitiveSubsystem for MuseManager {
     fn name(&self) -> &'static str {
         "muse_manager"
@@ -405,6 +500,35 @@ impl CognitiveSubsystem for MuseManager {
         // 6. Store for external access (RDP, direct output)
         self.last_chunk = chunk;
         self.last_musical_state = musical_state.clone();
+
+        // 6c. Accumulate samples; emit CompositionExport when target is reached
+        self.accumulated_samples.extend_from_slice(&self.last_chunk);
+        if self.accumulated_samples.len() >= self.export_target_samples {
+            let title = format!(
+                "Symthaea Composition #{} — Ψ={:.2}",
+                self.export_count + 1,
+                snapshot.unified_psi
+            );
+            let wav_bytes = Self::encode_wav_f32_stereo(
+                &self.accumulated_samples[..self.export_target_samples],
+                MUSE_SAMPLE_RATE,
+            );
+            let export = CompositionExport {
+                wav_bytes,
+                title,
+                duration_secs: MUSE_EXPORT_SECS,
+                musical_state: self.last_musical_state.clone(),
+                timestamp_secs: snapshot.cycle_number as u64,
+            };
+            if self.pending_exports.len() >= MUSE_EXPORT_QUEUE_CAPACITY {
+                self.pending_exports.pop_front(); // drop oldest if queue is full
+            }
+            self.pending_exports.push_back(export);
+            self.export_count += 1;
+            // Retain overflow samples so the next composition starts immediately
+            let excess = self.accumulated_samples.split_off(self.export_target_samples);
+            self.accumulated_samples = excess;
+        }
 
         // 6b. Push to live speakers if enabled
         #[cfg(feature = "muse-live")]

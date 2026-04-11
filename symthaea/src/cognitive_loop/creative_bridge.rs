@@ -135,8 +135,18 @@ enum CreativeModality {
 
 #[cfg(feature = "creative")]
 impl CreativeManager {
+    /// Create a new CreativeManager, loading aesthetic memory from the default path.
     pub fn new() -> Self {
-        let memory_path = std::path::PathBuf::from(AESTHETIC_MEMORY_PATH);
+        Self::new_with_path(None)
+    }
+
+    /// Create a new CreativeManager with an explicit aesthetic memory path.
+    ///
+    /// When `path` is `None`, falls back to `AESTHETIC_MEMORY_PATH` (`.claude/aesthetic_memory.json`).
+    /// This allows the cognitive loop config to specify a project-specific memory location,
+    /// so Symthaea's taste identity survives across deployments and working directories.
+    pub fn new_with_path(path: Option<std::path::PathBuf>) -> Self {
+        let memory_path = path.unwrap_or_else(|| std::path::PathBuf::from(AESTHETIC_MEMORY_PATH));
         let memory = AestheticMemory::load(&memory_path);
         let tracker =
             AestheticTracker::from_memory(AestheticConfig::default(), &memory);
@@ -411,6 +421,34 @@ impl CreativeManager {
                     };
                 }
 
+                self.next_modality = CreativeModality::ReactionDiffusion;
+            }
+            CreativeModality::ReactionDiffusion => {
+                let rd_config = AtelierConfig {
+                    style: symthaea_atelier::AtelierStyle::ReactionDiffusion,
+                    ..self.atelier_config.clone()
+                };
+                let artwork = symthaea_atelier::create_artwork(&rd_config, snap, self.seed_counter);
+                let score = artwork.aesthetic_score;
+                let feedback = self.tracker.process(&score, &snap.harmony_activations);
+                output.artwork_svg = Some(artwork.svg);
+                output.feedback = feedback;
+                modality_name = "reaction-diffusion";
+                self.record_telemetry(&score, &feedback, modality_name, 1, start.elapsed());
+                self.next_modality = CreativeModality::StrangeAttractor;
+            }
+            CreativeModality::StrangeAttractor => {
+                let sa_config = AtelierConfig {
+                    style: symthaea_atelier::AtelierStyle::StrangeAttractor,
+                    ..self.atelier_config.clone()
+                };
+                let artwork = symthaea_atelier::create_artwork(&sa_config, snap, self.seed_counter);
+                let score = artwork.aesthetic_score;
+                let feedback = self.tracker.process(&score, &snap.harmony_activations);
+                output.artwork_svg = Some(artwork.svg);
+                output.feedback = feedback;
+                modality_name = "strange-attractor";
+                self.record_telemetry(&score, &feedback, modality_name, 1, start.elapsed());
                 self.next_modality = CreativeModality::Visual;
             }
         }
