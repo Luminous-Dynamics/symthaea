@@ -36,9 +36,12 @@
 //! - Boys (1950). Proc. R. Soc. Lond. A 200, 542 (Boys function).
 
 pub mod basis;
+pub mod consciousness;
 pub mod constants;
+pub mod geometry_opt;
 pub mod integrals;
 pub mod molecule;
+pub mod post_hf;
 pub mod scf;
 
 // Re-export key types for convenience
@@ -46,3 +49,6 @@ pub use basis::{BasisSet, BasisSetProvider, ContractedGaussian, PrimitiveGaussia
 pub use molecule::{Atom, Molecule};
 pub use scf::generalized_eigen::GeneralizedEigenResult;
 pub use scf::rhf::{restricted_hartree_fock, RhfConfig, RhfResult};
+pub use post_hf::mp2::{mp2_correlation_energy, Mp2Result};
+pub use consciousness::{compute_orbital_phi, build_atom_basis_ranges, OrbitalPhiMeasurement};
+pub use geometry_opt::{optimize_geometry, GeomOptConfig, GeomOptResult};
