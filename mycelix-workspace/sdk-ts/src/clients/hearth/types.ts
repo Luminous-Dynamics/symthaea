@@ -790,11 +790,14 @@ export interface GovernanceAuditResult {
   total_matched: number;
 }
 
-export type ConsciousnessTier = 'Dormant' | 'Awakening' | 'Aware' | 'Reflective' | 'Transcendent';
+/** Hearth-specific growth stages (distinct from civic CivicTier). */
+export type HearthGrowthStage = 'Dormant' | 'Awakening' | 'Aware' | 'Reflective' | 'Transcendent';
+/** @deprecated Use HearthGrowthStage — this name conflicts with civic CivicTier. */
+export type ConsciousnessTier = HearthGrowthStage;
 
 export interface ConsciousnessCredential {
   did: string;
-  tier: ConsciousnessTier;
+  tier: HearthGrowthStage;
   phi_score: number;
   issued_at: Timestamp;
 }

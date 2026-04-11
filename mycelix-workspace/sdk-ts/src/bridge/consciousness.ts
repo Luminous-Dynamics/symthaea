@@ -2,14 +2,13 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 /**
- * Consciousness Gating Types
+ * Consciousness Gating Types (Legacy)
  *
- * TypeScript equivalents of mycelix-bridge-common consciousness_profile.rs.
- * These types enable TypeScript clients to understand their own consciousness
- * tier and the requirements for governance actions.
+ * @deprecated Use `@mycelix/sdk/core/sovereign-gate` for the 8D sovereign
+ * profile system. This module is retained for backward compatibility.
  *
- * The 4D consciousness profile maps agent activity across four dimensions
- * into a combined score that determines governance tier and vote weight.
+ * The 4D consciousness profile has been superseded by the 8D sovereign
+ * profile (CivicTier, SovereignProfile, CivicRequirement).
  */
 
 // =============================================================================
@@ -17,15 +16,8 @@
 // =============================================================================
 
 /**
- * Consciousness tiers determine governance capabilities.
- * Higher tiers unlock more powerful actions.
- *
- * Thresholds (with 0.05 hysteresis margin):
- * - Observer:    score < 0.30
- * - Participant: score >= 0.30
- * - Citizen:     score >= 0.40
- * - Steward:     score >= 0.60
- * - Guardian:    score >= 0.80
+ * @deprecated Use `CivicTier` from `@mycelix/sdk/core/sovereign-gate` instead.
+ * The tier values are identical (Observer→Guardian).
  */
 export enum ConsciousnessTier {
   /** Read-only access, no governance participation */

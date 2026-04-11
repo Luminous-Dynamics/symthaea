@@ -1219,7 +1219,8 @@ export interface TallySegment {
 }
 
 /**
- * Breakdown by voter consciousness tier
+ * Breakdown by voter civic tier.
+ * @deprecated Rename to CivicTierBreakdown in next major version.
  */
 export interface ConsciousnessTierBreakdown {
   highConsciousnessVotes: TallySegment;

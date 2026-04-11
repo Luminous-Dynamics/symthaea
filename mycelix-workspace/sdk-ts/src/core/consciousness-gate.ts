@@ -2,10 +2,10 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 /**
- * Consciousness Gate Error Handling & Middleware
+ * Consciousness Gate Error Handling & Middleware (Legacy)
  *
- * Provides structured error types for consciousness gate rejections,
- * pre-flight eligibility checks, and retry-on-expired middleware.
+ * @deprecated Use `sovereign-gate` for the 8D civic gating system.
+ * This module is retained for backward compatibility.
  *
  * @module @mycelix/sdk/core/consciousness-gate
  */
@@ -16,7 +16,7 @@ import { SdkError, SdkErrorCode } from './errors';
 // Types
 // ============================================================================
 
-/** Consciousness tier levels matching Rust ConsciousnessTier enum */
+/** @deprecated Use `CivicTier` from `sovereign-gate` instead. */
 export type ConsciousnessTier =
   | 'Observer'
   | 'Participant'

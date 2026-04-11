@@ -192,8 +192,8 @@ export interface ConsciousnessProfile {
   engagement: number;
 }
 
-/** Consciousness tiers — mirrors Rust ConsciousnessTier enum. */
-export type ConsciousnessTier =
+/** Civic tiers — mirrors Rust CivicTier enum. */
+export type CivicTier =
   | 'Observer'
   | 'Participant'
   | 'Citizen'
@@ -204,7 +204,7 @@ export type ConsciousnessTier =
 export interface ConsciousnessCredential {
   did: string;
   profile: ConsciousnessProfile;
-  tier: ConsciousnessTier;
+  tier: CivicTier;
   issued_at: number;
   expires_at: number;
   issuer: string;
@@ -214,7 +214,7 @@ export interface ConsciousnessCredential {
 export interface GovernanceEligibility {
   eligible: boolean;
   weight_bp: number;
-  tier: ConsciousnessTier;
+  tier: CivicTier;
   profile: ConsciousnessProfile;
   reasons: string[];
 }
@@ -238,8 +238,8 @@ export function isCivicDomain(value: string): value is CivicDomain {
   return CIVIC_DOMAINS.includes(value as CivicDomain);
 }
 
-/** Tier score thresholds (matches Rust ConsciousnessTier::min_score). */
-export const TIER_THRESHOLDS: Record<ConsciousnessTier, number> = {
+/** Tier score thresholds (matches Rust CivicTier::min_score). */
+export const TIER_THRESHOLDS: Record<CivicTier, number> = {
   Observer: 0.0,
   Participant: 0.3,
   Citizen: 0.4,
@@ -248,7 +248,7 @@ export const TIER_THRESHOLDS: Record<ConsciousnessTier, number> = {
 };
 
 /** Progressive vote weight in basis points per tier. */
-export const TIER_VOTE_WEIGHT_BP: Record<ConsciousnessTier, number> = {
+export const TIER_VOTE_WEIGHT_BP: Record<CivicTier, number> = {
   Observer: 0,
   Participant: 5000,
   Citizen: 7500,
