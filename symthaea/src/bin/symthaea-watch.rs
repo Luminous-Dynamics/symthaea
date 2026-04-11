@@ -10,16 +10,13 @@
 //!
 //! ```bash
 //! # Initialize the ClickHouse table (run once)
-//! cargo run --features "api_module,service" --bin symthaea-watch -- --init-db
+//! cargo run --features "api_module,service,full_consciousness" --bin symthaea-watch -- --init-db
 //!
 //! # Start the harness with defaults
-//! cargo run --features "api_module,service" --bin symthaea-watch
+//! cargo run --features "api_module,service,full_consciousness" --bin symthaea-watch
 //!
-//! # Custom settings via flags
-//! cargo run --features "api_module,service" --bin symthaea-watch \
-//!     --clickhouse http://localhost:8123 \
-//!     --metrics-port 8405 \
-//!     --cycles-per-second 10
+//! # Natural-speed operation (recommended for debug builds)
+//! cargo run --features "api_module,service,full_consciousness" --bin symthaea-watch -- --no-throttle
 //! ```
 //!
 //! # Live SQL queries against ClickHouse

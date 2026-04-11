@@ -207,8 +207,16 @@ impl CognitiveLoopService {
         // Sustained low coherence (>10 cycles) forces Critical — model needs full reprocessing.
         // Also boost exploration: if the model is persistently confused, seek novel inputs.
         // Schmidhuber (2010): curiosity-driven learning from persistent prediction failure.
+        //
+        // GATE: If consciousness is high (Phi > 0.5), the system is genuinely integrated
+        // despite low prediction coherence. Don't escalate to Critical — the low coherence
+        // is a measurement artifact (e.g., CfC predictions aren't aligned with HDC compressed
+        // space), not a genuine model failure. This prevents the "high consciousness but
+        // stuck in Critical" trap observed in watch telemetry.
+        let consciousness_level = self.carryover.history.consciousness_level;
         let error_urgency = if self.carryover.urgency.consecutive_low_coherence
             > super::super::thresholds::LOW_COHERENCE_EXPLORATION_THRESHOLD
+            && consciousness_level < 0.5
         {
             self.adjust_exploration(
                 "sustained_low_coherence",
