@@ -620,10 +620,14 @@ impl NetworkService {
             peer_info.trust_level = trust_level;
             peer_info.state = ConnectionState::Connected;
 
-            // Store peer
+            // Store peer and update connected count
             self.peers
                 .write()
                 .insert(peer_id.clone(), peer_info.clone());
+            let peer_count = self.peers.read().len();
+            self.stats.write().connected_peers = peer_count;
+            crate::api::metrics::global()
+                .set_gauge("swarm_peers_connected", peer_count as f64);
 
             // Emit connected event
             let _ = self
@@ -1016,6 +1020,7 @@ impl NetworkService {
                 }
                 Err(e) => {
                     tracing::debug!(error = %e, "accept_connections: inbound connection error — continuing");
+                    crate::api::metrics::global().increment("iroh_handshakes_failed_total");
                     tokio::time::sleep(std::time::Duration::from_millis(100)).await;
                     continue;
                 }
@@ -1040,7 +1045,10 @@ impl NetworkService {
             peer_info.trust_level = trust_level;
             peer_info.state = ConnectionState::Connected;
             self.peers.write().insert(peer_id.clone(), peer_info.clone());
-            self.stats.write().connected_peers = self.peers.read().len();
+            let peer_count = self.peers.read().len();
+            self.stats.write().connected_peers = peer_count;
+            crate::api::metrics::global()
+                .set_gauge("swarm_peers_connected", peer_count as f64);
 
             let _ = self.peer_event_tx.send(PeerEvent::Connected(peer_info));
 

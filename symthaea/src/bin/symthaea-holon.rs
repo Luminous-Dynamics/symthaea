@@ -192,6 +192,22 @@ async fn main() -> Result<()> {
                         info!("Iroh node ID (for peer bootstrap): {}", node_id);
                     }
                 }
+
+                // Bootstrap to known peers via SYMTHAEA_BOOTSTRAP_PEERS env var.
+                // Format: comma-separated JSON EndpointAddr tickets (as logged above).
+                // Example: SYMTHAEA_BOOTSTRAP_PEERS='{"ticket1",...},{"ticket2",...}'
+                if let Ok(raw) = std::env::var("SYMTHAEA_BOOTSTRAP_PEERS") {
+                    if let Some(service) = cls.network_service().cloned() {
+                        let tickets: Vec<&str> = raw.split(',').map(str::trim).filter(|s| !s.is_empty()).collect();
+                        info!("Bootstrapping to {} peer(s) from SYMTHAEA_BOOTSTRAP_PEERS", tickets.len());
+                        for ticket in tickets {
+                            match service.connect_to_peer(ticket).await {
+                                Ok(info) => info!(peer = %info.node_id, "Bootstrap connection established"),
+                                Err(e) => warn!(error = %e, ticket = %&ticket[..ticket.len().min(32)], "Bootstrap connect failed"),
+                            }
+                        }
+                    }
+                }
             }
             Err(e) => {
                 warn!(error = %e, "P2P networking disabled — running local-only");
@@ -420,6 +436,7 @@ async fn main() -> Result<()> {
                 let crisis_events = cls.drain_pending_crisis_events();
                 for event in crisis_events {
                     mycelix_bridge.dispatch_crisis(&event);
+                    symthaea::api::metrics::global().increment("crisis_dispatches_total");
                 }
             }
 
@@ -454,6 +471,8 @@ async fn main() -> Result<()> {
                         packets.push(pkt);
                     }
                     if !packets.is_empty() {
+                        symthaea::api::metrics::global()
+                            .add("mesh_packets_sent_total", packets.len() as u64);
                         mesh_bridge_handle.flush_outbox(packets);
                     }
                 }

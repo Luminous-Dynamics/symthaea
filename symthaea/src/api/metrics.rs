@@ -263,6 +263,24 @@ impl MetricsRegistry {
             "Total swarm messages received",
         );
 
+        // Networking subsystem metrics (P2P / federation / mesh / governance)
+        registry.register_counter(
+            "iroh_handshakes_failed_total",
+            "Iroh inbound QUIC handshake failures (transient errors, with 100ms backoff)",
+        );
+        registry.register_counter(
+            "federation_rounds_total",
+            "Successful federated learning synchronisation rounds",
+        );
+        registry.register_counter(
+            "mesh_packets_sent_total",
+            "Wisdom packets flushed to the DualLayerMesh bridge actor",
+        );
+        registry.register_counter(
+            "crisis_dispatches_total",
+            "Civic crisis events dispatched to the Mycelix governance channel",
+        );
+
         // Memory metrics
         registry.register_gauge("memory_entries_total", "Total entries in memory store");
         registry.register_gauge("memory_cache_hit_ratio", "Memory cache hit ratio");
@@ -682,6 +700,15 @@ mod tests {
         assert_eq!(snapshot.metrics.len(), 1);
         assert_eq!(snapshot.metrics[0].name, "test_metric");
         assert_eq!(snapshot.metrics[0].value, 1.0);
+    }
+
+    #[test]
+    fn test_networking_metrics_registered() {
+        let registry = MetricsRegistry::with_standard_metrics();
+        assert!(registry.get("iroh_handshakes_failed_total").is_some());
+        assert!(registry.get("federation_rounds_total").is_some());
+        assert!(registry.get("mesh_packets_sent_total").is_some());
+        assert!(registry.get("crisis_dispatches_total").is_some());
     }
 
     #[test]
