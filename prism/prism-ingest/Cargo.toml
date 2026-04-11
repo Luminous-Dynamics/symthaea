@@ -17,6 +17,10 @@ log = { workspace = true }
 name = "fetch_wikidata"
 required-features = ["fetch"]
 
+[[bin]]
+name = "build_corpus"
+required-features = ["fetch"]
+
 [features]
 fetch = ["dep:reqwest"]
 

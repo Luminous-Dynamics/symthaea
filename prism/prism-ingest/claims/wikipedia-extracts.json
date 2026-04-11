@@ -1,0 +1,4982 @@
+[
+  {
+    "claim": "Quantum mechanics is the fundamental physical theory that describes the behavior of matter and of light; its unusual characteristics typically occur at and below the scale of atoms.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Quantum mechanics"
+    ],
+    "tags": [
+      "physics"
+    ]
+  },
+  {
+    "claim": "It is the foundation of all quantum physics, which includes quantum chemistry, quantum biology, quantum field theory, quantum technology, and quantum information science.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Quantum mechanics"
+    ],
+    "tags": [
+      "physics"
+    ]
+  },
+  {
+    "claim": "General relativity generalizes special relativity and refines Isaac Newton's law of universal gravitation, providing a unified description of gravity as a geometric property of space and time, or four-dimensional spacetime.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: General relativity"
+    ],
+    "tags": [
+      "physics"
+    ]
+  },
+  {
+    "claim": "In particular, the curvature of spacetime is directly related to the energy, momentum, and stress of whatever is present, including matter and radiation.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: General relativity"
+    ],
+    "tags": [
+      "physics"
+    ]
+  },
+  {
+    "claim": "The relation is specified by the Einstein field equations, a system of second-order partial differential equations.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: General relativity"
+    ],
+    "tags": [
+      "physics"
+    ]
+  },
+  {
+    "claim": "Thermodynamics is a branch of physics that deals with heat, work, and temperature, and their relation to energy, entropy, and the physical properties of matter and radiation.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Thermodynamics"
+    ],
+    "tags": [
+      "physics"
+    ]
+  },
+  {
+    "claim": "Thermodynamics applies to various topics in science and engineering, especially physical chemistry, biochemistry, chemical engineering, and mechanical engineering, as well as other complex fields such as meteorology.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Thermodynamics"
+    ],
+    "tags": [
+      "physics"
+    ]
+  },
+  {
+    "claim": "In physics, electromagnetism is an interaction that occurs between particles with electric charge via electromagnetic fields.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Electromagnetism"
+    ],
+    "tags": [
+      "physics"
+    ]
+  },
+  {
+    "claim": "The electromagnetic force is one of the four fundamental forces of nature.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Electromagnetism"
+    ],
+    "tags": [
+      "physics"
+    ]
+  },
+  {
+    "claim": "It is the dominant force in the interactions of atoms and molecules.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Electromagnetism"
+    ],
+    "tags": [
+      "physics"
+    ]
+  },
+  {
+    "claim": "Particle physics or high-energy physics is the study of fundamental particles and forces that constitute matter and radiation.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Particle physics"
+    ],
+    "tags": [
+      "physics"
+    ]
+  },
+  {
+    "claim": "The field also studies combinations of elementary particles up to the scale of protons and neutrons, while the study of combinations of protons and neutrons is called nuclear physics.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Particle physics"
+    ],
+    "tags": [
+      "physics"
+    ]
+  },
+  {
+    "claim": "Nuclear physics is the field of physics that studies atomic nuclei and their constituents and interactions, in addition to the study of other forms of nuclear matter.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Nuclear physics"
+    ],
+    "tags": [
+      "physics"
+    ]
+  },
+  {
+    "claim": "Condensed matter physics is the field of physics that deals with the macroscopic and microscopic physical properties of matter, especially the solid and liquid phases, that arise from electromagnetic forces between atoms and electrons.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Condensed matter physics"
+    ],
+    "tags": [
+      "physics"
+    ]
+  },
+  {
+    "claim": "More generally, the subject deals with condensed phases of matter: systems of many constituents with strong interactions among them.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Condensed matter physics"
+    ],
+    "tags": [
+      "physics"
+    ]
+  },
+  {
+    "claim": "Plasma is a state of matter that results from a gaseous state having undergone some degree of ionization.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Plasma (physics)"
+    ],
+    "tags": [
+      "physics"
+    ]
+  },
+  {
+    "claim": "It thus consists of a significant portion of charged particles.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Plasma (physics)"
+    ],
+    "tags": [
+      "physics"
+    ]
+  },
+  {
+    "claim": "While rarely encountered on Earth, it is estimated that 99.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Plasma (physics)"
+    ],
+    "tags": [
+      "physics"
+    ]
+  },
+  {
+    "claim": "Optics is the branch of physics that studies the behaviour, manipulation, and detection of electromagnetic radiation, including its interactions with matter and instruments that use or detect it.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Optics"
+    ],
+    "tags": [
+      "physics"
+    ]
+  },
+  {
+    "claim": "Optics usually describes the behaviour of visible, ultraviolet, and infrared light.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Optics"
+    ],
+    "tags": [
+      "physics"
+    ]
+  },
+  {
+    "claim": "The study of optics extends to other forms of electromagnetic radiation, including radio waves, microwaves, \nand X-rays.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Optics"
+    ],
+    "tags": [
+      "physics"
+    ]
+  },
+  {
+    "claim": "Acoustics is a branch of continuum mechanics that deals with the study of mechanical waves in gases, liquids, and solids including topics such as vibration, sound, ultrasound and infrasound.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Acoustics"
+    ],
+    "tags": [
+      "physics"
+    ]
+  },
+  {
+    "claim": "A scientist who works in the field of acoustics is an acoustician while someone working in the field of acoustics technology may be called an acoustical engineer.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Acoustics"
+    ],
+    "tags": [
+      "physics"
+    ]
+  },
+  {
+    "claim": "The application of acoustics is present in almost all aspects of modern society with the most obvious being the audio and noise control industries.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Acoustics"
+    ],
+    "tags": [
+      "physics"
+    ]
+  },
+  {
+    "claim": "In physics, physical chemistry, and engineering, fluid dynamics is a subdiscipline of fluid mechanics that describes the flow of fluids – liquids and gases.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Fluid dynamics"
+    ],
+    "tags": [
+      "physics"
+    ]
+  },
+  {
+    "claim": "It has several subdisciplines, including aerodynamics and hydrodynamics.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Fluid dynamics"
+    ],
+    "tags": [
+      "physics"
+    ]
+  },
+  {
+    "claim": "In physics, statistical mechanics is a mathematical framework that applies statistical methods and probability theory to large assemblies of microscopic entities.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Statistical mechanics"
+    ],
+    "tags": [
+      "physics"
+    ]
+  },
+  {
+    "claim": "Sometimes called statistical physics or statistical thermodynamics, its applications include many problems in a wide variety of fields such as biology, neuroscience, computer science, information theory and sociology.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Statistical mechanics"
+    ],
+    "tags": [
+      "physics"
+    ]
+  },
+  {
+    "claim": "Its main purpose is to clarify the properties of matter in aggregate, in terms of physical laws governing atomic motion.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Statistical mechanics"
+    ],
+    "tags": [
+      "physics"
+    ]
+  },
+  {
+    "claim": "In theoretical physics, quantum field theory (QFT) is a theoretical framework that combines field theory, special relativity and quantum mechanics.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Quantum field theory"
+    ],
+    "tags": [
+      "physics"
+    ]
+  },
+  {
+    "claim": "QFT is used in particle physics to construct physical models of subatomic particles and in condensed matter physics to construct models of quasiparticles.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Quantum field theory"
+    ],
+    "tags": [
+      "physics"
+    ]
+  },
+  {
+    "claim": "The current Standard Model of particle physics is based on QFT.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Quantum field theory"
+    ],
+    "tags": [
+      "physics"
+    ]
+  },
+  {
+    "claim": "In physics, string theory is a theoretical framework in which the point-like particles of particle physics are replaced by one-dimensional objects called strings.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: String theory"
+    ],
+    "tags": [
+      "physics"
+    ]
+  },
+  {
+    "claim": "String theory describes how these strings propagate through space and interact with each other.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: String theory"
+    ],
+    "tags": [
+      "physics"
+    ]
+  },
+  {
+    "claim": "On distance scales larger than the string scale, a string acts like a particle, with its mass, charge, and other properties determined by the vibrational state of the string.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: String theory"
+    ],
+    "tags": [
+      "physics"
+    ]
+  },
+  {
+    "claim": "Cosmology is the study of the nature of the universe, the cosmos.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Cosmology"
+    ],
+    "tags": [
+      "physics"
+    ]
+  },
+  {
+    "claim": "The term cosmology was first used in English in 1656 in Thomas Blount's Glossographia, with the meaning of \"a speaking of the world\".",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Cosmology"
+    ],
+    "tags": [
+      "physics"
+    ]
+  },
+  {
+    "claim": "In 1731, German philosopher Christian Wolff used the term cosmology in Latin (cosmologia) to denote a branch of metaphysics that deals with the general nature of the physical world.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Cosmology"
+    ],
+    "tags": [
+      "physics"
+    ]
+  },
+  {
+    "claim": "A chemical bond is the association of atoms or ions to form molecules, crystals, and other structures.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Chemical bond"
+    ],
+    "tags": [
+      "chemistry"
+    ]
+  },
+  {
+    "claim": "The bond may result from the electrostatic force between oppositely charged ions as in ionic bonds or through the sharing of electrons as in covalent bonds, or some combination of these effects.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Chemical bond"
+    ],
+    "tags": [
+      "chemistry"
+    ]
+  },
+  {
+    "claim": "Organic chemistry is a subdiscipline within chemistry involving the scientific study of the structure, properties, and reactions of organic compounds and organic materials.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Organic chemistry"
+    ],
+    "tags": [
+      "chemistry"
+    ]
+  },
+  {
+    "claim": "It involves studying the structure of organic material to determine the structural formula, analyzing physical and chemical properties, and evaluating chemical reactivity to understand the behavior of organic compounds.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Organic chemistry"
+    ],
+    "tags": [
+      "chemistry"
+    ]
+  },
+  {
+    "claim": "The study of organic reactions includes the chemical synthesis of natural products, drugs, and polymers, and study of individual organic molecules in the laboratory and via theoretical study.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Organic chemistry"
+    ],
+    "tags": [
+      "chemistry"
+    ]
+  },
+  {
+    "claim": "Biochemistry, or biological chemistry, is the study of chemical processes within and relating to living organisms.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Biochemistry"
+    ],
+    "tags": [
+      "chemistry"
+    ]
+  },
+  {
+    "claim": "A sub-discipline of both chemistry and biology, biochemistry may be divided into three fields: structural biology, enzymology, and metabolism.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Biochemistry"
+    ],
+    "tags": [
+      "chemistry"
+    ]
+  },
+  {
+    "claim": "Over the last decades of the 20th century, biochemistry has become successful at explaining living processes through these three disciplines.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Biochemistry"
+    ],
+    "tags": [
+      "chemistry"
+    ]
+  },
+  {
+    "claim": "Electrochemistry is the branch of physical chemistry concerned with the relationship between electrical potential difference and identifiable chemical change.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Electrochemistry"
+    ],
+    "tags": [
+      "chemistry"
+    ]
+  },
+  {
+    "claim": "These reactions involve electrons moving via an electronically conducting phase between electrodes separated by an ionically conducting and electronically insulating electrolyte.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Electrochemistry"
+    ],
+    "tags": [
+      "chemistry"
+    ]
+  },
+  {
+    "claim": "Photochemistry is the branch of chemistry concerned with the chemical effects of light.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Photochemistry"
+    ],
+    "tags": [
+      "chemistry"
+    ]
+  },
+  {
+    "claim": "Generally, this term is used to describe a chemical reaction caused by absorption of ultraviolet, visible (400–750 nm), or infrared radiation (750–2500 nm).",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Photochemistry"
+    ],
+    "tags": [
+      "chemistry"
+    ]
+  },
+  {
+    "claim": "Polymer chemistry is a sub-discipline of chemistry that focuses on the structures, chemical synthesis, and chemical and physical properties of polymers and macromolecules.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Polymer chemistry"
+    ],
+    "tags": [
+      "chemistry"
+    ]
+  },
+  {
+    "claim": "The principles and methods used within polymer chemistry are also applicable through a wide range of other chemistry sub-disciplines like organic chemistry, analytical chemistry, and physical chemistry.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Polymer chemistry"
+    ],
+    "tags": [
+      "chemistry"
+    ]
+  },
+  {
+    "claim": "Many materials have polymeric structures, from fully inorganic metals and ceramics to DNA and other biological molecules.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Polymer chemistry"
+    ],
+    "tags": [
+      "chemistry"
+    ]
+  },
+  {
+    "claim": "Nuclear chemistry is the sub-field of chemistry dealing with radioactivity, nuclear processes, and transformations in the nuclei of atoms, such as nuclear transmutation and nuclear properties.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Nuclear chemistry"
+    ],
+    "tags": [
+      "chemistry"
+    ]
+  },
+  {
+    "claim": "Analytical chemistry is the branch of chemistry concerned with the development and application of methods to identify the chemical composition of materials and quantify the amounts of components in mixtures.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Analytical chemistry"
+    ],
+    "tags": [
+      "chemistry"
+    ]
+  },
+  {
+    "claim": "It focuses on methods to identify unknown compounds, possibly in a mixture or solution, and quantify a compound's presence in terms of amount of substance, concentration, percentage by mass or number of moles in a mixture of compounds.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Analytical chemistry"
+    ],
+    "tags": [
+      "chemistry"
+    ]
+  },
+  {
+    "claim": "Inorganic chemistry deals with synthesis and behavior of inorganic and organometallic compounds.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Inorganic chemistry"
+    ],
+    "tags": [
+      "chemistry"
+    ]
+  },
+  {
+    "claim": "This field covers chemical compounds that are not carbon-based, which are the subjects of organic chemistry.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Inorganic chemistry"
+    ],
+    "tags": [
+      "chemistry"
+    ]
+  },
+  {
+    "claim": "The distinction between the two disciplines is far from absolute, as there is much overlap in the subdiscipline of organometallic chemistry.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Inorganic chemistry"
+    ],
+    "tags": [
+      "chemistry"
+    ]
+  },
+  {
+    "claim": "Catalysis is the increase in rate of a chemical reaction due to an added substance known as a catalyst.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Catalysis"
+    ],
+    "tags": [
+      "chemistry"
+    ]
+  },
+  {
+    "claim": "Catalysts are not consumed by the reaction and remain unchanged after the reaction.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Catalysis"
+    ],
+    "tags": [
+      "chemistry"
+    ]
+  },
+  {
+    "claim": "If the reaction is rapid and the catalyst is recycled quickly, a very small amount of catalyst often suffices; mixing, surface area, and temperature are important factors in reaction rate.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Catalysis"
+    ],
+    "tags": [
+      "chemistry"
+    ]
+  },
+  {
+    "claim": "A chemical reaction is a process that leads to the chemical transformation of one set of chemical substances to another.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Chemical reaction"
+    ],
+    "tags": [
+      "chemistry"
+    ]
+  },
+  {
+    "claim": "When chemical reactions occur, the atoms are rearranged and the reaction is accompanied by an energy change as new products are generated.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Chemical reaction"
+    ],
+    "tags": [
+      "chemistry"
+    ]
+  },
+  {
+    "claim": "Classically, chemical reactions encompass changes that only involve the positions of electrons in the forming and breaking of chemical bonds between atoms, with no change to the nuclei, and can often be described by a chemical equation.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Chemical reaction"
+    ],
+    "tags": [
+      "chemistry"
+    ]
+  },
+  {
+    "claim": "Stoichiometry is the relationships between the quantities of reactants and products before, during and after chemical reactions.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Stoichiometry"
+    ],
+    "tags": [
+      "chemistry"
+    ]
+  },
+  {
+    "claim": "Thermochemistry is the study of the heat energy which is associated with chemical reactions and/or phase changes such as melting and boiling.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Thermochemistry"
+    ],
+    "tags": [
+      "chemistry"
+    ]
+  },
+  {
+    "claim": "A reaction may release or absorb energy, and a phase change may do the same.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Thermochemistry"
+    ],
+    "tags": [
+      "chemistry"
+    ]
+  },
+  {
+    "claim": "Thermochemistry focuses on the energy exchange between a system and its surroundings in the form of heat.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Thermochemistry"
+    ],
+    "tags": [
+      "chemistry"
+    ]
+  },
+  {
+    "claim": "The cell is the basic structural and functional unit of all forms of life or organisms.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Cell (biology)"
+    ],
+    "tags": [
+      "biology"
+    ]
+  },
+  {
+    "claim": "The term comes from the Latin word cellula meaning 'small room'.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Cell (biology)"
+    ],
+    "tags": [
+      "biology"
+    ]
+  },
+  {
+    "claim": "A biological cell basically consists of a semipermeable cell membrane enclosing cytoplasm that contains genetic material.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Cell (biology)"
+    ],
+    "tags": [
+      "biology"
+    ]
+  },
+  {
+    "claim": "Deoxyribonucleic acid is a polymer composed of two polynucleotide chains that coil around each other to form a double helix.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: DNA"
+    ],
+    "tags": [
+      "biology"
+    ]
+  },
+  {
+    "claim": "The polymer carries genetic instructions for the development, functioning, growth and reproduction of all known organisms and many viruses.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: DNA"
+    ],
+    "tags": [
+      "biology"
+    ]
+  },
+  {
+    "claim": "DNA and ribonucleic acid (RNA) are nucleic acids.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: DNA"
+    ],
+    "tags": [
+      "biology"
+    ]
+  },
+  {
+    "claim": "Evolution is the change in the heritable characteristics of biological populations over successive generations.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Evolution"
+    ],
+    "tags": [
+      "biology"
+    ]
+  },
+  {
+    "claim": "It occurs when evolutionary processes such as genetic drift and natural selection act on genetic variation, resulting in certain characteristics becoming more or less common within a population over successive generations.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Evolution"
+    ],
+    "tags": [
+      "biology"
+    ]
+  },
+  {
+    "claim": "The process of evolution has given rise to biodiversity at every level of biological organisation.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Evolution"
+    ],
+    "tags": [
+      "biology"
+    ]
+  },
+  {
+    "claim": "Ecology is the natural science of the relationships among living organisms and their environment.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Ecology"
+    ],
+    "tags": [
+      "biology"
+    ]
+  },
+  {
+    "claim": "Ecology considers organisms at the individual, population, community, ecosystem, and biosphere levels.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Ecology"
+    ],
+    "tags": [
+      "biology"
+    ]
+  },
+  {
+    "claim": "Ecology overlaps with the closely related sciences of biogeography, evolutionary biology, genetics, ethology, and natural history.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Ecology"
+    ],
+    "tags": [
+      "biology"
+    ]
+  },
+  {
+    "claim": "Genetics is the study of genes, genetic variation, and heredity in organisms.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Genetics"
+    ],
+    "tags": [
+      "biology"
+    ]
+  },
+  {
+    "claim": "It is an important branch in biology because heredity is vital to organisms' evolution.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Genetics"
+    ],
+    "tags": [
+      "biology"
+    ]
+  },
+  {
+    "claim": "Gregor Mendel, a Moravian Augustinian friar working in the 19th century in Brno, was the first to study genetics scientifically.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Genetics"
+    ],
+    "tags": [
+      "biology"
+    ]
+  },
+  {
+    "claim": "Microbiology is the scientific study of microorganisms, those being of unicellular (single-celled), multicellular, or acellular.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Microbiology"
+    ],
+    "tags": [
+      "biology"
+    ]
+  },
+  {
+    "claim": "Microbiology encompasses numerous sub-disciplines including virology, bacteriology, protistology, mycology, immunology, and parasitology.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Microbiology"
+    ],
+    "tags": [
+      "biology"
+    ]
+  },
+  {
+    "claim": "Immunology is a branch of biology and medicine that covers the study of immune systems in all organisms.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Immunology"
+    ],
+    "tags": [
+      "biology"
+    ]
+  },
+  {
+    "claim": "Neuroscience is the scientific study of the nervous system, its functions, and its disorders.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Neuroscience"
+    ],
+    "tags": [
+      "biology"
+    ]
+  },
+  {
+    "claim": "The understanding of the biological basis of learning, memory, behavior, perception, and consciousness has been described by Eric Kandel as the \"epic challenge\" of the biological sciences.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Neuroscience"
+    ],
+    "tags": [
+      "biology"
+    ]
+  },
+  {
+    "claim": "Botany, also called phytology or plant science, is the branch of natural science and biology that studies plants, especially their anatomy, taxonomy, and ecology.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Botany"
+    ],
+    "tags": [
+      "biology"
+    ]
+  },
+  {
+    "claim": "A botanist or plant scientist is a scientist who specialises in this field.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Botany"
+    ],
+    "tags": [
+      "biology"
+    ]
+  },
+  {
+    "claim": "\"Plant\" and \"botany\" may be defined more narrowly to include only land plants and their study, which is also known as phytology.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Botany"
+    ],
+    "tags": [
+      "biology"
+    ]
+  },
+  {
+    "claim": "Zoology is the scientific study of animals.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Zoology"
+    ],
+    "tags": [
+      "biology"
+    ]
+  },
+  {
+    "claim": "Its studies include the structure, embryology, classification, habits, and distribution of all animals, both living and extinct, and how they interact with their ecosystems.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Zoology"
+    ],
+    "tags": [
+      "biology"
+    ]
+  },
+  {
+    "claim": "Zoology is one of the primary branches of biology.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Zoology"
+    ],
+    "tags": [
+      "biology"
+    ]
+  },
+  {
+    "claim": "Marine biology is the scientific study of the biology of marine life, organisms that inhabit the sea.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Marine biology"
+    ],
+    "tags": [
+      "biology"
+    ]
+  },
+  {
+    "claim": "Given that in biology many phyla, families and genera have some species that live in the sea and others that live on land, marine biology classifies species based on the environment rather than on taxonomy.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Marine biology"
+    ],
+    "tags": [
+      "biology"
+    ]
+  },
+  {
+    "claim": "Molecular biology is a branch of biology that seeks to understand the molecular structures and chemical processes that are the basis of biological activity within and between cells.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Molecular biology"
+    ],
+    "tags": [
+      "biology"
+    ]
+  },
+  {
+    "claim": "It is centered largely on the study of nucleic acids and proteins.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Molecular biology"
+    ],
+    "tags": [
+      "biology"
+    ]
+  },
+  {
+    "claim": "It examines the structure, function, and interactions of these macromolecules as they orchestrate processes such as replication, transcription, translation, protein synthesis, and complex biomolecular interactions.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Molecular biology"
+    ],
+    "tags": [
+      "biology"
+    ]
+  },
+  {
+    "claim": "Developmental biology is the scientific study of the processes by which animals and plants grow and develop.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Developmental biology"
+    ],
+    "tags": [
+      "biology"
+    ]
+  },
+  {
+    "claim": "The field of developmental biology is further defined by its study of phenomena such as regeneration, asexual reproduction, metamorphosis, and the growth and differentiation of stem cells within the adult organism.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Developmental biology"
+    ],
+    "tags": [
+      "biology"
+    ]
+  },
+  {
+    "claim": "Epidemiology is the study and analysis of the distribution, patterns and determinants of health and disease conditions in a defined population, and application of this knowledge to prevent diseases.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Epidemiology"
+    ],
+    "tags": [
+      "biology"
+    ]
+  },
+  {
+    "claim": "Virology is the scientific study of biological viruses.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Virology"
+    ],
+    "tags": [
+      "biology"
+    ]
+  },
+  {
+    "claim": "A vaccine is a biological preparation that provides active acquired immunity to a particular infectious or malignant disease.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Vaccine"
+    ],
+    "tags": [
+      "medicine"
+    ]
+  },
+  {
+    "claim": "The safety and effectiveness of vaccines has been widely studied and verified.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Vaccine"
+    ],
+    "tags": [
+      "medicine"
+    ]
+  },
+  {
+    "claim": "A vaccine typically contains an agent that resembles a disease-causing microorganism and is often made from weakened or killed forms of the microbe, its toxins, or one of its surface proteins.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Vaccine"
+    ],
+    "tags": [
+      "medicine"
+    ]
+  },
+  {
+    "claim": "An antibiotic is a type of antimicrobial substance active against bacteria.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Antibiotic"
+    ],
+    "tags": [
+      "medicine"
+    ]
+  },
+  {
+    "claim": "It is the most important type of antibacterial agent for fighting bacterial infections, and antibiotic medications are widely used in the treatment and prevention of such infections.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Antibiotic"
+    ],
+    "tags": [
+      "medicine"
+    ]
+  },
+  {
+    "claim": "They may either kill or inhibit the growth of bacteria.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Antibiotic"
+    ],
+    "tags": [
+      "medicine"
+    ]
+  },
+  {
+    "claim": "Cancer is a group of diseases involving uncontrolled cell growth typically resulting in tumors with the potential to invade or spread to other parts of the body.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Cancer"
+    ],
+    "tags": [
+      "medicine"
+    ]
+  },
+  {
+    "claim": "These malignant tumors contrast with benign tumors, which do not spread.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Cancer"
+    ],
+    "tags": [
+      "medicine"
+    ]
+  },
+  {
+    "claim": "Over 100 types of cancers affect humans.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Cancer"
+    ],
+    "tags": [
+      "medicine"
+    ]
+  },
+  {
+    "claim": "Diabetes mellitus, commonly known as diabetes, is a group of common endocrine diseases characterized by sustained high blood sugar levels.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Diabetes"
+    ],
+    "tags": [
+      "medicine"
+    ]
+  },
+  {
+    "claim": "Diabetes tends to progress in severity, and is due to either a reduced production of the hormone insulin by the pancreas or unresponsiveness of bodily cells to insulin's effects.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Diabetes"
+    ],
+    "tags": [
+      "medicine"
+    ]
+  },
+  {
+    "claim": "Classic symptoms include the three Ps: polydipsia, polyuria, and polyphagia, together with weight loss and blurred vision.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Diabetes"
+    ],
+    "tags": [
+      "medicine"
+    ]
+  },
+  {
+    "claim": "Cardiovascular disease (CVD) is any disease involving the heart or blood vessels.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Cardiovascular disease"
+    ],
+    "tags": [
+      "medicine"
+    ]
+  },
+  {
+    "claim": "Mental health encompasses emotional, psychological, and social well-being, influencing cognition, perception, and behavior.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Mental health"
+    ],
+    "tags": [
+      "medicine"
+    ]
+  },
+  {
+    "claim": "Mental health plays a crucial role in an individual's daily life when managing stress, engaging with others, and contributing to life overall.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Mental health"
+    ],
+    "tags": [
+      "medicine"
+    ]
+  },
+  {
+    "claim": "According to the World Health Organization (WHO), it is a \"state of well-being in which the individual realizes their abilities, can cope with the normal stresses of life, can work productively and fruitfully, and can contribute to their community\".",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Mental health"
+    ],
+    "tags": [
+      "medicine"
+    ]
+  },
+  {
+    "claim": "Pharmacology is the science of drugs and medications, including a substance's origin, composition and interaction with biological systems; specifically through pharmacokinetics, pharmacodynamics, therapeutic use, and toxicology.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Pharmacology"
+    ],
+    "tags": [
+      "medicine"
+    ]
+  },
+  {
+    "claim": "The discipline examines these interactions through pharmacokinetics and pharmacodynamics, both of which determine how a substance alters normal or abnormal biochemical function.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Pharmacology"
+    ],
+    "tags": [
+      "medicine"
+    ]
+  },
+  {
+    "claim": "Substances with medicinal properties are classified as pharmaceuticals, while the term drug encompasses any chemical agent that alters biological processes.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Pharmacology"
+    ],
+    "tags": [
+      "medicine"
+    ]
+  },
+  {
+    "claim": "Public health is \"the science of preventing disease, prolonging life and promoting health through the organized efforts and informed choices of society, organizations, public and private, communities and individuals\".",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Public health"
+    ],
+    "tags": [
+      "medicine"
+    ]
+  },
+  {
+    "claim": "Analyzing the determinants of health of a population and the threats it faces is the basis for public health.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Public health"
+    ],
+    "tags": [
+      "medicine"
+    ]
+  },
+  {
+    "claim": "The public can be as small as a handful of people or as large as a village or an entire city; in the case of a pandemic it may encompass several continents.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Public health"
+    ],
+    "tags": [
+      "medicine"
+    ]
+  },
+  {
+    "claim": "Nutrition is the biochemical and physiological process by which an organism uses food and water to support its life.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Nutrition"
+    ],
+    "tags": [
+      "medicine"
+    ]
+  },
+  {
+    "claim": "The intake of these substances provides organisms with nutrients which can be metabolized to create energy and chemical structures; too much or too little of an essential nutrient can cause malnutrition.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Nutrition"
+    ],
+    "tags": [
+      "medicine"
+    ]
+  },
+  {
+    "claim": "Nutritional science, the study of nutrition as a hard science, typically emphasizes human nutrition.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Nutrition"
+    ],
+    "tags": [
+      "medicine"
+    ]
+  },
+  {
+    "claim": "Immunotherapy, also known as biological therapy or biotherapy, encompasses a diverse set of therapeutic strategies that harness or modify the immune system to prevent, control, or eliminate disease.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Immunotherapy"
+    ],
+    "tags": [
+      "medicine"
+    ]
+  },
+  {
+    "claim": "Gene therapy is medical technology that aims to produce a therapeutic effect through the manipulation of gene expression or through altering the biological properties of living cells.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Gene therapy"
+    ],
+    "tags": [
+      "medicine"
+    ]
+  },
+  {
+    "claim": "Telehealth is the use of electronic information and telecommunication technologies to support long-distance clinical health care, patient and professional health-related education, health administration, and public health.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Telehealth"
+    ],
+    "tags": [
+      "medicine"
+    ]
+  },
+  {
+    "claim": "This includes data sharing by way of patient portals and electronic medical records.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Telehealth"
+    ],
+    "tags": [
+      "medicine"
+    ]
+  },
+  {
+    "claim": "Telehealth encompasses a broad range of technologies and services used to provide patient care, health education, public health services, and health administration remotely using telecommunications technologies.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Telehealth"
+    ],
+    "tags": [
+      "medicine"
+    ]
+  },
+  {
+    "claim": "A black hole is an astronomical body so compact that its gravity prevents anything, including light, from escaping.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Black hole"
+    ],
+    "tags": [
+      "astronomy"
+    ]
+  },
+  {
+    "claim": "Albert Einstein's theory of general relativity, which describes gravitation as the curvature of spacetime, predicts that any sufficiently compact mass will form a black hole.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Black hole"
+    ],
+    "tags": [
+      "astronomy"
+    ]
+  },
+  {
+    "claim": "The boundary of no escape is called the event horizon.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Black hole"
+    ],
+    "tags": [
+      "astronomy"
+    ]
+  },
+  {
+    "claim": "A neutron star is the gravitationally collapsed core of a massive supergiant star.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Neutron star"
+    ],
+    "tags": [
+      "astronomy"
+    ]
+  },
+  {
+    "claim": "It results from the supernova explosion of a massive star—combined with gravitational collapse—that compresses the core past white dwarf star density to that of atomic nuclei.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Neutron star"
+    ],
+    "tags": [
+      "astronomy"
+    ]
+  },
+  {
+    "claim": "Surpassed only by black holes, neutron stars are the second smallest and densest known class of stellar objects.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Neutron star"
+    ],
+    "tags": [
+      "astronomy"
+    ]
+  },
+  {
+    "claim": "An exoplanet or extrasolar planet is a planet outside of the Solar System.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Exoplanet"
+    ],
+    "tags": [
+      "astronomy"
+    ]
+  },
+  {
+    "claim": "The first confirmed detection of an exoplanet was in 1992 around a pulsar, and the first detection around a main-sequence star was in 1995.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Exoplanet"
+    ],
+    "tags": [
+      "astronomy"
+    ]
+  },
+  {
+    "claim": "A different planet, first detected in 1988, was confirmed in 2003.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Exoplanet"
+    ],
+    "tags": [
+      "astronomy"
+    ]
+  },
+  {
+    "claim": "A galaxy is a system of stars, stellar remnants, interstellar gas, dust, and dark matter bound together by gravity.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Galaxy"
+    ],
+    "tags": [
+      "astronomy"
+    ]
+  },
+  {
+    "claim": "The word is derived from the Greek galaxias (γαλαξίας), meaning 'milky', a reference to the Milky Way galaxy that contains the Solar System.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Galaxy"
+    ],
+    "tags": [
+      "astronomy"
+    ]
+  },
+  {
+    "claim": "Galaxies, averaging an estimated 100 million stars, range in size from dwarfs with less than a thousand stars to the largest galaxies known—supergiants with one hundred trillion stars, each orbiting its galaxy's center of mass.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Galaxy"
+    ],
+    "tags": [
+      "astronomy"
+    ]
+  },
+  {
+    "claim": "The Solar System is the gravitationally bound system of the Sun and the masses that orbit it, most prominently its eight planets, of which Earth is one.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Solar System"
+    ],
+    "tags": [
+      "astronomy"
+    ]
+  },
+  {
+    "claim": "The system formed about 4.6 billion years ago when a dense region of a molecular cloud collapsed, creating the Sun and a protoplanetary disc from which the orbiting bodies assembled.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Solar System"
+    ],
+    "tags": [
+      "astronomy"
+    ]
+  },
+  {
+    "claim": "The Big Bang is a physical theory that describes how the universe expanded from an initial state of high density and temperature.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Big Bang"
+    ],
+    "tags": [
+      "astronomy"
+    ]
+  },
+  {
+    "claim": "The uniformity of the universe, known as the horizon and flatness problems, is explained through cosmic inflation: a phase of accelerated expansion during the earliest stages.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Big Bang"
+    ],
+    "tags": [
+      "astronomy"
+    ]
+  },
+  {
+    "claim": "Detailed measurements of the expansion rate of the universe place the initial singularity at an estimated 13.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Big Bang"
+    ],
+    "tags": [
+      "astronomy"
+    ]
+  },
+  {
+    "claim": "In astronomy and cosmology, dark matter is an invisible and hypothetical form of matter that does not interact with light or other electromagnetic radiation.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Dark matter"
+    ],
+    "tags": [
+      "astronomy"
+    ]
+  },
+  {
+    "claim": "Dark matter is implied by gravitational effects that cannot be explained by general relativity unless more matter is present than can be observed.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Dark matter"
+    ],
+    "tags": [
+      "astronomy"
+    ]
+  },
+  {
+    "claim": "Dark matter is thought to serve as gravitational scaffolding for cosmic structures.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Dark matter"
+    ],
+    "tags": [
+      "astronomy"
+    ]
+  },
+  {
+    "claim": "In physical cosmology and astronomy, dark energy is a proposed form of energy that affects the universe on its largest scales.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Dark energy"
+    ],
+    "tags": [
+      "astronomy"
+    ]
+  },
+  {
+    "claim": "Its primary effect is to drive the accelerating expansion of the universe.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Dark energy"
+    ],
+    "tags": [
+      "astronomy"
+    ]
+  },
+  {
+    "claim": "It also slows the rate of structure formation.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Dark energy"
+    ],
+    "tags": [
+      "astronomy"
+    ]
+  },
+  {
+    "claim": "A supernova is a powerful and luminous explosion of a star.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Supernova"
+    ],
+    "tags": [
+      "astronomy"
+    ]
+  },
+  {
+    "claim": "A supernova occurs during the last evolutionary stages of a massive star, or when a white dwarf is triggered into runaway nuclear fusion.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Supernova"
+    ],
+    "tags": [
+      "astronomy"
+    ]
+  },
+  {
+    "claim": "The original object, called the progenitor, either collapses to a neutron star or black hole, or is completely destroyed to form a diffuse nebula.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Supernova"
+    ],
+    "tags": [
+      "astronomy"
+    ]
+  },
+  {
+    "claim": "A pulsar is a highly magnetized rotating neutron star that emits beams of electromagnetic radiation out of its magnetic poles.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Pulsar"
+    ],
+    "tags": [
+      "astronomy"
+    ]
+  },
+  {
+    "claim": "This radiation can be observed only when a beam of emission is pointing toward Earth, and is responsible for the pulsed appearance of emission.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Pulsar"
+    ],
+    "tags": [
+      "astronomy"
+    ]
+  },
+  {
+    "claim": "Neutron stars are very dense and have short, regular rotational periods.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Pulsar"
+    ],
+    "tags": [
+      "astronomy"
+    ]
+  },
+  {
+    "claim": "A quasar is an extremely luminous active galactic nucleus (AGN).",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Quasar"
+    ],
+    "tags": [
+      "astronomy"
+    ]
+  },
+  {
+    "claim": "It is sometimes known as a quasi-stellar object, abbreviated QSO.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Quasar"
+    ],
+    "tags": [
+      "astronomy"
+    ]
+  },
+  {
+    "claim": "The emission from an AGN is powered by accretion onto a supermassive black hole with a mass ranging from millions to tens of billions of solar masses, surrounded by a gaseous accretion disc.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Quasar"
+    ],
+    "tags": [
+      "astronomy"
+    ]
+  },
+  {
+    "claim": "An asteroid is a minor planet—an object larger than a meteoroid that is neither a planet nor an identified comet—that orbits within the inner Solar System or is co-orbital with Jupiter.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Asteroid"
+    ],
+    "tags": [
+      "astronomy"
+    ]
+  },
+  {
+    "claim": "Asteroids are rocky, metallic, or icy bodies with no atmosphere, and are broadly classified into C-type (carbonaceous), M-type (metallic), or S-type (silicaceous).",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Asteroid"
+    ],
+    "tags": [
+      "astronomy"
+    ]
+  },
+  {
+    "claim": "The size and shape of asteroids vary significantly, ranging from small rubble piles under a kilometer across to Ceres, a dwarf planet almost 1000 km in diameter.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Asteroid"
+    ],
+    "tags": [
+      "astronomy"
+    ]
+  },
+  {
+    "claim": "A comet is an icy, small Solar System body or interstellar object that warms and begins to release gases when passing close to the Sun, a process called outgassing.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Comet"
+    ],
+    "tags": [
+      "astronomy"
+    ]
+  },
+  {
+    "claim": "This produces an extended, gravitationally unbound atmosphere or coma surrounding the nucleus, and sometimes a tail of gas and dust gas blown out from the coma.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Comet"
+    ],
+    "tags": [
+      "astronomy"
+    ]
+  },
+  {
+    "claim": "These phenomena are due to the effects of solar radiation and the outstreaming solar wind plasma acting upon the nucleus of the comet.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Comet"
+    ],
+    "tags": [
+      "astronomy"
+    ]
+  },
+  {
+    "claim": "A nebula is a distinct luminescent part of interstellar medium, which can consist of ionized, neutral, or molecular hydrogen and also cosmic dust.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Nebula"
+    ],
+    "tags": [
+      "astronomy"
+    ]
+  },
+  {
+    "claim": "Nebulae are often star-forming regions, such as the Pillars of Creation in the Eagle Nebula.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Nebula"
+    ],
+    "tags": [
+      "astronomy"
+    ]
+  },
+  {
+    "claim": "In these regions, the formations of gas, dust, and other materials \"clump\" together to form denser regions, which attract further matter and eventually become dense enough to form stars.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Nebula"
+    ],
+    "tags": [
+      "astronomy"
+    ]
+  },
+  {
+    "claim": "In mathematics and computer science, an algorithm is a finite sequence of mathematically rigorous instructions, typically used to solve a class of specific problems or to perform a computation.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Algorithm"
+    ],
+    "tags": [
+      "computer-science"
+    ]
+  },
+  {
+    "claim": "Algorithms are used as specifications for performing calculations and data processing.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Algorithm"
+    ],
+    "tags": [
+      "computer-science"
+    ]
+  },
+  {
+    "claim": "More advanced algorithms can use conditionals to divert the code execution through various routes and deduce valid inferences.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Algorithm"
+    ],
+    "tags": [
+      "computer-science"
+    ]
+  },
+  {
+    "claim": "In computer science, a data structure is a data organization and storage format that is usually chosen for efficient access to data.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Data structure"
+    ],
+    "tags": [
+      "computer-science"
+    ]
+  },
+  {
+    "claim": "More precisely, a data structure is a collection of data values, the relationships among them, and the functions or operations that can be applied to the data, i.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Data structure"
+    ],
+    "tags": [
+      "computer-science"
+    ]
+  },
+  {
+    "claim": "e., it is an algebraic structure about data.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Data structure"
+    ],
+    "tags": [
+      "computer-science"
+    ]
+  },
+  {
+    "claim": "An operating system (OS) is system software that manages computer hardware and software resources, and provides common services for computer programs.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Operating system"
+    ],
+    "tags": [
+      "computer-science"
+    ]
+  },
+  {
+    "claim": "The DBMS additionally encompasses the core facilities provided to administer the database.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Database"
+    ],
+    "tags": [
+      "computer-science"
+    ]
+  },
+  {
+    "claim": "The sum total of the database, the DBMS and the associated applications can be referred to as a database system.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Database"
+    ],
+    "tags": [
+      "computer-science"
+    ]
+  },
+  {
+    "claim": "Often the term \"database\" is also used loosely to refer to any of the DBMS, the database system or an application associated with the database.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Database"
+    ],
+    "tags": [
+      "computer-science"
+    ]
+  },
+  {
+    "claim": "In computing, a compiler is software that translates computer code written in one programming language into another language.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Compiler"
+    ],
+    "tags": [
+      "computer-science"
+    ]
+  },
+  {
+    "claim": "The name \"compiler\" is primarily used for programs that translate source code from a high-level programming language to a low-level programming language to create an executable program.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Compiler"
+    ],
+    "tags": [
+      "computer-science"
+    ]
+  },
+  {
+    "claim": "Artificial intelligence (AI) is the capability of computational systems to perform tasks typically associated with human intelligence, such as learning, reasoning, problem-solving, perception, and decision-making.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Artificial intelligence"
+    ],
+    "tags": [
+      "computer-science"
+    ]
+  },
+  {
+    "claim": "Within a subdiscipline of machine learning, advances in the field of deep learning have allowed neural networks, a class of statistical algorithms, to surpass many previous machine learning approaches in performance.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Machine learning"
+    ],
+    "tags": [
+      "computer-science"
+    ]
+  },
+  {
+    "claim": "Cryptography, or cryptology, is the practice and study of techniques for secure communication in the presence of adversarial behavior.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Cryptography"
+    ],
+    "tags": [
+      "computer-science"
+    ]
+  },
+  {
+    "claim": "More generally, cryptography is about constructing and analyzing protocols that prevent third parties or the public from reading private messages.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Cryptography"
+    ],
+    "tags": [
+      "computer-science"
+    ]
+  },
+  {
+    "claim": "Modern cryptography exists at the intersection of the disciplines of mathematics, computer science, information security, electrical engineering, digital signal processing, physics, and others.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Cryptography"
+    ],
+    "tags": [
+      "computer-science"
+    ]
+  },
+  {
+    "claim": "Computer security is a subdiscipline within the field of information security.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Computer security"
+    ],
+    "tags": [
+      "computer-science"
+    ]
+  },
+  {
+    "claim": "Software engineering is a branch of both computer science and engineering focused on designing, developing, testing, and maintaining software applications.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Software engineering"
+    ],
+    "tags": [
+      "computer-science"
+    ]
+  },
+  {
+    "claim": "It involves applying engineering principles and computer programming expertise to develop software systems that meet user needs.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Software engineering"
+    ],
+    "tags": [
+      "computer-science"
+    ]
+  },
+  {
+    "claim": "Distributed computing is a field of computer science that studies distributed systems, defined as computer systems whose inter-communicating components are located on different networked computers.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Distributed computing"
+    ],
+    "tags": [
+      "computer-science"
+    ]
+  },
+  {
+    "claim": "Computer graphics deals with generating images and art with the aid of computers.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Computer graphics"
+    ],
+    "tags": [
+      "computer-science"
+    ]
+  },
+  {
+    "claim": "Computer graphics is a core technology in digital photography, film, video games, digital art, cell phone and computer displays, and many specialized applications.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Computer graphics"
+    ],
+    "tags": [
+      "computer-science"
+    ]
+  },
+  {
+    "claim": "A great deal of specialized hardware and software has been developed, with the displays of most devices being driven by computer graphics hardware.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Computer graphics"
+    ],
+    "tags": [
+      "computer-science"
+    ]
+  },
+  {
+    "claim": "Natural language processing (NLP) is the processing of natural language information by a computer.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Natural language processing"
+    ],
+    "tags": [
+      "computer-science"
+    ]
+  },
+  {
+    "claim": "NLP is a subfield of computer science and is closely associated with artificial intelligence.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Natural language processing"
+    ],
+    "tags": [
+      "computer-science"
+    ]
+  },
+  {
+    "claim": "NLP is also related to information retrieval, knowledge representation, computational linguistics, and linguistics more broadly.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Natural language processing"
+    ],
+    "tags": [
+      "computer-science"
+    ]
+  },
+  {
+    "claim": "The Internet is the global system of interconnected computer networks that uses the Internet protocol suite (TCP/IP) to communicate between networks and devices.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Internet"
+    ],
+    "tags": [
+      "technology"
+    ]
+  },
+  {
+    "claim": "It is a network of networks that comprises private, public, academic, business, and government networks of local to global scope, linked by electronic, wireless, and optical networking technologies.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Internet"
+    ],
+    "tags": [
+      "technology"
+    ]
+  },
+  {
+    "claim": "The World Wide Web is a public interconnected information system that enables content sharing over the Internet.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: World Wide Web"
+    ],
+    "tags": [
+      "technology"
+    ]
+  },
+  {
+    "claim": "It facilitates access to documents and other web resources according to specific rules of the Hypertext Transfer Protocol (HTTP).",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: World Wide Web"
+    ],
+    "tags": [
+      "technology"
+    ]
+  },
+  {
+    "claim": "A blockchain is a distributed ledger with growing lists of records (blocks) that are securely linked together via cryptographic hashes.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Blockchain"
+    ],
+    "tags": [
+      "technology"
+    ]
+  },
+  {
+    "claim": "Each block contains a cryptographic hash of the previous block, a timestamp, and transaction data.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Blockchain"
+    ],
+    "tags": [
+      "technology"
+    ]
+  },
+  {
+    "claim": "Since each block contains information about the previous block, they effectively form a chain, with each additional block linking to the ones before it.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Blockchain"
+    ],
+    "tags": [
+      "technology"
+    ]
+  },
+  {
+    "claim": "It is commonly referred to as \"the cloud\".",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Cloud computing"
+    ],
+    "tags": [
+      "technology"
+    ]
+  },
+  {
+    "claim": "A quantum computer is a real or theoretical computer that exploits quantum phenomena like superposition and entanglement in an essential way.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Quantum computing"
+    ],
+    "tags": [
+      "technology"
+    ]
+  },
+  {
+    "claim": "It is widely believed that a quantum computer could perform some calculations exponentially faster than any classical computer.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Quantum computing"
+    ],
+    "tags": [
+      "technology"
+    ]
+  },
+  {
+    "claim": "For example, a large-scale quantum computer could break some widely used encryption schemes and aid physicists in performing physical simulations.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Quantum computing"
+    ],
+    "tags": [
+      "technology"
+    ]
+  },
+  {
+    "claim": "Robotics is the interdisciplinary study and practice of the design, construction, operation, and use of robots.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Robotics"
+    ],
+    "tags": [
+      "technology"
+    ]
+  },
+  {
+    "claim": "A roboticist is someone who specializes in robotics.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Robotics"
+    ],
+    "tags": [
+      "technology"
+    ]
+  },
+  {
+    "claim": "Robotics usually combines four aspects of design work: a power source, mechanical construction, a control system, and software.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Robotics"
+    ],
+    "tags": [
+      "technology"
+    ]
+  },
+  {
+    "claim": "Nanotechnology is the manipulation of matter with at least one dimension sized from 1 to 100 nanometers (nm).",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Nanotechnology"
+    ],
+    "tags": [
+      "technology"
+    ]
+  },
+  {
+    "claim": "At this scale, commonly known as the nanoscale, surface area and quantum mechanical effects become important in describing properties of matter.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Nanotechnology"
+    ],
+    "tags": [
+      "technology"
+    ]
+  },
+  {
+    "claim": "This definition of nanotechnology includes all types of research and technologies that deal with these special properties.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Nanotechnology"
+    ],
+    "tags": [
+      "technology"
+    ]
+  },
+  {
+    "claim": "Biotechnology is a multidisciplinary field that involves the integration of natural sciences and engineering sciences in order to achieve the application of organisms and parts thereof for products and services.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Biotechnology"
+    ],
+    "tags": [
+      "technology"
+    ]
+  },
+  {
+    "claim": "Specialists in the field are known as biotechnologists.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Biotechnology"
+    ],
+    "tags": [
+      "technology"
+    ]
+  },
+  {
+    "claim": "Renewable energy is energy made from renewable natural resources that are replenished on a human timescale.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Renewable energy"
+    ],
+    "tags": [
+      "technology"
+    ]
+  },
+  {
+    "claim": "The most widely used renewable energy types are solar energy, wind power, and hydropower.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Renewable energy"
+    ],
+    "tags": [
+      "technology"
+    ]
+  },
+  {
+    "claim": "Bioenergy and geothermal power are also significant in some countries.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Renewable energy"
+    ],
+    "tags": [
+      "technology"
+    ]
+  },
+  {
+    "claim": "An electric vehicle (EV) is a vehicle propelled mostly by electric power.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Electric vehicle"
+    ],
+    "tags": [
+      "technology"
+    ]
+  },
+  {
+    "claim": "EVs encompass road, rail, boats and submersibles, aircraft and spacecraft.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Electric vehicle"
+    ],
+    "tags": [
+      "technology"
+    ]
+  },
+  {
+    "claim": "3D printing, also called additive manufacturing, is the construction of a three-dimensional object from a CAD model or a digital 3D model.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: 3D printing"
+    ],
+    "tags": [
+      "technology"
+    ]
+  },
+  {
+    "claim": "It can be done in a variety of processes in which material is deposited, joined or solidified under computer control, with the material being added together, typically layer by layer.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: 3D printing"
+    ],
+    "tags": [
+      "technology"
+    ]
+  },
+  {
+    "claim": "Virtual reality (VR) is a simulated experience that employs 3D head-mounted displays and pose tracking to give the user an immersive feel of a virtual world.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Virtual reality"
+    ],
+    "tags": [
+      "technology"
+    ]
+  },
+  {
+    "claim": "Applications of virtual reality include entertainment, education, research and business.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Virtual reality"
+    ],
+    "tags": [
+      "technology"
+    ]
+  },
+  {
+    "claim": "Augmented reality (AR), also known as mixed reality (MR), is a form of 3D human–computer interaction that overlays real-time 3D-rendered computer graphics into the real world through a display, such as a handheld device or head-mounted display.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Augmented reality"
+    ],
+    "tags": [
+      "technology"
+    ]
+  },
+  {
+    "claim": "This experience is seamlessly interwoven with the physical world such that it is perceived as an immersive aspect of the real environment.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Augmented reality"
+    ],
+    "tags": [
+      "technology"
+    ]
+  },
+  {
+    "claim": "In this way, augmented reality alters one's ongoing perception of a real-world environment, compared to virtual reality, which aims to completely replace the user's real-world environment with a simulated one.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Augmented reality"
+    ],
+    "tags": [
+      "technology"
+    ]
+  },
+  {
+    "claim": "Internet of things (IoT) describes physical objects that are embedded with sensors, processing ability, software, and other technologies that connect and exchange data with other devices and systems over the Internet or other communication networks.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Internet of things"
+    ],
+    "tags": [
+      "technology"
+    ]
+  },
+  {
+    "claim": "The field of IoT encompasses electronics, communication, and computer science engineering.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Internet of things"
+    ],
+    "tags": [
+      "technology"
+    ]
+  },
+  {
+    "claim": "\"Internet of things\" has been considered a misnomer because most devices do not need to be connected to the public Internet; they only need to be connected to a network and be individually addressable.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Internet of things"
+    ],
+    "tags": [
+      "technology"
+    ]
+  },
+  {
+    "claim": "Present-day climate change includes both global warming—the ongoing increase in global average temperature—and its wider effects on Earth's climate system.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Climate change"
+    ],
+    "tags": [
+      "climate"
+    ]
+  },
+  {
+    "claim": "Climate change in a broader sense also includes previous long-term changes to Earth's climate.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Climate change"
+    ],
+    "tags": [
+      "climate"
+    ]
+  },
+  {
+    "claim": "The modern-day rise in global temperatures is driven by human activities, especially fossil fuel burning since the Industrial Revolution.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Climate change"
+    ],
+    "tags": [
+      "climate"
+    ]
+  },
+  {
+    "claim": "Greenhouse gases (GHGs) are the gases in an atmosphere that trap heat, raising the surface temperature of astronomical bodies such as Earth.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Greenhouse gas"
+    ],
+    "tags": [
+      "climate"
+    ]
+  },
+  {
+    "claim": "Unlike other gases, greenhouse gases absorb the radiations that a planet emits, resulting in the greenhouse effect.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Greenhouse gas"
+    ],
+    "tags": [
+      "climate"
+    ]
+  },
+  {
+    "claim": "The Earth is warmed by sunlight, causing its surface to radiate heat, which is then mostly absorbed by greenhouse gases.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Greenhouse gas"
+    ],
+    "tags": [
+      "climate"
+    ]
+  },
+  {
+    "claim": "Carbon dioxide is a chemical compound with the chemical formula CO2.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Carbon dioxide"
+    ],
+    "tags": [
+      "climate"
+    ]
+  },
+  {
+    "claim": "It is made up of molecules that each have one carbon atom covalently double bonded to two oxygen atoms.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Carbon dioxide"
+    ],
+    "tags": [
+      "climate"
+    ]
+  },
+  {
+    "claim": "It is found in a gas state at room temperature and at normally-encountered concentrations it is odorless.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Carbon dioxide"
+    ],
+    "tags": [
+      "climate"
+    ]
+  },
+  {
+    "claim": "The sea level has been rising since the end of the Last Glacial Maximum, which was around 20,000 years ago.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Sea level rise"
+    ],
+    "tags": [
+      "climate"
+    ]
+  },
+  {
+    "claim": "Between 1901 and 2018, the average sea level rose by 15–25 cm (6–10 in), with an increase of 2.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Sea level rise"
+    ],
+    "tags": [
+      "climate"
+    ]
+  },
+  {
+    "claim": "3 mm (0.091 in) per year since the 1970s.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Sea level rise"
+    ],
+    "tags": [
+      "climate"
+    ]
+  },
+  {
+    "claim": "Ocean acidification is the ongoing decrease in the pH of the Earth's ocean.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Ocean acidification"
+    ],
+    "tags": [
+      "climate"
+    ]
+  },
+  {
+    "claim": "Between 1950 and 2020, the average pH of the ocean surface fell from approximately 8.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Ocean acidification"
+    ],
+    "tags": [
+      "climate"
+    ]
+  },
+  {
+    "claim": "15 to 8.05. Carbon dioxide emissions from human activities are the primary cause of ocean acidification, with atmospheric carbon dioxide levels exceeding 422 ppm.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Ocean acidification"
+    ],
+    "tags": [
+      "climate"
+    ]
+  },
+  {
+    "claim": "Deforestation or forest clearance is the removal and destruction of a forest or stand of trees from land that is then converted to non-forest use.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Deforestation"
+    ],
+    "tags": [
+      "climate"
+    ]
+  },
+  {
+    "claim": "Deforestation can involve conversion of forest land to farms, ranches, or urban use.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Deforestation"
+    ],
+    "tags": [
+      "climate"
+    ]
+  },
+  {
+    "claim": "About 31% of Earth's land surface is covered by forests at present.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Deforestation"
+    ],
+    "tags": [
+      "climate"
+    ]
+  },
+  {
+    "claim": "The Paris Agreement is an international treaty on climate change that was signed in 2016.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Paris Agreement"
+    ],
+    "tags": [
+      "climate"
+    ]
+  },
+  {
+    "claim": "The treaty covers climate change mitigation, adaptation, and finance.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Paris Agreement"
+    ],
+    "tags": [
+      "climate"
+    ]
+  },
+  {
+    "claim": "The Paris Agreement was negotiated by 196 parties at the 2015 United Nations Climate Change Conference near Paris, France.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Paris Agreement"
+    ],
+    "tags": [
+      "climate"
+    ]
+  },
+  {
+    "claim": "Carbon capture and storage (CCS) is a process by which carbon dioxide (CO2) from industrial installations or natural sources is separated before it is released into the atmosphere, then transported to a long-term storage location.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Carbon capture and storage"
+    ],
+    "tags": [
+      "climate"
+    ]
+  },
+  {
+    "claim": "The CO2 is captured from a large point source, such as a natural gas processing plant and is typically stored in a deep geological formation.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Carbon capture and storage"
+    ],
+    "tags": [
+      "climate"
+    ]
+  },
+  {
+    "claim": "Around 80% of the CO2 captured annually is used for enhanced oil recovery (EOR), a process by which CO2 is injected into partially depleted oil reservoirs in order to extract more oil and then is largely left underground.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Carbon capture and storage"
+    ],
+    "tags": [
+      "climate"
+    ]
+  },
+  {
+    "claim": "Plate tectonics is the scientific theory that Earth's lithosphere comprises a number of large tectonic plates, which have been slowly moving since 3–4 billion years ago.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Plate tectonics"
+    ],
+    "tags": [
+      "geology"
+    ]
+  },
+  {
+    "claim": "The model builds on the concept of continental drift, an idea developed during the first decades of the 20th century.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Plate tectonics"
+    ],
+    "tags": [
+      "geology"
+    ]
+  },
+  {
+    "claim": "Plate tectonics came to be accepted by geoscientists after seafloor spreading was validated in the mid- to late 1960s.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Plate tectonics"
+    ],
+    "tags": [
+      "geology"
+    ]
+  },
+  {
+    "claim": "An earthquake, also called a quake, tremor, or temblor, is the shaking of the Earth's surface resulting from a sudden release of energy in the lithosphere that creates seismic waves.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Earthquake"
+    ],
+    "tags": [
+      "geology"
+    ]
+  },
+  {
+    "claim": "Earthquakes can range in intensity, from those so weak they cannot be felt, to those violent enough to propel objects and people into the air, damage critical infrastructure, and wreak destruction across entire cities.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Earthquake"
+    ],
+    "tags": [
+      "geology"
+    ]
+  },
+  {
+    "claim": "The seismic activity of an area is the frequency, type, and size of earthquakes experienced over a particular time.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Earthquake"
+    ],
+    "tags": [
+      "geology"
+    ]
+  },
+  {
+    "claim": "A volcano is a vent or fissure in the crust of a planetary-mass object, such as Earth, that allows hot lava, volcanic ash, and gases to escape from a magma chamber below the surface.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Volcano"
+    ],
+    "tags": [
+      "geology"
+    ]
+  },
+  {
+    "claim": "In geology and mineralogy, a mineral or mineral species is, broadly speaking, a solid substance with a fairly well-defined chemical composition and a specific crystal structure that occurs naturally in pure form.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Mineral"
+    ],
+    "tags": [
+      "geology"
+    ]
+  },
+  {
+    "claim": "In geology, a rock is any naturally occurring solid mass or aggregate of minerals or mineraloid matter.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Rock (geology)"
+    ],
+    "tags": [
+      "geology"
+    ]
+  },
+  {
+    "claim": "It is categorized by the minerals included, its chemical composition, and the way in which it is formed.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Rock (geology)"
+    ],
+    "tags": [
+      "geology"
+    ]
+  },
+  {
+    "claim": "Rocks form the Earth's outer solid layer, the crust, and most of its interior, except for the liquid outer core and pockets of magma in the asthenosphere.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Rock (geology)"
+    ],
+    "tags": [
+      "geology"
+    ]
+  },
+  {
+    "claim": "A fossil is any preserved remains, impression, or trace of any once-living thing from a past geological age.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Fossil"
+    ],
+    "tags": [
+      "geology"
+    ]
+  },
+  {
+    "claim": "Examples include bones, shells, exoskeletons, stone imprints of animals or microbes, objects preserved in amber, hair, petrified wood and DNA remnants.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Fossil"
+    ],
+    "tags": [
+      "geology"
+    ]
+  },
+  {
+    "claim": "The totality of fossils is known as the fossil record.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Fossil"
+    ],
+    "tags": [
+      "geology"
+    ]
+  },
+  {
+    "claim": "Geomorphology is the scientific study of the origin and evolution of topographic and bathymetric features generated by physical, chemical or biological processes operating at or near Earth's surface.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Geomorphology"
+    ],
+    "tags": [
+      "geology"
+    ]
+  },
+  {
+    "claim": "Geomorphologists seek to understand why landscapes look the way they do, to understand landform and terrain history and dynamics and to predict changes through a combination of field observations, physical experiments and numerical modeling.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Geomorphology"
+    ],
+    "tags": [
+      "geology"
+    ]
+  },
+  {
+    "claim": "Geomorphologists work within disciplines such as physical geography, geology, geodesy, engineering geology, archaeology, climatology, and geotechnical engineering.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Geomorphology"
+    ],
+    "tags": [
+      "geology"
+    ]
+  },
+  {
+    "claim": "Glaciology is the scientific study of glaciers, or, more generally, ice and natural phenomena that involve ice.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Glaciology"
+    ],
+    "tags": [
+      "geology"
+    ]
+  },
+  {
+    "claim": "Hydrology is the scientific study of the movement, distribution, and management of water on Earth and other planets, including the water cycle, water resources, and drainage basin sustainability.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Hydrology"
+    ],
+    "tags": [
+      "geology"
+    ]
+  },
+  {
+    "claim": "A practitioner of hydrology is called a hydrologist.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Hydrology"
+    ],
+    "tags": [
+      "geology"
+    ]
+  },
+  {
+    "claim": "Hydrologists are scientists studying earth or environmental science, civil or environmental engineering, and physical geography.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Hydrology"
+    ],
+    "tags": [
+      "geology"
+    ]
+  },
+  {
+    "claim": "Oceanography, also known as oceanology, sea science, ocean science, and marine science, is the scientific study of the ocean, including its physics, chemistry, biology, and geology.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Oceanography"
+    ],
+    "tags": [
+      "geology"
+    ]
+  },
+  {
+    "claim": "An ecosystem is a system formed by organisms in interaction with their environment.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Ecosystem"
+    ],
+    "tags": [
+      "ecology"
+    ]
+  },
+  {
+    "claim": "The biotic and abiotic components are linked together through nutrient cycles and energy flows.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Ecosystem"
+    ],
+    "tags": [
+      "ecology"
+    ]
+  },
+  {
+    "claim": "Biodiversity is the variability of life on Earth.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Biodiversity"
+    ],
+    "tags": [
+      "ecology"
+    ]
+  },
+  {
+    "claim": "It can be measured on various levels, for example, genetic variability, species diversity, ecosystem diversity and phylogenetic diversity.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Biodiversity"
+    ],
+    "tags": [
+      "ecology"
+    ]
+  },
+  {
+    "claim": "Diversity is not distributed evenly on Earth—it is greater in the tropics as a result of the warm climate and high primary productivity in the region near the equator.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Biodiversity"
+    ],
+    "tags": [
+      "ecology"
+    ]
+  },
+  {
+    "claim": "An endangered species is a species that is very likely to become extinct in the near future, either worldwide or in a particular region.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Endangered species"
+    ],
+    "tags": [
+      "ecology"
+    ]
+  },
+  {
+    "claim": "Endangered species may be at risk due to factors such as habitat loss, poaching, invasive species, and climate change.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Endangered species"
+    ],
+    "tags": [
+      "ecology"
+    ]
+  },
+  {
+    "claim": "The International Union for Conservation of Nature (IUCN) Red List lists the global conservation status of many species, and various other agencies assess the status of species within particular areas.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Endangered species"
+    ],
+    "tags": [
+      "ecology"
+    ]
+  },
+  {
+    "claim": "Conservation biology is the study of the conservation of nature and of Earth's biodiversity with the aim of protecting species, their habitats, and ecosystems from excessive rates of extinction and the erosion of biotic interactions.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Conservation biology"
+    ],
+    "tags": [
+      "ecology"
+    ]
+  },
+  {
+    "claim": "It is an interdisciplinary subject drawing on natural and social sciences, and the practice of natural resource management.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Conservation biology"
+    ],
+    "tags": [
+      "ecology"
+    ]
+  },
+  {
+    "claim": "A coral reef is an underwater ecosystem characterized by reef-building corals.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Coral reef"
+    ],
+    "tags": [
+      "ecology"
+    ]
+  },
+  {
+    "claim": "Reefs are formed of colonies of coral polyps held together by calcium carbonate.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Coral reef"
+    ],
+    "tags": [
+      "ecology"
+    ]
+  },
+  {
+    "claim": "Most coral reefs are built from stony corals, whose polyps cluster in groups.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Coral reef"
+    ],
+    "tags": [
+      "ecology"
+    ]
+  },
+  {
+    "claim": "A wetland is a distinct semi-aquatic ecosystem whose groundcovers are flooded or saturated in water, either permanently, for years or decades, or only seasonally.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Wetland"
+    ],
+    "tags": [
+      "ecology"
+    ]
+  },
+  {
+    "claim": "Flooding results in oxygen-poor (anoxic) processes taking place, especially in the soils.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Wetland"
+    ],
+    "tags": [
+      "ecology"
+    ]
+  },
+  {
+    "claim": "Wetlands form a transitional zone between waterbodies and dry lands, and are different from other terrestrial or aquatic ecosystems due to their vegetation's roots having adapted to oxygen-poor waterlogged soils.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Wetland"
+    ],
+    "tags": [
+      "ecology"
+    ]
+  },
+  {
+    "claim": "Rainforests are forests characterized by a closed and continuous tree canopy, moisture-dependent vegetation, the presence of epiphytes and lianas and the absence of wildfire.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Rainforest"
+    ],
+    "tags": [
+      "ecology"
+    ]
+  },
+  {
+    "claim": "Rainforests can generally be classified as tropical rainforests or temperate rainforests, but other types have been described.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Rainforest"
+    ],
+    "tags": [
+      "ecology"
+    ]
+  },
+  {
+    "claim": "Pollination is the transfer of pollen from an anther of a plant to the stigma of a plant, later enabling fertilisation and the production of seeds.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Pollination"
+    ],
+    "tags": [
+      "ecology"
+    ]
+  },
+  {
+    "claim": "Pollinating agents can be animals such as insects, for example bees, beetles or butterflies; birds, and bats; water; wind; and even plants themselves.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Pollination"
+    ],
+    "tags": [
+      "ecology"
+    ]
+  },
+  {
+    "claim": "Pollinating animals travel from plant to plant carrying pollen on their bodies in a vital interaction that allows the transfer of genetic material critical to the reproductive system of most flowering plants.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Pollination"
+    ],
+    "tags": [
+      "ecology"
+    ]
+  },
+  {
+    "claim": "A food web is the natural interconnection of food chains and a graphical representation of what-eats-what in an ecological community.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Food web"
+    ],
+    "tags": [
+      "ecology"
+    ]
+  },
+  {
+    "claim": "Position in the food web, or trophic level, is used in ecology to broadly classify organisms as autotrophs or heterotrophs.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Food web"
+    ],
+    "tags": [
+      "ecology"
+    ]
+  },
+  {
+    "claim": "This is a non-binary classification; some organisms occupy the role of mixotrophs, or autotrophs that additionally obtain organic matter from non-atmospheric sources.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Food web"
+    ],
+    "tags": [
+      "ecology"
+    ]
+  },
+  {
+    "claim": "Economics is a social science that studies the production, distribution, and consumption of goods and services.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Economics"
+    ],
+    "tags": [
+      "economics"
+    ]
+  },
+  {
+    "claim": "Gross domestic product (GDP) is a monetary measure of the total market value of all of the final goods and services which are produced and rendered during a specific period of time by a country or countries.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Gross domestic product"
+    ],
+    "tags": [
+      "economics"
+    ]
+  },
+  {
+    "claim": "GDP is often used to measure the economic activity of a country or region.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Gross domestic product"
+    ],
+    "tags": [
+      "economics"
+    ]
+  },
+  {
+    "claim": "The major components of GDP are consumption, government spending, net exports, and investment.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Gross domestic product"
+    ],
+    "tags": [
+      "economics"
+    ]
+  },
+  {
+    "claim": "In economics, inflation is an increase in the average price of goods and services in terms of money.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Inflation"
+    ],
+    "tags": [
+      "economics"
+    ]
+  },
+  {
+    "claim": "This increase is measured using a price index, typically a consumer price index (CPI).",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Inflation"
+    ],
+    "tags": [
+      "economics"
+    ]
+  },
+  {
+    "claim": "When the general price level rises, each unit of currency buys fewer goods and services; consequently, inflation corresponds to a reduction in the purchasing power of money.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Inflation"
+    ],
+    "tags": [
+      "economics"
+    ]
+  },
+  {
+    "claim": "In microeconomics, supply and demand is an economic model of price determination in a market.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Supply and demand"
+    ],
+    "tags": [
+      "economics"
+    ]
+  },
+  {
+    "claim": "The concept of supply and demand forms the theoretical basis of modern economics.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Supply and demand"
+    ],
+    "tags": [
+      "economics"
+    ]
+  },
+  {
+    "claim": "A market economy is an economic system in which decisions about investment, production, and the distribution of goods and services to consumers are guided by price signals created through the forces of supply and demand.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Market economy"
+    ],
+    "tags": [
+      "economics"
+    ]
+  },
+  {
+    "claim": "A key characteristic of a market economy is the presence of factor markets, which play a major role in allocating capital and other factors of production such as labor and land.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Market economy"
+    ],
+    "tags": [
+      "economics"
+    ]
+  },
+  {
+    "claim": "Monetary policy is the policy adopted by the monetary authority of a nation to affect monetary and other financial conditions to accomplish broader objectives like high employment and price stability.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Monetary policy"
+    ],
+    "tags": [
+      "economics"
+    ]
+  },
+  {
+    "claim": "Further purposes of a monetary policy may be to contribute to economic stability or to maintain predictable exchange rates with other currencies.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Monetary policy"
+    ],
+    "tags": [
+      "economics"
+    ]
+  },
+  {
+    "claim": "Today most central banks in developed countries conduct their monetary policy within an inflation targeting framework, whereas the monetary policies of most developing countries' central banks target some kind of a fixed exchange rate system.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Monetary policy"
+    ],
+    "tags": [
+      "economics"
+    ]
+  },
+  {
+    "claim": "In economics and political science, fiscal policy is the use of government revenue collection and expenditure to influence a country's economy.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Fiscal policy"
+    ],
+    "tags": [
+      "economics"
+    ]
+  },
+  {
+    "claim": "The use of government revenue expenditures to influence macroeconomic variables developed in reaction to the Great Depression of the 1930s, when the previous laissez-faire approach to economic management became unworkable.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Fiscal policy"
+    ],
+    "tags": [
+      "economics"
+    ]
+  },
+  {
+    "claim": "Fiscal and monetary policy are the key strategies used by a country's government and central bank to advance its economic objectives.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Fiscal policy"
+    ],
+    "tags": [
+      "economics"
+    ]
+  },
+  {
+    "claim": "International trade is the exchange of capital, goods, and services across international borders or territories because there is a need or want of goods or services.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: International trade"
+    ],
+    "tags": [
+      "economics"
+    ]
+  },
+  {
+    "claim": "Behavioral economics is the study of the psychological factors involved in the decisions of individuals or institutions, and how these decisions deviate from those implied by traditional economic theory.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Behavioral economics"
+    ],
+    "tags": [
+      "economics"
+    ]
+  },
+  {
+    "claim": "Development economics is a branch of economics that deals with economic aspects of the development process in low- and middle- income countries.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Development economics"
+    ],
+    "tags": [
+      "economics"
+    ]
+  },
+  {
+    "claim": "Psychology is the scientific study of the mind and behavior.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Psychology"
+    ],
+    "tags": [
+      "psychology"
+    ]
+  },
+  {
+    "claim": "Its subject matter includes the behavior of humans and nonhumans, both conscious and unconscious phenomena, and mental processes such as thoughts, feelings, and motives.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Psychology"
+    ],
+    "tags": [
+      "psychology"
+    ]
+  },
+  {
+    "claim": "Psychology is an academic discipline of broad scope, crossing the boundaries between the natural and social sciences.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Psychology"
+    ],
+    "tags": [
+      "psychology"
+    ]
+  },
+  {
+    "claim": "Cognitive psychology is the scientific study of human mental processes such as attention, language use, memory, perception, problem solving, creativity, and reasoning.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Cognitive psychology"
+    ],
+    "tags": [
+      "psychology"
+    ]
+  },
+  {
+    "claim": "Cognitive psychology originated in the 1960s in a break from behaviorism, which held from the 1920s to 1950s that unobservable mental processes were outside the realm of empirical science.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Cognitive psychology"
+    ],
+    "tags": [
+      "psychology"
+    ]
+  },
+  {
+    "claim": "This break came as researchers in linguistics, cybernetics, and applied psychology used models of mental processing to explain human behavior.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Cognitive psychology"
+    ],
+    "tags": [
+      "psychology"
+    ]
+  },
+  {
+    "claim": "Developmental psychology is the scientific study of how and why the human mind grows, changes, and adapts over the course of a human lifetime.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Developmental psychology"
+    ],
+    "tags": [
+      "psychology"
+    ]
+  },
+  {
+    "claim": "Originally concerned with infants and children, the field has expanded to include adolescence, adult development, aging, and the entire lifespan.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Developmental psychology"
+    ],
+    "tags": [
+      "psychology"
+    ]
+  },
+  {
+    "claim": "Developmental psychologists aim to explain how thinking, feeling, and behaviors change throughout life.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Developmental psychology"
+    ],
+    "tags": [
+      "psychology"
+    ]
+  },
+  {
+    "claim": "Social psychology is the methodical study of how thoughts, feelings, and behaviors are influenced by the actual, imagined, or implied presence of others.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Social psychology"
+    ],
+    "tags": [
+      "psychology"
+    ]
+  },
+  {
+    "claim": "Clinical psychology is an integration of human science, behavioral science, theory, and clinical knowledge aimed at understanding, preventing, and relieving psychological distress or dysfunction as well as promoting well-being and personal growth.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Clinical psychology"
+    ],
+    "tags": [
+      "psychology"
+    ]
+  },
+  {
+    "claim": "Central to its practice are psychological assessment, diagnosis, clinical formulation, and psychotherapy; although clinical psychologists also engage in research, teaching, consultation, forensic testimony, and program development and administration.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Clinical psychology"
+    ],
+    "tags": [
+      "psychology"
+    ]
+  },
+  {
+    "claim": "In many countries, clinical psychology is a regulated mental health profession.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Clinical psychology"
+    ],
+    "tags": [
+      "psychology"
+    ]
+  },
+  {
+    "claim": "Memory is the faculty of the mind by which data or information is encoded, stored, and retrieved when needed.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Memory"
+    ],
+    "tags": [
+      "psychology"
+    ]
+  },
+  {
+    "claim": "It is the retention of information over time for the purpose of influencing future action.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Memory"
+    ],
+    "tags": [
+      "psychology"
+    ]
+  },
+  {
+    "claim": "If past events could not be remembered, it would be impossible for language, relationships, or personal identity to develop.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Memory"
+    ],
+    "tags": [
+      "psychology"
+    ]
+  },
+  {
+    "claim": "Emotions are physical and mental states brought on by neurophysiological changes, variously associated with thoughts, feelings, behavioral responses, and a degree of pleasure or displeasure.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Emotion"
+    ],
+    "tags": [
+      "psychology"
+    ]
+  },
+  {
+    "claim": "There is no scientific consensus on a definition.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Emotion"
+    ],
+    "tags": [
+      "psychology"
+    ]
+  },
+  {
+    "claim": "Emotions are often intertwined with mood, temperament, personality, disposition, or creativity.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Emotion"
+    ],
+    "tags": [
+      "psychology"
+    ]
+  },
+  {
+    "claim": "Intelligence has been defined in many ways: the capacity for abstraction, logic, understanding, self-awareness, learning, emotional knowledge, reasoning, planning, creativity, critical thinking, and problem-solving.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Intelligence"
+    ],
+    "tags": [
+      "psychology"
+    ]
+  },
+  {
+    "claim": "It can be described as the ability to perceive or infer information and to retain it as knowledge to be applied to adaptive behaviors within an environment or context.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Intelligence"
+    ],
+    "tags": [
+      "psychology"
+    ]
+  },
+  {
+    "claim": "Motivation is an internal state that propels individuals to engage in goal-directed behavior.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Motivation"
+    ],
+    "tags": [
+      "psychology"
+    ]
+  },
+  {
+    "claim": "It is often understood as a force that explains why people or other animals initiate, continue, or terminate a certain behavior at a particular time.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Motivation"
+    ],
+    "tags": [
+      "psychology"
+    ]
+  },
+  {
+    "claim": "It is a complex phenomenon and its precise definition is disputed.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Motivation"
+    ],
+    "tags": [
+      "psychology"
+    ]
+  },
+  {
+    "claim": "Sociology is the scientific study of human society that focuses on society, human social behavior, patterns of social relationships, social interaction, and aspects of culture associated with everyday life.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Sociology"
+    ],
+    "tags": [
+      "sociology"
+    ]
+  },
+  {
+    "claim": "The term sociology was coined in the late 18th century to describe the scientific study of society.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Sociology"
+    ],
+    "tags": [
+      "sociology"
+    ]
+  },
+  {
+    "claim": "Regarded as a part of both the social sciences and humanities, sociology uses various methods of empirical investigation and critical analysis to develop a body of knowledge about social order and social change.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Sociology"
+    ],
+    "tags": [
+      "sociology"
+    ]
+  },
+  {
+    "claim": "Social inequality occurs when resources within a society are distributed unevenly, often as a result of inequitable allocation practices that create distinct unequal patterns based on socially defined categories of people.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Social inequality"
+    ],
+    "tags": [
+      "sociology"
+    ]
+  },
+  {
+    "claim": "Differences in accessing social goods within society are influenced by factors like power, religion, kinship, prestige, race, ethnicity, gender, age, sexual orientation, intelligence and class.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Social inequality"
+    ],
+    "tags": [
+      "sociology"
+    ]
+  },
+  {
+    "claim": "Social inequality usually implies the lack of equality of outcome, but may alternatively be conceptualized as a lack of equality in access to opportunity.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Social inequality"
+    ],
+    "tags": [
+      "sociology"
+    ]
+  },
+  {
+    "claim": "Globalization is the process of increasing interdependence and integration among the economies, markets, societies, and cultures of different countries worldwide.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Globalization"
+    ],
+    "tags": [
+      "sociology"
+    ]
+  },
+  {
+    "claim": "The term globalization first appeared in the early 20th century.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Globalization"
+    ],
+    "tags": [
+      "sociology"
+    ]
+  },
+  {
+    "claim": "It developed its current meaning in the second half of the 20th century, and came into popular use in the 1990s to describe the growing international connectivity of the post–Cold War world.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Globalization"
+    ],
+    "tags": [
+      "sociology"
+    ]
+  },
+  {
+    "claim": "Urbanization is the population shift from rural to urban areas, the corresponding decrease in the proportion of people living in rural areas, and the ways in which societies adapt to this change.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Urbanization"
+    ],
+    "tags": [
+      "sociology"
+    ]
+  },
+  {
+    "claim": "It can also mean population growth in urban areas instead of rural ones.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Urbanization"
+    ],
+    "tags": [
+      "sociology"
+    ]
+  },
+  {
+    "claim": "It is predominantly the process by which towns and cities are formed and become larger as more people begin to live and work in central areas.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Urbanization"
+    ],
+    "tags": [
+      "sociology"
+    ]
+  },
+  {
+    "claim": "A social movement or popular movement is a loosely organized effort by a large number of people to achieve a particular goal, typically a social or political one.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Social movement"
+    ],
+    "tags": [
+      "sociology"
+    ]
+  },
+  {
+    "claim": "This may be to carry out a social change, or to resist or undo one.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Social movement"
+    ],
+    "tags": [
+      "sociology"
+    ]
+  },
+  {
+    "claim": "It is a type of group action and may involve individuals, organizations, or both.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Social movement"
+    ],
+    "tags": [
+      "sociology"
+    ]
+  },
+  {
+    "claim": "Culture is a concept that encompasses the social behavior, institutions, and norms found in human societies, as well as the knowledge, beliefs, arts, laws, customs, capabilities, attitudes, and habits of the individuals in these groups.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Culture"
+    ],
+    "tags": [
+      "sociology"
+    ]
+  },
+  {
+    "claim": "Culture often originates from or is attributed to a specific region or location.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Culture"
+    ],
+    "tags": [
+      "sociology"
+    ]
+  },
+  {
+    "claim": "Education is the transmission of knowledge and skills and the development of character traits.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Education"
+    ],
+    "tags": [
+      "sociology"
+    ]
+  },
+  {
+    "claim": "Formal education happens in a complex institutional framework, like public schools.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Education"
+    ],
+    "tags": [
+      "sociology"
+    ]
+  },
+  {
+    "claim": "Non-formal education is also structured but occurs outside the formal schooling system, while informal education is unstructured learning through daily experiences.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Education"
+    ],
+    "tags": [
+      "sociology"
+    ]
+  },
+  {
+    "claim": "Poverty is a state or condition in which an individual lacks the financial resources and essentials for a basic standard of living.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Poverty"
+    ],
+    "tags": [
+      "sociology"
+    ]
+  },
+  {
+    "claim": "Poverty can have diverse environmental, legal, social, economic, and political causes and effects.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Poverty"
+    ],
+    "tags": [
+      "sociology"
+    ]
+  },
+  {
+    "claim": "The definition of relative poverty varies from one country to another, or from one society to another.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Poverty"
+    ],
+    "tags": [
+      "sociology"
+    ]
+  },
+  {
+    "claim": "Demography is the statistical study of human populations: their size, composition, and how they change through the interplay of fertility (births), mortality (deaths), and migration.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Demography"
+    ],
+    "tags": [
+      "sociology"
+    ]
+  },
+  {
+    "claim": "Democracy is a form of government in which political power is vested in the people or the population of a state.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Democracy"
+    ],
+    "tags": [
+      "politics"
+    ]
+  },
+  {
+    "claim": "Under a minimalist definition of democracy, rulers are elected through competitive elections while more expansive or maximalist definitions link democracy to guarantees of civil liberties and human rights in addition to competitive elections.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Democracy"
+    ],
+    "tags": [
+      "politics"
+    ]
+  },
+  {
+    "claim": "Authoritarian regimes may be either autocratic or oligarchic and may be based upon the rule of a party, the military, or the concentration of power in a single person.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Authoritarianism"
+    ],
+    "tags": [
+      "politics"
+    ]
+  },
+  {
+    "claim": "States that have a blurred boundary between democracy and authoritarianism have sometimes been characterized as \"hybrid democracies\", \"hybrid regimes\" or \"competitive authoritarian\" states.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Authoritarianism"
+    ],
+    "tags": [
+      "politics"
+    ]
+  },
+  {
+    "claim": "Human rights are universally recognized moral principles or norms that establish standards of human behavior and are often protected by both national and international laws.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Human rights"
+    ],
+    "tags": [
+      "politics"
+    ]
+  },
+  {
+    "claim": "They encompass a broad range of civil, political, economic, social, and cultural rights, such as the right to life, freedom of speech, protection against enslavement, and right to education.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Human rights"
+    ],
+    "tags": [
+      "politics"
+    ]
+  },
+  {
+    "claim": "International law, also known as public international law and the law of nations, is the set of rules, norms, legal customs and standards that states and other actors feel an obligation to, and generally do, obey in their mutual relations.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: International law"
+    ],
+    "tags": [
+      "politics"
+    ]
+  },
+  {
+    "claim": "In international relations, actors are simply the individuals and collective entities, such as states, international organizations, and non-state groups, which can make behavioral choices, whether lawful or unlawful.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: International law"
+    ],
+    "tags": [
+      "politics"
+    ]
+  },
+  {
+    "claim": "Rules are formal, typically written expectations that outline required behavior, while norms are informal, often unwritten guidelines about appropriate behavior that are shaped by custom and social practice.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: International law"
+    ],
+    "tags": [
+      "politics"
+    ]
+  },
+  {
+    "claim": "The European Union (EU) is a political and economic union of 27 member states that are located primarily in Europe.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: European Union"
+    ],
+    "tags": [
+      "politics"
+    ]
+  },
+  {
+    "claim": "The supranational union has a total area of 4,233,255 km2 (1,634,469 sq mi) and an estimated population of more than 450 million as of 2025.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: European Union"
+    ],
+    "tags": [
+      "politics"
+    ]
+  },
+  {
+    "claim": "The EU is often described as a sui generis political entity combining characteristics of both a federation and a confederation.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: European Union"
+    ],
+    "tags": [
+      "politics"
+    ]
+  },
+  {
+    "claim": "A constitution, or supreme law, is the aggregate of fundamental principles or established precedents that constitute the legal basis of a polity, organization or other type of entity, and commonly determines how that entity is to be governed.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Constitution"
+    ],
+    "tags": [
+      "politics"
+    ]
+  },
+  {
+    "claim": "Civil liberties are fundamental rights and freedoms that governments pledge not to restrict, either through constitutions, legislation, or judicial interpretation, without due process of law.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Civil liberties"
+    ],
+    "tags": [
+      "politics"
+    ]
+  },
+  {
+    "claim": "Other civil liberties include the right to own property, the right to defend oneself, and the right to bodily integrity.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Civil liberties"
+    ],
+    "tags": [
+      "politics"
+    ]
+  },
+  {
+    "claim": "Within the distinctions between civil liberties and other types of liberty, distinctions exist between positive liberty/positive rights and negative liberty/negative rights.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Civil liberties"
+    ],
+    "tags": [
+      "politics"
+    ]
+  },
+  {
+    "claim": "The rule of law entails that the law is clear, consistent and open; individuals and groups have access to justice ; and that government institutions are subject to the law.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Rule of law"
+    ],
+    "tags": [
+      "politics"
+    ]
+  },
+  {
+    "claim": "It entails that all people and institutions within a political body are subject to the same law.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Rule of law"
+    ],
+    "tags": [
+      "politics"
+    ]
+  },
+  {
+    "claim": "This concept is sometimes stated simply as \"no one is above the law\" or \"all are equal before the law\".",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Rule of law"
+    ],
+    "tags": [
+      "politics"
+    ]
+  },
+  {
+    "claim": "An election is a formal group decision-making process whereby a portion or all of a population or group votes to choose an individual or multiple individuals to hold public office or other position of responsibility.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Election"
+    ],
+    "tags": [
+      "politics"
+    ]
+  },
+  {
+    "claim": "Philosophy is a systematic study of general and fundamental questions concerning topics like existence, knowledge, mind, reason, language, and value.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Philosophy"
+    ],
+    "tags": [
+      "philosophy"
+    ]
+  },
+  {
+    "claim": "It is a rational and critical inquiry that reflects on its methods and assumptions.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Philosophy"
+    ],
+    "tags": [
+      "philosophy"
+    ]
+  },
+  {
+    "claim": "Ethics is the philosophical study of moral phenomena.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Ethics"
+    ],
+    "tags": [
+      "philosophy"
+    ]
+  },
+  {
+    "claim": "Also called moral philosophy, it investigates normative questions about what people ought to do or which behavior is morally right.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Ethics"
+    ],
+    "tags": [
+      "philosophy"
+    ]
+  },
+  {
+    "claim": "Its main branches include normative ethics, applied ethics, and metaethics.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Ethics"
+    ],
+    "tags": [
+      "philosophy"
+    ]
+  },
+  {
+    "claim": "Epistemology is the main branch of philosophy that examines the nature, origin, and limits of knowledge.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Epistemology"
+    ],
+    "tags": [
+      "philosophy"
+    ]
+  },
+  {
+    "claim": "Also called the theory of knowledge, it explores different types of knowledge, such as propositional knowledge about facts, practical knowledge in the form of skills, and knowledge by acquaintance as a familiarity through experience.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Epistemology"
+    ],
+    "tags": [
+      "philosophy"
+    ]
+  },
+  {
+    "claim": "Epistemologists study the concepts of belief, truth, and justification to understand the nature of knowledge.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Epistemology"
+    ],
+    "tags": [
+      "philosophy"
+    ]
+  },
+  {
+    "claim": "Logic is the study of correct reasoning.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Logic"
+    ],
+    "tags": [
+      "philosophy"
+    ]
+  },
+  {
+    "claim": "It includes both formal and informal logic.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Logic"
+    ],
+    "tags": [
+      "philosophy"
+    ]
+  },
+  {
+    "claim": "Formal logic is the study of deductively valid inferences or logical truths.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Logic"
+    ],
+    "tags": [
+      "philosophy"
+    ]
+  },
+  {
+    "claim": "Metaphysics is the branch of philosophy that examines the basic structure of reality.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Metaphysics"
+    ],
+    "tags": [
+      "philosophy"
+    ]
+  },
+  {
+    "claim": "It is traditionally seen as the study of mind-independent features of the world, but some theorists view it as an inquiry into the conceptual framework of human understanding.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Metaphysics"
+    ],
+    "tags": [
+      "philosophy"
+    ]
+  },
+  {
+    "claim": "Some philosophers, including Aristotle, designate metaphysics as first philosophy to suggest that it is more fundamental than other forms of philosophical inquiry.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Metaphysics"
+    ],
+    "tags": [
+      "philosophy"
+    ]
+  },
+  {
+    "claim": "Aesthetics is the branch of philosophy that studies beauty, taste, and related phenomena.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Aesthetics"
+    ],
+    "tags": [
+      "philosophy"
+    ]
+  },
+  {
+    "claim": "In a broad sense, it includes the philosophy of art, which examines the nature of art, artistic creativity, the meanings of artworks, and audience appreciation.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Aesthetics"
+    ],
+    "tags": [
+      "philosophy"
+    ]
+  },
+  {
+    "claim": "Political philosophy is the study of the theoretical and conceptual foundations of politics.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Political philosophy"
+    ],
+    "tags": [
+      "philosophy"
+    ]
+  },
+  {
+    "claim": "It examines the nature, scope, and legitimacy of political institutions, such as states.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Political philosophy"
+    ],
+    "tags": [
+      "philosophy"
+    ]
+  },
+  {
+    "claim": "The field investigates different forms of government, ranging from democracy to authoritarianism, as well as the values guiding political action, such as justice, equality, and liberty.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Political philosophy"
+    ],
+    "tags": [
+      "philosophy"
+    ]
+  },
+  {
+    "claim": "Philosophy of mind is a branch of philosophy that deals with the nature of the mind and its relation to the body and the external world.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Philosophy of mind"
+    ],
+    "tags": [
+      "philosophy"
+    ]
+  },
+  {
+    "claim": "Philosophy of science is the branch of philosophy concerned with the foundations, methods, and implications of science.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Philosophy of science"
+    ],
+    "tags": [
+      "philosophy"
+    ]
+  },
+  {
+    "claim": "Amongst its central questions are the difference between science and non-science, the reliability of scientific theories, and the ultimate purpose and meaning of science as a human endeavour.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Philosophy of science"
+    ],
+    "tags": [
+      "philosophy"
+    ]
+  },
+  {
+    "claim": "Philosophy of science is both a theoretical and empirical discipline, relying on philosophical theorising as well as meta-studies of scientific practice.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Philosophy of science"
+    ],
+    "tags": [
+      "philosophy"
+    ]
+  },
+  {
+    "claim": "Existentialism is a family of philosophical views and inquiry that explore the human individual's struggle to lead an authentic life despite the apparent absurdity or incomprehensibility of existence.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Existentialism"
+    ],
+    "tags": [
+      "philosophy"
+    ]
+  },
+  {
+    "claim": "In examining meaning, purpose, and value, existentialist thought often includes concepts such as existential crises, angst, courage, and freedom.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Existentialism"
+    ],
+    "tags": [
+      "philosophy"
+    ]
+  },
+  {
+    "claim": "Ancient history is a time period from the beginning of writing and recorded human history through late antiquity.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Ancient history"
+    ],
+    "tags": [
+      "history"
+    ]
+  },
+  {
+    "claim": "The span of recorded history is roughly 5,000 years, beginning with the development of Sumerian cuneiform script.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Ancient history"
+    ],
+    "tags": [
+      "history"
+    ]
+  },
+  {
+    "claim": "Ancient history covers all continents inhabited by humans in the period 3000 BC – AD 500, ending with the expansion of Islam in late antiquity.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Ancient history"
+    ],
+    "tags": [
+      "history"
+    ]
+  },
+  {
+    "claim": "In the history of Europe, the Middle Ages or medieval period lasted approximately from the 5th to late 15th centuries, comparable with the post-classical period of global history.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Middle Ages"
+    ],
+    "tags": [
+      "history"
+    ]
+  },
+  {
+    "claim": "The medieval period is the middle epoch of the three traditional divisions of Western history: classical antiquity, the medieval period, and the modern period.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Middle Ages"
+    ],
+    "tags": [
+      "history"
+    ]
+  },
+  {
+    "claim": "The medieval period is itself subdivided into the Early, High, and Late Middle Ages.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Middle Ages"
+    ],
+    "tags": [
+      "history"
+    ]
+  },
+  {
+    "claim": "The Renaissance is a European period of history and cultural movement, very roughly defined as covering the 14th through 17th centuries, though sometimes more narrowly defined for instance as only covering the 15th through 16th centuries.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Renaissance"
+    ],
+    "tags": [
+      "history"
+    ]
+  },
+  {
+    "claim": "It marked the transition from the Middle Ages to modernity and was characterized by the European rediscovery and revival of the literary, philosophical, and artistic achievements of classical antiquity.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Renaissance"
+    ],
+    "tags": [
+      "history"
+    ]
+  },
+  {
+    "claim": "The term rinascita ('rebirth') first appeared in Lives of the Artists by Giorgio Vasari, while the corresponding French word renaissance was adopted into English as the term for this period during the 1830s.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Renaissance"
+    ],
+    "tags": [
+      "history"
+    ]
+  },
+  {
+    "claim": "Beginning in Great Britain around 1760, the Industrial Revolution had spread to continental Europe and the United States by about 1840.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Industrial Revolution"
+    ],
+    "tags": [
+      "history"
+    ]
+  },
+  {
+    "claim": "Output greatly increased, and the result was an unprecedented rise in population and population growth.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Industrial Revolution"
+    ],
+    "tags": [
+      "history"
+    ]
+  },
+  {
+    "claim": "The textile industry was the first to use modern production methods, and textiles became the dominant industry in terms of employment, value of output, and capital invested.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Industrial Revolution"
+    ],
+    "tags": [
+      "history"
+    ]
+  },
+  {
+    "claim": "World War I, or the First World War, also known as The Great War, was a global conflict between two coalitions: the Allies and the Central Powers.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: World War I"
+    ],
+    "tags": [
+      "history"
+    ]
+  },
+  {
+    "claim": "Major areas of conflict included Europe and the Middle East, as well as parts of Africa and the Asia-Pacific.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: World War I"
+    ],
+    "tags": [
+      "history"
+    ]
+  },
+  {
+    "claim": "The war saw important developments in weaponry including tanks, aircraft, artillery, machine guns, and chemical weapons.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: World War I"
+    ],
+    "tags": [
+      "history"
+    ]
+  },
+  {
+    "claim": "World War II, or the Second World War, was a global conflict between two coalitions: the Allies and the Axis powers.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: World War II"
+    ],
+    "tags": [
+      "history"
+    ]
+  },
+  {
+    "claim": "Nearly all of the world's countries participated.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: World War II"
+    ],
+    "tags": [
+      "history"
+    ]
+  },
+  {
+    "claim": "Tanks and aircraft played major roles, the latter enabling the strategic bombing of cities and delivery of the only nuclear weapons used in war.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: World War II"
+    ],
+    "tags": [
+      "history"
+    ]
+  },
+  {
+    "claim": "The Cold War was a period of international geopolitical rivalry between the United States (US) and the Soviet Union (USSR) and their respective allies, the capitalist Western Bloc and communist Eastern Bloc.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Cold War"
+    ],
+    "tags": [
+      "history"
+    ]
+  },
+  {
+    "claim": "It began in the aftermath of the Second World War and ended with the dissolution of the Soviet Union in 1991.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Cold War"
+    ],
+    "tags": [
+      "history"
+    ]
+  },
+  {
+    "claim": "The term cold war is used because there was no direct fighting between the two superpowers, though each supported opposing sides in regional conflicts known as proxy wars.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Cold War"
+    ],
+    "tags": [
+      "history"
+    ]
+  },
+  {
+    "claim": "Colonialism is the practice of extending and maintaining political, social, economic, and cultural domination over a territory and its people by another people in pursuit of interests defined in an often distant metropole, who also claim superiority.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Colonialism"
+    ],
+    "tags": [
+      "history"
+    ]
+  },
+  {
+    "claim": "While frequently an imperialist project, colonialism functions through differentiating between the targeted land and people, and that of the colonizers.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Colonialism"
+    ],
+    "tags": [
+      "history"
+    ]
+  },
+  {
+    "claim": "Rather than annexation, this typically culminates in organizing the colonized into colonies separate to the colonizers' metropole.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Colonialism"
+    ],
+    "tags": [
+      "history"
+    ]
+  },
+  {
+    "claim": "Decolonization is the ending of colonialism, the latter being the process whereby imperial nations establish and dominate foreign territories, often overseas.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Decolonization"
+    ],
+    "tags": [
+      "history"
+    ]
+  },
+  {
+    "claim": "The meanings and applications of the term are disputed.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Decolonization"
+    ],
+    "tags": [
+      "history"
+    ]
+  },
+  {
+    "claim": "Some scholars of decolonization focus especially on independence movements in the colonies and the collapse of global colonial empires.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Decolonization"
+    ],
+    "tags": [
+      "history"
+    ]
+  },
+  {
+    "claim": "The civil rights movement was a social movement in the United States from 1954 to 1968 which aimed to abolish legalized racial segregation, discrimination, and disenfranchisement in the country, which most commonly affected African Americans.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Civil rights movement"
+    ],
+    "tags": [
+      "history"
+    ]
+  },
+  {
+    "claim": "The movement had origins in the Reconstruction era in the late 19th century, and modern roots in the 1940s and in Mohandas Gandhi's nonviolent movement in India.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Civil rights movement"
+    ],
+    "tags": [
+      "history"
+    ]
+  },
+  {
+    "claim": "Linguistics is the scientific study of language.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Linguistics"
+    ],
+    "tags": [
+      "linguistics"
+    ]
+  },
+  {
+    "claim": "The areas of linguistic analysis are syntax, semantics (meaning), morphology, phonetics, phonology, and pragmatics.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Linguistics"
+    ],
+    "tags": [
+      "linguistics"
+    ]
+  },
+  {
+    "claim": "Subdisciplines such as biolinguistics and psycholinguistics bridge many of these divisions.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Linguistics"
+    ],
+    "tags": [
+      "linguistics"
+    ]
+  },
+  {
+    "claim": "Phonetics is a branch of linguistics that mainly concerns the articulation and perception of speech sounds.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Phonetics"
+    ],
+    "tags": [
+      "linguistics"
+    ]
+  },
+  {
+    "claim": "The field of phonetics is traditionally divided into three sub-disciplines: articulatory phonetics, acoustic phonetics, and auditory phonetics.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Phonetics"
+    ],
+    "tags": [
+      "linguistics"
+    ]
+  },
+  {
+    "claim": "Linguists who specialize in studying these physical properties of talking or signing are phoneticians.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Phonetics"
+    ],
+    "tags": [
+      "linguistics"
+    ]
+  },
+  {
+    "claim": "In linguistics, syntax is the study of how words and morphemes combine to form well-formed larger units such as phrases and sentences.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Syntax"
+    ],
+    "tags": [
+      "linguistics"
+    ]
+  },
+  {
+    "claim": "Central concerns in this area of linguistics include word order, grammatical relations, hierarchical sentence structure (constituency), agreement, cross-linguistic variation, and the relationship between form and meaning (semantics).",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Syntax"
+    ],
+    "tags": [
+      "linguistics"
+    ]
+  },
+  {
+    "claim": "Diverse approaches, such as generative grammar and functional grammar, offer unique perspectives on syntax, reflecting its complexity and centrality to understanding human language.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Syntax"
+    ],
+    "tags": [
+      "linguistics"
+    ]
+  },
+  {
+    "claim": "Semantics is the study of linguistic meaning.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Semantics"
+    ],
+    "tags": [
+      "linguistics"
+    ]
+  },
+  {
+    "claim": "It examines what meaning is, how words get their meaning, and how the meaning of a complex expression depends on its parts.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Semantics"
+    ],
+    "tags": [
+      "linguistics"
+    ]
+  },
+  {
+    "claim": "Part of this process involves the distinction between sense and reference.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Semantics"
+    ],
+    "tags": [
+      "linguistics"
+    ]
+  },
+  {
+    "claim": "In linguistics and the philosophy of language, pragmatics is the study of how context contributes to meaning.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Pragmatics"
+    ],
+    "tags": [
+      "linguistics"
+    ]
+  },
+  {
+    "claim": "The field of study evaluates how human language is utilized in social interactions, as well as the relationship between the interpreter and the interpreted.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Pragmatics"
+    ],
+    "tags": [
+      "linguistics"
+    ]
+  },
+  {
+    "claim": "Linguists who specialize in pragmatics are called pragmaticians.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Pragmatics"
+    ],
+    "tags": [
+      "linguistics"
+    ]
+  },
+  {
+    "claim": "Sociolinguistics is the descriptive and scientific study of how language is shaped by and used differently within any given society.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Sociolinguistics"
+    ],
+    "tags": [
+      "linguistics"
+    ]
+  },
+  {
+    "claim": "The field largely looks at how a language varies between distinct social groups and under the influence of assorted cultural norms, expectations, and contexts, including how that variation plays a role in language change.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Sociolinguistics"
+    ],
+    "tags": [
+      "linguistics"
+    ]
+  },
+  {
+    "claim": "Sociolinguistics combines the older field of dialectology with the social sciences in order to identify regional dialects, sociolects, ethnolects, and other sub-varieties and styles within a language.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Sociolinguistics"
+    ],
+    "tags": [
+      "linguistics"
+    ]
+  },
+  {
+    "claim": "Language acquisition is the process by which humans acquire the capacity to perceive and comprehend language.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Language acquisition"
+    ],
+    "tags": [
+      "linguistics"
+    ]
+  },
+  {
+    "claim": "In other words, it is how human beings gain the ability to be aware of language, to understand it, and to produce and use words and sentences to communicate.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Language acquisition"
+    ],
+    "tags": [
+      "linguistics"
+    ]
+  },
+  {
+    "claim": "In linguistics, morphology is the study of how words are formed, and how they relate to one another within a language.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Morphology (linguistics)"
+    ],
+    "tags": [
+      "linguistics"
+    ]
+  },
+  {
+    "claim": "Most approaches to morphology investigate the structure of words in terms of morphemes, which are the smallest units in a language with some independent meaning or grammatical function.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Morphology (linguistics)"
+    ],
+    "tags": [
+      "linguistics"
+    ]
+  },
+  {
+    "claim": "Morphemes include roots that can exist as words by themselves, but also categories such as affixes that can only appear as part of a larger word.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Morphology (linguistics)"
+    ],
+    "tags": [
+      "linguistics"
+    ]
+  },
+  {
+    "claim": "A writing system is any conventional system for representing a particular language using a set of symbols, as well as the rules those symbols encode.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Writing system"
+    ],
+    "tags": [
+      "linguistics"
+    ]
+  },
+  {
+    "claim": "The earliest of conventional writing systems appeared during the late 4th millennium BC.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Writing system"
+    ],
+    "tags": [
+      "linguistics"
+    ]
+  },
+  {
+    "claim": "An endangered language or moribund language is a language that is at risk of disappearing as its speakers die out or shift to speaking other languages.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Endangered language"
+    ],
+    "tags": [
+      "linguistics"
+    ]
+  },
+  {
+    "claim": "Language loss occurs when the language has no more native speakers and becomes a \"dead\" or \"extinct language\".",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Endangered language"
+    ],
+    "tags": [
+      "linguistics"
+    ]
+  },
+  {
+    "claim": "A dead language may still be studied through recordings or writings, but it is still considered dead or extinct once there are no more fluent speakers left.",
+    "level": "E3",
+    "sources": [
+      "Wikipedia: Endangered language"
+    ],
+    "tags": [
+      "linguistics"
+    ]
+  },
+  {
+    "claim": "Mathematics is a field of study that discovers and organizes methods, theories, and theorems that are developed and proved either in response to the needs of empirical sciences or the needs of mathematics itself.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Mathematics"
+    ],
+    "tags": [
+      "mathematics"
+    ]
+  },
+  {
+    "claim": "There are many areas of mathematics, including number theory, algebra, geometry, analysis, and set theory.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Mathematics"
+    ],
+    "tags": [
+      "mathematics"
+    ]
+  },
+  {
+    "claim": "Calculus is the mathematical study of continuous change, and the principal precursor of modern mathematical analysis.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Calculus"
+    ],
+    "tags": [
+      "mathematics"
+    ]
+  },
+  {
+    "claim": "Originally called infinitesimal calculus or the calculus of infinitesimals, it has two major branches, differential calculus and integral calculus.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Calculus"
+    ],
+    "tags": [
+      "mathematics"
+    ]
+  },
+  {
+    "claim": "Differential calculus analyses instantaneous rates of change and the slopes of curves; integral calculus analyses accumulation of quantities and areas under or between curves.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Calculus"
+    ],
+    "tags": [
+      "mathematics"
+    ]
+  },
+  {
+    "claim": "Number theory is a branch of pure mathematics devoted primarily to the study of the integers and arithmetic functions.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Number theory"
+    ],
+    "tags": [
+      "mathematics"
+    ]
+  },
+  {
+    "claim": "Number theorists study prime numbers as well as the properties of mathematical objects constructed from integers, or defined as generalizations of the integers.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Number theory"
+    ],
+    "tags": [
+      "mathematics"
+    ]
+  },
+  {
+    "claim": "In mathematics and computer science, graph theory is the study of graphs, which are mathematical structures used to model pairwise relations between objects.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Graph theory"
+    ],
+    "tags": [
+      "mathematics"
+    ]
+  },
+  {
+    "claim": "A graph in this context is made up of vertices which are connected by edges.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Graph theory"
+    ],
+    "tags": [
+      "mathematics"
+    ]
+  },
+  {
+    "claim": "A distinction is made between undirected graphs, where edges link two vertices symmetrically, and directed graphs, where edges link two vertices asymmetrically.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Graph theory"
+    ],
+    "tags": [
+      "mathematics"
+    ]
+  },
+  {
+    "claim": "Probability theory or probability calculus is the branch of mathematics concerned with probability.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Probability theory"
+    ],
+    "tags": [
+      "mathematics"
+    ]
+  },
+  {
+    "claim": "Although there are several different probability interpretations, probability theory treats the concept in a rigorous mathematical manner by expressing it through a set of axioms.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Probability theory"
+    ],
+    "tags": [
+      "mathematics"
+    ]
+  },
+  {
+    "claim": "Typically these axioms formalise probability in terms of a probability space, which assigns a measure taking values between 0 and 1, termed the probability measure, to a set of outcomes called the sample space.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Probability theory"
+    ],
+    "tags": [
+      "mathematics"
+    ]
+  },
+  {
+    "claim": "Statistics is the discipline that concerns the collection, organization, analysis, interpretation, and presentation of data.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Statistics"
+    ],
+    "tags": [
+      "mathematics"
+    ]
+  },
+  {
+    "claim": "In applying statistics to a scientific, industrial, or social problem, it is conventional to begin with a statistical population or a statistical model to be studied.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Statistics"
+    ],
+    "tags": [
+      "mathematics"
+    ]
+  },
+  {
+    "claim": "Populations can be diverse groups of people or objects such as \"all people living in a country\" or \"every atom composing a crystal\".",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Statistics"
+    ],
+    "tags": [
+      "mathematics"
+    ]
+  },
+  {
+    "claim": "In mathematics, a differential equation is an equation that relates one or more unknown functions and their derivatives.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Differential equation"
+    ],
+    "tags": [
+      "mathematics"
+    ]
+  },
+  {
+    "claim": "In applications, the functions generally represent physical quantities, the derivatives represent their rates of change, and the differential equation defines a relationship between the two.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Differential equation"
+    ],
+    "tags": [
+      "mathematics"
+    ]
+  },
+  {
+    "claim": "Such relations are common in mathematical models and scientific laws; therefore, differential equations play a prominent role in many disciplines including engineering, physics, economics, and biology.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Differential equation"
+    ],
+    "tags": [
+      "mathematics"
+    ]
+  },
+  {
+    "claim": "In abstract algebra, group theory studies the algebraic structures known as groups.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Group theory"
+    ],
+    "tags": [
+      "mathematics"
+    ]
+  },
+  {
+    "claim": "The concept of a group is central to abstract algebra: other well-known algebraic structures, such as rings, fields, and vector spaces, can all be seen as groups endowed with additional operations and axioms.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Group theory"
+    ],
+    "tags": [
+      "mathematics"
+    ]
+  },
+  {
+    "claim": "Groups recur throughout mathematics, and the methods of group theory have influenced many parts of algebra.",
+    "level": "E4",
+    "sources": [
+      "Wikipedia: Group theory"
+    ],
+    "tags": [
+      "mathematics"
+    ]
+  }
+]

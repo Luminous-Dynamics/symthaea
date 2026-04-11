@@ -47,6 +47,11 @@ pub fn trigger_search(query: &str) {
 /// Resolves relative URLs against the source page's base URL.
 fn sanitize_html(html: &str, base_url: Option<&url::Url>) -> String {
     let mut builder = ammonia::Builder::new();
+
+    // Allow inline styles on all elements for better page rendering.
+    // ammonia's clean_content_tags strips dangerous CSS (expressions, url(), etc.)
+    let generic_attrs: &[&str] = &["style", "class", "id", "role"];
+
     builder
         .add_tags(&[
             "h1", "h2", "h3", "h4", "h5", "h6",
@@ -54,15 +59,19 @@ fn sanitize_html(html: &str, base_url: Option<&url::Url>) -> String {
             "ul", "ol", "li", "dl", "dt", "dd",
             "strong", "em", "b", "i", "u", "s", "mark", "small", "sub", "sup",
             "a", "blockquote", "pre", "code", "kbd", "var", "samp",
-            "table", "thead", "tbody", "tfoot", "tr", "th", "td", "caption",
+            "table", "thead", "tbody", "tfoot", "tr", "th", "td", "caption", "col", "colgroup",
             "img", "figure", "figcaption", "picture", "source",
             "details", "summary", "time", "abbr", "cite",
             "nav", "header", "footer", "aside",
+            "style",
         ])
+        .add_generic_attributes(generic_attrs)
         .add_tag_attributes("a", &["href", "title"])
         .add_tag_attributes("img", &["src", "alt", "width", "height", "loading"])
         .add_tag_attributes("td", &["colspan", "rowspan"])
         .add_tag_attributes("th", &["colspan", "rowspan", "scope"])
+        .add_tag_attributes("col", &["span"])
+        .add_tag_attributes("colgroup", &["span"])
         .add_tag_attributes("time", &["datetime"])
         .add_tag_attributes("abbr", &["title"])
         .link_rel(Some("noopener noreferrer"));

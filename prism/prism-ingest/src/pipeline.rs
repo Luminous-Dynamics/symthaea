@@ -107,6 +107,7 @@ const SOURCES: &[&str] = &[
     include_str!("../claims/communication-media.json"),
     include_str!("../claims/food-agriculture.json"),
     include_str!("../claims/anthropology-culture.json"),
+    include_str!("../claims/wikipedia-extracts.json"),
 ];
 
 /// Load all pipeline claims from embedded JSON files.

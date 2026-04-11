@@ -602,6 +602,15 @@ body {
 .reader-content a { color: var(--content-link); text-decoration: underline; }
 .reader-content code { background: var(--content-code-bg); padding: 2px 6px; border-radius: 3px; font-size: 0.9em; color: var(--content-code); }
 .reader-content blockquote { border-left: 3px solid var(--prism-accent); padding-left: 16px; margin: 1em 0; color: var(--content-text-secondary); }
+.reader-content table { border-collapse: collapse; margin: 1em 0; width: 100%; font-size: 0.9em; }
+.reader-content th, .reader-content td { padding: 6px 10px; border: 1px solid var(--content-border); text-align: left; }
+.reader-content th { background: var(--content-code-bg); font-weight: 600; }
+.reader-content img { max-width: 100%; height: auto; border-radius: 4px; margin: 0.5em 0; }
+.reader-content figure { margin: 1em 0; text-align: center; }
+.reader-content figcaption { font-size: 0.85em; color: var(--content-text-secondary); margin-top: 4px; }
+.reader-content details { margin: 0.5em 0; }
+.reader-content summary { cursor: pointer; font-weight: 600; }
+.reader-content pre { background: var(--content-code-bg); padding: 12px 16px; border-radius: 6px; overflow-x: auto; font-size: 0.85em; }
 
 /* ── Search Results ── */
 
