@@ -174,6 +174,7 @@ mod tests {
             created_at: Timestamp::from_micros(0),
             resolved_at: None,
             success: None,
+            schema_version: 1,
         }
     }
 
@@ -185,6 +186,7 @@ mod tests {
             payload: payload.into(),
             created_at: Timestamp::from_micros(0),
             related_hashes: vec![],
+            schema_version: 1,
         }
     }
 

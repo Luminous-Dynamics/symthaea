@@ -1956,7 +1956,9 @@ mod tests {
                 }
                 Ok(ValidateCallbackResult::Valid)
             }
-            LinkTypes::GeoIndex => Ok(ValidateCallbackResult::Valid),
+            LinkTypes::GeoIndex
+            | LinkTypes::PropertyIdIndex
+            | LinkTypes::DeedIdIndex => Ok(ValidateCallbackResult::Valid),
         }
     }
 
@@ -1998,7 +2000,9 @@ mod tests {
                 }
                 Ok(ValidateCallbackResult::Valid)
             }
-            LinkTypes::GeoIndex => Ok(ValidateCallbackResult::Valid),
+            LinkTypes::GeoIndex
+            | LinkTypes::PropertyIdIndex
+            | LinkTypes::DeedIdIndex => Ok(ValidateCallbackResult::Valid),
         }
     }
 

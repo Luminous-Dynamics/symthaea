@@ -237,8 +237,8 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
     match op.flattened::<EntryTypes, LinkTypes>()? {
         FlatOp::StoreEntry(store_entry) => match store_entry {
             OpEntry::CreateEntry { app_entry, action } => match app_entry {
-                EntryTypes::RoboticAsset(asset) => validate_robotic_asset(&asset, &action),
-                EntryTypes::DispatchOrder(order) => validate_dispatch_order(&order, &action),
+                EntryTypes::RoboticAsset(asset) => validate_robotic_asset(&asset, &EntryCreationAction::Create(action)),
+                EntryTypes::DispatchOrder(order) => validate_dispatch_order(&order, &EntryCreationAction::Create(action)),
                 EntryTypes::TelemetryReport(report) => validate_telemetry_report(&report),
                 EntryTypes::Anchor(_) => Ok(ValidateCallbackResult::Valid),
             },
@@ -249,10 +249,15 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 original_entry_hash: _,
             } => match app_entry {
                 EntryTypes::RoboticAsset(asset) => {
-                    check_author_match(&action)?;
-                    validate_robotic_asset(&asset, &action)
+                    let eca = EntryCreationAction::Update(action.clone());
+                    if *eca.author() != action.author {
+                        return Ok(ValidateCallbackResult::Invalid(
+                            "Only the original author can update this entry".into(),
+                        ));
+                    }
+                    validate_robotic_asset(&asset, &eca)
                 }
-                EntryTypes::DispatchOrder(order) => validate_dispatch_order(&order, &action),
+                EntryTypes::DispatchOrder(order) => validate_dispatch_order(&order, &EntryCreationAction::Update(action)),
                 _ => Ok(ValidateCallbackResult::Valid),
             },
             _ => Ok(ValidateCallbackResult::Valid),
