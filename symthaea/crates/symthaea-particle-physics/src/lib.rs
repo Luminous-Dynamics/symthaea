@@ -25,6 +25,10 @@
 pub mod constants;
 pub mod cross_sections;
 pub mod decay_widths;
+pub mod field_quantization;
+pub mod general_relativity;
+pub mod lattice_qcd;
+pub mod relativistic_qm;
 pub mod renormalization;
 pub mod symmetry_groups;
 

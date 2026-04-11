@@ -38,12 +38,18 @@
 pub mod basis;
 pub mod consciousness;
 pub mod constants;
+pub mod coupled_cluster;
 pub mod dft;
+pub mod emergent_consciousness;
 pub mod geometry_opt;
 pub mod integrals;
+pub mod molecular_dynamics;
 pub mod molecule;
 pub mod post_hf;
+pub mod quantum_info;
 pub mod scf;
+pub mod stat_mech;
+pub mod time_dependent;
 
 // Re-export key types for convenience
 pub use basis::{BasisSet, BasisSetProvider, ContractedGaussian, PrimitiveGaussian, ShellType};
