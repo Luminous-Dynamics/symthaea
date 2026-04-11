@@ -173,7 +173,7 @@ fn SearchResultsPage(query: String, results: Vec<SearchResult>) -> impl IntoView
                 <div class="spore-summary">
                     <div class="spore-summary-header">
                         <span class="spore-psi">{move || format!("\u{03A8} {:.0}%", state.consciousness.get() * 100.0)}</span>
-                        " Epistemic Summary"
+                        " Consciousness Reflection"
                     </div>
                     <p class="spore-summary-text">{move || state.spore_summary.get()}</p>
                     <p class="spore-disclaimer">{move || {
