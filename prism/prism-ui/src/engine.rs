@@ -185,6 +185,7 @@ fn search_query(query: &str, state: &BrowserState, engine: &SearchEngine) {
     state.set_safety.set(SafetyLevel::Green);
     state.set_threat_count.set(0);
     state.push_history(&url, &title, &view);
+    state.sync_active_tab();
 
     // Advanced/Paradigm: augment with web sources in background
     if mode == SearchMode::Basic {

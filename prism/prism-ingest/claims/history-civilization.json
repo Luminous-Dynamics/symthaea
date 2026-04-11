@@ -1,0 +1,22 @@
+[
+  {"claim": "The Agricultural Revolution beginning around 10000 BCE enabled permanent settlements and the rise of complex societies", "level": "E4", "sources": ["Archaeology"], "tags": ["history", "agriculture"]},
+  {"claim": "Writing was independently invented in Mesopotamia Egypt China and Mesoamerica between 3400 and 600 BCE", "level": "E4", "sources": ["Archaeology"], "tags": ["history", "writing"]},
+  {"claim": "The Roman Empire at its height controlled the entire Mediterranean basin and extended from Britain to Mesopotamia", "level": "E4", "sources": ["History"], "tags": ["history", "rome"]},
+  {"claim": "The Black Death killed approximately one-third of Europe's population between 1347 and 1353", "level": "E4", "sources": ["Medieval History"], "tags": ["history", "pandemic"]},
+  {"claim": "The Scientific Revolution of the 16th and 17th centuries established empirical observation and mathematical reasoning as the basis for knowledge", "level": "E4", "sources": ["History of Science"], "tags": ["history", "science"]},
+  {"claim": "The Industrial Revolution began in Britain in the late 18th century transforming manufacturing from hand production to machine-based processes", "level": "E4", "sources": ["Economic History"], "tags": ["history", "industry"]},
+  {"claim": "The abolition of slavery was achieved through a combination of slave resistance economic changes and moral campaigning across the 18th and 19th centuries", "level": "E4", "sources": ["History"], "tags": ["history", "rights"]},
+  {"claim": "The French Revolution of 1789 established the principles of liberty equality and fraternity that influenced democratic movements worldwide", "level": "E4", "sources": ["History"], "tags": ["history", "democracy"]},
+  {"claim": "World War II resulted in approximately 70 to 85 million deaths making it the deadliest conflict in human history", "level": "E4", "sources": ["History"], "tags": ["history", "war"]},
+  {"claim": "The Green Revolution of the 1960s and 1970s dramatically increased agricultural yields through high-yield crop varieties fertilizers and irrigation", "level": "E4", "sources": ["Agricultural History"], "tags": ["history", "agriculture"]},
+  {"claim": "The fall of the Berlin Wall in 1989 symbolized the end of the Cold War and the reunification of Europe", "level": "E4", "sources": ["Modern History"], "tags": ["history", "politics"]},
+  {"claim": "The Columbian Exchange transferred crops animals diseases and ideas between the Americas and Afro-Eurasia after 1492", "level": "E4", "sources": ["World History"], "tags": ["history", "globalization"]},
+  {"claim": "The Enlightenment promoted reason individual rights and skepticism of authority as foundations of modern democratic societies", "level": "E4", "sources": ["Philosophy"], "tags": ["history", "philosophy"]},
+  {"claim": "The Silk Road connected East Asia to the Mediterranean for over 1500 years facilitating trade in goods ideas and technologies", "level": "E4", "sources": ["History"], "tags": ["history", "trade"]},
+  {"claim": "The invention of the telegraph in the 1830s was the first technology to enable near-instantaneous long-distance communication", "level": "E4", "sources": ["Technology History"], "tags": ["history", "communication"]},
+  {"claim": "The Treaty of Westphalia in 1648 established the modern concept of state sovereignty and non-interference in internal affairs", "level": "E4", "sources": ["Political History"], "tags": ["history", "politics"]},
+  {"claim": "The Harappan civilization of the Indus Valley developed urban planning with standardized weights drainage systems and grid streets by 2600 BCE", "level": "E4", "sources": ["Archaeology"], "tags": ["history", "civilization"]},
+  {"claim": "Paper was invented in China around 105 CE and reached Europe via the Islamic world by the 12th century", "level": "E4", "sources": ["History of Technology"], "tags": ["history", "technology"]},
+  {"claim": "The decolonization movement after World War II led to the independence of over 80 nations across Asia and Africa", "level": "E4", "sources": ["Modern History"], "tags": ["history", "decolonization"]},
+  {"claim": "The invention of the compass in China during the Han dynasty revolutionized navigation and enabled transoceanic exploration", "level": "E4", "sources": ["History of Technology"], "tags": ["history", "navigation"]}
+]

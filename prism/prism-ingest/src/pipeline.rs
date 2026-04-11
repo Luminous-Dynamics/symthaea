@@ -99,6 +99,9 @@ const SOURCES: &[&str] = &[
     include_str!("../claims/philosophy-humanities.json"),
     include_str!("../claims/health-nutrition.json"),
     include_str!("../claims/energy-sustainability.json"),
+    include_str!("../claims/history-civilization.json"),
+    include_str!("../claims/mathematics-logic.json"),
+    include_str!("../claims/technology-internet.json"),
 ];
 
 /// Load all pipeline claims from embedded JSON files.

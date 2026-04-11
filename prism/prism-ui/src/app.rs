@@ -190,8 +190,10 @@ pub fn App() -> impl IntoView {
                     <button class="gear-btn" on:click=open_settings title="Settings" attr:aria-label="Settings" inner_html=GEAR_ICON></button>
                     <SecurityBadge />
                 </div>
+                <TabBar />
                 <div class="search-row">
                     <SearchBar />
+                    <BookmarkButton />
                 </div>
             </div>
 
@@ -234,5 +236,79 @@ fn ConsciousnessBadge() -> impl IntoView {
         <span class=psi_class title=title attr:aria-label="Consciousness level">
             {psi_display}
         </span>
+    }
+}
+
+const TAB_PLUS: &str = "+";
+const TAB_CLOSE: &str = "\u{00D7}";
+
+/// Tab bar — shows open tabs with close buttons and a new-tab button.
+#[component]
+fn TabBar() -> impl IntoView {
+    let state = expect_context::<BrowserState>();
+    let s_new = state.clone();
+
+    view! {
+        <div class="tab-bar">
+            <For
+                each=move || state.tabs.get()
+                key=|tab| tab.id
+                children=move |tab| {
+                    let id = tab.id;
+                    let title = tab.title.clone();
+                    let s_switch = expect_context::<BrowserState>();
+                    let s_close = expect_context::<BrowserState>();
+                    let s_active = expect_context::<BrowserState>();
+                    let active_class = move || {
+                        if s_active.active_tab.get() == id { "tab active" } else { "tab" }
+                    };
+                    view! {
+                        <div class=active_class>
+                            <span class="tab-title"
+                                on:click=move |_| { s_switch.switch_tab(id); }
+                            >{title}</span>
+                            <span class="tab-close"
+                                on:click=move |_| { s_close.close_tab(id); }
+                            >{TAB_CLOSE}</span>
+                        </div>
+                    }
+                }
+            />
+            <button class="tab-new" title="New tab" attr:aria-label="New tab"
+                on:click=move |_| { s_new.new_tab(); }
+            >{TAB_PLUS}</button>
+        </div>
+    }
+}
+
+const BOOKMARK_STAR: &str = "\u{2606}";
+const BOOKMARK_STAR_FILLED: &str = "\u{2605}";
+
+/// Bookmark button — toggles bookmark for the current page.
+#[component]
+fn BookmarkButton() -> impl IntoView {
+    let state = expect_context::<BrowserState>();
+    let s_icon = state.clone();
+    let s_class = state.clone();
+    let s_click = state.clone();
+
+    let icon = move || {
+        if s_icon.is_bookmarked() { BOOKMARK_STAR_FILLED } else { BOOKMARK_STAR }
+    };
+    let class = move || {
+        if s_class.is_bookmarked() { "bookmark-btn active" } else { "bookmark-btn" }
+    };
+
+    view! {
+        <button class=class title="Bookmark this page" attr:aria-label="Bookmark"
+            on:click=move |_| {
+                if s_click.is_bookmarked() {
+                    let url = s_click.current_url.get_untracked();
+                    s_click.remove_bookmark(&url);
+                } else {
+                    s_click.add_bookmark();
+                }
+            }
+        >{icon}</button>
     }
 }
