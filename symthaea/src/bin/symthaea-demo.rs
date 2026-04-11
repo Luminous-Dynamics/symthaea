@@ -73,5 +73,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .collect();
     }
 
-    symthaea::api::serve_demo_with_config(&addr, config).await
+    // Run server with graceful shutdown on SIGTERM/Ctrl-C.
+    // This ensures P2P peers get a clean Disconnected event instead of TCP RST.
+    tokio::select! {
+        result = symthaea::api::serve_demo_with_config(&addr, config) => {
+            result?;
+        }
+        _ = tokio::signal::ctrl_c() => {
+            eprintln!("\nShutting down gracefully...");
+        }
+    }
+
+    Ok(())
 }

@@ -104,6 +104,11 @@ impl DemoRunner {
             .map(|svc| svc.create_ticket().map_err(|e| e.to_string()))
     }
 
+    /// Get a cloneable reference to the NetworkService (for async broadcast from WS handler).
+    pub fn network_service_arc(&self) -> Option<&std::sync::Arc<crate::swarm::NetworkService>> {
+        self.service.network_service()
+    }
+
     /// Node ID (hex-encoded EndpointId public key) — available without the full ticket.
     pub fn iroh_node_id(&self) -> String {
         self.service
@@ -184,6 +189,13 @@ impl DemoRunner {
             sleep_pressure: m.neuromod.neuromod_sleep_pressure,
             active_injection_count: m.neuromod.active_injection_count,
             attractor_detected: m.neuromod.neuromod_attractor_detected,
+            // Swarm P2P telemetry (Iroh)
+            swarm_peers: self.service.swarm_connected_peers() as u32,
+            network_mean_phi: self
+                .service
+                .network_service()
+                .map(|svc| svc.network_mean_phi())
+                .unwrap_or(0.0),
             // Mesh telemetry
             mesh_health_score: m.mesh.mesh_health_score,
             mesh_peer_count: m.mesh.mesh_peer_count,

@@ -75,6 +75,14 @@ pub struct DemoCycleData {
     #[serde(default)]
     pub attractor_detected: bool,
 
+    // ── Swarm P2P Telemetry (Iroh) ──
+    /// Number of connected Iroh P2P peers (from NetworkService)
+    #[serde(default)]
+    pub swarm_peers: u32,
+    /// Mean Phi across all connected peers (0.0 when no peers)
+    #[serde(default)]
+    pub network_mean_phi: f64,
+
     // ── Mesh Network Telemetry ──
     #[serde(default)]
     pub mesh_health_score: f32,
@@ -497,10 +505,33 @@ async fn handle_socket(mut socket: WebSocket, runner: Arc<Mutex<DemoRunner>>) {
                     continue;
                 }
 
-                let data = {
+                let (data, broadcast_svc) = {
                     let mut r = runner.lock().await;
-                    r.run_cycle()
+                    let d = r.run_cycle();
+                    // Only prepare broadcast every 5th cycle (~4Hz instead of ~20Hz)
+                    #[cfg(all(feature = "swarm", feature = "identity"))]
+                    let svc = if d.swarm_peers > 0 && d.cycle % 5 == 0 {
+                        r.network_service_arc().cloned()
+                    } else {
+                        None
+                    };
+                    #[cfg(not(all(feature = "swarm", feature = "identity")))]
+                    let svc: Option<std::sync::Arc<crate::swarm::NetworkService>> = None;
+                    (d, svc)
                 };
+
+                // Broadcast consciousness to connected P2P peers (fire-and-forget, ~4Hz).
+                if let Some(svc) = broadcast_svc {
+                    let mut cv = crate::swarm::ConsciousnessVector::new(
+                        vec![data.valence, data.arousal],
+                        data.consciousness_level,
+                    );
+                    cv.valence = data.valence as f64;
+                    cv.arousal = data.arousal as f64;
+                    tokio::spawn(async move {
+                        let _ = svc.broadcast_consciousness(&cv).await;
+                    });
+                }
 
                 let json = match serde_json::to_string(&data) {
                     Ok(j) => j,

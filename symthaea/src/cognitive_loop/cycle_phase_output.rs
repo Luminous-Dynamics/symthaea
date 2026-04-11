@@ -1630,6 +1630,13 @@ impl CognitiveLoopService {
         metadata.mesh_enabled = cfg!(feature = "mesh");
         metadata.ssm_language_enabled = cfg!(feature = "ssm_language");
 
+        // ── Swarm P2P telemetry (from NetworkService) ──
+        if let Some(svc) = self.network_service() {
+            metadata.mesh.swarm_peer_count = svc.peer_count() as u32;
+            metadata.mesh.network_mean_phi = svc.network_mean_phi();
+            metadata.mesh.network_coherence = svc.network_coherence();
+        }
+
         // ── Immune system telemetry ──
         #[cfg(feature = "safety-agents")]
         {

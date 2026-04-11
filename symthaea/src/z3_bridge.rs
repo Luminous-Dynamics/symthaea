@@ -996,7 +996,10 @@ mod tests {
             .flat_map(|i| (0..metric.dim).map(move |j| metric.g(i, j)))
             .collect();
         let ricci_flat: Vec<f64> = (0..ricci.dim)
-            .flat_map(|i| (0..ricci.dim).map(move |j| ricci.g(i, j)))
+            .flat_map(|i| {
+                let r = ricci.clone();
+                (0..r.dim).map(move |j| r.g(i, j))
+            })
             .collect();
 
         // Step 3: Verify Einstein condition via Z3 bridge
