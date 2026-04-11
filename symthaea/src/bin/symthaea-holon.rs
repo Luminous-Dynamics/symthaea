@@ -233,7 +233,7 @@ async fn main() -> Result<()> {
     // Feature-gated: requires both `mycelix` (for MycelixBridge) and `safety-agents`
     // (for drain_pending_crisis_events). MockTransport consumer thread logs each dispatch.
     #[cfg(all(feature = "mycelix", feature = "safety-agents"))]
-    let mycelix_bridge = {
+    let mut mycelix_bridge = {
         use symthaea::consciousness::mycelix_bridge::{GovernanceDispatchCommand, MycelixBridge};
 
         let (dispatch_tx, dispatch_rx) = MycelixBridge::create_governance_channel();
