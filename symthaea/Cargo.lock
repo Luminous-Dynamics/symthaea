@@ -15498,6 +15498,7 @@ dependencies = [
  "symthaea-embeddings",
  "symthaea-enactive",
  "symthaea-epistemic-types",
+ "symthaea-exoskeleton",
  "symthaea-exploration",
  "symthaea-fabrication-kernel",
  "symthaea-factor-graph",
@@ -15527,17 +15528,20 @@ dependencies = [
  "symthaea-nuclear-forensics",
  "symthaea-nurture",
  "symthaea-observability",
+ "symthaea-orbital",
  "symthaea-phi-search",
  "symthaea-physics",
  "symthaea-physics-bridge",
  "symthaea-population",
  "symthaea-psych-bench",
+ "symthaea-quadruped",
  "symthaea-sensorimotor",
  "symthaea-sentinel",
  "symthaea-spore",
  "symthaea-ssm",
  "symthaea-stt",
  "symthaea-support",
+ "symthaea-surgical",
  "symthaea-therapeutic",
  "symthaea-types",
  "symthaea-vehicle",
@@ -15843,6 +15847,17 @@ version = "0.1.0"
 dependencies = [
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "symthaea-exoskeleton"
+version = "0.1.0"
+dependencies = [
+ "proptest",
+ "rand 0.8.5",
+ "serde",
+ "symthaea-core",
+ "symthaea-fep",
 ]
 
 [[package]]
@@ -16220,6 +16235,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "symthaea-orbital"
+version = "0.1.0"
+dependencies = [
+ "rand 0.8.5",
+ "serde",
+ "symthaea-core",
+ "symthaea-fep",
+]
+
+[[package]]
 name = "symthaea-perception"
 version = "0.1.0"
 dependencies = [
@@ -16343,6 +16368,16 @@ dependencies = [
  "symthaea",
  "symthaea-psych-bench",
  "symthaea-types",
+]
+
+[[package]]
+name = "symthaea-quadruped"
+version = "0.1.0"
+dependencies = [
+ "rand 0.8.5",
+ "serde",
+ "symthaea-core",
+ "symthaea-fep",
 ]
 
 [[package]]
@@ -16486,6 +16521,16 @@ dependencies = [
  "regex",
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "symthaea-surgical"
+version = "0.1.0"
+dependencies = [
+ "rand 0.8.5",
+ "serde",
+ "symthaea-core",
+ "symthaea-fep",
 ]
 
 [[package]]
