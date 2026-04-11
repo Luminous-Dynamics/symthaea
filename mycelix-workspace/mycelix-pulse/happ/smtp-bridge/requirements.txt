@@ -1,0 +1,11 @@
+# Mycelix Mail - MATL Bridge Dependencies
+
+# Holochain client
+holochain-client-python>=0.4.0
+
+# For future SMTP bridge
+aiosmtpd>=1.4.4
+email-validator>=2.1.0
+
+# Async support
+asyncio-mqtt>=0.16.1

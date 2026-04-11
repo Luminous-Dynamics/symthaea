@@ -1,0 +1,238 @@
+version: '3.8'
+
+# Mycelix Mail - Docker Compose Configuration
+# Production-ready deployment with all services
+
+services:
+  # ==========================================================================
+  # Core Application
+  # ==========================================================================
+
+  api:
+    image: mycelix/mail-api:latest
+    build:
+      context: ../../backend
+      dockerfile: Dockerfile
+    container_name: mycelix-api
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      - DATABASE_URL=postgres://mycelix:${DB_PASSWORD}@postgres:5432/mycelix
+      - REDIS_URL=redis://redis:6379
+      - MEILISEARCH_URL=http://meilisearch:7700
+      - MEILISEARCH_KEY=${MEILISEARCH_KEY}
+      - JWT_SECRET=${JWT_SECRET}
+      - RUST_LOG=info
+      - OLLAMA_URL=http://ollama:11434
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    volumes:
+      - attachments:/app/data/attachments
+      - ./config:/app/config:ro
+    networks:
+      - mycelix
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health/liveness"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  web:
+    image: mycelix/mail-web:latest
+    build:
+      context: ../../ui/frontend
+      dockerfile: Dockerfile
+    container_name: mycelix-web
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - API_URL=http://api:8080
+      - NODE_ENV=production
+    depends_on:
+      - api
+    networks:
+      - mycelix
+
+  # ==========================================================================
+  # Background Workers
+  # ==========================================================================
+
+  sync-worker:
+    image: mycelix/mail-api:latest
+    container_name: mycelix-sync
+    restart: unless-stopped
+    command: ["./mycelix-worker", "sync"]
+    environment:
+      - DATABASE_URL=postgres://mycelix:${DB_PASSWORD}@postgres:5432/mycelix
+      - REDIS_URL=redis://redis:6379
+      - RUST_LOG=info
+    depends_on:
+      - api
+    networks:
+      - mycelix
+
+  email-worker:
+    image: mycelix/mail-api:latest
+    container_name: mycelix-email-worker
+    restart: unless-stopped
+    command: ["./mycelix-worker", "email"]
+    environment:
+      - DATABASE_URL=postgres://mycelix:${DB_PASSWORD}@postgres:5432/mycelix
+      - REDIS_URL=redis://redis:6379
+      - RUST_LOG=info
+    depends_on:
+      - api
+    networks:
+      - mycelix
+
+  # ==========================================================================
+  # Databases
+  # ==========================================================================
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: mycelix-postgres
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=mycelix
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+      - POSTGRES_DB=mycelix
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-db.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    networks:
+      - mycelix
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mycelix"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: mycelix-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD}
+    volumes:
+      - redis_data:/data
+    networks:
+      - mycelix
+
+  # ==========================================================================
+  # Search
+  # ==========================================================================
+
+  meilisearch:
+    image: getmeili/meilisearch:latest
+    container_name: mycelix-meilisearch
+    restart: unless-stopped
+    environment:
+      - MEILI_MASTER_KEY=${MEILISEARCH_KEY}
+      - MEILI_ENV=production
+    volumes:
+      - meilisearch_data:/meili_data
+    networks:
+      - mycelix
+
+  # ==========================================================================
+  # AI/ML (Optional)
+  # ==========================================================================
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: mycelix-ollama
+    restart: unless-stopped
+    volumes:
+      - ollama_data:/root/.ollama
+    networks:
+      - mycelix
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    profiles:
+      - ai
+
+  # ==========================================================================
+  # Monitoring (Optional)
+  # ==========================================================================
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: mycelix-prometheus
+    restart: unless-stopped
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    networks:
+      - mycelix
+    profiles:
+      - monitoring
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: mycelix-grafana
+    restart: unless-stopped
+    ports:
+      - "3001:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD}
+      - GF_INSTALL_PLUGINS=grafana-piechart-panel
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./grafana/datasources:/etc/grafana/provisioning/datasources:ro
+    networks:
+      - mycelix
+    profiles:
+      - monitoring
+
+  # ==========================================================================
+  # Reverse Proxy
+  # ==========================================================================
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: mycelix-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - mycelix
+    profiles:
+      - production
+
+# ==========================================================================
+# Networks & Volumes
+# ==========================================================================
+
+networks:
+  mycelix:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:
+  meilisearch_data:
+  ollama_data:
+  prometheus_data:
+  grafana_data:
+  caddy_data:
+  caddy_config:
+  attachments:

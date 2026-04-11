@@ -1,0 +1,61 @@
+[package]
+name = "mycelix-mail"
+version = "1.0.0"
+edition = "2021"
+authors = ["Mycelix Protocol <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "CLI tool for Mycelix Mail - decentralized email with trust-based spam filtering"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/mycelix-mail"
+keywords = ["holochain", "email", "decentralized", "trust", "spam-filtering"]
+categories = ["command-line-utilities", "cryptography"]
+
+[[bin]]
+name = "mycelix-mail"
+path = "src/main.rs"
+
+[dependencies]
+# CLI framework
+clap = { version = "4.5", features = ["derive", "cargo", "env"] }
+colored = "2.1"
+
+# Holochain integration (Phase C - HDK 0.5.6 compatible)
+holochain_client = "0.7"
+holochain_types = "0.5"
+holochain_conductor_api = "0.5"
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Error handling
+anyhow = "1.0"
+thiserror = "1.0"
+
+# Async runtime
+tokio = { version = "1.40", features = ["full"] }
+
+# Crypto
+ed25519-dalek = "2.1"
+blake2 = "0.10"
+bs58 = "0.5"
+hex = "0.4"
+rand = "0.8"
+chacha20poly1305 = "0.10"  # AEAD symmetric encryption
+x25519-dalek = { version = "2", features = ["static_secrets"] }  # Key exchange
+
+# Date/time handling
+chrono = "0.4"
+
+# Configuration
+dirs = "5.0"
+toml = "0.8"
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# HTTP client for DID/MATL
+reqwest = { version = "0.12", features = ["json"] }
+
+[dev-dependencies]
+tempfile = "3.8"

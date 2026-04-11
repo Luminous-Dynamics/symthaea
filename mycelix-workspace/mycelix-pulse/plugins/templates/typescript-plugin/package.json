@@ -1,0 +1,78 @@
+{
+  "name": "mycelix-plugin-template",
+  "version": "1.0.0",
+  "description": "Starter template for Mycelix Mail plugins",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc -w",
+    "dev": "tsx watch src/index.ts",
+    "test": "vitest",
+    "lint": "eslint src/",
+    "format": "prettier --write src/",
+    "package": "npm run build && npm pack"
+  },
+  "keywords": [
+    "mycelix",
+    "email",
+    "plugin",
+    "extension"
+  ],
+  "author": "",
+  "license": "AGPL-3.0-or-later",
+  "peerDependencies": {
+    "@mycelix/plugin-api": "^1.0.0"
+  },
+  "devDependencies": {
+    "@mycelix/plugin-api": "^1.0.0",
+    "@types/node": "^20.0.0",
+    "eslint": "^8.0.0",
+    "prettier": "^3.0.0",
+    "tsx": "^4.0.0",
+    "typescript": "^5.0.0",
+    "vitest": "^1.0.0"
+  },
+  "mycelix": {
+    "id": "com.example.my-plugin",
+    "name": "My Plugin",
+    "version": "1.0.0",
+    "description": "A sample Mycelix Mail plugin",
+    "author": "Your Name",
+    "homepage": "https://example.com/my-plugin",
+    "repository": "https://github.com/example/my-plugin",
+    "permissions": [
+      "emails:read",
+      "contacts:read",
+      "settings:write"
+    ],
+    "hooks": [
+      "onEmailReceived",
+      "onEmailSent",
+      "onComposeOpen"
+    ],
+    "settings": [
+      {
+        "key": "enabled",
+        "type": "boolean",
+        "default": true,
+        "label": "Enable Plugin",
+        "description": "Toggle the plugin on or off"
+      },
+      {
+        "key": "apiKey",
+        "type": "string",
+        "secret": true,
+        "label": "API Key",
+        "description": "Your API key for the external service"
+      }
+    ],
+    "commands": [
+      {
+        "id": "my-plugin.run",
+        "title": "Run My Plugin",
+        "keybinding": "Ctrl+Shift+M"
+      }
+    ]
+  }
+}

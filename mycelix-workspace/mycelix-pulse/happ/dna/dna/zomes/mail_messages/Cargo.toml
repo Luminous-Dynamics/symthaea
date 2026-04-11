@@ -1,0 +1,22 @@
+[package]
+name = "mail_messages"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+# Empty workspace to prevent being included in parent workspace
+[workspace]
+
+[dependencies]
+# Holochain 0.6 - Coordinator zomes use hdk
+hdk = "0.6.0"
+serde = { version = "1.0", features = ["derive"] }
+mycelix_mail_integrity = { path = "../../integrity" }
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+overflow-checks = true

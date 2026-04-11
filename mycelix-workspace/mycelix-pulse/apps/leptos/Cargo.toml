@@ -1,0 +1,112 @@
+[package]
+name = "mycelix-pulse-ui"
+version = "0.1.0"
+edition = "2021"
+license = "AGPL-3.0-or-later"
+description = "Mycelix Pulse: Decentralized encrypted communication on Holochain"
+
+[workspace]
+
+[dependencies]
+# Leptos framework
+leptos = { version = "0.8", features = ["csr"] }
+leptos_router = "0.8"
+leptos_meta = "0.8"
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+rmp-serde = "1"
+
+# WASM bindings
+wasm-bindgen = "0.2"
+wasm-bindgen-futures = "0.4"
+js-sys = "0.3"
+
+# Web APIs
+web-sys = { version = "0.3", features = [
+    "console",
+    "Window",
+    "Document",
+    "Navigator",
+    "Response",
+    "Headers",
+    "Storage",
+    "Location",
+    "Performance",
+    "HtmlInputElement",
+    "HtmlTextAreaElement",
+    "HtmlSelectElement",
+    "EventTarget",
+    "CssStyleDeclaration",
+    "HtmlElement",
+    "MouseEvent",
+    "Element",
+    "KeyboardEvent",
+    "FocusEvent",
+    "Clipboard",
+    "DragEvent",
+    "DataTransfer",
+    "Selection",
+    "Range",
+    "DocumentFragment",
+    "Node",
+    "Crypto",
+    "SubtleCrypto",
+    "CryptoKey",
+    "AesGcmParams",
+    "FileList",
+    "File",
+    "FileReader",
+    "Blob",
+    "TouchEvent",
+    "TouchList",
+    "Touch",
+    "RtcPeerConnection",
+    "RtcConfiguration",
+    "RtcSessionDescription",
+    "RtcSessionDescriptionInit",
+    "RtcIceCandidate",
+    "RtcIceCandidateInit",
+    "RtcDataChannel",
+    "RtcDataChannelEvent",
+    "MediaStream",
+    "MediaStreamConstraints",
+    "MediaDevices",
+    "RtcSdpType",
+] }
+
+# Utilities
+console_error_panic_hook = "0.1"
+gloo-timers = { version = "0.3", features = ["futures"] }
+gloo-net = { version = "0.6", features = ["http"] }
+send_wrapper = "0.6"
+hkdf = "0.12"
+sha2 = "0.10"
+x25519-dalek = { version = "2", features = ["static_secrets"] }
+ed25519-dalek = { version = "2.1", features = ["rand_core"] }
+getrandom = { version = "0.2", features = ["js"] }
+base64 = "0.22"
+
+# WASM-safe mirror types (NO hdi dependencies)
+mail-leptos-types = { path = "../../crates/mail-leptos-types" }
+
+# Mycelix shared Leptos infrastructure
+mycelix-leptos-core = { path = "../../../../crates/mycelix-leptos-core" }
+mycelix-leptos-client = { path = "../../../../crates/mycelix-leptos-client", features = ["browser"] }
+
+# Symthaea HDC engine (optional — 16,384D semantic intelligence)
+symthaea-core = { path = "../../../../symthaea/symthaea-core", default-features = false, optional = true }
+
+[features]
+default = []
+# Enable full Symthaea HDC integration (16,384D vectors)
+# Build with: trunk build --release --features symthaea
+symthaea = ["dep:symthaea-core"]
+
+[profile.release]
+opt-level = "z"
+lto = "thin"
+codegen-units = 4
+strip = true
+panic = "abort"

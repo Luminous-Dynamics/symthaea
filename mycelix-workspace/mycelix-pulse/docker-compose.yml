@@ -1,0 +1,231 @@
+version: '3.8'
+
+# Mycelix-Mail Docker Compose
+# Run with: docker-compose up
+
+services:
+  # ============================================================================
+  # Backend API (Rust/Axum)
+  # ============================================================================
+  backend:
+    build:
+      context: ./happ/backend-rs
+      dockerfile: Dockerfile
+    ports:
+      - "3001:3001"
+    environment:
+      - HOST=0.0.0.0
+      - PORT=3001
+      - HOLOCHAIN_URL=ws://holochain:4444
+      - JWT_SECRET=${JWT_SECRET:?JWT_SECRET must be set}
+      - CORS_ORIGINS=http://localhost:5173,http://localhost:3000,http://frontend:80
+      - IPFS_API_URL=http://ipfs:5001
+      - RUST_LOG=mycelix_mail_backend=info,tower_http=debug
+    depends_on:
+      - ipfs
+    networks:
+      - mycelix-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ============================================================================
+  # Frontend (React/Vite - Production Build)
+  # ============================================================================
+  frontend:
+    build:
+      context: ./ui/frontend
+      dockerfile: Dockerfile
+      args:
+        - VITE_API_URL=http://localhost:3001
+        - VITE_WS_URL=ws://localhost:3001
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    networks:
+      - mycelix-network
+    restart: unless-stopped
+
+  # ============================================================================
+  # IPFS Node
+  # ============================================================================
+  ipfs:
+    image: ipfs/kubo:latest
+    ports:
+      - "4001:4001"      # P2P
+      - "5001:5001"      # API
+      - "8080:8080"      # Gateway
+    volumes:
+      - ipfs-data:/data/ipfs
+    environment:
+      - IPFS_PROFILE=server
+    networks:
+      - mycelix-network
+    restart: unless-stopped
+
+  # ============================================================================
+  # Holochain Conductor (for development/testing)
+  # ============================================================================
+  holochain:
+    image: holochain/holochain:latest
+    ports:
+      - "4444:4444"      # Admin
+      - "4445:4445"      # App
+    volumes:
+      - holochain-data:/data
+      - ./happ/dna:/dna:ro
+    command: ["holochain", "-c", "/data/conductor-config.yaml"]
+    networks:
+      - mycelix-network
+    restart: unless-stopped
+    profiles:
+      - with-holochain
+
+  # ============================================================================
+  # ML Service (Python/FastAPI for AI features)
+  # ============================================================================
+  ml-service:
+    build:
+      context: ./backend/ml
+      dockerfile: Dockerfile
+    ports:
+      - "3002:3002"
+    environment:
+      - HOST=0.0.0.0
+      - PORT=3002
+      - MODEL_PATH=/models
+      - EMBEDDING_MODEL=all-MiniLM-L6-v2
+      - REDIS_URL=redis://redis:6379
+    volumes:
+      - ml-models:/models
+    depends_on:
+      - redis
+    networks:
+      - mycelix-network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3002/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ============================================================================
+  # Redis (Caching, Real-time, Queue)
+  # ============================================================================
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    networks:
+      - mycelix-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # ============================================================================
+  # PostgreSQL (For search indexes, analytics)
+  # ============================================================================
+  postgres:
+    image: postgres:16-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=mycelix
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
+      - POSTGRES_DB=mycelix_mail
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./backend/db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    networks:
+      - mycelix-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mycelix -d mycelix_mail"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ============================================================================
+  # Prometheus (Metrics Collection)
+  # ============================================================================
+  prometheus:
+    image: prom/prometheus:v2.48.0
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=15d'
+    networks:
+      - mycelix-network
+    restart: unless-stopped
+    profiles:
+      - monitoring
+
+  # ============================================================================
+  # Grafana (Dashboards)
+  # ============================================================================
+  grafana:
+    image: grafana/grafana:10.2.0
+    ports:
+      - "3003:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:?GRAFANA_PASSWORD must be set}
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - grafana-data:/var/lib/grafana
+    depends_on:
+      - prometheus
+    networks:
+      - mycelix-network
+    restart: unless-stopped
+    profiles:
+      - monitoring
+
+  # ============================================================================
+  # Jaeger (Distributed Tracing)
+  # ============================================================================
+  jaeger:
+    image: jaegertracing/all-in-one:1.52
+    ports:
+      - "16686:16686"   # UI
+      - "4317:4317"     # OTLP gRPC
+      - "4318:4318"     # OTLP HTTP
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+    networks:
+      - mycelix-network
+    restart: unless-stopped
+    profiles:
+      - monitoring
+
+volumes:
+  ipfs-data:
+  holochain-data:
+  ml-models:
+  redis-data:
+  postgres-data:
+  prometheus-data:
+  grafana-data:
+
+networks:
+  mycelix-network:
+    driver: bridge

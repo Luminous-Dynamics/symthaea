@@ -1,0 +1,18 @@
+# Mycelix Mail DID Registry Dependencies
+# ========================================
+
+# Web framework
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+pydantic==2.4.2
+
+# Database
+asyncpg==0.29.0
+
+# Utilities
+python-dotenv==1.0.0
+
+# Development dependencies (optional)
+pytest==7.4.3
+pytest-asyncio==0.21.1
+httpx==0.25.1

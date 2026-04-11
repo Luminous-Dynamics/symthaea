@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mycelix Mail</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      width: 350px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #f5f5f5;
+    }
+
+    .popup-header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .popup-header img {
+      width: 32px;
+      height: 32px;
+    }
+
+    .popup-header h1 {
+      font-size: 18px;
+      font-weight: 600;
+    }
+
+    .popup-body {
+      padding: 16px;
+    }
+
+    .auth-section {
+      text-align: center;
+      padding: 24px 16px;
+    }
+
+    .auth-section p {
+      color: #666;
+      margin-bottom: 16px;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 10px 20px;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 500;
+      text-decoration: none;
+      cursor: pointer;
+      border: none;
+      transition: background-color 0.2s;
+    }
+
+    .btn-primary {
+      background: #667eea;
+      color: white;
+    }
+
+    .btn-primary:hover {
+      background: #5a6fd6;
+    }
+
+    .btn-secondary {
+      background: #e0e0e0;
+      color: #333;
+    }
+
+    .btn-secondary:hover {
+      background: #d0d0d0;
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    .stat-card {
+      background: white;
+      border-radius: 8px;
+      padding: 16px;
+      text-align: center;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+
+    .stat-value {
+      font-size: 24px;
+      font-weight: bold;
+      color: #333;
+    }
+
+    .stat-label {
+      font-size: 12px;
+      color: #666;
+      margin-top: 4px;
+    }
+
+    .quick-actions {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+
+    .quick-actions .btn {
+      flex: 1;
+    }
+
+    .trust-check {
+      background: white;
+      border-radius: 8px;
+      padding: 16px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+      margin-bottom: 16px;
+    }
+
+    .trust-check h3 {
+      font-size: 14px;
+      color: #333;
+      margin-bottom: 8px;
+    }
+
+    .trust-input {
+      display: flex;
+      gap: 8px;
+    }
+
+    .trust-input input {
+      flex: 1;
+      padding: 8px 12px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 14px;
+    }
+
+    .trust-result {
+      margin-top: 12px;
+      padding: 12px;
+      background: #f5f5f5;
+      border-radius: 6px;
+      display: none;
+    }
+
+    .trust-result.visible {
+      display: block;
+    }
+
+    .trust-score {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .trust-score-bar {
+      flex: 1;
+      height: 8px;
+      background: #e0e0e0;
+      border-radius: 4px;
+      overflow: hidden;
+    }
+
+    .trust-score-fill {
+      height: 100%;
+      border-radius: 4px;
+      transition: width 0.3s;
+    }
+
+    .trust-score-value {
+      font-weight: bold;
+      min-width: 40px;
+    }
+
+    .recent-list {
+      background: white;
+      border-radius: 8px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+      overflow: hidden;
+    }
+
+    .recent-header {
+      padding: 12px 16px;
+      border-bottom: 1px solid #eee;
+      font-size: 14px;
+      font-weight: 600;
+      color: #333;
+    }
+
+    .recent-item {
+      display: flex;
+      align-items: center;
+      padding: 12px 16px;
+      border-bottom: 1px solid #eee;
+      gap: 12px;
+    }
+
+    .recent-item:last-child {
+      border-bottom: none;
+    }
+
+    .recent-avatar {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: #667eea;
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 600;
+    }
+
+    .recent-info {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .recent-from {
+      font-size: 14px;
+      font-weight: 500;
+      color: #333;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .recent-subject {
+      font-size: 12px;
+      color: #666;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .recent-time {
+      font-size: 11px;
+      color: #999;
+    }
+
+    .popup-footer {
+      padding: 12px 16px;
+      border-top: 1px solid #eee;
+      display: flex;
+      justify-content: space-between;
+      background: white;
+    }
+
+    .footer-link {
+      color: #667eea;
+      text-decoration: none;
+      font-size: 13px;
+    }
+
+    .footer-link:hover {
+      text-decoration: underline;
+    }
+
+    .loading {
+      text-align: center;
+      padding: 24px;
+      color: #666;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+  </style>
+</head>
+<body>
+  <div class="popup-header">
+    <img src="icons/icon48.png" alt="Mycelix Mail">
+    <h1>Mycelix Mail</h1>
+  </div>
+
+  <div id="loading" class="loading">
+    Loading...
+  </div>
+
+  <div id="auth-section" class="auth-section hidden">
+    <p>Sign in to access your Mycelix Mail account</p>
+    <button id="login-btn" class="btn btn-primary">Sign In</button>
+  </div>
+
+  <div id="main-section" class="popup-body hidden">
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-value" id="unread-count">0</div>
+        <div class="stat-label">Unread</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="trust-avg">--</div>
+        <div class="stat-label">Avg Trust</div>
+      </div>
+    </div>
+
+    <div class="quick-actions">
+      <button id="compose-btn" class="btn btn-primary">Compose</button>
+      <button id="inbox-btn" class="btn btn-secondary">Open Inbox</button>
+    </div>
+
+    <div class="trust-check">
+      <h3>Quick Trust Check</h3>
+      <div class="trust-input">
+        <input type="email" id="trust-email" placeholder="Enter email address">
+        <button id="trust-check-btn" class="btn btn-secondary">Check</button>
+      </div>
+      <div id="trust-result" class="trust-result">
+        <div class="trust-score">
+          <div class="trust-score-bar">
+            <div id="trust-score-fill" class="trust-score-fill"></div>
+          </div>
+          <span id="trust-score-value" class="trust-score-value">0%</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="recent-list">
+      <div class="recent-header">Recent Emails</div>
+      <div id="recent-emails">
+        <div class="loading">Loading recent emails...</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="popup-footer">
+    <a href="#" id="settings-link" class="footer-link">Settings</a>
+    <a href="#" id="logout-link" class="footer-link hidden">Sign Out</a>
+  </div>
+
+  <script src="src/popup.js"></script>
+</body>
+</html>

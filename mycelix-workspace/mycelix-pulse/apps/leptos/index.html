@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="Decentralized PQC-encrypted email over Holochain" />
+    <meta name="theme-color" content="#06D6C8" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <title>Mycelix Pulse</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet" />
+    <link data-trunk rel="css" href="style/main.css" />
+    <link data-trunk rel="copy-dir" href="public" />
+    <link rel="manifest" href="/manifest.json" />
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>&#x2709;</text></svg>" />
+
+    <!-- Loading screen — shown while WASM initializes, hidden by app -->
+    <style id="loading-styles">
+        .loading-screen {
+            position: fixed; inset: 0; z-index: 99999;
+            background: #08080c; color: #e2e6f0;
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            font-family: "Inter", system-ui, sans-serif;
+            transition: opacity 0.3s ease;
+        }
+        .loading-screen.hidden { opacity: 0; pointer-events: none; }
+        .loading-logo { font-size: 3rem; margin-bottom: 1.5rem; }
+        .loading-title { font-size: 1.25rem; font-weight: 600; margin-bottom: 0.5rem; }
+        .loading-subtitle { font-size: 0.8rem; color: #8890a8; margin-bottom: 2rem; }
+        .loading-spinner {
+            width: 36px; height: 36px;
+            border: 3px solid #252838;
+            border-top-color: #06D6C8;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        .loading-hint {
+            margin-top: 2rem; font-size: 0.7rem; color: #5c6380;
+            max-width: 300px; text-align: center; line-height: 1.5;
+        }
+        .loading-progress {
+            width: 200px; height: 4px; background: #252838;
+            border-radius: 2px; overflow: hidden; margin-top: 1rem;
+        }
+        .loading-progress-bar {
+            height: 100%; background: #06D6C8;
+            border-radius: 2px; width: 0%;
+            transition: width 0.3s ease;
+        }
+        .loading-status {
+            font-size: 0.65rem; color: #5c6380;
+            margin-top: 0.5rem; font-variant-numeric: tabular-nums;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+    <!-- Loading screen visible immediately while WASM loads -->
+    <div id="loading-screen" class="loading-screen">
+        <div class="loading-logo">✉</div>
+        <div class="loading-title">Mycelix Pulse</div>
+        <div class="loading-subtitle">Communication that protects you</div>
+        <div class="loading-spinner"></div>
+        <div class="loading-progress"><div class="loading-progress-bar" id="load-progress"></div></div>
+        <div class="loading-status" id="load-status">Downloading...</div>
+        <div class="loading-hint">
+            Loading encrypted communication platform...<br>
+            First load may take a few seconds while WASM compiles.
+        </div>
+    </div>
+    <script>
+    // Progress tracking for WASM load
+    (function() {
+        const bar = document.getElementById('load-progress');
+        const status = document.getElementById('load-status');
+        let phase = 0;
+        const phases = ['Downloading WASM...', 'Compiling...', 'Initializing...', 'Starting app...'];
+        const interval = setInterval(() => {
+            phase = Math.min(phase + 1, phases.length - 1);
+            if (bar) bar.style.width = Math.min(25 + phase * 25, 90) + '%';
+            if (status) status.textContent = phases[phase];
+        }, 3000);
+        // Clean up when app starts
+        document.addEventListener('TrunkApplicationStarted', () => {
+            clearInterval(interval);
+            if (bar) bar.style.width = '100%';
+            if (status) status.textContent = 'Ready!';
+        });
+    })();
+    </script>
+
+    <!-- Connection handled by WASM (Rust BrowserWsTransport, like Prism) -->
+    <!-- No JS bridge needed — auth token from /api/token, conductor via WS -->
+
+    <!-- Hide loading screen when WASM app renders -->
+    <script>
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('/sw.js').catch(function() {});
+    }
+    // Hide loading screen after WASM initializes (TrunkApplicationStarted event)
+    document.addEventListener('TrunkApplicationStarted', function() {
+        var ls = document.getElementById('loading-screen');
+        if (ls) { ls.classList.add('hidden'); setTimeout(function() { ls.remove(); }, 500); }
+    });
+    // Fallback: hide after 15 seconds regardless
+    setTimeout(function() {
+        var ls = document.getElementById('loading-screen');
+        if (ls) { ls.classList.add('hidden'); setTimeout(function() { ls.remove(); }, 500); }
+    }, 15000);
+    </script>
+</body>
+</html>

@@ -1,0 +1,115 @@
+---
+manifest_version: "0"
+name: mycelix_mail_dna
+
+integrity:
+  network_seed: ~
+  properties:
+    default_trust_level: 0.3
+    max_attestation_age_days: 365
+    min_attestations_for_trust: 2
+    trust_decay_rate: 0.01
+    transitive_decay_factor: 0.7
+    max_transitive_depth: 5
+    pqe_algorithm: "CRYSTALS-Kyber-1024"
+    signature_algorithm: "CRYSTALS-Dilithium3"
+    max_attestations_per_day: 50
+    max_key_rotations_per_day: 5
+    max_emails_per_hour: 100
+    sync_checkpoint_interval: 100
+    max_offline_queue_size: 10000
+    crdt_merge_strategy: "last_writer_wins"
+    federation_enabled: true
+    max_federation_hops: 10
+    default_envelope_ttl: 86400
+  zomes:
+    - name: mail_contacts_integrity
+      path: ../target/wasm32-unknown-unknown/release/contacts_integrity.wasm
+    - name: mail_profiles_integrity
+      path: ../target/wasm32-unknown-unknown/release/mail_profiles_integrity.wasm
+    - name: mail_trust_integrity
+      path: ../target/wasm32-unknown-unknown/release/mail_trust_integrity.wasm
+    - name: mail_keys_integrity
+      path: ../target/wasm32-unknown-unknown/release/keys_integrity.wasm
+    - name: mail_messages_integrity
+      path: ../target/wasm32-unknown-unknown/release/mail_messages_integrity.wasm
+    - name: mail_capabilities_integrity
+      path: ../target/wasm32-unknown-unknown/release/mail_capabilities_integrity.wasm
+    - name: mail_sync_integrity
+      path: ../target/wasm32-unknown-unknown/release/mail_sync_integrity.wasm
+    - name: mail_federation_integrity
+      path: ../target/wasm32-unknown-unknown/release/mail_federation_integrity.wasm
+    - name: mail_search_integrity
+      path: ../target/wasm32-unknown-unknown/release/mail_search_integrity.wasm
+    - name: mail_backup_integrity
+      path: ../target/wasm32-unknown-unknown/release/mail_backup_integrity.wasm
+    - name: mail_scheduler_integrity
+      path: ../target/wasm32-unknown-unknown/release/scheduler_integrity.wasm
+    - name: mail_audit_integrity
+      path: ../target/wasm32-unknown-unknown/release/audit_integrity.wasm
+
+coordinator:
+  zomes:
+    - name: mail_contacts
+      path: ../target/wasm32-unknown-unknown/release/contacts.wasm
+      dependencies:
+        - name: mail_contacts_integrity
+        - name: mail_trust_integrity
+    - name: mail_profiles
+      path: ../target/wasm32-unknown-unknown/release/mail_profiles.wasm
+      dependencies:
+        - name: mail_profiles_integrity
+    - name: mail_trust
+      path: ../target/wasm32-unknown-unknown/release/mail_trust.wasm
+      dependencies:
+        - name: mail_trust_integrity
+        - name: mail_profiles_integrity
+    - name: mail_keys
+      path: ../target/wasm32-unknown-unknown/release/keys.wasm
+      dependencies:
+        - name: mail_keys_integrity
+        - name: mail_profiles_integrity
+    - name: mail_messages
+      path: ../target/wasm32-unknown-unknown/release/mail_messages.wasm
+      dependencies:
+        - name: mail_messages_integrity
+        - name: mail_trust_integrity
+        - name: mail_keys_integrity
+        - name: mail_capabilities_integrity
+    - name: mail_capabilities
+      path: ../target/wasm32-unknown-unknown/release/mail_capabilities.wasm
+      dependencies:
+        - name: mail_capabilities_integrity
+        - name: mail_profiles_integrity
+    - name: mail_sync
+      path: ../target/wasm32-unknown-unknown/release/mail_sync.wasm
+      dependencies:
+        - name: mail_sync_integrity
+        - name: mail_messages_integrity
+    - name: mail_federation
+      path: ../target/wasm32-unknown-unknown/release/mail_federation.wasm
+      dependencies:
+        - name: mail_federation_integrity
+        - name: mail_messages_integrity
+        - name: mail_trust_integrity
+    - name: mail_search
+      path: ../target/wasm32-unknown-unknown/release/mail_search.wasm
+      dependencies:
+        - name: mail_search_integrity
+        - name: mail_messages_integrity
+    - name: mail_backup
+      path: ../target/wasm32-unknown-unknown/release/mail_backup.wasm
+      dependencies:
+        - name: mail_backup_integrity
+        - name: mail_messages_integrity
+        - name: mail_contacts_integrity
+        - name: mail_trust_integrity
+    - name: mail_scheduler
+      path: ../target/wasm32-unknown-unknown/release/scheduler.wasm
+      dependencies:
+        - name: mail_scheduler_integrity
+        - name: mail_messages_integrity
+    - name: mail_audit
+      path: ../target/wasm32-unknown-unknown/release/audit.wasm
+      dependencies:
+        - name: mail_audit_integrity

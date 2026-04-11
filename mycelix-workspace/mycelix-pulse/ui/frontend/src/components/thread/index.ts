@@ -1,0 +1,18 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
+/**
+ * Thread Components Index
+ *
+ * Thread view and AI-powered conversation analysis
+ */
+
+export { default as ThreadSummaryPanel } from './ThreadSummaryPanel';
+export {
+  SentimentIndicator,
+  UrgencyBadge,
+  ParticipantCard,
+  ActionItemCard,
+  DecisionTimeline,
+  EpistemicQualityMeter,
+} from './ThreadSummaryPanel';

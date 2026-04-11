@@ -1,0 +1,78 @@
+{
+  "expo": {
+    "name": "Mycelix Pulse",
+    "slug": "mycelix-mail",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#1976d2"
+    },
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.mycelixmail.app",
+      "buildNumber": "1",
+      "infoPlist": {
+        "NSFaceIDUsageDescription": "Use Face ID to unlock Mycelix Pulse",
+        "NSCameraUsageDescription": "Scan QR codes for secure key exchange",
+        "NSPhotoLibraryUsageDescription": "Attach photos to emails"
+      },
+      "config": {
+        "usesNonExemptEncryption": true
+      },
+      "entitlements": {
+        "aps-environment": "production"
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#1976d2"
+      },
+      "package": "com.mycelixmail.app",
+      "versionCode": 1,
+      "permissions": [
+        "android.permission.USE_BIOMETRIC",
+        "android.permission.USE_FINGERPRINT",
+        "android.permission.CAMERA",
+        "android.permission.RECEIVE_BOOT_COMPLETED",
+        "android.permission.VIBRATE"
+      ],
+      "googleServicesFile": "./google-services.json"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro"
+    },
+    "plugins": [
+      "expo-secure-store",
+      "expo-local-authentication",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#1976d2",
+          "sounds": ["./assets/notification.wav"]
+        }
+      ]
+    ],
+    "scheme": "mycelixmail",
+    "extra": {
+      "eas": {
+        "projectId": "your-project-id"
+      },
+      "apiUrl": "https://api.mycelix.mail",
+      "holochainUrl": "wss://holo.mycelix.mail"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/your-project-id"
+    },
+    "runtimeVersion": {
+      "policy": "sdkVersion"
+    }
+  }
+}

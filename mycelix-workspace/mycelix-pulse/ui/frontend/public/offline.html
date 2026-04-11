@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#1976d2">
+  <title>Offline - Mycelix Mail</title>
+  <link rel="manifest" href="/manifest.json">
+  <style>
+    :root {
+      --primary: #1976d2;
+      --background: #f5f5f5;
+      --text: #333;
+      --text-secondary: #666;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --primary: #64b5f6;
+        --background: #121212;
+        --text: #e0e0e0;
+        --text-secondary: #999;
+      }
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+      background: var(--background);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+
+    .container {
+      text-align: center;
+      max-width: 400px;
+    }
+
+    .icon {
+      font-size: 72px;
+      margin-bottom: 24px;
+      animation: float 3s ease-in-out infinite;
+    }
+
+    @keyframes float {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-10px); }
+    }
+
+    h1 {
+      font-size: 28px;
+      font-weight: 600;
+      margin-bottom: 12px;
+    }
+
+    p {
+      color: var(--text-secondary);
+      line-height: 1.6;
+      margin-bottom: 32px;
+    }
+
+    .actions {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    button {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 14px 24px;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    button:active {
+      transform: scale(0.98);
+    }
+
+    .primary {
+      background: var(--primary);
+      color: white;
+      box-shadow: 0 4px 12px rgba(25, 118, 210, 0.3);
+    }
+
+    .primary:hover {
+      box-shadow: 0 6px 16px rgba(25, 118, 210, 0.4);
+    }
+
+    .secondary {
+      background: transparent;
+      color: var(--text);
+      border: 1px solid #e0e0e0;
+    }
+
+    .status {
+      margin-top: 48px;
+      padding: 16px;
+      background: rgba(255, 193, 7, 0.1);
+      border-radius: 8px;
+      font-size: 14px;
+    }
+
+    .status.online {
+      background: rgba(76, 175, 80, 0.1);
+    }
+
+    .status-indicator {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #FFC107;
+      margin-right: 8px;
+    }
+
+    .status.online .status-indicator {
+      background: #4CAF50;
+    }
+
+    .cached-info {
+      margin-top: 24px;
+      font-size: 12px;
+      color: var(--text-secondary);
+    }
+
+    /* Offline features */
+    .features {
+      margin-top: 32px;
+      text-align: left;
+      padding: 20px;
+      background: rgba(0,0,0,0.02);
+      border-radius: 12px;
+    }
+
+    .features h2 {
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 12px;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .features ul {
+      list-style: none;
+    }
+
+    .features li {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 0;
+      font-size: 14px;
+    }
+
+    .features li::before {
+      content: "✓";
+      color: #4CAF50;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="icon">📡</div>
+    <h1>You're Offline</h1>
+    <p>
+      No internet connection detected. Some features may be limited,
+      but you can still access your cached emails and drafts.
+    </p>
+
+    <div class="actions">
+      <button class="primary" onclick="tryReconnect()">
+        <span>↻</span> Try Reconnecting
+      </button>
+      <button class="secondary" onclick="viewCached()">
+        <span>📧</span> View Cached Emails
+      </button>
+    </div>
+
+    <div class="features">
+      <h2>Available Offline</h2>
+      <ul>
+        <li>Read cached emails</li>
+        <li>View and edit drafts</li>
+        <li>Search offline content</li>
+        <li>Compose new emails (sent when online)</li>
+      </ul>
+    </div>
+
+    <div class="status" id="connectionStatus">
+      <span class="status-indicator"></span>
+      Waiting for connection...
+    </div>
+
+    <div class="cached-info" id="cachedInfo">
+      Checking cached data...
+    </div>
+  </div>
+
+  <script>
+    // Check connection status
+    function updateStatus() {
+      const statusEl = document.getElementById('connectionStatus');
+      if (navigator.onLine) {
+        statusEl.className = 'status online';
+        statusEl.innerHTML = '<span class="status-indicator"></span> Connection restored! Redirecting...';
+        setTimeout(() => {
+          window.location.href = '/';
+        }, 1500);
+      } else {
+        statusEl.className = 'status';
+        statusEl.innerHTML = '<span class="status-indicator"></span> Waiting for connection...';
+      }
+    }
+
+    // Try to reconnect
+    function tryReconnect() {
+      updateStatus();
+      if (navigator.onLine) {
+        window.location.reload();
+      } else {
+        const btn = event.target.closest('button');
+        btn.textContent = 'Still offline...';
+        setTimeout(() => {
+          btn.innerHTML = '<span>↻</span> Try Reconnecting';
+        }, 2000);
+      }
+    }
+
+    // Navigate to cached view
+    function viewCached() {
+      window.location.href = '/?offline=true';
+    }
+
+    // Check cached data
+    async function checkCachedData() {
+      const infoEl = document.getElementById('cachedInfo');
+      try {
+        const cacheNames = await caches.keys();
+        let totalItems = 0;
+
+        for (const name of cacheNames) {
+          const cache = await caches.open(name);
+          const keys = await cache.keys();
+          totalItems += keys.length;
+        }
+
+        if (totalItems > 0) {
+          infoEl.textContent = `${totalItems} items available offline`;
+        } else {
+          infoEl.textContent = 'No cached data available';
+        }
+      } catch (e) {
+        infoEl.textContent = 'Cache unavailable';
+      }
+    }
+
+    // Listen for online/offline events
+    window.addEventListener('online', updateStatus);
+    window.addEventListener('offline', updateStatus);
+
+    // Initial checks
+    updateStatus();
+    checkCachedData();
+  </script>
+</body>
+</html>

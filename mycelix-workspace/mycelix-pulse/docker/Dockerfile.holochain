@@ -1,0 +1,67 @@
+# Mycelix Mail - Holochain Conductor Dockerfile
+# ==============================================
+# Multi-stage build for optimized Holochain deployment
+
+# Stage 1: Build zomes
+FROM rust:1.75-bookworm AS builder
+
+# Install Holochain tools
+RUN cargo install holochain_cli --locked
+RUN cargo install lair_keystore --locked
+
+# Add wasm target
+RUN rustup target add wasm32-unknown-unknown
+
+# Copy source
+WORKDIR /build
+COPY holochain/ ./holochain/
+
+# Build zomes
+WORKDIR /build/holochain
+RUN cargo build --release --target wasm32-unknown-unknown
+
+# Package DNA
+RUN hc dna pack workdir/dna || true
+
+# Package hApp
+RUN hc app pack workdir/happ || true
+
+# Stage 2: Runtime
+FROM debian:bookworm-slim
+
+# Install runtime dependencies
+RUN apt-get update && apt-get install -y \
+    libssl3 \
+    ca-certificates \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy Holochain binaries from builder
+COPY --from=builder /usr/local/cargo/bin/holochain /usr/local/bin/
+COPY --from=builder /usr/local/cargo/bin/hc /usr/local/bin/
+COPY --from=builder /usr/local/cargo/bin/lair-keystore /usr/local/bin/
+
+# Copy built hApp
+COPY --from=builder /build/holochain/workdir/happ/*.happ /app/
+
+# Create data directories
+RUN mkdir -p /data /keystore
+
+# Conductor configuration
+COPY docker/conductor-config.yaml /app/conductor-config.yaml
+
+# Environment
+ENV RUST_LOG=info
+ENV HC_ADMIN_PORT=8889
+ENV HC_APP_PORT=8888
+
+# Expose ports
+EXPOSE 8888 8889
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD curl -f http://localhost:8888/health || exit 1
+
+# Start conductor
+WORKDIR /app
+CMD ["holochain", "-c", "/app/conductor-config.yaml"]

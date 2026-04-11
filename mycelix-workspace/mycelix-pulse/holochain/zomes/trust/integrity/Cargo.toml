@@ -1,0 +1,13 @@
+[package]
+name = "mail_trust_integrity"
+version = "0.1.0"
+edition = "2021"
+description = "Integrity zome for Mycelix Mail Trust"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+hdi = { workspace = true }
+holochain_serialized_bytes = { workspace = true }
+serde = { workspace = true }

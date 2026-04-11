@@ -1,0 +1,13 @@
+[package]
+name = "mail_trust"
+version = "0.1.0"
+edition = "2021"
+description = "Coordinator zome for Mycelix Mail Trust"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+hdk = "0.6.0"
+serde = { version = "1.0", features = ["derive"] }
+mail_trust_integrity = { path = "../integrity" }

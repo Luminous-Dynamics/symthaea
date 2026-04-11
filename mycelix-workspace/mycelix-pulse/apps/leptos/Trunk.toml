@@ -1,0 +1,17 @@
+[build]
+target = "index.html"
+dist = "dist"
+
+[watch]
+watch = ["src", "style", "index.html"]
+
+[serve]
+address = "127.0.0.1"
+port = 8117
+open = false
+
+# Post-build: optimize WASM + copy public files
+[[hooks]]
+stage = "post_build"
+command = "sh"
+command_arguments = ["-c", "for f in dist/*.wasm; do wasm-opt -Oz --zero-filled-memory --enable-bulk-memory \"$f\" -o \"$f\" 2>/dev/null || true; done; cp -fr dist/public/. dist/ 2>/dev/null || true"]

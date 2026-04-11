@@ -1,0 +1,17 @@
+# Build artifacts
+target/
+dist/
+node_modules/
+Cargo.lock
+
+# Environment
+.env
+.env.local
+.env.production
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store

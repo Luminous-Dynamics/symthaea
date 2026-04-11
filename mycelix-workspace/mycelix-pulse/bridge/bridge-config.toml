@@ -1,0 +1,36 @@
+# Mycelix Mail Bridge — OAuth2 Configuration
+#
+# The bridge connects to external email providers and relays messages
+# into Holochain. Users click "Sign in with Google/Microsoft" in the app.
+
+conductor_url = "ws://127.0.0.1:8888"
+app_id = "mycelix_mail"
+
+# ── OAuth2 Credentials ──
+# Register at: https://console.cloud.google.com/apis/credentials
+# Create: OAuth 2.0 Client ID → Web application
+# Redirect URI: http://localhost:8118/callback
+# oauth_client_id = "YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com"
+# oauth_client_secret = "YOUR_GOOGLE_CLIENT_SECRET"
+
+# For Microsoft: https://portal.azure.com → App registrations
+# Same redirect URI, platform: Web
+
+# ── Accounts ──
+# Accounts are added via the app UI ("Add Account" → "Sign in with Google")
+# The bridge auto-discovers connected accounts from OAuth tokens.
+
+# Manual account (app password — fallback for providers without OAuth):
+# [[accounts]]
+# email = "you@fastmail.com"
+# provider = "Fastmail"
+# imap_host = "imap.fastmail.com"
+# imap_port = 993
+# imap_tls = true
+# smtp_host = "smtp.fastmail.com"
+# smtp_port = 587
+# smtp_tls = true
+# username = "you@fastmail.com"
+# password = "your-app-password"
+# enabled = true
+# sync_interval_secs = 300

@@ -1,0 +1,14 @@
+{
+  "name": "mycelix-pulse-desktop",
+  "version": "0.1.0",
+  "description": "Tauri v2 shell for the Mycelix Pulse Leptos application",
+  "author": "Mycelix Team",
+  "license": "AGPL-3.0-or-later",
+  "private": true,
+  "scripts": {
+    "dev": "cargo tauri dev --config src-tauri/tauri.conf.json",
+    "build": "cargo tauri build --config src-tauri/tauri.conf.json",
+    "type-check": "cargo check --manifest-path src-tauri/Cargo.toml",
+    "smoke": "bash scripts/verify-shell.sh"
+  }
+}

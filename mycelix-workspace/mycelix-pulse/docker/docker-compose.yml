@@ -1,0 +1,209 @@
+# Mycelix Mail - Docker Compose Configuration
+# ============================================
+# Development and production deployment setup
+
+version: '3.8'
+
+services:
+  # ==========================================
+  # Holochain Conductor
+  # ==========================================
+  holochain:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.holochain
+    container_name: mycelix-holochain
+    ports:
+      - "8888:8888"   # App WebSocket
+      - "8889:8889"   # Admin WebSocket
+    volumes:
+      - holochain-data:/data
+      - holochain-keystore:/keystore
+    environment:
+      - RUST_LOG=info
+      - HC_ADMIN_PORT=8889
+      - HC_APP_PORT=8888
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8888/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    restart: unless-stopped
+    networks:
+      - mycelix-network
+
+  # ==========================================
+  # Web Frontend (Production)
+  # ==========================================
+  frontend:
+    build:
+      context: ../ui/frontend
+      dockerfile: ../../docker/Dockerfile.frontend
+    container_name: mycelix-frontend
+    ports:
+      - "3000:80"
+    environment:
+      - VITE_HOLOCHAIN_URL=ws://holochain:8888
+      - VITE_APP_ID=mycelix-mail
+    depends_on:
+      holochain:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - mycelix-network
+
+  # ==========================================
+  # Backend API (Rust)
+  # ==========================================
+  backend:
+    build:
+      context: ../happ/backend-rs
+      dockerfile: ../../docker/Dockerfile.backend
+    container_name: mycelix-backend
+    ports:
+      - "3001:3001"
+    environment:
+      - HOLOCHAIN_URL=ws://holochain:8888
+      - HOLOCHAIN_ADMIN_URL=ws://holochain:8889
+      - HOLOCHAIN_APP_ID=mycelix-mail
+      - JWT_SECRET=${JWT_SECRET:?JWT_SECRET must be set}
+      - REDIS_URL=redis://redis:6379
+      - DATABASE_URL=postgres://mycelix:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@postgres:5432/mycelix_mail
+      - RUST_LOG=info
+    depends_on:
+      holochain:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+    networks:
+      - mycelix-network
+
+  # ==========================================
+  # Redis (Caching & Sessions)
+  # ==========================================
+  redis:
+    image: redis:7-alpine
+    container_name: mycelix-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+    networks:
+      - mycelix-network
+
+  # ==========================================
+  # PostgreSQL (Metadata & Search Index)
+  # ==========================================
+  postgres:
+    image: postgres:16-alpine
+    container_name: mycelix-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=mycelix
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
+      - POSTGRES_DB=mycelix_mail
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./init-db.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mycelix -d mycelix_mail"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - mycelix-network
+
+  # ==========================================
+  # Caddy (Reverse Proxy & TLS)
+  # ==========================================
+  caddy:
+    image: caddy:2-alpine
+    container_name: mycelix-caddy
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - frontend
+      - backend
+    restart: unless-stopped
+    networks:
+      - mycelix-network
+
+  # ==========================================
+  # Monitoring (Optional)
+  # ==========================================
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: mycelix-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+    profiles:
+      - monitoring
+    restart: unless-stopped
+    networks:
+      - mycelix-network
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: mycelix-grafana
+    ports:
+      - "3002:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:?GRAFANA_PASSWORD must be set}
+    volumes:
+      - grafana-data:/var/lib/grafana
+    depends_on:
+      - prometheus
+    profiles:
+      - monitoring
+    restart: unless-stopped
+    networks:
+      - mycelix-network
+
+# ==========================================
+# Volumes
+# ==========================================
+volumes:
+  holochain-data:
+  holochain-keystore:
+  redis-data:
+  postgres-data:
+  caddy-data:
+  caddy-config:
+  prometheus-data:
+  grafana-data:
+
+# ==========================================
+# Networks
+# ==========================================
+networks:
+  mycelix-network:
+    driver: bridge

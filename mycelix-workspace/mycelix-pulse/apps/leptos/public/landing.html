@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Mycelix Pulse — Communication That Protects You</title>
+    <meta name="description" content="The first communication platform where your messages, calendar, and calls are encrypted by default, owned by you, and impossible to spy on. Built on Holochain." />
+    <meta name="theme-color" content="#06D6C8" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        :root {
+            --bg: #08080c; --surface: #0f1118; --surface-2: #161822;
+            --text: #e2e6f0; --text-secondary: #8890a8; --text-muted: #5c6380;
+            --primary: #06D6C8; --primary-hover: #04b8ac;
+            --accent: #8b7ec8; --pqc: #fbbf24;
+            --success: #4ade80; --error: #ef4444;
+        }
+        html { font-size: 16px; }
+        body { font-family: "Inter", system-ui, sans-serif; color: var(--text); background: var(--bg); line-height: 1.6; -webkit-font-smoothing: antialiased; }
+        a { color: var(--primary); text-decoration: none; }
+        a:hover { color: var(--primary-hover); }
+
+        /* Hero */
+        .hero { text-align: center; padding: 6rem 2rem 4rem; max-width: 800px; margin: 0 auto; }
+        .hero-badge { display: inline-flex; align-items: center; gap: 6px; padding: 4px 14px; border-radius: 999px; background: rgba(6,214,200,0.1); border: 1px solid rgba(6,214,200,0.2); font-size: 0.75rem; font-weight: 600; color: var(--primary); margin-bottom: 2rem; letter-spacing: 0.03em; }
+        .hero h1 { font-size: 3rem; font-weight: 700; line-height: 1.15; margin-bottom: 1.5rem; }
+        .hero h1 span { color: var(--primary); }
+        .hero p { font-size: 1.125rem; color: var(--text-secondary); max-width: 600px; margin: 0 auto 2.5rem; }
+        .hero-cta { display: inline-flex; gap: 1rem; flex-wrap: wrap; justify-content: center; }
+        .btn-hero { padding: 0.75rem 2rem; border-radius: 8px; font-weight: 600; font-size: 1rem; border: none; cursor: pointer; transition: all 0.2s; }
+        .btn-primary { background: var(--primary); color: var(--bg); }
+        .btn-primary:hover { background: var(--primary-hover); transform: translateY(-1px); }
+        .btn-secondary { background: transparent; color: var(--text); border: 1px solid var(--text-muted); }
+        .btn-secondary:hover { border-color: var(--primary); color: var(--primary); }
+
+        /* Stats bar */
+        .stats { display: flex; justify-content: center; gap: 3rem; padding: 2rem; flex-wrap: wrap; }
+        .stat { text-align: center; }
+        .stat-value { font-size: 1.5rem; font-weight: 700; color: var(--primary); display: block; }
+        .stat-label { font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em; }
+
+        /* Features */
+        .features { max-width: 1000px; margin: 0 auto; padding: 4rem 2rem; }
+        .features h2 { text-align: center; font-size: 2rem; margin-bottom: 0.5rem; }
+        .features .subtitle { text-align: center; color: var(--text-secondary); margin-bottom: 3rem; font-size: 1rem; }
+        .feature-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem; }
+        .feature-card { padding: 1.5rem; background: var(--surface); border: 1px solid #252838; border-radius: 12px; transition: border-color 0.2s; }
+        .feature-card:hover { border-color: var(--primary); }
+        .feature-icon { font-size: 1.5rem; margin-bottom: 0.75rem; }
+        .feature-card h3 { font-size: 1rem; font-weight: 600; margin-bottom: 0.5rem; }
+        .feature-card p { font-size: 0.875rem; color: var(--text-secondary); line-height: 1.5; }
+
+        /* Paradigm section */
+        .paradigm { max-width: 800px; margin: 0 auto; padding: 4rem 2rem; }
+        .paradigm h2 { font-size: 2rem; margin-bottom: 1rem; }
+        .paradigm-list { display: flex; flex-direction: column; gap: 1.5rem; }
+        .paradigm-item { display: flex; gap: 1rem; align-items: flex-start; padding: 1.5rem; background: var(--surface); border-radius: 12px; border-left: 3px solid var(--primary); }
+        .paradigm-icon { font-size: 1.5rem; flex-shrink: 0; width: 2rem; text-align: center; }
+        .paradigm-item h3 { font-size: 1rem; font-weight: 600; margin-bottom: 0.25rem; }
+        .paradigm-item p { font-size: 0.875rem; color: var(--text-secondary); }
+
+        /* Comparison */
+        .comparison { max-width: 800px; margin: 0 auto; padding: 4rem 2rem; }
+        .comparison h2 { text-align: center; font-size: 2rem; margin-bottom: 2rem; }
+        .comp-table { width: 100%; border-collapse: collapse; }
+        .comp-table th, .comp-table td { padding: 0.75rem 1rem; text-align: left; border-bottom: 1px solid #252838; font-size: 0.875rem; }
+        .comp-table th { color: var(--text-muted); font-weight: 600; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.06em; }
+        .comp-table .yes { color: var(--success); }
+        .comp-table .no { color: var(--error); }
+        .comp-table .unique { color: var(--pqc); font-weight: 600; }
+
+        /* CTA */
+        .cta { text-align: center; padding: 4rem 2rem; }
+        .cta h2 { font-size: 2rem; margin-bottom: 1rem; }
+        .cta p { color: var(--text-secondary); margin-bottom: 2rem; max-width: 500px; margin-left: auto; margin-right: auto; }
+
+        /* Footer */
+        .footer { text-align: center; padding: 2rem; color: var(--text-muted); font-size: 0.75rem; border-top: 1px solid #252838; }
+        .footer a { color: var(--text-muted); }
+
+        @media (max-width: 640px) {
+            .hero h1 { font-size: 2rem; }
+            .stats { gap: 1.5rem; }
+            .feature-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="hero">
+        <div class="hero-badge">Post-Quantum Encrypted &middot; Decentralized &middot; Open Source</div>
+        <h1>Communication that <span>protects you</span></h1>
+        <p>Mail, chat, video calls, and calendar in one app. End-to-end encrypted by default. No server reads your messages. No company owns your data. Ever.</p>
+        <div class="hero-cta">
+            <a href="/" class="btn-hero btn-primary">Open Mycelix Pulse</a>
+            <a href="https://github.com/Luminous-Dynamics" class="btn-hero btn-secondary">View Source</a>
+        </div>
+    </div>
+
+    <div class="stats">
+        <div class="stat"><span class="stat-value">E2E</span><span class="stat-label">Encrypted by Default</span></div>
+        <div class="stat"><span class="stat-value">PQC</span><span class="stat-label">Quantum-Resistant</span></div>
+        <div class="stat"><span class="stat-value">0</span><span class="stat-label">Servers Read Your Mail</span></div>
+        <div class="stat"><span class="stat-value">P2P</span><span class="stat-label">Decentralized</span></div>
+    </div>
+
+    <div class="features">
+        <h2>Everything you need. Nothing you don't trust.</h2>
+        <p class="subtitle">One app for mail, chat, video, and calendar — all encrypted, all yours.</p>
+        <div class="feature-grid">
+            <div class="feature-card">
+                <div class="feature-icon">&#9993;</div>
+                <h3>Encrypted Mail</h3>
+                <p>Every message encrypted with Kyber1024 + Dilithium3 (post-quantum cryptography). Not even we can read it.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">&#x1F4AC;</div>
+                <h3>Real-Time Chat</h3>
+                <p>Instant messaging via P2P signals. Ephemeral by default — consolidate to permanent record when decisions are made.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">&#x1F4F9;</div>
+                <h3>Video Calls</h3>
+                <p>P2P WebRTC — your video goes directly to the other person. No server relay. No recording without consent.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">&#x1F4C5;</div>
+                <h3>Unified Calendar</h3>
+                <p>Personal, community, and family calendars in one view. Syncs with Google and Outlook. Your schedule, your privacy.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">&#x1F6E1;</div>
+                <h3>Trust-Gated Inbox</h3>
+                <p>No spam filters that read your mail. Unknown senders stake tokens to reach you. Reject = their stake is slashed.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">&#x1F512;</div>
+                <h3>Revocable Email</h3>
+                <p>Sent something by mistake? Revoke access permanently. The decryption key is destroyed. Gmail's undo works for 5 seconds. Ours works forever.</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="paradigm">
+        <h2>Things Gmail and Outlook physically cannot do</h2>
+        <div class="paradigm-list">
+            <div class="paradigm-item">
+                <span class="paradigm-icon">&#x1FA99;</span>
+                <div>
+                    <h3>Economic Email</h3>
+                    <p>Send payments, invoices, and bounties inside messages. Settled atomically on the DHT. No PayPal, no bank, no 3-5 business days.</p>
+                </div>
+            </div>
+            <div class="paradigm-item">
+                <span class="paradigm-icon">&#x1F9E0;</span>
+                <div>
+                    <h3>Attention Budgets</h3>
+                    <p>Set a daily cognitive budget. Your calendar auto-declines meetings when you're depleted. The first calendar that actually protects your time.</p>
+                </div>
+            </div>
+            <div class="paradigm-item">
+                <span class="paradigm-icon">&#x1F310;</span>
+                <div>
+                    <h3>Works Without Internet</h3>
+                    <p>Full offline support with CRDT sync. Edit, compose, and schedule — everything merges conflict-free when you reconnect.</p>
+                </div>
+            </div>
+            <div class="paradigm-item">
+                <span class="paradigm-icon">&#x1F3DB;</span>
+                <div>
+                    <h3>Thread &rarr; Organization</h3>
+                    <p>When a chat thread reaches critical mass, it can formalize into a working group with its own treasury, governance, and resources. No paperwork.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="comparison">
+        <h2>How we compare</h2>
+        <table class="comp-table">
+            <thead>
+                <tr><th>Feature</th><th>Gmail</th><th>Outlook</th><th>Mycelix Pulse</th></tr>
+            </thead>
+            <tbody>
+                <tr><td>E2E Encryption</td><td class="no">No</td><td class="no">No</td><td class="yes">Default</td></tr>
+                <tr><td>Post-Quantum Crypto</td><td class="no">No</td><td class="no">No</td><td class="unique">Kyber + Dilithium</td></tr>
+                <tr><td>Server reads your mail</td><td class="no">Yes</td><td class="no">Yes</td><td class="yes">Impossible</td></tr>
+                <tr><td>Data sovereignty</td><td class="no">Google owns it</td><td class="no">Microsoft owns it</td><td class="yes">You own it</td></tr>
+                <tr><td>Spam prevention</td><td>ML (reads all mail)</td><td>ML (reads all mail)</td><td class="unique">Trust + staking</td></tr>
+                <tr><td>Revoke sent email</td><td>5 seconds</td><td>Same org only</td><td class="unique">Forever</td></tr>
+                <tr><td>Offline sync</td><td>Limited</td><td>Desktop only</td><td class="unique">CRDT (full)</td></tr>
+                <tr><td>Inline payments</td><td class="no">No</td><td class="no">No</td><td class="unique">TEND tokens</td></tr>
+                <tr><td>Federation</td><td class="no">Walled garden</td><td class="no">Walled garden</td><td class="yes">SMTP + Matrix + AP</td></tr>
+                <tr><td>Open source</td><td class="no">No</td><td class="no">No</td><td class="yes">AGPL-3.0</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="cta">
+        <h2>Ready to own your communication?</h2>
+        <p>No account needed. No credit card. No surveillance. Just open the app and start communicating.</p>
+        <a href="/" class="btn-hero btn-primary">Launch Mycelix Pulse</a>
+    </div>
+
+    <div class="footer">
+        <p>&copy; 2026 Luminous Dynamics &middot; <a href="https://luminousdynamics.org">luminousdynamics.org</a> &middot; <a href="https://github.com/Luminous-Dynamics">GitHub</a> &middot; Built on <a href="https://holochain.org">Holochain</a></p>
+        <p style="margin-top: 0.5rem; font-style: italic;">Consciousness-first technology serving all beings</p>
+    </div>
+</body>
+</html>

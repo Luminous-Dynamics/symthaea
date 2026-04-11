@@ -1,0 +1,82 @@
+[workspace]
+members = [
+    # Shared crates
+    "crates/rate_limiter",
+    "crates/stake",
+
+    # Core identity zomes
+    "zomes/contacts/integrity",
+    "zomes/contacts/coordinator",
+    "zomes/profiles/integrity",
+    "zomes/profiles/coordinator",
+
+    # Trust and key management
+    "zomes/trust/integrity",
+    "zomes/trust/coordinator",
+    "zomes/keys/integrity",
+    "zomes/keys/coordinator",
+
+    # Email messages (new - DHT storage)
+    "zomes/messages/integrity",
+    "zomes/messages/coordinator",
+
+    # Capability-based access control (new)
+    "zomes/capabilities/integrity",
+    "zomes/capabilities/coordinator",
+
+    # Offline-first CRDT sync (new)
+    "zomes/sync/integrity",
+    "zomes/sync/coordinator",
+
+    # Cross-cell federation (new)
+    "zomes/federation/integrity",
+    "zomes/federation/coordinator",
+
+    # Mail bridge (cross-cluster)
+    "zomes/mail-bridge/integrity",
+    "zomes/mail-bridge/coordinator",
+
+    # Local search indexing (new)
+    "zomes/search/integrity",
+    "zomes/search/coordinator",
+
+    # Backup and restore (new)
+    "zomes/backup/integrity",
+    "zomes/backup/coordinator",
+
+    # Scheduler for delayed/recurring sends (new)
+    "zomes/scheduler/integrity",
+    "zomes/scheduler/coordinator",
+
+    # Audit log for compliance (new)
+    "zomes/audit/integrity",
+    "zomes/audit/coordinator",
+]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/luminous-dynamics/mycelix-mail"
+
+[workspace.dependencies]
+hdk = "0.6"
+hdi = "0.7"
+holochain_serialized_bytes = "0.0.56"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+thiserror = "1.0"
+derive_more = "0.99"
+lazy_static = "1.5"
+
+# ZKP verification for sender authentication
+mycelix-zkp-core = { path = "../../crates/mycelix-zkp-core" }
+
+[profile.dev]
+opt-level = "z"
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
