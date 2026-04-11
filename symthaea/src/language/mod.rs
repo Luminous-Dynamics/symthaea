@@ -52,6 +52,10 @@ pub mod code_certificate;
 #[cfg(feature = "code_generation")]
 pub mod code_orchestrator;
 
+// Pattern library bootstrap — parse Rust source files to populate HDC pattern library
+#[cfg(feature = "code_generation")]
+pub mod pattern_bootstrap;
+
 // Code understanding & generation (Phase: Consciousness-Aware Code)
 #[cfg(feature = "code_generation")]
 pub mod code_domain_plugin;
