@@ -18,7 +18,10 @@ pub fn ResultCard(result: SearchResult, rank: usize) -> impl IntoView {
     };
 
     let score_pct = (result.rank_score() * 100.0) as u32;
-    let source = result.sources.first().cloned().unwrap_or_else(|| "—".to_string());
+    let source = result.sources.first().cloned().unwrap_or_else(|| "\u{2014}".to_string());
+    let source_is_url = source.starts_with("http://") || source.starts_with("https://");
+    let source_nav = source.clone();
+    let source_display = source.clone();
     let tags = result.tags.join(", ");
     let result_for_actions = result.clone();
 
@@ -32,7 +35,19 @@ pub fn ResultCard(result: SearchResult, rank: usize) -> impl IntoView {
             <div class="result-content">{result.content.clone()}</div>
             <div class="result-footer">
                 <div class="result-meta">
-                    <span class="result-source">{source}</span>
+                    {if source_is_url {
+                        view! {
+                            <button class="result-source-link link-button"
+                                on:click=move |_| {
+                                    crate::engine::navigate_history(&source_nav);
+                                }
+                            >{source_display.clone()}</button>
+                        }.into_any()
+                    } else {
+                        view! {
+                            <span class="result-source">{source_display.clone()}</span>
+                        }.into_any()
+                    }}
                     <span class="result-tags">{tags}</span>
                 </div>
                 <ClaimActions result=result_for_actions />

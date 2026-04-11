@@ -1220,8 +1220,14 @@ button.example-query:active { opacity: 0.6; }
         flex-shrink: 0;
         scroll-snap-align: start;
     }
-    /* Hide tab bar on mobile when only one tab (the + button always exists) */
-    .tab-bar:not(:has(.tab ~ .tab)) { display: none; }
+    /* Hide tab bar on mobile when only one tab, but always show + button */
+    .tab-bar:not(:has(.tab ~ .tab)) .tab { display: none; }
+    /* Hide Compare button on mobile — move to settings/menu */
+    .compare-toggle { display: none; }
+    /* Shrink mode toggle to icon-like */
+    .mode-toggle { font-size: 10px; padding: 3px 6px; }
+    /* Larger tap targets for action buttons */
+    .claim-btn { padding: 8px 12px; }
     /* Find bar: full width on mobile */
     .find-bar {
         left: 0;
@@ -1365,6 +1371,16 @@ button.example-query:active { opacity: 0.6; }
 }
 .render-mode-btn:hover {
     opacity: 0.85;
+}
+
+/* Clickable source links in result cards */
+.result-source-link {
+    font-size: 12px;
+    text-decoration: underline;
+    text-decoration-style: dotted;
+}
+.result-source-link:hover {
+    text-decoration-style: solid;
 }
 
 /* Spore epistemic summary */

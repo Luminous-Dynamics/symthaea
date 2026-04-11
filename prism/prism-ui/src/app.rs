@@ -148,6 +148,7 @@ pub fn App() -> impl IntoView {
                         let s_fwd_cls = state.clone();
                         let s_fwd_click = state.clone();
                         let s_home = state.clone();
+                        let s_bookmarks = state.clone();
                         view! {
                             <div class="nav-buttons">
                                 <button
@@ -187,6 +188,15 @@ pub fn App() -> impl IntoView {
                                     }
                                     inner_html=NAV_HOME
                                 />
+                                <button class="nav-btn" title="Bookmarks" attr:aria-label="Bookmarks"
+                                    on:click=move |_| {
+                                        let view = PageView::Bookmarks;
+                                        s_bookmarks.set_view.set(view.clone());
+                                        s_bookmarks.set_current_url.set("prism://bookmarks".to_string());
+                                        s_bookmarks.set_page_title.set("Bookmarks".to_string());
+                                        s_bookmarks.push_history("prism://bookmarks", "Bookmarks", &view);
+                                    }
+                                >{"\u{2605}"}</button>
                             </div>
                         }
                     }
