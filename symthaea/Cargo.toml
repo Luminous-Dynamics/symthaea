@@ -673,7 +673,7 @@ reasoning_engine = ["magi_loop", "symthaea-causal-reasoning/counterfactual"]
 
 # ── Code Understanding & Generation ─────────────────────────────────
 # Subsumes former code_understanding feature (tree-sitter parsers + code generation).
-code_generation = ["tree-sitter-rust", "tree-sitter-python"]
+code_generation = ["tree-sitter-rust", "tree-sitter-python", "symthaea-core/synthesis-trait"]
 geodesic_synthesis = ["dep:symthaea-geodesic"]  # GCS verification gate for CodingAgent (PDG topology + execution oracle)
 wasm-sandbox = ["dep:wasmtime"]
 
