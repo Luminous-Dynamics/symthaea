@@ -26,6 +26,7 @@ use symthaea_core::synthesis_trait::{
     VerificationLayer, VerificationReport,
 };
 
+use super::code_certificate::CodeCertificate;
 use super::code_generator::{CodeGenerator, GeneratedCode};
 use super::code_intent::{CodeIntent, CodeSpec, CodeTarget};
 use super::code_parser::EntityKind;
@@ -54,6 +55,32 @@ pub struct CodeOrchestrator {
     energy_spent: f32,
     /// Audit trail of all synthesis attempts this session
     attempt_history: Vec<SynthesisAttempt>,
+    /// Distillation buffer: (ThoughtChannels-as-f32-vec, source_code, quality) triples
+    /// captured from successful generations for Broca SSM training.
+    /// The flywheel: LLM teaches native → native improves → less LLM needed.
+    distillation_buffer: Vec<DistillationCapture>,
+    /// Certificates issued for accepted code
+    certificates: Vec<CodeCertificate>,
+}
+
+/// A captured (intent, code, quality) triple for Broca SSM training.
+///
+/// When the orchestrator produces verified code (from any backend),
+/// it captures the intent-to-code mapping for distillation training.
+/// Over time, this trains the native CfC-HDC network to reproduce
+/// what the LLM generated, eliminating the LLM dependency.
+#[derive(Debug, Clone)]
+pub struct DistillationCapture {
+    /// The 43-element channel vector encoding the intent
+    pub channels: Vec<f32>,
+    /// The verified source code
+    pub source: String,
+    /// Quality score (0.0-1.0): verification similarity × plan coverage
+    pub quality: f32,
+    /// Which backend produced this code
+    pub backend: String,
+    /// Function/type name for tracking
+    pub name: String,
 }
 
 /// Record of a single synthesis attempt (for audit trail)
@@ -116,6 +143,8 @@ impl CodeOrchestrator {
             energy_budget: 100.0,
             energy_spent: 0.0,
             attempt_history: Vec::new(),
+            distillation_buffer: Vec::new(),
+            certificates: Vec::new(),
         }
     }
 
@@ -145,6 +174,132 @@ impl CodeOrchestrator {
     /// Get the audit trail of all attempts.
     pub fn attempt_history(&self) -> &[SynthesisAttempt] {
         &self.attempt_history
+    }
+
+    /// Get the distillation buffer — captured (intent, code, quality) triples.
+    ///
+    /// These are ready to be serialized as JSONL for Broca SSM training.
+    pub fn distillation_buffer(&self) -> &[DistillationCapture] {
+        &self.distillation_buffer
+    }
+
+    /// Get issued certificates.
+    pub fn certificates(&self) -> &[CodeCertificate] {
+        &self.certificates
+    }
+
+    /// Export the distillation buffer as JSONL suitable for Broca training.
+    ///
+    /// Each line is a JSON object with `channels` (43-element f32 vec) and
+    /// `target_text` (the verified source code). This format is directly
+    /// consumable by `TrainingDataset::from_jsonl()`.
+    pub fn export_distillation_jsonl(&self) -> String {
+        use serde_json::json;
+
+        self.distillation_buffer
+            .iter()
+            .map(|cap| {
+                json!({
+                    "channels": cap.channels,
+                    "target_text": cap.source,
+                    "target_ids": []
+                })
+                .to_string()
+            })
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+
+    /// Save distillation buffer to a JSONL file for Broca training.
+    pub fn save_distillation(&self, path: &std::path::Path) -> std::io::Result<()> {
+        let jsonl = self.export_distillation_jsonl();
+        if jsonl.is_empty() {
+            return Ok(());
+        }
+        std::fs::write(path, jsonl)
+    }
+
+    /// Capture a successful generation for distillation training.
+    ///
+    /// Converts the SynthesisRequest into a ThoughtChannels-compatible f32 vector
+    /// and stores it alongside the verified source code. This is the core of the
+    /// self-improvement flywheel: every successful generation becomes training data.
+    fn capture_distillation(
+        &mut self,
+        request: &SynthesisRequest,
+        source: &str,
+        backend: &str,
+        similarity: f32,
+    ) {
+        // Build a 43-element channel vector from the request
+        let mut channels = vec![0.0f32; 43];
+
+        // Channel 0: semantic intent = "code generation" (Answer=1.0)
+        channels[0] = 1.0;
+
+        // Channel 8: epistemic status ordinal
+        channels[8] = match request.epistemic_status {
+            symthaea_core::synthesis_trait::EpistemicStatus::Certain => 0.0,
+            symthaea_core::synthesis_trait::EpistemicStatus::Probable => 1.0,
+            symthaea_core::synthesis_trait::EpistemicStatus::Uncertain => 2.0,
+            symthaea_core::synthesis_trait::EpistemicStatus::Unknown => 3.0,
+            symthaea_core::synthesis_trait::EpistemicStatus::OutOfDomain => 4.0,
+        };
+
+        // Channel 12: consciousness level (psi)
+        channels[12] = request.consciousness_level;
+
+        // Channel 14: coherence (use similarity as proxy)
+        channels[14] = similarity;
+
+        // Channel 18: has_computed_answer = true (we have verified code)
+        channels[18] = 1.0;
+
+        // Channel 19: concept_count (number of constraints + examples)
+        channels[19] = (request.constraints.len() + request.examples.len())
+            .min(10) as f32;
+
+        // Channels 24-27: code-specific
+        channels[24] = 0.5; // syntax_complexity (mid-range default)
+        channels[25] = similarity; // type_confidence (use verification similarity)
+        channels[26] = 0.5; // algorithm_pattern
+        channels[27] = 0.0; // error_likelihood (low — code passed verification)
+
+        // Epistemic Cube: E3 (proven), N2 (network), M2 (persistent)
+        channels[31] = 1.0; // E3 (proven by compilation)
+        channels[35] = 1.0; // N2 (network consensus)
+        channels[39] = 1.0; // M2 (persistent/recorded)
+        channels[41] = similarity; // H (harmonic coherence)
+        channels[42] = 0.4 * 0.6 + 0.35 * 0.5 + 0.25 * 0.5; // Quality score
+
+        // Quality = similarity × (1 - error_penalty)
+        let quality = similarity;
+
+        self.distillation_buffer.push(DistillationCapture {
+            channels,
+            source: source.to_string(),
+            quality,
+            backend: backend.to_string(),
+            name: request.name.clone(),
+        });
+    }
+
+    /// Generate a CodeCertificate for verified code.
+    fn issue_certificate(
+        &mut self,
+        request: &SynthesisRequest,
+        source: &str,
+        backend: &str,
+        verification_layers: &[VerificationLayer],
+        similarity: f32,
+    ) -> CodeCertificate {
+        let cert = CodeCertificate::new(source, backend, similarity)
+            .with_epistemic_status(request.epistemic_status)
+            .with_verification_layers(verification_layers)
+            .with_safety_critical(request.safety_critical);
+
+        self.certificates.push(cert.clone());
+        cert
     }
 
     /// Synthesize code by trying backends in priority order.
@@ -180,6 +335,23 @@ impl CodeOrchestrator {
                     detail: "HDC+CfC template generation passed verification".to_string(),
                 });
 
+                // ── Distillation: capture for Broca SSM training ──
+                self.capture_distillation(
+                    request,
+                    &native_result.source,
+                    "CodeGenerator",
+                    native_result.similarity,
+                );
+
+                // ── Certificate: machine-verifiable audit trail ──
+                let certificate = self.issue_certificate(
+                    request,
+                    &native_result.source,
+                    "CodeGenerator",
+                    &verification_layers,
+                    native_result.similarity,
+                );
+
                 return SynthesisResponse {
                     source: native_result.source,
                     backend_name: "CodeGenerator".to_string(),
@@ -189,8 +361,8 @@ impl CodeOrchestrator {
                     accepted: true,
                     energy_cost: 1.0,
                     narrative: Some(format!(
-                        "Native HDC+CfC generation succeeded (similarity: {:.3})",
-                        native_result.similarity
+                        "Native HDC+CfC generation succeeded (similarity: {:.3}, cert: {})",
+                        native_result.similarity, certificate.id
                     )),
                 };
             }
@@ -227,6 +399,23 @@ impl CodeOrchestrator {
                     detail: "Code-by-analogy generation passed verification".to_string(),
                 });
 
+                // ── Distillation: capture for Broca SSM training ──
+                self.capture_distillation(
+                    request,
+                    &analogy_result.source,
+                    "CodeAlgebra::analogy",
+                    analogy_result.similarity,
+                );
+
+                // ── Certificate: machine-verifiable audit trail ──
+                let certificate = self.issue_certificate(
+                    request,
+                    &analogy_result.source,
+                    "CodeAlgebra::analogy",
+                    &verification_layers,
+                    analogy_result.similarity,
+                );
+
                 return SynthesisResponse {
                     source: analogy_result.source,
                     backend_name: "CodeAlgebra::analogy".to_string(),
@@ -236,8 +425,8 @@ impl CodeOrchestrator {
                     accepted: true,
                     energy_cost: 0.5,
                     narrative: Some(format!(
-                        "Analogy-based generation succeeded (similarity: {:.3})",
-                        analogy_result.similarity
+                        "Analogy-based generation succeeded (similarity: {:.3}, cert: {})",
+                        analogy_result.similarity, certificate.id
                     )),
                 };
             }

@@ -44,6 +44,10 @@ pub mod ssm_backend;
 // Intelligent code generation dispatch (consciousness-routed backend selection)
 pub mod intelligent_dispatcher;
 
+// Machine-verifiable code certificates — the competitive moat
+#[cfg(feature = "code_generation")]
+pub mod code_certificate;
+
 // Unified code orchestrator — routes requests through native backends before LLM fallback
 #[cfg(feature = "code_generation")]
 pub mod code_orchestrator;
