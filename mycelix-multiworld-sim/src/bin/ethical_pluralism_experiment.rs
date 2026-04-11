@@ -103,38 +103,45 @@ fn make_config(seed: u64, ticks: u32, trust_weighted: bool) -> SimulationConfig 
 }
 
 /// Override founding agents' ethics after construction but before run().
-fn apply_ethics(sim: &mut MultiWorldSimulator, profile: &EthicsProfile, seed: u64) {
-    let mut rng = StochasticEngine::new(seed.wrapping_add(9999));
-
-    for world in &mut sim.worlds {
-        let n = world.agents.len().max(1);
-        for (i, agent) in world.agents.iter_mut().filter(|a| a.is_alive()).enumerate() {
+///
+/// CRITICAL: Uses sim.rng (not a separate RNG) so that different ethical
+/// profiles produce different RNG states, causing the simulation to
+/// genuinely diverge. With a separate RNG, the sim's main RNG stays
+/// identical across conditions, making all Bernoulli outcomes the same
+/// regardless of ethics — the first experiment's false-negative.
+fn apply_ethics(sim: &mut MultiWorldSimulator, profile: &EthicsProfile) {
+    for wi in 0..sim.worlds.len() {
+        let n = sim.worlds[wi].agents.len().max(1);
+        for i in 0..sim.worlds[wi].agents.len() {
+            if !sim.worlds[wi].agents[i].is_alive() { continue; }
             match profile {
                 EthicsProfile::Homogeneous => {
-                    agent.ethics = EthicalOrientation::default();
+                    sim.worlds[wi].agents[i].ethics = EthicalOrientation::default();
+                    // NO dummy RNG calls — Homogeneous leaves RNG state unchanged.
+                    // Other profiles advance RNG, causing trajectory divergence.
                 }
                 EthicsProfile::Pluralistic => {
-                    agent.ethics = EthicalOrientation {
-                        deontological: 0.1 + rng.next_f64() * 0.8,
-                        consequentialist: 0.1 + rng.next_f64() * 0.8,
-                        virtue_care: 0.1 + rng.next_f64() * 0.8,
-                        relational: 0.1 + rng.next_f64() * 0.8,
+                    sim.worlds[wi].agents[i].ethics = EthicalOrientation {
+                        deontological: 0.1 + sim.rng.next_f64() * 0.8,
+                        consequentialist: 0.1 + sim.rng.next_f64() * 0.8,
+                        virtue_care: 0.1 + sim.rng.next_f64() * 0.8,
+                        relational: 0.1 + sim.rng.next_f64() * 0.8,
                     };
                 }
                 EthicsProfile::Dominated { dominant } => {
                     if (i as f64 / n as f64) < 0.8 {
-                        agent.ethics = EthicalOrientation {
-                            deontological: (dominant[0] + rng.next_gaussian(0.0, 0.05)).clamp(0.05, 1.0),
-                            consequentialist: (dominant[1] + rng.next_gaussian(0.0, 0.05)).clamp(0.05, 1.0),
-                            virtue_care: (dominant[2] + rng.next_gaussian(0.0, 0.05)).clamp(0.05, 1.0),
-                            relational: (dominant[3] + rng.next_gaussian(0.0, 0.05)).clamp(0.05, 1.0),
+                        sim.worlds[wi].agents[i].ethics = EthicalOrientation {
+                            deontological: (dominant[0] + sim.rng.next_gaussian(0.0, 0.05)).clamp(0.05, 1.0),
+                            consequentialist: (dominant[1] + sim.rng.next_gaussian(0.0, 0.05)).clamp(0.05, 1.0),
+                            virtue_care: (dominant[2] + sim.rng.next_gaussian(0.0, 0.05)).clamp(0.05, 1.0),
+                            relational: (dominant[3] + sim.rng.next_gaussian(0.0, 0.05)).clamp(0.05, 1.0),
                         };
                     } else {
-                        agent.ethics = EthicalOrientation {
-                            deontological: 0.1 + rng.next_f64() * 0.8,
-                            consequentialist: 0.1 + rng.next_f64() * 0.8,
-                            virtue_care: 0.1 + rng.next_f64() * 0.8,
-                            relational: 0.1 + rng.next_f64() * 0.8,
+                        sim.worlds[wi].agents[i].ethics = EthicalOrientation {
+                            deontological: 0.1 + sim.rng.next_f64() * 0.8,
+                            consequentialist: 0.1 + sim.rng.next_f64() * 0.8,
+                            virtue_care: 0.1 + sim.rng.next_f64() * 0.8,
+                            relational: 0.1 + sim.rng.next_f64() * 0.8,
                         };
                     }
                 }
@@ -151,7 +158,11 @@ struct RunResult {
 
 fn run_condition(seed: u64, ticks: u32, cond: &Condition) -> RunResult {
     let mut sim = MultiWorldSimulator::new(make_config(seed, ticks, cond.trust_weighted));
-    apply_ethics(&mut sim, &cond.ethics_profile, seed);
+    // Force world initialization (normally happens at start of run()).
+    // We need agents to exist before apply_ethics modifies them.
+    // run() will skip re-initialization because worlds is no longer empty.
+    sim.run_initialization();
+    apply_ethics(&mut sim, &cond.ethics_profile);
     let report = sim.run();
     let phi = sim.worlds.iter()
         .map(|w| w.mean_phi() * w.population() as f64)

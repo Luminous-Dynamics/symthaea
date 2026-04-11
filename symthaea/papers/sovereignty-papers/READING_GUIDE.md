@@ -43,7 +43,7 @@ Start here. Your frame is decentralization. These essays challenge it.
 | 1st | **Essay 2: The Inadequacy of Token Governance** | DAOs replicate the 1602 architecture. MakerDAO, Compound, Beanstalk as evidence. |
 | 2nd | **Essay 10: On Sybil Resistance** | Multi-dimensional credentialing vs. single-factor identity. |
 | 3rd | **Essay 11: On Plutocratic Capture** | Why capital is excluded entirely and dual-speed reputation prevents capture. |
-| 4th | **Essay 7: On the Four Dimensions** | The credential that replaces the token. |
+| 4th | **Essay 7: On the Eight Dimensions** | The credential that replaces the token. |
 | 5th | **Essay 5: On the Cognitive Loop** | Why governance must operate at consequence-speed. |
 
 ### Political Theorists / Governance Scholars
@@ -53,7 +53,7 @@ Start here. Your frame is institutional design. These essays propose a new insti
 | Order | Essay | Why |
 |-------|-------|-----|
 | 1st | **Essay 1: The Failure of the 1602 Architecture** | Historical diagnosis of the corporate form. |
-| 2nd | **Essay 7: On the Four Dimensions** | The governance credential — identity, reputation, community, engagement. |
+| 2nd | **Essay 7: On the Eight Dimensions** | The governance credential — identity, reputation, community, engagement. |
 | 3rd | **Essay 8: On the Five Tiers** | Progressive capability unlocking. Madison's problem, computationally solved. |
 | 4th | **Essay 9: On the Fractal** | Scale-invariant governance from individual to planetary. Ostrom operationalized. |
 | 5th | **Essay 16: On the Commons** | Consciousness-coupled commons governance. Cochabamba as the anti-case. |

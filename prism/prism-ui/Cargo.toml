@@ -19,6 +19,9 @@ prism-knowledge-bridge = { path = "../prism-knowledge-bridge" }
 mycelix-leptos-client = { path = "../../crates/mycelix-leptos-client" }
 mycelix-claim-types = { path = "../../crates/mycelix-claim-types" }
 
+# Symthaea consciousness kernel (WASM-safe, no default features)
+symthaea-spore = { path = "../../symthaea/crates/symthaea-spore", default-features = false }
+
 # Leptos
 leptos = { workspace = true }
 

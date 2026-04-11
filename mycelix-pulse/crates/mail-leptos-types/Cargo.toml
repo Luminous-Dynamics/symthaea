@@ -1,0 +1,9 @@
+[package]
+name = "mail-leptos-types"
+version = "0.1.0"
+edition = "2021"
+license = "AGPL-3.0-or-later"
+description = "WASM-safe mirror types for mycelix-mail Leptos frontend"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }

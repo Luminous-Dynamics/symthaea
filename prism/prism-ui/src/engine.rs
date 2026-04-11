@@ -165,6 +165,20 @@ fn search_query(query: &str, state: &BrowserState, engine: &SearchEngine) {
     let mode = state.search_mode.get_untracked();
     let local_results = engine.search(query, 10);
 
+    // Run query through Spore consciousness kernel for epistemic grounding
+    let spore = expect_context::<StoredValue<
+        Option<symthaea_spore::engine::SporeEngine>,
+        leptos::prelude::LocalStorage,
+    >>();
+    spore.update_value(|opt: &mut Option<symthaea_spore::engine::SporeEngine>| {
+        if let Some(spore_engine) = opt {
+            let result = spore_engine.cycle(query);
+            state.set_consciousness.set(result.consciousness_level);
+            state.set_epistemic_confidence.set(result.epistemic_status.honest_confidence);
+            state.set_prediction_error.set(result.prediction_error);
+        }
+    });
+
     let url = format!("prism://search?q={}", query);
     let title = format!("Search: {}", query);
     let view = PageView::Search {

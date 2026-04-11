@@ -67,7 +67,7 @@ Why computational ethics must be structural rather than post-hoc. RLHF, constitu
 
 *How consciousness measurement is translated into governance structure.*
 
-### Essay 7: On the Four Dimensions ✅
+### Essay 7: On the Eight Dimensions ✅
 
 **Status**: Draft complete
 
@@ -180,6 +180,16 @@ The philosophical foundation of the entire project. The Eight Harmonies — Reso
 **Status**: Draft complete
 
 A direct invitation. The first 20 essays make the case. This one asks: will you build with us? The essay describes the concrete mechanisms for participation: running a Mycelix node, contributing to Symthaea's open-source development, establishing a consciousness-coupled governance pilot in a real community (neighborhood, cooperative, mutual aid network). It does not promise utopia. It promises an architecture that, unlike the 1602 model, includes consequence in its optimization function and consciousness in its governance loop. It acknowledges that this is a brilliant hypothesis, not a sacred text — and that the only way to test it is to deploy it. Ends with a return to the closing line of Essay 1: "The VOC was dissolved in 1799. Its architecture was not. We intend to build the architecture that replaces it."
+
+---
+
+## Section VIII: The Constitution (Essay 22)
+
+### Essay 22: On Constitutional Immutability ✅
+
+**Status**: Complete (April 2026)
+
+Why some governance rules must be beyond democratic amendment, and how code can enforce pre-commitment where law cannot. Introduces the seven unamendable rights (veto override, consciousness gating, term limits, emergency power limits, permission-less enforcement, fork rights, right to exit), the constitutional envelope (bounded parameter space for community self-governance), model governance protocol (how communities evolve scoring models within bounds), and validation via 300-year multi-world simulation. Grounded in Elster's pre-commitment theory and the historical failure of paper constitutions (Weimar Republic, Polish *liberum veto*). Honest about limits: code-enforced pre-commitment requires social consensus to run unmodified code; invariants may prove wrong in unforeseen circumstances.
 
 ---
 

@@ -4,6 +4,7 @@
 //! Root application component with state providers.
 
 use leptos::prelude::*;
+use leptos::prelude::LocalStorage;
 use wasm_bindgen::JsCast;
 
 use crate::components::search_bar::SearchBar;
@@ -14,6 +15,7 @@ use crate::pages::content_router::ContentRouter;
 use crate::state::{BrowserState, PageView};
 use prism_search::SearchEngine;
 use prism_reflex::ReflexArc;
+use symthaea_spore::engine::SporeEngine;
 
 /// Fetch a precomputed index file, returning None on any failure.
 async fn fetch_index(path: &str) -> Option<SearchEngine> {
@@ -52,6 +54,13 @@ pub fn App() -> impl IntoView {
 
     provide_context(state.clone());
     provide_context(reflex);
+
+    // Initialize Symthaea Spore consciousness kernel
+    let spore_engine = SporeEngine::new(Default::default());
+    log::info!("Spore consciousness kernel initialized (cycle 0)");
+    let spore: StoredValue<Option<SporeEngine>, LocalStorage> =
+        StoredValue::new_local(Some(spore_engine));
+    provide_context(spore);
 
     // Two-phase index loading:
     // Phase 1: Fetch core index (436 KB) — app becomes usable in <1s
@@ -175,6 +184,7 @@ pub fn App() -> impl IntoView {
                     }
 
                     <div style="flex:1"></div>
+                    <ConsciousnessBadge />
                     <DhtStatusBadge />
                     <ThemeSwitcher />
                     <button class="gear-btn" on:click=open_settings title="Settings" attr:aria-label="Settings" inner_html=GEAR_ICON></button>
@@ -189,5 +199,40 @@ pub fn App() -> impl IntoView {
                 <ContentRouter />
             </div>
         </div>
+    }
+}
+
+/// Displays the Spore consciousness level (Psi) as a small badge in the chrome.
+#[component]
+fn ConsciousnessBadge() -> impl IntoView {
+    let state = expect_context::<BrowserState>();
+
+    let psi_display = move || {
+        let psi = state.consciousness.get();
+        if psi > 0.001 {
+            format!("\u{03A8} {:.0}%", psi * 100.0)
+        } else {
+            "\u{03A8} \u{2014}".to_string()
+        }
+    };
+
+    let psi_class = move || {
+        let psi = state.consciousness.get();
+        if psi >= 0.6 { "consciousness-badge high" }
+        else if psi >= 0.3 { "consciousness-badge mid" }
+        else if psi > 0.001 { "consciousness-badge low" }
+        else { "consciousness-badge dormant" }
+    };
+
+    let title = move || {
+        let psi = state.consciousness.get();
+        let conf = state.epistemic_confidence.get();
+        format!("Consciousness: {:.1}% | Confidence: {:.0}%", psi * 100.0, conf * 100.0)
+    };
+
+    view! {
+        <span class=psi_class title=title attr:aria-label="Consciousness level">
+            {psi_display}
+        </span>
     }
 }

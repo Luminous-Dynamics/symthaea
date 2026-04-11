@@ -119,7 +119,7 @@ With this essay, we complete Section III: The Architecture of Society.
 
 Across three essays, we have described how the consciousness measurement system (Section II) is translated into governance structure:
 
-- **The Four Dimensions** (Essay No. 7): Identity, reputation, community, and engagement — the minimal sufficient basis for the consciousness credential, directly countering the four defects of the 1602 architecture.
+- **The Eight Dimensions** (Essay No. 7): Identity, reputation, community, and engagement — the minimal sufficient basis for the consciousness credential, directly countering the four defects of the 1602 architecture.
 - **The Five Tiers** (Essay No. 8): Observer, Participant, Citizen, Steward, and Guardian — progressive capability unlocking that prevents both the tyranny of the majority and the tyranny of the expert.
 - **The Fractal** (this essay): Scale-invariant governance architecture, from individual to planetary, with event-driven cross-scale coordination that preserves local sovereignty while enabling collective action.
 

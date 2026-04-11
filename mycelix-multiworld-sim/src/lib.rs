@@ -353,6 +353,12 @@ impl MultiWorldSimulator {
     }
 
     /// Initialize worlds that should exist at tick 0.
+    /// Public for experiment binaries that need to modify agents before run().
+    pub fn run_initialization(&mut self) {
+        if !self.worlds.is_empty() { return; }
+        self.initialize_worlds();
+    }
+
     fn initialize_worlds(&mut self) {
         // If hybrid_earth is enabled, populate aggregate regions and spaceport
         // instead of creating individual Earth agents.

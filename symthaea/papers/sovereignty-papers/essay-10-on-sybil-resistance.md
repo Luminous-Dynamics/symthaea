@@ -62,7 +62,7 @@ The Sybil problem is not "can we verify that this is a unique person?" The Sybil
 
 ### III. Multi-Dimensional Resistance
 
-The four-dimensional domain-coupled credential described in Essay No. 7 addresses the Sybil problem not by solving identity (one dimension) but by requiring simultaneous presence across four independent verification channels.
+The eight-dimensional sovereign credential described in Essay No. 7 addresses the Sybil problem not by solving identity (one dimension) but by requiring simultaneous presence across eight independent verification channels.
 
 Consider an attacker who wishes to gain disproportionate governance influence in a consciousness-coupled system. They must simultaneously:
 
@@ -78,7 +78,7 @@ The cost of a Sybil attack in a domain-coupled credential system is not the cost
 
 In economic terms: the cost of a Sybil attack in a token-weighted system is the cost of the tokens (which can be borrowed via flash loan, as Beanstalk demonstrated). The cost of a Sybil attack in a consciousness-coupled system approaches the cost of genuine engagement with the governed domain — because the credential measures engagement, and there is no shortcut to real engagement that does not look, to the measurement system, like real engagement.[^5]
 
-This does not make Sybil attacks impossible. It makes them economically irrational for all but the most determined and well-resourced adversaries — and for those adversaries, the multi-dimensional credential ensures that the attack surface is four-dimensional rather than one-dimensional, requiring simultaneous mastery of identity fraud, behavioral simulation, social engineering, and domain expertise.
+This does not make Sybil attacks impossible. It makes them economically irrational for all but the most determined and well-resourced adversaries — and for those adversaries, the multi-dimensional credential ensures that the attack surface is eight-dimensional rather than one-dimensional, requiring simultaneous mastery of identity fraud, behavioral simulation, social engineering, and domain expertise.
 
 ---
 
@@ -110,7 +110,7 @@ We will not pretend that consciousness coupling eliminates the Sybil problem. It
 
 **Measurement gaming** is the subtlest threat. If the engagement dimension is measured by specific on-chain activities — monitoring data, submitting proposals, participating in discussions — a sophisticated attacker can automate these activities to produce the appearance of integrated engagement without genuine understanding. The integration measurement (Essay No. 4) is designed to detect this kind of gaming, but no measurement is perfectly resistant to a sufficiently sophisticated adversary who knows exactly what is being measured.
 
-These vulnerabilities are real, and we name them because naming them is the only honest response. The standard is not invulnerability. The standard is the 1602 architecture. In the 1602 architecture, a Sybil attack costs the price of a share — or, in the case of a flash loan, nothing at all. In a consciousness-coupled system, a Sybil attack costs months of sustained engagement across four dimensions, with 24-hour credential expiry requiring continuous maintenance. The attack surface has not been eliminated. It has been transformed from a single-dimension, single-moment, zero-cost exploit into a four-dimensional, multi-month, high-cost operation.
+These vulnerabilities are real, and we name them because naming them is the only honest response. The standard is not invulnerability. The standard is the 1602 architecture. In the 1602 architecture, a Sybil attack costs the price of a share — or, in the case of a flash loan, nothing at all. In a consciousness-coupled system, a Sybil attack costs months of sustained engagement across four dimensions, with 24-hour credential expiry requiring continuous maintenance. The attack surface has not been eliminated. It has been transformed from a single-dimension, single-moment, zero-cost exploit into a eight-dimensional, multi-month, high-cost operation.
 
 We believe this is sufficient for the majority of governance contexts. For contexts where it is not — where nation-state-level adversaries are expected — additional mechanisms (hardware attestation, physical proximity requirements, periodic in-person verification) may be necessary. These mechanisms are compatible with the consciousness-coupling framework but are not part of its core architecture. They are domain-specific hardening measures, applied where the threat model demands them.
 
