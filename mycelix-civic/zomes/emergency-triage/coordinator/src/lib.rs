@@ -17,18 +17,12 @@ fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
     hash_entry(&EntryTypes::Anchor(anchor))
 }
 
-fn require_consciousness(
-    requirement: &mycelix_bridge_common::CivicRequirement,
-    action_name: &str,
-) -> ExternResult<GovernanceEligibility> {
-    mycelix_zome_helpers::require_civic("civic_bridge", requirement, action_name)
-}
 
 /// Triage a patient
 
 #[hdk_extern]
 pub fn triage_patient(input: TriagePatientInput) -> ExternResult<Record> {
-    require_consciousness(&civic_requirement_basic(), "triage_patient")?;
+    mycelix_zome_helpers::require_civic("civic_bridge", &civic_requirement_basic(), "triage_patient")?;
     if input.patient_id.is_empty() || input.patient_id.len() > 128 {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "Patient ID must be 1-128 characters".into()
@@ -120,7 +114,7 @@ pub struct TriagePatientInput {
 /// Update a triage assessment (re-triage)
 #[hdk_extern]
 pub fn update_triage(input: UpdateTriageInput) -> ExternResult<Record> {
-    require_consciousness(&civic_requirement_proposal(), "update_triage")?;
+    mycelix_zome_helpers::require_civic("civic_bridge", &civic_requirement_proposal(), "update_triage")?;
     let current_record = get(input.original_triage_hash.clone(), GetOptions::default())?.ok_or(
         wasm_error!(WasmErrorInner::Guest("Triage record not found".into())),
     )?;

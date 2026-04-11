@@ -8,12 +8,6 @@ use mycelix_bridge_common::{
     GovernanceEligibility,
 };
 
-fn require_consciousness(
-    requirement: &mycelix_bridge_common::CivicRequirement,
-    action_name: &str,
-) -> ExternResult<GovernanceEligibility> {
-    mycelix_zome_helpers::require_civic("civic_bridge", requirement, action_name)
-}
 
 /// Helper to get an anchor entry hash
 fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
@@ -29,7 +23,7 @@ fn ensure_anchor(anchor_str: &str) -> ExternResult<EntryHash> {
 /// Publish content to the resonance feed (Participant+).
 #[hdk_extern]
 pub fn publish_content(entry: ContentEntry) -> ExternResult<Record> {
-    let _eligibility = require_consciousness(&civic_requirement_basic(), "publish_content")?;
+    let _eligibility = mycelix_zome_helpers::require_civic("civic_bridge", &civic_requirement_basic(), "publish_content")?;
 
     let action_hash = create_entry(&EntryTypes::ContentEntry(entry.clone()))?;
     let agent = agent_info()?.agent_initial_pubkey;

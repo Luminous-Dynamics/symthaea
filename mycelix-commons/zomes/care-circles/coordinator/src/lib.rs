@@ -9,12 +9,6 @@ use hdk::prelude::*;
 use mycelix_bridge_common::civic_requirement_basic;
 use mycelix_zome_helpers::records_from_links;
 
-fn require_consciousness(
-    requirement: &mycelix_bridge_common::CivicRequirement,
-    action_name: &str,
-) -> ExternResult<mycelix_bridge_common::GovernanceEligibility> {
-    mycelix_zome_helpers::require_civic("commons_bridge", requirement, action_name)
-}
 
 fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
     let anchor = Anchor(anchor_str.to_string());
@@ -30,7 +24,7 @@ fn ensure_anchor(anchor_str: &str) -> ExternResult<EntryHash> {
 /// Create a new care circle. The creator automatically becomes an Organizer member.
 #[hdk_extern]
 pub fn create_circle(circle: CareCircle) -> ExternResult<Record> {
-    require_consciousness(&civic_requirement_basic(), "create_circle")?;
+    mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_basic(), "create_circle")?;
     let action_hash = create_entry(&EntryTypes::CareCircle(circle.clone()))?;
 
     // Link to all circles
@@ -100,7 +94,7 @@ pub struct JoinCircleInput {
 /// Join an existing care circle
 #[hdk_extern]
 pub fn join_circle(input: JoinCircleInput) -> ExternResult<Record> {
-    require_consciousness(&civic_requirement_basic(), "join_circle")?;
+    mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_basic(), "join_circle")?;
     let caller = agent_info()?.agent_initial_pubkey;
 
     // Verify circle exists
@@ -198,7 +192,7 @@ pub fn join_circle(input: JoinCircleInput) -> ExternResult<Record> {
 /// Leave a care circle by deactivating membership
 #[hdk_extern]
 pub fn leave_circle(circle_hash: ActionHash) -> ExternResult<bool> {
-    require_consciousness(&civic_requirement_basic(), "leave_circle")?;
+    mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_basic(), "leave_circle")?;
     let caller = agent_info()?.agent_initial_pubkey;
 
     let cm_anchor = anchor_hash(&format!("circle_members:{}", circle_hash))?;
@@ -383,7 +377,7 @@ pub struct CircleTendBalance {
 /// Makes a best-effort cross-cluster call to the TEND zome.
 #[hdk_extern]
 pub fn record_care_exchange(input: RecordCareExchangeInput) -> ExternResult<Record> {
-    require_consciousness(&civic_requirement_basic(), "record_care_exchange")?;
+    mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_basic(), "record_care_exchange")?;
     let provider = agent_info()?.agent_initial_pubkey;
     if provider == input.receiver {
         return Err(wasm_error!("Cannot record exchange with yourself"));

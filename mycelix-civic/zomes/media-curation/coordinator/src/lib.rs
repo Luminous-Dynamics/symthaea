@@ -10,12 +10,6 @@ use mycelix_bridge_common::{
 };
 use mycelix_zome_helpers::{get_latest_record};
 
-fn require_consciousness(
-    requirement: &mycelix_bridge_common::CivicRequirement,
-    action_name: &str,
-) -> ExternResult<GovernanceEligibility> {
-    mycelix_zome_helpers::require_civic("civic_bridge", requirement, action_name)
-}
 
 /// Helper function to create an anchor entry and return its hash
 fn anchor_hash(anchor_string: &str) -> ExternResult<EntryHash> {
@@ -26,7 +20,7 @@ fn anchor_hash(anchor_string: &str) -> ExternResult<EntryHash> {
 
 #[hdk_extern]
 pub fn endorse(input: EndorseInput) -> ExternResult<Record> {
-    require_consciousness(&civic_requirement_basic(), "endorse")?;
+    mycelix_zome_helpers::require_civic("civic_bridge", &civic_requirement_basic(), "endorse")?;
     let now = sys_time()?;
     let endorsement = Endorsement {
         id: format!(
@@ -68,7 +62,7 @@ pub struct EndorseInput {
 
 #[hdk_extern]
 pub fn create_collection(input: CreateCollectionInput) -> ExternResult<Record> {
-    require_consciousness(&civic_requirement_proposal(), "create_collection")?;
+    mycelix_zome_helpers::require_civic("civic_bridge", &civic_requirement_proposal(), "create_collection")?;
     let now = sys_time()?;
     let collection = Collection {
         id: format!("collection:{}:{}", input.curator_did, now.as_micros()),
@@ -149,7 +143,7 @@ pub fn calculate_quality_score(publication_id: String) -> ExternResult<Record> {
 
 #[hdk_extern]
 pub fn feature_content(input: FeatureInput) -> ExternResult<Record> {
-    require_consciousness(&civic_requirement_voting(), "feature_content")?;
+    mycelix_zome_helpers::require_civic("civic_bridge", &civic_requirement_voting(), "feature_content")?;
     let now = sys_time()?;
     let featured = FeaturedContent {
         id: format!("featured:{}:{}", input.publication_id, now.as_micros()),
@@ -283,7 +277,7 @@ pub fn get_collection(collection_id: String) -> ExternResult<Option<Record>> {
 /// Add publication to collection
 #[hdk_extern]
 pub fn add_to_collection(input: AddToCollectionInput) -> ExternResult<Record> {
-    require_consciousness(&civic_requirement_basic(), "add_to_collection")?;
+    mycelix_zome_helpers::require_civic("civic_bridge", &civic_requirement_basic(), "add_to_collection")?;
     let filter = ChainQueryFilter::new()
         .entry_type(EntryType::App(AppEntryDef::try_from(
             UnitEntryTypes::Collection,
@@ -340,7 +334,7 @@ pub struct AddToCollectionInput {
 /// Remove publication from collection
 #[hdk_extern]
 pub fn remove_from_collection(input: RemoveFromCollectionInput) -> ExternResult<Record> {
-    require_consciousness(&civic_requirement_basic(), "remove_from_collection")?;
+    mycelix_zome_helpers::require_civic("civic_bridge", &civic_requirement_basic(), "remove_from_collection")?;
     let filter = ChainQueryFilter::new()
         .entry_type(EntryType::App(AppEntryDef::try_from(
             UnitEntryTypes::Collection,
@@ -393,7 +387,7 @@ pub struct RemoveFromCollectionInput {
 /// Update collection metadata
 #[hdk_extern]
 pub fn update_collection(input: UpdateCollectionInput) -> ExternResult<Record> {
-    require_consciousness(&civic_requirement_proposal(), "update_collection")?;
+    mycelix_zome_helpers::require_civic("civic_bridge", &civic_requirement_proposal(), "update_collection")?;
     let filter = ChainQueryFilter::new()
         .entry_type(EntryType::App(AppEntryDef::try_from(
             UnitEntryTypes::Collection,
@@ -475,7 +469,7 @@ pub struct UpdateQualityScoreInput {
 /// Remove endorsement
 #[hdk_extern]
 pub fn remove_endorsement(input: RemoveEndorsementInput) -> ExternResult<()> {
-    require_consciousness(&civic_requirement_basic(), "remove_endorsement")?;
+    mycelix_zome_helpers::require_civic("civic_bridge", &civic_requirement_basic(), "remove_endorsement")?;
     let filter = ChainQueryFilter::new()
         .entry_type(EntryType::App(AppEntryDef::try_from(
             UnitEntryTypes::Endorsement,
@@ -510,7 +504,7 @@ pub struct RemoveEndorsementInput {
 /// Unfeature content
 #[hdk_extern]
 pub fn unfeature_content(input: UnfeatureInput) -> ExternResult<()> {
-    require_consciousness(&civic_requirement_voting(), "unfeature_content")?;
+    mycelix_zome_helpers::require_civic("civic_bridge", &civic_requirement_voting(), "unfeature_content")?;
     let filter = ChainQueryFilter::new()
         .entry_type(EntryType::App(AppEntryDef::try_from(
             UnitEntryTypes::FeaturedContent,
@@ -603,7 +597,7 @@ pub struct CreateGalleryInput {
 /// Create a new curated gallery (Participant+).
 #[hdk_extern]
 pub fn create_gallery(input: CreateGalleryInput) -> ExternResult<Record> {
-    let _eligibility = require_consciousness(&civic_requirement_proposal(), "create_gallery")?;
+    let _eligibility = mycelix_zome_helpers::require_civic("civic_bridge", &civic_requirement_proposal(), "create_gallery")?;
     let agent = agent_info()?.agent_initial_pubkey;
     let now = sys_time()?;
 
@@ -639,7 +633,7 @@ pub struct AddToGalleryInput {
 /// Add a publication to a gallery (Observer+).
 #[hdk_extern]
 pub fn add_to_gallery(input: AddToGalleryInput) -> ExternResult<Record> {
-    let _eligibility = require_consciousness(&civic_requirement_basic(), "add_to_gallery")?;
+    let _eligibility = mycelix_zome_helpers::require_civic("civic_bridge", &civic_requirement_basic(), "add_to_gallery")?;
 
     let record = get(input.gallery_hash.clone(), GetOptions::default())?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Gallery not found".into())))?;
@@ -669,7 +663,7 @@ pub struct CreateExhibitionInput {
 /// Create a time-bounded exhibition (Citizen+).
 #[hdk_extern]
 pub fn create_exhibition(input: CreateExhibitionInput) -> ExternResult<Record> {
-    let _eligibility = require_consciousness(&civic_requirement_voting(), "create_exhibition")?;
+    let _eligibility = mycelix_zome_helpers::require_civic("civic_bridge", &civic_requirement_voting(), "create_exhibition")?;
     let agent = agent_info()?.agent_initial_pubkey;
     let now = sys_time()?;
 

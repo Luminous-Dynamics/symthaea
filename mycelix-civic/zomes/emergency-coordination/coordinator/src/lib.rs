@@ -35,18 +35,12 @@ fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
     hash_entry(&EntryTypes::Anchor(anchor))
 }
 
-fn require_consciousness(
-    requirement: &mycelix_bridge_common::CivicRequirement,
-    action_name: &str,
-) -> ExternResult<GovernanceEligibility> {
-    mycelix_zome_helpers::require_civic("civic_bridge", requirement, action_name)
-}
 
 /// Form a new response team
 
 #[hdk_extern]
 pub fn form_team(input: FormTeamInput) -> ExternResult<Record> {
-    require_consciousness(&civic_requirement_basic(), "form_team")?;
+    mycelix_zome_helpers::require_civic("civic_bridge", &civic_requirement_basic(), "form_team")?;
     if input.name.trim().is_empty() || input.name.len() > 128 {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "Team name must be 1-128 non-whitespace characters".into()
@@ -126,7 +120,7 @@ pub struct FormTeamInput {
 /// Assign a team to an operational zone
 #[hdk_extern]
 pub fn assign_to_zone(input: AssignToZoneInput) -> ExternResult<Record> {
-    require_consciousness(&civic_requirement_proposal(), "assign_to_zone")?;
+    mycelix_zome_helpers::require_civic("civic_bridge", &civic_requirement_proposal(), "assign_to_zone")?;
     if input.objective.trim().is_empty() || input.objective.len() > 1024 {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "Objective must be 1-1024 non-whitespace characters".into()
@@ -218,7 +212,7 @@ pub struct AssignToZoneInput {
 /// Submit a situation report from the field
 #[hdk_extern]
 pub fn submit_sitrep(input: SubmitSitrepInput) -> ExternResult<Record> {
-    require_consciousness(&civic_requirement_basic(), "submit_sitrep")?;
+    mycelix_zome_helpers::require_civic("civic_bridge", &civic_requirement_basic(), "submit_sitrep")?;
     if input.conditions.trim().is_empty() || input.conditions.len() > 4096 {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "Conditions must be 1-4096 non-whitespace characters".into()
@@ -286,7 +280,7 @@ pub struct SubmitSitrepInput {
 /// Agent location check-in
 #[hdk_extern]
 pub fn checkin(input: CheckinInput) -> ExternResult<Record> {
-    require_consciousness(&civic_requirement_basic(), "checkin")?;
+    mycelix_zome_helpers::require_civic("civic_bridge", &civic_requirement_basic(), "checkin")?;
     if input.lat < -90.0 || input.lat > 90.0 {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "Latitude must be between -90 and 90".into()

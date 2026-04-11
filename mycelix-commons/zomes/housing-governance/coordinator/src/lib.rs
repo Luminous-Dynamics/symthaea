@@ -15,12 +15,6 @@ fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
     hash_entry(&EntryTypes::Anchor(anchor))
 }
 
-fn require_consciousness(
-    requirement: &mycelix_bridge_common::CivicRequirement,
-    action_name: &str,
-) -> ExternResult<mycelix_bridge_common::GovernanceEligibility> {
-    mycelix_zome_helpers::require_civic("commons_bridge", requirement, action_name)
-}
 
 /// Schedule a board meeting
 
@@ -83,7 +77,7 @@ pub fn record_minutes(input: RecordMinutesInput) -> ExternResult<Record> {
 #[hdk_extern]
 pub fn propose_resolution(resolution: Resolution) -> ExternResult<Record> {
     // Consciousness gate: Participant tier + identity >= 0.25
-    let _eligibility = require_consciousness(&civic_requirement_proposal(), "propose_resolution")?;
+    let _eligibility = mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_proposal(), "propose_resolution")?;
 
     let action_hash = create_entry(&EntryTypes::Resolution(resolution.clone()))?;
 
@@ -123,7 +117,7 @@ pub struct VoteOnResolutionInput {
 #[hdk_extern]
 pub fn vote_on_resolution(input: VoteOnResolutionInput) -> ExternResult<Record> {
     // Consciousness gate: Citizen tier + identity >= 0.25
-    let _eligibility = require_consciousness(&civic_requirement_voting(), "vote_on_resolution")?;
+    let _eligibility = mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_voting(), "vote_on_resolution")?;
 
     let record = get(input.resolution_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
         WasmErrorInner::Guest("Resolution not found".into())
@@ -161,7 +155,7 @@ pub fn vote_on_resolution(input: VoteOnResolutionInput) -> ExternResult<Record> 
 #[hdk_extern]
 pub fn adopt_bylaw(bylaw: ByLaw) -> ExternResult<Record> {
     // Consciousness gate: Steward tier + identity >= 0.5 + community >= 0.3
-    let _eligibility = require_consciousness(&civic_requirement_constitutional(), "adopt_bylaw")?;
+    let _eligibility = mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_constitutional(), "adopt_bylaw")?;
 
     let action_hash = create_entry(&EntryTypes::ByLaw(bylaw.clone()))?;
 
@@ -199,7 +193,7 @@ pub struct AmendByLawInput {
 #[hdk_extern]
 pub fn amend_bylaw(input: AmendByLawInput) -> ExternResult<Record> {
     // Consciousness gate: Steward tier + identity >= 0.5 + community >= 0.3
-    let _eligibility = require_consciousness(&civic_requirement_constitutional(), "amend_bylaw")?;
+    let _eligibility = mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_constitutional(), "amend_bylaw")?;
 
     if input.new_content.is_empty() {
         return Err(wasm_error!(WasmErrorInner::Guest(
@@ -276,7 +270,7 @@ pub fn create_election(election: Election) -> ExternResult<Record> {
 #[hdk_extern]
 pub fn cast_ballot(ballot: Ballot) -> ExternResult<Record> {
     // Consciousness gate: Citizen tier + identity >= 0.25
-    let _eligibility = require_consciousness(&civic_requirement_voting(), "cast_ballot")?;
+    let _eligibility = mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_voting(), "cast_ballot")?;
 
     // Verify the election exists and is open
     let election_record = get(ballot.election_hash.clone(), GetOptions::default())?.ok_or(

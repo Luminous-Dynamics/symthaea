@@ -9,12 +9,6 @@ use mycelix_bridge_common::{
 };
 use mycelix_zome_helpers::records_from_links;
 
-fn require_consciousness(
-    requirement: &mycelix_bridge_common::CivicRequirement,
-    action_name: &str,
-) -> ExternResult<GovernanceEligibility> {
-    mycelix_zome_helpers::require_civic("civic_bridge", requirement, action_name)
-}
 
 /// Create a deterministic anchor hash from a string
 fn anchor_hash(s: &str) -> ExternResult<EntryHash> {
@@ -26,7 +20,7 @@ fn anchor_hash(s: &str) -> ExternResult<EntryHash> {
 
 #[hdk_extern]
 pub fn submit_evidence(evidence: Evidence) -> ExternResult<Record> {
-    let _eligibility = require_consciousness(&civic_requirement_proposal(), "submit_evidence")?;
+    let _eligibility = mycelix_zome_helpers::require_civic("civic_bridge", &civic_requirement_proposal(), "submit_evidence")?;
     if evidence.title.is_empty() || evidence.title.len() > 256 {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "Title must be 1-256 characters".into()
@@ -84,7 +78,7 @@ pub fn get_complaint_evidence(complaint_id: String) -> ExternResult<Vec<Record>>
 /// Verify evidence (by a juror or arbitrator)
 #[hdk_extern]
 pub fn verify_evidence(input: VerifyEvidenceInput) -> ExternResult<Record> {
-    let _eligibility = require_consciousness(&civic_requirement_voting(), "verify_evidence")?;
+    let _eligibility = mycelix_zome_helpers::require_civic("civic_bridge", &civic_requirement_voting(), "verify_evidence")?;
     if input.evidence_id.is_empty() || input.evidence_id.len() > 256 {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "Evidence ID must be 1-256 characters".into()
@@ -136,7 +130,7 @@ pub struct VerifyEvidenceInput {
 /// Dispute evidence (challenge its validity)
 #[hdk_extern]
 pub fn dispute_evidence(input: DisputeEvidenceInput) -> ExternResult<Record> {
-    let _eligibility = require_consciousness(&civic_requirement_proposal(), "dispute_evidence")?;
+    let _eligibility = mycelix_zome_helpers::require_civic("civic_bridge", &civic_requirement_proposal(), "dispute_evidence")?;
     if input.evidence_id.is_empty() || input.evidence_id.len() > 256 {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "Evidence ID must be 1-256 characters".into()

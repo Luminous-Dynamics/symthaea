@@ -11,12 +11,6 @@ use mycelix_zome_helpers::records_from_links;
 use support_tickets_integrity::*;
 use support_types::{sharded_anchor, TicketStatus};
 
-fn require_consciousness(
-    requirement: &mycelix_bridge_common::CivicRequirement,
-    action_name: &str,
-) -> ExternResult<mycelix_bridge_common::GovernanceEligibility> {
-    mycelix_zome_helpers::require_civic("commons_bridge", requirement, action_name)
-}
 #[cfg(test)]
 use support_tickets_integrity::{EscalationLevel, SatisfactionSurvey};
 #[cfg(test)]
@@ -92,7 +86,7 @@ pub struct EscalateInput {
 
 #[hdk_extern]
 pub fn create_ticket(ticket: SupportTicket) -> ExternResult<Record> {
-    require_consciousness(&civic_requirement_basic(), "create_ticket")?;
+    mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_basic(), "create_ticket")?;
     let action_hash = create_entry(&EntryTypes::SupportTicket(ticket.clone()))?;
 
     // ShardedTickets link (time-sharded anchor)
@@ -146,7 +140,7 @@ pub fn create_ticket(ticket: SupportTicket) -> ExternResult<Record> {
 
 #[hdk_extern]
 pub fn update_ticket(input: UpdateTicketInput) -> ExternResult<Record> {
-    require_consciousness(&civic_requirement_proposal(), "update_ticket")?;
+    mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_proposal(), "update_ticket")?;
     let action_hash = update_entry(
         input.original_hash,
         &EntryTypes::SupportTicket(input.updated),
@@ -184,7 +178,7 @@ pub fn list_my_tickets(_: ()) -> ExternResult<Vec<Record>> {
 
 #[hdk_extern]
 pub fn close_ticket(action_hash: ActionHash) -> ExternResult<Record> {
-    require_consciousness(&civic_requirement_proposal(), "close_ticket")?;
+    mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_proposal(), "close_ticket")?;
     let record = get(action_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
         WasmErrorInner::Guest("Ticket not found".into())
     ))?;
@@ -202,7 +196,7 @@ pub fn close_ticket(action_hash: ActionHash) -> ExternResult<Record> {
 
 #[hdk_extern]
 pub fn add_comment(comment: TicketComment) -> ExternResult<Record> {
-    require_consciousness(&civic_requirement_basic(), "add_comment")?;
+    mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_basic(), "add_comment")?;
     let action_hash = create_entry(&EntryTypes::TicketComment(comment.clone()))?;
     create_link(
         comment.ticket_hash.clone(),
@@ -240,7 +234,7 @@ pub fn get_comments(ticket_hash: ActionHash) -> ExternResult<Vec<Record>> {
 
 #[hdk_extern]
 pub fn propose_action(action: AutonomousAction) -> ExternResult<Record> {
-    require_consciousness(&civic_requirement_basic(), "propose_action")?;
+    mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_basic(), "propose_action")?;
     let action_hash = create_entry(&EntryTypes::AutonomousAction(action.clone()))?;
     create_link(
         action.ticket_hash.clone(),
@@ -265,7 +259,7 @@ pub fn propose_action(action: AutonomousAction) -> ExternResult<Record> {
 
 #[hdk_extern]
 pub fn approve_action(action_hash: ActionHash) -> ExternResult<Record> {
-    require_consciousness(&civic_requirement_proposal(), "approve_action")?;
+    mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_proposal(), "approve_action")?;
     let record = get(action_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
         WasmErrorInner::Guest("Action not found".into())
     ))?;
@@ -279,7 +273,7 @@ pub fn approve_action(action_hash: ActionHash) -> ExternResult<Record> {
 
 #[hdk_extern]
 pub fn execute_action(action_hash: ActionHash) -> ExternResult<Record> {
-    require_consciousness(&civic_requirement_proposal(), "execute_action")?;
+    mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_proposal(), "execute_action")?;
     let record = get(action_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
         WasmErrorInner::Guest("Action not found".into())
     ))?;
@@ -293,7 +287,7 @@ pub fn execute_action(action_hash: ActionHash) -> ExternResult<Record> {
 
 #[hdk_extern]
 pub fn rollback_action(action_hash: ActionHash) -> ExternResult<Record> {
-    require_consciousness(&civic_requirement_proposal(), "rollback_action")?;
+    mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_proposal(), "rollback_action")?;
     let record = get(action_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
         WasmErrorInner::Guest("Action not found".into())
     ))?;
@@ -311,7 +305,7 @@ pub fn rollback_action(action_hash: ActionHash) -> ExternResult<Record> {
 
 #[hdk_extern]
 pub fn create_undo(undo: UndoAction) -> ExternResult<Record> {
-    require_consciousness(&civic_requirement_basic(), "create_undo")?;
+    mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_basic(), "create_undo")?;
     let action_hash = create_entry(&EntryTypes::UndoAction(undo.clone()))?;
     create_link(
         undo.original_action_hash.clone(),
@@ -330,7 +324,7 @@ pub fn create_undo(undo: UndoAction) -> ExternResult<Record> {
 
 #[hdk_extern]
 pub fn create_preemptive_alert(alert: PreemptiveAlert) -> ExternResult<Record> {
-    require_consciousness(&civic_requirement_basic(), "create_preemptive_alert")?;
+    mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_basic(), "create_preemptive_alert")?;
     let agent = agent_info()?.agent_initial_pubkey;
     let action_hash = create_entry(&EntryTypes::PreemptiveAlert(alert.clone()))?;
     create_link(agent, action_hash.clone(), LinkTypes::AgentToAlert, ())?;
@@ -361,7 +355,7 @@ pub fn list_preemptive_alerts(_: ()) -> ExternResult<Vec<Record>> {
 
 #[hdk_extern]
 pub fn promote_alert_to_ticket(input: PromoteAlertInput) -> ExternResult<Record> {
-    require_consciousness(&civic_requirement_proposal(), "promote_alert_to_ticket")?;
+    mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_proposal(), "promote_alert_to_ticket")?;
     // Verify alert exists
     let _alert = get(input.alert_hash.clone(), GetOptions::default())?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Alert not found".into())))?;
@@ -430,7 +424,7 @@ pub fn promote_alert_to_ticket(input: PromoteAlertInput) -> ExternResult<Record>
 
 #[hdk_extern]
 pub fn escalate_ticket(input: EscalateInput) -> ExternResult<Record> {
-    require_consciousness(&civic_requirement_proposal(), "escalate_ticket")?;
+    mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_proposal(), "escalate_ticket")?;
     let _ticket = get(input.ticket_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
         WasmErrorInner::Guest("Ticket not found".into())
     ))?;
@@ -470,7 +464,7 @@ pub fn get_escalation_history(ticket_hash: ActionHash) -> ExternResult<Vec<Recor
 
 #[hdk_extern]
 pub fn submit_satisfaction(survey: SatisfactionSurvey) -> ExternResult<Record> {
-    require_consciousness(&civic_requirement_basic(), "submit_satisfaction")?;
+    mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_basic(), "submit_satisfaction")?;
     let action_hash = create_entry(&EntryTypes::SatisfactionSurvey(survey.clone()))?;
     create_link(
         survey.ticket_hash,

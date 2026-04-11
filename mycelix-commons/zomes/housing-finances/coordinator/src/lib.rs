@@ -14,12 +14,6 @@ use mycelix_bridge_common::{
 };
 use mycelix_zome_helpers::get_latest_record;
 
-fn require_consciousness(
-    requirement: &mycelix_bridge_common::CivicRequirement,
-    action_name: &str,
-) -> ExternResult<mycelix_bridge_common::GovernanceEligibility> {
-    mycelix_zome_helpers::require_civic("commons_bridge", requirement, action_name)
-}
 
 fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
     let anchor = Anchor(anchor_str.to_string());
@@ -47,7 +41,7 @@ pub struct MemberChargeInfo {
 
 #[hdk_extern]
 pub fn generate_monthly_charges(input: GenerateChargesInput) -> ExternResult<Vec<Record>> {
-    let _eligibility = require_consciousness(
+    let _eligibility = mycelix_zome_helpers::require_civic("commons_bridge", 
         &civic_requirement_constitutional(),
         "generate_monthly_charges",
     )?;
@@ -103,7 +97,7 @@ pub fn generate_monthly_charges(input: GenerateChargesInput) -> ExternResult<Vec
 /// Record a payment
 #[hdk_extern]
 pub fn record_payment(payment: Payment) -> ExternResult<Record> {
-    let _eligibility = require_consciousness(&civic_requirement_basic(), "record_payment")?;
+    let _eligibility = mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_basic(), "record_payment")?;
     let action_hash = create_entry(&EntryTypes::Payment(payment.clone()))?;
 
     // Link member to payment
@@ -152,7 +146,7 @@ pub fn get_member_payments(member: AgentPubKey) -> ExternResult<Vec<Record>> {
 /// Create a reserve fund
 #[hdk_extern]
 pub fn create_reserve_fund(fund: ReserveFund) -> ExternResult<Record> {
-    let _eligibility = require_consciousness(&civic_requirement_voting(), "create_reserve_fund")?;
+    let _eligibility = mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_voting(), "create_reserve_fund")?;
     if fund.name.len() > 256 {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "Fund name must be at most 256 characters".into()
@@ -183,7 +177,7 @@ pub struct DepositToReserveInput {
 /// Deposit funds into a reserve
 #[hdk_extern]
 pub fn deposit_to_reserve(input: DepositToReserveInput) -> ExternResult<Record> {
-    let _eligibility = require_consciousness(&civic_requirement_proposal(), "deposit_to_reserve")?;
+    let _eligibility = mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_proposal(), "deposit_to_reserve")?;
     if input.amount_cents == 0 {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "Deposit amount must be greater than 0".into()
@@ -214,7 +208,7 @@ pub fn deposit_to_reserve(input: DepositToReserveInput) -> ExternResult<Record> 
 /// Create an annual budget
 #[hdk_extern]
 pub fn create_budget(budget: Budget) -> ExternResult<Record> {
-    let _eligibility = require_consciousness(&civic_requirement_voting(), "create_budget")?;
+    let _eligibility = mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_voting(), "create_budget")?;
     let action_hash = create_entry(&EntryTypes::Budget(budget.clone()))?;
 
     let year_anchor = format!("fiscal_year:{}", budget.fiscal_year);
@@ -239,7 +233,7 @@ pub struct ApproveBudgetInput {
 /// Approve a budget
 #[hdk_extern]
 pub fn approve_budget(input: ApproveBudgetInput) -> ExternResult<Record> {
-    let _eligibility = require_consciousness(&civic_requirement_constitutional(), "approve_budget")?;
+    let _eligibility = mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_constitutional(), "approve_budget")?;
     let record = get(input.budget_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
         WasmErrorInner::Guest("Budget not found".into())
     ))?;

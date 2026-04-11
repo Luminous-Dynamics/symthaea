@@ -10,12 +10,6 @@ use mycelix_bridge_common::{
 use mycelix_zome_helpers::get_latest_record;
 use property_registry_integrity::*;
 
-fn require_consciousness(
-    requirement: &mycelix_bridge_common::CivicRequirement,
-    action_name: &str,
-) -> ExternResult<mycelix_bridge_common::GovernanceEligibility> {
-    mycelix_zome_helpers::require_civic("commons_bridge", requirement, action_name)
-}
 
 /// Get or create an anchor entry and return its EntryHash for use as link base.
 ///
@@ -31,7 +25,7 @@ fn anchor_hash(anchor_string: &str) -> ExternResult<EntryHash> {
 
 #[hdk_extern]
 pub fn register_property(input: RegisterPropertyInput) -> ExternResult<Record> {
-    let _eligibility = require_consciousness(&civic_requirement_proposal(), "register_property")?;
+    let _eligibility = mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_proposal(), "register_property")?;
     let now = sys_time()?;
     let property = Property {
         id: format!("property:{}:{}", input.owner_did, now.as_micros()),
@@ -173,7 +167,7 @@ pub fn get_owner_properties(did: String) -> ExternResult<Vec<Record>> {
 
 #[hdk_extern]
 pub fn add_encumbrance(input: AddEncumbranceInput) -> ExternResult<Record> {
-    let _eligibility = require_consciousness(&civic_requirement_voting(), "add_encumbrance")?;
+    let _eligibility = mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_voting(), "add_encumbrance")?;
     let filter = ChainQueryFilter::new()
         .entry_type(EntryType::App(AppEntryDef::try_from(
             UnitEntryTypes::TitleDeed,
@@ -287,7 +281,7 @@ pub fn get_property_deeds(property_id: String) -> ExternResult<Vec<Record>> {
 #[hdk_extern]
 pub fn update_property_metadata(input: UpdateMetadataInput) -> ExternResult<Record> {
     let _eligibility =
-        require_consciousness(&civic_requirement_proposal(), "update_property_metadata")?;
+        mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_proposal(), "update_property_metadata")?;
     let filter = ChainQueryFilter::new()
         .entry_type(EntryType::App(AppEntryDef::try_from(
             UnitEntryTypes::Property,
@@ -332,7 +326,7 @@ pub struct UpdateMetadataInput {
 /// Remove an encumbrance (when paid off)
 #[hdk_extern]
 pub fn remove_encumbrance(input: RemoveEncumbranceInput) -> ExternResult<Record> {
-    let _eligibility = require_consciousness(&civic_requirement_voting(), "remove_encumbrance")?;
+    let _eligibility = mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_voting(), "remove_encumbrance")?;
     let filter = ChainQueryFilter::new()
         .entry_type(EntryType::App(AppEntryDef::try_from(
             UnitEntryTypes::TitleDeed,
@@ -397,7 +391,7 @@ pub fn get_properties_by_type(property_type: PropertyType) -> ExternResult<Vec<R
 /// Add a co-owner to property
 #[hdk_extern]
 pub fn add_co_owner(input: AddCoOwnerInput) -> ExternResult<Record> {
-    let _eligibility = require_consciousness(&civic_requirement_proposal(), "add_co_owner")?;
+    let _eligibility = mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_proposal(), "add_co_owner")?;
     let filter = ChainQueryFilter::new()
         .entry_type(EntryType::App(AppEntryDef::try_from(
             UnitEntryTypes::Property,
@@ -454,7 +448,7 @@ pub struct AddCoOwnerInput {
 /// Remove a co-owner from property
 #[hdk_extern]
 pub fn remove_co_owner(input: RemoveCoOwnerInput) -> ExternResult<Record> {
-    let _eligibility = require_consciousness(&civic_requirement_proposal(), "remove_co_owner")?;
+    let _eligibility = mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_proposal(), "remove_co_owner")?;
     let filter = ChainQueryFilter::new()
         .entry_type(EntryType::App(AppEntryDef::try_from(
             UnitEntryTypes::Property,
@@ -557,7 +551,7 @@ pub fn has_clear_title(property_id: String) -> ExternResult<bool> {
 #[hdk_extern]
 pub fn transfer_ownership(input: TransferOwnershipInput) -> ExternResult<TransferOwnershipResult> {
     let _eligibility =
-        require_consciousness(&civic_requirement_constitutional(), "transfer_ownership")?;
+        mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_constitutional(), "transfer_ownership")?;
     let now = sys_time()?;
 
     // 1. Get the current property

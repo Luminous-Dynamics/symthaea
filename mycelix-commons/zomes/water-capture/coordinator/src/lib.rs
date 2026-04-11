@@ -14,12 +14,6 @@ fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
     hash_entry(&EntryTypes::Anchor(anchor))
 }
 
-fn require_consciousness(
-    requirement: &mycelix_bridge_common::CivicRequirement,
-    action_name: &str,
-) -> ExternResult<mycelix_bridge_common::GovernanceEligibility> {
-    mycelix_zome_helpers::require_civic("commons_bridge", requirement, action_name)
-}
 
 // ============================================================================
 // HARVEST SYSTEMS
@@ -28,7 +22,7 @@ fn require_consciousness(
 /// Register a new water harvesting system
 #[hdk_extern]
 pub fn register_harvest_system(system: HarvestSystem) -> ExternResult<Record> {
-    let _eligibility = require_consciousness(&civic_requirement_basic(), "register_harvest_system")?;
+    let _eligibility = mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_basic(), "register_harvest_system")?;
     if system.id.trim().is_empty() || system.id.len() > 256 {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "System ID must be 1-256 non-whitespace characters".into()
@@ -115,7 +109,7 @@ pub fn get_all_systems(_: ()) -> ExternResult<Vec<Record>> {
 /// Register a new storage tank
 #[hdk_extern]
 pub fn register_tank(tank: StorageTank) -> ExternResult<Record> {
-    let _eligibility = require_consciousness(&civic_requirement_basic(), "register_tank")?;
+    let _eligibility = mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_basic(), "register_tank")?;
     if tank.id.trim().is_empty() || tank.id.len() > 256 {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "Tank ID must be 1-256 non-whitespace characters".into()
@@ -169,7 +163,7 @@ pub fn register_tank(tank: StorageTank) -> ExternResult<Record> {
 /// Update the current water level in a tank
 #[hdk_extern]
 pub fn update_tank_level(input: UpdateTankLevelInput) -> ExternResult<Record> {
-    let _eligibility = require_consciousness(&civic_requirement_proposal(), "update_tank_level")?;
+    let _eligibility = mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_proposal(), "update_tank_level")?;
     let agent_info = agent_info()?;
     let record = get(input.tank_hash.clone(), GetOptions::default())?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Tank not found".into())))?;
@@ -218,7 +212,7 @@ pub struct UpdateTankLevelInput {
 /// Record a water harvest from a system
 #[hdk_extern]
 pub fn record_harvest(harvest: HarvestRecord) -> ExternResult<Record> {
-    let _eligibility = require_consciousness(&civic_requirement_basic(), "record_harvest")?;
+    let _eligibility = mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_basic(), "record_harvest")?;
     if harvest.liters_collected == 0 {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "Harvest amount must be greater than zero".into()
@@ -268,7 +262,7 @@ pub fn get_harvest_history(system_hash: ActionHash) -> ExternResult<Vec<Record>>
 #[hdk_extern]
 pub fn register_recharge_project(project: RechargeProject) -> ExternResult<Record> {
     let _eligibility =
-        require_consciousness(&civic_requirement_basic(), "register_recharge_project")?;
+        mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_basic(), "register_recharge_project")?;
     if project.id.trim().is_empty() || project.id.len() > 256 {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "Project ID must be 1-256 non-whitespace characters".into()

@@ -9,12 +9,6 @@ use mycelix_bridge_common::{
 };
 use mycelix_zome_helpers::get_latest_record;
 
-fn require_consciousness(
-    requirement: &mycelix_bridge_common::CivicRequirement,
-    action_name: &str,
-) -> ExternResult<GovernanceEligibility> {
-    mycelix_zome_helpers::require_civic("civic_bridge", requirement, action_name)
-}
 
 /// Helper function to create an anchor entry and return its hash
 fn anchor_hash(anchor_string: &str) -> ExternResult<EntryHash> {
@@ -25,7 +19,7 @@ fn anchor_hash(anchor_string: &str) -> ExternResult<EntryHash> {
 
 #[hdk_extern]
 pub fn publish(input: PublishInput) -> ExternResult<Record> {
-    let _eligibility = require_consciousness(&civic_requirement_proposal(), "publish")?;
+    let _eligibility = mycelix_zome_helpers::require_civic("civic_bridge", &civic_requirement_proposal(), "publish")?;
 
     let now = sys_time()?;
     let publication = Publication {
@@ -79,7 +73,7 @@ pub struct PublishInput {
 
 #[hdk_extern]
 pub fn add_content_block(input: AddBlockInput) -> ExternResult<Record> {
-    let _eligibility = require_consciousness(&civic_requirement_basic(), "add_content_block")?;
+    let _eligibility = mycelix_zome_helpers::require_civic("civic_bridge", &civic_requirement_basic(), "add_content_block")?;
 
     let block = ContentBlock {
         publication_id: input.publication_id.clone(),
@@ -108,7 +102,7 @@ pub struct AddBlockInput {
 
 #[hdk_extern]
 pub fn update_publication(input: UpdateInput) -> ExternResult<Record> {
-    let _eligibility = require_consciousness(&civic_requirement_proposal(), "update_publication")?;
+    let _eligibility = mycelix_zome_helpers::require_civic("civic_bridge", &civic_requirement_proposal(), "update_publication")?;
 
     let filter = ChainQueryFilter::new()
         .entry_type(EntryType::App(AppEntryDef::try_from(
@@ -506,7 +500,7 @@ pub struct CreateArtMetadataInput {
 /// Attach visual art metadata to a publication (Participant+).
 #[hdk_extern]
 pub fn create_art_metadata(input: CreateArtMetadataInput) -> ExternResult<Record> {
-    let _eligibility = require_consciousness(&civic_requirement_proposal(), "create_art_metadata")?;
+    let _eligibility = mycelix_zome_helpers::require_civic("civic_bridge", &civic_requirement_proposal(), "create_art_metadata")?;
 
     let metadata = VisualArtMetadata {
         publication_id: input.publication_hash.to_string(),

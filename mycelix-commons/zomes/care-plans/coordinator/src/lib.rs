@@ -9,12 +9,6 @@ use hdk::prelude::*;
 use mycelix_bridge_common::{civic_requirement_basic, civic_requirement_proposal};
 use mycelix_zome_helpers::records_from_links;
 
-fn require_consciousness(
-    requirement: &mycelix_bridge_common::CivicRequirement,
-    action_name: &str,
-) -> ExternResult<mycelix_bridge_common::GovernanceEligibility> {
-    mycelix_zome_helpers::require_civic("commons_bridge", requirement, action_name)
-}
 
 fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
     let anchor = Anchor(anchor_str.to_string());
@@ -30,7 +24,7 @@ fn ensure_anchor(anchor_str: &str) -> ExternResult<EntryHash> {
 /// Create a new care plan
 #[hdk_extern]
 pub fn create_care_plan(plan: CarePlan) -> ExternResult<Record> {
-    let _eligibility = require_consciousness(&civic_requirement_proposal(), "create_care_plan")?;
+    let _eligibility = mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_proposal(), "create_care_plan")?;
     let action_hash = create_entry(&EntryTypes::CarePlan(plan.clone()))?;
 
     // Link to all plans
@@ -69,7 +63,7 @@ pub fn create_care_plan(plan: CarePlan) -> ExternResult<Record> {
 /// Log a care session against a plan
 #[hdk_extern]
 pub fn log_session(session: CareSession) -> ExternResult<Record> {
-    let _eligibility = require_consciousness(&civic_requirement_basic(), "log_session")?;
+    let _eligibility = mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_basic(), "log_session")?;
     // Verify the plan exists
     let _plan_record = get(session.plan_hash.clone(), GetOptions::default())?.ok_or(
         wasm_error!(WasmErrorInner::Guest("Care plan not found".into())),
@@ -143,7 +137,7 @@ pub struct UpdatePlanStatusInput {
 /// Update the status of a care plan
 #[hdk_extern]
 pub fn update_plan_status(input: UpdatePlanStatusInput) -> ExternResult<Record> {
-    let _eligibility = require_consciousness(&civic_requirement_proposal(), "update_plan_status")?;
+    let _eligibility = mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_proposal(), "update_plan_status")?;
     let record = get(input.plan_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
         WasmErrorInner::Guest("Care plan not found".into())
     ))?;

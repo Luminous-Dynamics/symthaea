@@ -12,12 +12,6 @@ use mycelix_bridge_common::{
 };
 use mycelix_zome_helpers::{get_latest_record};
 
-fn require_consciousness(
-    requirement: &mycelix_bridge_common::CivicRequirement,
-    action_name: &str,
-) -> ExternResult<GovernanceEligibility> {
-    mycelix_zome_helpers::require_civic("civic_bridge", requirement, action_name)
-}
 
 /// Helper to get an anchor entry hash
 fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
@@ -29,7 +23,7 @@ fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
 
 #[hdk_extern]
 pub fn declare_disaster(input: DeclareDisasterInput) -> ExternResult<Record> {
-    require_consciousness(&civic_requirement_proposal(), "declare_disaster")?;
+    mycelix_zome_helpers::require_civic("civic_bridge", &civic_requirement_proposal(), "declare_disaster")?;
     if input.title.is_empty() || input.title.len() > 256 {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "Title must be 1-256 characters".into()
@@ -162,7 +156,7 @@ pub fn get_active_disasters(_: ()) -> ExternResult<Vec<Record>> {
 /// Update a disaster's status
 #[hdk_extern]
 pub fn update_disaster_status(input: UpdateDisasterStatusInput) -> ExternResult<Record> {
-    require_consciousness(&civic_requirement_proposal(), "update_disaster_status")?;
+    mycelix_zome_helpers::require_civic("civic_bridge", &civic_requirement_proposal(), "update_disaster_status")?;
     let current_record = get(input.disaster_hash.clone(), GetOptions::default())?.ok_or(
         wasm_error!(WasmErrorInner::Guest("Disaster not found".into())),
     )?;
@@ -219,7 +213,7 @@ pub struct UpdateDisasterStatusInput {
 /// Add an incident update to a disaster
 #[hdk_extern]
 pub fn add_incident_update(input: AddIncidentUpdateInput) -> ExternResult<Record> {
-    require_consciousness(&civic_requirement_basic(), "add_incident_update")?;
+    mycelix_zome_helpers::require_civic("civic_bridge", &civic_requirement_basic(), "add_incident_update")?;
     if input.content.is_empty() || input.content.len() > 8192 {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "Content must be 1-8192 characters".into()
@@ -263,7 +257,7 @@ pub struct AddIncidentUpdateInput {
 /// End a disaster (set status to Closed)
 #[hdk_extern]
 pub fn end_disaster(disaster_hash: ActionHash) -> ExternResult<Record> {
-    require_consciousness(&civic_requirement_voting(), "end_disaster")?;
+    mycelix_zome_helpers::require_civic("civic_bridge", &civic_requirement_voting(), "end_disaster")?;
     update_disaster_status(UpdateDisasterStatusInput {
         disaster_hash,
         new_status: DisasterStatus::Closed,

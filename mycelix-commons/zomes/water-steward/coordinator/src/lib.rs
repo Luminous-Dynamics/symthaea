@@ -9,12 +9,6 @@ use mycelix_bridge_common::{civic_requirement_constitutional, civic_requirement_
 use mycelix_zome_helpers::records_from_links;
 use water_steward_integrity::*;
 
-fn require_consciousness(
-    requirement: &mycelix_bridge_common::CivicRequirement,
-    action_name: &str,
-) -> ExternResult<mycelix_bridge_common::GovernanceEligibility> {
-    mycelix_zome_helpers::require_civic("commons_bridge", requirement, action_name)
-}
 
 fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
     let anchor = Anchor(anchor_str.to_string());
@@ -28,7 +22,7 @@ fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
 /// Define a new watershed
 #[hdk_extern]
 pub fn define_watershed(watershed: Watershed) -> ExternResult<Record> {
-    let _eligibility = require_consciousness(&civic_requirement_voting(), "define_watershed")?;
+    let _eligibility = mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_voting(), "define_watershed")?;
     if watershed.id.trim().is_empty() || watershed.id.len() > 256 {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "Watershed ID must be 1-256 non-whitespace characters".into()
@@ -117,7 +111,7 @@ pub fn get_all_watersheds(_: ()) -> ExternResult<Vec<Record>> {
 /// Register a new water right within a watershed
 #[hdk_extern]
 pub fn register_water_right(right: WaterRight) -> ExternResult<Record> {
-    let _eligibility = require_consciousness(&civic_requirement_proposal(), "register_water_right")?;
+    let _eligibility = mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_proposal(), "register_water_right")?;
     // Verify watershed exists
     let _ws_record = get(right.watershed_hash.clone(), GetOptions::default())?.ok_or(
         wasm_error!(WasmErrorInner::Guest("Watershed not found".into())),
@@ -174,7 +168,7 @@ pub fn get_my_rights(_: ()) -> ExternResult<Vec<Record>> {
 /// Transfer a water right to another holder
 #[hdk_extern]
 pub fn transfer_right(input: TransferRightInput) -> ExternResult<Record> {
-    let _eligibility = require_consciousness(&civic_requirement_voting(), "transfer_right")?;
+    let _eligibility = mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_voting(), "transfer_right")?;
     let agent_info = agent_info()?;
 
     // Fetch the water right
@@ -281,7 +275,7 @@ pub struct TransferRightInput {
 /// File a water dispute within a watershed
 #[hdk_extern]
 pub fn file_dispute(dispute: WaterDispute) -> ExternResult<Record> {
-    let _eligibility = require_consciousness(&civic_requirement_proposal(), "file_dispute")?;
+    let _eligibility = mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_proposal(), "file_dispute")?;
     if dispute.description.trim().is_empty() || dispute.description.len() > 8192 {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "Description must be 1-8192 non-whitespace characters".into()
@@ -319,7 +313,7 @@ pub fn file_dispute(dispute: WaterDispute) -> ExternResult<Record> {
 /// Resolve a water dispute
 #[hdk_extern]
 pub fn resolve_dispute(input: ResolveDisputeInput) -> ExternResult<Record> {
-    let _eligibility = require_consciousness(&civic_requirement_constitutional(), "resolve_dispute")?;
+    let _eligibility = mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_constitutional(), "resolve_dispute")?;
 
     if input.resolution_text.trim().is_empty() {
         return Err(wasm_error!(WasmErrorInner::Guest(

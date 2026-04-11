@@ -7,12 +7,6 @@ use mycelix_bridge_common::{
 };
 use name_registry_integrity::*;
 
-fn require_consciousness(
-    requirement: &mycelix_bridge_common::CivicRequirement,
-    action_name: &str,
-) -> ExternResult<GovernanceEligibility> {
-    mycelix_zome_helpers::require_civic("identity_bridge", requirement, action_name)
-}
 
 /// Helper to get an anchor entry hash
 fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
@@ -28,7 +22,7 @@ fn ensure_anchor(anchor_str: &str) -> ExternResult<EntryHash> {
 /// Register a mesh name (Participant+).
 #[hdk_extern]
 pub fn register_name(entry: MeshNameEntry) -> ExternResult<Record> {
-    let _eligibility = require_consciousness(&civic_requirement_basic(), "register_name")?;
+    let _eligibility = mycelix_zome_helpers::require_civic("identity_bridge", &civic_requirement_basic(), "register_name")?;
 
     let action_hash = create_entry(&EntryTypes::MeshNameEntry(entry.clone()))?;
     let agent = agent_info()?.agent_initial_pubkey;
@@ -84,7 +78,7 @@ pub fn resolve_name(canonical: String) -> ExternResult<Option<MeshNameEntry>> {
 /// Transfer name ownership (owner only, Citizen+).
 #[hdk_extern]
 pub fn transfer_name(transfer: NameTransfer) -> ExternResult<Record> {
-    let _eligibility = require_consciousness(&civic_requirement_voting(), "transfer_name")?;
+    let _eligibility = mycelix_zome_helpers::require_civic("identity_bridge", &civic_requirement_voting(), "transfer_name")?;
 
     // Verify caller owns the name
     let name_record = get(transfer.name_hash.clone(), GetOptions::default())?
@@ -122,7 +116,7 @@ pub fn transfer_name(transfer: NameTransfer) -> ExternResult<Record> {
 /// Renew a name (extend expiry by 1 year). Owner only.
 #[hdk_extern]
 pub fn renew_name(name_hash: ActionHash) -> ExternResult<Record> {
-    let _eligibility = require_consciousness(&civic_requirement_basic(), "renew_name")?;
+    let _eligibility = mycelix_zome_helpers::require_civic("identity_bridge", &civic_requirement_basic(), "renew_name")?;
 
     let record = get(name_hash.clone(), GetOptions::default())?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Name not found".into())))?;

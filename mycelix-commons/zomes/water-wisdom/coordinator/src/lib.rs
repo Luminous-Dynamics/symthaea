@@ -9,12 +9,6 @@ use mycelix_bridge_common::{civic_requirement_basic, civic_requirement_proposal}
 use mycelix_zome_helpers::records_from_links;
 use water_wisdom_integrity::*;
 
-fn require_consciousness(
-    requirement: &mycelix_bridge_common::CivicRequirement,
-    action_name: &str,
-) -> ExternResult<mycelix_bridge_common::GovernanceEligibility> {
-    mycelix_zome_helpers::require_civic("commons_bridge", requirement, action_name)
-}
 
 fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
     let anchor = Anchor(anchor_str.to_string());
@@ -28,7 +22,7 @@ fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
 /// Record a traditional water management practice
 #[hdk_extern]
 pub fn record_practice(practice: TraditionalPractice) -> ExternResult<Record> {
-    require_consciousness(&civic_requirement_basic(), "record_practice")?;
+    mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_basic(), "record_practice")?;
     if practice.title.is_empty() || practice.title.len() > 256 {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "Title must be 1-256 characters".into()
@@ -123,7 +117,7 @@ pub fn get_all_practices(_: ()) -> ExternResult<Vec<Record>> {
 /// Share a conservation method
 #[hdk_extern]
 pub fn share_conservation_method(method: ConservationMethod) -> ExternResult<Record> {
-    require_consciousness(&civic_requirement_basic(), "share_conservation_method")?;
+    mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_basic(), "share_conservation_method")?;
     if method.title.is_empty() || method.title.len() > 256 {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "Title must be 1-256 characters".into()
@@ -183,7 +177,7 @@ pub fn get_conservation_methods(_: ()) -> ExternResult<Vec<Record>> {
 /// Record an observed climate-water pattern
 #[hdk_extern]
 pub fn record_climate_pattern(pattern: ClimateWaterPattern) -> ExternResult<Record> {
-    require_consciousness(&civic_requirement_basic(), "record_climate_pattern")?;
+    mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_basic(), "record_climate_pattern")?;
     if pattern.region.is_empty() || pattern.region.len() > 256 {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "Region must be 1-256 characters".into()
@@ -267,7 +261,7 @@ pub struct UpdateTraditionalPracticeInput {
 /// Update a traditional water management practice
 #[hdk_extern]
 pub fn update_practice(input: UpdateTraditionalPracticeInput) -> ExternResult<ActionHash> {
-    require_consciousness(&civic_requirement_proposal(), "update_practice")?;
+    mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_proposal(), "update_practice")?;
     update_entry(
         input.original_action_hash,
         &EntryTypes::TraditionalPractice(input.updated_entry),
@@ -285,7 +279,7 @@ pub struct UpdateConservationMethodInput {
 pub fn update_conservation_method(
     input: UpdateConservationMethodInput,
 ) -> ExternResult<ActionHash> {
-    require_consciousness(&civic_requirement_proposal(), "update_conservation_method")?;
+    mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_proposal(), "update_conservation_method")?;
     update_entry(
         input.original_action_hash,
         &EntryTypes::ConservationMethod(input.updated_entry),
@@ -301,7 +295,7 @@ pub struct UpdateClimateWaterPatternInput {
 /// Update an observed climate-water pattern
 #[hdk_extern]
 pub fn update_climate_pattern(input: UpdateClimateWaterPatternInput) -> ExternResult<ActionHash> {
-    require_consciousness(&civic_requirement_proposal(), "update_climate_pattern")?;
+    mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_proposal(), "update_climate_pattern")?;
     update_entry(
         input.original_action_hash,
         &EntryTypes::ClimateWaterPattern(input.updated_entry),

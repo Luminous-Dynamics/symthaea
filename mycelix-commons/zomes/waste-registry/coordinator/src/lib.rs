@@ -14,12 +14,6 @@ fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
     hash_entry(&EntryTypes::Anchor(anchor))
 }
 
-fn require_consciousness(
-    requirement: &mycelix_bridge_common::CivicRequirement,
-    action_name: &str,
-) -> ExternResult<mycelix_bridge_common::GovernanceEligibility> {
-    mycelix_zome_helpers::require_civic("commons_bridge", requirement, action_name)
-}
 
 // ============================================================================
 // WASTE STREAMS
@@ -28,7 +22,7 @@ fn require_consciousness(
 /// Register a new waste stream for tracking
 #[hdk_extern]
 pub fn register_waste_stream(stream: WasteStream) -> ExternResult<Record> {
-    let _eligibility = require_consciousness(&civic_requirement_basic(), "register_waste_stream")?;
+    let _eligibility = mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_basic(), "register_waste_stream")?;
 
     // Validate quantity is positive and finite
     if !stream.quantity_kg.is_finite() || stream.quantity_kg <= 0.0 {
@@ -157,7 +151,7 @@ pub fn get_streams_by_status(status: WasteStreamStatus) -> ExternResult<Vec<Reco
 #[hdk_extern]
 pub fn classify_waste_stream(classification: WasteClassification) -> ExternResult<Record> {
     let _eligibility =
-        require_consciousness(&civic_requirement_basic(), "classify_waste_stream")?;
+        mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_basic(), "classify_waste_stream")?;
 
     // Validate confidence
     if !classification.confidence.is_finite()
@@ -231,7 +225,7 @@ pub fn check_contamination_feedback(
     classification_hash: ActionHash,
 ) -> ExternResult<ContaminationFeedback> {
     let _eligibility =
-        require_consciousness(&civic_requirement_basic(), "check_contamination_feedback")?;
+        mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_basic(), "check_contamination_feedback")?;
 
     // Get the classification
     let class_record = get(classification_hash, GetOptions::default())?
@@ -321,7 +315,7 @@ pub fn check_contamination_feedback(
 /// Register a waste processing facility (requires proposal-level consciousness)
 #[hdk_extern]
 pub fn register_facility(facility: WasteFacility) -> ExternResult<Record> {
-    let _eligibility = require_consciousness(&civic_requirement_proposal(), "register_facility")?;
+    let _eligibility = mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_proposal(), "register_facility")?;
 
     // Validate capacity
     if !facility.capacity_kg_per_day.is_finite() || facility.capacity_kg_per_day <= 0.0 {
@@ -410,7 +404,7 @@ pub struct RouteWasteStreamInput {
 /// Route a waste stream to the best matching facility
 #[hdk_extern]
 pub fn route_waste_stream(input: RouteWasteStreamInput) -> ExternResult<Option<Record>> {
-    let _eligibility = require_consciousness(&civic_requirement_basic(), "route_waste_stream")?;
+    let _eligibility = mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_basic(), "route_waste_stream")?;
 
     // Get the waste stream
     let stream_record = get(input.stream_hash.clone(), GetOptions::default())?

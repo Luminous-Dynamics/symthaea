@@ -204,12 +204,6 @@ fn bridge_reputation_slash(violator: &AgentPubKey, slash_factor: f32) -> bool {
 // Helpers
 // =============================================================================
 
-fn require_consciousness(
-    requirement: &mycelix_bridge_common::CivicRequirement,
-    action_name: &str,
-) -> ExternResult<mycelix_bridge_common::GovernanceEligibility> {
-    mycelix_zome_helpers::require_civic("commons_bridge", requirement, action_name)
-}
 
 fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
     let anchor = Anchor(anchor_str.to_string());
@@ -243,7 +237,7 @@ pub struct ProposeContractInput {
 /// Checks the other party's standing boundaries for blocks.
 #[hdk_extern]
 pub fn propose_contract(input: ProposeContractInput) -> ExternResult<Record> {
-    require_consciousness(&civic_requirement_proposal(), "propose_contract")?;
+    mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_proposal(), "propose_contract")?;
 
     let agent_info = agent_info()?;
     let proposer = agent_info.agent_initial_pubkey.clone();
@@ -335,7 +329,7 @@ pub fn propose_contract(input: ProposeContractInput) -> ExternResult<Record> {
 /// Only the non-proposing party can call this.
 #[hdk_extern]
 pub fn sign_contract(contract_hash: ActionHash) -> ExternResult<Record> {
-    require_consciousness(&civic_requirement_basic(), "sign_contract")?;
+    mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_basic(), "sign_contract")?;
 
     let agent_info = agent_info()?;
     let signer = agent_info.agent_initial_pubkey;
@@ -742,7 +736,7 @@ pub fn can_propose_to(provider: AgentPubKey) -> ExternResult<bool> {
     let me = agent_info.agent_initial_pubkey;
 
     // Check consciousness gate
-    if require_consciousness(&civic_requirement_proposal(), "can_propose_to").is_err() {
+    if mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_proposal(), "can_propose_to").is_err() {
         return Ok(false);
     }
 

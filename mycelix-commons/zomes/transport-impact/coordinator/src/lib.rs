@@ -20,12 +20,6 @@ pub struct BridgeEventSignal {
     pub payload: String,
 }
 
-fn require_consciousness(
-    requirement: &mycelix_bridge_common::CivicRequirement,
-    action_name: &str,
-) -> ExternResult<mycelix_bridge_common::GovernanceEligibility> {
-    mycelix_zome_helpers::require_civic("commons_bridge", requirement, action_name)
-}
 
 fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
     let anchor = Anchor(anchor_str.to_string());
@@ -55,7 +49,7 @@ fn emissions_factor(mode: &TripMode) -> f64 {
 
 #[hdk_extern]
 pub fn log_trip(mut trip: TripLog) -> ExternResult<Record> {
-    require_consciousness(&civic_requirement_basic(), "log_trip")?;
+    mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_basic(), "log_trip")?;
     let agent = agent_info()?.agent_initial_pubkey;
 
     // Auto-calculate emissions if not provided (zero means calculate)
@@ -200,7 +194,7 @@ pub struct RedeemInput {
 
 #[hdk_extern]
 pub fn redeem_credits(input: RedeemInput) -> ExternResult<Record> {
-    require_consciousness(&civic_requirement_basic(), "redeem_credits")?;
+    mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_basic(), "redeem_credits")?;
     let agent = agent_info()?.agent_initial_pubkey;
 
     // Verify sufficient balance before redeeming

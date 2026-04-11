@@ -16,12 +16,6 @@ use wellbeing_integrity::*;
 // Helpers
 // =============================================================================
 
-fn require_consciousness(
-    requirement: &mycelix_bridge_common::CivicRequirement,
-    action_name: &str,
-) -> ExternResult<mycelix_bridge_common::GovernanceEligibility> {
-    mycelix_zome_helpers::require_civic("commons_bridge", requirement, action_name)
-}
 
 fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
     let anchor = Anchor(anchor_str.to_string());
@@ -54,7 +48,7 @@ const EXPECTED_CHECKINS_PER_MONTH: f32 = 15.0;
 /// After creation, evaluates trend detection for nudge generation.
 #[hdk_extern]
 pub fn create_checkin(input: WellbeingCheckIn) -> ExternResult<Record> {
-    require_consciousness(&civic_requirement_basic(), "create_checkin")?;
+    mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_basic(), "create_checkin")?;
 
     let action_hash = create_entry(&EntryTypes::WellbeingCheckIn(input))?;
 
@@ -214,7 +208,7 @@ pub fn get_circle_shared_checkins(circle_hash: ActionHash) -> ExternResult<Vec<R
 /// Does NOT reveal individual data — only aggregate statistics.
 #[hdk_extern]
 pub fn compute_aggregate(_: ()) -> ExternResult<Record> {
-    require_consciousness(&civic_requirement_basic(), "compute_aggregate")?;
+    mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_basic(), "compute_aggregate")?;
 
     let agent_info = agent_info()?;
     let now = sys_time()?;

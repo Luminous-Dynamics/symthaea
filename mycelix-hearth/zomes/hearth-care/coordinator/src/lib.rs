@@ -19,12 +19,6 @@ use mycelix_bridge_common::{
 // Consciousness Gating
 // ============================================================================
 
-fn require_consciousness(
-    requirement: &mycelix_bridge_common::CivicRequirement,
-    action_name: &str,
-) -> ExternResult<GovernanceEligibility> {
-    mycelix_zome_helpers::require_civic("hearth_bridge", requirement, action_name)
-}
 
 // ============================================================================
 // Input Types
@@ -84,7 +78,7 @@ fn is_swap_pending(status: &SwapStatus) -> bool {
 /// Create a new care schedule and link it to the hearth and assigned agent.
 #[hdk_extern]
 pub fn create_care_schedule(input: CreateCareScheduleInput) -> ExternResult<Record> {
-    require_consciousness(&civic_requirement_basic(), "create_care_schedule")?;
+    mycelix_zome_helpers::require_civic("hearth_bridge", &civic_requirement_basic(), "create_care_schedule")?;
     require_membership(&input.hearth_hash)?;
     let schedule = CareSchedule {
         hearth_hash: input.hearth_hash.clone(),
@@ -128,7 +122,7 @@ pub fn create_care_schedule(input: CreateCareScheduleInput) -> ExternResult<Reco
 /// Status: only Active schedules can be completed.
 #[hdk_extern]
 pub fn complete_task(input: CompleteTaskInput) -> ExternResult<Record> {
-    require_consciousness(&civic_requirement_basic(), "complete_task")?;
+    mycelix_zome_helpers::require_civic("hearth_bridge", &civic_requirement_basic(), "complete_task")?;
     let now = sys_time()?;
 
     let record = get(input.schedule_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
@@ -204,7 +198,7 @@ pub fn complete_task(input: CompleteTaskInput) -> ExternResult<Record> {
 /// Propose a care task swap with another hearth member.
 #[hdk_extern]
 pub fn propose_swap(input: ProposeSwapInput) -> ExternResult<Record> {
-    require_consciousness(&civic_requirement_basic(), "propose_swap")?;
+    mycelix_zome_helpers::require_civic("hearth_bridge", &civic_requirement_basic(), "propose_swap")?;
     require_membership(&input.hearth_hash)?;
     let schedule_record =
         get(input.original_schedule_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
@@ -259,7 +253,7 @@ pub fn propose_swap(input: ProposeSwapInput) -> ExternResult<Record> {
 /// Status: only Proposed swaps can be accepted.
 #[hdk_extern]
 pub fn accept_swap(swap_hash: ActionHash) -> ExternResult<Record> {
-    require_consciousness(&civic_requirement_basic(), "accept_swap")?;
+    mycelix_zome_helpers::require_civic("hearth_bridge", &civic_requirement_basic(), "accept_swap")?;
     update_swap_status(swap_hash, SwapStatus::Accepted)
 }
 
@@ -269,14 +263,14 @@ pub fn accept_swap(swap_hash: ActionHash) -> ExternResult<Record> {
 /// Status: only Proposed swaps can be declined.
 #[hdk_extern]
 pub fn decline_swap(swap_hash: ActionHash) -> ExternResult<Record> {
-    require_consciousness(&civic_requirement_basic(), "decline_swap")?;
+    mycelix_zome_helpers::require_civic("hearth_bridge", &civic_requirement_basic(), "decline_swap")?;
     update_swap_status(swap_hash, SwapStatus::Declined)
 }
 
 /// Create a weekly meal plan for the hearth.
 #[hdk_extern]
 pub fn create_meal_plan(input: CreateMealPlanInput) -> ExternResult<Record> {
-    require_consciousness(&civic_requirement_basic(), "create_meal_plan")?;
+    mycelix_zome_helpers::require_civic("hearth_bridge", &civic_requirement_basic(), "create_meal_plan")?;
     require_membership(&input.hearth_hash)?;
     let plan = MealPlan {
         hearth_hash: input.hearth_hash.clone(),

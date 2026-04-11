@@ -484,7 +484,7 @@ pub fn broadcast_event(event: CivicEventEntry) -> ExternResult<Record> {
 
 /// Log a governance gate decision as an auditable event.
 ///
-/// Called fire-and-forget by each coordinator's `require_consciousness()`.
+/// Called fire-and-forget by each coordinator's `require_civic()`.
 /// Stores the decision as a `CivicEventEntry` with `domain: "governance_gate"`.
 #[hdk_extern]
 pub fn log_governance_gate(input: GateAuditInput) -> ExternResult<()> {

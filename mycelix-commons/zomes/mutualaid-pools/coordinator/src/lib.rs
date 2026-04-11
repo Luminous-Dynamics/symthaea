@@ -15,12 +15,6 @@ use mutualaid_pools_integrity::{
 use mycelix_bridge_common::{civic_requirement_proposal, civic_requirement_voting};
 use mycelix_zome_helpers::get_latest_record;
 
-fn require_consciousness(
-    requirement: &mycelix_bridge_common::CivicRequirement,
-    action_name: &str,
-) -> ExternResult<mycelix_bridge_common::GovernanceEligibility> {
-    mycelix_zome_helpers::require_civic("commons_bridge", requirement, action_name)
-}
 
 /// Input for creating a new pool
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -436,7 +430,7 @@ pub fn contribute(input: ContributeInput) -> ExternResult<ContributionWithHash> 
 /// Request a disbursement from a pool
 #[hdk_extern]
 pub fn request_disbursement(input: RequestDisbursementInput) -> ExternResult<DisbursementWithHash> {
-    let _eligibility = require_consciousness(&civic_requirement_proposal(), "request_disbursement")?;
+    let _eligibility = mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_proposal(), "request_disbursement")?;
 
     // Validate disbursement amount is non-zero
     if input.amount == 0 {
@@ -536,7 +530,7 @@ pub fn request_disbursement(input: RequestDisbursementInput) -> ExternResult<Dis
 /// Vote on a disbursement request
 #[hdk_extern]
 pub fn vote_disbursement(input: VoteDisbursementInput) -> ExternResult<DisbursementWithHash> {
-    let _eligibility = require_consciousness(&civic_requirement_voting(), "vote_disbursement")?;
+    let _eligibility = mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_voting(), "vote_disbursement")?;
 
     // Get the current disbursement
     let record = get(input.disbursement_hash.clone(), GetOptions::default())?

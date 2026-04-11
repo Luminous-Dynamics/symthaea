@@ -9,12 +9,6 @@ use hdk::prelude::*;
 use mycelix_bridge_common::{civic_requirement_basic, civic_requirement_proposal};
 use mycelix_zome_helpers::records_from_links;
 
-fn require_consciousness(
-    requirement: &mycelix_bridge_common::CivicRequirement,
-    action_name: &str,
-) -> ExternResult<mycelix_bridge_common::GovernanceEligibility> {
-    mycelix_zome_helpers::require_civic("commons_bridge", requirement, action_name)
-}
 
 fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
     let anchor = Anchor(anchor_str.to_string());
@@ -30,7 +24,7 @@ fn ensure_anchor(anchor_str: &str) -> ExternResult<EntryHash> {
 /// Issue a new credential to a holder
 #[hdk_extern]
 pub fn issue_credential(credential: CareCredential) -> ExternResult<Record> {
-    require_consciousness(&civic_requirement_basic(), "issue_credential")?;
+    mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_basic(), "issue_credential")?;
     let action_hash = create_entry(&EntryTypes::CareCredential(credential.clone()))?;
 
     // Link holder to credential
@@ -79,7 +73,7 @@ pub struct VerifyCredentialInput {
 /// Mark a credential as verified
 #[hdk_extern]
 pub fn verify_credential(input: VerifyCredentialInput) -> ExternResult<Record> {
-    require_consciousness(&civic_requirement_proposal(), "verify_credential")?;
+    mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_proposal(), "verify_credential")?;
     let record = get(input.credential_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
         WasmErrorInner::Guest("Credential not found".into())
     ))?;
@@ -122,7 +116,7 @@ pub fn verify_credential(input: VerifyCredentialInput) -> ExternResult<Record> {
 /// Add a reference for a care provider
 #[hdk_extern]
 pub fn add_reference(reference: CareReference) -> ExternResult<Record> {
-    require_consciousness(&civic_requirement_basic(), "add_reference")?;
+    mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_basic(), "add_reference")?;
     let caller = agent_info()?.agent_initial_pubkey;
 
     // Verify caller is the one giving the reference

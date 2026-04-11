@@ -23,12 +23,6 @@
 use hdk::prelude::*;
 use mycelix_bridge_common::{civic_requirement_basic, civic_requirement_proposal};
 
-fn require_consciousness(
-    requirement: &mycelix_bridge_common::CivicRequirement,
-    action_name: &str,
-) -> ExternResult<mycelix_bridge_common::GovernanceEligibility> {
-    mycelix_zome_helpers::require_civic("civic_bridge", requirement, action_name)
-}
 
 use robotics_dispatch_integrity::*;
 
@@ -58,7 +52,7 @@ pub struct RegisterAssetInput {
 /// The calling agent becomes the asset's sponsoring owner.
 #[hdk_extern]
 pub fn register_asset(input: RegisterAssetInput) -> ExternResult<Record> {
-    require_consciousness(&civic_requirement_proposal(), "register_asset")?;
+    mycelix_zome_helpers::require_civic("civic_bridge", &civic_requirement_proposal(), "register_asset")?;
 
     let agent = agent_info()?.agent_latest_pubkey;
 
@@ -121,9 +115,9 @@ pub struct DispatchMissionInput {
 pub fn dispatch_mission(input: DispatchMissionInput) -> ExternResult<Record> {
     // Emergency (Critical) requires only BASIC; others require PROPOSAL
     if input.priority == DispatchPriority::Critical {
-        require_consciousness(&civic_requirement_basic(), "dispatch_mission")?;
+        mycelix_zome_helpers::require_civic("civic_bridge", &civic_requirement_basic(), "dispatch_mission")?;
     } else {
-        require_consciousness(&civic_requirement_proposal(), "dispatch_mission")?;
+        mycelix_zome_helpers::require_civic("civic_bridge", &civic_requirement_proposal(), "dispatch_mission")?;
     }
 
     let agent = agent_info()?.agent_latest_pubkey;
@@ -185,7 +179,7 @@ pub struct SubmitTelemetryInput {
 /// Requires BASIC consciousness level (score ≥ 0.3).
 #[hdk_extern]
 pub fn submit_telemetry(input: SubmitTelemetryInput) -> ExternResult<Record> {
-    require_consciousness(&civic_requirement_basic(), "submit_telemetry")?;
+    mycelix_zome_helpers::require_civic("civic_bridge", &civic_requirement_basic(), "submit_telemetry")?;
 
     let report = TelemetryReport {
         asset_hash: input.asset_hash,
@@ -232,7 +226,7 @@ pub struct CompleteMissionInput {
 /// Requires BASIC consciousness level.
 #[hdk_extern]
 pub fn complete_mission(input: CompleteMissionInput) -> ExternResult<Record> {
-    require_consciousness(&civic_requirement_basic(), "complete_mission")?;
+    mycelix_zome_helpers::require_civic("civic_bridge", &civic_requirement_basic(), "complete_mission")?;
 
     let record = get(input.order_hash.clone(), GetOptions::default())?
         .ok_or(wasm_error!(WasmErrorInner::Guest(
@@ -269,7 +263,7 @@ pub fn complete_mission(input: CompleteMissionInput) -> ExternResult<Record> {
 /// Requires PROPOSAL consciousness level.
 #[hdk_extern]
 pub fn recall_asset(order_hash: ActionHash) -> ExternResult<Record> {
-    require_consciousness(&civic_requirement_proposal(), "recall_asset")?;
+    mycelix_zome_helpers::require_civic("civic_bridge", &civic_requirement_proposal(), "recall_asset")?;
 
     let record = get(order_hash.clone(), GetOptions::default())?
         .ok_or(wasm_error!(WasmErrorInner::Guest(

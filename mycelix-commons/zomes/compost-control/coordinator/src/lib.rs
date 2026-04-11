@@ -14,12 +14,6 @@ fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
     hash_entry(&EntryTypes::Anchor(anchor))
 }
 
-fn require_consciousness(
-    requirement: &mycelix_bridge_common::CivicRequirement,
-    action_name: &str,
-) -> ExternResult<mycelix_bridge_common::GovernanceEligibility> {
-    mycelix_zome_helpers::require_civic("commons_bridge", requirement, action_name)
-}
 
 // ============================================================================
 // COMPOST BATCHES
@@ -28,7 +22,7 @@ fn require_consciousness(
 /// Create a new compost batch
 #[hdk_extern]
 pub fn create_compost_batch(batch: CompostBatch) -> ExternResult<Record> {
-    let _eligibility = require_consciousness(&civic_requirement_basic(), "create_compost_batch")?;
+    let _eligibility = mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_basic(), "create_compost_batch")?;
 
     // Validate inputs
     if batch.inputs.is_empty() {
@@ -122,7 +116,7 @@ pub fn get_batches_by_facility(facility_hash: ActionHash) -> ExternResult<Vec<Re
 #[hdk_extern]
 pub fn record_compost_reading(reading: CompostReading) -> ExternResult<Record> {
     let _eligibility =
-        require_consciousness(&civic_requirement_basic(), "record_compost_reading")?;
+        mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_basic(), "record_compost_reading")?;
 
     // Validate ranges
     if !reading.temperature_c.is_finite()
@@ -418,7 +412,7 @@ fn evaluate_phase_transition(
 #[hdk_extern]
 pub fn record_compost_action(action: CompostAction) -> ExternResult<Record> {
     let _eligibility =
-        require_consciousness(&civic_requirement_basic(), "record_compost_action")?;
+        mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_basic(), "record_compost_action")?;
 
     let action_hash = create_entry(&EntryTypes::CompostAction(action.clone()))?;
 
@@ -791,7 +785,7 @@ pub struct SensorBridgeResult {
 #[hdk_extern]
 pub fn record_sensor_bridge_reading(input: SensorBridgeInput) -> ExternResult<SensorBridgeResult> {
     let _eligibility =
-        require_consciousness(&civic_requirement_basic(), "record_sensor_bridge_reading")?;
+        mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_basic(), "record_sensor_bridge_reading")?;
 
     // Verify the batch exists
     let _batch_record = get(input.batch_hash.clone(), GetOptions::default())?

@@ -17,12 +17,6 @@ use mycelix_bridge_common::{
 // Consciousness Gating
 // ============================================================================
 
-fn require_consciousness(
-    requirement: &mycelix_bridge_common::CivicRequirement,
-    action_name: &str,
-) -> ExternResult<GovernanceEligibility> {
-    mycelix_zome_helpers::require_civic("hearth_bridge", requirement, action_name)
-}
 
 // ============================================================================
 // Input Types
@@ -55,7 +49,7 @@ pub struct StartCircleInput {
 /// and emits a HearthSignal::GratitudeExpressed signal.
 #[hdk_extern]
 pub fn express_gratitude(input: ExpressGratitudeInput) -> ExternResult<Record> {
-    require_consciousness(&civic_requirement_basic(), "express_gratitude")?;
+    mycelix_zome_helpers::require_civic("hearth_bridge", &civic_requirement_basic(), "express_gratitude")?;
     require_membership(&input.hearth_hash)?;
     let caller = agent_info()?.agent_initial_pubkey;
     let now = sys_time()?;
@@ -113,7 +107,7 @@ pub fn express_gratitude(input: ExpressGratitudeInput) -> ExternResult<Record> {
 /// Start a new appreciation circle with a theme and initial participants.
 #[hdk_extern]
 pub fn start_appreciation_circle(input: StartCircleInput) -> ExternResult<Record> {
-    require_consciousness(&civic_requirement_basic(), "start_appreciation_circle")?;
+    mycelix_zome_helpers::require_civic("hearth_bridge", &civic_requirement_basic(), "start_appreciation_circle")?;
     require_membership(&input.hearth_hash)?;
     let now = sys_time()?;
 
@@ -154,7 +148,7 @@ pub fn start_appreciation_circle(input: StartCircleInput) -> ExternResult<Record
 /// Join an existing appreciation circle by adding the calling agent to participants.
 #[hdk_extern]
 pub fn join_circle(circle_hash: ActionHash) -> ExternResult<Record> {
-    require_consciousness(&civic_requirement_basic(), "join_circle")?;
+    mycelix_zome_helpers::require_civic("hearth_bridge", &civic_requirement_basic(), "join_circle")?;
     let caller = agent_info()?.agent_initial_pubkey;
 
     let record = get(circle_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
@@ -201,7 +195,7 @@ pub fn join_circle(circle_hash: ActionHash) -> ExternResult<Record> {
 /// Only the circle creator (action author) can complete it.
 #[hdk_extern]
 pub fn complete_circle(circle_hash: ActionHash) -> ExternResult<Record> {
-    require_consciousness(&civic_requirement_proposal(), "complete_circle")?;
+    mycelix_zome_helpers::require_civic("hearth_bridge", &civic_requirement_proposal(), "complete_circle")?;
     let caller = agent_info()?.agent_initial_pubkey;
     let now = sys_time()?;
 

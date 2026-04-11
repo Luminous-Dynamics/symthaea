@@ -7,12 +7,6 @@ use mycelix_bridge_common::{civic_requirement_proposal, civic_requirement_voting
 use mycelix_zome_helpers::get_latest_record;
 use property_transfer_integrity::*;
 
-fn require_consciousness(
-    requirement: &mycelix_bridge_common::CivicRequirement,
-    action_name: &str,
-) -> ExternResult<mycelix_bridge_common::GovernanceEligibility> {
-    mycelix_zome_helpers::require_civic("commons_bridge", requirement, action_name)
-}
 
 /// Get or create an anchor entry and return its EntryHash for use as link base
 fn anchor_hash(anchor_string: &str) -> ExternResult<EntryHash> {
@@ -23,7 +17,7 @@ fn anchor_hash(anchor_string: &str) -> ExternResult<EntryHash> {
 
 #[hdk_extern]
 pub fn initiate_transfer(input: InitiateTransferInput) -> ExternResult<Record> {
-    let _eligibility = require_consciousness(&civic_requirement_proposal(), "initiate_transfer")?;
+    let _eligibility = mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_proposal(), "initiate_transfer")?;
 
     let now = sys_time()?;
     let transfer = Transfer {
@@ -146,7 +140,7 @@ fn update_transfer_status(transfer_id: &str, new_status: TransferStatus) -> Exte
 /// 4. Broadcasts ownership change event via bridge
 #[hdk_extern]
 pub fn complete_transfer(transfer_id: String) -> ExternResult<Record> {
-    let _eligibility = require_consciousness(&civic_requirement_voting(), "complete_transfer")?;
+    let _eligibility = mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_voting(), "complete_transfer")?;
 
     let filter = ChainQueryFilter::new()
         .entry_type(EntryType::App(AppEntryDef::try_from(

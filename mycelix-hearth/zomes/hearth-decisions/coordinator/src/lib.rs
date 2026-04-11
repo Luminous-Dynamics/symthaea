@@ -163,12 +163,6 @@ fn requirement_for_decision_type(dt: &DecisionType) -> mycelix_bridge_common::Ci
     }
 }
 
-fn require_consciousness(
-    requirement: &mycelix_bridge_common::CivicRequirement,
-    action_name: &str,
-) -> ExternResult<GovernanceEligibility> {
-    mycelix_zome_helpers::require_civic("hearth_bridge", requirement, action_name)
-}
 
 /// Compose role-based vote weight with consciousness-based progressive weight.
 /// An Adult (10000bp) with Citizen tier (7500bp) gets 7500bp effective.
@@ -198,7 +192,7 @@ fn winning_option(tallies: &[(u32, u32)]) -> u32 {
 #[hdk_extern]
 pub fn create_decision(input: CreateDecisionInput) -> ExternResult<Record> {
     // Consciousness gate: requirement depends on decision type
-    let _eligibility = require_consciousness(
+    let _eligibility = mycelix_zome_helpers::require_civic("hearth_bridge", 
         &requirement_for_decision_type(&input.decision_type),
         "create_decision",
     )?;
@@ -321,7 +315,7 @@ pub fn cast_vote(input: CastVoteInput) -> ExternResult<Record> {
 
     // Consciousness gate: requirement depends on decision type.
     // Progressive weight composes with role-based weight.
-    let eligibility = require_consciousness(
+    let eligibility = mycelix_zome_helpers::require_civic("hearth_bridge", 
         &requirement_for_decision_type(&decision.decision_type),
         "cast_vote",
     )?;
@@ -787,7 +781,7 @@ pub fn amend_vote(input: AmendVoteInput) -> ExternResult<Record> {
     }
 
     // Consciousness gate + progressive weight (same as cast_vote)
-    let eligibility = require_consciousness(
+    let eligibility = mycelix_zome_helpers::require_civic("hearth_bridge", 
         &requirement_for_decision_type(&decision.decision_type),
         "amend_vote",
     )?;

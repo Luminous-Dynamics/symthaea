@@ -12,12 +12,6 @@ use mycelix_bridge_common::{
 };
 use mycelix_zome_helpers::{get_latest_record};
 
-fn require_consciousness(
-    requirement: &mycelix_bridge_common::CivicRequirement,
-    action_name: &str,
-) -> ExternResult<GovernanceEligibility> {
-    mycelix_zome_helpers::require_civic("civic_bridge", requirement, action_name)
-}
 
 /// Helper to get an anchor entry hash
 fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
@@ -29,7 +23,7 @@ fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
 
 #[hdk_extern]
 pub fn register_resource(input: RegisterResourceInput) -> ExternResult<Record> {
-    require_consciousness(&civic_requirement_proposal(), "register_resource")?;
+    mycelix_zome_helpers::require_civic("civic_bridge", &civic_requirement_proposal(), "register_resource")?;
     if input.name.is_empty() || input.name.len() > 256 {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "Name must be 1-256 characters".into()
@@ -119,7 +113,7 @@ pub struct RegisterResourceInput {
 /// Deploy a resource to a disaster
 #[hdk_extern]
 pub fn deploy_resource(input: DeployResourceInput) -> ExternResult<Record> {
-    require_consciousness(&civic_requirement_voting(), "deploy_resource")?;
+    mycelix_zome_helpers::require_civic("civic_bridge", &civic_requirement_voting(), "deploy_resource")?;
     let current_record = get(input.resource_hash.clone(), GetOptions::default())?.ok_or(
         wasm_error!(WasmErrorInner::Guest("Resource not found".into())),
     )?;
@@ -183,7 +177,7 @@ pub struct DeployResourceInput {
 /// Request resources for a disaster
 #[hdk_extern]
 pub fn request_resource(input: RequestResourceInput) -> ExternResult<Record> {
-    require_consciousness(&civic_requirement_basic(), "request_resource")?;
+    mycelix_zome_helpers::require_civic("civic_bridge", &civic_requirement_basic(), "request_resource")?;
     if input.quantity_needed == 0 {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "Quantity needed must be greater than 0".into()
@@ -238,7 +232,7 @@ pub struct RequestResourceInput {
 /// Fulfill a resource request
 #[hdk_extern]
 pub fn fulfill_request(input: FulfillRequestInput) -> ExternResult<Record> {
-    require_consciousness(&civic_requirement_proposal(), "fulfill_request")?;
+    mycelix_zome_helpers::require_civic("civic_bridge", &civic_requirement_proposal(), "fulfill_request")?;
     let current_record = get(input.request_hash.clone(), GetOptions::default())?.ok_or(
         wasm_error!(WasmErrorInner::Guest("Request not found".into())),
     )?;

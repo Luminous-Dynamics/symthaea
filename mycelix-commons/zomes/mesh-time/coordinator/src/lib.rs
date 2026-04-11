@@ -7,12 +7,7 @@ use mycelix_bridge_common::{
     gate_civic, civic_requirement_basic, GovernanceEligibility,
 };
 
-fn require_consciousness(
-    requirement: &mycelix_bridge_common::CivicRequirement,
-    action_name: &str,
-) -> ExternResult<GovernanceEligibility> {
     gate_civic("commons_bridge", requirement, action_name)
-}
 
 /// Helper to get an anchor entry hash
 fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
@@ -28,7 +23,7 @@ fn ensure_anchor(anchor_str: &str) -> ExternResult<EntryHash> {
 /// Record a time anchor on the DHT (Participant+).
 #[hdk_extern]
 pub fn record_time_anchor(anchor: TimeAnchor) -> ExternResult<Record> {
-    let _eligibility = require_consciousness(&civic_requirement_basic(), "record_time_anchor")?;
+    let _eligibility = mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_basic(), "record_time_anchor")?;
 
     let action_hash = create_entry(&EntryTypes::TimeAnchor(anchor.clone()))?;
 
@@ -120,7 +115,7 @@ pub fn get_agent_resilience_score(_: ()) -> ExternResult<f64> {
 /// Dispute a skewed time anchor (Participant+).
 #[hdk_extern]
 pub fn dispute_time_anchor(dispute: TimeDispute) -> ExternResult<Record> {
-    let _eligibility = require_consciousness(&civic_requirement_basic(), "dispute_time_anchor")?;
+    let _eligibility = mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_basic(), "dispute_time_anchor")?;
 
     let action_hash = create_entry(&EntryTypes::TimeDispute(dispute.clone()))?;
 

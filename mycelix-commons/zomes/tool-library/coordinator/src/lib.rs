@@ -13,12 +13,7 @@ use mycelix_bridge_common::{
     GovernanceEligibility,
 };
 
-fn require_consciousness(
-    requirement: &mycelix_bridge_common::CivicRequirement,
-    action_name: &str,
-) -> ExternResult<GovernanceEligibility> {
     gate_civic("commons_bridge", requirement, action_name)
-}
 
 /// Helper to get an anchor entry hash.
 fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
@@ -73,7 +68,7 @@ fn geohash_encode(lat: f64, lon: f64, precision: u8) -> String {
 /// Register a new tool in the community library.
 #[hdk_extern]
 pub fn register_tool(tool: Tool) -> ExternResult<ActionHash> {
-    let _eligibility = require_consciousness(&civic_requirement_proposal(), "register_tool")?;
+    let _eligibility = mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_proposal(), "register_tool")?;
 
     let action_hash = create_entry(&EntryTypes::Tool(tool.clone()))?;
 
@@ -129,7 +124,7 @@ pub fn get_all_tools(_: ()) -> ExternResult<Vec<Record>> {
 /// Get tools filtered by category.
 #[hdk_extern]
 pub fn get_tools_by_category(category: String) -> ExternResult<Vec<Record>> {
-    let _eligibility = require_consciousness(&civic_requirement_basic(), "get_tools_by_category")?;
+    let _eligibility = mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_basic(), "get_tools_by_category")?;
 
     let base = anchor_hash(&format!("tools/category/{}", category))?;
     let links = get_links(
@@ -184,7 +179,7 @@ pub struct BorrowInput {
 /// Borrow a tool from the library.
 #[hdk_extern]
 pub fn borrow_tool(input: BorrowInput) -> ExternResult<ActionHash> {
-    let _eligibility = require_consciousness(&civic_requirement_proposal(), "borrow_tool")?;
+    let _eligibility = mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_proposal(), "borrow_tool")?;
 
     // Get the tool to verify it exists and is available
     let record = get(input.tool_hash.clone(), GetOptions::default())?
@@ -248,7 +243,7 @@ pub struct ReturnInput {
 /// Return a borrowed tool.
 #[hdk_extern]
 pub fn return_tool(input: ReturnInput) -> ExternResult<ActionHash> {
-    let _eligibility = require_consciousness(&civic_requirement_proposal(), "return_tool")?;
+    let _eligibility = mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_proposal(), "return_tool")?;
 
     // Get the lending record
     let lending_record = get(input.lending_hash.clone(), GetOptions::default())?
@@ -293,7 +288,7 @@ pub fn return_tool(input: ReturnInput) -> ExternResult<ActionHash> {
 /// Get lending history for a specific tool.
 #[hdk_extern]
 pub fn get_tool_history(tool_hash: ActionHash) -> ExternResult<Vec<Record>> {
-    let _eligibility = require_consciousness(&civic_requirement_basic(), "get_tool_history")?;
+    let _eligibility = mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_basic(), "get_tool_history")?;
 
     let links = get_links(
         LinkQuery::try_new(tool_hash, LinkTypes::ToolToLending)?,
@@ -345,7 +340,7 @@ pub struct NearbyQuery {
 /// Get tools near a geographic location.
 #[hdk_extern]
 pub fn get_nearby_tools(input: NearbyQuery) -> ExternResult<Vec<Record>> {
-    let _eligibility = require_consciousness(&civic_requirement_basic(), "get_nearby_tools")?;
+    let _eligibility = mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_basic(), "get_nearby_tools")?;
 
     let precision = input.precision.unwrap_or(6);
     let gh = geohash_encode(input.latitude, input.longitude, precision);
@@ -373,7 +368,7 @@ pub fn get_nearby_tools(input: NearbyQuery) -> ExternResult<Vec<Record>> {
 /// Mark a tool as unavailable (owner only).
 #[hdk_extern]
 pub fn mark_unavailable(tool_hash: ActionHash) -> ExternResult<ActionHash> {
-    let _eligibility = require_consciousness(&civic_requirement_basic(), "mark_unavailable")?;
+    let _eligibility = mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_basic(), "mark_unavailable")?;
 
     let record = get(tool_hash.clone(), GetOptions::default())?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Tool not found".into())))?;
@@ -391,7 +386,7 @@ pub fn mark_unavailable(tool_hash: ActionHash) -> ExternResult<ActionHash> {
 /// Mark a tool as available (owner only).
 #[hdk_extern]
 pub fn mark_available(tool_hash: ActionHash) -> ExternResult<ActionHash> {
-    let _eligibility = require_consciousness(&civic_requirement_basic(), "mark_available")?;
+    let _eligibility = mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_basic(), "mark_available")?;
 
     let record = get(tool_hash.clone(), GetOptions::default())?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Tool not found".into())))?;

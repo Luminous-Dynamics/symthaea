@@ -9,12 +9,6 @@ use hdk::prelude::*;
 use mycelix_bridge_common::{civic_requirement_basic, civic_requirement_proposal};
 use mycelix_zome_helpers::records_from_links;
 
-fn require_consciousness(
-    requirement: &mycelix_bridge_common::CivicRequirement,
-    action_name: &str,
-) -> ExternResult<mycelix_bridge_common::GovernanceEligibility> {
-    mycelix_zome_helpers::require_civic("commons_bridge", requirement, action_name)
-}
 
 // ============================================================================
 // BRIDGE SIGNAL (for cross-domain UI notification)
@@ -80,7 +74,7 @@ pub struct NutrientSummary {
 
 #[hdk_extern]
 pub fn register_plot(plot: Plot) -> ExternResult<Record> {
-    require_consciousness(&civic_requirement_basic(), "register_plot")?;
+    mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_basic(), "register_plot")?;
     let action_hash = create_entry(&EntryTypes::Plot(plot.clone()))?;
 
     create_entry(&EntryTypes::Anchor(Anchor("all_plots".to_string())))?;
@@ -130,7 +124,7 @@ pub fn get_all_plots(_: ()) -> ExternResult<Vec<Record>> {
 
 #[hdk_extern]
 pub fn plant_crop(crop: Crop) -> ExternResult<Record> {
-    require_consciousness(&civic_requirement_basic(), "plant_crop")?;
+    mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_basic(), "plant_crop")?;
     // Verify plot exists
     let _plot = get(crop.plot_hash.clone(), GetOptions::default())?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Plot not found".into())))?;
@@ -163,7 +157,7 @@ pub fn get_plot_crops(plot_hash: ActionHash) -> ExternResult<Vec<Record>> {
 
 #[hdk_extern]
 pub fn record_harvest(yr: YieldRecord) -> ExternResult<Record> {
-    require_consciousness(&civic_requirement_basic(), "record_harvest")?;
+    mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_basic(), "record_harvest")?;
     let agent = agent_info()?.agent_initial_pubkey;
 
     // Verify crop exists
@@ -209,7 +203,7 @@ pub fn get_crop_yields(crop_hash: ActionHash) -> ExternResult<Vec<Record>> {
 
 #[hdk_extern]
 pub fn create_season_plan(plan: SeasonPlan) -> ExternResult<Record> {
-    require_consciousness(&civic_requirement_basic(), "create_season_plan")?;
+    mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_basic(), "create_season_plan")?;
     let _plot = get(plan.plot_hash.clone(), GetOptions::default())?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Plot not found".into())))?;
 
@@ -241,7 +235,7 @@ pub fn get_season_plans(plot_hash: ActionHash) -> ExternResult<Vec<Record>> {
 
 #[hdk_extern]
 pub fn add_garden_member(input: AddMemberInput) -> ExternResult<Record> {
-    require_consciousness(&civic_requirement_basic(), "add_garden_member")?;
+    mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_basic(), "add_garden_member")?;
 
     // Only the plot steward can add members
     let caller = agent_info()?.agent_initial_pubkey;
@@ -290,7 +284,7 @@ pub fn get_plot_members(plot_hash: ActionHash) -> ExternResult<Vec<Record>> {
 
 #[hdk_extern]
 pub fn remove_garden_member(input: RemoveMemberInput) -> ExternResult<ActionHash> {
-    require_consciousness(&civic_requirement_proposal(), "remove_garden_member")?;
+    mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_proposal(), "remove_garden_member")?;
 
     // Only the plot steward can remove members
     let caller = agent_info()?.agent_initial_pubkey;
@@ -329,7 +323,7 @@ pub fn remove_garden_member(input: RemoveMemberInput) -> ExternResult<ActionHash
 
 #[hdk_extern]
 pub fn log_resource_input(input: LogResourceInputData) -> ExternResult<Record> {
-    require_consciousness(&civic_requirement_basic(), "log_resource_input")?;
+    mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_basic(), "log_resource_input")?;
     let agent = agent_info()?.agent_initial_pubkey;
 
     // Verify plot exists if provided
