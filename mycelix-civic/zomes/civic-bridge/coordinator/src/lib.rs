@@ -24,9 +24,6 @@ use mycelix_bridge_common::{
     WaterSafetyQuery, WaterSafetyResult, RATE_LIMIT_WINDOW_SECS,
 };
 
-pub mod transport_context;
-pub mod transport;
-
 // ============================================================================
 // ZKP Interface Types
 // ============================================================================
