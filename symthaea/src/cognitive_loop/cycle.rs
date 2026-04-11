@@ -215,7 +215,19 @@ impl CognitiveLoopService {
             Err(blocked) => return *blocked,
         };
 
-        // ═══════════════════════════════════════════════════════════════════
+        // P3-A: Cognition -> Vision goal signal
+        // The current thought HV becomes the top-down task vector for the
+        // next frame: what Symthaea just perceived shapes what she looks for.
+        // Rao & Ballard (1999): top-down predictions drive bottom-up attention.
+        #[cfg(feature = "vision-manifold")]
+        if let Some(ref mut bridge) = self.sensorimotor.vision_sensory.vision_bridge {
+            let thought_hv = perception.encoding.encoding_result.hdv.clone();
+            bridge.set_goal_signal(
+                symthaea_vision_manifold::CognitiveGoalSignal::new(thought_hv),
+            );
+        }
+
+        // ===================================================================
         // PHASE 2: DYNAMICS
         // CfC step, prediction, FEP, training, parallel post-processing
         // ═══════════════════════════════════════════════════════════════════

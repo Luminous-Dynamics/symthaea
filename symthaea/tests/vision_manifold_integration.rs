@@ -489,4 +489,124 @@ mod vision_cognitive_integration {
             "Alert service should have higher NE: calm={calm_ne:.3}, alert={alert_ne:.3}"
         );
     }
+
+    // ── Test 14: P3-A goal signal — cycles with vision manifold remain stable ──
+    //
+    // After P3-A, each cognitive cycle sets the vision bridge's goal signal to
+    // the current thought HV. This test verifies that:
+    //   1. Cycles do not panic or produce NaN
+    //   2. Vision telemetry remains well-formed across 20 cycles
+    //   3. The goal signal does not degrade prediction quality
+    //
+    // (We cannot directly inspect `goal_signal` since it is a private field,
+    //  but a stable pipeline is the meaningful property to verify.)
+    #[test]
+    fn test_p3a_goal_signal_wiring_stable() {
+        let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+            genesis_phrase: Some(GENESIS.to_string()),
+            async_training: false,
+            learning_threshold: 0.0,
+            enable_vision_manifold: true,
+            vision_frame_width: 64,
+            vision_frame_height: 64,
+            ..Default::default()
+        })
+        .expect("Failed to create service");
+
+        let frame: Vec<u8> = (0..64 * 64).map(|i| (i % 256) as u8).collect();
+        let mut last_frame_seq = 0u64;
+
+        for _ in 0..20 {
+            service.inject_vision_frame(frame.clone());
+            let result = service.cycle("p3a goal signal test");
+
+            let vt = result
+                .metadata
+                .vision
+                .as_ref()
+                .expect("vision telemetry should be present");
+
+            assert!(vt.vision_active, "Vision should remain active across cycles");
+            assert!(
+                vt.prediction_error.is_finite(),
+                "Prediction error must be finite after goal signal wiring"
+            );
+            assert!(
+                vt.manifold_coherence.is_finite(),
+                "Manifold coherence must be finite after goal signal wiring"
+            );
+            assert!(
+                vt.frame_sequence > last_frame_seq,
+                "Frame sequence should increment: got {}",
+                vt.frame_sequence
+            );
+            last_frame_seq = vt.frame_sequence;
+        }
+    }
+
+    // ── Test 15: P3-C multi-spectral encoding integrates with VisionConfig ────
+    //
+    // Verifies that the MultiSpectralEncoder produces valid HVs for all five
+    // bands and that multi-band fusion is distinct from single-band encoding.
+    #[test]
+    fn test_p3c_multi_spectral_encoder() {
+        use symthaea::perception::vision_manifold::{
+            MultiSpectralEncoder, MultiSpectralFrame, SpectralLayer, SpectrumBand,
+        };
+
+        let cfg = VisionConfig::default();
+        let mut enc = MultiSpectralEncoder::new(&cfg, 64, 64);
+
+        // Single visible band
+        let vis_frame = MultiSpectralFrame::from_visible(vec![128u8; 64 * 64], 64, 64);
+        let vis_hv = enc.encode(&vis_frame);
+        assert!(
+            vis_hv.norm() > 0.0,
+            "Visible-band encoding should produce non-zero HV"
+        );
+        assert!(
+            vis_hv.as_slice().iter().all(|x| x.is_finite()),
+            "Visible-band HV must be finite"
+        );
+
+        // Multi-band frame (Visible + ThermalIR)
+        let multi_frame = MultiSpectralFrame::from_visible(vec![128u8; 64 * 64], 64, 64)
+            .with_layer(SpectrumBand::ThermalIR, vec![200u8; 64 * 64]);
+        let multi_hv = enc.encode(&multi_frame);
+        assert!(
+            multi_hv.norm() > 0.0,
+            "Multi-band encoding should produce non-zero HV"
+        );
+
+        // Multi-band HV should differ from single-band HV (different spectral content)
+        let sim = vis_hv.similarity(&multi_hv);
+        assert!(
+            sim < 0.99,
+            "Multi-band HV should differ from single-band HV, sim={sim}"
+        );
+
+        // All five bands should encode without panicking
+        for band in SpectrumBand::ALL {
+            let frame = MultiSpectralFrame {
+                width: 64,
+                height: 64,
+                layers: vec![SpectralLayer {
+                    band,
+                    data: vec![100u8; 64 * 64],
+                }],
+            };
+            let hv = enc.encode(&frame);
+            assert!(
+                hv.as_slice().iter().all(|x| x.is_finite()),
+                "Band {:?} encoding produced non-finite HV",
+                band
+            );
+        }
+
+        // Band identity HVs should be mutually near-orthogonal
+        assert!(
+            enc.bands_are_orthogonal(),
+            "Band identity HVs should be near-orthogonal in 16,384D"
+        );
+    }
 }

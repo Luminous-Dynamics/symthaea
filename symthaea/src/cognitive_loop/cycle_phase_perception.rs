@@ -277,6 +277,8 @@ impl CognitiveLoopService {
 
                     // Win 2: Ventral→Dorsal feedback — recognized patches dampen
                     // dorsal surprise so the system stops re-foveating known regions.
+                    // P3-B: Hebbian goal-template learning — recognized patches nudge
+                    // the task HV toward what was actually seen (Hebb 1949).
                     if let Some(ref mut bridge) =
                         self.sensorimotor.vision_sensory.vision_bridge
                     {
@@ -284,6 +286,10 @@ impl CognitiveLoopService {
                             bridge.dampen_patch_surprise(
                                 result.grid_row,
                                 result.grid_col,
+                                result.confidence,
+                            );
+                            bridge.learn_from_recognized_patch(
+                                &result.semantic_hv,
                                 result.confidence,
                             );
                         }

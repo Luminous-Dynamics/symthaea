@@ -34,17 +34,19 @@ pub mod camera;
 pub mod encoder;
 pub mod manifold;
 pub mod predictive;
+pub mod spectrum;
 pub mod training;
 pub mod types;
 
 pub use attention::SurpriseMap;
-pub use bridge::{CrossManifoldPredictor, VisionBridge};
+pub use bridge::{CognitiveGoalSignal, CrossManifoldPredictor, VisionBridge};
 #[cfg(feature = "camera")]
 pub use camera::CameraSource;
 pub use camera::{CameraManifold, CapturedFrame, MockCameraSource};
 pub use encoder::{MotionField, MultiScaleEncoder, PatchHdcEncoder};
 pub use manifold::{HorizonAccuracy, SceneMemory, VisionManifold};
 pub use predictive::{PredictiveCodingHierarchy, PredictiveOutput};
+pub use spectrum::{MultiSpectralEncoder, MultiSpectralFrame, SpectralLayer, SpectrumBand};
 pub use training::{BpttResult, ManifoldTrainer};
 pub use types::{
     AttentionMap, LearningConfig, ManifoldHealth, ManifoldState, MultiScaleConfig, PatchGrid,
