@@ -19,7 +19,7 @@
 use serde::{Deserialize, Serialize};
 use symthaea_aesthetic::ValenceArousal;
 
-use crate::{structure::SectionType, AudioData, Composition, MuseConfig, MusicalState, Note};
+use crate::{pitch::TuningSystem, structure::SectionType, AudioData, Composition, MuseConfig, MusicalState, Note};
 
 // ─── Bar Directive ────────────────────────────────────────────────────────────
 
@@ -79,14 +79,32 @@ impl Default for BarDirective {
 /// A sequence of bar directives forming a complete emotional arc.
 ///
 /// Arcs are automatically stretched to the composition duration.
+/// An optional `tuning_system` activates non-Western scales (maqamat, ragas,
+/// gamelan, just intonation, microtonal) for the entire arc.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EmotionalArc {
     pub bars: Vec<BarDirective>,
+    /// If set, overrides 12-TET for the entire composition.
+    /// This activates maqamat, ragas, gamelan, just intonation, or microtonal tuning.
+    pub tuning_system: Option<TuningSystem>,
 }
 
 impl EmotionalArc {
     pub fn new(bars: Vec<BarDirective>) -> Self {
-        Self { bars }
+        Self { bars, tuning_system: None }
+    }
+
+    /// Set the tuning system for this arc (builder-style).
+    ///
+    /// ```
+    /// use symthaea_muse::arc::EmotionalArc;
+    /// use symthaea_muse::pitch::{TuningSystem, MaqamMode};
+    /// let arc = EmotionalArc::meditative()
+    ///     .with_tuning(TuningSystem::Maqamat { maqam: MaqamMode::Rast });
+    /// ```
+    pub fn with_tuning(mut self, tuning: TuningSystem) -> Self {
+        self.tuning_system = Some(tuning);
+        self
     }
 
     /// Classic narrative arc: quiet intro → rising action → climax → resolution.
@@ -211,10 +229,14 @@ pub fn compose_with_arc(
             ..config.clone()
         };
 
-        // Build scale from the arc-modulated state
+        // Build scale from the arc-modulated state (use tuning system if specified)
         let tempo = rhythm::compute_tempo(&sec_config, &section_state);
         let beat_duration = 60.0 / tempo;
-        let base_scale = pitch::build_scale(&section_state);
+        let base_scale = if let Some(ref tuning) = arc.tuning_system {
+            pitch::build_scale_with_tuning(&section_state, tuning)
+        } else {
+            pitch::build_scale(&section_state)
+        };
 
         // Key shift from section
         let key_ratio = 2.0_f32.powf(section.key_shift as f32 / 12.0);
@@ -327,5 +349,34 @@ mod tests {
         let d = BarDirective::from_va(ValenceArousal::new(-1.0, 1.0));
         assert!(d.density >= 0.25 && d.density <= 2.0);
         assert!(d.dynamics >= 0.5 && d.dynamics <= 1.0);
+    }
+
+    #[test]
+    fn arc_with_maqam_tuning_composes() {
+        use crate::pitch::{MaqamMode, TuningSystem};
+        let config = MuseConfig { duration_secs: 4.0, max_notes: 16, ..Default::default() };
+        let state = MusicalState::default();
+        let arc = EmotionalArc::meditative()
+            .with_tuning(TuningSystem::Maqamat { maqam: MaqamMode::Hijaz });
+        assert!(arc.tuning_system.is_some());
+        let comp = compose_with_arc(&config, &state, &arc, 99);
+        assert!(!comp.notes.is_empty(), "maqam arc should produce notes");
+    }
+
+    #[test]
+    fn arc_with_raga_tuning_composes() {
+        use crate::pitch::{RagaMode, TuningSystem};
+        let config = MuseConfig { duration_secs: 4.0, max_notes: 16, ..Default::default() };
+        let state = MusicalState::default();
+        let arc = EmotionalArc::narrative_arc(0.6)
+            .with_tuning(TuningSystem::Raga { raga: RagaMode::Bhairav });
+        let comp = compose_with_arc(&config, &state, &arc, 77);
+        assert!(!comp.notes.is_empty(), "raga arc should produce notes");
+    }
+
+    #[test]
+    fn arc_default_has_no_tuning() {
+        let arc = EmotionalArc::turbulent();
+        assert!(arc.tuning_system.is_none(), "default arc should use 12-TET");
     }
 }

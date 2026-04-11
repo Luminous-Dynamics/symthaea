@@ -390,12 +390,12 @@ impl EthicalOrientation {
         let stress = allostatic_load.clamp(0.0, 1.0);
         // Below 0.3 stress: revealed = stated (principles hold)
         // Above 0.6 stress: strong consequentialist drift (survival mode)
-        let drift = ((stress - 0.3) / 0.3).clamp(0.0, 1.0) * 0.3;
+        let drift = ((stress - 0.5) / 0.3).clamp(0.0, 1.0) * 0.10;
         Self {
-            deontological: (self.deontological - drift * 0.2).max(0.05),
+            deontological: (self.deontological - drift * 0.1).max(0.05),
             consequentialist: (self.consequentialist + drift).min(1.0),
-            virtue_care: (self.virtue_care - drift * 0.15).max(0.05),
-            relational: (self.relational - drift * 0.1).max(0.05),
+            virtue_care: (self.virtue_care - drift * 0.08).max(0.05),
+            relational: (self.relational - drift * 0.06).max(0.05),
         }
     }
 

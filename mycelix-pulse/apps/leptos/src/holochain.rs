@@ -89,23 +89,33 @@ const TUNNEL_CONDUCTOR_URL: &str = "wss://mail-conductor.luminousdynamics.io";
 /// Fetch auth token from the SPA server's /api/token endpoint.
 /// Uses JS eval for the fetch to avoid web-sys feature gate issues.
 async fn fetch_auth_token() -> Option<Vec<u8>> {
-    // Fetch token via JS — returns base64-encoded token string or null
-    let js = "fetch('/api/token').then(r=>r.json()).then(d=>d.token||null).catch(()=>null)";
-    let promise = js_sys::eval(js).ok()?;
-    let result = wasm_bindgen_futures::JsFuture::from(js_sys::Promise::from(promise))
-        .await
-        .ok()?;
+    // Fetch auth token from SPA server using gloo-net (works reliably in WASM)
+    let resp = match gloo_net::http::Request::get("/api/token").send().await {
+        Ok(r) => r,
+        Err(e) => {
+            web_sys::console::warn_1(&format!("[Mail] Token fetch error: {e}").into());
+            return None;
+        }
+    };
 
-    let token_b64 = result.as_string()?;
+    let json: serde_json::Value = match resp.json().await {
+        Ok(j) => j,
+        Err(e) => {
+            web_sys::console::warn_1(&format!("[Mail] Token JSON parse error: {e}").into());
+            return None;
+        }
+    };
+
+    let token_b64 = json.get("token")?.as_str()?;
     if token_b64.is_empty() {
-        web_sys::console::warn_1(&"[Mail] Token fetch: empty response".into());
+        web_sys::console::warn_1(&"[Mail] Token: empty string".into());
         return None;
     }
 
     // Decode base64 to bytes
-    let decoded = web_sys::window()?.atob(&token_b64).ok()?;
+    let decoded = web_sys::window()?.atob(token_b64).ok()?;
     let bytes: Vec<u8> = decoded.chars().map(|c| c as u8).collect();
-    web_sys::console::log_1(&format!("[Mail] Auth token: {} bytes from /api/token", bytes.len()).into());
+    web_sys::console::log_1(&format!("[Mail] Auth token: {} bytes", bytes.len()).into());
     Some(bytes)
 }
 
@@ -153,20 +163,22 @@ pub fn HolochainProvider(children: Children) -> impl IntoView {
 
     let transport_for_connect = transport.clone();
     spawn_local(async move {
-        // Connect via BrowserWsTransport (pure Rust, like Prism)
-        // Auth token not needed — signing credentials are authorized server-side
+        // Fetch auth token (required by Holochain 0.6 app WebSocket)
+        let token = fetch_auth_token().await;
+        let has_token = token.is_some();
+
         let url = conductor_url();
         web_sys::console::log_1(
-            &format!("[Mail] Connecting to conductor at {url}...").into(),
+            &format!("[Mail] Connecting to {url} (token={has_token})...").into(),
         );
 
         let ws_transport = BrowserWsTransport::new();
         let config = ConnectConfig {
             url: url.clone(),
             app_id: "mycelix_mail".to_string(),
-            auth_token: None,
+            auth_token: token,
             reconnect: None,
-            request_timeout_ms: Some(30_000),
+            request_timeout_ms: None,
         };
 
         match ws_transport.connect(config).await {

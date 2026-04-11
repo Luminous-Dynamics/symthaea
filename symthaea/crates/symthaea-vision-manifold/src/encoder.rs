@@ -408,6 +408,12 @@ impl PatchHdcEncoder {
             }
         }
 
+        // Depth channel: neutral stub (0.5 = unknown distance) when no sensor data.
+        // A depth-aware caller can supply real values via observe_frame_with_depth().
+        if self.config.enable_depth {
+            features.push(0.5);
+        }
+
         features
     }
 

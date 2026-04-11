@@ -75,6 +75,23 @@ pub struct VisionConfig {
     /// Reference: Plate (1995) holographic reduced representations;
     /// Kanerva (2009) hyperdimensional computing.
     pub enable_temporal_binding: bool,
+    /// Enable depth channel per patch (default: false).
+    ///
+    /// When enabled, adds 1 feature per patch representing estimated depth
+    /// (0.0 = near, 1.0 = far). Without a depth sensor the encoder uses a
+    /// neutral stub value of 0.5. Connect real depth data via
+    /// `observe_frame_with_depth()` on the manifold or bridge.
+    pub enable_depth: bool,
+    /// Enable object-level relational binding in `observe_frame()` (default: false).
+    ///
+    /// When enabled, the scene HV is computed via object-centric binding:
+    /// `scene_hv = bundle(position_hv[centroid] ⊗ object_hv)` for each
+    /// spatial cluster, rather than a plain patch bag-of-words. This encodes
+    /// *where* each perceptual object is, not just *what* patches are present.
+    ///
+    /// Patches are grouped into object hypotheses by spatial proximity and
+    /// HDC cosine similarity. Each cluster contributes one bound HV.
+    pub enable_object_binding: bool,
     /// Learning configuration for adaptive encoding weights.
     pub learning: LearningConfig,
     /// Multi-scale configuration for spatial pyramid encoding.
@@ -95,6 +112,9 @@ impl VisionConfig {
         }
         if self.enable_opponent_color {
             n += 2; // rg_opponent, by_opponent (V1 double-opponent cells)
+        }
+        if self.enable_depth {
+            n += 1; // mean_z (depth estimate, stub = 0.5 without a sensor)
         }
         n
     }
@@ -189,6 +209,8 @@ impl Default for VisionConfig {
             input_blend: 0.7,
             enable_predictive_hierarchy: false,
             enable_temporal_binding: false,
+            enable_depth: false,
+            enable_object_binding: false,
             learning: LearningConfig::default(),
             multi_scale: MultiScaleConfig::default(),
             training: TrainingConfig::default(),
@@ -525,6 +547,26 @@ pub struct ManifoldHealth {
     pub total_training_steps: u64,
     /// Whether the manifold appears healthy (heuristic).
     pub is_healthy: bool,
+}
+
+/// A perceptual object hypothesis formed by clustering spatially-adjacent patches.
+///
+/// Used by the object-level binding pipeline (`enable_object_binding = true`).
+/// Patches are grouped by spatial proximity and HDC similarity; each cluster
+/// produces one `ObjectHypothesis` whose centroid determines the position HV
+/// used in the scene binding: `position_hv ⊗ object_hv`.
+#[derive(Debug, Clone)]
+pub struct ObjectHypothesis {
+    /// Row of the cluster centroid in the PatchGrid.
+    pub centroid_row: usize,
+    /// Column of the cluster centroid in the PatchGrid.
+    pub centroid_col: usize,
+    /// Patch indices belonging to this cluster.
+    pub patch_indices: Vec<usize>,
+    /// Mean saliency of patches in this cluster.
+    pub saliency: f32,
+    /// Object HV: bundle of all member patch HVs (normalized).
+    pub hv: symthaea_core::hdc::ContinuousHV,
 }
 
 /// Per-scale health metrics for multi-scale encoders.

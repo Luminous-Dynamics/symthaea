@@ -538,6 +538,15 @@ pub mod web_research;
 
 pub mod knowledge;
 
+// Z3 Formal Verification Bridge (Phase 4B — math/science plan)
+// Dual-mode: subprocess z3 binary (SMTLIB2) when available, internal DPLL fallback always.
+// Domain-specific verifiers for ODE solutions, Einstein condition, CSP solutions.
+pub mod z3_bridge;
+
+// Proof State: goal trees, tactic engine, proof search (Phase 5 math plan)
+// ProofTree struct with goal stack, tactic application, backtracking search.
+pub mod proof_state;
+
 // ============================================================================
 // Re-exports for Convenience
 // ============================================================================

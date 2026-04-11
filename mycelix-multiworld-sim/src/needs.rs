@@ -221,10 +221,13 @@ impl AffectState {
             care_base
         }.clamp(0.0, 1.0);
 
-        // Harm: exponential accumulation — moral injury compounds.
-        let faction_harm = if is_faction_member { 0.2 } else { 0.0 };
-        let harm_raw = trauma_level * 0.6 + faction_harm + needs.allostatic_load * 0.2;
-        let harm = (1.0 - (-harm_raw * 2.0).exp()).clamp(0.0, 1.0); // Saturating exponential
+        // Harm, guilt, and outrage are NOT computed here — they are managed
+        // exclusively by the moral emotions system in consciousness.rs.
+        // compute() only contributes structural violence from faction conflict.
+        // Trauma-driven suffering is captured by `sadness` above — not `harm`.
+        // Moral injury (harm) must be earned through ethical violations, not grief.
+        // This separation is critical: grief ≠ moral injury (Litz 2009, Haidt 2012).
+        let _ = (trauma_level, is_faction_member); // acknowledged but not used for harm
 
         // Consent: hysteresis — trust is hard to build, easy to lose.
         // Once consent drops below 0.3, it requires extra governance stability to rebuild.
@@ -233,7 +236,9 @@ impl AffectState {
             + care_activation * 0.2;
         let consent = consent_raw.clamp(0.0, 1.0);
 
-        Self { joy, sadness, desire, care, harm, consent, guilt: 0.0, outrage: 0.0 }
+        // harm=0.0, guilt=0.0, outrage=0.0 — all restored from previous state
+        // by blend_with_previous, which delegates to consciousness.rs for accumulation.
+        Self { joy, sadness, desire, care, harm: 0.0, consent, guilt: 0.0, outrage: 0.0 }
     }
 
     /// Blend new computed state with previous state (emotional momentum).
@@ -246,16 +251,21 @@ impl AffectState {
             sadness: previous.sadness * (1.0 - alpha) + self.sadness * alpha,
             desire: previous.desire * (1.0 - alpha) + self.desire * alpha,
             care: previous.care * (1.0 - alpha) + self.care * alpha,
-            // Harm accumulates faster than it decays (moral injury persists)
-            harm: previous.harm * (1.0 - alpha * 0.5) + self.harm * (alpha * 0.5),
+            // Harm is managed exclusively by consciousness.rs moral injury system
+            // (same as guilt/outrage). compute() outputs harm=0.0 so blending would
+            // decay it — instead preserve previous value, let consciousness.rs own it.
+            harm: previous.harm,
             // Consent rebuilds slowly but collapses fast (hysteresis)
             consent: if self.consent < previous.consent {
                 previous.consent * (1.0 - alpha * 1.5).max(0.0) + self.consent * (alpha * 1.5).min(1.0)
             } else {
                 previous.consent * (1.0 - alpha * 0.5) + self.consent * (alpha * 0.5)
             },
-            guilt: previous.guilt * (1.0 - alpha * 0.5) + self.guilt * (alpha * 0.5),
-            outrage: previous.outrage * (1.0 - alpha * 0.5) + self.outrage * (alpha * 0.5),
+            // Guilt and outrage are managed by consciousness.rs moral emotions,
+            // NOT by compute(). Preserve previous values — only consciousness.rs
+            // should modify them (with its own decay/accumulation logic).
+            guilt: previous.guilt,
+            outrage: previous.outrage,
         }
     }
 

@@ -366,3 +366,69 @@ h2 { font-size: 1.5rem; margin: 2rem 0 0.5rem; }
     .info-grid { grid-template-columns: 1fr; }
     .slider-label-left, .slider-label-right { display: none; }
 }
+
+/* --- Consciousness Signal Panel --- */
+.consciousness-signal-panel {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.25rem;
+    margin: 1.5rem 0;
+}
+
+.signal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid var(--border);
+}
+
+.signal-title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text);
+}
+
+.signal-status {
+    font-size: 0.8rem;
+    font-family: monospace;
+}
+
+.signal-empty {
+    color: var(--text-dim);
+    font-size: 0.875rem;
+    line-height: 1.5;
+    margin: 0;
+}
+
+.signal-meta-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 0.75rem;
+}
+
+.signal-meta-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+}
+
+.signal-tags {
+    grid-column: 1 / -1;
+}
+
+.meta-label {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-dim);
+}
+
+.meta-value {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--accent);
+    font-family: monospace;
+}

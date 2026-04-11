@@ -3,6 +3,8 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Simulation snapshots: serializable state sent from sim thread to game thread.
 
+use symtropy_consciousness_physics::macro_bridge::MacroWorldModifiers;
+
 /// Snapshot of the simulation state at a given tick.
 ///
 /// Sent from the sim thread to the game thread via channel.
@@ -105,6 +107,34 @@ impl SimSnapshot {
             factions: Vec::new(),
             events: Vec::new(),
         }
+    }
+
+    /// Convert this snapshot to [`MacroWorldModifiers`] for the physics engine.
+    ///
+    /// `production_baseline` is the expected total production at equilibrium —
+    /// used to normalize `total_production` to [0, 1]. Pass `1000.0` if unknown.
+    ///
+    /// `faction_harmony_bias` should be computed from your faction ideology vectors
+    /// (e.g., mean of the harmony dimension across all factions weighted by population).
+    /// Pass `0.0` if you don't have faction data.
+    pub fn to_macro_modifiers(
+        &self,
+        production_baseline: f64,
+        faction_harmony_bias: f64,
+    ) -> MacroWorldModifiers {
+        let production_norm = if production_baseline > 0.0 {
+            (self.economy.total_production / production_baseline).clamp(0.0, 1.0)
+        } else {
+            0.5
+        };
+        MacroWorldModifiers::from_sim(
+            self.governance.stability,
+            self.governance.oppression_index,
+            self.economy.gini,
+            self.governance.emergency_active,
+            production_norm,
+            faction_harmony_bias,
+        )
     }
 }
 

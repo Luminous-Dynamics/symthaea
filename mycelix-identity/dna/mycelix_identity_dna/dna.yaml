@@ -1,0 +1,102 @@
+manifest_version: '0'
+name: mycelix_identity_dna
+integrity:
+  network_seed: mycelix-identity-v1
+  properties: null
+  zomes:
+  - name: did_registry_integrity
+    hash: null
+    path: did_registry_integrity.wasm
+    dependencies: null
+  - name: credential_schema_integrity
+    hash: null
+    path: credential_schema_integrity.wasm
+    dependencies: null
+  - name: revocation_integrity
+    hash: null
+    path: revocation_integrity.wasm
+    dependencies: null
+  - name: recovery_integrity
+    hash: null
+    path: recovery_integrity.wasm
+    dependencies: null
+  - name: identity_bridge_integrity
+    hash: null
+    path: identity_bridge_integrity.wasm
+    dependencies: null
+  - name: trust_credential_integrity
+    hash: null
+    path: trust_credential_integrity.wasm
+    dependencies: null
+  - name: verifiable_credential_integrity
+    hash: null
+    path: verifiable_credential_integrity.wasm
+    dependencies: null
+  - name: education_integrity
+    hash: null
+    path: education_integrity.wasm
+    dependencies: null
+  - name: mfa_integrity
+    hash: null
+    path: mfa_integrity.wasm
+    dependencies: null
+coordinator:
+  zomes:
+  - name: did_registry
+    hash: null
+    path: did_registry.wasm
+    dependencies:
+    - name: did_registry_integrity
+    - name: recovery_integrity
+  - name: credential_schema
+    hash: null
+    path: credential_schema.wasm
+    dependencies:
+    - name: credential_schema_integrity
+  - name: revocation
+    hash: null
+    path: revocation.wasm
+    dependencies:
+    - name: revocation_integrity
+  - name: recovery
+    hash: null
+    path: recovery.wasm
+    dependencies:
+    - name: recovery_integrity
+    - name: did_registry_integrity
+    - name: identity_bridge_integrity
+    - name: mfa_integrity
+  - name: identity_bridge
+    hash: null
+    path: identity_bridge.wasm
+    dependencies:
+    - name: identity_bridge_integrity
+    - name: did_registry_integrity
+    - name: verifiable_credential_integrity
+    - name: mfa_integrity
+    - name: trust_credential_integrity
+  - name: trust_credential
+    hash: null
+    path: trust_credential_coordinator.wasm
+    dependencies:
+    - name: trust_credential_integrity
+    - name: did_registry_integrity
+  - name: verifiable_credential
+    hash: null
+    path: verifiable_credential_coordinator.wasm
+    dependencies:
+    - name: verifiable_credential_integrity
+    - name: did_registry_integrity
+    - name: credential_schema_integrity
+    - name: revocation_integrity
+  - name: education
+    hash: null
+    path: education_coordinator.wasm
+    dependencies:
+    - name: education_integrity
+  - name: mfa
+    hash: null
+    path: mfa_coordinator.wasm
+    dependencies:
+    - name: mfa_integrity
+    - name: did_registry_integrity

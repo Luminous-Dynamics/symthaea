@@ -22,3 +22,16 @@ pub use nuclear_physics::NuclearPhysicsBenchmark;
 
 #[cfg(feature = "materials-benchmarks")]
 pub use materials_design::MaterialsDesignBenchmark;
+
+/// ODE Chaos & Stiffness — van der Pol (stiff μ=1000), Lorenz (chaotic),
+/// Robertson chemistry (very stiff, conservation law), coupled oscillators
+/// (energy conservation). Uses inline Dormand-Prince RK45.
+/// Always enabled; requires only symthaea-core.
+pub mod ode_chaos;
+pub use ode_chaos::OdeChaosBenchmark;
+
+/// Chemistry — molar mass, Hess's Law, Gibbs free energy, ICE tables,
+/// Arrhenius kinetics. Tests stoichiometry and thermochemistry against
+/// NIST-JANAF values. Always enabled; requires only symthaea-core.
+pub mod chemistry;
+pub use chemistry::ChemistryBenchmark;

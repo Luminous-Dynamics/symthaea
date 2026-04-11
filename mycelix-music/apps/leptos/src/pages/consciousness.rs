@@ -10,13 +10,33 @@
 //! - Spectrum bars (64 frequency bins)
 //! - Consciousness orbit trail (V-A trajectory)
 //! - Phi meter gauge
+//!
+//! Also listens on the Holochain app WebSocket (`ws://localhost:8888`) for
+//! `consciousness_composition` signals emitted by the music-bridge zome and
+//! displays the latest composition metadata in real time.
 
 use leptos::prelude::*;
 use std::cell::RefCell;
 use std::rc::Rc;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
-use web_sys::{CanvasRenderingContext2d, HtmlCanvasElement};
+use web_sys::{CanvasRenderingContext2d, HtmlCanvasElement, MessageEvent, WebSocket};
+
+/// Holochain app WebSocket URL (shared ecosystem conductor).
+const HC_APP_WS: &str = "ws://localhost:8888";
+
+/// Metadata extracted from a `consciousness_composition` Holochain signal.
+#[derive(Clone, Debug, Default)]
+struct CompositionMeta {
+    tempo_bpm: f32,
+    scale_name: String,
+    note_count: u32,
+    quality_score: f32,
+    phi_score: f32,
+    valence: f32,
+    arousal: f32,
+    narrative_tags: Vec<String>,
+}
 
 /// Maximum orbit trail length.
 const ORBIT_TRAIL_LEN: usize = 200;
@@ -30,7 +50,91 @@ pub fn ConsciousnessPage() -> impl IntoView {
     let (phi, set_phi) = signal(0.5_f64);
     let (is_playing, set_playing) = signal(false);
 
+    // Latest consciousness composition from Holochain signal
+    let (last_comp, set_last_comp) = signal(Option::<CompositionMeta>::None);
+    let (hc_status, set_hc_status) = signal("Connecting…".to_string());
+
+    // Keeps the WebSocket alive for the component lifetime (WebSocket is !Send → new_local)
+    let _ws_handle = StoredValue::new_local(Option::<WebSocket>::None);
+
     let canvas_ref = NodeRef::<leptos::html::Canvas>::new();
+
+    // ── Holochain signal listener ──────────────────────────────────────────────
+    // Opens a WebSocket to the shared ecosystem conductor and listens for
+    // `consciousness_composition` signals emitted by the music-bridge zome.
+    // Updates `last_comp` and mirrors arousal/valence/phi into the viz.
+    Effect::new(move |_| {
+        let ws = match WebSocket::new(HC_APP_WS) {
+            Ok(ws) => ws,
+            Err(_) => {
+                set_hc_status.set("⚠ conductor unreachable".to_string());
+                return;
+            }
+        };
+
+        // onopen
+        {
+            let set_status = set_hc_status.clone();
+            let on_open = Closure::wrap(Box::new(move |_: web_sys::Event| {
+                set_status.set("Connected".to_string());
+            }) as Box<dyn FnMut(web_sys::Event)>);
+            ws.set_onopen(Some(on_open.as_ref().unchecked_ref()));
+            on_open.forget();
+        }
+
+        // onerror / onclose
+        {
+            let set_status = set_hc_status.clone();
+            let on_close = Closure::wrap(Box::new(move |_: web_sys::CloseEvent| {
+                set_status.set("Disconnected".to_string());
+            }) as Box<dyn FnMut(web_sys::CloseEvent)>);
+            ws.set_onclose(Some(on_close.as_ref().unchecked_ref()));
+            on_close.forget();
+        }
+
+        // onmessage — parse Holochain signal envelope and extract composition metadata
+        {
+            let set_comp = set_last_comp.clone();
+            let set_arousal2 = set_arousal.clone();
+            let set_valence2 = set_valence.clone();
+            let set_phi2 = set_phi.clone();
+            let on_msg = Closure::wrap(Box::new(move |ev: MessageEvent| {
+                let Some(text) = ev.data().as_string() else { return };
+                // Holochain signal envelope: {"type":"Signal","data":{...}}
+                // We look for the payload object containing signal_type.
+                // Use a simple JSON scan rather than pulling in a full parser.
+                if !text.contains("consciousness_composition") { return }
+
+                // Parse with js_sys::JSON for zero-dependency JSON access
+                let Ok(val) = js_sys::JSON::parse(&text) else { return };
+                // Drill: .data.App.payload  OR  .data.payload  (conductor version-dependent)
+                let payload = find_payload(&val);
+                let Some(obj) = payload.as_ref().and_then(|v| v.dyn_ref::<js_sys::Object>()) else { return };
+
+                let meta = CompositionMeta {
+                    tempo_bpm: get_f32(obj, "tempo_bpm"),
+                    scale_name: get_string(obj, "scale_name"),
+                    note_count: get_f32(obj, "note_count") as u32,
+                    quality_score: get_f32(obj, "quality_score"),
+                    phi_score: get_f32(obj, "phi_score"),
+                    valence: get_f32(obj, "valence"),
+                    arousal: get_f32(obj, "arousal"),
+                    narrative_tags: get_string_array(obj, "narrative_tags"),
+                };
+
+                // Mirror signal values into the viz sliders
+                set_arousal2.set(meta.arousal as f64);
+                set_valence2.set(meta.valence as f64);
+                set_phi2.set(meta.phi_score as f64);
+                set_comp.set(Some(meta));
+            }) as Box<dyn FnMut(MessageEvent)>);
+            ws.set_onmessage(Some(on_msg.as_ref().unchecked_ref()));
+            on_msg.forget();
+        }
+
+        // Keep WebSocket alive for the component lifetime
+        _ws_handle.set_value(Some(ws));
+    });
 
     // Derived emotion label from V-A quadrant
     let emotion_label = move || {
@@ -293,6 +397,74 @@ pub fn ConsciousnessPage() -> impl IntoView {
                 ></canvas>
             </div>
 
+            // Holochain signal panel: latest consciousness composition
+            <div class="consciousness-signal-panel">
+                <div class="signal-header">
+                    <span class="signal-title">"Latest Consciousness Composition"</span>
+                    <span class="signal-status"
+                        style=move || format!(
+                            "color: {}",
+                            if hc_status.get().starts_with("Connected") { "#7ec8a0" }
+                            else if hc_status.get().starts_with("⚠") { "#e8c547" }
+                            else { "#888" }
+                        )
+                    >
+                        {hc_status}
+                    </span>
+                </div>
+                {move || match last_comp.get() {
+                    None => view! {
+                        <p class="signal-empty">
+                            "No composition received yet. "
+                            "Start Symthaea's cognitive loop with the Music modality enabled "
+                            "to see live compositions appear here."
+                        </p>
+                    }.into_any(),
+                    Some(meta) => view! {
+                        <div class="signal-meta-grid">
+                            <div class="signal-meta-item">
+                                <span class="meta-label">"Tempo"</span>
+                                <span class="meta-value">{format!("{:.0} BPM", meta.tempo_bpm)}</span>
+                            </div>
+                            <div class="signal-meta-item">
+                                <span class="meta-label">"Scale"</span>
+                                <span class="meta-value">{meta.scale_name.replace('_', " ")}</span>
+                            </div>
+                            <div class="signal-meta-item">
+                                <span class="meta-label">"Notes"</span>
+                                <span class="meta-value">{meta.note_count.to_string()}</span>
+                            </div>
+                            <div class="signal-meta-item">
+                                <span class="meta-label">"Quality"</span>
+                                <span class="meta-value">{format!("{:.2}", meta.quality_score)}</span>
+                            </div>
+                            <div class="signal-meta-item">
+                                <span class="meta-label">"Phi (Φ)"</span>
+                                <span class="meta-value">{format!("{:.3}", meta.phi_score)}</span>
+                            </div>
+                            <div class="signal-meta-item">
+                                <span class="meta-label">"Valence / Arousal"</span>
+                                <span class="meta-value">
+                                    {format!("{:+.2} / {:.2}", meta.valence, meta.arousal)}
+                                </span>
+                            </div>
+                            {if meta.narrative_tags.is_empty() {
+                                view! { <div></div> }.into_any()
+                            } else {
+                                view! {
+                                    <div class="signal-meta-item signal-tags">
+                                        <span class="meta-label">"Narrative"</span>
+                                        <span class="meta-value">
+                                            {meta.narrative_tags.join(" · ")}
+                                        </span>
+                                    </div>
+                                }.into_any()
+                            }}
+                        </div>
+                    }.into_any(),
+                }}
+            </div>
+
             // Info section
             <div class="consciousness-info">
                 <h2>"How It Works"</h2>
@@ -313,6 +485,60 @@ pub fn ConsciousnessPage() -> impl IntoView {
             </div>
         </div>
     }
+}
+
+// ── Holochain signal helpers ───────────────────────────────────────────────────
+
+/// Drill into a Holochain signal envelope to find the zome payload.
+/// Supports: { type: "Signal", data: { App: { payload: ... } } }
+/// and simpler forms emitted by some conductor versions.
+fn find_payload(val: &JsValue) -> Option<JsValue> {
+    let obj = val.dyn_ref::<js_sys::Object>()?;
+
+    // Try .data.App.payload
+    let data = js_sys::Reflect::get(obj, &"data".into()).ok()?;
+    if let Some(data_obj) = data.dyn_ref::<js_sys::Object>() {
+        if let Ok(app) = js_sys::Reflect::get(data_obj, &"App".into()) {
+            if let Some(app_obj) = app.dyn_ref::<js_sys::Object>() {
+                if let Ok(payload) = js_sys::Reflect::get(app_obj, &"payload".into()) {
+                    return Some(payload);
+                }
+            }
+        }
+        // Try .data.payload (flat envelope)
+        if let Ok(payload) = js_sys::Reflect::get(data_obj, &"payload".into()) {
+            return Some(payload);
+        }
+        // .data itself might be the payload
+        return Some(data);
+    }
+    None
+}
+
+fn get_f32(obj: &js_sys::Object, key: &str) -> f32 {
+    js_sys::Reflect::get(obj, &key.into())
+        .ok()
+        .and_then(|v| v.as_f64())
+        .unwrap_or(0.0) as f32
+}
+
+fn get_string(obj: &js_sys::Object, key: &str) -> String {
+    js_sys::Reflect::get(obj, &key.into())
+        .ok()
+        .and_then(|v| v.as_string())
+        .unwrap_or_default()
+}
+
+fn get_string_array(obj: &js_sys::Object, key: &str) -> Vec<String> {
+    js_sys::Reflect::get(obj, &key.into())
+        .ok()
+        .and_then(|v| v.dyn_into::<js_sys::Array>().ok())
+        .map(|arr| {
+            arr.iter()
+                .filter_map(|v| v.as_string())
+                .collect()
+        })
+        .unwrap_or_default()
 }
 
 // ── Drawing functions ──

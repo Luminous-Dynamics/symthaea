@@ -853,7 +853,7 @@ mod tests {
         let nu = Partition::new(vec![2]);
         let lambda = Partition::new(vec![2]);
         let c = littlewood_richardson_coeff(&mu, &nu, &lambda);
-        assert_eq!(c, 1, "c^(2)_{∅,(2)} = 1");
+        assert_eq!(c, 1, "c^(2)_{{∅,(2)}} = 1");
     }
 
     #[test]
@@ -864,7 +864,7 @@ mod tests {
         let lambda = Partition::new(vec![2]);
         // s_(1) * s_(1) = s_(2) + s_(1,1); so c^(2)_{(1),(1)} = 1
         let c = littlewood_richardson_coeff(&mu, &nu, &lambda);
-        assert_eq!(c, 1, "c^(2)_{(1),(1)} = {}", c);
+        assert_eq!(c, 1, "c^(2)_{{(1),(1)}} = {}", c);
     }
 
     // ─── Kazhdan-Lusztig ─────────────────────────────────────────────────────

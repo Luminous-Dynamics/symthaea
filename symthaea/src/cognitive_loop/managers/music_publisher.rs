@@ -242,6 +242,7 @@ mod tests {
             duration_secs: 8.0,
             musical_state: MusicalState::default(),
             timestamp_secs: 42,
+            notes: Vec::new(),
         }
     }
 

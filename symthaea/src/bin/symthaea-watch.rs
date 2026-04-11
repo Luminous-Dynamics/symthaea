@@ -84,6 +84,11 @@ struct Args {
     /// Number of consecutive collapsed cycles before alerting.
     #[arg(long, default_value_t = 30)]
     collapse_window: u32,
+
+    /// Disable cycle-time throttle — let each cycle run at natural speed.
+    /// Default in debug builds where cycles exceed the real-time budget.
+    #[arg(long)]
+    no_throttle: bool,
 }
 
 // ─── DATA ROW ────────────────────────────────────────────────────────────────
@@ -295,17 +300,38 @@ async fn main() -> Result<()> {
     let (tx, mut rx) = mpsc::channel::<CycleRow>(4096);
 
     // ── Cognitive loop (blocking thread) ─────────────────────────────────
-    let cycle_interval_us = 1_000_000u64 / args.cycles_per_second.max(1) as u64;
+    let cycle_interval_us = if args.no_throttle {
+        0 // No sleep between cycles — run at natural speed
+    } else {
+        1_000_000u64 / args.cycles_per_second.max(1) as u64
+    };
     let collapse_threshold = args.collapse_threshold;
     let collapse_window = args.collapse_window;
     let metrics_for_loop = Arc::clone(&metrics);
 
     tokio::task::spawn_blocking(move || {
         info!("Building CognitiveLoopService…");
-        let mut service = match CognitiveLoopService::new(CognitiveLoopConfig::default()) {
+        let config = CognitiveLoopConfig {
+            // 60s budget — prevents the budget-exceeded → safety-escalation doom loop
+            // in debug builds where cycles naturally take 1-5 seconds.
+            attention_budget_override_us: Some(60_000_000),
+            causal_enhancement: true,
+            ..Default::default()
+        };
+        let mut service = match CognitiveLoopService::new(config) {
             Ok(s) => s,
             Err(e) => { error!("Failed to create CognitiveLoopService: {e}"); return; }
         };
+
+        // Drain safety alerts — log them as info, don't let the channel fill up
+        if let Some(rx) = service.take_safety_alert_receiver() {
+            std::thread::spawn(move || {
+                while let Ok(alert) = rx.recv() {
+                    info!(kind = ?alert.kind, cycle = alert.cycle, "Safety alert: {}", alert.message);
+                }
+            });
+        }
+
         info!("CognitiveLoopService ready — entering cognitive loop");
 
         let mut cycle_num: u64 = 0;
@@ -371,9 +397,12 @@ async fn main() -> Result<()> {
 
             let _ = tx.try_send(row);
 
-            let elapsed_us = tick.elapsed().as_micros() as u64;
-            if elapsed_us < cycle_interval_us {
-                std::thread::sleep(Duration::from_micros(cycle_interval_us - elapsed_us));
+            // Optional throttle — skip when --no-throttle for natural-speed operation
+            if cycle_interval_us > 0 {
+                let elapsed_us = tick.elapsed().as_micros() as u64;
+                if elapsed_us < cycle_interval_us {
+                    std::thread::sleep(Duration::from_micros(cycle_interval_us - elapsed_us));
+                }
             }
         }
     });

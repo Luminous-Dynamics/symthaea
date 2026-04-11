@@ -77,7 +77,11 @@ impl DemoRunner {
                 if let Some(svc) = self.service.network_service().cloned() {
                     let node_id = svc.node_id();
                     if !node_id.is_empty() {
-                        tracing::info!("Demo: Iroh node ID (for peer bootstrap): {}", node_id);
+                        tracing::info!("Demo: Iroh node ID: {}", node_id);
+                    }
+                    match svc.create_ticket() {
+                        Ok(ticket) => tracing::info!("Demo: bootstrap ticket (share with peers): {}", ticket),
+                        Err(e) => tracing::debug!(error = %e, "Demo: ticket not available yet"),
                     }
                     tokio::spawn(svc.accept_connections());
                 }

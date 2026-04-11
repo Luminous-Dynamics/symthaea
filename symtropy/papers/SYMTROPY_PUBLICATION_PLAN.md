@@ -54,11 +54,35 @@
 - HDC, entropy prediction (save for engine paper)
 
 **Action items**:
-- [ ] Update abstract to include phase transition
-- [ ] Add phase diagram figure (pressure vs survival)
-- [ ] Tighten to 6 pages with 4-5 key findings
-- [ ] Generate fig5_phase_transition.pdf
-- [ ] Submit by April 11
+- [x] Update abstract to include phase transition
+- [x] Add phase diagram figure (pressure vs survival)
+- [x] Tighten to 6 pages (11 findings, compact bibliography)
+- [x] Generate fig5_phase_transition.pdf
+- [x] Conclusion updated: 11 findings including phase transition (F10)
+- [ ] Submit (paper ready, 6 pages, all figures compiled)
+
+---
+
+## Paper 1.5: J/Phi Metric (Entropy MDPI)
+
+**Title**: "Joules per Phi: A Thermodynamic Metric for the Energy Cost of Information Integration in Multi-Agent Systems"
+**Venue**: Entropy (MDPI) — open access
+**Status**: Draft complete (papers/entropy-mdpi/main.tex)
+**Target**: Q2 2026
+
+**Core findings**:
+- J/Phi metric definition and theoretical grounding (Landauer bound)
+- Convergence under cooperative thermodynamic enforcement
+- 31% J/Phi reduction via epistemic offloading (p=0.0009, d=-1.94)
+- Phase transition at 0.20 J/tick (cooperative → collapsed J/Phi regimes)
+- Temperature-consciousness sigmoid coupling
+- Bifurcation analysis with susceptibility and Binder cumulant
+
+**Action items**:
+- [x] Draft paper with all sections
+- [ ] Generate figures (convergence plot, phase diagram, J/Phi time series)
+- [ ] Run jphi_convergence experiment for fresh data tables
+- [ ] Submit to Entropy MDPI
 
 ---
 

@@ -1410,7 +1410,7 @@ mod tests {
         let result = SDEEngine::euler_maruyama(growth, no_noise, 1.0, 0.0, 1.0, 10000, 123);
         let expected = std::f64::consts::E;
         assert!(
-            (result.y_final.last().unwrap_or(&0.0) - expected).abs() < 0.01,
+            (result.y_values.last().unwrap_or(&0.0) - expected).abs() < 0.01,
             "EM with no noise should match ODE solution"
         );
     }

@@ -1235,6 +1235,85 @@ impl NetworkService {
         (1.0 - variance.sqrt()).max(0.0)
     }
 
+    /// Spawn a background reconnection loop for bootstrap peers.
+    ///
+    /// Subscribes to `PeerEvent::Disconnected`. When a disconnected peer's
+    /// ticket is in `bootstrap_tickets`, retries with exponential backoff
+    /// (100ms → 200ms → … → 30s cap, max 5 attempts per disconnect).
+    #[cfg(feature = "swarm")]
+    pub fn spawn_reconnection_loop(self: &Arc<Self>, bootstrap_tickets: Vec<(String, String)>) {
+        if bootstrap_tickets.is_empty() {
+            return;
+        }
+        let service = Arc::clone(self);
+        let mut peer_rx = self.subscribe_peer_events();
+
+        // Map: peer_id → ticket (for looking up reconnect targets)
+        let ticket_map: std::collections::HashMap<String, String> = bootstrap_tickets.into_iter().collect();
+
+        tokio::spawn(async move {
+            while service.running.load(std::sync::atomic::Ordering::Relaxed) {
+                let event = match peer_rx.recv().await {
+                    Ok(e) => e,
+                    Err(broadcast::error::RecvError::Lagged(n)) => {
+                        tracing::debug!("Reconnection loop skipped {n} events");
+                        continue;
+                    }
+                    Err(broadcast::error::RecvError::Closed) => break,
+                };
+
+                if let PeerEvent::Disconnected { ref peer_id, .. } = event {
+                    let Some(ticket) = ticket_map.get(peer_id).cloned() else {
+                        continue; // not a bootstrap peer
+                    };
+
+                    let svc = Arc::clone(&service);
+                    let pid = peer_id.clone();
+                    tokio::spawn(async move {
+                        let mut delay = std::time::Duration::from_millis(100);
+                        let max_delay = std::time::Duration::from_secs(30);
+                        let max_retries = 5u32;
+
+                        for attempt in 1..=max_retries {
+                            if !svc.running.load(std::sync::atomic::Ordering::Relaxed) {
+                                break;
+                            }
+                            tokio::time::sleep(delay).await;
+                            tracing::info!(
+                                peer = %&pid[..pid.len().min(16)],
+                                attempt,
+                                "Reconnecting to bootstrap peer"
+                            );
+                            match svc.connect_to_peer(&ticket).await {
+                                Ok(info) => {
+                                    tracing::info!(
+                                        peer = %info.node_id,
+                                        attempt,
+                                        "Bootstrap peer reconnected"
+                                    );
+                                    return;
+                                }
+                                Err(e) => {
+                                    tracing::debug!(
+                                        error = %e,
+                                        peer = %&pid[..pid.len().min(16)],
+                                        attempt,
+                                        "Reconnect attempt failed"
+                                    );
+                                }
+                            }
+                            delay = (delay * 2).min(max_delay);
+                        }
+                        tracing::warn!(
+                            peer = %&pid[..pid.len().min(16)],
+                            "Gave up reconnecting after {max_retries} attempts"
+                        );
+                    });
+                }
+            }
+        });
+    }
+
     /// Shutdown the network service
     pub async fn shutdown(self) {
         self.running
@@ -2305,5 +2384,79 @@ mod tests {
             }
             _ => panic!("Expected TrustChanged"),
         }
+    }
+
+    /// Integration test: two NetworkService instances connect via Iroh ticket exchange.
+    ///
+    /// Node A creates a ticket, Node B connects using that ticket.
+    /// Verifies `connected_peers == 1` on both sides after handshake.
+    /// Requires `swarm` + `identity` features (real Iroh endpoints + attestation).
+    #[cfg(all(feature = "swarm", feature = "identity"))]
+    #[tokio::test]
+    async fn test_two_services_connect_via_ticket() {
+        // Node A: create service, init attestation, start accepting
+        let mut node_a = NetworkService::new(SwarmConfig::local_only()).await.unwrap();
+        node_a.initialize_attestation().unwrap();
+        let node_a = std::sync::Arc::new(node_a);
+        let mut a_events = node_a.subscribe_peer_events();
+        tokio::spawn(node_a.clone().accept_connections());
+
+        // Give Node A a moment to bind
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+
+        // Get Node A's ticket
+        let ticket = node_a.create_ticket().expect("Node A should produce a ticket");
+        assert!(!ticket.is_empty(), "Ticket should not be empty");
+
+        // Node B: create service, init attestation, connect to A
+        let mut node_b = NetworkService::new(SwarmConfig::local_only()).await.unwrap();
+        node_b.initialize_attestation().unwrap();
+        let node_b = std::sync::Arc::new(node_b);
+
+        let peer_info = node_b
+            .connect_to_peer(&ticket)
+            .await
+            .expect("Node B should connect to Node A");
+
+        // Node B should have 1 connected peer
+        assert_eq!(
+            node_b.peer_count(),
+            1,
+            "Node B should have 1 peer after connect"
+        );
+        assert!(
+            !peer_info.node_id.is_empty(),
+            "Peer info should contain node ID"
+        );
+
+        // Wait briefly for Node A's accept loop to register the inbound peer
+        let connected = tokio::time::timeout(
+            std::time::Duration::from_secs(5),
+            async {
+                loop {
+                    if node_a.peer_count() >= 1 {
+                        return true;
+                    }
+                    // Check for PeerEvent::Connected
+                    match a_events.try_recv() {
+                        Ok(PeerEvent::Connected(_)) => return true,
+                        _ => {}
+                    }
+                    tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+                }
+            },
+        )
+        .await;
+
+        assert!(
+            connected.unwrap_or(false),
+            "Node A should see 1 connected peer within 5s"
+        );
+
+        // Verify both nodes see each other
+        let a_peers = node_a.peer_count();
+        let b_peers = node_b.peer_count();
+        assert!(a_peers >= 1, "Node A peers: {a_peers} (expected >= 1)");
+        assert_eq!(b_peers, 1, "Node B peers: {b_peers} (expected 1)");
     }
 }

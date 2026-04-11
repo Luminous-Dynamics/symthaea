@@ -183,13 +183,14 @@ async fn main() -> Result<()> {
                 if let Some(service) = cls.network_service().cloned() {
                     tokio::spawn(service.accept_connections());
                     info!("Iroh: inbound connection listener active");
-                    // Log node ID so other instances can bootstrap to us.
-                    let node_id = cls
-                        .network_service()
-                        .map(|s| s.node_id())
-                        .unwrap_or_default();
+                    // Log node ID and bootstrap ticket so peers can connect.
+                    let node_id = service.node_id();
                     if !node_id.is_empty() {
-                        info!("Iroh node ID (for peer bootstrap): {}", node_id);
+                        info!("Iroh node ID: {}", node_id);
+                    }
+                    match service.create_ticket() {
+                        Ok(ticket) => info!("Iroh bootstrap ticket (share with peers): {}", ticket),
+                        Err(e) => debug!(error = %e, "Iroh ticket not available yet"),
                     }
                 }
 
@@ -200,11 +201,20 @@ async fn main() -> Result<()> {
                     if let Some(service) = cls.network_service().cloned() {
                         let tickets: Vec<&str> = raw.split(',').map(str::trim).filter(|s| !s.is_empty()).collect();
                         info!("Bootstrapping to {} peer(s) from SYMTHAEA_BOOTSTRAP_PEERS", tickets.len());
+                        let mut bootstrap_map: Vec<(String, String)> = Vec::new();
                         for ticket in tickets {
                             match service.connect_to_peer(ticket).await {
-                                Ok(info) => info!(peer = %info.node_id, "Bootstrap connection established"),
+                                Ok(info) => {
+                                    info!(peer = %info.node_id, "Bootstrap connection established");
+                                    bootstrap_map.push((info.node_id.clone(), ticket.to_string()));
+                                }
                                 Err(e) => warn!(error = %e, ticket = %&ticket[..ticket.len().min(32)], "Bootstrap connect failed"),
                             }
+                        }
+                        // Spawn reconnection loop for bootstrap peers that disconnect
+                        if !bootstrap_map.is_empty() {
+                            service.spawn_reconnection_loop(bootstrap_map);
+                            info!("Bootstrap peer reconnection loop active");
                         }
                     }
                 }

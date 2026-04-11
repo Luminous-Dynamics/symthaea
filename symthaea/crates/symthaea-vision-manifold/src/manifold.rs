@@ -68,6 +68,12 @@ pub struct VisionManifold {
     learning_frozen: bool,
     /// Optional episodic scene memory for recognition and surprise dampening.
     scene_memory: Option<SceneMemory>,
+    /// Optional object identity tracker for cross-frame persistence.
+    object_memory: Option<ObjectMemory>,
+    /// Monotonic track ID counter for object memory.
+    next_track_id: u64,
+    /// Last object tracking result.
+    last_tracking_result: Option<ObjectTrackingResult>,
     /// Last scene recognition match (if any).
     last_scene_match: Option<SceneMatch>,
     /// Minimum coherence required to store a scene landmark (default 0.7).
@@ -128,6 +134,9 @@ impl VisionManifold {
             predictive,
             learning_frozen: false,
             scene_memory: None, // Enabled externally via enable_scene_memory()
+            object_memory: None, // Enabled externally via enable_object_memory()
+            next_track_id: 0,
+            last_tracking_result: None,
             last_scene_match: None,
             scene_store_coherence_threshold: 0.7,
             scene_store_error_threshold: 0.1,
@@ -191,8 +200,66 @@ impl VisionManifold {
                 (0.0, vec![])
             };
 
+        // P3-E: Object-level binding — replace the bag-of-words frame HV with
+        // a relationally-structured HV that encodes *where* each perceptual
+        // object is, not just *what* patches are present.
+        //
+        // Clustering: patches are grouped by spatial proximity and HDC similarity.
+        // Each cluster's scene contribution: `position_hv[centroid] ⊗ object_hv`.
+        // Falls back to the standard frame_hv when fewer than 2 patches exist.
+        //
+        // P4-A: Object identity tracking — cluster hypotheses are matched against
+        // existing tracks via cosine similarity + temporal binding for persistence.
+        //
+        // P4-E: Foveation feedback — each hypothesis's saliency is computed from
+        // the attention/surprise map (mean over member patches).
+        let bound_frame_hv = if self.config.enable_object_binding && patch_hvs.len() >= 2 {
+            let grid = self.encoder.grid_for(width, height);
+            let mut hypotheses = Self::cluster_patches(&patch_hvs, &grid);
+
+            // P4-E: Fill saliency from attention map (mean surprise of member patches)
+            let attention = self.surprise.attention_map();
+            for hyp in &mut hypotheses {
+                let sum: f32 = hyp
+                    .patch_indices
+                    .iter()
+                    .map(|&idx| attention.values.get(idx).copied().unwrap_or(0.0))
+                    .sum();
+                hyp.saliency = if !hyp.patch_indices.is_empty() {
+                    sum / hyp.patch_indices.len() as f32
+                } else {
+                    0.0
+                };
+            }
+
+            // P4-A: Update object memory (cross-frame identity tracking)
+            if let Some(ref mut obj_mem) = self.object_memory {
+                self.last_tracking_result =
+                    Some(obj_mem.update(&hypotheses, self.frame_count, &mut self.next_track_id));
+            }
+
+            if !hypotheses.is_empty() {
+                let row_basis = self.encoder.row_basis();
+                let col_basis = self.encoder.col_basis();
+                let bound: Vec<ContinuousHV> = hypotheses
+                    .iter()
+                    .map(|h| {
+                        let r = h.centroid_row % row_basis.len().max(1);
+                        let c = h.centroid_col % col_basis.len().max(1);
+                        row_basis[r].bind(&col_basis[c]).bind(&h.hv)
+                    })
+                    .collect();
+                let refs: Vec<&ContinuousHV> = bound.iter().collect();
+                ContinuousHV::bundle(&refs).normalize()
+            } else {
+                frame_hv
+            }
+        } else {
+            frame_hv
+        };
+
         let t1 = Instant::now();
-        self.observe_encoded(&frame_hv, &patch_hvs, dt);
+        self.observe_encoded(&bound_frame_hv, &patch_hvs, dt);
 
         // P2-A: Inject cross-scale prediction errors into the surprise map.
         // After observe_encoded() has accumulated temporal surprise, blend in
@@ -228,6 +295,43 @@ impl VisionManifold {
                 .map_or(0.0, |m| m.similarity),
         };
 
+        self.telemetry.clone()
+    }
+
+    /// Observe a pre-encoded multi-spectral HV (no raw pixel processing).
+    ///
+    /// Called by `VisionBridge::process_multiband_frame()` after multi-spectral
+    /// encoding. Skips the standard pixel encoding, motion field, and predictive
+    /// hierarchy (all of which require raw pixels). State, surprise, scene memory,
+    /// and CfC dynamics are still fully updated.
+    pub fn observe_multiband_frame(&mut self, multi_hv: &ContinuousHV, dt: f32) -> VisionTelemetry {
+        let t0 = Instant::now();
+        self.observe_encoded(multi_hv, &[], dt);
+        let evolve_us = t0.elapsed().as_micros() as u64;
+
+        let training_triggered = self.telemetry.training_triggered;
+        let training_loss = self.telemetry.training_loss;
+        self.telemetry = VisionTelemetry {
+            encode_time_us: 0,
+            evolve_time_us: evolve_us,
+            prediction_error: self.prediction_error,
+            manifold_coherence: self.coherence,
+            attention_entropy: self.surprise.attention_map().entropy(),
+            num_salient_patches: self.surprise.salient_patches().len(),
+            frame_sequence: self.frame_count,
+            training_triggered,
+            training_loss,
+            motion_surprise: 0.0,
+            motion_field_norm: 0.0,
+            output_hv_norm: 0.0,
+            attention_boost_applied: 0.0,
+            cross_scale_prediction_error: 0.0,
+            scene_recognized: self.last_scene_match.is_some(),
+            scene_recognition_similarity: self
+                .last_scene_match
+                .as_ref()
+                .map_or(0.0, |m| m.similarity),
+        };
         self.telemetry.clone()
     }
 
@@ -342,6 +446,90 @@ impl VisionManifold {
         // Store training telemetry
         self.telemetry.training_triggered = training_triggered;
         self.telemetry.training_loss = training_loss;
+    }
+
+    /// Cluster patch HVs into object hypotheses for relational binding (P3-E).
+    ///
+    /// Uses a greedy proximity-based clustering: patches are grouped into connected
+    /// components where adjacent patches (4-connected) have cosine similarity ≥ 0.1.
+    /// This is intentionally coarse — the goal is rough perceptual grouping, not
+    /// precise object segmentation.
+    ///
+    /// Each cluster produces one `ObjectHypothesis` whose `hv` is the bundle of
+    /// member patch HVs, and whose centroid is the mean grid position.
+    fn cluster_patches(
+        patch_hvs: &[ContinuousHV],
+        grid: &crate::types::PatchGrid,
+    ) -> Vec<crate::types::ObjectHypothesis> {
+        if patch_hvs.is_empty() || grid.cols == 0 || grid.rows == 0 {
+            return vec![];
+        }
+
+        let n = patch_hvs.len().min(grid.rows * grid.cols);
+        let mut assigned = vec![usize::MAX; n];
+        let mut clusters: Vec<Vec<usize>> = Vec::new();
+
+        // Greedy 4-connected flood-fill grouping by HDC similarity
+        for start in 0..n {
+            if assigned[start] != usize::MAX {
+                continue;
+            }
+            let cluster_id = clusters.len();
+            let mut frontier = vec![start];
+            let mut members = vec![];
+            while let Some(idx) = frontier.pop() {
+                if assigned[idx] != usize::MAX {
+                    continue;
+                }
+                assigned[idx] = cluster_id;
+                members.push(idx);
+                // 4-connected neighbors
+                let row = idx / grid.cols;
+                let col = idx % grid.cols;
+                let neighbors = [
+                    if row > 0 { Some(idx - grid.cols) } else { None },
+                    if row + 1 < grid.rows { Some(idx + grid.cols) } else { None },
+                    if col > 0 { Some(idx - 1) } else { None },
+                    if col + 1 < grid.cols { Some(idx + 1) } else { None },
+                ];
+                for nb_opt in neighbors.into_iter().flatten() {
+                    if assigned[nb_opt] == usize::MAX {
+                        let sim = patch_hvs[idx].similarity(&patch_hvs[nb_opt]);
+                        if sim >= 0.1 {
+                            frontier.push(nb_opt);
+                        }
+                    }
+                }
+            }
+            clusters.push(members);
+        }
+
+        // Convert clusters → ObjectHypothesis
+        clusters
+            .into_iter()
+            .filter(|m| !m.is_empty())
+            .map(|members| {
+                let sum_r: usize = members.iter().map(|&i| i / grid.cols).sum();
+                let sum_c: usize = members.iter().map(|&i| i % grid.cols).sum();
+                let n_m = members.len();
+                let centroid_row = sum_r / n_m;
+                let centroid_col = sum_c / n_m;
+                let member_refs: Vec<&ContinuousHV> =
+                    members.iter().map(|&i| &patch_hvs[i]).collect();
+                let hv = if member_refs.len() == 1 {
+                    member_refs[0].clone()
+                } else {
+                    ContinuousHV::bundle(&member_refs).normalize()
+                };
+                crate::types::ObjectHypothesis {
+                    centroid_row,
+                    centroid_col,
+                    patch_indices: members,
+                    saliency: 0.0,
+                    hv,
+                }
+            })
+            .collect()
     }
 
     /// Internal training step: update weight_hv and tau_base from prediction error.
@@ -548,6 +736,24 @@ impl VisionManifold {
         self.scene_memory = Some(SceneMemory::new(capacity));
     }
 
+    /// Enable cross-frame object identity tracking with given capacity.
+    ///
+    /// Object hypotheses from `cluster_patches()` (when `enable_object_binding`
+    /// is true) are automatically matched and tracked across frames.
+    pub fn enable_object_memory(&mut self, capacity: usize) {
+        self.object_memory = Some(ObjectMemory::new(capacity));
+    }
+
+    /// Last object tracking result (matched / new / evicted counts).
+    pub fn last_tracking_result(&self) -> Option<&ObjectTrackingResult> {
+        self.last_tracking_result.as_ref()
+    }
+
+    /// Access the object memory for inspection.
+    pub fn object_memory(&self) -> Option<&ObjectMemory> {
+        self.object_memory.as_ref()
+    }
+
     /// Access the underlying config.
     pub fn config(&self) -> &VisionConfig {
         &self.config
@@ -626,6 +832,43 @@ impl VisionManifold {
             errors,
             frame_sequence: self.frame_count,
         }
+    }
+
+    /// Visual imagination: run the CfC manifold forward without sensory input.
+    ///
+    /// Generates `n_steps` predicted future scene HVs by iteratively applying
+    /// the closed-form CfC dynamics using only the current state and learned
+    /// weight HV — no pixel observation enters the loop.
+    ///
+    /// ```text
+    /// for each step:
+    ///   x_inf = equilibrium(current_state)
+    ///   state' = x_inf + (state - x_inf) * exp(-dt/τ)
+    /// ```
+    ///
+    /// The returned HVs represent what the system *expects* to see at each
+    /// future time step. Compare with actual observations to compute temporal
+    /// prediction surprise — the hallmark of active inference.
+    ///
+    /// # Biological analog
+    ///
+    /// Hippocampal preplay and mental simulation (Buckner & Carroll 2007):
+    /// the system can "run the movie forward" before it happens.
+    ///
+    /// # Arguments
+    /// * `n_steps` — number of future frames to imagine
+    /// * `dt` — time step per imagined frame (seconds)
+    pub fn dream_ahead(&self, n_steps: usize, dt: f32) -> Vec<ContinuousHV> {
+        let mut imagined = Vec::with_capacity(n_steps);
+        let mut dream_state = self.state.clone();
+
+        for _ in 0..n_steps {
+            let x_inf = self.equilibrium(&dream_state);
+            let sigma = self.gating(dt);
+            dream_state.lerp_in_place(&x_inf, 1.0 - sigma, sigma);
+            imagined.push(dream_state.clone());
+        }
+        imagined
     }
 
     /// Snapshot the manifold's learned state for serialization.
@@ -772,6 +1015,11 @@ impl VisionManifold {
         if let Some(ref mut memory) = self.scene_memory {
             memory.clear();
         }
+        if let Some(ref mut obj_mem) = self.object_memory {
+            obj_mem.clear();
+        }
+        self.next_track_id = 0;
+        self.last_tracking_result = None;
         self.last_scene_match = None;
     }
 }
@@ -908,6 +1156,170 @@ impl SceneMemory {
             .iter()
             .map(|(vals, frame)| (ContinuousHV::from_vec(vals.clone()), *frame))
             .collect();
+    }
+}
+
+/// Cross-frame object identity tracker (Spelke 1990 object permanence).
+///
+/// Stores a ring buffer of tracked objects. Each tracked object has:
+/// - An identity HV (temporally-bound accumulation across frames)
+/// - A centroid position (most recent)
+/// - A "last seen" frame number (for occlusion timeout)
+///
+/// On each frame, incoming `ObjectHypothesis` clusters are matched against
+/// existing tracks by HDC cosine similarity. Matched tracks update via
+/// temporal binding; unmatched clusters start new tracks; stale tracks
+/// (not seen for `max_absence_frames`) are evicted.
+pub struct ObjectMemory {
+    tracks: Vec<TrackedObject>,
+    capacity: usize,
+    /// Minimum cosine similarity to match a hypothesis to an existing track.
+    match_threshold: f32,
+    /// Number of frames before a track is evicted for absence.
+    max_absence_frames: u64,
+}
+
+/// A single tracked object persisting across frames.
+#[derive(Debug, Clone)]
+pub struct TrackedObject {
+    /// Unique track ID (monotonically assigned).
+    pub track_id: u64,
+    /// Temporally-accumulated identity HV: `bind_temporal(prev, curr)` across matches.
+    pub identity_hv: ContinuousHV,
+    /// Most recent centroid grid row.
+    pub centroid_row: usize,
+    /// Most recent centroid grid column.
+    pub centroid_col: usize,
+    /// Frame at which this object was last observed.
+    pub last_seen_frame: u64,
+    /// Number of consecutive frames this object has been tracked.
+    pub track_length: u64,
+}
+
+/// Result of matching hypotheses to object memory.
+#[derive(Debug, Clone)]
+pub struct ObjectTrackingResult {
+    /// Tracked objects that matched an incoming hypothesis (updated).
+    pub matched: Vec<(u64, f32)>, // (track_id, match_similarity)
+    /// Number of new tracks created this frame.
+    pub new_tracks: usize,
+    /// Number of stale tracks evicted this frame.
+    pub evicted: usize,
+    /// Total active tracks after this update.
+    pub active_tracks: usize,
+}
+
+impl ObjectMemory {
+    /// Create object memory with the given capacity.
+    pub fn new(capacity: usize) -> Self {
+        Self {
+            tracks: Vec::with_capacity(capacity),
+            capacity,
+            match_threshold: 0.3,
+            max_absence_frames: 30,
+        }
+    }
+
+    /// Set the match similarity threshold (default: 0.3).
+    pub fn set_match_threshold(&mut self, threshold: f32) {
+        self.match_threshold = threshold.clamp(0.0, 1.0);
+    }
+
+    /// Set the absence timeout in frames (default: 30).
+    pub fn set_max_absence(&mut self, frames: u64) {
+        self.max_absence_frames = frames;
+    }
+
+    /// Update tracks from this frame's object hypotheses.
+    ///
+    /// For each hypothesis: find the best-matching existing track. If the
+    /// similarity exceeds `match_threshold`, update that track's identity HV
+    /// via temporal binding. Otherwise, create a new track.
+    ///
+    /// Then evict all tracks not seen for `max_absence_frames`.
+    pub fn update(
+        &mut self,
+        hypotheses: &[crate::types::ObjectHypothesis],
+        current_frame: u64,
+        next_track_id: &mut u64,
+    ) -> ObjectTrackingResult {
+        let mut matched = Vec::new();
+        let mut claimed = vec![false; self.tracks.len()];
+
+        // Match each hypothesis to the best existing track
+        for hyp in hypotheses {
+            let mut best_idx = None;
+            let mut best_sim = self.match_threshold;
+            for (i, track) in self.tracks.iter().enumerate() {
+                if claimed[i] {
+                    continue;
+                }
+                let sim = track.identity_hv.similarity(&hyp.hv);
+                if sim > best_sim {
+                    best_sim = sim;
+                    best_idx = Some(i);
+                }
+            }
+
+            if let Some(idx) = best_idx {
+                // Update existing track via temporal binding
+                claimed[idx] = true;
+                let track = &mut self.tracks[idx];
+                track.identity_hv = track.identity_hv.bind_temporal(&hyp.hv).normalize();
+                track.centroid_row = hyp.centroid_row;
+                track.centroid_col = hyp.centroid_col;
+                track.last_seen_frame = current_frame;
+                track.track_length += 1;
+                matched.push((track.track_id, best_sim));
+            } else if self.tracks.len() < self.capacity {
+                // New track
+                self.tracks.push(TrackedObject {
+                    track_id: *next_track_id,
+                    identity_hv: hyp.hv.clone(),
+                    centroid_row: hyp.centroid_row,
+                    centroid_col: hyp.centroid_col,
+                    last_seen_frame: current_frame,
+                    track_length: 1,
+                });
+                *next_track_id += 1;
+            }
+        }
+
+        let new_tracks = hypotheses.len() - matched.len();
+
+        // Evict stale tracks
+        let before = self.tracks.len();
+        self.tracks.retain(|t| {
+            current_frame.saturating_sub(t.last_seen_frame) <= self.max_absence_frames
+        });
+        let evicted = before - self.tracks.len();
+
+        ObjectTrackingResult {
+            matched,
+            new_tracks,
+            evicted,
+            active_tracks: self.tracks.len(),
+        }
+    }
+
+    /// Get all currently active tracks.
+    pub fn tracks(&self) -> &[TrackedObject] {
+        &self.tracks
+    }
+
+    /// Number of active tracks.
+    pub fn len(&self) -> usize {
+        self.tracks.len()
+    }
+
+    /// Whether any tracks are active.
+    pub fn is_empty(&self) -> bool {
+        self.tracks.is_empty()
+    }
+
+    /// Clear all tracks.
+    pub fn clear(&mut self) {
+        self.tracks.clear();
     }
 }
 

@@ -15,6 +15,7 @@ use std::time::Instant;
 use symthaea_core::hdc::ContinuousHV;
 
 use crate::manifold::VisionManifold;
+use crate::spectrum::{MultiSpectralEncoder, MultiSpectralFrame};
 use crate::types::{SalientRegion, VisionConfig, VisionTelemetry};
 
 /// Top-down cognitive signal that modulates where the visual system looks.
@@ -145,6 +146,8 @@ pub struct VisionBridge {
     attention_boost: f32,
     /// Optional top-down cognitive goal for task-directed attention.
     goal_signal: CognitiveGoalSignal,
+    /// Optional multi-spectral encoder for non-visible-light bands.
+    multi_spectral: Option<MultiSpectralEncoder>,
 }
 
 impl VisionBridge {
@@ -159,6 +162,7 @@ impl VisionBridge {
             manifold,
             attention_boost: 0.3,
             goal_signal: CognitiveGoalSignal::default(),
+            multi_spectral: None,
         }
     }
 
@@ -168,6 +172,7 @@ impl VisionBridge {
             manifold,
             attention_boost: 0.3,
             goal_signal: CognitiveGoalSignal::default(),
+            multi_spectral: None,
         }
     }
 
@@ -194,6 +199,83 @@ impl VisionBridge {
     /// Clear the cognitive goal signal, returning to purely bottom-up attention.
     pub fn clear_goal_signal(&mut self) {
         self.goal_signal = CognitiveGoalSignal::default();
+    }
+
+    /// Gently drift the top-down goal signal toward the current cognitive state (P3-A EMA).
+    ///
+    /// Rather than hard-replacing the goal template each cycle (which causes
+    /// attentional thrashing when thoughts shift rapidly), this blends `thought_hv`
+    /// in with weight `alpha` (typical: 0.05):
+    ///
+    /// ```text
+    /// new_goal = normalize((1 - α) · existing_goal + α · thought_hv)
+    /// ```
+    ///
+    /// Biological analog: cortical priming signals decay slowly across V1/V4;
+    /// a single salient thought doesn't instantly redirect the entire visual system.
+    pub fn update_goal_from_cognition(&mut self, thought_hv: &ContinuousHV, alpha: f32) {
+        let alpha = alpha.clamp(0.0, 1.0);
+        // Clone the existing HV first to release the immutable borrow before writing back.
+        let new_goal = match self.goal_signal.task_hv.take() {
+            None => {
+                self.goal_signal.task_gain = 0.4;
+                thought_hv.clone()
+            }
+            Some(existing) => {
+                ContinuousHV::weighted_bundle(&[&existing, thought_hv], &[1.0 - alpha, alpha])
+                    .normalize()
+            }
+        };
+        self.goal_signal.task_hv = Some(new_goal);
+    }
+
+    /// Attach a multi-spectral encoder for non-visible-light processing (P3-C).
+    ///
+    /// Call once after construction; subsequent calls to `process_multiband_frame()`
+    /// will use this encoder. The encoder is built from the bridge's own manifold config
+    /// so band-identity HVs are guaranteed to be orthogonal to the existing basis vectors.
+    ///
+    /// # Arguments
+    /// * `max_width`, `max_height` — Maximum frame dimensions for the spectral encoder
+    ///   (should match or exceed the frames you intend to process).
+    pub fn enable_multi_spectral(&mut self, max_width: u32, max_height: u32) {
+        let config = self.manifold.config().clone();
+        self.multi_spectral = Some(MultiSpectralEncoder::new(&config, max_width, max_height));
+    }
+
+    /// Process a multi-spectral frame and return the output HV with telemetry (P3-C).
+    ///
+    /// Encodes each spectral band via band-identity binding:
+    /// `band_frame_hv = band_id_hv ⊗ encode(band_pixels)`
+    /// then bundles all bands into a single multi-band HV fed to the CfC manifold
+    /// via `observe_encoded`. Falls back to the current manifold state if no
+    /// multi-spectral encoder is attached (see `enable_multi_spectral()`).
+    ///
+    /// # Arguments
+    /// * `frame` — Multi-spectral frame with one or more spectral layers.
+    /// * `dt` — Time step in seconds since the last observation.
+    pub fn process_multiband_frame(
+        &mut self,
+        frame: &MultiSpectralFrame,
+        dt: f32,
+    ) -> (ContinuousHV, VisionTelemetry) {
+        let Some(ref mut enc) = self.multi_spectral else {
+            return (self.manifold.state().clone(), VisionTelemetry::default());
+        };
+        let t0 = Instant::now();
+        let multi_hv = enc.encode(frame);
+        let encode_us = t0.elapsed().as_micros() as u64;
+
+        let t1 = Instant::now();
+        let mut telemetry = self.manifold.observe_multiband_frame(&multi_hv, dt);
+        telemetry.encode_time_us = encode_us;
+        telemetry.evolve_time_us += t1.elapsed().as_micros() as u64;
+
+        let boosted_hv = self.apply_attention_boost();
+        telemetry.output_hv_norm = boosted_hv.norm();
+        telemetry.attention_boost_applied = self.attention_boost;
+
+        (boosted_hv, telemetry)
     }
 
     /// Apply ventral recognition feedback to suppress surprise at a patch.

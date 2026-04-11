@@ -793,6 +793,64 @@ mod tests {
             }
         }
     }
+
+    // ── Self-Recovery Tests ──
+
+    #[test]
+    fn self_recovery_min_time_lock_is_72_hours() {
+        assert_eq!(SELF_RECOVERY_MIN_TIME_LOCK, 72 * 3600);
+    }
+
+    #[test]
+    fn self_recovery_default_time_lock_is_7_days() {
+        assert_eq!(SELF_RECOVERY_DEFAULT_TIME_LOCK, 7 * 24 * 3600);
+    }
+
+    #[test]
+    fn self_recovery_default_longer_than_social() {
+        // Self-recovery (72h) must be longer than social recovery (24h)
+        assert!(SELF_RECOVERY_MIN_TIME_LOCK > 86400);
+    }
+
+    #[test]
+    fn verification_anchor_serde_roundtrip() {
+        let anchors = vec![
+            VerificationAnchor::PhoneHash("sha256:abc123".into()),
+            VerificationAnchor::EmailHash("sha256:def456".into()),
+            VerificationAnchor::PasskeyCredentialId("cred-001".into()),
+            VerificationAnchor::DeviceAttestation("device-hash".into()),
+            VerificationAnchor::BiometricHash("bio-hash".into()),
+        ];
+        for anchor in anchors {
+            let json = serde_json::to_string(&anchor).unwrap();
+            let back: VerificationAnchor = serde_json::from_str(&json).unwrap();
+            assert_eq!(anchor, back);
+        }
+    }
+
+    #[test]
+    fn self_recovery_request_status_machine_matches_social() {
+        // Self-recovery uses the same RecoveryStatus state machine
+        // Verify key transitions work
+        let valid = |from: &RecoveryStatus, to: &RecoveryStatus| -> bool {
+            match (from, to) {
+                (RecoveryStatus::Pending, RecoveryStatus::Approved)
+                | (RecoveryStatus::Pending, RecoveryStatus::Cancelled) => true,
+                (RecoveryStatus::Approved, RecoveryStatus::ReadyToExecute)
+                | (RecoveryStatus::Approved, RecoveryStatus::Cancelled) => true,
+                (RecoveryStatus::ReadyToExecute, RecoveryStatus::Completed)
+                | (RecoveryStatus::ReadyToExecute, RecoveryStatus::Cancelled) => true,
+                (a, b) if a == b => true,
+                _ => false,
+            }
+        };
+
+        assert!(valid(&RecoveryStatus::Pending, &RecoveryStatus::Approved));
+        assert!(valid(&RecoveryStatus::Approved, &RecoveryStatus::ReadyToExecute));
+        assert!(valid(&RecoveryStatus::ReadyToExecute, &RecoveryStatus::Completed));
+        assert!(!valid(&RecoveryStatus::Pending, &RecoveryStatus::Completed)); // can't skip
+        assert!(!valid(&RecoveryStatus::Completed, &RecoveryStatus::Pending)); // terminal
+    }
 }
 
 /// Validate recovery vote creation

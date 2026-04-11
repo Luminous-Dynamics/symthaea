@@ -44,12 +44,15 @@ pub use bridge::{CognitiveGoalSignal, CrossManifoldPredictor, VisionBridge};
 pub use camera::CameraSource;
 pub use camera::{CameraManifold, CapturedFrame, MockCameraSource};
 pub use encoder::{MotionField, MultiScaleEncoder, PatchHdcEncoder};
-pub use manifold::{HorizonAccuracy, SceneMemory, VisionManifold};
+pub use manifold::{
+    HorizonAccuracy, ObjectMemory, ObjectTrackingResult, SceneMemory, TrackedObject,
+    VisionManifold,
+};
 pub use predictive::{PredictiveCodingHierarchy, PredictiveOutput};
 pub use spectrum::{MultiSpectralEncoder, MultiSpectralFrame, SpectralLayer, SpectrumBand};
 pub use training::{BpttResult, ManifoldTrainer};
 pub use types::{
-    AttentionMap, LearningConfig, ManifoldHealth, ManifoldState, MultiScaleConfig, PatchGrid,
-    SalientRegion, ScaleHealth, SceneMatch, SceneMemoryState, TrainingConfig, TrainingMethod,
-    VisionConfig, VisionTelemetry,
+    AttentionMap, LearningConfig, ManifoldHealth, ManifoldState, MultiScaleConfig, ObjectHypothesis,
+    PatchGrid, SalientRegion, ScaleHealth, SceneMatch, SceneMemoryState, TrainingConfig,
+    TrainingMethod, VisionConfig, VisionTelemetry,
 };

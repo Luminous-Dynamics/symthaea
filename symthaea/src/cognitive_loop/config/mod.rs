@@ -688,6 +688,14 @@ pub struct CognitiveLoopConfig {
     pub fhe_aggregation_interval: usize,
 
     // ── Embodiment Bridge ────────────────────────────────────────────────
+    /// Override the attention budget (microseconds) used for cycle-time enforcement.
+    /// When `Some(us)`, replaces the default 50ms `ATTENTION_BUDGET_US` constant.
+    /// Set to a large value (e.g., 60_000_000 = 60s) for offline telemetry / debug
+    /// builds where cycles naturally exceed the real-time budget without indicating
+    /// a problem. Prevents the budget-exceeded → safety-escalation doom loop.
+    #[serde(default)]
+    pub attention_budget_override_us: Option<u64>,
+
     /// Which embodiment platform to use for proprioceptive loop closure.
     /// Default: `None` (disembodied cognitive loop).
     #[cfg(feature = "humanoid")]
@@ -876,6 +884,7 @@ impl Default for CognitiveLoopConfig {
             fhe_threshold_k: 3,
             #[cfg(feature = "fhe-wisdom")]
             fhe_aggregation_interval: 100,
+            attention_budget_override_us: None,
             #[cfg(feature = "humanoid")]
             embodiment_platform: super::motor_bridge::EmbodimentPlatform::None,
             #[cfg(feature = "humanoid")]

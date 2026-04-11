@@ -1742,6 +1742,11 @@ impl CognitiveLoopService {
             }
         }
 
+        // Honor enable_voice_synthesis config flag
+        if service.config.enable_voice_synthesis {
+            service.enable_voice_synthesis();
+        }
+
         Ok(service)
     }
 

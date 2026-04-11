@@ -53,6 +53,8 @@ pub struct CompositionExport {
     pub musical_state: MusicalState,
     /// Unix timestamp (seconds) when this was completed.
     pub timestamp_secs: u64,
+    /// Note sequence snapshot for self-evaluation via `CreativeQualityScore`.
+    pub notes: Vec<symthaea_muse::Note>,
 }
 
 // ─── Named Constants ──────────────────────────────────────────────────────────
@@ -513,12 +515,15 @@ impl CognitiveSubsystem for MuseManager {
                 &self.accumulated_samples[..self.export_target_samples],
                 MUSE_SAMPLE_RATE,
             );
+            // Snapshot generated notes for self-evaluation, then clear for next period
+            let notes = std::mem::take(&mut self.synth.generated_notes);
             let export = CompositionExport {
                 wav_bytes,
                 title,
                 duration_secs: MUSE_EXPORT_SECS,
                 musical_state: self.last_musical_state.clone(),
                 timestamp_secs: snapshot.cycle_number as u64,
+                notes,
             };
             if self.pending_exports.len() >= MUSE_EXPORT_QUEUE_CAPACITY {
                 self.pending_exports.pop_front(); // drop oldest if queue is full

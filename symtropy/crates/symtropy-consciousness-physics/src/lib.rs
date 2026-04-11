@@ -27,6 +27,10 @@
 //! 5. **Collision → Φ**: Prediction error feedback reduces motor precision
 
 pub mod active_inference;
+pub mod biometrics;
+pub mod macro_bridge;
+pub mod phase_transition;
+pub mod proc_gen;
 pub mod convergence;
 pub mod coupling;
 #[cfg(feature = "consciousness-curvature")]
@@ -37,6 +41,8 @@ pub mod fep_gradient;
 pub mod harmony_field;
 #[cfg(feature = "consciousness-hdc")]
 pub mod hdc_context;
+#[cfg(feature = "pyphi-validation")]
+pub mod pyphi_validation;
 pub mod prey;
 pub mod safety;
 pub mod sanctuary;
@@ -46,6 +52,16 @@ pub mod thermodynamics;
 #[cfg(feature = "wasm")]
 pub mod wasm_bindings;
 
+pub use biometrics::{BiometricHistory, BiometricNormParams, BiometricSample, ChannelNorm, neutral_inputs};
+pub use macro_bridge::{apply_macro_modifiers, MacroWorldModifiers};
+pub use phase_transition::{
+    run_bifurcation_sweep, BifurcationConfig, BifurcationResult, CriticalityIndicators,
+    TransitionType,
+};
+pub use proc_gen::{
+    ConsciousnessRegime, EnvironmentEvent, PhiEnvironmentCoupler, RoomProfile,
+    PHI_THRESHOLD_EMERGING, PHI_THRESHOLD_INTEGRATED, PHI_THRESHOLD_TRANSCENDENT,
+};
 pub use coupling::{ConsciousnessField, EntityConsciousness};
 pub use simple_field::{SimpleCoupledField, SimpleEntity};
 pub use energy::EnergyBudget;

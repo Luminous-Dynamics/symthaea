@@ -116,6 +116,11 @@ pub(crate) struct CreativeManager {
     next_modality: CreativeModality,
     /// Persistent streaming improvisation engine.
     live_stream: Option<symthaea_muse::stream::MuseStream>,
+    /// Active narrative episode — when set, Music modality composes from this episode
+    /// rather than free composition. Cleared after each use so every episode is unique.
+    active_episode: Option<symthaea_muse::narrative_bridge::NarrativeEpisode>,
+    /// Default bar count for narrative episode compositions.
+    default_bars: usize,
 }
 
 #[cfg(feature = "creative")]
@@ -172,7 +177,26 @@ impl CreativeManager {
             last_telemetry: CreativeTelemetry::default(),
             next_modality: CreativeModality::Visual,
             live_stream: None,
+            active_episode: None,
+            default_bars: 8,
         }
+    }
+
+    /// Set an active narrative episode.
+    ///
+    /// On the next Music modality tick, `NarrativeMusicBridge` will compose music
+    /// that tells this episode's emotional story instead of free composition.
+    /// The episode is cleared after use (one-shot — call again for each new episode).
+    pub fn set_narrative_episode(
+        &mut self,
+        episode: symthaea_muse::narrative_bridge::NarrativeEpisode,
+    ) {
+        self.active_episode = Some(episode);
+    }
+
+    /// Clear the active narrative episode, reverting to free composition.
+    pub fn clear_narrative_episode(&mut self) {
+        self.active_episode = None;
     }
 
     /// Flush aesthetic memory to disk. Called on drop and can be called manually.
@@ -240,14 +264,54 @@ impl CreativeManager {
             }
             CreativeModality::Music => {
                 let musical_state = snapshot_to_musical_state(snap);
-                let composition =
-                    symthaea_muse::compose(&self.muse_config, &musical_state, self.seed_counter);
 
-                // Score music using harmony alignment as a proxy
-                let music_score = score_composition(&composition, snap);
-                let feedback = self
-                    .tracker
-                    .process(&music_score, &snap.harmony_activations);
+                // C: Narrative autocompose — if an episode is active, let it drive the music.
+                // The episode is consumed after one use (each episode is unique).
+                let (composition, is_narrative) = if let Some(episode) = self.active_episode.take() {
+                    let bridge = symthaea_muse::narrative_bridge::NarrativeMusicBridge::new(
+                        self.default_bars,
+                    );
+                    let ec = bridge.compose_episode(
+                        &episode,
+                        &self.muse_config,
+                        &musical_state,
+                        self.seed_counter,
+                    );
+                    (ec.composition, true)
+                } else {
+                    (
+                        symthaea_muse::compose(&self.muse_config, &musical_state, self.seed_counter),
+                        false,
+                    )
+                };
+
+                // B: Aesthetic reward signal — blend proxy score with CreativeQualityScore.
+                // CreativeQualityScore uses IDyOM-inspired melodic coherence, rhythmic
+                // regularity, emotional alignment, and form compliance — richer than
+                // the harmony-alignment proxy alone.
+                let target_va = symthaea_aesthetic::from_core_affect(
+                    snap.valence, snap.arousal, snap.dopamine, snap.serotonin, snap.noradrenaline,
+                );
+                let proxy_score = score_composition(&composition, snap);
+                let quality =
+                    symthaea_muse::creative_bench::CreativeQualityScore::evaluate(&composition, target_va);
+
+                // Blend: proxy covers harmony/structure; quality covers melodic craft.
+                let blended_composite =
+                    (proxy_score.composite * 0.5 + quality.composite * 0.5).clamp(0.0, 1.0);
+                let music_score = AestheticScore {
+                    composite: blended_composite,
+                    order: (proxy_score.order + quality.rhythmic_regularity) / 2.0,
+                    complexity: (proxy_score.complexity + quality.melodic_coherence) / 2.0,
+                    surprise: (quality.composite - self.tracker.expectation()).abs(),
+                    ..proxy_score
+                };
+
+                let mut feedback = self.tracker.process(&music_score, &snap.harmony_activations);
+
+                // Amplify dopamine by quality composite (beautiful music = stronger reward)
+                feedback.dopamine_delta += quality.composite * 0.05;
+
                 output.music_samples = Some(match &composition.audio {
                     symthaea_muse::AudioData::I16(v) => v.clone(),
                     symthaea_muse::AudioData::F32(v) => {
@@ -259,7 +323,7 @@ impl CreativeManager {
                         .collect(),
                 });
                 output.feedback = feedback;
-                modality_name = "music";
+                modality_name = if is_narrative { "narrative-music" } else { "music" };
 
                 self.record_telemetry(&music_score, &feedback, modality_name, 1, start.elapsed());
 
@@ -493,6 +557,20 @@ impl CreativeManager {
     /// Total artworks produced.
     pub fn total_artworks(&self) -> u64 {
         self.total_artworks
+    }
+
+    /// Feed an external aesthetic score into the tracker (self-listening loop).
+    ///
+    /// Called when MuseManager finishes a composition: the creative_bench scores
+    /// get converted to an AestheticScore and processed through the tracker,
+    /// updating the EMA and harmony bias so Symthaea's taste evolves from its
+    /// own output — not just from cognitive state.
+    pub fn process_external_score(
+        &mut self,
+        score: &symthaea_aesthetic::AestheticScore,
+        harmony_activations: &[f32; 8],
+    ) -> symthaea_aesthetic::AestheticFeedback {
+        self.tracker.process(score, harmony_activations)
     }
 }
 

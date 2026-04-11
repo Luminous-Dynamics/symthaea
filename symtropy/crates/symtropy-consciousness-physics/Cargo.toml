@@ -34,6 +34,7 @@ console_error_panic_hook = { version = "0.1", optional = true }
 default = []
 consciousness-curvature = []
 consciousness-hdc = []
+pyphi-validation = []
 # Enables wasm-bindgen exports for the browser research demo.
 # Build: cargo build -p symtropy-consciousness-physics --target wasm32-unknown-unknown --features wasm
 # Then: ~/.cargo/bin/wasm-bindgen target/wasm32-unknown-unknown/release/symtropy_consciousness_physics.wasm \
@@ -42,3 +43,8 @@ wasm = ["dep:wasm-bindgen", "dep:serde", "dep:serde_json", "dep:console_error_pa
 
 [dev-dependencies]
 proptest = "1.4"
+criterion = { version = "0.5", features = ["html_reports"] }
+
+[[bench]]
+name = "coupling_bench"
+harness = false

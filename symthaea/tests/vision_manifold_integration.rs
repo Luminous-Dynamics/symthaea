@@ -609,4 +609,173 @@ mod vision_cognitive_integration {
             "Band identity HVs should be near-orthogonal in 16,384D"
         );
     }
+
+    // ── Test 16: Depth channel adds one feature when enabled ─────────────────
+    #[test]
+    fn test_depth_channel_adds_feature() {
+        let mut cfg = VisionConfig::default();
+        assert_eq!(cfg.total_features(), 11);
+        cfg.enable_depth = true;
+        assert_eq!(cfg.total_features(), 12);
+
+        // Encoder with depth should produce a valid HV from the same pixel data
+        use symthaea::perception::vision_manifold::VisionManifold;
+        let mut m = VisionManifold::new(cfg, 32, 32);
+        let pixels: Vec<u8> = (0..32 * 32 * 3).map(|i| (i % 256) as u8).collect();
+        let tel = m.observe_frame(&pixels, 32, 32, 3, 0.033);
+        assert!(tel.manifold_coherence.is_finite());
+        assert!(tel.prediction_error.is_finite());
+    }
+
+    // ── Test 17: Object binding changes the frame HV representation ──────────
+    #[test]
+    fn test_object_binding_changes_frame_hv() {
+        use symthaea::perception::vision_manifold::VisionManifold;
+
+        // Create two manifolds with identical config except object binding
+        let cfg_off = VisionConfig::default();
+        let mut cfg_on = VisionConfig::default();
+        cfg_on.enable_object_binding = true;
+
+        let mut m_off = VisionManifold::new(cfg_off, 64, 64);
+        let mut m_on = VisionManifold::new(cfg_on, 64, 64);
+
+        // Non-uniform frame (two distinct halves → should cluster differently)
+        let mut pixels = vec![0u8; 64 * 64 * 3];
+        for y in 0..32 {
+            for x in 0..64 {
+                let base = (y * 64 + x) * 3;
+                pixels[base] = 200;
+                pixels[base + 1] = 50;
+                pixels[base + 2] = 50;
+            }
+        }
+        for y in 32..64 {
+            for x in 0..64 {
+                let base = (y * 64 + x) * 3;
+                pixels[base] = 50;
+                pixels[base + 1] = 50;
+                pixels[base + 2] = 200;
+            }
+        }
+
+        m_off.observe_frame(&pixels, 64, 64, 3, 0.033);
+        m_on.observe_frame(&pixels, 64, 64, 3, 0.033);
+
+        let state_off = m_off.state();
+        let state_on = m_on.state();
+
+        // Both should be finite
+        assert!(state_off.norm() > 0.0);
+        assert!(state_on.norm() > 0.0);
+
+        // Object binding should produce a different representation
+        let sim = state_off.similarity(state_on);
+        assert!(
+            sim < 0.999,
+            "Object binding should change the frame HV, sim={sim}"
+        );
+    }
+
+    // ── Test 18: Visual imagination (dream_ahead) produces valid HVs ─────────
+    #[test]
+    fn test_dream_ahead_produces_valid_hvs() {
+        use symthaea::perception::vision_manifold::VisionManifold;
+
+        let mut m = VisionManifold::new(VisionConfig::default(), 64, 64);
+
+        // Need at least one frame to seed the state
+        let pixels: Vec<u8> = (0..64 * 64 * 3).map(|i| (i * 7 % 256) as u8).collect();
+        m.observe_frame(&pixels, 64, 64, 3, 0.033);
+
+        let dreams = m.dream_ahead(5, 0.033);
+        assert_eq!(dreams.len(), 5, "Should produce exactly 5 dream steps");
+
+        for (i, dream_hv) in dreams.iter().enumerate() {
+            assert!(
+                dream_hv.norm() > 0.0,
+                "Dream step {i} should be non-zero"
+            );
+            assert!(
+                dream_hv.as_slice().iter().all(|x| x.is_finite()),
+                "Dream step {i} must be finite"
+            );
+        }
+
+        // Later dreams should diverge from earlier ones (CfC evolves)
+        let sim_01 = dreams[0].similarity(&dreams[1]);
+        let sim_04 = dreams[0].similarity(&dreams[4]);
+        assert!(
+            sim_04 < sim_01 || sim_01 > 0.999,
+            "Later dreams should generally diverge (sim01={sim_01}, sim04={sim_04})"
+        );
+    }
+
+    // ── Test 19: Object memory tracks identity across frames ─────────────────
+    #[test]
+    fn test_object_memory_cross_frame_tracking() {
+        use symthaea::perception::vision_manifold::VisionManifold;
+
+        let mut cfg = VisionConfig::default();
+        cfg.enable_object_binding = true;
+        let mut m = VisionManifold::new(cfg, 64, 64);
+        m.enable_object_memory(32);
+
+        // Red top / blue bottom frame
+        let mut pixels = vec![0u8; 64 * 64 * 3];
+        for y in 0..32 {
+            for x in 0..64 {
+                let b = (y * 64 + x) * 3;
+                pixels[b] = 200;
+            }
+        }
+        for y in 32..64 {
+            for x in 0..64 {
+                let b = (y * 64 + x) * 3;
+                pixels[b + 2] = 200;
+            }
+        }
+
+        // Feed 5 frames of the same scene
+        for _ in 0..5 {
+            m.observe_frame(&pixels, 64, 64, 3, 0.033);
+        }
+
+        let obj_mem = m.object_memory().expect("object memory should be enabled");
+        assert!(
+            !obj_mem.is_empty(),
+            "Object memory should have tracked objects"
+        );
+
+        // Tracks should have length > 1 (persisted across frames)
+        let long_tracks = obj_mem.tracks().iter().filter(|t| t.track_length > 1).count();
+        assert!(
+            long_tracks > 0,
+            "At least one object should persist across multiple frames"
+        );
+    }
+
+    // ── Test 20: Multiband bridge pipeline (P3-C wiring end-to-end) ──────────
+    #[test]
+    fn test_multiband_bridge_pipeline() {
+        use symthaea::perception::vision_manifold::{
+            MultiSpectralFrame, SpectrumBand, VisionBridge,
+        };
+
+        let mut bridge = VisionBridge::new(VisionConfig::default(), 64, 64);
+        bridge.enable_multi_spectral(64, 64);
+
+        let frame = MultiSpectralFrame::from_visible(vec![128u8; 64 * 64], 64, 64)
+            .with_layer(SpectrumBand::ThermalIR, vec![200u8; 64 * 64]);
+
+        let (hv, tel) = bridge.process_multiband_frame(&frame, 0.033);
+        assert!(hv.norm() > 0.0, "Multiband bridge should produce non-zero HV");
+        assert!(tel.encode_time_us > 0, "Encoding time should be measured");
+        assert_eq!(tel.frame_sequence, 1, "Frame sequence should be 1");
+
+        // Second frame
+        let (hv2, tel2) = bridge.process_multiband_frame(&frame, 0.033);
+        assert!(hv2.norm() > 0.0);
+        assert_eq!(tel2.frame_sequence, 2);
+    }
 }

@@ -606,6 +606,62 @@ impl CognitiveLoopService {
                     #[cfg(feature = "muse")]
                     {
                         while let Some(export) = self.muse_manager.take_next_export() {
+                            // ── Self-listening: score the composition and feed back ──
+                            #[cfg(feature = "creative")]
+                            if !export.notes.is_empty() {
+                                use symthaea_muse::creative_bench::CreativeQualityScore;
+                                let target_va = symthaea_aesthetic::ValenceArousal {
+                                    valence: export.musical_state.valence,
+                                    arousal: export.musical_state.arousal,
+                                };
+                                // Build a minimal Composition for the scorer
+                                let comp = symthaea_muse::Composition {
+                                    audio: symthaea_muse::AudioData::Stereo(Vec::new()),
+                                    sample_rate: 44100,
+                                    notes: export.notes.clone(),
+                                    duration_secs: export.duration_secs,
+                                    section: symthaea_muse::structure::SectionType::Development,
+                                };
+                                let quality = CreativeQualityScore::evaluate(&comp, target_va);
+                                // Map creative quality → AestheticScore
+                                let aesthetic_score = symthaea_aesthetic::AestheticScore {
+                                    order: quality.rhythmic_regularity,
+                                    complexity: 1.0 - quality.form_compliance, // high form = low complexity
+                                    surprise: (1.0 - quality.melodic_coherence).max(0.0), // low coherence = surprise
+                                    harmony: quality.emotional_alignment,
+                                    birkhoff: quality.composite,
+                                    composite: quality.composite,
+                                };
+                                if let Some(ref mut cm) = self
+                                    .sensorimotor
+                                    .motor_rendering
+                                    .creative_manager
+                                {
+                                    let feedback = cm.process_external_score(
+                                        &aesthetic_score,
+                                        &export.musical_state.harmony_activations,
+                                    );
+                                    // Feed aesthetic dopamine back to muse injection
+                                    self.muse_manager.inject_neuromod(
+                                        (self.muse_manager.musical_state().dopamine
+                                            + feedback.dopamine_delta)
+                                            .clamp(0.0, 1.0),
+                                        (self.muse_manager.musical_state().serotonin
+                                            + feedback.serotonin_delta)
+                                            .clamp(0.0, 1.0),
+                                        (self.muse_manager.musical_state().noradrenaline
+                                            + feedback.surprise_signal)
+                                            .clamp(0.0, 1.0),
+                                        0.0, // allostatic load unaffected
+                                    );
+                                    log::debug!(
+                                        "[self-listen] quality={:.3} → dopamine_δ={:+.3}, harmony_bias={:.2?}",
+                                        quality.composite,
+                                        feedback.dopamine_delta,
+                                        cm.last_telemetry(),
+                                    );
+                                }
+                            }
                             self.music_publisher.submit(export);
                         }
                         // Drain upload results (best-effort logging; non-blocking).
@@ -3035,7 +3091,9 @@ impl CognitiveLoopService {
                 1.0
             }
         };
-        let attention_budget_us = (ATTENTION_BUDGET_US as f64
+        let base_budget_us = self.config.attention_budget_override_us
+            .unwrap_or(ATTENTION_BUDGET_US);
+        let attention_budget_us = (base_budget_us as f64
             * neuromod_attention_alloc as f64
             * depth_budget_scale
             * epistemic_budget_scale as f64

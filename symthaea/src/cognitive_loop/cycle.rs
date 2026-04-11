@@ -222,9 +222,18 @@ impl CognitiveLoopService {
         #[cfg(feature = "vision-manifold")]
         if let Some(ref mut bridge) = self.sensorimotor.vision_sensory.vision_bridge {
             let thought_hv = perception.encoding.encoding_result.hdv.clone();
-            bridge.set_goal_signal(
-                symthaea_vision_manifold::CognitiveGoalSignal::new(thought_hv),
-            );
+            // EMA drift (α=0.05): gently nudge the goal template toward the current
+            // thought rather than hard-replacing it each cycle. Prevents attentional
+            // thrashing when thoughts shift faster than the visual system can track.
+            bridge.update_goal_from_cognition(&thought_hv, 0.05);
+
+            // P4-B: Phi-modulated visual attention — consciousness level modulates
+            // the attention boost factor. High Phi → broad exploratory attention
+            // (0.8), low Phi → narrow conservative focus (0.2).
+            // Science: Luck et al. (1997) — arousal/ACh modulates V1/V4 gain.
+            let phi = self.carryover.history.consciousness_level;
+            let phi_boost = 0.2 + 0.6 * phi.clamp(0.0, 1.0);
+            bridge.set_attention_boost(phi_boost);
         }
 
         // ===================================================================

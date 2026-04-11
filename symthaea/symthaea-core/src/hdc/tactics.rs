@@ -1346,7 +1346,7 @@ mod tests {
         .with_hyp("hB", Expr::Var("B".into()));
         let prover = TacticProver::new(5);
         let trace = prover.prove(&goal);
-        assert!(trace.is_some(), "Prover should prove A ∧ B from {A, B}");
+        assert!(trace.is_some(), "Prover should prove A ∧ B from {{A, B}}");
     }
 
     #[test]

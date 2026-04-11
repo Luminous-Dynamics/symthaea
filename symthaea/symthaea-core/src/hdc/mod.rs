@@ -404,6 +404,9 @@ pub mod measure_probability;     // Measure spaces, martingales, Brownian motion
 pub mod polynomial_algebra;      // Groebner bases, Buchberger, ideal membership, resultants
 pub mod tactics;                 // Proof tactics: ring, omega, induct, norm_num, cases
 
+// ── Geometric Complexity Theory (Phase 8 — P vs NP probe) ────────────────────
+pub mod gct; // Permanent vs determinant orbit complexity, Kronecker coefficients, GCT obstruction conjecture
+
 // ── Einstein Manifold Search (Phase 6) ───────────────────────────────────────
 pub mod riemannian_geometry; // MetricTensor, Riemann/Ricci tensors, Ricci flow, Einstein condition
 pub mod ricci_flow;          // Normalized Ricci flow evolution, singularity detection, convergence

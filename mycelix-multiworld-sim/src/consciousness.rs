@@ -86,6 +86,26 @@ impl ConsciousnessEngine {
     ) -> Vec<CivEvent> {
         let mut events = Vec::new();
 
+        // Pre-compute community-level stats for social moral emotions (immutable read before loop).
+        // These drive guilt (survivor conscience) and outrage (moral isolation).
+        let community_mean_trauma: f64 = {
+            let living: Vec<_> = agents.iter().filter(|a| a.is_alive()).collect();
+            let n = living.len().max(1) as f64;
+            if living.is_empty() { 0.0 }
+            else { living.iter().map(|a| a.trauma_level).sum::<f64>() / n }
+        };
+        let community_mean_ethics: [f64; 4] = {
+            let living: Vec<_> = agents.iter().filter(|a| a.is_alive()).collect();
+            let n = living.len().max(1) as f64;
+            if living.is_empty() { [0.5; 4] }
+            else { [
+                living.iter().map(|a| a.ethics.deontological).sum::<f64>() / n,
+                living.iter().map(|a| a.ethics.consequentialist).sum::<f64>() / n,
+                living.iter().map(|a| a.ethics.virtue_care).sum::<f64>() / n,
+                living.iter().map(|a| a.ethics.relational).sum::<f64>() / n,
+            ]}
+        };
+
         // --- Individual evolution ---
         for agent in agents.iter_mut().filter(|a| a.is_alive()) {
             // Snapshot ethics before this tick's modifications for dissonance tracking
@@ -195,19 +215,15 @@ impl ConsciousnessEngine {
             // Engaged people develop care → virtue_care drift.
             // Disengaged people optimize selfishly → consequentialist drift.
             // Rate: 0.0003/tick ≈ 0.036/year — slow but persistent.
-            let needs_drift = 0.0003;
-            if agent.needs.allostatic_load > 0.5 {
-                agent.ethics.deontological = (agent.ethics.deontological + needs_drift).min(1.0);
-            }
-            if agent.needs.social_satiation > 0.7 {
-                agent.ethics.relational = (agent.ethics.relational + needs_drift).min(1.0);
-            }
-            if agent.needs.engagement > 0.7 {
-                agent.ethics.virtue_care = (agent.ethics.virtue_care + needs_drift).min(1.0);
-            }
-            if agent.needs.engagement < 0.3 {
-                agent.ethics.consequentialist = (agent.ethics.consequentialist + needs_drift).min(1.0);
-            }
+            let nd = 0.00015;
+            let stress_d = if agent.needs.allostatic_load > 0.5 { nd } else { -nd * 0.5 };
+            agent.ethics.modify_with_sacred_resistance(0, stress_d);
+            let social_d = if agent.needs.social_satiation > 0.6 { nd } else { -nd * 0.5 };
+            agent.ethics.modify_with_sacred_resistance(3, social_d);
+            let engage_d = if agent.needs.engagement > 0.6 { nd } else { -nd * 0.5 };
+            agent.ethics.modify_with_sacred_resistance(2, engage_d);
+            let disengage_d = if agent.needs.engagement < 0.4 { nd } else { -nd * 0.3 };
+            agent.ethics.modify_with_sacred_resistance(1, disengage_d);
 
             // Ethical switching cost (cognitive dissonance):
             // Rapid moral transitions are psychologically expensive.
@@ -223,36 +239,79 @@ impl ConsciousnessEngine {
                     (agent.needs.allostatic_load + dissonance_cost).min(1.0);
             }
 
-            // --- Moral emotions: guilt and outrage ---
+            // --- Ethics normalization: cap total ethics sum at 2.1 → 2.0 ---
+            // Prevents runaway growth where all 4 dims inflate simultaneously.
+            // Berlin (1969) value pluralism: genuine ethical tensions mean you can't
+            // be maximally committed to ALL frameworks. Trade-offs are irreducible.
+            let eth_sum = agent.ethics.deontological + agent.ethics.consequentialist
+                + agent.ethics.virtue_care + agent.ethics.relational;
+            if eth_sum > 2.1 {
+                let scale = 2.0 / eth_sum;
+                agent.ethics.deontological = (agent.ethics.deontological * scale).max(0.05);
+                agent.ethics.consequentialist = (agent.ethics.consequentialist * scale).max(0.05);
+                agent.ethics.virtue_care = (agent.ethics.virtue_care * scale).max(0.05);
+                agent.ethics.relational = (agent.ethics.relational * scale).max(0.05);
+            }
 
-            // Guilt: rises when revealed ethics diverge from stated.
-            // The hypocrisy gap IS the guilt source (Tangney & Dearing 2002).
+            // --- Moral emotions: guilt, moral injury, outrage ---
+
+            // ── Guilt ──────────────────────────────────────────────────────────
+            // Source 1: Survivor conscience — virtue/care agents feel guilty when
+            // their community suffers, even when personally secure.
+            // "I have what others lack — why?" (Tangney 2002: prosocial guilt).
+            // High virtue_care × community trauma → consistent low-level guilt.
+            let survivor_guilt = agent.ethics.virtue_care * community_mean_trauma * 0.005;
+
+            // Source 2: Hypocrisy gap — stress-driven pragmatism diverges from stated values.
+            // Only significant at allostatic_load > 0.5 (severe stress = survival mode).
             let revealed = agent.ethics.revealed(agent.needs.allostatic_load);
             let hypocrisy_gap: f64 = agent.ethics.as_vec().iter()
                 .zip(revealed.as_vec().iter())
                 .map(|(s, r)| (s - r).abs())
                 .sum::<f64>();
-            agent.needs.affect.guilt = (agent.needs.affect.guilt * 0.95 // slow decay
-                + hypocrisy_gap * 0.1).min(1.0);
-            // Guilt suppresses further consequentialist drift — moral self-regulation
-            if agent.needs.affect.guilt > 0.3 {
-                let correction = agent.needs.affect.guilt * 0.001;
+            let hypocrisy_guilt = hypocrisy_gap * 0.15;
+
+            // Combined: slow decay (0.98 ≈ 4-year half-life at monthly resolution)
+            agent.needs.affect.guilt = (agent.needs.affect.guilt * 0.98
+                + survivor_guilt + hypocrisy_guilt).min(1.0);
+
+            // Guilt → consequentialist self-correction: feeling guilty about pragmatic
+            // compromises triggers moral self-regulation (Tangney 2002).
+            if agent.needs.affect.guilt > 0.2 {
+                let correction = agent.needs.affect.guilt * 0.0008;
                 agent.ethics.consequentialist = (agent.ethics.consequentialist - correction).max(0.05);
             }
 
-            // Moral injury: sustained hypocrisy (harm > 0.4 for extended period)
-            // causes permanent psychological damage — coherence drops, trauma rises.
-            // The affect.harm field tracks cumulative moral injury.
-            if hypocrisy_gap > 0.2 {
-                agent.needs.affect.harm = (agent.needs.affect.harm + 0.005).min(1.0);
-                if agent.needs.affect.harm > 0.4 {
-                    // Moral injury: permanent scars from sustained ethical compromise
-                    agent.trauma_level = (agent.trauma_level + 0.002).min(1.0);
-                    agent.consciousness.coherence = (agent.consciousness.coherence - 0.001).max(0.0);
+            // ── Moral injury (harm) ────────────────────────────────────────────
+            // Only SEVERE hypocrisy (gap > 0.4) causes lasting moral injury.
+            // Recovery rate (0.005) is 5× accumulation rate (0.001) — most people heal.
+            // Ref: Litz et al. (2009) moral injury and moral repair.
+            if hypocrisy_gap > 0.4 {
+                agent.needs.affect.harm = (agent.needs.affect.harm + 0.001).min(1.0);
+                if agent.needs.affect.harm > 0.5 {
+                    agent.trauma_level = (agent.trauma_level + 0.0005).min(1.0);
+                    agent.consciousness.coherence = (agent.consciousness.coherence - 0.0003).max(0.0);
                 }
             } else {
-                // Slow recovery when not in hypocrisy
-                agent.needs.affect.harm = (agent.needs.affect.harm - 0.001).max(0.0);
+                agent.needs.affect.harm = (agent.needs.affect.harm - 0.005).max(0.0);
+            }
+
+            // ── Outrage ────────────────────────────────────────────────────────
+            // Moral outrage: righteous indignation when the agent's deepest ethical
+            // commitment is a minority view in their community.
+            // "My people no longer share what I hold sacred." (Graham et al. 2011).
+            // Fires when agent's sacred dim is significantly above community mean
+            // on that dimension AND the agent is strongly committed (> 0.6).
+            let (sacred_idx, sacred_val) = agent.ethics.sacred_dimension();
+            let community_sacred = community_mean_ethics[sacred_idx];
+            let moral_isolation = (sacred_val - community_sacred).max(0.0);
+            if moral_isolation > 0.15 && sacred_val > 0.6 {
+                // Outrage proportional to isolation × commitment strength
+                let outrage_rise = (moral_isolation - 0.15) * sacred_val * 0.008;
+                agent.needs.affect.outrage = (agent.needs.affect.outrage + outrage_rise).min(1.0);
+            } else {
+                // Slow recovery when moral isolation is low or agent uncommitted
+                agent.needs.affect.outrage = (agent.needs.affect.outrage * 0.985).max(0.0);
             }
         }
 
@@ -261,7 +320,7 @@ impl ConsciousnessEngine {
         // High coordination_understanding agents are better synthesizers (absorb more).
         // This models Bandura (1977) social learning + Haidt (2012) moral foundations
         // transmission through community interaction.
-        // Rate: ~10% of agents per tick contact a neighbor, blend at 0.02 rate.
+        // Rate: ~10% of agents per tick contact a neighbor, blend at 0.005 rate.
         {
             let living_indices: Vec<usize> = agents.iter().enumerate()
                 .filter(|(_, a)| a.is_alive())
@@ -284,8 +343,11 @@ impl ConsciousnessEngine {
                 let transmit_b = tier_mult(agents[bi].consciousness.tier());
                 let absorb_a = 1.0 + agents[ai].coordination_understanding * 0.5;
                 let absorb_b = 1.0 + agents[bi].coordination_understanding * 0.5;
-                let blend_a = 0.02 * absorb_a * transmit_b; // A absorbs B's ethics, weighted by B's moral authority
-                let blend_b = 0.02 * absorb_b * transmit_a; // B absorbs A's ethics, weighted by A's moral authority
+                // Rate reduced 0.02→0.005: faster diffusion caused rapid convergence
+                // in large populations (4000 × 10% × 0.02 ≈ population homogenizes
+                // in ~50 ticks). At 0.005, convergence takes ~200 ticks = 16 years.
+                let blend_a = 0.005 * absorb_a * transmit_b; // A absorbs B's ethics
+                let blend_b = 0.005 * absorb_b * transmit_a; // B absorbs A's ethics
                 let ethics_a = agents[ai].ethics.as_vec();
                 let ethics_b = agents[bi].ethics.as_vec();
                 // A absorbs from B

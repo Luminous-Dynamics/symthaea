@@ -35,6 +35,8 @@ web-sys = { version = "0.3", features = [
     "AudioScheduledSourceNode",
     # Blob/URL for WAV export download
     "Blob", "BlobPropertyBag", "Url",
+    # WebSocket for Holochain signal reception
+    "WebSocket", "MessageEvent", "CloseEvent", "ErrorEvent",
 ] }
 console_error_panic_hook = "0.1"
 gloo-timers = { version = "0.3", features = ["futures"] }
