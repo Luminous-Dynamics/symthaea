@@ -23,7 +23,8 @@ use hearth_types::{
 };
 use mycelix_bridge_common::{
     self as bridge, check_rate_limit_count, needs_refresh, routing_registry, BridgeHealth,
-    ConsciousnessCredential, ConsciousnessTier, CrossClusterDispatchInput, CrossClusterRole,
+    ConsciousnessCredential, ConsciousnessProfile, ConsciousnessTier,
+    CrossClusterDispatchInput, CrossClusterRole,
     DispatchInput, DispatchResult, EventTypeQuery, GateAuditInput, GovernanceAuditFilter,
     GovernanceAuditResult, ResolveQueryInput, RATE_LIMIT_WINDOW_SECS,
 };
@@ -923,110 +924,56 @@ pub fn get_sovereign_credential(
     }
 }
 
-/// cross-cluster call to `identity_bridge.issue_consciousness_credential` to
-/// obtain identity, reputation, and community dimensions, then fills in the
-/// engagement dimension locally from this cluster's activity data.
-/// The result is cached for subsequent calls.
+/// Legacy 4D credential — delegates to 8D sovereign path internally.
 #[hdk_extern]
 pub fn get_consciousness_credential(did: String) -> ExternResult<ConsciousnessCredential> {
-    // 1. Check cache first (avoids cross-cluster call if recent)
+    // 1. Check cache first
     if let Some(cached) = get_cached_credential(&did)? {
-        // Proactive refresh — attempt inline refresh, fall back to cached if it fails
         let now_us = sys_time()?.as_micros() as u64;
-        if needs_refresh(&cached, now_us) {
-            debug!(
-                "Credential nearing expiry, attempting proactive refresh for {}",
-                cached.did
-            );
-            if let Ok(ZomeCallResponse::Ok(response)) = call(
-                CallTargetCell::OtherRole(IDENTITY_ROLE.into()),
-                ZomeName::new("identity_bridge"),
-                FunctionName::new("refresh_consciousness_credential"),
-                None,
-                cached.did.clone(),
-            ) {
-                if let Ok(refreshed) = response.decode::<ConsciousnessCredential>() {
-                    let _ = cache_credential(&refreshed);
-                    return Ok(refreshed);
-                }
-            }
-            // Refresh failed — serve cached credential (still valid, just nearing expiry)
+        if !needs_refresh(&cached, now_us) {
+            return Ok(cached);
         }
-        return Ok(cached);
     }
 
-    enforce_rate_limit("identity:identity_bridge")?;
-
-    // 2. Cross-cluster call to identity: issue_consciousness_credential
-    let payload = ExternIO::encode(did.clone())
-        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-        .0;
-    let dispatch = CrossClusterDispatchInput {
-        role: IDENTITY_ROLE.to_string(),
-        zome: "identity_bridge".to_string(),
-        fn_name: "issue_consciousness_credential".to_string(),
-        payload,
-    };
-    let result = bridge::dispatch_call_cross_cluster(&dispatch, ALLOWED_IDENTITY_ZOMES);
-
-    let mut credential: ConsciousnessCredential = match result {
-        Ok(r) if r.success => {
-            let response_bytes = r.response.ok_or_else(|| {
-                wasm_error!(WasmErrorInner::Guest(
-                    "Empty response from identity bridge".into()
-                ))
-            })?;
-            ExternIO(response_bytes).decode().map_err(|e| {
-                wasm_error!(WasmErrorInner::Guest(format!(
-                    "Failed to decode consciousness credential: {:?}",
-                    e
-                )))
-            })?
+    // 2. Fetch via sovereign path (8D)
+    match get_sovereign_credential(did.clone()) {
+        Ok(sovereign_cred) => {
+            let legacy_profile = {
+                let lp = mycelix_bridge_common::sovereign_gate::LegacyProfile::from(
+                    sovereign_cred.profile.clone(),
+                );
+                ConsciousnessProfile {
+                    identity: lp.identity,
+                    reputation: lp.reputation,
+                    community: lp.community,
+                    engagement: lp.engagement,
+                }
+            };
+            let credential = ConsciousnessCredential {
+                did: sovereign_cred.did,
+                profile: legacy_profile.clone(),
+                tier: ConsciousnessTier::from_score(legacy_profile.combined_score()),
+                issued_at: sovereign_cred.issued_at,
+                expires_at: sovereign_cred.expires_at,
+                issuer: sovereign_cred.issuer,
+                trajectory_commitment: None,
+                extensions: Default::default(),
+            };
+            let _ = cache_credential(&credential);
+            Ok(credential)
         }
-        _ => {
-            // Identity role unavailable (network partition or crash).
-            // FAIL CLOSED: Do not issue unverified credentials. Hearth operations
-            // (kinship, care, autonomy) requiring consciousness gating must wait
-            // until identity verification is restored.
-            return Err(wasm_error!(WasmErrorInner::Guest(format!(
-                "Identity cluster unreachable — cannot verify consciousness credentials \
+        Err(_) => {
+            if let Some(cached) = get_cached_credential(&did)? {
+                debug!("Sovereign credential fetch failed, serving cached 4D credential");
+                return Ok(cached);
+            }
+            Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "Identity cluster unreachable — cannot verify credentials \
                  for {}. Hearth operations suspended until identity verification is restored.",
                 did
-            ))));
-        }
-    };
-
-    // 3. Fill in engagement dimension locally
-    credential.profile.engagement = calculate_local_engagement()?;
-
-    // 4. Recalculate tier with engagement included
-    credential.tier = ConsciousnessTier::from_score(credential.profile.combined_score());
-
-    // 5. Cache the result for subsequent calls
-    let _ = cache_credential(&credential);
-
-    // Proactive refresh check (covers edge case: identity issued a short-lived credential)
-    let now_us = sys_time()?.as_micros() as u64;
-    if needs_refresh(&credential, now_us) {
-        debug!(
-            "Freshly-issued credential nearing expiry, attempting proactive refresh for {}",
-            credential.did
-        );
-        if let Ok(ZomeCallResponse::Ok(response)) = call(
-            CallTargetCell::OtherRole(IDENTITY_ROLE.into()),
-            ZomeName::new("identity_bridge"),
-            FunctionName::new("refresh_consciousness_credential"),
-            None,
-            credential.did.clone(),
-        ) {
-            if let Ok(refreshed) = response.decode::<ConsciousnessCredential>() {
-                let _ = cache_credential(&refreshed);
-                return Ok(refreshed);
-            }
+            ))))
         }
     }
-
-    Ok(credential)
 }
 
 /// Refresh a consciousness credential by re-fetching from the identity cluster.

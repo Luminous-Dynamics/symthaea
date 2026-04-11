@@ -119,35 +119,26 @@ pub fn broadcast_event(event: CraftEventEntry) -> ExternResult<Record> {
 /// Bootstrap consciousness credential for the Craft cluster.
 ///
 /// Required by `gate_civic()` which calls `get_consciousness_credential`
-/// on the bridge zome. Returns a bootstrap credential with default scores.
-/// In production, this would fetch from the identity cluster via OtherRole.
+/// Legacy 4D credential — delegates to sovereign bootstrap path.
 #[hdk_extern]
 pub fn get_consciousness_credential(
     did: String,
 ) -> ExternResult<bridge::ConsciousnessCredential> {
-    let now_us = sys_time()?.as_micros() as u64;
-    let actual_did = if did.is_empty() {
-        format!("did:mycelix:{}", agent_info()?.agent_initial_pubkey)
-    } else {
-        did
+    let sovereign = get_sovereign_credential(did)?;
+    let lp = bridge::sovereign_gate::LegacyProfile::from(sovereign.profile.clone());
+    let profile = bridge::ConsciousnessProfile {
+        identity: lp.identity,
+        reputation: lp.reputation,
+        community: lp.community,
+        engagement: lp.engagement,
     };
-    // In production, this fetches real scores from the identity cluster
-    // via OtherRole("identity"). For standalone Craft DNA (no identity
-    // cluster), return a development credential with Steward-level access
-    // so all civic gates pass during testing.
-    use bridge::ConsciousnessProfile;
     Ok(bridge::ConsciousnessCredential {
-        did: actual_did,
-        profile: ConsciousnessProfile {
-            identity: 0.7,
-            reputation: 0.6,
-            community: 0.7,
-            engagement: 0.5,
-        },
-        tier: bridge::ConsciousnessTier::Steward,
-        issued_at: now_us,
-        expires_at: now_us + 24 * 60 * 60 * 1_000_000, // 24h
-        issuer: "did:mycelix:craft-bootstrap".into(),
+        did: sovereign.did,
+        profile: profile.clone(),
+        tier: bridge::ConsciousnessTier::from_score(profile.combined_score()),
+        issued_at: sovereign.issued_at,
+        expires_at: sovereign.expires_at,
+        issuer: sovereign.issuer,
         trajectory_commitment: None,
         extensions: Default::default(),
     })
