@@ -1064,8 +1064,8 @@ mod tests {
     /// computational evidence in algebraic combinatorics.
     #[test]
     fn test_gct_scaling_experiment() {
-        // Phase 1: Collect raw GCT data
-        let detailed = observe_gct_detailed(5);
+        // Phase 1: Collect raw GCT data (up to n=6 — the critical frontier)
+        let detailed = observe_gct_detailed(6);
         eprintln!("\n═══ GCT SCALING EXPERIMENT ═══");
         eprintln!("Computing Kronecker coefficient obstructions for perm_n vs det_n²...\n");
         for (n, obs, total, ratio) in &detailed {
@@ -1084,7 +1084,7 @@ mod tests {
             ..RegressorConfig::default()
         });
 
-        engine.observe(observe_gct_obstruction(5));
+        engine.observe(observe_gct_obstruction(6));
         engine.generate_conjectures(5);
         engine.verify_numerical();
 
