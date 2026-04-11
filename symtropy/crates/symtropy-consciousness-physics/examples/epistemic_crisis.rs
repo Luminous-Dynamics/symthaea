@@ -90,10 +90,10 @@ fn run<const D: usize>(seed: u64) -> DimResult {
         consciousness.register(h, 500.0, 20.0);
         if let Some(e) = consciousness.entities.get_mut(&h) {
             match i % 4 {
-                0 => e.harmony_activations = [0.9,0.1,0.1,0.1,0.1,0.1,0.1,0.8],
-                1 => e.harmony_activations = [0.1,0.9,0.1,0.1,0.1,0.1,0.8,0.1],
-                2 => e.harmony_activations = [0.1,0.1,0.9,0.1,0.1,0.8,0.1,0.1],
-                _ => e.harmony_activations = [0.4;8],
+                0 => e.harmony_activations = [0.9,0.1,0.1,0.1,0.1,0.1,0.1,0.8,0.5],
+                1 => e.harmony_activations = [0.1,0.9,0.1,0.1,0.1,0.1,0.8,0.1,0.5],
+                2 => e.harmony_activations = [0.1,0.1,0.9,0.1,0.1,0.8,0.1,0.1,0.5],
+                _ => e.harmony_activations = [0.4;9],
             }
         }
         agent_handles.push(h);
@@ -143,7 +143,7 @@ fn run<const D: usize>(seed: u64) -> DimResult {
             if consciousness.entities.get(&h).map(|e| e.energy.is_collapsed()).unwrap_or(true) { continue; }
             let pos = match world.body(h) { Some(b) => b.position().0, None => continue };
             let ef = consciousness.entities.get(&h).map(|e| e.energy.fraction_remaining()).unwrap_or(0.0);
-            let harm = consciousness.entities.get(&h).map(|e| e.harmony_activations).unwrap_or([0.5;8]);
+            let harm = consciousness.entities.get(&h).map(|e| e.harmony_activations).unwrap_or([0.5;9]);
             let nearby: Vec<_> = ad.iter().enumerate().filter(|(i,_)| *i!=idx).map(|(_,d)| d.clone()).collect();
             let dir = fep_gradient::free_energy_gradient(&pos, ef, &harm, &nearby, &[], None, 0.0);
             if let Some(b) = world.body_mut(h) {

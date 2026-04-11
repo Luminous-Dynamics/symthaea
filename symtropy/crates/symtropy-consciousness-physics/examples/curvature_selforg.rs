@@ -40,7 +40,7 @@ fn run_experiment(curvature_scale: f64, seed: u64) -> OrgResult {
     let mut field = HarmonyField::<2>::new();
     field.sources.push(HarmonySource {
         position: Point::new([0.0, 0.0]),
-        activations: [0.8, 0.7, 0.6, 0.5, 0.5, 0.6, 0.7, 0.8],
+        activations: [0.8, 0.7, 0.6, 0.5, 0.5, 0.6, 0.7, 0.8, 0.5],
         strength: 25.0,
         radius: 200.0,
         created_at: 0.0,

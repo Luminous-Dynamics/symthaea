@@ -32,11 +32,11 @@ const RESCUE_COST_FRACTION: f64 = 0.20; // donor loses 20% of energy
 const RESCUE_GIFT: f64 = 30.0; // recipient gets 30J
 const RESCUE_COOLDOWN: usize = 500; // ticks before same agent can be rescued again
 
-const HARMONY_PROFILES: [[f64; 8]; 4] = [
-    [0.8, 0.3, 0.2, 0.1, 0.2, 0.3, 0.2, 0.7],
-    [0.3, 0.7, 0.3, 0.2, 0.2, 0.3, 0.7, 0.3],
-    [0.2, 0.2, 0.7, 0.3, 0.7, 0.2, 0.2, 0.2],
-    [0.4, 0.4, 0.3, 0.5, 0.3, 0.5, 0.4, 0.4],
+const HARMONY_PROFILES: [[f64; 9]; 4] = [
+    [0.8, 0.3, 0.2, 0.1, 0.2, 0.3, 0.2, 0.7, 0.5],
+    [0.3, 0.7, 0.3, 0.2, 0.2, 0.3, 0.7, 0.3, 0.5],
+    [0.2, 0.2, 0.7, 0.3, 0.7, 0.2, 0.2, 0.2, 0.5],
+    [0.4, 0.4, 0.3, 0.5, 0.3, 0.5, 0.4, 0.4, 0.5],
 ];
 
 #[derive(Clone, Copy, PartialEq)]
@@ -133,7 +133,7 @@ fn run_experiment(mode: RescueMode, seed: u64) -> AltruismResult {
 
                 // Find nearest alive agent with high resonance
                 let mut best_donor: Option<(usize, f64)> = None;
-                let collapsed_harm = consciousness.entities.get(&hi).map(|e| e.harmony_activations).unwrap_or([0.0; 8]);
+                let collapsed_harm = consciousness.entities.get(&hi).map(|e| e.harmony_activations).unwrap_or([0.0; 9]);
 
                 for j in 0..handles.len() {
                     if i == j { continue; }
@@ -145,7 +145,7 @@ fn run_experiment(mode: RescueMode, seed: u64) -> AltruismResult {
                         _ => false,
                     };
                     if !in_range { continue; }
-                    let donor_harm = consciousness.entities.get(&hj).map(|e| e.harmony_activations).unwrap_or([0.0; 8]);
+                    let donor_harm = consciousness.entities.get(&hj).map(|e| e.harmony_activations).unwrap_or([0.0; 9]);
                     let res = HarmonyField::<2>::resonance(&collapsed_harm, &donor_harm);
                     if res > consciousness.constants.collapse_recovery_harmony_threshold {
                         if best_donor.map(|(_, r)| res > r).unwrap_or(true) {

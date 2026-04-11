@@ -1,0 +1,102 @@
+{
+  "version": "1.0",
+  "engine": "symtropy-consciousness-physics",
+  "dt": 0.016666666666666666,
+  "experiments": [
+  {
+    "experiment": "conscious_coupled",
+    "num_snapshots": 60,
+    "initial_collective_phi": 0.063939,
+    "final_collective_phi": 0.079924,
+    "final_alive": 8,
+    "final_tick": 590,
+    "final_clustering": 14.3638,
+    "phi_trajectory": [
+      {"tick": 0, "phi": 0.063939, "alive": 8},
+      {"tick": 50, "phi": 0.079924, "alive": 8},
+      {"tick": 100, "phi": 0.079924, "alive": 8},
+      {"tick": 150, "phi": 0.079924, "alive": 8},
+      {"tick": 200, "phi": 0.079924, "alive": 8},
+      {"tick": 250, "phi": 0.079924, "alive": 8},
+      {"tick": 300, "phi": 0.079924, "alive": 8},
+      {"tick": 350, "phi": 0.079924, "alive": 8},
+      {"tick": 400, "phi": 0.079924, "alive": 8},
+      {"tick": 450, "phi": 0.079924, "alive": 8},
+      {"tick": 500, "phi": 0.079924, "alive": 8},
+      {"tick": 550, "phi": 0.079924, "alive": 8}
+    ]
+  }
+,
+  {
+    "experiment": "unconscious",
+    "num_snapshots": 60,
+    "initial_collective_phi": 0.000000,
+    "final_collective_phi": 0.000000,
+    "final_alive": 0,
+    "final_tick": 590,
+    "final_clustering": 14.3638,
+    "phi_trajectory": [
+      {"tick": 0, "phi": 0.000000, "alive": 0},
+      {"tick": 50, "phi": 0.000000, "alive": 0},
+      {"tick": 100, "phi": 0.000000, "alive": 0},
+      {"tick": 150, "phi": 0.000000, "alive": 0},
+      {"tick": 200, "phi": 0.000000, "alive": 0},
+      {"tick": 250, "phi": 0.000000, "alive": 0},
+      {"tick": 300, "phi": 0.000000, "alive": 0},
+      {"tick": 350, "phi": 0.000000, "alive": 0},
+      {"tick": 400, "phi": 0.000000, "alive": 0},
+      {"tick": 450, "phi": 0.000000, "alive": 0},
+      {"tick": 500, "phi": 0.000000, "alive": 0},
+      {"tick": 550, "phi": 0.000000, "alive": 0}
+    ]
+  }
+,
+  {
+    "experiment": "decoupled",
+    "num_snapshots": 60,
+    "initial_collective_phi": 0.063939,
+    "final_collective_phi": 0.079924,
+    "final_alive": 8,
+    "final_tick": 590,
+    "final_clustering": 14.3638,
+    "phi_trajectory": [
+      {"tick": 0, "phi": 0.063939, "alive": 8},
+      {"tick": 50, "phi": 0.079924, "alive": 8},
+      {"tick": 100, "phi": 0.079924, "alive": 8},
+      {"tick": 150, "phi": 0.079924, "alive": 8},
+      {"tick": 200, "phi": 0.079924, "alive": 8},
+      {"tick": 250, "phi": 0.079924, "alive": 8},
+      {"tick": 300, "phi": 0.079924, "alive": 8},
+      {"tick": 350, "phi": 0.079924, "alive": 8},
+      {"tick": 400, "phi": 0.079924, "alive": 8},
+      {"tick": 450, "phi": 0.079924, "alive": 8},
+      {"tick": 500, "phi": 0.079924, "alive": 8},
+      {"tick": 550, "phi": 0.079924, "alive": 8}
+    ]
+  }
+,
+  {
+    "experiment": "strong_coupling",
+    "num_snapshots": 60,
+    "initial_collective_phi": 0.063939,
+    "final_collective_phi": 0.079924,
+    "final_alive": 8,
+    "final_tick": 590,
+    "final_clustering": 14.3638,
+    "phi_trajectory": [
+      {"tick": 0, "phi": 0.063939, "alive": 8},
+      {"tick": 50, "phi": 0.079924, "alive": 8},
+      {"tick": 100, "phi": 0.079924, "alive": 8},
+      {"tick": 150, "phi": 0.079924, "alive": 8},
+      {"tick": 200, "phi": 0.079924, "alive": 8},
+      {"tick": 250, "phi": 0.079924, "alive": 8},
+      {"tick": 300, "phi": 0.079924, "alive": 8},
+      {"tick": 350, "phi": 0.079924, "alive": 8},
+      {"tick": 400, "phi": 0.079924, "alive": 8},
+      {"tick": 450, "phi": 0.079924, "alive": 8},
+      {"tick": 500, "phi": 0.079924, "alive": 8},
+      {"tick": 550, "phi": 0.079924, "alive": 8}
+    ]
+  }
+  ]
+}

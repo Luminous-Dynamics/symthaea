@@ -85,10 +85,10 @@ fn run(with_drift: bool, seed: u64) -> Result {
         consciousness.register(h, 500.0, 20.0);
         if let Some(e) = consciousness.entities.get_mut(&h) {
             match i % 4 {
-                0 => e.harmony_activations = [0.9,0.1,0.1,0.1,0.1,0.1,0.1,0.8],
-                1 => e.harmony_activations = [0.1,0.9,0.1,0.1,0.1,0.1,0.8,0.1],
-                2 => e.harmony_activations = [0.1,0.1,0.9,0.1,0.1,0.8,0.1,0.1],
-                _ => e.harmony_activations = [0.4;8],
+                0 => e.harmony_activations = [0.9,0.1,0.1,0.1,0.1,0.1,0.1,0.8,0.5],
+                1 => e.harmony_activations = [0.1,0.9,0.1,0.1,0.1,0.1,0.8,0.1,0.5],
+                2 => e.harmony_activations = [0.1,0.1,0.9,0.1,0.1,0.8,0.1,0.1,0.5],
+                _ => e.harmony_activations = [0.4;9],
             }
         }
         agent_handles.push(h);
@@ -129,7 +129,7 @@ fn run(with_drift: bool, seed: u64) -> Result {
 
         // FEP gradient — agents sense in 3D only
         // Build "nearby agents" list using 3D projected positions
-        let agent_data_3d: Vec<(SVector<f64, 4>, [f64; 8])> = agent_handles.iter()
+        let agent_data_3d: Vec<(SVector<f64, 4>, [f64; 9])> = agent_handles.iter()
             .filter_map(|&h| {
                 let body = world.body(h)?;
                 let entity = consciousness.entities.get(&h)?;
@@ -140,7 +140,7 @@ fn run(with_drift: bool, seed: u64) -> Result {
             if consciousness.entities.get(&h).map(|e| e.energy.is_collapsed()).unwrap_or(true) { continue; }
             let pos = match world.body(h) { Some(b) => b.position().0, None => continue };
             let ef = consciousness.entities.get(&h).map(|e| e.energy.fraction_remaining()).unwrap_or(0.0);
-            let harm = consciousness.entities.get(&h).map(|e| e.harmony_activations).unwrap_or([0.5;8]);
+            let harm = consciousness.entities.get(&h).map(|e| e.harmony_activations).unwrap_or([0.5;9]);
 
             // 3D-BLIND: agent can only see other agents' xyz, not w
             let nearby: Vec<_> = agent_data_3d.iter().enumerate()

@@ -90,9 +90,9 @@ fn run_simulation(constants: &ThermodynamicConstants, seed: u64) -> RunResult {
 
         if let Some(entity) = consciousness.entities.get_mut(&h) {
             match i % 3 {
-                0 => entity.harmony_activations = [0.9, 0.2, 0.1, 0.1, 0.1, 0.1, 0.1, 0.8],
-                1 => entity.harmony_activations = [0.2, 0.1, 0.9, 0.1, 0.1, 0.1, 0.8, 0.2],
-                _ => entity.harmony_activations = [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5],
+                0 => entity.harmony_activations = [0.9, 0.2, 0.1, 0.1, 0.1, 0.1, 0.1, 0.8, 0.5],
+                1 => entity.harmony_activations = [0.2, 0.1, 0.9, 0.1, 0.1, 0.1, 0.8, 0.2, 0.5],
+                _ => entity.harmony_activations = [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5],
             }
         }
         handles.push(h);

@@ -48,10 +48,10 @@ fn run_at_cost(maint_cost: f64, seed: u64) -> f64 {
         consciousness.register(h, 500.0, 20.0);
         if let Some(e) = consciousness.entities.get_mut(&h) {
             match i % 4 {
-                0 => e.harmony_activations = [0.9,0.1,0.1,0.1,0.1,0.1,0.1,0.8],
-                1 => e.harmony_activations = [0.1,0.9,0.1,0.1,0.1,0.1,0.8,0.1],
-                2 => e.harmony_activations = [0.1,0.1,0.9,0.1,0.1,0.8,0.1,0.1],
-                _ => e.harmony_activations = [0.4;8],
+                0 => e.harmony_activations = [0.9,0.1,0.1,0.1,0.1,0.1,0.1,0.8,0.5],
+                1 => e.harmony_activations = [0.1,0.9,0.1,0.1,0.1,0.1,0.8,0.1,0.5],
+                2 => e.harmony_activations = [0.1,0.1,0.9,0.1,0.1,0.8,0.1,0.1,0.5],
+                _ => e.harmony_activations = [0.4;9],
             }
         }
         handles.push(h);

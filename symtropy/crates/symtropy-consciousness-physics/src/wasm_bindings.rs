@@ -397,6 +397,49 @@ impl WasmPhysicsDemo {
     pub fn world_size(&self) -> f64 {
         self.world_size
     }
+
+    /// Set the Φ-gravity coupling strength (bifurcation parameter).
+    ///
+    /// Controls how strongly integrated information attracts agents.
+    /// The phase transition occurs near `k ≈ 0.3-0.4` in the default configuration.
+    /// `k = 0.0`: no consciousness-driven attraction.
+    /// `k = 1.0`: strong attraction to high-Φ regions.
+    pub fn set_phi_gravity(&mut self, k: f64) {
+        self.field.phi_gravity_strength = k.clamp(0.0, 2.0);
+    }
+
+    /// Get the current Φ-gravity coupling strength.
+    pub fn phi_gravity(&self) -> f64 {
+        self.field.phi_gravity_strength
+    }
+
+    /// Toggle consciousness on/off for all agents.
+    ///
+    /// When disabled, all Φ inputs are zeroed — agents become "unconscious"
+    /// (Φ=0) while retaining energy and physics. This demonstrates the
+    /// conscious/unconscious clustering difference (Finding 3: 35% tighter
+    /// clustering with Φ>0).
+    pub fn set_consciousness_enabled(&mut self, enabled: bool) {
+        for agent in self.agents.iter_mut() {
+            if enabled {
+                agent.inputs.phi = 0.5;
+                agent.inputs.broadcast = 0.5;
+                agent.inputs.working_memory = 0.5;
+            } else {
+                agent.inputs.phi = 0.0;
+                agent.inputs.broadcast = 0.0;
+                agent.inputs.working_memory = 0.0;
+            }
+        }
+    }
+
+    /// Get per-agent Φ values as a JSON array.
+    pub fn phi_values(&self) -> String {
+        let phis: Vec<f64> = self.agents.iter()
+            .map(|a| self.field.phi(a.handle))
+            .collect();
+        serde_json::to_string(&phis).unwrap_or_else(|_| "[]".into())
+    }
 }
 
 // ── Native (non-WASM) unit tests ──────────────────────────────────────────

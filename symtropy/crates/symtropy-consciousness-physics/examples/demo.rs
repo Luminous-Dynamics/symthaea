@@ -127,7 +127,7 @@ fn run_simulation(enforce: bool, seed: u64) -> SimResult {
                 .unwrap_or(0.0);
             let harmony = field.entities.get(&h)
                 .map(|e| e.harmony_activations)
-                .unwrap_or([0.0; 8]);
+                .unwrap_or([0.0; 9]);
 
             // Nearby agents for FEP gradient
             let nearby: Vec<_> = handles.iter()
@@ -185,8 +185,8 @@ fn run_simulation(enforce: bool, seed: u64) -> SimResult {
                     if let (Some(ba), Some(bb)) = (ba, bb) {
                         let dist = ba.position().distance(bb.position());
                         if dist < field.constants.harmony_range {
-                            let harm_a = field.entities.get(&ha).map(|e| e.harmony_activations).unwrap_or([0.0;8]);
-                            let harm_b = field.entities.get(&hb).map(|e| e.harmony_activations).unwrap_or([0.0;8]);
+                            let harm_a = field.entities.get(&ha).map(|e| e.harmony_activations).unwrap_or([0.0;9]);
+                            let harm_b = field.entities.get(&hb).map(|e| e.harmony_activations).unwrap_or([0.0;9]);
                             let res = HarmonyField::<2>::resonance(&harm_a, &harm_b);
                             if res > 0.5 {
                                 let regen = field.constants.harmony_resonance_regen_rate * (res - 0.5) * 2.0;

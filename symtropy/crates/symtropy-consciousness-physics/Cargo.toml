@@ -48,3 +48,20 @@ criterion = { version = "0.5", features = ["html_reports"] }
 [[bench]]
 name = "coupling_bench"
 harness = false
+
+# Feature-gated examples (won't build with `cargo check --examples` without features)
+[[example]]
+name = "curvature_lensing"
+required-features = ["consciousness-curvature"]
+
+[[example]]
+name = "curvature_selforg"
+required-features = ["consciousness-curvature"]
+
+[[example]]
+name = "hdc_cooperation"
+required-features = ["consciousness-hdc"]
+
+[[example]]
+name = "pyphi_validate"
+required-features = ["pyphi-validation"]

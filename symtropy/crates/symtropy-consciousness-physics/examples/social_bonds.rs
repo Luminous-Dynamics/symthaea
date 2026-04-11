@@ -32,13 +32,13 @@ const BOND_STIFFNESS: f64 = 0.5;
 
 /// 6 distinct harmony archetypes with genuine diversity.
 /// Some pairs resonate highly (>0.7), others don't (<0.5).
-const HARMONY_PROFILES: [[f64; 8]; 6] = [
-    [0.9, 0.2, 0.1, 0.1, 0.2, 0.1, 0.1, 0.8], // Stillness+Stewardship
-    [0.2, 0.8, 0.2, 0.1, 0.1, 0.2, 0.8, 0.2], // Play+Kinship
-    [0.1, 0.2, 0.8, 0.2, 0.8, 0.1, 0.2, 0.1], // Craft+Curiosity
-    [0.1, 0.1, 0.2, 0.9, 0.2, 0.8, 0.1, 0.1], // Justice+Celebration
-    [0.7, 0.3, 0.3, 0.1, 0.3, 0.1, 0.3, 0.7], // variant of Stillness (compatible with 0)
-    [0.3, 0.7, 0.1, 0.2, 0.1, 0.3, 0.7, 0.3], // variant of Play (compatible with 1)
+const HARMONY_PROFILES: [[f64; 9]; 6] = [
+    [0.9, 0.2, 0.1, 0.1, 0.2, 0.1, 0.1, 0.8, 0.5], // Stillness+Stewardship
+    [0.2, 0.8, 0.2, 0.1, 0.1, 0.2, 0.8, 0.2, 0.5], // Play+Kinship
+    [0.1, 0.2, 0.8, 0.2, 0.8, 0.1, 0.2, 0.1, 0.5], // Craft+Curiosity
+    [0.1, 0.1, 0.2, 0.9, 0.2, 0.8, 0.1, 0.1, 0.5], // Justice+Celebration
+    [0.7, 0.3, 0.3, 0.1, 0.3, 0.1, 0.3, 0.7, 0.5], // variant of Stillness (compatible with 0)
+    [0.3, 0.7, 0.1, 0.2, 0.1, 0.3, 0.7, 0.3, 0.5], // variant of Play (compatible with 1)
 ];
 
 struct BondResult {

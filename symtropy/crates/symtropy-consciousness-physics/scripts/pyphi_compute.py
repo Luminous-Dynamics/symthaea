@@ -29,6 +29,14 @@ Run via:  echo '{"tpm": ..., "state": ...}' | python3 pyphi_compute.py
 
 import json
 import sys
+import collections
+import collections.abc
+
+# Compatibility shim for PyPhi on Python 3.10+
+# PyPhi uses collections.Iterable which was removed in 3.10
+for attr in ('Iterable', 'Mapping', 'MutableMapping', 'Sequence', 'MutableSequence'):
+    if not hasattr(collections, attr):
+        setattr(collections, attr, getattr(collections.abc, attr))
 
 def compute_phi(request: dict) -> dict:
     """Compute IIT Phi using PyPhi."""

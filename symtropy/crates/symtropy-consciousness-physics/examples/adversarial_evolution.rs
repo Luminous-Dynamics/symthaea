@@ -43,9 +43,9 @@ fn main() {
     let mut rng = 42u64;
     let mut coop_handles = Vec::new();
     let mut adv_handles = Vec::new();
-    let mut coop_harmonies: Vec<[f64; 8]> = Vec::new();
+    let mut coop_harmonies: Vec<[f64; 9]> = Vec::new();
     let mut coop_age: Vec<usize> = Vec::new();
-    let adv_harmony: [f64; 8] = [0.1, 0.1, 0.9, 0.9, 0.9, 0.1, 0.1, 0.1]; // fixed hostile profile
+    let adv_harmony: [f64; 9] = [0.1, 0.1, 0.9, 0.9, 0.9, 0.1, 0.1, 0.1, 0.5]; // fixed hostile profile
 
     // Spawn cooperators (random harmonies, will evolve)
     for _ in 0..COOPERATORS {
@@ -54,7 +54,7 @@ fn main() {
         let h = world.add_sphere(Point::new([x, y]), 1.0, 1.0);
         if let Some(b) = world.body_mut(h) { b.linear_damping = 0.05; }
         consciousness.register(h, consciousness.constants.initial_energy, consciousness.constants.harmony_range);
-        let harm: [f64; 8] = std::array::from_fn(|_| rng_f64(&mut rng) * 0.7 + 0.15);
+        let harm: [f64; 9] = std::array::from_fn(|_| rng_f64(&mut rng) * 0.7 + 0.15);
         if let Some(e) = consciousness.entities.get_mut(&h) { e.harmony_activations = harm; }
         coop_handles.push(h);
         coop_harmonies.push(harm);
@@ -274,7 +274,7 @@ fn mean_resonance_between(c: &ConsciousnessField<2>, group_a: &[symtropy_physics
 
 fn harm_var(c: &ConsciousnessField<2>, handles: &[symtropy_physics::BodyHandle]) -> f64 {
     let n = handles.len() as f64;
-    let mut mean = [0.0f64; 8];
+    let mut mean = [0.0f64; 9];
     for &h in handles { if let Some(e) = c.entities.get(&h) { for i in 0..8 { mean[i] += e.harmony_activations[i]; } } }
     for v in &mut mean { *v /= n; }
     handles.iter().filter_map(|h| c.entities.get(h).map(|e| (0..8).map(|i| (e.harmony_activations[i] - mean[i]).powi(2)).sum::<f64>())).sum::<f64>() / n

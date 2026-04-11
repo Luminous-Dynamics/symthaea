@@ -53,11 +53,11 @@ fn run(with_leakage: bool, seed: u64) -> Result {
     if with_leakage {
         // A wormhole: energy drains at (-30, 0) and appears at (30, 0)
         // 3D agents see energy vanish on the left and appear on the right
-        leakage.create_wormhole([-30.0, 0.0, 0.0], [30.0, 0.0, 0.0], 0.3, 40.0);
+        leakage.create_wormhole(SVector::from([-30.0, 0.0, 0.0]), SVector::from([30.0, 0.0, 0.0]), 0.3, 40.0);
         // A pure sink: energy drains at (0, 40) into the bulk — never returns to 3D
         leakage.add_point(
             symtropy_consciousness_physics::dimensional_leakage::LeakagePoint::sink(
-                [0.0, 40.0, 0.0], 2.0, 0.2, 30.0,
+                SVector::from([0.0, 40.0, 0.0]), 2.0, 0.2, 30.0,
             ),
         );
     }
@@ -75,10 +75,10 @@ fn run(with_leakage: bool, seed: u64) -> Result {
         consciousness.register(h, 400.0, 20.0);
         if let Some(e) = consciousness.entities.get_mut(&h) {
             match i % 4 {
-                0 => e.harmony_activations = [0.9,0.1,0.1,0.1,0.1,0.1,0.1,0.8],
-                1 => e.harmony_activations = [0.1,0.9,0.1,0.1,0.1,0.1,0.8,0.1],
-                2 => e.harmony_activations = [0.1,0.1,0.9,0.1,0.1,0.8,0.1,0.1],
-                _ => e.harmony_activations = [0.4;8],
+                0 => e.harmony_activations = [0.9,0.1,0.1,0.1,0.1,0.1,0.1,0.8,0.5],
+                1 => e.harmony_activations = [0.1,0.9,0.1,0.1,0.1,0.1,0.8,0.1,0.5],
+                2 => e.harmony_activations = [0.1,0.1,0.9,0.1,0.1,0.8,0.1,0.1,0.5],
+                _ => e.harmony_activations = [0.4;9],
             }
         }
         handles.push(h);
@@ -101,7 +101,7 @@ fn run(with_leakage: bool, seed: u64) -> Result {
             if consciousness.entities.get(&h).map(|e| e.energy.is_collapsed()).unwrap_or(true) { continue; }
             let pos = match world.body(h) { Some(b) => b.position().0, None => continue };
             let ef = consciousness.entities.get(&h).map(|e| e.energy.fraction_remaining()).unwrap_or(0.0);
-            let harm = consciousness.entities.get(&h).map(|e| e.harmony_activations).unwrap_or([0.5;8]);
+            let harm = consciousness.entities.get(&h).map(|e| e.harmony_activations).unwrap_or([0.5;9]);
             let nearby: Vec<_> = ad.iter().enumerate().filter(|(i,_)| *i!=idx).map(|(_,d)| d.clone()).collect();
             let dir = fep_gradient::free_energy_gradient(&pos, ef, &harm, &nearby, &[], None, 0.0);
             if let Some(b) = world.body_mut(h) { b.linear_velocity = dir * 30.0; }
@@ -124,7 +124,7 @@ fn run(with_leakage: bool, seed: u64) -> Result {
             for &h in &handles {
                 if let Some(body) = world.body(h) {
                     let pos_2d = body.position().0;
-                    let pos_3d = [pos_2d[0], pos_2d[1], 0.0]; // project to 3D
+                    let pos_3d = SVector::from([pos_2d[0], pos_2d[1], 0.0]); // project to 3D
                     let energy_effect = leakage.total_effect_at(&pos_3d);
 
                     if let Some(entity) = consciousness.entities.get_mut(&h) {
@@ -191,14 +191,14 @@ fn run(with_leakage: bool, seed: u64) -> Result {
     let near_source = handles.iter().filter(|&&h| {
         world.body(h).map(|b| {
             let p = b.position().0;
-            leakage.points.iter().any(|lp| lp.flow_rate > 0.0 && lp.distance_3d(&[p[0], p[1], 0.0]) < 30.0)
+            leakage.points.iter().any(|lp| lp.flow_rate > 0.0 && lp.distance(&SVector::from([p[0], p[1], 0.0])) < 30.0)
         }).unwrap_or(false)
     }).count() as f64 / alive.max(1) as f64;
 
     let near_sink = handles.iter().filter(|&&h| {
         world.body(h).map(|b| {
             let p = b.position().0;
-            leakage.points.iter().any(|lp| lp.flow_rate < 0.0 && lp.distance_3d(&[p[0], p[1], 0.0]) < 30.0)
+            leakage.points.iter().any(|lp| lp.flow_rate < 0.0 && lp.distance(&SVector::from([p[0], p[1], 0.0])) < 30.0)
         }).unwrap_or(false)
     }).count() as f64 / alive.max(1) as f64;
 

@@ -46,6 +46,31 @@ Inspired by McFadden's CEMI field theory (2020). Each of the 8 harmonies creates
 
 When Sacred Stillness > 0.6 and Φ > 0.3, a consciousness-created safe zone forms. Collision impulses dampened up to 90%. The physics literally protects conscious beings.
 
+## Benchmarks
+
+Measured on AMD Ryzen, `cargo bench -p symtropy-consciousness-physics`:
+
+| Operation | N | Median |
+|-----------|---|--------|
+| `update_entity` (single) | 1 | 2.2 µs |
+| `update_entity` (batch) | 8 | 26 µs |
+| `update_entity` (batch) | 32 | 77 µs |
+| `update_entity` (batch) | 128 | 706 µs |
+| `tick_prediction_errors` | 8 | 133 ns |
+| `tick_prediction_errors` | 64 | 1.1 µs |
+| `tick_prediction_errors` | 256 | 7.7 µs |
+| `spread_emotional_contagion` | 4 | 2.7 µs |
+| `spread_emotional_contagion` | 16 | 32 µs |
+| `spread_emotional_contagion` | 64 | 386 µs |
+| `apply_macro_modifiers` | 32 | 626 ns |
+| `phi_env_coupler_tick` | 1 | 778 ns |
+| `biometric_to_consciousness` | 30 | 1.2 µs |
+| `full_step_with_consciousness` | 4 | 13 µs |
+| `full_step_with_consciousness` | 16 | 60 µs |
+| `bifurcation_sweep` (3k×2) | — | 222 µs |
+
+At 60 Hz with 16 agents: ~60 µs/tick → **16,600 ticks/second** (277× real-time budget).
+
 ## WASM Compatible
 
 Part of the [Symtropy consciousness-physics engine](https://github.com/luminous-dynamics/symtropy).

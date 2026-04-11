@@ -41,7 +41,8 @@ use symtropy_physics::BodyHandle;
 
 /// Threshold for discretizing Φ to binary (on/off).
 /// Agents with Φ ≥ this value are considered "integrated" (state = 1).
-pub const PHI_BINARY_THRESHOLD: f64 = 0.3;
+/// Set low (0.1) because the softmin bottleneck typically produces Φ ∈ [0.05, 0.25].
+pub const PHI_BINARY_THRESHOLD: f64 = 0.1;
 
 /// A binary snapshot of agent states at one tick.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -274,9 +275,23 @@ pub fn call_pyphi(
     // Find script path
     let script_path = find_pyphi_script()?;
 
-    // Shell out to Python
-    let mut child = Command::new("python3")
+    // Shell out to Python — check PYPHI_PYTHON env var first, then common venv paths
+    let python = std::env::var("PYPHI_PYTHON")
+        .unwrap_or_else(|_| {
+            for candidate in &[
+                "/tmp/pyphi-venv/bin/python3",
+                "/tmp/pyphi310/bin/python3",
+            ] {
+                if std::path::Path::new(candidate).exists() {
+                    return candidate.to_string();
+                }
+            }
+            "python3".to_string()
+        });
+
+    let mut child = Command::new(&python)
         .arg(&script_path)
+        .env("PYPHI_WELCOME_OFF", "1")
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())

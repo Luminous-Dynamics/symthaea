@@ -65,8 +65,8 @@ fn run_experiment(mode: Mode, seed: u64) -> AdvLearnResult {
     let mut adv_handles = Vec::new();
     let mut coop_weights: Vec<LearnedFepWeights> = Vec::new();
     let mut adv_weights: Vec<LearnedFepWeights> = Vec::new();
-    let mut coop_harmonies: Vec<[f64; 8]> = Vec::new();
-    let mut adv_harmonies: Vec<[f64; 8]> = Vec::new();
+    let mut coop_harmonies: Vec<[f64; 9]> = Vec::new();
+    let mut adv_harmonies: Vec<[f64; 9]> = Vec::new();
 
     let coop_learn = matches!(mode, Mode::LearnFixed | Mode::LearnLearn);
     let adv_learn = matches!(mode, Mode::LearnLearn);
@@ -79,9 +79,9 @@ fn run_experiment(mode: Mode, seed: u64) -> AdvLearnResult {
         if let Some(b) = world.body_mut(h) { b.linear_damping = 0.05; }
         consciousness.register(h, consciousness.constants.initial_energy, consciousness.constants.harmony_range);
         let harmony = match i % 3 {
-            0 => [0.7, 0.4, 0.2, 0.1, 0.3, 0.3, 0.2, 0.6],
-            1 => [0.3, 0.6, 0.3, 0.2, 0.2, 0.4, 0.6, 0.3],
-            _ => [0.4, 0.3, 0.3, 0.6, 0.4, 0.6, 0.3, 0.4],
+            0 => [0.7, 0.4, 0.2, 0.1, 0.3, 0.3, 0.2, 0.6, 0.5],
+            1 => [0.3, 0.6, 0.3, 0.2, 0.2, 0.4, 0.6, 0.3, 0.5],
+            _ => [0.4, 0.3, 0.3, 0.6, 0.4, 0.6, 0.3, 0.4, 0.5],
         };
         if let Some(e) = consciousness.entities.get_mut(&h) { e.harmony_activations = harmony; }
         coop_handles.push(h);
@@ -96,7 +96,7 @@ fn run_experiment(mode: Mode, seed: u64) -> AdvLearnResult {
         let h = world.add_sphere(Point::new([x, y]), 1.0, 1.5);
         if let Some(b) = world.body_mut(h) { b.linear_damping = 0.03; }
         consciousness.register(h, consciousness.constants.initial_energy, consciousness.constants.harmony_range);
-        let harmony = [0.1, 0.1, 0.9, 0.9, 0.9, 0.1, 0.1, 0.1];
+        let harmony = [0.1, 0.1, 0.9, 0.9, 0.9, 0.1, 0.1, 0.1, 0.5];
         if let Some(e) = consciousness.entities.get_mut(&h) { e.harmony_activations = harmony; }
         adv_handles.push(h);
         adv_weights.push(LearnedFepWeights::default());

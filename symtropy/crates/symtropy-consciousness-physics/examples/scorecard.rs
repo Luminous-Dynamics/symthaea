@@ -36,10 +36,10 @@ fn main() {
         consciousness.register(h, consciousness.constants.initial_energy, consciousness.constants.harmony_range);
         if let Some(e) = consciousness.entities.get_mut(&h) {
             match i % 4 {
-                0 => e.harmony_activations = [0.9, 0.2, 0.1, 0.1, 0.1, 0.1, 0.1, 0.8],
-                1 => e.harmony_activations = [0.2, 0.1, 0.9, 0.1, 0.1, 0.1, 0.8, 0.2],
-                2 => e.harmony_activations = [0.5; 8],
-                _ => e.harmony_activations = [0.1, 0.8, 0.2, 0.7, 0.3, 0.6, 0.4, 0.3],
+                0 => e.harmony_activations = [0.9, 0.2, 0.1, 0.1, 0.1, 0.1, 0.1, 0.8, 0.5],
+                1 => e.harmony_activations = [0.2, 0.1, 0.9, 0.1, 0.1, 0.1, 0.8, 0.2, 0.5],
+                2 => e.harmony_activations = [0.5; 9],
+                _ => e.harmony_activations = [0.1, 0.8, 0.2, 0.7, 0.3, 0.6, 0.4, 0.3, 0.5],
             }
         }
         handles.push(h);

@@ -86,10 +86,10 @@ fn run_experiment(condition: Condition, seed: u64) -> RunResult {
 
         if let Some(entity) = consciousness.entities.get_mut(&h) {
             match i % 4 {
-                0 => entity.harmony_activations = [0.9, 0.2, 0.1, 0.1, 0.1, 0.1, 0.1, 0.8],
-                1 => entity.harmony_activations = [0.2, 0.1, 0.9, 0.1, 0.1, 0.1, 0.8, 0.2],
-                2 => entity.harmony_activations = [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5],
-                _ => entity.harmony_activations = [0.1, 0.8, 0.2, 0.7, 0.3, 0.6, 0.4, 0.3],
+                0 => entity.harmony_activations = [0.9, 0.2, 0.1, 0.1, 0.1, 0.1, 0.1, 0.8, 0.3],
+                1 => entity.harmony_activations = [0.2, 0.1, 0.9, 0.1, 0.1, 0.1, 0.8, 0.2, 0.5],
+                2 => entity.harmony_activations = [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5],
+                _ => entity.harmony_activations = [0.1, 0.8, 0.2, 0.7, 0.3, 0.6, 0.4, 0.3, 0.4],
             }
         }
         handles.push(h);
@@ -142,7 +142,7 @@ fn run_experiment(condition: Condition, seed: u64) -> RunResult {
 
         // 2. FEP gradient movement (if condition uses it)
         if condition.use_gradient() {
-            let agent_data: Vec<(SVector<f64, 2>, [f64; 8])> = handles.iter()
+            let agent_data: Vec<(SVector<f64, 2>, [f64; 9])> = handles.iter()
                 .filter_map(|&h| {
                     let body = world.body(h)?;
                     let entity = consciousness.entities.get(&h)?;

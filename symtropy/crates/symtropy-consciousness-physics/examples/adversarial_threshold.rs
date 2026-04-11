@@ -58,10 +58,10 @@ fn run_experiment(adversary_fraction: f64, seed: u64) -> AdversarialResult {
         consciousness.register(h, consciousness.constants.initial_energy, consciousness.constants.harmony_range);
         if let Some(e) = consciousness.entities.get_mut(&h) {
             match i % 4 {
-                0 => e.harmony_activations = [0.8, 0.3, 0.2, 0.1, 0.2, 0.3, 0.2, 0.7],
-                1 => e.harmony_activations = [0.3, 0.7, 0.3, 0.2, 0.3, 0.2, 0.6, 0.3],
-                2 => e.harmony_activations = [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5],
-                _ => e.harmony_activations = [0.4, 0.4, 0.6, 0.3, 0.4, 0.5, 0.4, 0.4],
+                0 => e.harmony_activations = [0.8, 0.3, 0.2, 0.1, 0.2, 0.3, 0.2, 0.7, 0.3],
+                1 => e.harmony_activations = [0.3, 0.7, 0.3, 0.2, 0.3, 0.2, 0.6, 0.3, 0.5],
+                2 => e.harmony_activations = [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5],
+                _ => e.harmony_activations = [0.4, 0.4, 0.6, 0.3, 0.4, 0.5, 0.4, 0.4, 0.4],
             }
         }
         coop_handles.push(h);
@@ -76,7 +76,7 @@ fn run_experiment(adversary_fraction: f64, seed: u64) -> AdversarialResult {
         consciousness.register(h, consciousness.constants.initial_energy, consciousness.constants.harmony_range);
         if let Some(e) = consciousness.entities.get_mut(&h) {
             // Inverted: high where cooperators are low, low where they're high
-            e.harmony_activations = [0.1, 0.1, 0.9, 0.9, 0.9, 0.1, 0.1, 0.1];
+            e.harmony_activations = [0.1, 0.1, 0.9, 0.9, 0.9, 0.1, 0.1, 0.1, 0.9];
         }
         adv_handles.push(h);
     }
@@ -191,7 +191,7 @@ fn run_experiment(adversary_fraction: f64, seed: u64) -> AdversarialResult {
 
     // Polarization: variance of harmony across all agents
     let n = all_handles.len() as f64;
-    let mut mean_h = [0.0f64; 8];
+    let mut mean_h = [0.0f64; 9];
     for &h in &all_handles { if let Some(e) = consciousness.entities.get(&h) { for i in 0..8 { mean_h[i] += e.harmony_activations[i]; } } }
     for v in &mut mean_h { *v /= n; }
     let polarization: f64 = all_handles.iter().filter_map(|h| consciousness.entities.get(h).map(|e| (0..8).map(|i| (e.harmony_activations[i] - mean_h[i]).powi(2)).sum::<f64>())).sum::<f64>() / n;

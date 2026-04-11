@@ -41,7 +41,7 @@ fn main() {
 
     let mut rng = 42u64;
     let mut handles = Vec::new();
-    let mut agent_harmonies: Vec<[f64; 8]> = Vec::new();
+    let mut agent_harmonies: Vec<[f64; 9]> = Vec::new();
     let mut agent_age: Vec<usize> = Vec::new();
     let mut generation = 0usize;
 
@@ -53,7 +53,7 @@ fn main() {
         if let Some(b) = world.body_mut(h) { b.linear_damping = 0.05; }
         consciousness.register(h, consciousness.constants.initial_energy, consciousness.constants.harmony_range);
 
-        let harmony: [f64; 8] = std::array::from_fn(|_| rng_f64(&mut rng) * 0.8 + 0.1);
+        let harmony: [f64; 9] = std::array::from_fn(|_| rng_f64(&mut rng) * 0.8 + 0.1);
         if let Some(e) = consciousness.entities.get_mut(&h) {
             e.harmony_activations = harmony;
         }
@@ -262,7 +262,7 @@ fn main() {
 }
 
 fn compute_mean_resonance(consciousness: &ConsciousnessField<2>, handles: &[symtropy_physics::BodyHandle]) -> f64 {
-    let harms: Vec<[f64; 8]> = handles.iter().filter_map(|h| consciousness.entities.get(h).map(|e| e.harmony_activations)).collect();
+    let harms: Vec<[f64; 9]> = handles.iter().filter_map(|h| consciousness.entities.get(h).map(|e| e.harmony_activations)).collect();
     if harms.len() < 2 { return 0.0; }
     let mut total = 0.0;
     let mut count = 0;
@@ -277,7 +277,7 @@ fn compute_mean_resonance(consciousness: &ConsciousnessField<2>, handles: &[symt
 
 fn compute_harmony_variance(consciousness: &ConsciousnessField<2>, handles: &[symtropy_physics::BodyHandle]) -> f64 {
     let n = handles.len() as f64;
-    let mut mean = [0.0f64; 8];
+    let mut mean = [0.0f64; 9];
     for &h in handles { if let Some(e) = consciousness.entities.get(&h) { for i in 0..8 { mean[i] += e.harmony_activations[i]; } } }
     for v in &mut mean { *v /= n; }
     handles.iter().filter_map(|h| consciousness.entities.get(h).map(|e| (0..8).map(|i| (e.harmony_activations[i] - mean[i]).powi(2)).sum::<f64>())).sum::<f64>() / n

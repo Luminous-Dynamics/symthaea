@@ -47,9 +47,9 @@ fn main() {
         // Set harmony activations — alternate between two profiles
         if let Some(entity) = consciousness.entities.get_mut(&h) {
             if i % 2 == 0 {
-                entity.harmony_activations = [0.8, 0.3, 0.1, 0.1, 0.1, 0.1, 0.1, 0.7]; // Stillness-heavy
+                entity.harmony_activations = [0.8, 0.3, 0.1, 0.1, 0.1, 0.1, 0.1, 0.7, 0.5]; // Stillness-heavy
             } else {
-                entity.harmony_activations = [0.3, 0.1, 0.8, 0.1, 0.1, 0.1, 0.7, 0.3]; // Progression-heavy
+                entity.harmony_activations = [0.3, 0.1, 0.8, 0.1, 0.1, 0.1, 0.7, 0.3, 0.5]; // Progression-heavy
             }
         }
         handles.push(h);

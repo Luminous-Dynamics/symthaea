@@ -78,10 +78,10 @@ fn run_experiment(name: &'static str, enforce: bool, seed: u64) -> ExperimentRes
         // Assign harmony profiles — 4 groups for interesting resonance patterns
         if let Some(entity) = consciousness.entities.get_mut(&h) {
             match i % 4 {
-                0 => entity.harmony_activations = [0.9, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.8],
-                1 => entity.harmony_activations = [0.1, 0.9, 0.1, 0.1, 0.1, 0.1, 0.8, 0.1],
-                2 => entity.harmony_activations = [0.1, 0.1, 0.9, 0.1, 0.1, 0.8, 0.1, 0.1],
-                _ => entity.harmony_activations = [0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4],
+                0 => entity.harmony_activations = [0.9, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.8, 0.5],
+                1 => entity.harmony_activations = [0.1, 0.9, 0.1, 0.1, 0.1, 0.1, 0.8, 0.1, 0.5],
+                2 => entity.harmony_activations = [0.1, 0.1, 0.9, 0.1, 0.1, 0.8, 0.1, 0.1, 0.5],
+                _ => entity.harmony_activations = [0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.5],
             }
         }
         handles.push(h);
@@ -109,7 +109,7 @@ fn run_experiment(name: &'static str, enforce: bool, seed: u64) -> ExperimentRes
         // FEP gradient-driven movement (only in enforced condition)
         if enforce {
             // Gather nearby agent data for gradient computation
-            let agent_data: Vec<(SVector<f64, 2>, [f64; 8])> = handles.iter()
+            let agent_data: Vec<(SVector<f64, 2>, [f64; 9])> = handles.iter()
                 .filter_map(|&h| {
                     let body = world.body(h)?;
                     let entity = consciousness.entities.get(&h)?;
@@ -129,7 +129,7 @@ fn run_experiment(name: &'static str, enforce: bool, seed: u64) -> ExperimentRes
                 let energy_frac = consciousness.entities.get(&h)
                     .map(|e| e.energy.fraction_remaining()).unwrap_or(0.0);
                 let harmony = consciousness.entities.get(&h)
-                    .map(|e| e.harmony_activations).unwrap_or([0.0; 8]);
+                    .map(|e| e.harmony_activations).unwrap_or([0.0; 9]);
 
                 // Build nearby agents list (exclude self)
                 let nearby: Vec<_> = agent_data.iter()

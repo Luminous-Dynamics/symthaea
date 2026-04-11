@@ -71,12 +71,12 @@ fn run_era(era: &Era, seed: u64) -> EraResult {
         // Diverse harmony profiles — 6 ideological groups
         if let Some(e) = consciousness.entities.get_mut(&h) {
             match i % 6 {
-                0 => e.harmony_activations = [0.9, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.8], // traditionalist
-                1 => e.harmony_activations = [0.1, 0.9, 0.1, 0.1, 0.1, 0.1, 0.8, 0.1], // progressive
-                2 => e.harmony_activations = [0.1, 0.1, 0.9, 0.1, 0.1, 0.8, 0.1, 0.1], // intellectual
-                3 => e.harmony_activations = [0.1, 0.1, 0.1, 0.9, 0.8, 0.1, 0.1, 0.1], // creative
-                4 => e.harmony_activations = [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5], // centrist
-                _ => e.harmony_activations = [0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3], // apathetic
+                0 => e.harmony_activations = [0.9, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.8, 0.5], // traditionalist
+                1 => e.harmony_activations = [0.1, 0.9, 0.1, 0.1, 0.1, 0.1, 0.8, 0.1, 0.5], // progressive
+                2 => e.harmony_activations = [0.1, 0.1, 0.9, 0.1, 0.1, 0.8, 0.1, 0.1, 0.5], // intellectual
+                3 => e.harmony_activations = [0.1, 0.1, 0.1, 0.9, 0.8, 0.1, 0.1, 0.1, 0.5], // creative
+                4 => e.harmony_activations = [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5], // centrist
+                _ => e.harmony_activations = [0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.5], // apathetic
             }
         }
         handles.push(h);
@@ -84,12 +84,12 @@ fn run_era(era: &Era, seed: u64) -> EraResult {
 
     // Invisible influencers: emit harmony fields but aren't real agents.
     // Models: algorithms, bots, media narratives that shape the field.
-    let mut influencer_fields: Vec<([f64; 8], SVector<f64, 2>)> = Vec::new();
+    let mut influencer_fields: Vec<([f64; 9], SVector<f64, 2>)> = Vec::new();
     for i in 0..era.influencer_count {
         let x = (rng_f64(&mut rng) - 0.5) * 150.0;
         let y = (rng_f64(&mut rng) - 0.5) * 150.0;
         // Influencers have EXTREME harmony profiles (polarizing)
-        let mut harm = [0.0; 8];
+        let mut harm = [0.0; 9];
         harm[i % 8] = 1.0; // single-issue amplifier
         influencer_fields.push((harm, SVector::from([x, y])));
     }
@@ -354,7 +354,7 @@ fn compute_polarization(consciousness: &ConsciousnessField<2>,
     handles: &[symtropy_physics::BodyHandle]) -> f64 {
     // Mean harmony vector
     let n = handles.len() as f64;
-    let mut mean = [0.0f64; 8];
+    let mut mean = [0.0f64; 9];
     for &h in handles {
         if let Some(e) = consciousness.entities.get(&h) {
             for i in 0..8 { mean[i] += e.harmony_activations[i]; }

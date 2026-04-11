@@ -29,13 +29,13 @@ const SEEDS: usize = 20;
 const DIMENSIONALITIES: [usize; 4] = [1, 2, 4, 8];
 
 // Full 8-channel profiles
-const FULL_PROFILES: [[f64; 8]; 6] = [
-    [0.8, 0.3, 0.2, 0.1, 0.2, 0.3, 0.2, 0.7],
-    [0.3, 0.7, 0.3, 0.2, 0.2, 0.4, 0.6, 0.3],
-    [0.2, 0.2, 0.7, 0.4, 0.6, 0.2, 0.3, 0.2],
-    [0.4, 0.3, 0.3, 0.6, 0.4, 0.6, 0.3, 0.4],
-    [0.6, 0.2, 0.4, 0.3, 0.5, 0.4, 0.2, 0.5],
-    [0.3, 0.5, 0.2, 0.5, 0.3, 0.5, 0.5, 0.3],
+const FULL_PROFILES: [[f64; 9]; 6] = [
+    [0.8, 0.3, 0.2, 0.1, 0.2, 0.3, 0.2, 0.7, 0.5],
+    [0.3, 0.7, 0.3, 0.2, 0.2, 0.4, 0.6, 0.3, 0.5],
+    [0.2, 0.2, 0.7, 0.4, 0.6, 0.2, 0.3, 0.2, 0.5],
+    [0.4, 0.3, 0.3, 0.6, 0.4, 0.6, 0.3, 0.4, 0.5],
+    [0.6, 0.2, 0.4, 0.3, 0.5, 0.4, 0.2, 0.5, 0.5],
+    [0.3, 0.5, 0.2, 0.5, 0.3, 0.5, 0.5, 0.3, 0.5],
 ];
 
 struct DimResult {
@@ -47,9 +47,9 @@ struct DimResult {
     resonance_variance: f64,
 }
 
-fn truncate_harmony(full: &[f64; 8], active_dims: usize) -> [f64; 8] {
-    let mut h = [0.0f64; 8];
-    for i in 0..active_dims.min(8) {
+fn truncate_harmony(full: &[f64; 9], active_dims: usize) -> [f64; 9] {
+    let mut h = [0.0f64; 9];
+    for i in 0..active_dims.min(9) {
         h[i] = full[i];
     }
     h
@@ -174,7 +174,7 @@ fn run_experiment(active_dims: usize, seed: u64) -> DimResult {
     } else { f64::MAX };
 
     // Compute all pairwise resonances
-    let harms: Vec<[f64; 8]> = handles.iter().filter_map(|h| consciousness.entities.get(h).map(|e| e.harmony_activations)).collect();
+    let harms: Vec<[f64; 9]> = handles.iter().filter_map(|h| consciousness.entities.get(h).map(|e| e.harmony_activations)).collect();
     let mut resonances = Vec::new();
     for i in 0..harms.len() {
         for j in (i+1)..harms.len() {

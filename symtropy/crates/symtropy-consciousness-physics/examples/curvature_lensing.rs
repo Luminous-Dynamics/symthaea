@@ -30,7 +30,7 @@ struct LensingResult {
 fn run_lensing(curvature_scale: f64, seed: u64) -> LensingResult {
     // Source at origin with high harmony
     let mut field = HarmonyField::<2>::new();
-    let mut activations = [0.0; 8];
+    let mut activations = [0.0; 9];
     for i in 0..8 { activations[i] = 0.8 + (seed as f64 * 0.01 * (i as f64 + 1.0)).sin() * 0.2; }
 
     field.sources.push(HarmonySource {

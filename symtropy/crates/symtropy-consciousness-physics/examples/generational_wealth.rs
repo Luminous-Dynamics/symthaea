@@ -48,7 +48,7 @@ fn run_experiment(seed: u64) -> WealthResult {
 
     let mut rng = seed;
     let mut handles = Vec::new();
-    let mut agent_harmonies: Vec<[f64; 8]> = Vec::new();
+    let mut agent_harmonies: Vec<[f64; 9]> = Vec::new();
     let mut agent_lineage: Vec<usize> = Vec::new(); // tracks which original agent they descend from
     let mut generation = 0usize;
 
@@ -58,7 +58,7 @@ fn run_experiment(seed: u64) -> WealthResult {
         let h = world.add_sphere(Point::new([x, y]), 1.0, 1.0);
         if let Some(b) = world.body_mut(h) { b.linear_damping = 0.05; }
         consciousness.register(h, consciousness.constants.initial_energy, consciousness.constants.harmony_range);
-        let harmony: [f64; 8] = std::array::from_fn(|_| rng_f64(&mut rng) * 0.7 + 0.15);
+        let harmony: [f64; 9] = std::array::from_fn(|_| rng_f64(&mut rng) * 0.7 + 0.15);
         if let Some(e) = consciousness.entities.get_mut(&h) {
             e.harmony_activations = harmony;
         }
@@ -234,7 +234,7 @@ fn run_experiment(seed: u64) -> WealthResult {
     let lineage_diversity = unique_lineages.len() as f64;
 
     // Mean resonance
-    let harms: Vec<[f64; 8]> = handles.iter().filter_map(|h| consciousness.entities.get(h).map(|e| e.harmony_activations)).collect();
+    let harms: Vec<[f64; 9]> = handles.iter().filter_map(|h| consciousness.entities.get(h).map(|e| e.harmony_activations)).collect();
     let mut res_total = 0.0;
     let mut res_count = 0;
     for i in 0..harms.len() {

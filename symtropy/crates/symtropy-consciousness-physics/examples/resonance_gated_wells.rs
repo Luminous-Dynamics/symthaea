@@ -39,13 +39,13 @@ const SEEDS: usize = 20;
 const RES_THRESHOLDS: [f64; 3] = [0.0, 0.5, 0.7];
 
 // 6 diverse harmony profiles — some pairs resonate, some don't
-const HARMONY_PROFILES: [[f64; 8]; 6] = [
-    [0.9, 0.2, 0.1, 0.1, 0.2, 0.1, 0.1, 0.8], // A: Stillness
-    [0.8, 0.3, 0.2, 0.1, 0.3, 0.2, 0.2, 0.7], // A': compatible with A
-    [0.1, 0.2, 0.8, 0.2, 0.8, 0.1, 0.2, 0.1], // B: Craft+Curiosity
-    [0.2, 0.1, 0.7, 0.3, 0.7, 0.2, 0.1, 0.2], // B': compatible with B
-    [0.1, 0.8, 0.1, 0.2, 0.1, 0.2, 0.8, 0.1], // C: Play+Kinship
-    [0.2, 0.7, 0.2, 0.1, 0.2, 0.1, 0.7, 0.2], // C': compatible with C
+const HARMONY_PROFILES: [[f64; 9]; 6] = [
+    [0.9, 0.2, 0.1, 0.1, 0.2, 0.1, 0.1, 0.8, 0.5], // A: Stillness
+    [0.8, 0.3, 0.2, 0.1, 0.3, 0.2, 0.2, 0.7, 0.5], // A': compatible with A
+    [0.1, 0.2, 0.8, 0.2, 0.8, 0.1, 0.2, 0.1, 0.5], // B: Craft+Curiosity
+    [0.2, 0.1, 0.7, 0.3, 0.7, 0.2, 0.1, 0.2, 0.5], // B': compatible with B
+    [0.1, 0.8, 0.1, 0.2, 0.1, 0.2, 0.8, 0.1, 0.5], // C: Play+Kinship
+    [0.2, 0.7, 0.2, 0.1, 0.2, 0.1, 0.7, 0.2, 0.5], // C': compatible with C
 ];
 
 #[derive(Clone, Copy)]

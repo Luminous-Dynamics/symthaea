@@ -89,10 +89,10 @@ fn run(cond: &Condition, seed: u64) -> Result {
         consciousness.register(h, 400.0, 20.0);
         if let Some(entity) = consciousness.entities.get_mut(&h) {
             match i % 4 {
-                0 => entity.harmony_activations = [0.9, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.8],
-                1 => entity.harmony_activations = [0.1, 0.9, 0.1, 0.1, 0.1, 0.1, 0.8, 0.1],
-                2 => entity.harmony_activations = [0.1, 0.1, 0.9, 0.1, 0.1, 0.8, 0.1, 0.1],
-                _ => entity.harmony_activations = [0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4],
+                0 => entity.harmony_activations = [0.9, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.8, 0.5],
+                1 => entity.harmony_activations = [0.1, 0.9, 0.1, 0.1, 0.1, 0.1, 0.8, 0.1, 0.5],
+                2 => entity.harmony_activations = [0.1, 0.1, 0.9, 0.1, 0.1, 0.8, 0.1, 0.1, 0.5],
+                _ => entity.harmony_activations = [0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.5],
             }
         }
         handles.push(h);
@@ -145,7 +145,7 @@ fn run(cond: &Condition, seed: u64) -> Result {
                 let energy_frac = consciousness.entities.get(&h)
                     .map(|e| e.energy.fraction_remaining()).unwrap_or(0.0);
                 let harmony = consciousness.entities.get(&h)
-                    .map(|e| e.harmony_activations).unwrap_or([0.5; 8]);
+                    .map(|e| e.harmony_activations).unwrap_or([0.5; 9]);
 
                 let nearby: Vec<_> = agent_data.iter()
                     .enumerate().filter(|(i, _)| *i != idx)

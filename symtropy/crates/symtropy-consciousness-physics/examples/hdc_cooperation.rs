@@ -75,10 +75,10 @@ fn run_experiment(condition: Condition, seed: u64) -> RunResult {
 
         if let Some(entity) = consciousness.entities.get_mut(&h) {
             match i % 4 {
-                0 => entity.harmony_activations = [0.9, 0.2, 0.1, 0.1, 0.1, 0.1, 0.1, 0.8],
-                1 => entity.harmony_activations = [0.2, 0.1, 0.9, 0.1, 0.1, 0.1, 0.8, 0.2],
-                2 => entity.harmony_activations = [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5],
-                _ => entity.harmony_activations = [0.1, 0.8, 0.2, 0.7, 0.3, 0.6, 0.4, 0.3],
+                0 => entity.harmony_activations = [0.9, 0.2, 0.1, 0.1, 0.1, 0.1, 0.1, 0.8, 0.5],
+                1 => entity.harmony_activations = [0.2, 0.1, 0.9, 0.1, 0.1, 0.1, 0.8, 0.2, 0.5],
+                2 => entity.harmony_activations = [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5],
+                _ => entity.harmony_activations = [0.1, 0.8, 0.2, 0.7, 0.3, 0.6, 0.4, 0.3, 0.5],
             }
         }
 
@@ -104,7 +104,7 @@ fn run_experiment(condition: Condition, seed: u64) -> RunResult {
             let pred_error = entity.map(|e| e.prediction_error).unwrap_or(0.0);
             let motor_prec = entity.map(|e| e.motor_precision).unwrap_or(1.0);
             let harmony_total = entity.map(|e| e.total_harmony_energy()).unwrap_or(0.0);
-            let harmony_acts = entity.map(|e| e.harmony_activations).unwrap_or([0.0; 8]);
+            let harmony_acts = entity.map(|e| e.harmony_activations).unwrap_or([0.0; 9]);
 
             let nearby = if let Some(body) = world.body(h) {
                 let pos = body.position().0;
@@ -177,7 +177,7 @@ fn run_experiment(condition: Condition, seed: u64) -> RunResult {
         }
 
         // 2. FEP gradient movement
-        let agent_data: Vec<(SVector<f64, 2>, [f64; 8])> = handles.iter()
+        let agent_data: Vec<(SVector<f64, 2>, [f64; 9])> = handles.iter()
             .filter_map(|&h| {
                 let body = world.body(h)?;
                 let entity = consciousness.entities.get(&h)?;

@@ -34,11 +34,11 @@ const PRESSURES: [f64; 12] = [
 ];
 
 /// 4 harmony archetypes with two compatible pairs.
-const HARMONY_PROFILES: [[f64; 8]; 4] = [
-    [0.8, 0.3, 0.2, 0.1, 0.2, 0.3, 0.2, 0.7], // A
-    [0.7, 0.4, 0.3, 0.1, 0.3, 0.2, 0.3, 0.6], // A' (resonates with A)
-    [0.1, 0.2, 0.7, 0.3, 0.8, 0.2, 0.1, 0.2], // B
-    [0.2, 0.1, 0.6, 0.4, 0.7, 0.3, 0.2, 0.1], // B' (resonates with B)
+const HARMONY_PROFILES: [[f64; 9]; 4] = [
+    [0.8, 0.3, 0.2, 0.1, 0.2, 0.3, 0.2, 0.7, 0.5], // A
+    [0.7, 0.4, 0.3, 0.1, 0.3, 0.2, 0.3, 0.6, 0.5], // A' (resonates with A)
+    [0.1, 0.2, 0.7, 0.3, 0.8, 0.2, 0.1, 0.2, 0.5], // B
+    [0.2, 0.1, 0.6, 0.4, 0.7, 0.3, 0.2, 0.1, 0.5], // B' (resonates with B)
 ];
 
 struct PhaseResult {

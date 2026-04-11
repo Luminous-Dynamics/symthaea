@@ -56,7 +56,7 @@ fn run_experiment(ctrl: Ctrl, require_complementary: bool, seed: u64) -> (f64, f
         if let Some(b) = world.body_mut(h) { b.linear_damping = 0.05; }
         consciousness.register(h, consciousness.constants.initial_energy, consciousness.constants.harmony_range);
         if let Some(e) = consciousness.entities.get_mut(&h) {
-            e.harmony_activations = [0.9, 0.2, 0.1, 0.1, 0.2, 0.1, 0.1, 0.1];
+            e.harmony_activations = [0.9, 0.2, 0.1, 0.1, 0.2, 0.1, 0.1, 0.1, 0.5];
         }
         handles.push(h);
     }
@@ -68,7 +68,7 @@ fn run_experiment(ctrl: Ctrl, require_complementary: bool, seed: u64) -> (f64, f
         if let Some(b) = world.body_mut(h) { b.linear_damping = 0.05; }
         consciousness.register(h, consciousness.constants.initial_energy, consciousness.constants.harmony_range);
         if let Some(e) = consciousness.entities.get_mut(&h) {
-            e.harmony_activations = [0.1, 0.1, 0.9, 0.1, 0.1, 0.1, 0.1, 0.1];
+            e.harmony_activations = [0.1, 0.1, 0.9, 0.1, 0.1, 0.1, 0.1, 0.1, 0.5];
         }
         handles.push(h);
     }
@@ -178,7 +178,7 @@ fn run_experiment(ctrl: Ctrl, require_complementary: bool, seed: u64) -> (f64, f
         for prey in &mut prey_list {
             if !prey.is_active() { continue; }
 
-            let agents_at_prey: Vec<(usize, [f64; 8])> = handles.iter().enumerate()
+            let agents_at_prey: Vec<(usize, [f64; 9])> = handles.iter().enumerate()
                 .filter(|(_, &h)| {
                     world.body(h).map(|b| (b.position().0 - prey.position).norm() < prey.radius).unwrap_or(false)
                         && consciousness.entities.get(&h).map(|e| !e.energy.is_collapsed()).unwrap_or(false)
