@@ -2391,20 +2391,19 @@ mod tests {
     /// Node A creates a ticket, Node B connects using that ticket.
     /// Verifies `connected_peers == 1` on both sides after handshake.
     /// Requires `swarm` + `identity` features (real Iroh endpoints + attestation).
+    ///
+    /// Tests that two NetworkService instances can exchange tickets and connect.
+    /// Uses `tokio::select!` to run accept_connections concurrently without
+    /// requiring Send on the future (Iroh endpoint references aren't Send).
     #[cfg(all(feature = "swarm", feature = "identity"))]
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn test_two_services_connect_via_ticket() {
-        // Node A: create service, init attestation, start accepting
+        // Node A: create service, init attestation
         let mut node_a = NetworkService::new(SwarmConfig::local_only()).await.unwrap();
         node_a.initialize_attestation().unwrap();
         let node_a = std::sync::Arc::new(node_a);
-        let mut a_events = node_a.subscribe_peer_events();
-        tokio::spawn(node_a.clone().accept_connections());
 
-        // Give Node A a moment to bind
-        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
-
-        // Get Node A's ticket
+        // Get Node A's ticket (available immediately after bind)
         let ticket = node_a.create_ticket().expect("Node A should produce a ticket");
         assert!(!ticket.is_empty(), "Ticket should not be empty");
 
@@ -2413,10 +2412,18 @@ mod tests {
         node_b.initialize_attestation().unwrap();
         let node_b = std::sync::Arc::new(node_b);
 
-        let peer_info = node_b
-            .connect_to_peer(&ticket)
-            .await
-            .expect("Node B should connect to Node A");
+        // Run accept + connect concurrently via select
+        let node_a_accept = node_a.clone();
+        let connect_result = tokio::select! {
+            // Node A accepts (runs until connect completes or times out)
+            _ = node_a_accept.accept_connections() => {
+                panic!("accept_connections should not exit during test")
+            }
+            // Node B connects to A using the ticket
+            result = node_b.connect_to_peer(&ticket) => result,
+        };
+
+        let peer_info = connect_result.expect("Node B should connect to Node A");
 
         // Node B should have 1 connected peer
         assert_eq!(
@@ -2436,11 +2443,6 @@ mod tests {
                 loop {
                     if node_a.peer_count() >= 1 {
                         return true;
-                    }
-                    // Check for PeerEvent::Connected
-                    match a_events.try_recv() {
-                        Ok(PeerEvent::Connected(_)) => return true,
-                        _ => {}
                     }
                     tokio::time::sleep(std::time::Duration::from_millis(50)).await;
                 }

@@ -508,6 +508,26 @@ async fn handle_socket(mut socket: WebSocket, runner: Arc<Mutex<DemoRunner>>) {
                 let (data, broadcast_svc) = {
                     let mut r = runner.lock().await;
                     let d = r.run_cycle();
+
+                    // Drain mesh daemon outputs → feed as SwarmEvents
+                    #[cfg(feature = "mesh")]
+                    {
+                        let daemon_outputs = r.drain_mesh_daemon();
+                        if !daemon_outputs.is_empty() {
+                            let swarm_tx = r.swarm_event_sender();
+                            for output in daemon_outputs {
+                                let _ = swarm_tx.send(
+                                    crate::cognitive_loop::managers::swarm_manager::SwarmEvent::ConsciousnessUpdate {
+                                        peer_id: "mesh-daemon-local".to_string(),
+                                        phi: output.phi as f64,
+                                        valence: output.valence as f64,
+                                        arousal: output.arousal as f64,
+                                    },
+                                );
+                            }
+                        }
+                    }
+
                     // Only prepare broadcast every 5th cycle (~4Hz instead of ~20Hz)
                     #[cfg(all(feature = "swarm", feature = "identity"))]
                     let svc = if d.swarm_peers > 0 && d.cycle % 5 == 0 {

@@ -351,10 +351,12 @@ pub async fn serve_demo_with_config(
     addr: &str,
     config: ApiConfig,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    // Build runner before wrapping so we can do async P2P init.
+    // Build runner before wrapping so we can do async P2P/mesh init.
     let mut runner = demo_runner::DemoRunner::new()?;
     #[cfg(all(feature = "identity", feature = "swarm"))]
     runner.enable_p2p().await;
+    #[cfg(feature = "mesh")]
+    runner.enable_mesh_daemon().await;
     let app = build_demo_router(Arc::new(Mutex::new(runner)), config)?;
     let listener = tokio::net::TcpListener::bind(addr).await?;
     println!("Symthaea Demo running at http://{}", addr);

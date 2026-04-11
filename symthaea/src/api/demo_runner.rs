@@ -27,6 +27,9 @@ pub struct DemoRunner {
     /// Whether to run vision manifold each cycle.
     #[cfg(feature = "vision-manifold")]
     pub vision_enabled: bool,
+    /// Optional mesh daemon orchestrator (spawned edge consciousness kernel).
+    #[cfg(feature = "mesh")]
+    pub mesh_daemon: Option<crate::swarm::mesh::MeshDaemonOrchestrator>,
 }
 
 impl DemoRunner {
@@ -48,7 +51,40 @@ impl DemoRunner {
             vision: None,
             #[cfg(feature = "vision-manifold")]
             vision_enabled: false,
+            #[cfg(feature = "mesh")]
+            mesh_daemon: None,
         })
+    }
+
+    /// Spawn the mesh daemon subprocess (spore-mesh-daemon).
+    ///
+    /// Gracefully degrades: if the binary is not found, logs a warning and continues.
+    #[cfg(feature = "mesh")]
+    pub async fn enable_mesh_daemon(&mut self) {
+        use crate::swarm::mesh::{DaemonConfig, MeshDaemonOrchestrator};
+
+        let config = DaemonConfig::default();
+        match MeshDaemonOrchestrator::spawn(config).await {
+            Ok(orch) => {
+                tracing::info!("Mesh daemon spawned (spore-mesh-daemon, 15Hz edge kernel)");
+                self.mesh_daemon = Some(orch);
+            }
+            Err(e) => {
+                tracing::warn!(error = %e, "Mesh daemon not available — running without local mesh kernel");
+            }
+        }
+    }
+
+    /// Drain consciousness outputs from the mesh daemon and return as SwarmEvents.
+    ///
+    /// Called each tick from the WebSocket handler. Returns empty vec if no daemon.
+    #[cfg(feature = "mesh")]
+    pub fn drain_mesh_daemon(&mut self) -> Vec<crate::swarm::mesh::ConsciousnessOutput> {
+        if let Some(ref mut daemon) = self.mesh_daemon {
+            daemon.drain_outputs()
+        } else {
+            Vec::new()
+        }
     }
 
     /// Enable the vision manifold with a mock camera source.
@@ -107,6 +143,13 @@ impl DemoRunner {
     /// Get a cloneable reference to the NetworkService (for async broadcast from WS handler).
     pub fn network_service_arc(&self) -> Option<&std::sync::Arc<crate::swarm::NetworkService>> {
         self.service.network_service()
+    }
+
+    /// Get the swarm event sender for injecting mesh daemon consciousness updates.
+    pub fn swarm_event_sender(
+        &self,
+    ) -> std::sync::mpsc::Sender<crate::cognitive_loop::managers::swarm_manager::SwarmEvent> {
+        self.service.swarm_event_sender()
     }
 
     /// Node ID (hex-encoded EndpointId public key) — available without the full ticket.
