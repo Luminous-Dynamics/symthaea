@@ -52,6 +52,15 @@ pub fn ContentRouter() -> impl IntoView {
             PageView::Compare { query } => {
                 view! { <CompareView query=query.clone() /> }.into_any()
             }
+            PageView::FullPageIframe { url } => {
+                view! {
+                    <iframe
+                        class="fullpage-iframe"
+                        src=url.clone()
+                        sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox"
+                    ></iframe>
+                }.into_any()
+            }
             PageView::Settings => {
                 view! { <SettingsPage /> }.into_any()
             }

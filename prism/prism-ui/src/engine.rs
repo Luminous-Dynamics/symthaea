@@ -208,7 +208,11 @@ pub fn process_input(
 
     if is_url(input) {
         let url = normalize_url(input);
-        navigate_url(&url, state, reflex);
+        if state.render_mode.get_untracked() == crate::state::RenderMode::FullPage {
+            navigate_fullpage(&url, state, reflex);
+        } else {
+            navigate_url(&url, state, reflex);
+        }
     } else {
         search_query(input, state, search_engine);
     }
@@ -369,6 +373,53 @@ fn external_hit_to_result(
         age_days: 7,
         tags: vec![source_name.to_lowercase()],
     }
+}
+
+/// Full Page mode: load URL directly in a sandboxed iframe.
+/// No proxy, no sanitization — the real site with real JS/CSS.
+/// The reflex arc pre-assesses the URL for security level.
+fn navigate_fullpage(url_str: &str, state: &BrowserState, reflex: &ReflexArc) {
+    let url = match url::Url::parse(url_str) {
+        Ok(u) => u,
+        Err(e) => {
+            state.set_view.set(PageView::Error {
+                message: format!("Invalid URL: {}", e),
+            });
+            return;
+        }
+    };
+
+    // Pre-flight security assessment
+    let pre = reflex.pre_fetch(&url, false, false);
+    let safety = if pre.zone == ContentZone::Private {
+        SafetyLevel::Yellow
+    } else {
+        SafetyLevel::Green
+    };
+
+    // Update consciousness
+    let spore = expect_context::<StoredValue<
+        Option<symthaea_spore::engine::SporeEngine>,
+        leptos::prelude::LocalStorage,
+    >>();
+    spore.update_value(|opt: &mut Option<symthaea_spore::engine::SporeEngine>| {
+        if let Some(spore_engine) = opt {
+            let result = spore_engine.cycle(url_str);
+            state.set_consciousness.set(result.consciousness_level);
+            state.set_epistemic_confidence.set(result.epistemic_status.honest_confidence);
+            state.set_prediction_error.set(result.prediction_error);
+        }
+    });
+
+    let host = url.host_str().unwrap_or("").to_string();
+    let view = PageView::FullPageIframe { url: url_str.to_string() };
+    state.set_current_url.set(url_str.to_string());
+    state.set_page_title.set(host);
+    state.set_zone.set(ContentZone::Public);
+    state.set_safety.set(safety);
+    state.set_view.set(view.clone());
+    state.push_history(url_str, url.host_str().unwrap_or(""), &view);
+    state.sync_active_tab();
 }
 
 fn navigate_url(url_str: &str, state: &BrowserState, reflex: &ReflexArc) {

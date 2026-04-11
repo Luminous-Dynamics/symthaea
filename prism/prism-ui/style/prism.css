@@ -1335,6 +1335,38 @@ button.example-query:active { opacity: 0.6; }
 .bookmark-btn:hover { color: var(--chrome-text-bright); }
 .bookmark-btn.active { color: var(--prism-accent); }
 
+/* Full page iframe */
+.fullpage-iframe {
+    width: 100%;
+    height: calc(100vh - 90px);
+    border: none;
+    background: #fff;
+}
+
+/* Render mode toggle */
+.render-mode-btn {
+    font-size: 11px;
+    padding: 3px 8px;
+    border-radius: 4px;
+    border: 1px solid var(--chrome-border);
+    cursor: pointer;
+    font-weight: 600;
+    flex-shrink: 0;
+    transition: all 0.2s;
+}
+.render-mode-btn.reader {
+    background: transparent;
+    color: var(--chrome-text);
+}
+.render-mode-btn.fullpage {
+    background: var(--prism-accent);
+    color: var(--chrome-bg);
+    border-color: var(--prism-accent);
+}
+.render-mode-btn:hover {
+    opacity: 0.85;
+}
+
 /* Spore epistemic summary */
 .spore-summary {
     margin: 12px 0;

@@ -36,13 +36,25 @@ impl SearchMode {
     }
 }
 
+/// Page rendering mode.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum RenderMode {
+    /// Sanitized HTML, no JS/CSS. Overlay works. Safe.
+    Reader,
+    /// Full site in sandboxed iframe. Real JS/CSS. Security badge only.
+    FullPage,
+}
+
 /// Represents the current page being displayed.
 #[derive(Clone, Debug)]
 pub enum PageView {
     Welcome,
     Search { query: String, results: Vec<SearchResult> },
     Compare { query: String },
+    /// Reader mode: sanitized HTML rendered as innerHTML.
     Page { html: String },
+    /// Full page mode: raw URL loaded in sandboxed iframe.
+    FullPageIframe { url: String },
     Settings,
     SubmitClaim,
     Bookmarks,
@@ -117,6 +129,9 @@ pub struct BrowserState {
     /// Spore-generated epistemic summary for the current search.
     pub spore_summary: ReadSignal<String>,
     pub set_spore_summary: WriteSignal<String>,
+    /// Page rendering mode (Reader vs Full Page).
+    pub render_mode: ReadSignal<RenderMode>,
+    pub set_render_mode: WriteSignal<RenderMode>,
     /// Open tabs.
     pub tabs: ReadSignal<Vec<Tab>>,
     pub set_tabs: WriteSignal<Vec<Tab>>,
@@ -162,6 +177,9 @@ impl BrowserState {
         let (epistemic_confidence, set_epistemic_confidence) = signal(0.0f32);
         let (prediction_error, set_prediction_error) = signal(0.0f32);
         let (spore_summary, set_spore_summary) = signal(String::new());
+        let saved_mode = crate::persistence::load::<RenderMode>("render-mode")
+            .unwrap_or(RenderMode::Reader);
+        let (render_mode, set_render_mode) = signal(saved_mode);
 
         let initial_tab = Tab {
             id: 1,
@@ -193,6 +211,7 @@ impl BrowserState {
             epistemic_confidence, set_epistemic_confidence,
             prediction_error, set_prediction_error,
             spore_summary, set_spore_summary,
+            render_mode, set_render_mode,
             tabs, set_tabs,
             active_tab, set_active_tab,
             next_tab_id,

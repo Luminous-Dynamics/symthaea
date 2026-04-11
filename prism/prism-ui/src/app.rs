@@ -201,6 +201,7 @@ pub fn App() -> impl IntoView {
                 <TabBar />
                 <div class="search-row">
                     <SearchBar />
+                    <RenderModeToggle />
                     <BookmarkButton />
                 </div>
             </div>
@@ -293,6 +294,46 @@ const BOOKMARK_STAR: &str = "\u{2606}";
 const BOOKMARK_STAR_FILLED: &str = "\u{2605}";
 
 /// Bookmark button — toggles bookmark for the current page.
+/// Toggle between Reader mode (sanitized, overlay works) and Full Page mode (real site).
+#[component]
+fn RenderModeToggle() -> impl IntoView {
+    let state = expect_context::<BrowserState>();
+    let s_click = state.clone();
+
+    let label = move || {
+        match state.render_mode.get() {
+            crate::state::RenderMode::Reader => "Reader",
+            crate::state::RenderMode::FullPage => "Full",
+        }
+    };
+    let title = move || {
+        match state.render_mode.get() {
+            crate::state::RenderMode::Reader => "Reader mode: safe, with epistemic overlay",
+            crate::state::RenderMode::FullPage => "Full page: real JS/CSS, no overlay",
+        }
+    };
+    let class = move || {
+        match state.render_mode.get() {
+            crate::state::RenderMode::Reader => "render-mode-btn reader",
+            crate::state::RenderMode::FullPage => "render-mode-btn fullpage",
+        }
+    };
+
+    view! {
+        <button class=class title=title attr:aria-label="Toggle render mode"
+            on:click=move |_| {
+                use crate::state::RenderMode;
+                let next = match s_click.render_mode.get() {
+                    RenderMode::Reader => RenderMode::FullPage,
+                    RenderMode::FullPage => RenderMode::Reader,
+                };
+                s_click.set_render_mode.set(next);
+                crate::persistence::save("render-mode", &next);
+            }
+        >{label}</button>
+    }
+}
+
 #[component]
 fn BookmarkButton() -> impl IntoView {
     let state = expect_context::<BrowserState>();
