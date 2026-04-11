@@ -63,6 +63,7 @@ members = [
     "crates/symthaea-gravcraft",
     "crates/symthaea-nuclear",
     "crates/symthaea-quantum-chemistry",
+    "crates/symthaea-particle-physics",
     "crates/symthaea-proteins",
     "crates/symthaea-bandgap",
     "crates/symthaea-physics-catalog",
