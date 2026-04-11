@@ -7,6 +7,7 @@ use leptos::prelude::*;
 use mycelix_leptos_core::{
     holochain_provider::use_holochain,
     toasts::{use_toasts, ToastKind},
+    SovereignRadar, SovereignRadarSize,
 };
 
 use crate::context::{use_craft, CraftProfile};
@@ -172,6 +173,10 @@ pub fn ProfilePage() -> impl IntoView {
 
                 <div class="profile-section">
                     <crate::components::SkillRadar />
+                    <div class="profile-section">
+                        <h3>"Civic Profile"</h3>
+                        <SovereignRadar size=SovereignRadarSize::Small />
+                    </div>
                 </div>
 
                 <div class="profile-section">

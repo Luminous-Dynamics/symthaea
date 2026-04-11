@@ -9,6 +9,7 @@
 //! sovereignty level, cognitive state, and active adaptations.
 
 use leptos::prelude::*;
+use mycelix_leptos_core::{SovereignRadar, SovereignRadarSize};
 
 use crate::adaptivity_provider::use_adaptivity;
 use crate::cognitive_adaptivity::*;
@@ -349,6 +350,10 @@ pub fn DashboardPage() -> impl IntoView {
             <div class="dashboard-grid">
                 <SovereigntyCard />
                 <LearningReadinessCard />
+                <div class="dash-card">
+                    <h3>"Civic Profile"</h3>
+                    <SovereignRadar size=SovereignRadarSize::Small />
+                </div>
             </div>
             <CapsRecommendationsSection />
         </div>

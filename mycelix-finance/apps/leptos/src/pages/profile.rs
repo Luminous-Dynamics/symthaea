@@ -4,6 +4,7 @@
 use crate::context::use_finance_context;
 use leptos::prelude::*;
 use mycelix_leptos_core::consciousness::use_consciousness;
+use mycelix_leptos_core::SovereignRadar;
 
 #[component]
 pub fn ProfilePage() -> impl IntoView {
@@ -18,7 +19,7 @@ pub fn ProfilePage() -> impl IntoView {
                 <h2>"Identity"</h2>
                 <div class="dashboard-grid">
                     <div class="dash-card">
-                        <span class="dash-label">"Consciousness Tier"</span>
+                        <span class="dash-label">"Civic Tier"</span>
                         <span class="dash-value">{move || consciousness.tier.get().label()}</span>
                     </div>
                     <div class="dash-card">
@@ -26,6 +27,11 @@ pub fn ProfilePage() -> impl IntoView {
                         <span class="dash-value">{move || ctx.mycel_score.get().tier.label()}</span>
                     </div>
                 </div>
+            </div>
+
+            <div class="profile-section">
+                <h2>"Sovereign Profile"</h2>
+                <SovereignRadar />
             </div>
 
             <div class="profile-section">

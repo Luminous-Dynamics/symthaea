@@ -6,7 +6,7 @@
 //! AI-interactable: data-agent-did, data-tier, all balances as data-* attributes.
 
 use leptos::prelude::*;
-use mycelix_leptos_core::use_consciousness;
+use mycelix_leptos_core::{use_consciousness, SovereignRadar, SovereignRadarSize};
 use crate::contexts::governance_context::use_governance;
 use crate::contexts::finance_context::use_finance;
 
@@ -40,24 +40,7 @@ pub fn ProfilePage() -> impl IntoView {
                                     {tier.label()}
                                 </span>
                             </div>
-                            <div class="identity-dimensions">
-                                <div class="id-dim" data-dimension="identity">
-                                    <span>"identity"</span>
-                                    <span>{format!("{:.2}", profile.identity)}</span>
-                                </div>
-                                <div class="id-dim" data-dimension="reputation">
-                                    <span>"reputation"</span>
-                                    <span>{format!("{:.2}", profile.reputation)}</span>
-                                </div>
-                                <div class="id-dim" data-dimension="community">
-                                    <span>"community"</span>
-                                    <span>{format!("{:.2}", profile.community)}</span>
-                                </div>
-                                <div class="id-dim" data-dimension="engagement">
-                                    <span>"engagement"</span>
-                                    <span>{format!("{:.2}", profile.engagement)}</span>
-                                </div>
-                            </div>
+                            <SovereignRadar size=SovereignRadarSize::Medium />
                         </div>
                     }
                 }}
