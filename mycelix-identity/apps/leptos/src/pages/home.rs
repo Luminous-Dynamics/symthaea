@@ -4,6 +4,7 @@
 use leptos::prelude::*;
 use crate::identity_context::use_identity;
 use identity_leptos_types::*;
+use mycelix_leptos_core::{SovereignRadar, SovereignRadarSize};
 
 #[component]
 pub fn HomePage() -> impl IntoView {
@@ -100,39 +101,11 @@ pub fn HomePage() -> impl IntoView {
                 </div>
             </div>
 
-            // ── Consciousness Profile ──
-            <section class="consciousness-section">
-                <h2>"Consciousness Profile"</h2>
-                <p class="section-desc">"Your 4-dimensional identity score across the Mycelix ecosystem"</p>
-                <div class="consciousness-grid">
-                    {move || {
-                        let c = consciousness();
-                        vec![
-                            ("Identity", c.identity, "Self-verification depth"),
-                            ("Reputation", c.reputation, "Trust earned from peers"),
-                            ("Community", c.community, "Network embeddedness"),
-                            ("Engagement", c.engagement, "Active participation"),
-                        ].into_iter().map(|(label, value, desc)| {
-                            let pct = (value * 100.0) as u32;
-                            view! {
-                                <div class="consciousness-dim">
-                                    <div class="dim-header">
-                                        <span class="dim-label">{label}</span>
-                                        <span class="dim-value">{format!("{pct}%")}</span>
-                                    </div>
-                                    <div class="dim-bar">
-                                        <div class="dim-fill" style=format!("width: {pct}%") />
-                                    </div>
-                                    <span class="dim-desc">{desc}</span>
-                                </div>
-                            }
-                        }).collect::<Vec<_>>()
-                    }}
-                </div>
-                <div class="consciousness-combined">
-                    <span class="combined-label">"Combined Score"</span>
-                    <span class="combined-value">{move || format!("{:.0}%", consciousness().combined_score() * 100.0)}</span>
-                </div>
+            // ── Sovereign Profile ──
+            <section class="sovereign-section">
+                <h2>"Sovereign Profile"</h2>
+                <p class="section-desc">"Your 8-dimensional civic identity across the Mycelix ecosystem"</p>
+                <SovereignRadar size=SovereignRadarSize::Large />
             </section>
 
             // ── Domain Reputation ──

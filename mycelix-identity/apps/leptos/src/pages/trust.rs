@@ -4,6 +4,7 @@
 use leptos::prelude::*;
 use crate::identity_context::use_identity;
 use identity_leptos_types::*;
+use mycelix_leptos_core::SovereignRadar;
 
 #[component]
 pub fn TrustPage() -> impl IntoView {
@@ -88,6 +89,13 @@ pub fn TrustPage() -> impl IntoView {
                                 }
                             }).collect::<Vec<_>>()}
                         </div>
+                    </section>
+
+                    // ── Sovereign Profile Radar ──
+                    <section class="trust-section">
+                        <h2>"Sovereign Profile"</h2>
+                        <p class="section-desc">"Your 8-dimensional civic identity"</p>
+                        <SovereignRadar />
                     </section>
 
                     // ── Domain Reputation Breakdown ──
