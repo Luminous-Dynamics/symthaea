@@ -2299,14 +2299,14 @@ mod tests {
     #[test]
     fn format_timestamp_epoch() {
         let ts = Timestamp::from_micros(0);
-        assert_eq!(format_timestamp_iso8601(ts), "0Z");
+        assert_eq!(format_timestamp_iso8601(ts), "1970-01-01T00:00:00Z");
     }
 
     #[test]
     fn format_timestamp_known_value() {
         let ts = Timestamp::from_micros(1_700_000_000_000_000);
         let formatted = format_timestamp_iso8601(ts);
-        assert_eq!(formatted, "1700000000Z");
+        assert_eq!(formatted, "2023-11-14T22:13:20Z");
     }
 
     // --- base58_decode ---

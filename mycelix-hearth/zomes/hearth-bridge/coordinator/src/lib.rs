@@ -1538,7 +1538,6 @@ mod tests {
             response: Some(vec![0xFF, 0xFE, 0xFD]),
             error: None,
             error_code: None,
-            error_code: None,
         };
         let err = decode_dispatch_response::<Vec<u32>>(&result, "ctx").unwrap_err();
         let msg = format!("{}", err);
