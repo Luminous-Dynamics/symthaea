@@ -1,6 +1,0 @@
-{
-  "dependencies": {
-    "@holochain/client": "^0.17.1",
-    "buffer": "^6.0.3"
-  }
-}
