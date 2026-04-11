@@ -16,6 +16,9 @@ default = []
 symthaea-backend = ["dep:symthaea"]
 neuroevolution = ["dep:symthaea-neuroevolution"]
 neural_validation = ["symthaea-core/neural_validation"]  # TRIBE v2 fMRI comparison benchmark
+nuclear-benchmarks = ["dep:symthaea-nuclear"]            # Nuclear physics science benchmarks
+materials-benchmarks = ["dep:symthaea-materials"]        # Materials design science benchmarks
+science-benchmarks = ["nuclear-benchmarks", "materials-benchmarks"]
 
 [dependencies]
 symthaea-core = { path = "../../symthaea-core" }
@@ -24,6 +27,8 @@ symthaea-ssm = { path = "../symthaea-ssm" }
 symthaea-neuromodulators = { path = "../symthaea-neuromodulators" }
 symthaea = { path = "../..", optional = true }
 symthaea-neuroevolution = { path = "../symthaea-neuroevolution", optional = true }
+symthaea-nuclear = { path = "../symthaea-nuclear", optional = true }
+symthaea-materials = { path = "../symthaea-materials", optional = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 rand = { workspace = true }

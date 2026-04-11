@@ -1,20 +1,23 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! LUCID domain module — consciousness dashboard, collective sensemaking.
-//!
-//! Migrates the SvelteKit LUCID dashboard to a portal domain module.
-//! Uses portal-viz ForceGraph for agent relationship networks,
-//! KaTeX bridge for math rendering, and Candle WASM for local NLP.
 
 pub mod types;
 
-use portal_domain_trait::{ColorFamily, CivicTier, DomainModule, NavItem};
+use portal_domain_trait::{
+    ClusterDependency, ColorFamily, CivicTier, DataSensitivity, DomainModule, EntryTypeInfo, NavItem,
+};
 
 pub struct LucidDomain;
 
 impl DomainModule for LucidDomain {
     fn id(&self) -> &'static str { "lucid" }
     fn name(&self) -> &'static str { "LUCID" }
+    fn bio_name(&self) -> &'static str { "Inner Eye" }
+    fn description(&self) -> &'static str {
+        "Consciousness dashboard and collective sensemaking: thought streams, relationship graphs, collective knowledge building, and reasoning traces."
+    }
+
     fn color_family(&self) -> ColorFamily { ColorFamily { primary: "#8B5CF6", glow: "#C4B5FD" } }
 
     fn nav_items(&self) -> Vec<NavItem> {
@@ -34,5 +37,21 @@ impl DomainModule for LucidDomain {
     fn zomes(&self) -> &'static [&'static str] {
         &["lucid", "bridge", "collective", "reasoning", "temporal",
           "temporal_consciousness", "sources", "privacy"]
+    }
+
+    fn dependencies(&self) -> &'static [ClusterDependency] {
+        &[
+            ClusterDependency { cluster_id: "identity", reason: "Thought authorship linked to DID", required: true },
+            ClusterDependency { cluster_id: "knowledge", reason: "Cross-domain knowledge graph", required: false },
+        ]
+    }
+
+    fn entry_types(&self) -> &'static [EntryTypeInfo] {
+        &[
+            EntryTypeInfo { label: "Thought Stream", zome: "lucid", sensitivity: DataSensitivity::Private },
+            EntryTypeInfo { label: "Relationship", zome: "lucid", sensitivity: DataSensitivity::Protected },
+            EntryTypeInfo { label: "Collective Post", zome: "collective", sensitivity: DataSensitivity::Community },
+            EntryTypeInfo { label: "Reasoning Trace", zome: "reasoning", sensitivity: DataSensitivity::Protected },
+        ]
     }
 }

@@ -108,6 +108,8 @@ impl PortalIdentity {
                 url,
                 app_id,
                 auth_token: auth_token.map(|s| s.into_bytes()),
+                reconnect: None,
+                request_timeout_ms: Some(30_000),
             };
 
             match ws_transport.connect(config).await {
@@ -115,6 +117,35 @@ impl PortalIdentity {
                     web_sys::console::log_1(&"[Portal] Conductor connected!".into());
                     *transport_for_connect.borrow_mut() = Some(ws_transport);
                     status_signal.set(ConductorStatus::Connected);
+
+                    // Fetch live consciousness score from reputation aggregator.
+                    // Falls back to the default 0.35 if the zome call fails.
+                    let transport_for_score = transport_for_connect.clone();
+                    let score_signal = consciousness_score;
+                    wasm_bindgen_futures::spawn_local(async move {
+                        use mycelix_leptos_client::{encode, decode};
+                        #[derive(serde::Deserialize)]
+                        struct CompositeScore { composite_score: f64 }
+
+                        let payload = match encode(&"self".to_string()) {
+                            Ok(p) => p,
+                            Err(_) => return,
+                        };
+                        let guard = transport_for_score.borrow();
+                        if let Some(t) = guard.as_ref() {
+                            if let Ok(bytes) = t.call_zome(
+                                "identity", "reputation_aggregator",
+                                "get_composite_reputation", payload,
+                            ).await {
+                                // Try structured response first, then scalar fallback
+                                if let Ok(resp) = decode::<CompositeScore>(&bytes) {
+                                    score_signal.set(resp.composite_score.clamp(0.0, 1.0));
+                                } else if let Ok(score) = decode::<f64>(&bytes) {
+                                    score_signal.set(score.clamp(0.0, 1.0));
+                                }
+                            }
+                        }
+                    });
                 }
                 Err(e) => {
                     web_sys::console::log_1(

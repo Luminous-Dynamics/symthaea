@@ -686,7 +686,12 @@ pub struct CognitiveLoopConfig {
     #[serde(default)]
     pub embodiment_platform: super::motor_bridge::EmbodimentPlatform,
 
-    /// Blend weight for proprioceptive HV injection (0.0–1.0). Default: 0.2.
+    /// Blend weight for proprioceptive HV injection (0.0–1.0). Default: 0.1.
+    ///
+    /// Empirically optimized via 11-point sweep (0.0–1.0):
+    /// weight=0.1 → Phi=0.757, weight=0.2 → ~0.62, weight=0.3 → ~0.44.
+    /// Light proprioceptive feedback grounds consciousness; heavy feedback
+    /// floods the CfC with prediction errors that reduce Phi.
     #[cfg(feature = "humanoid")]
     #[serde(default = "default_embodiment_blend")]
     pub embodiment_blend_weight: f32,
@@ -699,7 +704,7 @@ pub struct CognitiveLoopConfig {
 
 #[cfg(feature = "humanoid")]
 fn default_embodiment_blend() -> f32 {
-    0.2
+    0.1 // Optimized via weight sweep: 0.1 → Phi=0.757 (was 0.2 → ~0.62)
 }
 
 #[cfg(feature = "humanoid")]
@@ -865,7 +870,7 @@ impl Default for CognitiveLoopConfig {
             #[cfg(feature = "humanoid")]
             embodiment_platform: super::motor_bridge::EmbodimentPlatform::None,
             #[cfg(feature = "humanoid")]
-            embodiment_blend_weight: 0.2,
+            embodiment_blend_weight: 0.1,
             #[cfg(feature = "humanoid")]
             embodiment_step_interval: 1,
         }

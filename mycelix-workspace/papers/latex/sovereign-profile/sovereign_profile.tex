@@ -1,0 +1,388 @@
+\documentclass[11pt,twocolumn]{article}
+
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{enumitem}
+\usepackage{natbib}
+\usepackage{float}
+
+\hypersetup{colorlinks=true,linkcolor=blue!60!black,citecolor=green!40!black,urlcolor=blue!60!black}
+
+\lstset{
+  %language=Rust, % Requires listings-rust package; removed for portability
+  basicstyle=\ttfamily\scriptsize,
+  keywordstyle=\color{blue!70!black}\bfseries,
+  commentstyle=\color{green!50!black}\itshape,
+  breaklines=true,
+  frame=single,
+  backgroundcolor=\color{gray!5}
+}
+
+\newtheorem{definition}{Definition}
+\newtheorem{theorem}{Theorem}
+\newtheorem{proposition}{Proposition}
+
+\title{The 8-Dimensional Sovereign Profile:\\Multi-Dimensional Civic Identity for\\Post-State Governance}
+\author{Tristan Stoltz \\ Luminous Dynamics \\ \texttt{tristan.stoltz@luminousdynamics.org}}
+\date{April 2026}
+
+\begin{document}
+
+\twocolumn[
+\begin{@twocolumnfalse}
+\maketitle
+
+\begin{abstract}
+We present the 8-Dimensional Sovereign Profile, a governance credential system that replaces single-axis identity verification (Proof of Humanity, Worldcoin, Gitcoin Passport) with eight physically-grounded dimensions measured from independent on-chain source clusters. Each dimension---epistemic integrity, thermodynamic yield, network resilience, economic velocity, civic participation, stewardship, semantic resonance, and domain competence---is measured directly from verifiable activity rather than self-reports or financial proxies. Constitutional invariants enforced at the DHT validation layer (no single dimension exceeding 50\% weight, mandatory exponential decay with bounded $\lambda$, AI agents capped at Steward tier) prevent dimensional capture and permanent oligarchy. Privacy is architecturally enforced through zero-knowledge STARK proofs ($\sim$1ms prove, $\sim$0.3ms verify, 7.5KB proof) that demonstrate threshold compliance without revealing raw dimensions. Deployed across 141+ Holochain zomes in 16 cluster DNAs with 87 unit tests, the system has been validated through 300-year governance simulations showing zero Guardian vetoes attempted (deterrence effect) and 100\% community survival across all seeds. The system is open-source (AGPL-3.0) and published as a standalone Rust crate with zero HDK dependency.
+\end{abstract}
+
+\textbf{Keywords:} Decentralized Identity, Multi-Dimensional Credentials, Sybil Resistance, Zero-Knowledge Proofs, Governance, Holochain
+
+\end{@twocolumnfalse}
+]
+
+% ============================================================================
+\section{Introduction}
+% ============================================================================
+
+Decentralized governance systems face a fundamental credential problem: how do you determine who should participate in governance decisions, and with what weight, without reproducing the failure modes of capital-weighted voting (plutocracy) or uniform voting (ochlocracy)?
+
+Existing approaches are single-axis solutions. \textbf{Proof of Humanity}~\citep{poh2021} uses video attestation to verify biological uniqueness but measures nothing about governance engagement. \textbf{Worldcoin}~\citep{worldcoin2023} uses iris biometrics for global uniqueness but provides no information about trustworthiness or domain expertise. \textbf{Gitcoin Passport}~\citep{gitcoin2023} aggregates identity signals (ENS names, social accounts, guild memberships) but remains fundamentally identity-focused, not governance-focused. \textbf{Soulbound Tokens}~\citep{weyl2022} propose non-transferable attestations but lack temporal dynamics---a token issued in 2020 carries the same weight as one issued today.
+
+All of these share a common structural limitation: they verify \emph{identity} without verifying \emph{consciousness of the governed domain}. A verified human with no engagement, no reputation, no community trust, and no domain knowledge is a verified human who can still be paid to vote, bribed to attest, or coerced to participate.
+
+We propose a fundamentally different approach: the \textbf{8-Dimensional Sovereign Profile}, a governance credential computed from eight independent, physically-grounded dimensions, each measured from a primary on-chain source cluster. The credential produces a continuous score in $[0,1]$ that maps to five progressive governance tiers, decays exponentially without engagement, and is provable via zero-knowledge proofs without revealing raw dimensions.
+
+The key architectural insight is that \emph{dimensional independence} is the foundation of Sybil resistance. Gaming one dimension is straightforward. Gaming eight independent dimensions simultaneously---each measured from a different physical source---approaches the cost of genuine engagement.
+
+\subsection{Contributions}
+
+\begin{enumerate}[nosep]
+  \item \textbf{8D credential architecture}: Eight physically-grounded dimensions with independent source clusters, replacing abstract composite scores.
+  \item \textbf{Constitutional envelope}: Hardcoded invariants (decay bounds, weight caps, AI tier limits) enforced at DHT validation layer---below any governance vote.
+  \item \textbf{Privacy-preserving proofs}: STARK circuits proving threshold compliance without revealing individual dimensions ($\sim$1ms, 7.5KB).
+  \item \textbf{Hyperdimensional encoding}: 16,384-bit binary hypervector encoding of profiles for efficient similarity search and tier derivation.
+  \item \textbf{Empirical validation}: 300-year multi-world governance simulation demonstrating constitutional stability.
+\end{enumerate}
+
+% ============================================================================
+\section{The Eight Dimensions}
+\label{sec:dimensions}
+% ============================================================================
+
+\begin{definition}[Sovereign Profile]
+A sovereign profile is a vector $\mathbf{P} = (D_0, D_1, \ldots, D_7) \in [0,1]^8$ where each dimension $D_i$ is measured from an independent source cluster. Values outside $[0,1]$ are clamped; NaN and $\pm\infty$ are treated as 0.0.
+\end{definition}
+
+Table~\ref{tab:dimensions} presents the eight dimensions with their source clusters, measurement methods, and saturation thresholds.
+
+\begin{table*}[t]
+\centering
+\caption{The eight dimensions of the sovereign profile. Each dimension is measured from an independent source cluster and saturates at a defined activity level.}
+\label{tab:dimensions}
+\begin{tabular}{clllrl}
+\toprule
+\textbf{Dim} & \textbf{Name} & \textbf{Source Cluster} & \textbf{Measures} & \textbf{Saturation} & \textbf{Sybil Cost} \\
+\midrule
+$D_0$ & Epistemic Integrity & knowledge/claims & Truth-telling record & 50 validated claims & Months of verification \\
+$D_1$ & Thermodynamic Yield & energy/grid & Physical energy contribution & 30 verified records & Physical infrastructure \\
+$D_2$ & Network Resilience & commons/mesh-time & Node uptime, bandwidth & 720 time anchors & Hardware + uptime \\
+$D_3$ & Economic Velocity & finance/TEND & Anti-hoarding compliance & 50 TEND exchanges & Sustained circulation \\
+$D_4$ & Civic Participation & governance/voting & Jury duty, voting, proposals & 20 governance actions & Months of engagement \\
+$D_5$ & Stewardship \& Care & attribution/reciprocity & Verified commons labor & 30 pledges & Physical labor \\
+$D_6$ & Semantic Resonance & core-FL/hyperfeel & Community value alignment & FL Hamming similarity & Genuine contribution \\
+$D_7$ & Domain Competence & craft/credentials & Peer-verified expertise & 3 living credentials & Skill + peer review \\
+\bottomrule
+\end{tabular}
+\end{table*}
+
+\subsection{Why Eight, Not Four}
+
+The original Mycelix governance credential used four abstract dimensions: identity verification (25\%), reputation (25\%), community trust (30\%), and engagement (20\%). Implementation revealed five attack vectors that the 4D model left unaddressed:
+
+\begin{enumerate}[nosep]
+  \item \textbf{The Confident Liar}: Strong identity, good reputation, high trust, active engagement---but systematically spreading misinformation. $D_0$ (Epistemic Integrity) closes this gap.
+  \item \textbf{The Digital Ghost}: Entirely digital presence with no physical footprint. $D_1$ (Thermodynamic Yield) and $D_2$ (Network Resilience) require interaction with physical reality.
+  \item \textbf{The Hoarder}: Accumulates resources without reciprocating. $D_3$ (Economic Velocity) measures circulation, not accumulation.
+  \item \textbf{The Credential Fossilizer}: Historical qualifications without current competence. $D_7$ (Domain Competence) with Ebbinghaus decay ensures only living skills count.
+  \item \textbf{The Value Drifter}: Contributions diverging from community consensus. $D_6$ (Semantic Resonance) makes alignment measurable and continuous.
+\end{enumerate}
+
+\subsection{Dimensional Independence}
+
+Each dimension is measured from a \emph{different} Holochain DNA cluster. The knowledge cluster cannot influence energy records; the governance cluster cannot fabricate craft credentials. This architectural independence is the primary Sybil defense: compromising one cluster provides no advantage in other dimensions.
+
+The normalization formula for each dimension is:
+\begin{equation}
+D_i = \min\left(1, \frac{\text{count}_i}{\text{baseline}_i}\right) \times q_i \times w_{\text{recency},i}
+\end{equation}
+where $\text{baseline}_i$ is the saturation threshold, $q_i$ is a quality multiplier, and $w_{\text{recency},i}$ is a recency weight that downweights stale activity.
+
+% ============================================================================
+\section{Constitutional Envelope}
+\label{sec:constitution}
+% ============================================================================
+
+The sovereign profile operates within a \emph{constitutional envelope}---invariants enforced at the DHT integrity validation layer, below any coordinator zome, below any governance vote.
+
+\subsection{Hardcoded Invariants}
+
+Sixteen parameters are compiled into WASM and enforced at validation:
+
+\begin{table}[H]
+\centering
+\caption{Constitutional invariants (non-exhaustive). All enforced at DHT validation layer.}
+\label{tab:invariants}
+\begin{tabular}{lrl}
+\toprule
+\textbf{Invariant} & \textbf{Value} & \textbf{Purpose} \\
+\midrule
+Max dimension weight & 0.50 & Prevent single-axis capture \\
+$\lambda_{\min}$ & 0.001/day & Protect long-term stewards \\
+$\lambda_{\max}$ & 0.020/day & Ensure only actives govern \\
+Min maturation & 72 hours & Prevent instant bootstrap \\
+Grace period & 30 days & Prevent surprise demotion \\
+Ramp period & 30 days & Prevent sudden parameter changes \\
+AI max tier & Steward & Human sovereignty \\
+Membership term & 365 days & Prevent permanent tenure \\
+Veto override & 67\% & Break Guardian tyranny \\
+Override window & 48 hours & Community mobilization \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Seven Unamendable Rights}
+
+Seven invariants form an \emph{unamendable core}---even a 100\% unanimous vote cannot remove them:
+\begin{enumerate}[nosep]
+  \item Veto override mechanism (67\% supermajority)
+  \item Consciousness gating (governance via sovereign profile)
+  \item Term limits (365-day maximum without renewal)
+  \item Emergency power limits (3 sessions, 14 days each, 30-day cooldown)
+  \item Permission-less enforcement (any Observer can trigger expiration)
+  \item Fork rights (any subset can migrate)
+  \item Right to exit (withdrawal without penalty)
+\end{enumerate}
+
+\subsection{Mandatory Decay}
+
+All dimensions decay exponentially without continued engagement:
+\begin{equation}
+S_{\text{decayed}} = S_{\text{raw}} \cdot e^{-\lambda \cdot \Delta t}
+\end{equation}
+where $\lambda$ is community-configurable within $[\lambda_{\min}, \lambda_{\max}]$. $\lambda = 0$ is constitutionally impossible, preventing permanent oligarchy. Changes to $\lambda$ ramp linearly over a minimum of 30 days to prevent sudden disenfranchisement.
+
+\begin{proposition}[No Permanent Power]
+For any $\lambda > 0$ and any initial score $S_0 \in (0,1]$, there exists a finite time $T^*$ such that $S(T^*) < \theta_{\text{Observer}}$. No participant retains governance power indefinitely without continuous engagement.
+\end{proposition}
+
+% ============================================================================
+\section{Privacy Architecture}
+\label{sec:privacy}
+% ============================================================================
+
+The sovereign profile never leaves the participant's device. Governance proofs use zero-knowledge STARK proofs (Winterfell 0.13.1~\citep{winterfell2023}):
+
+\begin{definition}[Sovereign Threshold Proof]
+Given a public threshold $\theta$ and a public commitment $c = \text{SHA-256}(\texttt{SOVEREIGN:v1:}\text{did}:\text{score}:\lambda:\text{elapsed})$, prove that $S_{\text{decayed}} \geq \theta$ without revealing $S_{\text{raw}}$, individual dimensions, $\lambda$, or $\Delta t$.
+\end{definition}
+
+\begin{table}[H]
+\centering
+\caption{ZKP performance (release build, 32-row range proof).}
+\label{tab:zkp}
+\begin{tabular}{lr}
+\toprule
+\textbf{Metric} & \textbf{Value} \\
+\midrule
+Prove time & $\sim$1 ms \\
+Verify time & $\sim$0.3 ms \\
+Proof size & $\sim$7.5 KB \\
+Public inputs & threshold, commitment \\
+Private inputs & decayed\_score, agent\_did \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The commitment hash prevents replay attacks: a proof generated for one score/time combination cannot be reused for another.
+
+% ============================================================================
+\section{Hyperdimensional Encoding}
+\label{sec:hdc}
+% ============================================================================
+
+For efficient similarity search and tier derivation, profiles are encoded as 16,384-bit binary hypervectors (BinaryHV):
+
+\begin{enumerate}[nosep]
+  \item Each dimension owns a weighted fraction of the 16,384 bits, allocated according to the community's \texttt{DimensionWeights}.
+  \item Active bits within each dimension's region are proportional to the dimension value: $\text{bits}_i = \lfloor w_i \times 16384 \times D_i \rfloor$.
+  \item The encoding guarantees \textbf{monotonicity} (higher values produce strictly more bits) and \textbf{determinism} (same profile + weights = same HV).
+\end{enumerate}
+
+Tier derivation uses popcount: $\text{tier} = f(\text{popcount}(\text{HV}))$ where $f$ maps to calibrated thresholds.
+
+This encoding enables efficient operations:
+\begin{itemize}[nosep]
+  \item \textbf{Profile similarity}: Hamming distance between two profiles in $O(d/64)$ via POPCNT.
+  \item \textbf{Community consensus}: Majority-vote bundle of profiles produces the ``average citizen'' HV.
+  \item \textbf{Anomaly detection}: Profiles far from the consensus HV trigger investigation.
+\end{itemize}
+
+% ============================================================================
+\section{Security Analysis}
+\label{sec:security}
+% ============================================================================
+
+\subsection{Sybil Cost Analysis}
+
+\begin{table}[H]
+\centering
+\caption{Cost of Sybil attack by credential dimensionality.}
+\label{tab:sybil}
+\begin{tabular}{lrl}
+\toprule
+\textbf{System} & \textbf{Dims} & \textbf{Sybil Cost} \\
+\midrule
+Token voting & 1 & Cost of tokens (flash-loanable) \\
+Proof of Humanity & 1 & Cost of biometric fraud \\
+Gitcoin Passport & $\sim$3 & Cost of social account farming \\
+4D Consciousness & 4 & Months of multi-dimensional engagement \\
+\textbf{8D Sovereign} & \textbf{8} & \textbf{Months across 8 independent sources} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The key insight is that dimensions measured from \emph{independent source clusters} compound the attack cost multiplicatively, not additively. Compromising the knowledge cluster provides zero advantage in the energy cluster.
+
+\subsection{Dimensional Capture Prevention}
+
+The constitutional constraint $\max(w_i) \leq 0.50$ ensures that no single dimension can become the sole gateway to power. Even if a community attempts to set $w_0 = 1.0$ (making epistemic integrity the only dimension that matters), the DHT validation layer rejects the configuration.
+
+\subsection{Temporal Attack Resistance}
+
+Mandatory decay ($\lambda > 0$) prevents two temporal attacks:
+\begin{enumerate}[nosep]
+  \item \textbf{Credential fossilization}: Historical qualifications cannot provide permanent governance power.
+  \item \textbf{Flash participation}: The 72-hour maturation period prevents instant credential bootstrapping.
+\end{enumerate}
+
+% ============================================================================
+\section{Evaluation}
+\label{sec:evaluation}
+% ============================================================================
+
+\subsection{Unit Tests}
+
+The \texttt{sovereign-profile} crate contains 87 unit tests across five modules:
+\begin{itemize}[nosep]
+  \item \texttt{lib.rs}: 29 tests (core types, scoring, tier derivation)
+  \item \texttt{decay.rs}: 28 tests (exponential decay, constitutional bounds, ramp transitions)
+  \item \texttt{hdc.rs}: 17 tests (HDC encoding, monotonicity, determinism)
+  \item \texttt{collectors.rs}: 12 tests (normalization, saturation, recency)
+  \item \texttt{compat.rs}: 1 test (4D$\to$8D conversion)
+\end{itemize}
+
+\subsection{Migration}
+
+The 8D system was deployed across the full Mycelix platform in a single migration:
+\begin{itemize}[nosep]
+  \item 74 zome coordinators across 8 clusters migrated from \texttt{gate\_consciousness()} to \texttt{gate\_civic()}
+  \item Zero regressions in 9,600+ existing tests
+  \item Backward-compatible: legacy 4D credentials auto-convert to 8D
+\end{itemize}
+
+\subsection{300-Year Governance Simulation}
+
+A multi-world simulation (5 seeds, 50 agents per world, 10,000 cycles per world) tested the constitutional invariants over 300 simulated years:
+
+\begin{itemize}[nosep]
+  \item \textbf{Zero Guardian vetoes attempted} across all seeds (deterrence effect)
+  \item \textbf{100\% community survival} (no governance collapse)
+  \item \textbf{Hostile Guardian scenario}: 84 veto attempts over 50 years, 100\% community override success rate
+  \item \textbf{Governance authority evolution}: Mission Control $\to$ Local Sovereignty $\to$ Federation $\to$ Confederation
+\end{itemize}
+
+The zero-veto result demonstrates the strongest form of constitutional success: the constraint prevents the behavior it targets without ever being invoked.
+
+% ============================================================================
+\section{Related Work}
+\label{sec:related}
+% ============================================================================
+
+\textbf{Proof of Humanity}~\citep{poh2021} verifies biological uniqueness via video attestation but provides no governance engagement signal. \textbf{Worldcoin}~\citep{worldcoin2023} uses iris biometrics for global uniqueness but raises privacy concerns and measures nothing about trustworthiness. \textbf{Gitcoin Passport}~\citep{gitcoin2023} aggregates multiple identity signals but remains identity-focused rather than governance-focused. \textbf{BrightID}~\citep{brightid2020} uses social graph analysis for Sybil resistance but does not produce governance credentials. \textbf{Soulbound Tokens}~\citep{weyl2022} propose non-transferable attestations but lack temporal dynamics (no decay, no constitutional bounds). \textbf{Verifiable Credentials}~\citep{w3c2022vc} provide a data model for claims but do not specify governance semantics.
+
+Our approach differs in three ways: (1)~eight independent dimensions measured from physical sources, not abstract identity signals; (2)~mandatory temporal decay preventing credential fossilization; (3)~constitutional invariants enforced at the validation layer, not the application layer.
+
+% ============================================================================
+\section{Conclusion}
+\label{sec:conclusion}
+% ============================================================================
+
+The 8-Dimensional Sovereign Profile introduces a new primitive for decentralized governance: a multi-dimensional, temporally-decaying, privacy-preserving civic credential computed from independent physical sources. The constitutional envelope---hardcoded invariants below any governance vote---provides the strongest available form of pre-commitment against dimensional capture, permanent oligarchy, and Guardian tyranny.
+
+The system is deployed across 141+ Holochain zomes, validated through 300-year simulations, and released as an open-source Rust crate (\texttt{sovereign-profile}, AGPL-3.0) with 87 unit tests and zero HDK dependency. We believe this architecture offers a structural alternative to both capital-weighted governance (plutocracy) and uniform governance (ochlocracy): governance power that is earned, multi-dimensional, temporally bounded, and constitutionally constrained.
+
+\paragraph{Availability.} Code: \url{https://github.com/Luminous-Dynamics/mycelix} (AGPL-3.0). The \texttt{sovereign-profile} crate is published on crates.io.
+
+% ============================================================================
+\bibliographystyle{plainnat}
+\begin{thebibliography}{99}
+
+\bibitem[BrightID(2020)]{brightid2020}
+BrightID Team.
+\newblock BrightID: A social identity network.
+\newblock \url{https://www.brightid.org}, 2020.
+
+\bibitem[Gitcoin(2023)]{gitcoin2023}
+Gitcoin.
+\newblock Gitcoin Passport: Decentralized identity verification.
+\newblock \url{https://passport.gitcoin.co}, 2023.
+
+\bibitem[Kleros(2021)]{poh2021}
+Kleros.
+\newblock Proof of Humanity: A Sybil-resistant registry of humans.
+\newblock \url{https://proofofhumanity.id}, 2021.
+
+\bibitem[W3C(2022)]{w3c2022vc}
+W3C.
+\newblock Verifiable Credentials Data Model v1.1.
+\newblock \url{https://www.w3.org/TR/vc-data-model/}, 2022.
+
+\bibitem[Weyl et~al.(2022)]{weyl2022}
+E.~G.~Weyl, P.~Ohlhaver, and V.~Buterin.
+\newblock Decentralized society: Finding Web3's soul.
+\newblock \textit{SSRN}, 2022.
+
+\bibitem[Winterfell(2023)]{winterfell2023}
+Facebook (Meta).
+\newblock Winterfell: A STARK prover and verifier.
+\newblock \url{https://github.com/facebook/winterfell}, 2023.
+
+\bibitem[Worldcoin(2023)]{worldcoin2023}
+Worldcoin.
+\newblock Worldcoin whitepaper.
+\newblock \url{https://whitepaper.worldcoin.org}, 2023.
+
+\bibitem[Ostrom(1990)]{ostrom1990}
+E.~Ostrom.
+\newblock \textit{Governing the Commons: The Evolution of Institutions for Collective Action}.
+\newblock Cambridge University Press, 1990.
+
+\bibitem[Douceur(2002)]{douceur2002}
+J.~R.~Douceur.
+\newblock The Sybil attack.
+\newblock In \textit{Peer-to-Peer Systems (IPTPS)}, pp. 251--260, 2002.
+
+\bibitem[Elster(2000)]{elster2000}
+J.~Elster.
+\newblock \textit{Ulysses Unbound: Studies in Rationality, Precommitment, and Constraints}.
+\newblock Cambridge University Press, 2000.
+
+\end{thebibliography}
+
+\end{document}

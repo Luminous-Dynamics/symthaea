@@ -25,7 +25,10 @@ pub fn ClaimActions(result: SearchResult) -> impl IntoView {
 
     let on_verify = move |_| {
         set_verified.set(true);
-        log::info!("Claim verified: {}", &content[..content.len().min(50)]);
+        // Personal verification: the user confirms they consider this claim accurate.
+        // This is a local endorsement — in future, verified claims will carry
+        // higher trust weight in the epistemic ranking.
+        log::info!("Claim personally verified: {}", &content[..content.len().min(50)]);
     };
 
     let content_share = result.content.clone();
@@ -80,7 +83,7 @@ pub fn ClaimActions(result: SearchResult) -> impl IntoView {
                 on:click=on_verify
                 disabled=move || verified.get()
             >
-                {move || if verified.get() { "Verified ✓" } else { "Verify" }}
+                {move || if verified.get() { "Endorsed \u{2713}" } else { "Endorse" }}
             </button>
 
             <button

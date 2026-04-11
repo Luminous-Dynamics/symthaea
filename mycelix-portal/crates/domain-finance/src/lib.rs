@@ -5,7 +5,7 @@
 pub mod types;
 
 use portal_domain_trait::{
-    ColorFamily, CivicTier, DomainModule, NavItem,
+    ClusterDependency, ColorFamily, CivicTier, DataSensitivity, DomainModule, EntryTypeInfo, NavItem,
 };
 
 pub struct FinanceDomain;
@@ -13,6 +13,10 @@ pub struct FinanceDomain;
 impl DomainModule for FinanceDomain {
     fn id(&self) -> &'static str { "finance" }
     fn name(&self) -> &'static str { "Finance" }
+    fn bio_name(&self) -> &'static str { "Metabolism" }
+    fn description(&self) -> &'static str {
+        "Economic metabolism: SAP/TEND/MYCEL payments, community treasury, staking, and recognition for contributions to the commons."
+    }
 
     fn color_family(&self) -> ColorFamily {
         ColorFamily { primary: "#D97706", glow: "#FBBF24" }
@@ -33,5 +37,21 @@ impl DomainModule for FinanceDomain {
 
     fn zomes(&self) -> &'static [&'static str] {
         &["payments", "treasury", "staking", "recognition"]
+    }
+
+    fn dependencies(&self) -> &'static [ClusterDependency] {
+        &[
+            ClusterDependency { cluster_id: "identity", reason: "Payment recipient DID", required: true },
+            ClusterDependency { cluster_id: "governance", reason: "Treasury proposals", required: false },
+        ]
+    }
+
+    fn entry_types(&self) -> &'static [EntryTypeInfo] {
+        &[
+            EntryTypeInfo { label: "Payment", zome: "payments", sensitivity: DataSensitivity::Private },
+            EntryTypeInfo { label: "Treasury Entry", zome: "treasury", sensitivity: DataSensitivity::Community },
+            EntryTypeInfo { label: "Stake", zome: "staking", sensitivity: DataSensitivity::Protected },
+            EntryTypeInfo { label: "Recognition Award", zome: "recognition", sensitivity: DataSensitivity::Community },
+        ]
     }
 }

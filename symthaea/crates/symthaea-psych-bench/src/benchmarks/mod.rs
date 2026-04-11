@@ -34,5 +34,8 @@ pub mod sustained_attention;
 pub mod tombench;
 pub mod worm;
 
+#[cfg(any(feature = "nuclear-benchmarks", feature = "materials-benchmarks"))]
+pub mod science;
+
 #[cfg(feature = "neural_validation")]
 pub mod neural_validation;

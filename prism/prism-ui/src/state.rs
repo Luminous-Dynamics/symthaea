@@ -31,7 +31,7 @@ impl SearchMode {
         match self {
             Self::Basic => "Local claims only",
             Self::Advanced => "Local + web sources",
-            Self::Paradigm => "Full epistemic pipeline",
+            Self::Paradigm => "Local + web + DHT + AI (requires Ollama)",
         }
     }
 }
@@ -45,16 +45,18 @@ pub enum PageView {
     Page { html: String },
     Settings,
     SubmitClaim,
+    Bookmarks,
     Loading,
     Error { message: String },
 }
 
-/// A snapshot of a visited page for the history stack.
+/// A lightweight snapshot for the history stack — stores URL + title only.
+/// Full page content is NOT stored to avoid memory explosion.
+/// Back/forward navigation re-fetches or re-searches as needed.
 #[derive(Clone, Debug)]
 pub struct HistoryEntry {
     pub url: String,
     pub title: String,
-    pub view: PageView,
 }
 
 /// A saved bookmark.
@@ -148,7 +150,6 @@ impl BrowserState {
         let initial_entry = HistoryEntry {
             url: "prism://welcome".to_string(),
             title: "Prism".to_string(),
-            view: PageView::Welcome,
         };
         let history = StoredValue::new(vec![initial_entry]);
         let (history_cursor, set_history_cursor) = signal(0usize);
@@ -195,21 +196,18 @@ impl BrowserState {
     }
 
     /// Push a new page onto the history stack (called on every navigation).
-    /// Truncates forward history if we navigated back then went somewhere new.
-    pub fn push_history(&self, url: &str, title: &str, view: &PageView) {
+    /// Only stores URL + title (not full page content) to avoid memory explosion.
+    pub fn push_history(&self, url: &str, title: &str, _view: &PageView) {
         if self.navigating_history.get_value() {
             return;
         }
         self.history.update_value(|h| {
             let cursor = self.history_cursor.get_untracked();
-            // Truncate any forward entries
             h.truncate(cursor + 1);
             h.push(HistoryEntry {
                 url: url.to_string(),
                 title: title.to_string(),
-                view: view.clone(),
             });
-            // Cap at 50 entries
             if h.len() > 50 {
                 h.remove(0);
             }
@@ -218,37 +216,37 @@ impl BrowserState {
         });
     }
 
-    /// Navigate back in history. Returns true if navigation happened.
-    pub fn go_back(&self) -> bool {
+    /// Navigate back in history. Returns the URL to re-navigate to.
+    pub fn go_back(&self) -> Option<String> {
         let cursor = self.history_cursor.get_untracked();
         if cursor == 0 {
-            return false;
+            return None;
         }
-        let new_cursor = cursor - 1;
-        self.navigate_to_history(new_cursor);
-        true
+        self.navigate_to_history(cursor - 1)
     }
 
-    /// Navigate forward in history. Returns true if navigation happened.
-    pub fn go_forward(&self) -> bool {
+    /// Navigate forward in history. Returns the URL to re-navigate to.
+    pub fn go_forward(&self) -> Option<String> {
         let cursor = self.history_cursor.get_untracked();
         let can = self.history.with_value(|h| cursor + 1 < h.len());
         if !can {
-            return false;
+            return None;
         }
-        self.navigate_to_history(cursor + 1);
-        true
+        self.navigate_to_history(cursor + 1)
     }
 
-    fn navigate_to_history(&self, idx: usize) {
+    fn navigate_to_history(&self, idx: usize) -> Option<String> {
         self.navigating_history.set_value(true);
-        if let Some(entry) = self.history.with_value(|h| h.get(idx).cloned()) {
-            self.set_history_cursor.set(idx);
-            self.set_current_url.set(entry.url);
-            self.set_page_title.set(entry.title);
-            self.set_view.set(entry.view);
-        }
+        let url = self.history.with_value(|h| {
+            h.get(idx).map(|entry| {
+                self.set_history_cursor.set(idx);
+                self.set_current_url.set(entry.url.clone());
+                self.set_page_title.set(entry.title.clone());
+                entry.url.clone()
+            })
+        });
         self.navigating_history.set_value(false);
+        url
     }
 
     pub fn can_go_back(&self) -> bool {

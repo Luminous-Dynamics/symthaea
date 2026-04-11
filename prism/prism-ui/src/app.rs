@@ -153,13 +153,21 @@ pub fn App() -> impl IntoView {
                                 <button
                                     class=move || if s_back_cls.can_go_back() { "nav-btn" } else { "nav-btn disabled" }
                                     title="Back" attr:aria-label="Back"
-                                    on:click=move |_| { s_back_click.go_back(); }
+                                    on:click=move |_| {
+                                        if let Some(url) = s_back_click.go_back() {
+                                            crate::engine::navigate_history(&url);
+                                        }
+                                    }
                                     inner_html=NAV_BACK
                                 />
                                 <button
                                     class=move || if s_fwd_cls.can_go_forward() { "nav-btn" } else { "nav-btn disabled" }
                                     title="Forward" attr:aria-label="Forward"
-                                    on:click=move |_| { s_fwd_click.go_forward(); }
+                                    on:click=move |_| {
+                                        if let Some(url) = s_fwd_click.go_forward() {
+                                            crate::engine::navigate_history(&url);
+                                        }
+                                    }
                                     inner_html=NAV_FORWARD
                                 />
                                 <button class="nav-btn" title="Refresh" attr:aria-label="Refresh page"

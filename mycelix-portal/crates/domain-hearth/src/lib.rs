@@ -4,13 +4,20 @@
 
 pub mod types;
 
-use portal_domain_trait::{ColorFamily, CivicTier, DomainModule, NavItem};
+use portal_domain_trait::{
+    ClusterDependency, ColorFamily, CivicTier, DataSensitivity, DomainModule, EntryTypeInfo, NavItem,
+};
 
 pub struct HearthDomain;
 
 impl DomainModule for HearthDomain {
     fn id(&self) -> &'static str { "hearth" }
     fn name(&self) -> &'static str { "Hearth" }
+    fn bio_name(&self) -> &'static str { "Kinship" }
+    fn description(&self) -> &'static str {
+        "The intimate layer: family and chosen-kin networks, gratitude webs, care coordination, family council decisions, and life story archives."
+    }
+
     fn color_family(&self) -> ColorFamily { ColorFamily { primary: "#DB2777", glow: "#F472B6" } }
 
     fn nav_items(&self) -> Vec<NavItem> {
@@ -31,5 +38,22 @@ impl DomainModule for HearthDomain {
     fn zomes(&self) -> &'static [&'static str] {
         &["kinship", "gratitude", "care", "autonomy", "decisions", "stories",
           "milestones", "rhythms", "emergency", "resources", "bridge"]
+    }
+
+    fn dependencies(&self) -> &'static [ClusterDependency] {
+        &[
+            ClusterDependency { cluster_id: "identity", reason: "Kin network linked to DID", required: true },
+            ClusterDependency { cluster_id: "commons", reason: "Household resource sharing", required: false },
+        ]
+    }
+
+    fn entry_types(&self) -> &'static [EntryTypeInfo] {
+        &[
+            EntryTypeInfo { label: "Kinship Bond", zome: "kinship", sensitivity: DataSensitivity::Protected },
+            EntryTypeInfo { label: "Gratitude Note", zome: "gratitude", sensitivity: DataSensitivity::Community },
+            EntryTypeInfo { label: "Care Record", zome: "care", sensitivity: DataSensitivity::Sensitive },
+            EntryTypeInfo { label: "Family Decision", zome: "decisions", sensitivity: DataSensitivity::Protected },
+            EntryTypeInfo { label: "Story", zome: "stories", sensitivity: DataSensitivity::Protected },
+        ]
     }
 }

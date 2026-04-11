@@ -33,6 +33,8 @@ pub mod harmony_shapes;
 pub mod iterate;
 pub mod lsystem;
 pub mod persistence;
+pub mod reaction_diffusion;
+pub mod strange_attractors;
 pub mod timeline;
 
 use rand::rngs::StdRng;
@@ -83,6 +85,12 @@ pub enum AtelierStyle {
     ColorField,
     /// All subsystems, layered via golden-ratio composition.
     Composite,
+    /// Gray-Scott reaction-diffusion: living, emergent chemical patterns.
+    /// Harmony activations map to (F, k) parameter space; consciousness controls steps.
+    ReactionDiffusion,
+    /// Strange attractor trajectory: Clifford, Lorenz, Rössler, or Duffing.
+    /// Dominant harmony selects the attractor family; Phi gates orbit depth.
+    StrangeAttractor,
 }
 
 // ─── Artwork ─────────────────────────────────────────────────────────────────
@@ -144,6 +152,8 @@ pub fn generate(
         AtelierStyle::PersistenceTexture => persistence::generate(config, snapshot, rng),
         AtelierStyle::ColorField => color_field::generate(config, snapshot, rng),
         AtelierStyle::Composite => composition::generate(config, snapshot, rng),
+        AtelierStyle::ReactionDiffusion => reaction_diffusion::generate(config, snapshot, rng),
+        AtelierStyle::StrangeAttractor => strange_attractors::generate(config, snapshot, rng),
     }
 }
 

@@ -12,6 +12,21 @@ use prism_search::SearchEngine;
 use crate::state::{BrowserState, PageView, SearchMode};
 use prism_common::{EmpiricalLevel, NormativeLevel, MaterialityLevel, SearchResult};
 
+/// Re-navigate to a URL from history (back/forward). Calls process_input
+/// without pushing to the history stack (the navigating_history flag handles this).
+pub fn navigate_history(url: &str) {
+    let state = expect_context::<BrowserState>();
+    let engine_cell = expect_context::<StoredValue<Option<SearchEngine>>>();
+    let reflex = expect_context::<StoredValue<ReflexArc>>();
+    engine_cell.with_value(|opt| {
+        if let Some(se) = opt {
+            reflex.with_value(|r| {
+                process_input(url, &state, se, r);
+            });
+        }
+    });
+}
+
 /// Trigger a search from outside the search bar (e.g., clicking an example query).
 pub fn trigger_search(query: &str) {
     log::info!("trigger_search called with: {}", query);
@@ -117,6 +132,18 @@ pub fn process_input(
         state.set_safety.set(SafetyLevel::Green);
         state.set_threat_count.set(0);
         state.push_history("prism://settings", "Settings", &view);
+        return;
+    }
+
+    if input == "prism://bookmarks" {
+        let view = PageView::Bookmarks;
+        state.set_current_url.set("prism://bookmarks".to_string());
+        state.set_page_title.set("Bookmarks".to_string());
+        state.set_view.set(view.clone());
+        state.set_zone.set(ContentZone::Local);
+        state.set_safety.set(SafetyLevel::Green);
+        state.set_threat_count.set(0);
+        state.push_history("prism://bookmarks", "Bookmarks", &view);
         return;
     }
 
@@ -311,6 +338,20 @@ fn navigate_url(url_str: &str, state: &BrowserState, reflex: &ReflexArc) {
             return;
         }
     };
+
+    // Update consciousness with navigation context
+    let spore = expect_context::<StoredValue<
+        Option<symthaea_spore::engine::SporeEngine>,
+        leptos::prelude::LocalStorage,
+    >>();
+    spore.update_value(|opt: &mut Option<symthaea_spore::engine::SporeEngine>| {
+        if let Some(spore_engine) = opt {
+            let result = spore_engine.cycle(url_str);
+            state.set_consciousness.set(result.consciousness_level);
+            state.set_epistemic_confidence.set(result.epistemic_status.honest_confidence);
+            state.set_prediction_error.set(result.prediction_error);
+        }
+    });
 
     let pre = reflex.pre_fetch(&url, false, false);
     let url_string = url_str.to_string();

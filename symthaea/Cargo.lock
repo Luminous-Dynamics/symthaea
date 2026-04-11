@@ -16352,8 +16352,10 @@ dependencies = [
  "symthaea",
  "symthaea-core",
  "symthaea-fep",
+ "symthaea-materials",
  "symthaea-neuroevolution",
  "symthaea-neuromodulators",
+ "symthaea-nuclear",
  "symthaea-ssm",
 ]
 

@@ -26,7 +26,7 @@
 \newtheorem{theorem}{Theorem}
 \newtheorem{proposition}{Proposition}
 
-\title{Type-Safe Cross-Cluster Dispatch:\\Bridging 133 Zomes Across 16 DNA Clusters}
+\title{Type-Safe Cross-Cluster Dispatch:\\Bridging 141+ Zomes Across 16 DNA Clusters}
 \author{Tristan Stoltz \\ Luminous Dynamics \\ \texttt{tristan.stoltz@evolvingresonantcocreationism.com}}
 \date{March 2026}
 
@@ -38,7 +38,7 @@
 
 \begin{abstract}
 We present a type-safe cross-cluster dispatch mechanism for Holochain applications
-with 133+ WebAssembly zomes organized into 16 DNA clusters. The mechanism replaces
+with 141+ WebAssembly zomes organized into 16 DNA clusters. The mechanism replaces
 fragile string-based routing with strongly typed Rust enums for domain selection
 (12 variants), zome targeting (38 Commons + 15 Civic variants), and cross-cluster
 role identification. Case-insensitive parsing with alias support eliminates a class
@@ -47,7 +47,7 @@ would previously fail exact matching. The dispatch layer includes consciousness-
 access control (requiring valid credentials for cross-cluster calls), allowlist-based
 authorization (restricting which source clusters can call which destination zomes),
 and per-agent rate limiting. Implemented as the \texttt{mycelix-bridge-common} Rust
-crate shared across all 16 clusters, the system is validated by 295+ tests including
+crate shared across all 16 clusters, the system is validated by 450+ tests including
 property-based verification of routing correctness, tier enforcement, and NaN safety.
 The crate also provides shared types for consciousness profiles, credentials, reputation
 operations, and schema-versioned entry types used by all clusters.

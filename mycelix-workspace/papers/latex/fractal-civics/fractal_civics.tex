@@ -38,7 +38,7 @@
 
 \begin{abstract}
 We present the architecture of Mycelix, a fractal civic operating system (CivOS)
-implemented as a unified Holochain application with 133+ WebAssembly zomes
+implemented as a unified Holochain application with 141+ WebAssembly zomes
 organized into 16 cluster DNAs. The architecture addresses the challenge of
 building comprehensive civic infrastructure---spanning governance, finance,
 identity, health, education, and commons management---on a decentralized platform
@@ -67,7 +67,7 @@ infrastructure: the full stack from identity verification through governance,
 finance, healthcare, education, supply chain, and commons management. This
 paper presents such an attempt.
 
-The technical challenge is not merely scale (133+ zomes) but
+The technical challenge is not merely scale (141+ zomes) but
 \emph{coherent integration}. Each domain has different integrity requirements,
 different performance characteristics, and different governance needs. A health
 record system requires strict privacy. A property registry requires public
@@ -230,9 +230,9 @@ In Mycelix:
     uses the same consciousness tier hierarchy.
 \end{itemize}
 
-The governance primitives---\texttt{ConsciousnessProfile},
-\texttt{ConsciousnessTier}, \texttt{GovernanceRequirement}---are defined
-once in bridge-common and used identically at all three levels.
+The governance primitives---\texttt{SovereignProfile} (8D),
+\texttt{CivicTier}, \texttt{CivicRequirement}---are defined
+once in bridge-common and used identically at all three levels (with backward-compatible \texttt{ConsciousnessProfile} fallback).
 
 \subsection{Domain Cohesion Principle}
 
@@ -292,7 +292,7 @@ Two crates provide shared types across all clusters:
 boundaries. When a housing unit needs to reference an identity credential,
 both clusters use the same entry type definition.
 
-\textbf{bridge-common} (295+ tests): Coordinator dispatch logic, consciousness
+\textbf{bridge-common} (450+ tests): Coordinator dispatch logic, consciousness
 profile/tier/credential types, routing enums, rate limiting, and reputation
 primitives.
 
@@ -394,7 +394,7 @@ consciousness-gated governance, and typed cross-cluster dispatch.
 Mycelix demonstrates that comprehensive decentralized civic infrastructure is
 architecturally feasible. The fractal cluster pattern---self-similar governance
 at every scale, typed cross-cluster dispatch, consciousness-gated access
-control---provides a coherent framework for organizing 133+ zomes into a
+control---provides a coherent framework for organizing 141+ zomes into a
 unified civic operating system. The 8,600+ test suite and three-language SDK
 coverage indicate that this architecture can be developed, tested, and
 maintained at scale.

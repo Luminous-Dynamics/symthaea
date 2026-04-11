@@ -1958,8 +1958,8 @@ mod tests {
 
     #[test]
     fn local_allowlist_has_expected_count() {
-        // 5 justice + 6 emergency + 4 media + 1 resonance = 16
-        assert_eq!(ALLOWED_ZOMES.len(), 16);
+        // 5 justice + 6 emergency + 4 media + 1 resonance + 1 robotics = 17
+        assert_eq!(ALLOWED_ZOMES.len(), 17);
     }
 
     #[test]

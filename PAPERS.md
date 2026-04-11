@@ -1,18 +1,34 @@
 # Luminous Dynamics — Paper Portfolio Tracker
 
-> Last updated: 2026-02-18 (deep audit v4 — SALVAGEABILITY ASSESSED)
-> Total papers: 52+ (19 primary + 16 historical-K + 15 phi-lab satellites + whitepapers/grants)
-> **Verified submission-ready: 4** (P1, P4, P2, P3) | Near-ready: 3 (P5, P6, P12) | Needs work: 9
-> **Integrity issues: 10+** (HK-1/HK-2 fabricated R², HK-10 fictional studies, HK-11/12 broken math, P7 synthetic data, P16 simulated results, P19 corrupted baselines, phi-lab 03/06/14 fabricated clinical data)
-> Retire: 1 (P8) | HK series: 0/16 ready (data EXISTS on Windows drive) | Phi-lab satellites: 3/14 independently publishable (02, 04, 07)
-> **Confirmed submissions: 0**
+> Last updated: **2026-04-11** (April audit — 8D migration + integrity fixes + new papers)
+> Total papers: 60+ (19 primary + 16 historical-K + 15 phi-lab satellites + 4 new Mycelix outlines + whitepapers/grants)
+> **Verified submission-ready: 4** (P1, P4, P2, P3) | Near-ready: 4 (P5, P6, P12, **P21 8D Sovereign Profile NEW**) | Needs work: 7
+> **Integrity issues RESOLVED (April 2026):**
+> - ~~P7 synthetic data~~ → LABELED as synthetic predictions (not empirical)
+> - ~~P12 lambda2/Phi conflation~~ → REFRAMED to lambda2 throughout (main.md, abstract.md, supplementary.md)
+> - ~~phi-lab 03 fabricated clinical data~~ → LABELED as synthetic calibration
+> - ~~Kosmic K-Index formula drift~~ → FIXED across papers 1, 3, 4
+> - **Remaining**: HK-1/HK-2 fabricated R² (CANNOT SUBMIT), P16 simulated results (narrow to detection-only)
+> Retire: 1 (P8) | HK series: 0/16 ready | Phi-lab satellites: 3/14 independently publishable (02, 04, 07)
+> **Confirmed submissions: 0** (ALIFE 2026 paper fixed but deadline may have passed)
 >
-> ### Execution Priority Chain (Feb 18 Salvageability Assessment)
-> 1. **SUBMIT NOW**: P1, P4, P2 (verified ready), P3 (after figs + OSF DOI)
-> 2. **QUICK WINS (1-2 weeks)**: P12 reframe (lambda2→Phi rename), phi-lab 02/04/07 (independent, refs needed)
-> 3. **CRITICAL PATH**: Satellite 06 (Sleep-EDF pipeline, 3-5 days) → P7 reframe → Satellite 12 (depends on pipeline)
-> 4. **NARROW SCOPE**: P16 (strip to detection-only workshop paper), P19 (split: 7D K-Vector = FIX, K_Topo = PARK)
-> 5. **PARK**: Satellite 03 (needs real clinical data), Satellite 12 (needs pipeline), HK series (needs data reconnection)
+> ### April 2026 Major Changes
+> - **8D Migration**: All papers, both books, 22 sovereignty essays updated from 4D ConsciousnessProfile to 8D SovereignProfile
+> - **New Essay 22**: "On Constitutional Immutability" (16 hardcoded invariants, 7 unamendable rights, 300-year simulation)
+> - **New Paper P21**: "8D Sovereign Profile" (full LaTeX, 10 pages, ready for submission)
+> - **4 New Mycelix Paper Outlines**: sovereign-profile, fractal-governance, tend-economics, living-credentials
+> - **Symthaea Book**: New Symtropy chapter + full numerical audit (14 stale numbers fixed)
+> - **Mycelix Book**: 8D rewrite of trust profile chapter + numerical audit
+> - **5 Mycelix Papers Updated**: consciousness-gating (heavy), federated-learning, decentralized-identity, fractal-civics, cross-cluster-bridge
+> - **Figure Pipelines**: make_figures.sh scripts for 4 papers
+> - **18 Duplicate Files Deleted**, 15 broken symlinks fixed, license corrected (MIT→AGPL)
+>
+> ### Execution Priority Chain (April 11 Update)
+> 1. **SUBMIT NOW**: P1 (HAI, numbers updated), P4 (K-Index), P2 (Zero-TrustML), P3 (Coherence-Guided), **P21 (8D Sovereign Profile, NEW)**
+> 2. **QUICK WINS**: P12 reframe DONE (lambda2), phi-lab 02/04/07 (independent, refs needed)
+> 3. **CRITICAL PATH**: Satellite 06 (Sleep-EDF pipeline) → P7 reframe (DONE, needs real data) → Satellite 12
+> 4. **NARROW SCOPE**: P16 (strip to detection-only workshop paper)
+> 5. **PARK**: HK series (data on Windows drive), P19 (bugs, underpowered)
 > 6. **ARCHIVE**: Satellite 09 (trivial theorems, no salvage path)
 
 ## AUDIT RESULTS (Feb 17, 2026)

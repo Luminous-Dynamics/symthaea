@@ -16,6 +16,29 @@ impl DomainModule for HealthDomain {
 
     fn name(&self) -> &'static str { "Health" }
 
+    fn bio_name(&self) -> &'static str { "Homeostasis" }
+
+    fn description(&self) -> &'static str {
+        "Sovereign health records, consent-gated data sharing, federated learning data dividends, and clinical trial participation — your body, your data."
+    }
+
+    fn dependencies(&self) -> &'static [ClusterDependency] {
+        &[
+            ClusterDependency { cluster_id: "identity", reason: "DID-linked patient records", required: true },
+            ClusterDependency { cluster_id: "finance", reason: "Data dividend payouts", required: false },
+        ]
+    }
+
+    fn entry_types(&self) -> &'static [EntryTypeInfo] {
+        &[
+            EntryTypeInfo { label: "Patient Record", zome: "patient", sensitivity: DataSensitivity::Sensitive },
+            EntryTypeInfo { label: "Consent Grant", zome: "consent", sensitivity: DataSensitivity::Protected },
+            EntryTypeInfo { label: "Clinical Trial", zome: "trials", sensitivity: DataSensitivity::Protected },
+            EntryTypeInfo { label: "Prescription", zome: "prescriptions", sensitivity: DataSensitivity::Sensitive },
+            EntryTypeInfo { label: "FL Gradient", zome: "dividends", sensitivity: DataSensitivity::Private },
+        ]
+    }
+
     fn color_family(&self) -> ColorFamily {
         ColorFamily {
             primary: "#0D7377",

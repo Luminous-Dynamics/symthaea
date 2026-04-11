@@ -186,6 +186,42 @@ impl ConsciousnessEngine {
                 (agent.consciousness.epistemic_confidence + agent.ethics.consequentialist * 0.0005).min(1.0);
         }
 
+        // --- Ethical diffusion: social contact spreads ethical orientations ---
+        // Each tick, a fraction of agents contact a neighbor and blend ethics.
+        // High coordination_understanding agents are better synthesizers (absorb more).
+        // This models Bandura (1977) social learning + Haidt (2012) moral foundations
+        // transmission through community interaction.
+        // Rate: ~10% of agents per tick contact a neighbor, blend at 0.02 rate.
+        {
+            let living_indices: Vec<usize> = agents.iter().enumerate()
+                .filter(|(_, a)| a.is_alive())
+                .map(|(i, _)| i)
+                .collect();
+            let n_contacts = (living_indices.len() as f64 * 0.10).ceil() as usize;
+            for _ in 0..n_contacts {
+                if living_indices.len() < 2 { break; }
+                let ai = living_indices[(rng.next_u64() as usize) % living_indices.len()];
+                let bi = living_indices[(rng.next_u64() as usize) % living_indices.len()];
+                if ai == bi { continue; }
+                // Blend rate scales with the receiver's coordination understanding
+                // (systems thinkers absorb diverse perspectives faster)
+                let blend_a = 0.02 * (1.0 + agents[ai].coordination_understanding * 0.5);
+                let blend_b = 0.02 * (1.0 + agents[bi].coordination_understanding * 0.5);
+                let ethics_a = agents[ai].ethics.as_vec();
+                let ethics_b = agents[bi].ethics.as_vec();
+                // A absorbs from B
+                agents[ai].ethics.deontological += (ethics_b[0] - ethics_a[0]) * blend_a;
+                agents[ai].ethics.consequentialist += (ethics_b[1] - ethics_a[1]) * blend_a;
+                agents[ai].ethics.virtue_care += (ethics_b[2] - ethics_a[2]) * blend_a;
+                agents[ai].ethics.relational += (ethics_b[3] - ethics_a[3]) * blend_a;
+                // B absorbs from A
+                agents[bi].ethics.deontological += (ethics_a[0] - ethics_b[0]) * blend_b;
+                agents[bi].ethics.consequentialist += (ethics_a[1] - ethics_b[1]) * blend_b;
+                agents[bi].ethics.virtue_care += (ethics_a[2] - ethics_b[2]) * blend_b;
+                agents[bi].ethics.relational += (ethics_a[3] - ethics_b[3]) * blend_b;
+            }
+        }
+
         // --- Collective computation ---
         let living: Vec<&CivAgent> = agents.iter().filter(|a| a.is_alive()).collect();
         let n = living.len();

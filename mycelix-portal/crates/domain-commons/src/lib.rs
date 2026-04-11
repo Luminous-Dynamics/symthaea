@@ -8,7 +8,7 @@
 pub mod types;
 
 use portal_domain_trait::{
-    ColorFamily, CivicTier, DomainModule, NavItem,
+    ClusterDependency, ColorFamily, CivicTier, DataSensitivity, DomainModule, EntryTypeInfo, NavItem,
 };
 
 pub struct CommonsDomain;
@@ -16,6 +16,10 @@ pub struct CommonsDomain;
 impl DomainModule for CommonsDomain {
     fn id(&self) -> &'static str { "commons" }
     fn name(&self) -> &'static str { "Commons" }
+    fn bio_name(&self) -> &'static str { "Mutualism" }
+    fn description(&self) -> &'static str {
+        "Shared infrastructure for community wellbeing: property registries, housing, mutual aid, water, food, transport, and resource meshes."
+    }
 
     fn color_family(&self) -> ColorFamily {
         ColorFamily { primary: "#059669", glow: "#34D399" }
@@ -42,6 +46,23 @@ impl DomainModule for CommonsDomain {
             "property_registry", "housing_units", "care_plans",
             "mutualaid_requests", "water_flow", "food_distribution",
             "transport_routes", "mesh_time", "resource_mesh",
+        ]
+    }
+
+    fn dependencies(&self) -> &'static [ClusterDependency] {
+        &[
+            ClusterDependency { cluster_id: "identity", reason: "Stewardship rights linked to DID", required: true },
+            ClusterDependency { cluster_id: "governance", reason: "Resource allocation proposals", required: false },
+        ]
+    }
+
+    fn entry_types(&self) -> &'static [EntryTypeInfo] {
+        &[
+            EntryTypeInfo { label: "Property Claim", zome: "property_registry", sensitivity: DataSensitivity::Community },
+            EntryTypeInfo { label: "Housing Unit", zome: "housing_units", sensitivity: DataSensitivity::Community },
+            EntryTypeInfo { label: "Mutual Aid Request", zome: "mutualaid_requests", sensitivity: DataSensitivity::Protected },
+            EntryTypeInfo { label: "Resource Entry", zome: "resource_mesh", sensitivity: DataSensitivity::Community },
+            EntryTypeInfo { label: "Care Plan", zome: "care_plans", sensitivity: DataSensitivity::Protected },
         ]
     }
 }

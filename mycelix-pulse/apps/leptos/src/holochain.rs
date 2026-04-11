@@ -87,17 +87,22 @@ const LOCAL_CONDUCTOR_URL: &str = "ws://localhost:8888";
 const TUNNEL_CONDUCTOR_URL: &str = "wss://mail-conductor.luminousdynamics.io";
 
 /// Fetch auth token from the SPA server's /api/token endpoint.
-/// Works on both local (localhost:8117) and remote (mail.mycelix.net) deployments.
+/// Uses JS eval for the fetch to avoid web-sys feature gate issues.
 async fn fetch_auth_token() -> Option<Vec<u8>> {
-    let resp = wasm_bindgen_futures::JsFuture::from(
-        web_sys::window()?.fetch_with_str("/api/token")
-    ).await.ok()?;
-    let resp: web_sys::Response = resp.dyn_into().ok()?;
-    if !resp.ok() { return None; }
-    let json = wasm_bindgen_futures::JsFuture::from(resp.json().ok()?).await.ok()?;
-    let token_b64 = js_sys::Reflect::get(&json, &JsValue::from_str("token")).ok()?.as_string()?;
+    // Fetch token via JS — returns base64-encoded token string or null
+    let js = "fetch('/api/token').then(r=>r.json()).then(d=>d.token||null).catch(()=>null)";
+    let promise = js_sys::eval(js).ok()?;
+    let result = wasm_bindgen_futures::JsFuture::from(js_sys::Promise::from(promise))
+        .await
+        .ok()?;
 
-    // Decode base64 token to bytes
+    let token_b64 = result.as_string()?;
+    if token_b64.is_empty() {
+        web_sys::console::warn_1(&"[Mail] Token fetch: empty response".into());
+        return None;
+    }
+
+    // Decode base64 to bytes
     let decoded = web_sys::window()?.atob(&token_b64).ok()?;
     let bytes: Vec<u8> = decoded.chars().map(|c| c as u8).collect();
     web_sys::console::log_1(&format!("[Mail] Auth token: {} bytes from /api/token", bytes.len()).into());
@@ -114,17 +119,22 @@ fn conductor_url() -> String {
         return url;
     }
 
-    // 2. Auto-detect: if we're on a remote origin, use the tunnel proxy
-    let is_remote = web_sys::window()
+    let hostname = web_sys::window()
         .and_then(|w| w.location().hostname().ok())
-        .map(|h| !h.is_empty() && h != "localhost" && h != "127.0.0.1" && !h.starts_with("10.") && !h.starts_with("192.168."))
-        .unwrap_or(false);
+        .unwrap_or_default();
 
-    if is_remote {
-        TUNNEL_CONDUCTOR_URL.to_string()
-    } else {
-        LOCAL_CONDUCTOR_URL.to_string()
+    // 2. Localhost: direct connection
+    if hostname == "localhost" || hostname == "127.0.0.1" {
+        return LOCAL_CONDUCTOR_URL.to_string();
     }
+
+    // 3. LAN IP: connect to same host on conductor port
+    if hostname.starts_with("10.") || hostname.starts_with("192.168.") {
+        return format!("ws://{}:8888", hostname);
+    }
+
+    // 4. Remote (mail.mycelix.net): use tunnel
+    TUNNEL_CONDUCTOR_URL.to_string()
 }
 
 /// Wait for the dynamic token promise (from /api/token), then read the value.
@@ -143,10 +153,8 @@ pub fn HolochainProvider(children: Children) -> impl IntoView {
 
     let transport_for_connect = transport.clone();
     spawn_local(async move {
-        // Get auth token from SPA server (/api/token)
-        let token_bytes = fetch_auth_token().await;
-
         // Connect via BrowserWsTransport (pure Rust, like Prism)
+        // Auth token not needed — signing credentials are authorized server-side
         let url = conductor_url();
         web_sys::console::log_1(
             &format!("[Mail] Connecting to conductor at {url}...").into(),
@@ -156,7 +164,7 @@ pub fn HolochainProvider(children: Children) -> impl IntoView {
         let config = ConnectConfig {
             url: url.clone(),
             app_id: "mycelix_mail".to_string(),
-            auth_token: token_bytes,
+            auth_token: None,
             reconnect: None,
             request_timeout_ms: Some(30_000),
         };

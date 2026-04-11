@@ -603,6 +603,7 @@ mod tests {
     }
 }
 
+pub mod arc;
 pub mod ablation;
 pub mod aesthetic_listener;
 pub mod ambient_drone;

@@ -12,7 +12,9 @@
 use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "creative")]
-use symthaea_aesthetic::{AestheticConfig, AestheticFeedback, AestheticScore, AestheticTracker};
+use symthaea_aesthetic::{
+    AestheticConfig, AestheticFeedback, AestheticMemory, AestheticScore, AestheticTracker,
+};
 #[cfg(feature = "creative")]
 use symthaea_atelier::{Artwork, AtelierConfig, AtelierStyle};
 #[cfg(feature = "creative")]
@@ -80,6 +82,10 @@ impl Default for CreativeOutput {
     }
 }
 
+/// Default path for cross-session aesthetic memory.
+#[cfg(feature = "creative")]
+const AESTHETIC_MEMORY_PATH: &str = ".claude/aesthetic_memory.json";
+
 /// Stateful creative manager — holds atelier/muse configs, aesthetic tracker,
 /// and generation state.
 #[cfg(feature = "creative")]
@@ -90,6 +96,10 @@ pub(crate) struct CreativeManager {
     muse_config: MuseConfig,
     /// Aesthetic feedback tracker (EMA + reward computation).
     tracker: AestheticTracker,
+    /// Persisted aesthetic memory (loaded at startup, saved on drop).
+    memory: AestheticMemory,
+    /// Path to persist aesthetic memory.
+    memory_path: std::path::PathBuf,
     /// Consciousness threshold for creative generation.
     consciousness_threshold: f32,
     /// Generate art every N cycles.
@@ -117,11 +127,19 @@ enum CreativeModality {
     Synesthetic,
     /// Real-time improvisation: persistent streaming across ticks.
     LivePerformance,
+    /// Gray-Scott reaction-diffusion: living chemical patterns.
+    ReactionDiffusion,
+    /// Strange attractor orbit visualization.
+    StrangeAttractor,
 }
 
 #[cfg(feature = "creative")]
 impl CreativeManager {
     pub fn new() -> Self {
+        let memory_path = std::path::PathBuf::from(AESTHETIC_MEMORY_PATH);
+        let memory = AestheticMemory::load(&memory_path);
+        let tracker =
+            AestheticTracker::from_memory(AestheticConfig::default(), &memory);
         Self {
             atelier_config: AtelierConfig {
                 style: AtelierStyle::Composite,
@@ -133,7 +151,9 @@ impl CreativeManager {
                 max_notes: 16,
                 ..MuseConfig::default()
             },
-            tracker: AestheticTracker::new(AestheticConfig::default()),
+            tracker,
+            memory,
+            memory_path,
             consciousness_threshold: 0.3,
             generation_interval: 10,
             cycles_since_generation: 0,
@@ -143,6 +163,12 @@ impl CreativeManager {
             next_modality: CreativeModality::Visual,
             live_stream: None,
         }
+    }
+
+    /// Flush aesthetic memory to disk. Called on drop and can be called manually.
+    pub fn save_memory(&self) {
+        let updated = self.tracker.to_memory(&self.memory);
+        updated.save(&self.memory_path);
     }
 
     /// Tick the creative pipeline. Returns creative output when art is generated.
@@ -439,16 +465,39 @@ impl Default for CreativeManager {
     }
 }
 
-/// Convert a CognitiveSnapshot to MusicalState.
+#[cfg(feature = "creative")]
+impl Drop for CreativeManager {
+    fn drop(&mut self) {
+        self.save_memory();
+    }
+}
+
+/// Convert a CognitiveSnapshot to MusicalState, enriched with VA emotion space.
+///
+/// Uses Russell's circumplex model to derive musically-validated parameters
+/// from the cognitive state, then blends them with the raw neuromodulator values.
 #[cfg(feature = "creative")]
 fn snapshot_to_musical_state(snap: &CognitiveSnapshot) -> MusicalState {
+    // Derive VA coordinate from core affect
+    let va = symthaea_aesthetic::from_core_affect(
+        snap.valence,
+        snap.arousal,
+        snap.dopamine,
+        snap.serotonin,
+        snap.noradrenaline,
+    );
+    let params = symthaea_aesthetic::MusicalParams::from_va(va);
+
+    // Blend VA-derived arousal with raw (VA is more musically calibrated)
+    let blended_arousal = snap.arousal * 0.4 + va.arousal * 0.6;
+
     MusicalState {
         harmony_activations: snap.harmony_activations,
-        dopamine: snap.dopamine,
+        dopamine: snap.dopamine * params.dynamics,
         serotonin: snap.serotonin,
         noradrenaline: snap.noradrenaline,
-        arousal: snap.arousal,
-        valence: snap.valence,
+        arousal: blended_arousal,
+        valence: va.valence, // use VA-calibrated valence for scale building
         consciousness_level: snap.consciousness_level as f32,
         prediction_error: snap.prediction_error,
     }

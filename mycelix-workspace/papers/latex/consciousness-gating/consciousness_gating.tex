@@ -29,7 +29,7 @@
 \newtheorem{proposition}{Proposition}
 \newtheorem{lemma}{Lemma}
 
-\title{Consciousness-Gated Governance: 4D Identity Profiles and Progressive Vote Weighting in Decentralized Systems}
+\title{Consciousness-Gated Governance: 8D Sovereign Profiles and Progressive Vote Weighting in Decentralized Systems}
 \author{Tristan Stoltz \\ Luminous Dynamics \\ \texttt{tristan.stoltz@evolvingresonantcocreationism.com}}
 \date{March 2026}
 
@@ -42,13 +42,14 @@
 \begin{abstract}
 We present a novel access control mechanism for decentralized governance systems:
 \emph{consciousness gating}. Instead of binary permission checks or token-weighted
-voting, governance participation is determined by a 4-dimensional profile measuring
-identity verification strength, cross-system reputation, peer community trust,
-and domain-specific engagement. This profile maps to five progressive tiers
+voting, governance participation is determined by an 8-dimensional sovereign profile measuring
+epistemic integrity, thermodynamic yield, network resilience, economic velocity,
+civic participation, stewardship, semantic resonance, and domain competence---each
+measured from an independent source cluster. This profile maps to five progressive tiers
 (Observer through Guardian) with sigmoid-smoothed vote weighting and hysteresis
 to prevent tier oscillation. We implement this mechanism in Mycelix, a
-Holochain-based platform with 133+ zomes across 16 clusters, and validate it
-with 295+ tests including property-based verification of tier monotonicity,
+Holochain-based platform with 141+ zomes across 16 clusters, and validate it
+with 450+ tests including property-based verification of tier monotonicity,
 score boundedness, and sigmoid continuity. Our approach addresses three
 fundamental problems in decentralized governance: Sybil resistance (via the
 identity dimension), plutocracy prevention (via non-economic governance
@@ -102,17 +103,24 @@ existing decentralized governance failures:
     and local (no real-time cross-system queries).
 \end{enumerate}
 
-\section{The 4D Consciousness Profile}
+\section{The 8D Sovereign Profile}
 
-\begin{definition}[Consciousness Profile]
-A consciousness profile $\mathbf{P} = (I, R, C, E) \in [0,1]^4$ where:
+\begin{definition}[Sovereign Profile]
+A sovereign profile $\mathbf{P} = (D_0, D_1, \ldots, D_7) \in [0,1]^8$ where each dimension is measured from a primary source cluster:
 \begin{itemize}[nosep]
-  \item $I$: Identity verification strength
-  \item $R$: Cross-system reputation with temporal decay
-  \item $C$: Peer community trust attestations
-  \item $E$: Domain-specific engagement
+  \item $D_0$: Epistemic Integrity (truth-telling, knowledge cluster)
+  \item $D_1$: Thermodynamic Yield (energy contribution, energy/grid)
+  \item $D_2$: Network Resilience (uptime/bandwidth, mesh-time)
+  \item $D_3$: Economic Velocity (TEND circulation, finance)
+  \item $D_4$: Civic Participation (voting/jury/proposals, governance)
+  \item $D_5$: Stewardship \& Care (commons labor, attribution)
+  \item $D_6$: Semantic Resonance (FL Hamming similarity, core-FL)
+  \item $D_7$: Domain Competence (peer-verified, Ebbinghaus decay, craft)
 \end{itemize}
+No single dimension weight may exceed 50\% (constitutional invariant). All dimensions decay exponentially ($\lambda_{\min} = 0.001$/day, $\lambda_{\max} = 0.020$/day; $\lambda = 0$ constitutionally impossible).
 \end{definition}
+
+\paragraph{Legacy compatibility.} The earlier 4D \texttt{ConsciousnessProfile} (I, R, C, E) remains for backward compatibility. The \texttt{gate\_civic()} function evaluates native 8D first, falling back to 4D with automatic conversion.
 
 \subsection{Dimension 1: Identity ($I$)}
 
@@ -270,7 +278,7 @@ zome issues a \texttt{ConsciousnessCredential}:
 \begin{lstlisting}
 pub struct ConsciousnessCredential {
     pub did: String,
-    pub profile: ConsciousnessProfile,
+    pub profile: SovereignProfile, // replaces legacy ConsciousnessProfile
     pub tier: ConsciousnessTier,
     pub issued_at: u64,
     pub expires_at: u64,  // +24h default
@@ -306,7 +314,7 @@ An attacker creating $n$ Sybil identities faces:
 \end{itemize}
 
 The multi-dimensional requirement means an attacker must simultaneously
-solve all four dimensions for each Sybil identity, making the attack cost
+solve all eight dimensions for each Sybil identity, making the attack cost
 multiplicative rather than additive.
 
 \subsection{Governance Capture}
@@ -373,7 +381,7 @@ We validate the system with 6 property-based tests (proptest framework):
 
 \subsection{Integration Tests}
 
-295+ tests in the bridge-common crate cover the full surface area, including
+450+ tests in the bridge-common crate cover the full surface area, including
 cross-cluster dispatch, rate limiting, reputation operations, and credential
 lifecycle.
 
@@ -409,7 +417,7 @@ BrightID (social graph) & High & Yes & No & No \\
   \item \textbf{Cross-community portability}: Consciousness profiles are
     community-specific. A mechanism for portable profiles across independent
     Mycelix deployments remains open.
-  \item \textbf{Formal verification}: The Rust implementation has 295+ tests
+  \item \textbf{Formal verification}: The Rust implementation has 450+ tests
     but no formal verification. Proving the security properties in a theorem
     prover (e.g., Coq or Lean) is desirable for high-assurance deployments.
 \end{enumerate}
@@ -425,8 +433,8 @@ the sigmoid-smoothed vote weighting and hysteresis mechanisms ensure stable,
 continuous governance participation.
 
 The implementation in Mycelix demonstrates that this framework is practical at
-scale: 133+ zomes across 16 clusters, all sharing the same consciousness
-gating infrastructure through a single bridge-common crate with 295+ tests.
+scale: 141+ zomes across 16 clusters, all sharing the same consciousness
+gating infrastructure through a single bridge-common crate with 450+ tests.
 
 \begin{thebibliography}{99}
   \bibitem{buterin2019} Buterin, V. (2019). Moving beyond coin voting governance.

@@ -3,6 +3,7 @@
 //! Domain page components — rendered when the user zooms into a domain.
 
 pub mod admin;
+pub mod catalog;
 pub mod commons;
 pub mod praxis;
 pub mod finance;
@@ -12,6 +13,7 @@ pub mod hearth;
 pub mod knowledge;
 pub mod lucid;
 pub mod mail;
+pub mod sovereignty;
 
 use leptos::prelude::*;
 
@@ -29,6 +31,9 @@ pub fn DomainContent(domain_id: String) -> impl IntoView {
         "knowledge" => view! { <knowledge::KnowledgeOverview /> }.into_any(),
         "mail" => view! { <mail::MailOverview /> }.into_any(),
         "admin" => view! { <admin::AdminOverview /> }.into_any(),
+        // Meta-views accessible via admin or direct orbital node
+        "catalog" => view! { <catalog::CatalogOverview /> }.into_any(),
+        "sovereignty" => view! { <sovereignty::SovereigntyDashboard /> }.into_any(),
         _ => view! {
             <div class="domain-coming-soon">
                 <p class="coming-soon-text">

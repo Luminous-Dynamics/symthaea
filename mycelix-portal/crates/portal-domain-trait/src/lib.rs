@@ -75,6 +75,65 @@ pub struct NavItem {
     pub path: &'static str,
 }
 
+/// Dependency on another cluster.
+#[derive(Clone, Debug)]
+pub struct ClusterDependency {
+    /// ID of the required cluster (e.g., "identity").
+    pub cluster_id: &'static str,
+    /// Human-readable reason for the dependency.
+    pub reason: &'static str,
+    /// If `true`, this domain cannot function without the dependency.
+    pub required: bool,
+}
+
+/// Data sensitivity classification for sovereignty dashboard.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum DataSensitivity {
+    /// Publicly visible to all network participants.
+    Public,
+    /// Visible to community members with appropriate tier.
+    Community,
+    /// Shared only with explicit consent grants.
+    Protected,
+    /// Only accessible to the owner.
+    Private,
+    /// Highly sensitive — encrypted at rest, ZKP for any disclosure.
+    Sensitive,
+}
+
+impl DataSensitivity {
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Public => "Public",
+            Self::Community => "Community",
+            Self::Protected => "Protected",
+            Self::Private => "Private",
+            Self::Sensitive => "Sensitive",
+        }
+    }
+
+    pub fn css_class(self) -> &'static str {
+        match self {
+            Self::Public => "sensitivity-public",
+            Self::Community => "sensitivity-community",
+            Self::Protected => "sensitivity-protected",
+            Self::Private => "sensitivity-private",
+            Self::Sensitive => "sensitivity-sensitive",
+        }
+    }
+}
+
+/// Metadata about a Holochain entry type — for sovereignty dashboard.
+#[derive(Clone, Debug)]
+pub struct EntryTypeInfo {
+    /// Human-readable label (e.g., "Patient Record").
+    pub label: &'static str,
+    /// Which zome owns this entry type.
+    pub zome: &'static str,
+    /// Sensitivity classification.
+    pub sensitivity: DataSensitivity,
+}
+
 /// The contract every Mycelix domain implements for portal integration.
 pub trait DomainModule {
     /// Unique identifier (e.g., "health", "governance", "praxis").
@@ -82,6 +141,12 @@ pub trait DomainModule {
 
     /// Human-readable name (e.g., "Health", "Governance").
     fn name(&self) -> &'static str;
+
+    /// Biological metaphor name (e.g., "Homeostasis", "Consensus").
+    fn bio_name(&self) -> &'static str;
+
+    /// One-sentence description of the domain's purpose.
+    fn description(&self) -> &'static str;
 
     /// Domain color palette.
     fn color_family(&self) -> ColorFamily;
@@ -102,6 +167,18 @@ pub trait DomainModule {
 
     /// Zome names this domain can call.
     fn zomes(&self) -> &'static [&'static str];
+
+    /// Other clusters this domain depends on.
+    /// Used by the catalog and sovereignty dashboard.
+    fn dependencies(&self) -> &'static [ClusterDependency] {
+        &[]
+    }
+
+    /// Key entry types managed by this domain.
+    /// Used by the sovereignty dashboard to build the data inventory.
+    fn entry_types(&self) -> &'static [EntryTypeInfo] {
+        &[]
+    }
 }
 
 /// Registry of all compiled domain modules.

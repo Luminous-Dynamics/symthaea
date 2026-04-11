@@ -1981,9 +1981,8 @@ mod tests {
 
     #[test]
     fn local_allowlist_has_expected_count() {
-        // 4 property + 6 housing + 5 care + 7 mutualaid + 5 water + 4 food
-        // + 3 transport + 3 support + 1 space = 38
-        assert_eq!(ALLOWED_ZOMES.len(), 38);
+        // Land (17) + Care (21) + commons_bridge = 40 (union of both sub-clusters + bridge)
+        assert_eq!(ALLOWED_ZOMES.len(), 40);
     }
 
     #[test]
@@ -2888,8 +2887,8 @@ mod tests {
 
     #[test]
     fn care_zomes_has_expected_count() {
-        // 5 care + 7 mutualaid + 3 transport + 3 support + 1 space = 19
-        assert_eq!(CARE_ZOMES.len(), 19, "Expected 19 care zomes");
+        // 5 care + 7 mutualaid + 3 transport + 3 support + 1 space + 1 wellbeing + 1 community-calendar = 21
+        assert_eq!(CARE_ZOMES.len(), 21, "Expected 21 care zomes");
     }
 
     #[test]

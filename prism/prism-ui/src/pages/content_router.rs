@@ -58,6 +58,9 @@ pub fn ContentRouter() -> impl IntoView {
             PageView::SubmitClaim => {
                 view! { <SubmitClaimPage /> }.into_any()
             }
+            PageView::Bookmarks => {
+                view! { <BookmarksPage /> }.into_any()
+            }
             PageView::Error { message } => {
                 view! {
                     <div class="reader-content">
@@ -189,6 +192,56 @@ fn SearchResultsPage(query: String, results: Vec<SearchResult>) -> impl IntoView
             {results.into_iter().enumerate().map(|(i, r)| {
                 view! { <ResultCard result=r rank={i+1} /> }
             }).collect_view()}
+        </div>
+    }
+}
+
+#[component]
+fn BookmarksPage() -> impl IntoView {
+    let state = expect_context::<BrowserState>();
+
+    view! {
+        <div class="reader-content">
+            <h1>"Bookmarks"</h1>
+
+            {move || {
+                let bm = state.bookmarks.get();
+                if bm.is_empty() {
+                    view! {
+                        <p class="bookmarks-empty">"No bookmarks yet. Click the \u{2606} star in the search bar to bookmark a page."</p>
+                    }.into_any()
+                } else {
+                    view! {
+                        <div class="bookmarks-list">
+                            {bm.into_iter().map(|b| {
+                                let url = b.url.clone();
+                                let url_display = b.url.clone();
+                                let url_delete = b.url.clone();
+                                let title = if b.title.is_empty() { b.url.clone() } else { b.title.clone() };
+                                let s_nav = expect_context::<BrowserState>();
+                                let s_del = expect_context::<BrowserState>();
+                                view! {
+                                    <div class="bookmark-item">
+                                        <div class="bookmark-info"
+                                            on:click=move |_| {
+                                                crate::engine::navigate_history(&url);
+                                            }
+                                        >
+                                            <span class="bookmark-title">{title}</span>
+                                            <span class="bookmark-url">{url_display}</span>
+                                        </div>
+                                        <button class="bookmark-delete" title="Remove bookmark"
+                                            on:click=move |_| {
+                                                s_del.remove_bookmark(&url_delete);
+                                            }
+                                        >"\u{00D7}"</button>
+                                    </div>
+                                }
+                            }).collect_view()}
+                        </div>
+                    }.into_any()
+                }
+            }}
         </div>
     }
 }

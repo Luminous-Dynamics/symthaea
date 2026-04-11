@@ -30,6 +30,7 @@ web-sys = { version = "0.3", features = [
     "Document",
     "Navigator",
     "Response",
+    "Headers",
     "Storage",
     "Location",
     "Performance",

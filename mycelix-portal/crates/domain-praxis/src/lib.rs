@@ -4,13 +4,20 @@
 
 pub mod types;
 
-use portal_domain_trait::{ColorFamily, CivicTier, DomainModule, NavItem};
+use portal_domain_trait::{
+    ClusterDependency, ColorFamily, CivicTier, DataSensitivity, DomainModule, EntryTypeInfo, NavItem,
+};
 
 pub struct PraxisDomain;
 
 impl DomainModule for PraxisDomain {
     fn id(&self) -> &'static str { "praxis" }
     fn name(&self) -> &'static str { "Education" }
+    fn bio_name(&self) -> &'static str { "Growth" }
+    fn description(&self) -> &'static str {
+        "K-to-PhD adaptive learning: 2,002 curriculum nodes, BKT mastery tracking, spaced repetition, and consciousness-gated credential issuance."
+    }
+
     fn color_family(&self) -> ColorFamily { ColorFamily { primary: "#2563EB", glow: "#60A5FA" } }
 
     fn nav_items(&self) -> Vec<NavItem> {
@@ -30,5 +37,21 @@ impl DomainModule for PraxisDomain {
 
     fn zomes(&self) -> &'static [&'static str] {
         &["learning", "fl", "credential", "dao", "srs", "gamification", "adaptive", "integration"]
+    }
+
+    fn dependencies(&self) -> &'static [ClusterDependency] {
+        &[
+            ClusterDependency { cluster_id: "identity", reason: "Credential issuance linked to DID", required: true },
+            ClusterDependency { cluster_id: "governance", reason: "Curriculum DAO voting", required: false },
+        ]
+    }
+
+    fn entry_types(&self) -> &'static [EntryTypeInfo] {
+        &[
+            EntryTypeInfo { label: "Learning Record", zome: "learning", sensitivity: DataSensitivity::Protected },
+            EntryTypeInfo { label: "Credential", zome: "credential", sensitivity: DataSensitivity::Community },
+            EntryTypeInfo { label: "Mastery Score", zome: "adaptive", sensitivity: DataSensitivity::Protected },
+            EntryTypeInfo { label: "Review Card", zome: "srs", sensitivity: DataSensitivity::Private },
+        ]
     }
 }

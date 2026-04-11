@@ -441,7 +441,7 @@ impl Default for CycleHistory {
             mcts_plan: None,
             body_arousal: 0.5,
             resonance_frequency: 0.0,
-            consciousness_level: 0.0,
+            consciousness_level: 0.05, // Floor: prevents fully unconscious cold-start
             recent_hvs: std::collections::VecDeque::with_capacity(4),
             last_causal_relations: 0,
             last_causal_confidence: 0.0,
