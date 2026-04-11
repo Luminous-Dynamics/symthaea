@@ -6,10 +6,15 @@ description = "Standalone CLI bridge: reads governance commands from stdin (JSON
 
 # NOT part of the symthaea workspace — avoids serde version conflict with holochain_client.
 # Build with: cargo build   (from this directory)
+#
+# IMPORTANT: holochain_client on crates.io (0.6.0) has a version mismatch —
+# it depends on holochain_conductor_api 0.4.0 which uses serde tag="data",
+# but the conductor binary 0.6.0 uses conductor_api 0.6.0 with tag="value".
+# Using git source ensures all internal types match the conductor.
 
 [dependencies]
-holochain_client = "=0.6.0"
-holochain_types = "=0.4.0"
+holochain_client = { git = "https://github.com/holochain/holochain", tag = "holochain-0.6.0" }
+holochain_types = { git = "https://github.com/holochain/holochain", tag = "holochain-0.6.0" }
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "io-util", "io-std", "sync", "time"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
