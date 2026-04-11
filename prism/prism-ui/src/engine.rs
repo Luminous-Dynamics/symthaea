@@ -242,28 +242,7 @@ fn search_query(query: &str, state: &BrowserState, engine: &SearchEngine) {
     let mode = state.search_mode.get_untracked();
     let local_results = engine.search(query, 10);
 
-    // Run query through Spore consciousness kernel for epistemic grounding + summary
-    let spore = expect_context::<StoredValue<
-        Option<symthaea_spore::engine::SporeEngine>,
-        leptos::prelude::LocalStorage,
-    >>();
-    spore.update_value(|opt: &mut Option<symthaea_spore::engine::SporeEngine>| {
-        if let Some(spore_engine) = opt {
-            let result = spore_engine.cycle(query);
-            state.set_consciousness.set(result.consciousness_level);
-            state.set_epistemic_confidence.set(result.epistemic_status.honest_confidence);
-            state.set_prediction_error.set(result.prediction_error);
-
-            // Generate epistemic summary via Broca text generation
-            let generated = spore_engine.generate_text_with_input(query, 40);
-            if !generated.text.is_empty() {
-                state.set_spore_summary.set(generated.text);
-            } else {
-                state.set_spore_summary.set(String::new());
-            }
-        }
-    });
-
+    // Show results IMMEDIATELY — don't block on Spore
     let url = format!("prism://search?q={}", query);
     let title = format!("Search: {}", query);
     let view = PageView::Search {
@@ -280,6 +259,35 @@ fn search_query(query: &str, state: &BrowserState, engine: &SearchEngine) {
     state.set_threat_count.set(0);
     state.push_history(&url, &title, &view);
     state.sync_active_tab();
+    // Clear stale summary while Spore processes
+    state.set_spore_summary.set(String::new());
+
+    // Run Spore consciousness cycle AFTER results are displayed (non-blocking).
+    // Uses spawn_local to yield to the event loop first so results render instantly.
+    let query_for_spore = query.to_string();
+    let state_spore = state.clone();
+    wasm_bindgen_futures::spawn_local(async move {
+        // Yield one frame so the search results render before Spore blocks
+        gloo_timers::future::TimeoutFuture::new(0).await;
+
+        let spore = expect_context::<StoredValue<
+            Option<symthaea_spore::engine::SporeEngine>,
+            leptos::prelude::LocalStorage,
+        >>();
+        spore.update_value(|opt: &mut Option<symthaea_spore::engine::SporeEngine>| {
+            if let Some(spore_engine) = opt {
+                let result = spore_engine.cycle(&query_for_spore);
+                state_spore.set_consciousness.set(result.consciousness_level);
+                state_spore.set_epistemic_confidence.set(result.epistemic_status.honest_confidence);
+                state_spore.set_prediction_error.set(result.prediction_error);
+
+                let generated = spore_engine.generate_text_with_input(&query_for_spore, 40);
+                if !generated.text.is_empty() {
+                    state_spore.set_spore_summary.set(generated.text);
+                }
+            }
+        });
+    });
 
     // Advanced/Paradigm: augment with web sources in background
     if mode == SearchMode::Basic {
@@ -417,18 +425,23 @@ fn navigate_fullpage(url_str: &str, state: &BrowserState, reflex: &ReflexArc) {
         SafetyLevel::Green
     };
 
-    // Update consciousness
-    let spore = expect_context::<StoredValue<
-        Option<symthaea_spore::engine::SporeEngine>,
-        leptos::prelude::LocalStorage,
-    >>();
-    spore.update_value(|opt: &mut Option<symthaea_spore::engine::SporeEngine>| {
-        if let Some(spore_engine) = opt {
-            let result = spore_engine.cycle(url_str);
-            state.set_consciousness.set(result.consciousness_level);
-            state.set_epistemic_confidence.set(result.epistemic_status.honest_confidence);
-            state.set_prediction_error.set(result.prediction_error);
-        }
+    // Consciousness update deferred (non-blocking)
+    let url_for_spore = url_str.to_string();
+    let state_spore = state.clone();
+    wasm_bindgen_futures::spawn_local(async move {
+        gloo_timers::future::TimeoutFuture::new(0).await;
+        let spore = expect_context::<StoredValue<
+            Option<symthaea_spore::engine::SporeEngine>,
+            leptos::prelude::LocalStorage,
+        >>();
+        spore.update_value(|opt: &mut Option<symthaea_spore::engine::SporeEngine>| {
+            if let Some(spore_engine) = opt {
+                let result = spore_engine.cycle(&url_for_spore);
+                state_spore.set_consciousness.set(result.consciousness_level);
+                state_spore.set_epistemic_confidence.set(result.epistemic_status.honest_confidence);
+                state_spore.set_prediction_error.set(result.prediction_error);
+            }
+        });
     });
 
     let host = url.host_str().unwrap_or("").to_string();
@@ -453,18 +466,23 @@ fn navigate_url(url_str: &str, state: &BrowserState, reflex: &ReflexArc) {
         }
     };
 
-    // Update consciousness with navigation context
-    let spore = expect_context::<StoredValue<
-        Option<symthaea_spore::engine::SporeEngine>,
-        leptos::prelude::LocalStorage,
-    >>();
-    spore.update_value(|opt: &mut Option<symthaea_spore::engine::SporeEngine>| {
-        if let Some(spore_engine) = opt {
-            let result = spore_engine.cycle(url_str);
-            state.set_consciousness.set(result.consciousness_level);
-            state.set_epistemic_confidence.set(result.epistemic_status.honest_confidence);
-            state.set_prediction_error.set(result.prediction_error);
-        }
+    // Spore consciousness update runs after the page loads (non-blocking)
+    let url_for_spore = url_str.to_string();
+    let state_spore = state.clone();
+    wasm_bindgen_futures::spawn_local(async move {
+        gloo_timers::future::TimeoutFuture::new(0).await;
+        let spore = expect_context::<StoredValue<
+            Option<symthaea_spore::engine::SporeEngine>,
+            leptos::prelude::LocalStorage,
+        >>();
+        spore.update_value(|opt: &mut Option<symthaea_spore::engine::SporeEngine>| {
+            if let Some(spore_engine) = opt {
+                let result = spore_engine.cycle(&url_for_spore);
+                state_spore.set_consciousness.set(result.consciousness_level);
+                state_spore.set_epistemic_confidence.set(result.epistemic_status.honest_confidence);
+                state_spore.set_prediction_error.set(result.prediction_error);
+            }
+        });
     });
 
     let pre = reflex.pre_fetch(&url, false, false);
