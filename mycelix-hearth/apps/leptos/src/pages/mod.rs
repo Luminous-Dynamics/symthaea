@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 mod home;
+pub mod found;
 mod kinship;
 mod care;
 mod decisions;

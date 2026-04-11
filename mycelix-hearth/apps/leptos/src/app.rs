@@ -66,6 +66,7 @@ fn AppInner() -> impl IntoView {
             <main id="main-content" class="main-content heartbeat" role="main" aria-label="hearth content">
                 <Routes fallback=|| view! { <p class="not-found">"you’ve wandered off the path"</p> }>
                     <Route path=path!("/") view=HomePage />
+                    <Route path=path!("/found") view=crate::pages::found::FoundingCeremony />
                     <Route path=path!("/kinship") view=KinshipPage />
                     <Route path=path!("/care") view=CarePage />
                     <Route path=path!("/decisions") view=DecisionsPage />
