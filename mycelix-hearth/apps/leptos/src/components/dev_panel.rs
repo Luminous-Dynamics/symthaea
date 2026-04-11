@@ -45,38 +45,38 @@ pub fn DevPanel() -> impl IntoView {
                                 <h4>"Consciousness"</h4>
 
                                 <DevSlider
-                                    label="Identity"
-                                    value=p.identity
+                                    label="Epistemic"
+                                    value=p.epistemic_integrity
                                     on_change=move |v| {
                                         let mut p = consciousness.profile.get();
-                                        p.identity = v;
+                                        p.epistemic_integrity = v;
                                         set_profile.set(p);
                                     }
                                 />
                                 <DevSlider
-                                    label="Reputation"
-                                    value=p.reputation
+                                    label="Civic"
+                                    value=p.civic_participation
                                     on_change=move |v| {
                                         let mut p = consciousness.profile.get();
-                                        p.reputation = v;
+                                        p.civic_participation = v;
                                         set_profile.set(p);
                                     }
                                 />
                                 <DevSlider
-                                    label="Community"
-                                    value=p.community
+                                    label="Stewardship"
+                                    value=p.stewardship_care
                                     on_change=move |v| {
                                         let mut p = consciousness.profile.get();
-                                        p.community = v;
+                                        p.stewardship_care = v;
                                         set_profile.set(p);
                                     }
                                 />
                                 <DevSlider
-                                    label="Engagement"
-                                    value=p.engagement
+                                    label="Competence"
+                                    value=p.domain_competence
                                     on_change=move |v| {
                                         let mut p = consciousness.profile.get();
-                                        p.engagement = v;
+                                        p.domain_competence = v;
                                         set_profile.set(p);
                                     }
                                 />
@@ -87,7 +87,7 @@ pub fn DevPanel() -> impl IntoView {
                                         {move || consciousness.tier.get().label()}
                                     </span>
                                     <span class="dev-score">
-                                        {move || format!(" ({:.0}%)", consciousness.profile.get().combined_score() * 100.0)}
+                                        {move || format!(" ({:.0}%)", consciousness.profile.get().combined_score(&mycelix_leptos_core::consciousness::DimensionWeights::governance()) * 100.0)}
                                     </span>
                                 </div>
 

@@ -24,7 +24,7 @@ pub fn DecisionsPage() -> impl IntoView {
             None => return,
         };
         let role = hearth.my_role.get().unwrap_or(MemberRole::Guest);
-        let tier_bp = ((consciousness.profile.get().combined_score() * 10000.0) as u32).min(10000);
+        let tier_bp = ((consciousness.profile.get().combined_score(&mycelix_leptos_core::consciousness::DimensionWeights::governance()) * 10000.0) as u32).min(10000);
         let weight = effective_vote_weight(&role, tier_bp);
         let reasoning = vote_reasoning.get();
         let reasoning = if reasoning.is_empty() { None } else { Some(reasoning) };
@@ -50,7 +50,7 @@ pub fn DecisionsPage() -> impl IntoView {
                 {move || {
                     let role = hearth.my_role.get().unwrap_or(MemberRole::Guest);
                     let role_bp = role.default_vote_weight_bp();
-                    let tier_bp = ((consciousness.profile.get().combined_score() * 10000.0) as u32).min(10000);
+                    let tier_bp = ((consciousness.profile.get().combined_score(&mycelix_leptos_core::consciousness::DimensionWeights::governance()) * 10000.0) as u32).min(10000);
                     let effective = effective_vote_weight(&role, tier_bp);
                     view! {
                         <span class="weight-display">
