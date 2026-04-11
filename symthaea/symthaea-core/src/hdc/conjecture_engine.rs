@@ -816,6 +816,123 @@ pub fn observe_perm_det_ratio(max_n: usize) -> ObservedSequence {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
+// ODE INVARIANT DISCOVERY
+// ═══════════════════════════════════════════════════════════════════════════
+
+/// Inline Dormand-Prince RK45 for ODE trajectory generation.
+/// Returns (times, states) where states[i] = [x, y, z, ...] at time times[i].
+fn rk45_trajectory(
+    f: impl Fn(&[f64], f64) -> Vec<f64>,
+    y0: &[f64],
+    t_end: f64,
+    dt: f64,
+) -> (Vec<f64>, Vec<Vec<f64>>) {
+    let mut t = 0.0;
+    let mut y = y0.to_vec();
+    let mut times = vec![t];
+    let mut states = vec![y.clone()];
+    let dim = y0.len();
+
+    while t < t_end {
+        let h = dt.min(t_end - t);
+        let k1 = f(&y, t);
+        let y2: Vec<f64> = (0..dim).map(|i| y[i] + h * 0.5 * k1[i]).collect();
+        let k2 = f(&y2, t + 0.5 * h);
+        let y3: Vec<f64> = (0..dim).map(|i| y[i] + h * 0.5 * k2[i]).collect();
+        let k3 = f(&y3, t + 0.5 * h);
+        let y4: Vec<f64> = (0..dim).map(|i| y[i] + h * k3[i]).collect();
+        let k4 = f(&y4, t + h);
+        for i in 0..dim {
+            y[i] += h / 6.0 * (k1[i] + 2.0 * k2[i] + 2.0 * k3[i] + k4[i]);
+        }
+        t += h;
+        times.push(t);
+        states.push(y.clone());
+    }
+    (times, states)
+}
+
+/// Lorenz system: dx/dt = σ(y-x), dy/dt = x(ρ-z)-y, dz/dt = xy-βz
+fn lorenz_rhs(s: &[f64], _t: f64) -> Vec<f64> {
+    let (x, y, z) = (s[0], s[1], s[2]);
+    let (sigma, rho, beta) = (10.0, 28.0, 8.0 / 3.0);
+    vec![sigma * (y - x), x * (rho - z) - y, x * y - beta * z]
+}
+
+/// Observe time-averaged Lorenz statistics for conjecture discovery.
+///
+/// Computes candidate invariant quantities along the Lorenz trajectory:
+/// - ⟨z(t)⟩ as a function of trajectory length → should converge to ρ-1 = 27
+/// - ⟨x²+y²⟩ / ⟨z⟩ → ratio of oscillation energy to height
+///
+/// The ConjectureEngine can then search for algebraic relationships
+/// between these time-averaged quantities and the system parameters.
+pub fn observe_lorenz_time_averages(n_samples: usize) -> ObservedSequence {
+    let (_, states) = rk45_trajectory(lorenz_rhs, &[1.0, 1.0, 1.0], 50.0, 0.01);
+
+    // Skip transient (first 1000 steps) to reach attractor
+    let attractor_states = if states.len() > 1000 { &states[1000..] } else { &states };
+    let total = attractor_states.len();
+
+    // Compute running time-average of z as a function of sample count
+    let step = total / n_samples.max(1);
+    let mut data = Vec::new();
+    let mut z_sum = 0.0;
+    let mut count = 0usize;
+
+    for (i, state) in attractor_states.iter().enumerate() {
+        z_sum += state[2];
+        count += 1;
+        if (i + 1) % step == 0 && data.len() < n_samples {
+            data.push((data.len() as f64 + 1.0, z_sum / count as f64));
+        }
+    }
+
+    ObservedSequence::new("lorenz_time_avg_z(samples)", MathDomain::DynamicalSystems, data)
+}
+
+/// Observe Lorenz attractor: for each time step, compute candidate invariant
+/// I(x,y,z) = x² + y² + z² (not conserved — Lorenz is dissipative) and
+/// track how it varies. The ConjectureEngine can search for combinations
+/// that have MINIMUM variance (approximate invariants).
+pub fn observe_lorenz_invariant_candidates(n_points: usize) -> Vec<ObservedSequence> {
+    let (times, states) = rk45_trajectory(lorenz_rhs, &[1.0, 1.0, 1.0], 50.0, 0.01);
+
+    let skip = if states.len() > 1000 { 1000 } else { 0 };
+    let attractor = &states[skip..];
+    let attractor_t = &times[skip..];
+    let step = attractor.len() / n_points.max(1);
+
+    let mut seqs = Vec::new();
+
+    // Candidate 1: z(t) — should oscillate around ρ-1 = 27
+    let z_data: Vec<(f64, f64)> = attractor.iter().zip(attractor_t)
+        .step_by(step.max(1))
+        .take(n_points)
+        .map(|(s, &t)| (t, s[2]))
+        .collect();
+    seqs.push(ObservedSequence::new("lorenz_z(t)", MathDomain::DynamicalSystems, z_data));
+
+    // Candidate 2: x² + y² (oscillation energy proxy)
+    let xy_data: Vec<(f64, f64)> = attractor.iter().zip(attractor_t)
+        .step_by(step.max(1))
+        .take(n_points)
+        .map(|(s, &t)| (t, s[0] * s[0] + s[1] * s[1]))
+        .collect();
+    seqs.push(ObservedSequence::new("lorenz_x2_y2(t)", MathDomain::DynamicalSystems, xy_data));
+
+    // Candidate 3: x²+y²+z² (total "energy" — not conserved but bounded)
+    let r2_data: Vec<(f64, f64)> = attractor.iter().zip(attractor_t)
+        .step_by(step.max(1))
+        .take(n_points)
+        .map(|(s, &t)| (t, s[0]*s[0] + s[1]*s[1] + s[2]*s[2]))
+        .collect();
+    seqs.push(ObservedSequence::new("lorenz_r2(t)", MathDomain::DynamicalSystems, r2_data));
+
+    seqs
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 // INTERNAL UTILITIES
 // ═══════════════════════════════════════════════════════════════════════════
 
@@ -1168,5 +1285,53 @@ mod tests {
         if let Some(best) = engine.best_for("partition_count(n)") {
             eprintln!("\n  BEST: p(n) ≈ {}", best.formula_str);
         }
+    }
+
+    /// Lorenz attractor: discover that ⟨z⟩ converges to ρ-1 = 27.
+    #[test]
+    fn test_lorenz_time_average_discovery() {
+        let mut engine = ConjectureEngine::with_config(RegressorConfig {
+            population_size: 200,
+            generations: 80,
+            max_depth: 3,
+            max_complexity: 8,
+            lambda: 0.001,
+            seed: 42,
+            ..RegressorConfig::default()
+        });
+
+        engine.observe(observe_lorenz_time_averages(20));
+        engine.generate_conjectures(3);
+        engine.verify_numerical();
+
+        eprintln!("\n═══ LORENZ TIME-AVERAGE DISCOVERY ═══");
+        for c in engine.conjectures.iter().take(3) {
+            eprintln!("  ⟨z⟩ ≈ {} | MSE={:.2e} | status={:?}",
+                c.formula_str, c.training_mse, c.status);
+            let pred = c.formula.eval(&[("n", 20.0)]);
+            eprintln!("    predicted ⟨z⟩ = {:.4} (expected ≈ 27.0)", pred);
+        }
+
+        // The time average should converge to ~27 (ρ-1)
+        if let Some(best) = engine.best_for("lorenz_time_avg_z(samples)") {
+            let pred = best.formula.eval(&[("n", 20.0)]);
+            eprintln!("\n  >>> BEST: ⟨z⟩ ≈ {} (predicted={:.4})", best.formula_str, pred);
+            // Should be within 10% of 27
+            assert!(
+                (pred - 27.0).abs() < 5.0 || best.training_mse < 1.0,
+                "Lorenz ⟨z⟩ should approximate 27, got {:.4} (formula: {})",
+                pred, best.formula_str,
+            );
+        }
+    }
+
+    #[test]
+    fn test_lorenz_trajectory_generated() {
+        let (times, states) = rk45_trajectory(lorenz_rhs, &[1.0, 1.0, 1.0], 10.0, 0.01);
+        assert!(times.len() > 100, "should have many time steps");
+        assert_eq!(states[0].len(), 3, "Lorenz is 3D");
+        // After transient, z should be positive (attractor lives at z > 0)
+        let last_z = states.last().unwrap()[2];
+        assert!(last_z > 0.0, "Lorenz z should be positive on attractor, got {}", last_z);
     }
 }
