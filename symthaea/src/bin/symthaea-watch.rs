@@ -45,7 +45,7 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
 use tracing::{error, info, warn};
 
-use symthaea::cognitive_loop::{CognitiveLoopConfig, CognitiveLoopService};
+use symthaea::cognitive_loop::{CognitiveLoopConfig, CognitiveLoopService, TemporalBackend};
 
 // ─── CLI ─────────────────────────────────────────────────────────────────────
 
@@ -331,9 +331,12 @@ async fn main() -> Result<()> {
             // in debug builds where cycles naturally take 1-5 seconds.
             attention_budget_override_us: Some(60_000_000),
             causal_enhancement: true,
+            // CfC backend: He-initialized output weights produce non-zero predictions
+            // from cycle 1. The default HdcLtcUnified has near-zero network output
+            // (closed-form evolution + project_from_hdc 1e-10 skip threshold) producing
+            // zero-vector predictions → norm_pred=0 → PE=1.0 forever.
+            temporal_backend: TemporalBackend::CfC,
             // Online learning: CfC adapts weights from each cycle's prediction error.
-            // Without this, PE stays at 1.0 for hundreds of cycles until async replay
-            // training converges. With it, PE should start dropping within ~20 cycles.
             enable_online_learning: true,
             ..Default::default()
         };
