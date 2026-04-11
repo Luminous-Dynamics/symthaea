@@ -94,24 +94,104 @@ pub enum VoteDecision {
     Abstain,
 }
 
+// =============================================================================
+// Progressive Recovery — Self-Recovery Types
+// =============================================================================
+
+/// A verification anchor for self-recovery — a hashed external identifier
+/// that the user proves control of to authorize recovery.
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+pub enum VerificationAnchor {
+    /// SHA-256 hash of normalized phone number (E.164 format)
+    PhoneHash(String),
+    /// SHA-256 hash of normalized email address (lowercase, trimmed)
+    EmailHash(String),
+    /// WebAuthn credential ID for passkey-based recovery
+    PasskeyCredentialId(String),
+    /// Device attestation hash (TPM/Secure Enclave binding)
+    DeviceAttestation(String),
+    /// Biometric template hash (privacy-preserving, never raw biometrics)
+    BiometricHash(String),
+}
+
+/// Minimum self-recovery time lock: 72 hours (vs 24h for social recovery).
+/// Longer because no humans are independently verifying the request.
+pub const SELF_RECOVERY_MIN_TIME_LOCK: u64 = 72 * 3600;
+
+/// Default time lock: 7 days (conservative for zero-anchor configs).
+pub const SELF_RECOVERY_DEFAULT_TIME_LOCK: u64 = 7 * 24 * 3600;
+
+/// Self-recovery configuration — created automatically at DID creation.
+/// Recovery is time-locked and requires proving control of enrolled anchors.
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct SelfRecoveryConfig {
+    /// The DID being protected
+    pub did: String,
+    /// Owner's agent pub key
+    pub owner: AgentPubKey,
+    /// Enrolled verification anchors (hashed — never stores raw identifiers)
+    pub anchors: Vec<VerificationAnchor>,
+    /// Minimum anchors required to initiate self-recovery
+    pub anchor_threshold: u32,
+    /// Time lock in seconds before self-recovery executes (minimum 72 hours)
+    pub time_lock: u64,
+    /// Whether self-recovery is active
+    pub active: bool,
+    /// True when social recovery has been configured (self-recovery becomes fallback)
+    pub superseded_by_social: bool,
+    /// Creation timestamp
+    pub created: Timestamp,
+    /// Last update timestamp
+    pub updated: Timestamp,
+}
+
+/// A self-recovery request — initiated by proving control of verification anchors.
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct SelfRecoveryRequest {
+    /// Request identifier
+    pub id: String,
+    /// DID being recovered
+    pub did: String,
+    /// New agent pub key to recover to
+    pub new_agent: AgentPubKey,
+    /// Anchors that have been verified so far
+    pub verified_anchors: Vec<VerificationAnchor>,
+    /// Current status (reuses existing state machine)
+    pub status: RecoveryStatus,
+    /// When the request was created
+    pub created: Timestamp,
+    /// When time lock expires (set when anchor threshold met)
+    pub time_lock_expires: Option<Timestamp>,
+    /// Reason for recovery
+    pub reason: String,
+}
+
 #[hdk_entry_types]
 #[unit_enum(UnitEntryTypes)]
 pub enum EntryTypes {
     RecoveryConfig(RecoveryConfig),
     RecoveryRequest(RecoveryRequest),
     RecoveryVote(RecoveryVote),
+    SelfRecoveryConfig(SelfRecoveryConfig),
+    SelfRecoveryRequest(SelfRecoveryRequest),
 }
 
 #[hdk_link_types]
 pub enum LinkTypes {
-    /// DID to recovery config
+    /// DID to social recovery config
     DidToRecoveryConfig,
-    /// DID to recovery requests
+    /// DID to social recovery requests
     DidToRecoveryRequest,
     /// Recovery request to votes
     RequestToVotes,
     /// Trustee to their responsibilities
     TrusteeToConfig,
+    /// DID to self-recovery config (progressive recovery)
+    DidToSelfRecoveryConfig,
+    /// DID to self-recovery requests
+    DidToSelfRecoveryRequest,
 }
 
 /// Genesis self-check - called when app is installed
@@ -135,6 +215,12 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 EntryTypes::RecoveryVote(vote) => {
                     validate_create_recovery_vote(EntryCreationAction::Create(action), vote)
                 }
+                EntryTypes::SelfRecoveryConfig(config) => {
+                    validate_create_self_recovery_config(EntryCreationAction::Create(action), config)
+                }
+                EntryTypes::SelfRecoveryRequest(request) => {
+                    validate_create_self_recovery_request(request)
+                }
             },
             OpEntry::UpdateEntry {
                 app_entry, action, ..
@@ -148,6 +234,13 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 EntryTypes::RecoveryVote(_) => Ok(ValidateCallbackResult::Invalid(
                     "Recovery votes cannot be updated".into(),
                 )),
+                EntryTypes::SelfRecoveryConfig(_) => {
+                    // Updates allowed (adding/removing anchors, marking superseded)
+                    Ok(ValidateCallbackResult::Valid)
+                }
+                EntryTypes::SelfRecoveryRequest(request) => {
+                    validate_update_self_recovery_request(action, request)
+                }
             },
             _ => Ok(ValidateCallbackResult::Valid),
         },
@@ -158,10 +251,12 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 ));
             }
             match link_type {
-                LinkTypes::DidToRecoveryConfig => Ok(ValidateCallbackResult::Valid),
-                LinkTypes::DidToRecoveryRequest => Ok(ValidateCallbackResult::Valid),
-                LinkTypes::RequestToVotes => Ok(ValidateCallbackResult::Valid),
-                LinkTypes::TrusteeToConfig => Ok(ValidateCallbackResult::Valid),
+                LinkTypes::DidToRecoveryConfig
+                | LinkTypes::DidToRecoveryRequest
+                | LinkTypes::RequestToVotes
+                | LinkTypes::TrusteeToConfig
+                | LinkTypes::DidToSelfRecoveryConfig
+                | LinkTypes::DidToSelfRecoveryRequest => Ok(ValidateCallbackResult::Valid),
             }
         }
         FlatOp::RegisterDeleteLink {
@@ -462,6 +557,108 @@ fn validate_update_recovery_request(
         return Ok(ValidateCallbackResult::Invalid(
             "Cannot complete recovery without timelock (time_lock_expires must be set)".into(),
         ));
+    }
+
+    Ok(ValidateCallbackResult::Valid)
+}
+
+// =============================================================================
+// Self-Recovery Validation
+// =============================================================================
+
+/// Validate self-recovery config creation
+fn validate_create_self_recovery_config(
+    action: EntryCreationAction,
+    config: SelfRecoveryConfig,
+) -> ExternResult<ValidateCallbackResult> {
+    if !config.did.starts_with("did:mycelix:") {
+        return Ok(ValidateCallbackResult::Invalid(
+            "DID must start with 'did:mycelix:'".into(),
+        ));
+    }
+    if config.owner != *action.author() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Owner must be the author".into(),
+        ));
+    }
+    // Time lock minimum: 72 hours for self-recovery (stronger than social's 24h)
+    if config.time_lock < SELF_RECOVERY_MIN_TIME_LOCK {
+        return Ok(ValidateCallbackResult::Invalid(format!(
+            "Self-recovery time lock must be at least {} seconds (72 hours)",
+            SELF_RECOVERY_MIN_TIME_LOCK
+        )));
+    }
+    // Anchors can be empty at creation (progressive enrollment)
+    // Threshold must not exceed anchor count (when anchors exist)
+    if !config.anchors.is_empty() && config.anchor_threshold as usize > config.anchors.len() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Anchor threshold cannot exceed anchor count".into(),
+        ));
+    }
+    Ok(ValidateCallbackResult::Valid)
+}
+
+/// Validate self-recovery request creation
+fn validate_create_self_recovery_request(
+    request: SelfRecoveryRequest,
+) -> ExternResult<ValidateCallbackResult> {
+    if !request.did.starts_with("did:mycelix:") {
+        return Ok(ValidateCallbackResult::Invalid(
+            "DID must start with 'did:mycelix:'".into(),
+        ));
+    }
+    if request.reason.is_empty() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Recovery reason is required".into(),
+        ));
+    }
+    if request.status != RecoveryStatus::Pending {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Initial status must be Pending".into(),
+        ));
+    }
+    Ok(ValidateCallbackResult::Valid)
+}
+
+/// Validate self-recovery request updates (same state machine as social recovery)
+fn validate_update_self_recovery_request(
+    action: Update,
+    request: SelfRecoveryRequest,
+) -> ExternResult<ValidateCallbackResult> {
+    let original_record = must_get_valid_record(action.original_action_address.clone())?;
+    let original: SelfRecoveryRequest = original_record
+        .entry()
+        .to_app_option()
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Original self-recovery request not found".into()
+        )))?;
+
+    // Immutable fields
+    if request.id != original.id || request.did != original.did
+        || request.new_agent != original.new_agent || request.created != original.created
+    {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Self-recovery request immutable fields cannot be changed".into(),
+        ));
+    }
+
+    // Same state machine as social recovery
+    let valid_transition = match (&original.status, &request.status) {
+        (RecoveryStatus::Pending, RecoveryStatus::Approved)
+        | (RecoveryStatus::Pending, RecoveryStatus::Cancelled) => true,
+        (RecoveryStatus::Approved, RecoveryStatus::ReadyToExecute)
+        | (RecoveryStatus::Approved, RecoveryStatus::Cancelled) => true,
+        (RecoveryStatus::ReadyToExecute, RecoveryStatus::Completed)
+        | (RecoveryStatus::ReadyToExecute, RecoveryStatus::Cancelled) => true,
+        (a, b) if a == b => true,
+        _ => false,
+    };
+    if !valid_transition {
+        return Ok(ValidateCallbackResult::Invalid(format!(
+            "Invalid self-recovery status transition from {:?} to {:?}",
+            original.status, request.status
+        )));
     }
 
     Ok(ValidateCallbackResult::Valid)
