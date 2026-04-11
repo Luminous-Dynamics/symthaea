@@ -79,10 +79,20 @@ fn benchmark_platform(name: &str, platform: EmbodimentPlatform) -> PlatformResul
 #[cfg(feature = "humanoid")]
 #[test]
 fn test_platform_benchmark_comparison() {
-    let platforms = vec![
+    let mut platforms = vec![
         ("Humanoid", EmbodimentPlatform::Humanoid),
         ("Disembodied", EmbodimentPlatform::None),
     ];
+
+    // Add new platforms when their features are enabled
+    #[cfg(feature = "exoskeleton")]
+    platforms.push(("Exoskeleton", EmbodimentPlatform::Exoskeleton));
+    #[cfg(feature = "surgical")]
+    platforms.push(("Surgical", EmbodimentPlatform::Surgical));
+    #[cfg(feature = "orbital")]
+    platforms.push(("Orbital", EmbodimentPlatform::Orbital));
+    #[cfg(feature = "quadruped")]
+    platforms.push(("Quadruped", EmbodimentPlatform::Quadruped));
 
     let mut results = Vec::new();
 
