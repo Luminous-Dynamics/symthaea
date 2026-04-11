@@ -754,15 +754,32 @@ pub fn observe_gct_obstruction(max_n: usize) -> ObservedSequence {
     ObservedSequence::new("gct_obstruction_ratio(n)", MathDomain::AlgebraicComplexity, data)
 }
 
-/// Detailed GCT obstruction report — returns raw counts for analysis.
-pub fn observe_gct_detailed(max_n: usize) -> Vec<(usize, usize, usize, f64)> {
+/// Detailed GCT obstruction report — returns raw counts + survivor triples.
+pub fn observe_gct_detailed(max_n: usize) -> Vec<GctObservation> {
     use super::gct::check_obstruction_conjecture;
     (2..=max_n.min(6))
         .map(|n| {
             let r = check_obstruction_conjecture(n, n * n);
-            (n, r.obstructions_found, r.total_tested, r.obstruction_ratio)
+            GctObservation {
+                n,
+                obstructions: r.obstructions_found,
+                total: r.total_tested,
+                ratio: r.obstruction_ratio,
+                survivors: r.survivors,
+            }
         })
         .collect()
+}
+
+/// Detailed observation for one dimension of the GCT obstruction scan.
+#[derive(Debug, Clone)]
+pub struct GctObservation {
+    pub n: usize,
+    pub obstructions: usize,
+    pub total: usize,
+    pub ratio: f64,
+    /// The surviving (non-zero) triples: (lambda, mu, nu, coefficient)
+    pub survivors: Vec<(Vec<usize>, Vec<usize>, Vec<usize>, u64)>,
 }
 
 /// Collect prime gap sequence: gap(k) = p_{k+1} - p_k.
@@ -1068,9 +1085,14 @@ mod tests {
         let detailed = observe_gct_detailed(6);
         eprintln!("\n═══ GCT SCALING EXPERIMENT ═══");
         eprintln!("Computing Kronecker coefficient obstructions for perm_n vs det_n²...\n");
-        for (n, obs, total, ratio) in &detailed {
+        for obs in &detailed {
             eprintln!("  n={}: {}/{} zero coefficients ({:.1}%) — P≠NP evidence: {}",
-                n, obs, total, ratio * 100.0, if *ratio > 0.3 { "YES" } else { "no" });
+                obs.n, obs.obstructions, obs.total, obs.ratio * 100.0,
+                if obs.ratio > 0.3 { "YES" } else { "no" });
+            for (lam, mu, nu, coeff) in &obs.survivors {
+                eprintln!("    SURVIVOR: λ={:?}, μ={:?}, ν={:?} → LR bound = {}",
+                    lam, mu, nu, coeff);
+            }
         }
 
         // Phase 2: Feed into ConjectureEngine

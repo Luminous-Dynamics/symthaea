@@ -282,6 +282,7 @@ pub fn check_obstruction_conjecture(perm_size: usize, det_size: usize) -> Obstru
     let _ = det_size; // used for labeling; actual GCT requires perm_size ≤ det_size²
     let mut obstructions_found = 0usize;
     let mut total_tested = 0usize;
+    let mut survivors = Vec::new();
 
     // Enumerate small partition triples up to size perm_size.
     // LR coefficient computation has a size guard (lambda.size() <= 6),
@@ -303,6 +304,8 @@ pub fn check_obstruction_conjecture(perm_size: usize, det_size: usize) -> Obstru
                 let bound = kronecker_coefficient_bound(lambda, mu, nu);
                 if bound == 0 {
                     obstructions_found += 1;
+                } else {
+                    survivors.push((lambda.clone(), mu.clone(), nu.clone(), bound));
                 }
             }
         }
@@ -324,6 +327,7 @@ pub fn check_obstruction_conjecture(perm_size: usize, det_size: usize) -> Obstru
         total_tested,
         obstruction_ratio,
         supports_p_ne_np,
+        survivors,
     }
 }
 
@@ -340,6 +344,8 @@ pub struct ObstructionResult {
     pub obstruction_ratio: f64,
     /// True if obstruction_ratio > 0.3 (evidence for P ≠ NP)
     pub supports_p_ne_np: bool,
+    /// The surviving (non-zero) partition triples: (lambda, mu, nu, coefficient)
+    pub survivors: Vec<(Vec<usize>, Vec<usize>, Vec<usize>, u64)>,
 }
 
 // ── Algebraic variety intersection ───────────────────────────────────────────
