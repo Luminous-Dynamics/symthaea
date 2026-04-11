@@ -3135,4 +3135,300 @@ mod tests {
         cfg.tau_base = 0.0;
         let _ = VisionManifold::new(cfg, 64, 64);
     }
+
+    // === Visual Working Memory ===
+
+    #[test]
+    fn test_working_memory_capacity_enforcement() {
+        let mut wm = VisualWorkingMemory::new(3);
+        let tracks: Vec<TrackedObject> = (0..5)
+            .map(|i| TrackedObject {
+                track_id: i,
+                identity_hv: ContinuousHV::random(256, i),
+                centroid_row: i as usize,
+                centroid_col: 0,
+                last_seen_frame: 0,
+                track_length: 1,
+            })
+            .collect();
+        let hyps: Vec<crate::types::ObjectHypothesis> = (0..5)
+            .map(|i| crate::types::ObjectHypothesis {
+                centroid_row: i as usize,
+                centroid_col: 0,
+                patch_indices: vec![],
+                saliency: 0.1 * (i + 1) as f32, // 0.1, 0.2, ..., 0.5
+                hv: ContinuousHV::random(256, 100 + i),
+            })
+            .collect();
+        wm.update(&tracks, &hyps, 0);
+        assert!(
+            wm.load() <= 3,
+            "Working memory should hold ≤ 3 objects, got {}",
+            wm.load()
+        );
+    }
+
+    #[test]
+    fn test_working_memory_saliency_eviction() {
+        let mut wm = VisualWorkingMemory::new(2);
+        let tracks: Vec<TrackedObject> = (0..3)
+            .map(|i| TrackedObject {
+                track_id: i,
+                identity_hv: ContinuousHV::random(256, i),
+                centroid_row: i as usize,
+                centroid_col: 0,
+                last_seen_frame: 0,
+                track_length: 1,
+            })
+            .collect();
+        // First two with low saliency
+        let hyps_low: Vec<crate::types::ObjectHypothesis> = (0..2)
+            .map(|i| crate::types::ObjectHypothesis {
+                centroid_row: i as usize,
+                centroid_col: 0,
+                patch_indices: vec![],
+                saliency: 0.1,
+                hv: ContinuousHV::random(256, 100 + i),
+            })
+            .collect();
+        wm.update(&tracks[..2], &hyps_low, 0);
+        assert_eq!(wm.load(), 2);
+
+        // Third object with high saliency should evict the weakest
+        let hyps_high = vec![crate::types::ObjectHypothesis {
+            centroid_row: 2,
+            centroid_col: 0,
+            patch_indices: vec![],
+            saliency: 0.9,
+            hv: ContinuousHV::random(256, 200),
+        }];
+        wm.update(&tracks, &hyps_high, 1);
+        assert_eq!(wm.load(), 2);
+        // The high-saliency object (track_id=2) should be present
+        assert!(
+            wm.slots().iter().any(|s| s.track_id == 2),
+            "High-saliency object should have evicted a low-saliency one"
+        );
+    }
+
+    #[test]
+    fn test_working_memory_decay() {
+        let mut wm = VisualWorkingMemory::new(4);
+        let tracks = vec![TrackedObject {
+            track_id: 0,
+            identity_hv: ContinuousHV::random(256, 0),
+            centroid_row: 0,
+            centroid_col: 0,
+            last_seen_frame: 0,
+            track_length: 1,
+        }];
+        let hyps = vec![crate::types::ObjectHypothesis {
+            centroid_row: 0,
+            centroid_col: 0,
+            patch_indices: vec![],
+            saliency: 0.1,
+            hv: ContinuousHV::random(256, 100),
+        }];
+        wm.update(&tracks, &hyps, 0);
+        let initial_saliency = wm.slots()[0].saliency;
+
+        // Run 100 frames with no refresh → saliency should decay below threshold
+        for frame in 1..100 {
+            wm.update(&[], &[], frame);
+        }
+        // After 100 frames of decay at 0.95^100 ≈ 0.006, below 0.01 threshold
+        assert_eq!(
+            wm.load(),
+            0,
+            "Object should be evicted after 100 frames of pure decay (initial={initial_saliency})"
+        );
+    }
+
+    #[test]
+    fn test_working_memory_bundle_attended() {
+        let mut wm = VisualWorkingMemory::new(4);
+        assert!(wm.bundle_attended().is_none(), "Empty WM should have no bundle");
+
+        let tracks = vec![TrackedObject {
+            track_id: 0,
+            identity_hv: ContinuousHV::random(256, 0),
+            centroid_row: 0,
+            centroid_col: 0,
+            last_seen_frame: 0,
+            track_length: 1,
+        }];
+        let hyps = vec![crate::types::ObjectHypothesis {
+            centroid_row: 0,
+            centroid_col: 0,
+            patch_indices: vec![],
+            saliency: 0.5,
+            hv: ContinuousHV::random(256, 100),
+        }];
+        wm.update(&tracks, &hyps, 0);
+        let bundle = wm.bundle_attended();
+        assert!(bundle.is_some(), "Non-empty WM should produce a bundle");
+        assert!(
+            bundle.unwrap().norm() > 0.0,
+            "Bundle should be non-zero"
+        );
+    }
+
+    // === Visual Scene Graph ===
+
+    #[test]
+    fn test_scene_graph_computes_relations() {
+        let mut sg = VisualSceneGraph::new(256, 42);
+        let tracks = vec![
+            TrackedObject {
+                track_id: 0,
+                identity_hv: ContinuousHV::random(256, 0),
+                centroid_row: 0, // top
+                centroid_col: 4,
+                last_seen_frame: 0,
+                track_length: 5,
+            },
+            TrackedObject {
+                track_id: 1,
+                identity_hv: ContinuousHV::random(256, 1),
+                centroid_row: 7, // bottom
+                centroid_col: 4,
+                last_seen_frame: 0,
+                track_length: 5,
+            },
+        ];
+        sg.update(&tracks);
+        assert!(sg.num_edges() > 0, "Two objects should produce edges");
+        // Object 0 is above object 1 (row 0 < row 7)
+        let has_above = sg.edges().iter().any(|e| {
+            e.relation == crate::types::SpatialRelation::Above
+        });
+        assert!(has_above, "Should detect Above relation");
+        // Graph HV should exist
+        assert!(sg.graph_hv().is_some());
+    }
+
+    #[test]
+    fn test_scene_graph_near_overlapping() {
+        let mut sg = VisualSceneGraph::new(256, 42);
+        let tracks = vec![
+            TrackedObject {
+                track_id: 0,
+                identity_hv: ContinuousHV::random(256, 0),
+                centroid_row: 3,
+                centroid_col: 3,
+                last_seen_frame: 0,
+                track_length: 1,
+            },
+            TrackedObject {
+                track_id: 1,
+                identity_hv: ContinuousHV::random(256, 1),
+                centroid_row: 3, // same position
+                centroid_col: 3,
+                last_seen_frame: 0,
+                track_length: 1,
+            },
+        ];
+        sg.update(&tracks);
+        let has_overlap = sg.edges().iter().any(|e| {
+            e.relation == crate::types::SpatialRelation::Overlapping
+        });
+        assert!(has_overlap, "Same position should produce Overlapping");
+    }
+
+    #[test]
+    fn test_scene_graph_edge_hvs_are_finite() {
+        let mut sg = VisualSceneGraph::new(256, 42);
+        let tracks = vec![
+            TrackedObject {
+                track_id: 0,
+                identity_hv: ContinuousHV::random(256, 0),
+                centroid_row: 0,
+                centroid_col: 0,
+                last_seen_frame: 0,
+                track_length: 1,
+            },
+            TrackedObject {
+                track_id: 1,
+                identity_hv: ContinuousHV::random(256, 1),
+                centroid_row: 5,
+                centroid_col: 5,
+                last_seen_frame: 0,
+                track_length: 1,
+            },
+        ];
+        sg.update(&tracks);
+        for edge in sg.edges() {
+            assert!(
+                edge.relation_hv.as_slice().iter().all(|x| x.is_finite()),
+                "Edge HV for {:?} must be finite",
+                edge.relation
+            );
+        }
+        if let Some(ghv) = sg.graph_hv() {
+            assert!(
+                ghv.as_slice().iter().all(|x| x.is_finite()),
+                "Graph HV must be finite"
+            );
+        }
+    }
+
+    #[test]
+    fn test_scene_graph_empty_tracks() {
+        let mut sg = VisualSceneGraph::new(256, 42);
+        sg.update(&[]);
+        assert_eq!(sg.num_edges(), 0);
+        assert!(sg.graph_hv().is_none());
+    }
+
+    // === Imagination-Reality Comparison ===
+
+    #[test]
+    fn test_imagination_surprise_zero_on_first_frame() {
+        let mut m = VisionManifold::new(VisionConfig::default(), 32, 32);
+        let pixels = vec![128u8; 32 * 32 * 3];
+        let tel = m.observe_frame(&pixels, 32, 32, 3, 0.033);
+        // No imagination yet on frame 0
+        assert_eq!(tel.imagination_surprise, 0.0);
+    }
+
+    #[test]
+    fn test_imagination_surprise_low_for_static_scene() {
+        let mut m = VisionManifold::new(VisionConfig::default(), 32, 32);
+        let pixels = vec![128u8; 32 * 32 * 3];
+        m.observe_frame(&pixels, 32, 32, 3, 0.033);
+        let tel2 = m.observe_frame(&pixels, 32, 32, 3, 0.033);
+        let tel3 = m.observe_frame(&pixels, 32, 32, 3, 0.033);
+        // Static scene → low imagination surprise
+        assert!(
+            tel3.imagination_surprise < 0.5,
+            "Static scene should have low imagination surprise, got {}",
+            tel3.imagination_surprise
+        );
+    }
+
+    // === Dream Ahead ===
+
+    #[test]
+    fn test_dream_ahead_zero_steps() {
+        let m = VisionManifold::new(VisionConfig::default(), 32, 32);
+        let dreams = m.dream_ahead(0, 0.033);
+        assert!(dreams.is_empty());
+    }
+
+    #[test]
+    fn test_dream_ahead_converges() {
+        let mut m = VisionManifold::new(VisionConfig::default(), 32, 32);
+        let pixels = vec![128u8; 32 * 32 * 3];
+        m.observe_frame(&pixels, 32, 32, 3, 0.033);
+
+        let dreams = m.dream_ahead(20, 0.033);
+        assert_eq!(dreams.len(), 20);
+        // Later dreams should converge (similarity approaching 1.0)
+        let sim_early = dreams[0].similarity(&dreams[1]);
+        let sim_late = dreams[18].similarity(&dreams[19]);
+        assert!(
+            sim_late >= sim_early - 0.01,
+            "CfC dreams should converge over time (early={sim_early}, late={sim_late})"
+        );
+    }
 }
