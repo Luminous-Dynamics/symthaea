@@ -38,6 +38,7 @@
 pub mod basis;
 pub mod consciousness;
 pub mod constants;
+pub mod dft;
 pub mod geometry_opt;
 pub mod integrals;
 pub mod molecule;
@@ -52,3 +53,4 @@ pub use scf::rhf::{restricted_hartree_fock, RhfConfig, RhfResult};
 pub use post_hf::mp2::{mp2_correlation_energy, Mp2Result};
 pub use consciousness::{compute_orbital_phi, build_atom_basis_ranges, OrbitalPhiMeasurement};
 pub use geometry_opt::{optimize_geometry, GeomOptConfig, GeomOptResult};
+pub use dft::{kohn_sham_dft, DftConfig, DftResult, XcFunctional};
