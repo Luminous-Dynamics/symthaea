@@ -45,6 +45,8 @@ mod geodesic_gate;
 pub mod magi_code_bridge;
 mod planning;
 mod prompts;
+/// Self-test generation — agent writes its own #[test] modules.
+pub mod test_generation;
 
 use crate::action::primitives::{
     Atom, DispatchTier, Molecule, MoleculeExecutor, PlanProfile, PrimitiveValue,

@@ -7,6 +7,9 @@
 //! lattice structure, composition rules, and belief bridges.
 
 pub mod code_primitives;
+/// Code-specific primitive evolution — discovers novel code patterns via HDC algebra.
+#[cfg(feature = "code_generation")]
+pub mod code_primitive_evolution;
 pub mod compositionality;
 pub mod primitive_belief_bridge;
 pub mod primitive_composition_rules;
