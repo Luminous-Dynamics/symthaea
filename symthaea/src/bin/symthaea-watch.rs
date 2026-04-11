@@ -99,26 +99,34 @@ struct CycleRow {
     /// Unix timestamp in milliseconds.
     ts_ms: u64,
     cycle_num: u64,
-    // Consciousness
+    // ── Consciousness ──────────────────────────────────────────────────
     consciousness_level: f64,
-    // Prediction
+    narrative_self_psi: f64,
+    living_mind_vitality: f64,
+    resonance_frequency: f64,
+    // ── Prediction ─────────────────────────────────────────────────────
     prediction_error: f32,
     peak_attention: f32,
-    // Neuromodulators
+    reasoning_confidence: f32,
+    // ── Neuromodulators ────────────────────────────────────────────────
     dopamine: f32,
     noradrenaline: f32,
     serotonin: f32,
     acetylcholine: f32,
-    // Phi decomposition
+    // ── Phi decomposition ──────────────────────────────────────────────
     micro_phi: f64,
     meso_phi: f64,
     macro_phi: f64,
-    // Temporal
+    // ── Temporal ───────────────────────────────────────────────────────
     temporal_coherence: f64,
-    // Affect
+    // ── Thermodynamic ──────────────────────────────────────────────────
+    hierarchical_free_energy: f64,
+    // ── Affect ─────────────────────────────────────────────────────────
     mood_temperature: f32,
-    // Cycle info
+    // ── Cycle info ─────────────────────────────────────────────────────
     learning_occurred: u8,
+    surprise_triggered: u8,
+    prefrontal_veto: u8,
     cycle_time_us: u64,
     urgency: String,
     language_output: String,
@@ -211,25 +219,32 @@ const CORPUS: &[&str] = &[
 
 const CREATE_TABLE_SQL: &str = "\
 CREATE TABLE IF NOT EXISTS symthaea_cycles (\
-    ts                DateTime64(3) DEFAULT now64(),\
-    ts_ms             UInt64,\
-    cycle_num         UInt64,\
-    consciousness_level Float64,\
-    prediction_error  Float32,\
-    peak_attention    Float32,\
-    dopamine          Float32,\
-    noradrenaline     Float32,\
-    serotonin         Float32,\
-    acetylcholine     Float32,\
-    micro_phi         Float64,\
-    meso_phi          Float64,\
-    macro_phi         Float64,\
-    temporal_coherence Float64,\
-    mood_temperature  Float32,\
-    learning_occurred UInt8,\
-    cycle_time_us     UInt64,\
-    urgency           LowCardinality(String),\
-    language_output   String\
+    ts                    DateTime64(3) DEFAULT now64(),\
+    ts_ms                 UInt64,\
+    cycle_num             UInt64,\
+    consciousness_level   Float64,\
+    narrative_self_psi    Float64,\
+    living_mind_vitality  Float64,\
+    resonance_frequency   Float64,\
+    prediction_error      Float32,\
+    peak_attention        Float32,\
+    reasoning_confidence  Float32,\
+    dopamine              Float32,\
+    noradrenaline         Float32,\
+    serotonin             Float32,\
+    acetylcholine         Float32,\
+    micro_phi             Float64,\
+    meso_phi              Float64,\
+    macro_phi             Float64,\
+    temporal_coherence    Float64,\
+    hierarchical_free_energy Float64,\
+    mood_temperature      Float32,\
+    learning_occurred     UInt8,\
+    surprise_triggered    UInt8,\
+    prefrontal_veto       UInt8,\
+    cycle_time_us         UInt64,\
+    urgency               LowCardinality(String),\
+    language_output        String\
 ) ENGINE = MergeTree()\
   PARTITION BY toYYYYMMDD(ts)\
   ORDER BY (ts, cycle_num)\
@@ -316,6 +331,10 @@ async fn main() -> Result<()> {
             // in debug builds where cycles naturally take 1-5 seconds.
             attention_budget_override_us: Some(60_000_000),
             causal_enhancement: true,
+            // Online learning: CfC adapts weights from each cycle's prediction error.
+            // Without this, PE stays at 1.0 for hundreds of cycles until async replay
+            // training converges. With it, PE should start dropping within ~20 cycles.
+            enable_online_learning: true,
             ..Default::default()
         };
         let mut service = match CognitiveLoopService::new(config) {
@@ -377,19 +396,34 @@ async fn main() -> Result<()> {
             let row = CycleRow {
                 ts_ms,
                 cycle_num,
+                // Consciousness
                 consciousness_level: m.consciousness.consciousness_level,
+                narrative_self_psi: m.narrative_self_psi,
+                living_mind_vitality: m.living_mind_vitality,
+                resonance_frequency: m.resonance_frequency,
+                // Prediction
                 prediction_error: result.prediction_error,
                 peak_attention: result.peak_attention,
+                reasoning_confidence: m.reasoning_confidence,
+                // Neuromodulators
                 dopamine: m.neuromod.dopamine_effective,
                 noradrenaline: m.neuromod.noradrenaline_effective,
                 serotonin: m.neuromod.serotonin_effective,
                 acetylcholine: m.neuromod.acetylcholine_effective,
+                // Phi decomposition
                 micro_phi: m.structural.structural_micro_phi,
                 meso_phi: m.structural.structural_meso_phi,
                 macro_phi: m.structural.structural_macro_phi,
+                // Temporal
                 temporal_coherence: m.temporal.temporal_coherence_score,
+                // Thermodynamic
+                hierarchical_free_energy: m.hierarchical_total_free_energy,
+                // Affect
                 mood_temperature: m.embodied.mood_temperature,
+                // Cycle info
                 learning_occurred: result.learning_occurred as u8,
+                surprise_triggered: m.surprise_triggered as u8,
+                prefrontal_veto: m.prefrontal_veto as u8,
                 cycle_time_us: result.cycle_time_us,
                 urgency: format!("{:?}", m.urgency).to_lowercase(),
                 language_output: result.language_output.clone().unwrap_or_default(),
