@@ -335,6 +335,10 @@ async fn main() -> Result<()> {
             temporal_backend: TemporalBackend::CfC,
             // Online learning: CfC adapts weights from each cycle's prediction error.
             enable_online_learning: true,
+            // Higher learning threshold: default 0.05 means Critical at PE>0.15.
+            // With CfC still learning (PE 0.5-0.8), the system is permanently Critical.
+            // 0.3 sets Critical at PE>0.9, Normal at PE>0.3, Cruise below 0.3.
+            learning_threshold: 0.3,
             ..Default::default()
         };
         let mut service = match CognitiveLoopService::new(config) {
