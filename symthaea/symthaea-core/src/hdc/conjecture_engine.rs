@@ -48,6 +48,9 @@ pub enum Expr {
     BinOp(BinOp, Box<Expr>, Box<Expr>),
     /// Unary function
     Func(UnaryFn, Box<Expr>),
+    /// Summation: Σ_{k=1}^{n} body(k) — enables discovering identities like B(n) = Σ S(n,k)
+    /// The String is the summation variable name (typically "k").
+    Sum(Box<Expr>, String),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -104,6 +107,23 @@ impl Expr {
                     UnaryFn::Floor => x.floor(),
                 }
             }
+            Expr::Sum(body, var_name) => {
+                // Σ_{k=1}^{n} body(k) — n comes from the "n" variable in vars
+                let n = vars.iter()
+                    .find(|(name, _)| *name == "n")
+                    .map(|(_, v)| *v as usize)
+                    .unwrap_or(0);
+                let n = n.min(100); // cap to prevent runaway sums
+                let mut sum = 0.0f64;
+                for k in 0..=n {
+                    // Build vars with the summation variable bound to k
+                    let mut inner_vars: Vec<(&str, f64)> = vars.to_vec();
+                    inner_vars.push((var_name.as_str(), k as f64));
+                    sum += body.eval(&inner_vars);
+                    if !sum.is_finite() { return f64::NAN; }
+                }
+                sum
+            }
         }
     }
 
@@ -113,6 +133,7 @@ impl Expr {
             Expr::Var(_) | Expr::Const(_) => 1,
             Expr::BinOp(_, l, r) => 1 + l.complexity() + r.complexity(),
             Expr::Func(_, arg) => 1 + arg.complexity(),
+            Expr::Sum(body, _) => 2 + body.complexity(), // summation costs 2 (operator + bound)
         }
     }
 
@@ -136,6 +157,9 @@ impl Expr {
             }
             Expr::Func(f, arg) => {
                 Expr::Func(*f, Box::new(arg.mutate(rng, depth + 1)))
+            }
+            Expr::Sum(body, var) => {
+                Expr::Sum(Box::new(body.mutate(rng, depth + 1)), var.clone())
             }
         }
     }
@@ -172,6 +196,9 @@ impl fmt::Display for Expr {
                 };
                 write!(f, "({} {} {})", l, sym, r)
             }
+            Expr::Sum(body, var) => {
+                write!(f, "Σ_{}({})", var, body)
+            }
             Expr::Func(func, arg) => {
                 let name = match func {
                     UnaryFn::Sqrt => "sqrt",
@@ -183,6 +210,9 @@ impl fmt::Display for Expr {
                     UnaryFn::Floor => "floor",
                 };
                 write!(f, "{}({})", name, arg)
+            }
+            Expr::Sum(body, var) => {
+                write!(f, "Σ_{}({})", var, body)
             }
         }
     }
@@ -933,6 +963,46 @@ pub fn observe_lorenz_invariant_candidates(n_points: usize) -> Vec<ObservedSeque
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
+// PHYSICS INVARIANT DISCOVERY
+// ═══════════════════════════════════════════════════════════════════════════
+
+/// Harmonic oscillator: dx/dt = v, dv/dt = -x.
+fn harmonic_rhs(s: &[f64], _t: f64) -> Vec<f64> {
+    vec![s[1], -s[0]]
+}
+
+/// Observe harmonic oscillator invariant candidates.
+/// Returns time series of x²+v² (true invariant) and x² (not conserved).
+pub fn observe_harmonic_invariants(n_points: usize) -> Vec<ObservedSequence> {
+    let (times, states) = rk45_trajectory(harmonic_rhs, &[1.0, 0.0], 20.0, 0.01);
+    let step = states.len() / n_points.max(1);
+    let mut seqs = Vec::new();
+
+    let energy: Vec<(f64, f64)> = states.iter().zip(&times)
+        .step_by(step.max(1)).take(n_points)
+        .map(|(s, &t)| (t, s[0] * s[0] + s[1] * s[1]))
+        .collect();
+    seqs.push(ObservedSequence::new("harmonic_E(t)", MathDomain::DynamicalSystems, energy));
+
+    let x2: Vec<(f64, f64)> = states.iter().zip(&times)
+        .step_by(step.max(1)).take(n_points)
+        .map(|(s, &t)| (t, s[0] * s[0]))
+        .collect();
+    seqs.push(ObservedSequence::new("harmonic_x²(t)", MathDomain::DynamicalSystems, x2));
+
+    seqs
+}
+
+/// Score invariant by variance. Zero variance = exact conservation law.
+pub fn invariant_variance(data: &[(f64, f64)]) -> (f64, f64) {
+    if data.is_empty() { return (0.0, f64::MAX); }
+    let values: Vec<f64> = data.iter().map(|(_, v)| *v).collect();
+    let mean = values.iter().sum::<f64>() / values.len() as f64;
+    let var = values.iter().map(|v| (v - mean).powi(2)).sum::<f64>() / values.len() as f64;
+    (mean, var)
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 // INTERNAL UTILITIES
 // ═══════════════════════════════════════════════════════════════════════════
 
@@ -1333,5 +1403,49 @@ mod tests {
         // After transient, z should be positive (attractor lives at z > 0)
         let last_z = states.last().unwrap()[2];
         assert!(last_z > 0.0, "Lorenz z should be positive on attractor, got {}", last_z);
+    }
+
+    /// PHYSICS DISCOVERY: find E = x² + v² is conserved in harmonic oscillator.
+    #[test]
+    fn test_harmonic_oscillator_invariant() {
+        let candidates = observe_harmonic_invariants(50);
+
+        eprintln!("\n═══ HARMONIC OSCILLATOR INVARIANT DISCOVERY ═══");
+        for seq in &candidates {
+            let (mean, var) = invariant_variance(&seq.data);
+            let is_conserved = var < 1e-6;
+            eprintln!("  {} | mean={:.6}, variance={:.2e} | CONSERVED: {}",
+                seq.name, mean, var, if is_conserved { "YES" } else { "no" });
+        }
+
+        // x²+v² should be conserved (variance ≈ 0)
+        let (e_mean, e_var) = invariant_variance(&candidates[0].data);
+        assert!(e_var < 1e-6,
+            "E = x²+v² should be conserved (var={:.2e}), mean={:.6}", e_var, e_mean);
+        assert!((e_mean - 1.0).abs() < 0.01,
+            "E should equal initial energy 1.0, got {:.6}", e_mean);
+
+        // x² should NOT be conserved
+        let (_, x2_var) = invariant_variance(&candidates[1].data);
+        assert!(x2_var > 0.01,
+            "x² should oscillate (not conserved), var={:.2e}", x2_var);
+
+        eprintln!("  >>> DISCOVERY: E = x² + v² is a conserved quantity (var={:.2e})", e_var);
+        eprintln!("  >>> x² alone is NOT conserved (var={:.2e})", x2_var);
+    }
+
+    /// Summation operator test: Σ_{k=0}^{n} k = n(n+1)/2
+    #[test]
+    fn test_summation_operator() {
+        // Σ_{k=0}^{n} k
+        let expr = Expr::Sum(Box::new(Expr::Var("k".into())), "k".into());
+        // Σ_{k=0}^5 k = 0+1+2+3+4+5 = 15
+        let result = expr.eval(&[("n", 5.0)]);
+        assert!((result - 15.0).abs() < 1e-10, "Σ k for n=5 should be 15, got {}", result);
+        // Σ_{k=0}^10 k = 55
+        let result10 = expr.eval(&[("n", 10.0)]);
+        assert!((result10 - 55.0).abs() < 1e-10, "Σ k for n=10 should be 55, got {}", result10);
+        // Display
+        assert_eq!(format!("{}", expr), "Σ_k(k)");
     }
 }
