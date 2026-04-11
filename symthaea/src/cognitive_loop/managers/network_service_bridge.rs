@@ -455,6 +455,7 @@ pub fn spawn_federated_coordinator(
                     match coordinator.run_sync_round().await {
                         Ok(Some(_weights)) => {
                             rounds.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                            #[cfg(feature = "api_module")]
                             crate::api::metrics::global().increment("federation_rounds_total");
                             let peer_count = coordinator.peer_count();
                             let trust_confidence = if peer_count > 0 { 0.8 } else { 0.0 };
