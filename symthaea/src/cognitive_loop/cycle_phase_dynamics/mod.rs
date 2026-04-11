@@ -2096,6 +2096,9 @@ impl CognitiveLoopService {
                     MathProblemType::Chemistry => {
                         Some(self.math_service.compute_chemistry(input))
                     }
+                    MathProblemType::Proof => {
+                        Some(self.math_service.construct_proof(input))
+                    }
                     // Arithmetic, Unknown — safe fallback to statistics
                     _ => {
                         if !numbers.is_empty() {

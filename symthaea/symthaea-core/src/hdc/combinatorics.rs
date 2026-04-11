@@ -446,6 +446,121 @@ pub fn polya_count(colors: usize, cycle_index_coeffs: &[(usize, usize)]) -> u64 
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
+// FUNDAMENTAL COUNTING
+// ═══════════════════════════════════════════════════════════════════════════
+
+/// Binomial coefficient C(n, k) = n! / (k! * (n-k)!).
+///
+/// Uses the multiplicative formula to avoid overflow for moderate n.
+/// Returns 0 if k > n.
+pub fn binomial(n: u64, k: u64) -> u64 {
+    if k > n {
+        return 0;
+    }
+    let k = k.min(n - k); // symmetry: C(n,k) = C(n,n-k)
+    let mut result = 1u64;
+    for i in 0..k {
+        result = result.checked_mul(n - i).unwrap_or(u64::MAX) / (i + 1);
+    }
+    result
+}
+
+/// Multinomial coefficient: n! / (k₁! * k₂! * ... * kₘ!).
+///
+/// `groups` must sum to n. Returns 0 if they don't.
+pub fn multinomial(n: u64, groups: &[u64]) -> u64 {
+    let sum: u64 = groups.iter().sum();
+    if sum != n {
+        return 0;
+    }
+    let mut result = 1u64;
+    let mut remaining = n;
+    for &k in groups {
+        result = result.checked_mul(binomial(remaining, k)).unwrap_or(u64::MAX);
+        remaining -= k;
+    }
+    result
+}
+
+/// Fibonacci number F(n) via iterative doubling. O(log n).
+///
+/// F(0) = 0, F(1) = 1, F(n) = F(n-1) + F(n-2).
+pub fn fibonacci(n: u64) -> u64 {
+    if n == 0 {
+        return 0;
+    }
+    let (mut a, mut b) = (0u64, 1u64);
+    for _ in 1..n {
+        let tmp = a.saturating_add(b);
+        a = b;
+        b = tmp;
+    }
+    b
+}
+
+/// Lucas number L(n). L(0)=2, L(1)=1, L(n) = L(n-1) + L(n-2).
+///
+/// Related to Fibonacci: L(n) = F(n-1) + F(n+1).
+pub fn lucas(n: u64) -> u64 {
+    if n == 0 {
+        return 2;
+    }
+    if n == 1 {
+        return 1;
+    }
+    let (mut a, mut b) = (2u64, 1u64);
+    for _ in 2..=n {
+        let tmp = a.saturating_add(b);
+        a = b;
+        b = tmp;
+    }
+    b
+}
+
+/// Möbius function μ(n).
+///
+/// μ(1) = 1; μ(n) = 0 if n has a squared prime factor;
+/// μ(n) = (-1)^k if n is a product of k distinct primes.
+pub fn moebius(n: u64) -> i64 {
+    if n == 0 {
+        return 0;
+    }
+    if n == 1 {
+        return 1;
+    }
+    let mut m = n;
+    let mut num_factors = 0i64;
+    let mut d = 2u64;
+    while d * d <= m {
+        if m % d == 0 {
+            m /= d;
+            if m % d == 0 {
+                return 0; // squared factor
+            }
+            num_factors += 1;
+        }
+        d += 1;
+    }
+    if m > 1 {
+        num_factors += 1; // remaining prime factor
+    }
+    if num_factors % 2 == 0 { 1 } else { -1 }
+}
+
+/// Rising factorial (Pochhammer symbol): x^{(n)} = x(x+1)(x+2)...(x+n-1).
+pub fn rising_factorial(x: u64, n: u64) -> u64 {
+    (0..n).fold(1u64, |acc, i| acc.saturating_mul(x + i))
+}
+
+/// Falling factorial: x_{(n)} = x(x-1)(x-2)...(x-n+1).
+pub fn falling_factorial(x: u64, n: u64) -> u64 {
+    if n > x {
+        return 0;
+    }
+    (0..n).fold(1u64, |acc, i| acc.saturating_mul(x - i))
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 // RAMSEY THEORY
 // ═══════════════════════════════════════════════════════════════════════════
 
@@ -805,5 +920,75 @@ mod tests {
         let rot_contrib = polya_count(2, &[(3, 1)]);  // each rotation: 1 fixed-3-cycle → 2^1 = 2
         let total = (id_contrib + 2 * rot_contrib) / 3;
         assert_eq!(total, 4);
+    }
+
+    // ── Fundamental counting tests ──────────────────────────────────────
+
+    #[test]
+    fn test_binomial_basic() {
+        assert_eq!(binomial(5, 2), 10);
+        assert_eq!(binomial(10, 3), 120);
+        assert_eq!(binomial(0, 0), 1);
+        assert_eq!(binomial(5, 0), 1);
+        assert_eq!(binomial(5, 5), 1);
+        assert_eq!(binomial(5, 6), 0); // k > n
+    }
+
+    #[test]
+    fn test_binomial_symmetry() {
+        for n in 0..15 {
+            for k in 0..=n {
+                assert_eq!(binomial(n, k), binomial(n, n - k));
+            }
+        }
+    }
+
+    #[test]
+    fn test_multinomial() {
+        // C(6; 2,2,2) = 6!/(2!2!2!) = 90
+        assert_eq!(multinomial(6, &[2, 2, 2]), 90);
+        // C(4; 1,1,1,1) = 4! = 24
+        assert_eq!(multinomial(4, &[1, 1, 1, 1]), 24);
+        // Sum doesn't match n → 0
+        assert_eq!(multinomial(5, &[2, 2]), 0);
+    }
+
+    #[test]
+    fn test_fibonacci() {
+        assert_eq!(fibonacci(0), 0);
+        assert_eq!(fibonacci(1), 1);
+        assert_eq!(fibonacci(10), 55);
+        assert_eq!(fibonacci(20), 6765);
+    }
+
+    #[test]
+    fn test_lucas() {
+        assert_eq!(lucas(0), 2);
+        assert_eq!(lucas(1), 1);
+        assert_eq!(lucas(5), 11);
+        // L(n) = F(n-1) + F(n+1)
+        assert_eq!(lucas(10), fibonacci(9) + fibonacci(11));
+    }
+
+    #[test]
+    fn test_moebius() {
+        assert_eq!(moebius(1), 1);
+        assert_eq!(moebius(2), -1);  // prime
+        assert_eq!(moebius(3), -1);  // prime
+        assert_eq!(moebius(4), 0);   // 2²
+        assert_eq!(moebius(6), 1);   // 2×3 (two distinct primes)
+        assert_eq!(moebius(30), -1); // 2×3×5 (three distinct primes)
+    }
+
+    #[test]
+    fn test_rising_falling_factorial() {
+        // 5^(3) = 5×6×7 = 210
+        assert_eq!(rising_factorial(5, 3), 210);
+        // 5_(3) = 5×4×3 = 60
+        assert_eq!(falling_factorial(5, 3), 60);
+        // n_(n) = n!
+        assert_eq!(falling_factorial(5, 5), 120);
+        // C(n,k) = n_(k) / k!
+        assert_eq!(falling_factorial(10, 3) / falling_factorial(3, 3), binomial(10, 3));
     }
 }

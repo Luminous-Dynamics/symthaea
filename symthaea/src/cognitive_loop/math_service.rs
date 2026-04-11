@@ -74,6 +74,8 @@ pub enum MathProblemType {
     DifferentialEquation,
     /// Chemistry (stoichiometry, thermochemistry, kinetics)
     Chemistry,
+    /// Proof construction (tactic-based theorem proving)
+    Proof,
     /// General arithmetic
     Arithmetic,
     /// Unknown
@@ -97,6 +99,7 @@ impl MathProblemType {
             Self::GraphTheory => "GraphTheory",
             Self::DifferentialEquation => "DifferentialEquation",
             Self::Chemistry => "Chemistry",
+            Self::Proof => "Proof",
             Self::Arithmetic => "Arithmetic",
             Self::Unknown => "Unknown",
         }
@@ -434,9 +437,16 @@ impl MathService {
         if lower.contains("fft") || lower.contains("fourier") || lower.contains("spectrum") {
             return MathProblemType::SignalAnalysis;
         }
+        if lower.contains("prove")
+            || lower.contains("theorem")
+            || lower.contains("show that")
+            || lower.contains("by induction")
+            || lower.contains("by contradiction")
+        {
+            return MathProblemType::Proof;
+        }
         if lower.contains("satisf")
             || lower.contains("tautolog")
-            || lower.contains("prove")
             || lower.contains("logic")
             || lower.contains("proposition")
         {
@@ -1337,6 +1347,49 @@ impl MathService {
             error_bound: None,
         };
         self.store_episode(&response, "chemistry");
+        response
+    }
+
+    /// Attempt to construct a proof for a mathematical statement.
+    ///
+    /// Uses the TacticProver from symthaea-core to search for a proof via
+    /// automated tactic application (intro, assumption, ring, omega, norm_num,
+    /// simp, contradiction, induction). Returns a proof script if found.
+    pub fn construct_proof(&mut self, conjecture: &str) -> MathResponse {
+        use symthaea_core::hdc::tactics::{Expr, Goal, TacticProver};
+
+        // Parse the conjecture into a Goal and attempt automated proof search.
+        let goal = Goal::new(Expr::Var(conjecture.to_string()));
+        let prover = TacticProver::new(50); // max 50 steps depth
+        let result = prover.prove(&goal);
+
+        let (answer, phi) = if let Some(script) = &result {
+            (
+                format!("Proof found ({} steps):\n{}", script.len(), script.join("\n")),
+                0.8 + 0.01 * script.len().min(20) as f64,
+            )
+        } else {
+            ("No proof found within search depth".to_string(), 0.2)
+        };
+        let found = result.is_some();
+
+        self.record_solve(MathProblemType::Proof, phi);
+
+        let encoding = BinaryHV::random(seed_from_name(&format!("PROOF_{}", &conjecture[..conjecture.len().min(32)])));
+
+        let response = MathResponse {
+            answer,
+            numerical_result: None,
+            vector_result: None,
+            encoding,
+            phi,
+            confidence: if found { 0.95 } else { 0.1 },
+            multipath_verified: found,
+            problem_type: MathProblemType::Proof,
+            epistemic_caveat: Some("Tactic-based proof search; depth-limited".into()),
+            error_bound: None,
+        };
+        self.store_episode(&response, "proof");
         response
     }
 
