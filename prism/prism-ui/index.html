@@ -97,24 +97,29 @@
         }
     });
 
-    // PWA install prompt
+    // PWA install prompt — delayed 30s to avoid covering content on first load
     var deferredPrompt = null;
     window.addEventListener('beforeinstallprompt', function(e) {
         e.preventDefault();
         deferredPrompt = e;
-        var banner = document.createElement('div');
-        banner.className = 'pwa-install-banner';
-        banner.innerHTML = '<span>Install Prism for the best experience</span>'
-            + '<button class="pwa-install-btn">Install</button>'
-            + '<button class="pwa-dismiss-btn">&times;</button>';
-        document.body.appendChild(banner);
-        banner.querySelector('.pwa-install-btn').addEventListener('click', function() {
-            deferredPrompt.prompt();
-            deferredPrompt.userChoice.then(function() { banner.remove(); });
-        });
-        banner.querySelector('.pwa-dismiss-btn').addEventListener('click', function() {
-            banner.remove();
-        });
+        setTimeout(function() {
+            if (!deferredPrompt) return;
+            var banner = document.createElement('div');
+            banner.className = 'pwa-install-banner';
+            banner.innerHTML = '<span>Install Prism for the best experience</span>'
+                + '<button class="pwa-install-btn">Install</button>'
+                + '<button class="pwa-dismiss-btn">&times;</button>';
+            document.body.appendChild(banner);
+            banner.querySelector('.pwa-install-btn').addEventListener('click', function() {
+                deferredPrompt.prompt();
+                deferredPrompt.userChoice.then(function() { banner.remove(); });
+                deferredPrompt = null;
+            });
+            banner.querySelector('.pwa-dismiss-btn').addEventListener('click', function() {
+                banner.remove();
+                deferredPrompt = null;
+            });
+        }, 30000);
     });
 
     // Service worker

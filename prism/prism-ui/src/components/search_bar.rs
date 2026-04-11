@@ -85,10 +85,14 @@ pub fn SearchBar() -> impl IntoView {
     };
 
     let on_focus = move |_: leptos::ev::FocusEvent| {
+        // Clear internal prism:// URLs on focus so the user sees the placeholder
+        let current = input.get_untracked();
+        if current.starts_with("prism://") {
+            set_input.set(String::new());
+        }
         if let Some(el) = input_ref.get() {
             let _ = el.select();
         }
-        // Show history dropdown on focus if input is empty or matches a history item
         let h = load_history();
         if !h.is_empty() {
             set_history.set(h);
@@ -149,7 +153,7 @@ pub fn SearchBar() -> impl IntoView {
                     node_ref=input_ref
                     class="search-input"
                     type="text"
-                    placeholder="Search knowledge or enter URL..."
+                    placeholder="Search anything or enter a URL\u{2026}"
                     prop:value=input
                     on:input:target=move |ev| {
                         set_input.set(ev.target().value());

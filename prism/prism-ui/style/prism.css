@@ -1220,6 +1220,8 @@ button.example-query:active { opacity: 0.6; }
         flex-shrink: 0;
         scroll-snap-align: start;
     }
+    /* Hide tab bar on mobile when only one tab (the + button always exists) */
+    .tab-bar:not(:has(.tab ~ .tab)) { display: none; }
     /* Find bar: full width on mobile */
     .find-bar {
         left: 0;
