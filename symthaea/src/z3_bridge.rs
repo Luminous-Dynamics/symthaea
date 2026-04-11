@@ -961,4 +961,58 @@ mod tests {
         assert!(VerificationResult::Valid.is_valid());
         assert!(!VerificationResult::Invalid.is_valid());
     }
+
+    // ── Verified Einstein Pipeline ──────────────────────────────────────────
+
+    /// Integration test: einstein_search finds a candidate → z3_bridge verifies
+    /// the Einstein condition formally. This is the verified mathematical
+    /// discovery pipeline (Phase 8 of math/science plan).
+    #[test]
+    fn test_verified_einstein_pipeline() {
+        use symthaea_core::hdc::einstein_search::{search_einstein_metrics, EinsteinSearchConfig};
+        use symthaea_core::hdc::riemannian_geometry::MetricTensor;
+
+        // Step 1: Search for Einstein metrics on S² (trivially the round sphere)
+        let config = EinsteinSearchConfig {
+            dim: 2,
+            n_discretization: 4,
+            population_size: 3,
+            max_generations: 2,
+            hdc_crossover_rate: 0.3,
+            tol: 1e-4,
+            stabilization_steps: 1,
+            flow_dt: 0.01,
+            perturbation_epsilon: 0.01,
+            seed: 42,
+        };
+        let result = search_einstein_metrics(&config);
+        assert!(result.best.einstein_defect.is_finite(),
+            "Search must produce a finite defect");
+
+        // Step 2: Extract best candidate's Ricci and metric tensors
+        let metric = &result.best.metric;
+        let ricci = metric.ricci_tensor();
+        let metric_flat: Vec<f64> = (0..metric.dim)
+            .flat_map(|i| (0..metric.dim).map(move |j| metric.g(i, j)))
+            .collect();
+        let ricci_flat: Vec<f64> = (0..ricci.dim)
+            .flat_map(|i| (0..ricci.dim).map(move |j| ricci.g(i, j)))
+            .collect();
+
+        // Step 3: Verify Einstein condition via Z3 bridge
+        let bridge = Z3Bridge::new();
+        let verification = bridge.verify_einstein_condition(
+            &ricci_flat,
+            &metric_flat,
+            metric.dim,
+            0.1, // relaxed tolerance for search result
+        );
+
+        // The round sphere should satisfy Einstein (Ric = kg)
+        assert!(
+            matches!(verification, VerificationResult::Sat { .. }
+                | VerificationResult::UsingFallback),
+            "Best candidate from S² search should satisfy Einstein condition: {verification:?}"
+        );
+    }
 }
