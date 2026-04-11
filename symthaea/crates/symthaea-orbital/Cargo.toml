@@ -9,6 +9,7 @@ symthaea-core = { path = "../../symthaea-core" }
 symthaea-fep = { path = "../symthaea-fep" }
 serde = { workspace = true }
 rand = { workspace = true }
+proptest = "1"
 
 [features]
 default = []
