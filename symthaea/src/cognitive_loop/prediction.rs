@@ -75,13 +75,28 @@ impl CognitiveLoopService {
             return (pred, Vec::new());
         }
 
+        // Save hidden state before prediction — predict_forward calls forward()
+        // which advances the network state. Without save/restore, 3 prediction
+        // calls corrupt the temporal dynamics (4 state advances per cycle instead of 1).
+        let saved_state = self.temporal_network.read_state().ok();
+
         // Collect predictions at multiple time horizons
         let mut predictions: Vec<Array1<f32>> = Vec::with_capacity(horizons.len());
 
         for &horizon in horizons {
+            // Restore state before each prediction so all horizons predict
+            // from the same starting point (not cascading advances).
+            if let Some(ref state) = saved_state {
+                let _ = self.temporal_network.inject(state);
+            }
             if let Ok(pred) = self.temporal_network.predict_forward(input, horizon) {
                 predictions.push(pred);
             }
+        }
+
+        // Restore original state — predictions should be read-only w.r.t. network state
+        if let Some(state) = saved_state {
+            let _ = self.temporal_network.inject(&state);
         }
 
         if predictions.is_empty() {
