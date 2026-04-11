@@ -59,14 +59,16 @@ pub enum ApproximationTier {
     #[default]
     SampledPartition,
 
-    /// O(n²) - Spectral connectivity approximation using algebraic connectivity.
+    /// O(n²) - Spectral connectivity via algebraic connectivity (Fiedler value).
     ///
-    /// **WARNING**: This measures SPECTRAL GAP (mixing time), NOT IIT Φ!
-    /// It favors uniform k-regular structures over hub-and-spoke.
-    /// Star < Random with this method (opposite of IIT predictions).
+    /// **DEPRECATED FOR Φ MEASUREMENT**. Empirically validated: r = -0.62
+    /// correlation with true IIT Φ (nearly opposite behavior).
+    /// Star topology scores LOW (wrong), random scores HIGH (wrong).
     ///
-    /// Use for graph analysis, NOT consciousness measurement.
+    /// Retained for graph analysis (mixing time, robustness) — NOT for
+    /// consciousness measurement. Removed from `auto_tier()` 2026-04-11.
     #[serde(alias = "Spectral")]
+    #[deprecated(note = "measures spectral gap, not IIT Φ — use SampledPartition or ExhaustivePartition")]
     SpectralConnectivity,
 
     /// O(2^n) - Exhaustive partition search (closest to IIT MIP).
@@ -305,9 +307,12 @@ impl TieredPhi {
         Self::new(ApproximationTier::RandomBaseline)
     }
 
-    /// Create for production (O(n²) spectral - accurate)
+    /// Create for production use (O(n) sampled partition — IIT-aligned).
+    ///
+    /// Previously used SpectralConnectivity, which measures spectral gap
+    /// (r = -0.62 with true Φ). Switched to SampledPartition 2026-04-11.
     pub fn for_production() -> Self {
-        Self::new(ApproximationTier::SpectralConnectivity)
+        Self::new(ApproximationTier::SampledPartition)
     }
 
     /// Create for research (O(2^n) exact)
@@ -1832,9 +1837,11 @@ use once_cell::sync::Lazy;
 use std::sync::Mutex;
 
 /// Global thread-safe Φ calculator for convenience functions
-/// Uses Spectral tier by default (good balance of speed and accuracy)
+/// Uses SampledPartition by default (IIT-aligned, O(n), good accuracy).
+/// SpectralConnectivity was removed from default — it measures spectral gap,
+/// not IIT integrated information (r = -0.62 correlation with true Φ).
 static GLOBAL_PHI: Lazy<Mutex<TieredPhi>> =
-    Lazy::new(|| Mutex::new(TieredPhi::new(ApproximationTier::SpectralConnectivity)));
+    Lazy::new(|| Mutex::new(TieredPhi::new(ApproximationTier::SampledPartition)));
 
 /// Compute Φ using the global calculator
 ///
@@ -1867,16 +1874,19 @@ pub fn auto_phi(components: &[BinaryHV]) -> f64 {
 
 /// Automatically select the appropriate tier based on component count
 ///
-/// Returns the most accurate tier that's still computationally feasible:
-/// - n ≤ 8: Exact (2^8 = 256 partitions, fast enough)
-/// - 8 < n ≤ 50: Spectral (n² = 2500 max, excellent approximation)
-/// - 50 < n ≤ 500: Heuristic (linear, good approximation)
-/// - n > 500: Mock (for testing/emergency, deterministic)
+/// Returns the most accurate IIT-valid tier for a given component count.
+///
+/// **SpectralConnectivity is NOT used** — it measures spectral gap (mixing time),
+/// not IIT integrated information. Empirical validation showed r = -0.62
+/// correlation with true Φ (nearly opposite behavior). Removed 2026-04-11.
+///
+/// - n ≤ 8: ExhaustivePartition (O(2^n), true MIP search)
+/// - 9 ≤ n ≤ 500: SampledPartition (O(n), IIT-aligned sampling)
+/// - n > 500: RandomBaseline (O(1), testing/emergency only)
 pub fn auto_tier(n: usize) -> ApproximationTier {
     match n {
         0..=8 => ApproximationTier::ExhaustivePartition,
-        9..=50 => ApproximationTier::SpectralConnectivity,
-        51..=500 => ApproximationTier::SampledPartition,
+        9..=500 => ApproximationTier::SampledPartition,
         _ => ApproximationTier::RandomBaseline,
     }
 }
@@ -1911,7 +1921,7 @@ mod tests {
         assert_eq!(t1.tier(), ApproximationTier::RandomBaseline);
 
         let t2 = TieredPhi::for_production();
-        assert_eq!(t2.tier(), ApproximationTier::SpectralConnectivity);
+        assert_eq!(t2.tier(), ApproximationTier::SampledPartition);
 
         let t3 = TieredPhi::for_research();
         assert_eq!(t3.tier(), ApproximationTier::ExhaustivePartition);
@@ -2020,7 +2030,7 @@ mod tests {
     #[test]
     fn test_auto_tier_selection() {
         assert_eq!(auto_tier(4), ApproximationTier::ExhaustivePartition);
-        assert_eq!(auto_tier(30), ApproximationTier::SpectralConnectivity);
+        assert_eq!(auto_tier(30), ApproximationTier::SampledPartition);
         assert_eq!(auto_tier(200), ApproximationTier::SampledPartition);
         assert_eq!(auto_tier(1000), ApproximationTier::RandomBaseline);
     }
