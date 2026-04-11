@@ -404,6 +404,9 @@ pub mod measure_probability;     // Measure spaces, martingales, Brownian motion
 pub mod polynomial_algebra;      // Groebner bases, Buchberger, ideal membership, resultants
 pub mod tactics;                 // Proof tactics: ring, omega, induct, norm_num, cases
 
+// ── Conjecture Engine — The Ramanujan Protocol ───────────────────────────────
+pub mod conjecture_engine; // Automated conjecture generation via symbolic regression + verification
+
 // ── Geometric Complexity Theory (Phase 8 — P vs NP probe) ────────────────────
 pub mod gct; // Permanent vs determinant orbit complexity, Kronecker coefficients, GCT obstruction conjecture
 
