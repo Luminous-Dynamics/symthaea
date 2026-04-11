@@ -10,6 +10,10 @@ pub mod code_primitives;
 /// Code-specific primitive evolution — discovers novel code patterns via HDC algebra.
 #[cfg(feature = "code_generation")]
 pub mod code_primitive_evolution;
+/// Immune-inspired code evolution — V(D)J recombination, affinity maturation,
+/// negative selection, cytokine signaling for self-improving code generation.
+#[cfg(feature = "code_generation")]
+pub mod immune_code_evolution;
 pub mod compositionality;
 pub mod primitive_belief_bridge;
 pub mod primitive_composition_rules;
