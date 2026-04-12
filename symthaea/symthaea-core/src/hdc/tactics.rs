@@ -1003,6 +1003,117 @@ pub fn try_seq(goal: &Goal, tactics: &[Box<dyn Fn(&Goal) -> TacticResult>]) -> T
     }
 }
 
+// ─── Phase 1: IMO number-theory tactics ──────────────────────────────────────
+//
+// These tactics bridge `NumberTheoryEngine` / `diophantine::pell_equation`
+// into the tactic framework. They are parameterized (not pattern-matched out
+// of the goal) because `Expr` does not yet carry modular-arithmetic or nested
+// existential shape. Integration tests below show how to build the matching
+// `Expr` goal and close it with these tactics.
+
+use crate::hdc::diophantine::pell_equation;
+use crate::hdc::number_theory::NumberTheoryEngine;
+
+/// Closes `∃x. ∃y. a·x + b·y = c` when the primitive `linear_diophantine`
+/// finds a solution. Caller supplies (a, b, c) as concrete integers.
+///
+/// Returns `Closed` with an implicit witness, `Failed` when no solution
+/// exists (gcd(a,b) ∤ c).
+pub fn tactic_linear_diophantine(_goal: &Goal, a: i64, b: i64, c: i64) -> TacticResult {
+    let engine = NumberTheoryEngine::new();
+    match engine.linear_diophantine(a, b, c) {
+        Some((x0, y0, _dx, _dy)) => {
+            if a * x0 + b * y0 == c {
+                TacticResult::Closed
+            } else {
+                TacticResult::Failed(format!(
+                    "linear_diophantine produced inconsistent witness ({}, {})",
+                    x0, y0
+                ))
+            }
+        }
+        None => TacticResult::Failed(format!(
+            "no integer solution to {}x + {}y = {}",
+            a, b, c
+        )),
+    }
+}
+
+/// Closes `∃x. ∃y. x² − D·y² = 1 ∧ y > 0` by invoking the Pell solver.
+pub fn tactic_pell(_goal: &Goal, d: i64) -> TacticResult {
+    match pell_equation(d) {
+        Some(sol) => {
+            let (x, y) = sol.fundamental;
+            if sol.verify(x, y) && y > 0 {
+                TacticResult::Closed
+            } else {
+                TacticResult::Failed(format!(
+                    "pell solver returned inconsistent fundamental ({}, {})",
+                    x, y
+                ))
+            }
+        }
+        None => TacticResult::Failed(format!(
+            "x² − {}·y² = 1 has no nontrivial solution (D ≤ 0 or perfect square)",
+            d
+        )),
+    }
+}
+
+/// Closes quadratic-residuosity goals via the Legendre symbol.
+/// `expected`: +1 for QR, -1 for non-residue, 0 for p|a.
+pub fn tactic_quadratic_residue(_goal: &Goal, a: i64, p: i64, expected: i32) -> TacticResult {
+    if p <= 2 || p % 2 == 0 {
+        return TacticResult::Failed(format!("legendre requires odd prime p, got {}", p));
+    }
+    let engine = NumberTheoryEngine::new();
+    let actual = engine.legendre_symbol(a, p);
+    if actual == expected {
+        TacticResult::Closed
+    } else {
+        TacticResult::Failed(format!(
+            "(({}/{})) = {}, expected {}",
+            a, p, actual, expected
+        ))
+    }
+}
+
+/// Closes v_p(a^n − b^n) = k goals via Lifting the Exponent.
+pub fn tactic_lte_bound(_goal: &Goal, p: i64, a: i64, b: i64, n: u32, k: u32) -> TacticResult {
+    let engine = NumberTheoryEngine::new();
+    match engine.lifting_the_exponent(p, a, b, n) {
+        Some(v) if v == k => TacticResult::Closed,
+        Some(v) => TacticResult::Failed(format!(
+            "LTE gives v_{}({}^{} − {}^{}) = {}, not {}",
+            p, a, n, b, n, v, k
+        )),
+        None => TacticResult::Failed(format!(
+            "LTE preconditions fail for p={}, a={}, b={}",
+            p, a, b
+        )),
+    }
+}
+
+/// Closes ∃x. x ≡ a_i (mod m_i) for all i  via CRT. Supplies residue list.
+pub fn tactic_crt_solve(_goal: &Goal, residues: &[(i64, i64)]) -> TacticResult {
+    let engine = NumberTheoryEngine::new();
+    match engine.crt(residues) {
+        Some((x, m)) => {
+            for &(a, mi) in residues {
+                if x.rem_euclid(mi) != a.rem_euclid(mi) {
+                    return TacticResult::Failed(format!(
+                        "crt witness x={} violates x ≡ {} (mod {})",
+                        x, a, mi
+                    ));
+                }
+            }
+            assert!(m > 0);
+            TacticResult::Closed
+        }
+        None => TacticResult::Failed("CRT system inconsistent".to_string()),
+    }
+}
+
 // ─── TacticProver ────────────────────────────────────────────────────────────
 
 /// Automated proof search via BFS over the tactic library.
@@ -1384,5 +1495,123 @@ mod tests {
         let fv = e.free_vars();
         assert!(fv.contains(&"x".to_string()));
         assert!(fv.contains(&"y".to_string()));
+    }
+
+    // ── Phase 1 IMO number-theory tactics ───────────────────────────────
+
+    fn exists_linear_goal(a: i64, b: i64, c: i64) -> Goal {
+        let x_times = Expr::Mul(
+            Box::new(Expr::Const(a)),
+            Box::new(Expr::Var("x".into())),
+        );
+        let y_times = Expr::Mul(
+            Box::new(Expr::Const(b)),
+            Box::new(Expr::Var("y".into())),
+        );
+        let sum = Expr::Add(Box::new(x_times), Box::new(y_times));
+        let eq = Expr::Eq(Box::new(sum), Box::new(Expr::Const(c)));
+        let inner = Expr::Exists("y".into(), Box::new(eq));
+        Goal::new(Expr::Exists("x".into(), Box::new(inner)))
+    }
+
+    #[test]
+    fn test_tactic_linear_diophantine_closes_solvable() {
+        let goal = exists_linear_goal(12, 8, 20);
+        assert!(matches!(
+            tactic_linear_diophantine(&goal, 12, 8, 20),
+            TacticResult::Closed
+        ));
+    }
+
+    #[test]
+    fn test_tactic_linear_diophantine_fails_unsolvable() {
+        let goal = exists_linear_goal(6, 9, 5);
+        assert!(matches!(
+            tactic_linear_diophantine(&goal, 6, 9, 5),
+            TacticResult::Failed(_)
+        ));
+    }
+
+    #[test]
+    fn test_tactic_pell_closes_for_nonsquare() {
+        let goal = Goal::new(Expr::Const(0));
+        assert!(matches!(tactic_pell(&goal, 2), TacticResult::Closed));
+        assert!(matches!(tactic_pell(&goal, 13), TacticResult::Closed));
+        assert!(matches!(tactic_pell(&goal, 61), TacticResult::Closed));
+    }
+
+    #[test]
+    fn test_tactic_pell_fails_for_square() {
+        let goal = Goal::new(Expr::Const(0));
+        assert!(matches!(tactic_pell(&goal, 4), TacticResult::Failed(_)));
+        assert!(matches!(tactic_pell(&goal, 9), TacticResult::Failed(_)));
+    }
+
+    #[test]
+    fn test_tactic_quadratic_residue() {
+        let goal = Goal::new(Expr::Const(0));
+        assert!(matches!(
+            tactic_quadratic_residue(&goal, 2, 7, 1),
+            TacticResult::Closed
+        ));
+        assert!(matches!(
+            tactic_quadratic_residue(&goal, 3, 7, -1),
+            TacticResult::Closed
+        ));
+        assert!(matches!(
+            tactic_quadratic_residue(&goal, 2, 7, -1),
+            TacticResult::Failed(_)
+        ));
+    }
+
+    #[test]
+    fn test_tactic_lte_bound() {
+        let goal = Goal::new(Expr::Const(0));
+        assert!(matches!(
+            tactic_lte_bound(&goal, 3, 5, 2, 6, 2),
+            TacticResult::Closed
+        ));
+        assert!(matches!(
+            tactic_lte_bound(&goal, 3, 5, 2, 6, 99),
+            TacticResult::Failed(_)
+        ));
+        assert!(matches!(
+            tactic_lte_bound(&goal, 3, 6, 2, 4, 1),
+            TacticResult::Failed(_)
+        ));
+    }
+
+    #[test]
+    fn test_tactic_crt_solve() {
+        let goal = Goal::new(Expr::Const(0));
+        assert!(matches!(
+            tactic_crt_solve(&goal, &[(2, 3), (3, 5), (2, 7)]),
+            TacticResult::Closed
+        ));
+        assert!(matches!(
+            tactic_crt_solve(&goal, &[(1, 4), (2, 6)]),
+            TacticResult::Failed(_)
+        ));
+    }
+
+    /// Integration test: IMO-style sub-problem combining CRT + Legendre.
+    /// Shows two Phase-1 tactics composing to reason about a concrete witness.
+    #[test]
+    fn test_imo_style_crt_plus_quadratic_residue() {
+        let goal = Goal::new(Expr::Const(0));
+        match tactic_crt_solve(&goal, &[(1, 4), (2, 5)]) {
+            TacticResult::Closed => {}
+            other => panic!("CRT failed: {:?}", other),
+        }
+        let engine = NumberTheoryEngine::new();
+        let (x, m) = engine.crt(&[(1, 4), (2, 5)]).unwrap();
+        assert_eq!(m, 20);
+        assert_eq!(x, 17);
+        // (17/11) = (6/11): compute directly
+        let leg = engine.legendre_symbol(17, 11);
+        assert!(matches!(
+            tactic_quadratic_residue(&goal, x, 11, leg),
+            TacticResult::Closed
+        ));
     }
 }
