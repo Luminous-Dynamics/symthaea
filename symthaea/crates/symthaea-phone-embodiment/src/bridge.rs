@@ -48,6 +48,8 @@ pub struct PhoneBridge {
     last_prediction_error: f32,
     /// Whether confirmation mode is active (default: true).
     confirmation_mode: bool,
+    /// Last template match similarity (from goal-directed search).
+    last_match_similarity: Option<f32>,
 }
 
 impl PhoneBridge {
@@ -85,6 +87,7 @@ impl PhoneBridge {
             total_steps: 0,
             last_prediction_error: 0.0,
             confirmation_mode: true,
+            last_match_similarity: None,
         }
     }
 
@@ -174,6 +177,136 @@ impl PhoneBridge {
 
         self.proposed_action = Some(action.clone());
         action
+    }
+
+    /// Goal-directed action proposal: select action to minimize distance to goal.
+    ///
+    /// Instead of tapping the most salient object (exploration), this finds the
+    /// working memory object most similar to the goal HV and taps it (exploitation).
+    /// If no match exceeds the threshold, falls back to exploration (swipe to
+    /// reveal new content).
+    ///
+    /// # Arguments
+    /// * `phi` — consciousness level for safety gating
+    /// * `goal_hv` — target visual template (from `learn_template` or `load_template`)
+    /// * `threshold` — minimum cosine similarity to count as a match (0.3–0.8)
+    pub fn propose_goal_action(
+        &mut self,
+        phi: f64,
+        goal_hv: &ContinuousHV,
+        threshold: f32,
+    ) -> PhoneAction {
+        // Update safety level
+        let phi_level = MotorSafetyLevel::from_phi(phi);
+        self.current_safety = match self.safety_override {
+            Some(override_level) => phi_level.max(override_level),
+            None => phi_level,
+        };
+
+        if self.current_safety >= MotorSafetyLevel::Red {
+            return PhoneAction::NoOp;
+        }
+        if self.current_safety >= MotorSafetyLevel::Orange {
+            return PhoneAction::Screenshot;
+        }
+
+        // Strategy 1: Search all patches for best match to goal
+        if let Some(match_result) = self.find_on_screen(goal_hv, threshold) {
+            let (sx, sy, sim) = match_result;
+            if phi >= (PhoneAction::Tap { x: 0, y: 0 }).required_phi() {
+                let action = PhoneAction::Tap { x: sx, y: sy };
+                self.proposed_action = Some(action.clone());
+                self.last_match_similarity = Some(sim);
+                return action;
+            }
+        }
+
+        // Strategy 2: No match found — explore by swiping down
+        if phi >= (PhoneAction::Swipe { x1: 0, y1: 0, x2: 0, y2: 0, duration_ms: 0 }).required_phi() {
+            let mid_x = self.screen_w / 2;
+            let action = PhoneAction::Swipe {
+                x1: mid_x,
+                y1: self.screen_h * 2 / 3,
+                x2: mid_x,
+                y2: self.screen_h / 3,
+                duration_ms: 300,
+            };
+            self.proposed_action = Some(action.clone());
+            self.last_match_similarity = None;
+            return action;
+        }
+
+        PhoneAction::Screenshot
+    }
+
+    /// Search the current frame's patches for the best match to a template HV.
+    ///
+    /// Returns `(screen_x, screen_y, similarity)` if a match exceeds the threshold.
+    /// Uses the manifold's `last_patch_hvs()` from the most recent `capture_and_observe()`.
+    pub fn find_on_screen(
+        &self,
+        template_hv: &ContinuousHV,
+        threshold: f32,
+    ) -> Option<(u32, u32, f32)> {
+        let patch_hvs = self.vision.last_patch_hvs();
+        if patch_hvs.is_empty() {
+            return None;
+        }
+
+        let patch_size = 8usize; // VisionConfig default
+        let grid_cols = self.target_w as usize / patch_size;
+
+        let mut best_sim = threshold;
+        let mut best_pos: Option<(usize, usize)> = None;
+
+        for (idx, patch_hv) in patch_hvs.iter().enumerate() {
+            let sim = template_hv.similarity(patch_hv);
+            if sim > best_sim {
+                best_sim = sim;
+                let row = idx / grid_cols.max(1);
+                let col = idx % grid_cols.max(1);
+                best_pos = Some((row, col));
+            }
+        }
+
+        best_pos.map(|(row, col)| {
+            let (sx, sy) = self.grid_to_screen(row, col);
+            (sx, sy, best_sim)
+        })
+    }
+
+    /// Learn a visual template from an image file (PNG/JPG).
+    ///
+    /// Loads the image, resizes to the vision target resolution, encodes
+    /// through the patch encoder, and returns a bundled template HV.
+    pub fn learn_template_from_file(
+        &self,
+        path: &std::path::Path,
+    ) -> Result<ContinuousHV, String> {
+        use image::GenericImageView;
+        let img = image::open(path).map_err(|e| format!("Load failed: {e}"))?;
+        let resized = img.resize_exact(
+            self.target_w,
+            self.target_h,
+            image::imageops::FilterType::Triangle,
+        );
+        let rgb = resized.to_rgb8();
+        let pixels: Vec<u8> = rgb.into_raw();
+
+        // Encode through a temporary encoder (same config as manifold)
+        let cfg = self.vision.config().clone();
+        let mut encoder = symthaea_vision_manifold::PatchHdcEncoder::new(
+            &cfg,
+            self.target_w,
+            self.target_h,
+        );
+        let (frame_hv, _) = encoder.encode_frame(&pixels, self.target_w, self.target_h, 3);
+        Ok(frame_hv.normalize())
+    }
+
+    /// Last match similarity from `propose_goal_action` (if a match was found).
+    pub fn last_match_similarity(&self) -> Option<f32> {
+        self.last_match_similarity
     }
 
     /// Execute the proposed action (after user confirmation).

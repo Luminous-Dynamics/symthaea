@@ -60,8 +60,42 @@ fn main() {
         .and_then(|s| s.parse().ok())
         .unwrap_or(10);
     let interactive = args.iter().any(|a| a == "--interactive");
+    let task: Option<String> = args
+        .iter()
+        .position(|a| a == "--task")
+        .and_then(|i| args.get(i + 1))
+        .cloned();
 
-    if interactive {
+    // Load goal template if task specified
+    let goal_hv: Option<symthaea_core::hdc::ContinuousHV> = task.as_ref().and_then(|task_name| {
+        // Try to load visual template from data/phone-templates/{task}.png
+        let template_path = std::path::Path::new("data/phone-templates")
+            .join(format!("{}.png", task_name.to_lowercase().replace(' ', "_")));
+        if template_path.exists() {
+            match phone.learn_template_from_file(&template_path) {
+                Ok(hv) => {
+                    println!("[Goal] Loaded visual template: {}", template_path.display());
+                    Some(hv)
+                }
+                Err(e) => {
+                    eprintln!("[Goal] Template load failed: {e}");
+                    None
+                }
+            }
+        } else {
+            println!("[Goal] No template at {}. Using saliency-driven exploration.", template_path.display());
+            None
+        }
+    });
+
+    if let Some(ref task_name) = task {
+        println!("[Task] \"find {}\"", task_name);
+        if goal_hv.is_some() {
+            println!("[Strategy] Visual template matching (exploitation)\n");
+        } else {
+            println!("[Strategy] Saliency-driven exploration (no template)\n");
+        }
+    } else if interactive {
         println!("[Mode] Interactive — Symthaea proposes, you confirm\n");
     } else {
         println!("[Mode] Autonomous — Symthaea acts on her own ({max_steps} steps)\n");
@@ -116,9 +150,16 @@ fn main() {
             println!();
         }
 
-        // 5. Propose action
-        let action = phone.propose_action(phi);
-        println!("  ACTION: {} (phi_req={:.2})", action.label(), action.required_phi());
+        // 5. Propose action (goal-directed if template available, else saliency)
+        let action = if let Some(ref ghv) = goal_hv {
+            phone.propose_goal_action(phi, ghv, 0.3)
+        } else {
+            phone.propose_action(phi)
+        };
+        let match_info = phone.last_match_similarity()
+            .map(|s| format!(" [MATCH sim={s:.3}]"))
+            .unwrap_or_default();
+        println!("  ACTION: {} (phi_req={:.2}){match_info}", action.label(), action.required_phi());
 
         if interactive {
             // Interactive mode: ask for confirmation
