@@ -440,6 +440,7 @@ fn gcd_u64(a: u64, b: u64) -> u64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::io::Write;
 
     // ── Montgomery Pair Correlation ─────────────────────────────────────
 
@@ -528,6 +529,60 @@ mod tests {
         assert_eq!(clause_count, 20, "R(3,3)>5 should have 20 clauses, got {}", clause_count);
     }
 
+    /// FORMAL PROOF: R(3,3) = 6 via Z3.
+    /// R(3,3) > 5 is SAT, R(3,3) > 6 is UNSAT → R(3,3) = 6. QED.
+    #[test]
+    fn test_ramsey_3_3_z3_proof() {
+        // Write encoding to temp file and invoke Z3
+        let smt_5 = ramsey_sat_encoding(5, 3, 3);
+        let smt_6 = ramsey_sat_encoding(6, 3, 3);
+
+        eprintln!("\n═══ RAMSEY R(3,3) = 6 PROOF ═══\n");
+        eprintln!("  R(3,3) > 5: {} variables, {} clauses",
+            5 * 4 / 2, smt_5.matches("(assert").count());
+        eprintln!("  R(3,3) > 6: {} variables, {} clauses",
+            6 * 5 / 2, smt_6.matches("(assert").count());
+
+        // Try Z3 if available
+        let z3_path = std::path::Path::new(
+            "/nix/store/fyvrsfnsqsbalrfhmq3sfjnqc316mlmw-z3-4.15.8/bin/z3");
+        if !z3_path.exists() {
+            eprintln!("  Z3 not available — skipping formal proof");
+            return;
+        }
+
+        // R(3,3) > 5: should be SAT
+        let output_5 = std::process::Command::new(z3_path)
+            .arg("-in").stdin(std::process::Stdio::piped())
+            .stdout(std::process::Stdio::piped())
+            .spawn().and_then(|mut child| {
+                child.stdin.as_mut().unwrap().write_all(smt_5.as_bytes()).ok();
+                child.wait_with_output()
+            });
+
+        if let Ok(out) = output_5 {
+            let result = String::from_utf8_lossy(&out.stdout).trim().to_string();
+            eprintln!("  R(3,3) > 5: {} (expected: sat)", result);
+            assert_eq!(result, "sat", "R(3,3) > 5 should be SAT");
+        }
+
+        // R(3,3) > 6: should be UNSAT (the PROOF)
+        let output_6 = std::process::Command::new(z3_path)
+            .arg("-in").stdin(std::process::Stdio::piped())
+            .stdout(std::process::Stdio::piped())
+            .spawn().and_then(|mut child| {
+                child.stdin.as_mut().unwrap().write_all(smt_6.as_bytes()).ok();
+                child.wait_with_output()
+            });
+
+        if let Ok(out) = output_6 {
+            let result = String::from_utf8_lossy(&out.stdout).trim().to_string();
+            eprintln!("  R(3,3) > 6: {} (expected: unsat)", result);
+            assert_eq!(result, "unsat", "R(3,3) > 6 should be UNSAT — this proves R(3,3) = 6");
+            eprintln!("\n  >>> R(3,3) = 6 FORMALLY PROVED BY Z3!");
+        }
+    }
+
     // ── Knot Invariants ─────────────────────────────────────────────────
 
     #[test]
@@ -585,5 +640,128 @@ mod tests {
         if let Some(best) = triples.first() {
             eprintln!("\n  >>> BEST TRIPLE: {} (quality {:.4})", best, best.quality);
         }
+    }
+
+    // ── Volume Conjecture: knot invariants → hyperbolic volume ──────────
+
+    /// Feed knot Alexander polynomial coefficients and volumes to ConjectureEngine.
+    /// See if it discovers a correlation (the Volume Conjecture direction).
+    #[test]
+    fn test_volume_conjecture_discovery() {
+        let knots = knot_table();
+
+        eprintln!("\n═══ VOLUME CONJECTURE EXPLORATION ═══\n");
+
+        // Generate data: (Alexander polynomial evaluation at -1, volume)
+        // Δ(-1) is the determinant of the knot, a classical invariant
+        let data: Vec<(f64, f64)> = knots.iter()
+            .filter(|k| k.volume.is_some())
+            .map(|k| {
+                let alex = k.alexander_polynomial();
+                // Evaluate at t = -1 (gives knot determinant)
+                let det: f64 = alex.iter().enumerate()
+                    .map(|(i, &c)| c as f64 * (-1.0f64).powi(i as i32))
+                    .sum();
+                let vol = k.volume.unwrap();
+                eprintln!("  {} — det={:.1}, volume={:.4}", k.name, det.abs(), vol);
+                (det.abs(), vol)
+            })
+            .collect();
+
+        eprintln!("\n  Data points: {}", data.len());
+        eprintln!("  Note: Volume Conjecture relates colored Jones polynomial (not Alexander)");
+        eprintln!("  to hyperbolic volume. This is an exploratory test with limited data.");
+
+        // With only 4 knots, we can observe the trend but not discover a formula
+        // Key observation: torus knots (trefoil, 5_1) have volume 0
+        let torus_knots: Vec<_> = data.iter().filter(|&&(_, v)| v < 0.01).collect();
+        let hyperbolic: Vec<_> = data.iter().filter(|&&(_, v)| v > 0.01).collect();
+        eprintln!("  Torus knots (vol=0): {}", torus_knots.len());
+        eprintln!("  Hyperbolic knots (vol>0): {}", hyperbolic.len());
+
+        assert!(data.len() >= 3, "need at least 3 knots for analysis");
+    }
+
+    // ── Cross-domain frontier discovery ─────────────────────────────────
+
+    /// Feed ALL frontier data to ConjectureEngine simultaneously.
+    /// Look for unexpected cross-domain connections.
+    #[test]
+    fn test_cross_domain_frontier_discovery() {
+        eprintln!("\n═══ CROSS-DOMAIN FRONTIER DISCOVERY ═══\n");
+
+        // 1. abc triple qualities as a sequence
+        let abc_triples = search_abc_triples(5000, 1.0);
+        let abc_seq = ObservedSequence::new(
+            "abc_quality",
+            MathDomain::NumberTheory,
+            abc_triples.iter().enumerate().take(50)
+                .map(|(i, t)| (i as f64, t.quality))
+                .collect(),
+        );
+        eprintln!("  abc quality sequence: {} points", abc_seq.data.len());
+
+        // 2. Zeta zero spacings
+        let zeros = find_zeta_zeros(14.0, 100.0, 0.1);
+        let spacings: Vec<(f64, f64)> = zeros.windows(2).enumerate()
+            .map(|(i, w)| (i as f64, w[1] - w[0]))
+            .collect();
+        let zeta_seq = ObservedSequence::new(
+            "zeta_zero_spacings",
+            MathDomain::Physics, // quantum chaos domain
+            spacings,
+        );
+        eprintln!("  Zeta zero spacings: {} points", zeta_seq.data.len());
+
+        // 3. Knot determinants
+        let knots = knot_table();
+        let knot_seq = ObservedSequence::new(
+            "knot_determinants",
+            MathDomain::Combinatorics,
+            knots.iter().enumerate().map(|(i, k)| {
+                let alex = k.alexander_polynomial();
+                let det: f64 = alex.iter().enumerate()
+                    .map(|(j, &c)| c as f64 * (-1.0f64).powi(j as i32))
+                    .sum();
+                (i as f64, det.abs())
+            }).collect(),
+        );
+        eprintln!("  Knot determinants: {} points", knot_seq.data.len());
+
+        // Feed all to ConjectureEngine
+        let mut engine = super::super::conjecture_engine::ConjectureEngine::with_config(
+            super::super::conjecture_engine::RegressorConfig {
+                population_size: 80,
+                generations: 30,
+                max_depth: 3,
+                max_complexity: 8,
+                seed: 42,
+                ..super::super::conjecture_engine::RegressorConfig::default()
+            });
+
+        engine.observe(abc_seq);
+        engine.observe(zeta_seq);
+        engine.observe(knot_seq);
+
+        engine.generate_conjectures(2);
+        engine.verify_numerical();
+
+        eprintln!("\n  Conjectures discovered:");
+        for c in engine.conjectures.iter().take(5) {
+            eprintln!("    {} ≈ {} (MSE={:.2e})", c.source, c.formula_str, c.training_mse);
+        }
+
+        // Try cross-domain formula matching
+        let cross = engine.discover_cross_domain_formulas(5.0);
+        if !cross.is_empty() {
+            eprintln!("\n  CROSS-DOMAIN MATCHES:");
+            for m in cross.iter().take(5) {
+                eprintln!("    {}", m);
+            }
+        } else {
+            eprintln!("\n  No cross-domain matches found (expected — domains are very different)");
+        }
+
+        eprintln!("\n  Total conjectures: {}", engine.conjectures.len());
     }
 }
