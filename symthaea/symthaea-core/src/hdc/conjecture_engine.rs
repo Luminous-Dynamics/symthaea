@@ -407,6 +407,38 @@ impl SymbolicRegressor {
     pub fn fit(&mut self, seq: &ObservedSequence, top_k: usize) -> Vec<Conjecture> {
         let (train, _test) = seq.train_test_split();
 
+        // ── Asymptotic seeding ─────────────────────────────────────────
+        // If the data grows faster than linear, seed the population with
+        // exponential/power-law templates to avoid wasting generations.
+        if train.len() >= 3 {
+            let (_, y_first) = train[0];
+            let (_, y_last) = train[train.len() - 1];
+            let growth = if y_first.abs() > 1e-10 { (y_last / y_first).abs() } else { 1.0 };
+            if growth > 100.0 {
+                // Exponential-looking data: seed with exp(a*n), n^a, a^n templates
+                let seed_count = self.config.population_size / 5;
+                for i in 0..seed_count.min(self.population.len()) {
+                    self.rng = lcg_step(self.rng);
+                    let templates = [
+                        // exp(c * sqrt(n))
+                        Expr::Func(UnaryFn::Exp, Box::new(Expr::BinOp(
+                            BinOp::Mul, Box::new(Expr::Const(1.0)),
+                            Box::new(Expr::Func(UnaryFn::Sqrt, Box::new(Expr::Var("n".into()))))))),
+                        // c * n^a
+                        Expr::BinOp(BinOp::Mul, Box::new(Expr::Const(1.0)),
+                            Box::new(Expr::BinOp(BinOp::Pow, Box::new(Expr::Var("n".into())),
+                                Box::new(Expr::Const(2.0))))),
+                        // c * exp(a * n)
+                        Expr::BinOp(BinOp::Mul, Box::new(Expr::Const(1.0)),
+                            Box::new(Expr::Func(UnaryFn::Exp, Box::new(Expr::BinOp(
+                                BinOp::Mul, Box::new(Expr::Const(0.5)),
+                                Box::new(Expr::Var("n".into()))))))),
+                    ];
+                    self.population[i] = templates[self.rng as usize % templates.len()].clone();
+                }
+            }
+        }
+
         for _gen in 0..self.config.generations {
             // Evaluate fitness for entire population
             let mut scored: Vec<(usize, f64)> = self.population.iter().enumerate()
@@ -424,15 +456,37 @@ impl SymbolicRegressor {
 
             scored.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
 
-            // Elitism: keep top 10%
-            let elite_count = self.config.population_size / 10;
-            let elite: Vec<Expr> = scored.iter()
+            // ── Deduplicate: remove functionally identical formulas ───
+            // Two formulas are "same" if they produce identical outputs on
+            // the first 5 training points. Keep the simpler one.
+            let mut fingerprints: Vec<(u64, usize)> = Vec::new();
+            let mut unique_indices: Vec<usize> = Vec::new();
+            let sample_points: Vec<f64> = train.iter().take(5).map(|(x, _)| *x).collect();
+
+            for &(idx, _fit) in &scored {
+                let fp = fingerprint_expr(&self.population[idx], &sample_points);
+                if !fingerprints.iter().any(|(f, _)| *f == fp) {
+                    fingerprints.push((fp, idx));
+                    unique_indices.push(idx);
+                }
+            }
+
+            // Elitism: keep top 10% of UNIQUE formulas
+            let elite_count = (self.config.population_size / 10).min(unique_indices.len());
+            let elite: Vec<Expr> = unique_indices.iter()
                 .take(elite_count)
-                .map(|(i, _)| self.population[*i].clone())
+                .map(|&i| self.population[i].clone())
                 .collect();
 
-            // Build next generation
+            // Build next generation with diversity injection
             let mut next_gen = elite;
+
+            // Inject 5% fresh random individuals to maintain diversity
+            let fresh_count = self.config.population_size / 20;
+            for _ in 0..fresh_count {
+                next_gen.push(random_expr(&mut self.rng, self.config.max_depth));
+            }
+
             while next_gen.len() < self.config.population_size {
                 // Tournament selection
                 let parent = self.tournament_select(&scored);
@@ -493,6 +547,16 @@ impl SymbolicRegressor {
             .collect();
 
         results.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
+
+        // Deduplicate results by fingerprint (keep first = best fitness)
+        let sample_pts: Vec<f64> = train.iter().take(5).map(|(x, _)| *x).collect();
+        let mut seen_fps = Vec::new();
+        let results: Vec<_> = results.into_iter()
+            .filter(|(_, _, i)| {
+                let fp = fingerprint_expr(&self.population[*i], &sample_pts);
+                if seen_fps.contains(&fp) { false } else { seen_fps.push(fp); true }
+            })
+            .collect();
 
         results.iter()
             .take(top_k)
@@ -638,6 +702,19 @@ fn replace_nth_const_inner(expr: &Expr, target: usize, val: f64, counter: &mut u
             var.clone(),
         ),
     }
+}
+
+/// Fingerprint an expression by hashing its outputs on sample points.
+/// Two formulas with the same fingerprint are functionally identical.
+fn fingerprint_expr(expr: &Expr, sample_points: &[f64]) -> u64 {
+    let mut hash = 0x517cc1b727220a95u64; // FNV offset basis
+    for &x in sample_points {
+        let y = expr.eval(&[("n", x)]);
+        let bits = if y.is_finite() { y.to_bits() } else { u64::MAX };
+        hash ^= bits;
+        hash = hash.wrapping_mul(0x100000001b3); // FNV prime
+    }
+    hash
 }
 
 /// Compute mean squared error of an expression against data.
