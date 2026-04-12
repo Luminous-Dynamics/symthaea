@@ -36,6 +36,7 @@ pub mod dilithium;
 pub mod domain;
 pub mod error;
 pub mod fixed_point;
+pub mod mission_audit;
 pub mod pogq;
 pub mod types;
 
