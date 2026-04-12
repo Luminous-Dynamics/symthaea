@@ -1934,4 +1934,137 @@ mod tests {
             eprintln!("  First-differences uncorrelated ({:.4}) — growth fluctuations independent.", diff_rho);
         }
     }
+
+    /// FINAL AUDIT: Detrend ALL significant correlations from the matrix.
+    ///
+    /// The correlation matrix showed 5 pairs with |ρ| > 0.5:
+    ///   1. class_nums ↔ partitions:   ρ = +0.62  (KILLED above)
+    ///   2. abc_quality ↔ partitions:  ρ = -1.00
+    ///   3. abc_quality ↔ class_nums:  ρ = -0.62
+    ///   4. prime_gaps ↔ abc_quality:  ρ = -0.51
+    ///   5. prime_gaps ↔ partitions:   ρ = +0.51
+    ///
+    /// If ALL detrended correlations collapse to ~0, the entire matrix was
+    /// a growth-rate artifact. If any survive, that pair has real structure.
+    #[test]
+    fn test_detrend_all_significant_pairs() {
+        eprintln!("\n═══ FINAL AUDIT: DETRENDING ALL CORRELATIONS ═══\n");
+
+        let max_n = 100;
+
+        // Generate all sequences (same as correlation matrix test)
+        let primes = {
+            let max = 600usize;
+            let mut is_p = vec![true; max + 1];
+            is_p[0] = false; if max > 0 { is_p[1] = false; }
+            for i in 2..=(max as f64).sqrt() as usize {
+                if is_p[i] { let mut j = i*i; while j <= max { is_p[j] = false; j += i; } }
+            }
+            (2..=max).filter(|&i| is_p[i]).map(|i| i as u64).collect::<Vec<u64>>()
+        };
+        let prime_gaps: Vec<f64> = primes.windows(2).take(max_n)
+            .map(|w| (w[1] - w[0]) as f64).collect();
+
+        let abc = super::search_abc_triples(10000, 1.0);
+        let abc_quals: Vec<f64> = abc.iter().take(max_n).map(|t| t.quality).collect();
+
+        let partitions: Vec<f64> = (1..=max_n)
+            .map(|n| super::super::conjecture_engine::observe_partitions(n)
+                .data.last().map(|&(_, y)| y).unwrap_or(0.0))
+            .collect();
+
+        let squarefree: Vec<u64> = (1..=500u64)
+            .filter(|&d| {
+                let mut p = 2u64;
+                while p * p <= d { if d % (p * p) == 0 { return false; } p += 1; }
+                true
+            })
+            .take(max_n)
+            .collect();
+        let class_nums: Vec<f64> = squarefree.iter()
+            .map(|&d| super::class_number(d) as f64)
+            .collect();
+
+        let zeros = super::find_zeta_zeros(14.0, 300.0, 0.05);
+        let zeta_spaces: Vec<f64> = zeros.windows(2).take(max_n)
+            .map(|w| w[1] - w[0]).collect();
+
+        // Detrending function: subtract power-law fit in log-log space
+        let detrend = |seq: &[f64]| -> Vec<f64> {
+            let log_data: Vec<(f64, f64)> = seq.iter().enumerate()
+                .filter(|(_, &y)| y > 0.0)
+                .map(|(i, &y)| ((i as f64 + 1.0).ln(), y.ln()))
+                .collect();
+            if log_data.len() < 3 { return seq.to_vec(); }
+            let (slope, intercept, _) = super::linear_regression(&log_data);
+            seq.iter().enumerate().map(|(i, &y)| {
+                if y > 0.0 {
+                    y - (intercept + slope * (i as f64 + 1.0).ln()).exp()
+                } else { 0.0 }
+            }).collect()
+        };
+
+        // First differences
+        let diff = |seq: &[f64]| -> Vec<f64> {
+            seq.windows(2).map(|w| w[1] - w[0]).collect()
+        };
+
+        // All named sequences
+        let seqs: Vec<(&str, Vec<f64>)> = vec![
+            ("prime_gaps", prime_gaps),
+            ("abc_quality", abc_quals),
+            ("partitions", partitions),
+            ("class_nums", class_nums),
+            ("zeta_spaces", zeta_spaces),
+        ];
+
+        // Test all pairs with raw |ρ| > 0.3
+        eprintln!("  {:>14} ↔ {:<14} | raw ρ  | detrend | Δ-diff | verdict", "seq A", "seq B");
+        eprintln!("  {}", "-".repeat(78));
+
+        let mut any_survived = false;
+
+        for i in 0..seqs.len() {
+            for j in (i+1)..seqs.len() {
+                let n = seqs[i].1.len().min(seqs[j].1.len());
+                if n < 10 { continue; }
+
+                let raw = spearman_correlation(&seqs[i].1[..n], &seqs[j].1[..n]);
+                if raw.abs() < 0.3 { continue; } // only test significant pairs
+
+                let dt_a = detrend(&seqs[i].1[..n]);
+                let dt_b = detrend(&seqs[j].1[..n]);
+                let detrended = spearman_correlation(&dt_a, &dt_b);
+
+                let da = diff(&seqs[i].1[..n]);
+                let db = diff(&seqs[j].1[..n]);
+                let dn = da.len().min(db.len());
+                let diff_rho = spearman_correlation(&da[..dn], &db[..dn]);
+
+                let verdict = if detrended.abs() > 0.3 {
+                    any_survived = true;
+                    "REAL STRUCTURE"
+                } else if detrended.abs() > 0.15 {
+                    "weak signal"
+                } else {
+                    "SPURIOUS"
+                };
+
+                eprintln!("  {:>14} ↔ {:<14} | {:+.3} | {:+.4}  | {:+.4} | {}",
+                    seqs[i].0, seqs[j].0, raw, detrended, diff_rho, verdict);
+            }
+        }
+
+        eprintln!("\n  ═══ FINAL VERDICT ═══");
+        if any_survived {
+            eprintln!("  At least one correlation SURVIVES detrending.");
+            eprintln!("  There IS real arithmetic structure beyond growth rates.");
+        } else {
+            eprintln!("  ALL correlations collapse after detrending.");
+            eprintln!("  The entire correlation matrix was a growth-rate artifact.");
+            eprintln!("  Arithmetic sequences share GROWTH RATES but not LOCAL STRUCTURE.");
+            eprintln!("  Only EXACT identities (like modularity a_p = c_p) are real bridges.");
+            eprintln!("  Statistical correlation between different arithmetic sequences is not.");
+        }
+    }
 }
