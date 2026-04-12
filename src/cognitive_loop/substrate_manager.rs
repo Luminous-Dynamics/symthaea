@@ -274,8 +274,7 @@ impl SubstrateManager {
                     310.0, // Body temperature in Kelvin
                 );
             // Blend: 50% physics-derived, 50% validation-framework-derived
-            self.effective_feasibility =
-                0.5 * self.effective_feasibility + 0.5 * physics_score;
+            self.effective_feasibility = 0.5 * self.effective_feasibility + 0.5 * physics_score;
         }
     }
 

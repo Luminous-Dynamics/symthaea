@@ -76,7 +76,12 @@ fn harmony_to_params(activations: &[f32; 8], consciousness: f32) -> RdParams {
     f = (f + phi_nudge).clamp(0.010, 0.070);
     k = (k + phi_nudge * 0.5).clamp(0.045, 0.070);
 
-    RdParams { feed: f, kill: k, du: 0.2097, dv: 0.1050 }
+    RdParams {
+        feed: f,
+        kill: k,
+        du: 0.2097,
+        dv: 0.1050,
+    }
 }
 
 // ─── Simulation ──────────────────────────────────────────────────────────────
@@ -129,21 +134,15 @@ impl RdGrid {
                 let v = self.v[idx];
 
                 // Discrete Laplacian (5-point stencil)
-                let lap_u = self.u[idx - n]
-                    + self.u[idx + n]
-                    + self.u[idx - 1]
-                    + self.u[idx + 1]
-                    - 4.0 * u;
-                let lap_v = self.v[idx - n]
-                    + self.v[idx + n]
-                    + self.v[idx - 1]
-                    + self.v[idx + 1]
-                    - 4.0 * v;
+                let lap_u =
+                    self.u[idx - n] + self.u[idx + n] + self.u[idx - 1] + self.u[idx + 1] - 4.0 * u;
+                let lap_v =
+                    self.v[idx - n] + self.v[idx + n] + self.v[idx - 1] + self.v[idx + 1] - 4.0 * v;
 
                 // Gray-Scott reaction terms
                 let uvv = u * v * v;
-                nu[idx] = (u + dt * (params.du * lap_u - uvv + params.feed * (1.0 - u)))
-                    .clamp(0.0, 1.0);
+                nu[idx] =
+                    (u + dt * (params.du * lap_u - uvv + params.feed * (1.0 - u))).clamp(0.0, 1.0);
                 nv[idx] = (v + dt * (params.dv * lap_v + uvv - (params.feed + params.kill) * v))
                     .clamp(0.0, 1.0);
             }
@@ -164,8 +163,10 @@ pub fn generate(
     snapshot: &CognitiveSnapshot,
     rng: &mut StdRng,
 ) -> SceneNode {
-    let params =
-        harmony_to_params(&snapshot.harmony_activations, snapshot.consciousness_level as f32);
+    let params = harmony_to_params(
+        &snapshot.harmony_activations,
+        snapshot.consciousness_level as f32,
+    );
 
     let mut grid = RdGrid::new_random(rng, &params);
 
@@ -212,12 +213,13 @@ pub fn generate(
             let lightness = 0.30 + v * 0.55;
             let opacity = 0.4 + v * 0.6;
 
-            let dot = SceneNode::circle(cx, cy, radius).with_style(
-                symthaea_canvas::scene_graph::Style {
-                    fill: Some(symthaea_canvas::Color::from_hsla(hue, 0.75, lightness, opacity)),
+            let dot =
+                SceneNode::circle(cx, cy, radius).with_style(symthaea_canvas::scene_graph::Style {
+                    fill: Some(symthaea_canvas::Color::from_hsla(
+                        hue, 0.75, lightness, opacity,
+                    )),
                     ..Default::default()
-                },
-            );
+                });
             root = root.with_child(dot);
         }
     }
@@ -246,8 +248,16 @@ mod tests {
     fn harmony_to_params_bounded() {
         let activations = [0.5; 8];
         let p = harmony_to_params(&activations, 0.7);
-        assert!(p.feed >= 0.010 && p.feed <= 0.070, "feed out of bounds: {}", p.feed);
-        assert!(p.kill >= 0.045 && p.kill <= 0.070, "kill out of bounds: {}", p.kill);
+        assert!(
+            p.feed >= 0.010 && p.feed <= 0.070,
+            "feed out of bounds: {}",
+            p.feed
+        );
+        assert!(
+            p.kill >= 0.045 && p.kill <= 0.070,
+            "kill out of bounds: {}",
+            p.kill
+        );
     }
 
     #[test]

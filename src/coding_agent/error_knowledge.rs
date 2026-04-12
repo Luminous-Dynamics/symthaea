@@ -299,8 +299,7 @@ impl CodeErrorKnowledge {
         if let Ok(data_dir) = std::env::var("SYMTHAEA_DATA_DIR") {
             std::path::PathBuf::from(data_dir).join("error-knowledge.json")
         } else if let Ok(home) = std::env::var("HOME") {
-            std::path::PathBuf::from(home)
-                .join(".local/share/symthaea/error-knowledge.json")
+            std::path::PathBuf::from(home).join(".local/share/symthaea/error-knowledge.json")
         } else {
             std::path::PathBuf::from("error-knowledge.json")
         }

@@ -640,10 +640,8 @@ impl CognitiveLoopService {
                                     birkhoff: quality.composite,
                                     composite: quality.composite,
                                 };
-                                if let Some(ref mut cm) = self
-                                    .sensorimotor
-                                    .motor_rendering
-                                    .creative_manager
+                                if let Some(ref mut cm) =
+                                    self.sensorimotor.motor_rendering.creative_manager
                                 {
                                     let feedback = cm.process_external_score(
                                         &aesthetic_score,
@@ -2093,12 +2091,8 @@ impl CognitiveLoopService {
                             None
                         }
                     }
-                    MathProblemType::Chemistry => {
-                        Some(self.math_service.compute_chemistry(input))
-                    }
-                    MathProblemType::Proof => {
-                        Some(self.math_service.construct_proof(input))
-                    }
+                    MathProblemType::Chemistry => Some(self.math_service.compute_chemistry(input)),
+                    MathProblemType::Proof => Some(self.math_service.construct_proof(input)),
                     // Arithmetic, Unknown — safe fallback to statistics
                     _ => {
                         if !numbers.is_empty() {
@@ -3157,7 +3151,9 @@ impl CognitiveLoopService {
                 1.0
             }
         };
-        let base_budget_us = self.config.attention_budget_override_us
+        let base_budget_us = self
+            .config
+            .attention_budget_override_us
             .unwrap_or(ATTENTION_BUDGET_US);
         let attention_budget_us = (base_budget_us as f64
             * neuromod_attention_alloc as f64
@@ -3250,7 +3246,11 @@ impl CognitiveLoopService {
             self.stats.predictive_budget_gated_count += 1;
         }
 
-        (attention_budget_exceeded, predictive_budget_gated, epistemic_budget_scale)
+        (
+            attention_budget_exceeded,
+            predictive_budget_gated,
+            epistemic_budget_scale,
+        )
     }
 
     /// Self-model accuracy tracking, confidence crash detection, PE variance modulation,

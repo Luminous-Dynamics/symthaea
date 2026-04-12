@@ -455,7 +455,9 @@ impl StreamingSynth {
         let (atk, dec, sus, rel) = match instruments::select_instrument(&self.state) {
             Instrument::Piano | Instrument::PianoPP => (0.005, 0.3, 0.15, 0.4),
             Instrument::Violin | Instrument::Cello => (0.08, 0.1, 0.7, 0.3),
-            Instrument::AcousticGuitar | Instrument::Harp | Instrument::Koto => (0.003, 0.2, 0.1, 0.3),
+            Instrument::AcousticGuitar | Instrument::Harp | Instrument::Koto => {
+                (0.003, 0.2, 0.1, 0.3)
+            }
             Instrument::Oud | Instrument::UprightBass => (0.008, 0.15, 0.4, 0.5),
             Instrument::Flute | Instrument::Ney => (0.05, 0.1, 0.6, 0.2),
             Instrument::Clarinet => (0.03, 0.08, 0.7, 0.15),
@@ -786,8 +788,8 @@ impl StreamingSynth {
                     let idx = local_offset + j;
                     if idx < buffer.len() {
                         // Drums: consciousness-weighted gain with emotion
-                        let drum_gain = 0.15 + self.state.arousal * 0.15
-                            + self.state.dopamine * 0.05;
+                        let drum_gain =
+                            0.15 + self.state.arousal * 0.15 + self.state.dopamine * 0.05;
                         buffer[idx][0] += s * drum_gain;
                         buffer[idx][1] += s * drum_gain;
                     }
@@ -1272,10 +1274,10 @@ impl StreamingSynth {
 
             // Collect for MIDI export — hard clamp to singable MIDI range
             let midi_freq = note.frequency.clamp(196.0, 988.0); // G3 (MIDI 55) to B5 (MIDI 83)
-            // Quantize start_time to the nearest 8th-note grid position.
-            // Without quantization, notes land at chunk boundaries (arbitrary),
-            // producing chaotic inter-onset intervals and 0.07 rhythmic regularity.
-            // With quantization, notes snap to a musical pulse (CV→0, regularity→0.5+).
+                                                                // Quantize start_time to the nearest 8th-note grid position.
+                                                                // Without quantization, notes land at chunk boundaries (arbitrary),
+                                                                // producing chaotic inter-onset intervals and 0.07 rhythmic regularity.
+                                                                // With quantization, notes snap to a musical pulse (CV→0, regularity→0.5+).
             let raw_time = self.total_samples_rendered as f32 / self.sample_rate as f32;
             let beat_dur = 60.0 / self.muse_stream.tempo().max(30.0); // seconds per beat
             let grid_unit = beat_dur * 0.5; // 8th-note grid

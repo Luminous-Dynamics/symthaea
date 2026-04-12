@@ -134,12 +134,18 @@ impl Instrument {
 
     /// Whether this instrument uses Karplus-Strong synthesis.
     pub fn uses_karplus_strong(&self) -> bool {
-        matches!(self, Self::AcousticGuitar | Self::Harp | Self::Koto | Self::Oud | Self::UprightBass)
+        matches!(
+            self,
+            Self::AcousticGuitar | Self::Harp | Self::Koto | Self::Oud | Self::UprightBass
+        )
     }
 
     /// Whether this instrument uses FM synthesis.
     pub fn uses_fm(&self) -> bool {
-        matches!(self, Self::ElectricPiano | Self::Bell | Self::Marimba | Self::Kalimba)
+        matches!(
+            self,
+            Self::ElectricPiano | Self::Bell | Self::Marimba | Self::Kalimba
+        )
     }
 
     /// Karplus-Strong parameters: (damping, brightness, stiffness).
@@ -289,23 +295,51 @@ pub fn select_instrument(state: &MusicalState) -> Instrument {
     let play = state.harmony_activations[3];
 
     if stillness > 0.6 && arousal < 0.3 {
-        if cultural > 0.5 { Instrument::Kalimba } else { Instrument::Pad }
+        if cultural > 0.5 {
+            Instrument::Kalimba
+        } else {
+            Instrument::Pad
+        }
     } else if psi < 0.3 {
-        if valence < -0.2 { Instrument::Ney } else { Instrument::Flute }
+        if valence < -0.2 {
+            Instrument::Ney
+        } else {
+            Instrument::Flute
+        }
     } else if ne > 0.6 && arousal > 0.5 {
-        if valence < -0.3 { Instrument::SawLead } else { Instrument::Trumpet }
+        if valence < -0.3 {
+            Instrument::SawLead
+        } else {
+            Instrument::Trumpet
+        }
     } else if da > 0.7 {
-        if arousal > 0.6 { Instrument::Marimba }
-        else if arousal > 0.4 { Instrument::Bell }
-        else { Instrument::ElectricPiano }
+        if arousal > 0.6 {
+            Instrument::Marimba
+        } else if arousal > 0.4 {
+            Instrument::Bell
+        } else {
+            Instrument::ElectricPiano
+        }
     } else if cultural > 0.6 {
-        if valence < -0.2 { Instrument::Oud }
-        else if arousal < 0.4 { Instrument::Koto }
-        else { Instrument::Sitar }
+        if valence < -0.2 {
+            Instrument::Oud
+        } else if arousal < 0.4 {
+            Instrument::Koto
+        } else {
+            Instrument::Sitar
+        }
     } else if psi > 0.7 && arousal > 0.5 {
-        if state.harmony_activations[2] > 0.5 { Instrument::Violin } else { Instrument::Cello }
+        if state.harmony_activations[2] > 0.5 {
+            Instrument::Violin
+        } else {
+            Instrument::Cello
+        }
     } else if progress > 0.5 && arousal > 0.5 {
-        if valence > 0.2 { Instrument::Saxophone } else { Instrument::Clarinet }
+        if valence > 0.2 {
+            Instrument::Saxophone
+        } else {
+            Instrument::Clarinet
+        }
     } else if play > 0.5 && arousal > 0.3 {
         Instrument::AcousticGuitar
     } else if valence < -0.3 && arousal < 0.4 {

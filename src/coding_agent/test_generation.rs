@@ -204,7 +204,9 @@ impl TestGenerator {
                 // Boolean return: test that it returns a bool (type check)
                 tests.push(GeneratedTest {
                     name: format!("test_{fn_name}_returns_bool"),
-                    assertion: format!("let result: bool = {fn_name}(Default::default()); let _ = result;"),
+                    assertion: format!(
+                        "let result: bool = {fn_name}(Default::default()); let _ = result;"
+                    ),
                     category: TestCategory::Property,
                 });
             }
@@ -220,7 +222,9 @@ impl TestGenerator {
                 // Option return: test None case
                 tests.push(GeneratedTest {
                     name: format!("test_{fn_name}_can_return_none"),
-                    assertion: format!("// Option return type: {fn_name} should handle None gracefully"),
+                    assertion: format!(
+                        "// Option return type: {fn_name} should handle None gracefully"
+                    ),
                     category: TestCategory::Property,
                 });
             }
@@ -457,8 +461,9 @@ mod tests {
 
     #[test]
     fn test_extract_param_types_generic() {
-        let params =
-            TestGenerator::extract_param_types("fn find(haystack: &[u8], needle: Vec<u8>) -> Option<usize>");
+        let params = TestGenerator::extract_param_types(
+            "fn find(haystack: &[u8], needle: Vec<u8>) -> Option<usize>",
+        );
         assert_eq!(params.len(), 2);
         assert_eq!(params[0].1, "&[u8]");
         assert_eq!(params[1].1, "Vec<u8>");

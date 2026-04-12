@@ -1085,7 +1085,11 @@ impl AR1Model {
     /// σ = std(x_t) * sqrt(1 - φ²)
     pub fn fit(data: &[f64]) -> Self {
         if data.len() < 2 {
-            return Self { phi: 0.0, sigma: 1.0, mean: 0.0 };
+            return Self {
+                phi: 0.0,
+                sigma: 1.0,
+                mean: 0.0,
+            };
         }
         let mu = mean(data);
         let n = data.len();
@@ -1102,7 +1106,11 @@ impl AR1Model {
         let phi = if var > 1e-15 { cov / var } else { 0.0 };
         let sigma = var.sqrt() * (1.0 - phi * phi).max(0.0).sqrt();
 
-        Self { phi, sigma, mean: mu }
+        Self {
+            phi,
+            sigma,
+            mean: mu,
+        }
     }
 
     /// Predict next value: x_{t+1} = μ + φ(x_t - μ)
@@ -1157,7 +1165,11 @@ pub fn fit_normal_mle(data: &[f64]) -> (f64, f64) {
 /// MLE estimate for Exponential distribution: λ̂ = 1/mean
 pub fn fit_exponential_mle(data: &[f64]) -> f64 {
     let m = mean(data);
-    if m > 1e-15 { 1.0 / m } else { 1.0 }
+    if m > 1e-15 {
+        1.0 / m
+    } else {
+        1.0
+    }
 }
 
 /// MLE estimate for Gamma via moment matching.
@@ -1298,7 +1310,13 @@ pub fn pca(columns: &[&[f64]], k: usize) -> PcaResult {
     let total_var: f64 = singular_values.iter().sum();
     let variance_explained: Vec<f64> = singular_values
         .iter()
-        .map(|&s| if total_var > 1e-15 { s / total_var } else { 0.0 })
+        .map(|&s| {
+            if total_var > 1e-15 {
+                s / total_var
+            } else {
+                0.0
+            }
+        })
         .collect();
 
     let mut cumulative = Vec::with_capacity(singular_values.len());
@@ -1769,13 +1787,16 @@ mod tests {
     #[test]
     fn test_bootstrap_mean_ci_contains_true_mean() {
         // Data from N(5, 1) — CI should contain 5.0
-        let data: Vec<f64> = vec![4.8, 5.1, 5.0, 4.9, 5.2, 5.0, 4.9, 5.1, 5.3, 4.7,
-                                   5.1, 4.8, 5.0, 5.2, 4.9, 5.0, 5.1, 4.8, 5.3, 5.0];
+        let data: Vec<f64> = vec![
+            4.8, 5.1, 5.0, 4.9, 5.2, 5.0, 4.9, 5.1, 5.3, 4.7, 5.1, 4.8, 5.0, 5.2, 4.9, 5.0, 5.1,
+            4.8, 5.3, 5.0,
+        ];
         let (lo, hi) = bootstrap_mean_ci(&data, 1000, 0.95, 42);
         assert!(
             lo < 5.0 && hi > 5.0,
             "Bootstrap 95% CI ({:.3}, {:.3}) should contain 5.0",
-            lo, hi
+            lo,
+            hi
         );
     }
 
@@ -1792,22 +1813,36 @@ mod tests {
     #[test]
     fn test_ar1_stationarity() {
         // phi = 0.5 → stationary
-        let m = AR1Model { phi: 0.5, sigma: 1.0, mean: 0.0 };
+        let m = AR1Model {
+            phi: 0.5,
+            sigma: 1.0,
+            mean: 0.0,
+        };
         assert!(m.is_stationary());
         // phi = 1.1 → non-stationary
-        let m2 = AR1Model { phi: 1.1, sigma: 1.0, mean: 0.0 };
+        let m2 = AR1Model {
+            phi: 1.1,
+            sigma: 1.0,
+            mean: 0.0,
+        };
         assert!(!m2.is_stationary());
     }
 
     #[test]
     fn test_ar1_acf_matches_phi_power() {
-        let m = AR1Model { phi: 0.7, sigma: 1.0, mean: 0.0 };
+        let m = AR1Model {
+            phi: 0.7,
+            sigma: 1.0,
+            mean: 0.0,
+        };
         for lag in 0..5 {
             let expected = 0.7f64.powi(lag as i32);
             assert!(
                 (m.acf(lag) - expected).abs() < 1e-10,
                 "ACF at lag {} = {} != {}",
-                lag, m.acf(lag), expected
+                lag,
+                m.acf(lag),
+                expected
             );
         }
     }
@@ -1815,7 +1850,11 @@ mod tests {
     #[test]
     fn test_ar1_fit_recovers_phi() {
         // Simulate AR(1) with phi=0.6 and fit
-        let m = AR1Model { phi: 0.6, sigma: 0.5, mean: 2.0 };
+        let m = AR1Model {
+            phi: 0.6,
+            sigma: 0.5,
+            mean: 2.0,
+        };
         let data = m.simulate(2000, 1234);
         let fitted = AR1Model::fit(&data);
         assert!(
@@ -1827,7 +1866,11 @@ mod tests {
 
     #[test]
     fn test_ar1_forecast_decays_to_mean() {
-        let m = AR1Model { phi: 0.5, sigma: 1.0, mean: 10.0 };
+        let m = AR1Model {
+            phi: 0.5,
+            sigma: 1.0,
+            mean: 10.0,
+        };
         let forecast = m.forecast(20.0, 20);
         // After many steps, should converge to mean
         let last = *forecast.last().unwrap();
@@ -1855,7 +1898,11 @@ mod tests {
         let lambda = fit_exponential_mle(&data);
         assert!(lambda > 0.0, "lambda must be positive");
         // Should be near 2.0
-        assert!((lambda - 2.0).abs() < 0.5, "lambda {} should be near 2.0", lambda);
+        assert!(
+            (lambda - 2.0).abs() < 0.5,
+            "lambda {} should be near 2.0",
+            lambda
+        );
     }
 
     #[test]

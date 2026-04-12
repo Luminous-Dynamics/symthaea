@@ -133,7 +133,8 @@ pub fn pion_decay_width() -> f64 {
     let mass_ratio_sq = (M_MUON / M_PION_CHARGED).powi(2);
 
     G_FERMI * G_FERMI * f_pi * f_pi * M_PION_CHARGED / (8.0 * PI)
-        * M_MUON * M_MUON
+        * M_MUON
+        * M_MUON
         * (1.0 - mass_ratio_sq).powi(2)
         * v_ud_sq
 }

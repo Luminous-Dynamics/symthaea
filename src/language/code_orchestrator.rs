@@ -122,9 +122,7 @@ pub struct SynthesisAttempt {
 }
 
 /// Conversion from synthesis_trait EpistemicStatus to crate-local EpistemicStatus
-fn to_local_epistemic(
-    status: symthaea_core::synthesis_trait::EpistemicStatus,
-) -> EpistemicStatus {
+fn to_local_epistemic(status: symthaea_core::synthesis_trait::EpistemicStatus) -> EpistemicStatus {
     match status {
         symthaea_core::synthesis_trait::EpistemicStatus::Certain => EpistemicStatus::Certain,
         symthaea_core::synthesis_trait::EpistemicStatus::Probable => EpistemicStatus::Probable,
@@ -137,9 +135,7 @@ fn to_local_epistemic(
 }
 
 /// Conversion from crate-local EpistemicStatus to synthesis_trait EpistemicStatus
-fn to_trait_epistemic(
-    status: EpistemicStatus,
-) -> symthaea_core::synthesis_trait::EpistemicStatus {
+fn to_trait_epistemic(status: EpistemicStatus) -> symthaea_core::synthesis_trait::EpistemicStatus {
     match status {
         EpistemicStatus::Certain => symthaea_core::synthesis_trait::EpistemicStatus::Certain,
         EpistemicStatus::Probable => symthaea_core::synthesis_trait::EpistemicStatus::Probable,
@@ -281,8 +277,7 @@ impl CodeOrchestrator {
         channels[18] = 1.0;
 
         // Channel 19: concept_count (number of constraints + examples)
-        channels[19] = (request.constraints.len() + request.examples.len())
-            .min(10) as f32;
+        channels[19] = (request.constraints.len() + request.examples.len()).min(10) as f32;
 
         // Channels 24-27: code-specific
         channels[24] = 0.5; // syntax_complexity (mid-range default)
@@ -312,19 +307,22 @@ impl CodeOrchestrator {
         // Infer the plan actions the CfC sequencer should have produced
         // based on the structure of the successful output.
         let target_actions = Self::infer_plan_from_source(source);
-        self.sequencer_training_buffer.push(SequencerTrainingCapture {
-            purpose: request.purpose.clone(),
-            target_actions,
-            quality,
-            backend: backend.to_string(),
-        });
+        self.sequencer_training_buffer
+            .push(SequencerTrainingCapture {
+                purpose: request.purpose.clone(),
+                target_actions,
+                quality,
+                backend: backend.to_string(),
+            });
     }
 
     /// Infer PlanAction sequence from generated source code.
     ///
     /// Analyzes the code structure to determine what plan steps the
     /// sequencer should learn to produce for similar inputs.
-    fn infer_plan_from_source(source: &str) -> Vec<crate::dynamics::cfc_code_sequencer::PlanAction> {
+    fn infer_plan_from_source(
+        source: &str,
+    ) -> Vec<crate::dynamics::cfc_code_sequencer::PlanAction> {
         use crate::dynamics::cfc_code_sequencer::PlanAction;
 
         let mut actions = Vec::new();
@@ -368,8 +366,10 @@ impl CodeOrchestrator {
         if source.contains("use ") {
             actions.push(PlanAction::AddImport);
         }
-        if source.contains("Result<") || source.contains("Result ")
-            || source.contains(".map_err(") || source.contains("?;")
+        if source.contains("Result<")
+            || source.contains("Result ")
+            || source.contains(".map_err(")
+            || source.contains("?;")
         {
             actions.push(PlanAction::AddErrorHandling);
         }
@@ -389,8 +389,10 @@ impl CodeOrchestrator {
         }
         if source.contains("|") && (source.contains("||") || source.contains("| ")) {
             // Simple heuristic for closures — avoid false positives from logical OR
-            if source.contains(".map(|") || source.contains(".filter(|")
-                || source.contains(".for_each(|") || source.contains("= |")
+            if source.contains(".map(|")
+                || source.contains(".filter(|")
+                || source.contains(".for_each(|")
+                || source.contains("= |")
             {
                 actions.push(PlanAction::ClosureDefine);
             }
@@ -607,17 +609,15 @@ impl CodeOrchestrator {
             verification: verification_layers,
             accepted: false,
             energy_cost: self.energy_spent,
-            narrative: Some(
-                "All native backends exhausted. LLM fallback recommended.".to_string(),
-            ),
+            narrative: Some("All native backends exhausted. LLM fallback recommended.".to_string()),
         }
     }
 
     /// Attempt native code generation via CodeGenerator.
     fn try_native_generation(&self, request: &SynthesisRequest) -> BackendResult {
         let spec = self.request_to_spec(request);
-        let target = CodeTarget::new(&request.name, EntityKind::Function)
-            .with_language(&request.language);
+        let target =
+            CodeTarget::new(&request.name, EntityKind::Function).with_language(&request.language);
 
         let intent = CodeIntent::Create { target, spec };
         let context = super::code_generator::CodeContext::default();
@@ -639,8 +639,7 @@ impl CodeOrchestrator {
 
         // Verify: HDC round-trip similarity
         let intent_hv = self.generator.encoder().encode_name(&request.name);
-        let parsed =
-            super::code_parser::ParsedCode::new(&generated.source, &request.language);
+        let parsed = super::code_parser::ParsedCode::new(&generated.source, &request.language);
         let verification = self.verifier.verify_against_intent(&parsed, &intent_hv);
 
         BackendResult {
@@ -708,8 +707,8 @@ impl CodeOrchestrator {
 
         // Generate using the analogy-informed context
         let spec = self.request_to_spec(request);
-        let target = CodeTarget::new(&request.name, EntityKind::Function)
-            .with_language(&request.language);
+        let target =
+            CodeTarget::new(&request.name, EntityKind::Function).with_language(&request.language);
 
         let intent = CodeIntent::Create { target, spec };
         let context = super::code_generator::CodeContext::default();
@@ -739,12 +738,8 @@ impl CodeOrchestrator {
 
     /// Convert a SynthesisRequest to the crate-local CodeSpec type.
     fn request_to_spec(&self, request: &SynthesisRequest) -> CodeSpec {
-        let mut spec = CodeSpec::new(
-            &request.language,
-            &request.name,
-            &request.purpose,
-        )
-        .with_epistemic(to_local_epistemic(request.epistemic_status));
+        let mut spec = CodeSpec::new(&request.language, &request.name, &request.purpose)
+            .with_epistemic(to_local_epistemic(request.epistemic_status));
 
         if let Some(ref sig) = request.signature {
             spec = spec.with_signature(sig);
@@ -780,8 +775,8 @@ impl CodeSynthesisBackend for CodeOrchestrator {
         // The trait requires &self but our synthesize needs &mut self for tracking.
         // Create a minimal pass-through for trait compliance.
         let spec = self.request_to_spec(request);
-        let target = CodeTarget::new(&request.name, EntityKind::Function)
-            .with_language(&request.language);
+        let target =
+            CodeTarget::new(&request.name, EntityKind::Function).with_language(&request.language);
         let intent = CodeIntent::Create { target, spec };
         let context = super::code_generator::CodeContext::default();
         let generated = self.generator.generate(&intent, &context);
@@ -823,8 +818,8 @@ impl CodeSynthesisBackend for CodeOrchestrator {
         let parsed = super::code_parser::ParsedCode::new(code, &request.language);
 
         let spec = self.request_to_spec(request);
-        let target = CodeTarget::new(&request.name, EntityKind::Function)
-            .with_language(&request.language);
+        let target =
+            CodeTarget::new(&request.name, EntityKind::Function).with_language(&request.language);
         let intent = CodeIntent::Create { target, spec };
 
         let intent_hv = self.generator.encoder().encode_name(&request.name);

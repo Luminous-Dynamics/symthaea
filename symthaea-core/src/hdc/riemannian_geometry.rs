@@ -27,7 +27,11 @@ pub struct MetricTensor {
 impl MetricTensor {
     /// Create from row-major flat slice. Panics if length ≠ dim×dim.
     pub fn new(components: Vec<f64>, dim: usize) -> Self {
-        assert_eq!(components.len(), dim * dim, "components length must be dim²");
+        assert_eq!(
+            components.len(),
+            dim * dim,
+            "components length must be dim²"
+        );
         Self { components, dim }
     }
 
@@ -40,7 +44,10 @@ impl MetricTensor {
         for i in 0..dim {
             comp[i * dim + i] = radius * radius;
         }
-        Self { components: comp, dim }
+        Self {
+            components: comp,
+            dim,
+        }
     }
 
     /// Flat Euclidean metric (identity).
@@ -105,7 +112,10 @@ impl MetricTensor {
                 inv[i * n + j] = aug[i][n + j];
             }
         }
-        Self { components: inv, dim: n }
+        Self {
+            components: inv,
+            dim: n,
+        }
     }
 
     /// Christoffel symbols Γ^k_{ij} via central finite differences.
@@ -149,8 +159,7 @@ impl MetricTensor {
         let mut riemann = vec![0.0f64; size];
 
         // Detect diagonal metric (sphere / conformally flat)
-        let is_diagonal = (0..n)
-            .all(|i| (0..n).all(|j| i == j || self.g(i, j).abs() < 1e-12));
+        let is_diagonal = (0..n).all(|i| (0..n).all(|j| i == j || self.g(i, j).abs() < 1e-12));
 
         if is_diagonal {
             // For a round sphere with radius r: sectional curvature K = 1/r²
@@ -202,7 +211,10 @@ impl MetricTensor {
                 ricci[i * n + j] = sum;
             }
         }
-        Self { components: ricci, dim: n }
+        Self {
+            components: ricci,
+            dim: n,
+        }
     }
 
     /// Ricci scalar R = g^{ij} R_{ij}.
@@ -235,7 +247,10 @@ impl MetricTensor {
                 }
             }
         }
-        Self { components: einstein, dim: n }
+        Self {
+            components: einstein,
+            dim: n,
+        }
     }
 
     /// Check Einstein condition: |Ric - (R/n)·g|_F < tol.
@@ -285,7 +300,10 @@ impl MetricTensor {
                 idx += 1;
             }
         }
-        Self { components: comp, dim }
+        Self {
+            components: comp,
+            dim,
+        }
     }
 
     /// One step of (un-normalized) Ricci flow: g → g - 2·Ric·dt.
@@ -298,7 +316,10 @@ impl MetricTensor {
                 new_comp[i * n + j] -= 2.0 * ricci.g(i, j) * dt;
             }
         }
-        Self { components: new_comp, dim: n }
+        Self {
+            components: new_comp,
+            dim: n,
+        }
     }
 
     /// Normalized Ricci flow step: g → g + (-2Ric + (2R̄/n)g)·dt
@@ -315,7 +336,10 @@ impl MetricTensor {
                 new_comp[i * n + j] += correction * dt;
             }
         }
-        Self { components: new_comp, dim: n }
+        Self {
+            components: new_comp,
+            dim: n,
+        }
     }
 
     /// Rescale metric so that vol ≈ target (for n-ball approximation).
@@ -379,10 +403,14 @@ impl MetricTensor {
     pub fn perturb(&self, epsilon: f64, seed: u64) -> Self {
         let n = self.dim;
         let mut comp = self.components.clone();
-        let mut rng = seed.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+        let mut rng = seed
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
         for i in 0..n {
             for j in i..n {
-                rng = rng.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+                rng = rng
+                    .wrapping_mul(6364136223846793005)
+                    .wrapping_add(1442695040888963407);
                 // Map to [-1, 1]
                 let r = ((rng >> 33) as f64) / (u32::MAX as f64) - 1.0;
                 let delta = epsilon * r;
@@ -391,14 +419,19 @@ impl MetricTensor {
             }
         }
         // Ensure positive definiteness by adding a small multiple of identity if needed
-        let min_diag = (0..n).map(|i| comp[i * n + i]).fold(f64::INFINITY, f64::min);
+        let min_diag = (0..n)
+            .map(|i| comp[i * n + i])
+            .fold(f64::INFINITY, f64::min);
         if min_diag < epsilon * 0.1 {
             let shift = epsilon * 0.1 - min_diag + 1e-10;
             for i in 0..n {
                 comp[i * n + i] += shift;
             }
         }
-        Self { components: comp, dim: n }
+        Self {
+            components: comp,
+            dim: n,
+        }
     }
 
     /// Is the metric positive definite? (All eigenvalues > 0, checked via Cholesky attempt.)
@@ -467,7 +500,10 @@ impl DiscretizedSphere {
         for v in &mut avg {
             *v /= count;
         }
-        MetricTensor { components: avg, dim: n }
+        MetricTensor {
+            components: avg,
+            dim: n,
+        }
     }
 
     /// Averaged traceless Ricci norm (Einstein defect across all sample points).
@@ -475,7 +511,11 @@ impl DiscretizedSphere {
         if self.metric_samples.is_empty() {
             return f64::INFINITY;
         }
-        let total: f64 = self.metric_samples.iter().map(|m| m.traceless_ricci_norm_sq()).sum();
+        let total: f64 = self
+            .metric_samples
+            .iter()
+            .map(|m| m.traceless_ricci_norm_sq())
+            .sum();
         (total / self.n_points as f64).sqrt()
     }
 
@@ -484,27 +524,29 @@ impl DiscretizedSphere {
     /// We compute this analytically since the discretization doesn't change topology.
     pub fn betti_numbers(&self) -> Vec<usize> {
         let mut betti = vec![0usize; self.dim + 1];
-        betti[0] = 1;         // β₀ = 1 (connected)
-        betti[self.dim] = 1;  // βₙ = 1 (fundamental class)
+        betti[0] = 1; // β₀ = 1 (connected)
+        betti[self.dim] = 1; // βₙ = 1 (fundamental class)
         betti
     }
 
     /// Check that Betti numbers match expected S^n topology.
     pub fn has_sphere_topology(&self) -> bool {
         let betti = self.betti_numbers();
-        betti[0] == 1
-            && betti[self.dim] == 1
-            && betti[1..self.dim].iter().all(|&b| b == 0)
+        betti[0] == 1 && betti[self.dim] == 1 && betti[1..self.dim].iter().all(|&b| b == 0)
     }
 
     /// Encode the full metric field as a flat vector (concatenation of upper-triangular components).
     pub fn encode_flat(&self) -> Vec<f64> {
-        self.metric_samples.iter().flat_map(|m| m.encode_flat()).collect()
+        self.metric_samples
+            .iter()
+            .flat_map(|m| m.encode_flat())
+            .collect()
     }
 
     /// Perturb all sample points by epsilon (using different seeds per point).
     pub fn perturb(&self, epsilon: f64, base_seed: u64) -> Self {
-        let new_samples: Vec<_> = self.metric_samples
+        let new_samples: Vec<_> = self
+            .metric_samples
             .iter()
             .enumerate()
             .map(|(i, m)| m.perturb(epsilon, base_seed.wrapping_add(i as u64 * 1000007)))
@@ -518,7 +560,8 @@ impl DiscretizedSphere {
 
     /// Apply one step of normalized Ricci flow to all sample points.
     pub fn ricci_flow_step(&self, dt: f64) -> Self {
-        let new_samples: Vec<_> = self.metric_samples
+        let new_samples: Vec<_> = self
+            .metric_samples
             .iter()
             .map(|m| m.normalized_ricci_flow_step(dt))
             .collect();
@@ -579,8 +622,13 @@ mod tests {
         for i in 0..3 {
             for j in 0..3 {
                 let expected = if i == j { 1.0 } else { 0.0 };
-                assert!((inv.g(i, j) - expected).abs() < 1e-10,
-                    "inv({},{}) = {}", i, j, inv.g(i, j));
+                assert!(
+                    (inv.g(i, j) - expected).abs() < 1e-10,
+                    "inv({},{}) = {}",
+                    i,
+                    j,
+                    inv.g(i, j)
+                );
             }
         }
     }
@@ -619,7 +667,11 @@ mod tests {
             let ric_ii = ricci.g(i, i);
             assert!(
                 (ric_ii - expected_ric * m.g(i, i)).abs() < 1e-8,
-                "R_{{{}{}}} = {}, expected {}", i, i, ric_ii, expected_ric * m.g(i, i)
+                "R_{{{}{}}} = {}, expected {}",
+                i,
+                i,
+                ric_ii,
+                expected_ric * m.g(i, i)
             );
         }
     }
@@ -629,7 +681,11 @@ mod tests {
         // Round sphere IS Einstein (Ric = K·g, so traceless Ricci = 0)
         let m = MetricTensor::sphere_metric(3, 1.5);
         let defect = m.traceless_ricci_norm_sq();
-        assert!(defect < 1e-8, "Round sphere should be Einstein, defect={}", defect);
+        assert!(
+            defect < 1e-8,
+            "Round sphere should be Einstein, defect={}",
+            defect
+        );
         assert!(m.is_einstein(1e-4));
     }
 
@@ -682,8 +738,14 @@ mod tests {
         let decoded = MetricTensor::decode_flat(&flat, 3);
         for i in 0..3 {
             for j in 0..3 {
-                assert!((m.g(i, j) - decoded.g(i, j)).abs() < 1e-12,
-                    "g({},{}) mismatch: {} vs {}", i, j, m.g(i, j), decoded.g(i, j));
+                assert!(
+                    (m.g(i, j) - decoded.g(i, j)).abs() < 1e-12,
+                    "g({},{}) mismatch: {} vs {}",
+                    i,
+                    j,
+                    m.g(i, j),
+                    decoded.g(i, j)
+                );
             }
         }
     }
@@ -731,6 +793,10 @@ mod tests {
         let vol_before = det_before.sqrt();
         m.normalize_volume(1.0);
         let vol_after = m.determinant().sqrt();
-        assert!((vol_after - 1.0).abs() < 1e-8, "normalized vol = {}", vol_after);
+        assert!(
+            (vol_after - 1.0).abs() < 1e-8,
+            "normalized vol = {}",
+            vol_after
+        );
     }
 }

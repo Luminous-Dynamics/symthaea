@@ -1272,7 +1272,9 @@ impl MathService {
     /// molar mass as a baseline. More specific queries (enthalpy, Gibbs, kinetics)
     /// are dispatched to the appropriate chemistry engine function.
     pub fn compute_chemistry(&mut self, text: &str) -> MathResponse {
-        use symthaea_core::hdc::chemistry::{all_elements, molar_mass, thermochemical_database, hess_law, gibbs_free_energy};
+        use symthaea_core::hdc::chemistry::{
+            all_elements, gibbs_free_energy, hess_law, molar_mass, thermochemical_database,
+        };
 
         let lower = text.to_lowercase();
         let elements = all_elements();
@@ -1285,11 +1287,21 @@ impl MathService {
             // Gibbs free energy query — needs ΔH and ΔS from thermochemical DB
             if let Some(ref f) = formula {
                 let phase_formula = format!("{}(g)", f); // try gas phase
-                let dh = db.iter().find(|d| d.formula == phase_formula).map(|d| d.delta_hf_kj_mol);
-                let ds = db.iter().find(|d| d.formula == phase_formula).map(|d| d.delta_sf_j_mol_k);
+                let dh = db
+                    .iter()
+                    .find(|d| d.formula == phase_formula)
+                    .map(|d| d.delta_hf_kj_mol);
+                let ds = db
+                    .iter()
+                    .find(|d| d.formula == phase_formula)
+                    .map(|d| d.delta_sf_j_mol_k);
                 if let (Some(dh), Some(ds)) = (dh, ds) {
                     let dg = gibbs_free_energy(dh, 298.15, ds);
-                    (format!("ΔG°({}) = {:.2} kJ/mol at 298.15 K", f, dg), Some(dg), 0.7)
+                    (
+                        format!("ΔG°({}) = {:.2} kJ/mol at 298.15 K", f, dg),
+                        Some(dg),
+                        0.7,
+                    )
                 } else {
                     (format!("No thermochemical data for {}", f), None, 0.2)
                 }
@@ -1305,13 +1317,25 @@ impl MathService {
             } else {
                 ("No chemical formula found in query".into(), None, 0.1)
             }
-        } else if lower.contains("enthalpy") || lower.contains("hess") || lower.contains("combustion") {
+        } else if lower.contains("enthalpy")
+            || lower.contains("hess")
+            || lower.contains("combustion")
+        {
             // Default: try to find ΔH°f for the formula
             if let Some(ref f) = formula {
                 let phase_formula = format!("{}(g)", f);
-                if let Some(entry) = db.iter().find(|d| d.formula == phase_formula || d.formula == *f) {
-                    (format!("ΔH°f({}) = {:.3} kJ/mol", entry.formula, entry.delta_hf_kj_mol),
-                     Some(entry.delta_hf_kj_mol), 0.7)
+                if let Some(entry) = db
+                    .iter()
+                    .find(|d| d.formula == phase_formula || d.formula == *f)
+                {
+                    (
+                        format!(
+                            "ΔH°f({}) = {:.3} kJ/mol",
+                            entry.formula, entry.delta_hf_kj_mol
+                        ),
+                        Some(entry.delta_hf_kj_mol),
+                        0.7,
+                    )
                 } else {
                     (format!("No enthalpy data for {}", f), None, 0.2)
                 }
@@ -1326,13 +1350,20 @@ impl MathService {
                     Err(e) => (format!("Chemistry query: {}", e), None, 0.1),
                 }
             } else {
-                ("Chemistry query received but no formula extracted".into(), None, 0.1)
+                (
+                    "Chemistry query received but no formula extracted".into(),
+                    None,
+                    0.1,
+                )
             }
         };
 
         self.record_solve(MathProblemType::Chemistry, phi);
 
-        let encoding = BinaryHV::random(seed_from_name(&format!("CHEM_{}", formula.as_deref().unwrap_or("unknown"))));
+        let encoding = BinaryHV::random(seed_from_name(&format!(
+            "CHEM_{}",
+            formula.as_deref().unwrap_or("unknown")
+        )));
 
         let response = MathResponse {
             answer,
@@ -1365,7 +1396,11 @@ impl MathService {
 
         let (answer, phi) = if let Some(script) = &result {
             (
-                format!("Proof found ({} steps):\n{}", script.len(), script.join("\n")),
+                format!(
+                    "Proof found ({} steps):\n{}",
+                    script.len(),
+                    script.join("\n")
+                ),
                 0.8 + 0.01 * script.len().min(20) as f64,
             )
         } else {
@@ -1375,7 +1410,10 @@ impl MathService {
 
         self.record_solve(MathProblemType::Proof, phi);
 
-        let encoding = BinaryHV::random(seed_from_name(&format!("PROOF_{}", &conjecture[..conjecture.len().min(32)])));
+        let encoding = BinaryHV::random(seed_from_name(&format!(
+            "PROOF_{}",
+            &conjecture[..conjecture.len().min(32)]
+        )));
 
         let response = MathResponse {
             answer,
@@ -1745,9 +1783,14 @@ fn extract_formula(text: &str) -> Option<String> {
             continue;
         }
         // Check if it looks like a formula: uppercase + (lowercase|digit|parentheses)
-        let has_chem_pattern = clean.chars().skip(1).any(|c| c.is_ascii_lowercase() || c.is_ascii_digit());
+        let has_chem_pattern = clean
+            .chars()
+            .skip(1)
+            .any(|c| c.is_ascii_lowercase() || c.is_ascii_digit());
         let has_non_alpha = clean.chars().any(|c| c.is_ascii_digit());
-        let all_valid = clean.chars().all(|c| c.is_ascii_alphanumeric() || c == '(' || c == ')');
+        let all_valid = clean
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '(' || c == ')');
         if all_valid && (has_chem_pattern || has_non_alpha) {
             // Prefer longer formulas (more specific)
             if best.as_ref().map_or(true, |b| clean.len() > b.len()) {

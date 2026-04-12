@@ -13,7 +13,9 @@ use std::collections::HashMap;
 use std::time::{Duration, SystemTime};
 
 /// Assurance levels aligned with Epistemic Charter v2.0
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Default)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Default,
+)]
 pub enum AssuranceLevel {
     /// E0: Anonymous - Read-only access
     #[default]

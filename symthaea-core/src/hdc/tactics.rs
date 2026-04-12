@@ -374,9 +374,7 @@ impl Goal {
             return true;
         }
         // Check if conclusion appears directly in hypotheses
-        self.hypotheses
-            .iter()
-            .any(|(_, h)| h == &self.conclusion)
+        self.hypotheses.iter().any(|(_, h)| h == &self.conclusion)
     }
 
     /// True if hypotheses contain a direct contradiction (P and ¬P).
@@ -616,7 +614,11 @@ pub fn tactic_rw(goal: &Goal, eq_hyp: &str, direction: bool) -> TacticResult {
         None => TacticResult::Failed(format!("rw: hypothesis '{}' not found", eq_hyp)),
         Some((_, expr)) => match expr.clone() {
             Expr::Eq(lhs, rhs) => {
-                let (from, to) = if direction { (*lhs, *rhs) } else { (*rhs, *lhs) };
+                let (from, to) = if direction {
+                    (*lhs, *rhs)
+                } else {
+                    (*rhs, *lhs)
+                };
                 let new_concl = rewrite_in(&goal.conclusion, &from, &to);
                 if new_concl == goal.conclusion {
                     TacticResult::Failed(format!(
@@ -635,10 +637,7 @@ pub fn tactic_rw(goal: &Goal, eq_hyp: &str, direction: bool) -> TacticResult {
                     }
                 }
             }
-            _ => TacticResult::Failed(format!(
-                "rw: hypothesis '{}' is not an equation",
-                eq_hyp
-            )),
+            _ => TacticResult::Failed(format!("rw: hypothesis '{}' is not an equation", eq_hyp)),
         },
     }
 }
@@ -811,7 +810,9 @@ pub fn tactic_omega(goal: &Goal) -> TacticResult {
     let simplified2 = conc_with_env.simplify();
     match &simplified2 {
         Expr::Bool(true) => TacticResult::Closed,
-        Expr::Bool(false) => TacticResult::Failed("omega: conclusion is false under current bindings".to_string()),
+        Expr::Bool(false) => {
+            TacticResult::Failed("omega: conclusion is false under current bindings".to_string())
+        }
         Expr::Eq(a, b) => {
             if let (Some(av), Some(bv)) = (a.eval(&env), b.eval(&env)) {
                 if av == bv {
@@ -863,7 +864,9 @@ pub fn tactic_norm_num(goal: &Goal) -> TacticResult {
     let simplified = goal.conclusion.simplify();
     match &simplified {
         Expr::Bool(true) => return TacticResult::Closed,
-        Expr::Bool(false) => return TacticResult::Failed("norm_num: evaluates to false".to_string()),
+        Expr::Bool(false) => {
+            return TacticResult::Failed("norm_num: evaluates to false".to_string())
+        }
         Expr::Eq(a, b) => {
             if let (Some(av), Some(bv)) = (a.eval(&env), b.eval(&env)) {
                 return if av == bv {
@@ -961,7 +964,10 @@ pub fn tactic_induction(goal: &Goal, var: &str) -> TacticResult {
     let ind_hyp = body.clone(); // P(n)
     let ind_concl = body.substitute(
         var,
-        &Expr::Add(Box::new(Expr::Var(var.to_string())), Box::new(Expr::Const(1))),
+        &Expr::Add(
+            Box::new(Expr::Var(var.to_string())),
+            Box::new(Expr::Const(1)),
+        ),
     );
     let mut step_hyps = goal.hypotheses.clone();
     step_hyps.push((format!("ih_{}", var), ind_hyp));
@@ -1044,7 +1050,10 @@ impl TacticProver {
         // Try fast-path tactics first
         let fast_tactics: Vec<(&str, Box<dyn Fn(&Goal) -> TacticResult>)> = vec![
             ("assumption", Box::new(|g: &Goal| tactic_assumption(g))),
-            ("contradiction", Box::new(|g: &Goal| tactic_contradiction(g))),
+            (
+                "contradiction",
+                Box::new(|g: &Goal| tactic_contradiction(g)),
+            ),
             ("norm_num", Box::new(|g: &Goal| tactic_norm_num(g))),
             ("ring", Box::new(|g: &Goal| tactic_ring(g))),
             ("simp", Box::new(|g: &Goal| tactic_simp(g, &[]))),
@@ -1065,8 +1074,7 @@ impl TacticProver {
                     if new_goals.len() <= self.max_goals {
                         let mut new_trace = trace.clone();
                         new_trace.push(name.to_string());
-                        if let result @ Some(_) =
-                            self.prove_goals(new_goals, new_trace, depth + 1)
+                        if let result @ Some(_) = self.prove_goals(new_goals, new_trace, depth + 1)
                         {
                             return result;
                         }
@@ -1135,8 +1143,7 @@ impl TacticProver {
                     if new_goals.len() <= self.max_goals {
                         let mut new_trace = trace.clone();
                         new_trace.push(format!("cases {}", hyp_name));
-                        if let result @ Some(_) =
-                            self.prove_goals(new_goals, new_trace, depth + 1)
+                        if let result @ Some(_) = self.prove_goals(new_goals, new_trace, depth + 1)
                         {
                             return result;
                         }
@@ -1228,10 +1235,7 @@ mod tests {
         let y = || Box::new(Expr::Var("y".into()));
         let z = || Box::new(Expr::Var("z".into()));
         let lhs = Expr::Mul(x(), Box::new(Expr::Add(y(), z())));
-        let rhs = Expr::Add(
-            Box::new(Expr::Mul(x(), y())),
-            Box::new(Expr::Mul(x(), z())),
-        );
+        let rhs = Expr::Add(Box::new(Expr::Mul(x(), y())), Box::new(Expr::Mul(x(), z())));
         let goal = Goal::new(Expr::Eq(Box::new(lhs), Box::new(rhs)));
         assert!(matches!(tactic_ring(&goal), TacticResult::Closed));
     }
@@ -1239,7 +1243,10 @@ mod tests {
     #[test]
     fn test_norm_num_closes_2_plus_3_equals_5() {
         let goal = Goal::new(Expr::Eq(
-            Box::new(Expr::Add(Box::new(Expr::Const(2)), Box::new(Expr::Const(3)))),
+            Box::new(Expr::Add(
+                Box::new(Expr::Const(2)),
+                Box::new(Expr::Const(3)),
+            )),
             Box::new(Expr::Const(5)),
         ));
         assert!(matches!(tactic_norm_num(&goal), TacticResult::Closed));
@@ -1247,10 +1254,7 @@ mod tests {
 
     #[test]
     fn test_norm_num_fails_on_false_equality() {
-        let goal = Goal::new(Expr::Eq(
-            Box::new(Expr::Const(2)),
-            Box::new(Expr::Const(3)),
-        ));
+        let goal = Goal::new(Expr::Eq(Box::new(Expr::Const(2)), Box::new(Expr::Const(3))));
         assert!(matches!(tactic_norm_num(&goal), TacticResult::Failed(_)));
     }
 
@@ -1286,8 +1290,14 @@ mod tests {
             TacticResult::Subgoals(subs) => {
                 assert_eq!(subs.len(), 1);
                 // Should have both A and B as hypotheses
-                assert!(subs[0].hypotheses.iter().any(|(_, e)| e == &Expr::Var("A".into())));
-                assert!(subs[0].hypotheses.iter().any(|(_, e)| e == &Expr::Var("B".into())));
+                assert!(subs[0]
+                    .hypotheses
+                    .iter()
+                    .any(|(_, e)| e == &Expr::Var("A".into())));
+                assert!(subs[0]
+                    .hypotheses
+                    .iter()
+                    .any(|(_, e)| e == &Expr::Var("B".into())));
             }
             other => panic!("Expected Subgoals, got {:?}", other),
         }
@@ -1307,10 +1317,13 @@ mod tests {
             .with_hyp("h2", Expr::Var("P".into()));
         let prover = TacticProver::new(5);
         // Manual: apply h1, then assumption on P
-        let result = tactic_apply(&goal, &Expr::Implies(
-            Box::new(Expr::Var("P".into())),
-            Box::new(Expr::Var("Q".into())),
-        ));
+        let result = tactic_apply(
+            &goal,
+            &Expr::Implies(
+                Box::new(Expr::Var("P".into())),
+                Box::new(Expr::Var("Q".into())),
+            ),
+        );
         // Should produce a subgoal ⊢ P
         match result {
             TacticResult::Subgoals(subs) => {
@@ -1352,10 +1365,7 @@ mod tests {
     #[test]
     fn test_induction_produces_base_and_step() {
         // ∀n. P(n) → base ⊢ P(0) and {ih: P(n)} ⊢ P(n+1)
-        let goal = Goal::new(Expr::ForAll(
-            "n".into(),
-            Box::new(Expr::Var("P_n".into())),
-        ));
+        let goal = Goal::new(Expr::ForAll("n".into(), Box::new(Expr::Var("P_n".into()))));
         match tactic_induction(&goal, "n") {
             TacticResult::Subgoals(subs) => {
                 assert_eq!(subs.len(), 2, "Induction produces base + step");
@@ -1374,13 +1384,19 @@ mod tests {
         assert_eq!(e.simplify(), Expr::Var("x".into()));
 
         // x - x = 0
-        let e = Expr::Sub(Box::new(Expr::Var("x".into())), Box::new(Expr::Var("x".into())));
+        let e = Expr::Sub(
+            Box::new(Expr::Var("x".into())),
+            Box::new(Expr::Var("x".into())),
+        );
         assert_eq!(e.simplify(), Expr::Const(0));
     }
 
     #[test]
     fn test_expr_free_vars() {
-        let e = Expr::Add(Box::new(Expr::Var("x".into())), Box::new(Expr::Var("y".into())));
+        let e = Expr::Add(
+            Box::new(Expr::Var("x".into())),
+            Box::new(Expr::Var("y".into())),
+        );
         let fv = e.free_vars();
         assert!(fv.contains(&"x".to_string()));
         assert!(fv.contains(&"y".to_string()));

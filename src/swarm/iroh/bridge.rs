@@ -337,18 +337,16 @@ impl IrohBridgeActor {
                         let attestation_ok = {
                             let mgr = attestation.read();
                             match mgr.attest(&cv) {
-                                Ok(_attested) => {
-                                    match bincode::serialize(&_attested) {
-                                        Ok(_b) => true,
-                                        Err(e) => {
-                                            tracing::warn!(
-                                                peer = peer_id,
-                                                "Failed to serialize attested CV: {e}"
-                                            );
-                                            false
-                                        }
+                                Ok(_attested) => match bincode::serialize(&_attested) {
+                                    Ok(_b) => true,
+                                    Err(e) => {
+                                        tracing::warn!(
+                                            peer = peer_id,
+                                            "Failed to serialize attested CV: {e}"
+                                        );
+                                        false
                                     }
-                                }
+                                },
                                 Err(e) => {
                                     tracing::warn!("Failed to attest CV: {e}");
                                     true // still send unsigned

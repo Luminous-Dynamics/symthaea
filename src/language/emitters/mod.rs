@@ -297,7 +297,8 @@ fn infer_rust_body(
     if purpose_lower.contains("divide") || purpose_lower.contains("quotient") {
         if params.len() == 2 {
             // Safe divide: return Result with zero-check
-            if purpose_lower.contains("safe") || purpose_lower.contains("zero")
+            if purpose_lower.contains("safe")
+                || purpose_lower.contains("zero")
                 || ret.contains("Result")
             {
                 return format!(
@@ -975,15 +976,23 @@ fn infer_rust_body(
     // Count matching (with target param)
     if purpose_lower.contains("count") && purpose_lower.contains("match") {
         if params.len() == 2 && is_collection(&params[0].1) {
-            return format!("{}.iter().filter(|&&x| x == {}).count()", params[0].0, params[1].0);
+            return format!(
+                "{}.iter().filter(|&&x| x == {}).count()",
+                params[0].0, params[1].0
+            );
         }
     }
     // Count occurrences / how many times
     if purpose_lower.contains("count")
-        && (purpose_lower.contains("occur") || purpose_lower.contains("times") || purpose_lower.contains("appear"))
+        && (purpose_lower.contains("occur")
+            || purpose_lower.contains("times")
+            || purpose_lower.contains("appear"))
     {
         if params.len() == 2 && is_collection(&params[0].1) {
-            return format!("{}.iter().filter(|&&x| x == {}).count()", params[0].0, params[1].0);
+            return format!(
+                "{}.iter().filter(|&&x| x == {}).count()",
+                params[0].0, params[1].0
+            );
         }
     }
     // Last element
@@ -1018,7 +1027,9 @@ fn infer_rust_body(
     }
     // Group by sign (positive/negative)
     if purpose_lower.contains("group")
-        && (purpose_lower.contains("sign") || purpose_lower.contains("positive") || purpose_lower.contains("negative"))
+        && (purpose_lower.contains("sign")
+            || purpose_lower.contains("positive")
+            || purpose_lower.contains("negative"))
     {
         if params.len() == 1 && is_collection(&params[0].1) {
             return format!(
@@ -1106,7 +1117,9 @@ fn infer_rust_body(
         }
     }
     // First or error
-    if purpose_lower.contains("first") && (purpose_lower.contains("error") || ret.contains("Result")) {
+    if purpose_lower.contains("first")
+        && (purpose_lower.contains("error") || ret.contains("Result"))
+    {
         if params.len() == 1 && is_collection(&params[0].1) {
             return format!(
                 "{}.first().copied().ok_or_else(|| \"empty collection\".to_string())",
@@ -1141,7 +1154,10 @@ fn infer_rust_body(
     // Split into words (Vec<String>)
     if purpose_lower.contains("split") && purpose_lower.contains("word") {
         if params.len() == 1 {
-            return format!("{}.split_whitespace().map(|s| s.to_string()).collect()", params[0].0);
+            return format!(
+                "{}.split_whitespace().map(|s| s.to_string()).collect()",
+                params[0].0
+            );
         }
     }
     // Char at index
@@ -1238,7 +1254,9 @@ fn infer_rust_body(
         }
     }
     // ETL (Extract-Transform-Load): transform scrabble scores from old to new format
-    if purpose_lower.contains("transform") && (purpose_lower.contains("format") || purpose_lower.contains("etl")) {
+    if purpose_lower.contains("transform")
+        && (purpose_lower.contains("format") || purpose_lower.contains("etl"))
+    {
         if params.len() == 1 && params[0].1.contains("HashMap") {
             return format!(
                 "let mut result = std::collections::BTreeMap::new();\n    \
@@ -1258,9 +1276,13 @@ fn infer_rust_body(
         }
     }
     // Eliud's eggs / count set bits / popcount / count 1 bits
-    if purpose_lower.contains("egg") || purpose_lower.contains("popcount")
-        || purpose_lower.contains("set bit") || purpose_lower.contains("1 bit")
-        || (purpose_lower.contains("count") && purpose_lower.contains("bit") && purpose_lower.contains("binary"))
+    if purpose_lower.contains("egg")
+        || purpose_lower.contains("popcount")
+        || purpose_lower.contains("set bit")
+        || purpose_lower.contains("1 bit")
+        || (purpose_lower.contains("count")
+            && purpose_lower.contains("bit")
+            && purpose_lower.contains("binary"))
     {
         if params.len() == 1 {
             return format!(
@@ -1307,7 +1329,9 @@ fn infer_rust_body(
         }
     }
     // Isogram (no repeating letters)
-    if purpose_lower.contains("isogram") || (purpose_lower.contains("repeating") && purpose_lower.contains("letter")) {
+    if purpose_lower.contains("isogram")
+        || (purpose_lower.contains("repeating") && purpose_lower.contains("letter"))
+    {
         if params.len() == 1 {
             return format!(
                 "let mut seen = std::collections::HashSet::new();\n    {}.to_lowercase().chars().filter(|c| c.is_alphabetic()).all(|c| seen.insert(c))",
@@ -1334,7 +1358,8 @@ fn infer_rust_body(
         }
     }
     // Square of sum (but NOT "difference between square of sum and sum of squares")
-    if purpose_lower.contains("square of") && purpose_lower.contains("sum")
+    if purpose_lower.contains("square of")
+        && purpose_lower.contains("sum")
         && !purpose_lower.contains("difference")
     {
         if params.len() == 1 {
@@ -1348,7 +1373,10 @@ fn infer_rust_body(
         }
     }
     // Difference (between square of sum and sum of squares)
-    if purpose_lower.contains("difference") && purpose_lower.contains("square") && purpose_lower.contains("sum") {
+    if purpose_lower.contains("difference")
+        && purpose_lower.contains("square")
+        && purpose_lower.contains("sum")
+    {
         if params.len() == 1 {
             return format!(
                 "let s: u32 = (1..={0}).sum();\n    let sq_sum = s * s;\n    let sum_sq: u32 = (1..={0}).map(|i| i * i).sum();\n    sq_sum - sum_sq",
@@ -1357,7 +1385,9 @@ fn infer_rust_body(
         }
     }
     // Bob (reply to messages)
-    if purpose_lower.contains("bob") && (purpose_lower.contains("reply") || purpose_lower.contains("respond")) {
+    if purpose_lower.contains("bob")
+        && (purpose_lower.contains("reply") || purpose_lower.contains("respond"))
+    {
         if params.len() == 1 {
             return format!(
                 "let trimmed = {0}.trim();\n    let is_question = trimmed.ends_with('?');\n    let is_yelling = trimmed.chars().any(|c| c.is_alphabetic()) && trimmed.chars().filter(|c| c.is_alphabetic()).all(|c| c.is_uppercase());\n    match (is_question, is_yelling, trimmed.is_empty()) {{\n        (_, _, true) => \"Fine. Be that way!\",\n        (true, true, _) => \"Calm down, I know what I'm doing!\",\n        (true, _, _) => \"Sure.\",\n        (_, true, _) => \"Whoa, chill out!\",\n        _ => \"Whatever.\",\n    }}",
@@ -1366,7 +1396,10 @@ fn infer_rust_body(
         }
     }
     // Two-fer
-    if purpose_lower.contains("one for") || purpose_lower.contains("two-fer") || purpose_lower.contains("twofer") {
+    if purpose_lower.contains("one for")
+        || purpose_lower.contains("two-fer")
+        || purpose_lower.contains("twofer")
+    {
         if params.len() == 1 {
             let p = &params[0].0;
             return format!(
@@ -2057,12 +2090,206 @@ fn infer_from_examples(
         return None;
     }
 
-    // Check if all examples show the same simple pattern
-    // e.g., ("add(1, 2)", "3"), ("add(3, 4)", "7") → a + b
-    // This is a heuristic; for complex patterns we fall through to purpose matching
+    // Extract numeric input→output pairs for arithmetic inference
+    let numeric_pairs: Vec<(Vec<i64>, i64)> = examples
+        .iter()
+        .filter_map(|(input, output)| {
+            // Parse input args: "func(1, 2)" → [1, 2]
+            let args_str = input.split('(').nth(1)?.split(')').next()?;
+            let args: Vec<i64> = args_str
+                .split(',')
+                .filter_map(|s| s.trim().parse().ok())
+                .collect();
+            let out: i64 = output.trim().parse().ok()?;
+            if args.is_empty() {
+                None
+            } else {
+                Some((args, out))
+            }
+        })
+        .collect();
 
-    // For now, if we have examples but can't infer, return None
-    // The examples will still be used in test generation
+    // Try arithmetic inference with 2+ numeric pairs
+    if numeric_pairs.len() >= 2 && params.len() == 2 {
+        let p0 = &params[0].0;
+        let p1 = &params[1].0;
+
+        // Check: a + b
+        if numeric_pairs
+            .iter()
+            .all(|(args, out)| args.len() >= 2 && args[0] + args[1] == *out)
+        {
+            return Some(format!("{} + {}", p0, p1));
+        }
+        // Check: a - b
+        if numeric_pairs
+            .iter()
+            .all(|(args, out)| args.len() >= 2 && args[0] - args[1] == *out)
+        {
+            return Some(format!("{} - {}", p0, p1));
+        }
+        // Check: a * b
+        if numeric_pairs
+            .iter()
+            .all(|(args, out)| args.len() >= 2 && args[0] * args[1] == *out)
+        {
+            return Some(format!("{} * {}", p0, p1));
+        }
+        // Check: a / b (integer division)
+        if numeric_pairs
+            .iter()
+            .all(|(args, out)| args.len() >= 2 && args[1] != 0 && args[0] / args[1] == *out)
+        {
+            return Some(format!("{} / {}", p0, p1));
+        }
+        // Check: max(a, b)
+        if numeric_pairs
+            .iter()
+            .all(|(args, out)| args.len() >= 2 && args[0].max(args[1]) == *out)
+        {
+            return Some(format!("if {} > {} {{ {} }} else {{ {} }}", p0, p1, p0, p1));
+        }
+        // Check: min(a, b)
+        if numeric_pairs
+            .iter()
+            .all(|(args, out)| args.len() >= 2 && args[0].min(args[1]) == *out)
+        {
+            return Some(format!("if {} < {} {{ {} }} else {{ {} }}", p0, p1, p0, p1));
+        }
+    }
+
+    // Single-param numeric patterns
+    if numeric_pairs.len() >= 2 && params.len() == 1 {
+        let p0 = &params[0].0;
+
+        // Check: abs
+        if numeric_pairs
+            .iter()
+            .all(|(args, out)| !args.is_empty() && args[0].abs() == *out)
+        {
+            return Some(format!("{}.abs()", p0));
+        }
+        // Check: negate
+        if numeric_pairs
+            .iter()
+            .all(|(args, out)| !args.is_empty() && -args[0] == *out)
+        {
+            return Some(format!("-{}", p0));
+        }
+        // Check: square
+        if numeric_pairs
+            .iter()
+            .all(|(args, out)| !args.is_empty() && args[0] * args[0] == *out)
+        {
+            return Some(format!("{} * {}", p0, p0));
+        }
+        // Check: double
+        if numeric_pairs
+            .iter()
+            .all(|(args, out)| !args.is_empty() && args[0] * 2 == *out)
+        {
+            return Some(format!("{} * 2", p0));
+        }
+        // Check: factorial (limited range)
+        let factorials: Vec<i64> = vec![1, 1, 2, 6, 24, 120, 720, 5040];
+        if numeric_pairs.iter().all(|(args, out)| {
+            !args.is_empty()
+                && args[0] >= 0
+                && (args[0] as usize) < factorials.len()
+                && factorials[args[0] as usize] == *out
+        }) {
+            return Some(format!("(1..={}).product()", p0));
+        }
+    }
+
+    // Boolean inference: extract true/false examples
+    let bool_pairs: Vec<(String, bool)> = examples
+        .iter()
+        .filter_map(|(input, output)| {
+            let val = match output.trim() {
+                "true" => true,
+                "false" => false,
+                _ => return None,
+            };
+            // Extract the argument portion
+            let args_str = input
+                .split('(')
+                .nth(1)?
+                .split(')')
+                .next()?
+                .trim()
+                .to_string();
+            Some((args_str, val))
+        })
+        .collect();
+
+    if bool_pairs.len() >= 2 && params.len() == 1 {
+        let p0 = &params[0].0;
+
+        // Check even/odd pattern from numeric boolean pairs
+        let numeric_bools: Vec<(i64, bool)> = bool_pairs
+            .iter()
+            .filter_map(|(s, b)| s.parse::<i64>().ok().map(|n| (n, *b)))
+            .collect();
+
+        if numeric_bools.len() >= 2 {
+            // Even check
+            if numeric_bools.iter().all(|(n, b)| (n % 2 == 0) == *b) {
+                return Some(format!("{} % 2 == 0", p0));
+            }
+            // Odd check
+            if numeric_bools.iter().all(|(n, b)| (n % 2 != 0) == *b) {
+                return Some(format!("{} % 2 != 0", p0));
+            }
+            // Positive check
+            if numeric_bools.iter().all(|(n, b)| (*n > 0) == *b) {
+                return Some(format!("{} > 0", p0));
+            }
+            // Negative check
+            if numeric_bools.iter().all(|(n, b)| (*n < 0) == *b) {
+                return Some(format!("{} < 0", p0));
+            }
+        }
+    }
+
+    // String transformation inference
+    let string_pairs: Vec<(&str, &str)> = examples
+        .iter()
+        .filter_map(|(input, output)| {
+            let arg = input.split('(').nth(1)?.split(')').next()?.trim();
+            // Strip quotes
+            let arg = arg.trim_matches('"').trim_matches('\'');
+            let out = output.trim().trim_matches('"').trim_matches('\'');
+            // Skip if output has .to_string() or other method calls
+            let out = out.split('.').next().unwrap_or(out).trim_matches('"');
+            Some((arg, out))
+        })
+        .collect();
+
+    if string_pairs.len() >= 2 && params.len() == 1 {
+        let p0 = &params[0].0;
+
+        // Check: reverse
+        if string_pairs
+            .iter()
+            .all(|(i, o)| i.chars().rev().collect::<String>() == *o)
+        {
+            return Some(format!("{}.chars().rev().collect()", p0));
+        }
+        // Check: uppercase
+        if string_pairs.iter().all(|(i, o)| i.to_uppercase() == *o) {
+            return Some(format!("{}.to_uppercase()", p0));
+        }
+        // Check: lowercase
+        if string_pairs.iter().all(|(i, o)| i.to_lowercase() == *o) {
+            return Some(format!("{}.to_lowercase()", p0));
+        }
+        // Check: length
+        if string_pairs.iter().all(|(i, o)| i.len().to_string() == *o) {
+            return Some(format!("{}.len()", p0));
+        }
+    }
+
     None
 }
 

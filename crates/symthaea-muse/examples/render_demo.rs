@@ -92,7 +92,11 @@ fn main() {
     println!("Rendering Symthaea demo compositions...\n");
 
     for (name, state) in &states {
-        let cfg = if *name == "joyful" { &joyful_config } else { &config };
+        let cfg = if *name == "joyful" {
+            &joyful_config
+        } else {
+            &config
+        };
         let comp = compose(cfg, state, 42);
         let path = format!("{dir}/demo_{name}.wav");
         match write_wav(&path, &comp) {

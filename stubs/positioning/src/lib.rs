@@ -185,5 +185,7 @@ impl PeerFusion3D {
             self.add_peer(peer);
         }
     }
-    pub fn fused_estimate(&self) -> Option<GaussianEstimate3D> { self.fuse() }
+    pub fn fused_estimate(&self) -> Option<GaussianEstimate3D> {
+        self.fuse()
+    }
 }

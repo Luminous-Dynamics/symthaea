@@ -104,12 +104,7 @@ fn parse_exercise_functions(dir: &Path) -> Vec<ParsedFunction> {
 
             let name = if let Some(fn_start) = sig_line.find("fn ") {
                 let after_fn = &sig_line[fn_start + 3..];
-                after_fn
-                    .split('(')
-                    .next()
-                    .unwrap_or("")
-                    .trim()
-                    .to_string()
+                after_fn.split('(').next().unwrap_or("").trim().to_string()
             } else {
                 String::new()
             };
@@ -144,12 +139,100 @@ fn parse_exercise(dir: &Path) -> Option<(String, String, String)> {
     Some((first.name, first.purpose, first.signature))
 }
 
+/// Parse test files to extract (input, expected_output) example pairs.
+///
+/// Reads all .rs files in the exercise's tests/ directory and extracts
+/// assertions like `assert_eq!(func(args), expected)` into pairs.
+fn parse_test_examples(exercise_dir: &Path, fn_name: &str) -> Vec<(String, String)> {
+    let mut examples = Vec::new();
+    let tests_dir = exercise_dir.join("tests");
+
+    if !tests_dir.exists() {
+        return examples;
+    }
+
+    let entries = match std::fs::read_dir(&tests_dir) {
+        Ok(e) => e,
+        Err(_) => return examples,
+    };
+
+    for entry in entries.flatten() {
+        if !entry.path().extension().map_or(false, |e| e == "rs") {
+            continue;
+        }
+        let content = match std::fs::read_to_string(entry.path()) {
+            Ok(c) => c,
+            Err(_) => continue,
+        };
+
+        for line in content.lines() {
+            let trimmed = line.trim();
+
+            // Pattern: assert_eq!(func(args), expected)
+            if trimmed.starts_with("assert_eq!(") {
+                let inner = &trimmed[11..]; // skip "assert_eq!("
+                                            // Find the function call and expected value
+                if let Some(comma_pos) = find_balanced_comma(inner) {
+                    let call = inner[..comma_pos].trim();
+                    let expected = inner[comma_pos + 1..]
+                        .trim()
+                        .trim_end_matches(')')
+                        .trim_end_matches(';')
+                        .trim();
+                    if call.contains(fn_name) || call.contains("::") {
+                        examples.push((call.to_string(), expected.to_string()));
+                    }
+                }
+            }
+
+            // Pattern: assert!(func(args)) → boolean true
+            if trimmed.starts_with("assert!(") && !trimmed.starts_with("assert_eq") {
+                let inner = trimmed[8..].trim_end_matches(')').trim_end_matches(';');
+                if inner.starts_with('!') {
+                    // assert!(!func(args)) → false
+                    let call = inner[1..].trim();
+                    if call.contains(fn_name) || call.contains("::") {
+                        examples.push((call.to_string(), "false".to_string()));
+                    }
+                } else if inner.contains(fn_name) || inner.contains("::") {
+                    examples.push((inner.to_string(), "true".to_string()));
+                }
+            }
+        }
+    }
+
+    // Limit to 8 examples (more than enough for inference)
+    examples.truncate(8);
+    examples
+}
+
+/// Find the comma that separates func(args) from expected in assert_eq!
+/// Handles nested parentheses: assert_eq!(func(a, b), expected)
+fn find_balanced_comma(s: &str) -> Option<usize> {
+    let mut depth = 0;
+    for (i, c) in s.char_indices() {
+        match c {
+            '(' | '[' | '{' => depth += 1,
+            ')' | ']' | '}' => {
+                if depth == 0 {
+                    return None; // unbalanced
+                }
+                depth -= 1;
+            }
+            ',' if depth == 0 => return Some(i),
+            _ => {}
+        }
+    }
+    None
+}
+
 /// Generate implementation for an exercise
 fn generate_implementation(
     generator: &CodeGenerator,
     name: &str,
     purpose: &str,
     signature: &str,
+    examples: &[(String, String)],
 ) -> Option<String> {
     let spec = CodeSpec {
         language: "rust".into(),
@@ -158,7 +241,7 @@ fn generate_implementation(
         purpose_hv: None,
         signature: Some(signature.into()),
         constraints: Vec::new(),
-        examples: Vec::new(),
+        examples: examples.to_vec(),
         epistemic_status: EpistemicStatus::Certain,
         metadata: HashMap::new(),
     };
@@ -200,10 +283,7 @@ fn run_exercise_tests(exercise_dir: &Path, implementation: &str) -> ExerciseResu
         .unwrap_or_default();
 
     // Create a temp directory with a copy of the exercise
-    let temp_dir = std::env::temp_dir().join(format!(
-        "symthaea-exercism-{}",
-        exercise_name
-    ));
+    let temp_dir = std::env::temp_dir().join(format!("symthaea-exercism-{}", exercise_name));
     let _ = std::fs::remove_dir_all(&temp_dir);
 
     // Copy the exercise
@@ -403,17 +483,29 @@ fn main() {
             continue;
         }
 
+        // Parse test examples for this exercise (test-driven generation)
+        let first_fn_name = functions.first().map(|f| f.name.as_str()).unwrap_or("");
+        let test_examples = parse_test_examples(exercise_dir, first_fn_name);
+
         // Generate each function and combine
         let mut all_implementations = Vec::new();
         let mut any_generated = false;
         let mut method = "native".to_string();
 
         for func in &functions {
+            // Per-function examples: filter to this function's name
+            let fn_examples: Vec<(String, String)> = test_examples
+                .iter()
+                .filter(|(call, _)| call.contains(&func.name))
+                .cloned()
+                .collect();
+
             if let Some(impl_code) = generate_implementation(
                 &generator,
                 &func.name,
                 &func.purpose,
                 &func.signature,
+                &fn_examples,
             ) {
                 all_implementations.push(impl_code);
                 any_generated = true;
@@ -491,16 +583,51 @@ fn main() {
     println!("  Total exercises:  {}", total);
     println!("  Skipped:          {} (no signature or todo!())", skipped);
     println!("  Attempted:        {}", attempted);
-    println!("  Generated body:   {}/{} ({:.0}%)", generated, attempted,
-        if attempted > 0 { generated as f64 / attempted as f64 * 100.0 } else { 0.0 });
-    println!("  Compiled:         {}/{} ({:.0}%)", compiled, attempted,
-        if attempted > 0 { compiled as f64 / attempted as f64 * 100.0 } else { 0.0 });
-    println!("  All tests pass:   {}/{} ({:.0}%)", all_pass, attempted,
-        if attempted > 0 { all_pass as f64 / attempted as f64 * 100.0 } else { 0.0 });
-    println!("\n  pass@1 = {:.1}%", if attempted > 0 { all_pass as f64 / attempted as f64 * 100.0 } else { 0.0 });
+    println!(
+        "  Generated body:   {}/{} ({:.0}%)",
+        generated,
+        attempted,
+        if attempted > 0 {
+            generated as f64 / attempted as f64 * 100.0
+        } else {
+            0.0
+        }
+    );
+    println!(
+        "  Compiled:         {}/{} ({:.0}%)",
+        compiled,
+        attempted,
+        if attempted > 0 {
+            compiled as f64 / attempted as f64 * 100.0
+        } else {
+            0.0
+        }
+    );
+    println!(
+        "  All tests pass:   {}/{} ({:.0}%)",
+        all_pass,
+        attempted,
+        if attempted > 0 {
+            all_pass as f64 / attempted as f64 * 100.0
+        } else {
+            0.0
+        }
+    );
+    println!(
+        "\n  pass@1 = {:.1}%",
+        if attempted > 0 {
+            all_pass as f64 / attempted as f64 * 100.0
+        } else {
+            0.0
+        }
+    );
 
     // Category breakdown
-    let mut pass_names: Vec<&str> = results.iter().filter(|r| r.all_pass).map(|r| r.name.as_str()).collect();
+    let mut pass_names: Vec<&str> = results
+        .iter()
+        .filter(|r| r.all_pass)
+        .map(|r| r.name.as_str())
+        .collect();
     pass_names.sort();
     if !pass_names.is_empty() {
         println!("\n  Passed exercises:");

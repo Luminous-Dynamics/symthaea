@@ -31,8 +31,12 @@
 /// Elementary symmetric polynomial eₖ(x₁,…,xₙ) = Σ_{i₁ < … < iₖ} xᵢ₁ · … · xᵢₖ.
 pub fn elementary_symmetric(vars: &[f64], k: usize) -> f64 {
     let n = vars.len();
-    if k > n { return 0.0; }
-    if k == 0 { return 1.0; }
+    if k > n {
+        return 0.0;
+    }
+    if k == 0 {
+        return 1.0;
+    }
     // Iterate over k-subsets of {0..n-1}
     let mut total = 0.0;
     subset_sum(vars, k, 0, 1.0, &mut total);
@@ -45,7 +49,9 @@ fn subset_sum(vars: &[f64], remaining: usize, start: usize, current: f64, total:
         return;
     }
     let n = vars.len();
-    if start + remaining > n { return; }
+    if start + remaining > n {
+        return;
+    }
     for i in start..=(n - remaining) {
         subset_sum(vars, remaining - 1, i + 1, current * vars[i], total);
     }
@@ -53,9 +59,13 @@ fn subset_sum(vars: &[f64], remaining: usize, start: usize, current: f64, total:
 
 /// Complete homogeneous symmetric polynomial hₖ = Σ_{i₁ ≤ … ≤ iₖ} xᵢ₁ · … · xᵢₖ.
 pub fn complete_homogeneous(vars: &[f64], k: usize) -> f64 {
-    if k == 0 { return 1.0; }
+    if k == 0 {
+        return 1.0;
+    }
     let n = vars.len();
-    if n == 0 { return 0.0; }
+    if n == 0 {
+        return 0.0;
+    }
     // Dynamic programming: h[j] = h_j(x₁,...,xₙ)
     let mut h = vec![0.0; k + 1];
     h[0] = 1.0;
@@ -109,7 +119,10 @@ impl Partition {
         parts.retain(|&x| x > 0);
         // Verify non-increasing
         for i in 1..parts.len() {
-            assert!(parts[i] <= parts[i - 1], "partition parts must be non-increasing");
+            assert!(
+                parts[i] <= parts[i - 1],
+                "partition parts must be non-increasing"
+            );
         }
         Self { parts }
     }
@@ -133,14 +146,20 @@ impl Partition {
         let mut conj = Vec::with_capacity(max_part);
         for j in 1..=max_part {
             let count = self.parts.iter().filter(|&&p| p >= j).count();
-            if count > 0 { conj.push(count); }
+            if count > 0 {
+                conj.push(count);
+            }
         }
         Self { parts: conj }
     }
 
     /// Dominance partial order: λ ≥ μ if Σᵢ₌₁ᵏ λᵢ ≥ Σᵢ₌₁ᵏ μᵢ for all k.
     pub fn dominates(&self, other: &Self) -> bool {
-        assert_eq!(self.size(), other.size(), "dominance order requires equal size partitions");
+        assert_eq!(
+            self.size(),
+            other.size(),
+            "dominance order requires equal size partitions"
+        );
         let n = self.size();
         let mut sum_self = 0;
         let mut sum_other = 0;
@@ -179,7 +198,9 @@ pub fn schur_polynomial(partition: &Partition, vars: &[f64]) -> f64 {
 /// Jacobi-Trudi determinant: det(h_{λᵢ - i + j}).
 pub fn jacobi_trudi_h(partition: &Partition, vars: &[f64]) -> f64 {
     let l = partition.length();
-    if l == 0 { return 1.0; }
+    if l == 0 {
+        return 1.0;
+    }
     // Build the matrix M where M[i][j] = h_{λᵢ - i + j} (1-indexed → 0-indexed: i,j ∈ 0..l)
     let mut mat = vec![vec![0.0; l]; l];
     for i in 0..l {
@@ -200,15 +221,22 @@ pub fn jacobi_trudi_h(partition: &Partition, vars: &[f64]) -> f64 {
 /// Compute the determinant of an n×n matrix via Gaussian elimination.
 fn det_nxn(m: &[Vec<f64>]) -> f64 {
     let n = m.len();
-    if n == 0 { return 1.0; }
+    if n == 0 {
+        return 1.0;
+    }
     let mut a: Vec<Vec<f64>> = m.to_vec();
     let mut det = 1.0;
     for col in 0..n {
-        let pivot_row = (col..n)
-            .max_by(|&r1, &r2| a[r1][col].abs().partial_cmp(&a[r2][col].abs()).unwrap());
+        let pivot_row =
+            (col..n).max_by(|&r1, &r2| a[r1][col].abs().partial_cmp(&a[r2][col].abs()).unwrap());
         if let Some(pr) = pivot_row {
-            if a[pr][col].abs() < 1e-14 { return 0.0; }
-            if pr != col { a.swap(pr, col); det = -det; }
+            if a[pr][col].abs() < 1e-14 {
+                return 0.0;
+            }
+            if pr != col {
+                a.swap(pr, col);
+                det = -det;
+            }
         }
         det *= a[col][col];
         let piv = a[col][col];
@@ -249,7 +277,11 @@ impl YoungTableau {
     pub fn is_standard(&self) -> bool {
         let n: usize = self.entries.iter().map(|r| r.len()).sum();
         // Collect all entries
-        let mut all: Vec<usize> = self.entries.iter().flat_map(|r| r.iter().copied()).collect();
+        let mut all: Vec<usize> = self
+            .entries
+            .iter()
+            .flat_map(|r| r.iter().copied())
+            .collect();
         all.sort_unstable();
         if all != (1..=n).collect::<Vec<_>>() {
             return false;
@@ -257,7 +289,9 @@ impl YoungTableau {
         // Rows strictly increasing
         for row in &self.entries {
             for j in 1..row.len() {
-                if row[j] <= row[j - 1] { return false; }
+                if row[j] <= row[j - 1] {
+                    return false;
+                }
             }
         }
         // Columns strictly increasing
@@ -284,7 +318,9 @@ impl YoungTableau {
         }
         for row in &self.entries {
             for j in 1..row.len() {
-                if row[j] < row[j - 1] { return false; }
+                if row[j] < row[j - 1] {
+                    return false;
+                }
             }
         }
         let num_rows = self.entries.len();
@@ -302,7 +338,11 @@ impl YoungTableau {
 
     /// Reading word: read rows from bottom to top, left to right.
     pub fn reading_word(&self) -> Vec<usize> {
-        self.entries.iter().rev().flat_map(|r| r.iter().copied()).collect()
+        self.entries
+            .iter()
+            .rev()
+            .flat_map(|r| r.iter().copied())
+            .collect()
     }
 
     /// RSK row insertion of x into the tableau.
@@ -341,7 +381,12 @@ impl YoungTableau {
 ///             = (arm length) + (leg length) + 1
 fn hook_length(partition: &Partition, i: usize, j: usize) -> usize {
     let arm = partition.parts[i] - j - 1; // cells to the right in same row
-    let leg = partition.parts.iter().skip(i + 1).filter(|&&p| p > j).count();
+    let leg = partition
+        .parts
+        .iter()
+        .skip(i + 1)
+        .filter(|&&p| p > j)
+        .count();
     arm + leg + 1
 }
 
@@ -368,8 +413,14 @@ fn factorial(n: usize) -> usize {
 pub fn rsk_correspondence(permutation: &[usize]) -> (YoungTableau, YoungTableau) {
     let n = permutation.len();
     // Build P via row insertion
-    let mut p = YoungTableau { shape: Partition { parts: vec![] }, entries: vec![] };
-    let mut q = YoungTableau { shape: Partition { parts: vec![] }, entries: vec![] };
+    let mut p = YoungTableau {
+        shape: Partition { parts: vec![] },
+        entries: vec![],
+    };
+    let mut q = YoungTableau {
+        shape: Partition { parts: vec![] },
+        entries: vec![],
+    };
 
     for (step, &sigma_i) in permutation.iter().enumerate() {
         let label = step + 1; // recording label (1-indexed)
@@ -407,8 +458,22 @@ pub fn rsk_correspondence(permutation: &[usize]) -> (YoungTableau, YoungTableau)
     }
 
     // Rebuild shapes
-    let p_shape = Partition { parts: p.entries.iter().map(|r| r.len()).filter(|&l| l > 0).collect() };
-    let q_shape = Partition { parts: q.entries.iter().map(|r| r.len()).filter(|&l| l > 0).collect() };
+    let p_shape = Partition {
+        parts: p
+            .entries
+            .iter()
+            .map(|r| r.len())
+            .filter(|&l| l > 0)
+            .collect(),
+    };
+    let q_shape = Partition {
+        parts: q
+            .entries
+            .iter()
+            .map(|r| r.len())
+            .filter(|&l| l > 0)
+            .collect(),
+    };
     p.shape = p_shape;
     q.shape = q_shape;
 
@@ -426,19 +491,29 @@ pub fn rsk_correspondence(permutation: &[usize]) -> (YoungTableau, YoungTableau)
 /// Implemented for partitions with n ≤ 6.
 pub fn littlewood_richardson_coeff(mu: &Partition, nu: &Partition, lambda: &Partition) -> usize {
     // Validate: |μ| + |ν| = |λ|, λ ⊇ μ
-    if mu.size() + nu.size() != lambda.size() { return 0; }
-    if !contains(lambda, mu) { return 0; }
-    if lambda.size() > 6 { return 0; } // implementation limit
+    if mu.size() + nu.size() != lambda.size() {
+        return 0;
+    }
+    if !contains(lambda, mu) {
+        return 0;
+    }
+    if lambda.size() > 6 {
+        return 0;
+    } // implementation limit
 
     // Count SSYT of skew shape λ/μ with content ν (weight ν) whose reading word is a ballot sequence.
     let nu_content = nu.parts.clone();
     let max_entry = nu.length();
-    if max_entry == 0 { return if mu == lambda { 1 } else { 0 }; }
+    if max_entry == 0 {
+        return if mu == lambda { 1 } else { 0 };
+    }
 
     // Enumerate all fillings of the skew shape λ/μ with entries 1..=max_entry
     // such that the content equals ν and the tableau is semistandard.
     let skew_cells = skew_shape_cells(lambda, mu);
-    if skew_cells.is_empty() { return if nu.size() == 0 { 1 } else { 0 }; }
+    if skew_cells.is_empty() {
+        return if nu.size() == 0 { 1 } else { 0 };
+    }
 
     count_lr_tableaux(&skew_cells, &nu_content, max_entry, lambda)
 }
@@ -466,7 +541,11 @@ fn skew_shape_cells(lambda: &Partition, mu: &Partition) -> Vec<(usize, usize)> {
 }
 
 /// Reading word: bottom-to-top, left-to-right.
-fn reading_word_from_filling(cells: &[(usize, usize)], filling: &[usize], num_rows: usize) -> Vec<usize> {
+fn reading_word_from_filling(
+    cells: &[(usize, usize)],
+    filling: &[usize],
+    num_rows: usize,
+) -> Vec<usize> {
     // Build row groups
     let max_row = cells.iter().map(|&(r, _)| r).max().unwrap_or(0);
     let mut rows: Vec<Vec<(usize, usize)>> = vec![vec![]; max_row + 1];
@@ -489,10 +568,14 @@ fn reading_word_from_filling(cells: &[(usize, usize)], filling: &[usize], num_ro
 fn is_ballot_sequence(word: &[usize], max_entry: usize) -> bool {
     let mut counts = vec![0usize; max_entry + 1];
     for &x in word {
-        if x == 0 || x > max_entry { return false; }
+        if x == 0 || x > max_entry {
+            return false;
+        }
         counts[x] += 1;
         for k in 1..max_entry {
-            if counts[k] < counts[k + 1] { return false; }
+            if counts[k] < counts[k + 1] {
+                return false;
+            }
         }
     }
     true
@@ -514,7 +597,8 @@ fn count_lr_tableaux(
     let num_rows = lambda.parts.len();
 
     // Build index maps for quick lookup
-    let mut cell_to_idx: std::collections::HashMap<(usize, usize), usize> = std::collections::HashMap::new();
+    let mut cell_to_idx: std::collections::HashMap<(usize, usize), usize> =
+        std::collections::HashMap::new();
     for (idx, &cell) in cells.iter().enumerate() {
         cell_to_idx.insert(cell, idx);
     }
@@ -568,7 +652,9 @@ fn enumerate_filling(
         if col > 0 {
             // Left neighbor could be in μ (fixed) or in the skew
             if let Some(&left_idx) = cell_to_idx.get(&(row, col - 1)) {
-                if filling[left_idx] > entry { continue; }
+                if filling[left_idx] > entry {
+                    continue;
+                }
             }
             // If left neighbor is in μ (not a skew cell), the constraint is automatically satisfied
             // since μ cells are not filled (they are 0) — we treat them as boundary
@@ -576,12 +662,23 @@ fn enumerate_filling(
         // SSYT: columns strictly increase (top neighbor must be < entry)
         if row > 0 {
             if let Some(&top_idx) = cell_to_idx.get(&(row - 1, col)) {
-                if filling[top_idx] >= entry { continue; }
+                if filling[top_idx] >= entry {
+                    continue;
+                }
             }
         }
 
         filling[pos] = entry;
-        enumerate_filling(cells, cell_to_idx, filling, pos + 1, nu_content, max_entry, lambda, count);
+        enumerate_filling(
+            cells,
+            cell_to_idx,
+            filling,
+            pos + 1,
+            nu_content,
+            max_entry,
+            lambda,
+            count,
+        );
         filling[pos] = 0;
     }
 }
@@ -611,7 +708,12 @@ pub fn bruhat_order_s3() -> Vec<Vec<bool>> {
     // Covers: 0<1, 0<2, 1<3, 1<4, 2<3, 2<4, 3<5, 4<5
     // Let's compute transitive closure:
     let perms: Vec<[usize; 3]> = vec![
-        [1, 2, 3], [1, 3, 2], [2, 1, 3], [2, 3, 1], [3, 1, 2], [3, 2, 1],
+        [1, 2, 3],
+        [1, 3, 2],
+        [2, 1, 3],
+        [2, 3, 1],
+        [3, 1, 2],
+        [3, 2, 1],
     ];
     let n = 6;
     let mut order = vec![vec![false; n]; n];
@@ -647,9 +749,13 @@ pub fn kl_polynomial_s3(x_idx: usize, w_idx: usize) -> Vec<i32> {
     let order = bruhat_order_s3();
     assert!(x_idx < 6 && w_idx < 6);
     // P_{w,w} = 1
-    if x_idx == w_idx { return vec![1]; }
+    if x_idx == w_idx {
+        return vec![1];
+    }
     // P_{x,w} = 0 if x > w
-    if !order[x_idx][w_idx] { return vec![0]; }
+    if !order[x_idx][w_idx] {
+        return vec![0];
+    }
     // For S₃: all P_{x,w} = 1 when x < w (S₃ is too small for q-terms)
     vec![1]
 }
@@ -906,7 +1012,11 @@ mod tests {
         let order = bruhat_order_s3();
         // The longest element [3,2,1] (index 5) is above everything
         for x in 0..6 {
-            assert!(order[x][5], "longest element should be above everything (x={})", x);
+            assert!(
+                order[x][5],
+                "longest element should be above everything (x={})",
+                x
+            );
         }
     }
 }

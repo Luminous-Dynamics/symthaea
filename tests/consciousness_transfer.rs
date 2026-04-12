@@ -51,15 +51,23 @@ fn test_consciousness_survives_disembodiment() {
     }
 
     // All values must be finite
-    assert!(phi_embodied.iter().all(|p| p.is_finite()), "Embodied phase NaN");
-    assert!(phi_disembodied.iter().all(|p| p.is_finite()), "Disembodied phase NaN");
+    assert!(
+        phi_embodied.iter().all(|p| p.is_finite()),
+        "Embodied phase NaN"
+    );
+    assert!(
+        phi_disembodied.iter().all(|p| p.is_finite()),
+        "Disembodied phase NaN"
+    );
 
     // Consciousness should persist after losing body
     let mean_e: f64 = phi_embodied.iter().sum::<f64>() / phi_embodied.len() as f64;
     let mean_d: f64 = phi_disembodied.iter().sum::<f64>() / phi_disembodied.len() as f64;
     eprintln!(
         "TRANSFER: Embodied mean Phi={:.4}, Disembodied mean Phi={:.4}, Delta={:.4}",
-        mean_e, mean_d, mean_e - mean_d
+        mean_e,
+        mean_d,
+        mean_e - mean_d
     );
 }
 
@@ -74,7 +82,11 @@ fn test_consciousness_survives_reembodiment() {
     for _ in 0..30 {
         service.cycle("initial embodied state");
     }
-    let phi_before = service.cycle("checkpoint").metadata.consciousness.consciousness_level;
+    let phi_before = service
+        .cycle("checkpoint")
+        .metadata
+        .consciousness
+        .consciousness_level;
 
     // Phase 2: Disembody
     service.switch_embodiment(EmbodimentPlatform::None);
@@ -86,7 +98,13 @@ fn test_consciousness_survives_reembodiment() {
     service.switch_embodiment(EmbodimentPlatform::Humanoid);
     let mut phi_after = Vec::new();
     for _ in 0..50 {
-        phi_after.push(service.cycle("reembodied, recovering").metadata.consciousness.consciousness_level);
+        phi_after.push(
+            service
+                .cycle("reembodied, recovering")
+                .metadata
+                .consciousness
+                .consciousness_level,
+        );
     }
 
     let recovery_mean: f64 = phi_after[30..].iter().sum::<f64>() / 20.0;
@@ -95,7 +113,10 @@ fn test_consciousness_survives_reembodiment() {
         phi_before, recovery_mean
     );
 
-    assert!(phi_after.iter().all(|p| p.is_finite()), "Recovery phase NaN");
+    assert!(
+        phi_after.iter().all(|p| p.is_finite()),
+        "Recovery phase NaN"
+    );
 }
 
 /// Multi-platform consciousness landscape.
@@ -130,7 +151,8 @@ fn test_multi_platform_phi_landscape() {
         let mean: f64 = phi_values.iter().sum::<f64>() / phi_values.len() as f64;
         let min = phi_values.iter().cloned().fold(f64::INFINITY, f64::min);
         let max = phi_values.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
-        let variance: f64 = phi_values.iter().map(|p| (p - mean).powi(2)).sum::<f64>() / phi_values.len() as f64;
+        let variance: f64 =
+            phi_values.iter().map(|p| (p - mean).powi(2)).sum::<f64>() / phi_values.len() as f64;
 
         eprintln!(
             "PLATFORM {}: mean={:.4}, min={:.4}, max={:.4}, var={:.6}",
@@ -139,7 +161,11 @@ fn test_multi_platform_phi_landscape() {
 
         results.push((name.to_string(), mean, min, max, variance));
 
-        assert!(phi_values.iter().all(|p| p.is_finite()), "{} produced NaN", name);
+        assert!(
+            phi_values.iter().all(|p| p.is_finite()),
+            "{} produced NaN",
+            name
+        );
     }
 
     // At least 2 platforms should have different mean Phi

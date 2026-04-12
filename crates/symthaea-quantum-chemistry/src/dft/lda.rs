@@ -168,12 +168,7 @@ mod tests {
         let rho = 0.1;
         let ex = SlaterExchange::energy_density(rho).abs();
         let ec = VwnCorrelation::energy_density(rho).abs();
-        assert!(
-            ec < ex,
-            "|ε_c| = {:.6} should be < |ε_x| = {:.6}",
-            ec,
-            ex
-        );
+        assert!(ec < ex, "|ε_c| = {:.6} should be < |ε_x| = {:.6}", ec, ex);
     }
 
     #[test]

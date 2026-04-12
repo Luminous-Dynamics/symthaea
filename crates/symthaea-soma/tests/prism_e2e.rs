@@ -16,7 +16,10 @@ fn make_engine() -> SomaEngine {
 #[test]
 fn prism_init_loads_core_claims() {
     let mut engine = make_engine();
-    assert!(!engine.prism_available(), "should not be available before init");
+    assert!(
+        !engine.prism_available(),
+        "should not be available before init"
+    );
 
     engine.prism_init();
     assert!(engine.prism_available(), "should be available after init");
@@ -43,7 +46,9 @@ fn prism_search_returns_relevant_results() {
     let top = &results[0];
     let content_lower = top.content.to_lowercase();
     assert!(
-        content_lower.contains("ocean") || content_lower.contains("acidification") || content_lower.contains("co2"),
+        content_lower.contains("ocean")
+            || content_lower.contains("acidification")
+            || content_lower.contains("co2"),
         "top result should be about ocean acidification, got: {}",
         &top.content[..top.content.len().min(80)]
     );
@@ -63,10 +68,16 @@ fn prism_search_consciousness_domain() {
     // At least one result should mention consciousness-related terms
     let any_relevant = results.iter().any(|r| {
         let low = r.content.to_lowercase();
-        low.contains("conscious") || low.contains("phi") || low.contains("iit")
-            || low.contains("workspace") || low.contains("neural")
+        low.contains("conscious")
+            || low.contains("phi")
+            || low.contains("iit")
+            || low.contains("workspace")
+            || low.contains("neural")
     });
-    assert!(any_relevant, "at least one result should be about consciousness");
+    assert!(
+        any_relevant,
+        "at least one result should be about consciousness"
+    );
 }
 
 #[test]
@@ -78,7 +89,10 @@ fn prism_search_empty_query_returns_empty() {
     assert!(results.is_empty(), "empty query should return no results");
 
     let results = engine.prism_search("   ", 5);
-    assert!(results.is_empty(), "whitespace query should return no results");
+    assert!(
+        results.is_empty(),
+        "whitespace query should return no results"
+    );
 }
 
 #[test]

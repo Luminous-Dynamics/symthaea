@@ -71,10 +71,12 @@ pub fn hermite_coefficient(
                 let tt_i = tt as i32;
                 let mut val = xpb * get_e(&e, ii, jj - 1, tt, stride_i, stride_j, max_t);
                 if tt_i >= 1 {
-                    val += (1.0 / (2.0 * p)) * get_e(&e, ii, jj - 1, tt - 1, stride_i, stride_j, max_t);
+                    val += (1.0 / (2.0 * p))
+                        * get_e(&e, ii, jj - 1, tt - 1, stride_i, stride_j, max_t);
                 }
                 if tt + 1 < max_t {
-                    val += (tt_i + 1) as f64 * get_e(&e, ii, jj - 1, tt + 1, stride_i, stride_j, max_t);
+                    val += (tt_i + 1) as f64
+                        * get_e(&e, ii, jj - 1, tt + 1, stride_i, stride_j, max_t);
                 }
                 e[ii * stride_i + jj * stride_j + tt] = val;
             }
@@ -84,7 +86,15 @@ pub fn hermite_coefficient(
     e[i * stride_i + j * stride_j + t]
 }
 
-fn get_e(e: &[f64], i: usize, j: usize, t: usize, stride_i: usize, stride_j: usize, max_t: usize) -> f64 {
+fn get_e(
+    e: &[f64],
+    i: usize,
+    j: usize,
+    t: usize,
+    stride_i: usize,
+    stride_j: usize,
+    max_t: usize,
+) -> f64 {
     let idx = i * stride_i + j * stride_j + t;
     if t >= max_t || idx >= e.len() {
         return 0.0;
@@ -95,14 +105,7 @@ fn get_e(e: &[f64], i: usize, j: usize, t: usize, stride_i: usize, stride_j: usi
 /// Compute Hermite Coulomb integral coefficient R^n_{tuv} for nuclear/ERI integrals.
 ///
 /// Uses bottom-up tabulation with flat Vec to avoid stack overflow.
-pub fn hermite_coulomb(
-    t: i32,
-    u: i32,
-    v: i32,
-    n: u32,
-    p: f64,
-    rpc: [f64; 3],
-) -> f64 {
+pub fn hermite_coulomb(t: i32, u: i32, v: i32, n: u32, p: f64, rpc: [f64; 3]) -> f64 {
     if t < 0 || u < 0 || v < 0 {
         return 0.0;
     }
@@ -163,9 +166,11 @@ pub fn hermite_coulomb(
         for tt in 0..=t {
             for uu in 0..=u {
                 for m in 0..=(max_n - tt - uu - vv) {
-                    let mut val = rpc[2] * r[tt * stride_t + uu * stride_u + (vv - 1) * stride_v + m + 1];
+                    let mut val =
+                        rpc[2] * r[tt * stride_t + uu * stride_u + (vv - 1) * stride_v + m + 1];
                     if vv >= 2 {
-                        val += (vv - 1) as f64 * r[tt * stride_t + uu * stride_u + (vv - 2) * stride_v + m + 1];
+                        val += (vv - 1) as f64
+                            * r[tt * stride_t + uu * stride_u + (vv - 2) * stride_v + m + 1];
                     }
                     r[tt * stride_t + uu * stride_u + vv * stride_v + m] = val;
                 }

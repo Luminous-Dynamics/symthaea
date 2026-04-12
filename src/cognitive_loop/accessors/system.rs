@@ -481,13 +481,35 @@ impl CognitiveLoopService {
     }
 
     /// Whether a physical embodiment bridge is active.
-    #[cfg(any(feature = "humanoid", feature = "helicopter", feature = "flight", feature = "vehicle", feature = "auv", feature = "manipulator", feature = "exoskeleton", feature = "surgical", feature = "orbital", feature = "quadruped"))]
+    #[cfg(any(
+        feature = "humanoid",
+        feature = "helicopter",
+        feature = "flight",
+        feature = "vehicle",
+        feature = "auv",
+        feature = "manipulator",
+        feature = "exoskeleton",
+        feature = "surgical",
+        feature = "orbital",
+        feature = "quadruped"
+    ))]
     pub fn has_embodiment(&self) -> bool {
         self.sensorimotor.embodiment_bridge.is_some()
     }
 
     /// Get the current embodiment platform.
-    #[cfg(any(feature = "humanoid", feature = "helicopter", feature = "flight", feature = "vehicle", feature = "auv", feature = "manipulator", feature = "exoskeleton", feature = "surgical", feature = "orbital", feature = "quadruped"))]
+    #[cfg(any(
+        feature = "humanoid",
+        feature = "helicopter",
+        feature = "flight",
+        feature = "vehicle",
+        feature = "auv",
+        feature = "manipulator",
+        feature = "exoskeleton",
+        feature = "surgical",
+        feature = "orbital",
+        feature = "quadruped"
+    ))]
     pub fn embodiment_platform(&self) -> super::super::motor_bridge::EmbodimentPlatform {
         self.sensorimotor
             .embodiment_bridge
@@ -497,13 +519,35 @@ impl CognitiveLoopService {
     }
 
     /// Get the latest embodiment telemetry.
-    #[cfg(any(feature = "humanoid", feature = "helicopter", feature = "flight", feature = "vehicle", feature = "auv", feature = "manipulator", feature = "exoskeleton", feature = "surgical", feature = "orbital", feature = "quadruped"))]
+    #[cfg(any(
+        feature = "humanoid",
+        feature = "helicopter",
+        feature = "flight",
+        feature = "vehicle",
+        feature = "auv",
+        feature = "manipulator",
+        feature = "exoskeleton",
+        feature = "surgical",
+        feature = "orbital",
+        feature = "quadruped"
+    ))]
     pub fn embodiment_telemetry(&self) -> &super::super::motor_bridge::EmbodimentTelemetry {
         &self.sensorimotor.embodiment_telemetry
     }
 
     /// Get the last proprioceptive HV.
-    #[cfg(any(feature = "humanoid", feature = "helicopter", feature = "flight", feature = "vehicle", feature = "auv", feature = "manipulator", feature = "exoskeleton", feature = "surgical", feature = "orbital", feature = "quadruped"))]
+    #[cfg(any(
+        feature = "humanoid",
+        feature = "helicopter",
+        feature = "flight",
+        feature = "vehicle",
+        feature = "auv",
+        feature = "manipulator",
+        feature = "exoskeleton",
+        feature = "surgical",
+        feature = "orbital",
+        feature = "quadruped"
+    ))]
     pub fn last_proprioceptive_hv(&self) -> Option<&symthaea_core::hdc::ContinuousHV> {
         self.sensorimotor.last_proprioceptive_hv.as_ref()
     }
@@ -516,17 +560,22 @@ impl CognitiveLoopService {
     ///
     /// This enables Multiple Realizability experiments: does consciousness survive
     /// a body transfer? Does Phi adapt when the proprioceptive dimensionality changes?
-    #[cfg(any(feature = "humanoid", feature = "helicopter", feature = "flight", feature = "vehicle", feature = "auv", feature = "manipulator", feature = "exoskeleton", feature = "surgical", feature = "orbital", feature = "quadruped"))]
-    pub fn switch_embodiment(
-        &mut self,
-        platform: super::super::motor_bridge::EmbodimentPlatform,
-    ) {
+    #[cfg(any(
+        feature = "humanoid",
+        feature = "helicopter",
+        feature = "flight",
+        feature = "vehicle",
+        feature = "auv",
+        feature = "manipulator",
+        feature = "exoskeleton",
+        feature = "surgical",
+        feature = "orbital",
+        feature = "quadruped"
+    ))]
+    pub fn switch_embodiment(&mut self, platform: super::super::motor_bridge::EmbodimentPlatform) {
         use super::super::motor_bridge::EmbodimentPlatform;
         let genesis = symthaea_core::genesis::GenesisSeed::from_phrase(
-            self.config
-                .genesis_phrase
-                .as_deref()
-                .unwrap_or("default"),
+            self.config.genesis_phrase.as_deref().unwrap_or("default"),
         );
         let new_bridge: Option<Box<dyn super::super::motor_bridge::EmbodimentBridge>> =
             match platform {
@@ -537,25 +586,32 @@ impl CognitiveLoopService {
                 }
                 #[cfg(feature = "helicopter")]
                 EmbodimentPlatform::Helicopter => {
-                    let inner =
-                        crate::helicopter::embodiment::HelicopterEmbodiment::new(&genesis);
-                    Some(Box::new(super::super::constructor::HelicopterBridgeAdapter(inner)))
+                    let inner = crate::helicopter::embodiment::HelicopterEmbodiment::new(&genesis);
+                    Some(Box::new(
+                        super::super::constructor::HelicopterBridgeAdapter(inner),
+                    ))
                 }
                 #[cfg(feature = "flight")]
                 EmbodimentPlatform::Quadrotor => {
                     let inner = crate::flight::embodiment::FlightEmbodiment::new(&genesis);
-                    Some(Box::new(super::super::constructor::FlightBridgeAdapter(inner)))
+                    Some(Box::new(super::super::constructor::FlightBridgeAdapter(
+                        inner,
+                    )))
                 }
                 #[cfg(feature = "vehicle")]
                 EmbodimentPlatform::Vehicle => {
                     let inner = crate::vehicle::embodiment::VehicleEmbodiment::new(&genesis);
-                    Some(Box::new(super::super::constructor::VehicleBridgeAdapter(inner)))
+                    Some(Box::new(super::super::constructor::VehicleBridgeAdapter(
+                        inner,
+                    )))
                 }
                 #[cfg(feature = "manipulator")]
                 EmbodimentPlatform::Manipulator => {
                     let inner =
                         crate::manipulator::embodiment::ManipulatorEmbodiment::new(&genesis);
-                    Some(Box::new(super::super::constructor::ManipulatorBridgeAdapter(inner)))
+                    Some(Box::new(
+                        super::super::constructor::ManipulatorBridgeAdapter(inner),
+                    ))
                 }
                 #[cfg(feature = "auv")]
                 EmbodimentPlatform::Auv => {
@@ -563,21 +619,21 @@ impl CognitiveLoopService {
                     Some(Box::new(super::super::constructor::AuvBridgeAdapter(inner)))
                 }
                 #[cfg(feature = "exoskeleton")]
-                EmbodimentPlatform::Exoskeleton => {
-                    Some(Box::new(symthaea_exoskeleton::embodiment::ExoskeletonEmbodiment::new(&genesis)))
-                }
+                EmbodimentPlatform::Exoskeleton => Some(Box::new(
+                    symthaea_exoskeleton::embodiment::ExoskeletonEmbodiment::new(&genesis),
+                )),
                 #[cfg(feature = "surgical")]
-                EmbodimentPlatform::Surgical => {
-                    Some(Box::new(symthaea_surgical::embodiment::SurgicalEmbodiment::new(&genesis)))
-                }
+                EmbodimentPlatform::Surgical => Some(Box::new(
+                    symthaea_surgical::embodiment::SurgicalEmbodiment::new(&genesis),
+                )),
                 #[cfg(feature = "orbital")]
-                EmbodimentPlatform::Orbital => {
-                    Some(Box::new(symthaea_orbital::embodiment::OrbitalEmbodiment::new(&genesis)))
-                }
+                EmbodimentPlatform::Orbital => Some(Box::new(
+                    symthaea_orbital::embodiment::OrbitalEmbodiment::new(&genesis),
+                )),
                 #[cfg(feature = "quadruped")]
-                EmbodimentPlatform::Quadruped => {
-                    Some(Box::new(symthaea_quadruped::embodiment::QuadrupedEmbodiment::new(&genesis)))
-                }
+                EmbodimentPlatform::Quadruped => Some(Box::new(
+                    symthaea_quadruped::embodiment::QuadrupedEmbodiment::new(&genesis),
+                )),
                 _ => None,
             };
 
@@ -613,7 +669,9 @@ impl CognitiveLoopService {
 
     /// Get a mutable reference to the conjecture engine.
     #[cfg(feature = "mathematics")]
-    pub fn conjecture_engine_mut(&mut self) -> &mut symthaea_core::hdc::conjecture_engine::ConjectureEngine {
+    pub fn conjecture_engine_mut(
+        &mut self,
+    ) -> &mut symthaea_core::hdc::conjecture_engine::ConjectureEngine {
         &mut self.conjecture_engine
     }
 
