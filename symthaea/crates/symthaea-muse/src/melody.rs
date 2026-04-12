@@ -31,56 +31,87 @@ pub fn generate_melody(
 
     // Contour direction: valence influences ascending/descending tendency
     let ascend_bias = 0.5 + state.valence * 0.3; // positive valence → upward motion
-    let mut pitch_selector = 0.5f32; // start in middle of scale
+    let mut pitch_selector = 0.45f32; // start slightly below center
+
+    // Phrase contour: arc shape (rise → peak → fall) scaled by arousal.
+    // Calm music gets flatter contours; intense music gets dramatic arcs.
+    let phrase_len = config.max_notes.max(4);
+    let peak_position = 0.35 + (1.0 - state.arousal) * 0.25; // 0.35-0.60 through phrase
+    let contour_strength = 0.3 + state.arousal * 0.5; // 0.3-0.8: calm=subtle, intense=dramatic
+
+    // Base velocity from consciousness + dopamine
+    let base_velocity = (0.3 + state.consciousness_level * 0.3 + state.dopamine * 0.15).clamp(0.2, 0.85);
+    // Dynamic range: arousal widens velocity spread
+    let dynamic_range = 0.10 + state.arousal * 0.20;
 
     for i in 0..config.max_notes {
         if time >= max_time {
             break;
         }
 
+        // Phrase position [0, 1] — where are we in the melodic phrase?
+        let phrase_t = i as f32 / (phrase_len - 1).max(1) as f32;
+
+        // Phrase contour: parabolic arc peaking at peak_position.
+        // Strength scales with arousal: calm music stays flatter.
+        let contour = {
+            let dist = (phrase_t - peak_position).abs();
+            let width = peak_position.max(1.0 - peak_position);
+            (1.0 - (dist / width).powi(2)) * contour_strength
+        };
+
+        // Pitch influenced by contour arc — higher in the middle of the phrase
+        let contour_pitch = 0.45 + contour * 0.3; // 0.45-0.75, scaled by contour_strength
+
         // Select pitch from scale
         let freq = select_pitch(scale, pitch_selector.clamp(0.0, 1.0));
 
         // Duration with syncopation (random lengthening/shortening)
         let dur_factor = if rng.gen::<f32>() < syncopation {
-            // Syncopated: random duration variation
             0.5 + rng.gen::<f32>() * 1.5
         } else {
-            1.0 // straight
+            1.0
         };
         let duration = (base_note_dur * dur_factor).max(0.05);
 
-        // Velocity from consciousness + dopamine
-        let velocity =
-            (0.3 + state.consciousness_level * 0.4 + state.dopamine * 0.2).clamp(0.1, 1.0);
+        // Expressive velocity: follows phrase contour (louder at climax)
+        // Plus per-note humanization jitter
+        let vel_jitter = (rng.gen::<f32>() - 0.5) * 0.08; // ±4%
+        let velocity = (base_velocity + contour * dynamic_range + vel_jitter).clamp(0.15, 1.0);
 
-        // Rest probability: SacredStillness increases rests
-        let rest_prob = state.harmony_activations[7] * 0.4;
-        if rng.gen::<f32>() < rest_prob {
-            time += duration;
-            continue; // rest
+        // Rest probability: SacredStillness increases rests.
+        let rest_prob = (state.harmony_activations[7] * 0.4).min(0.25);
+        if notes.len() >= 4 && rng.gen::<f32>() < rest_prob {
+            let rest_steps = (duration / base_note_dur).round().max(1.0);
+            time += rest_steps * base_note_dur;
+            continue;
         }
+
+        // Quantize onset to subdivision grid
+        let grid_time = (time / base_note_dur).round() * base_note_dur;
+        let grid_steps = (duration / base_note_dur).round().max(1.0);
 
         notes.push(Note {
             frequency: freq,
-            start_time: time,
+            start_time: grid_time,
             duration,
             velocity,
         });
 
-        time += duration;
+        time = grid_time + grid_steps * base_note_dur;
 
-        // Update pitch selector for next note (contour)
-        let step = (rng.gen::<f32>() - (1.0 - ascend_bias)) * 0.2;
-        pitch_selector += step;
+        // Pitch contour: blend random walk with arc shape
+        let random_step = (rng.gen::<f32>() - (1.0 - ascend_bias)) * 0.18;
+        let arc_pull = (contour_pitch - pitch_selector) * 0.15 * contour_strength;
+        pitch_selector += random_step + arc_pull;
 
         // EvolutionaryProgression (harmony 6): tendency to ascend
         if state.harmony_activations[6] > 0.5 {
             pitch_selector += 0.02;
         }
 
-        // Gravity: slowly return to center
-        pitch_selector += (0.5 - pitch_selector) * 0.05;
+        // Gravity: return toward contour target, scaled by contour strength
+        pitch_selector += (contour_pitch - pitch_selector) * 0.05;
 
         let _ = i;
     }

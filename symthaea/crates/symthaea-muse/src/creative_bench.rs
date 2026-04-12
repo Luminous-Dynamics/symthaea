@@ -1378,6 +1378,7 @@ impl FadScore {
 
 #[cfg(test)]
 mod external_validation_tests {
+    #[allow(unused_imports)]
     use super::*;
     use crate::MuseConfig;
 
@@ -1473,5 +1474,89 @@ mod external_validation_tests {
                 fad_cross.fad, fad_self.fad,
             );
         }
+    }
+
+    #[test]
+    fn full_quality_benchmark() {
+        let config = MuseConfig { duration_secs: 4.0, max_notes: 16, ..Default::default() };
+
+        let scenarios: Vec<(&str, MusicalState)> = vec![
+            ("Joyful", MusicalState {
+                arousal: 0.7, valence: 0.6, dopamine: 0.7, serotonin: 0.6,
+                consciousness_level: 0.6, ..Default::default()
+            }),
+            ("Tense", MusicalState {
+                arousal: 0.8, valence: -0.5, dopamine: 0.4, noradrenaline: 0.7,
+                consciousness_level: 0.5, ..Default::default()
+            }),
+            ("Melancholy", MusicalState {
+                arousal: 0.2, valence: -0.3, serotonin: 0.3,
+                consciousness_level: 0.4, ..Default::default()
+            }),
+            ("Serene", MusicalState {
+                arousal: 0.3, valence: 0.4, serotonin: 0.7,
+                consciousness_level: 0.7, ..Default::default()
+            }),
+            ("Neutral", MusicalState::default()),
+        ];
+
+        let mut total_creative = 0.0f32;
+        let mut total_audio = 0.0f32;
+        let mut total_theory = 0.0f32;
+
+        eprintln!("\n══════════════════════════════════════════════════");
+        eprintln!("  Symthaea Music Quality Benchmark");
+        eprintln!("══════════════════════════════════════════════════");
+
+        for (name, state) in &scenarios {
+            let comp = crate::compose(&config, state, 42);
+            let va = ValenceArousal::new(state.valence, state.arousal);
+
+            let creative = CreativeQualityScore::evaluate(&comp, va);
+            let scale = crate::pitch::build_scale(state);
+            let theory = TheoryValidation::validate(&comp.notes, &scale);
+            let audio = match &comp.audio {
+                crate::AudioData::StereoF32(s) => AudioQualityScore::evaluate(s, comp.sample_rate),
+                crate::AudioData::F32(s) => AudioQualityScore::evaluate_mono(s, comp.sample_rate),
+                crate::AudioData::I16(s) => {
+                    let f: Vec<f32> = s.iter().map(|&v| v as f32 / 32768.0).collect();
+                    AudioQualityScore::evaluate_mono(&f, comp.sample_rate)
+                }
+            };
+
+            eprintln!("\n── {} ({} notes, {:.1}s) ──", name, comp.notes.len(), comp.duration_secs);
+            eprintln!("  Creative:  mel={:.3} rhy={:.3} emo={:.3} form={:.3} -> {:.3}",
+                creative.melodic_coherence, creative.rhythmic_regularity,
+                creative.emotional_alignment, creative.form_compliance, creative.composite);
+            eprintln!("  Audio:     rms={:.1}dB flat={:.3} dynVar={:.1}dB hnr={:.1}dB -> {:.3}",
+                audio.rms_db, audio.spectral_flatness,
+                audio.dynamic_range_variation_db, audio.harmonic_to_noise_db, audio.composite);
+            eprintln!("  Theory:    scale={:.0}% p5={:.0}% grid={:.0}% range={:.0}% contour={:.0}% -> {:.3}",
+                theory.scale_adherence * 100.0, theory.parallel_fifth_avoidance * 100.0,
+                theory.rhythmic_quantization * 100.0, theory.voice_range_compliance * 100.0,
+                theory.phrase_contour_quality * 100.0, theory.composite);
+
+            total_creative += creative.composite;
+            total_audio += audio.composite;
+            total_theory += theory.composite;
+        }
+
+        let n = scenarios.len() as f32;
+        let avg_creative = total_creative / n;
+        let avg_audio = total_audio / n;
+        let avg_theory = total_theory / n;
+        let overall = (avg_creative + avg_audio + avg_theory) / 3.0;
+
+        eprintln!("\n══════════════════════════════════════════════════");
+        eprintln!("  AVERAGES");
+        eprintln!("  Creative Quality: {:.3}", avg_creative);
+        eprintln!("  Audio Quality:    {:.3}", avg_audio);
+        eprintln!("  Theory Score:     {:.3}", avg_theory);
+        eprintln!("  Overall:          {:.3}", overall);
+        eprintln!("══════════════════════════════════════════════════\n");
+
+        // Baseline assertions: overall should be at least 0.3
+        assert!(overall > 0.2, "Overall quality {overall:.3} is below minimum");
+        assert!(avg_creative > 0.2, "Creative quality too low: {avg_creative:.3}");
     }
 }
