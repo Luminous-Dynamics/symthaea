@@ -113,6 +113,84 @@ pub fn grounding_label(level: u8) -> &'static str {
     }
 }
 
+// ── Grounding Estimator ──────────────────────────────────────────────
+
+/// Estimates epistemic grounding level from prediction error trends
+/// and optional peer interaction data.
+///
+/// - **Sensorimotor** (default): Raw proprioceptive data, no temporal model.
+/// - **Temporal**: Prediction errors are consistently decreasing and low — the
+///   platform has learned a temporal model of its body dynamics.
+/// - **Social**: Prediction incorporates multi-agent data (mesh swarm peers).
+#[derive(Debug, Clone)]
+pub struct GroundingEstimator {
+    /// Rolling window of prediction errors (most recent at end).
+    window: Vec<f32>,
+    /// Maximum window size.
+    capacity: usize,
+}
+
+impl GroundingEstimator {
+    /// Create with a 32-sample rolling window.
+    pub fn new() -> Self {
+        Self {
+            window: Vec::with_capacity(32),
+            capacity: 32,
+        }
+    }
+
+    /// Update with the latest prediction error and return the estimated grounding level.
+    ///
+    /// `peer_count`: number of mesh/swarm peers contributing to perception.
+    /// Pass `None` or `Some(0)` for platforms without social interaction.
+    pub fn estimate(&mut self, prediction_error: f32, peer_count: Option<usize>) -> u8 {
+        // Update rolling window
+        if self.window.len() >= self.capacity {
+            self.window.remove(0);
+        }
+        self.window.push(prediction_error);
+
+        // Social grounding: requires peers and a stable temporal model
+        if let Some(peers) = peer_count {
+            if peers > 0 && self.window.len() >= 16 {
+                let mean = self.window.iter().sum::<f32>() / self.window.len() as f32;
+                if mean < 0.3 {
+                    return GROUNDING_SOCIAL;
+                }
+            }
+        }
+
+        // Temporal grounding: full window, mean < 0.3, and trend is decreasing
+        if self.window.len() >= self.capacity {
+            let mean = self.window.iter().sum::<f32>() / self.window.len() as f32;
+            if mean < 0.3 {
+                // Check trend: compare first half mean to second half mean
+                let half = self.capacity / 2;
+                let first_half: f32 =
+                    self.window[..half].iter().sum::<f32>() / half as f32;
+                let second_half: f32 =
+                    self.window[half..].iter().sum::<f32>() / half as f32;
+                if second_half <= first_half {
+                    return GROUNDING_TEMPORAL;
+                }
+            }
+        }
+
+        GROUNDING_SENSORIMOTOR
+    }
+
+    /// Reset the estimator.
+    pub fn reset(&mut self) {
+        self.window.clear();
+    }
+}
+
+impl Default for GroundingEstimator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// Compute observation confidence from prediction error.
 ///
 /// Low prediction error implies high confidence in the observation.
@@ -408,5 +486,56 @@ mod tests {
         assert_eq!(grounding_label(GROUNDING_TEMPORAL), "Temporal");
         assert_eq!(grounding_label(GROUNDING_SOCIAL), "Social");
         assert_eq!(grounding_label(42), "Unknown");
+    }
+
+    #[test]
+    fn test_grounding_estimator_starts_sensorimotor() {
+        let mut est = GroundingEstimator::new();
+        // Not enough samples yet
+        assert_eq!(est.estimate(0.1, None), GROUNDING_SENSORIMOTOR);
+    }
+
+    #[test]
+    fn test_grounding_estimator_temporal_after_stable_predictions() {
+        let mut est = GroundingEstimator::new();
+        // Fill window with low, decreasing prediction errors
+        for i in 0..32 {
+            let pe = 0.2 - (i as f32 * 0.005); // decreasing from 0.2 to 0.045
+            est.estimate(pe, None);
+        }
+        let level = est.estimate(0.05, None);
+        assert_eq!(level, GROUNDING_TEMPORAL);
+    }
+
+    #[test]
+    fn test_grounding_estimator_social_with_peers() {
+        let mut est = GroundingEstimator::new();
+        // Fill 16+ samples with low PE and provide peers
+        for _ in 0..20 {
+            est.estimate(0.1, Some(3));
+        }
+        let level = est.estimate(0.1, Some(3));
+        assert_eq!(level, GROUNDING_SOCIAL);
+    }
+
+    #[test]
+    fn test_grounding_estimator_no_social_without_peers() {
+        let mut est = GroundingEstimator::new();
+        for _ in 0..20 {
+            est.estimate(0.1, None);
+        }
+        let level = est.estimate(0.1, None);
+        // Without peers, should be temporal at best (if window is full)
+        assert_ne!(level, GROUNDING_SOCIAL);
+    }
+
+    #[test]
+    fn test_grounding_estimator_reset() {
+        let mut est = GroundingEstimator::new();
+        for _ in 0..32 {
+            est.estimate(0.1, None);
+        }
+        est.reset();
+        assert_eq!(est.estimate(0.5, None), GROUNDING_SENSORIMOTOR);
     }
 }
