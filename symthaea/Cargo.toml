@@ -336,6 +336,7 @@ symthaea-jepa = { path = "crates/symthaea-jepa", optional = true }
 symthaea-materials = { path = "crates/symthaea-materials", optional = true }
 symthaea-nuclear = { path = "crates/symthaea-nuclear", optional = true }
 symthaea-nuclear-forensics = { path = "crates/symthaea-nuclear-forensics", optional = true }
+symthaea-quantum-chemistry = { path = "crates/symthaea-quantum-chemistry", optional = true }
 symthaea-fabrication-kernel = { path = "crates/symthaea-fabrication-kernel", optional = true }
 
 # Symthaea Vision Manifold - Patch-based HDC video encoding with CfC temporal dynamics
@@ -710,6 +711,7 @@ safety-agents = []
 materials = ["dep:symthaea-materials", "safety-agents"]
 nuclear = ["dep:symthaea-nuclear", "safety-agents"]     # Computational nuclear structure: mass formula, shell model, island of stability
 nuclear-forensics = ["dep:symthaea-nuclear-forensics", "safety-agents"]
+quantum-consciousness = ["dep:symthaea-quantum-chemistry"]  # Ground consciousness in Schrödinger equation (10 theories × molecular wavefunction)
 water-prediction = ["cell-foundry", "safety-agents"]
 physics-bridge = ["physics", "dep:symthaea-physics-bridge"]  # HDC semantic physics bridge + guided design exploration
 analogy-engine = []   # Cross-domain analogy detection in cognitive loop (AnalogyEngine from symthaea-core)
@@ -1008,6 +1010,14 @@ required-features = ["code_generation"]
 
 [[example]]
 name = "benchmark_code_primitives"
+required-features = ["code_generation"]
+
+[[example]]
+name = "train_code_sequencer"
+required-features = ["code_generation"]
+
+[[example]]
+name = "run_code_benchmark"
 required-features = ["code_generation"]
 
 [[example]]

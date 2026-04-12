@@ -261,6 +261,22 @@ impl SubstrateManager {
         } else {
             self.effective_feasibility = self.feasibility;
         }
+
+        // Physics-grounded override: when quantum-consciousness feature is enabled,
+        // blend the ab initio multi-theory composite score into effective_feasibility.
+        // This grounds consciousness in the Schrödinger equation rather than heuristics.
+        // See symthaea-quantum-chemistry/cognitive_loop_bridge.rs for the mapping.
+        #[cfg(feature = "quantum-consciousness")]
+        {
+            let physics_score = symthaea_quantum_chemistry::cognitive_loop_bridge
+                ::substrate_feasibility_from_physics(
+                    &symthaea_quantum_chemistry::Molecule::water(), // Reference substrate
+                    310.0, // Body temperature in Kelvin
+                );
+            // Blend: 50% physics-derived, 50% validation-framework-derived
+            self.effective_feasibility =
+                0.5 * self.effective_feasibility + 0.5 * physics_score;
+        }
     }
 
     /// Recompute substrate speed/scale modulation factors.
