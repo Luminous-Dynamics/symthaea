@@ -94,11 +94,12 @@ fn render_kick(sr: f32, velocity: f32, color: &DrumColor) -> Vec<f32> {
     for i in 0..n {
         let t = i as f32 / sr;
 
-        // Two-stage envelope: attack click + body decay
+        // Two-stage envelope: attack click + body decay.
+        // FIX: removed overshoot (1.0 + 0.3*vel) that pushed envelope above 1.0
+        // causing distortion when summed with other voices.
         let env = if i < click_samples {
             let attack_t = i as f32 / click_samples as f32;
-            // Fast exponential rise with slight overshoot
-            (1.0 + 0.3 * vel) * (1.0 - (-attack_t * 8.0).exp())
+            1.0 - (-attack_t * 8.0).exp()
         } else {
             (-t * decay_rate).exp()
         };

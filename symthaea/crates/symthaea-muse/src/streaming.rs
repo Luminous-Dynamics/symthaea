@@ -255,6 +255,12 @@ pub struct StreamingSynth {
     timbre_manifold: crate::timbre_space::TimbreManifold,
     /// Cached manifold partials for current emotional state.
     manifold_partials: Vec<f32>,
+    /// Haas delay history buffers (4 voices × up to 353 samples).
+    /// Maintains continuity across chunk boundaries — fixes crackling
+    /// caused by reading sample[0] when delayed_i < delay.
+    haas_history: [Vec<f32>; 4],
+    /// Smoothed sub-bass volume — prevents amplitude jump when kick fires.
+    sub_bass_volume_smoothed: f32,
 }
 
 impl StreamingSynth {
@@ -330,6 +336,13 @@ impl StreamingSynth {
                 &symthaea_core::genesis::GenesisSeed::from_phrase("symthaea-muse-timbre"),
             ),
             manifold_partials: vec![1.0, 0.5, 0.25, 0.12, 0.06, 0.03, 0.015, 0.0],
+            haas_history: [
+                vec![0.0; 400],
+                vec![0.0; 400],
+                vec![0.0; 400],
+                vec![0.0; 400],
+            ],
+            sub_bass_volume_smoothed: 0.0,
         }
     }
 
@@ -507,6 +520,17 @@ impl StreamingSynth {
 
         // Select instrument from consciousness state (updated per chunk)
         let _current_instrument = instruments::select_instrument(&self.state);
+
+        // Density-aware attack noise: reduce when many voices active.
+        // High polyphony + full attack noise = crackling texture.
+        let active_count = self.active_notes.len() as f32;
+        let noise_density_factor = if active_count > 8.0 {
+            0.3
+        } else if active_count > 4.0 {
+            0.6
+        } else {
+            1.0
+        };
 
         for active in &mut self.active_notes {
             let voice = active.voice_idx.min(num_voices - 1);
@@ -710,12 +734,12 @@ impl StreamingSynth {
                 };
 
                 // Attack noise transient: adds realism to note onsets.
-                // Reduced at low arousal — peaceful notes should be soft and clean.
+                // Reduced at low arousal AND at high polyphony (many notes → crackling).
                 let attack_samples = (0.015 * sr) as usize;
                 let noise =
                     crate::dramatic::attack_noise(active.sample_pos, attack_samples, brightness)
-                        * noise_scale;
-                let sample = sample + noise + stochastic * noise_scale;
+                        * noise_scale * noise_density_factor;
+                let sample = sample + noise + stochastic * noise_scale * noise_density_factor;
 
                 // Gain staging: ensure all consciousness states are audible.
                 // Professional solo piano: -20 to -14 dBFS RMS.
@@ -747,21 +771,42 @@ impl StreamingSynth {
             self.binaural.render(&voice_buffers)
         } else {
             // Wide pan positions — lead slightly off-center for stereo interest
-            let pans = [0.15f32, -0.5, 0.6, -0.4]; // lead slightly right, bass left, harmony right, ostinato left
-                                                   // Haas delay in samples: 3-8ms per voice for wide spatial image
+            let pans = [0.15f32, -0.5, 0.6, -0.4]; // lead/bass/harmony/ostinato
             let haas_delays = [44usize, 265, 132, 353]; // 1ms, 6ms, 3ms, 8ms at 44.1kHz
             let mut buf = vec![[0.0f32; 2]; self.chunk_samples];
             for (v, voice_buf) in voice_buffers.iter().enumerate() {
                 let theta = (pans[v.min(3)] + 1.0) * std::f32::consts::FRAC_PI_4;
                 let (gl, gr) = (theta.cos(), theta.sin());
-                let delay = haas_delays[v.min(3)];
+                let delay = haas_delays[v.min(3)].min(399);
+                let v_idx = v.min(3);
+
                 for (i, &s) in voice_buf.iter().enumerate() {
                     buf[i][0] += s * gl;
-                    // Delay the right channel by Haas amount for spatial width
-                    let delayed_i = if i >= delay { i - delay } else { 0 };
-                    if delayed_i < voice_buf.len() {
-                        buf[i][1] += voice_buf[delayed_i] * gr;
-                    }
+                    // FIX: Haas delay reads from history buffer, preserving
+                    // continuity across chunk boundaries. Previous code read
+                    // sample[0] when i < delay, causing a click every chunk.
+                    let delayed_sample = if i >= delay {
+                        voice_buf[i - delay]
+                    } else {
+                        // Read from history (previous chunk tail)
+                        let hist_idx = self.haas_history[v_idx].len() + i - delay;
+                        self.haas_history[v_idx][hist_idx]
+                    };
+                    buf[i][1] += delayed_sample * gr;
+                }
+
+                // Update history: keep last `delay+1` samples of this chunk
+                let hist_len = self.haas_history[v_idx].len();
+                let voice_len = voice_buf.len();
+                if voice_len >= hist_len {
+                    // Take the tail of voice_buf
+                    let start = voice_len - hist_len;
+                    self.haas_history[v_idx].copy_from_slice(&voice_buf[start..]);
+                } else {
+                    // Shift old history, append new voice_buf
+                    self.haas_history[v_idx].rotate_left(voice_len);
+                    let tail_start = hist_len - voice_len;
+                    self.haas_history[v_idx][tail_start..].copy_from_slice(voice_buf);
                 }
             }
             buf
@@ -821,14 +866,21 @@ impl StreamingSynth {
         self.bar_sample_pos += self.chunk_samples;
 
         // ── Phase 3.6: Sub-bass (physical weight) ──
-        let kick_active = !self.drum_hits.is_empty(); // rough proxy
+        // FIX: smooth the sub-bass contribution across chunks to prevent
+        // amplitude jump when kick fires. 1-pole filter with ~10ms time constant.
+        let kick_active = !self.drum_hits.is_empty();
         let sub_bass =
             self.dramatic
                 .render_sub_bass(self.chunk_samples, self.sample_rate as f32, kick_active);
+        let target_gain = if kick_active { 1.0 } else { 0.7 };
+        let smoothing_alpha = 0.05;
         for (i, pair) in buffer.iter_mut().enumerate() {
+            self.sub_bass_volume_smoothed +=
+                smoothing_alpha * (target_gain - self.sub_bass_volume_smoothed);
             if i < sub_bass.len() {
-                pair[0] += sub_bass[i];
-                pair[1] += sub_bass[i];
+                let s = sub_bass[i] * self.sub_bass_volume_smoothed;
+                pair[0] += s;
+                pair[1] += s;
             }
         }
 
