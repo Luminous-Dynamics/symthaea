@@ -11,13 +11,13 @@ use crate::basis::{BasisSet, ContractedGaussian};
 use crate::constants::{MAX_SCF_ITERATIONS, SCF_DENSITY_THRESHOLD, SCF_ENERGY_THRESHOLD};
 use crate::dft::grid::{DftGrid, GridQuality};
 use crate::dft::lda::lda_exchange_correlation;
+use crate::integrals::eri::compute_eri_tensor;
 use crate::integrals::kinetic::kinetic_matrix;
 use crate::integrals::nuclear::nuclear_matrix;
 use crate::integrals::overlap::overlap_matrix;
 use crate::molecule::Molecule;
 use crate::scf::density::{build_density_matrix, density_rms_change};
 use crate::scf::diis::Diis;
-use crate::scf::fock::electronic_energy;
 use crate::scf::generalized_eigen::{canonical_orthogonalization, solve_generalized_eigen};
 
 /// Available exchange-correlation functionals.
@@ -67,6 +67,9 @@ pub struct DftResult {
 }
 
 /// Run a Kohn-Sham DFT calculation.
+///
+/// The KS Fock matrix is: F_KS = H_core + J + V_xc
+/// where J is the Coulomb operator (from ERIs) and V_xc replaces exact exchange.
 pub fn kohn_sham_dft(molecule: &Molecule, basis: &BasisSet, config: &DftConfig) -> DftResult {
     let n = basis.n_basis();
     let n_occ = molecule.n_occupied();
@@ -84,6 +87,9 @@ pub fn kohn_sham_dft(molecule: &Molecule, basis: &BasisSet, config: &DftConfig) 
     for i in 0..n * n {
         h_core[i] = t_mat[i] + v_mat[i];
     }
+
+    // Two-electron integrals (for Coulomb J)
+    let (eri, _, _) = compute_eri_tensor(&basis.functions);
 
     // Evaluate basis functions at grid points
     let basis_at_grid = evaluate_basis_on_grid(&basis.functions, &grid);
@@ -115,20 +121,29 @@ pub fn kohn_sham_dft(molecule: &Molecule, basis: &BasisSet, config: &DftConfig) 
         // Compute electron density at grid points
         let rho = compute_density_at_grid(&density, &basis_at_grid, n, grid.n_points());
 
-        // Compute XC energy and potential
-        let (e_xc, v_xc) = lda_exchange_correlation(&rho);
-        xc_energy = e_xc;
+        // Compute XC energy and potential on grid
+        // E_xc = Σ_g w_g × ε_xc(ρ_g) × ρ_g
+        let (e_xc_unweighted, v_xc) = lda_exchange_correlation(&rho);
+        // Weight the XC energy by grid weights
+        xc_energy = 0.0;
+        for (g, pt) in grid.points.iter().enumerate() {
+            let rho_g = rho[g];
+            if rho_g > 1e-20 {
+                xc_energy += pt.weight * crate::dft::lda::SlaterExchange::energy_per_point(rho_g)
+                    + pt.weight * crate::dft::lda::VwnCorrelation::energy_per_point(rho_g);
+            }
+        }
 
-        // Build KS Fock matrix: F_KS = H_core + V_xc (no exact exchange, no Coulomb J for now)
-        // For a proper DFT we'd add J (Coulomb) but skip K (exchange is in XC).
-        // Simplified: F = H_core + V_xc_matrix
-        // V_xc_μν = Σ_g w_g × v_xc(r_g) × φ_μ(r_g) × φ_ν(r_g)
-        let v_xc_matrix =
-            build_xc_matrix(&v_xc, &basis_at_grid, &grid, n);
+        // Build Coulomb matrix J_μν = Σ_λσ P_λσ (μν|λσ)
+        let j_matrix = build_coulomb_matrix(&density, &eri, n);
 
+        // Build XC potential matrix from grid
+        let v_xc_matrix = build_xc_matrix(&v_xc, &basis_at_grid, &grid, n);
+
+        // KS Fock matrix: F = H_core + J + V_xc (no exact exchange K)
         let mut fock = h_core.clone();
         for i in 0..n * n {
-            fock[i] += v_xc_matrix[i];
+            fock[i] += j_matrix[i] + v_xc_matrix[i];
         }
 
         // DIIS
@@ -136,11 +151,10 @@ pub fn kohn_sham_dft(molecule: &Molecule, basis: &BasisSet, config: &DftConfig) 
             fock = diis_engine.extrapolate(&fock, &density, &s_mat);
         }
 
-        // Electronic energy (simplified: E = Tr[P*H_core] + E_xc)
-        let e_one: f64 = (0..n * n)
-            .map(|i| density[i] * h_core[i])
-            .sum::<f64>();
-        let e_elec = e_one + xc_energy;
+        // Electronic energy: E = Tr[P*H_core] + ½Tr[P*J] + E_xc
+        let e_one: f64 = (0..n * n).map(|i| density[i] * h_core[i]).sum::<f64>();
+        let e_j: f64 = (0..n * n).map(|i| density[i] * j_matrix[i]).sum::<f64>();
+        let e_elec = e_one + 0.5 * e_j + xc_energy;
         let e_total = e_elec + v_nn;
 
         // Solve KS equations
@@ -162,11 +176,20 @@ pub fn kohn_sham_dft(molecule: &Molecule, basis: &BasisSet, config: &DftConfig) 
         }
     }
 
-    // Final energy
+    // Final energy with properly weighted XC
     let rho_final = compute_density_at_grid(&density, &basis_at_grid, n, grid.n_points());
-    let (e_xc_final, _) = lda_exchange_correlation(&rho_final);
+    let mut e_xc_final = 0.0;
+    for (g, pt) in grid.points.iter().enumerate() {
+        let rho_g = rho_final[g];
+        if rho_g > 1e-20 {
+            e_xc_final += pt.weight * crate::dft::lda::SlaterExchange::energy_per_point(rho_g)
+                + pt.weight * crate::dft::lda::VwnCorrelation::energy_per_point(rho_g);
+        }
+    }
+    let j_final = build_coulomb_matrix(&density, &eri, n);
     let e_one: f64 = (0..n * n).map(|i| density[i] * h_core[i]).sum::<f64>();
-    let e_elec = e_one + e_xc_final;
+    let e_j: f64 = (0..n * n).map(|i| density[i] * j_final[i]).sum::<f64>();
+    let e_elec = e_one + 0.5 * e_j + e_xc_final;
 
     DftResult {
         total_energy: e_elec + v_nn,
@@ -236,6 +259,28 @@ fn compute_density_at_grid(
     rho
 }
 
+/// Build the Coulomb matrix: J_μν = Σ_λσ P_λσ (μν|λσ)
+fn build_coulomb_matrix(density: &[f64], eri: &[f64], n: usize) -> Vec<f64> {
+    let n2 = n * n;
+    let n3 = n2 * n;
+    let mut j = vec![0.0; n * n];
+
+    for mu in 0..n {
+        for nu in mu..n {
+            let mut val = 0.0;
+            for lam in 0..n {
+                for sig in 0..n {
+                    val += density[lam * n + sig] * eri[mu * n3 + nu * n2 + lam * n + sig];
+                }
+            }
+            j[mu * n + nu] = val;
+            j[nu * n + mu] = val;
+        }
+    }
+
+    j
+}
+
 /// Build the XC potential matrix: V_xc_μν = Σ_g w_g × v_xc(r_g) × φ_μ(r_g) × φ_ν(r_g)
 fn build_xc_matrix(
     v_xc: &[f64],
@@ -288,11 +333,11 @@ mod tests {
         let result = kohn_sham_dft(&mol, &basis, &config);
 
         assert!(result.converged, "KS-DFT should converge for H2");
-        // Note: This is pure-XC DFT (no Coulomb J term), so energy is
-        // more negative than physical. The key test is convergence + XC contribution.
+        // With Coulomb J + XC, energy should be in a physical range
+        // LDA typically overbinds slightly vs HF
         assert!(
-            result.total_energy < 0.0,
-            "H2 DFT energy = {:.4}, should be negative",
+            result.total_energy < 0.0 && result.total_energy > -3.0,
+            "H2 DFT/LDA energy = {:.4}, expected in [-3, 0]",
             result.total_energy
         );
     }
@@ -309,9 +354,10 @@ mod tests {
         let result = kohn_sham_dft(&mol, &basis, &config);
 
         assert!(result.converged, "KS-DFT should converge for H2O");
+        // LDA/STO-3G water should be in [-80, -60] Hartree range
         assert!(
-            result.total_energy < 0.0,
-            "H2O DFT energy = {:.4}, should be negative",
+            result.total_energy < -50.0 && result.total_energy > -100.0,
+            "H2O DFT/LDA energy = {:.4}, expected in [-100, -50]",
             result.total_energy
         );
     }
