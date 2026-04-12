@@ -9,11 +9,15 @@
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
 
+use crate::emotional_gestures::{detect_emotion, gesture_for_emotion};
 use crate::pitch::select_pitch;
 use crate::rhythm::{select_subdivision, syncopation_level};
 use crate::{MuseConfig, MusicalState, Note};
 
 /// Generate a melody (sequence of notes) from cognitive state.
+///
+/// Uses the emotional gesture system to shape pitch direction, note duration,
+/// velocity, and articulation based on the detected emotional quality.
 pub fn generate_melody(
     config: &MuseConfig,
     state: &MusicalState,
@@ -29,23 +33,30 @@ pub fn generate_melody(
     let base_note_dur = beat_duration / subdivision as f32;
     let syncopation = syncopation_level(state);
 
-    // Contour direction: valence influences ascending/descending tendency
-    let ascend_bias = 0.5 + state.valence * 0.3; // positive valence → upward motion
-    let mut pitch_selector = 0.35f32; // start low — gives room for the arc to rise
+    // Detect emotion and get the corresponding musical gesture
+    let emotion = detect_emotion(state);
+    let gesture = gesture_for_emotion(emotion);
 
-    // Phrase contour: arc shape (rise → peak → fall) scaled by arousal.
-    // Calm music gets flatter contours; intense music gets dramatic arcs.
+    // Direction bias: gesture overrides valence-only bias
+    let ascend_bias = 0.5 + gesture.direction_bias * 0.5;
+    let mut pitch_selector: f32 = if gesture.direction_bias > 0.2 {
+        0.30 // start low for ascending gestures (joy, wonder, triumph)
+    } else if gesture.direction_bias < -0.2 {
+        0.65 // start high for descending gestures (sadness)
+    } else {
+        0.45 // neutral start
+    };
+
+    // Phrase contour: arc shape scaled by arousal + gesture energy
     let phrase_len = config.max_notes.max(4);
-    let peak_position = 0.35 + (1.0 - state.arousal) * 0.25; // 0.35-0.60 through phrase
-    // Contour strength: base from arousal, boosted for sparse melodies
-    // (fewer notes need more pronounced pitch arc to register as a contour)
+    let peak_position = 0.35 + (1.0 - state.arousal) * 0.25;
     let sparsity_boost = if config.max_notes <= 8 { 0.15 } else { 0.0 };
     let contour_strength = (0.35 + state.arousal * 0.45 + sparsity_boost).min(0.9);
 
-    // Base velocity from consciousness + dopamine
-    let base_velocity = (0.3 + state.consciousness_level * 0.3 + state.dopamine * 0.15).clamp(0.2, 0.85);
-    // Dynamic range: arousal widens velocity spread
-    let dynamic_range = 0.10 + state.arousal * 0.20;
+    // Velocity: gesture shapes the base level and dynamic range
+    let base_velocity = (0.3 + state.consciousness_level * 0.2 + state.dopamine * 0.1)
+        .clamp(0.15, 0.8) * gesture.velocity_scale;
+    let dynamic_range = (0.10 + state.arousal * 0.20) * gesture.velocity_scale;
 
     for i in 0..config.max_notes {
         if time >= max_time {
@@ -69,18 +80,17 @@ pub fn generate_melody(
         // Select pitch from scale
         let freq = select_pitch(scale, pitch_selector.clamp(0.0, 1.0));
 
-        // Duration with syncopation (random lengthening/shortening)
+        // Duration: gesture shapes note length (peace=2x, tension=0.6x, joy=0.8x)
         let dur_factor = if rng.gen::<f32>() < syncopation {
             0.5 + rng.gen::<f32>() * 1.5
         } else {
             1.0
         };
-        let duration = (base_note_dur * dur_factor).max(0.05);
+        let duration = (base_note_dur * dur_factor * gesture.duration_scale).max(0.05);
 
-        // Expressive velocity: follows phrase contour (louder at climax)
-        // Plus per-note humanization jitter
-        let vel_jitter = (rng.gen::<f32>() - 0.5) * 0.08; // ±4%
-        let velocity = (base_velocity + contour * dynamic_range + vel_jitter).clamp(0.15, 1.0);
+        // Expressive velocity: gesture + contour + jitter
+        let vel_jitter = (rng.gen::<f32>() - 0.5) * 0.10; // ±5%
+        let velocity = (base_velocity + contour * dynamic_range + vel_jitter).clamp(0.10, 1.0);
 
         // Rest probability: SacredStillness increases rests.
         let rest_prob = (state.harmony_activations[7] * 0.4).min(0.25);
