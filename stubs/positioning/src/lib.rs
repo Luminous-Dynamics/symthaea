@@ -175,3 +175,15 @@ pub enum MeasurementModality {
     AbsolutePosition,
     RelativePosition,
 }
+
+// Additional methods used by symthaea swarm service
+impl PeerFusion3D {
+    pub fn upsert_peer(&mut self, peer: PeerEstimate3D) {
+        if let Some(pos) = self.peers.iter().position(|p| p.peer_id == peer.peer_id) {
+            self.peers[pos] = peer;
+        } else {
+            self.add_peer(peer);
+        }
+    }
+    pub fn fused_estimate(&self) -> Option<GaussianEstimate3D> { self.fuse() }
+}

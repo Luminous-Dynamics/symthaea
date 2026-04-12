@@ -6,3 +6,4 @@ description = "Stub for standalone builds (real crate in mycelix-position)"
 
 [dependencies]
 serde = { version = "1", features = ["derive"] }
+license = "AGPL-3.0-or-later"
