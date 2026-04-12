@@ -42,11 +42,11 @@ broca-full = ["dep:symthaea-broca"]
 # On-device Gemma 4 E2B via Google LiteRT-LM (requires native/litert_shim.so on Android).
 litert = []
 # Prism epistemic search (16,384-bit BinaryHV, offline-capable, sub-ms queries).
-prism-search = ["dep:prism-common", "dep:prism-search"]
+# [standalone-stripped] prism-search = ["dep:prism-common", "dep:prism-search"]
 # Broca + LiteRT fusion engine (consciousness skeleton + factual expansion).
 fusion = ["litert", "broca-full"]
 # Decentralized cooperative positioning (GPS-independent).
-positioning = ["dep:positioning"]
+# [standalone-stripped] positioning = ["dep:positioning"]
 
 [[bin]]
 name = "soma_bench"

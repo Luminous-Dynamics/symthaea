@@ -112,28 +112,51 @@ impl CodeTaskCategory {
             Self::Sorting
         } else if p.contains("search") || p.contains("find") || p.contains("lookup") {
             Self::Search
-        } else if p.contains("add") || p.contains("subtract") || p.contains("multiply")
-            || p.contains("divide") || p.contains("sum") || p.contains("product")
+        } else if p.contains("add")
+            || p.contains("subtract")
+            || p.contains("multiply")
+            || p.contains("divide")
+            || p.contains("sum")
+            || p.contains("product")
         {
             Self::Arithmetic
-        } else if p.contains("reverse") || p.contains("uppercase") || p.contains("lowercase")
-            || p.contains("trim") || p.contains("split") || p.contains("join")
-            || p.contains("replace") || p.contains("string")
+        } else if p.contains("reverse")
+            || p.contains("uppercase")
+            || p.contains("lowercase")
+            || p.contains("trim")
+            || p.contains("split")
+            || p.contains("join")
+            || p.contains("replace")
+            || p.contains("string")
         {
             Self::StringOps
-        } else if p.contains("filter") || p.contains("map") || p.contains("collect")
-            || p.contains("flatten") || p.contains("zip") || p.contains("chain")
+        } else if p.contains("filter")
+            || p.contains("map")
+            || p.contains("collect")
+            || p.contains("flatten")
+            || p.contains("zip")
+            || p.contains("chain")
         {
             Self::IteratorChains
-        } else if p.contains("is even") || p.contains("is odd") || p.contains("is empty")
-            || p.contains("is positive") || p.contains("is negative") || p.contains("palindrome")
+        } else if p.contains("is even")
+            || p.contains("is odd")
+            || p.contains("is empty")
+            || p.contains("is positive")
+            || p.contains("is negative")
+            || p.contains("palindrome")
         {
             Self::BooleanChecks
-        } else if p.contains("factorial") || p.contains("fibonacci") || p.contains("gcd")
-            || p.contains("sqrt") || p.contains("prime") || p.contains("distance")
+        } else if p.contains("factorial")
+            || p.contains("fibonacci")
+            || p.contains("gcd")
+            || p.contains("sqrt")
+            || p.contains("prime")
+            || p.contains("distance")
         {
             Self::MathFunctions
-        } else if p.contains("error") || p.contains("result") || p.contains("parse")
+        } else if p.contains("error")
+            || p.contains("result")
+            || p.contains("parse")
             || p.contains("validate")
         {
             Self::ErrorHandling
@@ -536,7 +559,9 @@ impl IntelligentDispatcher {
 
         // Condition 3: Budget exhausted
         if self.energy_budget > 0.0 && self.total_energy >= self.energy_budget {
-            return Some("Energy budget exhausted — cannot generate more code this session".to_string());
+            return Some(
+                "Energy budget exhausted — cannot generate more code this session".to_string(),
+            );
         }
 
         None

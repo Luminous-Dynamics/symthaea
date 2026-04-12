@@ -254,7 +254,18 @@ pub mod math_service;
 #[cfg(feature = "nurture")]
 pub mod nurture_bridge;
 
-#[cfg(any(feature = "humanoid", feature = "helicopter", feature = "flight", feature = "vehicle", feature = "auv", feature = "manipulator", feature = "exoskeleton", feature = "surgical", feature = "orbital", feature = "quadruped"))]
+#[cfg(any(
+    feature = "humanoid",
+    feature = "helicopter",
+    feature = "flight",
+    feature = "vehicle",
+    feature = "auv",
+    feature = "manipulator",
+    feature = "exoskeleton",
+    feature = "surgical",
+    feature = "orbital",
+    feature = "quadruped"
+))]
 pub mod motor_bridge;
 
 #[cfg(feature = "safety-agents")]

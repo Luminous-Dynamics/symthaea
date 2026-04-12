@@ -26,8 +26,8 @@
 //! ```
 
 use crate::consciousness::recursive_improvement::world_prediction::{
-    OutcomeCategory, PredictionDomain, ResolutionAuthority, ResolutionContract,
-    WorldActionContext, WorldPrediction,
+    OutcomeCategory, PredictionDomain, ResolutionAuthority, ResolutionContract, WorldActionContext,
+    WorldPrediction,
 };
 
 /// Bridge between code generation and MAGI world predictions.
@@ -127,7 +127,10 @@ impl MagiCodeBridge {
     ) -> String {
         let action_context = WorldActionContext::new(
             "compile",
-            format!("Generate {} via {} — code should compile and pass tests", request_name, backend),
+            format!(
+                "Generate {} via {} — code should compile and pass tests",
+                request_name, backend
+            ),
         );
 
         let resolution_contract = ResolutionContract::new(
@@ -260,8 +263,7 @@ impl MagiCodeBridge {
         // Blend raw confidence with historical accuracy
         // More history → more trust in historical data
         let history_weight = (self.stats.total_predictions as f64 / 20.0).min(0.7);
-        let adjusted =
-            raw_confidence * (1.0 - history_weight) + backend_accuracy * history_weight;
+        let adjusted = raw_confidence * (1.0 - history_weight) + backend_accuracy * history_weight;
 
         adjusted.clamp(0.05, 0.95) // Never 0% or 100% confident
     }
@@ -384,7 +386,10 @@ mod tests {
         // Adjusted confidence should reflect the 80% reality
         let adjusted = bridge.adjusted_confidence(0.9, "CodeGenerator");
         // Should be pulled toward historical accuracy (~0.8)
-        assert!(adjusted < 0.9, "Should be pulled down from 0.9: got {adjusted}");
+        assert!(
+            adjusted < 0.9,
+            "Should be pulled down from 0.9: got {adjusted}"
+        );
         assert!(adjusted > 0.5, "Should still be positive: got {adjusted}");
     }
 
@@ -414,12 +419,7 @@ mod tests {
 
         // Add 10 perfectly calibrated predictions (0.8 confidence, 80% success)
         for i in 0..10 {
-            let id = bridge.predict_generation(
-                &format!("f{i}"),
-                "CodeGenerator",
-                0.8,
-                "compile",
-            );
+            let id = bridge.predict_generation(&format!("f{i}"), "CodeGenerator", 0.8, "compile");
             bridge.resolve_prediction(&id, i < 8, Some(i < 8));
         }
 

@@ -64,7 +64,9 @@ pub fn complexity_from_action(wheeler_dewitt_action: f64) -> f64 {
 /// For a black hole: t_scr = (1/2πT_H) × ln(S_BH)
 /// where T_H is the Hawking temperature and S_BH is the entropy.
 pub fn scrambling_time(hawking_temperature: f64, entropy: f64) -> f64 {
-    if hawking_temperature <= 0.0 { return f64::INFINITY; }
+    if hawking_temperature <= 0.0 {
+        return f64::INFINITY;
+    }
     entropy.ln() / (2.0 * PI * hawking_temperature)
 }
 
@@ -129,7 +131,11 @@ mod tests {
     fn test_er_epr_positive_for_entangled() {
         // Maximally entangled: S(AB) = 0, S(A) = S(B) = ln(2)
         let width = er_epr_bridge_width(0.693, 0.693, 0.0);
-        assert!(width > 1.0, "Entangled pair should have bridge: width={:.4}", width);
+        assert!(
+            width > 1.0,
+            "Entangled pair should have bridge: width={:.4}",
+            width
+        );
     }
 
     #[test]

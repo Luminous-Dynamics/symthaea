@@ -239,7 +239,9 @@ impl ConsciousnessEngine {
                 // provides a minimal form of information integration.
                 // Use max of: coherence-proportional floor OR absolute minimum.
                 let coherence_floor = BINDING_FALLBACK_FLOOR * input.coherence as f64;
-                let binding = raw_binding.max(coherence_floor).max(BINDING_FALLBACK_FLOOR * 0.5);
+                let binding = raw_binding
+                    .max(coherence_floor)
+                    .max(BINDING_FALLBACK_FLOOR * 0.5);
                 core_values.insert(CoreComponent::Binding, binding.clamp(0.0, 1.0));
 
                 // Workspace: use GWT broadcast success as primary signal.

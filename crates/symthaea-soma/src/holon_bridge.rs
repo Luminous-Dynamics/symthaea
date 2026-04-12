@@ -458,8 +458,14 @@ mod tests {
             sources: vec!["https://noaa.gov".to_string()],
         });
         assert!(bridge.has_search_results());
-        assert_eq!(bridge.take_language_output(), Some("Ocean acidification lowers pH".to_string()));
-        assert_eq!(bridge.take_language_output(), Some("CO2 absorption causes acidification".to_string()));
+        assert_eq!(
+            bridge.take_language_output(),
+            Some("Ocean acidification lowers pH".to_string())
+        );
+        assert_eq!(
+            bridge.take_language_output(),
+            Some("CO2 absorption causes acidification".to_string())
+        );
         assert_eq!(bridge.take_language_output(), None);
     }
 

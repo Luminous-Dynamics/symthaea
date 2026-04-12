@@ -23,7 +23,7 @@
 
 use symthaea_core::hdc::ContinuousHV;
 
-use super::primitive_evolution::{EvolvingConcept, EvolverConfig, EvolverStats, PrimitiveEvolver};
+use super::primitive_evolution::{EvolverConfig, EvolverStats, EvolvingConcept, PrimitiveEvolver};
 use crate::hdc::code_algebra::CodeAlgebra;
 use crate::hdc::code_encoder::CodeHDEncoder;
 
@@ -144,22 +144,39 @@ impl CodePrimitiveEvolver {
     pub fn seed_standard_patterns(&mut self) {
         self.seed_patterns(&[
             // Sorting
-            "bubble_sort", "quick_sort", "merge_sort", "insertion_sort",
+            "bubble_sort",
+            "quick_sort",
+            "merge_sort",
+            "insertion_sort",
             // Searching
-            "binary_search", "linear_search", "hash_lookup",
+            "binary_search",
+            "linear_search",
+            "hash_lookup",
             // Data structures
-            "stack_push_pop", "queue_enqueue_dequeue", "linked_list_insert",
-            "hash_map_insert_get", "binary_tree_insert",
+            "stack_push_pop",
+            "queue_enqueue_dequeue",
+            "linked_list_insert",
+            "hash_map_insert_get",
+            "binary_tree_insert",
             // Algorithms
-            "fibonacci_recursive", "fibonacci_iterative", "factorial",
-            "gcd_euclidean", "is_prime",
+            "fibonacci_recursive",
+            "fibonacci_iterative",
+            "factorial",
+            "gcd_euclidean",
+            "is_prime",
             // Patterns
-            "iterator_map_filter", "error_handling_result",
-            "builder_pattern", "state_machine",
+            "iterator_map_filter",
+            "error_handling_result",
+            "builder_pattern",
+            "state_machine",
             // String operations
-            "string_reverse", "string_contains", "string_split",
+            "string_reverse",
+            "string_contains",
+            "string_split",
             // Mathematical
-            "matrix_multiply", "dot_product", "normalize_vector",
+            "matrix_multiply",
+            "dot_product",
+            "normalize_vector",
         ]);
     }
 
@@ -222,11 +239,7 @@ impl CodePrimitiveEvolver {
     ///
     /// This is the "HDC Code Splicing" operation: BIND two algorithm HVs
     /// and evolve the population to discover their optimal hybridization.
-    pub fn evolve_hybrid(
-        &mut self,
-        algorithm_a: &str,
-        algorithm_b: &str,
-    ) -> CodeEvolutionResult {
+    pub fn evolve_hybrid(&mut self, algorithm_a: &str, algorithm_b: &str) -> CodeEvolutionResult {
         let hv_a = self.algebra.encoder().encode_name(algorithm_a);
         let hv_b = self.algebra.encoder().encode_name(algorithm_b);
 
@@ -262,9 +275,11 @@ impl CodePrimitiveEvolver {
 
     /// Get the best pattern from the latest run.
     pub fn best_pattern(&self) -> Option<&DiscoveredCodePattern> {
-        self.discoveries
-            .iter()
-            .max_by(|a, b| a.fitness.partial_cmp(&b.fitness).unwrap_or(std::cmp::Ordering::Equal))
+        self.discoveries.iter().max_by(|a, b| {
+            a.fitness
+                .partial_cmp(&b.fitness)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        })
     }
 
     /// Extract the abstract pattern from all discoveries.

@@ -2,5 +2,12 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Orbital servicing arm — zero-g dual-body dynamics, consciousness under substrate constraint.
 #![deny(unsafe_code)]
-pub mod types; pub mod encoder; pub mod controller; pub mod simulator;
-pub mod embodiment; pub mod fep_agent; pub mod perturbations; pub mod training; pub mod plugin;
+pub mod controller;
+pub mod embodiment;
+pub mod encoder;
+pub mod fep_agent;
+pub mod perturbations;
+pub mod plugin;
+pub mod simulator;
+pub mod training;
+pub mod types;

@@ -71,11 +71,7 @@ pub fn newton_system(
         }
     }
 
-    let residual: f64 = f
-        .iter()
-        .map(|fi| fi(&x).powi(2))
-        .sum::<f64>()
-        .sqrt();
+    let residual: f64 = f.iter().map(|fi| fi(&x).powi(2)).sum::<f64>().sqrt();
     if residual < tol {
         Ok(x)
     } else {
@@ -93,8 +89,8 @@ fn solve_linear(a: &mut Vec<Vec<f64>>, b: &[f64]) -> Option<Vec<f64>> {
 
     for col in 0..n {
         // Partial pivoting
-        let pivot = (col..n)
-            .max_by(|&r1, &r2| a[r1][col].abs().partial_cmp(&a[r2][col].abs()).unwrap());
+        let pivot =
+            (col..n).max_by(|&r1, &r2| a[r1][col].abs().partial_cmp(&a[r2][col].abs()).unwrap());
         let pivot = pivot?;
         if a[pivot][col].abs() < 1e-14 {
             return None;
@@ -226,10 +222,8 @@ impl Conic {
         // Degenerate check via matrix determinant
         // Full matrix: [[a, b/2, d/2], [b/2, c, e/2], [d/2, e/2, f]]
         let det = self.a * (self.c * self.f - (self.e / 2.0).powi(2))
-            - (self.b / 2.0)
-                * ((self.b / 2.0) * self.f - (self.e / 2.0) * (self.d / 2.0))
-            + (self.d / 2.0)
-                * ((self.b / 2.0) * (self.e / 2.0) - self.c * (self.d / 2.0));
+            - (self.b / 2.0) * ((self.b / 2.0) * self.f - (self.e / 2.0) * (self.d / 2.0))
+            + (self.d / 2.0) * ((self.b / 2.0) * (self.e / 2.0) - self.c * (self.d / 2.0));
         if det.abs() < 1e-10 {
             return "degenerate";
         }
@@ -428,11 +422,7 @@ impl EllipticCurve {
 
     /// Find the smallest n ≤ max_order such that nP = O (point at infinity),
     /// or None if no such n is found.
-    pub fn torsion_points_order_check(
-        &self,
-        p: &EllipticPoint,
-        max_order: usize,
-    ) -> Option<usize> {
+    pub fn torsion_points_order_check(&self, p: &EllipticPoint, max_order: usize) -> Option<usize> {
         let mut current = p.clone();
         for n in 1..=max_order {
             if matches!(current, EllipticPoint::Infinity) {
@@ -519,7 +509,10 @@ mod tests {
             e: 0.0,
             f: -1.0,
         };
-        assert!(circle.discriminant() < 0.0, "circle discriminant should be negative");
+        assert!(
+            circle.discriminant() < 0.0,
+            "circle discriminant should be negative"
+        );
         assert_eq!(circle.conic_type(), "circle");
     }
 
@@ -614,10 +607,7 @@ mod tests {
         let p = EllipticPoint::Affine { x: 0.0, y: 1.0 };
         let two_p = ec.add(&p, &p);
         // Verify 2P is on the curve
-        assert!(
-            ec.is_on_curve(&two_p),
-            "2P should lie on the curve"
-        );
+        assert!(ec.is_on_curve(&two_p), "2P should lie on the curve");
         match &two_p {
             EllipticPoint::Affine { x, y } => {
                 // slope = (3*0² + (-1)) / (2*1) = -1/2
@@ -636,7 +626,11 @@ mod tests {
         let ec = EllipticCurve { a: 0.0, b: -1.0 };
         // j = 1728 * 4*0 / (0 + 27) = 0
         let j = ec.j_invariant();
-        assert!((j - 0.0).abs() < 1e-9, "j-invariant of y²=x³-1 should be 0, got {}", j);
+        assert!(
+            (j - 0.0).abs() < 1e-9,
+            "j-invariant of y²=x³-1 should be 0, got {}",
+            j
+        );
     }
 
     // 10. ProjectivePoint to affine
@@ -645,8 +639,16 @@ mod tests {
         let p = ProjectivePoint::new(vec![1.0, 2.0, 1.0]);
         let affine = p.to_affine().unwrap();
         assert_eq!(affine.len(), 2);
-        assert!((affine[0] - 1.0).abs() < PROJ_TOL, "x should be 1, got {}", affine[0]);
-        assert!((affine[1] - 2.0).abs() < PROJ_TOL, "y should be 2, got {}", affine[1]);
+        assert!(
+            (affine[0] - 1.0).abs() < PROJ_TOL,
+            "x should be 1, got {}",
+            affine[0]
+        );
+        assert!(
+            (affine[1] - 2.0).abs() < PROJ_TOL,
+            "y should be 2, got {}",
+            affine[1]
+        );
     }
 
     // 11. Projective point at infinity
@@ -667,13 +669,9 @@ mod tests {
     // 13. Bezout intersection count: line y=x and y=-x intersect at (0,0)
     #[test]
     fn bezout_intersection_line_line() {
-        let f = |x: f64, y: f64| y - x;     // y = x
-        let g = |x: f64, y: f64| y + x;     // y = -x
-        let count = bezout_intersection_count(
-            &f, &g,
-            (-2.0, 2.0), (-2.0, 2.0),
-            100, 0.05,
-        );
+        let f = |x: f64, y: f64| y - x; // y = x
+        let g = |x: f64, y: f64| y + x; // y = -x
+        let count = bezout_intersection_count(&f, &g, (-2.0, 2.0), (-2.0, 2.0), 100, 0.05);
         assert_eq!(count, 1, "Two lines through origin intersect once");
     }
 
@@ -688,10 +686,7 @@ mod tests {
         let df1_dy = |_: &[f64]| -1.0;
 
         let f: &[&dyn Fn(&[f64]) -> f64] = &[&f0, &f1];
-        let jac: &[Vec<&dyn Fn(&[f64]) -> f64>] = &[
-            vec![&df0_dx, &df0_dy],
-            vec![&df1_dx, &df1_dy],
-        ];
+        let jac: &[Vec<&dyn Fn(&[f64]) -> f64>] = &[vec![&df0_dx, &df0_dy], vec![&df1_dx, &df1_dy]];
 
         let result = newton_system(f, jac, &[0.6, 0.6], 50, 1e-10);
         assert!(result.is_ok(), "Newton should converge");

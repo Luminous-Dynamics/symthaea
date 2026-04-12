@@ -101,7 +101,12 @@ fn main() {
         ),
     ];
 
-    println!("Rendering {} seeds × {} emotions = {} compositions...\n", n_seeds, states.len(), n_seeds * states.len());
+    println!(
+        "Rendering {} seeds × {} emotions = {} compositions...\n",
+        n_seeds,
+        states.len(),
+        n_seeds * states.len()
+    );
 
     for (name, state, cfg) in &states {
         for seed in 1..=n_seeds as u64 {

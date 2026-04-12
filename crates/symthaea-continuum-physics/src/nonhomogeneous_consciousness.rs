@@ -10,7 +10,7 @@
 //!
 //! The question: does hierarchy still win when networks are messy?
 
-use crate::id_tradeoff::{TradeoffPoint};
+use crate::id_tradeoff::TradeoffPoint;
 use crate::nonlinear_waves::OscillatorNetwork;
 
 // ── Topology Builders ───────────────────────────────────────────────────────
@@ -125,7 +125,9 @@ pub fn build_hierarchical(n: usize, g: f64) -> Vec<f64> {
         let qi = i / quarter;
         let hi = i / (n / 2).max(1);
         for j in 0..n {
-            if i == j { continue; }
+            if i == j {
+                continue;
+            }
             let qj = j / quarter;
             let hj = j / (n / 2).max(1);
             c[i * n + j] = if qi == qj {
@@ -144,7 +146,13 @@ pub fn build_hierarchical(n: usize, g: f64) -> Vec<f64> {
 pub fn build_all_to_all(n: usize, g: f64) -> Vec<f64> {
     let mut c = vec![0.0; n * n];
     let w = g / (n - 1).max(1) as f64;
-    for i in 0..n { for j in 0..n { if i != j { c[i * n + j] = w; } } }
+    for i in 0..n {
+        for j in 0..n {
+            if i != j {
+                c[i * n + j] = w;
+            }
+        }
+    }
     c
 }
 
@@ -161,17 +169,21 @@ pub fn compute_id(
     let measure = 5000;
 
     let mut net = OscillatorNetwork {
-        oscillators: (0..n).map(|i| {
-            let mut osc = crate::nonlinear_waves::FitzHughNagumo::new();
-            osc.i_ext = i_ext_values[i];
-            osc.v = -1.0 + 0.2 * (i as f64 / n as f64);
-            osc
-        }).collect(),
+        oscillators: (0..n)
+            .map(|i| {
+                let mut osc = crate::nonlinear_waves::FitzHughNagumo::new();
+                osc.i_ext = i_ext_values[i];
+                osc.v = -1.0 + 0.2 * (i as f64 / n as f64);
+                osc
+            })
+            .collect(),
         coupling: coupling.to_vec(),
         n,
     };
 
-    for _ in 0..warmup { net.step(dt); }
+    for _ in 0..warmup {
+        net.step(dt);
+    }
 
     let mut traces: Vec<Vec<f64>> = vec![Vec::with_capacity(measure); n];
     let mut sync_trace = Vec::with_capacity(measure);
@@ -185,24 +197,37 @@ pub fn compute_id(
 
     let mut integration = 0.0;
     let mut n_pairs = 0usize;
-    for i in 0..n { for j in (i+1)..n {
-        integration += pearson_abs(&traces[i], &traces[j]);
-        n_pairs += 1;
-    }}
+    for i in 0..n {
+        for j in (i + 1)..n {
+            integration += pearson_abs(&traces[i], &traces[j]);
+            n_pairs += 1;
+        }
+    }
     integration /= n_pairs.max(1) as f64;
 
-    let rates: Vec<f64> = traces.iter().map(|tr| {
-        tr.windows(2).filter(|w| w[0] < 0.0 && w[1] >= 0.0).count() as f64 / (measure as f64 * dt)
-    }).collect();
+    let rates: Vec<f64> = traces
+        .iter()
+        .map(|tr| {
+            tr.windows(2).filter(|w| w[0] < 0.0 && w[1] >= 0.0).count() as f64
+                / (measure as f64 * dt)
+        })
+        .collect();
     let rate_mean = rates.iter().sum::<f64>() / n as f64;
     let differentiation = if n > 1 {
         (rates.iter().map(|r| (r - rate_mean).powi(2)).sum::<f64>() / n as f64 * 100.0).min(1.0)
-    } else { 0.0 };
+    } else {
+        0.0
+    };
 
     let synchrony = sync_trace.iter().sum::<f64>() / sync_trace.len() as f64;
     let sync_mean = synchrony;
-    let metastability = (sync_trace.iter().map(|s| (s - sync_mean).powi(2)).sum::<f64>()
-        / sync_trace.len() as f64 * 50.0).min(1.0);
+    let metastability = (sync_trace
+        .iter()
+        .map(|s| (s - sync_mean).powi(2))
+        .sum::<f64>()
+        / sync_trace.len() as f64
+        * 50.0)
+        .min(1.0);
 
     TradeoffPoint {
         coupling: 0.0, // Set by caller
@@ -221,14 +246,16 @@ pub fn sweep(
     build_fn: &dyn Fn(usize, f64) -> Vec<f64>,
     i_ext_values: &[f64],
 ) -> Vec<TradeoffPoint> {
-    (0..n_points).map(|i| {
-        let frac = i as f64 / (n_points - 1) as f64;
-        let g = 0.001 * (2000.0_f64).powf(frac);
-        let coupling = build_fn(n, g);
-        let mut point = compute_id(n, &coupling, i_ext_values);
-        point.coupling = g;
-        point
-    }).collect()
+    (0..n_points)
+        .map(|i| {
+            let frac = i as f64 / (n_points - 1) as f64;
+            let g = 0.001 * (2000.0_f64).powf(frac);
+            let coupling = build_fn(n, g);
+            let mut point = compute_id(n, &coupling, i_ext_values);
+            point.coupling = g;
+            point
+        })
+        .collect()
 }
 
 // ── Tier System ─────────────────────────────────────────────────────────────
@@ -258,26 +285,36 @@ pub fn five_tier_drives(n: usize) -> Vec<f64> {
     }
     // Truncate or pad
     drives.truncate(n);
-    while drives.len() < n { drives.push(0.5); }
+    while drives.len() < n {
+        drives.push(0.5);
+    }
     drives
 }
 
 /// Uniform drives (for comparison).
 pub fn uniform_drives(n: usize) -> Vec<f64> {
-    (0..n).map(|i| 0.4 + 0.4 * (i as f64 / n as f64 - 0.5)).collect()
+    (0..n)
+        .map(|i| 0.4 + 0.4 * (i as f64 / n as f64 - 0.5))
+        .collect()
 }
 
 fn pearson_abs(x: &[f64], y: &[f64]) -> f64 {
     let n = x.len().min(y.len()) as f64;
-    if n < 3.0 { return 0.0; }
+    if n < 3.0 {
+        return 0.0;
+    }
     let mx = x.iter().sum::<f64>() / n;
     let my = y.iter().sum::<f64>() / n;
     let (mut cov, mut vx, mut vy) = (0.0, 0.0, 0.0);
     for (xi, yi) in x.iter().zip(y.iter()) {
         let (dx, dy) = (xi - mx, yi - my);
-        cov += dx * dy; vx += dx * dx; vy += dy * dy;
+        cov += dx * dy;
+        vx += dx * dx;
+        vy += dy * dy;
     }
-    if vx < 1e-15 || vy < 1e-15 { return 0.0; }
+    if vx < 1e-15 || vy < 1e-15 {
+        return 0.0;
+    }
     (cov / (vx * vy).sqrt()).abs().min(1.0)
 }
 
@@ -297,13 +334,18 @@ mod tests {
     fn test_scale_free_has_hubs() {
         let c = build_scale_free(20, 0.5, 2);
         // Compute degree per node
-        let degrees: Vec<usize> = (0..20).map(|i|
-            (0..20).filter(|&j| c[i * 20 + j] > 0.0).count()
-        ).collect();
+        let degrees: Vec<usize> = (0..20)
+            .map(|i| (0..20).filter(|&j| c[i * 20 + j] > 0.0).count())
+            .collect();
         let max_deg = *degrees.iter().max().unwrap();
         let min_deg = *degrees.iter().min().unwrap();
         // Scale-free should have heterogeneous degrees
-        assert!(max_deg > min_deg, "Should have hubs: max={}, min={}", max_deg, min_deg);
+        assert!(
+            max_deg > min_deg,
+            "Should have hubs: max={}, min={}",
+            max_deg,
+            min_deg
+        );
     }
 
     #[test]

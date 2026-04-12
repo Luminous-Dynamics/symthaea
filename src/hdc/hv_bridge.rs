@@ -118,7 +118,10 @@ mod tests {
 
         // Round-trip: continuous → binary should recover original
         let bhv_recovered = HvBridge::continuous_to_binary(&chv);
-        assert_eq!(bhv, bhv_recovered, "Round-trip should be lossless for bipolar vectors");
+        assert_eq!(
+            bhv, bhv_recovered,
+            "Round-trip should be lossless for bipolar vectors"
+        );
     }
 
     #[test]

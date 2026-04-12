@@ -270,7 +270,9 @@ pub struct PlatformRegistry {
 impl PlatformRegistry {
     /// Create an empty registry.
     pub fn new() -> Self {
-        Self { plugins: Vec::new() }
+        Self {
+            plugins: Vec::new(),
+        }
     }
 
     /// Register a platform plugin.
@@ -360,8 +362,14 @@ mod tests {
     #[test]
     fn test_from_phi_non_finite_returns_red() {
         assert_eq!(MotorSafetyLevel::from_phi(f64::NAN), MotorSafetyLevel::Red);
-        assert_eq!(MotorSafetyLevel::from_phi(f64::INFINITY), MotorSafetyLevel::Red);
-        assert_eq!(MotorSafetyLevel::from_phi(f64::NEG_INFINITY), MotorSafetyLevel::Red);
+        assert_eq!(
+            MotorSafetyLevel::from_phi(f64::INFINITY),
+            MotorSafetyLevel::Red
+        );
+        assert_eq!(
+            MotorSafetyLevel::from_phi(f64::NEG_INFINITY),
+            MotorSafetyLevel::Red
+        );
     }
 
     #[test]

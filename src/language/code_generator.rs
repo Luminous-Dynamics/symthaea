@@ -936,7 +936,10 @@ impl CodeGenerator {
             }
 
             // Detect return of reference to local
-            if trimmed.starts_with("&") && !trimmed.contains("&self") && !trimmed.contains("&mut self") {
+            if trimmed.starts_with("&")
+                && !trimmed.contains("&self")
+                && !trimmed.contains("&mut self")
+            {
                 // Check if this looks like a return of a local ref
                 let is_last_expr = i == lines.len() - 2; // second to last (before closing brace)
                 if is_last_expr && !trimmed.contains("&str") && !trimmed.contains("&[") {

@@ -102,7 +102,9 @@ fn infer_target_plan(task: &BenchmarkTask) -> Vec<PlanAction> {
     if purpose.contains("for each") || purpose.contains("iterate") || purpose.contains("loop") {
         actions.push(PlanAction::ForLoop);
     }
-    if purpose.contains("filter") || purpose.contains("map") || purpose.contains("chain")
+    if purpose.contains("filter")
+        || purpose.contains("map")
+        || purpose.contains("chain")
         || purpose.contains("collect")
     {
         actions.push(PlanAction::IteratorChain);
@@ -287,8 +289,14 @@ pub fn generate_training_data(
 
     // Shuffle deterministically (use purpose hash as seed)
     all_examples.sort_by(|a, b| {
-        let hash_a: u64 = a.purpose.bytes().fold(0u64, |acc, b| acc.wrapping_mul(31).wrapping_add(b as u64));
-        let hash_b: u64 = b.purpose.bytes().fold(0u64, |acc, b| acc.wrapping_mul(31).wrapping_add(b as u64));
+        let hash_a: u64 = a
+            .purpose
+            .bytes()
+            .fold(0u64, |acc, b| acc.wrapping_mul(31).wrapping_add(b as u64));
+        let hash_b: u64 = b
+            .purpose
+            .bytes()
+            .fold(0u64, |acc, b| acc.wrapping_mul(31).wrapping_add(b as u64));
         hash_a.cmp(&hash_b)
     });
 
@@ -331,10 +339,7 @@ fn augment_with_synonyms(
         for (word, replacements) in synonyms {
             if purpose_lower.contains(word) {
                 for replacement in *replacements {
-                    let new_purpose = example
-                        .purpose
-                        .to_lowercase()
-                        .replace(word, replacement);
+                    let new_purpose = example.purpose.to_lowercase().replace(word, replacement);
                     let hv = encoder.encode_name(&new_purpose);
                     augmented.push(TrainingExample {
                         purpose: new_purpose,

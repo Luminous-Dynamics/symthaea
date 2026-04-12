@@ -116,7 +116,9 @@ impl DemoRunner {
                         tracing::info!("Demo: Iroh node ID: {}", node_id);
                     }
                     match svc.create_ticket() {
-                        Ok(ticket) => tracing::info!("Demo: bootstrap ticket (share with peers): {}", ticket),
+                        Ok(ticket) => {
+                            tracing::info!("Demo: bootstrap ticket (share with peers): {}", ticket)
+                        }
                         Err(e) => tracing::debug!(error = %e, "Demo: ticket not available yet"),
                     }
                     tokio::spawn(svc.accept_connections());

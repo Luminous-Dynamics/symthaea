@@ -597,68 +597,95 @@ pub fn func(name: &str, arg: TermType) -> TermType {
 pub fn integrate_symbolic(term: &TermType, variable: &str) -> Option<TermType> {
     match term {
         // ∫ c dx = c*x
-        TermType::Constant(c) => {
-            Some(TermType::BinaryOp {
-                op: SymbolicOp::Mul,
-                left: Box::new(TermType::Constant(*c)),
-                right: Box::new(TermType::Variable(variable.to_string())),
-            })
-        }
+        TermType::Constant(c) => Some(TermType::BinaryOp {
+            op: SymbolicOp::Mul,
+            left: Box::new(TermType::Constant(*c)),
+            right: Box::new(TermType::Variable(variable.to_string())),
+        }),
 
         // ∫ x dx = x²/2
-        TermType::Variable(v) if v == variable => {
-            Some(TermType::BinaryOp {
-                op: SymbolicOp::Div,
-                left: Box::new(TermType::BinaryOp {
-                    op: SymbolicOp::Pow,
-                    left: Box::new(TermType::Variable(variable.to_string())),
-                    right: Box::new(TermType::Constant(2)),
-                }),
+        TermType::Variable(v) if v == variable => Some(TermType::BinaryOp {
+            op: SymbolicOp::Div,
+            left: Box::new(TermType::BinaryOp {
+                op: SymbolicOp::Pow,
+                left: Box::new(TermType::Variable(variable.to_string())),
                 right: Box::new(TermType::Constant(2)),
-            })
-        }
+            }),
+            right: Box::new(TermType::Constant(2)),
+        }),
 
         // ∫ y dx = y*x (other variable treated as constant)
-        TermType::Variable(v) => {
-            Some(TermType::BinaryOp {
-                op: SymbolicOp::Mul,
-                left: Box::new(TermType::Variable(v.clone())),
-                right: Box::new(TermType::Variable(variable.to_string())),
-            })
-        }
+        TermType::Variable(v) => Some(TermType::BinaryOp {
+            op: SymbolicOp::Mul,
+            left: Box::new(TermType::Variable(v.clone())),
+            right: Box::new(TermType::Variable(variable.to_string())),
+        }),
 
         // ∫ (f + g) dx = ∫f dx + ∫g dx
-        TermType::BinaryOp { op: SymbolicOp::Add, left, right } => {
+        TermType::BinaryOp {
+            op: SymbolicOp::Add,
+            left,
+            right,
+        } => {
             let il = integrate_symbolic(left, variable)?;
             let ir = integrate_symbolic(right, variable)?;
-            Some(TermType::BinaryOp { op: SymbolicOp::Add, left: Box::new(il), right: Box::new(ir) })
+            Some(TermType::BinaryOp {
+                op: SymbolicOp::Add,
+                left: Box::new(il),
+                right: Box::new(ir),
+            })
         }
 
         // ∫ (f - g) dx = ∫f dx - ∫g dx
-        TermType::BinaryOp { op: SymbolicOp::Sub, left, right } => {
+        TermType::BinaryOp {
+            op: SymbolicOp::Sub,
+            left,
+            right,
+        } => {
             let il = integrate_symbolic(left, variable)?;
             let ir = integrate_symbolic(right, variable)?;
-            Some(TermType::BinaryOp { op: SymbolicOp::Sub, left: Box::new(il), right: Box::new(ir) })
+            Some(TermType::BinaryOp {
+                op: SymbolicOp::Sub,
+                left: Box::new(il),
+                right: Box::new(ir),
+            })
         }
 
         // ∫ c*f dx = c * ∫f dx (constant factor)
-        TermType::BinaryOp { op: SymbolicOp::Mul, left, right } => {
+        TermType::BinaryOp {
+            op: SymbolicOp::Mul,
+            left,
+            right,
+        } => {
             if !contains_variable(left, variable) {
                 // Left is constant w.r.t. variable
                 let ir = integrate_symbolic(right, variable)?;
-                Some(TermType::BinaryOp { op: SymbolicOp::Mul, left: left.clone(), right: Box::new(ir) })
+                Some(TermType::BinaryOp {
+                    op: SymbolicOp::Mul,
+                    left: left.clone(),
+                    right: Box::new(ir),
+                })
             } else if !contains_variable(right, variable) {
                 // Right is constant
                 let il = integrate_symbolic(left, variable)?;
-                Some(TermType::BinaryOp { op: SymbolicOp::Mul, left: Box::new(il), right: right.clone() })
+                Some(TermType::BinaryOp {
+                    op: SymbolicOp::Mul,
+                    left: Box::new(il),
+                    right: right.clone(),
+                })
             } else {
                 None // Integration by parts would be needed
             }
         }
 
         // ∫ x^n dx = x^(n+1)/(n+1) for constant n ≠ -1
-        TermType::BinaryOp { op: SymbolicOp::Pow, left, right } => {
-            if let (TermType::Variable(v), TermType::Constant(n)) = (left.as_ref(), right.as_ref()) {
+        TermType::BinaryOp {
+            op: SymbolicOp::Pow,
+            left,
+            right,
+        } => {
+            if let (TermType::Variable(v), TermType::Constant(n)) = (left.as_ref(), right.as_ref())
+            {
                 if v == variable && *n != -1 {
                     let n1 = n + 1;
                     Some(TermType::BinaryOp {
@@ -682,13 +709,21 @@ pub fn integrate_symbolic(term: &TermType, variable: &str) -> Option<TermType> {
         }
 
         // ∫ neg(f) dx = -(∫f dx) — BinaryOp with Neg op (shouldn't happen, but handle it)
-        TermType::BinaryOp { op: SymbolicOp::Neg, left, .. } => {
+        TermType::BinaryOp {
+            op: SymbolicOp::Neg,
+            left,
+            ..
+        } => {
             let il = integrate_symbolic(left, variable)?;
             Some(negate(il))
         }
 
         // ∫ 1/f dx — check for 1/x = ln(x)
-        TermType::BinaryOp { op: SymbolicOp::Div, left, right } => {
+        TermType::BinaryOp {
+            op: SymbolicOp::Div,
+            left,
+            right,
+        } => {
             if let TermType::Constant(1) = left.as_ref() {
                 if let TermType::Variable(v) = right.as_ref() {
                     if v == variable {
@@ -699,16 +734,18 @@ pub fn integrate_symbolic(term: &TermType, variable: &str) -> Option<TermType> {
             // ∫ f/c dx = (1/c) * ∫f dx
             if !contains_variable(right, variable) {
                 let il = integrate_symbolic(left, variable)?;
-                Some(TermType::BinaryOp { op: SymbolicOp::Div, left: Box::new(il), right: right.clone() })
+                Some(TermType::BinaryOp {
+                    op: SymbolicOp::Div,
+                    left: Box::new(il),
+                    right: right.clone(),
+                })
             } else {
                 None
             }
         }
 
         // ∫ sin(f) dx, ∫ cos(f) dx, ∫ exp(f) dx
-        TermType::Function { name, arg } => {
-            integrate_transcendental(name, arg, variable)
-        }
+        TermType::Function { name, arg } => integrate_transcendental(name, arg, variable),
 
         // Unary operation (negation): ∫ (-f) dx = -(∫ f dx)
         TermType::UnaryOp { operand, .. } => {
@@ -727,7 +764,10 @@ fn integrate_transcendental(name: &str, arg: &TermType, variable: &str) -> Optio
     if let TermType::Variable(v) = arg {
         if v == variable {
             return match name {
-                "sin" => Some(negate(func("cos", TermType::Variable(variable.to_string())))),
+                "sin" => Some(negate(func(
+                    "cos",
+                    TermType::Variable(variable.to_string()),
+                ))),
                 "cos" => Some(func("sin", TermType::Variable(variable.to_string()))),
                 "exp" => Some(func("exp", TermType::Variable(variable.to_string()))),
                 "ln" => {
@@ -750,7 +790,9 @@ fn integrate_transcendental(name: &str, arg: &TermType, variable: &str) -> Optio
 
     // Check for linear argument: a*x + b
     if let Some((a_coeff, _b_const)) = extract_linear_arg(arg, variable) {
-        if a_coeff == 0 { return None; }
+        if a_coeff == 0 {
+            return None;
+        }
 
         let antideriv = match name {
             "sin" => Some(negate(func("cos", arg.clone()))),
@@ -792,21 +834,31 @@ fn extract_linear_arg(term: &TermType, variable: &str) -> Option<(i64, i64)> {
         // Just c → (0, c)
         TermType::Constant(c) => Some((0, *c)),
         // a * x → (a, 0)
-        TermType::BinaryOp { op: SymbolicOp::Mul, left, right } => {
-            match (left.as_ref(), right.as_ref()) {
-                (TermType::Constant(a), TermType::Variable(v)) if v == variable => Some((*a, 0)),
-                (TermType::Variable(v), TermType::Constant(a)) if v == variable => Some((*a, 0)),
-                _ => None,
-            }
-        }
+        TermType::BinaryOp {
+            op: SymbolicOp::Mul,
+            left,
+            right,
+        } => match (left.as_ref(), right.as_ref()) {
+            (TermType::Constant(a), TermType::Variable(v)) if v == variable => Some((*a, 0)),
+            (TermType::Variable(v), TermType::Constant(a)) if v == variable => Some((*a, 0)),
+            _ => None,
+        },
         // a*x + b
-        TermType::BinaryOp { op: SymbolicOp::Add, left, right } => {
+        TermType::BinaryOp {
+            op: SymbolicOp::Add,
+            left,
+            right,
+        } => {
             let (a1, b1) = extract_linear_arg(left, variable)?;
             let (a2, b2) = extract_linear_arg(right, variable)?;
             Some((a1 + a2, b1 + b2))
         }
         // a*x - b
-        TermType::BinaryOp { op: SymbolicOp::Sub, left, right } => {
+        TermType::BinaryOp {
+            op: SymbolicOp::Sub,
+            left,
+            right,
+        } => {
             let (a1, b1) = extract_linear_arg(left, variable)?;
             let (a2, b2) = extract_linear_arg(right, variable)?;
             Some((a1 - a2, b1 - b2))
@@ -1038,6 +1090,164 @@ impl RationalPolynomial {
                 an * bd == bn * ad
             })
     }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// TRANSCENDENTAL INTEGRATION — numerical evaluation of special integrals
+// ═══════════════════════════════════════════════════════════════════════════
+
+/// Sine integral: Si(x) = ∫₀ˣ sin(t)/t dt.
+///
+/// Computed via adaptive Simpson's rule. Si(∞) = π/2.
+/// Used in signal processing, diffraction, and antenna theory.
+pub fn sine_integral(x: f64) -> f64 {
+    if x.abs() < 1e-15 {
+        return 0.0;
+    }
+    let sign = if x < 0.0 { -1.0 } else { 1.0 };
+    let x = x.abs();
+    // For small x, use Taylor series: Si(x) = x - x³/18 + x⁵/600 - ...
+    if x < 1.0 {
+        let mut sum = 0.0;
+        let mut term = x;
+        for k in 0..20 {
+            sum += term / (2 * k + 1) as f64;
+            term *= -x * x / ((2 * k + 2) as f64 * (2 * k + 3) as f64);
+        }
+        return sign * sum;
+    }
+    // For larger x, use adaptive quadrature
+    let n = (x * 20.0).ceil() as usize;
+    let n = n.max(100).min(10000);
+    let h = x / n as f64;
+    // Simpson's rule
+    let mut sum = (x.sin() / x); // sinc at x
+                                 // f(0) = sin(0)/0 = 1 by L'Hôpital
+    sum += 1.0; // f(0) = 1
+    for i in 1..n {
+        let t = i as f64 * h;
+        let f = t.sin() / t;
+        sum += if i % 2 == 0 { 2.0 * f } else { 4.0 * f };
+    }
+    sign * sum * h / 3.0
+}
+
+/// Error function: erf(x) = (2/√π) ∫₀ˣ e^(-t²) dt.
+///
+/// Computed via series expansion for |x| < 3.5, asymptotic for large x.
+/// Fundamental in probability, heat transfer, and statistics.
+pub fn error_function(x: f64) -> f64 {
+    if x.abs() < 1e-15 {
+        return 0.0;
+    }
+    let sign = if x < 0.0 { -1.0 } else { 1.0 };
+    let x = x.abs();
+
+    if x < 3.5 {
+        // Taylor series: erf(x) = (2/√π) Σ (-1)^n x^(2n+1) / (n! (2n+1))
+        let two_over_sqrt_pi = 2.0 / std::f64::consts::PI.sqrt();
+        let mut sum = 0.0;
+        let mut term = x; // first term: x
+        for n in 0..30 {
+            sum += term / (2 * n + 1) as f64;
+            term *= -x * x / (n + 1) as f64;
+        }
+        sign * two_over_sqrt_pi * sum
+    } else {
+        // Asymptotic: erf(x) ≈ 1 - e^(-x²)/(x√π) for large x
+        sign * (1.0 - (-x * x).exp() / (x * std::f64::consts::PI.sqrt()))
+    }
+}
+
+/// Exponential integral: Ei(x) = ∫₋∞ˣ e^t/t dt (principal value for x > 0).
+///
+/// For x > 0, Ei(x) = -PV∫₋ₓ^∞ e^(-t)/t dt = γ + ln(x) + Σ x^n/(n·n!)
+/// where γ ≈ 0.5772 is the Euler-Mascheroni constant.
+pub fn exponential_integral(x: f64) -> f64 {
+    if x.abs() < 1e-15 {
+        return f64::NEG_INFINITY;
+    }
+    let euler_gamma = 0.5772156649015329;
+
+    if x.abs() < 40.0 {
+        // Series: Ei(x) = γ + ln|x| + Σ_{n=1}^∞ x^n / (n·n!)
+        let mut sum = euler_gamma + x.abs().ln();
+        let mut term = x;
+        let mut fact = 1.0;
+        for n in 1..60 {
+            fact *= n as f64;
+            sum += term / (n as f64 * fact);
+            term *= x;
+            if term.abs() / (n as f64 * fact) < 1e-15 {
+                break;
+            }
+        }
+        sum
+    } else {
+        // Asymptotic: Ei(x) ~ e^x/x (1 + 1!/x + 2!/x² + ...)
+        let mut sum = 1.0;
+        let mut term = 1.0;
+        for n in 1..20 {
+            term *= n as f64 / x;
+            if term.abs() > sum.abs() {
+                break;
+            } // diverging
+            sum += term;
+        }
+        x.exp() / x * sum
+    }
+}
+
+/// Fresnel cosine integral: C(x) = ∫₀ˣ cos(πt²/2) dt.
+///
+/// Used in optics (Fresnel diffraction). C(∞) = 0.5.
+pub fn fresnel_c(x: f64) -> f64 {
+    if x.abs() < 1e-15 {
+        return 0.0;
+    }
+    let sign = if x < 0.0 { -1.0 } else { 1.0 };
+    let x = x.abs();
+
+    // Taylor series: C(x) = Σ (-1)^n (π/2)^(2n) x^(4n+1) / ((4n+1)(2n)!)
+    let pi_half = std::f64::consts::PI / 2.0;
+    let mut sum = 0.0;
+    let mut term = x; // n=0 term: x
+    let mut fact = 1.0;
+    for n in 0..30 {
+        sum += term / (4 * n + 1) as f64 / fact;
+        term *= -pi_half * pi_half * x * x * x * x;
+        fact *= (2 * n + 1) as f64 * (2 * n + 2) as f64;
+        if term.abs() / ((4 * n + 5) as f64 * fact) < 1e-15 {
+            break;
+        }
+    }
+    sign * sum
+}
+
+/// Fresnel sine integral: S(x) = ∫₀ˣ sin(πt²/2) dt.
+///
+/// Used in optics (Fresnel diffraction). S(∞) = 0.5.
+pub fn fresnel_s(x: f64) -> f64 {
+    if x.abs() < 1e-15 {
+        return 0.0;
+    }
+    let sign = if x < 0.0 { -1.0 } else { 1.0 };
+    let x = x.abs();
+
+    let pi_half = std::f64::consts::PI / 2.0;
+    let mut sum = 0.0;
+    let mut term = pi_half * x * x * x / 3.0; // n=0 term
+    let mut fact = 1.0;
+    for n in 0..30 {
+        let denom = (4 * n + 3) as f64 * fact;
+        sum += term / denom;
+        term *= -pi_half * pi_half * x * x * x * x;
+        fact *= (2 * n + 2) as f64 * (2 * n + 3) as f64;
+        if (term / ((4 * n + 7) as f64 * fact)).abs() < 1e-15 {
+            break;
+        }
+    }
+    sign * sum
 }
 
 #[cfg(test)]
@@ -1581,7 +1791,10 @@ mod tests {
         };
         let sin_2x1 = func("sin", linear_arg);
         let result = integrate_symbolic(&sin_2x1, "x");
-        assert!(result.is_some(), "should integrate sin(2x+1) via linear substitution");
+        assert!(
+            result.is_some(),
+            "should integrate sin(2x+1) via linear substitution"
+        );
     }
 
     /// Fundamental theorem verification: d/dx ∫f = f for transcendentals
@@ -1594,6 +1807,100 @@ mod tests {
         let derivative = SymbolicDifferentiator::diff_recursive(&integral, "x", prims);
         // The derivative of -cos(x) = sin(x). Verify by structure.
         let s = format!("{:?}", derivative);
-        assert!(s.contains("sin"), "d/dx(∫sin(x)dx) should recover sin: {:?}", derivative);
+        assert!(
+            s.contains("sin"),
+            "d/dx(∫sin(x)dx) should recover sin: {:?}",
+            derivative
+        );
+    }
+
+    // ==================== TRANSCENDENTAL INTEGRATION ====================
+
+    #[test]
+    fn test_sine_integral_known_values() {
+        // Si(0) = 0
+        assert!(sine_integral(0.0).abs() < 1e-15);
+        // Si(π) ≈ 1.8519
+        let si_pi = sine_integral(std::f64::consts::PI);
+        assert!(
+            (si_pi - 1.8519).abs() < 0.01,
+            "Si(π) should ≈ 1.8519, got {:.4}",
+            si_pi
+        );
+        // Si(-x) = -Si(x) (odd function)
+        let si_2 = sine_integral(2.0);
+        let si_neg2 = sine_integral(-2.0);
+        assert!(
+            (si_2 + si_neg2).abs() < 1e-10,
+            "Si should be odd: Si(2)={:.6}, Si(-2)={:.6}",
+            si_2,
+            si_neg2
+        );
+    }
+
+    #[test]
+    fn test_error_function_known_values() {
+        // erf(0) = 0
+        assert!(error_function(0.0).abs() < 1e-15);
+        // erf(1) ≈ 0.8427
+        let erf1 = error_function(1.0);
+        assert!(
+            (erf1 - 0.8427).abs() < 0.001,
+            "erf(1) should ≈ 0.8427, got {:.4}",
+            erf1
+        );
+        // erf(∞) → 1
+        let erf_big = error_function(5.0);
+        assert!(
+            (erf_big - 1.0).abs() < 1e-6,
+            "erf(5) should ≈ 1.0, got {:.6}",
+            erf_big
+        );
+        // erf(-x) = -erf(x) (odd function)
+        let erf_neg = error_function(-1.0);
+        assert!(
+            (erf1 + erf_neg).abs() < 1e-10,
+            "erf should be odd: erf(1)={:.6}, erf(-1)={:.6}",
+            erf1,
+            erf_neg
+        );
+    }
+
+    #[test]
+    fn test_exponential_integral_known_values() {
+        // Ei(1) ≈ 1.8951
+        let ei1 = exponential_integral(1.0);
+        assert!(
+            (ei1 - 1.8951).abs() < 0.01,
+            "Ei(1) should ≈ 1.8951, got {:.4}",
+            ei1
+        );
+        // Ei(2) ≈ 4.9542
+        let ei2 = exponential_integral(2.0);
+        assert!(
+            (ei2 - 4.9542).abs() < 0.01,
+            "Ei(2) should ≈ 4.9542, got {:.4}",
+            ei2
+        );
+    }
+
+    #[test]
+    fn test_fresnel_integrals_known_values() {
+        // C(0) = 0, S(0) = 0
+        assert!(fresnel_c(0.0).abs() < 1e-15);
+        assert!(fresnel_s(0.0).abs() < 1e-15);
+        // C(1) ≈ 0.7799, S(1) ≈ 0.4383
+        let c1 = fresnel_c(1.0);
+        let s1 = fresnel_s(1.0);
+        assert!(
+            (c1 - 0.7799).abs() < 0.01,
+            "C(1) should ≈ 0.7799, got {:.4}",
+            c1
+        );
+        assert!(
+            (s1 - 0.4383).abs() < 0.01,
+            "S(1) should ≈ 0.4383, got {:.4}",
+            s1
+        );
     }
 }

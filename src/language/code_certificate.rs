@@ -196,7 +196,10 @@ impl CodeCertificate {
     /// Human-readable summary of the certificate.
     pub fn summary(&self) -> String {
         let topo_str = match &self.topology {
-            Some(t) => format!(", topology: β₀={} β₁={} β₂={}", t.beta_0, t.beta_1, t.beta_2),
+            Some(t) => format!(
+                ", topology: β₀={} β₁={} β₂={}",
+                t.beta_0, t.beta_1, t.beta_2
+            ),
             None => String::new(),
         };
         let oracle_str = match self.oracle_convergence {
@@ -212,7 +215,11 @@ impl CodeCertificate {
         format!(
             "[{}] {} via {} | sim: {:.3} | {}/{} checks passed | {}{}{}{}",
             self.id,
-            if self.safety_critical { "SAFETY" } else { "std" },
+            if self.safety_critical {
+                "SAFETY"
+            } else {
+                "std"
+            },
             self.backend_used,
             self.semantic_similarity,
             self.layers_passed(),
@@ -227,11 +234,7 @@ impl CodeCertificate {
 
 /// Convert first N bytes to hex string.
 fn hex_prefix(bytes: &[u8], n: usize) -> String {
-    bytes
-        .iter()
-        .take(n)
-        .map(|b| format!("{b:02x}"))
-        .collect()
+    bytes.iter().take(n).map(|b| format!("{b:02x}")).collect()
 }
 
 #[cfg(test)]
@@ -240,7 +243,11 @@ mod tests {
 
     #[test]
     fn test_certificate_creation() {
-        let cert = CodeCertificate::new("fn add(a: i32, b: i32) -> i32 { a + b }", "CodeGenerator", 0.85);
+        let cert = CodeCertificate::new(
+            "fn add(a: i32, b: i32) -> i32 { a + b }",
+            "CodeGenerator",
+            0.85,
+        );
 
         assert!(cert.id.starts_with("cert_"));
         assert_eq!(cert.backend_used, "CodeGenerator");
@@ -260,8 +267,7 @@ mod tests {
 
     #[test]
     fn test_certificate_with_topology() {
-        let cert = CodeCertificate::new("fn x() {}", "Geodesic", 0.8)
-            .with_topology(1, 2, 0);
+        let cert = CodeCertificate::new("fn x() {}", "Geodesic", 0.8).with_topology(1, 2, 0);
 
         let topo = cert.topology.unwrap();
         assert_eq!(topo.beta_0, 1);
@@ -293,8 +299,8 @@ mod tests {
             },
         ];
 
-        let cert = CodeCertificate::new("fn x() {}", "Test", 0.85)
-            .with_verification_layers(&layers);
+        let cert =
+            CodeCertificate::new("fn x() {}", "Test", 0.85).with_verification_layers(&layers);
 
         assert_eq!(cert.layers_passed(), 2);
         assert_eq!(cert.layers_total(), 3);
@@ -302,12 +308,16 @@ mod tests {
 
     #[test]
     fn test_certificate_json_roundtrip() {
-        let cert = CodeCertificate::new("fn add(a: i32, b: i32) -> i32 { a + b }", "CodeGenerator", 0.85)
-            .with_epistemic_status(EpistemicStatus::Certain)
-            .with_safety_critical(true)
-            .with_topology(1, 0, 0)
-            .with_oracle_convergence(0.95)
-            .with_sheaf_coherent(true);
+        let cert = CodeCertificate::new(
+            "fn add(a: i32, b: i32) -> i32 { a + b }",
+            "CodeGenerator",
+            0.85,
+        )
+        .with_epistemic_status(EpistemicStatus::Certain)
+        .with_safety_critical(true)
+        .with_topology(1, 0, 0)
+        .with_oracle_convergence(0.95)
+        .with_sheaf_coherent(true);
 
         let json = cert.to_json();
         assert!(json.contains("cert_"));

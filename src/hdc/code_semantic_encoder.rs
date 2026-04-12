@@ -168,7 +168,9 @@ impl CodeSemanticEncoder {
         let mut values = vec![0.0f32; dim];
         for i in 0..dim {
             // Deterministic pseudo-random from hash
-            hash = hash.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+            hash = hash
+                .wrapping_mul(6364136223846793005)
+                .wrapping_add(1442695040888963407);
             let frac = (hash >> 33) as f32 / (u32::MAX as f32);
             values[i] = frac * 2.0 - 1.0;
         }
@@ -229,219 +231,207 @@ impl CodeSemanticEncoder {
     /// Initialize all synonym groups for Rust programming concepts
     fn init_synonym_groups(&mut self) {
         // ── Arithmetic Operations ──
-        self.register_group("arithmetic:add", &[
-            "add", "sum", "plus", "total", "increment", "accumulate",
-        ]);
-        self.register_group("arithmetic:subtract", &[
-            "subtract", "minus", "difference", "decrement", "reduce",
-        ]);
-        self.register_group("arithmetic:multiply", &[
-            "multiply", "product", "times", "scale",
-        ]);
-        self.register_group("arithmetic:divide", &[
-            "divide", "quotient", "ratio", "split",
-        ]);
-        self.register_group("arithmetic:modulo", &[
-            "modulo", "remainder", "mod",
-        ]);
-        self.register_group("arithmetic:negate", &[
-            "negate", "negative", "invert", "flip",
-        ]);
-        self.register_group("arithmetic:absolute", &[
-            "absolute", "abs", "magnitude",
-        ]);
-        self.register_group("arithmetic:power", &[
-            "power", "exponent", "pow", "raise",
-        ]);
+        self.register_group(
+            "arithmetic:add",
+            &["add", "sum", "plus", "total", "increment", "accumulate"],
+        );
+        self.register_group(
+            "arithmetic:subtract",
+            &["subtract", "minus", "difference", "decrement", "reduce"],
+        );
+        self.register_group(
+            "arithmetic:multiply",
+            &["multiply", "product", "times", "scale"],
+        );
+        self.register_group(
+            "arithmetic:divide",
+            &["divide", "quotient", "ratio", "split"],
+        );
+        self.register_group("arithmetic:modulo", &["modulo", "remainder", "mod"]);
+        self.register_group(
+            "arithmetic:negate",
+            &["negate", "negative", "invert", "flip"],
+        );
+        self.register_group("arithmetic:absolute", &["absolute", "abs", "magnitude"]);
+        self.register_group("arithmetic:power", &["power", "exponent", "pow", "raise"]);
 
         // ── Comparison Operations ──
-        self.register_group("compare:max", &[
-            "maximum", "max", "largest", "biggest", "greatest", "highest",
-        ]);
-        self.register_group("compare:min", &[
-            "minimum", "min", "smallest", "least", "lowest",
-        ]);
-        self.register_group("compare:clamp", &[
-            "clamp", "bound", "constrain", "limit",
-        ]);
-        self.register_group("compare:equal", &[
-            "equal", "equals", "same", "identical", "match",
-        ]);
+        self.register_group(
+            "compare:max",
+            &[
+                "maximum", "max", "largest", "biggest", "greatest", "highest",
+            ],
+        );
+        self.register_group(
+            "compare:min",
+            &["minimum", "min", "smallest", "least", "lowest"],
+        );
+        self.register_group("compare:clamp", &["clamp", "bound", "constrain", "limit"]);
+        self.register_group(
+            "compare:equal",
+            &["equal", "equals", "same", "identical", "match"],
+        );
 
         // ── String Operations ──
-        self.register_group("string:reverse", &[
-            "reverse", "flip", "backward", "invert",
-        ]);
-        self.register_group("string:uppercase", &[
-            "uppercase", "upper", "capitalize", "upcase",
-        ]);
-        self.register_group("string:lowercase", &[
-            "lowercase", "lower", "downcase",
-        ]);
-        self.register_group("string:trim", &[
-            "trim", "strip", "clean",
-        ]);
-        self.register_group("string:split", &[
-            "split", "tokenize", "separate", "segment",
-        ]);
-        self.register_group("string:join", &[
-            "join", "concatenate", "concat", "combine", "merge", "append",
-        ]);
-        self.register_group("string:replace", &[
-            "replace", "substitute", "swap",
-        ]);
-        self.register_group("string:contains", &[
-            "contains", "includes", "has",
-        ]);
-        self.register_group("string:starts", &[
-            "starts", "prefix", "begins",
-        ]);
-        self.register_group("string:ends", &[
-            "ends", "suffix", "trailing",
-        ]);
-        self.register_group("string:length", &[
-            "length", "len", "size", "count",
-        ]);
-        self.register_group("string:repeat", &[
-            "repeat", "replicate", "duplicate",
-        ]);
-        self.register_group("string:parse", &[
-            "parse", "convert", "decode", "interpret",
-        ]);
-        self.register_group("string:format", &[
-            "format", "stringify", "serialize", "render",
-        ]);
+        self.register_group("string:reverse", &["reverse", "flip", "backward", "invert"]);
+        self.register_group(
+            "string:uppercase",
+            &["uppercase", "upper", "capitalize", "upcase"],
+        );
+        self.register_group("string:lowercase", &["lowercase", "lower", "downcase"]);
+        self.register_group("string:trim", &["trim", "strip", "clean"]);
+        self.register_group(
+            "string:split",
+            &["split", "tokenize", "separate", "segment"],
+        );
+        self.register_group(
+            "string:join",
+            &[
+                "join",
+                "concatenate",
+                "concat",
+                "combine",
+                "merge",
+                "append",
+            ],
+        );
+        self.register_group("string:replace", &["replace", "substitute", "swap"]);
+        self.register_group("string:contains", &["contains", "includes", "has"]);
+        self.register_group("string:starts", &["starts", "prefix", "begins"]);
+        self.register_group("string:ends", &["ends", "suffix", "trailing"]);
+        self.register_group("string:length", &["length", "len", "size", "count"]);
+        self.register_group("string:repeat", &["repeat", "replicate", "duplicate"]);
+        self.register_group("string:parse", &["parse", "convert", "decode", "interpret"]);
+        self.register_group(
+            "string:format",
+            &["format", "stringify", "serialize", "render"],
+        );
 
         // ── Collection Operations ──
-        self.register_group("collection:sort", &[
-            "sort", "order", "arrange", "rank", "organize",
-        ]);
-        self.register_group("collection:filter", &[
-            "filter", "select", "keep", "retain", "where",
-        ]);
-        self.register_group("collection:map", &[
-            "map", "transform", "apply", "convert",
-        ]);
-        self.register_group("collection:reduce", &[
-            "reduce", "fold", "aggregate", "accumulate",
-        ]);
-        self.register_group("collection:find", &[
-            "find", "search", "locate", "lookup", "seek",
-        ]);
-        self.register_group("collection:flatten", &[
-            "flatten", "unnest", "unroll",
-        ]);
-        self.register_group("collection:unique", &[
-            "unique", "distinct", "deduplicate", "dedup",
-        ]);
-        self.register_group("collection:zip", &[
-            "zip", "pair", "combine", "interleave",
-        ]);
-        self.register_group("collection:take", &[
-            "take", "first", "head", "prefix", "limit",
-        ]);
-        self.register_group("collection:skip", &[
-            "skip", "drop", "tail", "offset",
-        ]);
-        self.register_group("collection:chunk", &[
-            "chunk", "batch", "partition", "group", "window",
-        ]);
-        self.register_group("collection:enumerate", &[
-            "enumerate", "index", "number", "label",
-        ]);
+        self.register_group(
+            "collection:sort",
+            &["sort", "order", "arrange", "rank", "organize"],
+        );
+        self.register_group(
+            "collection:filter",
+            &["filter", "select", "keep", "retain", "where"],
+        );
+        self.register_group("collection:map", &["map", "transform", "apply", "convert"]);
+        self.register_group(
+            "collection:reduce",
+            &["reduce", "fold", "aggregate", "accumulate"],
+        );
+        self.register_group(
+            "collection:find",
+            &["find", "search", "locate", "lookup", "seek"],
+        );
+        self.register_group("collection:flatten", &["flatten", "unnest", "unroll"]);
+        self.register_group(
+            "collection:unique",
+            &["unique", "distinct", "deduplicate", "dedup"],
+        );
+        self.register_group("collection:zip", &["zip", "pair", "combine", "interleave"]);
+        self.register_group(
+            "collection:take",
+            &["take", "first", "head", "prefix", "limit"],
+        );
+        self.register_group("collection:skip", &["skip", "drop", "tail", "offset"]);
+        self.register_group(
+            "collection:chunk",
+            &["chunk", "batch", "partition", "group", "window"],
+        );
+        self.register_group(
+            "collection:enumerate",
+            &["enumerate", "index", "number", "label"],
+        );
 
         // ── Boolean/Check Operations ──
-        self.register_group("check:empty", &[
-            "empty", "blank", "void", "nil",
-        ]);
+        self.register_group("check:empty", &["empty", "blank", "void", "nil"]);
         self.register_group("check:even", &["even"]);
         self.register_group("check:odd", &["odd"]);
-        self.register_group("check:positive", &[
-            "positive", "nonnegative",
-        ]);
+        self.register_group("check:positive", &["positive", "nonnegative"]);
         self.register_group("check:negative", &["negative"]);
-        self.register_group("check:sorted", &[
-            "sorted", "ordered", "monotonic",
-        ]);
-        self.register_group("check:palindrome", &[
-            "palindrome", "symmetric",
-        ]);
+        self.register_group("check:sorted", &["sorted", "ordered", "monotonic"]);
+        self.register_group("check:palindrome", &["palindrome", "symmetric"]);
         self.register_group("check:prime", &["prime"]);
 
         // ── Math Functions ──
         self.register_group("math:factorial", &["factorial"]);
-        self.register_group("math:fibonacci", &[
-            "fibonacci", "fib",
-        ]);
-        self.register_group("math:gcd", &[
-            "gcd", "greatest common divisor",
-        ]);
-        self.register_group("math:lcm", &[
-            "lcm", "least common multiple",
-        ]);
-        self.register_group("math:sqrt", &[
-            "sqrt", "square root", "root",
-        ]);
-        self.register_group("math:average", &[
-            "average", "mean", "avg",
-        ]);
+        self.register_group("math:fibonacci", &["fibonacci", "fib"]);
+        self.register_group("math:gcd", &["gcd", "greatest common divisor"]);
+        self.register_group("math:lcm", &["lcm", "least common multiple"]);
+        self.register_group("math:sqrt", &["sqrt", "square root", "root"]);
+        self.register_group("math:average", &["average", "mean", "avg"]);
         self.register_group("math:median", &["median", "middle"]);
         self.register_group("math:mode", &["mode", "frequent"]);
-        self.register_group("math:distance", &[
-            "distance", "euclidean", "norm",
-        ]);
+        self.register_group("math:distance", &["distance", "euclidean", "norm"]);
 
         // ── Error Handling ──
-        self.register_group("error:result", &[
-            "result", "error", "fallible",
-        ]);
-        self.register_group("error:option", &[
-            "option", "optional", "nullable", "maybe",
-        ]);
-        self.register_group("error:unwrap", &[
-            "unwrap", "expect", "extract",
-        ]);
-        self.register_group("error:validate", &[
-            "validate", "check", "verify", "ensure",
-        ]);
+        self.register_group("error:result", &["result", "error", "fallible"]);
+        self.register_group("error:option", &["option", "optional", "nullable", "maybe"]);
+        self.register_group("error:unwrap", &["unwrap", "expect", "extract"]);
+        self.register_group("error:validate", &["validate", "check", "verify", "ensure"]);
 
         // ── Structural Concepts ──
-        self.register_group("struct:define", &[
-            "struct", "structure", "record", "type",
-        ]);
-        self.register_group("struct:field", &[
-            "field", "member", "attribute", "property",
-        ]);
-        self.register_group("struct:method", &[
-            "method", "function", "fn", "procedure",
-        ]);
-        self.register_group("trait:define", &[
-            "trait", "interface", "protocol", "contract",
-        ]);
-        self.register_group("enum:define", &[
-            "enum", "variant", "union", "choice",
-        ]);
-        self.register_group("impl:define", &[
-            "implement", "impl", "realize",
-        ]);
+        self.register_group("struct:define", &["struct", "structure", "record", "type"]);
+        self.register_group(
+            "struct:field",
+            &["field", "member", "attribute", "property"],
+        );
+        self.register_group("struct:method", &["method", "function", "fn", "procedure"]);
+        self.register_group(
+            "trait:define",
+            &["trait", "interface", "protocol", "contract"],
+        );
+        self.register_group("enum:define", &["enum", "variant", "union", "choice"]);
+        self.register_group("impl:define", &["implement", "impl", "realize"]);
 
         // ── Algorithm Families ──
-        self.register_group("algo:sort", &[
-            "bubble", "merge", "quick", "insertion", "heap",
-            "ascending", "descending",
-        ]);
-        self.register_group("algo:search", &[
-            "binary search", "linear search", "bfs", "dfs",
-            "breadth", "depth",
-        ]);
-        self.register_group("algo:dp", &[
-            "dynamic programming", "memoize", "tabulate",
-            "knapsack", "subsequence",
-        ]);
-        self.register_group("algo:graph", &[
-            "graph", "node", "edge", "vertex",
-            "dijkstra", "shortest path", "topological",
-        ]);
+        self.register_group(
+            "algo:sort",
+            &[
+                "bubble",
+                "merge",
+                "quick",
+                "insertion",
+                "heap",
+                "ascending",
+                "descending",
+            ],
+        );
+        self.register_group(
+            "algo:search",
+            &[
+                "binary search",
+                "linear search",
+                "bfs",
+                "dfs",
+                "breadth",
+                "depth",
+            ],
+        );
+        self.register_group(
+            "algo:dp",
+            &[
+                "dynamic programming",
+                "memoize",
+                "tabulate",
+                "knapsack",
+                "subsequence",
+            ],
+        );
+        self.register_group(
+            "algo:graph",
+            &[
+                "graph",
+                "node",
+                "edge",
+                "vertex",
+                "dijkstra",
+                "shortest path",
+                "topological",
+            ],
+        );
     }
 }
 
@@ -532,11 +522,9 @@ mod tests {
 
         // All these common words should be in the codebook
         let common_words = [
-            "add", "subtract", "multiply", "divide",
-            "sort", "filter", "map", "reduce",
-            "find", "search", "reverse", "contains",
-            "struct", "trait", "enum", "impl",
-            "result", "option", "validate",
+            "add", "subtract", "multiply", "divide", "sort", "filter", "map", "reduce", "find",
+            "search", "reverse", "contains", "struct", "trait", "enum", "impl", "result", "option",
+            "validate",
         ];
 
         for word in common_words {
@@ -560,7 +548,9 @@ mod tests {
                 assert!(
                     sim > 0.5,
                     "{}/{} similarity should be > 0.5, got {:.3}",
-                    add_words[i], add_words[j], sim
+                    add_words[i],
+                    add_words[j],
+                    sim
                 );
             }
         }

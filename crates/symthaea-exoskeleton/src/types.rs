@@ -17,16 +17,31 @@ pub enum AssistanceMode {
 
 impl AssistanceMode {
     pub fn from_phi(phi: f64) -> Self {
-        if phi > 0.6 { Self::Predictive }
-        else if phi > 0.3 { Self::Responsive }
-        else if phi > 0.1 { Self::Transparent }
-        else { Self::GravityCompensation }
+        if phi > 0.6 {
+            Self::Predictive
+        } else if phi > 0.3 {
+            Self::Responsive
+        } else if phi > 0.1 {
+            Self::Transparent
+        } else {
+            Self::GravityCompensation
+        }
     }
     pub fn torque_factor(&self) -> f32 {
-        match self { Self::Predictive => 1.0, Self::Responsive => 0.6, Self::Transparent => 0.2, Self::GravityCompensation => 0.0 }
+        match self {
+            Self::Predictive => 1.0,
+            Self::Responsive => 0.6,
+            Self::Transparent => 0.2,
+            Self::GravityCompensation => 0.0,
+        }
     }
     pub fn stiffness_factor(&self) -> f64 {
-        match self { Self::Predictive => 1.0, Self::Responsive => 0.6, Self::Transparent => 0.15, Self::GravityCompensation => 0.0 }
+        match self {
+            Self::Predictive => 1.0,
+            Self::Responsive => 0.6,
+            Self::Transparent => 0.15,
+            Self::GravityCompensation => 0.0,
+        }
     }
 }
 
@@ -68,11 +83,15 @@ impl ExoskeletonState {
         c
     }
     pub fn is_finite(&self) -> bool {
-        self.joint_angles.iter().chain(self.joint_velocities.iter())
-            .chain(self.human_torques.iter()).chain(self.exo_torques.iter())
+        self.joint_angles
+            .iter()
+            .chain(self.joint_velocities.iter())
+            .chain(self.human_torques.iter())
+            .chain(self.exo_torques.iter())
             .all(|v| v.is_finite())
             && self.center_of_pressure.iter().all(|v| v.is_finite())
-            && self.ground_reaction_force.is_finite() && self.battery_soc.is_finite()
+            && self.ground_reaction_force.is_finite()
+            && self.battery_soc.is_finite()
     }
 }
 
@@ -84,8 +103,16 @@ pub struct ExoskeletonCommand {
 }
 
 impl ExoskeletonCommand {
-    pub fn zero() -> Self { Self { joint_torques: [0.0; NUM_ACTUATORS], stiffness_gain: 0.5, damping_gain: 0.3 } }
-    pub fn control_effort(&self) -> f32 { self.joint_torques.iter().map(|t| t.abs()).sum::<f32>() / NUM_ACTUATORS as f32 }
+    pub fn zero() -> Self {
+        Self {
+            joint_torques: [0.0; NUM_ACTUATORS],
+            stiffness_gain: 0.5,
+            damping_gain: 0.3,
+        }
+    }
+    pub fn control_effort(&self) -> f32 {
+        self.joint_torques.iter().map(|t| t.abs()).sum::<f32>() / NUM_ACTUATORS as f32
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -105,28 +132,44 @@ impl Default for ExoskeletonConfig {
     fn default() -> Self {
         Self {
             max_torques: [40.0, 30.0, 20.0, 40.0, 30.0, 20.0],
-            human_mass: 80.0, exo_mass: 12.0, physics_hz: 200.0,
-            cognitive_interval: 10, steps_per_episode: 2000,
-            network_layers: 3, neurons_per_layer: 8, learning_rate: 0.001,
+            human_mass: 80.0,
+            exo_mass: 12.0,
+            physics_hz: 200.0,
+            cognitive_interval: 10,
+            steps_per_episode: 2000,
+            network_layers: 3,
+            neurons_per_layer: 8,
+            learning_rate: 0.001,
         }
     }
 }
 
 impl ExoskeletonConfig {
-    pub fn physics_dt(&self) -> f64 { 1.0 / self.physics_hz }
+    pub fn physics_dt(&self) -> f64 {
+        1.0 / self.physics_hz
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     #[test]
-    fn test_standing_valid() { let s = ExoskeletonState::standing(); assert!(s.is_finite()); assert_eq!(s.to_channels().len(), NUM_STATE_CHANNELS); }
+    fn test_standing_valid() {
+        let s = ExoskeletonState::standing();
+        assert!(s.is_finite());
+        assert_eq!(s.to_channels().len(), NUM_STATE_CHANNELS);
+    }
     #[test]
     fn test_assistance_from_phi() {
         assert_eq!(AssistanceMode::from_phi(0.8), AssistanceMode::Predictive);
         assert_eq!(AssistanceMode::from_phi(0.4), AssistanceMode::Responsive);
-        assert_eq!(AssistanceMode::from_phi(0.05), AssistanceMode::GravityCompensation);
+        assert_eq!(
+            AssistanceMode::from_phi(0.05),
+            AssistanceMode::GravityCompensation
+        );
     }
     #[test]
-    fn test_zero_cmd() { assert_eq!(ExoskeletonCommand::zero().control_effort(), 0.0); }
+    fn test_zero_cmd() {
+        assert_eq!(ExoskeletonCommand::zero().control_effort(), 0.0);
+    }
 }

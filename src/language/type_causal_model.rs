@@ -126,7 +126,11 @@ impl TypeCausalModel {
             ReturnWrapping::CollectVec
         } else if return_type == "String" {
             ReturnWrapping::ToString
-        } else if return_type == "u32" || return_type == "u64" || return_type == "i32" || return_type == "i64" {
+        } else if return_type == "u32"
+            || return_type == "u64"
+            || return_type == "i32"
+            || return_type == "i64"
+        {
             ReturnWrapping::Direct
         } else {
             ReturnWrapping::Direct
@@ -163,7 +167,10 @@ impl TypeCausalModel {
     /// If the return type needs owned `T`, we need `.copied()`.
     pub fn needs_copy_after_iter(param_type: &str, return_type: &str) -> bool {
         // If iterating over a slice and collecting to Vec<T> (not Vec<&T>)
-        if Self::is_slice(param_type) && return_type.contains("Vec<") && !return_type.contains("Vec<&") {
+        if Self::is_slice(param_type)
+            && return_type.contains("Vec<")
+            && !return_type.contains("Vec<&")
+        {
             return true;
         }
         // If iterating over a slice and summing/counting (need owned values)
@@ -191,7 +198,9 @@ impl TypeCausalModel {
             ReturnWrapping::Direct => body.to_string(),
             ReturnWrapping::OptionSome => {
                 // Don't double-wrap if body already returns Option
-                if body.contains("None") || body.contains("Some(") || body.contains("return None")
+                if body.contains("None")
+                    || body.contains("Some(")
+                    || body.contains("return None")
                     || body.contains("return Some")
                 {
                     body.to_string()
@@ -200,7 +209,9 @@ impl TypeCausalModel {
                 }
             }
             ReturnWrapping::ResultOk => {
-                if body.contains("Err(") || body.contains("Ok(") || body.contains("return Err")
+                if body.contains("Err(")
+                    || body.contains("Ok(")
+                    || body.contains("return Err")
                     || body.contains("return Ok")
                 {
                     body.to_string()
@@ -216,7 +227,10 @@ impl TypeCausalModel {
                 }
             }
             ReturnWrapping::ToString => {
-                if body.contains(".to_string()") || body.contains("String::") || body.contains("format!(") {
+                if body.contains(".to_string()")
+                    || body.contains("String::")
+                    || body.contains("format!(")
+                {
                     body.to_string()
                 } else {
                     format!("{}.to_string()", body)
@@ -240,10 +254,16 @@ impl TypeCausalModel {
         for param_type in param_types {
             if Self::needs_copy_after_iter(param_type, return_type) {
                 // If body uses .iter().filter() or .iter().map() without .copied()
-                if fixed.contains(".iter().filter(") && !fixed.contains(".copied()") && !fixed.contains(".cloned()") {
+                if fixed.contains(".iter().filter(")
+                    && !fixed.contains(".copied()")
+                    && !fixed.contains(".cloned()")
+                {
                     fixed = fixed.replace(".iter().filter(", ".iter().copied().filter(");
                 }
-                if fixed.contains(".iter().map(") && !fixed.contains(".copied()") && !fixed.contains(".cloned()") {
+                if fixed.contains(".iter().map(")
+                    && !fixed.contains(".copied()")
+                    && !fixed.contains(".cloned()")
+                {
                     fixed = fixed.replace(".iter().map(", ".iter().copied().map(");
                 }
             }
@@ -268,11 +288,26 @@ mod tests {
 
     #[test]
     fn test_required_wrapping() {
-        assert_eq!(TypeCausalModel::required_wrapping("Option<u64>"), ReturnWrapping::OptionSome);
-        assert_eq!(TypeCausalModel::required_wrapping("Result<f64, String>"), ReturnWrapping::ResultOk);
-        assert_eq!(TypeCausalModel::required_wrapping("Vec<i32>"), ReturnWrapping::CollectVec);
-        assert_eq!(TypeCausalModel::required_wrapping("String"), ReturnWrapping::ToString);
-        assert_eq!(TypeCausalModel::required_wrapping("bool"), ReturnWrapping::Direct);
+        assert_eq!(
+            TypeCausalModel::required_wrapping("Option<u64>"),
+            ReturnWrapping::OptionSome
+        );
+        assert_eq!(
+            TypeCausalModel::required_wrapping("Result<f64, String>"),
+            ReturnWrapping::ResultOk
+        );
+        assert_eq!(
+            TypeCausalModel::required_wrapping("Vec<i32>"),
+            ReturnWrapping::CollectVec
+        );
+        assert_eq!(
+            TypeCausalModel::required_wrapping("String"),
+            ReturnWrapping::ToString
+        );
+        assert_eq!(
+            TypeCausalModel::required_wrapping("bool"),
+            ReturnWrapping::Direct
+        );
     }
 
     #[test]
@@ -299,7 +334,9 @@ mod tests {
     #[test]
     fn test_needs_copy() {
         assert!(TypeCausalModel::needs_copy_after_iter("&[i32]", "Vec<i32>"));
-        assert!(!TypeCausalModel::needs_copy_after_iter("Vec<i32>", "Vec<i32>"));
+        assert!(!TypeCausalModel::needs_copy_after_iter(
+            "Vec<i32>", "Vec<i32>"
+        ));
         assert!(TypeCausalModel::needs_copy_after_iter("&[i32]", "i32"));
     }
 
@@ -314,6 +351,9 @@ mod tests {
     #[test]
     fn test_recommend_iterator() {
         assert_eq!(TypeCausalModel::recommend_iterator("&[i32]"), ".iter()");
-        assert_eq!(TypeCausalModel::recommend_iterator("Vec<i32>"), ".into_iter()");
+        assert_eq!(
+            TypeCausalModel::recommend_iterator("Vec<i32>"),
+            ".into_iter()"
+        );
     }
 }

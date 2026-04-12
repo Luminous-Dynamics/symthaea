@@ -95,11 +95,7 @@ impl ProofTree {
         subgoals: Vec<String>,
     ) -> Vec<GoalId> {
         let mut new_ids = Vec::new();
-        let depth = self
-            .nodes
-            .get(goal_id)
-            .map(|n| n.depth + 1)
-            .unwrap_or(1);
+        let depth = self.nodes.get(goal_id).map(|n| n.depth + 1).unwrap_or(1);
 
         for subgoal_stmt in subgoals {
             let id = GoalId(self.next_id);
@@ -510,7 +506,10 @@ mod tests {
         let script = tree.proof_script();
         // Should contain split and two assumption steps
         assert!(script.iter().any(|s| s.contains("split")));
-        assert_eq!(script.iter().filter(|s| s.contains("assumption")).count(), 2);
+        assert_eq!(
+            script.iter().filter(|s| s.contains("assumption")).count(),
+            2
+        );
     }
 
     #[test]

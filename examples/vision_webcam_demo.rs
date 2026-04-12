@@ -29,10 +29,8 @@ fn main() {
 
 #[cfg(feature = "vision-manifold")]
 fn main() {
-    use symthaea::perception::vision_manifold::{
-        VisionBridge, VisionConfig, VisionManifold,
-    };
     use std::time::Instant;
+    use symthaea::perception::vision_manifold::{VisionBridge, VisionConfig, VisionManifold};
 
     println!("=== Symthaea Vision Manifold Demo ===");
     println!("Processing 100 synthetic frames through the full P1-P6 pipeline\n");
@@ -65,15 +63,9 @@ fn main() {
 
         // Print telemetry every 10 frames
         if frame_idx % 10 == 0 || frame_idx == 99 {
-            let obj_count = manifold
-                .object_memory()
-                .map_or(0, |m| m.len());
-            let wm_load = manifold
-                .working_memory()
-                .map_or(0, |wm| wm.load());
-            let sg_edges = manifold
-                .scene_graph()
-                .map_or(0, |sg| sg.num_edges());
+            let obj_count = manifold.object_memory().map_or(0, |m| m.len());
+            let wm_load = manifold.working_memory().map_or(0, |wm| wm.load());
+            let sg_edges = manifold.scene_graph().map_or(0, |sg| sg.num_edges());
 
             println!(
                 "Frame {:3} | {:.1}ms | PE={:.3} | Coh={:.3} | ImgSurp={:.3} | \
@@ -195,7 +187,15 @@ fn generate_scene(width: u32, height: u32, frame_idx: usize) -> Vec<u8> {
 }
 
 #[cfg(feature = "vision-manifold")]
-fn draw_rect(pixels: &mut [u8], stride: usize, x: usize, y: usize, w: usize, h: usize, color: [u8; 3]) {
+fn draw_rect(
+    pixels: &mut [u8],
+    stride: usize,
+    x: usize,
+    y: usize,
+    w: usize,
+    h: usize,
+    color: [u8; 3],
+) {
     for dy in 0..h {
         for dx in 0..w {
             let px = (x + dx) % stride;

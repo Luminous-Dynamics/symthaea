@@ -62,10 +62,8 @@ impl DftGrid {
                 let r = r_bs * (1.0 + xi) / (1.0 - xi); // Becke mapping
                 let dr = 2.0 * r_bs / ((1.0 - xi) * (1.0 - xi)); // dr/dxi
 
-                let radial_weight = PI / (n_radial as f64 + 1.0)
-                    * (1.0 - xi * xi).sqrt()
-                    * r * r
-                    * dr;
+                let radial_weight =
+                    PI / (n_radial as f64 + 1.0) * (1.0 - xi * xi).sqrt() * r * r * dr;
 
                 // Angular grid
                 for &(theta_x, theta_y, theta_z, ang_weight) in &angular_points {
@@ -74,9 +72,7 @@ impl DftGrid {
                     let z = atom.position[2] + r * theta_z;
 
                     // Becke partitioning weight
-                    let becke_w = becke_partition_weight(
-                        atom_idx, x, y, z, atoms,
-                    );
+                    let becke_w = becke_partition_weight(atom_idx, x, y, z, atoms);
 
                     let total_weight = radial_weight * ang_weight * becke_w;
 
@@ -104,13 +100,7 @@ impl DftGrid {
 /// Becke partition weight for atom `atom_idx` at point (x, y, z).
 ///
 /// Uses the Becke fuzzy-cell scheme with Stratmann step function.
-fn becke_partition_weight(
-    atom_idx: usize,
-    x: f64,
-    y: f64,
-    z: f64,
-    atoms: &[Atom],
-) -> f64 {
+fn becke_partition_weight(atom_idx: usize, x: f64, y: f64, z: f64, atoms: &[Atom]) -> f64 {
     let n_atoms = atoms.len();
     if n_atoms == 1 {
         return 1.0;
@@ -165,11 +155,11 @@ fn dist_to_atom(x: f64, y: f64, z: f64, atom: &Atom) -> f64 {
 /// Bragg-Slater radii in Bohr for grid scaling.
 fn bragg_slater_radius(z: u8) -> f64 {
     match z {
-        1 => 0.661, // H: 0.35 Å
-        2 => 0.567, // He: 0.30 Å
-        3..=4 => 2.268, // Li-Be: ~1.2 Å
+        1 => 0.661,      // H: 0.35 Å
+        2 => 0.567,      // He: 0.30 Å
+        3..=4 => 2.268,  // Li-Be: ~1.2 Å
         5..=10 => 1.323, // B-Ne: ~0.7 Å
-        _ => 1.5, // Default
+        _ => 1.5,        // Default
     }
 }
 
@@ -177,8 +167,8 @@ fn bragg_slater_radius(z: u8) -> f64 {
 /// Returns (x, y, z, weight) for points on the unit sphere.
 fn lebedev_6() -> Vec<(f64, f64, f64, f64)> {
     let w = 1.0 / 6.0; // 4π/6 normalized to sum=4π... actually sum of weights = 4π
-    // For integration: Σ w_i f(r_i) ≈ ∫ f dΩ / (4π), so w_i should sum to 1
-    // We normalize so Σ w = 1 (weights are for ∫ f(Ω) dΩ/(4π))
+                       // For integration: Σ w_i f(r_i) ≈ ∫ f dΩ / (4π), so w_i should sum to 1
+                       // We normalize so Σ w = 1 (weights are for ∫ f(Ω) dΩ/(4π))
     vec![
         (1.0, 0.0, 0.0, w),
         (-1.0, 0.0, 0.0, w),
@@ -196,9 +186,12 @@ fn lebedev_26() -> Vec<(f64, f64, f64, f64)> {
     // 6 points along axes (weight a1)
     let a1 = 1.0 / 21.0;
     for &(x, y, z) in &[
-        (1.0, 0.0, 0.0), (-1.0, 0.0, 0.0),
-        (0.0, 1.0, 0.0), (0.0, -1.0, 0.0),
-        (0.0, 0.0, 1.0), (0.0, 0.0, -1.0),
+        (1.0, 0.0, 0.0),
+        (-1.0, 0.0, 0.0),
+        (0.0, 1.0, 0.0),
+        (0.0, -1.0, 0.0),
+        (0.0, 0.0, 1.0),
+        (0.0, 0.0, -1.0),
     ] {
         pts.push((x, y, z, a1));
     }
@@ -207,9 +200,18 @@ fn lebedev_26() -> Vec<(f64, f64, f64, f64)> {
     let a2 = 4.0 / 105.0;
     let s = 1.0 / 2.0_f64.sqrt();
     for &(x, y, z) in &[
-        (s, s, 0.0), (s, -s, 0.0), (-s, s, 0.0), (-s, -s, 0.0),
-        (s, 0.0, s), (s, 0.0, -s), (-s, 0.0, s), (-s, 0.0, -s),
-        (0.0, s, s), (0.0, s, -s), (0.0, -s, s), (0.0, -s, -s),
+        (s, s, 0.0),
+        (s, -s, 0.0),
+        (-s, s, 0.0),
+        (-s, -s, 0.0),
+        (s, 0.0, s),
+        (s, 0.0, -s),
+        (-s, 0.0, s),
+        (-s, 0.0, -s),
+        (0.0, s, s),
+        (0.0, s, -s),
+        (0.0, -s, s),
+        (0.0, -s, -s),
     ] {
         pts.push((x, y, z, a2));
     }
@@ -218,8 +220,14 @@ fn lebedev_26() -> Vec<(f64, f64, f64, f64)> {
     let a3 = 27.0 / 840.0;
     let t = 1.0 / 3.0_f64.sqrt();
     for &(x, y, z) in &[
-        (t, t, t), (t, t, -t), (t, -t, t), (t, -t, -t),
-        (-t, t, t), (-t, t, -t), (-t, -t, t), (-t, -t, -t),
+        (t, t, t),
+        (t, t, -t),
+        (t, -t, t),
+        (t, -t, -t),
+        (-t, t, t),
+        (-t, t, -t),
+        (-t, -t, t),
+        (-t, -t, -t),
     ] {
         pts.push((x, y, z, a3));
     }
@@ -240,9 +248,18 @@ fn lebedev_50() -> Vec<(f64, f64, f64, f64)> {
     let b = 0.8506_508_084;
 
     for &(x, y, z) in &[
-        (0.0, a, b), (0.0, a, -b), (0.0, -a, b), (0.0, -a, -b),
-        (a, b, 0.0), (a, -b, 0.0), (-a, b, 0.0), (-a, -b, 0.0),
-        (b, 0.0, a), (b, 0.0, -a), (-b, 0.0, a), (-b, 0.0, -a),
+        (0.0, a, b),
+        (0.0, a, -b),
+        (0.0, -a, b),
+        (0.0, -a, -b),
+        (a, b, 0.0),
+        (a, -b, 0.0),
+        (-a, b, 0.0),
+        (-a, -b, 0.0),
+        (b, 0.0, a),
+        (b, 0.0, -a),
+        (-b, 0.0, a),
+        (-b, 0.0, -a),
     ] {
         pts.push((x, y, z, w));
         pts.push((-x, -y, -z, w)); // Inversion partner
@@ -288,10 +305,7 @@ mod tests {
     #[test]
     fn test_becke_partition_midpoint() {
         // At the midpoint of H2, both atoms should have weight ~0.5
-        let atoms = vec![
-            Atom::new(1, 0.0, 0.0, 0.0),
-            Atom::new(1, 0.0, 0.0, 2.0),
-        ];
+        let atoms = vec![Atom::new(1, 0.0, 0.0, 0.0), Atom::new(1, 0.0, 0.0, 2.0)];
         let w0 = becke_partition_weight(0, 0.0, 0.0, 1.0, &atoms);
         let w1 = becke_partition_weight(1, 0.0, 0.0, 1.0, &atoms);
         assert!(

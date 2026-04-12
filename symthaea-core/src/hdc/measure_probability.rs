@@ -186,10 +186,7 @@ impl Martingale {
             return true;
         }
         for t in 0..n - 1 {
-            let known: Vec<f64> = self.filtration[t]
-                .iter()
-                .map(|&i| self.values[i])
-                .collect();
+            let known: Vec<f64> = self.filtration[t].iter().map(|&i| self.values[i]).collect();
             let cond_exp = expectation_fn(&known);
             if (cond_exp - self.values[t]).abs() > 1e-8 {
                 return false;
@@ -201,7 +198,11 @@ impl Martingale {
 
 /// Doob's optional stopping bound: E[X_τ] ≤ max|X_n| (crude bound).
 pub fn optional_stopping_bound(martingale_values: &[f64], _stopping_time: usize) -> f64 {
-    martingale_values.iter().cloned().map(f64::abs).fold(0.0f64, f64::max)
+    martingale_values
+        .iter()
+        .cloned()
+        .map(f64::abs)
+        .fold(0.0f64, f64::max)
 }
 
 /// Doob's maximal inequality: P(max X_n ≥ λ) ≤ E[|X_N|] / λ.
@@ -218,7 +219,9 @@ pub fn doobs_maximal_inequality(values: &[f64], lambda: f64) -> f64 {
 /// Simple LCG random number generator producing values in [0, 1).
 fn lcg_next(state: &mut u64) -> f64 {
     // Parameters from Numerical Recipes
-    *state = state.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+    *state = state
+        .wrapping_mul(6364136223846793005)
+        .wrapping_add(1442695040888963407);
     (*state >> 33) as f64 / (1u64 << 31) as f64
 }
 
@@ -381,7 +384,11 @@ pub fn standard_normal_cdf(x: f64) -> f64 {
                 + t * (1.781_477_937 + t * (-1.821_255_978 + t * 1.330_274_429))));
     let pdf = (-0.5 * x * x).exp() / (2.0 * std::f64::consts::PI).sqrt();
     let cdf_positive = 1.0 - pdf * poly;
-    if x >= 0.0 { cdf_positive } else { 1.0 - cdf_positive }
+    if x >= 0.0 {
+        cdf_positive
+    } else {
+        1.0 - cdf_positive
+    }
 }
 
 // ─── Tests ────────────────────────────────────────────────────────────────────
@@ -468,7 +475,10 @@ mod tests {
     fn test_gbm_positive() {
         // GBM paths are always positive
         let path = geometric_brownian_motion(100.0, 0.05, 0.2, 0.01, 252, 42);
-        assert!(path.iter().all(|&v| v > 0.0), "All GBM values must be positive");
+        assert!(
+            path.iter().all(|&v| v > 0.0),
+            "All GBM values must be positive"
+        );
     }
 
     #[test]
@@ -536,7 +546,12 @@ mod tests {
         // ||sin||_2 on [0, π] = sqrt(π/2)
         let norm = lp_norm(|x: f64| x.sin(), 2.0, 0.0, std::f64::consts::PI, 10000);
         let expected = (std::f64::consts::PI / 2.0).sqrt();
-        assert!((norm - expected).abs() < 0.01, "L2 norm of sin on [0,π]: expected {}, got {}", expected, norm);
+        assert!(
+            (norm - expected).abs() < 0.01,
+            "L2 norm of sin on [0,π]: expected {}, got {}",
+            expected,
+            norm
+        );
     }
 
     #[test]

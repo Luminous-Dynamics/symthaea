@@ -37,13 +37,14 @@ pub fn generate_melody(
     // Calm music gets flatter contours; intense music gets dramatic arcs.
     let phrase_len = config.max_notes.max(4);
     let peak_position = 0.35 + (1.0 - state.arousal) * 0.25; // 0.35-0.60 through phrase
-    // Contour strength: base from arousal, boosted for sparse melodies
-    // (fewer notes need more pronounced pitch arc to register as a contour)
+                                                             // Contour strength: base from arousal, boosted for sparse melodies
+                                                             // (fewer notes need more pronounced pitch arc to register as a contour)
     let sparsity_boost = if config.max_notes <= 8 { 0.15 } else { 0.0 };
     let contour_strength = (0.35 + state.arousal * 0.45 + sparsity_boost).min(0.9);
 
     // Base velocity from consciousness + dopamine
-    let base_velocity = (0.3 + state.consciousness_level * 0.3 + state.dopamine * 0.15).clamp(0.2, 0.85);
+    let base_velocity =
+        (0.3 + state.consciousness_level * 0.3 + state.dopamine * 0.15).clamp(0.2, 0.85);
     // Dynamic range: arousal widens velocity spread
     let dynamic_range = 0.10 + state.arousal * 0.20;
 

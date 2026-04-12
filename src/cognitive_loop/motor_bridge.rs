@@ -19,9 +19,12 @@
 //!   → proprioceptive HV → next cognitive cycle input
 //! ```
 
+#[cfg(feature = "humanoid")]
 use symthaea_core::genesis::GenesisSeed;
+#[cfg(feature = "humanoid")]
 use symthaea_core::hdc::ContinuousHV;
 
+#[cfg(feature = "humanoid")]
 use crate::humanoid::{
     HumanoidCommand, HumanoidConfig, HumanoidController, HumanoidHdcEncoder,
     HumanoidPhysicsSimulator, HumanoidState, SimpleHumanoidSimulator,
@@ -37,8 +40,11 @@ pub use symthaea_core::embodiment::{
 };
 
 // ── Humanoid implementation ─────────────────────────────────────────────────
+// Everything below is the humanoid-specific MotorBridge. Other platforms
+// implement EmbodimentBridge directly in their crate.
 
 /// Bridge between cognitive loop and humanoid motor system.
+#[cfg(feature = "humanoid")]
 ///
 /// Implements [`EmbodimentBridge`] for the 21-DOF bipedal humanoid.
 pub struct MotorBridge {
@@ -56,6 +62,7 @@ pub struct MotorBridge {
     last_prediction_error: f32,
 }
 
+#[cfg(feature = "humanoid")]
 impl MotorBridge {
     /// Create a new motor bridge with default configuration.
     pub fn new(genesis: &GenesisSeed) -> Self {
@@ -174,6 +181,7 @@ impl MotorBridge {
     }
 }
 
+#[cfg(feature = "humanoid")]
 impl EmbodimentBridge for MotorBridge {
     fn step(&mut self, thought_hv: &ContinuousHV, _dt: f32, phi: f64) -> EmbodimentResult {
         let phi_level = MotorSafetyLevel::from_phi(phi);
@@ -280,7 +288,7 @@ impl EmbodimentBridge for MotorBridge {
 
 // ── Tests ───────────────────────────────────────────────────────────────────
 
-#[cfg(test)]
+#[cfg(all(test, feature = "humanoid"))]
 mod embodiment_tests {
     use super::*;
 
