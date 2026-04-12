@@ -1040,6 +1040,146 @@ impl RationalPolynomial {
     }
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// TRANSCENDENTAL INTEGRATION — numerical evaluation of special integrals
+// ═══════════════════════════════════════════════════════════════════════════
+
+/// Sine integral: Si(x) = ∫₀ˣ sin(t)/t dt.
+///
+/// Computed via adaptive Simpson's rule. Si(∞) = π/2.
+/// Used in signal processing, diffraction, and antenna theory.
+pub fn sine_integral(x: f64) -> f64 {
+    if x.abs() < 1e-15 { return 0.0; }
+    let sign = if x < 0.0 { -1.0 } else { 1.0 };
+    let x = x.abs();
+    // For small x, use Taylor series: Si(x) = x - x³/18 + x⁵/600 - ...
+    if x < 1.0 {
+        let mut sum = 0.0;
+        let mut term = x;
+        for k in 0..20 {
+            sum += term / (2 * k + 1) as f64;
+            term *= -x * x / ((2 * k + 2) as f64 * (2 * k + 3) as f64);
+        }
+        return sign * sum;
+    }
+    // For larger x, use adaptive quadrature
+    let n = (x * 20.0).ceil() as usize;
+    let n = n.max(100).min(10000);
+    let h = x / n as f64;
+    // Simpson's rule
+    let mut sum = (x.sin() / x); // sinc at x
+    // f(0) = sin(0)/0 = 1 by L'Hôpital
+    sum += 1.0; // f(0) = 1
+    for i in 1..n {
+        let t = i as f64 * h;
+        let f = t.sin() / t;
+        sum += if i % 2 == 0 { 2.0 * f } else { 4.0 * f };
+    }
+    sign * sum * h / 3.0
+}
+
+/// Error function: erf(x) = (2/√π) ∫₀ˣ e^(-t²) dt.
+///
+/// Computed via series expansion for |x| < 3.5, asymptotic for large x.
+/// Fundamental in probability, heat transfer, and statistics.
+pub fn error_function(x: f64) -> f64 {
+    if x.abs() < 1e-15 { return 0.0; }
+    let sign = if x < 0.0 { -1.0 } else { 1.0 };
+    let x = x.abs();
+
+    if x < 3.5 {
+        // Taylor series: erf(x) = (2/√π) Σ (-1)^n x^(2n+1) / (n! (2n+1))
+        let two_over_sqrt_pi = 2.0 / std::f64::consts::PI.sqrt();
+        let mut sum = 0.0;
+        let mut term = x; // first term: x
+        for n in 0..30 {
+            sum += term / (2 * n + 1) as f64;
+            term *= -x * x / (n + 1) as f64;
+        }
+        sign * two_over_sqrt_pi * sum
+    } else {
+        // Asymptotic: erf(x) ≈ 1 - e^(-x²)/(x√π) for large x
+        sign * (1.0 - (-x * x).exp() / (x * std::f64::consts::PI.sqrt()))
+    }
+}
+
+/// Exponential integral: Ei(x) = ∫₋∞ˣ e^t/t dt (principal value for x > 0).
+///
+/// For x > 0, Ei(x) = -PV∫₋ₓ^∞ e^(-t)/t dt = γ + ln(x) + Σ x^n/(n·n!)
+/// where γ ≈ 0.5772 is the Euler-Mascheroni constant.
+pub fn exponential_integral(x: f64) -> f64 {
+    if x.abs() < 1e-15 { return f64::NEG_INFINITY; }
+    let euler_gamma = 0.5772156649015329;
+
+    if x.abs() < 40.0 {
+        // Series: Ei(x) = γ + ln|x| + Σ_{n=1}^∞ x^n / (n·n!)
+        let mut sum = euler_gamma + x.abs().ln();
+        let mut term = x;
+        let mut fact = 1.0;
+        for n in 1..60 {
+            fact *= n as f64;
+            sum += term / (n as f64 * fact);
+            term *= x;
+            if term.abs() / (n as f64 * fact) < 1e-15 { break; }
+        }
+        sum
+    } else {
+        // Asymptotic: Ei(x) ~ e^x/x (1 + 1!/x + 2!/x² + ...)
+        let mut sum: f64 = 1.0;
+        let mut term: f64 = 1.0;
+        for n in 1..20 {
+            term *= n as f64 / x;
+            if term.abs() > sum.abs() { break; } // diverging
+            sum += term;
+        }
+        x.exp() / x * sum
+    }
+}
+
+/// Fresnel cosine integral: C(x) = ∫₀ˣ cos(πt²/2) dt.
+///
+/// Used in optics (Fresnel diffraction). C(∞) = 0.5.
+pub fn fresnel_c(x: f64) -> f64 {
+    if x.abs() < 1e-15 { return 0.0; }
+    let sign = if x < 0.0 { -1.0 } else { 1.0 };
+    let x = x.abs();
+
+    // Taylor series: C(x) = Σ (-1)^n (π/2)^(2n) x^(4n+1) / ((4n+1)(2n)!)
+    let pi_half = std::f64::consts::PI / 2.0;
+    let mut sum = 0.0;
+    let mut term = x; // n=0 term: x
+    let mut fact = 1.0;
+    for n in 0..30 {
+        sum += term / (4 * n + 1) as f64 / fact;
+        term *= -pi_half * pi_half * x * x * x * x;
+        fact *= (2 * n + 1) as f64 * (2 * n + 2) as f64;
+        if term.abs() / ((4 * n + 5) as f64 * fact) < 1e-15 { break; }
+    }
+    sign * sum
+}
+
+/// Fresnel sine integral: S(x) = ∫₀ˣ sin(πt²/2) dt.
+///
+/// Used in optics (Fresnel diffraction). S(∞) = 0.5.
+pub fn fresnel_s(x: f64) -> f64 {
+    if x.abs() < 1e-15 { return 0.0; }
+    let sign = if x < 0.0 { -1.0 } else { 1.0 };
+    let x = x.abs();
+
+    let pi_half = std::f64::consts::PI / 2.0;
+    let mut sum = 0.0;
+    let mut term = pi_half * x * x * x / 3.0; // n=0 term
+    let mut fact = 1.0;
+    for n in 0..30 {
+        let denom = (4 * n + 3) as f64 * fact;
+        sum += term / denom;
+        term *= -pi_half * pi_half * x * x * x * x;
+        fact *= (2 * n + 2) as f64 * (2 * n + 3) as f64;
+        if (term / ((4 * n + 7) as f64 * fact)).abs() < 1e-15 { break; }
+    }
+    sign * sum
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1595,5 +1735,66 @@ mod tests {
         // The derivative of -cos(x) = sin(x). Verify by structure.
         let s = format!("{:?}", derivative);
         assert!(s.contains("sin"), "d/dx(∫sin(x)dx) should recover sin: {:?}", derivative);
+    }
+
+    // ==================== TRANSCENDENTAL INTEGRATION ====================
+
+    #[test]
+    fn test_sine_integral_known_values() {
+        // Si(0) = 0
+        assert!(sine_integral(0.0).abs() < 1e-15);
+        // Si(π) ≈ 1.8519
+        let si_pi = sine_integral(std::f64::consts::PI);
+        assert!((si_pi - 1.8519).abs() < 0.01,
+            "Si(π) should ≈ 1.8519, got {:.4}", si_pi);
+        // Si(-x) = -Si(x) (odd function)
+        let si_2 = sine_integral(2.0);
+        let si_neg2 = sine_integral(-2.0);
+        assert!((si_2 + si_neg2).abs() < 1e-10,
+            "Si should be odd: Si(2)={:.6}, Si(-2)={:.6}", si_2, si_neg2);
+    }
+
+    #[test]
+    fn test_error_function_known_values() {
+        // erf(0) = 0
+        assert!(error_function(0.0).abs() < 1e-15);
+        // erf(1) ≈ 0.8427
+        let erf1 = error_function(1.0);
+        assert!((erf1 - 0.8427).abs() < 0.001,
+            "erf(1) should ≈ 0.8427, got {:.4}", erf1);
+        // erf(∞) → 1
+        let erf_big = error_function(5.0);
+        assert!((erf_big - 1.0).abs() < 1e-6,
+            "erf(5) should ≈ 1.0, got {:.6}", erf_big);
+        // erf(-x) = -erf(x) (odd function)
+        let erf_neg = error_function(-1.0);
+        assert!((erf1 + erf_neg).abs() < 1e-10,
+            "erf should be odd: erf(1)={:.6}, erf(-1)={:.6}", erf1, erf_neg);
+    }
+
+    #[test]
+    fn test_exponential_integral_known_values() {
+        // Ei(1) ≈ 1.8951
+        let ei1 = exponential_integral(1.0);
+        assert!((ei1 - 1.8951).abs() < 0.01,
+            "Ei(1) should ≈ 1.8951, got {:.4}", ei1);
+        // Ei(2) ≈ 4.9542
+        let ei2 = exponential_integral(2.0);
+        assert!((ei2 - 4.9542).abs() < 0.01,
+            "Ei(2) should ≈ 4.9542, got {:.4}", ei2);
+    }
+
+    #[test]
+    fn test_fresnel_integrals_known_values() {
+        // C(0) = 0, S(0) = 0
+        assert!(fresnel_c(0.0).abs() < 1e-15);
+        assert!(fresnel_s(0.0).abs() < 1e-15);
+        // C(1) ≈ 0.7799, S(1) ≈ 0.4383
+        let c1 = fresnel_c(1.0);
+        let s1 = fresnel_s(1.0);
+        assert!((c1 - 0.7799).abs() < 0.01,
+            "C(1) should ≈ 0.7799, got {:.4}", c1);
+        assert!((s1 - 0.4383).abs() < 0.01,
+            "S(1) should ≈ 0.4383, got {:.4}", s1);
     }
 }
