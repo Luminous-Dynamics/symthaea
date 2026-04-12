@@ -264,6 +264,19 @@ impl PatchHdcEncoder {
         (frame_hv, patch_hvs)
     }
 
+    /// Extract the appearance component from a position-bound patch HV.
+    ///
+    /// Since `patch_hv = position_hv ⊗ appearance_hv` and HDC binding is
+    /// self-inverse (`a ⊗ a ⊗ b ≈ b`), we recover appearance by re-binding
+    /// with the position HV: `appearance ≈ patch_hv ⊗ position_hv`.
+    ///
+    /// This enables position-invariant template matching: compare a template's
+    /// appearance against patches regardless of where they are on screen.
+    pub fn unbind_position(&self, patch_hv: &ContinuousHV, row: usize, col: usize) -> ContinuousHV {
+        let pos = self.position_hv(row, col);
+        patch_hv.bind(&pos)
+    }
+
     /// Factored position HV: row_hv ⊗ col_hv (GridEncoder pattern).
     fn position_hv(&self, row: usize, col: usize) -> ContinuousHV {
         let r = row % self.max_rows.max(1);

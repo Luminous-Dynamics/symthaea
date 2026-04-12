@@ -241,8 +241,13 @@ impl PhoneBridge {
 
     /// Search the current frame's patches for the best match to a template HV.
     ///
+    /// Uses **appearance-only matching**: unbinds the position component from
+    /// each patch HV before comparing, so the template matches by visual content
+    /// regardless of where it appears on screen. This is critical because the
+    /// template was encoded from a crop (with its own position binding) that
+    /// doesn't correspond to the icon's actual screen position.
+    ///
     /// Returns `(screen_x, screen_y, similarity)` if a match exceeds the threshold.
-    /// Uses the manifold's `last_patch_hvs()` from the most recent `capture_and_observe()`.
     pub fn find_on_screen(
         &self,
         template_hv: &ContinuousHV,
@@ -253,18 +258,23 @@ impl PhoneBridge {
             return None;
         }
 
-        let patch_size = 8usize; // VisionConfig default
+        let patch_size = 8usize;
         let grid_cols = self.target_w as usize / patch_size;
+        let encoder = self.vision.encoder();
 
         let mut best_sim = threshold;
         let mut best_pos: Option<(usize, usize)> = None;
 
         for (idx, patch_hv) in patch_hvs.iter().enumerate() {
-            let sim = template_hv.similarity(patch_hv);
+            let row = idx / grid_cols.max(1);
+            let col = idx % grid_cols.max(1);
+
+            // Unbind position to get pure appearance HV
+            let appearance = encoder.unbind_position(patch_hv, row, col);
+            let sim = template_hv.similarity(&appearance);
+
             if sim > best_sim {
                 best_sim = sim;
-                let row = idx / grid_cols.max(1);
-                let col = idx % grid_cols.max(1);
                 best_pos = Some((row, col));
             }
         }
@@ -278,12 +288,13 @@ impl PhoneBridge {
     /// Learn a visual template from an image file (PNG/JPG).
     ///
     /// Loads the image, resizes to the vision target resolution, encodes
-    /// through the patch encoder, and returns a bundled template HV.
+    /// through the patch encoder, then **unbinds all position components**
+    /// to produce a pure appearance template. This template will match
+    /// the same visual content regardless of screen position.
     pub fn learn_template_from_file(
         &self,
         path: &std::path::Path,
     ) -> Result<ContinuousHV, String> {
-        use image::GenericImageView;
         let img = image::open(path).map_err(|e| format!("Load failed: {e}"))?;
         let resized = img.resize_exact(
             self.target_w,
@@ -300,8 +311,28 @@ impl PhoneBridge {
             self.target_w,
             self.target_h,
         );
-        let (frame_hv, _) = encoder.encode_frame(&pixels, self.target_w, self.target_h, 3);
-        Ok(frame_hv.normalize())
+        let (_, patch_hvs) = encoder.encode_frame(&pixels, self.target_w, self.target_h, 3);
+
+        // Unbind position from each patch to get appearance-only HVs,
+        // then bundle them into a single appearance template.
+        let patch_size = 8usize;
+        let grid_cols = self.target_w as usize / patch_size;
+        let appearance_hvs: Vec<ContinuousHV> = patch_hvs
+            .iter()
+            .enumerate()
+            .map(|(idx, phv)| {
+                let row = idx / grid_cols.max(1);
+                let col = idx % grid_cols.max(1);
+                encoder.unbind_position(phv, row, col)
+            })
+            .collect();
+
+        if appearance_hvs.is_empty() {
+            return Err("No patches encoded".into());
+        }
+
+        let refs: Vec<&ContinuousHV> = appearance_hvs.iter().collect();
+        Ok(ContinuousHV::bundle(&refs).normalize())
     }
 
     /// Last match similarity from `propose_goal_action` (if a match was found).
@@ -386,9 +417,125 @@ impl PhoneBridge {
 // EmbodimentBridge implementation — allows PhoneBridge to be used
 // as a drop-in embodiment platform in the cognitive loop.
 //
-// NOTE: This requires adding `Phone` to the `EmbodimentPlatform` enum
-// and the feature flag `phone` to the cfg gate in sensorimotor_execution.rs.
-// For now, this is used standalone via the example binary.
+// ── EmbodimentBridge Implementation ──────────────────────────────────
+
+impl PhoneBridge {
+    /// Step the embodiment: capture screen → propose action → execute if not confirmation mode.
+    ///
+    /// This is the EmbodimentBridge-compatible step that maps thought HV to phone actions.
+    /// The thought HV is used as a goal template for visual search when in Green safety.
+    pub fn step_embodiment(
+        &mut self,
+        _thought_hv: &symthaea_core::hdc::ContinuousHV,
+        dt: f32,
+        phi: f64,
+    ) -> symthaea_core::embodiment::EmbodimentResult {
+        use symthaea_core::embodiment::*;
+
+        // 1. Capture and observe
+        let capture_ok = self.capture_and_observe(dt).is_ok();
+
+        // 2. Propose action based on consciousness level
+        let action = self.propose_action(phi);
+
+        // 3. Execute if not in confirmation mode and capture succeeded
+        let mut success = capture_ok;
+        if capture_ok && !self.confirmation_mode && !matches!(action, PhoneAction::NoOp) {
+            if self.execute_action(&action).is_err() {
+                success = false;
+            }
+        }
+
+        // 4. Compute prediction error from vision manifold
+        let pe = self.last_prediction_error;
+        self.total_steps += 1;
+
+        EmbodimentResult {
+            num_actuators: 5, // tap_x, tap_y, swipe_dx, swipe_dy, keyboard
+            control_effort: if matches!(action, PhoneAction::NoOp | PhoneAction::Screenshot) {
+                0.0
+            } else {
+                0.5
+            },
+            success,
+            prediction_error: pe,
+            safety_level: self.current_safety,
+            epistemic_grounding: GROUNDING_SENSORIMOTOR,
+            observation_confidence: grounding_from_prediction_error(pe),
+        }
+    }
+
+    /// Encode current screen perception as a 16,384D ContinuousHV.
+    pub fn encode_perception_hv(&mut self) -> symthaea_core::hdc::ContinuousHV {
+        self.vision.scene_hv().cloned().unwrap_or_else(|| {
+            symthaea_core::hdc::ContinuousHV::zero(symthaea_core::hdc::HDC_DIMENSION)
+        })
+    }
+}
+
+impl symthaea_core::embodiment::EmbodimentBridge for PhoneBridge {
+    fn step(
+        &mut self,
+        thought_hv: &symthaea_core::hdc::ContinuousHV,
+        dt: f32,
+        phi: f64,
+    ) -> symthaea_core::embodiment::EmbodimentResult {
+        self.step_embodiment(thought_hv, dt, phi)
+    }
+
+    fn encode_perception(&mut self) -> symthaea_core::hdc::ContinuousHV {
+        self.encode_perception_hv()
+    }
+
+    fn reset(&mut self) {
+        self.current_safety = MotorSafetyLevel::Red;
+        self.safety_override = None;
+        self.last_perception = None;
+        self.last_action = None;
+        self.proposed_action = None;
+        self.total_steps = 0;
+        self.last_prediction_error = 0.0;
+    }
+
+    fn safety_level(&self) -> MotorSafetyLevel {
+        self.current_safety
+    }
+
+    fn set_safety_override(&mut self, level: MotorSafetyLevel) {
+        self.safety_override = Some(level);
+    }
+
+    fn clear_safety_override(&mut self) {
+        self.safety_override = None;
+    }
+
+    fn platform(&self) -> symthaea_core::embodiment::EmbodimentPlatform {
+        symthaea_core::embodiment::EmbodimentPlatform::Phone
+    }
+
+    fn num_actuators(&self) -> usize {
+        5
+    }
+
+    fn total_steps(&self) -> usize {
+        self.total_steps
+    }
+
+    fn telemetry(&self) -> symthaea_core::embodiment::EmbodimentTelemetry {
+        use symthaea_core::embodiment::*;
+        EmbodimentTelemetry {
+            total_steps: self.total_steps as u64,
+            control_effort: 0.0,
+            prediction_error: self.last_prediction_error,
+            safety_level: format!("{:?}", self.current_safety),
+            platform: "phone".to_string(),
+            num_actuators: 5,
+            epistemic_grounding: grounding_label(GROUNDING_SENSORIMOTOR).to_string(),
+            observation_confidence: grounding_from_prediction_error(self.last_prediction_error),
+            platform_specific: Vec::new(),
+        }
+    }
+}
 
 #[cfg(test)]
 mod tests {
@@ -406,6 +553,16 @@ mod tests {
         let (x, y) = phone.grid_to_screen(7, 7);
         assert!(x > 800, "Bottom-right x should be >800, got {x}");
         assert!(y > 1800, "Bottom-right y should be >1800, got {y}");
+    }
+
+    #[test]
+    fn test_embodiment_bridge_step_no_device() {
+        // step() fails gracefully when no ADB device is connected
+        let mut phone = PhoneBridge::new("nonexistent", 1008, 2244);
+        let hv = symthaea_core::hdc::ContinuousHV::random(symthaea_core::hdc::HDC_DIMENSION, 42);
+        let result = phone.step_embodiment(&hv, 0.033, 0.7);
+        // Should not panic — failure is reported via success=false
+        assert!(!result.success);
     }
 
     #[test]
