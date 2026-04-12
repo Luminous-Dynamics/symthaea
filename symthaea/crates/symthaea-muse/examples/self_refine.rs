@@ -70,33 +70,59 @@ fn main() {
             let mut round_best_score = 0.0f32;
             let mut round_best_seed = 0u64;
 
+            let mut rejected = 0usize;
             for candidate in 0..CANDIDATES_PER_ROUND {
-                // Each candidate gets a different seed
-                let seed = (round * CANDIDATES_PER_ROUND + candidate) as u64 + 1;
-                let comp = compose(&config, state, seed);
+                // Each candidate gets a different seed. Retry up to 4x per slot if rejected.
+                let mut seed = (round * CANDIDATES_PER_ROUND + candidate) as u64 + 1;
+                let mut comp = compose(&config, state, seed);
+                let mut attempts = 0;
 
-                // Score across all 4 dimensions
+                let audio = loop {
+                    let audio = match &comp.audio {
+                        symthaea_muse::AudioData::StereoF32(s) => {
+                            AudioQualityScore::evaluate(s, comp.sample_rate)
+                        }
+                        symthaea_muse::AudioData::F32(s) => {
+                            AudioQualityScore::evaluate_mono(s, comp.sample_rate)
+                        }
+                        symthaea_muse::AudioData::I16(s) => {
+                            let f: Vec<f32> = s.iter().map(|&v| v as f32 / 32768.0).collect();
+                            AudioQualityScore::evaluate_mono(&f, comp.sample_rate)
+                        }
+                    };
+
+                    // HARD GATE: reject if spectral flatness > 0.4 (static/noise)
+                    // Spectral flatness is the one metric that correlates with user perception:
+                    // flat > 0.5 = NOISY (user experienced as static/harsh)
+                    // flat < 0.3 = TONAL (user experienced as musical)
+                    if audio.spectral_flatness > 0.4 && attempts < 4 {
+                        rejected += 1;
+                        attempts += 1;
+                        // Try a different seed
+                        seed = seed.wrapping_mul(31).wrapping_add(attempts * 1000);
+                        comp = compose(&config, state, seed);
+                        continue;
+                    }
+                    break audio;
+                };
+
+                // Score across all 4 dimensions (for ranking survivors)
                 let creative = CreativeQualityScore::evaluate(&comp, va);
                 let theory = TheoryValidation::validate(&comp.notes, &scale);
                 let harmonic = HarmonicProgressionScore::evaluate(&comp.notes);
-                let audio = match &comp.audio {
-                    symthaea_muse::AudioData::StereoF32(s) => {
-                        AudioQualityScore::evaluate(s, comp.sample_rate)
-                    }
-                    symthaea_muse::AudioData::F32(s) => {
-                        AudioQualityScore::evaluate_mono(s, comp.sample_rate)
-                    }
-                    symthaea_muse::AudioData::I16(s) => {
-                        let f: Vec<f32> = s.iter().map(|&v| v as f32 / 32768.0).collect();
-                        AudioQualityScore::evaluate_mono(&f, comp.sample_rate)
-                    }
-                };
 
-                // Weighted composite across all dimensions
-                let total = 0.30 * creative.composite
-                    + 0.25 * audio.composite
-                    + 0.25 * theory.composite
-                    + 0.20 * harmonic.composite;
+                // Perceptually-calibrated composite: tonal-ness dominates.
+                // Flatness < 0.3 = tonal bonus, > 0.3 = penalty.
+                // This calibration comes from user ratings:
+                //   refined_melancholy (good)   flat=0.153
+                //   refined_joyful (bad)        flat=0.516
+                //   composed_07_flow (arcade)   flat=0.560
+                let tonal_bonus = (0.4 - audio.spectral_flatness).max(0.0) * 2.5;
+                let total = 0.25 * creative.composite
+                    + 0.15 * audio.composite
+                    + 0.20 * theory.composite
+                    + 0.15 * harmonic.composite
+                    + 0.25 * tonal_bonus; // perceptual correlate
 
                 if total > round_best_score {
                     round_best_score = total;
@@ -108,6 +134,10 @@ fn main() {
                     best_seed = seed;
                     best_comp = Some(comp);
                 }
+            }
+            if rejected > 0 {
+                println!("  Round {}: rejected {} noisy candidates (flat > 0.4)",
+                    round + 1, rejected);
             }
 
             println!(

@@ -341,13 +341,27 @@ pub fn compose(config: &MuseConfig, state: &MusicalState, seed: u64) -> Composit
     let beat_duration = 60.0 / tempo;
     let base_scale = pitch::build_scale(state);
 
+    // HIGH-AROUSAL GRACE: when arousal > 0.5, cap note density so the
+    // synthesis engine can handle the output. Intensity comes from harmonic
+    // tension and register, not density. This is a honest acknowledgement
+    // of synthesis limits — dense polyphony sounds harsh/arcade-like.
+    let arousal_density_cap = if state.arousal > 0.5 {
+        // Linear reduction: arousal 0.5 → 1.0x, arousal 1.0 → 0.35x
+        1.0 - (state.arousal - 0.5) * 1.3
+    } else {
+        1.0
+    };
+
     // 3. Generate melody per section with key shifts and density modulation
-    let notes_per_section = config
+    let base_notes_per_section = config
         .max_notes
         .max(2)
         .checked_div(song_form.sections.len().max(1))
         .unwrap_or(config.max_notes)
         .max(2);
+    let notes_per_section = ((base_notes_per_section as f32) * arousal_density_cap)
+        .round()
+        .max(2.0) as usize;
 
     let mut all_notes: Vec<Note> = Vec::new();
 

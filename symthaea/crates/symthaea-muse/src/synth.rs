@@ -121,7 +121,18 @@ pub fn render_arrangement(
     config: &MuseConfig,
 ) -> AudioData {
     let sr = sample_rate as f32;
-    let partials = compute_timbre(state, config.num_partials.clamp(1, 16));
+    // At high arousal, use FEWER partials to reduce intermodulation distortion
+    // when many voices play simultaneously. User feedback: high-arousal + chord
+    // accompaniment produced static (spectral flatness > 0.5). Fewer partials
+    // → less harmonic density → less beating/noise.
+    let partial_cap = if state.arousal > 0.6 {
+        4 // minimal partials for clean high-energy sound
+    } else if state.arousal > 0.4 {
+        6
+    } else {
+        config.num_partials.clamp(1, 16)
+    };
+    let partials = compute_timbre(state, partial_cap);
     let adsr = compute_adsr(state);
     // FM synthesis: emotion-gated.
     // Tense: moderate FM (the original B-grade sound used moderate FM, not extreme).

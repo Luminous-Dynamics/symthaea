@@ -4303,6 +4303,7 @@ mod tests {
         let seq = ObservedSequence::new("linear_test", MathDomain::NumberTheory, data);
 
         let config = RegressorConfig {
+            disable_macro_seeds: false,
             population_size: 100,
             generations: 50,
             max_depth: 3,
