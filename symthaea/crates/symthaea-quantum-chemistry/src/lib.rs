@@ -37,8 +37,8 @@
 
 pub mod basis;
 pub mod bridge;
+pub mod cognitive_loop_bridge;
 pub mod consciousness;
-// must come after consciousness, quantum_info, stat_mech, time_dependent, post_hf
 pub mod constants;
 pub mod coupled_cluster;
 pub mod dft;

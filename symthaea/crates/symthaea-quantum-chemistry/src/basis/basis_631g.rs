@@ -82,7 +82,10 @@ fn shells_for_element(z: u8) -> Vec<ShellData631G> {
             },
         ],
 
-        // ── Nitrogen (Z=7) ────────────────────────────────────────────────
+        // ── Nitrogen (Z=7) — Hehre, Ditchfield & Pople (1972) ────────────
+        // NOTE: 6-31G valence S coefficients are for SEGMENTED contractions
+        // with primitive normalization applied separately. The negative first
+        // coefficient describes the 2s nodal structure.
         7 => vec![
             ShellData631G {
                 shell_type: ShellType::S,
@@ -130,6 +133,7 @@ fn shells_for_element(z: u8) -> Vec<ShellData631G> {
                     0.232_714, 0.470_193, 0.358_521,
                 ],
             },
+            // 2s inner: 3 primitives
             ShellData631G {
                 shell_type: ShellType::S,
                 exponents: vec![15.539_616, 3.599_934, 1.013_762],
