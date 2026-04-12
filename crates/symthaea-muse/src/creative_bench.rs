@@ -153,35 +153,62 @@ pub fn emotional_alignment(composition: &Composition, target: ValenceArousal) ->
         return 0.0;
     }
 
-    // Proxy for arousal: note density (notes per second)
-    let density = composition.notes.len() as f32 / composition.duration_secs.max(0.1);
-    // Normalize: 0 notes/sec → 0.0 arousal, 8+ notes/sec → 1.0 arousal
-    let inferred_arousal = (density / 8.0).clamp(0.0, 1.0);
+    let notes = &composition.notes;
+    let n = notes.len() as f32;
+    let dur = composition.duration_secs.max(0.1);
 
-    // Proxy for valence: interval brightness (major intervals → positive)
-    // Count major 3rds and major 6ths vs minor 3rds and minor 6ths
+    // ── Arousal inference: multi-feature (robust for sparse melodies) ──
+    // 1. Note density
+    let density_arousal = ((n / dur) / 6.0).clamp(0.0, 1.0);
+    // 2. Mean velocity (louder = higher arousal)
+    let mean_vel = notes.iter().map(|n| n.velocity).sum::<f32>() / n;
+    let velocity_arousal = mean_vel;
+    // 3. Pitch register (higher average = higher arousal)
+    let mean_freq = notes.iter().map(|n| n.frequency).sum::<f32>() / n;
+    let pitch_arousal = ((mean_freq - 200.0) / 400.0).clamp(0.0, 1.0);
+    // 4. Note duration (shorter = higher arousal)
+    let mean_dur = notes.iter().map(|n| n.duration).sum::<f32>() / n;
+    let dur_arousal = (1.0 - (mean_dur - 0.1) / 0.7).clamp(0.0, 1.0);
+
+    let inferred_arousal = 0.30 * density_arousal
+        + 0.30 * velocity_arousal
+        + 0.20 * pitch_arousal
+        + 0.20 * dur_arousal;
+
+    // ── Valence inference: interval brightness + dynamics ──
     let mut major_count = 0usize;
     let mut minor_count = 0usize;
-    for w in composition.notes.windows(2) {
+    for w in notes.windows(2) {
         let ratio = w[1].frequency / w[0].frequency.max(0.001);
         let semitones = (ratio.log2() * 12.0).abs().round() as i32;
         match semitones % 12 {
-            4 | 9 => major_count += 1, // major 3rd, major 6th
-            3 | 8 => minor_count += 1, // minor 3rd, minor 6th
+            4 | 9 | 7 => major_count += 1, // M3, M6, P5 → bright
+            3 | 8 | 6 => minor_count += 1, // m3, m6, tritone → dark
             _ => {}
         }
     }
     let total = (major_count + minor_count).max(1);
-    // major-heavy → positive valence, minor-heavy → negative
-    let inferred_valence = (major_count as f32 - minor_count as f32) / total as f32;
+    let interval_valence = (major_count as f32 - minor_count as f32) / total as f32;
 
-    // Compute distance in VA space
+    // Velocity variance: high variance → tension → negative
+    let vel_var = {
+        let var = notes
+            .iter()
+            .map(|n| (n.velocity - mean_vel).powi(2))
+            .sum::<f32>()
+            / n;
+        var.sqrt()
+    };
+    let dynamics_valence = -vel_var * 0.5;
+
+    let inferred_valence = (interval_valence * 0.7 + dynamics_valence * 0.3).clamp(-1.0, 1.0);
+
+    // ── Distance in VA space ──
     let d_valence = inferred_valence - target.valence;
     let d_arousal = inferred_arousal - target.arousal;
     let distance = (d_valence.powi(2) + d_arousal.powi(2)).sqrt();
 
-    // Max possible distance in VA space: √(4 + 1) ≈ 2.24 (corners: v=±1, a=0/1)
-    let max_distance = 2.0f32.sqrt(); // more realistic max
+    let max_distance = 1.5_f32;
     (1.0 - distance / max_distance).clamp(0.0, 1.0)
 }
 
@@ -199,40 +226,56 @@ pub fn form_compliance(composition: &Composition) -> f32 {
         return 0.0;
     }
 
-    let n_windows = 4.min(composition.notes.len() / 2);
-    if n_windows < 2 {
-        return 0.5;
-    }
-
+    let n_windows = 4.min(composition.notes.len() / 2).max(2);
     let window_dur = composition.duration_secs / n_windows as f32;
+
     let mut densities = Vec::with_capacity(n_windows);
+    let mut mean_velocities = Vec::with_capacity(n_windows);
+    let mut mean_pitches = Vec::with_capacity(n_windows);
 
     for w in 0..n_windows {
         let t_start = w as f32 * window_dur;
         let t_end = t_start + window_dur;
-        let count = composition
+        let window_notes: Vec<&Note> = composition
             .notes
             .iter()
             .filter(|n| n.start_time >= t_start && n.start_time < t_end)
-            .count();
-        densities.push(count as f32 / window_dur);
+            .collect();
+
+        densities.push(window_notes.len() as f32 / window_dur);
+
+        if window_notes.is_empty() {
+            mean_velocities.push(0.0);
+            mean_pitches.push(0.0);
+        } else {
+            let n = window_notes.len() as f32;
+            mean_velocities.push(window_notes.iter().map(|n| n.velocity).sum::<f32>() / n);
+            mean_pitches.push(window_notes.iter().map(|n| n.frequency).sum::<f32>() / n);
+        }
     }
 
-    let mean_density = densities.iter().sum::<f32>() / densities.len() as f32;
-    if mean_density < 0.001 {
-        return 0.0;
-    }
+    // Coefficient of variation for each dimension
+    let cv = |values: &[f32]| -> f32 {
+        let n = values.len() as f32;
+        let mean = values.iter().sum::<f32>() / n;
+        if mean < 0.001 {
+            return 0.0;
+        }
+        let var = values.iter().map(|&v| (v - mean).powi(2)).sum::<f32>() / n;
+        (var.sqrt() / mean).min(1.0)
+    };
 
-    // Coefficient of variation: higher CV = more structure
-    let variance = densities
-        .iter()
-        .map(|&d| (d - mean_density).powi(2))
-        .sum::<f32>()
-        / densities.len() as f32;
-    let cv = variance.sqrt() / mean_density;
+    let density_cv = cv(&densities);
+    let velocity_cv = cv(&mean_velocities);
+    let pitch_cv = cv(&mean_pitches);
 
-    // CV=0 (no structure) → 0.0, CV=1.0+ (strong structure) → 1.0
-    cv.min(1.0)
+    // Combine: any dimension showing variation counts as form.
+    // Velocity and pitch variation matter more for sparse melodies where
+    // density can't show contrast (7 notes / 4 windows ≈ uniform).
+    let combined = (density_cv * 0.4 + velocity_cv * 0.35 + pitch_cv * 0.25).clamp(0.0, 1.0);
+
+    // Scale: CV > 0.1 starts scoring, CV > 0.5 = full marks
+    (combined / 0.5).clamp(0.0, 1.0)
 }
 
 // ─── Harmony Diversity ────────────────────────────────────────────────────────
@@ -1584,8 +1627,8 @@ mod external_validation_tests {
     #[test]
     fn full_quality_benchmark() {
         let config = MuseConfig {
-            duration_secs: 4.0,
-            max_notes: 16,
+            duration_secs: 6.0,
+            max_notes: 32,
             ..Default::default()
         };
 

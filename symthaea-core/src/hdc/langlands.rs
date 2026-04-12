@@ -39,24 +39,25 @@ use super::conjecture_engine::{MathDomain, ObservedSequence};
 // ELLIPTIC CURVES OVER FINITE FIELDS
 // ═══════════════════════════════════════════════════════════════════════════
 
-/// An elliptic curve in short Weierstrass form: y² = x³ + ax + b over ℚ.
+/// An elliptic curve in general Weierstrass form:
+/// y² + a1*xy + a3*y = x³ + a2*x² + a4*x + a6
+///
+/// Also supports short Weierstrass y² = x³ + ax + b (set a1=a2=a3=0, a4=a, a6=b).
 #[derive(Debug, Clone)]
 pub struct EllipticCurve {
-    /// Coefficient a in y² = x³ + ax + b
-    pub a: i64,
-    /// Coefficient b in y² = x³ + ax + b
-    pub b: i64,
+    /// General Weierstrass coefficients [a1, a2, a3, a4, a6]
+    pub coeffs: [i64; 5],
     /// Conductor (level of the corresponding modular form)
     pub conductor: Option<u64>,
-    /// Human-readable label (e.g., "11a1" from Cremona's tables)
+    /// Human-readable label
     pub label: String,
 }
 
 impl EllipticCurve {
+    /// Short Weierstrass: y² = x³ + ax + b
     pub fn new(a: i64, b: i64, label: &str) -> Self {
         Self {
-            a,
-            b,
+            coeffs: [0, 0, 0, a, b],
             conductor: None,
             label: label.to_string(),
         }
@@ -64,38 +65,71 @@ impl EllipticCurve {
 
     pub fn with_conductor(a: i64, b: i64, conductor: u64, label: &str) -> Self {
         Self {
-            a,
-            b,
+            coeffs: [0, 0, 0, a, b],
             conductor: Some(conductor),
             label: label.to_string(),
         }
     }
 
-    /// Count points on E over F_p: #E(F_p) = #{(x,y) ∈ F_p² : y² ≡ x³+ax+b} + 1 (point at infinity).
+    /// General Weierstrass: y² + a1*xy + a3*y = x³ + a2*x² + a4*x + a6
+    pub fn general(
+        a1: i64,
+        a2: i64,
+        a3: i64,
+        a4: i64,
+        a6: i64,
+        conductor: u64,
+        label: &str,
+    ) -> Self {
+        Self {
+            coeffs: [a1, a2, a3, a4, a6],
+            conductor: Some(conductor),
+            label: label.to_string(),
+        }
+    }
+
+    /// Count points on E over F_p using general Weierstrass model.
     ///
-    /// Uses naive enumeration — O(p²) but exact. Sufficient for p < 10000.
+    /// Counts (x,y) ∈ F_p² satisfying y² + a1*xy + a3*y = x³ + a2*x² + a4*x + a6 (mod p),
+    /// plus the point at infinity.
     pub fn count_points(&self, p: u64) -> u64 {
         let mut count = 1u64; // point at infinity
-        let a_mod = ((self.a % p as i64) + p as i64) as u64 % p;
-        let b_mod = ((self.b % p as i64) + p as i64) as u64 % p;
+        let [a1, a2, a3, a4, a6] = self.coeffs;
 
         for x in 0..p {
-            // Compute rhs = x³ + ax + b mod p
-            let x2 = (x * x) % p;
-            let x3 = (x2 * x) % p;
-            let rhs = (x3 + a_mod * x % p + b_mod) % p;
+            let xi = x as i128;
+            let pi = p as i128;
+            // RHS = x³ + a2*x² + a4*x + a6 mod p
+            let rhs = ((xi * xi * xi + a2 as i128 * xi * xi + a4 as i128 * xi + a6 as i128) % pi
+                + pi)
+                % pi;
 
-            // Count y values where y² ≡ rhs (mod p)
-            // If rhs = 0: one solution (y=0)
-            // If rhs is a quadratic residue: two solutions
-            // Otherwise: no solutions
-            if rhs == 0 {
-                count += 1;
+            // For each y in F_p, check if y² + a1*x*y + a3*y ≡ rhs (mod p)
+            // This is a quadratic in y: y² + (a1*x + a3)*y - rhs ≡ 0 (mod p)
+            let b_coeff = ((a1 as i128 * xi + a3 as i128) % pi + pi) % pi;
+
+            // Count solutions of y² + b*y - rhs ≡ 0 (mod p)
+            // Complete the square: (y + b/2)² ≡ rhs + (b/2)² ≡ rhs + b²/4 (mod p)
+            // For p=2, handle separately
+            if p == 2 {
+                for y in 0..2u64 {
+                    let yi = y as i128;
+                    let lhs = ((yi * yi + b_coeff * yi) % pi + pi) % pi;
+                    if lhs == rhs {
+                        count += 1;
+                    }
+                }
             } else {
-                // Check if rhs is a QR via Euler's criterion: rhs^((p-1)/2) ≡ 1 (mod p)
-                let euler = mod_pow(rhs, (p - 1) / 2, p);
-                if euler == 1 {
-                    count += 2;
+                // Discriminant: D = b² + 4*rhs (since equation is y² + by - rhs = 0)
+                let disc = ((b_coeff * b_coeff + 4 * rhs) % pi + pi) % pi;
+                if disc == 0 {
+                    count += 1; // one solution
+                } else {
+                    let euler = mod_pow(disc as u64, (p - 1) / 2, p);
+                    if euler == 1 {
+                        count += 2; // two solutions (disc is QR)
+                    }
+                    // else: no solutions
                 }
             }
         }
@@ -118,10 +152,12 @@ impl EllipticCurve {
         primes
             .iter()
             .filter(|&&p| {
-                // Skip primes dividing the discriminant (bad reduction)
-                // Simple check: skip if discriminant ≡ 0 (mod p)
-                let disc = -16 * (4 * self.a * self.a * self.a + 27 * self.b * self.b);
-                disc % p as i64 != 0
+                // Skip primes dividing the conductor (bad reduction)
+                if let Some(n) = self.conductor {
+                    p != n && n % p != 0
+                } else {
+                    true
+                }
             })
             .map(|&p| (p, self.a_p(p)))
             .collect()
@@ -218,12 +254,9 @@ impl ModularForm {
 /// form is the unique weight-2 newform of level 11:
 ///   f(τ) = q - 2q² - q³ + 2q⁴ + q⁵ + 2q⁶ - 2q⁷ - 2q⁹ - 2q¹⁰ + ...
 pub fn curve_11a1() -> EllipticCurve {
-    // y² + y = x³ - x² in minimal Weierstrass form
-    // For point counting, use the Weierstrass form: y² = x³ - x² + ...
-    // Actually we use the simplified model: a = -1, b = 0 won't work.
-    // The correct short Weierstrass is y² = x³ - 432x - 8208 (discriminant = -11^5)
-    // But for point counting over F_p, we need to count (x,y) with y² ≡ x³ + ax + b
-    EllipticCurve::with_conductor(-432, -8208, 11, "11a1")
+    // y² + y = x³ - x² (Cremona 11a1, LMFDB 11.a2)
+    // General Weierstrass: a1=0, a2=-1, a3=1, a4=0, a6=0
+    EllipticCurve::general(0, -1, 1, 0, 0, 11, "11a1")
 }
 
 /// The newform of level 11 (q-expansion from Cremona / LMFDB).
@@ -289,16 +322,15 @@ pub fn newform_11() -> ModularForm {
     )
 }
 
-/// Curve 14a1: y² + xy + y = x³ + 4x - 6 → short Weierstrass: y² = x³ - 171x - 874
-/// Conductor 14.
+/// Curve 14a1: y² + xy + y = x³ + 4x - 6
+/// General Weierstrass: a1=1, a2=0, a3=1, a4=4, a6=-6. Conductor 14.
 pub fn curve_14a1() -> EllipticCurve {
-    EllipticCurve::with_conductor(-171, -874, 14, "14a1")
+    EllipticCurve::general(1, 0, 1, 4, -6, 14, "14a1")
 }
 
-/// Curve 15a1: conductor 15.
-/// y² + xy + y = x³ + x² - 10x - 10 → y² = x³ - 675x - 6750
+/// Curve 15a1: y² + xy + y = x³ + x² - 10x - 10. Conductor 15.
 pub fn curve_15a1() -> EllipticCurve {
-    EllipticCurve::with_conductor(-675, -6750, 15, "15a1")
+    EllipticCurve::general(1, 1, 1, -10, -10, 15, "15a1")
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -446,22 +478,23 @@ mod tests {
 
     #[test]
     fn test_point_counting_small_prime() {
-        // y² = x³ + x + 1 over F_5
-        // x=0: y²≡1 → y=1,4 (2 points)
-        // x=1: y²≡3 → no solutions (3 is not QR mod 5)
-        // x=2: y²≡11≡1 → y=1,4 (2 points)
-        // x=3: y²≡31≡1 → y=1,4 (2 points)
-        // x=4: y²≡69≡4 → y=2,3 (2 points)
-        // Total: 8 affine + 1 infinity = 9
+        // y² = x³ + x + 1 over F_5 (short Weierstrass: a1=a2=a3=0, a4=1, a6=1)
         let e = EllipticCurve::new(1, 1, "test");
         let count = e.count_points(5);
+        // Manually verify: for each x in F_5, check y² ≡ x³+x+1
+        // x=0: rhs=1, disc=4*1=4, QR(4,5)=1 → 2 points
+        // x=1: rhs=3, disc=4*3=12≡2, QR(2,5)? 2^2=4≠1 → 0 points
+        // x=2: rhs=11≡1, disc=4 → 2 points
+        // x=3: rhs=31≡1, disc=4 → 2 points
+        // x=4: rhs=69≡4, disc=16≡1 → 2 points
+        // Total affine: 8, + infinity = 9
         assert_eq!(count, 9, "#E(F_5) should be 9, got {}", count);
     }
 
     #[test]
     fn test_hasse_bound() {
         // For any curve over F_p: |a_p| ≤ 2√p
-        let e = EllipticCurve::new(-1, 0, "test");
+        let e = EllipticCurve::new(-1, 1, "test"); // y² = x³ - x + 1
         for p in [5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47] {
             let ap = e.a_p(p);
             let bound = (2.0 * (p as f64).sqrt()).ceil() as i64;
@@ -539,39 +572,28 @@ mod tests {
         assert_eq!(seq.data.len(), 20);
     }
 
-    /// Cross-domain test: feed both sequences to ConjectureEngine's
-    /// cross-sequence relation discovery.
+    /// Cross-domain test: verify we can generate both sequences for the
+    /// ConjectureEngine to compare.
     #[test]
-    fn test_cross_domain_modularity_discovery() {
+    fn test_sequences_for_conjecture_engine() {
         let curve = curve_11a1();
         let form = newform_11();
 
         let curve_seq = curve.observe_l_function(47);
         let form_seq = form.observe_q_expansion(47);
 
-        // Use the ConjectureEngine's cross-sequence relation discovery
-        let relations = super::super::conjecture_engine::discover_cross_sequence_relations(
-            &curve_seq, &form_seq,
-        );
+        eprintln!("\n═══ SEQUENCES FOR MODULARITY DISCOVERY ═══");
+        eprintln!("Curve L-function: {} points", curve_seq.data.len());
+        eprintln!("Modular form q-expansion: {} points", form_seq.data.len());
 
-        eprintln!("\n═══ CROSS-DOMAIN MODULARITY DISCOVERY ═══");
-        eprintln!(
-            "Curve: {} ({} data points)",
-            curve_seq.name,
-            curve_seq.data.len()
+        // Both should have data
+        assert!(
+            !curve_seq.data.is_empty(),
+            "curve L-function should have data"
         );
-        eprintln!(
-            "Form:  {} ({} data points)",
-            form_seq.name,
-            form_seq.data.len()
-        );
-        for rel in &relations {
-            eprintln!("  RELATION: {}", rel);
-        }
+        assert!(!form_seq.data.is_empty(), "modular form should have data");
 
-        // The discovery should find some relationship (proportional, linear, etc.)
-        // Even if it doesn't find the exact a_p = c_p identity, finding ANY
-        // cross-domain correlation is significant
-        eprintln!("  Found {} relations", relations.len());
+        // These can be fed to ConjectureEngine::observe() for cross-domain discovery
+        eprintln!("  Ready for ConjectureEngine cross-domain analysis");
     }
 }

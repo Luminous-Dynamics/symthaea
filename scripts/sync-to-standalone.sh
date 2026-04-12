@@ -77,7 +77,7 @@ echo
 # --- Verify stubs exist in standalone ----------------------------------------
 
 STUBS_OK=true
-for stub in mycelix-fl-core mycelix-sdk mycelix-crypto; do
+for stub in mycelix-fl-core mycelix-sdk mycelix-crypto positioning; do
     if [ ! -f "${STANDALONE_REPO}/stubs/${stub}/Cargo.toml" ]; then
         warn "Stub missing: stubs/${stub}/Cargo.toml"
         STUBS_OK=false
@@ -289,7 +289,8 @@ if ! $DRY_RUN; then
         "${STANDALONE_REPO}/Cargo.toml"
     sed -i '/^plexus-search\s*=.*path.*\.\.\//s/^/# [standalone-stripped] /' \
         "${STANDALONE_REPO}/Cargo.toml"
-    sed -i '/^positioning\s*=.*path.*\.\.\//s/^/# [standalone-stripped] /' \
+    # Rewrite positioning to stub (required dep, not optional)
+    sed -i 's|^\(positioning\s*=\s*{\s*path\s*=\s*\)"[^"]*"|\1"stubs/positioning"|' \
         "${STANDALONE_REPO}/Cargo.toml"
     # Strip feature flags that reference stripped deps
     sed -i '/^prism_search\s*=/s/^/# [standalone-stripped] /' \

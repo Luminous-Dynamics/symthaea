@@ -188,6 +188,7 @@ symthaea-causal-reasoning = { path = "crates/symthaea-causal-reasoning", default
 symthaea-fep = { path = "crates/symthaea-fep" }
 
 # Shared positioning and peer-fusion primitives
+positioning = { path = "stubs/positioning" }
 
 # Symthaea Dream - Counterfactual Dream Engine (always enabled)
 symthaea-dream = { path = "crates/symthaea-dream" }

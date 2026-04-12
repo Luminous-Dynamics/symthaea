@@ -282,6 +282,341 @@ impl Default for TypeCausalModel {
     }
 }
 
+// =========================================================================
+// Solution Family Classification — Structural reasoning from signatures
+// =========================================================================
+
+/// What structural pattern a solution should use.
+///
+/// Inferred from the function signature (input types + return type) before
+/// the emitter runs. This is Symthaea's structural reasoning about code:
+/// "the signature tells me what KIND of solution this needs."
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SolutionFamily {
+    /// Single expression or short formula: `a + b`, `x % 4 == 0`
+    /// Signature: few params, primitive return, no collection
+    SingleExpression,
+    /// Iterator chain: `input.iter().map().filter().collect()`
+    /// Signature: collection in → collection/value out
+    IteratorChain,
+    /// Loop with mutable accumulator: `while { acc += ...; } acc`
+    /// Signature: numeric in → Option/numeric out (suggests iteration to find answer)
+    LoopAccumulator,
+    /// Pattern match / conditional dispatch: `match input { ... }`
+    /// Signature: &str → &str or enum-like dispatch
+    PatternMatch,
+    /// Struct with methods: `struct X { ... } impl X { fn new() ... }`
+    /// Signature: has &self, or constructs a named type
+    StructMethods,
+    /// Error handling with Result: validation + Ok/Err
+    /// Signature: returns Result<T, E>
+    ErrorHandling,
+    /// Can't determine from signature alone
+    Unknown,
+}
+
+impl SolutionFamily {
+    /// Classify the solution family from function parameter types and return type.
+    ///
+    /// This is the core structural reasoning: the signature constrains what
+    /// kind of code can satisfy it. No keyword matching needed.
+    pub fn from_signature(params: &[(String, String)], return_type: &str) -> Self {
+        let ret = return_type.trim();
+        let has_collection_input = params
+            .iter()
+            .any(|(_, t)| t.contains("&[") || t.contains("Vec<") || t.contains("&str"));
+        let has_numeric_input = params.iter().any(|(_, t)| {
+            t.contains("i32")
+                || t.contains("i64")
+                || t.contains("u32")
+                || t.contains("u64")
+                || t.contains("f32")
+                || t.contains("f64")
+                || t.contains("usize")
+        });
+        let returns_collection = ret.contains("Vec<")
+            || ret.contains("HashSet<")
+            || ret.contains("HashMap<")
+            || ret.contains("BTreeMap<");
+        let returns_string = ret == "String" || ret == "&str" || ret == "&'static str";
+        let returns_option = ret.starts_with("Option<");
+        let returns_result = ret.starts_with("Result<");
+        let returns_bool = ret == "bool";
+        let returns_numeric = ret == "i32"
+            || ret == "i64"
+            || ret == "u32"
+            || ret == "u64"
+            || ret == "f32"
+            || ret == "f64"
+            || ret == "usize";
+        let has_self = params
+            .iter()
+            .any(|(n, _)| n == "self" || n == "&self" || n == "&mut self");
+        let no_params = params.is_empty();
+
+        // Error handling: Result return type
+        if returns_result {
+            return Self::ErrorHandling;
+        }
+
+        // Struct methods: has &self parameter
+        if has_self {
+            return Self::StructMethods;
+        }
+
+        // Iterator chain: collection input → collection output or String output
+        if has_collection_input && (returns_collection || returns_string) {
+            return Self::IteratorChain;
+        }
+
+        // Iterator chain: collection input → numeric output (sum/count/product)
+        if has_collection_input && returns_numeric {
+            return Self::IteratorChain;
+        }
+
+        // Iterator chain: collection input → bool (all/any/contains check)
+        if has_collection_input && returns_bool {
+            return Self::IteratorChain;
+        }
+
+        // Iterator chain: &str input → String output (string transformation)
+        if params.len() == 1 && params[0].1.contains("str") && returns_string {
+            return Self::IteratorChain;
+        }
+
+        // Loop accumulator: numeric input → Option (suggests search/iteration)
+        if has_numeric_input && returns_option {
+            return Self::LoopAccumulator;
+        }
+
+        // Loop accumulator: numeric input → numeric output (computation)
+        if has_numeric_input && returns_numeric && params.len() <= 2 {
+            return Self::SingleExpression;
+        }
+
+        // Pattern match: &str → &str (dispatch/lookup)
+        if params.len() == 1 && params[0].1.contains("str") && (ret.contains("str") || returns_bool)
+        {
+            return Self::PatternMatch;
+        }
+
+        // No params → single expression or constant
+        if no_params {
+            return Self::SingleExpression;
+        }
+
+        // Bool return with few params → single expression
+        if returns_bool && params.len() <= 2 {
+            return Self::SingleExpression;
+        }
+
+        Self::Unknown
+    }
+
+    /// Generate a structural template body based on the solution family.
+    ///
+    /// This produces a SKELETON that the emitter fills in with domain logic.
+    /// Even without knowing the specific algorithm, the structure constrains
+    /// what valid code looks like.
+    pub fn generate_skeleton(
+        &self,
+        params: &[(String, String)],
+        return_type: &str,
+        purpose: &str,
+    ) -> Option<String> {
+        match self {
+            Self::IteratorChain => {
+                if params.is_empty() {
+                    return None;
+                }
+                let p0 = &params[0].0;
+                let p0_type = &params[0].1;
+                let purpose_lower = purpose.to_lowercase();
+
+                // Determine iterator start
+                let iter_start = if p0_type.contains("&str") {
+                    format!("{}.chars()", p0)
+                } else if p0_type.contains("&[") {
+                    format!("{}.iter()", p0)
+                } else if p0_type.contains("Vec<") {
+                    format!("{}.into_iter()", p0)
+                } else {
+                    return None;
+                };
+
+                // Infer adapter chain from purpose keywords
+                let mut adapters = Vec::new();
+
+                // Filtering adapters
+                if purpose_lower.contains("filter")
+                    || purpose_lower.contains("keep")
+                    || purpose_lower.contains("select")
+                    || purpose_lower.contains("remove")
+                {
+                    if purpose_lower.contains("even") {
+                        adapters.push(".filter(|&x| x % 2 == 0)");
+                    } else if purpose_lower.contains("odd") {
+                        adapters.push(".filter(|&x| x % 2 != 0)");
+                    } else if purpose_lower.contains("positive") {
+                        adapters.push(".filter(|&x| x > 0)");
+                    } else if purpose_lower.contains("alpha") {
+                        adapters.push(".filter(|c| c.is_alphabetic())");
+                    } else {
+                        adapters.push(".filter(|x| true /* TODO: condition */)");
+                    }
+                }
+
+                // Transformation adapters
+                if purpose_lower.contains("uppercase") || purpose_lower.contains("upper") {
+                    adapters.push(".map(|c| c.to_uppercase().next().unwrap_or(c))");
+                } else if purpose_lower.contains("lowercase") || purpose_lower.contains("lower") {
+                    adapters.push(".map(|c| c.to_lowercase().next().unwrap_or(c))");
+                } else if purpose_lower.contains("double") {
+                    adapters.push(".map(|x| x * 2)");
+                } else if purpose_lower.contains("square") {
+                    adapters.push(".map(|x| x * x)");
+                }
+
+                // Windowing
+                if purpose_lower.contains("window")
+                    || purpose_lower.contains("consecutive")
+                    || purpose_lower.contains("series")
+                    || purpose_lower.contains("substring")
+                {
+                    if params.len() >= 2 {
+                        let p1 = &params[1].0;
+                        // Switch from chars() to windows approach
+                        return Some(format!(
+                            "if {p1} == 0 {{ return vec![\"\".to_string(); {p0}.len() + 1]; }}\n    \
+                             {p0}.as_bytes().windows({p1}).map(|w| std::str::from_utf8(w).unwrap().to_string()).collect()"
+                        ));
+                    }
+                }
+
+                // Second param for zip
+                if params.len() >= 2
+                    && (purpose_lower.contains("distance")
+                        || purpose_lower.contains("compare")
+                        || purpose_lower.contains("zip"))
+                {
+                    let p1 = &params[1].0;
+                    let p1_type = &params[1].1;
+                    let iter2 = if p1_type.contains("&str") {
+                        format!("{}.chars()", p1)
+                    } else {
+                        format!("{}.iter()", p1)
+                    };
+                    return Some(format!(
+                        "{}.zip({}).filter(|(a, b)| a != b).count()",
+                        iter_start, iter2
+                    ));
+                }
+
+                // Copy for slices producing owned values
+                let needs_copy = p0_type.contains("&[")
+                    && (return_type.contains("Vec<") && !return_type.contains("Vec<&"));
+
+                // Determine terminal
+                let terminal = if return_type.contains("Vec<String>") {
+                    ".map(|c| c.to_string()).collect()"
+                } else if return_type.contains("Vec<") {
+                    if needs_copy && adapters.is_empty() {
+                        ".copied().collect()"
+                    } else if needs_copy {
+                        ".collect()" // adapter should handle ownership
+                    } else {
+                        ".collect()"
+                    }
+                } else if return_type == "String" {
+                    ".collect()"
+                } else if return_type == "usize" {
+                    ".count()"
+                } else if return_type == "bool" {
+                    if purpose_lower.contains("all") || purpose_lower.contains("every") {
+                        ".all(|x| true /* TODO */)"
+                    } else if purpose_lower.contains("any") {
+                        ".any(|x| true /* TODO */)"
+                    } else if purpose_lower.contains("pangram") {
+                        // Special: check all letters present
+                        return Some(format!(
+                            "let lower = {}.to_lowercase();\n    ('a'..='z').all(|c| lower.contains(c))",
+                            p0
+                        ));
+                    } else if purpose_lower.contains("sorted") {
+                        return Some(format!("{}.windows(2).all(|w| w[0] <= w[1])", p0));
+                    } else {
+                        ".count() > 0"
+                    }
+                } else if return_type.contains("i32")
+                    || return_type.contains("i64")
+                    || return_type.contains("u16")
+                    || return_type.contains("u32")
+                    || return_type.contains("u64")
+                    || return_type.contains("f64")
+                {
+                    ".sum()"
+                } else {
+                    ".collect()"
+                };
+
+                let adapter_chain = adapters.join("");
+                Some(format!("{}{}{}", iter_start, adapter_chain, terminal))
+            }
+
+            Self::LoopAccumulator => {
+                if params.is_empty() {
+                    return None;
+                }
+                let p0 = &params[0].0;
+
+                if return_type.starts_with("Option<") {
+                    Some(format!(
+                        "let mut n = {};\n    let mut result = 0;\n    while n > 0 {{\n        // accumulate\n        n -= 1;\n        result += 1;\n    }}\n    Some(result)",
+                        p0
+                    ))
+                } else {
+                    Some(format!(
+                        "let mut result = 0;\n    for i in 0..{} {{\n        result += i;\n    }}\n    result",
+                        p0
+                    ))
+                }
+            }
+
+            Self::ErrorHandling => {
+                if params.is_empty() {
+                    return None;
+                }
+                let p0 = &params[0].0;
+
+                // Generic error handling skeleton: validate input, process, wrap in Ok
+                let purpose_lower = purpose.to_lowercase();
+                if purpose_lower.contains("count") || purpose_lower.contains("how many") {
+                    // Counting with validation
+                    Some(format!(
+                        "let mut count = 0;\n    for c in {}.chars() {{\n        // validate and count\n        count += 1;\n    }}\n    Ok(count)",
+                        p0
+                    ))
+                } else if purpose_lower.contains("parse") || purpose_lower.contains("convert") {
+                    Some(format!(
+                        "{}.parse().map_err(|e: std::num::ParseIntError| e.to_string())",
+                        p0
+                    ))
+                } else {
+                    // Generic: validate then wrap
+                    Some(format!(
+                        "// Validate input\n    // Process\n    Ok({}.to_string())",
+                        p0
+                    ))
+                }
+            }
+
+            Self::SingleExpression | Self::PatternMatch | Self::StructMethods | Self::Unknown => {
+                None
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -355,5 +690,71 @@ mod tests {
             TypeCausalModel::recommend_iterator("Vec<i32>"),
             ".into_iter()"
         );
+    }
+
+    // Solution Family Classification tests
+
+    #[test]
+    fn test_classify_iterator_chain_slice_to_vec() {
+        let family = SolutionFamily::from_signature(&[("v".into(), "&[i32]".into())], "Vec<i32>");
+        assert_eq!(family, SolutionFamily::IteratorChain);
+    }
+
+    #[test]
+    fn test_classify_iterator_chain_str_to_string() {
+        let family = SolutionFamily::from_signature(&[("input".into(), "&str".into())], "String");
+        assert_eq!(family, SolutionFamily::IteratorChain);
+    }
+
+    #[test]
+    fn test_classify_iterator_chain_slice_to_bool() {
+        let family = SolutionFamily::from_signature(&[("sentence".into(), "&str".into())], "bool");
+        // &str → bool could be iterator chain (pangram check) or pattern match
+        assert!(matches!(
+            family,
+            SolutionFamily::IteratorChain | SolutionFamily::PatternMatch
+        ));
+    }
+
+    #[test]
+    fn test_classify_loop_accumulator() {
+        let family = SolutionFamily::from_signature(&[("n".into(), "u64".into())], "Option<u64>");
+        assert_eq!(family, SolutionFamily::LoopAccumulator);
+    }
+
+    #[test]
+    fn test_classify_error_handling() {
+        let family =
+            SolutionFamily::from_signature(&[("s".into(), "&str".into())], "Result<i32, String>");
+        assert_eq!(family, SolutionFamily::ErrorHandling);
+    }
+
+    #[test]
+    fn test_classify_single_expression() {
+        let family = SolutionFamily::from_signature(
+            &[("a".into(), "i32".into()), ("b".into(), "i32".into())],
+            "i32",
+        );
+        assert_eq!(family, SolutionFamily::SingleExpression);
+    }
+
+    #[test]
+    fn test_classify_no_params() {
+        let family = SolutionFamily::from_signature(&[], "u64");
+        assert_eq!(family, SolutionFamily::SingleExpression);
+    }
+
+    #[test]
+    fn test_skeleton_iterator_chain() {
+        let family = SolutionFamily::IteratorChain;
+        let skeleton = family.generate_skeleton(
+            &[("input".into(), "&str".into())],
+            "String",
+            "Reverse a string",
+        );
+        assert!(skeleton.is_some());
+        let s = skeleton.unwrap();
+        assert!(s.contains(".chars()"));
+        assert!(s.contains(".collect()"));
     }
 }

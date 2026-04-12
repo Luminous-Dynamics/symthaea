@@ -25,8 +25,11 @@
 pub mod controller;
 pub mod embodiment;
 pub mod encoder;
+pub mod fep_agent;
 pub mod kinematics;
+pub mod perturbations;
 pub mod simulator;
+pub mod training;
 pub mod types;
 pub mod workspace_safety;
 
