@@ -226,11 +226,7 @@ mod tests {
 
         let (re_t, im_t) = time_evolve_eigenstate(&re, &im, &energies, 10.0);
 
-        let norm: f64 = re_t
-            .iter()
-            .zip(im_t.iter())
-            .map(|(r, i)| r * r + i * i)
-            .sum();
+        let norm: f64 = re_t.iter().zip(im_t.iter()).map(|(r, i)| r * r + i * i).sum();
         assert!(
             (norm - 1.0).abs() < 1e-10,
             "Norm should be preserved: {}",

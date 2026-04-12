@@ -26,9 +26,7 @@
 /// Classical objectivity requires R >> 1: many independent observers
 /// can learn the same information.
 pub fn redundancy(n_env_fragments: usize, fraction_needed: f64) -> f64 {
-    if fraction_needed <= 0.0 {
-        return f64::INFINITY;
-    }
+    if fraction_needed <= 0.0 { return f64::INFINITY; }
     n_env_fragments as f64 / fraction_needed
 }
 
@@ -48,20 +46,16 @@ pub fn has_classical_plateau(
     let plateau_value = system_entropy;
 
     // Count how many points are within tolerance of the plateau
-    let plateau_count = mutual_info_vs_fraction
-        .iter()
+    let plateau_count = mutual_info_vs_fraction.iter()
         .filter(|(f, mi)| *f > 0.1 && *f < 0.9 && (mi - plateau_value).abs() < tolerance)
         .count();
 
     // Classical behavior: most of the curve is at the plateau
-    let total = mutual_info_vs_fraction
-        .iter()
+    let total = mutual_info_vs_fraction.iter()
         .filter(|(f, _)| *f > 0.1 && *f < 0.9)
         .count();
 
-    if total == 0 {
-        return false;
-    }
+    if total == 0 { return false; }
     (plateau_count as f64 / total as f64) > 0.5
 }
 
@@ -110,7 +104,10 @@ pub fn decoherence_rate(coupling_strength: f64, env_overlap: f64) -> f64 {
 /// For a quantum state (before decoherence): Discord > 0
 ///
 /// This quantifies "quantumness" of correlations.
-pub fn quantum_discord_estimate(total_mutual_info: f64, classical_mutual_info: f64) -> f64 {
+pub fn quantum_discord_estimate(
+    total_mutual_info: f64,
+    classical_mutual_info: f64,
+) -> f64 {
     (total_mutual_info - classical_mutual_info).max(0.0)
 }
 
@@ -135,9 +132,7 @@ pub fn quantum_classical_parameter(
     coupling: f64,
     energy_gap: f64,
 ) -> f64 {
-    if energy_gap.abs() < 1e-20 {
-        return f64::INFINITY;
-    }
+    if energy_gap.abs() < 1e-20 { return f64::INFINITY; }
     n_system as f64 * coupling * coupling * n_environment as f64 / (energy_gap * energy_gap)
 }
 
@@ -161,17 +156,11 @@ mod tests {
     #[test]
     fn test_plateau_detection() {
         let h_s = 1.0; // System entropy
-                       // Classical: plateau at H(S) for most fractions
+        // Classical: plateau at H(S) for most fractions
         let profile: Vec<(f64, f64)> = (1..=10)
             .map(|i| {
                 let f = i as f64 / 10.0;
-                let mi = if f < 0.1 {
-                    f * 10.0 * h_s
-                } else if f > 0.9 {
-                    h_s + f * h_s
-                } else {
-                    h_s
-                };
+                let mi = if f < 0.1 { f * 10.0 * h_s } else if f > 0.9 { h_s + f * h_s } else { h_s };
                 (f, mi)
             })
             .collect();

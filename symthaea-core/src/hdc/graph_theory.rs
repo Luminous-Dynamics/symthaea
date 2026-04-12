@@ -381,11 +381,7 @@ impl Graph {
     /// - Related to Cheeger constant: h(G) ≥ λ₂ / 2 (Cheeger inequality)
     pub fn algebraic_connectivity(&self) -> f64 {
         let evals = self.laplacian_eigenvalues();
-        if evals.len() >= 2 {
-            evals[1]
-        } else {
-            0.0
-        }
+        if evals.len() >= 2 { evals[1] } else { 0.0 }
     }
 
     /// Spectral gap: λ₂ (difference between first two distinct eigenvalues).
@@ -813,11 +809,7 @@ mod tests {
         g.add_edge(2, 3);
         let evals = g.laplacian_eigenvalues();
         assert_eq!(evals.len(), 4);
-        assert!(
-            evals[0].abs() < 1e-6,
-            "smallest eigenvalue should be 0, got {}",
-            evals[0]
-        );
+        assert!(evals[0].abs() < 1e-6, "smallest eigenvalue should be 0, got {}", evals[0]);
         assert!(evals[1] > 0.2, "λ₂ should be > 0 (connected): {}", evals[1]);
     }
 
@@ -831,11 +823,7 @@ mod tests {
             }
         }
         let ac = g.algebraic_connectivity();
-        assert!(
-            (ac - 5.0).abs() < 0.1,
-            "K₅ algebraic connectivity should be 5, got {}",
-            ac
-        );
+        assert!((ac - 5.0).abs() < 0.1, "K₅ algebraic connectivity should be 5, got {}", ac);
     }
 
     #[test]
@@ -845,11 +833,7 @@ mod tests {
         g.add_edge(0, 1);
         g.add_edge(2, 3);
         let ac = g.algebraic_connectivity();
-        assert!(
-            ac < 1e-6,
-            "disconnected graph should have λ₂ ≈ 0, got {}",
-            ac
-        );
+        assert!(ac < 1e-6, "disconnected graph should have λ₂ ≈ 0, got {}", ac);
     }
 
     #[test]
@@ -866,11 +850,7 @@ mod tests {
     fn test_cheeger_bound() {
         // Complete graph has high Cheeger bound
         let mut g = Graph::new(4, false);
-        for i in 0..4 {
-            for j in (i + 1)..4 {
-                g.add_edge(i, j);
-            }
-        }
+        for i in 0..4 { for j in (i+1)..4 { g.add_edge(i, j); } }
         let ch = g.cheeger_lower_bound();
         assert!(ch > 1.0, "K₄ should have high Cheeger bound: {}", ch);
     }

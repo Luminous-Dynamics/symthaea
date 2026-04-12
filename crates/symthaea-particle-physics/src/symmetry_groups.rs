@@ -102,11 +102,7 @@ pub fn gell_mann_matrix(index: usize) -> [[Complex; 3]; 3] {
         // λ₇: off-diagonal (2,3) imaginary
         6 => [[z, z, z], [z, z, mi], [z, i, z]],
         // λ₈: diagonal (hypercharge-like)
-        7 => [
-            [s, z, z],
-            [z, s, z],
-            [z, z, Complex::new(-2.0 / 3.0_f64.sqrt(), 0.0)],
-        ],
+        7 => [[s, z, z], [z, s, z], [z, z, Complex::new(-2.0 / 3.0_f64.sqrt(), 0.0)]],
         _ => [[z, z, z], [z, z, z], [z, z, z]],
     }
 }
@@ -122,7 +118,7 @@ pub fn su3_structure_constant(a: usize, b: usize, c: usize) -> f64 {
             (0, 1, 2) => Some(1.0),
             (0, 3, 6) => Some(0.5),
             (0, 4, 5) => Some(-0.5), // f_156 = -1/2 (0-indexed: 0,4,5)
-            (1, 3, 5) => Some(0.5),  // f_245 (0-indexed: 1,3,5) — actually f_246=1/2
+            (1, 3, 5) => Some(0.5), // f_245 (0-indexed: 1,3,5) — actually f_246=1/2
             (1, 4, 6) => Some(0.5),
             (2, 3, 4) => Some(0.5),
             (2, 5, 6) => Some(-0.5),
@@ -189,12 +185,7 @@ mod tests {
         let sigma = pauli_matrices();
         for a in 0..3 {
             let trace = sigma[a][0][0].re + sigma[a][1][1].re;
-            assert!(
-                trace.abs() < 1e-14,
-                "σ_{} not traceless: Tr={}",
-                a + 1,
-                trace
-            );
+            assert!(trace.abs() < 1e-14, "σ_{} not traceless: Tr={}", a + 1, trace);
         }
     }
 
@@ -295,13 +286,7 @@ mod tests {
                     assert!(
                         (fabc + fbac).abs() < 1e-10,
                         "f_{}{}{} + f_{}{}{} = {} (not antisymmetric)",
-                        a,
-                        b,
-                        c,
-                        b,
-                        a,
-                        c,
-                        fabc + fbac
+                        a, b, c, b, a, c, fabc + fbac
                     );
                 }
             }

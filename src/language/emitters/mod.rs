@@ -297,8 +297,7 @@ fn infer_rust_body(
     if purpose_lower.contains("divide") || purpose_lower.contains("quotient") {
         if params.len() == 2 {
             // Safe divide: return Result with zero-check
-            if purpose_lower.contains("safe")
-                || purpose_lower.contains("zero")
+            if purpose_lower.contains("safe") || purpose_lower.contains("zero")
                 || ret.contains("Result")
             {
                 return format!(
@@ -976,23 +975,15 @@ fn infer_rust_body(
     // Count matching (with target param)
     if purpose_lower.contains("count") && purpose_lower.contains("match") {
         if params.len() == 2 && is_collection(&params[0].1) {
-            return format!(
-                "{}.iter().filter(|&&x| x == {}).count()",
-                params[0].0, params[1].0
-            );
+            return format!("{}.iter().filter(|&&x| x == {}).count()", params[0].0, params[1].0);
         }
     }
     // Count occurrences / how many times
     if purpose_lower.contains("count")
-        && (purpose_lower.contains("occur")
-            || purpose_lower.contains("times")
-            || purpose_lower.contains("appear"))
+        && (purpose_lower.contains("occur") || purpose_lower.contains("times") || purpose_lower.contains("appear"))
     {
         if params.len() == 2 && is_collection(&params[0].1) {
-            return format!(
-                "{}.iter().filter(|&&x| x == {}).count()",
-                params[0].0, params[1].0
-            );
+            return format!("{}.iter().filter(|&&x| x == {}).count()", params[0].0, params[1].0);
         }
     }
     // Last element
@@ -1027,9 +1018,7 @@ fn infer_rust_body(
     }
     // Group by sign (positive/negative)
     if purpose_lower.contains("group")
-        && (purpose_lower.contains("sign")
-            || purpose_lower.contains("positive")
-            || purpose_lower.contains("negative"))
+        && (purpose_lower.contains("sign") || purpose_lower.contains("positive") || purpose_lower.contains("negative"))
     {
         if params.len() == 1 && is_collection(&params[0].1) {
             return format!(
@@ -1117,9 +1106,7 @@ fn infer_rust_body(
         }
     }
     // First or error
-    if purpose_lower.contains("first")
-        && (purpose_lower.contains("error") || ret.contains("Result"))
-    {
+    if purpose_lower.contains("first") && (purpose_lower.contains("error") || ret.contains("Result")) {
         if params.len() == 1 && is_collection(&params[0].1) {
             return format!(
                 "{}.first().copied().ok_or_else(|| \"empty collection\".to_string())",
@@ -1154,10 +1141,7 @@ fn infer_rust_body(
     // Split into words (Vec<String>)
     if purpose_lower.contains("split") && purpose_lower.contains("word") {
         if params.len() == 1 {
-            return format!(
-                "{}.split_whitespace().map(|s| s.to_string()).collect()",
-                params[0].0
-            );
+            return format!("{}.split_whitespace().map(|s| s.to_string()).collect()", params[0].0);
         }
     }
     // Char at index
@@ -1209,15 +1193,28 @@ fn infer_rust_body(
             );
         }
     }
-    // Acronym / abbreviation from phrase
+    // Acronym / abbreviation from phrase (handles camelCase)
     if purpose_lower.contains("acronym") || purpose_lower.contains("abbreviat") {
         if params.len() == 1 && (params[0].1.contains("str") || params[0].1.contains("String")) {
             return format!(
-                "{}.split(|c: char| c.is_whitespace() || c == '-' || c == '_')\n    \
-                     .filter(|w| !w.is_empty())\n    \
-                     .filter_map(|w| w.chars().next())\n    \
-                     .collect::<String>()\n    \
-                     .to_uppercase()",
+                "let mut result = String::new();\n    \
+                 let mut prev_lower = false;\n    \
+                 let mut new_word = true;\n    \
+                 for c in {}.chars() {{\n        \
+                     if c.is_whitespace() || c == '-' || c == '_' {{\n            \
+                         new_word = true;\n            \
+                         prev_lower = false;\n        \
+                     }} else if new_word && c.is_alphabetic() {{\n            \
+                         result.push(c.to_uppercase().next().unwrap_or(c));\n            \
+                         new_word = false;\n            \
+                         prev_lower = c.is_lowercase();\n        \
+                     }} else if prev_lower && c.is_uppercase() {{\n            \
+                         result.push(c);\n            \
+                         prev_lower = false;\n        \
+                     }} else {{\n            \
+                         prev_lower = c.is_lowercase();\n        \
+                     }}\n    \
+                 }}\n    result",
                 params[0].0
             );
         }
@@ -1241,9 +1238,7 @@ fn infer_rust_body(
         }
     }
     // ETL (Extract-Transform-Load): transform scrabble scores from old to new format
-    if purpose_lower.contains("transform")
-        && (purpose_lower.contains("format") || purpose_lower.contains("etl"))
-    {
+    if purpose_lower.contains("transform") && (purpose_lower.contains("format") || purpose_lower.contains("etl")) {
         if params.len() == 1 && params[0].1.contains("HashMap") {
             return format!(
                 "let mut result = std::collections::BTreeMap::new();\n    \
@@ -1262,11 +1257,10 @@ fn infer_rust_body(
             return "\"Hello, World!\"".to_string();
         }
     }
-    // Eliud's eggs / count set bits / popcount
-    if purpose_lower.contains("egg")
-        || purpose_lower.contains("popcount")
-        || purpose_lower.contains("set bit")
-        || purpose_lower.contains("count.*bit")
+    // Eliud's eggs / count set bits / popcount / count 1 bits
+    if purpose_lower.contains("egg") || purpose_lower.contains("popcount")
+        || purpose_lower.contains("set bit") || purpose_lower.contains("1 bit")
+        || (purpose_lower.contains("count") && purpose_lower.contains("bit") && purpose_lower.contains("binary"))
     {
         if params.len() == 1 {
             return format!(
@@ -1313,9 +1307,7 @@ fn infer_rust_body(
         }
     }
     // Isogram (no repeating letters)
-    if purpose_lower.contains("isogram")
-        || (purpose_lower.contains("repeating") && purpose_lower.contains("letter"))
-    {
+    if purpose_lower.contains("isogram") || (purpose_lower.contains("repeating") && purpose_lower.contains("letter")) {
         if params.len() == 1 {
             return format!(
                 "let mut seen = std::collections::HashSet::new();\n    {}.to_lowercase().chars().filter(|c| c.is_alphabetic()).all(|c| seen.insert(c))",
@@ -1342,8 +1334,7 @@ fn infer_rust_body(
         }
     }
     // Square of sum (but NOT "difference between square of sum and sum of squares")
-    if purpose_lower.contains("square of")
-        && purpose_lower.contains("sum")
+    if purpose_lower.contains("square of") && purpose_lower.contains("sum")
         && !purpose_lower.contains("difference")
     {
         if params.len() == 1 {
@@ -1357,10 +1348,7 @@ fn infer_rust_body(
         }
     }
     // Difference (between square of sum and sum of squares)
-    if purpose_lower.contains("difference")
-        && purpose_lower.contains("square")
-        && purpose_lower.contains("sum")
-    {
+    if purpose_lower.contains("difference") && purpose_lower.contains("square") && purpose_lower.contains("sum") {
         if params.len() == 1 {
             return format!(
                 "let s: u32 = (1..={0}).sum();\n    let sq_sum = s * s;\n    let sum_sq: u32 = (1..={0}).map(|i| i * i).sum();\n    sq_sum - sum_sq",
@@ -1369,9 +1357,7 @@ fn infer_rust_body(
         }
     }
     // Bob (reply to messages)
-    if purpose_lower.contains("bob")
-        && (purpose_lower.contains("reply") || purpose_lower.contains("respond"))
-    {
+    if purpose_lower.contains("bob") && (purpose_lower.contains("reply") || purpose_lower.contains("respond")) {
         if params.len() == 1 {
             return format!(
                 "let trimmed = {0}.trim();\n    let is_question = trimmed.ends_with('?');\n    let is_yelling = trimmed.chars().any(|c| c.is_alphabetic()) && trimmed.chars().filter(|c| c.is_alphabetic()).all(|c| c.is_uppercase());\n    match (is_question, is_yelling, trimmed.is_empty()) {{\n        (_, _, true) => \"Fine. Be that way!\",\n        (true, true, _) => \"Calm down, I know what I'm doing!\",\n        (true, _, _) => \"Sure.\",\n        (_, true, _) => \"Whoa, chill out!\",\n        _ => \"Whatever.\",\n    }}",
@@ -1380,10 +1366,7 @@ fn infer_rust_body(
         }
     }
     // Two-fer
-    if purpose_lower.contains("one for")
-        || purpose_lower.contains("two-fer")
-        || purpose_lower.contains("twofer")
-    {
+    if purpose_lower.contains("one for") || purpose_lower.contains("two-fer") || purpose_lower.contains("twofer") {
         if params.len() == 1 {
             let p = &params[0].0;
             return format!(

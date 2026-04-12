@@ -67,14 +67,20 @@ impl Rat {
 impl Add for Rat {
     type Output = Self;
     fn add(self, rhs: Self) -> Self {
-        Rat::new(self.num * rhs.den + rhs.num * self.den, self.den * rhs.den)
+        Rat::new(
+            self.num * rhs.den + rhs.num * self.den,
+            self.den * rhs.den,
+        )
     }
 }
 
 impl Sub for Rat {
     type Output = Self;
     fn sub(self, rhs: Self) -> Self {
-        Rat::new(self.num * rhs.den - rhs.num * self.den, self.den * rhs.den)
+        Rat::new(
+            self.num * rhs.den - rhs.num * self.den,
+            self.den * rhs.den,
+        )
     }
 }
 
@@ -209,10 +215,12 @@ pub fn cmp_monomials(a: &Monomial, b: &Monomial, order: MonomialOrder) -> Orderi
             }
             Ordering::Equal
         }
-        MonomialOrder::Grlex => match a.degree().cmp(&b.degree()) {
-            Ordering::Equal => cmp_monomials(a, b, MonomialOrder::Lex),
-            other => other,
-        },
+        MonomialOrder::Grlex => {
+            match a.degree().cmp(&b.degree()) {
+                Ordering::Equal => cmp_monomials(a, b, MonomialOrder::Lex),
+                other => other,
+            }
+        }
         MonomialOrder::Grevlex => {
             match a.degree().cmp(&b.degree()) {
                 Ordering::Equal => {
@@ -275,8 +283,9 @@ impl Poly {
     fn normalize(&mut self) {
         let order = self.order;
         // Sort descending
-        self.terms
-            .sort_by(|a, b| cmp_monomials(&b.mono, &a.mono, order));
+        self.terms.sort_by(|a, b| {
+            cmp_monomials(&b.mono, &a.mono, order)
+        });
         // Combine like monomials
         let mut combined: Vec<Term> = Vec::new();
         for term in self.terms.drain(..) {
@@ -310,11 +319,7 @@ impl Poly {
     }
 
     pub fn degree(&self) -> u32 {
-        self.terms
-            .iter()
-            .map(|t| t.mono.degree())
-            .max()
-            .unwrap_or(0)
+        self.terms.iter().map(|t| t.mono.degree()).max().unwrap_or(0)
     }
 
     /// Evaluate the polynomial by substituting f64 values for each variable.
@@ -585,13 +590,15 @@ pub fn s_polynomial(f: &Poly, g: &Poly) -> Poly {
                 .collect(),
         }
     });
-    let div_g_mono = lm_g.div(&lcm).unwrap_or_else(|| Monomial {
-        exponents: lcm
-            .exponents
-            .iter()
-            .zip(&lm_g.exponents)
-            .map(|(&a, &b)| a - b)
-            .collect(),
+    let div_g_mono = lm_g.div(&lcm).unwrap_or_else(|| {
+        Monomial {
+            exponents: lcm
+                .exponents
+                .iter()
+                .zip(&lm_g.exponents)
+                .map(|(&a, &b)| a - b)
+                .collect(),
+        }
     });
 
     let coeff_f = Rat::one() / lc_f;
@@ -1100,7 +1107,7 @@ mod tests {
         // In 1 variable: x is mono([1]), constant is mono([0])
         let x_minus_1 = Poly::from_terms(
             vec![
-                term(1, 1, vec![1]),  // x
+                term(1, 1, vec![1]), // x
                 term(-1, 1, vec![0]), // -1
             ],
             1,
@@ -1116,7 +1123,7 @@ mod tests {
         // Should equal x² - 1
         let x2_minus_1 = Poly::from_terms(
             vec![
-                term(1, 1, vec![2]),  // x²
+                term(1, 1, vec![2]), // x²
                 term(-1, 1, vec![0]), // -1
             ],
             1,
@@ -1135,7 +1142,7 @@ mod tests {
         // f = x² - y: x²y⁰ term and x⁰y¹ term
         let f = Poly::from_terms(
             vec![
-                term(1, 1, vec![2, 0]),  // x²
+                term(1, 1, vec![2, 0]), // x²
                 term(-1, 1, vec![0, 1]), // -y
             ],
             2,
@@ -1143,7 +1150,7 @@ mod tests {
         // g = xy² - x
         let g = Poly::from_terms(
             vec![
-                term(1, 1, vec![1, 2]),  // xy²
+                term(1, 1, vec![1, 2]), // xy²
                 term(-1, 1, vec![1, 0]), // -x
             ],
             2,
@@ -1168,8 +1175,8 @@ mod tests {
         // f = x² + y² - 1
         let f = Poly::from_terms(
             vec![
-                term(1, 1, vec![2, 0]),  // x²
-                term(1, 1, vec![0, 2]),  // y²
+                term(1, 1, vec![2, 0]), // x²
+                term(1, 1, vec![0, 2]), // y²
                 term(-1, 1, vec![0, 0]), // -1
             ],
             2,
@@ -1214,8 +1221,14 @@ mod tests {
         let x = Poly::from_terms(vec![term(1, 1, vec![1])], 1);
         let ideal = Ideal::new(vec![x]);
 
-        let x_plus_1 = Poly::from_terms(vec![term(1, 1, vec![1]), term(1, 1, vec![0])], 1);
-        assert!(!ideal.contains(&x_plus_1), "x+1 should NOT be in ideal <x>");
+        let x_plus_1 = Poly::from_terms(
+            vec![term(1, 1, vec![1]), term(1, 1, vec![0])],
+            1,
+        );
+        assert!(
+            !ideal.contains(&x_plus_1),
+            "x+1 should NOT be in ideal <x>"
+        );
     }
 
     // 7. UniPoly eval
@@ -1279,7 +1292,13 @@ mod tests {
     #[test]
     fn poly_evaluate() {
         // f = x + 2y at (3, 4) = 3 + 8 = 11
-        let f = Poly::from_terms(vec![term(1, 1, vec![1, 0]), term(2, 1, vec![0, 1])], 2);
+        let f = Poly::from_terms(
+            vec![
+                term(1, 1, vec![1, 0]),
+                term(2, 1, vec![0, 1]),
+            ],
+            2,
+        );
         let val = f.evaluate(&[3.0, 4.0]);
         assert!((val - 11.0).abs() < 1e-10);
     }

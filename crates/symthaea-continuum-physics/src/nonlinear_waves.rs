@@ -33,9 +33,7 @@ impl KdvSolver {
         let dt = 0.01 * dx * dx * dx; // CFL for third-order term
         Self {
             u: vec![0.0; n],
-            dx,
-            dt,
-            n,
+            dx, dt, n,
         }
     }
 
@@ -103,22 +101,19 @@ impl KdvSolver {
 /// v = membrane voltage, w = recovery variable, I_ext = external current
 #[derive(Debug, Clone)]
 pub struct FitzHughNagumo {
-    pub v: f64,       // Membrane voltage
-    pub w: f64,       // Recovery variable
-    pub a: f64,       // Offset parameter (typ. 0.7)
-    pub b: f64,       // Recovery coupling (typ. 0.8)
+    pub v: f64, // Membrane voltage
+    pub w: f64, // Recovery variable
+    pub a: f64, // Offset parameter (typ. 0.7)
+    pub b: f64, // Recovery coupling (typ. 0.8)
     pub epsilon: f64, // Time scale separation (typ. 0.08)
-    pub i_ext: f64,   // External stimulus current
+    pub i_ext: f64, // External stimulus current
 }
 
 impl FitzHughNagumo {
     pub fn new() -> Self {
         Self {
-            v: -1.0,
-            w: -0.5,
-            a: 0.7,
-            b: 0.8,
-            epsilon: 0.08,
+            v: -1.0, w: -0.5,
+            a: 0.7, b: 0.8, epsilon: 0.08,
             i_ext: 0.0,
         }
     }
@@ -183,11 +178,7 @@ impl OscillatorNetwork {
             oscillators[i].v = -1.0 + 0.1 * (i as f64 / n as f64);
         }
 
-        Self {
-            oscillators,
-            coupling,
-            n,
-        }
+        Self { oscillators, coupling, n }
     }
 
     /// Advance one step with coupling: dv_i/dt += Σ_j g_ij (v_j - v_i)
@@ -246,9 +237,7 @@ mod tests {
 
         assert!(
             (mass_0 - mass_1).abs() / mass_0.abs().max(1e-10) < 0.01,
-            "KdV mass: initial={:.6}, final={:.6}",
-            mass_0,
-            mass_1
+            "KdV mass: initial={:.6}, final={:.6}", mass_0, mass_1
         );
     }
 
@@ -275,11 +264,7 @@ mod tests {
                 crossings += 1;
             }
         }
-        assert!(
-            crossings > 2,
-            "Should oscillate: {} zero-crossings",
-            crossings
-        );
+        assert!(crossings > 2, "Should oscillate: {} zero-crossings", crossings);
     }
 
     #[test]
@@ -295,10 +280,6 @@ mod tests {
         }
 
         let r = net.synchronization_index();
-        assert!(
-            r > 0.3,
-            "Coupled oscillators should tend to synchronize: r={:.3}",
-            r
-        );
+        assert!(r > 0.3, "Coupled oscillators should tend to synchronize: r={:.3}", r);
     }
 }

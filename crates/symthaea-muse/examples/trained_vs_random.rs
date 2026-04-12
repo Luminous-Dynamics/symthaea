@@ -113,9 +113,7 @@ fn main() {
             .to_midi_file(&midi_dir.join(format!("{name}_classic.mid")), tempo_c)
             .ok();
         write_wav(
-            &audio_dir
-                .join(format!("trained_{name}_classic.wav"))
-                .to_string_lossy(),
+            &audio_dir.join(format!("trained_{name}_classic.wav")).to_string_lossy(),
             &classic,
         )
         .ok();
@@ -128,9 +126,7 @@ fn main() {
             .to_midi_file(&midi_dir.join(format!("{name}_neural.mid")), tempo_n)
             .ok();
         write_wav(
-            &audio_dir
-                .join(format!("trained_{name}_neural.wav"))
-                .to_string_lossy(),
+            &audio_dir.join(format!("trained_{name}_neural.wav")).to_string_lossy(),
             &neural,
         )
         .ok();

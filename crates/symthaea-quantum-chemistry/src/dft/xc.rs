@@ -221,8 +221,9 @@ fn evaluate_basis_on_grid(basis: &[ContractedGaussian], grid: &DftGrid) -> Vec<f
                 let dz = pt.z - prim.center[2];
                 let r2 = dx * dx + dy * dy + dz * dz;
 
-                let angular =
-                    dx.powi(prim.l as i32) * dy.powi(prim.m as i32) * dz.powi(prim.n as i32);
+                let angular = dx.powi(prim.l as i32)
+                    * dy.powi(prim.m as i32)
+                    * dz.powi(prim.n as i32);
 
                 val += prim.coeff * prim.normalization() * angular * (-prim.alpha * r2).exp();
             }
@@ -281,7 +282,12 @@ fn build_coulomb_matrix(density: &[f64], eri: &[f64], n: usize) -> Vec<f64> {
 }
 
 /// Build the XC potential matrix: V_xc_μν = Σ_g w_g × v_xc(r_g) × φ_μ(r_g) × φ_ν(r_g)
-fn build_xc_matrix(v_xc: &[f64], basis_at_grid: &[f64], grid: &DftGrid, n: usize) -> Vec<f64> {
+fn build_xc_matrix(
+    v_xc: &[f64],
+    basis_at_grid: &[f64],
+    grid: &DftGrid,
+    n: usize,
+) -> Vec<f64> {
     let mut mat = vec![0.0; n * n];
 
     for (g, pt) in grid.points.iter().enumerate() {

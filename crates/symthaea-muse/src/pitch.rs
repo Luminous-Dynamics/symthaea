@@ -155,24 +155,16 @@ pub fn select_tuning_system(state: &MusicalState) -> TuningSystem {
 
     if v > 0.2 && a > 0.5 {
         // Joyful, high-energy: Raga Desh (rain raga, celebratory pentatonic)
-        TuningSystem::Raga {
-            raga: RagaMode::Desh,
-        }
+        TuningSystem::Raga { raga: RagaMode::Desh }
     } else if v > 0.2 && a <= 0.5 {
         // Serene, peaceful: Gamelan Slendro (5-note equidistant, contemplative)
-        TuningSystem::Gamelan {
-            tuning: GamelanTuning::Slendro,
-        }
+        TuningSystem::Gamelan { tuning: GamelanTuning::Slendro }
     } else if v < -0.2 && a > 0.5 {
         // Tense, dramatic: Maqam Hijaz (augmented 2nd, intense)
-        TuningSystem::Maqamat {
-            maqam: MaqamMode::Hijaz,
-        }
+        TuningSystem::Maqamat { maqam: MaqamMode::Hijaz }
     } else if v < -0.2 && a <= 0.5 {
         // Sorrowful, subdued: Maqam Saba (half-flat intervals, grief)
-        TuningSystem::Maqamat {
-            maqam: MaqamMode::Saba,
-        }
+        TuningSystem::Maqamat { maqam: MaqamMode::Saba }
     } else {
         // Neutral zone: standard Western tuning
         TuningSystem::TwelveTET
@@ -300,11 +292,7 @@ fn build_gamelan_scale(state: &MusicalState, tuning: GamelanTuning) -> Vec<f32> 
 
     // Gamelan doesn't naturally have a Western root — use C4 as anchor.
     // Consciousness level gates register (high consciousness = broader range).
-    let range_octaves = if state.consciousness_level > 0.5 {
-        2
-    } else {
-        1
-    };
+    let range_octaves = if state.consciousness_level > 0.5 { 2 } else { 1 };
     let mut freqs = Vec::new();
     for oct in 0..range_octaves {
         for &c in cents {
@@ -532,20 +520,14 @@ mod tests {
     #[test]
     fn cents_to_hz_octave() {
         let hz = cents_to_hz(1200.0);
-        assert!(
-            (hz - C4_HZ * 2.0).abs() < 0.5,
-            "1200c should be one octave: {hz}"
-        );
+        assert!((hz - C4_HZ * 2.0).abs() < 0.5, "1200c should be one octave: {hz}");
     }
 
     #[test]
     fn cents_to_hz_semitone() {
         let hz = cents_to_hz(100.0);
         let expected = C4_HZ * 2.0_f32.powf(1.0 / 12.0);
-        assert!(
-            (hz - expected).abs() < 0.5,
-            "100c = 1 semitone: {hz} vs {expected}"
-        );
+        assert!((hz - expected).abs() < 0.5, "100c = 1 semitone: {hz} vs {expected}");
     }
 
     #[test]
@@ -559,12 +541,7 @@ mod tests {
     #[test]
     fn maqam_rast_has_microtones() {
         let state = MusicalState::default();
-        let scale = build_scale_with_tuning(
-            &state,
-            &TuningSystem::Maqamat {
-                maqam: MaqamMode::Rast,
-            },
-        );
+        let scale = build_scale_with_tuning(&state, &TuningSystem::Maqamat { maqam: MaqamMode::Rast });
         assert!(!scale.is_empty());
         // Rast has a half-flat 3rd at ~350 cents — should produce non-12-TET frequency
         // Check that some frequency is NOT on a 12-TET grid (i.e., not n*semitone from C4)
@@ -574,46 +551,26 @@ mod tests {
             let deviation = (semitones - semitones.round()).abs();
             deviation > 0.05 // more than 5 cents off the grid
         });
-        assert!(
-            has_microtone,
-            "Maqam Rast should contain microtonal pitches"
-        );
+        assert!(has_microtone, "Maqam Rast should contain microtonal pitches");
     }
 
     #[test]
     fn raga_yaman_has_sharp_four() {
         let state = MusicalState::default();
-        let scale = build_scale_with_tuning(
-            &state,
-            &TuningSystem::Raga {
-                raga: RagaMode::Yaman,
-            },
-        );
+        let scale = build_scale_with_tuning(&state, &TuningSystem::Raga { raga: RagaMode::Yaman });
         assert!(!scale.is_empty());
         // Yaman has a sharp 4th (tritone = 600 cents from root = ~370 Hz from C4)
         let has_tritone = scale.iter().any(|&f| (f - cents_to_hz(600.0)).abs() < 5.0);
-        assert!(
-            has_tritone,
-            "Yaman should contain the sharp 4th (tritone): {scale:?}"
-        );
+        assert!(has_tritone, "Yaman should contain the sharp 4th (tritone): {scale:?}");
     }
 
     #[test]
     fn gamelan_slendro_pentatonic() {
         let state = MusicalState::default();
-        let scale = build_scale_with_tuning(
-            &state,
-            &TuningSystem::Gamelan {
-                tuning: GamelanTuning::Slendro,
-            },
-        );
+        let scale = build_scale_with_tuning(&state, &TuningSystem::Gamelan { tuning: GamelanTuning::Slendro });
         // Slendro has 5 degrees per octave
         // With range filtering, expect at least 5 pitches
-        assert!(
-            scale.len() >= 5,
-            "Slendro should have >= 5 pitches, got {}",
-            scale.len()
-        );
+        assert!(scale.len() >= 5, "Slendro should have >= 5 pitches, got {}", scale.len());
     }
 
     #[test]
@@ -623,10 +580,7 @@ mod tests {
         // Just perfect fifth = 3/2 ratio = C4 * 1.5 ≈ 392.44 Hz
         let expected_fifth = C4_HZ * 1.5;
         let has_just_fifth = scale.iter().any(|&f| (f - expected_fifth).abs() < 1.0);
-        assert!(
-            has_just_fifth,
-            "Just intonation should have pure 3/2 fifth: {scale:?}"
-        );
+        assert!(has_just_fifth, "Just intonation should have pure 3/2 fifth: {scale:?}");
     }
 
     #[test]
@@ -638,10 +592,7 @@ mod tests {
         // Check a custom pitch is present: 150 cents ≈ C4 * 2^(150/1200) ≈ 290.3 Hz
         let expected = cents_to_hz(150.0);
         let has_custom = scale.iter().any(|&f| (f - expected).abs() < 2.0);
-        assert!(
-            has_custom,
-            "Custom microtonal scale should contain 150c pitch: {scale:?}"
-        );
+        assert!(has_custom, "Custom microtonal scale should contain 150c pitch: {scale:?}");
     }
 
     #[test]
@@ -649,28 +600,14 @@ mod tests {
         let state = MusicalState::default();
         let systems = vec![
             TuningSystem::TwelveTET,
-            TuningSystem::Maqamat {
-                maqam: MaqamMode::Bayati,
-            },
-            TuningSystem::Maqamat {
-                maqam: MaqamMode::Hijaz,
-            },
-            TuningSystem::Raga {
-                raga: RagaMode::Bhairav,
-            },
-            TuningSystem::Raga {
-                raga: RagaMode::Todi,
-            },
-            TuningSystem::Gamelan {
-                tuning: GamelanTuning::Pelog,
-            },
-            TuningSystem::Gamelan {
-                tuning: GamelanTuning::Slendro,
-            },
+            TuningSystem::Maqamat { maqam: MaqamMode::Bayati },
+            TuningSystem::Maqamat { maqam: MaqamMode::Hijaz },
+            TuningSystem::Raga { raga: RagaMode::Bhairav },
+            TuningSystem::Raga { raga: RagaMode::Todi },
+            TuningSystem::Gamelan { tuning: GamelanTuning::Pelog },
+            TuningSystem::Gamelan { tuning: GamelanTuning::Slendro },
             TuningSystem::JustIntonation,
-            TuningSystem::Microtonal {
-                cents: vec![0.0, 240.0, 480.0, 720.0, 960.0],
-            },
+            TuningSystem::Microtonal { cents: vec![0.0, 240.0, 480.0, 720.0, 960.0] },
         ];
         for system in &systems {
             let scale = build_scale_with_tuning(&state, system);
@@ -680,107 +617,60 @@ mod tests {
 
     #[test]
     fn select_tuning_high_consciousness_is_just() {
-        let state = MusicalState {
-            consciousness_level: 0.8,
-            ..Default::default()
-        };
+        let state = MusicalState { consciousness_level: 0.8, ..Default::default() };
         assert_eq!(select_tuning_system(&state), TuningSystem::JustIntonation);
     }
 
     #[test]
     fn select_tuning_low_consciousness_is_tet() {
-        let state = MusicalState {
-            consciousness_level: 0.1,
-            ..Default::default()
-        };
+        let state = MusicalState { consciousness_level: 0.1, ..Default::default() };
         assert_eq!(select_tuning_system(&state), TuningSystem::TwelveTET);
     }
 
     #[test]
     fn select_tuning_joyful_is_raga_desh() {
         let state = MusicalState {
-            valence: 0.6,
-            arousal: 0.7,
-            consciousness_level: 0.5,
-            ..Default::default()
+            valence: 0.6, arousal: 0.7, consciousness_level: 0.5, ..Default::default()
         };
-        assert!(matches!(
-            select_tuning_system(&state),
-            TuningSystem::Raga {
-                raga: RagaMode::Desh
-            }
-        ));
+        assert!(matches!(select_tuning_system(&state), TuningSystem::Raga { raga: RagaMode::Desh }));
     }
 
     #[test]
     fn select_tuning_tense_is_maqam_hijaz() {
         let state = MusicalState {
-            valence: -0.5,
-            arousal: 0.8,
-            consciousness_level: 0.5,
-            ..Default::default()
+            valence: -0.5, arousal: 0.8, consciousness_level: 0.5, ..Default::default()
         };
-        assert!(matches!(
-            select_tuning_system(&state),
-            TuningSystem::Maqamat {
-                maqam: MaqamMode::Hijaz
-            }
-        ));
+        assert!(matches!(select_tuning_system(&state), TuningSystem::Maqamat { maqam: MaqamMode::Hijaz }));
     }
 
     #[test]
     fn select_tuning_serene_is_gamelan() {
         let state = MusicalState {
-            valence: 0.4,
-            arousal: 0.2,
-            consciousness_level: 0.5,
-            ..Default::default()
+            valence: 0.4, arousal: 0.2, consciousness_level: 0.5, ..Default::default()
         };
-        assert!(matches!(
-            select_tuning_system(&state),
-            TuningSystem::Gamelan {
-                tuning: GamelanTuning::Slendro
-            }
-        ));
+        assert!(matches!(select_tuning_system(&state), TuningSystem::Gamelan { tuning: GamelanTuning::Slendro }));
     }
 
     #[test]
     fn select_tuning_sorrowful_is_maqam_saba() {
         let state = MusicalState {
-            valence: -0.6,
-            arousal: 0.2,
-            consciousness_level: 0.5,
-            ..Default::default()
+            valence: -0.6, arousal: 0.2, consciousness_level: 0.5, ..Default::default()
         };
-        assert!(matches!(
-            select_tuning_system(&state),
-            TuningSystem::Maqamat {
-                maqam: MaqamMode::Saba
-            }
-        ));
+        assert!(matches!(select_tuning_system(&state), TuningSystem::Maqamat { maqam: MaqamMode::Saba }));
     }
 
     #[test]
     fn all_pitches_in_musical_range() {
         let state = MusicalState::default();
         for system in [
-            TuningSystem::Maqamat {
-                maqam: MaqamMode::Rast,
-            },
-            TuningSystem::Raga {
-                raga: RagaMode::Yaman,
-            },
-            TuningSystem::Gamelan {
-                tuning: GamelanTuning::Pelog,
-            },
+            TuningSystem::Maqamat { maqam: MaqamMode::Rast },
+            TuningSystem::Raga { raga: RagaMode::Yaman },
+            TuningSystem::Gamelan { tuning: GamelanTuning::Pelog },
             TuningSystem::JustIntonation,
         ] {
             let scale = build_scale_with_tuning(&state, &system);
             for &f in &scale {
-                assert!(
-                    f >= 60.0 && f <= 2100.0,
-                    "{system:?}: pitch {f} out of musical range"
-                );
+                assert!(f >= 60.0 && f <= 2100.0, "{system:?}: pitch {f} out of musical range");
             }
         }
     }

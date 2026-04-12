@@ -104,7 +104,12 @@ fn parse_exercise_functions(dir: &Path) -> Vec<ParsedFunction> {
 
             let name = if let Some(fn_start) = sig_line.find("fn ") {
                 let after_fn = &sig_line[fn_start + 3..];
-                after_fn.split('(').next().unwrap_or("").trim().to_string()
+                after_fn
+                    .split('(')
+                    .next()
+                    .unwrap_or("")
+                    .trim()
+                    .to_string()
             } else {
                 String::new()
             };
@@ -195,7 +200,10 @@ fn run_exercise_tests(exercise_dir: &Path, implementation: &str) -> ExerciseResu
         .unwrap_or_default();
 
     // Create a temp directory with a copy of the exercise
-    let temp_dir = std::env::temp_dir().join(format!("symthaea-exercism-{}", exercise_name));
+    let temp_dir = std::env::temp_dir().join(format!(
+        "symthaea-exercism-{}",
+        exercise_name
+    ));
     let _ = std::fs::remove_dir_all(&temp_dir);
 
     // Copy the exercise
@@ -401,9 +409,12 @@ fn main() {
         let mut method = "native".to_string();
 
         for func in &functions {
-            if let Some(impl_code) =
-                generate_implementation(&generator, &func.name, &func.purpose, &func.signature)
-            {
+            if let Some(impl_code) = generate_implementation(
+                &generator,
+                &func.name,
+                &func.purpose,
+                &func.signature,
+            ) {
                 all_implementations.push(impl_code);
                 any_generated = true;
             } else {
@@ -480,51 +491,16 @@ fn main() {
     println!("  Total exercises:  {}", total);
     println!("  Skipped:          {} (no signature or todo!())", skipped);
     println!("  Attempted:        {}", attempted);
-    println!(
-        "  Generated body:   {}/{} ({:.0}%)",
-        generated,
-        attempted,
-        if attempted > 0 {
-            generated as f64 / attempted as f64 * 100.0
-        } else {
-            0.0
-        }
-    );
-    println!(
-        "  Compiled:         {}/{} ({:.0}%)",
-        compiled,
-        attempted,
-        if attempted > 0 {
-            compiled as f64 / attempted as f64 * 100.0
-        } else {
-            0.0
-        }
-    );
-    println!(
-        "  All tests pass:   {}/{} ({:.0}%)",
-        all_pass,
-        attempted,
-        if attempted > 0 {
-            all_pass as f64 / attempted as f64 * 100.0
-        } else {
-            0.0
-        }
-    );
-    println!(
-        "\n  pass@1 = {:.1}%",
-        if attempted > 0 {
-            all_pass as f64 / attempted as f64 * 100.0
-        } else {
-            0.0
-        }
-    );
+    println!("  Generated body:   {}/{} ({:.0}%)", generated, attempted,
+        if attempted > 0 { generated as f64 / attempted as f64 * 100.0 } else { 0.0 });
+    println!("  Compiled:         {}/{} ({:.0}%)", compiled, attempted,
+        if attempted > 0 { compiled as f64 / attempted as f64 * 100.0 } else { 0.0 });
+    println!("  All tests pass:   {}/{} ({:.0}%)", all_pass, attempted,
+        if attempted > 0 { all_pass as f64 / attempted as f64 * 100.0 } else { 0.0 });
+    println!("\n  pass@1 = {:.1}%", if attempted > 0 { all_pass as f64 / attempted as f64 * 100.0 } else { 0.0 });
 
     // Category breakdown
-    let mut pass_names: Vec<&str> = results
-        .iter()
-        .filter(|r| r.all_pass)
-        .map(|r| r.name.as_str())
-        .collect();
+    let mut pass_names: Vec<&str> = results.iter().filter(|r| r.all_pass).map(|r| r.name.as_str()).collect();
     pass_names.sort();
     if !pass_names.is_empty() {
         println!("\n  Passed exercises:");

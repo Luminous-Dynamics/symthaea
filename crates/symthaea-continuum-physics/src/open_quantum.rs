@@ -279,12 +279,7 @@ impl LindbladSolver {
     }
 
     /// Evolve for n_steps and return the purity at each step.
-    pub fn evolve_purity_trace(
-        &self,
-        rho: &mut DensityMatrix,
-        dt: f64,
-        n_steps: usize,
-    ) -> Vec<f64> {
+    pub fn evolve_purity_trace(&self, rho: &mut DensityMatrix, dt: f64, n_steps: usize) -> Vec<f64> {
         let mut trace = Vec::with_capacity(n_steps);
         for _ in 0..n_steps {
             self.step(rho, dt);
@@ -356,8 +351,7 @@ mod tests {
         assert!(
             coh_after < coh_before * 0.5,
             "Dephasing should reduce coherence: before={:.4}, after={:.4}",
-            coh_before,
-            coh_after
+            coh_before, coh_after
         );
     }
 
@@ -421,8 +415,7 @@ mod tests {
         assert!(
             purity_after < purity_before,
             "Purity should decrease: before={:.4}, after={:.4}",
-            purity_before,
-            purity_after
+            purity_before, purity_after
         );
     }
 }

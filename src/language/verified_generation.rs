@@ -88,14 +88,12 @@ impl VerifiedCode {
                 },
             )
         } else if self.compiled {
-            format!("COMPILED but {} tests failed", self.test_count_failed)
-        } else {
             format!(
-                "FAILED to compile: {}",
-                self.compile_errors
-                    .first()
-                    .unwrap_or(&"unknown".to_string())
+                "COMPILED but {} tests failed",
+                self.test_count_failed
             )
+        } else {
+            format!("FAILED to compile: {}", self.compile_errors.first().unwrap_or(&"unknown".to_string()))
         }
     }
 }
@@ -116,12 +114,7 @@ pub struct VerificationConfidence {
 }
 
 impl VerificationConfidence {
-    fn compute(
-        compiled: bool,
-        tests_passed: bool,
-        formally_verified: bool,
-        category_rate: f32,
-    ) -> Self {
+    fn compute(compiled: bool, tests_passed: bool, formally_verified: bool, category_rate: f32) -> Self {
         let mut confidence = 0.0f32;
 
         if compiled {
@@ -354,11 +347,7 @@ mod tests {
             &[("add(2, 3)", "5")],
         );
 
-        assert!(
-            result.compiled,
-            "add() should compile: {:?}",
-            result.compile_errors
-        );
+        assert!(result.compiled, "add() should compile: {:?}", result.compile_errors);
     }
 
     #[test]
@@ -375,11 +364,7 @@ mod tests {
             &[],
         );
 
-        assert!(
-            result.compiled,
-            "reverse_string() should compile: {:?}",
-            result.compile_errors
-        );
+        assert!(result.compiled, "reverse_string() should compile: {:?}", result.compile_errors);
     }
 
     #[test]

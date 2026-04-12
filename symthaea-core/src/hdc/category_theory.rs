@@ -52,12 +52,7 @@ impl Category {
         let morphisms = vec![vec![vec![]; n]; n];
         let mut composition = HashMap::new();
         // identities compose as id ∘ f = f = f ∘ id (populated incrementally)
-        Self {
-            objects,
-            morphisms,
-            composition,
-            identities,
-        }
+        Self { objects, morphisms, composition, identities }
     }
 
     /// Number of objects.
@@ -74,15 +69,12 @@ impl Category {
 
     /// Register that g ∘ f = h (g after f).
     pub fn set_composition(&mut self, f: &str, g: &str, h: &str) {
-        self.composition
-            .insert((f.to_string(), g.to_string()), h.to_string());
+        self.composition.insert((f.to_string(), g.to_string()), h.to_string());
     }
 
     /// Compute g ∘ f, returning the morphism name if known.
     pub fn compose(&self, f: &str, g: &str) -> Option<&str> {
-        self.composition
-            .get(&(f.to_string(), g.to_string()))
-            .map(|s| s.as_str())
+        self.composition.get(&(f.to_string(), g.to_string())).map(|s| s.as_str())
     }
 
     /// The hom-set Hom(from, to).
@@ -157,29 +149,19 @@ impl Category {
 
         // Check identity laws: id_A ∘ f = f and f ∘ id_B = f for every f: A → B
         for f in &all {
-            let dom = match self.domain_of(f) {
-                Some(d) => d,
-                None => continue,
-            };
-            let cod = match self.codomain_of(f) {
-                Some(c) => c,
-                None => continue,
-            };
+            let dom = match self.domain_of(f) { Some(d) => d, None => continue };
+            let cod = match self.codomain_of(f) { Some(c) => c, None => continue };
 
             let id_dom = &self.identities[dom];
             let id_cod = &self.identities[cod];
 
             // f ∘ id_dom = f  (id_dom then f)
             if let Some(r) = self.compose(id_dom, f) {
-                if r != f.as_str() {
-                    return false;
-                }
+                if r != f.as_str() { return false; }
             }
             // id_cod ∘ f = f  (f then id_cod)
             if let Some(r) = self.compose(f, id_cod) {
-                if r != f.as_str() {
-                    return false;
-                }
+                if r != f.as_str() { return false; }
             }
         }
 
@@ -188,20 +170,14 @@ impl Category {
             let (f, g) = fg;
             for (gh, _) in &self.composition {
                 let (g2, h2) = gh;
-                if g != g2 {
-                    continue;
-                }
+                if g != g2 { continue; }
                 // We have f, g, h2 potentially composable in order f then g then h2
                 if let Some(fg_name) = self.compose(f, g) {
                     if let Some(g_h2) = self.compose(g, h2) {
                         let lhs = self.compose(fg_name, h2);
                         let rhs = self.compose(f, g_h2);
                         match (lhs, rhs) {
-                            (Some(l), Some(r)) => {
-                                if l != r {
-                                    return false;
-                                }
-                            }
+                            (Some(l), Some(r)) => { if l != r { return false; } }
                             _ => {}
                         }
                     }
@@ -214,14 +190,8 @@ impl Category {
     /// Check if a morphism has a two-sided inverse (is an isomorphism).
     pub fn is_isomorphism(&self, f: &str) -> bool {
         let all = self.all_morphism_names();
-        let dom = match self.domain_of(f) {
-            Some(d) => d,
-            None => return false,
-        };
-        let cod = match self.codomain_of(f) {
-            Some(c) => c,
-            None => return false,
-        };
+        let dom = match self.domain_of(f) { Some(d) => d, None => return false };
+        let cod = match self.codomain_of(f) { Some(c) => c, None => return false };
         let id_dom = &self.identities[dom];
         let id_cod = &self.identities[cod];
         for g in &all {
@@ -262,17 +232,14 @@ impl Category {
                 let id_d = identities[d].clone();
                 let id_c = identities[c].clone();
                 // id_d ∘ (nothing yet) → then f: so f ∘ id_d = f (id_d first, then f)
-                self.composition
-                    .insert((id_d.clone(), f.clone()), f.clone());
+                self.composition.insert((id_d.clone(), f.clone()), f.clone());
                 // id_c after f: f first, then id_c = f
-                self.composition
-                    .insert((f.clone(), id_c.clone()), f.clone());
+                self.composition.insert((f.clone(), id_c.clone()), f.clone());
             }
         }
         // Also register identity ∘ identity = identity
         for id in &identities {
-            self.composition
-                .insert((id.clone(), id.clone()), id.clone());
+            self.composition.insert((id.clone(), id.clone()), id.clone());
         }
     }
 }
@@ -406,18 +373,9 @@ impl Functor {
 
         // 2. Composition preservation
         for ((f, g), fg) in &c.composition {
-            let ff = match self.morphism_map.get(f) {
-                Some(m) => m,
-                None => continue,
-            };
-            let fg_c = match self.morphism_map.get(g) {
-                Some(m) => m,
-                None => continue,
-            };
-            let ffg = match self.morphism_map.get(fg) {
-                Some(m) => m,
-                None => continue,
-            };
+            let ff = match self.morphism_map.get(f) { Some(m) => m, None => continue };
+            let fg_c = match self.morphism_map.get(g) { Some(m) => m, None => continue };
+            let ffg = match self.morphism_map.get(fg) { Some(m) => m, None => continue };
             // In D: F(g) ∘ F(f) should equal F(fg)
             if let Some(composed) = d.compose(ff, fg_c) {
                 if composed != ffg.as_str() {
@@ -435,8 +393,7 @@ impl Functor {
         for from in 0..n {
             for to in 0..n {
                 let hom = &c.morphisms[from][to];
-                let images: Vec<&String> = hom
-                    .iter()
+                let images: Vec<&String> = hom.iter()
                     .filter_map(|m| self.morphism_map.get(m))
                     .collect();
                 let unique: std::collections::HashSet<_> = images.iter().collect();
@@ -455,22 +412,10 @@ impl Functor {
         let n = c.objects.len();
         for from in 0..n {
             for to in 0..n {
-                let fa = match self.object_map.get(&c.objects[from]) {
-                    Some(o) => o,
-                    None => return false,
-                };
-                let fb = match self.object_map.get(&c.objects[to]) {
-                    Some(o) => o,
-                    None => return false,
-                };
-                let fa_idx = match d.objects.iter().position(|o| o == fa) {
-                    Some(i) => i,
-                    None => return false,
-                };
-                let fb_idx = match d.objects.iter().position(|o| o == fb) {
-                    Some(i) => i,
-                    None => return false,
-                };
+                let fa = match self.object_map.get(&c.objects[from]) { Some(o) => o, None => return false };
+                let fb = match self.object_map.get(&c.objects[to]) { Some(o) => o, None => return false };
+                let fa_idx = match d.objects.iter().position(|o| o == fa) { Some(i) => i, None => return false };
+                let fb_idx = match d.objects.iter().position(|o| o == fb) { Some(i) => i, None => return false };
                 let d_hom = &d.morphisms[fa_idx][fb_idx];
                 let c_images: std::collections::HashSet<&str> = c.morphisms[from][to]
                     .iter()
@@ -489,8 +434,7 @@ impl Functor {
     /// Essentially surjective: every object of D is isomorphic to some F(a).
     pub fn is_essentially_surjective(&self) -> bool {
         let d = &self.target;
-        let image_objects: std::collections::HashSet<&str> =
-            self.object_map.values().map(|s| s.as_str()).collect();
+        let image_objects: std::collections::HashSet<&str> = self.object_map.values().map(|s| s.as_str()).collect();
         for obj in &d.objects {
             if !image_objects.contains(obj.as_str()) {
                 // Check if obj is isomorphic to some image object (simplified: check identity)
@@ -514,8 +458,8 @@ impl Functor {
 /// A natural transformation η: F ⇒ G between functors F, G: C → D.
 #[derive(Debug, Clone)]
 pub struct NaturalTransformation {
-    pub source_functor: Functor, // F
-    pub target_functor: Functor, // G
+    pub source_functor: Functor,  // F
+    pub target_functor: Functor,  // G
     /// `components[a]` = name of the morphism η_a: F(a) → G(a) in D.
     pub components: HashMap<String, String>,
 }
@@ -530,32 +474,16 @@ impl NaturalTransformation {
         for from in 0..n {
             for to in 0..n {
                 for f in &c.morphisms[from][to] {
-                    let eta_a = match self.components.get(&c.objects[from]) {
-                        Some(e) => e,
-                        None => return false,
-                    };
-                    let eta_b = match self.components.get(&c.objects[to]) {
-                        Some(e) => e,
-                        None => return false,
-                    };
-                    let ff = match self.source_functor.morphism_map.get(f) {
-                        Some(m) => m,
-                        None => return false,
-                    };
-                    let gf = match self.target_functor.morphism_map.get(f) {
-                        Some(m) => m,
-                        None => return false,
-                    };
+                    let eta_a = match self.components.get(&c.objects[from]) { Some(e) => e, None => return false };
+                    let eta_b = match self.components.get(&c.objects[to]) { Some(e) => e, None => return false };
+                    let ff = match self.source_functor.morphism_map.get(f) { Some(m) => m, None => return false };
+                    let gf = match self.target_functor.morphism_map.get(f) { Some(m) => m, None => return false };
                     // G(f) ∘ η_a  (η_a first, then G(f))
                     let lhs = d.compose(eta_a, gf);
                     // η_b ∘ F(f)  (F(f) first, then η_b)
                     let rhs = d.compose(ff, eta_b);
                     match (lhs, rhs) {
-                        (Some(l), Some(r)) => {
-                            if l != r {
-                                return false;
-                            }
-                        }
+                        (Some(l), Some(r)) => { if l != r { return false; } }
                         (None, None) => {} // both undefined — acceptable for small categories
                         _ => return false,
                     }
@@ -568,9 +496,7 @@ impl NaturalTransformation {
     /// A natural isomorphism has all components as isomorphisms.
     pub fn is_natural_isomorphism(&self) -> bool {
         let d = &self.source_functor.target;
-        self.components
-            .values()
-            .all(|eta_a| d.is_isomorphism(eta_a))
+        self.components.values().all(|eta_a| d.is_isomorphism(eta_a))
     }
 }
 
@@ -597,25 +523,13 @@ impl Adjunction {
         let c = &self.left_functor.source;
         let d = &self.left_functor.target;
         for (i, obj) in c.objects.iter().enumerate() {
-            let eta_a = match self.unit.components.get(obj) {
-                Some(e) => e,
-                None => return false,
-            };
+            let eta_a = match self.unit.components.get(obj) { Some(e) => e, None => return false };
             // F(η_a)
-            let f_eta_a = match self.left_functor.morphism_map.get(eta_a) {
-                Some(m) => m,
-                None => continue,
-            };
+            let f_eta_a = match self.left_functor.morphism_map.get(eta_a) { Some(m) => m, None => continue };
             // F(a)
-            let fa = match self.left_functor.object_map.get(obj) {
-                Some(o) => o,
-                None => return false,
-            };
+            let fa = match self.left_functor.object_map.get(obj) { Some(o) => o, None => return false };
             // ε_{F(a)}
-            let eps_fa = match self.counit.components.get(fa) {
-                Some(e) => e,
-                None => continue,
-            };
+            let eps_fa = match self.counit.components.get(fa) { Some(e) => e, None => continue };
             // ε_{F(a)} ∘ F(η_a)
             if let Some(composed) = d.compose(f_eta_a, eps_fa) {
                 let fa_idx = d.objects.iter().position(|o| o == fa);
@@ -649,14 +563,8 @@ impl Monad {
         let d = &self.endofunctor.target;
         // Check η components are typed correctly: η_a: a → T(a)
         for obj in &c.objects {
-            let eta_a = match self.unit.components.get(obj) {
-                Some(e) => e,
-                None => return false,
-            };
-            let ta = match self.endofunctor.object_map.get(obj) {
-                Some(o) => o,
-                None => return false,
-            };
+            let eta_a = match self.unit.components.get(obj) { Some(e) => e, None => return false };
+            let ta = match self.endofunctor.object_map.get(obj) { Some(o) => o, None => return false };
             // codomain of η_a should be T(a)
             if let Some(cod) = d.codomain_of(eta_a) {
                 if &d.objects[cod] != ta {
@@ -666,14 +574,8 @@ impl Monad {
         }
         // Check μ components: μ_a: T²(a) → T(a)
         for obj in &c.objects {
-            let mu_a = match self.multiplication.components.get(obj) {
-                Some(m) => m,
-                None => return false,
-            };
-            let ta = match self.endofunctor.object_map.get(obj) {
-                Some(o) => o,
-                None => return false,
-            };
+            let mu_a = match self.multiplication.components.get(obj) { Some(m) => m, None => return false };
+            let ta = match self.endofunctor.object_map.get(obj) { Some(o) => o, None => return false };
             if let Some(cod) = d.codomain_of(mu_a) {
                 if &d.objects[cod] != ta {
                     return false;
@@ -861,34 +763,22 @@ mod tests {
         // Identity natural transformation on the identity functor
         let mut obj_map = HashMap::new();
         let mut mor_map = HashMap::new();
-        for obj in &cat.objects {
-            obj_map.insert(obj.clone(), obj.clone());
-        }
-        for id in &cat.identities {
-            mor_map.insert(id.clone(), id.clone());
-        }
+        for obj in &cat.objects { obj_map.insert(obj.clone(), obj.clone()); }
+        for id in &cat.identities { mor_map.insert(id.clone(), id.clone()); }
         mor_map.insert("f01".to_string(), "f01".to_string());
         let f = Functor {
-            source: cat.clone(),
-            target: cat.clone(),
-            object_map: obj_map.clone(),
-            morphism_map: mor_map.clone(),
+            source: cat.clone(), target: cat.clone(),
+            object_map: obj_map.clone(), morphism_map: mor_map.clone(),
         };
         let g = Functor {
-            source: cat.clone(),
-            target: cat.clone(),
-            object_map: obj_map,
-            morphism_map: mor_map,
+            source: cat.clone(), target: cat.clone(),
+            object_map: obj_map, morphism_map: mor_map,
         };
         // η: F ⇒ G where η_a = id_a
         let mut components = HashMap::new();
         components.insert("0".to_string(), "id0".to_string());
         components.insert("1".to_string(), "id1".to_string());
-        let nt = NaturalTransformation {
-            source_functor: f,
-            target_functor: g,
-            components,
-        };
+        let nt = NaturalTransformation { source_functor: f, target_functor: g, components };
         assert!(nt.is_valid());
     }
 
@@ -928,15 +818,9 @@ mod tests {
         let hom = yoneda_hom_set(&cat, 1);
         assert_eq!(hom.len(), 2);
         // From object 0 to object 1: should contain f01
-        assert!(
-            hom[0].contains(&"f01".to_string()),
-            "Hom(0,1) should contain f01"
-        );
+        assert!(hom[0].contains(&"f01".to_string()), "Hom(0,1) should contain f01");
         // From object 1 to object 1: should contain id1
-        assert!(
-            hom[1].contains(&"id1".to_string()),
-            "Hom(1,1) should contain id1"
-        );
+        assert!(hom[1].contains(&"id1".to_string()), "Hom(1,1) should contain id1");
     }
 
     #[test]
@@ -945,10 +829,7 @@ mod tests {
         let ambient = category_2();
         let mut legs = HashMap::new();
         legs.insert("*".to_string(), "id0".to_string());
-        let cone = Cone {
-            apex: "0".to_string(),
-            legs,
-        };
+        let cone = Cone { apex: "0".to_string(), legs };
         assert!(is_limit(&diagram, &cone, &ambient));
     }
 }

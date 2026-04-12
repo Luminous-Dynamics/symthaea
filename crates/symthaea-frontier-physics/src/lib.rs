@@ -16,13 +16,13 @@
 //! 9. **Holographic Principle** — ER=EPR, AdS/CFT, spacetime from entanglement
 //! 10. **Quantum Darwinism** — Emergence of classicality from decoherence
 
-pub mod dmrg;
-pub mod holographic;
-pub mod information_geometry;
-pub mod nonequilibrium_thermo;
 pub mod path_integrals;
-pub mod quantum_darwinism;
-pub mod quantum_error_correction;
-pub mod stochastic_qed;
-pub mod tensor_networks;
+pub mod information_geometry;
+pub mod dmrg;
 pub mod topological_qft;
+pub mod quantum_error_correction;
+pub mod tensor_networks;
+pub mod stochastic_qed;
+pub mod nonequilibrium_thermo;
+pub mod holographic;
+pub mod quantum_darwinism;

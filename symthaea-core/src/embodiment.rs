@@ -230,6 +230,38 @@ pub trait EmbodimentBridge: Send + Sync {
     fn physical_reliability(&self) -> f64 {
         1.0
     }
+
+    /// Apply moral gate from the ethics engine.
+    ///
+    /// Platforms opt in by overriding this method. The default is a no-op.
+    /// Safety-critical platforms (manipulator, surgical) should override
+    /// to enforce: Blocked → Red, Caution → Yellow cap, consent → Orange,
+    /// ahimsa → Red.
+    fn apply_moral_gate(&mut self, _gate: MoralGateInput) {}
+}
+
+// ── Moral Gate Input ─────────────────────────────────────────────────
+
+/// Ethics engine output forwarded to the embodiment bridge.
+///
+/// Uses u8 for `verdict` to keep symthaea-core free of ethics-types dependency:
+/// - 0 = Safe (no constraint)
+/// - 1 = Caution (cap at Yellow)
+/// - 2 = Blocked (force Red)
+#[derive(Debug, Clone, Copy)]
+pub struct MoralGateInput {
+    /// Ethical verdict: 0=Safe, 1=Caution, 2=Blocked.
+    pub verdict: u8,
+    /// True if consent was violated (force Orange or stricter).
+    pub consent_violation: bool,
+    /// True if ahimsa (non-harm) principle was violated (force Red).
+    pub ahimsa_violated: bool,
+}
+
+impl MoralGateInput {
+    pub const VERDICT_SAFE: u8 = 0;
+    pub const VERDICT_CAUTION: u8 = 1;
+    pub const VERDICT_BLOCKED: u8 = 2;
 }
 
 // ── Platform Plugin System ───────────────────────────────────────────────
@@ -270,9 +302,7 @@ pub struct PlatformRegistry {
 impl PlatformRegistry {
     /// Create an empty registry.
     pub fn new() -> Self {
-        Self {
-            plugins: Vec::new(),
-        }
+        Self { plugins: Vec::new() }
     }
 
     /// Register a platform plugin.
@@ -362,14 +392,8 @@ mod tests {
     #[test]
     fn test_from_phi_non_finite_returns_red() {
         assert_eq!(MotorSafetyLevel::from_phi(f64::NAN), MotorSafetyLevel::Red);
-        assert_eq!(
-            MotorSafetyLevel::from_phi(f64::INFINITY),
-            MotorSafetyLevel::Red
-        );
-        assert_eq!(
-            MotorSafetyLevel::from_phi(f64::NEG_INFINITY),
-            MotorSafetyLevel::Red
-        );
+        assert_eq!(MotorSafetyLevel::from_phi(f64::INFINITY), MotorSafetyLevel::Red);
+        assert_eq!(MotorSafetyLevel::from_phi(f64::NEG_INFINITY), MotorSafetyLevel::Red);
     }
 
     #[test]

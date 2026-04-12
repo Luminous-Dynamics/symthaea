@@ -70,9 +70,7 @@ impl SimpleManipulatorSimulator {
     fn gravity_torque_at(&self, joint: usize) -> f64 {
         let mut tau = 0.0;
         for j in joint..NUM_JOINTS {
-            tau += self.link_masses[j]
-                * self.gravity
-                * self.link_com_distances[j]
+            tau += self.link_masses[j] * self.gravity * self.link_com_distances[j]
                 * self.state.joint_angles[joint].cos();
         }
         tau

@@ -66,7 +66,9 @@ pub fn mutual_information(s_a: f64, s_b: f64, s_ab: f64) -> f64 {
 /// pair density: I_{ij} ∝ |K_{ij}|² / (ε_i - ε_j)² where K is the exchange.
 ///
 /// Simplified: uses orbital energy proximity as a correlation proxy.
-pub fn orbital_mutual_information(rhf: &RhfResult) -> Vec<Vec<f64>> {
+pub fn orbital_mutual_information(
+    rhf: &RhfResult,
+) -> Vec<Vec<f64>> {
     let n_mo = rhf.n_independent;
     let eps = &rhf.orbital_energies;
     let mut mi = vec![vec![0.0; n_mo]; n_mo];
@@ -170,9 +172,7 @@ mod tests {
         let s = von_neumann_entropy(&[0.5, 0.5]);
         assert!(
             (s - 2.0_f64.ln()).abs() < 1e-14,
-            "Max mixed entropy = {}, expected ln(2)={}",
-            s,
-            2.0_f64.ln()
+            "Max mixed entropy = {}, expected ln(2)={}", s, 2.0_f64.ln()
         );
     }
 

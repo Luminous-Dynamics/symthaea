@@ -833,9 +833,7 @@ where
         let fa = f(&xa);
 
         if fa > f0 + c1 * alpha * derphi0 || (_iter > 0 && fa >= f_prev) {
-            return wolfe_zoom(
-                f, &derphi, x, direction, alpha_prev, alpha, f0, derphi0, c1, c2, &x_alpha,
-            );
+            return wolfe_zoom(f, &derphi, x, direction, alpha_prev, alpha, f0, derphi0, c1, c2, &x_alpha);
         }
 
         let da = derphi(alpha);
@@ -844,9 +842,7 @@ where
         }
 
         if da >= 0.0 {
-            return wolfe_zoom(
-                f, &derphi, x, direction, alpha, alpha_prev, f0, derphi0, c1, c2, &x_alpha,
-            );
+            return wolfe_zoom(f, &derphi, x, direction, alpha, alpha_prev, f0, derphi0, c1, c2, &x_alpha);
         }
 
         alpha_prev = alpha;
@@ -999,11 +995,7 @@ impl LevenbergMarquardt {
                 .zip(&jtr)
                 .map(|(d, g)| d * (lambda * d - g))
                 .sum::<f64>();
-            let rho = if predicted.abs() > 1e-15 {
-                (sse - sse_new) / predicted
-            } else {
-                0.0
-            };
+            let rho = if predicted.abs() > 1e-15 { (sse - sse_new) / predicted } else { 0.0 };
 
             if rho > 0.0 {
                 // Accept step
@@ -1037,32 +1029,24 @@ impl LevenbergMarquardt {
     /// Gaussian elimination solver for Ax = b (in-place, n ≤ 100).
     fn solve_linear(a: &[Vec<f64>], b: &[f64]) -> Option<Vec<f64>> {
         let n = b.len();
-        let mut aug: Vec<Vec<f64>> = (0..n)
-            .map(|i| {
-                let mut row = a[i].clone();
-                row.push(b[i]);
-                row
-            })
-            .collect();
+        let mut aug: Vec<Vec<f64>> = (0..n).map(|i| {
+            let mut row = a[i].clone();
+            row.push(b[i]);
+            row
+        }).collect();
 
         for col in 0..n {
             // Partial pivoting
             let max_row = (col..n)
                 .max_by(|&r1, &r2| aug[r1][col].abs().partial_cmp(&aug[r2][col].abs()).unwrap())?;
             aug.swap(col, max_row);
-            if aug[col][col].abs() < 1e-14 {
-                return None;
-            }
+            if aug[col][col].abs() < 1e-14 { return None; }
             let pivot = aug[col][col];
-            for k in col..=n {
-                aug[col][k] /= pivot;
-            }
+            for k in col..=n { aug[col][k] /= pivot; }
             for row in 0..n {
                 if row != col {
                     let factor = aug[row][col];
-                    for k in col..=n {
-                        aug[row][k] -= factor * aug[col][k];
-                    }
+                    for k in col..=n { aug[row][k] -= factor * aug[col][k]; }
                 }
             }
         }
@@ -1126,28 +1110,19 @@ where
         for _step in 0..500 {
             let g = al_grad(&x);
             let gn: f64 = g.iter().map(|v| v * v).sum::<f64>().sqrt();
-            if gn < tol {
-                break;
-            }
-            for j in 0..n {
-                x[j] -= lr * g[j] / gn.max(1e-12);
-            }
+            if gn < tol { break; }
+            for j in 0..n { x[j] -= lr * g[j] / gn.max(1e-12); }
             lr *= 0.999;
         }
 
         // Update multipliers
-        let constraint_viol: f64 = (0..m)
-            .map(|i| constraints[i](&x).powi(2))
-            .sum::<f64>()
-            .sqrt();
+        let constraint_viol: f64 = (0..m).map(|i| constraints[i](&x).powi(2)).sum::<f64>().sqrt();
         for i in 0..m {
             lambda[i] += rho * constraints[i](&x);
         }
         rho = (rho * 1.5).min(1e6);
 
-        if constraint_viol < tol {
-            break;
-        }
+        if constraint_viol < tol { break; }
         let _ = outer;
     }
 
@@ -1569,39 +1544,22 @@ mod tests {
         let xs = [0.0f64, 1.0, 2.0, 3.0];
         let ys = [1.0f64, 3.0, 5.0, 7.0];
         let residual_fn = |p: &[f64]| -> Vec<f64> {
-            xs.iter()
-                .zip(ys.iter())
-                .map(|(&x, &y)| y - (p[0] * x + p[1]))
-                .collect()
+            xs.iter().zip(ys.iter()).map(|(&x, &y)| y - (p[0] * x + p[1])).collect()
         };
         let result = LevenbergMarquardt::fit(residual_fn, &[0.0, 0.0], 1e-8, 200);
-        assert!(
-            result.sse < 1e-6,
-            "LM should fit linear data exactly, SSE={}",
-            result.sse
-        );
-        assert!(
-            (result.params[0] - 2.0).abs() < 0.01,
-            "slope should be ~2, got {}",
-            result.params[0]
-        );
-        assert!(
-            (result.params[1] - 1.0).abs() < 0.01,
-            "intercept should be ~1, got {}",
-            result.params[1]
-        );
+        assert!(result.sse < 1e-6, "LM should fit linear data exactly, SSE={}", result.sse);
+        assert!((result.params[0] - 2.0).abs() < 0.01, "slope should be ~2, got {}", result.params[0]);
+        assert!((result.params[1] - 1.0).abs() < 0.01, "intercept should be ~1, got {}", result.params[1]);
     }
 
     #[test]
     fn test_lm_rosenbrock() {
         // Rosenbrock as nonlinear LS: r1 = 10*(x1 - x0²), r2 = 1 - x0 → min at (1,1)
-        let residual_fn = |p: &[f64]| -> Vec<f64> { vec![10.0 * (p[1] - p[0] * p[0]), 1.0 - p[0]] };
+        let residual_fn = |p: &[f64]| -> Vec<f64> {
+            vec![10.0 * (p[1] - p[0] * p[0]), 1.0 - p[0]]
+        };
         let result = LevenbergMarquardt::fit(residual_fn, &[-1.2, 1.0], 1e-8, 500);
-        assert!(
-            result.sse < 1e-6,
-            "LM Rosenbrock SSE should be near 0, got {}",
-            result.sse
-        );
+        assert!(result.sse < 1e-6, "LM Rosenbrock SSE should be near 0, got {}", result.sse);
     }
 
     #[test]
@@ -1610,17 +1568,10 @@ mod tests {
         let xs = [0.0f64, 1.0, 2.0, 3.0];
         let ys: Vec<f64> = xs.iter().map(|&x| (-0.5 * x).exp()).collect();
         let residual_fn = |p: &[f64]| -> Vec<f64> {
-            xs.iter()
-                .zip(ys.iter())
-                .map(|(&x, &y)| y - (-p[0] * x).exp())
-                .collect()
+            xs.iter().zip(ys.iter()).map(|(&x, &y)| y - (-p[0] * x).exp()).collect()
         };
         let result = LevenbergMarquardt::fit(residual_fn, &[5.0], 1e-8, 300);
-        assert!(
-            (result.params[0] - 0.5).abs() < 0.01,
-            "LM should recover a≈0.5, got {}",
-            result.params[0]
-        );
+        assert!((result.params[0] - 0.5).abs() < 0.01, "LM should recover a≈0.5, got {}", result.params[0]);
     }
 
     // ── Wolfe line search tests ───────────────────────────────────────────
@@ -1647,10 +1598,7 @@ mod tests {
         let grad0 = g(&x0);
         let dir = [-grad0[0]];
         let alpha = wolfe_line_search(&f, &g, &x0, &dir, f(&x0), &grad0, 1e-4, 0.9, 20);
-        assert!(
-            alpha.is_finite() && alpha > 0.0,
-            "Wolfe alpha should be finite and positive"
-        );
+        assert!(alpha.is_finite() && alpha > 0.0, "Wolfe alpha should be finite and positive");
     }
 
     // ── Augmented Lagrangian tests ────────────────────────────────────────
@@ -1664,9 +1612,7 @@ mod tests {
         let result = augmented_lagrangian(&f, &gf, &[c], &[2.0, 0.0], 1e-4, 30);
         assert!(
             (result.x[0] - 0.5).abs() < 0.1 && (result.x[1] - 0.5).abs() < 0.1,
-            "AL should find x≈y≈0.5, got ({:.3},{:.3})",
-            result.x[0],
-            result.x[1]
+            "AL should find x≈y≈0.5, got ({:.3},{:.3})", result.x[0], result.x[1]
         );
     }
 }

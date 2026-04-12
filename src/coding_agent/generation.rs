@@ -164,11 +164,7 @@ impl CodingAgent {
                     // within the SAME iteration (don't wait for next cycle).
                     self.native_exhausted = true;
                     if let Some(ref mut dispatcher) = self.dispatcher {
-                        dispatcher.record_outcome_with_category(
-                            BackendTier::Native,
-                            false,
-                            &self.task,
-                        );
+                        dispatcher.record_outcome_with_category(BackendTier::Native, false, &self.task);
 
                         // Re-dispatch with overridden state to force LLM tier
                         let params = GenerationParams {

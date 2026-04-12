@@ -1,5 +1,4 @@
-#![allow(deprecated)]
-// Tests use legacy ConsciousnessCredential/Tier for backward-compat bridge testing
+#![allow(deprecated)] // Tests use legacy ConsciousnessCredential/Tier for backward-compat bridge testing
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
@@ -20,8 +19,9 @@ use mycelix_bridge_common::consciousness_profile::{
 };
 use mycelix_bridge_common::consciousness_profile::{
     evaluate_governance, requirement_for_basic, requirement_for_constitutional,
-    requirement_for_guardian, requirement_for_proposal, requirement_for_voting, CivicTier,
-    ConsciousnessCredential, ConsciousnessProfile, ReputationState, REPUTATION_DECAY_PER_DAY,
+    requirement_for_guardian, requirement_for_proposal, requirement_for_voting,
+    ConsciousnessCredential, ConsciousnessProfile, CivicTier, ReputationState,
+    REPUTATION_DECAY_PER_DAY,
 };
 
 /// Convenience: a timestamp well before any credential expiry.
@@ -122,24 +122,54 @@ fn test_governance_thresholds_guardian() {
 #[test]
 fn test_consciousness_tier_from_score() {
     // Observer: score < 0.3
-    assert_eq!(CivicTier::from_score(0.0), CivicTier::Observer);
-    assert_eq!(CivicTier::from_score(0.29), CivicTier::Observer);
+    assert_eq!(
+        CivicTier::from_score(0.0),
+        CivicTier::Observer
+    );
+    assert_eq!(
+        CivicTier::from_score(0.29),
+        CivicTier::Observer
+    );
 
     // Participant: 0.3 <= score < 0.4
-    assert_eq!(CivicTier::from_score(0.3), CivicTier::Participant);
-    assert_eq!(CivicTier::from_score(0.39), CivicTier::Participant);
+    assert_eq!(
+        CivicTier::from_score(0.3),
+        CivicTier::Participant
+    );
+    assert_eq!(
+        CivicTier::from_score(0.39),
+        CivicTier::Participant
+    );
 
     // Citizen: 0.4 <= score < 0.6
-    assert_eq!(CivicTier::from_score(0.4), CivicTier::Citizen);
-    assert_eq!(CivicTier::from_score(0.59), CivicTier::Citizen);
+    assert_eq!(
+        CivicTier::from_score(0.4),
+        CivicTier::Citizen
+    );
+    assert_eq!(
+        CivicTier::from_score(0.59),
+        CivicTier::Citizen
+    );
 
     // Steward: 0.6 <= score < 0.8
-    assert_eq!(CivicTier::from_score(0.6), CivicTier::Steward);
-    assert_eq!(CivicTier::from_score(0.79), CivicTier::Steward);
+    assert_eq!(
+        CivicTier::from_score(0.6),
+        CivicTier::Steward
+    );
+    assert_eq!(
+        CivicTier::from_score(0.79),
+        CivicTier::Steward
+    );
 
     // Guardian: score >= 0.8
-    assert_eq!(CivicTier::from_score(0.8), CivicTier::Guardian);
-    assert_eq!(CivicTier::from_score(1.0), CivicTier::Guardian);
+    assert_eq!(
+        CivicTier::from_score(0.8),
+        CivicTier::Guardian
+    );
+    assert_eq!(
+        CivicTier::from_score(1.0),
+        CivicTier::Guardian
+    );
 }
 
 // ============================================================================

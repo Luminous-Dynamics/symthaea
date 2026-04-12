@@ -34,9 +34,9 @@
 //! (get-model)
 //! ```
 
-use std::io::Write as _;
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
+use std::io::Write as _;
 use std::time::Duration;
 
 use symthaea_core::hdc::logic_engine::{LogicEngine, Proposition};
@@ -270,8 +270,7 @@ impl Z3Bridge {
             // rhs value: for linear ODEs of form dy/dt = α * y, evaluate at midpoint
             let t_mid = (t0 + t1) / 2.0;
             let y_mid = (y0 + y1) / 2.0;
-            let constraint =
-                Self::format_ode_constraint(t_mid, y_mid, dy_dt_approx, dy_dt_approx, tolerance);
+            let constraint = Self::format_ode_constraint(t_mid, y_mid, dy_dt_approx, dy_dt_approx, tolerance);
             assertions.push(constraint);
         }
 
@@ -308,9 +307,7 @@ impl Z3Bridge {
             if all_satisfied {
                 VerificationResult::Sat { witness: None }
             } else {
-                VerificationResult::Unsat {
-                    core: Some("ODE residual exceeded tolerance".to_string()),
-                }
+                VerificationResult::Unsat { core: Some("ODE residual exceeded tolerance".to_string()) }
             }
         }
     }
@@ -350,11 +347,7 @@ impl Z3Bridge {
                 diag_count += 1;
             }
         }
-        let k = if diag_count > 0 {
-            k_sum / diag_count as f64
-        } else {
-            0.0
-        };
+        let k = if diag_count > 0 { k_sum / diag_count as f64 } else { 0.0 };
 
         // Build SMTLIB2 constraints: for each (i,j), |Ric_ij - k*g_ij| < tol
         let mut assertions = Vec::new();
@@ -396,9 +389,7 @@ impl Z3Bridge {
                 }
             } else {
                 VerificationResult::Unsat {
-                    core: Some(format!(
-                        "max_residual={max_residual:.2e} > tol={tolerance:.2e}"
-                    )),
+                    core: Some(format!("max_residual={max_residual:.2e} > tol={tolerance:.2e}")),
                 }
             }
         }
@@ -414,9 +405,7 @@ impl Z3Bridge {
         constraints: &[(&str, Vec<usize>)],
     ) -> VerificationResult {
         if variables.is_empty() {
-            return VerificationResult::Sat {
-                witness: Some("empty".to_string()),
-            };
+            return VerificationResult::Sat { witness: Some("empty".to_string()) };
         }
 
         // Build SMTLIB2
@@ -428,11 +417,7 @@ impl Z3Bridge {
 
         let mut constraint_smt: Vec<String> = Vec::new();
         for (name, indices) in constraints {
-            let vals: Vec<i64> = indices
-                .iter()
-                .filter_map(|&i| variables.get(i))
-                .copied()
-                .collect();
+            let vals: Vec<i64> = indices.iter().filter_map(|&i| variables.get(i)).copied().collect();
             match *name {
                 "alldiff" => {
                     // Assert all values are distinct
@@ -510,7 +495,13 @@ impl Z3Bridge {
     /// Format an ODE residual constraint as SMTLIB2.
     ///
     /// Asserts `|dy_dt_approx - rhs_val| < tol` in real arithmetic.
-    pub fn format_ode_constraint(t: f64, y: f64, dy_dt: f64, rhs_val: f64, tol: f64) -> String {
+    pub fn format_ode_constraint(
+        t: f64,
+        y: f64,
+        dy_dt: f64,
+        rhs_val: f64,
+        tol: f64,
+    ) -> String {
         let residual = (dy_dt - rhs_val).abs();
         format!(
             "; ODE constraint at t={t:.4}, y={y:.4}: residual={residual:.2e}\n\
@@ -657,9 +648,7 @@ impl Z3Bridge {
                 } else if trimmed == "sat" {
                     VerificationResult::Invalid
                 } else {
-                    VerificationResult::Unknown {
-                        reason: format!("Z3: {}", trimmed),
-                    }
+                    VerificationResult::Unknown { reason: format!("Z3: {}", trimmed) }
                 }
             }
             None => VerificationResult::UsingFallback,
@@ -709,8 +698,7 @@ impl Z3Bridge {
             base_n, rhs_smt, base_value
         );
 
-        let base_ok = self
-            .run_z3(&base_smt)
+        let base_ok = self.run_z3(&base_smt)
             .map(|out| out.trim() == "unsat")
             .unwrap_or(false);
 
@@ -729,8 +717,7 @@ impl Z3Bridge {
             base_n, rhs_at_k1, rhs_at_k, delta_smt
         );
 
-        let step_ok = self
-            .run_z3(&step_smt)
+        let step_ok = self.run_z3(&step_smt)
             .map(|out| out.trim() == "unsat")
             .unwrap_or(false);
 
@@ -740,32 +727,17 @@ impl Z3Bridge {
             proved,
             base_case: base_ok,
             inductive_step: step_ok,
-            method: if proved {
-                "Z3_QF_NIA_induction".to_string()
-            } else {
-                "Z3_QF_NIA_partial".to_string()
-            },
+            method: if proved { "Z3_QF_NIA_induction".to_string() }
+                    else { "Z3_QF_NIA_partial".to_string() },
             details: format!(
                 "Base case f({}) = {}: {}\n\
                  Inductive step f(k+1) = f(k) + delta(k): {}\n\
                  {}",
-                base_n,
-                base_value,
-                if base_ok {
-                    "PROVED (Z3: unsat)"
-                } else {
-                    "FAILED"
-                },
-                if step_ok {
-                    "PROVED (Z3: unsat)"
-                } else {
-                    "FAILED"
-                },
-                if proved {
-                    "Conclusion: forall n >= base: P(n) holds. QED"
-                } else {
-                    "Proof incomplete."
-                }
+                base_n, base_value,
+                if base_ok { "PROVED (Z3: unsat)" } else { "FAILED" },
+                if step_ok { "PROVED (Z3: unsat)" } else { "FAILED" },
+                if proved { "Conclusion: forall n >= base: P(n) holds. QED" }
+                else { "Proof incomplete." }
             ),
         }
     }
@@ -807,9 +779,7 @@ impl Z3Bridge {
                 } else if trimmed == "sat" {
                     VerificationResult::Invalid // counterexample exists
                 } else {
-                    VerificationResult::Unknown {
-                        reason: format!("Z3: {}", trimmed),
-                    }
+                    VerificationResult::Unknown { reason: format!("Z3: {}", trimmed) }
                 }
             }
             None => VerificationResult::UsingFallback,
@@ -839,15 +809,9 @@ impl Z3Bridge {
         match self.run_z3(&smt) {
             Some(output) => {
                 let trimmed = output.trim();
-                if trimmed == "unsat" {
-                    VerificationResult::Valid
-                } else if trimmed == "sat" {
-                    VerificationResult::Invalid
-                } else {
-                    VerificationResult::Unknown {
-                        reason: format!("Z3: {}", trimmed),
-                    }
-                }
+                if trimmed == "unsat" { VerificationResult::Valid }
+                else if trimmed == "sat" { VerificationResult::Invalid }
+                else { VerificationResult::Unknown { reason: format!("Z3: {}", trimmed) } }
             }
             None => VerificationResult::UsingFallback,
         }
@@ -976,19 +940,12 @@ fn build_validity_check(smt: &str) -> String {
     // Build: (assert (not (and assertion1 assertion2 ...)))
     let conjunction = if assertions.len() == 1 {
         // Strip outer (assert ...) wrapper
-        let inner = assertions[0]
-            .trim()
-            .trim_start_matches("(assert ")
-            .trim_end_matches(')');
+        let inner = assertions[0].trim().trim_start_matches("(assert ").trim_end_matches(')');
         inner.to_string()
     } else {
         let inners: Vec<&str> = assertions
             .iter()
-            .map(|s| {
-                s.trim()
-                    .trim_start_matches("(assert ")
-                    .trim_end_matches(')')
-            })
+            .map(|s| s.trim().trim_start_matches("(assert ").trim_end_matches(')'))
             .collect();
         format!("(and {})", inners.join(" "))
     };
@@ -996,9 +953,7 @@ fn build_validity_check(smt: &str) -> String {
     // Keep declarations, remove original asserts, add negation
     let decls: Vec<&str> = smt
         .lines()
-        .filter(|l| {
-            !l.trim_start().starts_with("(assert ") && !l.trim_start().starts_with("(check-sat)")
-        })
+        .filter(|l| !l.trim_start().starts_with("(assert ") && !l.trim_start().starts_with("(check-sat)"))
         .collect();
 
     format!(
@@ -1072,14 +1027,10 @@ fn parse_simple_proposition(smt: &str) -> Option<Proposition> {
         let a = a.trim();
         if a.starts_with("(not ") {
             let inner = a.trim_start_matches("(not ").trim_end_matches(')').trim();
-            if bool_vars.contains(&inner.to_string())
-                || inner.chars().all(|c| c.is_alphanumeric() || c == '_')
-            {
+            if bool_vars.contains(&inner.to_string()) || inner.chars().all(|c| c.is_alphanumeric() || c == '_') {
                 props.push(Proposition::atom(inner).not());
             }
-        } else if bool_vars.contains(&a.to_string())
-            || a.chars().all(|c| c.is_alphanumeric() || c == '_')
-        {
+        } else if bool_vars.contains(&a.to_string()) || a.chars().all(|c| c.is_alphanumeric() || c == '_') {
             props.push(Proposition::atom(a));
         }
     }
@@ -1145,20 +1096,14 @@ mod tests {
     fn test_format_ode_constraint_contains_assert() {
         let s = Z3Bridge::format_ode_constraint(0.5, 1.0, -0.5, -0.5, 0.01);
         assert!(s.contains("(assert"), "should contain SMTLIB2 assert: {s}");
-        assert!(
-            s.contains("(declare-const"),
-            "should declare a constant: {s}"
-        );
+        assert!(s.contains("(declare-const"), "should declare a constant: {s}");
     }
 
     #[test]
     fn test_format_ode_constraint_residual_is_small_for_exact() {
         // When dy_dt == rhs_val, residual = 0.0
         let s = Z3Bridge::format_ode_constraint(1.0, 2.0, 3.0, 3.0, 0.01);
-        assert!(
-            s.contains("0.000000e0") || s.contains("0.00000"),
-            "zero residual: {s}"
-        );
+        assert!(s.contains("0.000000e0") || s.contains("0.00000"), "zero residual: {s}");
     }
 
     #[test]
@@ -1189,10 +1134,7 @@ mod tests {
         let result = b.verify_ode_solution_satisfies_equation("dy/dt", "-y", &solution, 0.05);
         // Internal fallback should return Sat (finite derivatives for well-behaved solution)
         assert!(
-            matches!(
-                result,
-                VerificationResult::Sat { .. } | VerificationResult::UsingFallback
-            ),
+            matches!(result, VerificationResult::Sat { .. } | VerificationResult::UsingFallback),
             "expected Sat or UsingFallback, got {result:?}"
         );
     }
@@ -1280,10 +1222,7 @@ mod tests {
         let smt = "(declare-const p Bool)\n(assert p)";
         let result = b.verify_satisfiable(smt);
         assert!(
-            matches!(
-                result,
-                VerificationResult::UsingFallback | VerificationResult::Sat { .. }
-            ),
+            matches!(result, VerificationResult::UsingFallback | VerificationResult::Sat { .. }),
             "simple bool should be satisfiable: {result:?}"
         );
     }
@@ -1377,10 +1316,8 @@ mod tests {
             seed: 42,
         };
         let result = search_einstein_metrics(&config);
-        assert!(
-            result.best.einstein_defect.is_finite(),
-            "Search must produce a finite defect"
-        );
+        assert!(result.best.einstein_defect.is_finite(),
+            "Search must produce a finite defect");
 
         // Step 2: Extract best candidate's Ricci and metric tensors
         let metric = &result.best.metric;
@@ -1406,10 +1343,8 @@ mod tests {
 
         // The round sphere should satisfy Einstein (Ric = kg)
         assert!(
-            matches!(
-                verification,
-                VerificationResult::Sat { .. } | VerificationResult::UsingFallback
-            ),
+            matches!(verification, VerificationResult::Sat { .. }
+                | VerificationResult::UsingFallback),
             "Best candidate from S² search should satisfy Einstein condition: {verification:?}"
         );
     }
@@ -1426,13 +1361,12 @@ mod tests {
         }
 
         // Prove: n*(n+1)/2 = n*(n+1)/2 (trivial identity)
-        let result =
-            bridge.prove_polynomial_identity("(div (* n (+ n 1)) 2)", "(div (* n (+ n 1)) 2)", 1);
-        assert!(
-            result.is_valid(),
-            "trivial identity should be valid: {:?}",
-            result
+        let result = bridge.prove_polynomial_identity(
+            "(div (* n (+ n 1)) 2)",
+            "(div (* n (+ n 1)) 2)",
+            1,
         );
+        assert!(result.is_valid(), "trivial identity should be valid: {:?}", result);
         eprintln!("Z3 polynomial identity proof: {:?}", result);
     }
 
@@ -1448,10 +1382,10 @@ mod tests {
         // Prove: T(n) = n*(n+1)/2 with T(1) = 1 and T(n) = T(n-1) + n
         // rhs = n*(n+1)/2, delta = (k+1) (since T(k+1) - T(k) = k+1)
         let result = bridge.prove_induction(
-            "(div (* n (+ n 1)) 2)", // rhs: n*(n+1)/2
-            "(+ k 1)",               // delta: k+1
-            1,                       // base_n
-            1,                       // base_value: T(1) = 1
+            "(div (* n (+ n 1)) 2)",  // rhs: n*(n+1)/2
+            "(+ k 1)",                 // delta: k+1
+            1,                          // base_n
+            1,                          // base_value: T(1) = 1
         );
 
         eprintln!("Triangular number induction proof:\n{}", result);
@@ -1472,10 +1406,10 @@ mod tests {
         // Prove: Σk² = n(n+1)(2n+1)/6
         // delta(k) = (k+1)^2
         let result = bridge.prove_induction(
-            "(div (* (* n (+ n 1)) (+ (* 2 n) 1)) 6)", // n(n+1)(2n+1)/6
-            "(* (+ k 1) (+ k 1))",                     // (k+1)²
-            1,                                         // base_n
-            1,                                         // base_value: 1²=1
+            "(div (* (* n (+ n 1)) (+ (* 2 n) 1)) 6)",  // n(n+1)(2n+1)/6
+            "(* (+ k 1) (+ k 1))",                        // (k+1)²
+            1,                                              // base_n
+            1,                                              // base_value: 1²=1
         );
 
         eprintln!("Sum of squares induction proof:\n{}", result);
@@ -1496,12 +1430,12 @@ mod tests {
         }
 
         // This is FALSE: n*(n+1)/2 ≠ n*n
-        let result = bridge.prove_polynomial_identity("(div (* n (+ n 1)) 2)", "(* n n)", 1);
-        assert!(
-            !result.is_valid(),
-            "false identity should be rejected: {:?}",
-            result
+        let result = bridge.prove_polynomial_identity(
+            "(div (* n (+ n 1)) 2)",
+            "(* n n)",
+            1,
         );
+        assert!(!result.is_valid(), "false identity should be rejected: {:?}", result);
         eprintln!("Z3 correctly rejected false identity: {:?}", result);
     }
 
@@ -1515,12 +1449,14 @@ mod tests {
             timeout_secs: 5,
         };
 
-        let result = bridge.prove_induction("(div (* n (+ n 1)) 2)", "(+ k 1)", 1, 1);
-
-        assert!(
-            !result.proved,
-            "without Z3, induction should not claim proof"
+        let result = bridge.prove_induction(
+            "(div (* n (+ n 1)) 2)",
+            "(+ k 1)",
+            1,
+            1,
         );
+
+        assert!(!result.proved, "without Z3, induction should not claim proof");
         assert_eq!(result.method, "unavailable");
     }
 
@@ -1535,11 +1471,7 @@ mod tests {
             return;
         }
         let result = bridge.prove_inequality("(* n n)", "n", 1);
-        assert!(
-            result.is_valid(),
-            "n² ≥ n for n≥1 should be proved: {:?}",
-            result
-        );
+        assert!(result.is_valid(), "n² ≥ n for n≥1 should be proved: {:?}", result);
         eprintln!("Z3 proved: ∀n≥1: n² ≥ n");
     }
 
@@ -1566,12 +1498,9 @@ mod tests {
             return;
         }
         // (n + 1/n) / 2 ≥ 1 for n ≥ 1 (AM-GM inequality)
-        let result = bridge.prove_inequality("(/ (+ n (/ 1.0 n)) 2.0)", "1.0", 1);
-        assert!(
-            result.is_valid(),
-            "AM-GM (n+1/n)/2 ≥ 1 should be proved: {:?}",
-            result
-        );
+        let result = bridge.prove_inequality(
+            "(/ (+ n (/ 1.0 n)) 2.0)", "1.0", 1);
+        assert!(result.is_valid(), "AM-GM (n+1/n)/2 ≥ 1 should be proved: {:?}", result);
         eprintln!("Z3 proved: ∀n≥1: (n + 1/n)/2 ≥ 1 (AM-GM)");
     }
 
@@ -1585,11 +1514,7 @@ mod tests {
         }
         // n ≥ n² is FALSE for n > 1
         let result = bridge.prove_inequality("n", "(* n n)", 1);
-        assert!(
-            !result.is_valid(),
-            "n ≥ n² should be rejected (counterexample at n=2): {:?}",
-            result
-        );
+        assert!(!result.is_valid(), "n ≥ n² should be rejected (counterexample at n=2): {:?}", result);
         eprintln!("Z3 correctly rejected: n ≥ n² for n≥1");
     }
 }

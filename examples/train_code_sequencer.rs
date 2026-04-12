@@ -29,7 +29,10 @@ fn main() {
 
     // 2. Create sequencer (starts with random weights)
     let sequencer = CfCCodeSequencer::default();
-    println!("Network parameters: {}", sequencer.export_weights().len());
+    println!(
+        "Network parameters: {}",
+        sequencer.export_weights().len()
+    );
 
     // 3. Evaluate BEFORE training (baseline)
     println!("\n--- Pre-Training Evaluation ---");

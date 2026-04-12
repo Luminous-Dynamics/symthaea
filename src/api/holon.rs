@@ -439,8 +439,12 @@ async fn holon_status(State(state): State<SharedHolonState>) -> Json<StatusRespo
         consciousness: state.get_consciousness(),
         has_tts: cfg!(feature = "voice-tts"),
         has_broca: cfg!(feature = "ssm_language"),
-        swarm_peers: state.peer_count.load(std::sync::atomic::Ordering::Relaxed),
-        iroh_active: state.iroh_active.load(std::sync::atomic::Ordering::Relaxed),
+        swarm_peers: state
+            .peer_count
+            .load(std::sync::atomic::Ordering::Relaxed),
+        iroh_active: state
+            .iroh_active
+            .load(std::sync::atomic::Ordering::Relaxed),
         federation_enabled: cfg!(feature = "swarm"),
     })
 }

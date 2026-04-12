@@ -126,11 +126,7 @@ impl TypeCausalModel {
             ReturnWrapping::CollectVec
         } else if return_type == "String" {
             ReturnWrapping::ToString
-        } else if return_type == "u32"
-            || return_type == "u64"
-            || return_type == "i32"
-            || return_type == "i64"
-        {
+        } else if return_type == "u32" || return_type == "u64" || return_type == "i32" || return_type == "i64" {
             ReturnWrapping::Direct
         } else {
             ReturnWrapping::Direct
@@ -167,10 +163,7 @@ impl TypeCausalModel {
     /// If the return type needs owned `T`, we need `.copied()`.
     pub fn needs_copy_after_iter(param_type: &str, return_type: &str) -> bool {
         // If iterating over a slice and collecting to Vec<T> (not Vec<&T>)
-        if Self::is_slice(param_type)
-            && return_type.contains("Vec<")
-            && !return_type.contains("Vec<&")
-        {
+        if Self::is_slice(param_type) && return_type.contains("Vec<") && !return_type.contains("Vec<&") {
             return true;
         }
         // If iterating over a slice and summing/counting (need owned values)
@@ -198,9 +191,7 @@ impl TypeCausalModel {
             ReturnWrapping::Direct => body.to_string(),
             ReturnWrapping::OptionSome => {
                 // Don't double-wrap if body already returns Option
-                if body.contains("None")
-                    || body.contains("Some(")
-                    || body.contains("return None")
+                if body.contains("None") || body.contains("Some(") || body.contains("return None")
                     || body.contains("return Some")
                 {
                     body.to_string()
@@ -209,9 +200,7 @@ impl TypeCausalModel {
                 }
             }
             ReturnWrapping::ResultOk => {
-                if body.contains("Err(")
-                    || body.contains("Ok(")
-                    || body.contains("return Err")
+                if body.contains("Err(") || body.contains("Ok(") || body.contains("return Err")
                     || body.contains("return Ok")
                 {
                     body.to_string()
@@ -227,10 +216,7 @@ impl TypeCausalModel {
                 }
             }
             ReturnWrapping::ToString => {
-                if body.contains(".to_string()")
-                    || body.contains("String::")
-                    || body.contains("format!(")
-                {
+                if body.contains(".to_string()") || body.contains("String::") || body.contains("format!(") {
                     body.to_string()
                 } else {
                     format!("{}.to_string()", body)
@@ -254,16 +240,10 @@ impl TypeCausalModel {
         for param_type in param_types {
             if Self::needs_copy_after_iter(param_type, return_type) {
                 // If body uses .iter().filter() or .iter().map() without .copied()
-                if fixed.contains(".iter().filter(")
-                    && !fixed.contains(".copied()")
-                    && !fixed.contains(".cloned()")
-                {
+                if fixed.contains(".iter().filter(") && !fixed.contains(".copied()") && !fixed.contains(".cloned()") {
                     fixed = fixed.replace(".iter().filter(", ".iter().copied().filter(");
                 }
-                if fixed.contains(".iter().map(")
-                    && !fixed.contains(".copied()")
-                    && !fixed.contains(".cloned()")
-                {
+                if fixed.contains(".iter().map(") && !fixed.contains(".copied()") && !fixed.contains(".cloned()") {
                     fixed = fixed.replace(".iter().map(", ".iter().copied().map(");
                 }
             }
@@ -326,32 +306,19 @@ impl SolutionFamily {
             .iter()
             .any(|(_, t)| t.contains("&[") || t.contains("Vec<") || t.contains("&str"));
         let has_numeric_input = params.iter().any(|(_, t)| {
-            t.contains("i32")
-                || t.contains("i64")
-                || t.contains("u32")
-                || t.contains("u64")
-                || t.contains("f32")
-                || t.contains("f64")
+            t.contains("i32") || t.contains("i64") || t.contains("u32")
+                || t.contains("u64") || t.contains("f32") || t.contains("f64")
                 || t.contains("usize")
         });
-        let returns_collection = ret.contains("Vec<")
-            || ret.contains("HashSet<")
-            || ret.contains("HashMap<")
-            || ret.contains("BTreeMap<");
+        let returns_collection = ret.contains("Vec<") || ret.contains("HashSet<")
+            || ret.contains("HashMap<") || ret.contains("BTreeMap<");
         let returns_string = ret == "String" || ret == "&str" || ret == "&'static str";
         let returns_option = ret.starts_with("Option<");
         let returns_result = ret.starts_with("Result<");
         let returns_bool = ret == "bool";
-        let returns_numeric = ret == "i32"
-            || ret == "i64"
-            || ret == "u32"
-            || ret == "u64"
-            || ret == "f32"
-            || ret == "f64"
-            || ret == "usize";
-        let has_self = params
-            .iter()
-            .any(|(n, _)| n == "self" || n == "&self" || n == "&mut self");
+        let returns_numeric = ret == "i32" || ret == "i64" || ret == "u32"
+            || ret == "u64" || ret == "f32" || ret == "f64" || ret == "usize";
+        let has_self = params.iter().any(|(n, _)| n == "self" || n == "&self" || n == "&mut self");
         let no_params = params.is_empty();
 
         // Error handling: Result return type
@@ -395,7 +362,8 @@ impl SolutionFamily {
         }
 
         // Pattern match: &str → &str (dispatch/lookup)
-        if params.len() == 1 && params[0].1.contains("str") && (ret.contains("str") || returns_bool)
+        if params.len() == 1 && params[0].1.contains("str")
+            && (ret.contains("str") || returns_bool)
         {
             return Self::PatternMatch;
         }
@@ -448,10 +416,8 @@ impl SolutionFamily {
                 let mut adapters = Vec::new();
 
                 // Filtering adapters
-                if purpose_lower.contains("filter")
-                    || purpose_lower.contains("keep")
-                    || purpose_lower.contains("select")
-                    || purpose_lower.contains("remove")
+                if purpose_lower.contains("filter") || purpose_lower.contains("keep")
+                    || purpose_lower.contains("select") || purpose_lower.contains("remove")
                 {
                     if purpose_lower.contains("even") {
                         adapters.push(".filter(|&x| x % 2 == 0)");
@@ -478,10 +444,8 @@ impl SolutionFamily {
                 }
 
                 // Windowing
-                if purpose_lower.contains("window")
-                    || purpose_lower.contains("consecutive")
-                    || purpose_lower.contains("series")
-                    || purpose_lower.contains("substring")
+                if purpose_lower.contains("window") || purpose_lower.contains("consecutive")
+                    || purpose_lower.contains("series") || purpose_lower.contains("substring")
                 {
                     if params.len() >= 2 {
                         let p1 = &params[1].0;
@@ -494,10 +458,8 @@ impl SolutionFamily {
                 }
 
                 // Second param for zip
-                if params.len() >= 2
-                    && (purpose_lower.contains("distance")
-                        || purpose_lower.contains("compare")
-                        || purpose_lower.contains("zip"))
+                if params.len() >= 2 && (purpose_lower.contains("distance")
+                    || purpose_lower.contains("compare") || purpose_lower.contains("zip"))
                 {
                     let p1 = &params[1].0;
                     let p1_type = &params[1].1;
@@ -528,7 +490,7 @@ impl SolutionFamily {
                         ".collect()"
                     }
                 } else if return_type == "String" {
-                    ".collect()"
+                    ".collect::<String>()"
                 } else if return_type == "usize" {
                     ".count()"
                 } else if return_type == "bool" {
@@ -547,12 +509,9 @@ impl SolutionFamily {
                     } else {
                         ".count() > 0"
                     }
-                } else if return_type.contains("i32")
-                    || return_type.contains("i64")
-                    || return_type.contains("u16")
-                    || return_type.contains("u32")
-                    || return_type.contains("u64")
-                    || return_type.contains("f64")
+                } else if return_type.contains("i32") || return_type.contains("i64")
+                    || return_type.contains("u16") || return_type.contains("u32")
+                    || return_type.contains("u64") || return_type.contains("f64")
                 {
                     ".sum()"
                 } else {
@@ -610,9 +569,8 @@ impl SolutionFamily {
                 }
             }
 
-            Self::SingleExpression | Self::PatternMatch | Self::StructMethods | Self::Unknown => {
-                None
-            }
+            Self::SingleExpression | Self::PatternMatch
+            | Self::StructMethods | Self::Unknown => None,
         }
     }
 }
@@ -623,26 +581,11 @@ mod tests {
 
     #[test]
     fn test_required_wrapping() {
-        assert_eq!(
-            TypeCausalModel::required_wrapping("Option<u64>"),
-            ReturnWrapping::OptionSome
-        );
-        assert_eq!(
-            TypeCausalModel::required_wrapping("Result<f64, String>"),
-            ReturnWrapping::ResultOk
-        );
-        assert_eq!(
-            TypeCausalModel::required_wrapping("Vec<i32>"),
-            ReturnWrapping::CollectVec
-        );
-        assert_eq!(
-            TypeCausalModel::required_wrapping("String"),
-            ReturnWrapping::ToString
-        );
-        assert_eq!(
-            TypeCausalModel::required_wrapping("bool"),
-            ReturnWrapping::Direct
-        );
+        assert_eq!(TypeCausalModel::required_wrapping("Option<u64>"), ReturnWrapping::OptionSome);
+        assert_eq!(TypeCausalModel::required_wrapping("Result<f64, String>"), ReturnWrapping::ResultOk);
+        assert_eq!(TypeCausalModel::required_wrapping("Vec<i32>"), ReturnWrapping::CollectVec);
+        assert_eq!(TypeCausalModel::required_wrapping("String"), ReturnWrapping::ToString);
+        assert_eq!(TypeCausalModel::required_wrapping("bool"), ReturnWrapping::Direct);
     }
 
     #[test]
@@ -669,9 +612,7 @@ mod tests {
     #[test]
     fn test_needs_copy() {
         assert!(TypeCausalModel::needs_copy_after_iter("&[i32]", "Vec<i32>"));
-        assert!(!TypeCausalModel::needs_copy_after_iter(
-            "Vec<i32>", "Vec<i32>"
-        ));
+        assert!(!TypeCausalModel::needs_copy_after_iter("Vec<i32>", "Vec<i32>"));
         assert!(TypeCausalModel::needs_copy_after_iter("&[i32]", "i32"));
     }
 
@@ -686,46 +627,54 @@ mod tests {
     #[test]
     fn test_recommend_iterator() {
         assert_eq!(TypeCausalModel::recommend_iterator("&[i32]"), ".iter()");
-        assert_eq!(
-            TypeCausalModel::recommend_iterator("Vec<i32>"),
-            ".into_iter()"
-        );
+        assert_eq!(TypeCausalModel::recommend_iterator("Vec<i32>"), ".into_iter()");
     }
 
     // Solution Family Classification tests
 
     #[test]
     fn test_classify_iterator_chain_slice_to_vec() {
-        let family = SolutionFamily::from_signature(&[("v".into(), "&[i32]".into())], "Vec<i32>");
+        let family = SolutionFamily::from_signature(
+            &[("v".into(), "&[i32]".into())],
+            "Vec<i32>",
+        );
         assert_eq!(family, SolutionFamily::IteratorChain);
     }
 
     #[test]
     fn test_classify_iterator_chain_str_to_string() {
-        let family = SolutionFamily::from_signature(&[("input".into(), "&str".into())], "String");
+        let family = SolutionFamily::from_signature(
+            &[("input".into(), "&str".into())],
+            "String",
+        );
         assert_eq!(family, SolutionFamily::IteratorChain);
     }
 
     #[test]
     fn test_classify_iterator_chain_slice_to_bool() {
-        let family = SolutionFamily::from_signature(&[("sentence".into(), "&str".into())], "bool");
+        let family = SolutionFamily::from_signature(
+            &[("sentence".into(), "&str".into())],
+            "bool",
+        );
         // &str → bool could be iterator chain (pangram check) or pattern match
-        assert!(matches!(
-            family,
-            SolutionFamily::IteratorChain | SolutionFamily::PatternMatch
-        ));
+        assert!(matches!(family, SolutionFamily::IteratorChain | SolutionFamily::PatternMatch));
     }
 
     #[test]
     fn test_classify_loop_accumulator() {
-        let family = SolutionFamily::from_signature(&[("n".into(), "u64".into())], "Option<u64>");
+        let family = SolutionFamily::from_signature(
+            &[("n".into(), "u64".into())],
+            "Option<u64>",
+        );
         assert_eq!(family, SolutionFamily::LoopAccumulator);
     }
 
     #[test]
     fn test_classify_error_handling() {
-        let family =
-            SolutionFamily::from_signature(&[("s".into(), "&str".into())], "Result<i32, String>");
+        let family = SolutionFamily::from_signature(
+            &[("s".into(), "&str".into())],
+            "Result<i32, String>",
+        );
         assert_eq!(family, SolutionFamily::ErrorHandling);
     }
 

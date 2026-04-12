@@ -39,16 +39,16 @@ pub const N_THEORIES: usize = 10;
 
 /// Theory names for display.
 pub const THEORY_NAMES: [&str; N_THEORIES] = [
-    "IIT",         // 0: Integration
-    "GWT",         // 1: Global Workspace
-    "FEP",         // 2: Free Energy Principle
-    "HOT",         // 3: Higher-Order Thought
-    "Orch-OR",     // 4: Orchestrated Objective Reduction
-    "Autopoiesis", // 5: Self-Organization
+    "IIT",        // 0: Integration
+    "GWT",        // 1: Global Workspace
+    "FEP",        // 2: Free Energy Principle
+    "HOT",        // 3: Higher-Order Thought
+    "Orch-OR",    // 4: Orchestrated Objective Reduction
+    "Autopoiesis",// 5: Self-Organization
     "Complexity",  // 6: Mutual Information
-    "InfoGeom",    // 7: Information Geometry
+    "InfoGeom",   // 7: Information Geometry
     "Dissipative", // 8: Dissipative Structures
-    "QDarwinism",  // 9: Quantum Darwinism
+    "QDarwinism", // 9: Quantum Darwinism
 ];
 
 /// Short theory descriptions.
@@ -88,7 +88,11 @@ pub struct MultiTheorySurvey {
 }
 
 /// Compute all 10 theory-grounded consciousness metrics for a molecule.
-pub fn compute_theory_scores(molecule: &Molecule, name: &str, temperature: f64) -> TheoryScores {
+pub fn compute_theory_scores(
+    molecule: &Molecule,
+    name: &str,
+    temperature: f64,
+) -> TheoryScores {
     let basis = Sto3g::build(molecule);
     let n = basis.n_basis();
     let rhf = restricted_hartree_fock(molecule, &basis, &RhfConfig::default());
@@ -111,9 +115,7 @@ pub fn compute_theory_scores(molecule: &Molecule, name: &str, temperature: f64) 
         for cut in 1..n_atoms {
             let part_a: Vec<usize> = (0..ranges[cut].0).collect();
             let s = bipartition_entanglement(&rhf, &part_a);
-            if s > max_ent {
-                max_ent = s;
-            }
+            if s > max_ent { max_ent = s; }
         }
         max_ent
     } else {
@@ -143,11 +145,7 @@ pub fn compute_theory_scores(molecule: &Molecule, name: &str, temperature: f64) 
 
     // === Theory 3: HOT — Excitation gap (meta-representation capacity) ===
     let exc = cis_excitations(&rhf, 1);
-    let first_exc_ev = if exc.is_empty() {
-        100.0
-    } else {
-        exc[0].energy_ev
-    };
+    let first_exc_ev = if exc.is_empty() { 100.0 } else { exc[0].energy_ev };
     let hot_raw = first_exc_ev;
     // Higher score for SMALLER gap (easier meta-representation)
     let hot_norm = 1.0 / (1.0 + first_exc_ev / 10.0);
@@ -175,7 +173,9 @@ pub fn compute_theory_scores(molecule: &Molecule, name: &str, temperature: f64) 
     // === Theory 6: Complexity — MI network density ===
     let mi_matrix = orbital_mutual_information(&rhf);
     let n_pairs = if n_mo > 1 { n_mo * (n_mo - 1) / 2 } else { 1 };
-    let mi_total: f64 = mi_matrix.iter().flat_map(|row| row.iter()).sum::<f64>() / 2.0;
+    let mi_total: f64 = mi_matrix.iter()
+        .flat_map(|row| row.iter())
+        .sum::<f64>() / 2.0;
     let mi_density = mi_total / n_pairs as f64;
     let complexity_raw = mi_density;
     let complexity_norm = mi_density.min(1.0);
@@ -233,37 +233,17 @@ pub fn compute_theory_scores(molecule: &Molecule, name: &str, temperature: f64) 
     // Small χ = quantum (more "conscious"), large χ = classical
     let n_env = 1000; // Assume environment of ~1000 modes
     let coupling = 0.01; // Typical system-environment coupling
-    let chi =
-        n as f64 * coupling * coupling * n_env as f64 / (homo_lumo_gap * homo_lumo_gap + 1e-10);
+    let chi = n as f64 * coupling * coupling * n_env as f64
+        / (homo_lumo_gap * homo_lumo_gap + 1e-10);
     let qd_raw = chi;
     // Invert: quantum regime (small χ) gets high score
     let qd_norm = 1.0 / (1.0 + chi);
 
     // === Assemble raw and normalized scores ===
-    let raw = [
-        iit_raw,
-        gwt_raw,
-        fep_raw,
-        hot_raw,
-        orch_raw,
-        auto_raw,
-        complexity_raw,
-        ig_raw,
-        dissipative_raw,
-        qd_raw,
-    ];
-    let normalized = [
-        iit_norm,
-        gwt_norm,
-        fep_norm,
-        hot_norm,
-        orch_norm,
-        auto_norm,
-        complexity_norm,
-        ig_norm,
-        dissipative_norm,
-        qd_norm,
-    ];
+    let raw = [iit_raw, gwt_raw, fep_raw, hot_raw, orch_raw,
+               auto_raw, complexity_raw, ig_raw, dissipative_raw, qd_raw];
+    let normalized = [iit_norm, gwt_norm, fep_norm, hot_norm, orch_norm,
+                      auto_norm, complexity_norm, ig_norm, dissipative_norm, qd_norm];
 
     // === Composite: softmin(necessary) × mean(amplifiers) ===
     // Necessary conditions: IIT(0), GWT(1), Complexity(6)
@@ -272,15 +252,8 @@ pub fn compute_theory_scores(molecule: &Molecule, name: &str, temperature: f64) 
     let softmin_val = softmin(&necessary, softmin_tau);
 
     // Amplifiers: FEP(2), HOT(3), Orch-OR(4), Autopoiesis(5), InfoGeom(7), Dissipative(8), QDarwinism(9)
-    let amplifiers = [
-        normalized[2],
-        normalized[3],
-        normalized[4],
-        normalized[5],
-        normalized[7],
-        normalized[8],
-        normalized[9],
-    ];
+    let amplifiers = [normalized[2], normalized[3], normalized[4], normalized[5],
+                      normalized[7], normalized[8], normalized[9]];
     let amp_mean: f64 = amplifiers.iter().sum::<f64>() / amplifiers.len() as f64;
 
     let composite = softmin_val * (0.5 + 0.5 * amp_mean);
@@ -307,7 +280,10 @@ pub fn compute_theory_scores(molecule: &Molecule, name: &str, temperature: f64) 
 }
 
 /// Run the full multi-theory survey.
-pub fn multi_theory_survey(molecules: &[(&str, Molecule)], temperature: f64) -> MultiTheorySurvey {
+pub fn multi_theory_survey(
+    molecules: &[(&str, Molecule)],
+    temperature: f64,
+) -> MultiTheorySurvey {
     let results: Vec<TheoryScores> = molecules
         .iter()
         .map(|(name, mol)| compute_theory_scores(mol, name, temperature))
@@ -351,9 +327,7 @@ pub fn find_theory_clusters(
     let mut clusters = Vec::new();
 
     for i in 0..N_THEORIES {
-        if visited[i] {
-            continue;
-        }
+        if visited[i] { continue; }
         let mut cluster = vec![i];
         visited[i] = true;
 
@@ -388,23 +362,14 @@ pub fn find_theory_clusters(
 fn softmin(values: &[f64], tau: f64) -> f64 {
     let weights: Vec<f64> = values.iter().map(|&x| (-x / tau).exp()).collect();
     let w_sum: f64 = weights.iter().sum();
-    if w_sum < 1e-30 {
-        return values.iter().cloned().fold(f64::INFINITY, f64::min);
-    }
-    values
-        .iter()
-        .zip(weights.iter())
-        .map(|(&x, &w)| x * w)
-        .sum::<f64>()
-        / w_sum
+    if w_sum < 1e-30 { return values.iter().cloned().fold(f64::INFINITY, f64::min); }
+    values.iter().zip(weights.iter()).map(|(&x, &w)| x * w).sum::<f64>() / w_sum
 }
 
 /// Pearson correlation coefficient. Returns 0.0 for constant inputs.
 fn pearson(x: &[f64], y: &[f64]) -> f64 {
     let n = x.len() as f64;
-    if n < 3.0 {
-        return 0.0;
-    }
+    if n < 3.0 { return 0.0; }
     let mx = x.iter().sum::<f64>() / n;
     let my = y.iter().sum::<f64>() / n;
     let mut cov = 0.0;
@@ -417,15 +382,9 @@ fn pearson(x: &[f64], y: &[f64]) -> f64 {
         vx += dx * dx;
         vy += dy * dy;
     }
-    if vx < 1e-15 || vy < 1e-15 {
-        return 0.0;
-    }
+    if vx < 1e-15 || vy < 1e-15 { return 0.0; }
     let r = cov / (vx * vy).sqrt();
-    if r.is_nan() {
-        0.0
-    } else {
-        r.clamp(-1.0, 1.0)
-    }
+    if r.is_nan() { 0.0 } else { r.clamp(-1.0, 1.0) }
 }
 
 /// Compute information-geometric Phi (KL divergence from product state).
@@ -465,9 +424,7 @@ mod tests {
             assert!(
                 scores.normalized[i] >= 0.0 && scores.normalized[i] <= 1.0,
                 "Theory {} ({}) normalized = {:.4}, should be in [0,1]",
-                i,
-                THEORY_NAMES[i],
-                scores.normalized[i]
+                i, THEORY_NAMES[i], scores.normalized[i]
             );
         }
     }
@@ -500,18 +457,13 @@ mod tests {
             // Diagonal is 1.0 for non-constant theories, 0.0 for constant
             assert!(
                 (corr[i][i] - 1.0).abs() < 1e-8 || corr[i][i].abs() < 1e-8,
-                "Diagonal[{}] = {:.6}, should be 1.0 or 0.0",
-                i,
-                corr[i][i]
+                "Diagonal[{}] = {:.6}, should be 1.0 or 0.0", i, corr[i][i]
             );
             for j in 0..N_THEORIES {
                 assert!(
                     (corr[i][j] - corr[j][i]).abs() < 1e-8,
                     "Correlation matrix not symmetric at ({},{}): {} vs {}",
-                    i,
-                    j,
-                    corr[i][j],
-                    corr[j][i]
+                    i, j, corr[i][j], corr[j][i]
                 );
             }
         }
@@ -524,14 +476,16 @@ mod tests {
         assert!(
             heh.composite_score < water.composite_score,
             "HeH+ ({:.4}) should score lower than H2O ({:.4})",
-            heh.composite_score,
-            water.composite_score
+            heh.composite_score, water.composite_score
         );
     }
 
     #[test]
     fn test_survey_runs() {
-        let molecules = vec![("H2", Molecule::h2()), ("H2O", Molecule::water())];
+        let molecules = vec![
+            ("H2", Molecule::h2()),
+            ("H2O", Molecule::water()),
+        ];
         let survey = multi_theory_survey(&molecules, 300.0);
         assert_eq!(survey.molecules.len(), 2);
         assert!(!survey.clusters.is_empty() || survey.molecules.len() < 3);

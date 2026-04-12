@@ -141,8 +141,7 @@ mod tests {
         assert!(
             sigma_small > sigma_large,
             "Small gap ({:.2e}) should conduct more than large gap ({:.2e})",
-            sigma_small,
-            sigma_large
+            sigma_small, sigma_large
         );
     }
 
@@ -161,8 +160,7 @@ mod tests {
         assert!(
             (cv - k_b).abs() / k_b < 0.1,
             "Classical limit: C_v={:.2e}, k_B={:.2e}",
-            cv,
-            k_b
+            cv, k_b
         );
     }
 

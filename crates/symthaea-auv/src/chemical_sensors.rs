@@ -99,6 +99,105 @@ pub fn detect_anomalies(readings: &ChemicalReadings) -> Vec<String> {
     anomalies
 }
 
+// ── Sensor Noise Model ────────────────────────────────────────────────
+
+/// Realistic sensor noise: additive Gaussian noise, mean-reverting drift,
+/// and first-order temporal lag (IIR low-pass filter).
+///
+/// Each of the 8 chemical channels has independent noise/drift/lag.
+#[derive(Debug, Clone)]
+pub struct SensorNoiseModel {
+    /// Gaussian noise standard deviation per channel.
+    pub noise_std: [f64; 8],
+    /// Drift rate per channel (random walk step size per dt).
+    pub drift_rate: [f64; 8],
+    /// Current drift state per channel.
+    drift_state: [f64; 8],
+    /// Time constant for first-order IIR lag (seconds).
+    pub response_tau: f64,
+    /// Filtered (lagged) output state.
+    filtered: [f64; 8],
+    /// Whether the model has been initialized with a first reading.
+    initialized: bool,
+}
+
+impl SensorNoiseModel {
+    /// Create a noise model with typical environmental sensor characteristics.
+    pub fn typical() -> Self {
+        Self {
+            // Noise std: ~1% of typical range per channel
+            noise_std: [0.05, 0.2, 5.0, 0.5, 0.5, 0.5, 0.05, 0.1],
+            // Drift rate: slow random walk
+            drift_rate: [0.001, 0.01, 0.5, 0.02, 0.02, 0.02, 0.002, 0.005],
+            drift_state: [0.0; 8],
+            response_tau: 2.0, // 2-second sensor lag
+            filtered: [0.0; 8],
+            initialized: false,
+        }
+    }
+
+    /// Apply noise, drift, and temporal lag to clean sensor readings.
+    ///
+    /// `rng_seed` is incremented per call to produce deterministic but
+    /// varying noise (avoids requiring `rand` as a non-dev dependency).
+    pub fn apply(&mut self, clean: &ChemicalReadings, dt: f64, rng_seed: u64) -> ChemicalReadings {
+        let channels = clean.to_array();
+        let mut noisy = [0.0f64; 8];
+
+        for i in 0..8 {
+            // Deterministic pseudo-random noise (xorshift64)
+            let mut s = rng_seed.wrapping_add(i as u64).wrapping_mul(6364136223846793005);
+            s ^= s >> 12;
+            s ^= s << 25;
+            s ^= s >> 27;
+            let uniform = (s as f64) / (u64::MAX as f64); // [0, 1)
+            // Box-Muller approximation: (uniform - 0.5) * sqrt(12) ≈ N(0,1)
+            let gaussian = (uniform - 0.5) * 3.464;
+
+            // Additive noise
+            let noise = gaussian * self.noise_std[i];
+
+            // Mean-reverting drift: drift += rate * gaussian - revert * drift
+            let revert = 0.01;
+            self.drift_state[i] += self.drift_rate[i] * gaussian * dt.sqrt() - revert * self.drift_state[i] * dt;
+
+            // Clean + noise + drift
+            noisy[i] = channels[i] + noise + self.drift_state[i];
+        }
+
+        // First-order IIR temporal lag: filtered = filtered + alpha * (noisy - filtered)
+        let alpha = if self.response_tau > 0.0 {
+            (dt / (self.response_tau + dt)).min(1.0)
+        } else {
+            1.0
+        };
+
+        if !self.initialized {
+            self.filtered = noisy;
+            self.initialized = true;
+        } else {
+            for i in 0..8 {
+                self.filtered[i] += alpha * (noisy[i] - self.filtered[i]);
+            }
+        }
+
+        ChemicalReadings::from_array(&self.filtered)
+    }
+
+    /// Reset drift and filter state.
+    pub fn reset(&mut self) {
+        self.drift_state = [0.0; 8];
+        self.filtered = [0.0; 8];
+        self.initialized = false;
+    }
+}
+
+impl Default for SensorNoiseModel {
+    fn default() -> Self {
+        Self::typical()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -126,6 +225,65 @@ mod tests {
         assert!(
             (far_away.arsenic_ug_l - clean.arsenic_ug_l).abs() < 0.1,
             "Far from plume should be clean"
+        );
+    }
+
+    #[test]
+    fn test_noise_model_adds_variance() {
+        let clean = ChemicalReadings::clean_freshwater();
+        let mut model = SensorNoiseModel::typical();
+        let mut readings = Vec::new();
+        for i in 0..100 {
+            readings.push(model.apply(&clean, 0.1, i as u64));
+        }
+        // pH should have nonzero variance (noise is being applied)
+        let mean_ph: f64 = readings.iter().map(|r| r.ph).sum::<f64>() / 100.0;
+        let var_ph: f64 = readings.iter().map(|r| (r.ph - mean_ph).powi(2)).sum::<f64>() / 100.0;
+        assert!(var_ph > 0.0, "Noise should add variance to readings");
+    }
+
+    #[test]
+    fn test_noise_model_mean_near_clean() {
+        let clean = ChemicalReadings::clean_freshwater();
+        let mut model = SensorNoiseModel::typical();
+        let mut ph_sum = 0.0;
+        for i in 0..1000 {
+            let r = model.apply(&clean, 0.1, i as u64);
+            ph_sum += r.ph;
+        }
+        let mean_ph = ph_sum / 1000.0;
+        // Mean should be close to clean value (within 0.5 for pH)
+        assert!(
+            (mean_ph - clean.ph).abs() < 0.5,
+            "Mean pH {mean_ph} too far from clean {}", clean.ph
+        );
+    }
+
+    #[test]
+    fn test_noise_model_reset() {
+        let clean = ChemicalReadings::clean_freshwater();
+        let mut model = SensorNoiseModel::typical();
+        // Run for a while to accumulate drift
+        for i in 0..100 {
+            model.apply(&clean, 0.1, i);
+        }
+        model.reset();
+        assert!(!model.initialized);
+    }
+
+    #[test]
+    fn test_noise_model_temporal_lag() {
+        // With a large step, filter should track clean readings closely
+        let clean = ChemicalReadings::clean_freshwater();
+        let mut model = SensorNoiseModel::typical();
+        model.noise_std = [0.0; 8]; // Disable noise to test lag only
+        model.drift_rate = [0.0; 8]; // Disable drift
+
+        // First reading initializes filter
+        let r1 = model.apply(&clean, 10.0, 0); // Large dt → alpha ≈ 1.0
+        assert!(
+            (r1.ph - clean.ph).abs() < 0.01,
+            "With large dt and no noise, should track clean"
         );
     }
 

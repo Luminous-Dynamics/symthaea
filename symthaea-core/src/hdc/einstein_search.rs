@@ -26,8 +26,8 @@
 //! in different directions — it would break the O(5) symmetry of the round sphere.
 //! Whether such a metric exists is unknown. This search is genuine research.
 
-use super::ricci_flow::{has_converged, normalized_ricci_flow};
 use super::riemannian_geometry::{DiscretizedSphere, MetricTensor};
+use super::ricci_flow::{normalized_ricci_flow, has_converged};
 
 // ─── Configuration ────────────────────────────────────────────────────────────
 
@@ -134,8 +134,7 @@ impl EinsteinCandidate {
         let expected = round_radius * round_radius;
         let diag_variance = (0..n)
             .map(|i| (self.metric.g(i, i) - expected).powi(2))
-            .sum::<f64>()
-            / n as f64;
+            .sum::<f64>() / n as f64;
         diag_variance > 0.01 // Significantly non-round
     }
 }
@@ -181,9 +180,7 @@ pub fn hdc_bind_crossover(a: &MetricTensor, b: &MetricTensor, seed: u64) -> Metr
     let range = 8.0f64;
 
     let mut result_flat = Vec::with_capacity(flat_a.len());
-    let mut rng = seed
-        .wrapping_mul(6364136223846793005)
-        .wrapping_add(1442695040888963407);
+    let mut rng = seed.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
 
     for (&va, &vb) in flat_a.iter().zip(flat_b.iter()) {
         // Encode to fixed point
@@ -194,9 +191,7 @@ pub fn hdc_bind_crossover(a: &MetricTensor, b: &MetricTensor, seed: u64) -> Metr
         // Decode back
         let vc = (ic as f64 / scale) - range;
         // Add a small LCG perturbation to explore the basin more thoroughly
-        rng = rng
-            .wrapping_mul(6364136223846793005)
-            .wrapping_add(1442695040888963407);
+        rng = rng.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
         let noise = ((rng >> 33) as f64 / u32::MAX as f64 - 0.5) * 0.01;
         result_flat.push(vc + noise);
     }
@@ -225,16 +220,10 @@ pub fn hdc_bind_crossover(a: &MetricTensor, b: &MetricTensor, seed: u64) -> Metr
 /// Convex crossover (classical genetic algorithm — for baseline comparison).
 pub fn convex_crossover(a: &MetricTensor, b: &MetricTensor, alpha: f64) -> MetricTensor {
     let n = a.dim;
-    let comp: Vec<f64> = a
-        .components
-        .iter()
-        .zip(b.components.iter())
+    let comp: Vec<f64> = a.components.iter().zip(b.components.iter())
         .map(|(&va, &vb)| alpha * va + (1.0 - alpha) * vb)
         .collect();
-    MetricTensor {
-        components: comp,
-        dim: n,
-    }
+    MetricTensor { components: comp, dim: n }
 }
 
 // ─── Main search ──────────────────────────────────────────────────────────────
@@ -260,9 +249,7 @@ pub fn search_einstein_metrics(config: &EinsteinSearchConfig) -> EinsteinSearchR
 
     let mut rng_state = config.seed;
     let mut lcg = || -> u64 {
-        rng_state = rng_state
-            .wrapping_mul(6364136223846793005)
-            .wrapping_add(1442695040888963407);
+        rng_state = rng_state.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
         rng_state
     };
 
@@ -279,9 +266,7 @@ pub fn search_einstein_metrics(config: &EinsteinSearchConfig) -> EinsteinSearchR
 
     for gen in 0..config.max_generations {
         // ── Evaluate ──────────────────────────────────────────────────────
-        let mut scored: Vec<(f64, usize, bool)> = population
-            .iter()
-            .enumerate()
+        let mut scored: Vec<(f64, usize, bool)> = population.iter().enumerate()
             .map(|(i, s)| (s.einstein_defect(), i, false))
             .collect();
         scored.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
@@ -439,8 +424,8 @@ pub fn verify_einstein_certificate(metric: &MetricTensor, tol: f64) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::super::riemannian_geometry::MetricTensor;
     use super::*;
+    use super::super::riemannian_geometry::MetricTensor;
 
     #[test]
     fn test_round_sphere_is_einstein_2d() {
@@ -448,11 +433,8 @@ mod tests {
         let config = EinsteinSearchConfig::fast_test(2);
         let result = search_einstein_metrics(&config);
         // The round sphere (first candidate) should have near-zero defect
-        assert!(
-            result.convergence_history[0] < 1e-5,
-            "Round 2D sphere defect = {}",
-            result.convergence_history[0]
-        );
+        assert!(result.convergence_history[0] < 1e-5,
+            "Round 2D sphere defect = {}", result.convergence_history[0]);
     }
 
     #[test]
@@ -460,11 +442,8 @@ mod tests {
         let config = EinsteinSearchConfig::fast_test(3);
         let result = search_einstein_metrics(&config);
         // 3D round sphere: Ric = 2g (K=1), R=6, R/n=2, so traceless Ric=0
-        assert!(
-            result.convergence_history[0] < 1e-5,
-            "Round 3D sphere defect = {}",
-            result.convergence_history[0]
-        );
+        assert!(result.convergence_history[0] < 1e-5,
+            "Round 3D sphere defect = {}", result.convergence_history[0]);
     }
 
     #[test]
@@ -483,10 +462,8 @@ mod tests {
         let child = hdc_bind_crossover(&a, &b, 42);
         assert_eq!(child.dim, 3);
         // Child should be positive definite (guaranteed by our shift)
-        assert!(
-            child.is_positive_definite(),
-            "HDC crossover child should be positive definite"
-        );
+        assert!(child.is_positive_definite(),
+            "HDC crossover child should be positive definite");
     }
 
     #[test]
@@ -497,17 +474,10 @@ mod tests {
         let hdc = hdc_bind_crossover(&a, &b, 42);
         let convex = convex_crossover(&a, &b, 0.5);
         // The XOR result should differ from the convex combination
-        let diff: f64 = hdc
-            .components
-            .iter()
-            .zip(convex.components.iter())
+        let diff: f64 = hdc.components.iter().zip(convex.components.iter())
             .map(|(x, y)| (x - y).abs())
             .sum();
-        assert!(
-            diff > 0.01,
-            "HDC and convex crossovers should differ, diff={}",
-            diff
-        );
+        assert!(diff > 0.01, "HDC and convex crossovers should differ, diff={}", diff);
     }
 
     #[test]

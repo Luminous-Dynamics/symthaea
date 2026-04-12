@@ -40,15 +40,9 @@ fn kinetic_primitive(
     // (and similarly for y, z)
     // Total T = T_x * Sy * Sz + Sx * T_y * Sz + Sx * Sy * T_z
 
-    let term_x = kinetic_1d(
-        alpha_a, la, center_a, alpha_b, lb, center_b, ma, mb, na, nb, 0,
-    );
-    let term_y = kinetic_1d(
-        alpha_a, ma, center_a, alpha_b, mb, center_b, la, lb, na, nb, 1,
-    );
-    let term_z = kinetic_1d(
-        alpha_a, na, center_a, alpha_b, nb, center_b, la, lb, ma, mb, 2,
-    );
+    let term_x = kinetic_1d(alpha_a, la, center_a, alpha_b, lb, center_b, ma, mb, na, nb, 0);
+    let term_y = kinetic_1d(alpha_a, ma, center_a, alpha_b, mb, center_b, la, lb, na, nb, 1);
+    let term_z = kinetic_1d(alpha_a, na, center_a, alpha_b, nb, center_b, la, lb, ma, mb, 2);
 
     term_x + term_y + term_z
 }

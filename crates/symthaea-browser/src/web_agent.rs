@@ -12,10 +12,10 @@
 //! This is the integration layer between Prism (epistemic search) and
 //! symthaea-browser (CDP-connected browser agent).
 
-use crate::actions::BrowserAction;
 use crate::cdp::CdpSession;
 use crate::observation::PageObservation;
 use crate::safety::BrowserSafetyPolicy;
+use crate::actions::BrowserAction;
 use anyhow::Result;
 
 /// Result of a web agent query — combines local + web sources.
@@ -67,8 +67,7 @@ impl WebAgent {
 
     /// Check if the agent can navigate (Phi >= 0.30).
     pub fn can_navigate(&self) -> bool {
-        self.safety
-            .is_action_allowed(&BrowserAction::Navigate { url: String::new() }, self.phi)
+        self.safety.is_action_allowed(&BrowserAction::Navigate { url: String::new() }, self.phi)
     }
 
     /// Execute a web research session via CDP.
@@ -162,8 +161,8 @@ fn extract_claims_from_text(text: &str, source_url: &str) -> Vec<WebClaim> {
     text.split(|c: char| c == '.' || c == '!' || c == '\n')
         .map(|s| s.trim())
         .filter(|s| s.len() > 40 && s.len() < 500)
-        .filter(|s| !s.contains('?')) // Skip questions
-        .filter(|s| !s.starts_with('[')) // Skip [link] fragments
+        .filter(|s| !s.contains('?'))                // Skip questions
+        .filter(|s| !s.starts_with('['))             // Skip [link] fragments
         .filter(|s| s.chars().filter(|c| c.is_alphabetic()).count() > s.len() / 2) // Mostly text
         .take(10)
         .map(|s| WebClaim {
@@ -190,12 +189,7 @@ mod tests {
     fn extract_claims_skips_questions() {
         let text = "What is consciousness and how does it arise in biological systems?\nConsciousness is the state of being aware of surroundings and internal mental states according to modern neuroscience research conducted across multiple laboratories";
         let claims = extract_claims_from_text(text, "https://example.com");
-        assert_eq!(
-            claims.len(),
-            1,
-            "Should skip question, keep statement: {:?}",
-            claims
-        );
+        assert_eq!(claims.len(), 1, "Should skip question, keep statement: {:?}", claims);
         assert!(claims[0].content.contains("aware"));
     }
 
@@ -203,10 +197,7 @@ mod tests {
     fn web_agent_phi_gating() {
         let safety = BrowserSafetyPolicy::default();
         let low_phi = WebAgent::new(safety.clone(), 0.1);
-        assert!(
-            !low_phi.can_navigate(),
-            "Low Phi should not allow navigation"
-        );
+        assert!(!low_phi.can_navigate(), "Low Phi should not allow navigation");
 
         let high_phi = WebAgent::new(safety, 0.5);
         assert!(high_phi.can_navigate(), "High Phi should allow navigation");
@@ -220,10 +211,6 @@ mod tests {
             .collect::<Vec<_>>()
             .join(". ");
         let claims = extract_claims_from_text(&text, "https://example.com");
-        assert!(
-            claims.len() <= 10,
-            "Should cap at 10 claims, got {}",
-            claims.len()
-        );
+        assert!(claims.len() <= 10, "Should cap at 10 claims, got {}", claims.len());
     }
 }

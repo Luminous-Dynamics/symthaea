@@ -52,11 +52,7 @@ impl NormalFormGame {
     /// Create a new game. `payoffs[player]` must have length equal to the total
     /// number of strategy profiles.
     pub fn new(players: usize, strategy_counts: Vec<usize>, payoffs: Vec<Vec<f64>>) -> Self {
-        NormalFormGame {
-            players,
-            strategy_counts,
-            payoffs,
-        }
+        NormalFormGame { players, strategy_counts, payoffs }
     }
 
     /// Get payoff for `player` at strategy profile `profile`.
@@ -191,11 +187,8 @@ impl NormalFormGame {
             for new_idx in 0..total_new {
                 let new_profile = decode_profile(new_idx, &new_counts);
                 // Map back to original indices
-                let orig_profile: Vec<usize> = new_profile
-                    .iter()
-                    .enumerate()
-                    .map(|(p, &s)| kept[p][s])
-                    .collect();
+                let orig_profile: Vec<usize> =
+                    new_profile.iter().enumerate().map(|(p, &s)| kept[p][s]).collect();
                 for pl in 0..current.players {
                     new_payoffs[pl][new_idx] = current.get_payoff(pl, &orig_profile);
                 }
@@ -316,11 +309,7 @@ impl ZeroSumGame {
 
         // Compute game value as row_probs^T * matrix * col_probs
         let value: f64 = (0..r)
-            .map(|i| {
-                (0..c)
-                    .map(|j| row_probs[i] * self.matrix[i][j] * col_probs[j])
-                    .sum::<f64>()
-            })
+            .map(|i| (0..c).map(|j| row_probs[i] * self.matrix[i][j] * col_probs[j]).sum::<f64>())
             .sum();
 
         (value, row_probs, col_probs)
@@ -361,7 +350,8 @@ impl CooperativeGame {
                     continue; // S contains i, skip
                 }
                 let s_size = mask.count_ones() as usize;
-                let weight = (factorial(s_size) * factorial(n - s_size - 1)) as f64 / n_fact;
+                let weight =
+                    (factorial(s_size) * factorial(n - s_size - 1)) as f64 / n_fact;
                 let v_with = self.coalition_value(mask | (1u64 << i));
                 let v_without = self.coalition_value(mask);
                 value += weight * (v_with - v_without);
@@ -379,9 +369,7 @@ impl CooperativeGame {
                 if s & t != 0 {
                     continue; // Not disjoint
                 }
-                if self.coalition_value(s | t)
-                    < self.coalition_value(s) + self.coalition_value(t) - 1e-10
-                {
+                if self.coalition_value(s | t) < self.coalition_value(s) + self.coalition_value(t) - 1e-10 {
                     return false;
                 }
             }
@@ -467,11 +455,7 @@ pub fn vcg_payment(valuations: &[f64], chosen_idx: usize) -> Vec<f64> {
                 .filter(|&(j, _)| j != i)
                 .map(|(_, &v)| v)
                 .fold(f64::NEG_INFINITY, f64::max);
-            payments[i] = if others_best == f64::NEG_INFINITY {
-                0.0
-            } else {
-                others_best
-            };
+            payments[i] = if others_best == f64::NEG_INFINITY { 0.0 } else { others_best };
         } else {
             // Losers pay 0
             payments[i] = 0.0;
@@ -514,11 +498,7 @@ pub fn is_dominant_strategy_truthful(mechanism: &dyn Fn(&[f64]) -> usize) -> boo
                         let lie_winner = mechanism(&lie_report);
 
                         // Utility = value if you win, 0 otherwise (quasi-linear, no payment for simplicity)
-                        let u_truth = if truthful_winner == agent {
-                            true_val
-                        } else {
-                            0.0
-                        };
+                        let u_truth = if truthful_winner == agent { true_val } else { 0.0 };
                         let u_lie = if lie_winner == agent { true_val } else { 0.0 };
 
                         if u_lie > u_truth + 1e-10 {
@@ -552,11 +532,7 @@ pub fn vickrey_winner(bids: &[f64]) -> (usize, f64) {
         .map(|(_, &v)| v)
         .fold(f64::NEG_INFINITY, f64::max);
 
-    let price = if second_highest == f64::NEG_INFINITY {
-        0.0
-    } else {
-        second_highest
-    };
+    let price = if second_highest == f64::NEG_INFINITY { 0.0 } else { second_highest };
     (winner, price)
 }
 
@@ -652,11 +628,7 @@ mod tests {
         let phi = game.shapley_value();
         // By symmetry, each player gets 1/3
         for p in &phi {
-            assert!(
-                (p - 1.0 / 3.0).abs() < 1e-10,
-                "Shapley value: expected 1/3, got {}",
-                p
-            );
+            assert!((p - 1.0 / 3.0).abs() < 1e-10, "Shapley value: expected 1/3, got {}", p);
         }
     }
 
@@ -673,10 +645,7 @@ mod tests {
         let game = CooperativeGame::new(3, v);
         let phi = game.shapley_value();
         let sum: f64 = phi.iter().sum();
-        assert!(
-            (sum - 8.0).abs() < 1e-10,
-            "Shapley values sum to grand coalition value"
-        );
+        assert!((sum - 8.0).abs() < 1e-10, "Shapley values sum to grand coalition value");
     }
 
     #[test]
@@ -737,10 +706,8 @@ mod tests {
         let mut v = HashMap::new();
         let vals = [1.0, 2.0, 3.0];
         for mask in 0u64..8 {
-            let val: f64 = (0..3)
-                .filter(|&i| mask & (1 << i) != 0)
-                .map(|i| vals[i])
-                .sum();
+            let val: f64 =
+                (0..3).filter(|&i| mask & (1 << i) != 0).map(|i| vals[i]).sum();
             v.insert(mask, val);
         }
         let game = CooperativeGame::new(3, v);
@@ -766,10 +733,6 @@ mod tests {
         // Matching pennies value should be ≈ 0
         let m = ZeroSumGame::new(vec![vec![1.0, -1.0], vec![-1.0, 1.0]]);
         let (value, _rp, _cp) = m.mixed_strategy_value_lp();
-        assert!(
-            value.abs() < 0.1,
-            "Matching pennies value ≈ 0, got {}",
-            value
-        );
+        assert!(value.abs() < 0.1, "Matching pennies value ≈ 0, got {}", value);
     }
 }

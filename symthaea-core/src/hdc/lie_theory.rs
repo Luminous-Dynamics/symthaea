@@ -150,12 +150,8 @@ fn gram_det(m: &[Vec<f64>]) -> f64 {
     let mut a: Vec<Vec<f64>> = m.to_vec();
     let mut det = 1.0;
     for col in 0..n {
-        let pivot_row = (col..n).max_by(|&a_idx, &b_idx| {
-            a[a_idx][col]
-                .abs()
-                .partial_cmp(&a[b_idx][col].abs())
-                .unwrap()
-        });
+        let pivot_row = (col..n)
+            .max_by(|&a_idx, &b_idx| a[a_idx][col].abs().partial_cmp(&a[b_idx][col].abs()).unwrap());
         if let Some(pr) = pivot_row {
             if a[pr][col].abs() < 1e-15 {
                 return 0.0;
@@ -212,12 +208,7 @@ pub fn sl2_real() -> LieAlgebra {
     sc[2][1][1] = -2.0;
     sc[1][2][1] = 2.0;
 
-    LieAlgebra {
-        name: "sl(2,R)",
-        dimension: d,
-        basis,
-        structure_constants: sc,
-    }
+    LieAlgebra { name: "sl(2,R)", dimension: d, basis, structure_constants: sc }
 }
 
 /// su(2): basis {T₁, T₂, T₃} with [Tᵢ,Tⱼ] = εᵢⱼₖ Tₖ.
@@ -226,64 +217,36 @@ pub fn su2() -> LieAlgebra {
     // [T1,T2] = T3, [T2,T3] = T1, [T3,T1] = T2
     // We represent the algebra by its structure constants; basis matrices are 2×2 complex
     // but we approximate with real placeholders (structure constants are the key data).
-    let e1 = vec![vec![0.0, 0.5], vec![0.5, 0.0]]; // Re(iσ₁/2)
-    let e2 = vec![vec![0.0, -0.5], vec![0.5, 0.0]]; // placeholder for iσ₂/2
-    let e3 = vec![vec![0.5, 0.0], vec![0.0, -0.5]]; // iσ₃/2
+    let e1 = vec![vec![0.0, 0.5], vec![0.5, 0.0]];   // Re(iσ₁/2)
+    let e2 = vec![vec![0.0, -0.5], vec![0.5, 0.0]];  // placeholder for iσ₂/2
+    let e3 = vec![vec![0.5, 0.0], vec![0.0, -0.5]];  // iσ₃/2
 
     let d = 3;
     let mut sc = vec![vec![vec![0.0; d]; d]; d];
     // Levi-Civita: [Ti,Tj] = εijk Tk
     // [T0,T1]=T2, [T1,T2]=T0, [T2,T0]=T1
-    sc[0][1][2] = 1.0;
-    sc[1][0][2] = -1.0;
-    sc[1][2][0] = 1.0;
-    sc[2][1][0] = -1.0;
-    sc[2][0][1] = 1.0;
-    sc[0][2][1] = -1.0;
+    sc[0][1][2] = 1.0;  sc[1][0][2] = -1.0;
+    sc[1][2][0] = 1.0;  sc[2][1][0] = -1.0;
+    sc[2][0][1] = 1.0;  sc[0][2][1] = -1.0;
 
-    LieAlgebra {
-        name: "su(2)",
-        dimension: d,
-        basis: vec![e1, e2, e3],
-        structure_constants: sc,
-    }
+    LieAlgebra { name: "su(2)", dimension: d, basis: vec![e1, e2, e3], structure_constants: sc }
 }
 
 /// so(3): 3×3 skew-symmetric matrices; same structure constants as su(2).
 pub fn so3() -> LieAlgebra {
     // Standard basis: Lx, Ly, Lz
-    let lx = vec![
-        vec![0.0, 0.0, 0.0],
-        vec![0.0, 0.0, -1.0],
-        vec![0.0, 1.0, 0.0],
-    ];
-    let ly = vec![
-        vec![0.0, 0.0, 1.0],
-        vec![0.0, 0.0, 0.0],
-        vec![-1.0, 0.0, 0.0],
-    ];
-    let lz = vec![
-        vec![0.0, -1.0, 0.0],
-        vec![1.0, 0.0, 0.0],
-        vec![0.0, 0.0, 0.0],
-    ];
+    let lx = vec![vec![0.0, 0.0, 0.0], vec![0.0, 0.0, -1.0], vec![0.0, 1.0, 0.0]];
+    let ly = vec![vec![0.0, 0.0, 1.0], vec![0.0, 0.0, 0.0], vec![-1.0, 0.0, 0.0]];
+    let lz = vec![vec![0.0, -1.0, 0.0], vec![1.0, 0.0, 0.0], vec![0.0, 0.0, 0.0]];
 
     let d = 3;
     let mut sc = vec![vec![vec![0.0; d]; d]; d];
     // [Lx,Ly]=Lz, [Ly,Lz]=Lx, [Lz,Lx]=Ly (same as su(2) ε structure)
-    sc[0][1][2] = 1.0;
-    sc[1][0][2] = -1.0;
-    sc[1][2][0] = 1.0;
-    sc[2][1][0] = -1.0;
-    sc[2][0][1] = 1.0;
-    sc[0][2][1] = -1.0;
+    sc[0][1][2] = 1.0;  sc[1][0][2] = -1.0;
+    sc[1][2][0] = 1.0;  sc[2][1][0] = -1.0;
+    sc[2][0][1] = 1.0;  sc[0][2][1] = -1.0;
 
-    LieAlgebra {
-        name: "so(3)",
-        dimension: d,
-        basis: vec![lx, ly, lz],
-        structure_constants: sc,
-    }
+    LieAlgebra { name: "so(3)", dimension: d, basis: vec![lx, ly, lz], structure_constants: sc }
 }
 
 /// gl(2,ℝ): all 2×2 matrices; [A,B] = AB - BA; dimension 4.
@@ -311,12 +274,7 @@ pub fn gl2_real() -> LieAlgebra {
             }
         }
     }
-    LieAlgebra {
-        name: "gl(2,R)",
-        dimension: d,
-        basis,
-        structure_constants: sc,
-    }
+    LieAlgebra { name: "gl(2,R)", dimension: d, basis, structure_constants: sc }
 }
 
 fn mat2x2_comm(a: &[Vec<f64>], b: &[Vec<f64>]) -> Vec<Vec<f64>> {
@@ -352,10 +310,7 @@ pub fn matrix_exp_lie(m: &[Vec<f64>], t: f64, terms: usize) -> Vec<Vec<f64>> {
     let mut result = identity_nxn(n);
     let mut power = identity_nxn(n);
     let mut factorial = 1.0_f64;
-    let tm: Vec<Vec<f64>> = m
-        .iter()
-        .map(|row| row.iter().map(|&x| x * t).collect())
-        .collect();
+    let tm: Vec<Vec<f64>> = m.iter().map(|row| row.iter().map(|&x| x * t).collect()).collect();
     for k in 1..=terms {
         factorial *= k as f64;
         power = mat_mul_nxn(&power, &tm);
@@ -404,9 +359,7 @@ pub fn bcf_first_order(a: &[Vec<f64>], b: &[Vec<f64>]) -> Vec<Vec<f64>> {
 // ─── n×n matrix helpers ──────────────────────────────────────────────────────
 
 fn identity_nxn(n: usize) -> Vec<Vec<f64>> {
-    (0..n)
-        .map(|i| (0..n).map(|j| if i == j { 1.0 } else { 0.0 }).collect())
-        .collect()
+    (0..n).map(|i| (0..n).map(|j| if i == j { 1.0 } else { 0.0 }).collect()).collect()
 }
 
 fn mat_mul_nxn(a: &[Vec<f64>], b: &[Vec<f64>]) -> Vec<Vec<f64>> {
@@ -416,9 +369,7 @@ fn mat_mul_nxn(a: &[Vec<f64>], b: &[Vec<f64>]) -> Vec<Vec<f64>> {
     let mut c = vec![vec![0.0; m]; n];
     for i in 0..n {
         for l in 0..k {
-            if a[i][l].abs() < 1e-300 {
-                continue;
-            }
+            if a[i][l].abs() < 1e-300 { continue; }
             for j in 0..m {
                 c[i][j] += a[i][l] * b[l][j];
             }
@@ -457,77 +408,52 @@ impl RootSystem {
     /// Check whether v is (approximately) in the root system.
     pub fn is_root(&self, v: &[f64], tol: f64) -> bool {
         self.all_roots.iter().any(|r| {
-            r.iter()
-                .zip(v.iter())
-                .map(|(&a, &b)| (a - b) * (a - b))
-                .sum::<f64>()
-                .sqrt()
-                < tol
+            r.iter().zip(v.iter()).map(|(&a, &b)| (a - b) * (a - b)).sum::<f64>().sqrt() < tol
         })
     }
 
     /// Return positive roots (those that can be written as non-negative integer combinations of simple roots).
     pub fn positive_roots(&self) -> Vec<Vec<f64>> {
         let n = self.simple_roots.len();
-        if n == 0 {
-            return vec![];
-        }
+        if n == 0 { return vec![]; }
         let dim = self.simple_roots[0].len();
-        self.all_roots
-            .iter()
-            .filter(|r| {
-                // A root is positive if its first nonzero coordinate is positive
-                for &x in r.iter() {
-                    if x > 1e-10 {
-                        return true;
-                    }
-                    if x < -1e-10 {
-                        return false;
-                    }
-                }
-                false
-            })
-            .cloned()
-            .collect()
+        self.all_roots.iter().filter(|r| {
+            // A root is positive if its first nonzero coordinate is positive
+            for &x in r.iter() {
+                if x > 1e-10 { return true; }
+                if x < -1e-10 { return false; }
+            }
+            false
+        }).cloned().collect()
     }
 
     /// Return the highest root (largest in the dominance partial order).
     pub fn highest_root(&self) -> Vec<f64> {
         let pos = self.positive_roots();
-        pos.into_iter()
-            .max_by(|a, b| {
-                let sa: f64 = a.iter().sum();
-                let sb: f64 = b.iter().sum();
-                sa.partial_cmp(&sb).unwrap()
-            })
-            .unwrap_or_default()
+        pos.into_iter().max_by(|a, b| {
+            let sa: f64 = a.iter().sum();
+            let sb: f64 = b.iter().sum();
+            sa.partial_cmp(&sb).unwrap()
+        }).unwrap_or_default()
     }
 
     /// ASCII text representation of the Dynkin diagram.
     pub fn dynkin_diagram(&self) -> String {
         let n = self.rank;
-        if n == 0 {
-            return String::new();
-        }
+        if n == 0 { return String::new(); }
         let mut nodes: Vec<String> = (1..=n).map(|i| format!("○{}", i)).collect();
         let mut edges: Vec<String> = Vec::new();
         for i in 0..n.saturating_sub(1) {
             let bond = if i < self.cartan_matrix.len() && i + 1 < self.cartan_matrix[i].len() {
                 let a = self.cartan_matrix[i][i + 1];
-                let b = if i + 1 < self.cartan_matrix.len() {
-                    self.cartan_matrix[i + 1][i]
-                } else {
-                    0
-                };
+                let b = if i + 1 < self.cartan_matrix.len() { self.cartan_matrix[i + 1][i] } else { 0 };
                 match (a, b) {
                     (-1, -1) => "─",
                     (-2, -1) | (-1, -2) => "═",
                     (-3, -1) | (-1, -3) => "≡",
                     _ => "─",
                 }
-            } else {
-                "─"
-            };
+            } else { "─" };
             edges.push(bond.to_string());
         }
         let mut result = String::new();
@@ -548,25 +474,19 @@ fn inner_prod(a: &[f64], b: &[f64]) -> f64 {
 fn cartan_entry(alpha: &[f64], beta: &[f64]) -> i32 {
     let ip = inner_prod(alpha, beta);
     let bb = inner_prod(beta, beta);
-    if bb.abs() < 1e-15 {
-        0
-    } else {
-        (2.0 * ip / bb).round() as i32
-    }
+    if bb.abs() < 1e-15 { 0 } else { (2.0 * ip / bb).round() as i32 }
 }
 
 /// Root system Aₙ: simple roots αᵢ = eᵢ - eᵢ₊₁ in ℝⁿ⁺¹.
 pub fn root_system_a(n: usize) -> RootSystem {
     // Simple roots: α₁=e1-e2, α₂=e2-e3, ..., αₙ=eₙ-eₙ₊₁
     let dim = n + 1;
-    let simple_roots: Vec<Vec<f64>> = (0..n)
-        .map(|i| {
-            let mut v = vec![0.0; dim];
-            v[i] = 1.0;
-            v[i + 1] = -1.0;
-            v
-        })
-        .collect();
+    let simple_roots: Vec<Vec<f64>> = (0..n).map(|i| {
+        let mut v = vec![0.0; dim];
+        v[i] = 1.0;
+        v[i + 1] = -1.0;
+        v
+    }).collect();
 
     // All roots: eᵢ - eⱼ for i ≠ j
     let mut all_roots = Vec::new();
@@ -581,34 +501,23 @@ pub fn root_system_a(n: usize) -> RootSystem {
         }
     }
 
-    let cartan_matrix: Vec<Vec<i32>> = (0..n)
-        .map(|i| {
-            (0..n)
-                .map(|j| cartan_entry(&simple_roots[i], &simple_roots[j]))
-                .collect()
-        })
-        .collect();
+    let cartan_matrix: Vec<Vec<i32>> = (0..n).map(|i| {
+        (0..n).map(|j| cartan_entry(&simple_roots[i], &simple_roots[j])).collect()
+    }).collect();
 
-    RootSystem {
-        rank: n,
-        simple_roots,
-        all_roots,
-        cartan_matrix,
-    }
+    RootSystem { rank: n, simple_roots, all_roots, cartan_matrix }
 }
 
 /// Root system Bₙ: so(2n+1). Simple roots: e₁-e₂, ..., eₙ₋₁-eₙ, eₙ.
 pub fn root_system_b(n: usize) -> RootSystem {
     assert!(n >= 2, "B_n requires n ≥ 2");
     let dim = n;
-    let mut simple_roots: Vec<Vec<f64>> = (0..n.saturating_sub(1))
-        .map(|i| {
-            let mut v = vec![0.0; dim];
-            v[i] = 1.0;
-            v[i + 1] = -1.0;
-            v
-        })
-        .collect();
+    let mut simple_roots: Vec<Vec<f64>> = (0..n.saturating_sub(1)).map(|i| {
+        let mut v = vec![0.0; dim];
+        v[i] = 1.0;
+        v[i + 1] = -1.0;
+        v
+    }).collect();
     // Last simple root: eₙ (short root)
     let mut last = vec![0.0; dim];
     last[n - 1] = 1.0;
@@ -636,34 +545,23 @@ pub fn root_system_b(n: usize) -> RootSystem {
         }
     }
 
-    let cartan_matrix: Vec<Vec<i32>> = (0..n)
-        .map(|i| {
-            (0..n)
-                .map(|j| cartan_entry(&simple_roots[i], &simple_roots[j]))
-                .collect()
-        })
-        .collect();
+    let cartan_matrix: Vec<Vec<i32>> = (0..n).map(|i| {
+        (0..n).map(|j| cartan_entry(&simple_roots[i], &simple_roots[j])).collect()
+    }).collect();
 
-    RootSystem {
-        rank: n,
-        simple_roots,
-        all_roots,
-        cartan_matrix,
-    }
+    RootSystem { rank: n, simple_roots, all_roots, cartan_matrix }
 }
 
 /// Root system Dₙ: so(2n). Simple roots: e₁-e₂, ..., eₙ₋₁-eₙ, eₙ₋₁+eₙ.
 pub fn root_system_d(n: usize) -> RootSystem {
     assert!(n >= 3, "D_n requires n ≥ 3");
     let dim = n;
-    let mut simple_roots: Vec<Vec<f64>> = (0..n.saturating_sub(1))
-        .map(|i| {
-            let mut v = vec![0.0; dim];
-            v[i] = 1.0;
-            v[i + 1] = -1.0;
-            v
-        })
-        .collect();
+    let mut simple_roots: Vec<Vec<f64>> = (0..n.saturating_sub(1)).map(|i| {
+        let mut v = vec![0.0; dim];
+        v[i] = 1.0;
+        v[i + 1] = -1.0;
+        v
+    }).collect();
     // Last simple root: eₙ₋₁ + eₙ
     let mut last = vec![0.0; dim];
     last[n - 2] = 1.0;
@@ -685,20 +583,11 @@ pub fn root_system_d(n: usize) -> RootSystem {
         }
     }
 
-    let cartan_matrix: Vec<Vec<i32>> = (0..n)
-        .map(|i| {
-            (0..n)
-                .map(|j| cartan_entry(&simple_roots[i], &simple_roots[j]))
-                .collect()
-        })
-        .collect();
+    let cartan_matrix: Vec<Vec<i32>> = (0..n).map(|i| {
+        (0..n).map(|j| cartan_entry(&simple_roots[i], &simple_roots[j])).collect()
+    }).collect();
 
-    RootSystem {
-        rank: n,
-        simple_roots,
-        all_roots,
-        cartan_matrix,
-    }
+    RootSystem { rank: n, simple_roots, all_roots, cartan_matrix }
 }
 
 /// Root system G₂: 12 roots (6 short + 6 long) in the plane.
@@ -711,20 +600,14 @@ pub fn root_system_g2() -> RootSystem {
     // long roots: ±(3/2, √3/2), ±(0, √3), ±(3/2, -√3/2)  (scaled by √3)
     let s3 = 3.0_f64.sqrt();
     let short = vec![
-        vec![1.0, 0.0],
-        vec![-1.0, 0.0],
-        vec![0.5, s3 / 2.0],
-        vec![-0.5, -s3 / 2.0],
-        vec![0.5, -s3 / 2.0],
-        vec![-0.5, s3 / 2.0],
+        vec![1.0, 0.0], vec![-1.0, 0.0],
+        vec![0.5, s3 / 2.0], vec![-0.5, -s3 / 2.0],
+        vec![0.5, -s3 / 2.0], vec![-0.5, s3 / 2.0],
     ];
     let long = vec![
-        vec![0.0, s3],
-        vec![0.0, -s3],
-        vec![3.0 / 2.0, s3 / 2.0],
-        vec![-3.0 / 2.0, -s3 / 2.0],
-        vec![3.0 / 2.0, -s3 / 2.0],
-        vec![-3.0 / 2.0, s3 / 2.0],
+        vec![0.0, s3], vec![0.0, -s3],
+        vec![3.0 / 2.0, s3 / 2.0], vec![-3.0 / 2.0, -s3 / 2.0],
+        vec![3.0 / 2.0, -s3 / 2.0], vec![-3.0 / 2.0, s3 / 2.0],
     ];
     let mut all_roots = short.clone();
     all_roots.extend(long);
@@ -732,20 +615,11 @@ pub fn root_system_g2() -> RootSystem {
     // Simple roots: α₁ = short root (1,0), α₂ = long root (-3/2, √3/2)
     let simple_roots = vec![vec![1.0, 0.0], vec![-3.0 / 2.0, s3 / 2.0]];
 
-    let cartan_matrix: Vec<Vec<i32>> = (0..2)
-        .map(|i| {
-            (0..2)
-                .map(|j| cartan_entry(&simple_roots[i], &simple_roots[j]))
-                .collect()
-        })
-        .collect();
+    let cartan_matrix: Vec<Vec<i32>> = (0..2).map(|i| {
+        (0..2).map(|j| cartan_entry(&simple_roots[i], &simple_roots[j])).collect()
+    }).collect();
 
-    RootSystem {
-        rank: 2,
-        simple_roots,
-        all_roots,
-        cartan_matrix,
-    }
+    RootSystem { rank: 2, simple_roots, all_roots, cartan_matrix }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -805,11 +679,7 @@ pub fn sl2_irrep(spin_2: usize) -> Representation {
     matrices.insert("f".to_string(), f_mat);
     matrices.insert("h".to_string(), h_mat);
 
-    Representation {
-        dimension: dim,
-        h_eigenvalues,
-        matrices,
-    }
+    Representation { dimension: dim, h_eigenvalues, matrices }
 }
 
 /// Compute the value of the Casimir element C₂ = h²/4 + ef + fe in the representation.
@@ -822,18 +692,9 @@ pub fn casimir_element_value(_rep: &Representation, spin_2: usize) -> f64 {
 
 /// Verify that the representation matrices satisfy the sl(2) commutation relations.
 pub fn check_representation(rep: &Representation, _algebra: &LieAlgebra) -> bool {
-    let e = match rep.matrices.get("e") {
-        Some(m) => m,
-        None => return false,
-    };
-    let f = match rep.matrices.get("f") {
-        Some(m) => m,
-        None => return false,
-    };
-    let h = match rep.matrices.get("h") {
-        Some(m) => m,
-        None => return false,
-    };
+    let e = match rep.matrices.get("e") { Some(m) => m, None => return false };
+    let f = match rep.matrices.get("f") { Some(m) => m, None => return false };
+    let h = match rep.matrices.get("h") { Some(m) => m, None => return false };
     let d = rep.dimension;
 
     // [h,e] = 2e
@@ -886,10 +747,7 @@ mod tests {
     #[test]
     fn test_sl2_jacobi_identity() {
         let alg = sl2_real();
-        assert!(
-            alg.check_jacobi_identity(),
-            "sl(2) must satisfy Jacobi identity"
-        );
+        assert!(alg.check_jacobi_identity(), "sl(2) must satisfy Jacobi identity");
     }
 
     #[test]
@@ -962,11 +820,7 @@ mod tests {
         // h is index 2 in sl2_real
         let coeffs = vec![0.0, 0.0, 1.0];
         let result = lie_element_to_group(&alg, &coeffs);
-        assert!(
-            close(result[0][0], 1.0_f64.exp(), 1e-8),
-            "got {}",
-            result[0][0]
-        );
+        assert!(close(result[0][0], 1.0_f64.exp(), 1e-8), "got {}", result[0][0]);
         assert!(close(result[1][1], (-1.0_f64).exp(), 1e-8));
     }
 
@@ -1033,10 +887,7 @@ mod tests {
     fn test_sl2_representation_commutation_relations() {
         let alg = sl2_real();
         let rep = sl2_irrep(2); // j=1 representation
-        assert!(
-            check_representation(&rep, &alg),
-            "[h,e]=2e, [h,f]=-2f, [e,f]=h must hold"
-        );
+        assert!(check_representation(&rep, &alg), "[h,e]=2e, [h,f]=-2f, [e,f]=h must hold");
     }
 
     #[test]

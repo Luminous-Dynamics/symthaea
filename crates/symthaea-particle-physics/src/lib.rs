@@ -47,6 +47,7 @@ pub use renormalization::{
     BetaCoefficients,
 };
 pub use symmetry_groups::{
-    gell_mann_matrix, gell_mann_trace_product, pauli_matrices, su2_casimir, su2_structure_constant,
-    su3_casimir_adjoint, su3_casimir_fundamental, su3_structure_constant, Complex,
+    gell_mann_matrix, gell_mann_trace_product, pauli_matrices, su2_casimir,
+    su2_structure_constant, su3_casimir_adjoint, su3_casimir_fundamental,
+    su3_structure_constant, Complex,
 };

@@ -627,7 +627,8 @@ impl NetworkService {
             let peer_count = self.peers.read().len();
             self.stats.write().connected_peers = peer_count;
             #[cfg(feature = "api_module")]
-            crate::api::metrics::global().set_gauge("swarm_peers_connected", peer_count as f64);
+            crate::api::metrics::global()
+                .set_gauge("swarm_peers_connected", peer_count as f64);
 
             // Emit connected event
             let _ = self
@@ -1045,13 +1046,12 @@ impl NetworkService {
             let mut peer_info = PeerInfo::new(&peer_id);
             peer_info.trust_level = trust_level;
             peer_info.state = ConnectionState::Connected;
-            self.peers
-                .write()
-                .insert(peer_id.clone(), peer_info.clone());
+            self.peers.write().insert(peer_id.clone(), peer_info.clone());
             let peer_count = self.peers.read().len();
             self.stats.write().connected_peers = peer_count;
             #[cfg(feature = "api_module")]
-            crate::api::metrics::global().set_gauge("swarm_peers_connected", peer_count as f64);
+            crate::api::metrics::global()
+                .set_gauge("swarm_peers_connected", peer_count as f64);
 
             let _ = self.peer_event_tx.send(PeerEvent::Connected(peer_info));
 
@@ -1249,8 +1249,7 @@ impl NetworkService {
         let mut peer_rx = self.subscribe_peer_events();
 
         // Map: peer_id → ticket (for looking up reconnect targets)
-        let ticket_map: std::collections::HashMap<String, String> =
-            bootstrap_tickets.into_iter().collect();
+        let ticket_map: std::collections::HashMap<String, String> = bootstrap_tickets.into_iter().collect();
 
         tokio::spawn(async move {
             while service.running.load(std::sync::atomic::Ordering::Relaxed) {
@@ -2400,16 +2399,12 @@ mod tests {
     #[tokio::test]
     async fn test_two_services_connect_via_ticket() {
         // Node A: create service with attestation
-        let mut node_a = NetworkService::new(SwarmConfig::local_only())
-            .await
-            .unwrap();
+        let mut node_a = NetworkService::new(SwarmConfig::local_only()).await.unwrap();
         node_a.initialize_attestation().unwrap();
         let node_a = std::sync::Arc::new(node_a);
 
         // Verify Node A produces a valid ticket
-        let ticket = node_a
-            .create_ticket()
-            .expect("Node A should produce a ticket");
+        let ticket = node_a.create_ticket().expect("Node A should produce a ticket");
         assert!(!ticket.is_empty(), "Ticket should not be empty");
         // Ticket should be valid JSON (EndpointAddr serialization)
         assert!(
@@ -2422,24 +2417,17 @@ mod tests {
         assert!(!node_id.is_empty(), "Node ID should not be empty");
 
         // Node B: create service with attestation
-        let mut node_b = NetworkService::new(SwarmConfig::local_only())
-            .await
-            .unwrap();
+        let mut node_b = NetworkService::new(SwarmConfig::local_only()).await.unwrap();
         node_b.initialize_attestation().unwrap();
         let node_b = std::sync::Arc::new(node_b);
 
         // Verify Node B has a different node ID
         let node_b_id = node_b.node_id();
         assert!(!node_b_id.is_empty());
-        assert_ne!(
-            node_id, node_b_id,
-            "Two services should have different node IDs"
-        );
+        assert_ne!(node_id, node_b_id, "Two services should have different node IDs");
 
         // Verify Node B can also produce a ticket
-        let ticket_b = node_b
-            .create_ticket()
-            .expect("Node B should produce a ticket");
+        let ticket_b = node_b.create_ticket().expect("Node B should produce a ticket");
         assert!(!ticket_b.is_empty());
 
         // Verify both start with 0 peers
@@ -2455,8 +2443,11 @@ mod tests {
         // Here we verify the prerequisite: both nodes are properly initialized,
         // produce valid tickets, and are ready for connection.
 
-        let connected =
-            tokio::time::timeout(std::time::Duration::from_secs(1), async { true }).await;
+        let connected = tokio::time::timeout(
+            std::time::Duration::from_secs(1),
+            async { true },
+        )
+        .await;
 
         assert!(connected.is_ok(), "Timeout should not occur");
     }

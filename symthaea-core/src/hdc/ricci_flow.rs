@@ -120,11 +120,7 @@ pub fn normalized_ricci_flow_single(
 /// Maximum absolute Ricci tensor component (proxy for curvature magnitude).
 pub fn max_ricci_component(metric: &MetricTensor) -> f64 {
     let ricci = metric.ricci_tensor();
-    ricci
-        .components
-        .iter()
-        .map(|v| v.abs())
-        .fold(0.0f64, f64::max)
+    ricci.components.iter().map(|v| v.abs()).fold(0.0f64, f64::max)
 }
 
 /// Detect singularity in the flow history.
@@ -166,26 +162,20 @@ pub fn is_converging_to_round(history: &[RicciFlowState]) -> bool {
 
 /// Check if flow has converged (defect < tol).
 pub fn has_converged(history: &[RicciFlowState], tol: f64) -> bool {
-    history
-        .last()
-        .map(|s| s.einstein_defect < tol)
-        .unwrap_or(false)
+    history.last().map(|s| s.einstein_defect < tol).unwrap_or(false)
 }
 
 /// Final Einstein defect in the flow history.
 pub fn final_defect(history: &[RicciFlowState]) -> f64 {
-    history
-        .last()
-        .map(|s| s.einstein_defect)
-        .unwrap_or(f64::INFINITY)
+    history.last().map(|s| s.einstein_defect).unwrap_or(f64::INFINITY)
 }
 
 // ─── Tests ────────────────────────────────────────────────────────────────────
 
 #[cfg(test)]
 mod tests {
-    use super::super::riemannian_geometry::{DiscretizedSphere, MetricTensor};
     use super::*;
+    use super::super::riemannian_geometry::{DiscretizedSphere, MetricTensor};
 
     #[test]
     fn test_round_sphere_is_fixed_point() {
@@ -196,16 +186,8 @@ mod tests {
         assert!(!history.is_empty());
         let defect_0 = history[0].einstein_defect;
         let defect_final = history.last().unwrap().einstein_defect;
-        assert!(
-            defect_0 < 1e-6,
-            "Initial defect should be zero, got {}",
-            defect_0
-        );
-        assert!(
-            defect_final < 1e-5,
-            "Final defect should still be zero, got {}",
-            defect_final
-        );
+        assert!(defect_0 < 1e-6, "Initial defect should be zero, got {}", defect_0);
+        assert!(defect_final < 1e-5, "Final defect should still be zero, got {}", defect_final);
     }
 
     #[test]
@@ -215,7 +197,7 @@ mod tests {
         assert!(!history.is_empty());
         // Iterations should be non-decreasing
         for i in 1..history.len() {
-            assert!(history[i].iteration >= history[i - 1].iteration);
+            assert!(history[i].iteration >= history[i-1].iteration);
         }
     }
 

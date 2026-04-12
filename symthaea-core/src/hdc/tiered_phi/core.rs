@@ -68,9 +68,7 @@ pub enum ApproximationTier {
     /// Retained for graph analysis (mixing time, robustness) — NOT for
     /// consciousness measurement. Removed from `auto_tier()` 2026-04-11.
     #[serde(alias = "Spectral")]
-    #[deprecated(
-        note = "measures spectral gap, not IIT Φ — use SampledPartition or ExhaustivePartition"
-    )]
+    #[deprecated(note = "measures spectral gap, not IIT Φ — use SampledPartition or ExhaustivePartition")]
     SpectralConnectivity,
 
     /// O(2^n) - Exhaustive partition search (closest to IIT MIP).

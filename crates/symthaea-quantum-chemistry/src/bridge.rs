@@ -103,15 +103,11 @@ pub fn quick_consciousness_assessment(
     let (eri, _, _) = compute_eri_tensor(&basis.functions);
     let mp2 = mp2_correlation_energy(&rhf, &eri);
 
-    let profile =
-        consciousness_from_first_principles(&rhf, &molecule.atoms, &basis.functions, temperature);
+    let profile = consciousness_from_first_principles(
+        &rhf, &molecule.atoms, &basis.functions, temperature,
+    );
 
-    profile_to_bridge(
-        &profile,
-        &rhf,
-        mp2.correlation_energy,
-        ComputationalMethod::Mp2,
-    )
+    profile_to_bridge(&profile, &rhf, mp2.correlation_energy, ComputationalMethod::Mp2)
 }
 
 /// Molecular consciousness comparison: rank molecules by consciousness score.
@@ -146,7 +142,10 @@ mod tests {
 
     #[test]
     fn test_ranking() {
-        let molecules = vec![("H2", Molecule::h2()), ("H2O", Molecule::water())];
+        let molecules = vec![
+            ("H2", Molecule::h2()),
+            ("H2O", Molecule::water()),
+        ];
         let ranking = rank_by_consciousness(&molecules, 300.0);
         assert_eq!(ranking.len(), 2);
         // Water should rank higher than H2

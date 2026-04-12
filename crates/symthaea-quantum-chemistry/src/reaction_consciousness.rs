@@ -12,9 +12,7 @@
 //! a consciousness maximum — a prediction testable from first principles.
 
 use crate::molecule::{Atom, Molecule};
-use crate::multi_theory::{
-    compute_theory_scores, theory_correlation_matrix, TheoryScores, N_THEORIES, THEORY_NAMES,
-};
+use crate::multi_theory::{compute_theory_scores, theory_correlation_matrix, TheoryScores, N_THEORIES, THEORY_NAMES};
 
 /// A single point on the reaction-consciousness curve.
 #[derive(Debug, Clone)]
@@ -42,8 +40,7 @@ pub struct ReactionConsciousnessProfile {
 impl ReactionConsciousnessProfile {
     /// Find the coordinate of minimum energy (equilibrium).
     pub fn equilibrium_coordinate(&self) -> f64 {
-        self.points
-            .iter()
+        self.points.iter()
             .min_by(|a, b| a.energy.partial_cmp(&b.energy).unwrap())
             .map(|p| p.coordinate)
             .unwrap_or(0.0)
@@ -51,27 +48,16 @@ impl ReactionConsciousnessProfile {
 
     /// Find the coordinate of maximum composite consciousness.
     pub fn consciousness_maximum(&self) -> (f64, f64) {
-        self.points
-            .iter()
-            .max_by(|a, b| {
-                a.scores
-                    .composite_score
-                    .partial_cmp(&b.scores.composite_score)
-                    .unwrap()
-            })
+        self.points.iter()
+            .max_by(|a, b| a.scores.composite_score.partial_cmp(&b.scores.composite_score).unwrap())
             .map(|p| (p.coordinate, p.scores.composite_score))
             .unwrap_or((0.0, 0.0))
     }
 
     /// Find the coordinate of maximum IIT score.
     pub fn iit_maximum(&self) -> (f64, f64) {
-        self.points
-            .iter()
-            .max_by(|a, b| {
-                a.scores.normalized[0]
-                    .partial_cmp(&b.scores.normalized[0])
-                    .unwrap()
-            })
+        self.points.iter()
+            .max_by(|a, b| a.scores.normalized[0].partial_cmp(&b.scores.normalized[0]).unwrap())
             .map(|p| (p.coordinate, p.scores.normalized[0]))
             .unwrap_or((0.0, 0.0))
     }
@@ -85,15 +71,8 @@ impl ReactionConsciousnessProfile {
     /// (at transition state) and equilibrium consciousness.
     pub fn consciousness_barrier(&self) -> f64 {
         let eq_coord = self.equilibrium_coordinate();
-        let eq_consciousness = self
-            .points
-            .iter()
-            .min_by(|a, b| {
-                (a.coordinate - eq_coord)
-                    .abs()
-                    .partial_cmp(&(b.coordinate - eq_coord).abs())
-                    .unwrap()
-            })
+        let eq_consciousness = self.points.iter()
+            .min_by(|a, b| (a.coordinate - eq_coord).abs().partial_cmp(&(b.coordinate - eq_coord).abs()).unwrap())
             .map(|p| p.scores.composite_score)
             .unwrap_or(0.0);
         let (_, max_c) = self.consciousness_maximum();
@@ -103,27 +82,21 @@ impl ReactionConsciousnessProfile {
     /// Thermodynamic cost: correlation between energy and consciousness.
     pub fn energy_consciousness_correlation(&self) -> f64 {
         let energies: Vec<f64> = self.points.iter().map(|p| p.energy).collect();
-        let scores: Vec<f64> = self
-            .points
-            .iter()
-            .map(|p| p.scores.composite_score)
-            .collect();
+        let scores: Vec<f64> = self.points.iter().map(|p| p.scores.composite_score).collect();
         pearson(&energies, &scores)
     }
 }
 
 /// Scan H₂ dissociation: R from r_min to r_max Bohr.
-pub fn h2_dissociation(
-    r_min: f64,
-    r_max: f64,
-    n_points: usize,
-    temperature: f64,
-) -> ReactionConsciousnessProfile {
+pub fn h2_dissociation(r_min: f64, r_max: f64, n_points: usize, temperature: f64) -> ReactionConsciousnessProfile {
     let dr = (r_max - r_min) / (n_points - 1) as f64;
     let points: Vec<ReactionPoint> = (0..n_points)
         .map(|i| {
             let r = r_min + i as f64 * dr;
-            let mol = Molecule::new(vec![Atom::new(1, 0.0, 0.0, 0.0), Atom::new(1, 0.0, 0.0, r)]);
+            let mol = Molecule::new(vec![
+                Atom::new(1, 0.0, 0.0, 0.0),
+                Atom::new(1, 0.0, 0.0, r),
+            ]);
             let scores = compute_theory_scores(&mol, &format!("H2_R{:.1}", r), temperature);
             ReactionPoint {
                 coordinate: r,
@@ -146,12 +119,7 @@ pub fn h2_dissociation(
 }
 
 /// Scan H₂O symmetric stretch: both O-H bonds scaled by factor f.
-pub fn h2o_symmetric_stretch(
-    f_min: f64,
-    f_max: f64,
-    n_points: usize,
-    temperature: f64,
-) -> ReactionConsciousnessProfile {
+pub fn h2o_symmetric_stretch(f_min: f64, f_max: f64, n_points: usize, temperature: f64) -> ReactionConsciousnessProfile {
     let df = (f_max - f_min) / (n_points - 1) as f64;
     let oh_eq = 1.809; // Equilibrium O-H in Bohr (0.9572 Å)
     let angle = 104.52_f64.to_radians();
@@ -187,17 +155,15 @@ pub fn h2o_symmetric_stretch(
 }
 
 /// Scan LiH dissociation: R from r_min to r_max Bohr.
-pub fn lih_dissociation(
-    r_min: f64,
-    r_max: f64,
-    n_points: usize,
-    temperature: f64,
-) -> ReactionConsciousnessProfile {
+pub fn lih_dissociation(r_min: f64, r_max: f64, n_points: usize, temperature: f64) -> ReactionConsciousnessProfile {
     let dr = (r_max - r_min) / (n_points - 1) as f64;
     let points: Vec<ReactionPoint> = (0..n_points)
         .map(|i| {
             let r = r_min + i as f64 * dr;
-            let mol = Molecule::new(vec![Atom::new(3, 0.0, 0.0, 0.0), Atom::new(1, 0.0, 0.0, r)]);
+            let mol = Molecule::new(vec![
+                Atom::new(3, 0.0, 0.0, 0.0),
+                Atom::new(1, 0.0, 0.0, r),
+            ]);
             let scores = compute_theory_scores(&mol, &format!("LiH_R{:.1}", r), temperature);
             ReactionPoint {
                 coordinate: r,
@@ -221,9 +187,7 @@ pub fn lih_dissociation(
 
 fn pearson(x: &[f64], y: &[f64]) -> f64 {
     let n = x.len() as f64;
-    if n < 3.0 {
-        return 0.0;
-    }
+    if n < 3.0 { return 0.0; }
     let mx = x.iter().sum::<f64>() / n;
     let my = y.iter().sum::<f64>() / n;
     let mut cov = 0.0;
@@ -236,15 +200,9 @@ fn pearson(x: &[f64], y: &[f64]) -> f64 {
         vx += dx * dx;
         vy += dy * dy;
     }
-    if vx < 1e-15 || vy < 1e-15 {
-        return 0.0;
-    }
+    if vx < 1e-15 || vy < 1e-15 { return 0.0; }
     let r = cov / (vx * vy).sqrt();
-    if r.is_nan() {
-        0.0
-    } else {
-        r.clamp(-1.0, 1.0)
-    }
+    if r.is_nan() { 0.0 } else { r.clamp(-1.0, 1.0) }
 }
 
 #[cfg(test)]
@@ -264,27 +222,16 @@ mod tests {
     fn test_energy_minimum_near_equilibrium() {
         let profile = h2_dissociation(1.0, 3.0, 5, 300.0);
         let eq = profile.equilibrium_coordinate();
-        assert!(
-            (eq - 1.5).abs() < 1.0,
-            "Equilibrium should be near 1.4: got {:.2}",
-            eq
-        );
+        assert!((eq - 1.5).abs() < 1.0, "Equilibrium should be near 1.4: got {:.2}", eq);
     }
 
     #[test]
     fn test_consciousness_varies_along_coordinate() {
         let profile = h2_dissociation(1.0, 4.0, 5, 300.0);
-        let scores: Vec<f64> = profile
-            .points
-            .iter()
-            .map(|p| p.scores.composite_score)
-            .collect();
+        let scores: Vec<f64> = profile.points.iter().map(|p| p.scores.composite_score).collect();
         let min = scores.iter().cloned().fold(f64::INFINITY, f64::min);
         let max = scores.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
         // Consciousness should vary (not be constant)
-        assert!(
-            max > min || max == min,
-            "Scores should vary or be constant at machine precision"
-        );
+        assert!(max > min || max == min, "Scores should vary or be constant at machine precision");
     }
 }

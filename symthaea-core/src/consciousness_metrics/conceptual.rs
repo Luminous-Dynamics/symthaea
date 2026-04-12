@@ -202,9 +202,10 @@ impl ConceptualStructureCalculator {
         } else {
             mech_bundle.clone()
         };
-        let cause_info = self
-            .estimator
-            .mutual_information_fast(&mech_bundle, &context_bundle);
+        let cause_info = self.estimator.mutual_information_fast(
+            &mech_bundle,
+            &context_bundle,
+        );
 
         // Effect information: how much the mechanism constrains the context
         // (effect repertoire). Computed separately from cause to satisfy

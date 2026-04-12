@@ -539,10 +539,7 @@ impl DifferentialEquationsEngine {
     ) -> PDE2DResult {
         assert_eq!(u0.len(), nx * ny, "u0 length must equal nx * ny");
         assert!(alpha > 0.0, "thermal diffusivity must be positive");
-        assert!(
-            nx >= 2 && ny >= 2,
-            "need at least 2 interior points per axis"
-        );
+        assert!(nx >= 2 && ny >= 2, "need at least 2 interior points per axis");
 
         let dx = lx / (nx + 1) as f64;
         let dy = ly / (ny + 1) as f64;
@@ -563,17 +560,9 @@ impl DifferentialEquationsEngine {
                 for j in 0..ny {
                     let idx = i * ny + j;
                     let u_left = if i == 0 { 0.0 } else { u[(i - 1) * ny + j] };
-                    let u_right = if i == nx - 1 {
-                        0.0
-                    } else {
-                        u[(i + 1) * ny + j]
-                    };
+                    let u_right = if i == nx - 1 { 0.0 } else { u[(i + 1) * ny + j] };
                     let u_down = if j == 0 { 0.0 } else { u[i * ny + (j - 1)] };
-                    let u_up = if j == ny - 1 {
-                        0.0
-                    } else {
-                        u[i * ny + (j + 1)]
-                    };
+                    let u_up = if j == ny - 1 { 0.0 } else { u[i * ny + (j + 1)] };
 
                     u_new[idx] = u[idx]
                         + rx * (u_left - 2.0 * u[idx] + u_right)
@@ -710,7 +699,13 @@ impl DifferentialEquationsEngine {
     ///
     /// Dormand-Prince Butcher tableau (DOPRI5 — Hairer et al. 1993):
     /// c2=1/5, c3=3/10, c4=4/5, c5=8/9, c6=1, c7=1
-    pub fn solve_rk45(system: &ODESystem, t0: f64, t_end: f64, y0: &[f64], tol: f64) -> RK45Result {
+    pub fn solve_rk45(
+        system: &ODESystem,
+        t0: f64,
+        t_end: f64,
+        y0: &[f64],
+        tol: f64,
+    ) -> RK45Result {
         // Dormand-Prince coefficients (a-matrix, b5, b4)
         let a21 = 1.0 / 5.0;
         let a31 = 3.0 / 40.0;
@@ -765,21 +760,27 @@ impl DifferentialEquationsEngine {
             let k1 = (system.f)(t, &y);
             let y2: Vec<f64> = (0..dim).map(|i| y[i] + h * a21 * k1[i]).collect();
             let k2 = (system.f)(t + h / 5.0, &y2);
-            let y3: Vec<f64> = (0..dim)
-                .map(|i| y[i] + h * (a31 * k1[i] + a32 * k2[i]))
-                .collect();
+            let y3: Vec<f64> =
+                (0..dim).map(|i| y[i] + h * (a31 * k1[i] + a32 * k2[i])).collect();
             let k3 = (system.f)(t + 3.0 * h / 10.0, &y3);
             let y4: Vec<f64> = (0..dim)
                 .map(|i| y[i] + h * (a41 * k1[i] + a42 * k2[i] + a43 * k3[i]))
                 .collect();
             let k4 = (system.f)(t + 4.0 * h / 5.0, &y4);
             let y5: Vec<f64> = (0..dim)
-                .map(|i| y[i] + h * (a51 * k1[i] + a52 * k2[i] + a53 * k3[i] + a54 * k4[i]))
+                .map(|i| {
+                    y[i] + h * (a51 * k1[i] + a52 * k2[i] + a53 * k3[i] + a54 * k4[i])
+                })
                 .collect();
             let k5 = (system.f)(t + 8.0 * h / 9.0, &y5);
             let y6: Vec<f64> = (0..dim)
                 .map(|i| {
-                    y[i] + h * (a61 * k1[i] + a62 * k2[i] + a63 * k3[i] + a64 * k4[i] + a65 * k5[i])
+                    y[i]
+                        + h * (a61 * k1[i]
+                            + a62 * k2[i]
+                            + a63 * k3[i]
+                            + a64 * k4[i]
+                            + a65 * k5[i])
                 })
                 .collect();
             let k6 = (system.f)(t + h, &y6);
@@ -880,13 +881,13 @@ impl DifferentialEquationsEngine {
                 let fy = (system.f)(t_next, &y_next);
 
                 // Residual: G = y_next - y - h*f(t_next, y_next)
-                let residual: Vec<f64> = (0..dim).map(|i| y_next[i] - y[i] - h * fy[i]).collect();
+                let residual: Vec<f64> = (0..dim)
+                    .map(|i| y_next[i] - y[i] - h * fy[i])
+                    .collect();
 
                 // Check convergence
                 let res_norm: f64 = residual.iter().map(|r| r.abs()).fold(0.0f64, f64::max);
-                if res_norm < newton_tol {
-                    break;
-                }
+                if res_norm < newton_tol { break; }
 
                 // Diagonal Jacobian via finite differences: J_ii = 1 - h * df_i/dy_i
                 let eps_fd = 1e-8;
@@ -912,7 +913,9 @@ impl DifferentialEquationsEngine {
             y_values.push(y.clone());
         }
 
-        let state_hash: u64 = y.iter().fold(0u64, |acc, &v| acc.wrapping_add(v.to_bits()));
+        let state_hash: u64 = y.iter().fold(0u64, |acc, &v| {
+            acc.wrapping_add(v.to_bits())
+        });
         let base = BinaryHV::random(seed_from_name("IMPLICIT_EULER"));
         let state_hv = BinaryHV::random(seed_from_name(&format!("IE_STATE_{}", state_hash)));
         let encoding = base.bind(&state_hv);
@@ -1514,11 +1517,7 @@ mod tests {
         let result = DifferentialEquationsEngine::solve_rk45(&sys, 0.0, 1.0, &[1.0], 1e-8);
         assert!(result.converged, "RK45 should converge");
         let err = (result.y_final[0] - std::f64::consts::E).abs();
-        assert!(
-            err < 1e-7,
-            "RK45 exponential error should be < 1e-7, got {}",
-            err
-        );
+        assert!(err < 1e-7, "RK45 exponential error should be < 1e-7, got {}", err);
     }
 
     #[test]
@@ -1530,10 +1529,7 @@ mod tests {
         let sys = ODESystem { f: harm, dim: 2 };
         let rk45 = DifferentialEquationsEngine::solve_rk45(&sys, 0.0, 10.0, &[1.0, 0.0], 1e-6);
         assert!(rk45.converged, "RK45 harmonic oscillator should converge");
-        assert!(
-            rk45.steps_taken < 5000,
-            "RK45 should adapt step size efficiently"
-        );
+        assert!(rk45.steps_taken < 5000, "RK45 should adapt step size efficiently");
     }
 
     #[test]
@@ -1544,10 +1540,7 @@ mod tests {
         let sys = ODESystem { f: stiff, dim: 1 };
         let result = DifferentialEquationsEngine::solve_rk45(&sys, 0.0, 1.0, &[1.0], 1e-6);
         // May or may not converge on stiff problem but should not panic
-        assert!(
-            result.rejected_steps < 100_000,
-            "Should not loop infinitely"
-        );
+        assert!(result.rejected_steps < 100_000, "Should not loop infinitely");
     }
 
     #[test]
@@ -1557,15 +1550,13 @@ mod tests {
             vec![-y[0]]
         }
         let sys = ODESystem { f: decay, dim: 1 };
-        let result =
-            DifferentialEquationsEngine::solve_implicit_euler(&sys, 0.0, 1.0, &[1.0], 1000, 5);
+        let result = DifferentialEquationsEngine::solve_implicit_euler(&sys, 0.0, 1.0, &[1.0], 1000, 5);
         let final_y = result.final_state()[0];
         let expected = (-1.0f64).exp();
         assert!(
             (final_y - expected).abs() < 0.01,
             "Implicit Euler decay: got {:.6}, expected {:.6}",
-            final_y,
-            expected
+            final_y, expected
         );
     }
 
@@ -1579,13 +1570,10 @@ mod tests {
         fn stiff_decay(_t: f64, y: &[f64]) -> Vec<f64> {
             vec![-1000.0 * y[0] + 1000.0]
         }
-        let sys = ODESystem {
-            f: stiff_decay,
-            dim: 1,
-        };
+        let sys = ODESystem { f: stiff_decay, dim: 1 };
         // h = 0.01 → h*λ = 10 (well beyond explicit stability limit of 2)
-        let result =
-            DifferentialEquationsEngine::solve_implicit_euler(&sys, 0.0, 0.1, &[0.0], 10, 10);
+        let result = DifferentialEquationsEngine::solve_implicit_euler(
+            &sys, 0.0, 0.1, &[0.0], 10, 10);
         let final_y = result.final_state()[0];
         // y(0.1) = 1 - exp(-100) ≈ 1.0
         assert!(
@@ -1604,28 +1592,22 @@ mod tests {
         fn two_rate(_t: f64, y: &[f64]) -> Vec<f64> {
             vec![-y[0], -1000.0 * y[1]]
         }
-        let sys = ODESystem {
-            f: two_rate,
-            dim: 2,
-        };
-        let result =
-            DifferentialEquationsEngine::solve_implicit_euler(&sys, 0.0, 1.0, &[1.0, 1.0], 100, 10);
+        let sys = ODESystem { f: two_rate, dim: 2 };
+        let result = DifferentialEquationsEngine::solve_implicit_euler(
+            &sys, 0.0, 1.0, &[1.0, 1.0], 100, 10);
         let final_state = result.final_state();
 
         // y1(1) = exp(-1) ≈ 0.3679
         let y1_expected = (-1.0f64).exp();
         assert!(
             (final_state[0] - y1_expected).abs() < 0.05,
-            "Slow component: got {:.6}, expected {:.6}",
-            final_state[0],
-            y1_expected
+            "Slow component: got {:.6}, expected {:.6}", final_state[0], y1_expected
         );
 
         // y2(1) = exp(-1000) ≈ 0 (fast component fully decayed)
         assert!(
             final_state[1].abs() < 1e-3,
-            "Fast component should decay to ~0, got {:.6}",
-            final_state[1]
+            "Fast component should decay to ~0, got {:.6}", final_state[1]
         );
     }
 
@@ -1639,13 +1621,10 @@ mod tests {
             let mu = 1000.0;
             vec![y[1], mu * (1.0 - y[0] * y[0]) * y[1] - y[0]]
         }
-        let sys = ODESystem {
-            f: van_der_pol,
-            dim: 2,
-        };
+        let sys = ODESystem { f: van_der_pol, dim: 2 };
         // Small step size (h=0.001) with many Newton iterations for severely stiff VdP
-        let result =
-            DifferentialEquationsEngine::solve_implicit_euler(&sys, 0.0, 0.1, &[2.0, 0.0], 100, 20);
+        let result = DifferentialEquationsEngine::solve_implicit_euler(
+            &sys, 0.0, 0.1, &[2.0, 0.0], 100, 20);
         let final_state = result.final_state();
 
         // Don't check exact value — VdP at μ=1000 is notoriously difficult.
@@ -1653,15 +1632,13 @@ mod tests {
         assert!(
             final_state[0].is_finite() && final_state[1].is_finite(),
             "Van der Pol (μ=1000) should produce finite output, got [{:.6}, {:.6}]",
-            final_state[0],
-            final_state[1]
+            final_state[0], final_state[1]
         );
         // The solution should stay bounded (VdP has a stable limit cycle)
         assert!(
             final_state[0].abs() < 10.0 && final_state[1].abs() < 2000.0,
             "Van der Pol should stay bounded, got [{:.6}, {:.6}]",
-            final_state[0],
-            final_state[1]
+            final_state[0], final_state[1]
         );
     }
 
@@ -1670,29 +1647,17 @@ mod tests {
     #[test]
     fn test_em_brownian_motion_zero_drift() {
         // dX = 0*dt + 1*dW → X(t) has E[X(t)] = 0
-        fn zero_drift(_x: f64, _t: f64) -> f64 {
-            0.0
-        }
-        fn unit_diffusion(_x: f64, _t: f64) -> f64 {
-            1.0
-        }
+        fn zero_drift(_x: f64, _t: f64) -> f64 { 0.0 }
+        fn unit_diffusion(_x: f64, _t: f64) -> f64 { 1.0 }
         let result = SDEEngine::ensemble(zero_drift, unit_diffusion, 0.0, 0.0, 1.0, 1000, 500, 42);
-        assert!(
-            result.mean_final.abs() < 0.15,
-            "BM mean should be near 0, got {}",
-            result.mean_final
-        );
+        assert!(result.mean_final.abs() < 0.15, "BM mean should be near 0, got {}", result.mean_final);
     }
 
     #[test]
     fn test_em_exponential_growth() {
         // dX = X dt + 0 dW → X(t) = X₀ * e^t (no noise)
-        fn growth(x: f64, _t: f64) -> f64 {
-            x
-        }
-        fn no_noise(_x: f64, _t: f64) -> f64 {
-            0.0
-        }
+        fn growth(x: f64, _t: f64) -> f64 { x }
+        fn no_noise(_x: f64, _t: f64) -> f64 { 0.0 }
         let result = SDEEngine::euler_maruyama(growth, no_noise, 1.0, 0.0, 1.0, 10000, 123);
         let expected = std::f64::consts::E;
         assert!(
@@ -1731,8 +1696,7 @@ mod tests {
         let mut u0 = vec![0.0; nx * ny];
         u0[5 * ny + 5] = 1.0;
 
-        let result =
-            DifferentialEquationsEngine::heat_equation_2d(0.01, 1.0, 1.0, 1.0, nx, ny, &u0);
+        let result = DifferentialEquationsEngine::heat_equation_2d(0.01, 1.0, 1.0, 1.0, nx, ny, &u0);
 
         // Energy should decay (heat dissipates)
         let initial_energy: f64 = u0.iter().map(|v| v * v).sum::<f64>();
@@ -1747,11 +1711,7 @@ mod tests {
             "Solution should stay non-negative"
         );
         // Phi should indicate stable solution
-        assert!(
-            result.phi > 0.5,
-            "Phi should indicate good solution: {}",
-            result.phi
-        );
+        assert!(result.phi > 0.5, "Phi should indicate good solution: {}", result.phi);
     }
 
     #[test]

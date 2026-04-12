@@ -186,7 +186,8 @@ impl MeshDaemonOrchestrator {
 
         if let Some(ref mut child) = self.child {
             // Wait up to 5s for graceful exit
-            let wait_result = tokio::time::timeout(Duration::from_secs(5), child.wait()).await;
+            let wait_result =
+                tokio::time::timeout(Duration::from_secs(5), child.wait()).await;
 
             match wait_result {
                 Ok(Ok(status)) => {

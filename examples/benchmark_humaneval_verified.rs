@@ -49,41 +49,25 @@ fn humaneval_problems() -> Vec<Problem> {
             name: "absolute_value",
             purpose: "Return absolute value",
             signature: "fn absolute_value(x: i32) -> i32",
-            test_cases: vec![
-                ("absolute_value(-5)", "5"),
-                ("absolute_value(3)", "3"),
-                ("absolute_value(0)", "0"),
-            ],
+            test_cases: vec![("absolute_value(-5)", "5"), ("absolute_value(3)", "3"), ("absolute_value(0)", "0")],
         },
         Problem {
             name: "is_even",
             purpose: "Check if number is even",
             signature: "fn is_even(n: i32) -> bool",
-            test_cases: vec![
-                ("is_even(4)", "true"),
-                ("is_even(7)", "false"),
-                ("is_even(0)", "true"),
-            ],
+            test_cases: vec![("is_even(4)", "true"), ("is_even(7)", "false"), ("is_even(0)", "true")],
         },
         Problem {
             name: "factorial",
             purpose: "Compute factorial of n",
             signature: "fn factorial(n: u64) -> u64",
-            test_cases: vec![
-                ("factorial(0)", "1"),
-                ("factorial(1)", "1"),
-                ("factorial(5)", "120"),
-            ],
+            test_cases: vec![("factorial(0)", "1"), ("factorial(1)", "1"), ("factorial(5)", "120")],
         },
         Problem {
             name: "fibonacci",
             purpose: "Compute nth fibonacci number",
             signature: "fn fibonacci(n: u64) -> u64",
-            test_cases: vec![
-                ("fibonacci(0)", "0"),
-                ("fibonacci(1)", "1"),
-                ("fibonacci(10)", "55"),
-            ],
+            test_cases: vec![("fibonacci(0)", "0"), ("fibonacci(1)", "1"), ("fibonacci(10)", "55")],
         },
         Problem {
             name: "reverse_string",
@@ -104,10 +88,7 @@ fn humaneval_problems() -> Vec<Problem> {
             name: "string_length",
             purpose: "Get length of a string",
             signature: "fn string_length(s: &str) -> usize",
-            test_cases: vec![
-                ("string_length(\"hello\")", "5"),
-                ("string_length(\"\")", "0"),
-            ],
+            test_cases: vec![("string_length(\"hello\")", "5"), ("string_length(\"\")", "0")],
         },
         Problem {
             name: "max_of_two",
@@ -158,10 +139,7 @@ fn humaneval_problems() -> Vec<Problem> {
             name: "celsius_to_fahrenheit",
             purpose: "Convert celsius to fahrenheit",
             signature: "fn celsius_to_fahrenheit(c: f64) -> f64",
-            test_cases: vec![
-                ("celsius_to_fahrenheit(0.0)", "32.0"),
-                ("celsius_to_fahrenheit(100.0)", "212.0"),
-            ],
+            test_cases: vec![("celsius_to_fahrenheit(0.0)", "32.0"), ("celsius_to_fahrenheit(100.0)", "212.0")],
         },
         Problem {
             name: "safe_divide",
@@ -239,26 +217,8 @@ fn main() {
     }
 
     println!("\n=== Results ===");
-    println!(
-        "  Compiled:     {}/{} ({:.0}%)",
-        compiled,
-        total,
-        compiled as f64 / total as f64 * 100.0
-    );
-    println!(
-        "  Tests passed: {}/{} ({:.0}%)",
-        tests_passed,
-        total,
-        tests_passed as f64 / total as f64 * 100.0
-    );
-    println!(
-        "  Verified:     {}/{} ({:.0}%)",
-        verified,
-        total,
-        verified as f64 / total as f64 * 100.0
-    );
-    println!(
-        "\n  pass@1 = {:.1}%",
-        verified as f64 / total as f64 * 100.0
-    );
+    println!("  Compiled:     {}/{} ({:.0}%)", compiled, total, compiled as f64 / total as f64 * 100.0);
+    println!("  Tests passed: {}/{} ({:.0}%)", tests_passed, total, tests_passed as f64 / total as f64 * 100.0);
+    println!("  Verified:     {}/{} ({:.0}%)", verified, total, verified as f64 / total as f64 * 100.0);
+    println!("\n  pass@1 = {:.1}%", verified as f64 / total as f64 * 100.0);
 }

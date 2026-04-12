@@ -556,11 +556,7 @@ pub fn fft_2d(input: &[Vec<f64>]) -> Vec<Vec<(f64, f64)>> {
         .iter()
         .map(|row| {
             let result = FftEngine::fft(row);
-            result
-                .spectrum
-                .into_iter()
-                .take(cols.next_power_of_two())
-                .collect()
+            result.spectrum.into_iter().take(cols.next_power_of_two()).collect()
         })
         .collect();
 
@@ -638,14 +634,13 @@ pub fn spectral_centroid(spectrum: &[(f64, f64)], sample_rate: f64) -> f64 {
         return 0.0;
     }
     let freq_res = sample_rate / n as f64;
-    let (weighted_sum, total) =
-        spectrum
-            .iter()
-            .enumerate()
-            .fold((0.0, 0.0), |(ws, t), (k, (re, im))| {
-                let mag = (re * re + im * im).sqrt();
-                (ws + mag * k as f64 * freq_res, t + mag)
-            });
+    let (weighted_sum, total) = spectrum
+        .iter()
+        .enumerate()
+        .fold((0.0, 0.0), |(ws, t), (k, (re, im))| {
+            let mag = (re * re + im * im).sqrt();
+            (ws + mag * k as f64 * freq_res, t + mag)
+        });
     if total < 1e-15 {
         0.0
     } else {
@@ -1024,9 +1019,7 @@ mod tests {
         // Sum of Hann window ≈ n/2
         assert!(
             (sum - n as f64 / 2.0).abs() < 2.0,
-            "Hann sum {} should be near {}",
-            sum,
-            n as f64 / 2.0
+            "Hann sum {} should be near {}", sum, n as f64 / 2.0
         );
     }
 
@@ -1054,11 +1047,7 @@ mod tests {
         assert_eq!(w.len(), 16);
         // Kaiser is symmetric
         for i in 0..8 {
-            assert!(
-                (w[i] - w[15 - i]).abs() < 1e-10,
-                "Kaiser not symmetric at index {}",
-                i
-            );
+            assert!((w[i] - w[15 - i]).abs() < 1e-10, "Kaiser not symmetric at index {}", i);
         }
     }
 
@@ -1079,10 +1068,7 @@ mod tests {
                 assert!(
                     (input[i][j] - recovered[i][j]).abs() < 1e-6,
                     "2D FFT round-trip failed at [{},{}]: {} vs {}",
-                    i,
-                    j,
-                    input[i][j],
-                    recovered[i][j]
+                    i, j, input[i][j], recovered[i][j]
                 );
             }
         }
@@ -1100,14 +1086,17 @@ mod tests {
             .map(|i| (2.0 * std::f64::consts::PI * freq * i as f64 / sample_rate).sin())
             .collect();
         let fft = FftEngine::fft(&signal);
-        let spectrum_pairs: Vec<(f64, f64)> = fft.spectrum.iter().map(|c| (c.re, c.im)).collect();
+        let spectrum_pairs: Vec<(f64, f64)> = fft
+            .spectrum
+            .iter()
+            .map(|c| (c.re, c.im))
+            .collect();
         // Peak frequency should be near 440 Hz
         let peak = peak_frequency(&spectrum_pairs, sample_rate);
         assert!(
             (peak - freq).abs() < sample_rate / n as f64 * 2.0,
             "Peak frequency {} should be near {} Hz",
-            peak,
-            freq
+            peak, freq
         );
     }
 

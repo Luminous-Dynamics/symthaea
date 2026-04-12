@@ -199,15 +199,8 @@ async fn main() -> Result<()> {
                 // Example: SYMTHAEA_BOOTSTRAP_PEERS='{"ticket1",...},{"ticket2",...}'
                 if let Ok(raw) = std::env::var("SYMTHAEA_BOOTSTRAP_PEERS") {
                     if let Some(service) = cls.network_service().cloned() {
-                        let tickets: Vec<&str> = raw
-                            .split(',')
-                            .map(str::trim)
-                            .filter(|s| !s.is_empty())
-                            .collect();
-                        info!(
-                            "Bootstrapping to {} peer(s) from SYMTHAEA_BOOTSTRAP_PEERS",
-                            tickets.len()
-                        );
+                        let tickets: Vec<&str> = raw.split(',').map(str::trim).filter(|s| !s.is_empty()).collect();
+                        info!("Bootstrapping to {} peer(s) from SYMTHAEA_BOOTSTRAP_PEERS", tickets.len());
                         let mut bootstrap_map: Vec<(String, String)> = Vec::new();
                         for ticket in tickets {
                             match service.connect_to_peer(ticket).await {
@@ -215,9 +208,7 @@ async fn main() -> Result<()> {
                                     info!(peer = %info.node_id, "Bootstrap connection established");
                                     bootstrap_map.push((info.node_id.clone(), ticket.to_string()));
                                 }
-                                Err(e) => {
-                                    warn!(error = %e, ticket = %&ticket[..ticket.len().min(32)], "Bootstrap connect failed")
-                                }
+                                Err(e) => warn!(error = %e, ticket = %&ticket[..ticket.len().min(32)], "Bootstrap connect failed"),
                             }
                         }
                         // Spawn reconnection loop for bootstrap peers that disconnect

@@ -39,7 +39,7 @@ pub fn generate_melody(
 
     // Direction bias: gesture overrides valence-only bias
     let ascend_bias = 0.5 + gesture.direction_bias * 0.5;
-    let mut pitch_selector = if gesture.direction_bias > 0.2 {
+    let mut pitch_selector: f32 = if gesture.direction_bias > 0.2 {
         0.30 // start low for ascending gestures (joy, wonder, triumph)
     } else if gesture.direction_bias < -0.2 {
         0.65 // start high for descending gestures (sadness)
@@ -55,8 +55,7 @@ pub fn generate_melody(
 
     // Velocity: gesture shapes the base level and dynamic range
     let base_velocity = (0.3 + state.consciousness_level * 0.2 + state.dopamine * 0.1)
-        .clamp(0.15, 0.8)
-        * gesture.velocity_scale;
+        .clamp(0.15, 0.8) * gesture.velocity_scale;
     let dynamic_range = (0.10 + state.arousal * 0.20) * gesture.velocity_scale;
 
     for i in 0..config.max_notes {

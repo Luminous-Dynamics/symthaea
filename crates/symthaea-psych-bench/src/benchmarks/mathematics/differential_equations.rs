@@ -73,10 +73,10 @@ impl DifferentialEquationsBenchmark {
         };
         let ivp = DifferentialEquationsEngine::solve_ivp(
             &ivp_system,
-            0.0,    // t0
-            1.0,    // t_end
+            0.0,  // t0
+            1.0,  // t_end
             &[1.0], // y0 = 1
-            1000,   // steps
+            1000, // steps
         );
         let y_at_1 = ivp.final_state()[0];
         let exact_e = std::f64::consts::E;
@@ -87,13 +87,13 @@ impl DifferentialEquationsBenchmark {
         // we verify the shooting method converges (boundary residual < tol).
         let bvp = DifferentialEquationsEngine::solve_bvp_shooting(
             harmonic_oscillator_rhs,
-            0.0,                  // a (left boundary t)
+            0.0,              // a (left boundary t)
             std::f64::consts::PI, // b (right boundary t)
-            0.0,                  // y(a) = 0
-            0.0,                  // y(b) = 0
-            -10.0,                // slope_lo bracket
-            10.0,                 // slope_hi bracket
-            500,                  // IVP steps
+            0.0,              // y(a) = 0
+            0.0,              // y(b) = 0
+            -10.0,            // slope_lo bracket
+            10.0,             // slope_hi bracket
+            500,              // IVP steps
         );
         let bvp_converged = if bvp.converged && bvp.boundary_residual < 1e-4 {
             1.0
@@ -161,10 +161,7 @@ impl PsychBenchmark for DifferentialEquationsBenchmark {
 
         result.insert("ivp_relative_error", MetricValue::from_samples(&ivp_errors));
         result.insert("bvp_converged_rate", MetricValue::from_samples(&bvp_rates));
-        result.insert(
-            "pde_energy_decay_rate",
-            MetricValue::from_samples(&pde_decays),
-        );
+        result.insert("pde_energy_decay_rate", MetricValue::from_samples(&pde_decays));
 
         result.conditions = 3; // IVP, BVP, PDE
         result.trials_per_condition = config.trials_per_condition;

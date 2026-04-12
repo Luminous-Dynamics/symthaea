@@ -49,19 +49,19 @@ pub mod molecular_dynamics;
 pub mod molecule;
 pub mod multi_theory;
 pub mod post_hf;
-pub mod quantum_info;
 pub mod reaction_consciousness;
+pub mod validation;
+pub mod quantum_info;
 pub mod scf;
 pub mod stat_mech;
 pub mod time_dependent;
-pub mod validation;
 
 // Re-export key types for convenience
 pub use basis::{BasisSet, BasisSetProvider, ContractedGaussian, PrimitiveGaussian, ShellType};
-pub use consciousness::{build_atom_basis_ranges, compute_orbital_phi, OrbitalPhiMeasurement};
-pub use dft::{kohn_sham_dft, DftConfig, DftResult, XcFunctional};
-pub use geometry_opt::{optimize_geometry, GeomOptConfig, GeomOptResult};
 pub use molecule::{Atom, Molecule};
-pub use post_hf::mp2::{mp2_correlation_energy, Mp2Result};
 pub use scf::generalized_eigen::GeneralizedEigenResult;
 pub use scf::rhf::{restricted_hartree_fock, RhfConfig, RhfResult};
+pub use post_hf::mp2::{mp2_correlation_energy, Mp2Result};
+pub use consciousness::{compute_orbital_phi, build_atom_basis_ranges, OrbitalPhiMeasurement};
+pub use geometry_opt::{optimize_geometry, GeomOptConfig, GeomOptResult};
+pub use dft::{kohn_sham_dft, DftConfig, DftResult, XcFunctional};

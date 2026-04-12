@@ -6,15 +6,15 @@
 //! HDC-based consciousness primitives: reasoning, evolution, discovery,
 //! lattice structure, composition rules, and belief bridges.
 
+pub mod code_primitives;
 /// Code-specific primitive evolution — discovers novel code patterns via HDC algebra.
 #[cfg(feature = "code_generation")]
 pub mod code_primitive_evolution;
-pub mod code_primitives;
-pub mod compositionality;
 /// Immune-inspired code evolution — V(D)J recombination, affinity maturation,
 /// negative selection, cytokine signaling for self-improving code generation.
 #[cfg(feature = "code_generation")]
 pub mod immune_code_evolution;
+pub mod compositionality;
 pub mod primitive_belief_bridge;
 pub mod primitive_composition_rules;
 pub mod primitive_consciousness;

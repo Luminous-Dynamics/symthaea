@@ -41,31 +41,31 @@ pub struct PredictiveNetwork {
 }
 
 impl PredictiveNetwork {
-    pub fn new(n: usize, base_coupling: Vec<f64>, drives: Vec<f64>, window: usize) -> Self {
+    pub fn new(
+        n: usize,
+        base_coupling: Vec<f64>,
+        drives: Vec<f64>,
+        window: usize,
+    ) -> Self {
         let initial_g = 0.1;
         let net = OscillatorNetwork {
-            oscillators: (0..n)
-                .map(|i| {
-                    let mut osc = crate::nonlinear_waves::FitzHughNagumo::new();
-                    osc.i_ext = drives[i];
-                    osc.v = -1.0 + 0.2 * (i as f64 / n as f64);
-                    osc
-                })
-                .collect(),
+            oscillators: (0..n).map(|i| {
+                let mut osc = crate::nonlinear_waves::FitzHughNagumo::new();
+                osc.i_ext = drives[i];
+                osc.v = -1.0 + 0.2 * (i as f64 / n as f64);
+                osc
+            }).collect(),
             coupling: base_coupling.iter().map(|&c| c * initial_g).collect(),
             n,
         };
 
         // Exploration: sample g at logarithmic intervals
-        let explore_g_values: Vec<f64> = (0..8)
-            .map(|i| {
-                0.003 * (300.0_f64).powf(i as f64 / 7.0) // 0.003 to 0.9
-            })
-            .collect();
+        let explore_g_values: Vec<f64> = (0..8).map(|i| {
+            0.003 * (300.0_f64).powf(i as f64 / 7.0) // 0.003 to 0.9
+        }).collect();
 
         PredictiveNetwork {
-            net,
-            n,
+            net, n,
             g: initial_g,
             base_coupling,
             drives,
@@ -92,14 +92,10 @@ impl PredictiveNetwork {
             self.voltage_buffer.remove(0);
         }
 
-        if self.voltage_buffer.len() < self.window {
-            return;
-        }
+        if self.voltage_buffer.len() < self.window { return; }
 
         // Measure every `window/2` steps
-        if self.voltage_buffer.len() % (self.window / 2).max(1) != 0 {
-            return;
-        }
+        if self.voltage_buffer.len() % (self.window / 2).max(1) != 0 { return; }
 
         let (i_est, d_est) = self.estimate_id();
         let id = i_est * d_est;
@@ -152,9 +148,7 @@ impl PredictiveNetwork {
     ///
     /// Fits separate models for I(g) and D(g), then finds where I×D peaks.
     fn predict_optimal_coupling(&self) -> Option<f64> {
-        if self.model.len() < 3 {
-            return None;
-        }
+        if self.model.len() < 3 { return None; }
 
         // Find g that maximizes I×D among ALL observed points
         let mut best_g = self.model[0].0;
@@ -201,9 +195,9 @@ impl PredictiveNetwork {
     fn estimate_id(&self) -> (f64, f64) {
         let n = self.n;
         let len = self.voltage_buffer.len();
-        let traces: Vec<Vec<f64>> = (0..n)
-            .map(|i| self.voltage_buffer.iter().map(|snap| snap[i]).collect())
-            .collect();
+        let traces: Vec<Vec<f64>> = (0..n).map(|i| {
+            self.voltage_buffer.iter().map(|snap| snap[i]).collect()
+        }).collect();
 
         // Integration
         let mut integration = 0.0;
@@ -218,16 +212,13 @@ impl PredictiveNetwork {
         integration /= n_pairs.max(1) as f64;
 
         // Differentiation via firing rates
-        let rates: Vec<f64> = traces
-            .iter()
-            .map(|tr| tr.windows(2).filter(|w| w[0] < 0.0 && w[1] >= 0.0).count() as f64)
-            .collect();
+        let rates: Vec<f64> = traces.iter().map(|tr| {
+            tr.windows(2).filter(|w| w[0] < 0.0 && w[1] >= 0.0).count() as f64
+        }).collect();
         let rate_mean = rates.iter().sum::<f64>() / n as f64;
         let differentiation = if n > 1 {
             (rates.iter().map(|r| (r - rate_mean).powi(2)).sum::<f64>() / n as f64 * 0.1).min(1.0)
-        } else {
-            0.0
-        };
+        } else { 0.0 };
 
         (integration, differentiation)
     }
@@ -235,9 +226,7 @@ impl PredictiveNetwork {
     pub fn mean_id(&self, last_n: usize) -> f64 {
         let start = self.id_history.len().saturating_sub(last_n);
         let slice = &self.id_history[start..];
-        if slice.is_empty() {
-            return 0.0;
-        }
+        if slice.is_empty() { return 0.0; }
         slice.iter().sum::<f64>() / slice.len() as f64
     }
 }
@@ -253,32 +242,21 @@ pub fn three_way_comparison(
     let warmup = 1000;
 
     // 1. Predictive (model-based) network
-    let mut predictive = PredictiveNetwork::new(n, base_coupling.to_vec(), drives.to_vec(), 400);
-    for _ in 0..warmup {
-        predictive.step(dt);
-    }
-    for _ in 0..n_steps {
-        predictive.step(dt);
-    }
+    let mut predictive = PredictiveNetwork::new(
+        n, base_coupling.to_vec(), drives.to_vec(), 400,
+    );
+    for _ in 0..warmup { predictive.step(dt); }
+    for _ in 0..n_steps { predictive.step(dt); }
     let pred_id = predictive.mean_id(200);
     let pred_g = predictive.g;
     let pred_g_star = predictive.predicted_g_star.last().copied().unwrap_or(0.0);
 
     // 2. Gradient-following (the one that failed before)
     let mut gradient = crate::self_tuning_consciousness::SelfTuningNetwork::new(
-        n,
-        base_coupling.to_vec(),
-        drives.to_vec(),
-        0.1,
-        0.005,
-        500,
+        n, base_coupling.to_vec(), drives.to_vec(), 0.1, 0.005, 500,
     );
-    for _ in 0..warmup {
-        gradient.step(dt);
-    }
-    for _ in 0..n_steps {
-        gradient.step(dt);
-    }
+    for _ in 0..warmup { gradient.step(dt); }
+    for _ in 0..n_steps { gradient.step(dt); }
     let grad_id = gradient.mean_id(200);
     let grad_g = gradient.current_coupling();
 
@@ -290,20 +268,15 @@ pub fn three_way_comparison(
     for &g in &fixed_gs {
         let coupling: Vec<f64> = base_coupling.iter().map(|&c| c * g).collect();
         let mut net = OscillatorNetwork {
-            oscillators: (0..n)
-                .map(|i| {
-                    let mut osc = crate::nonlinear_waves::FitzHughNagumo::new();
-                    osc.i_ext = drives[i];
-                    osc.v = -1.0 + 0.2 * (i as f64 / n as f64);
-                    osc
-                })
-                .collect(),
-            coupling,
-            n,
+            oscillators: (0..n).map(|i| {
+                let mut osc = crate::nonlinear_waves::FitzHughNagumo::new();
+                osc.i_ext = drives[i];
+                osc.v = -1.0 + 0.2 * (i as f64 / n as f64);
+                osc
+            }).collect(),
+            coupling, n,
         };
-        for _ in 0..warmup {
-            net.step(dt);
-        }
+        for _ in 0..warmup { net.step(dt); }
 
         let mut traces: Vec<Vec<f64>> = vec![Vec::with_capacity(n_steps); n];
         for _ in 0..n_steps {
@@ -317,29 +290,22 @@ pub fn three_way_comparison(
         let mut np = 0usize;
         let step = (n / 6).max(1);
         for i in (0..n).step_by(step) {
-            for j in ((i + 1)..n).step_by(step) {
+            for j in ((i+1)..n).step_by(step) {
                 integration += pearson_abs(&traces[i], &traces[j]);
                 np += 1;
             }
         }
         integration /= np.max(1) as f64;
 
-        let rates: Vec<f64> = traces
-            .iter()
-            .map(|tr| tr.windows(2).filter(|w| w[0] < 0.0 && w[1] >= 0.0).count() as f64)
-            .collect();
+        let rates: Vec<f64> = traces.iter().map(|tr| {
+            tr.windows(2).filter(|w| w[0] < 0.0 && w[1] >= 0.0).count() as f64
+        }).collect();
         let rm = rates.iter().sum::<f64>() / n as f64;
-        let diff = if n > 1 {
-            (rates.iter().map(|r| (r - rm).powi(2)).sum::<f64>() / n as f64 * 0.1).min(1.0)
-        } else {
-            0.0
-        };
+        let diff = if n > 1 { (rates.iter().map(|r| (r - rm).powi(2)).sum::<f64>() / n as f64 * 0.1).min(1.0) } else { 0.0 };
         let id = integration * diff;
 
         all_fixed.push((g, integration, diff, id));
-        if id > best_fixed.1 {
-            best_fixed = (g, id);
-        }
+        if id > best_fixed.1 { best_fixed = (g, id); }
     }
 
     ThreeWayResult {
@@ -370,21 +336,15 @@ pub struct ThreeWayResult {
 
 fn pearson_abs(x: &[f64], y: &[f64]) -> f64 {
     let n = x.len().min(y.len()) as f64;
-    if n < 3.0 {
-        return 0.0;
-    }
+    if n < 3.0 { return 0.0; }
     let mx = x.iter().sum::<f64>() / n;
     let my = y.iter().sum::<f64>() / n;
     let (mut cov, mut vx, mut vy) = (0.0, 0.0, 0.0);
     for (xi, yi) in x.iter().zip(y.iter()) {
         let (dx, dy) = (xi - mx, yi - my);
-        cov += dx * dy;
-        vx += dx * dx;
-        vy += dy * dy;
+        cov += dx * dy; vx += dx * dx; vy += dy * dy;
     }
-    if vx < 1e-15 || vy < 1e-15 {
-        return 0.0;
-    }
+    if vx < 1e-15 || vy < 1e-15 { return 0.0; }
     (cov / (vx * vy).sqrt()).abs().min(1.0)
 }
 
@@ -402,9 +362,7 @@ mod tests {
         let drives = uniform_drives(n);
 
         let mut pn = PredictiveNetwork::new(n, base, drives, 200);
-        for _ in 0..2000 {
-            pn.step(0.1);
-        }
+        for _ in 0..2000 { pn.step(0.1); }
 
         assert!(!pn.id_history.is_empty());
         assert!(pn.g > 0.0 && pn.g < 3.0);

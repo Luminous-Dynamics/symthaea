@@ -82,7 +82,12 @@ proptest! {
 
 #[test]
 fn non_finite_phi_always_red() {
-    let cases = [f64::NAN, f64::INFINITY, f64::NEG_INFINITY, -f64::NAN];
+    let cases = [
+        f64::NAN,
+        f64::INFINITY,
+        f64::NEG_INFINITY,
+        -f64::NAN,
+    ];
     for phi in cases {
         let level = MotorSafetyLevel::from_phi(phi);
         assert_eq!(
@@ -103,23 +108,14 @@ fn threshold_boundaries_exact() {
     // At threshold values (using > not >=):
     // phi=0.6 → Yellow (not Green, because > 0.6 needed for Green)
     assert_eq!(MotorSafetyLevel::from_phi(0.6), MotorSafetyLevel::Yellow);
-    assert_eq!(
-        MotorSafetyLevel::from_phi(0.6 + f64::EPSILON),
-        MotorSafetyLevel::Yellow
-    );
+    assert_eq!(MotorSafetyLevel::from_phi(0.6 + f64::EPSILON), MotorSafetyLevel::Yellow);
     assert_eq!(MotorSafetyLevel::from_phi(0.60001), MotorSafetyLevel::Green);
 
     assert_eq!(MotorSafetyLevel::from_phi(0.3), MotorSafetyLevel::Orange);
-    assert_eq!(
-        MotorSafetyLevel::from_phi(0.30001),
-        MotorSafetyLevel::Yellow
-    );
+    assert_eq!(MotorSafetyLevel::from_phi(0.30001), MotorSafetyLevel::Yellow);
 
     assert_eq!(MotorSafetyLevel::from_phi(0.1), MotorSafetyLevel::Red);
-    assert_eq!(
-        MotorSafetyLevel::from_phi(0.10001),
-        MotorSafetyLevel::Orange
-    );
+    assert_eq!(MotorSafetyLevel::from_phi(0.10001), MotorSafetyLevel::Orange);
 }
 
 // ============================================================================

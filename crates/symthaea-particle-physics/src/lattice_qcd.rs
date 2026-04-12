@@ -113,11 +113,7 @@ mod tests {
     fn test_cornell_potential_coulomb_short() {
         // At very short r, should be negative (attractive Coulomb)
         let v_short = cornell_potential(0.1);
-        assert!(
-            v_short < 0.0,
-            "Short-range: V(0.1fm) = {:.3} should be negative",
-            v_short
-        );
+        assert!(v_short < 0.0, "Short-range: V(0.1fm) = {:.3} should be negative", v_short);
     }
 
     #[test]

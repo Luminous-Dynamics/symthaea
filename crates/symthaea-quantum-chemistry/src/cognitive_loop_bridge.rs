@@ -31,8 +31,8 @@
 //! }
 //! ```
 
-use crate::molecule::Molecule;
 use crate::multi_theory::{compute_theory_scores, N_THEORIES, THEORY_NAMES};
+use crate::molecule::Molecule;
 
 /// Physics-grounded consciousness state for the cognitive loop.
 ///
@@ -102,7 +102,10 @@ pub fn physics_to_consciousness_state(
 
 /// Convenience: compute substrate feasibility only (for minimal integration).
 /// Returns a single f64 to replace the hardcoded 1.0 in ConsciousnessStateV2.
-pub fn substrate_feasibility_from_physics(molecule: &Molecule, temperature: f64) -> f64 {
+pub fn substrate_feasibility_from_physics(
+    molecule: &Molecule,
+    temperature: f64,
+) -> f64 {
     let scores = compute_theory_scores(molecule, "substrate", temperature);
     scores.composite_score
 }

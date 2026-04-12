@@ -13,7 +13,7 @@ use crate::types::ManipulatorConfig;
 
 pub use symthaea_core::embodiment::{
     grounding_from_prediction_error, grounding_label, EmbodimentResult, EmbodimentTelemetry,
-    MotorSafetyLevel, GROUNDING_SENSORIMOTOR,
+    MoralGateInput, MotorSafetyLevel, GROUNDING_SENSORIMOTOR,
 };
 
 /// Manipulator embodiment bridge.
@@ -27,6 +27,7 @@ pub struct ManipulatorEmbodiment {
     safety_override: Option<MotorSafetyLevel>,
     last_control_effort: f32,
     last_prediction_error: f32,
+    moral_safety: Option<MotorSafetyLevel>,
 }
 
 impl ManipulatorEmbodiment {
@@ -42,6 +43,26 @@ impl ManipulatorEmbodiment {
             safety_override: None,
             last_control_effort: 0.0,
             last_prediction_error: 0.0,
+            moral_safety: None,
+        }
+    }
+
+    /// Apply moral gate from the ethics engine.
+    ///
+    /// For the manipulator (force on humans/objects), ethics gating is critical:
+    /// - Blocked → Red (power cut)
+    /// - Caution → cap at Yellow (reduced force)
+    /// - consent_violation → Orange (retreat to home)
+    /// - ahimsa_violated → Red (emergency stop)
+    pub fn apply_moral_gate(&mut self, gate: MoralGateInput) {
+        if gate.ahimsa_violated || gate.verdict == MoralGateInput::VERDICT_BLOCKED {
+            self.moral_safety = Some(MotorSafetyLevel::Red);
+        } else if gate.consent_violation {
+            self.moral_safety = Some(MotorSafetyLevel::Orange);
+        } else if gate.verdict == MoralGateInput::VERDICT_CAUTION {
+            self.moral_safety = Some(MotorSafetyLevel::Yellow);
+        } else {
+            self.moral_safety = None;
         }
     }
 
@@ -55,10 +76,15 @@ impl ManipulatorEmbodiment {
 
     pub fn step(&mut self, thought_hv: &ContinuousHV, dt: f32, phi: f64) -> EmbodimentResult {
         let phi_level = MotorSafetyLevel::from_phi(phi);
-        self.current_safety = match self.safety_override {
-            Some(override_level) => phi_level.max(override_level),
-            None => phi_level,
-        };
+        // Effective safety = max(phi_safety, safety_override, moral_safety)
+        // Higher enum variant = stricter (Green < Yellow < Orange < Red)
+        self.current_safety = phi_level;
+        if let Some(override_level) = self.safety_override {
+            self.current_safety = self.current_safety.max(override_level);
+        }
+        if let Some(moral_level) = self.moral_safety {
+            self.current_safety = self.current_safety.max(moral_level);
+        }
         let gain = self.current_safety.motor_gain();
 
         let mut cmd = self.controller.forward(thought_hv, dt);
@@ -109,6 +135,7 @@ impl ManipulatorEmbodiment {
         self.total_steps = 0;
         self.current_safety = MotorSafetyLevel::Green;
         self.safety_override = None;
+        self.moral_safety = None;
         self.last_control_effort = 0.0;
         self.last_prediction_error = 0.0;
     }
@@ -173,6 +200,72 @@ mod tests {
         let t = bridge.telemetry();
         assert_eq!(t.total_steps, 1);
         assert_eq!(t.platform, "manipulator");
+    }
+
+    #[test]
+    fn test_moral_gate_blocked_forces_red() {
+        let mut bridge = ManipulatorEmbodiment::new(&GenesisSeed::from_phrase("test"));
+        bridge.apply_moral_gate(MoralGateInput {
+            verdict: MoralGateInput::VERDICT_BLOCKED,
+            consent_violation: false,
+            ahimsa_violated: false,
+        });
+        let hv = ContinuousHV::random(16384, 42);
+        let r = bridge.step(&hv, 0.002, 0.9); // High phi, but blocked
+        assert_eq!(r.safety_level, MotorSafetyLevel::Red);
+        assert_eq!(r.control_effort, 0.0, "Blocked should zero motor output");
+    }
+
+    #[test]
+    fn test_moral_gate_ahimsa_forces_red() {
+        let mut bridge = ManipulatorEmbodiment::new(&GenesisSeed::from_phrase("test"));
+        bridge.apply_moral_gate(MoralGateInput {
+            verdict: MoralGateInput::VERDICT_SAFE,
+            consent_violation: false,
+            ahimsa_violated: true,
+        });
+        let hv = ContinuousHV::random(16384, 42);
+        let r = bridge.step(&hv, 0.002, 0.9);
+        assert_eq!(r.safety_level, MotorSafetyLevel::Red);
+    }
+
+    #[test]
+    fn test_moral_gate_consent_forces_orange() {
+        let mut bridge = ManipulatorEmbodiment::new(&GenesisSeed::from_phrase("test"));
+        bridge.apply_moral_gate(MoralGateInput {
+            verdict: MoralGateInput::VERDICT_SAFE,
+            consent_violation: true,
+            ahimsa_violated: false,
+        });
+        let hv = ContinuousHV::random(16384, 42);
+        let r = bridge.step(&hv, 0.002, 0.9);
+        assert_eq!(r.safety_level, MotorSafetyLevel::Orange);
+    }
+
+    #[test]
+    fn test_moral_gate_caution_caps_yellow() {
+        let mut bridge = ManipulatorEmbodiment::new(&GenesisSeed::from_phrase("test"));
+        bridge.apply_moral_gate(MoralGateInput {
+            verdict: MoralGateInput::VERDICT_CAUTION,
+            consent_violation: false,
+            ahimsa_violated: false,
+        });
+        let hv = ContinuousHV::random(16384, 42);
+        let r = bridge.step(&hv, 0.002, 0.9); // Phi says Green, ethics caps at Yellow
+        assert_eq!(r.safety_level, MotorSafetyLevel::Yellow);
+    }
+
+    #[test]
+    fn test_moral_gate_safe_no_effect() {
+        let mut bridge = ManipulatorEmbodiment::new(&GenesisSeed::from_phrase("test"));
+        bridge.apply_moral_gate(MoralGateInput {
+            verdict: MoralGateInput::VERDICT_SAFE,
+            consent_violation: false,
+            ahimsa_violated: false,
+        });
+        let hv = ContinuousHV::random(16384, 42);
+        let r = bridge.step(&hv, 0.002, 0.9);
+        assert_eq!(r.safety_level, MotorSafetyLevel::Green);
     }
 
     #[test]

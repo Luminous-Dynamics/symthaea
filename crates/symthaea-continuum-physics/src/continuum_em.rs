@@ -30,8 +30,7 @@ pub fn drude_conductivity(sigma_dc: f64, omega: f64, tau: f64) -> (f64, f64) {
 /// Returns (real, imaginary) parts of relative permittivity.
 pub fn drude_permittivity(eps_inf: f64, omega_p: f64, omega: f64, gamma: f64) -> (f64, f64) {
     let denom = omega * omega + gamma * gamma;
-    let re = eps_inf
-        - omega_p * omega_p * (omega * omega - gamma * gamma) / (denom * omega * omega + 1e-30);
+    let re = eps_inf - omega_p * omega_p * (omega * omega - gamma * gamma) / (denom * omega * omega + 1e-30);
     let im = omega_p * omega_p * gamma / (omega * denom + 1e-30);
 
     // Simplified: ε(ω) = ε_∞ - ω_p²/(ω(ω + iγ))
@@ -140,8 +139,7 @@ mod tests {
         let delta = skin_depth(omega, MU_0, sigma);
         assert!(
             delta > 1e-6 && delta < 5e-6,
-            "Cu skin depth at 1GHz = {:.2e} m",
-            delta
+            "Cu skin depth at 1GHz = {:.2e} m", delta
         );
     }
 

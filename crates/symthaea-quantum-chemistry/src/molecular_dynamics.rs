@@ -47,7 +47,7 @@ pub struct MdConfig {
 impl Default for MdConfig {
     fn default() -> Self {
         Self {
-            dt: 20.0, // ~0.5 fs
+            dt: 20.0,        // ~0.5 fs
             n_steps: 50,
             temperature: 300.0,
             fd_step: 0.005,
@@ -100,7 +100,10 @@ fn compute_forces(mol: &Molecule, fd_step: f64) -> Vec<[f64; 3]> {
 }
 
 /// Compute kinetic energy and instantaneous temperature.
-fn kinetic_energy_and_temperature(velocities: &[[f64; 3]], masses: &[f64]) -> (f64, f64) {
+fn kinetic_energy_and_temperature(
+    velocities: &[[f64; 3]],
+    masses: &[f64],
+) -> (f64, f64) {
     let mut ke = 0.0;
     for (v, &m) in velocities.iter().zip(masses.iter()) {
         ke += 0.5 * m * (v[0] * v[0] + v[1] * v[1] + v[2] * v[2]);
@@ -117,11 +120,7 @@ fn kinetic_energy_and_temperature(velocities: &[[f64; 3]], masses: &[f64]) -> (f
 /// Run Born-Oppenheimer molecular dynamics using Velocity-Verlet.
 pub fn run_md(molecule: &Molecule, config: &MdConfig) -> MdResult {
     let n_atoms = molecule.n_atoms();
-    let masses: Vec<f64> = molecule
-        .atoms
-        .iter()
-        .map(|a| atomic_mass_au(a.atomic_number))
-        .collect();
+    let masses: Vec<f64> = molecule.atoms.iter().map(|a| atomic_mass_au(a.atomic_number)).collect();
 
     let mut positions: Vec<[f64; 3]> = molecule.atoms.iter().map(|a| a.position).collect();
     let mut velocities = vec![[0.0; 3]; n_atoms];
@@ -132,13 +131,9 @@ pub fn run_md(molecule: &Molecule, config: &MdConfig) -> MdResult {
         for i in 0..n_atoms {
             for c in 0..3 {
                 // Simple deterministic pseudo-random
-                let hash = ((seed
-                    .wrapping_mul(6364136223846793005)
-                    .wrapping_add(1442695040888963407))
-                .wrapping_mul((i * 3 + c + 1) as u64)) as f64
-                    / u64::MAX as f64;
-                let v_scale =
-                    (crate::stat_mech::K_BOLTZMANN_HARTREE * config.temperature / masses[i]).sqrt();
+                let hash = ((seed.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407))
+                    .wrapping_mul((i * 3 + c + 1) as u64)) as f64 / u64::MAX as f64;
+                let v_scale = (crate::stat_mech::K_BOLTZMANN_HARTREE * config.temperature / masses[i]).sqrt();
                 velocities[i][c] = (hash - 0.5) * 2.0 * v_scale;
             }
         }
@@ -242,8 +237,7 @@ mod tests {
         let result = run_md(&mol, &config);
 
         let e_total_0 = result.frames[0].energy + result.frames[0].kinetic_energy;
-        let e_total_last =
-            result.frames.last().unwrap().energy + result.frames.last().unwrap().kinetic_energy;
+        let e_total_last = result.frames.last().unwrap().energy + result.frames.last().unwrap().kinetic_energy;
 
         // Allow 10% drift for short trajectory with large dt
         let drift = (e_total_last - e_total_0).abs();

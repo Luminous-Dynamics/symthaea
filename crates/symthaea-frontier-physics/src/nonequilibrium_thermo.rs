@@ -100,9 +100,7 @@ pub fn landauer_bound(kt: f64) -> f64 {
 /// η = W_extracted / (kT × I) where I is the mutual information used.
 /// Thermodynamic bound: η ≤ 1.
 pub fn information_engine_efficiency(work: f64, kt: f64, mutual_info: f64) -> f64 {
-    if kt * mutual_info < 1e-20 {
-        return 0.0;
-    }
+    if kt * mutual_info < 1e-20 { return 0.0; }
     work / (kt * mutual_info)
 }
 
@@ -121,11 +119,7 @@ mod tests {
     fn test_entropy_production_positive() {
         // Second law: σ ≥ 0 when fluxes and forces are aligned
         let sigma = entropy_production_rate(&[1.0, 2.0], &[1.0, 1.0]);
-        assert!(
-            sigma >= 0.0,
-            "Entropy production should be ≥ 0: {:.4}",
-            sigma
-        );
+        assert!(sigma >= 0.0, "Entropy production should be ≥ 0: {:.4}", sigma);
     }
 
     #[test]
@@ -147,8 +141,7 @@ mod tests {
         assert!(
             (df_estimated - delta_f).abs() < 1e-10,
             "Reversible: ΔF_est={:.6}, true={:.6}",
-            df_estimated,
-            delta_f
+            df_estimated, delta_f
         );
     }
 

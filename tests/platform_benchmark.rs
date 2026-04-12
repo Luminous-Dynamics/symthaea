@@ -50,8 +50,7 @@ fn benchmark_platform(name: &str, platform: EmbodimentPlatform) -> PlatformResul
     let mean: f64 = phi_values.iter().sum::<f64>() / phi_values.len() as f64;
     let min = phi_values.iter().cloned().fold(f64::INFINITY, f64::min);
     let max = phi_values.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
-    let variance: f64 =
-        phi_values.iter().map(|p| (p - mean).powi(2)).sum::<f64>() / phi_values.len() as f64;
+    let variance: f64 = phi_values.iter().map(|p| (p - mean).powi(2)).sum::<f64>() / phi_values.len() as f64;
 
     // Find convergence: first cycle where Phi stays within 0.05 of final-50-cycle mean
     let final_mean: f64 = phi_values[CYCLES - 50..].iter().sum::<f64>() / 50.0;
@@ -104,48 +103,25 @@ fn test_platform_benchmark_comparison() {
 
     // Print comparison table
     eprintln!("\n=== PLATFORM CONSCIOUSNESS BENCHMARK ===");
-    eprintln!(
-        "{:<15} {:>5} {:>8} {:>8} {:>8} {:>10} {:>12}",
-        "Platform", "Act", "Mean Φ", "Min Φ", "Max Φ", "Variance", "Converge@"
-    );
+    eprintln!("{:<15} {:>5} {:>8} {:>8} {:>8} {:>10} {:>12}",
+        "Platform", "Act", "Mean Φ", "Min Φ", "Max Φ", "Variance", "Converge@");
     eprintln!("{}", "-".repeat(78));
     for r in &results {
-        eprintln!(
-            "{:<15} {:>5} {:>8.4} {:>8.4} {:>8.4} {:>10.6} {:>12}",
-            r.name, r.actuators, r.mean_phi, r.min_phi, r.max_phi, r.variance, r.convergence_cycle
-        );
+        eprintln!("{:<15} {:>5} {:>8.4} {:>8.4} {:>8.4} {:>10.6} {:>12}",
+            r.name, r.actuators, r.mean_phi, r.min_phi, r.max_phi, r.variance, r.convergence_cycle);
     }
 
     // Print CSV for plotting
     eprintln!("\n=== CSV DATA (Phi per cycle) ===");
-    eprintln!(
-        "cycle,{}",
-        results
-            .iter()
-            .map(|r| r.name.as_str())
-            .collect::<Vec<_>>()
-            .join(",")
-    );
+    eprintln!("cycle,{}", results.iter().map(|r| r.name.as_str()).collect::<Vec<_>>().join(","));
     for cycle in 0..CYCLES {
-        let values: Vec<String> = results
-            .iter()
-            .map(|r| format!("{:.6}", r.phi_values[cycle]))
-            .collect();
+        let values: Vec<String> = results.iter().map(|r| format!("{:.6}", r.phi_values[cycle])).collect();
         eprintln!("{},{}", cycle, values.join(","));
     }
 
     // Assertions
     for r in &results {
-        assert!(
-            r.phi_values.iter().all(|p| p.is_finite()),
-            "{} produced NaN",
-            r.name
-        );
-        assert!(
-            r.mean_phi >= 0.0 && r.mean_phi <= 1.0,
-            "{} mean Phi out of bounds: {}",
-            r.name,
-            r.mean_phi
-        );
+        assert!(r.phi_values.iter().all(|p| p.is_finite()), "{} produced NaN", r.name);
+        assert!(r.mean_phi >= 0.0 && r.mean_phi <= 1.0, "{} mean Phi out of bounds: {}", r.name, r.mean_phi);
     }
 }

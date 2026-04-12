@@ -605,10 +605,12 @@ mod tests {
     }
 }
 
+pub mod arc;
+pub mod creative_bench;
+pub mod narrative_bridge;
 pub mod ablation;
 pub mod aesthetic_listener;
 pub mod ambient_drone;
-pub mod arc;
 pub mod audio_feedback;
 pub mod auto_master;
 pub mod binaural;
@@ -616,7 +618,6 @@ pub mod collaborative;
 pub mod composer_mind;
 pub mod consciousness_reverb;
 pub mod creative_agency;
-pub mod creative_bench;
 pub mod density_regulator;
 pub mod dramatic;
 pub mod emotional_gestures;
@@ -629,7 +630,6 @@ pub mod midi_trainer;
 pub mod mixing;
 pub mod motif_memory;
 pub mod musical_inference;
-pub mod narrative_bridge;
 pub mod param_tuner;
 pub mod percussion;
 pub mod performance;
