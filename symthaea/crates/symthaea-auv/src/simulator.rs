@@ -6,6 +6,16 @@
 use crate::hydrodynamics::{self, HydrodynamicConfig};
 use crate::types::{AuvCommand, AuvState, NUM_ACTUATORS};
 
+/// Convert quaternion [w, x, y, z] to Euler angles [roll, pitch, yaw] in radians.
+/// Uses ZYX convention (aerospace standard).
+fn quaternion_to_euler(q: &[f64; 4]) -> [f64; 3] {
+    let (w, x, y, z) = (q[0], q[1], q[2], q[3]);
+    let roll = (2.0 * (w * x + y * z)).atan2(1.0 - 2.0 * (x * x + y * y));
+    let pitch = (2.0 * (w * y - z * x)).clamp(-1.0, 1.0).asin();
+    let yaw = (2.0 * (w * z + x * y)).atan2(1.0 - 2.0 * (y * y + z * z));
+    [roll, pitch, yaw]
+}
+
 /// Trait for AUV physics simulation backends.
 pub trait AuvPhysicsSimulator {
     fn step(&mut self, cmd: &AuvCommand, dt: f64);
@@ -100,10 +110,14 @@ impl AuvPhysicsSimulator for SimpleAuvSimulator {
         self.energy_consumed_j += energy_this_step;
         self.energy_remaining_j = (self.energy_remaining_j - energy_this_step).max(0.0);
 
+        // Extract Euler angles (roll, pitch, yaw) from quaternion for restoring moments
+        let q = &self.state.quaternion;
+        let orientation_angles = quaternion_to_euler(q);
         let hydro = hydrodynamics::compute_forces(
             &self.hydro_config,
             &self.state.linear_velocity,
             &self.state.angular_velocity,
+            &orientation_angles,
             self.state.depth,
         );
         let eff = hydrodynamics::effective_mass(&self.hydro_config);

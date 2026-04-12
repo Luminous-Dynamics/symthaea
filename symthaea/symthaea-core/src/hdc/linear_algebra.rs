@@ -28,6 +28,11 @@ use serde::{Deserialize, Serialize};
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 const DEFAULT_TOLERANCE: f64 = 1e-12;
+/// Consistent tolerance for SVD rank determination, null space, and condition number.
+/// Using 1e-9 (geometric mean of machine epsilon and 1) avoids both:
+/// - 1e-12 (too tight: numerical noise in eigendecomposition creates false nonzero σ)
+/// - 1e-6 (too loose: discards real structure in ill-conditioned matrices)
+const SVD_TOLERANCE: f64 = 1e-9;
 const MAX_QR_ITERATIONS: usize = 200;
 const POWER_ITERATION_MAX: usize = 100;
 
@@ -793,39 +798,93 @@ impl HdcMatrix {
     // ─── SVD ─────────────────────────────────────────────────────────────
 
     /// Singular Value Decomposition: A = U Σ V^T
-    /// Returns (singular_values, U, V).
+    ///
+    /// Returns (singular_values, U, V) where:
+    /// - singular_values: min(m,n) values sorted by descending magnitude
+    /// - U: m×m orthogonal matrix (left singular vectors)
+    /// - V: n×n orthogonal matrix (right singular vectors)
+    ///
+    /// Uses eigendecomposition of A^T A. Handles rectangular matrices correctly.
+    /// The SVD tolerance for rank determination is `SVD_TOLERANCE = 1e-9`.
     pub fn svd(&self) -> (Vec<f64>, HdcMatrix, HdcMatrix, LinAlgResult) {
         let mut result = LinAlgResult::new(format!("{}x{} SVD", self.rows, self.cols));
+        let m = self.rows;
+        let n = self.cols;
+        let min_mn = m.min(n);
 
-        // A^T A for V and singular values
+        // A^T A (n×n) gives V and σ²
         let at = self.transpose();
         let (ata, _) = at.mul(self);
         let (eigenvalues, v, _) = ata.eigen_symmetric();
 
         let singular_values: Vec<f64> = eigenvalues
             .iter()
+            .take(min_mn) // only min(m,n) singular values are meaningful
             .map(|&e| if e > 0.0 { e.sqrt() } else { 0.0 })
             .collect();
 
-        // U = A V Σ^{-1}
-        let (av, _) = self.mul(&v);
-        let mut u_data = vec![0.0; self.rows * self.rows];
+        // Consistent rank threshold: use SVD_TOLERANCE for ALL rank decisions
         let rank = singular_values
             .iter()
-            .filter(|&&s| s > DEFAULT_TOLERANCE)
+            .filter(|&&s| s > SVD_TOLERANCE)
             .count();
-        for j in 0..rank {
+
+        // U = A V Σ^{-1} for the first `rank` columns
+        // AV has shape m × n; we only use the first `rank` columns
+        let (av, _) = self.mul(&v);
+        let mut u_data = vec![0.0; m * m];
+
+        for j in 0..rank.min(min_mn) {
             let inv_sigma = 1.0 / singular_values[j];
-            for i in 0..self.rows {
-                u_data[i * self.rows + j] = av.get(i, j) * inv_sigma;
+            for i in 0..m {
+                // av is m×n, so j must be < n (guaranteed since rank ≤ min(m,n))
+                u_data[i * m + j] = av.get(i, j) * inv_sigma;
             }
         }
-        // Fill remaining columns with orthogonal complement (simplified: just identity cols)
-        for j in rank..self.rows {
-            u_data[j * self.rows + j] = 1.0;
+
+        // Fill remaining columns (rank..m) with orthogonal complement via
+        // modified Gram-Schmidt against existing U columns.
+        // Try each standard basis vector e_k as candidate; if linearly
+        // independent from existing columns, orthogonalize and add.
+        let mut filled = rank;
+        for candidate_idx in 0..m {
+            if filled >= m { break; }
+
+            let mut col = vec![0.0; m];
+            col[candidate_idx] = 1.0;
+
+            // Orthogonalize against all existing columns (0..filled)
+            for k in 0..filled {
+                let mut dot = 0.0;
+                for i in 0..m {
+                    dot += col[i] * u_data[i * m + k];
+                }
+                for i in 0..m {
+                    col[i] -= dot * u_data[i * m + k];
+                }
+            }
+
+            // Double orthogonalization for numerical stability (CGS re-orthogonalization)
+            for k in 0..filled {
+                let mut dot = 0.0;
+                for i in 0..m {
+                    dot += col[i] * u_data[i * m + k];
+                }
+                for i in 0..m {
+                    col[i] -= dot * u_data[i * m + k];
+                }
+            }
+
+            let norm: f64 = col.iter().map(|v| v * v).sum::<f64>().sqrt();
+            if norm > SVD_TOLERANCE {
+                for i in 0..m {
+                    u_data[i * m + filled] = col[i] / norm;
+                }
+                filled += 1;
+            }
         }
 
-        let u = HdcMatrix::new(u_data, self.rows, self.rows);
+        let u = HdcMatrix::new(u_data, m, m);
         result.add_step(
             &format!(
                 "SVD computed: {} singular values, rank = {}",
@@ -840,12 +899,45 @@ impl HdcMatrix {
         (singular_values, u, v, result)
     }
 
+    /// Null space (kernel) of the matrix.
+    ///
+    /// Returns the columns of V corresponding to zero singular values.
+    /// For an m×n matrix of rank r, the null space has dimension n - r.
+    /// Returns None if the matrix has full column rank (null space is trivial).
+    pub fn null_space(&self) -> Option<HdcMatrix> {
+        let (sv, _, v, _) = self.svd();
+        let n = self.cols;
+        let rank = self.rank(); // uses relative tolerance
+        let null_dim = n.saturating_sub(rank);
+
+        if null_dim == 0 {
+            return None;
+        }
+
+        // Null space = columns rank..n of V
+        let mut null_data = vec![0.0; n * null_dim];
+        for j in 0..null_dim {
+            for i in 0..n {
+                null_data[i * null_dim + j] = v.get(i, rank + j);
+            }
+        }
+
+        Some(HdcMatrix::new(null_data, n, null_dim))
+    }
+
     // ─── Properties ──────────────────────────────────────────────────────
 
-    /// Matrix rank (number of non-zero singular values)
+    /// Matrix rank (number of non-zero singular values).
+    ///
+    /// Uses a **relative** tolerance: σ_i is considered zero if
+    /// σ_i < max(m,n) × ε × σ_max, where ε = SVD_TOLERANCE.
+    /// This is the standard approach (MATLAB, NumPy, LAPACK) and handles
+    /// ill-conditioned matrices correctly even when SVD is computed via A^T A.
     pub fn rank(&self) -> usize {
         let (sv, _, _, _) = self.svd();
-        sv.iter().filter(|&&s| s > DEFAULT_TOLERANCE.sqrt()).count()
+        let sigma_max = sv.iter().cloned().fold(0.0f64, f64::max);
+        let tol = (self.rows.max(self.cols) as f64) * SVD_TOLERANCE * sigma_max;
+        sv.iter().filter(|&&s| s > tol).count()
     }
 
     /// Inverse via LU decomposition
@@ -876,15 +968,17 @@ impl HdcMatrix {
     }
 
     /// Condition number estimate (ratio of largest to smallest singular value)
+    /// Condition number κ(A) = σ_max / σ_min.
+    /// Uses SVD_TOLERANCE for consistent rank determination.
     pub fn condition_number(&self) -> f64 {
         let (sv, _, _, _) = self.svd();
         let max = sv.iter().cloned().fold(0.0_f64, f64::max);
         let min = sv
             .iter()
             .cloned()
-            .filter(|&s| s > DEFAULT_TOLERANCE)
+            .filter(|&s| s > SVD_TOLERANCE)
             .fold(f64::INFINITY, f64::min);
-        if min <= DEFAULT_TOLERANCE {
+        if min <= SVD_TOLERANCE {
             f64::INFINITY
         } else {
             max / min
@@ -1713,6 +1807,150 @@ mod tests {
         sv.sort_by(|a, b| b.partial_cmp(a).unwrap());
         assert!((sv[0] - 5.0).abs() < 1e-6);
         assert!((sv[1] - 3.0).abs() < 1e-6);
+    }
+
+    /// SVD reconstruction: A ≈ U Σ V^T
+    #[test]
+    fn test_svd_reconstruction() {
+        let a = HdcMatrix::from_rows(&[
+            &[1.0, 2.0, 3.0],
+            &[4.0, 5.0, 6.0],
+            &[7.0, 8.0, 10.0], // NOT 9, so full rank
+        ]);
+        let (sv, u, v, _) = a.svd();
+
+        // Reconstruct: U Σ V^T
+        // Build Σ as m×n diagonal
+        let m = a.rows;
+        let n = a.cols;
+        let mut sigma_data = vec![0.0; m * n];
+        for i in 0..sv.len().min(m).min(n) {
+            sigma_data[i * n + i] = sv[i];
+        }
+        let sigma = HdcMatrix::new(sigma_data, m, n);
+        let vt = v.transpose();
+        let (us, _) = u.mul(&sigma);
+        let (reconstructed, _) = us.mul(&vt);
+
+        // Check A ≈ U Σ V^T
+        for i in 0..m {
+            for j in 0..n {
+                let diff = (a.get(i, j) - reconstructed.get(i, j)).abs();
+                assert!(diff < 1e-6,
+                    "SVD reconstruction failed at ({},{}): A={}, UΣV^T={}, diff={}",
+                    i, j, a.get(i, j), reconstructed.get(i, j), diff);
+            }
+        }
+    }
+
+    /// U should be orthogonal: U^T U ≈ I
+    #[test]
+    fn test_svd_u_orthogonal() {
+        let a = HdcMatrix::from_rows(&[
+            &[1.0, 2.0],
+            &[3.0, 4.0],
+            &[5.0, 6.0], // 3×2 rectangular — exercises the fix
+        ]);
+        let (_, u, _, _) = a.svd();
+        let ut = u.transpose();
+        let (utu, _) = ut.mul(&u);
+        let eye = HdcMatrix::identity(u.rows);
+
+        for i in 0..u.rows {
+            for j in 0..u.rows {
+                let diff = (utu.get(i, j) - eye.get(i, j)).abs();
+                assert!(diff < 1e-6,
+                    "U not orthogonal at ({},{}): U^TU={}, I={}", i, j, utu.get(i, j), eye.get(i, j));
+            }
+        }
+    }
+
+    /// V should be orthogonal: V^T V ≈ I
+    #[test]
+    fn test_svd_v_orthogonal() {
+        let a = HdcMatrix::from_rows(&[
+            &[1.0, 2.0, 3.0],
+            &[4.0, 5.0, 6.0],
+        ]); // 2×3 — wide rectangular
+        let (_, _, v, _) = a.svd();
+        let vt = v.transpose();
+        let (vtv, _) = vt.mul(&v);
+        let eye = HdcMatrix::identity(v.rows);
+
+        for i in 0..v.rows {
+            for j in 0..v.rows {
+                let diff = (vtv.get(i, j) - eye.get(i, j)).abs();
+                assert!(diff < 1e-6,
+                    "V not orthogonal at ({},{}): V^TV={}, I={}", i, j, vtv.get(i, j), eye.get(i, j));
+            }
+        }
+    }
+
+    /// SVD of rank-deficient matrix: [1 2 3; 2 4 6; 3 6 9] has rank 1
+    #[test]
+    fn test_svd_rank_deficient() {
+        let a = HdcMatrix::from_rows(&[
+            &[1.0, 2.0, 3.0],
+            &[2.0, 4.0, 6.0],
+            &[3.0, 6.0, 9.0],
+        ]);
+        let (sv, _, _, _) = a.svd();
+
+        // Only 1 non-zero singular value
+        let nonzero = sv.iter().filter(|&&s| s > 1e-6).count();
+        assert_eq!(nonzero, 1, "rank-1 matrix should have 1 nonzero singular value, got {}", nonzero);
+        assert_eq!(a.rank(), 1);
+    }
+
+    /// Null space of rank-deficient matrix
+    #[test]
+    fn test_null_space() {
+        // [1 2 3; 2 4 6; 3 6 9] has rank 1, null space dimension 2
+        let a = HdcMatrix::from_rows(&[
+            &[1.0, 2.0, 3.0],
+            &[2.0, 4.0, 6.0],
+            &[3.0, 6.0, 9.0],
+        ]);
+        let ns = a.null_space();
+        assert!(ns.is_some(), "rank-1 3×3 matrix should have non-trivial null space");
+        let ns = ns.unwrap();
+        assert_eq!(ns.cols, 2, "null space should have dimension 2, got {}", ns.cols);
+
+        // Verify A * null_vector ≈ 0 for each null space column
+        for j in 0..ns.cols {
+            let mut nv = vec![0.0; ns.rows];
+            for i in 0..ns.rows { nv[i] = ns.get(i, j); }
+            let nv_mat = HdcMatrix::new(nv, ns.rows, 1);
+            let (product, _) = a.mul(&nv_mat);
+            for i in 0..a.rows {
+                assert!(product.get(i, 0).abs() < 1e-6,
+                    "A * null_vec[{}] should be 0, got {} at row {}", j, product.get(i, 0), i);
+            }
+        }
+    }
+
+    /// Full-rank matrix should have trivial null space
+    #[test]
+    fn test_null_space_full_rank() {
+        let a = HdcMatrix::from_rows(&[&[1.0, 0.0], &[0.0, 1.0]]);
+        assert!(a.null_space().is_none(), "identity should have no null space");
+    }
+
+    /// SVD of tall rectangular matrix (m > n)
+    #[test]
+    fn test_svd_tall_rectangular() {
+        let a = HdcMatrix::from_rows(&[
+            &[1.0, 2.0],
+            &[3.0, 4.0],
+            &[5.0, 6.0],
+        ]); // 3×2
+        let (sv, u, v, _) = a.svd();
+        assert_eq!(sv.len(), 2, "should have min(3,2)=2 singular values");
+        assert_eq!(u.rows, 3, "U should be 3×3");
+        assert_eq!(v.rows, 2, "V should be 2×2");
+
+        // All singular values should be positive (full column rank)
+        assert!(sv.iter().all(|s| *s > 1e-6), "3×2 full-rank matrix should have 2 positive singular values");
     }
 
     // ── Properties ───────────────────────────────────────────────────────

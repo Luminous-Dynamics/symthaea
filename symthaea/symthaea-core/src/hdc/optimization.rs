@@ -60,15 +60,19 @@ pub trait ObjectiveFunction {
 }
 
 /// Compute the gradient via central finite differences.
+/// Uses adaptive per-component step size: eps_i = sqrt(machine_eps) * max(|x_i|, 1)
+/// for better accuracy across different variable scales (Nocedal & Wright 2006, §8.1).
 fn numerical_gradient<F: Fn(&[f64]) -> f64>(f: &F, x: &[f64]) -> Vec<f64> {
     let n = x.len();
     let mut grad = vec![0.0; n];
     let mut x_plus = x.to_vec();
     let mut x_minus = x.to_vec();
+    let base_eps = f64::EPSILON.sqrt(); // ~1.49e-8, optimal for central differences
     for i in 0..n {
-        x_plus[i] = x[i] + FINITE_DIFF_EPS;
-        x_minus[i] = x[i] - FINITE_DIFF_EPS;
-        grad[i] = (f(&x_plus) - f(&x_minus)) / (2.0 * FINITE_DIFF_EPS);
+        let eps_i = base_eps * x[i].abs().max(1.0);
+        x_plus[i] = x[i] + eps_i;
+        x_minus[i] = x[i] - eps_i;
+        grad[i] = (f(&x_plus) - f(&x_minus)) / (2.0 * eps_i);
         x_plus[i] = x[i];
         x_minus[i] = x[i];
     }
@@ -595,7 +599,11 @@ impl OptimizationEngine {
             let y: Vec<f64> = g_new.iter().zip(g.iter()).map(|(a, b)| a - b).collect();
             let sy: f64 = s.iter().zip(y.iter()).map(|(si, yi)| si * yi).sum();
 
-            if sy > 1e-15 {
+            // Scale curvature check relative to step and gradient magnitudes
+            // to avoid rejecting valid updates on large-scale problems
+            let s_norm = s.iter().map(|v| v * v).sum::<f64>().sqrt();
+            let y_norm = y.iter().map(|v| v * v).sum::<f64>().sqrt();
+            if sy > 1e-10 * s_norm * y_norm {
                 if s_history.len() >= m {
                     s_history.remove(0);
                     y_history.remove(0);

@@ -99,12 +99,13 @@ impl ApproximationTier {
         }
     }
 
-    /// Suggest the best tier for a given component count
+    /// Suggest the best tier for a given component count.
+    /// Uses ExhaustivePartition (true IIT Φ) for small systems, and
+    /// SampledPartition for larger ones. SpectralConnectivity (algebraic
+    /// connectivity λ₂) is deprecated: r = -0.62 with true Φ (2026-04-11).
     pub fn suggest_for(n: usize) -> Self {
         if n <= 8 {
             ApproximationTier::ExhaustivePartition
-        } else if n <= 100 {
-            ApproximationTier::SpectralConnectivity
         } else {
             ApproximationTier::SampledPartition
         }

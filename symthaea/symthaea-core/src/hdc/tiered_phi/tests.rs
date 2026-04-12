@@ -206,9 +206,11 @@ mod tests {
             ApproximationTier::suggest_for(4),
             ApproximationTier::ExhaustivePartition
         );
+        // SpectralConnectivity deprecated (r = -0.62 with true Φ, 2026-04-11).
+        // suggest_for() now uses SampledPartition for n > 8.
         assert_eq!(
             ApproximationTier::suggest_for(50),
-            ApproximationTier::SpectralConnectivity
+            ApproximationTier::SampledPartition
         );
         assert_eq!(
             ApproximationTier::suggest_for(500),

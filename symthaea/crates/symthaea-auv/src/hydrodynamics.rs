@@ -73,13 +73,15 @@ pub struct HydrodynamicForces {
     pub drag_magnitude: f64,
 }
 
-/// Compute hydrodynamic forces given current velocity and angular velocity.
+/// Compute hydrodynamic forces given current velocity, angular velocity,
+/// and orientation angles (roll, pitch, yaw in radians).
 ///
 /// Returns forces and moments in body frame.
 pub fn compute_forces(
     config: &HydrodynamicConfig,
     velocity: &[f64; 3],
     angular_velocity: &[f64; 3],
+    orientation_angles: &[f64; 3],
     depth: f64,
 ) -> HydrodynamicForces {
     let rho = config.water_density;
@@ -108,13 +110,11 @@ pub fn compute_forces(
     let buoyancy = rho * g * config.displacement_volume - config.mass * g;
 
     // 3. Hydrostatic restoring moments (from metacentric height)
-    // When tilted, buoyancy creates a restoring torque
-    // Approximate: M_restore = -ρ × g × V × GM × sin(angle)
-    // For small angles, sin(angle) ≈ angular displacement
-    // We use angular velocity as proxy (would need angle integration for accuracy)
+    // Buoyancy creates a spring-like restoring torque proportional to sin(angle).
+    // M_restore = -ρ × g × V × GM × sin(angle) (Fossen 2011, §4.2)
     let gm = config.metacentric_height;
-    let restoring_roll = -rho * g * config.displacement_volume * gm * angular_velocity[0] * 0.1;
-    let restoring_pitch = -rho * g * config.displacement_volume * gm * angular_velocity[1] * 0.1;
+    let restoring_roll = -rho * g * config.displacement_volume * gm * orientation_angles[0].sin();
+    let restoring_pitch = -rho * g * config.displacement_volume * gm * orientation_angles[1].sin();
 
     // 4. Combine forces
     let force = [
@@ -188,7 +188,7 @@ mod tests {
     fn test_drag_opposes_motion() {
         let config = HydrodynamicConfig::default();
         let velocity = [1.0, 0.0, 0.0]; // Moving forward
-        let forces = compute_forces(&config, &velocity, &[0.0; 3], 10.0);
+        let forces = compute_forces(&config, &velocity, &[0.0; 3], &[0.0; 3], 10.0);
         assert!(forces.force[0] < 0.0, "Drag should oppose forward motion");
     }
 
@@ -197,8 +197,8 @@ mod tests {
         let config = HydrodynamicConfig::default();
         let v1 = [1.0, 0.0, 0.0];
         let v2 = [2.0, 0.0, 0.0];
-        let f1 = compute_forces(&config, &v1, &[0.0; 3], 10.0);
-        let f2 = compute_forces(&config, &v2, &[0.0; 3], 10.0);
+        let f1 = compute_forces(&config, &v1, &[0.0; 3], &[0.0; 3], 10.0);
+        let f2 = compute_forces(&config, &v2, &[0.0; 3], &[0.0; 3], 10.0);
         // At 2× speed, drag should be ~4× (quadratic)
         let ratio = f2.force[0].abs() / f1.force[0].abs();
         assert!(
@@ -210,7 +210,7 @@ mod tests {
     #[test]
     fn test_buoyancy_positive() {
         let config = HydrodynamicConfig::default();
-        let forces = compute_forces(&config, &[0.0; 3], &[0.0; 3], 10.0);
+        let forces = compute_forces(&config, &[0.0; 3], &[0.0; 3], &[0.0; 3], 10.0);
         // Default config is slightly positively buoyant (displacement_volume > mass/rho)
         assert!(forces.buoyancy > -1.0, "Should be near-neutral buoyancy");
     }

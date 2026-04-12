@@ -185,7 +185,9 @@ impl MasterConsciousnessEquation {
     }
 
     /// Softmin function: softmin(x; τ) = Σ(xᵢ × exp(-xᵢ/τ)) / Σ(exp(-xᵢ/τ))
-    /// This is a smooth minimum that identifies the bottleneck
+    /// This is a smooth minimum that identifies the bottleneck.
+    /// Numerically stabilized: clamps exponents to prevent overflow, and falls
+    /// back to hard-min when the result is non-finite.
     fn softmin_with_name(&self, factors: &[(&str, f64)]) -> (f64, String) {
         let tau = self.config.softmin_tau;
         let epsilon = self.config.epsilon;
@@ -196,7 +198,9 @@ impl MasterConsciousnessEquation {
         let mut min_name = "Unknown".to_string();
 
         for (name, val) in factors {
-            let weight = (-val / tau).exp();
+            // Clamp exponent to prevent overflow/underflow: exp(709.78) is f64::MAX,
+            // exp(-745) is the smallest positive subnormal. Use ±700 for safety margin.
+            let weight = (-val / tau).clamp(-700.0, 700.0).exp();
             weighted_sum += val * weight;
             weight_sum += weight;
 
@@ -207,7 +211,9 @@ impl MasterConsciousnessEquation {
         }
 
         let softmin = if weight_sum > epsilon {
-            weighted_sum / weight_sum
+            let raw = weighted_sum / weight_sum;
+            // Fall back to hard-min if val*weight overflowed
+            if raw.is_finite() { raw } else { min_val }
         } else {
             min_val
         };
@@ -215,9 +221,16 @@ impl MasterConsciousnessEquation {
         (softmin, min_name)
     }
 
-    /// Sigmoid function: σ(x) = 1 / (1 + exp(-x))
+    /// Sigmoid function: σ(x) = 1 / (1 + exp(-5x))
+    /// Numerically stable: avoids exp() overflow for large |x| by branching on sign.
     fn sigmoid(&self, x: f64) -> f64 {
-        1.0 / (1.0 + (-x * 5.0).exp()) // Scaled for [0,1] inputs
+        let z = x * 5.0; // Scaled for [0,1] inputs
+        if z >= 0.0 {
+            1.0 / (1.0 + (-z).exp())
+        } else {
+            let e = z.exp();
+            e / (1.0 + e)
+        }
     }
 
     /// Compute weighted sum: Σ(wᵢ × Cᵢ × γᵢ) / Σ(wᵢ)
@@ -751,5 +764,55 @@ mod tests {
             "Default component weights should total to ~1.0, got {}",
             total
         );
+    }
+
+    #[test]
+    fn test_softmin_extreme_values_no_nan() {
+        let eq = MasterConsciousnessEquation::default();
+        // Very large positive values — softmin exponent would overflow without clamping
+        let factors = vec![
+            ("A", 1e300_f64),
+            ("B", 1e300_f64),
+        ];
+        let (result, _) = eq.softmin_with_name(&factors);
+        assert!(result.is_finite(), "softmin with extreme positive inputs should be finite, got {}", result);
+
+        // Very large negative values
+        let factors_neg = vec![
+            ("A", -1e300_f64),
+            ("B", -1e300_f64),
+        ];
+        let (result_neg, _) = eq.softmin_with_name(&factors_neg);
+        assert!(result_neg.is_finite(), "softmin with extreme negative inputs should be finite, got {}", result_neg);
+
+        // Tiny tau with moderate values
+        let mut eq_tiny = MasterConsciousnessEquation::default();
+        eq_tiny.update_config({
+            let mut c = MasterEquationConfig::default();
+            c.softmin_tau = 1e-10;
+            c
+        });
+        let factors_mod = vec![("A", 0.5), ("B", 0.8)];
+        let (result_tiny, _) = eq_tiny.softmin_with_name(&factors_mod);
+        assert!(result_tiny.is_finite(), "softmin with tiny tau should be finite, got {}", result_tiny);
+    }
+
+    #[test]
+    fn test_sigmoid_extreme_values_no_nan() {
+        let eq = MasterConsciousnessEquation::default();
+        // Large positive — should saturate to 1.0
+        let s_pos = eq.sigmoid(200.0);
+        assert!((s_pos - 1.0).abs() < 1e-10, "sigmoid(200) should be ~1.0, got {}", s_pos);
+        assert!(s_pos.is_finite());
+
+        // Large negative — should saturate to 0.0
+        let s_neg = eq.sigmoid(-200.0);
+        assert!(s_neg.abs() < 1e-10, "sigmoid(-200) should be ~0.0, got {}", s_neg);
+        assert!(s_neg.is_finite());
+
+        // Normal value — should match original formula
+        let s_mid = eq.sigmoid(0.5);
+        let expected = 1.0 / (1.0 + (-2.5_f64).exp());
+        assert!((s_mid - expected).abs() < 1e-10, "sigmoid(0.5) should be {}, got {}", expected, s_mid);
     }
 }
