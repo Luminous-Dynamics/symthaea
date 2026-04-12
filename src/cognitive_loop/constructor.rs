@@ -870,6 +870,7 @@ impl CognitiveLoopService {
             let embodiment_bridge_init = {
                 use super::motor_bridge::EmbodimentPlatform;
                 match config.embodiment_platform {
+                    #[cfg(feature = "humanoid")]
                     EmbodimentPlatform::Humanoid => {
                         let genesis = config
                             .genesis_phrase

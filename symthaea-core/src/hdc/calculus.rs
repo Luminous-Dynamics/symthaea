@@ -1185,8 +1185,8 @@ pub fn exponential_integral(x: f64) -> f64 {
         sum
     } else {
         // Asymptotic: Ei(x) ~ e^x/x (1 + 1!/x + 2!/x² + ...)
-        let mut sum = 1.0;
-        let mut term = 1.0;
+        let mut sum: f64 = 1.0;
+        let mut term: f64 = 1.0;
         for n in 1..20 {
             term *= n as f64 / x;
             if term.abs() > sum.abs() {

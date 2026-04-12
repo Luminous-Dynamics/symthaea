@@ -50,6 +50,32 @@ pub const ORGAN: [f32; 16] = [
     0.000, 0.000, 0.000,
 ];
 
+/// Clarinet: strong odd harmonics (cylindrical bore, Benade 1976).
+pub const CLARINET: [f32; 16] = [
+    1.000, 0.050, 0.750, 0.030, 0.500, 0.020, 0.350, 0.015, 0.200, 0.010, 0.120, 0.008, 0.070,
+    0.005, 0.040, 0.003,
+];
+/// Trumpet: rich harmonics with formant emphasis around partials 4-8 (Luce 1963).
+pub const TRUMPET: [f32; 16] = [
+    1.000, 0.700, 0.600, 0.800, 0.900, 0.750, 0.600, 0.500, 0.350, 0.250, 0.180, 0.120, 0.080,
+    0.060, 0.040, 0.025,
+];
+/// Saxophone: complex spectrum with strong even+odd partials (Backus 1977).
+pub const SAXOPHONE: [f32; 16] = [
+    1.000, 0.600, 0.450, 0.350, 0.400, 0.300, 0.350, 0.200, 0.250, 0.150, 0.180, 0.100, 0.120,
+    0.080, 0.060, 0.040,
+];
+/// Sitar: sympathetic resonance with buzzing bridge (jawari effect).
+pub const SITAR: [f32; 16] = [
+    1.000, 0.400, 0.600, 0.200, 0.450, 0.150, 0.350, 0.120, 0.300, 0.100, 0.200, 0.080, 0.150,
+    0.060, 0.100, 0.050,
+];
+/// Sawtooth wave (electronic synth lead, all harmonics with 1/n falloff).
+pub const SAW_LEAD: [f32; 16] = [
+    1.000, 0.500, 0.333, 0.250, 0.200, 0.167, 0.143, 0.125, 0.111, 0.100, 0.091, 0.083, 0.077,
+    0.071, 0.067, 0.063,
+];
+
 /// Piano decay time T60 by octave (seconds, Weinreich 1977).
 pub const PIANO_T60: [f32; 8] = [18.0, 14.0, 12.0, 10.0, 6.0, 3.5, 1.5, 0.5];
 

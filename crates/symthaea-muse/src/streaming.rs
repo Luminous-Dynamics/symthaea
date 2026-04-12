@@ -455,11 +455,20 @@ impl StreamingSynth {
         let (atk, dec, sus, rel) = match instruments::select_instrument(&self.state) {
             Instrument::Piano | Instrument::PianoPP => (0.005, 0.3, 0.15, 0.4),
             Instrument::Violin | Instrument::Cello => (0.08, 0.1, 0.7, 0.3),
-            Instrument::AcousticGuitar | Instrument::Harp => (0.003, 0.2, 0.1, 0.3),
-            Instrument::Flute => (0.05, 0.1, 0.6, 0.2),
+            Instrument::AcousticGuitar | Instrument::Harp | Instrument::Koto => {
+                (0.003, 0.2, 0.1, 0.3)
+            }
+            Instrument::Oud | Instrument::UprightBass => (0.008, 0.15, 0.4, 0.5),
+            Instrument::Flute | Instrument::Ney => (0.05, 0.1, 0.6, 0.2),
+            Instrument::Clarinet => (0.03, 0.08, 0.7, 0.15),
+            Instrument::Trumpet => (0.02, 0.05, 0.8, 0.1),
+            Instrument::Saxophone => (0.04, 0.08, 0.7, 0.2),
+            Instrument::Sitar => (0.005, 0.15, 0.5, 0.4),
+            Instrument::SawLead => (0.01, 0.05, 0.8, 0.15),
+            Instrument::Marimba => (0.001, 0.3, 0.02, 0.2),
+            Instrument::Bell | Instrument::Kalimba => (0.001, 0.5, 0.05, 0.8),
             Instrument::Pad | Instrument::Organ => (0.2, 0.1, 0.8, 0.5),
             Instrument::ElectricPiano => (0.01, 0.2, 0.3, 0.3),
-            Instrument::Bell => (0.001, 0.5, 0.05, 0.8),
         };
 
         // ── Phase 1: Render per-voice mono buffers ──
@@ -483,9 +492,15 @@ impl StreamingSynth {
             // Vibrato LFO: 5Hz for strings, 0 for piano/guitar
             let (vibrato_depth_cents, vibrato_rate) = match active.instrument {
                 Instrument::Violin | Instrument::Cello => (25.0, 5.0),
-                Instrument::Flute => (15.0, 4.5),
+                Instrument::Flute | Instrument::Ney => (15.0, 4.5),
+                Instrument::Clarinet => (12.0, 5.5),
+                Instrument::Trumpet => (10.0, 5.0),
+                Instrument::Saxophone => (20.0, 5.5),
+                Instrument::Sitar => (30.0, 6.0),
+                Instrument::Oud => (15.0, 4.0),
+                Instrument::SawLead => (18.0, 5.5),
                 Instrument::Pad => (8.0, 3.0),
-                _ => (0.0, 0.0), // no vibrato for piano, guitar, bell
+                _ => (0.0, 0.0),
             };
 
             for i in 0..self.chunk_samples {

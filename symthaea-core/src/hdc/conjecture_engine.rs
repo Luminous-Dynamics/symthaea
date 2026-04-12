@@ -227,9 +227,6 @@ impl fmt::Display for Expr {
                 };
                 write!(f, "{}({})", name, arg)
             }
-            Expr::Sum(body, var) => {
-                write!(f, "Σ_{}({})", var, body)
-            }
         }
     }
 }
@@ -2446,6 +2443,144 @@ fn lcg_step(state: u64) -> u64 {
     state
         .wrapping_mul(6364136223846793005)
         .wrapping_add(1442695040888963407)
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// CROSS-SEQUENCE RELATION DISCOVERY
+// ═══════════════════════════════════════════════════════════════════════════
+
+/// Type of relationship between two sequences.
+#[derive(Debug, Clone)]
+pub enum RelationType {
+    /// A(n) ≈ constant · B(n)
+    Proportional { constant: f64 },
+    /// A(n) ≈ B(n) + offset
+    ConstantDifference { offset: f64 },
+    /// A(n) ≈ a · B(n) + b
+    Linear { slope: f64, intercept: f64 },
+}
+
+/// A discovered relationship between two sequences.
+#[derive(Debug, Clone)]
+pub struct CrossSequenceRelation {
+    pub source_a: String,
+    pub source_b: String,
+    pub relation_type: RelationType,
+    pub r_squared: f64,
+}
+
+impl fmt::Display for CrossSequenceRelation {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match &self.relation_type {
+            RelationType::Proportional { constant } => write!(
+                f,
+                "{} ≈ {:.4} · {} (R²={:.4})",
+                self.source_a, constant, self.source_b, self.r_squared
+            ),
+            RelationType::ConstantDifference { offset } => write!(
+                f,
+                "{} ≈ {} + {:.4} (R²={:.4})",
+                self.source_a, self.source_b, offset, self.r_squared
+            ),
+            RelationType::Linear { slope, intercept } => write!(
+                f,
+                "{} ≈ {:.4}·{} + {:.4} (R²={:.4})",
+                self.source_a, slope, self.source_b, intercept, self.r_squared
+            ),
+        }
+    }
+}
+
+/// Discover relationships between two sequences by testing proportional,
+/// constant-difference, and linear fits.
+pub fn discover_cross_sequence_relations(
+    a: &ObservedSequence,
+    b: &ObservedSequence,
+) -> Vec<CrossSequenceRelation> {
+    let mut relations = Vec::new();
+    // Align sequences by matching x-values
+    let pairs: Vec<(f64, f64)> = a
+        .data
+        .iter()
+        .filter_map(|(ax, ay)| {
+            b.data
+                .iter()
+                .find(|(bx, _)| (*bx - *ax).abs() < 1e-10)
+                .map(|(_, by)| (*ay, *by))
+        })
+        .collect();
+
+    if pairs.len() < 3 {
+        return relations;
+    }
+
+    // Test proportional: A = k·B
+    let valid_ratios: Vec<f64> = pairs
+        .iter()
+        .filter(|(_, by)| by.abs() > 1e-10)
+        .map(|(ay, by)| ay / by)
+        .collect();
+    if valid_ratios.len() >= 3 {
+        let mean_ratio = valid_ratios.iter().sum::<f64>() / valid_ratios.len() as f64;
+        let var = valid_ratios
+            .iter()
+            .map(|r| (r - mean_ratio).powi(2))
+            .sum::<f64>()
+            / valid_ratios.len() as f64;
+        let cv = var.sqrt() / mean_ratio.abs().max(1e-10);
+        if cv < 0.1 {
+            let ss_res: f64 = pairs
+                .iter()
+                .map(|(ay, by)| (ay - mean_ratio * by).powi(2))
+                .sum();
+            let mean_a = pairs.iter().map(|(ay, _)| ay).sum::<f64>() / pairs.len() as f64;
+            let ss_tot: f64 = pairs.iter().map(|(ay, _)| (ay - mean_a).powi(2)).sum();
+            let r2 = if ss_tot > 1e-10 {
+                1.0 - ss_res / ss_tot
+            } else {
+                0.0
+            };
+            relations.push(CrossSequenceRelation {
+                source_a: a.name.clone(),
+                source_b: b.name.clone(),
+                relation_type: RelationType::Proportional {
+                    constant: mean_ratio,
+                },
+                r_squared: r2,
+            });
+        }
+    }
+
+    // Test constant difference: A = B + c
+    let diffs: Vec<f64> = pairs.iter().map(|(ay, by)| ay - by).collect();
+    let mean_diff = diffs.iter().sum::<f64>() / diffs.len() as f64;
+    let diff_var = diffs.iter().map(|d| (d - mean_diff).powi(2)).sum::<f64>() / diffs.len() as f64;
+    let mean_a = pairs.iter().map(|(ay, _)| ay).sum::<f64>() / pairs.len() as f64;
+    let a_var = pairs
+        .iter()
+        .map(|(ay, _)| (ay - mean_a).powi(2))
+        .sum::<f64>()
+        / pairs.len() as f64;
+    if diff_var < a_var * 0.01 && a_var > 1e-10 {
+        let ss_res: f64 = pairs
+            .iter()
+            .map(|(ay, by)| (ay - by - mean_diff).powi(2))
+            .sum();
+        let ss_tot: f64 = pairs.iter().map(|(ay, _)| (ay - mean_a).powi(2)).sum();
+        let r2 = if ss_tot > 1e-10 {
+            1.0 - ss_res / ss_tot
+        } else {
+            0.0
+        };
+        relations.push(CrossSequenceRelation {
+            source_a: a.name.clone(),
+            source_b: b.name.clone(),
+            relation_type: RelationType::ConstantDifference { offset: mean_diff },
+            r_squared: r2,
+        });
+    }
+
+    relations
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
