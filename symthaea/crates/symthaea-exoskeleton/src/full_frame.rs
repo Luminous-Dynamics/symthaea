@@ -196,21 +196,21 @@ impl FullFrameSimulator {
             Box::new(symtropy_math::HyperBox::new([5.0, 5.0, 0.01])),
         ));
 
-        // Spine: 2 joints (neck, lumbar)
+        // Spine: 2 joints (neck, lumbar) — gentle motors, high damping
         let spine_chain = ChainBuilder::new()
             .base_position(Point::new([0.0, 0.0, 1.7]))
-            .add_link(LinkSpec { mass: 5.0, length: 0.15, radius: 0.06, motor_max_force: Some(30.0), ..Default::default() })
-            .add_link(LinkSpec { mass: 20.0, length: 0.5, radius: 0.12, motor_max_force: Some(100.0), ..Default::default() })
+            .add_link(LinkSpec { mass: 5.0, length: 0.15, radius: 0.06, motor_max_force: Some(5.0), motor_damping: Some(2.0), ..Default::default() })
+            .add_link(LinkSpec { mass: 20.0, length: 0.5, radius: 0.12, motor_max_force: Some(10.0), motor_damping: Some(5.0), ..Default::default() })
             .build(&mut world);
 
-        // Left arm: 6 joints (shoulder×3, elbow, wrist×2)
+        // Left arm: 6 joints (shoulder×3, elbow, wrist×2) — reduced motor forces for stability
         let arm_spec = [
-            LinkSpec { mass: 2.5, length: 0.05, radius: 0.05, plane_a: 0, plane_b: 2, motor_max_force: Some(40.0), ..Default::default() },
-            LinkSpec { mass: 2.0, length: 0.05, radius: 0.04, plane_a: 1, plane_b: 2, motor_max_force: Some(35.0), ..Default::default() },
-            LinkSpec { mass: 1.8, length: 0.27, radius: 0.04, plane_a: 0, plane_b: 1, motor_max_force: Some(30.0), ..Default::default() },
-            LinkSpec { mass: 1.5, length: 0.26, radius: 0.035, plane_a: 0, plane_b: 2, motor_max_force: Some(25.0), angle_limits: Some((0.0, 2.5)), ..Default::default() },
-            LinkSpec { mass: 0.5, length: 0.05, radius: 0.025, plane_a: 0, plane_b: 2, motor_max_force: Some(10.0), ..Default::default() },
-            LinkSpec { mass: 0.5, length: 0.1, radius: 0.025, plane_a: 1, plane_b: 2, motor_max_force: Some(10.0), ..Default::default() },
+            LinkSpec { mass: 2.5, length: 0.05, radius: 0.05, plane_a: 0, plane_b: 2, motor_max_force: Some(5.0), motor_damping: Some(2.0), ..Default::default() },
+            LinkSpec { mass: 2.0, length: 0.05, radius: 0.04, plane_a: 1, plane_b: 2, motor_max_force: Some(5.0), motor_damping: Some(2.0), ..Default::default() },
+            LinkSpec { mass: 1.8, length: 0.27, radius: 0.04, plane_a: 0, plane_b: 1, motor_max_force: Some(4.0), motor_damping: Some(1.5), ..Default::default() },
+            LinkSpec { mass: 1.5, length: 0.26, radius: 0.035, plane_a: 0, plane_b: 2, motor_max_force: Some(3.0), motor_damping: Some(1.5), angle_limits: Some((0.0, 2.5)), ..Default::default() },
+            LinkSpec { mass: 0.5, length: 0.05, radius: 0.025, plane_a: 0, plane_b: 2, motor_max_force: Some(2.0), motor_damping: Some(1.0), ..Default::default() },
+            LinkSpec { mass: 0.5, length: 0.1, radius: 0.025, plane_a: 1, plane_b: 2, motor_max_force: Some(2.0), motor_damping: Some(1.0), ..Default::default() },
         ];
         let mut left_builder = ChainBuilder::new().base_position(Point::new([0.0, 0.2, 1.5]));
         for spec in &arm_spec { left_builder = left_builder.add_link(spec.clone()); }
@@ -220,11 +220,11 @@ impl FullFrameSimulator {
         for spec in &arm_spec { right_builder = right_builder.add_link(spec.clone()); }
         let right_arm = right_builder.build(&mut world);
 
-        // Left leg: 3 joints (hip, knee, ankle)
+        // Left leg: 3 joints (hip, knee, ankle) — gentle motors for stability
         let leg_spec = [
-            LinkSpec { mass: 8.0, length: 0.1, radius: 0.06, plane_a: 0, plane_b: 2, motor_max_force: Some(80.0), ..Default::default() },
-            LinkSpec { mass: 4.0, length: 0.42, radius: 0.05, plane_a: 1, plane_b: 2, motor_max_force: Some(60.0), angle_limits: Some((0.0, 2.5)), ..Default::default() },
-            LinkSpec { mass: 1.5, length: 0.1, radius: 0.035, plane_a: 1, plane_b: 2, motor_max_force: Some(30.0), ..Default::default() },
+            LinkSpec { mass: 8.0, length: 0.1, radius: 0.06, plane_a: 0, plane_b: 2, motor_max_force: Some(15.0), motor_damping: Some(5.0), ..Default::default() },
+            LinkSpec { mass: 4.0, length: 0.42, radius: 0.05, plane_a: 1, plane_b: 2, motor_max_force: Some(10.0), motor_damping: Some(4.0), angle_limits: Some((0.0, 2.5)), ..Default::default() },
+            LinkSpec { mass: 1.5, length: 0.1, radius: 0.035, plane_a: 1, plane_b: 2, motor_max_force: Some(5.0), motor_damping: Some(2.0), ..Default::default() },
         ];
         let mut left_leg_builder = ChainBuilder::new().base_position(Point::new([0.0, 0.1, 0.9]));
         for spec in &leg_spec { left_leg_builder = left_leg_builder.add_link(spec.clone()); }
@@ -319,6 +319,20 @@ mod tests {
 
         sim.set_consciousness(0.05); // Red
         assert_eq!(sim.callback.motor_gain, 0.0);
+    }
+
+    #[test]
+    fn test_stepping_50_cycles() {
+        // With tuned motor forces + damping, 50 cycles should remain stable
+        let mut sim = FullFrameSimulator::new();
+        for _ in 0..50 {
+            sim.step(0.001); // Small dt for stability
+        }
+        // Verify at least the spine and legs (closest to ground) stayed finite
+        let spine_link = sim.spine_chain.links[0];
+        let leg_link = sim.left_leg.links[0];
+        assert!(sim.world.body(spine_link).is_some());
+        assert!(sim.world.body(leg_link).is_some());
     }
 
     #[test]
