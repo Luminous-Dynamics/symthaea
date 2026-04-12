@@ -2761,6 +2761,8 @@ pub enum SymExpr {
     Neg(Box<SymExpr>),
     Pow(Box<SymExpr>, f64), // base^(constant exponent)
     Log(Box<SymExpr>),      // natural logarithm
+    Sin(Box<SymExpr>),      // sine
+    Cos(Box<SymExpr>),      // cosine
 }
 
 impl SymExpr {
@@ -2783,6 +2785,8 @@ impl SymExpr {
                 let v = a.eval(vars);
                 if v > 0.0 { v.ln() } else { f64::NAN }
             }
+            SymExpr::Sin(a) => a.eval(vars).sin(),
+            SymExpr::Cos(a) => a.eval(vars).cos(),
         }
     }
 
@@ -2830,6 +2834,20 @@ impl SymExpr {
                 SymExpr::Div(
                     Box::new(a.diff(var)),
                     a.clone(),
+                )
+            }
+            SymExpr::Sin(a) => {
+                // Chain rule: d/dx(sin(f)) = cos(f) · f'(x)
+                SymExpr::Mul(
+                    Box::new(SymExpr::Cos(a.clone())),
+                    Box::new(a.diff(var)),
+                )
+            }
+            SymExpr::Cos(a) => {
+                // Chain rule: d/dx(cos(f)) = -sin(f) · f'(x)
+                SymExpr::Mul(
+                    Box::new(SymExpr::Neg(Box::new(SymExpr::Sin(a.clone())))),
+                    Box::new(a.diff(var)),
                 )
             }
         }
@@ -2894,6 +2912,20 @@ impl SymExpr {
                     _ => SymExpr::Log(Box::new(a)),
                 }
             }
+            SymExpr::Sin(a) => {
+                let a = a.simplify();
+                match &a {
+                    SymExpr::Const(c) => SymExpr::Const(c.sin()),
+                    _ => SymExpr::Sin(Box::new(a)),
+                }
+            }
+            SymExpr::Cos(a) => {
+                let a = a.simplify();
+                match &a {
+                    SymExpr::Const(c) => SymExpr::Const(c.cos()),
+                    _ => SymExpr::Cos(Box::new(a)),
+                }
+            }
             _ => self.clone(),
         }
     }
@@ -2913,6 +2945,8 @@ impl fmt::Display for SymExpr {
             SymExpr::Neg(a) => write!(f, "(-{})", a),
             SymExpr::Pow(base, exp) => write!(f, "{}^{}", base, exp),
             SymExpr::Log(a) => write!(f, "ln({})", a),
+            SymExpr::Sin(a) => write!(f, "sin({})", a),
+            SymExpr::Cos(a) => write!(f, "cos({})", a),
         }
     }
 }
@@ -3014,7 +3048,17 @@ pub fn expr_to_sym(expr: &Expr) -> Option<SymExpr> {
                 }
             }
         }
-        Expr::Func(_, _) | Expr::Sum(_, _) => None,
+        Expr::Func(f, arg) => {
+            let a = expr_to_sym(arg)?;
+            match f {
+                UnaryFn::Sin => Some(SymExpr::Sin(Box::new(a))),
+                UnaryFn::Cos => Some(SymExpr::Cos(Box::new(a))),
+                UnaryFn::Log => Some(SymExpr::Log(Box::new(a))),
+                UnaryFn::Sqrt => Some(SymExpr::Pow(Box::new(a), 0.5)),
+                UnaryFn::Exp | UnaryFn::Abs | UnaryFn::Floor => None,
+            }
+        }
+        Expr::Sum(_, _) => None,
     }
 }
 
