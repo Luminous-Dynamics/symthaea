@@ -39,6 +39,10 @@ pub struct VisionManager {
 
     /// EMA of visual prediction error
     visual_pe_ema: f32,
+
+    /// Imagination-reality surprise from the vision manifold (P6-A).
+    /// Set externally each cycle by the cognitive loop from VisionBridge::imagination_surprise().
+    imagination_surprise: f32,
 }
 
 impl Default for VisionManager {
@@ -50,6 +54,7 @@ impl Default for VisionManager {
             low_surprise_streak: 0,
             surprise_threshold: 0.2,
             visual_pe_ema: 0.0,
+            imagination_surprise: 0.0,
         }
     }
 }
@@ -86,6 +91,19 @@ impl VisionManager {
     /// Consecutive low-surprise cycles (habituation streak).
     pub fn low_surprise_streak(&self) -> u32 {
         self.low_surprise_streak
+    }
+
+    /// Set imagination-reality surprise from the vision manifold (P6-A).
+    ///
+    /// Called by the cognitive loop each cycle after processing vision frames.
+    /// This signal is blended into the visual surprise computation in `process()`.
+    pub fn set_imagination_surprise(&mut self, surprise: f32) {
+        self.imagination_surprise = surprise.clamp(0.0, 1.0);
+    }
+
+    /// Current imagination surprise.
+    pub fn imagination_surprise(&self) -> f32 {
+        self.imagination_surprise
     }
 
     fn mean_surprise(&self) -> f32 {
@@ -130,8 +148,12 @@ impl CognitiveSubsystem for VisionManager {
             var.sqrt().min(1.0)
         };
 
-        // Combine compressed state variance with prediction error for visual surprise
-        let visual_surprise = (state_variance * 0.4 + snapshot.prediction_error * 0.6).min(1.0);
+        // Combine compressed state variance with prediction error for visual surprise.
+        // P6-A: Imagination surprise amplifies the signal — when reality violates
+        // the mental model, surprise is boosted by up to 30%.
+        let base_surprise = state_variance * 0.4 + snapshot.prediction_error * 0.6;
+        let imagination_boost = self.imagination_surprise * 0.3;
+        let visual_surprise = (base_surprise + imagination_boost).min(1.0);
 
         self.push_surprise(visual_surprise);
 

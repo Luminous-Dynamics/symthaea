@@ -506,6 +506,60 @@ impl VisionBridge {
     pub fn active_patch_count(&self) -> (usize, usize) {
         self.manifold.active_patch_count()
     }
+
+    /// Unified visual context HV for the cognitive loop (P6-E).
+    ///
+    /// Combines three signals into a single context vector:
+    /// 1. **Working memory bundle** — what the system is attending to (weighted by saliency)
+    /// 2. **Scene graph HV** — spatial relational structure between objects
+    /// 3. **Manifold state** — raw perceptual scene encoding
+    ///
+    /// The cognitive loop can use this as a comprehensive "visual situation"
+    /// vector that encodes what's there, what's attended, and how things relate.
+    ///
+    /// Returns `None` if neither working memory nor scene graph are active.
+    pub fn scene_context_hv(&self) -> Option<ContinuousHV> {
+        let mut components: Vec<&ContinuousHV> = Vec::new();
+        let mut weights: Vec<f32> = Vec::new();
+
+        // Working memory: what we're attending to (highest weight)
+        let wm_bundle;
+        if let Some(wm) = self.manifold.working_memory() {
+            if let Some(bundle) = wm.bundle_attended() {
+                wm_bundle = bundle;
+                components.push(&wm_bundle);
+                weights.push(0.4);
+            }
+        }
+
+        // Scene graph: relational structure
+        if let Some(sg) = self.manifold.scene_graph() {
+            if let Some(ghv) = sg.graph_hv() {
+                components.push(ghv);
+                weights.push(0.3);
+            }
+        }
+
+        // Manifold state: raw perception (lowest weight — already in the thought HV)
+        let state = self.manifold.state();
+        if state.norm() > 1e-6 {
+            components.push(state);
+            weights.push(0.3);
+        }
+
+        if components.is_empty() {
+            return None;
+        }
+
+        Some(ContinuousHV::weighted_bundle(&components, &weights).normalize())
+    }
+
+    /// Current imagination surprise from the manifold (P6-A accessor).
+    ///
+    /// 0 = reality matched prediction, 1 = maximum divergence.
+    pub fn imagination_surprise(&self) -> f32 {
+        self.manifold.imagination_surprise()
+    }
 }
 
 /// Cross-manifold predictor: learns to predict cognitive state from vision state.

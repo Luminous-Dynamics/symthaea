@@ -234,6 +234,25 @@ impl CognitiveLoopService {
             let phi = self.carryover.history.consciousness_level as f32;
             let phi_boost = 0.2 + 0.6 * phi.clamp(0.0, 1.0);
             bridge.set_attention_boost(phi_boost);
+
+            // P6-A: Feed imagination surprise into VisionManager for FEP integration.
+            // When reality diverges from imagination, the system increases exploration.
+            self.vision_manager
+                .set_imagination_surprise(bridge.imagination_surprise());
+
+            // P6-B: Blend visual context into the thought HV.
+            // The scene context (working memory + scene graph + state) colors
+            // the current thought with what the system is visually attending to.
+            // Desimone & Duncan (1995): biased competition — attention shapes perception.
+            if let Some(context_hv) = bridge.scene_context_hv() {
+                let thought_hv = perception.encoding.encoding_result.hdv.clone();
+                perception.encoding.encoding_result.hdv =
+                    symthaea_core::hdc::ContinuousHV::weighted_bundle(
+                        &[&thought_hv, &context_hv],
+                        &[0.85, 0.15],
+                    )
+                    .normalize();
+            }
         }
 
         // ===================================================================

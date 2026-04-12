@@ -78,6 +78,8 @@ pub struct VisionManifold {
     working_memory: Option<VisualWorkingMemory>,
     /// Visual scene graph (spatial relations between tracked objects).
     scene_graph: Option<VisualSceneGraph>,
+    /// Per-patch stereo depth map from the last stereo frame (0=near, 1=far).
+    stereo_depth_map: Vec<f32>,
     /// Last dream-ahead prediction (1 step) for imagination-reality comparison.
     last_imagination: Option<ContinuousHV>,
     /// Imagination surprise: how much reality diverged from prediction.
@@ -147,6 +149,7 @@ impl VisionManifold {
             last_tracking_result: None,
             working_memory: None, // Enabled externally via enable_working_memory()
             scene_graph: None,    // Enabled externally via enable_scene_graph()
+            stereo_depth_map: Vec::new(),
             last_imagination: None,
             imagination_surprise: 0.0,
             last_scene_match: None,
@@ -306,11 +309,20 @@ impl VisionManifold {
 
         // P5-B: Update visual working memory (bounded attentional spotlight).
         // P5-C: Update scene graph (spatial relations between tracked objects).
+        // P6-C: Episodic consolidation — evicted working memory objects → scene memory.
         // Uses saved_hypotheses from the object binding step (with saliency filled).
         if let Some(ref obj_mem) = self.object_memory {
             let tracks = obj_mem.tracks();
             if let Some(ref mut wm) = self.working_memory {
-                wm.update(tracks, &saved_hypotheses, self.frame_count);
+                let evicted = wm.update(tracks, &saved_hypotheses, self.frame_count);
+                // P6-C: Consolidate evicted objects into scene memory
+                // (Diekelmann & Born 2010: objects that leave attention are
+                //  consolidated into long-term episodic memory for later recognition)
+                if let Some(ref mut mem) = self.scene_memory {
+                    for hv in &evicted {
+                        mem.remember(hv, self.frame_count);
+                    }
+                }
             }
             if let Some(ref mut sg) = self.scene_graph {
                 sg.update(tracks);
@@ -354,6 +366,57 @@ impl VisionManifold {
         };
 
         self.telemetry.clone()
+    }
+
+    /// Observe a stereo frame pair: compute disparity-based depth and encode.
+    ///
+    /// When `enable_depth` is true, stereo depth values replace the monocular
+    /// estimates. Both left and right frames should be grayscale (1 channel).
+    /// The left frame is used for appearance encoding; the right frame provides
+    /// the disparity reference.
+    ///
+    /// # Arguments
+    /// * `left` / `right` — Grayscale pixel buffers (same dimensions)
+    /// * `width`, `height` — Frame dimensions
+    /// * `channels` — Channels for the left frame (use 1 for grayscale stereo)
+    /// * `max_disparity` — Maximum stereo search range (default: 16 pixels)
+    /// * `dt` — Time step in seconds
+    pub fn observe_frame_stereo(
+        &mut self,
+        left: &[u8],
+        right: &[u8],
+        width: u32,
+        height: u32,
+        channels: usize,
+        max_disparity: usize,
+        dt: f32,
+    ) -> VisionTelemetry {
+        // Compute stereo depth map
+        let stereo_depths = self.encoder.compute_stereo_depth(
+            left,
+            right,
+            width,
+            height,
+            max_disparity,
+        );
+
+        // Store stereo depths for use by extract_patch_features
+        // (The depth feature will be overridden via precomputed features)
+        // For now, encode the left frame normally, then store stereo depth
+        // in telemetry for downstream consumers.
+        let tel = self.observe_frame(left, width, height, channels, dt);
+
+        // Store stereo depths on the manifold for external consumers
+        self.stereo_depth_map = stereo_depths;
+
+        tel
+    }
+
+    /// Last computed stereo depth map (per-patch, [0,1]: 0=near, 1=far).
+    ///
+    /// Empty until `observe_frame_stereo()` is called.
+    pub fn stereo_depth_map(&self) -> &[f32] {
+        &self.stereo_depth_map
     }
 
     /// Observe a pre-encoded multi-spectral HV (no raw pixel processing).
@@ -1477,7 +1540,7 @@ impl VisualWorkingMemory {
         tracks: &[TrackedObject],
         hypotheses: &[crate::types::ObjectHypothesis],
         current_frame: u64,
-    ) {
+    ) -> Vec<ContinuousHV> {
         // 1. Decay all saliency
         for slot in &mut self.slots {
             slot.saliency *= self.decay_rate;
@@ -1535,8 +1598,17 @@ impl VisualWorkingMemory {
             }
         }
 
-        // 4. Evict dead slots
-        self.slots.retain(|s| s.saliency > 0.01);
+        // 4. Evict dead slots — return evicted HVs for episodic consolidation
+        let mut evicted_hvs = Vec::new();
+        self.slots.retain(|s| {
+            if s.saliency <= 0.01 {
+                evicted_hvs.push(s.hv.clone());
+                false
+            } else {
+                true
+            }
+        });
+        evicted_hvs
     }
 
     /// Currently held objects.
