@@ -1515,7 +1515,7 @@ mod external_validation_tests {
 
     #[test]
     fn full_quality_benchmark() {
-        let config = MuseConfig { duration_secs: 4.0, max_notes: 16, ..Default::default() };
+        let config = MuseConfig { duration_secs: 6.0, max_notes: 32, ..Default::default() };
 
         let scenarios: Vec<(&str, MusicalState)> = vec![
             ("Joyful", MusicalState {
