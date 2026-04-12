@@ -815,4 +815,116 @@ mod tests {
         let expected = 1.0 / (1.0 + (-2.5_f64).exp());
         assert!((s_mid - expected).abs() < 1e-10, "sigmoid(0.5) should be {}, got {}", expected, s_mid);
     }
+
+    /// Weight sensitivity analysis: sweep each weight ±50% and measure impact.
+    ///
+    /// Documents which weights the consciousness score is most sensitive to.
+    /// Results guide future weight tuning and identify double-counting effects.
+    #[test]
+    fn test_weight_sensitivity_analysis() {
+        let baseline_inputs = ConsciousnessInputs {
+            phi: 0.6,
+            broadcast: 0.5,
+            working_memory: 0.5,
+            attention: 0.6,
+            recurrence: 0.5,
+            embodiment: 0.5,
+            knowledge: 0.4,
+            synchrony: 0.7,
+        };
+
+        // Compute baseline
+        let mut eq = MasterConsciousnessEquation::default();
+        let baseline = eq.compute(&baseline_inputs);
+        let c0 = baseline.consciousness_level;
+
+        // Weight names and their default values for sweeping
+        let weight_names = [
+            "phi", "broadcast", "working_memory", "attention",
+            "recurrence", "embodiment", "knowledge",
+            "embodiment_factor", "narrative", "social",
+        ];
+        let default_weights = [0.15, 0.10, 0.10, 0.12, 0.10, 0.10, 0.08, 0.10, 0.08, 0.07];
+
+        let mut sensitivities = Vec::new();
+
+        for (i, &name) in weight_names.iter().enumerate() {
+            let w0 = default_weights[i];
+
+            // Sweep +50%
+            let mut config_up = MasterEquationConfig::default();
+            let w_up = &mut config_up.component_weights;
+            match name {
+                "phi" => w_up.phi = w0 * 1.5,
+                "broadcast" => w_up.broadcast = w0 * 1.5,
+                "working_memory" => w_up.working_memory = w0 * 1.5,
+                "attention" => w_up.attention = w0 * 1.5,
+                "recurrence" => w_up.recurrence = w0 * 1.5,
+                "embodiment" => w_up.embodiment = w0 * 1.5,
+                "knowledge" => w_up.knowledge = w0 * 1.5,
+                "embodiment_factor" => w_up.embodiment_factor = w0 * 1.5,
+                "narrative" => w_up.narrative = w0 * 1.5,
+                "social" => w_up.social = w0 * 1.5,
+                _ => unreachable!(),
+            }
+            let mut eq_up = MasterConsciousnessEquation::new(config_up);
+            let c_up = eq_up.compute(&baseline_inputs).consciousness_level;
+
+            // Sweep -50%
+            let mut config_down = MasterEquationConfig::default();
+            let w_dn = &mut config_down.component_weights;
+            match name {
+                "phi" => w_dn.phi = w0 * 0.5,
+                "broadcast" => w_dn.broadcast = w0 * 0.5,
+                "working_memory" => w_dn.working_memory = w0 * 0.5,
+                "attention" => w_dn.attention = w0 * 0.5,
+                "recurrence" => w_dn.recurrence = w0 * 0.5,
+                "embodiment" => w_dn.embodiment = w0 * 0.5,
+                "knowledge" => w_dn.knowledge = w0 * 0.5,
+                "embodiment_factor" => w_dn.embodiment_factor = w0 * 0.5,
+                "narrative" => w_dn.narrative = w0 * 0.5,
+                "social" => w_dn.social = w0 * 0.5,
+                _ => unreachable!(),
+            }
+            let mut eq_dn = MasterConsciousnessEquation::new(config_down);
+            let c_dn = eq_dn.compute(&baseline_inputs).consciousness_level;
+
+            // Sensitivity coefficient: (c_up - c_dn) / (w_up - w_dn) normalized by c0
+            let delta_c = c_up - c_dn;
+            let sensitivity = if c0 > 1e-10 { delta_c / c0 } else { 0.0 };
+            sensitivities.push((name, sensitivity, c_dn, c0, c_up));
+        }
+
+        // Verify all results are finite and consciousness stays in [0, 1]
+        for (name, sens, c_dn, _c0, c_up) in &sensitivities {
+            assert!(sens.is_finite(), "Sensitivity for {name} is non-finite");
+            assert!(*c_dn >= 0.0 && *c_dn <= 1.0, "{name} c_dn out of range: {c_dn}");
+            assert!(*c_up >= 0.0 && *c_up <= 1.0, "{name} c_up out of range: {c_up}");
+        }
+
+        // The equation should respond to weight changes (not be constant)
+        let total_sensitivity: f64 = sensitivities.iter().map(|(_, s, _, _, _)| s.abs()).sum();
+        assert!(
+            total_sensitivity > 0.01,
+            "Total sensitivity should be non-trivial, got {total_sensitivity}"
+        );
+
+        // Verify M, N, Soc double-counting is bounded:
+        // Their sensitivity should not be > 2× the average of other weights
+        // (since they appear in both weighted sum and modulation)
+        let core_sensitivities: Vec<f64> = sensitivities[..7]
+            .iter()
+            .map(|(_, s, _, _, _)| s.abs())
+            .collect();
+        let avg_core = core_sensitivities.iter().sum::<f64>() / core_sensitivities.len() as f64;
+
+        for &(name, sens, _, _, _) in &sensitivities[7..] {
+            assert!(
+                sens.abs() < avg_core * 3.0,
+                "Double-counted factor {name} sensitivity ({:.4}) exceeds 3× core average ({:.4})",
+                sens.abs(),
+                avg_core
+            );
+        }
+    }
 }

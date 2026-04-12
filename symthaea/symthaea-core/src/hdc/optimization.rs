@@ -41,6 +41,9 @@ const ARMIJO_C1: f64 = 1e-4;
 const ARMIJO_SHRINK: f64 = 0.5;
 const ARMIJO_MAX_BACKTRACKS: usize = 30;
 const FINITE_DIFF_EPS: f64 = 1e-7;
+/// Default gradient clipping norm. Prevents catastrophic steps in
+/// ill-conditioned problems (e.g., exp(100x) near x=0).
+const DEFAULT_GRADIENT_CLIP_NORM: f64 = 100.0;
 
 // ─── ObjectiveFunction Trait ─────────────────────────────────────────────────
 
@@ -56,6 +59,21 @@ pub trait ObjectiveFunction {
     fn gradient(&self, x: &[f64]) -> Option<Vec<f64>> {
         let _ = x;
         None
+    }
+}
+
+/// Clip gradient vector to a maximum L2 norm, rescaling if needed.
+/// Returns the (possibly clipped) gradient and its norm.
+fn clip_gradient(g: &mut [f64], max_norm: f64) -> f64 {
+    let norm: f64 = g.iter().map(|v| v * v).sum::<f64>().sqrt();
+    if norm > max_norm && norm > 0.0 {
+        let scale = max_norm / norm;
+        for gi in g.iter_mut() {
+            *gi *= scale;
+        }
+        max_norm
+    } else {
+        norm
     }
 }
 
@@ -265,8 +283,9 @@ impl OptimizationEngine {
 
         for iter in 0..MAX_ITERATIONS {
             let fx = f(&x);
-            let g = grad(&x);
-            let grad_norm: f64 = g.iter().map(|gi| gi * gi).sum::<f64>().sqrt();
+            let mut g = grad(&x);
+            // Clip gradient to prevent catastrophic steps from extreme gradients
+            let grad_norm = clip_gradient(&mut g, DEFAULT_GRADIENT_CLIP_NORM);
 
             history.push(OptStep {
                 iteration: iter,
@@ -492,6 +511,7 @@ impl OptimizationEngine {
 
         let mut x = x0.to_vec();
         let mut g = grad(&x);
+        clip_gradient(&mut g, DEFAULT_GRADIENT_CLIP_NORM);
         let mut history = Vec::new();
 
         // Storage for L-BFGS two-loop recursion
@@ -593,7 +613,8 @@ impl OptimizationEngine {
                 .zip(r.iter())
                 .map(|(xi, ri)| xi - step * ri)
                 .collect();
-            let g_new = grad(&x_new);
+            let mut g_new = grad(&x_new);
+            clip_gradient(&mut g_new, DEFAULT_GRADIENT_CLIP_NORM);
 
             let s: Vec<f64> = x_new.iter().zip(x.iter()).map(|(a, b)| a - b).collect();
             let y: Vec<f64> = g_new.iter().zip(g.iter()).map(|(a, b)| a - b).collect();

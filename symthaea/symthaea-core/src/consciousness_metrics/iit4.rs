@@ -59,12 +59,28 @@ pub struct ConceptStructure {
 /// - Intrinsic difference as the fundamental measure
 /// - Improved irreducibility computation
 /// - Intrinsic information quantification
+///
+/// ## Entropy estimation
+///
+/// Intrinsic difference uses histogram-based JSD (Jensen-Shannon divergence).
+/// The bin count controls the bias-variance tradeoff:
+/// - Fewer bins (8-16): lower variance, higher bias (smooths differences)
+/// - More bins (32-64): lower bias, higher variance (noisy with few samples)
+///
+/// Default: 16 bins. For HV dimensions ≥ 1000, the bias from 16 bins is
+/// small relative to the signal. For smaller dimensions, consider Sturges'
+/// rule: `num_bins = ceil(log2(n)) + 1`.
+///
+/// Max approximation error for JSD with k bins and n samples:
+/// O(k / (2n)) + O(1 / (k × bin_width)) (discretization + finite-sample).
 #[derive(Debug, Clone)]
 pub struct IIT4Calculator {
     /// Base entropy estimator
     estimator: ContinuousEntropyEstimator,
     /// Threshold for considering φ > 0
     phi_threshold: f64,
+    /// Number of histogram bins for intrinsic difference computation
+    num_bins: usize,
 }
 
 impl Default for IIT4Calculator {
@@ -74,11 +90,21 @@ impl Default for IIT4Calculator {
 }
 
 impl IIT4Calculator {
-    /// Create a new IIT 4.0 calculator
+    /// Create a new IIT 4.0 calculator with default 16 bins
     pub fn new() -> Self {
         Self {
             estimator: ContinuousEntropyEstimator::fast(),
             phi_threshold: 0.001,
+            num_bins: 16,
+        }
+    }
+
+    /// Create with custom bin count for entropy estimation
+    pub fn with_bins(num_bins: usize) -> Self {
+        Self {
+            estimator: ContinuousEntropyEstimator::fast(),
+            phi_threshold: 0.001,
+            num_bins: num_bins.max(2),
         }
     }
 
@@ -92,8 +118,8 @@ impl IIT4Calculator {
             return 0.0;
         }
 
-        // Compute histogram distributions
-        let num_bins = 16;
+        // Compute histogram distributions (bin count configurable via with_bins())
+        let num_bins = self.num_bins;
         let mut p_counts = vec![0usize; num_bins];
         let mut q_counts = vec![0usize; num_bins];
 
@@ -182,7 +208,7 @@ impl IIT4Calculator {
         // Use entropy as a proxy for self-information
         // Lower entropy = more specific state = higher intrinsic info
         let h = self.estimator.entropy(state);
-        let max_h = (16.0_f64).log2(); // Max entropy for 16 bins
+        let max_h = (self.num_bins as f64).log2(); // Max entropy for uniform distribution
         (max_h - h).max(0.0)
     }
 
