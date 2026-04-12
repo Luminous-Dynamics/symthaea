@@ -158,7 +158,19 @@ impl ManipulatorEmbodiment {
             num_actuators: 8,
             epistemic_grounding: grounding_label(GROUNDING_SENSORIMOTOR).to_string(),
             observation_confidence: grounding_from_prediction_error(self.last_prediction_error),
+            platform_specific: self.platform_telemetry_bytes(),
         }
+    }
+
+    /// Serialize joint angles and end-effector force as JSON bytes.
+    pub fn platform_telemetry_bytes(&self) -> Vec<u8> {
+        let state = self.simulator.state();
+        serde_json::to_vec(&serde_json::json!({
+            "joint_angles": state.joint_angles,
+            "ee_force": state.end_effector_force,
+            "gripper": state.gripper_opening,
+        }))
+        .unwrap_or_default()
     }
 }
 
