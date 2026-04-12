@@ -368,6 +368,9 @@ pub struct RegressorConfig {
     pub mutation_rate: f64,
     /// RNG seed
     pub seed: u64,
+    /// If true, skip macro-operator seeding even if macros are available.
+    /// Used for cold-vs-primed benchmarking.
+    pub disable_macro_seeds: bool,
 }
 
 impl Default for RegressorConfig {
@@ -381,6 +384,7 @@ impl Default for RegressorConfig {
             tournament_size: 5,
             mutation_rate: 0.3,
             seed: 42,
+            disable_macro_seeds: false,
         }
     }
 }
@@ -393,6 +397,9 @@ pub struct SymbolicRegressor {
     /// Optional seed expressions from learned macro-operators (abstract thought).
     /// Injected into the initial population alongside growth-class templates.
     seed_macros: Vec<Expr>,
+    /// Per-generation best fitness (lower = better). Collected during `fit()`.
+    /// Enables cold-vs-primed convergence comparison and "generations-to-ε" analysis.
+    fitness_history: Vec<f64>,
 }
 
 impl SymbolicRegressor {
@@ -401,7 +408,21 @@ impl SymbolicRegressor {
         let population = (0..config.population_size)
             .map(|_| random_expr(&mut rng, config.max_depth))
             .collect();
-        Self { config, population, rng, seed_macros: Vec::new() }
+        Self {
+            config,
+            population,
+            rng,
+            seed_macros: Vec::new(),
+            fitness_history: Vec::new(),
+        }
+    }
+
+    /// Access the per-generation best-fitness history from the most recent `fit()` call.
+    ///
+    /// Each element is the best fitness (lower = better) observed after that
+    /// generation's evaluation. Use for convergence analysis and cold-vs-primed comparison.
+    pub fn fitness_history(&self) -> &[f64] {
+        &self.fitness_history
     }
 
     /// Inject macro-operator templates into the initial population.
@@ -416,6 +437,8 @@ impl SymbolicRegressor {
     /// Run symbolic regression on observed data.
     /// Returns the top-k conjectures sorted by fitness (lower = better).
     pub fn fit(&mut self, seq: &ObservedSequence, top_k: usize) -> Vec<Conjecture> {
+        // Clear history at the start of each fit — each call is independent
+        self.fitness_history.clear();
         let (train, _test) = seq.train_test_split();
 
         // ── Log-space pre-transform ──────────────────────────────────
@@ -444,6 +467,7 @@ impl SymbolicRegressor {
                 tournament_size: self.config.tournament_size,
                 mutation_rate: self.config.mutation_rate,
                 seed: self.config.seed.wrapping_add(777),
+                disable_macro_seeds: self.config.disable_macro_seeds,
             });
             let log_results = log_regressor.fit(&log_seq, 2);
 
@@ -473,7 +497,8 @@ impl SymbolicRegressor {
         // ── Macro-operator seeding (abstract thought feedback loop) ──
         // Inject learned macro-operators discovered across previous runs.
         // Each macro replaces a slot in the post-template region of the population.
-        if !self.seed_macros.is_empty() {
+        // Skipped entirely when `disable_macro_seeds` is set (cold benchmark mode).
+        if !self.seed_macros.is_empty() && !self.config.disable_macro_seeds {
             let macro_seed_count = (self.config.population_size / 8).min(self.seed_macros.len() * 2);
             let macro_start = seed_count;
             for i in 0..macro_seed_count {
@@ -505,6 +530,11 @@ impl SymbolicRegressor {
                 .collect();
 
             scored.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
+
+            // Record best fitness this generation (for benchmarking / convergence analysis)
+            if let Some(&(_, best_fit)) = scored.first() {
+                self.fitness_history.push(best_fit);
+            }
 
             // ── Deduplicate: remove functionally identical formulas ───
             // Two formulas are "same" if they produce identical outputs on
@@ -1666,6 +1696,7 @@ impl ConjectureEngine {
                     lambda: self.config.lambda,
                     tournament_size: self.config.tournament_size,
                     mutation_rate: self.config.mutation_rate,
+                    disable_macro_seeds: self.config.disable_macro_seeds,
                 });
                 let diff_results = diff_reg.fit(&diff_obs, 1);
                 for c in &diff_results {
@@ -1705,6 +1736,7 @@ impl ConjectureEngine {
                     lambda: self.config.lambda,
                     tournament_size: self.config.tournament_size,
                     mutation_rate: self.config.mutation_rate,
+                    disable_macro_seeds: self.config.disable_macro_seeds,
                 });
                 if !macro_seeds.is_empty() {
                     regressor.set_seed_macros(macro_seeds.clone());
@@ -4303,7 +4335,6 @@ mod tests {
         let seq = ObservedSequence::new("linear_test", MathDomain::NumberTheory, data);
 
         let config = RegressorConfig {
-            disable_macro_seeds: false,
             population_size: 100,
             generations: 50,
             max_depth: 3,
@@ -4312,6 +4343,7 @@ mod tests {
             tournament_size: 5,
             mutation_rate: 0.3,
             seed: 42,
+            disable_macro_seeds: false,
         };
         let mut regressor = SymbolicRegressor::new(config);
         let results = regressor.fit(&seq, 3);
