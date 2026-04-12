@@ -27,3 +27,4 @@ pub mod plasma_mhd;
 pub mod coarse_graining;
 pub mod consciousness_scaling;
 pub mod open_quantum;
+pub mod topology_consciousness;
