@@ -29,5 +29,6 @@ pub mod consciousness_scaling;
 pub mod id_tradeoff;
 pub mod nonhomogeneous_consciousness;
 pub mod open_quantum;
+pub mod predictive_consciousness;
 pub mod self_tuning_consciousness;
 pub mod topology_consciousness;
