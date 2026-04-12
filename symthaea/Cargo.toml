@@ -1021,6 +1021,10 @@ name = "run_code_benchmark"
 required-features = ["code_generation"]
 
 [[example]]
+name = "benchmark_humaneval_verified"
+required-features = ["code_generation"]
+
+[[example]]
 name = "causal_tower_test"
 required-features = ["unstable-examples"]
 
@@ -1573,6 +1577,11 @@ harness = false
 name = "neural_bridge"
 harness = false
 required-features = ["neural-bridge"]
+
+[[bench]]
+name = "vision_manifold"
+harness = false
+required-features = ["vision-manifold"]
 
 [[bench]]
 name = "hdc_benchmarks"

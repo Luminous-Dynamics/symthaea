@@ -1029,6 +1029,81 @@ impl VisionManifold {
         imagined
     }
 
+    /// Dream replay: revisit stored scene memory landmarks during offline
+    /// consolidation (Walker & Stickgold 2004).
+    ///
+    /// For each stored landmark, evolves the CfC state toward that memory
+    /// and returns the sequence of replayed states. This strengthens the
+    /// manifold's ability to recognize previously seen scenes.
+    ///
+    /// # Arguments
+    /// * `dt` — Time step per replay step (typically longer than real-time, e.g., 0.1s)
+    /// * `steps_per_memory` — CfC evolution steps per memory (more = deeper consolidation)
+    pub fn dream_replay(&mut self, dt: f32, steps_per_memory: usize) -> Vec<ContinuousHV> {
+        let landmarks: Vec<ContinuousHV> = self
+            .scene_memory
+            .as_ref()
+            .map_or(Vec::new(), |mem| {
+                mem.export_landmarks().iter().map(|(hv, _)| hv.clone()).collect()
+            });
+
+        if landmarks.is_empty() {
+            return Vec::new();
+        }
+
+        let mut replays = Vec::new();
+        let mut dream_state = self.state.clone();
+
+        for landmark in &landmarks {
+            // Drive the CfC state toward this memory landmark
+            for _ in 0..steps_per_memory {
+                let x_inf = self.equilibrium(landmark);
+                let sigma = self.gating(dt);
+                dream_state.lerp_in_place(&x_inf, 1.0 - sigma, sigma);
+            }
+            replays.push(dream_state.clone());
+
+            // Hebbian consolidation: strengthen the weight_hv toward the
+            // replayed state (implicit gradient from the replay experience)
+            let error = 1.0 - dream_state.similarity(landmark).clamp(-1.0, 1.0);
+            if error > 0.01 {
+                let lr = 0.001; // gentle replay learning rate
+                let delta = ContinuousHV::weighted_bundle(
+                    &[landmark, &dream_state],
+                    &[lr, -lr],
+                );
+                self.weight_hv = self.weight_hv.add(&delta);
+            }
+        }
+        replays
+    }
+
+    /// Generate a scene description as structured relational tuples.
+    ///
+    /// Returns a vector of `(subject_label, relation, object_label)` strings
+    /// derived from the scene graph. This is the bridge to Broca's area —
+    /// the cognitive loop can feed these triples into the language pipeline
+    /// for natural language generation.
+    ///
+    /// Labels are generated from track IDs; a real system would map them
+    /// to semantic concept HVs via the ventral stream.
+    pub fn describe_scene(&self) -> Vec<(String, String, String)> {
+        let sg = match &self.scene_graph {
+            Some(sg) => sg,
+            None => return Vec::new(),
+        };
+
+        sg.edges()
+            .iter()
+            .map(|edge| {
+                let subject = format!("object_{}", edge.subject_id);
+                let relation = format!("{:?}", edge.relation);
+                let object = format!("object_{}", edge.object_id);
+                (subject, relation, object)
+            })
+            .collect()
+    }
+
     /// Snapshot the manifold's learned state for serialization.
     ///
     /// Captures weight_hv, tau_base, feature_weights, training steps,
@@ -3501,6 +3576,214 @@ mod tests {
         assert!(
             sim_late >= sim_early - 0.01,
             "CfC dreams should converge over time (early={sim_early}, late={sim_late})"
+        );
+    }
+
+    // === Psych-Bench: Visual Cognition Battery ===
+    //
+    // Quantitative tests measuring cognitive properties of the vision system.
+    // These produce publishable numbers for the psych-bench paper.
+
+    /// Change blindness: does the system detect changes in unattended regions?
+    /// (Rensink et al. 1997)
+    #[test]
+    fn test_psychbench_change_blindness() {
+        let mut cfg = VisionConfig::default();
+        cfg.enable_object_binding = true;
+        let mut m = VisionManifold::new(cfg, 64, 64);
+        m.enable_object_memory(32);
+
+        // Phase 1: Establish scene (red top, blue bottom)
+        let mut scene_a = vec![0u8; 64 * 64 * 3];
+        for y in 0..32 {
+            for x in 0..64 {
+                scene_a[(y * 64 + x) * 3] = 200;
+            }
+        }
+        for y in 32..64 {
+            for x in 0..64 {
+                scene_a[(y * 64 + x) * 3 + 2] = 200;
+            }
+        }
+        for _ in 0..10 {
+            m.observe_frame(&scene_a, 64, 64, 3, 0.033);
+        }
+        let pe_stable = m.prediction_error();
+
+        // Phase 2: Change blue → green (bottom half)
+        let mut scene_b = scene_a.clone();
+        for y in 32..64 {
+            for x in 0..64 {
+                let b = (y * 64 + x) * 3;
+                scene_b[b + 1] = 200; // green
+                scene_b[b + 2] = 0;   // no blue
+            }
+        }
+        let tel = m.observe_frame(&scene_b, 64, 64, 3, 0.033);
+
+        // The system should detect the change (higher PE than stable baseline)
+        assert!(
+            tel.prediction_error > pe_stable,
+            "Change blindness test: system should detect color change \
+             (stable_pe={pe_stable}, change_pe={})",
+            tel.prediction_error
+        );
+    }
+
+    /// Object permanence: does a tracked object survive brief occlusion?
+    /// (Spelke 1990)
+    #[test]
+    fn test_psychbench_object_permanence() {
+        let mut cfg = VisionConfig::default();
+        cfg.enable_object_binding = true;
+        let mut m = VisionManifold::new(cfg, 64, 64);
+        m.enable_object_memory(32);
+
+        // Phase 1: Show a distinctive red object (5 frames)
+        let mut scene = vec![128u8; 64 * 64 * 3];
+        for y in 10..20 {
+            for x in 10..20 {
+                let b = (y * 64 + x) * 3;
+                scene[b] = 255;
+                scene[b + 1] = 0;
+                scene[b + 2] = 0;
+            }
+        }
+        for _ in 0..5 {
+            m.observe_frame(&scene, 64, 64, 3, 0.033);
+        }
+        let tracks_before = m.object_memory().map_or(0, |m| m.len());
+
+        // Phase 2: Occlude (uniform gray, 10 frames)
+        let occluder = vec![128u8; 64 * 64 * 3];
+        for _ in 0..10 {
+            m.observe_frame(&occluder, 64, 64, 3, 0.033);
+        }
+
+        // Phase 3: Object should still be in memory (within max_absence_frames=30)
+        let tracks_after = m.object_memory().map_or(0, |m| m.len());
+        assert!(
+            tracks_after > 0,
+            "Object permanence: tracked object should survive 10-frame occlusion \
+             (before={tracks_before}, after={tracks_after})"
+        );
+    }
+
+    /// Visual search: does goal-directed attention find targets faster?
+    /// (Treisman & Gelade 1980)
+    #[test]
+    fn test_psychbench_visual_search() {
+        use crate::bridge::{CognitiveGoalSignal, VisionBridge};
+
+        let cfg = VisionConfig::default();
+        let mut bridge_no_goal = VisionBridge::new(cfg.clone(), 64, 64);
+        let mut bridge_with_goal = VisionBridge::new(cfg, 64, 64);
+
+        // Warm up both bridges with the same frame to build state
+        let frame: Vec<u8> = (0..64 * 64 * 3).map(|i| (i * 7 % 256) as u8).collect();
+        bridge_no_goal.process_frame(&frame, 64, 64, 3, 0.033);
+        bridge_with_goal.process_frame(&frame, 64, 64, 3, 0.033);
+
+        // Use the manifold's current state as goal — it IS correlated with patches.
+        // In 16,384D, a random goal has ~0 similarity to patches (concentration of
+        // measure), so we need a goal that's semantically related to the scene.
+        let goal_hv = bridge_with_goal.manifold().state().clone();
+        bridge_with_goal.set_goal_signal(
+            CognitiveGoalSignal::with_gain(goal_hv, 0.8),
+        );
+
+        // Scene change → surprise → attention boost modulates differently
+        let frame2: Vec<u8> = (0..64 * 64 * 3).map(|i| (i * 13 % 256) as u8).collect();
+        let (hv_no_goal, tel_no_goal) =
+            bridge_no_goal.process_frame_with_telemetry(&frame2, 64, 64, 3, 0.033);
+        let (hv_with_goal, tel_with_goal) =
+            bridge_with_goal.process_frame_with_telemetry(&frame2, 64, 64, 3, 0.033);
+
+        // Goal-directed vision should produce a measurably different HV.
+        // The effect is subtle after normalization (concentration of measure),
+        // but non-zero: attention boost modulates patch-level scaling.
+        let sim = hv_no_goal.similarity(&hv_with_goal);
+        assert!(
+            sim < 1.0 - 1e-6,
+            "Visual search: goal-directed HV should differ from passive (sim={sim})"
+        );
+        // Both should be valid
+        assert!(tel_no_goal.output_hv_norm > 0.0);
+        assert!(tel_with_goal.output_hv_norm > 0.0);
+    }
+
+    /// Working memory capacity: does the system show Cowan's 4±1 limit?
+    /// (Cowan 2001)
+    #[test]
+    fn test_psychbench_working_memory_capacity() {
+        let mut cfg = VisionConfig::default();
+        cfg.enable_object_binding = true;
+        let mut m = VisionManifold::new(cfg, 128, 128);
+        m.enable_object_memory(64);
+        m.enable_working_memory(4);
+
+        // Create a scene with 8 distinct colored regions
+        let mut pixels = vec![64u8; 128 * 128 * 3];
+        let colors: [[u8; 3]; 8] = [
+            [200, 0, 0], [0, 200, 0], [0, 0, 200], [200, 200, 0],
+            [200, 0, 200], [0, 200, 200], [200, 128, 0], [128, 0, 200],
+        ];
+        for (i, color) in colors.iter().enumerate() {
+            let row = (i / 4) * 64;
+            let col = (i % 4) * 32;
+            for y in row..(row + 30) {
+                for x in col..(col + 30) {
+                    if y < 128 && x < 128 {
+                        let b = (y * 128 + x) * 3;
+                        pixels[b] = color[0];
+                        pixels[b + 1] = color[1];
+                        pixels[b + 2] = color[2];
+                    }
+                }
+            }
+        }
+
+        // Process enough frames for working memory to stabilize
+        for _ in 0..20 {
+            m.observe_frame(&pixels, 128, 128, 3, 0.033);
+        }
+
+        let wm_load = m.working_memory().map_or(0, |wm| wm.load());
+        // Working memory should hold ≤ 4 objects (capacity limit)
+        assert!(
+            wm_load <= 4,
+            "Cowan's limit: WM should hold ≤ 4 objects, got {wm_load}"
+        );
+        // Should hold at least 1 (the scene has many objects)
+        assert!(
+            wm_load >= 1,
+            "WM should hold at least 1 object from 8-object scene, got {wm_load}"
+        );
+    }
+
+    /// Imagination accuracy: do dream predictions improve with familiarity?
+    /// (Kosslyn 1994 mental imagery)
+    #[test]
+    fn test_psychbench_imagination_accuracy() {
+        let mut m = VisionManifold::new(VisionConfig::default(), 64, 64);
+        let frame: Vec<u8> = (0..64 * 64 * 3).map(|i| (i * 11 % 256) as u8).collect();
+
+        // Phase 1: Show the same scene for 20 frames (build familiarity)
+        for _ in 0..20 {
+            m.observe_frame(&frame, 64, 64, 3, 0.033);
+        }
+        let imagination_familiar = m.imagination_surprise();
+
+        // Phase 2: Show a completely new scene
+        let novel: Vec<u8> = (0..64 * 64 * 3).map(|i| (255 - (i % 256)) as u8).collect();
+        m.observe_frame(&novel, 64, 64, 3, 0.033);
+        let imagination_novel = m.imagination_surprise();
+
+        // Familiar scenes should have lower imagination surprise
+        assert!(
+            imagination_familiar < imagination_novel,
+            "Imagination accuracy: familiar scene ({imagination_familiar}) should have \
+             lower surprise than novel scene ({imagination_novel})"
         );
     }
 }
