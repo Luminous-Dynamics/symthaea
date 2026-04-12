@@ -453,12 +453,14 @@ fn generate_chord_accompaniment(
     // Harmony register: at root level (melody is typically above)
     let harmony_octave = root_freq;
 
-    // Gesture shapes velocity
+    // Gesture shapes velocity and articulation
     let gesture = emotional_gestures::gesture_for_emotion(
         emotional_gestures::detect_emotion(state),
     );
-    let bass_vel = (0.5 * gesture.velocity_scale).clamp(0.2, 0.8);
-    let harmony_vel = (0.3 * gesture.velocity_scale).clamp(0.15, 0.5);
+    let bass_vel_base = (0.5 * gesture.velocity_scale).clamp(0.2, 0.8);
+    let harmony_vel_base = (0.3 * gesture.velocity_scale).clamp(0.15, 0.5);
+    // Chord counter for dynamic crescendo/decrescendo across progression
+    let mut chord_idx = 0usize;
 
     // Cycle through progression for the full duration
     let total_prog_beats: f32 = progression.iter().map(|c| c.duration_beats).sum();
@@ -475,43 +477,52 @@ fn generate_chord_accompaniment(
             let chord_dur_secs = chord.duration_beats * beat_dur;
             let root_ratio = 2.0f32.powf(chord.root_semitones as f32 / 12.0);
 
+            // Dynamic shaping: crescendo through first half, decrescendo through second
+            let prog_len = progression.len().max(1);
+            let prog_t = (chord_idx % prog_len) as f32 / prog_len as f32;
+            let dyn_curve = 1.0 - (prog_t - 0.4).abs() * 1.5; // peaks at 40%
+            let dyn_factor = 0.8 + dyn_curve.clamp(0.0, 1.0) * 0.4; // 0.8-1.2
+
+            let bass_vel = (bass_vel_base * dyn_factor).clamp(0.15, 0.9);
+            let harmony_vel = (harmony_vel_base * dyn_factor).clamp(0.10, 0.6);
+
             // Bass note: root of the chord, one octave below
             let bass_freq = bass_octave * root_ratio;
+            let bass_dur = chord_dur_secs * (1.0 - gesture.staccato * 0.5);
             notes.push(Note {
                 frequency: bass_freq,
                 start_time: time,
-                duration: chord_dur_secs * 0.9, // slight gap between changes
+                duration: bass_dur.max(0.1),
                 velocity: bass_vel,
             });
 
             // Walking bass: add 5th on beat 3 at higher arousal
             if state.arousal > 0.4 && chord.duration_beats >= 4.0 {
-                let fifth_ratio = 2.0f32.powf(7.0 / 12.0); // perfect 5th
+                let fifth_ratio = 2.0f32.powf(7.0 / 12.0);
                 notes.push(Note {
                     frequency: bass_freq * fifth_ratio,
                     start_time: time + beat_dur * 2.0,
-                    duration: beat_dur * 1.8,
-                    velocity: bass_vel * 0.8,
+                    duration: beat_dur * 1.5,
+                    velocity: bass_vel * 0.75,
                 });
             }
 
-            // Harmony pad: chord tones sustained through the chord
+            // Harmony pad: chord tones sustained through chord, on the beat
             let ratios = chord.chord_type.ratios();
             for (i, &ratio) in ratios.iter().enumerate() {
-                // Skip root (already in bass), start from 3rd
-                if i == 0 {
-                    continue;
-                }
+                if i == 0 { continue; } // root is in bass
                 let harm_freq = harmony_octave * root_ratio * ratio;
+                let harm_dur = chord_dur_secs * (1.0 - gesture.staccato * 0.4);
                 notes.push(Note {
                     frequency: harm_freq,
-                    start_time: time,
-                    duration: chord_dur_secs * 0.95,
-                    velocity: harmony_vel,
+                    start_time: time, // on the beat, not staggered
+                    duration: harm_dur.max(0.1),
+                    velocity: harmony_vel * (1.0 - i as f32 * 0.05),
                 });
             }
 
             time += chord_dur_secs;
+            chord_idx += 1;
         }
     }
 

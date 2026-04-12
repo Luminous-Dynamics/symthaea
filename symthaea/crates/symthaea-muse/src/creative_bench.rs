@@ -1540,6 +1540,7 @@ mod external_validation_tests {
         let mut total_creative = 0.0f32;
         let mut total_audio = 0.0f32;
         let mut total_theory = 0.0f32;
+        let mut total_harmonic = 0.0f32;
 
         eprintln!("\n══════════════════════════════════════════════════");
         eprintln!("  Symthaea Music Quality Benchmark");
@@ -1568,27 +1569,34 @@ mod external_validation_tests {
             eprintln!("  Audio:     rms={:.1}dB flat={:.3} dynVar={:.1}dB hnr={:.1}dB -> {:.3}",
                 audio.rms_db, audio.spectral_flatness,
                 audio.dynamic_range_variation_db, audio.harmonic_to_noise_db, audio.composite);
+            let harmonic = HarmonicProgressionScore::evaluate(&comp.notes);
             eprintln!("  Theory:    scale={:.0}% p5={:.0}% grid={:.0}% range={:.0}% contour={:.0}% -> {:.3}",
                 theory.scale_adherence * 100.0, theory.parallel_fifth_avoidance * 100.0,
                 theory.rhythmic_quantization * 100.0, theory.voice_range_compliance * 100.0,
                 theory.phrase_contour_quality * 100.0, theory.composite);
+            eprintln!("  Harmonic:  strong={:.0}% resolve={:.0}% variety={:.0}% -> {:.3}",
+                harmonic.strong_progressions * 100.0, harmonic.resolution_tendency * 100.0,
+                harmonic.harmonic_variety * 100.0, harmonic.composite);
 
             total_creative += creative.composite;
             total_audio += audio.composite;
             total_theory += theory.composite;
+            total_harmonic += harmonic.composite;
         }
 
         let n = scenarios.len() as f32;
         let avg_creative = total_creative / n;
         let avg_audio = total_audio / n;
         let avg_theory = total_theory / n;
-        let overall = (avg_creative + avg_audio + avg_theory) / 3.0;
+        let avg_harmonic = total_harmonic / n;
+        let overall = (avg_creative + avg_audio + avg_theory + avg_harmonic) / 4.0;
 
         eprintln!("\n══════════════════════════════════════════════════");
         eprintln!("  AVERAGES");
         eprintln!("  Creative Quality: {:.3}", avg_creative);
         eprintln!("  Audio Quality:    {:.3}", avg_audio);
         eprintln!("  Theory Score:     {:.3}", avg_theory);
+        eprintln!("  Harmonic Prog:    {:.3}", avg_harmonic);
         eprintln!("  Overall:          {:.3}", overall);
         eprintln!("══════════════════════════════════════════════════\n");
 
