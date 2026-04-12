@@ -389,6 +389,13 @@ pub fn compose(config: &MuseConfig, state: &MusicalState, seed: u64) -> Composit
         all_notes.extend(sec_notes);
     }
 
+    // 3.5. Generate chord accompaniment — bass + harmony voices from progression
+    let progression = instruments::select_progression(state);
+    let chord_notes = generate_chord_accompaniment(
+        &progression, &base_scale, tempo, config.duration_secs, state, seed,
+    );
+    all_notes.extend(chord_notes);
+
     // 4. Arrange voices (polyphony gated by consciousness level)
     let arrangement = voice::arrange(&all_notes, state);
 
@@ -409,6 +416,106 @@ pub fn compose(config: &MuseConfig, state: &MusicalState, seed: u64) -> Composit
         duration_secs: config.duration_secs,
         section: overall_section,
     }
+}
+
+/// Generate bass + harmony chord notes from a progression.
+///
+/// Creates two layers:
+/// - **Bass**: chord root, one octave below the melody register, playing on
+///   beat 1 of each chord change (and beat 3 for walking bass at high arousal).
+/// - **Harmony pad**: chord tones sustained through each chord change, at
+///   reduced velocity for background warmth.
+///
+/// These notes are mixed with the melody before arrangement, so `voice::arrange()`
+/// can assign them to Bass and Harmony voice roles.
+fn generate_chord_accompaniment(
+    progression: &[instruments::ProgressionChord],
+    scale: &[f32],
+    tempo: f32,
+    duration_secs: f32,
+    state: &MusicalState,
+    _seed: u64,
+) -> Vec<Note> {
+    if progression.is_empty() || scale.is_empty() {
+        return Vec::new();
+    }
+
+    let beat_dur = 60.0 / tempo;
+    let mut notes = Vec::new();
+    let mut time = 0.0f32;
+
+    // Root frequency: use the lowest scale degree as reference
+    let root_freq = scale.iter().copied().fold(f32::MAX, f32::min).max(60.0);
+
+    // Bass register: one octave below root
+    let bass_octave = root_freq * 0.5;
+
+    // Harmony register: at root level (melody is typically above)
+    let harmony_octave = root_freq;
+
+    // Gesture shapes velocity
+    let gesture = emotional_gestures::gesture_for_emotion(
+        emotional_gestures::detect_emotion(state),
+    );
+    let bass_vel = (0.5 * gesture.velocity_scale).clamp(0.2, 0.8);
+    let harmony_vel = (0.3 * gesture.velocity_scale).clamp(0.15, 0.5);
+
+    // Cycle through progression for the full duration
+    let total_prog_beats: f32 = progression.iter().map(|c| c.duration_beats).sum();
+    if total_prog_beats < 0.1 {
+        return Vec::new();
+    }
+
+    while time < duration_secs {
+        for chord in progression {
+            if time >= duration_secs {
+                break;
+            }
+
+            let chord_dur_secs = chord.duration_beats * beat_dur;
+            let root_ratio = 2.0f32.powf(chord.root_semitones as f32 / 12.0);
+
+            // Bass note: root of the chord, one octave below
+            let bass_freq = bass_octave * root_ratio;
+            notes.push(Note {
+                frequency: bass_freq,
+                start_time: time,
+                duration: chord_dur_secs * 0.9, // slight gap between changes
+                velocity: bass_vel,
+            });
+
+            // Walking bass: add 5th on beat 3 at higher arousal
+            if state.arousal > 0.4 && chord.duration_beats >= 4.0 {
+                let fifth_ratio = 2.0f32.powf(7.0 / 12.0); // perfect 5th
+                notes.push(Note {
+                    frequency: bass_freq * fifth_ratio,
+                    start_time: time + beat_dur * 2.0,
+                    duration: beat_dur * 1.8,
+                    velocity: bass_vel * 0.8,
+                });
+            }
+
+            // Harmony pad: chord tones sustained through the chord
+            let ratios = chord.chord_type.ratios();
+            for (i, &ratio) in ratios.iter().enumerate() {
+                // Skip root (already in bass), start from 3rd
+                if i == 0 {
+                    continue;
+                }
+                let harm_freq = harmony_octave * root_ratio * ratio;
+                notes.push(Note {
+                    frequency: harm_freq,
+                    start_time: time,
+                    duration: chord_dur_secs * 0.95,
+                    velocity: harmony_vel,
+                });
+            }
+
+            time += chord_dur_secs;
+        }
+    }
+
+    notes
 }
 
 #[cfg(test)]
