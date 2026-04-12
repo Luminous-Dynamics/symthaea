@@ -431,6 +431,77 @@ pub fn random_corpus(n: usize, seed: u64) -> Vec<Problem> {
     out
 }
 
+// ─── Difficulty stratification ──────────────────────────────────────────────
+
+/// Difficulty class of a problem, defined operationally as the number of
+/// attempts the strong-heuristic baseline (σ=0, strength=1.0) needs to
+/// solve it. Easy problems are ranked near the top by the baseline; Hard
+/// problems are ranked near the bottom.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum ProblemDifficulty {
+    Easy,   // baseline attempts 1-2
+    Medium, // baseline attempts 3-6
+    Hard,   // baseline attempts 7+
+}
+
+impl ProblemDifficulty {
+    fn contains(self, attempts: usize) -> bool {
+        match self {
+            ProblemDifficulty::Easy => attempts <= 2,
+            ProblemDifficulty::Medium => (3..=6).contains(&attempts),
+            ProblemDifficulty::Hard => attempts >= 7,
+        }
+    }
+}
+
+/// Stratified corpus generation. Generates up to `n_per_tier` problems
+/// at each difficulty tier by sampling the underlying random_corpus and
+/// filtering by baseline-attempts-needed. Returns a HashMap from
+/// difficulty to problem list. Uses the strong heuristic at σ=0 as the
+/// baseline difficulty classifier.
+pub fn stratified_corpus(
+    n_per_tier: usize,
+    seed: u64,
+) -> HashMap<ProblemDifficulty, Vec<Problem>> {
+    let tactics = TacticId::all();
+    let mut easy: Vec<Problem> = Vec::new();
+    let mut medium: Vec<Problem> = Vec::new();
+    let mut hard: Vec<Problem> = Vec::new();
+    let mut baseline = SrTacticSelector::new(0.0, seed);
+    let mut state = seed;
+    let mut generated = 0usize;
+    let max_attempts = n_per_tier * 60; // hard cap to avoid infinite loop
+    while (easy.len() < n_per_tier || medium.len() < n_per_tier || hard.len() < n_per_tier)
+        && generated < max_attempts
+    {
+        generated += 1;
+        // Draw a random tactic id (like random_corpus, but inline so we can
+        // filter).
+        let r = xorshift64(&mut state);
+        let t = tactics[(r % tactics.len() as u64) as usize];
+        let p = Problem::new(
+            &format!("strat_{}", generated),
+            t.native_domain(),
+            t,
+        );
+        // Classify: how many attempts does the strong-heuristic baseline
+        // need to solve this problem? Use solve_scaled at strength=1.0.
+        let attempts = baseline.solve_scaled(&p, &tactics, 1.0);
+        if ProblemDifficulty::Easy.contains(attempts) && easy.len() < n_per_tier {
+            easy.push(p);
+        } else if ProblemDifficulty::Medium.contains(attempts) && medium.len() < n_per_tier {
+            medium.push(p);
+        } else if ProblemDifficulty::Hard.contains(attempts) && hard.len() < n_per_tier {
+            hard.push(p);
+        }
+    }
+    let mut out = HashMap::new();
+    out.insert(ProblemDifficulty::Easy, easy);
+    out.insert(ProblemDifficulty::Medium, medium);
+    out.insert(ProblemDifficulty::Hard, hard);
+    out
+}
+
 /// Solve a problem at a specified heuristic strength. At strength=1.0,
 /// equivalent to `solve()` (strong heuristic); at 0.0, equivalent to
 /// `solve_weak()` (weakest). Used by the 2D sweep.
@@ -990,6 +1061,95 @@ mod tests {
         }
 
         assert_eq!(points.len(), sigmas.len() * strengths.len());
+    }
+
+    // ── Difficulty stratification ──────────────────────────────────────
+
+    #[test]
+    fn test_stratified_corpus_populates_tiers() {
+        let corpus = stratified_corpus(20, 42);
+        assert!(!corpus[&ProblemDifficulty::Easy].is_empty());
+        assert!(!corpus[&ProblemDifficulty::Medium].is_empty());
+        assert!(corpus.contains_key(&ProblemDifficulty::Hard));
+    }
+
+    /// **The difficulty-scaling experiment.** Hypothesis: SR benefit in
+    /// solve rate should SCALE with problem difficulty in the sub-
+    /// threshold regime. Hard problems have more room for baseline to
+    /// be wrong, so noise has more to amplify.
+    #[test]
+    fn test_phase4_5_difficulty_scaling() {
+        let corpus = stratified_corpus(20, 42);
+        let sigmas = [0.00, 0.10, 0.20, 0.30, 0.40];
+        let trials = 50;
+
+        eprintln!("\n════════════════════════════════════════════════════════════");
+        eprintln!("  PHASE 4.5 — DIFFICULTY-STRATIFIED SR SWEEP");
+        eprintln!("  Hypothesis: SR benefit scales with problem difficulty");
+        eprintln!("────────────────────────────────────────────────────────────");
+
+        let tiers = [
+            (ProblemDifficulty::Easy, "Easy  (baseline ≤2 attempts)"),
+            (ProblemDifficulty::Medium, "Medium (baseline 3-6 attempts)"),
+            (ProblemDifficulty::Hard, "Hard  (baseline ≥7 attempts)"),
+        ];
+
+        let mut summary: Vec<(&str, f32, f32, f32, usize)> = Vec::new();
+
+        for (tier, label) in &tiers {
+            let problems = &corpus[tier];
+            if problems.is_empty() {
+                eprintln!("\n  {}: (no problems generated — skipping)", label);
+                continue;
+            }
+            eprintln!("\n  {} ({} problems)", label, problems.len());
+            eprintln!("    σ     │ solve rate │ 95% CI");
+            eprintln!("   ───────┼────────────┼─────────────");
+            let points = sigma_sweep_weak(problems, &sigmas, trials, 42);
+            for pt in &points {
+                let successes = (pt.solve_rate * pt.trials as f32).round() as usize;
+                let (lo, hi) = wilson_ci_95(successes, pt.trials);
+                eprintln!(
+                    "    {:.2}  │   {:5.2}%  │ [{:5.2}%, {:5.2}%]",
+                    pt.sigma,
+                    pt.solve_rate * 100.0,
+                    lo * 100.0,
+                    hi * 100.0
+                );
+            }
+            let baseline = &points[0];
+            let best = points
+                .iter()
+                .max_by(|a, b| a.solve_rate.partial_cmp(&b.solve_rate).unwrap())
+                .unwrap();
+            let delta_pp = (best.solve_rate - baseline.solve_rate) * 100.0;
+            summary.push((
+                label,
+                baseline.solve_rate * 100.0,
+                best.solve_rate * 100.0,
+                delta_pp,
+                problems.len(),
+            ));
+            eprintln!(
+                "    → best σ={:.2}, Δ = {:+.2}pp",
+                best.sigma, delta_pp
+            );
+        }
+
+        eprintln!("\n════════════════════════════════════════════════════════════");
+        eprintln!("  DIFFICULTY × SR BENEFIT SUMMARY");
+        eprintln!("────────────────────────────────────────────────────────────");
+        eprintln!("  tier                  │ n  │ σ=0    │ best σ │ Δ");
+        eprintln!("  ──────────────────────┼────┼────────┼────────┼─────────");
+        for (label, base, best, delta, n) in &summary {
+            eprintln!(
+                "  {:21} │ {:2} │ {:5.1}% │ {:5.1}% │ {:+6.2}pp",
+                label, n, base, best, delta
+            );
+        }
+        eprintln!("════════════════════════════════════════════════════════════");
+
+        assert!(!summary.is_empty());
     }
 
     /// Sanity: the heuristic MUST be imperfect for SR to have room to help.
