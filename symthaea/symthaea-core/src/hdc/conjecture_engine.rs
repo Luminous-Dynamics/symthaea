@@ -2249,4 +2249,94 @@ mod tests {
         assert!(after_mse < before_mse * 0.1,
             "NM should significantly improve: {:.2e} → {:.2e}", before_mse, after_mse);
     }
+
+    /// Can Nelder-Mead recover Hardy-Ramanujan constants given the right skeleton?
+    /// p(n) ≈ a * exp(b * sqrt(n)) / (c * n)
+    /// True: a = 1/(4√3) ≈ 0.1443, b = π√(2/3) ≈ 2.5650, c = 1
+    #[test]
+    fn test_nelder_mead_hardy_ramanujan() {
+        use crate::hdc::combinatorics::partition_count;
+
+        // Build the skeleton: a * exp(b * sqrt(n)) / (c * n)
+        // with initial guesses a=1, b=1, c=1
+        let skeleton = Expr::BinOp(BinOp::Div,
+            Box::new(Expr::BinOp(BinOp::Mul,
+                Box::new(Expr::Const(1.0)), // a
+                Box::new(Expr::Func(UnaryFn::Exp,
+                    Box::new(Expr::BinOp(BinOp::Mul,
+                        Box::new(Expr::Const(1.0)), // b
+                        Box::new(Expr::Func(UnaryFn::Sqrt,
+                            Box::new(Expr::Var("n".into())))))))))),
+            Box::new(Expr::BinOp(BinOp::Mul,
+                Box::new(Expr::Const(1.0)), // c
+                Box::new(Expr::Var("n".into())))));
+
+        let data: Vec<(f64, f64)> = (5..=40)
+            .map(|n| (n as f64, partition_count(n as u64) as f64))
+            .collect();
+
+        let before_mse = compute_mse(&skeleton, &data);
+        let optimized = optimize_constants(&skeleton, &data, 500);
+        let after_mse = compute_mse(&optimized, &data);
+
+        // Extract optimized constants
+        let consts = collect_constants(&optimized);
+        eprintln!("\n═══ HARDY-RAMANUJAN CONSTANT RECOVERY ═══");
+        eprintln!("  Skeleton: a * exp(b * sqrt(n)) / (c * n)");
+        eprintln!("  Before NM: MSE = {:.2e}", before_mse);
+        eprintln!("  After NM:  MSE = {:.2e}", after_mse);
+        if consts.len() >= 3 {
+            let true_a = 1.0 / (4.0 * 3.0_f64.sqrt());
+            let true_b = std::f64::consts::PI * (2.0_f64 / 3.0).sqrt();
+            eprintln!("  Discovered: a={:.6}, b={:.6}, c={:.6}", consts[0], consts[1], consts[2]);
+            eprintln!("  True H-R:   a={:.6}, b={:.6}", true_a, true_b);
+            eprintln!("  a error: {:.1}%", ((consts[0] - true_a) / true_a * 100.0).abs());
+            eprintln!("  b error: {:.1}%", ((consts[1] - true_b) / true_b * 100.0).abs());
+        }
+
+        // Show predictions
+        for n in [10, 20, 30, 40, 50] {
+            let pred = optimized.eval(&[("n", n as f64)]);
+            let actual = if n <= 40 { partition_count(n) as f64 } else { f64::NAN };
+            eprintln!("  p({})={:.0}, predicted={:.0}", n,
+                if actual.is_nan() { -1.0 } else { actual }, pred);
+        }
+
+        assert!(after_mse < before_mse, "NM should improve on wrong constants");
+    }
+
+    /// Combined pipeline: recurrence detection + simplification + GP discovery
+    #[test]
+    fn test_full_pipeline_with_improvements() {
+        // Generate factorial: f(n) = n * f(n-1)
+        let data: Vec<(f64, f64)> = (1..=10)
+            .map(|n| {
+                let mut f = 1u64;
+                for i in 1..=n { f *= i; }
+                (n as f64, f as f64)
+            })
+            .collect();
+
+        // Recurrence detection should find it
+        let rec = detect_recurrence(&data);
+        eprintln!("\n═══ FACTORIAL PIPELINE ═══");
+        if let Some(r) = &rec {
+            eprintln!("  Recurrence detected: {}", r.formula);
+        }
+
+        // GP + NM should find an approximation
+        let seq = ObservedSequence::new("factorial(n)", MathDomain::Combinatorics, data.clone());
+        let mut regressor = SymbolicRegressor::new(RegressorConfig {
+            population_size: 200, generations: 80, max_depth: 4,
+            max_complexity: 12, seed: 42, ..RegressorConfig::default()
+        });
+        let results = regressor.fit(&seq, 3);
+        for r in &results {
+            let simplified = simplify(&r.formula);
+            eprintln!("  GP found: {} (simplified: {}) MSE={:.2e}",
+                r.formula_str, simplified, r.training_mse);
+        }
+
+        assert!(!results.is_empty());
+    }
 }
