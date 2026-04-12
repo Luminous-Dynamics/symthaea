@@ -374,6 +374,7 @@ pub mod diophantine;
 pub mod synthetic_geometry;
 pub mod barycentric;
 pub mod inequalities;
+pub mod sr_tactic;
 pub mod numeric_tower; // Unified numeric tower (N -> Z -> Q -> R) with auto-promotion
 pub mod optimization; // Optimization: gradient descent, Nelder-Mead, L-BFGS
 #[cfg(feature = "parallel")]
