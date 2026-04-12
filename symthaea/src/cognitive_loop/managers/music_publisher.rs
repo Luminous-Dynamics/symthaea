@@ -29,8 +29,8 @@ use crate::cognitive_loop::managers::muse_manager::CompositionExport;
 /// Default Mycelix-Music upload endpoint (local dev instance).
 const DEFAULT_UPLOAD_URL: &str = "http://localhost:8121/api/upload";
 
-/// Default consciousness trigger endpoint (eval-api bridge to Holochain).
-const DEFAULT_TRIGGER_URL: &str = "http://localhost:8090/api/consciousness-compose";
+/// Default consciousness trigger endpoint (consciousness bridge → Holochain).
+const DEFAULT_TRIGGER_URL: &str = "http://localhost:8092/api/consciousness-compose";
 
 /// Upload timeout in seconds.
 const UPLOAD_TIMEOUT_SECS: u64 = 30;

@@ -24,7 +24,10 @@ use web_sys::{CanvasRenderingContext2d, HtmlCanvasElement, MessageEvent, WebSock
 
 use crate::live_synth::{LiveSynth, LiveSynthRunner};
 
-/// Holochain app WebSocket URL (shared ecosystem conductor).
+/// Consciousness bridge WebSocket relay.
+/// Falls back to the Holochain conductor if the bridge isn't running.
+/// Override per-deployment via `window.__HC_CONDUCTOR_URL` in index.html.
+const BRIDGE_WS: &str = "ws://localhost:8893";
 const HC_APP_WS: &str = "ws://localhost:8888";
 
 /// Metadata extracted from a `consciousness_composition` Holochain signal.
@@ -70,10 +73,27 @@ pub fn ConsciousnessPage() -> impl IntoView {
     // `consciousness_composition` signals emitted by the music-bridge zome.
     // Updates `last_comp` and mirrors arousal/valence/phi into the viz.
     Effect::new(move |_| {
-        let ws = match WebSocket::new(HC_APP_WS) {
+        // Try bridge relay first (has signal broadcast); fall back to conductor.
+        // Allow override via window.__HC_CONDUCTOR_URL for production deployments.
+        let url = js_sys::Reflect::get(
+            &wasm_bindgen::JsValue::from(web_sys::window().unwrap()),
+            &wasm_bindgen::JsValue::from_str("__HC_CONDUCTOR_URL"),
+        )
+        .ok()
+        .and_then(|v| v.as_string())
+        .unwrap_or_else(|| {
+            // Try bridge relay first, fall back to conductor
+            if WebSocket::new(BRIDGE_WS).is_ok() {
+                BRIDGE_WS.to_string()
+            } else {
+                HC_APP_WS.to_string()
+            }
+        });
+
+        let ws = match WebSocket::new(&url) {
             Ok(ws) => ws,
             Err(_) => {
-                set_hc_status.set("⚠ conductor unreachable".to_string());
+                set_hc_status.set("⚠ no signal source".to_string());
                 return;
             }
         };
