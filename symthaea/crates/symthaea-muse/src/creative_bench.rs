@@ -104,7 +104,7 @@ pub fn rhythmic_regularity(notes: &[Note]) -> f32 {
         return 0.5;
     }
 
-    let intervals: Vec<f32> = notes
+    let mut intervals: Vec<f32> = notes
         .windows(2)
         .map(|w| (w[1].start_time - w[0].start_time).abs())
         .filter(|&i| i > 0.001)
@@ -114,13 +114,25 @@ pub fn rhythmic_regularity(notes: &[Note]) -> f32 {
         return 0.5;
     }
 
-    let mean = intervals.iter().sum::<f32>() / intervals.len() as f32;
+    // Filter out section boundary gaps: large IOIs (> 3× median) are structural
+    // pauses between song sections, not rhythmic irregularity. Including them
+    // destroys the CV even when within-section rhythm is perfectly regular.
+    intervals.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    let median = intervals[intervals.len() / 2];
+    let threshold = median * 3.0;
+    let filtered: Vec<f32> = intervals.into_iter().filter(|&i| i <= threshold).collect();
+
+    if filtered.is_empty() {
+        return 0.5;
+    }
+
+    let mean = filtered.iter().sum::<f32>() / filtered.len() as f32;
     if mean < 0.001 {
         return 0.5;
     }
 
     let variance =
-        intervals.iter().map(|&i| (i - mean).powi(2)).sum::<f32>() / intervals.len() as f32;
+        filtered.iter().map(|&i| (i - mean).powi(2)).sum::<f32>() / filtered.len() as f32;
     let cv = variance.sqrt() / mean;
 
     // CV=0 (perfectly regular) → 1.0, CV=1.0 (chaotic) → 0.0
@@ -329,6 +341,289 @@ impl CreativeQualityScore {
     }
 }
 
+// ─── Audio Quality Score ─────────────────────────────────────────────────────
+
+/// Audio-level quality metrics computed on the actual waveform, not just notes.
+///
+/// Complements `CreativeQualityScore` (which measures compositional structure)
+/// with perceptual audio features: dynamics, silence, spectral brightness.
+/// These catch problems invisible to note-level analysis (e.g., clipping,
+/// silence from synthesis bugs, harsh timbre).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AudioQualityScore {
+    /// RMS level in dB (loudness). Good music: -20 to -10 dB.
+    pub rms_db: f32,
+    /// Peak level in dB. Should be < 0 dB (no clipping).
+    pub peak_db: f32,
+    /// Crest factor (peak/RMS in dB). Good range: 6-20 dB.
+    pub crest_db: f32,
+    /// Fraction of samples below silence threshold [0, 1]. Good: < 0.3.
+    pub silence_ratio: f32,
+    /// Spectral centroid in Hz (brightness). Music: 500-3000 Hz.
+    pub spectral_centroid: f32,
+    /// Number of clipped samples (|sample| >= 0.999).
+    pub clipped_samples: usize,
+    /// Spectral flatness (Wiener entropy): 0 = tonal, 1 = noise-like.
+    /// Good music: 0.05-0.40 (mostly tonal with some texture).
+    pub spectral_flatness: f32,
+    /// Dynamic range variation: std dev of windowed RMS levels.
+    /// Higher = more expressive dynamics. Good: 3-12 dB.
+    pub dynamic_range_variation_db: f32,
+    /// Harmonic-to-noise ratio estimate (dB). Higher = cleaner tone.
+    /// Good music: > 10 dB.
+    pub harmonic_to_noise_db: f32,
+    /// Composite audio quality [0, 1].
+    pub composite: f32,
+}
+
+impl AudioQualityScore {
+    /// Evaluate audio quality from stereo f32 samples.
+    pub fn evaluate(samples: &[[f32; 2]], sample_rate: u32) -> Self {
+        if samples.is_empty() {
+            return Self {
+                rms_db: -100.0,
+                peak_db: -100.0,
+                crest_db: 0.0,
+                silence_ratio: 1.0,
+                spectral_centroid: 0.0,
+                clipped_samples: 0,
+                spectral_flatness: 0.0,
+                dynamic_range_variation_db: 0.0,
+                harmonic_to_noise_db: 0.0,
+                composite: 0.0,
+            };
+        }
+
+        // Mono mix
+        let mono: Vec<f32> = samples.iter().map(|[l, r]| (l + r) * 0.5).collect();
+        let n = mono.len() as f32;
+
+        // Peak and RMS
+        let peak = mono.iter().map(|s| s.abs()).fold(0.0f32, f32::max);
+        let rms = (mono.iter().map(|s| s * s).sum::<f32>() / n).sqrt();
+
+        let peak_db = if peak > 0.0 { 20.0 * peak.log10() } else { -100.0 };
+        let rms_db = if rms > 0.0 { 20.0 * rms.log10() } else { -100.0 };
+        let crest_db = peak_db - rms_db;
+
+        // Silence ratio
+        let silence_thresh = 0.001f32;
+        let silent = mono.iter().filter(|s| s.abs() < silence_thresh).count();
+        let silence_ratio = silent as f32 / n;
+
+        // Clipping
+        let clipped_samples = mono.iter().filter(|s| s.abs() >= 0.999).count();
+
+        // Spectral centroid (simplified: single FFT over the full signal)
+        // For short signals this is sufficient; for long signals consider windowing.
+        let mut centroid_sum = 0.0f32;
+        let mut magnitude_sum = 0.0f32;
+        let sr = sample_rate as f32;
+        // Use Goertzel-like frequency-band energy estimation (much cheaper than full FFT)
+        // Sample 32 frequency bands from 100 Hz to 8000 Hz
+        for band in 0..32 {
+            let freq = 100.0 * (8000.0f32 / 100.0).powf(band as f32 / 31.0);
+            let omega = 2.0 * std::f32::consts::PI * freq / sr;
+            // Compute energy at this frequency (first 8192 samples for speed)
+            let window = mono.len().min(8192);
+            let mut re = 0.0f32;
+            let mut im = 0.0f32;
+            for (j, &s) in mono[..window].iter().enumerate() {
+                re += s * (omega * j as f32).cos();
+                im += s * (omega * j as f32).sin();
+            }
+            let mag = (re * re + im * im).sqrt();
+            centroid_sum += freq * mag;
+            magnitude_sum += mag;
+        }
+        let spectral_centroid = if magnitude_sum > 0.0 {
+            centroid_sum / magnitude_sum
+        } else {
+            0.0
+        };
+
+        // Spectral flatness: geometric mean / arithmetic mean of power spectrum
+        // Low = tonal (good for music), high = noise-like
+        let spectral_flatness = {
+            let mut band_mags = Vec::with_capacity(32);
+            for band in 0..32 {
+                let freq = 100.0 * (8000.0f32 / 100.0).powf(band as f32 / 31.0);
+                let omega = 2.0 * std::f32::consts::PI * freq / sr;
+                let window = mono.len().min(8192);
+                let mut re = 0.0f32;
+                let mut im = 0.0f32;
+                for (j, &s) in mono[..window].iter().enumerate() {
+                    re += s * (omega * j as f32).cos();
+                    im += s * (omega * j as f32).sin();
+                }
+                band_mags.push((re * re + im * im).sqrt().max(1e-10));
+            }
+            let n_bands = band_mags.len() as f32;
+            let log_geo_mean = band_mags.iter().map(|m| m.ln()).sum::<f32>() / n_bands;
+            let arith_mean = band_mags.iter().sum::<f32>() / n_bands;
+            if arith_mean > 0.0 { (log_geo_mean.exp() / arith_mean).clamp(0.0, 1.0) } else { 0.0 }
+        };
+
+        // Dynamic range variation: std dev of windowed RMS in dB
+        // Higher = more expression (crescendo/decrescendo present)
+        let dynamic_range_variation_db = {
+            let window_size = (sr * 0.1) as usize; // 100ms windows
+            if mono.len() > window_size * 2 {
+                let mut window_rms_db = Vec::new();
+                for chunk in mono.chunks(window_size) {
+                    let rms_w = (chunk.iter().map(|s| s * s).sum::<f32>() / chunk.len() as f32).sqrt();
+                    if rms_w > 1e-6 {
+                        window_rms_db.push(20.0 * rms_w.log10());
+                    }
+                }
+                if window_rms_db.len() > 1 {
+                    let mean_db = window_rms_db.iter().sum::<f32>() / window_rms_db.len() as f32;
+                    let var = window_rms_db.iter().map(|d| (d - mean_db).powi(2)).sum::<f32>()
+                        / window_rms_db.len() as f32;
+                    var.sqrt()
+                } else { 0.0 }
+            } else { 0.0 }
+        };
+
+        // Harmonic-to-noise ratio: ratio of energy at harmonic peaks vs rest
+        // Estimate via autocorrelation peak strength
+        let harmonic_to_noise_db = {
+            let window = mono.len().min(4096);
+            let samples = &mono[..window];
+            // Find autocorrelation peak (pitch period) in lag range 40-500 (88-1102 Hz)
+            let min_lag = (sr / 1102.0) as usize;
+            let max_lag = (sr / 88.0) as usize;
+            let mut best_r = 0.0f32;
+            let energy: f32 = samples.iter().map(|s| s * s).sum();
+            if energy > 1e-8 {
+                for lag in min_lag..max_lag.min(window / 2) {
+                    let mut corr = 0.0f32;
+                    for j in 0..(window - lag) {
+                        corr += samples[j] * samples[j + lag];
+                    }
+                    let r = corr / energy;
+                    if r > best_r { best_r = r; }
+                }
+            }
+            // HNR from autocorrelation: HNR = 10 * log10(r / (1 - r))
+            let r = best_r.clamp(0.01, 0.99);
+            10.0 * (r / (1.0 - r)).log10()
+        };
+
+        // Composite score
+        // Dynamics: RMS between -25 and -8 dB is ideal
+        let dynamics_score = if rms_db > -8.0 {
+            0.5 // too loud
+        } else if rms_db < -40.0 {
+            0.1 // too quiet
+        } else {
+            // Peak at -15 dB
+            let dist = (rms_db + 15.0).abs();
+            (1.0 - dist / 25.0).clamp(0.0, 1.0)
+        };
+
+        // Silence: < 20% is good, > 50% is bad
+        let silence_score = (1.0 - silence_ratio * 2.0).clamp(0.0, 1.0);
+
+        // Clipping: any clipping degrades quality
+        let clip_score = if clipped_samples == 0 { 1.0 } else { 0.3 };
+
+        // Brightness: centroid 500-2500 Hz is musical
+        let brightness_score = (1.0 - (spectral_centroid - 1500.0).abs() / 3000.0).clamp(0.0, 1.0);
+
+        // Crest factor: 6-18 dB is healthy dynamic range
+        let crest_score = if crest_db > 6.0 && crest_db < 18.0 {
+            1.0
+        } else {
+            0.5
+        };
+
+        // Spectral flatness: too flat = noise, too peaked = pure sine
+        let flatness_score = if spectral_flatness > 0.05 && spectral_flatness < 0.40 {
+            1.0
+        } else if spectral_flatness < 0.60 {
+            0.6
+        } else {
+            0.2 // very noise-like
+        };
+
+        // Dynamic variation: expression matters — flat dynamics = robotic
+        let expression_score = if dynamic_range_variation_db > 3.0 && dynamic_range_variation_db < 15.0 {
+            1.0
+        } else if dynamic_range_variation_db > 1.0 {
+            0.6
+        } else {
+            0.3 // flat dynamics
+        };
+
+        // HNR: higher = cleaner harmonic content
+        let hnr_score = if harmonic_to_noise_db > 15.0 {
+            1.0
+        } else if harmonic_to_noise_db > 5.0 {
+            0.7
+        } else {
+            0.4
+        };
+
+        let composite = (0.18 * dynamics_score
+            + 0.15 * silence_score
+            + 0.12 * clip_score
+            + 0.10 * brightness_score
+            + 0.10 * crest_score
+            + 0.10 * flatness_score
+            + 0.15 * expression_score
+            + 0.10 * hnr_score)
+            .clamp(0.0, 1.0);
+
+        Self {
+            rms_db,
+            peak_db,
+            crest_db,
+            silence_ratio,
+            spectral_centroid,
+            clipped_samples,
+            spectral_flatness,
+            dynamic_range_variation_db,
+            harmonic_to_noise_db,
+            composite,
+        }
+    }
+
+    /// Evaluate from mono f32 samples.
+    pub fn evaluate_mono(samples: &[f32], sample_rate: u32) -> Self {
+        let stereo: Vec<[f32; 2]> = samples.iter().map(|&s| [s, s]).collect();
+        Self::evaluate(&stereo, sample_rate)
+    }
+
+    pub fn report(&self) -> String {
+        format!(
+            "Audio Quality Report\n\
+             ════════════════════\n\
+             RMS Level:     {:6.1} dB\n\
+             Peak Level:    {:6.1} dB\n\
+             Crest Factor:  {:6.1} dB\n\
+             Silence:       {:5.1}%\n\
+             Centroid:      {:5.0} Hz\n\
+             Flatness:      {:5.3}\n\
+             Dynamic Var:   {:5.1} dB\n\
+             HNR:           {:5.1} dB\n\
+             Clipped:       {}\n\
+             ────────────────────\n\
+             Audio Score:   {:.3}",
+            self.rms_db,
+            self.peak_db,
+            self.crest_db,
+            self.silence_ratio * 100.0,
+            self.spectral_centroid,
+            self.spectral_flatness,
+            self.dynamic_range_variation_db,
+            self.harmonic_to_noise_db,
+            self.clipped_samples,
+            self.composite,
+        )
+    }
+}
+
 /// Run the full creative benchmark suite on a given musical state.
 ///
 /// Generates multiple compositions across different emotional states and
@@ -342,10 +637,25 @@ pub fn run_benchmark(config: &MuseConfig, state: &MusicalState) -> BenchmarkResu
         (ValenceArousal::new(0.0, 0.5), 5),   // neutral
     ];
 
-    let mut scores = Vec::new();
+    let mut scores: Vec<CreativeQualityScore> = Vec::new();
+    let mut audio_scores: Vec<AudioQualityScore> = Vec::new();
     for (target_va, seed) in &test_cases {
         let comp = crate::compose(config, state, *seed);
         let score = CreativeQualityScore::evaluate(&comp, *target_va);
+        // Audio quality from the actual waveform
+        let audio_score = match &comp.audio {
+            crate::AudioData::StereoF32(samples) => {
+                AudioQualityScore::evaluate(samples, comp.sample_rate)
+            }
+            crate::AudioData::F32(samples) => {
+                AudioQualityScore::evaluate_mono(samples, comp.sample_rate)
+            }
+            crate::AudioData::I16(samples) => {
+                let f: Vec<f32> = samples.iter().map(|&s| s as f32 / 32768.0).collect();
+                AudioQualityScore::evaluate_mono(&f, comp.sample_rate)
+            }
+        };
+        audio_scores.push(audio_score);
         scores.push(score);
     }
 
@@ -356,6 +666,10 @@ pub fn run_benchmark(config: &MuseConfig, state: &MusicalState) -> BenchmarkResu
         mean_emotional_alignment: scores.iter().map(|s| s.emotional_alignment).sum::<f32>() / n,
         mean_form_compliance: scores.iter().map(|s| s.form_compliance).sum::<f32>() / n,
         mean_composite: scores.iter().map(|s| s.composite).sum::<f32>() / n,
+        mean_audio_quality: audio_scores.iter().map(|s| s.composite).sum::<f32>() / n,
+        mean_rms_db: audio_scores.iter().map(|s| s.rms_db).sum::<f32>() / n,
+        mean_silence_ratio: audio_scores.iter().map(|s| s.silence_ratio).sum::<f32>() / n,
+        mean_spectral_centroid: audio_scores.iter().map(|s| s.spectral_centroid).sum::<f32>() / n,
         n_compositions: scores.len(),
     }
 }
@@ -368,6 +682,11 @@ pub struct BenchmarkResult {
     pub mean_emotional_alignment: f32,
     pub mean_form_compliance: f32,
     pub mean_composite: f32,
+    /// Audio-level quality: dynamics, silence, brightness, clipping.
+    pub mean_audio_quality: f32,
+    pub mean_rms_db: f32,
+    pub mean_silence_ratio: f32,
+    pub mean_spectral_centroid: f32,
     pub n_compositions: usize,
 }
 
@@ -386,13 +705,23 @@ impl BenchmarkResult {
              Emotional Alignment: {:.3}\n\
              Form Compliance:     {:.3}\n\
              ──────────────────────────────────\n\
-             Mean Composite:      {:.3}",
+             Mean Composite:      {:.3}\n\n\
+             Audio Quality\n\
+             ══════════════════════════════════\n\
+             Audio Score:         {:.3}\n\
+             RMS Level:           {:.1} dB\n\
+             Silence:             {:.1}%\n\
+             Spectral Centroid:   {:.0} Hz",
             self.n_compositions,
             self.mean_melodic_coherence,
             self.mean_rhythmic_regularity,
             self.mean_emotional_alignment,
             self.mean_form_compliance,
             self.mean_composite,
+            self.mean_audio_quality,
+            self.mean_rms_db,
+            self.mean_silence_ratio * 100.0,
+            self.mean_spectral_centroid,
         )
     }
 }
@@ -578,5 +907,571 @@ mod tests {
         let report = score.report();
         assert!(report.contains("Melodic"));
         assert!(report.contains("Composite"));
+    }
+}
+
+// ─── Music Theory Validation ────────────────────────────────────────────────
+
+/// Theory-level validation of generated music against fundamental musical rules.
+///
+/// Unlike `CreativeQualityScore` (which measures statistical properties) and
+/// `AudioQualityScore` (which measures signal properties), this validates
+/// against *prescriptive* music theory rules that distinguish "correct" from
+/// "wrong" in a formal sense.
+///
+/// # References
+/// - Aldwell, E. & Schachter, C. (2010). *Harmony and Voice Leading*. 4th ed.
+/// - Kostka, S. & Payne, D. (2012). *Tonal Harmony*. 7th ed.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TheoryValidation {
+    /// Fraction of notes that fall on scale degrees [0, 1]. 1.0 = all in scale.
+    pub scale_adherence: f32,
+    /// Fraction of consecutive note pairs that avoid parallel fifths [0, 1].
+    pub parallel_fifth_avoidance: f32,
+    /// Fraction of note onsets that fall on rhythmic grid positions [0, 1].
+    pub rhythmic_quantization: f32,
+    /// Fraction of intervals within a singable range (< octave) [0, 1].
+    pub voice_range_compliance: f32,
+    /// Fraction of phrases with proper contour (arc shape) [0, 1].
+    pub phrase_contour_quality: f32,
+    /// Number of theory violations found.
+    pub violations: usize,
+    /// Composite theory score [0, 1].
+    pub composite: f32,
+}
+
+impl TheoryValidation {
+    /// Validate a composition against music theory rules.
+    ///
+    /// `scale_freqs` is the set of frequencies in the target scale. If empty,
+    /// scale adherence is computed against the chromatic scale (always 1.0).
+    pub fn validate(notes: &[Note], scale_freqs: &[f32]) -> Self {
+        let scale_adherence = Self::compute_scale_adherence(notes, scale_freqs);
+        let parallel_fifth_avoidance = Self::compute_parallel_fifth_avoidance(notes);
+        let rhythmic_quantization = Self::compute_rhythmic_quantization(notes);
+        let voice_range_compliance = Self::compute_voice_range(notes);
+        let phrase_contour_quality = Self::compute_phrase_contour(notes);
+
+        let violations = [
+            scale_adherence < 0.7,
+            parallel_fifth_avoidance < 0.8,
+            rhythmic_quantization < 0.6,
+            voice_range_compliance < 0.7,
+            phrase_contour_quality < 0.5,
+        ]
+        .iter()
+        .filter(|&&v| v)
+        .count();
+
+        let composite = (0.30 * scale_adherence
+            + 0.20 * parallel_fifth_avoidance
+            + 0.20 * rhythmic_quantization
+            + 0.15 * voice_range_compliance
+            + 0.15 * phrase_contour_quality)
+            .clamp(0.0, 1.0);
+
+        Self {
+            scale_adherence,
+            parallel_fifth_avoidance,
+            rhythmic_quantization,
+            voice_range_compliance,
+            phrase_contour_quality,
+            violations,
+            composite,
+        }
+    }
+
+    /// What fraction of notes fall on scale degrees?
+    fn compute_scale_adherence(notes: &[Note], scale_freqs: &[f32]) -> f32 {
+        if notes.is_empty() || scale_freqs.is_empty() {
+            return 1.0; // no scale to violate
+        }
+
+        let mut on_scale = 0usize;
+        for note in notes {
+            // Normalize to within one octave of the nearest scale frequency
+            let pitch_class = note_to_pitch_class(note.frequency);
+            let scale_classes: Vec<f32> = scale_freqs.iter().map(|&f| note_to_pitch_class(f)).collect();
+
+            // Check if this pitch class is within 25 cents of any scale degree
+            let min_distance = scale_classes
+                .iter()
+                .map(|&sc| {
+                    let diff = (pitch_class - sc).abs();
+                    diff.min(12.0 - diff) // wrap around octave
+                })
+                .fold(f32::MAX, f32::min);
+
+            if min_distance < 0.25 {
+                // Within quarter-tone tolerance
+                on_scale += 1;
+            }
+        }
+        on_scale as f32 / notes.len() as f32
+    }
+
+    /// Check for parallel perfect fifths (a voice-leading error in classical theory).
+    fn compute_parallel_fifth_avoidance(notes: &[Note]) -> f32 {
+        if notes.len() < 4 {
+            return 1.0;
+        }
+
+        let mut parallel_fifths = 0usize;
+        let mut total_pairs = 0usize;
+
+        // Check consecutive note pairs for parallel fifth motion
+        for w in notes.windows(4) {
+            let interval_1 = interval_semitones(w[0].frequency, w[1].frequency);
+            let interval_2 = interval_semitones(w[2].frequency, w[3].frequency);
+
+            // Both intervals are perfect fifths (7 semitones) = parallel fifths
+            if (interval_1 - 7.0).abs() < 0.5 && (interval_2 - 7.0).abs() < 0.5 {
+                // Check if motion is parallel (both voices move in same direction)
+                let motion_1 = w[2].frequency - w[0].frequency;
+                let motion_2 = w[3].frequency - w[1].frequency;
+                if motion_1.signum() == motion_2.signum() {
+                    parallel_fifths += 1;
+                }
+            }
+            total_pairs += 1;
+        }
+
+        if total_pairs == 0 {
+            return 1.0;
+        }
+        1.0 - (parallel_fifths as f32 / total_pairs as f32)
+    }
+
+    /// How well do note onsets align with a rhythmic grid?
+    fn compute_rhythmic_quantization(notes: &[Note]) -> f32 {
+        if notes.len() < 2 {
+            return 1.0;
+        }
+
+        // Estimate tempo from median IOI (inter-onset interval)
+        let mut iois: Vec<f32> = notes
+            .windows(2)
+            .map(|w| (w[1].start_time - w[0].start_time).abs())
+            .filter(|&ioi| ioi > 0.01) // ignore simultaneous notes
+            .collect();
+
+        if iois.is_empty() {
+            return 0.5;
+        }
+        iois.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+        let median_ioi = iois[iois.len() / 2];
+
+        if median_ioi < 0.05 {
+            return 0.5; // too short to be meaningful
+        }
+
+        // Check how many onsets fall near grid positions (multiples/subdivisions of median IOI)
+        let grid_sizes = [median_ioi, median_ioi / 2.0, median_ioi / 3.0, median_ioi * 2.0];
+        let tolerance = median_ioi * 0.15; // 15% tolerance
+
+        let mut on_grid = 0usize;
+        for note in notes {
+            let best_grid_dist = grid_sizes
+                .iter()
+                .map(|&grid| {
+                    if grid < 0.01 { return f32::MAX; }
+                    let remainder = note.start_time % grid;
+                    remainder.min(grid - remainder)
+                })
+                .fold(f32::MAX, f32::min);
+
+            if best_grid_dist < tolerance {
+                on_grid += 1;
+            }
+        }
+
+        on_grid as f32 / notes.len() as f32
+    }
+
+    /// What fraction of intervals are within a comfortable singing range?
+    fn compute_voice_range(notes: &[Note]) -> f32 {
+        if notes.len() < 2 {
+            return 1.0;
+        }
+
+        let mut comfortable = 0usize;
+        for w in notes.windows(2) {
+            let semitones = interval_semitones(w[0].frequency, w[1].frequency);
+            // Within an octave (12 semitones) is comfortable for a single voice
+            if semitones <= 12.0 {
+                comfortable += 1;
+            }
+        }
+        comfortable as f32 / (notes.len() - 1) as f32
+    }
+
+    /// Do phrases have proper melodic contour (rise → peak → fall)?
+    fn compute_phrase_contour(notes: &[Note]) -> f32 {
+        if notes.len() < 4 {
+            return 0.5;
+        }
+
+        // Split into phrases at gaps > 0.3s
+        let mut phrases: Vec<Vec<f32>> = Vec::new();
+        let mut current_phrase = vec![notes[0].frequency];
+
+        for w in notes.windows(2) {
+            let gap = w[1].start_time - w[0].start_time - w[0].duration;
+            if gap > 0.3 {
+                if current_phrase.len() >= 3 {
+                    phrases.push(current_phrase.clone());
+                }
+                current_phrase.clear();
+            }
+            current_phrase.push(w[1].frequency);
+        }
+        if current_phrase.len() >= 3 {
+            phrases.push(current_phrase);
+        }
+
+        if phrases.is_empty() {
+            return 0.5;
+        }
+
+        // Score each phrase for arc shape: should have a peak somewhere in the middle
+        let mut good_contours = 0usize;
+        for phrase in &phrases {
+            let max_idx = phrase
+                .iter()
+                .enumerate()
+                .max_by(|a, b| a.1.partial_cmp(b.1).unwrap_or(std::cmp::Ordering::Equal))
+                .map(|(i, _)| i)
+                .unwrap_or(0);
+
+            let relative_peak = max_idx as f32 / (phrase.len() - 1) as f32;
+            // Peak between 20% and 80% of phrase = good arc
+            if relative_peak > 0.15 && relative_peak < 0.85 {
+                good_contours += 1;
+            }
+        }
+
+        good_contours as f32 / phrases.len() as f32
+    }
+
+    pub fn report(&self) -> String {
+        format!(
+            "Music Theory Validation\n\
+             ═══════════════════════\n\
+             Scale Adherence:    {:.1}%\n\
+             Parallel 5th Avoid: {:.1}%\n\
+             Rhythmic Grid:      {:.1}%\n\
+             Voice Range:        {:.1}%\n\
+             Phrase Contour:     {:.1}%\n\
+             Violations:         {}\n\
+             ───────────────────────\n\
+             Theory Score:       {:.3}",
+            self.scale_adherence * 100.0,
+            self.parallel_fifth_avoidance * 100.0,
+            self.rhythmic_quantization * 100.0,
+            self.voice_range_compliance * 100.0,
+            self.phrase_contour_quality * 100.0,
+            self.violations,
+            self.composite,
+        )
+    }
+}
+
+/// Convert frequency to pitch class (0-12, where 0 = C, continuous).
+fn note_to_pitch_class(freq: f32) -> f32 {
+    if freq <= 0.0 { return 0.0; }
+    (12.0 * (freq / 261.63).log2()).rem_euclid(12.0) // relative to C4
+}
+
+/// Interval between two frequencies in semitones.
+fn interval_semitones(f1: f32, f2: f32) -> f32 {
+    if f1 <= 0.0 || f2 <= 0.0 { return 0.0; }
+    (12.0 * (f2 / f1).log2()).abs()
+}
+
+// ─── FAD (Fréchet Audio Distance) ───────────────────────────────────────────
+
+/// Fréchet Audio Distance: the industry-standard metric for generative music.
+///
+/// Compares the statistical distribution of generated audio features against
+/// a reference distribution of real music. Lower FAD = closer to real music.
+///
+/// Since we don't have VGGish/CLAP embeddings available in pure Rust, this
+/// implementation uses hand-crafted audio features (MFCCs approximation via
+/// spectral band energies) as the embedding space. This is less precise than
+/// VGGish FAD but still captures the key distributional differences.
+///
+/// # References
+/// - Kilgour et al. (2019). "Fréchet Audio Distance: A Reference-Free Metric
+///   for Evaluating Music Enhancement Algorithms." INTERSPEECH.
+/// - Hershey et al. (2017). "CNN Architectures for Large-Scale Audio
+///   Classification" (VGGish model).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FadScore {
+    /// Fréchet distance between generated and reference distributions.
+    /// Lower is better. < 5.0 = excellent, < 15.0 = good, > 30.0 = poor.
+    pub fad: f32,
+    /// Number of generated compositions evaluated.
+    pub n_generated: usize,
+    /// Number of reference compositions used.
+    pub n_reference: usize,
+    /// Mean embedding of generated set (for debugging).
+    pub generated_mean: Vec<f32>,
+    /// Mean embedding of reference set (for debugging).
+    pub reference_mean: Vec<f32>,
+}
+
+/// Number of spectral bands used as audio features (pseudo-MFCCs).
+const FAD_N_BANDS: usize = 24;
+
+impl FadScore {
+    /// Compute FAD between generated compositions and a reference set.
+    ///
+    /// `generated`: stereo audio samples from Symthaea compositions.
+    /// `reference`: stereo audio samples from real music (e.g., Spotify likes).
+    /// Both at `sample_rate` Hz.
+    pub fn compute(
+        generated: &[Vec<[f32; 2]>],
+        reference: &[Vec<[f32; 2]>],
+        sample_rate: u32,
+    ) -> Self {
+        let gen_embeddings: Vec<[f32; FAD_N_BANDS]> = generated
+            .iter()
+            .map(|s| Self::extract_embedding(s, sample_rate))
+            .collect();
+        let ref_embeddings: Vec<[f32; FAD_N_BANDS]> = reference
+            .iter()
+            .map(|s| Self::extract_embedding(s, sample_rate))
+            .collect();
+
+        if gen_embeddings.is_empty() || ref_embeddings.is_empty() {
+            return Self {
+                fad: f32::MAX,
+                n_generated: gen_embeddings.len(),
+                n_reference: ref_embeddings.len(),
+                generated_mean: vec![0.0; FAD_N_BANDS],
+                reference_mean: vec![0.0; FAD_N_BANDS],
+            };
+        }
+
+        // Compute means
+        let gen_mean = Self::mean_embedding(&gen_embeddings);
+        let ref_mean = Self::mean_embedding(&ref_embeddings);
+
+        // Compute covariances
+        let gen_cov = Self::covariance(&gen_embeddings, &gen_mean);
+        let ref_cov = Self::covariance(&ref_embeddings, &ref_mean);
+
+        // Fréchet distance: ||mu_g - mu_r||^2 + Tr(C_g + C_r - 2*(C_g*C_r)^0.5)
+        // Simplified: use diagonal covariance (assumes independence between bands)
+        let mean_diff_sq: f32 = gen_mean
+            .iter()
+            .zip(&ref_mean)
+            .map(|(g, r)| (g - r).powi(2))
+            .sum();
+
+        // Diagonal FAD: sum of (var_g + var_r - 2*sqrt(var_g * var_r))
+        let trace_term: f32 = gen_cov
+            .iter()
+            .zip(&ref_cov)
+            .map(|(&vg, &vr)| {
+                let vg = vg.max(0.0);
+                let vr = vr.max(0.0);
+                vg + vr - 2.0 * (vg * vr).sqrt()
+            })
+            .sum();
+
+        let fad = (mean_diff_sq + trace_term).max(0.0);
+
+        Self {
+            fad,
+            n_generated: gen_embeddings.len(),
+            n_reference: ref_embeddings.len(),
+            generated_mean: gen_mean,
+            reference_mean: ref_mean,
+        }
+    }
+
+    /// Extract a pseudo-MFCC embedding from stereo audio.
+    ///
+    /// Uses log-spaced spectral band energies as features (approximation of
+    /// mel-frequency cepstral coefficients without the DCT step).
+    fn extract_embedding(samples: &[[f32; 2]], sample_rate: u32) -> [f32; FAD_N_BANDS] {
+        let sr = sample_rate as f32;
+        let mono: Vec<f32> = samples.iter().map(|[l, r]| (l + r) * 0.5).collect();
+        let window = mono.len().min(16384);
+        let mut bands = [0.0f32; FAD_N_BANDS];
+
+        if window < 64 {
+            return bands;
+        }
+
+        // Log-spaced frequency bands from 50 Hz to 8000 Hz
+        for (b, band) in bands.iter_mut().enumerate() {
+            let freq = 50.0 * (8000.0f32 / 50.0).powf(b as f32 / (FAD_N_BANDS - 1) as f32);
+            let omega = 2.0 * std::f32::consts::PI * freq / sr;
+
+            // Goertzel energy at this frequency
+            let mut re = 0.0f32;
+            let mut im = 0.0f32;
+            for (j, &s) in mono[..window].iter().enumerate() {
+                re += s * (omega * j as f32).cos();
+                im += s * (omega * j as f32).sin();
+            }
+            let energy = (re * re + im * im).sqrt() / window as f32;
+            *band = (energy + 1e-10).ln(); // log energy
+        }
+
+        bands
+    }
+
+    fn mean_embedding(embeddings: &[[f32; FAD_N_BANDS]]) -> Vec<f32> {
+        let n = embeddings.len() as f32;
+        let mut mean = vec![0.0f32; FAD_N_BANDS];
+        for emb in embeddings {
+            for (i, &v) in emb.iter().enumerate() {
+                mean[i] += v;
+            }
+        }
+        for m in &mut mean {
+            *m /= n;
+        }
+        mean
+    }
+
+    fn covariance(embeddings: &[[f32; FAD_N_BANDS]], mean: &[f32]) -> Vec<f32> {
+        let n = embeddings.len() as f32;
+        let mut var = vec![0.0f32; FAD_N_BANDS];
+        for emb in embeddings {
+            for (i, &v) in emb.iter().enumerate() {
+                var[i] += (v - mean[i]).powi(2);
+            }
+        }
+        for v in &mut var {
+            *v /= n.max(1.0);
+        }
+        var
+    }
+
+    pub fn report(&self) -> String {
+        let quality = if self.fad < 5.0 {
+            "Excellent"
+        } else if self.fad < 15.0 {
+            "Good"
+        } else if self.fad < 30.0 {
+            "Fair"
+        } else {
+            "Poor"
+        };
+
+        format!(
+            "Frechet Audio Distance\n\
+             ══════════════════════\n\
+             FAD Score:      {:.2} ({})\n\
+             Generated:      {} compositions\n\
+             Reference:      {} compositions\n\
+             ──────────────────────\n\
+             Interpretation: < 5 excellent, < 15 good, < 30 fair, > 30 poor",
+            self.fad, quality, self.n_generated, self.n_reference,
+        )
+    }
+}
+
+#[cfg(test)]
+mod external_validation_tests {
+    use super::*;
+    use crate::MuseConfig;
+
+    #[test]
+    fn theory_validation_on_composition() {
+        let config = MuseConfig { duration_secs: 2.0, max_notes: 8, ..Default::default() };
+        let state = MusicalState::default();
+        let comp = crate::compose(&config, &state, 42);
+        let scale = crate::pitch::build_scale(&state);
+        let theory = TheoryValidation::validate(&comp.notes, &scale);
+        assert!(theory.composite > 0.0);
+        assert!(theory.scale_adherence >= 0.0 && theory.scale_adherence <= 1.0);
+        assert!(theory.violations <= 5);
+        let report = theory.report();
+        assert!(report.contains("Scale Adherence"));
+    }
+
+    #[test]
+    fn audio_quality_has_new_metrics() {
+        let config = MuseConfig { duration_secs: 1.0, max_notes: 4, ..Default::default() };
+        let state = MusicalState::default();
+        let comp = crate::compose(&config, &state, 42);
+        let aq = match &comp.audio {
+            crate::AudioData::StereoF32(s) => AudioQualityScore::evaluate(s, comp.sample_rate),
+            crate::AudioData::F32(s) => AudioQualityScore::evaluate_mono(s, comp.sample_rate),
+            crate::AudioData::I16(s) => {
+                let f: Vec<f32> = s.iter().map(|&v| v as f32 / 32768.0).collect();
+                AudioQualityScore::evaluate_mono(&f, comp.sample_rate)
+            }
+        };
+        assert!(aq.spectral_flatness >= 0.0 && aq.spectral_flatness <= 1.0);
+        assert!(aq.dynamic_range_variation_db >= 0.0);
+        // HNR can be negative for noise-heavy audio
+        let report = aq.report();
+        assert!(report.contains("Flatness"));
+        assert!(report.contains("HNR"));
+    }
+
+    #[test]
+    fn fad_self_distance_near_zero() {
+        // FAD of a set against itself should be ~0
+        let config = MuseConfig { duration_secs: 1.0, max_notes: 4, ..Default::default() };
+        let state = MusicalState::default();
+
+        let mut compositions = Vec::new();
+        for seed in 0..3 {
+            let comp = crate::compose(&config, &state, seed);
+            if let crate::AudioData::StereoF32(samples) = &comp.audio {
+                compositions.push(samples.clone());
+            }
+        }
+
+        if compositions.len() >= 2 {
+            let fad = FadScore::compute(&compositions, &compositions, 44100);
+            assert!(
+                fad.fad < 1.0,
+                "FAD of set against itself should be near zero, got {}",
+                fad.fad
+            );
+        }
+    }
+
+    #[test]
+    fn fad_different_sets_diverge() {
+        let config = MuseConfig { duration_secs: 1.0, max_notes: 4, ..Default::default() };
+
+        // Set A: calm music
+        let calm = MusicalState { arousal: 0.2, valence: 0.5, ..Default::default() };
+        let mut set_a = Vec::new();
+        for seed in 0..3 {
+            let comp = crate::compose(&config, &calm, seed);
+            if let crate::AudioData::StereoF32(s) = &comp.audio {
+                set_a.push(s.clone());
+            }
+        }
+
+        // Set B: intense music
+        let intense = MusicalState { arousal: 0.9, valence: -0.5, dopamine: 0.8, ..Default::default() };
+        let mut set_b = Vec::new();
+        for seed in 10..13 {
+            let comp = crate::compose(&config, &intense, seed);
+            if let crate::AudioData::StereoF32(s) = &comp.audio {
+                set_b.push(s.clone());
+            }
+        }
+
+        if !set_a.is_empty() && !set_b.is_empty() {
+            let fad_self = FadScore::compute(&set_a, &set_a, 44100);
+            let fad_cross = FadScore::compute(&set_a, &set_b, 44100);
+            assert!(
+                fad_cross.fad > fad_self.fad,
+                "Cross-set FAD ({:.2}) should exceed self FAD ({:.2})",
+                fad_cross.fad, fad_self.fad,
+            );
+        }
     }
 }
