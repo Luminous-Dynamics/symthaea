@@ -28,3 +28,5 @@ pub mod symtropy_sim;
 pub mod full_frame;
 #[cfg(feature = "hal")]
 pub mod hal_bridge;
+#[cfg(feature = "sensors")]
+pub mod sensored_suite;

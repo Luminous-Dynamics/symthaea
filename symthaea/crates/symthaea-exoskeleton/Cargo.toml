@@ -35,10 +35,15 @@ optional = true
 path = "../symthaea-humanoid"
 optional = true
 
+[dependencies.symthaea-sensors]
+path = "../symthaea-sensors"
+optional = true
+
 [features]
 default = []
 symtropy = ["dep:symtropy-physics", "dep:symtropy-math", "dep:nalgebra"]
 hal = ["dep:symthaea-hal", "dep:symthaea-humanoid", "symtropy"]
+sensors = ["dep:symthaea-sensors", "symtropy"]
 
 [[example]]
 name = "full_frame_demo"
