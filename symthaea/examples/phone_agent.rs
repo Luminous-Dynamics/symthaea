@@ -65,72 +65,59 @@ fn main() {
         .and_then(|s| s.parse().ok())
         .unwrap_or(10);
     let interactive = args.iter().any(|a| a == "--interactive");
-    let task: Option<String> = args
+    let task_desc: Option<String> = args
         .iter()
         .position(|a| a == "--task")
         .and_then(|i| args.get(i + 1))
         .cloned();
 
-    // Load goal template if task specified.
-    // Strategy: first capture a reference frame, then learn the template
-    // directly from the live screen patches (avoids resolution mismatch).
-    let goal_hv: Option<symthaea_core::hdc::ContinuousHV> = task.as_ref().and_then(|task_name| {
-        // Known app positions on the Pixel home screen (128×128, 16×16 grid).
-        // YouTube icon center: approximately grid row=5, col=8 (spans 2×2 patches)
-        let known_positions: &[(&str, usize, usize, usize, usize)] = &[
-            // (name, row_start, col_start, rows, cols)
-            ("youtube",     4, 8, 2, 2),
-            ("settings",    8, 8, 2, 2),
-            ("clock",       4, 12, 2, 2),
-            ("spotify",     8, 0, 2, 2),
-            ("authenticator", 4, 0, 2, 2),
-        ];
+    // Known app positions on the Pixel home screen (128×128, 16×16 grid).
+    let known_positions: &[(&str, usize, usize, usize, usize)] = &[
+        ("youtube",       4, 8, 2, 2),
+        ("settings",      8, 8, 2, 2),
+        ("clock",         4, 12, 2, 2),
+        ("spotify",       8, 0, 2, 2),
+        ("authenticator", 4, 0, 2, 2),
+    ];
 
-        let name_lower = task_name.to_lowercase();
-        if let Some(&(_, row, col, rows, cols)) = known_positions.iter().find(|(n, _, _, _, _)| *n == name_lower.as_str()) {
-            // Capture a reference frame first to learn the template from
-            println!("[Goal] Learning template from live screen at grid ({row},{col})...");
-            if phone.capture_and_observe(0.033).is_ok() {
-                if let Some(hv) = phone.learn_template_from_region(row, col, rows, cols) {
-                    println!("[Goal] Learned template from {rows}×{cols} patches");
-                    return Some(hv);
-                }
-            }
-            println!("[Goal] Failed to learn from screen. Falling back to saliency.");
-            None
-        } else {
-            // Try file-based template
-            let template_path = std::path::Path::new("data/phone-templates")
-                .join(format!("{}.png", name_lower.replace(' ', "_")));
-            if template_path.exists() {
-                match phone.learn_template_from_file(&template_path) {
-                    Ok(hv) => {
-                        println!("[Goal] Loaded visual template: {}", template_path.display());
-                        Some(hv)
-                    }
-                    Err(e) => {
-                        eprintln!("[Goal] Template load failed: {e}");
-                        None
-                    }
-                }
-            } else {
-                println!("[Goal] Unknown target \"{task_name}\". Using saliency exploration.");
-                None
-            }
+    // Parse task into multi-step sequence
+    let task = task_desc.as_ref().map(|desc| {
+        let t = symthaea_phone_embodiment::Task::parse(desc);
+        println!("[Task] \"{}\" → {} steps", t.name, t.steps.len());
+        for (i, step) in t.steps.iter().enumerate() {
+            println!("  Step {}: {}", i + 1, step.description);
         }
+        println!();
+        t
     });
 
-    if let Some(ref task_name) = task {
-        println!("[Task] \"find {}\"", task_name);
-        if goal_hv.is_some() {
-            println!("[Strategy] Visual template matching (exploitation)\n");
-        } else {
-            println!("[Strategy] Saliency-driven exploration (no template)\n");
+    // Learn template for the first app target (if task has one)
+    let mut goal_hv: Option<symthaea_core::hdc::ContinuousHV> = None;
+    if let Some(ref t) = task {
+        if let Some(step) = t.steps.first() {
+            if let symthaea_phone_embodiment::StepTarget::AppByName(ref name) = step.target {
+                if let Some(&(_, row, col, rows, cols)) = known_positions
+                    .iter()
+                    .find(|(n, _, _, _, _)| *n == name.as_str())
+                {
+                    println!("[Goal] Learning template for \"{name}\" from screen...");
+                    if phone.capture_and_observe(0.033).is_ok() {
+                        if let Some(hv) = phone.learn_template_from_region(row, col, rows, cols) {
+                            println!("[Goal] Learned from {rows}×{cols} patches\n");
+                            goal_hv = Some(hv);
+                        }
+                    }
+                }
+            }
         }
-    } else if interactive {
-        println!("[Mode] Interactive — Symthaea proposes, you confirm\n");
-    } else {
-        println!("[Mode] Autonomous — Symthaea acts on her own ({max_steps} steps)\n");
+    }
+
+    if task.is_none() {
+        if interactive {
+            println!("[Mode] Interactive\n");
+        } else {
+            println!("[Mode] Autonomous saliency exploration ({max_steps} steps)\n");
+        }
     }
 
     // Disable confirmation mode for autonomous operation.
@@ -140,6 +127,113 @@ fn main() {
     let stdin = io::stdin();
     let mut stdout = io::stdout();
 
+    // ══════════════════════════════════════════════════════════════════
+    // MULTI-STEP TASK EXECUTOR
+    // ══════════════════════════════════════════════════════════════════
+    if let Some(ref t) = task {
+        use symthaea_phone_embodiment::{StepAction, StepTarget};
+
+        for (step_idx, task_step) in t.steps.iter().enumerate() {
+            println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+            println!("Task Step {}/{}: {}", step_idx + 1, t.steps.len(), task_step.description);
+
+            let mut success = false;
+            for attempt in 1..=task_step.max_attempts {
+                // Perceive
+                if phone.capture_and_observe(0.033).is_err() {
+                    println!("  [ERR] Capture failed, retrying...");
+                    continue;
+                }
+                let tel = phone.vision().telemetry().clone();
+                println!("  [{attempt}] PE={:.3} ImgSurp={:.3}", tel.prediction_error, tel.imagination_surprise);
+
+                // Execute action based on step type
+                match &task_step.action {
+                    StepAction::Tap => {
+                        // Find target and tap it
+                        let action = match &task_step.target {
+                            StepTarget::AppByName(_) => {
+                                if let Some(ref ghv) = goal_hv {
+                                    phone.propose_goal_action(phi, ghv, 0.3)
+                                } else {
+                                    phone.propose_action(phi)
+                                }
+                            }
+                            StepTarget::MostSalient => phone.propose_action(phi),
+                            StepTarget::GridRegion { row, col, .. } => {
+                                let (sx, sy) = phone.grid_to_screen(*row, *col);
+                                symthaea_phone_embodiment::PhoneAction::Tap { x: sx, y: sy }
+                            }
+                            StepTarget::None => symthaea_phone_embodiment::PhoneAction::NoOp,
+                        };
+                        let sim_info = phone.last_match_similarity()
+                            .map(|s| format!(" sim={s:.3}"))
+                            .unwrap_or_default();
+                        println!("  ACTION: {}{sim_info}", action.label());
+                        if let Err(e) = phone.execute_action(&action) {
+                            println!("  [ERR] {e}");
+                            continue;
+                        }
+                    }
+                    StepAction::Type(text) => {
+                        println!("  ACTION: type \"{text}\"");
+                        let action = symthaea_phone_embodiment::PhoneAction::Type { text: text.clone() };
+                        if let Err(e) = phone.execute_action(&action) {
+                            println!("  [ERR] {e}");
+                            continue;
+                        }
+                    }
+                    StepAction::ScrollDown => {
+                        let mid_x = 504; // screen center
+                        let action = symthaea_phone_embodiment::PhoneAction::Swipe {
+                            x1: mid_x, y1: 1500, x2: mid_x, y2: 700, duration_ms: 300,
+                        };
+                        println!("  ACTION: scroll down");
+                        let _ = phone.execute_action(&action);
+                    }
+                    StepAction::Back => {
+                        let _ = phone.execute_action(&symthaea_phone_embodiment::PhoneAction::Back);
+                        println!("  ACTION: back");
+                    }
+                    StepAction::Home => {
+                        let _ = phone.execute_action(&symthaea_phone_embodiment::PhoneAction::Home);
+                        println!("  ACTION: home");
+                    }
+                    StepAction::WaitForTransition => {
+                        println!("  Waiting for screen to settle...");
+                    }
+                }
+
+                // Wait and detect transition
+                std::thread::sleep(std::time::Duration::from_millis(1000));
+                if phone.capture_and_observe(0.033).is_ok() {
+                    let (transitioned, conf) = phone.detect_state_transition();
+                    if transitioned {
+                        println!("  [TRANSITION] confidence={conf:.3}");
+                        success = true;
+                        break;
+                    } else {
+                        println!("  [STABLE] Retrying...");
+                    }
+                }
+            }
+
+            if success {
+                println!("  [OK] Step complete.");
+            } else {
+                println!("  [FAIL] Step failed after {} attempts.", task_step.max_attempts);
+            }
+            println!();
+        }
+
+        println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+        println!("Task \"{}\" complete.", t.name);
+        std::process::exit(0);
+    }
+
+    // ══════════════════════════════════════════════════════════════════
+    // SALIENCY EXPLORATION LOOP (no task specified)
+    // ══════════════════════════════════════════════════════════════════
     for step in 1..=max_steps {
         println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
         println!("Step {step}/{max_steps}: Perceiving...");

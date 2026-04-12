@@ -30,6 +30,8 @@
 pub mod adb;
 pub mod bridge;
 pub mod actions;
+pub mod task;
 
 pub use actions::PhoneAction;
 pub use bridge::PhoneBridge;
+pub use task::{Task, TaskStep, StepTarget, StepAction};
