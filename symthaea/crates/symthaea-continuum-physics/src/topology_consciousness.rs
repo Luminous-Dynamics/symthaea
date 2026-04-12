@@ -145,12 +145,16 @@ pub fn topology_scores(
     let measure = 3000;
 
     (0..n_configs).map(|c| {
-        let coupling = 0.1 + (c as f64 / n_configs as f64) * 0.9;
-        let i_ext = 0.3 + (c as f64 / n_configs as f64) * 0.4;
+        // Vary coupling across critical regime
+        let coupling = 0.005 + (c as f64 / n_configs as f64) * 0.5;
+        let base_i_ext = 0.4 + (c as f64 / n_configs as f64) * 0.2;
 
         let mut net = build_network(n, topology, coupling);
-        for osc in &mut net.oscillators {
-            osc.i_ext = i_ext;
+        // HETEROGENEOUS drive: each oscillator has different natural frequency
+        // This prevents trivial synchronization from identical dynamics
+        for (i, osc) in net.oscillators.iter_mut().enumerate() {
+            let spread = 0.3; // Frequency spread
+            osc.i_ext = base_i_ext + spread * (i as f64 / n as f64 - 0.5);
         }
 
         // Warm up
