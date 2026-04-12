@@ -31,6 +31,8 @@ pub enum StepTarget {
         rows: usize,
         cols: usize,
     },
+    /// Tap at a known screen coordinate (for in-app elements).
+    ScreenCoord { x: u32, y: u32 },
     /// Use the highest-saliency working memory object (exploration).
     MostSalient,
     /// No target needed (e.g., for typing into the focused field).
@@ -92,10 +94,19 @@ impl Task {
                             max_attempts: 1,
                         },
                         TaskStep {
-                            description: "Tap search area".to_string(),
-                            target: StepTarget::MostSalient,
+                            description: "Tap search icon".to_string(),
+                            // YouTube/most apps: search icon top-right area.
+                            // On 1008×2244 screen → grid (0,14) at 128×128.
+                            // Known screen coordinates: ~(940, 80)
+                            target: StepTarget::ScreenCoord { x: 940, y: 80 },
                             action: StepAction::Tap,
                             max_attempts: 2,
+                        },
+                        TaskStep {
+                            description: "Wait for search field".to_string(),
+                            target: StepTarget::None,
+                            action: StepAction::WaitForTransition,
+                            max_attempts: 1,
                         },
                         TaskStep {
                             description: format!("Type \"{query}\""),

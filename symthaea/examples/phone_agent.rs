@@ -164,6 +164,9 @@ fn main() {
                                 let (sx, sy) = phone.grid_to_screen(*row, *col);
                                 symthaea_phone_embodiment::PhoneAction::Tap { x: sx, y: sy }
                             }
+                            StepTarget::ScreenCoord { x, y } => {
+                                symthaea_phone_embodiment::PhoneAction::Tap { x: *x, y: *y }
+                            }
                             StepTarget::None => symthaea_phone_embodiment::PhoneAction::NoOp,
                         };
                         let sim_info = phone.last_match_similarity()
