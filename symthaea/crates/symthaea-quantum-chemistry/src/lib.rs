@@ -38,6 +38,7 @@
 pub mod basis;
 pub mod bridge;
 pub mod consciousness;
+// must come after consciousness, quantum_info, stat_mech, time_dependent, post_hf
 pub mod constants;
 pub mod coupled_cluster;
 pub mod dft;
@@ -46,6 +47,7 @@ pub mod geometry_opt;
 pub mod integrals;
 pub mod molecular_dynamics;
 pub mod molecule;
+pub mod multi_theory;
 pub mod post_hf;
 pub mod quantum_info;
 pub mod scf;
