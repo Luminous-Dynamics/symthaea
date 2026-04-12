@@ -5,3 +5,5 @@
 #![deny(unsafe_code)]
 pub mod types; pub mod encoder; pub mod controller; pub mod simulator;
 pub mod embodiment; pub mod fep_agent; pub mod perturbations; pub mod training; pub mod plugin;
+#[cfg(feature = "symtropy")]
+pub mod symtropy_sim;
