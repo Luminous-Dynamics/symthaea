@@ -980,12 +980,13 @@ impl CognitiveLoopConfig {
         domain_profile: crate::domain::DomainProfile,
     ) -> Self {
         let capability = crate::domain::PlatformCapabilityProfile::for_platform(platform);
+        let resolved_domain = if capability.supports_domain(&domain_profile.kind) {
+            domain_profile
+        } else {
+            capability.preferred_domain_profile()
+        };
         let mut config = Self {
-            domain_profile: if capability.supports_domain(&domain_profile.kind) {
-                domain_profile
-            } else {
-                capability.preferred_domain_profile()
-            },
+            domain_profile: resolved_domain,
             ..Default::default()
         };
         #[cfg(feature = "humanoid")]
