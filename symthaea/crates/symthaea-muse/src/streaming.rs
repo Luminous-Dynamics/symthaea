@@ -740,13 +740,27 @@ impl StreamingSynth {
         let tempo = self.muse_stream.tempo();
         self.samples_per_bar = ((60.0 / tempo) * 4.0 * self.sample_rate as f32) as usize;
         if self.bar_sample_pos >= self.samples_per_bar || self.drum_hits.is_empty() {
-            self.drum_hits = percussion::generate_pattern(
+            self.drum_hits = percussion::generate_pattern_full(
                 tempo,
                 self.state.consciousness_level,
                 self.state.arousal,
+                self.state.dopamine,
+                self.state.valence,
+            );
+            // Humanize timing for organic feel
+            percussion::humanize_hits(
+                &mut self.drum_hits,
+                self.state.consciousness_level,
+                self.chunks_rendered as u32,
             );
             self.bar_sample_pos = 0;
         }
+        // Emotional coloring: consciousness state shapes drum timbre
+        let drum_color = percussion::DrumColor {
+            tightness: self.state.noradrenaline.clamp(0.0, 1.0),
+            brightness: self.state.dopamine.clamp(0.0, 1.0),
+            warmth: self.state.valence.clamp(-1.0, 1.0),
+        };
         // Render drum hits into the buffer
         for hit in &self.drum_hits {
             let hit_sample = (hit.time * self.sample_rate as f32) as usize;
@@ -754,12 +768,13 @@ impl StreamingSynth {
                 && hit_sample < self.bar_sample_pos + self.chunk_samples
             {
                 let local_offset = hit_sample - self.bar_sample_pos;
-                let drum_buf = percussion::render_drum(hit, self.sample_rate);
+                let drum_buf = percussion::render_drum_colored(hit, self.sample_rate, &drum_color);
                 for (j, &s) in drum_buf.iter().enumerate() {
                     let idx = local_offset + j;
                     if idx < buffer.len() {
-                        // Drums: arousal drives volume. Soft-clipped to prevent crackling.
-                        let drum_gain = 0.12 + self.state.arousal * 0.18;
+                        // Drums: consciousness-weighted gain with emotion
+                        let drum_gain = 0.15 + self.state.arousal * 0.15
+                            + self.state.dopamine * 0.05;
                         buffer[idx][0] += s * drum_gain;
                         buffer[idx][1] += s * drum_gain;
                     }
@@ -1178,7 +1193,8 @@ impl StreamingSynth {
 
             // Apply full emotional gesture: direction + duration + staccato + velocity + tension
             {
-                let scale = crate::pitch::build_scale(&self.state);
+                let tuning = crate::pitch::select_tuning_system(&self.state);
+                let scale = crate::pitch::build_scale_with_tuning(&self.state, &tuning);
                 note.frequency = emotional_gestures::apply_gesture_to_pitch(
                     note.frequency,
                     self.prev_note_freq,
@@ -1243,10 +1259,28 @@ impl StreamingSynth {
 
             // Collect for MIDI export — hard clamp to singable MIDI range
             let midi_freq = note.frequency.clamp(196.0, 988.0); // G3 (MIDI 55) to B5 (MIDI 83)
+            // Quantize start_time to the nearest 8th-note grid position.
+            // Without quantization, notes land at chunk boundaries (arbitrary),
+            // producing chaotic inter-onset intervals and 0.07 rhythmic regularity.
+            // With quantization, notes snap to a musical pulse (CV→0, regularity→0.5+).
+            let raw_time = self.total_samples_rendered as f32 / self.sample_rate as f32;
+            let beat_dur = 60.0 / self.muse_stream.tempo().max(30.0); // seconds per beat
+            let grid_unit = beat_dur * 0.5; // 8th-note grid
+            let quantized_time = if grid_unit > 0.01 {
+                (raw_time / grid_unit).round() * grid_unit
+            } else {
+                raw_time
+            };
+            // Also quantize note duration to multiples of the grid unit for rhythmic coherence
+            let quantized_duration = if grid_unit > 0.01 {
+                ((note.duration / grid_unit).round().max(1.0)) * grid_unit
+            } else {
+                note.duration
+            };
             self.generated_notes.push(crate::Note {
                 frequency: midi_freq,
-                start_time: self.total_samples_rendered as f32 / self.sample_rate as f32,
-                duration: note.duration,
+                start_time: quantized_time,
+                duration: quantized_duration,
                 velocity: note.velocity,
             });
             self.prev_note_freq = Some(note.frequency);
@@ -1425,6 +1459,16 @@ impl StreamingSynth {
     pub fn tempo(&self) -> f32 {
         self.muse_stream.tempo()
     }
+    /// Snapshot motif memory for cross-session persistence.
+    pub fn motif_snapshot(&self) -> crate::motif_memory::MotifSnapshot {
+        self.motif.to_snapshot()
+    }
+
+    /// Restore motif memory from a saved snapshot.
+    pub fn restore_motif(&mut self, snapshot: &crate::motif_memory::MotifSnapshot) {
+        self.motif = MotifMemory::from_snapshot(snapshot);
+    }
+
     pub fn phi_metrics(&self) -> Option<crate::phi_optimizer::PhiOptimizerMetrics> {
         if self.enable_phi_optimizer {
             Some(self.phi_optimizer.metrics())
