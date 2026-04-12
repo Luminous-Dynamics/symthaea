@@ -22,6 +22,8 @@ use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
 use web_sys::{CanvasRenderingContext2d, HtmlCanvasElement, MessageEvent, WebSocket};
 
+use crate::live_synth::{LiveSynth, LiveSynthRunner};
+
 /// Holochain app WebSocket URL (shared ecosystem conductor).
 const HC_APP_WS: &str = "ws://localhost:8888";
 
@@ -56,6 +58,10 @@ pub fn ConsciousnessPage() -> impl IntoView {
 
     // Keeps the WebSocket alive for the component lifetime (WebSocket is !Send → new_local)
     let _ws_handle = StoredValue::new_local(Option::<WebSocket>::None);
+
+    // Live synthesis engine — creates Web Audio graph, renders consciousness-driven audio
+    let synth_runner: StoredValue<Option<Rc<RefCell<LiveSynthRunner>>>, LocalStorage> =
+        StoredValue::new_local(None);
 
     let canvas_ref = NodeRef::<leptos::html::Canvas>::new();
 
@@ -122,11 +128,16 @@ pub fn ConsciousnessPage() -> impl IntoView {
                     narrative_tags: get_string_array(obj, "narrative_tags"),
                 };
 
-                // Mirror signal values into the viz sliders
+                // Mirror signal values into the viz sliders (triggers synth state update via Effect)
                 set_arousal2.set(meta.arousal as f64);
                 set_valence2.set(meta.valence as f64);
                 set_phi2.set(meta.phi_score as f64);
                 set_comp.set(Some(meta));
+
+                // Auto-start synth on first signal if not already playing
+                if !is_playing.get_untracked() {
+                    set_playing.set(true);
+                }
             }) as Box<dyn FnMut(MessageEvent)>);
             ws.set_onmessage(Some(on_msg.as_ref().unchecked_ref()));
             on_msg.forget();
@@ -134,6 +145,45 @@ pub fn ConsciousnessPage() -> impl IntoView {
 
         // Keep WebSocket alive for the component lifetime
         _ws_handle.set_value(Some(ws));
+    });
+
+    // Reactive synth lifecycle — start/stop the Web Audio engine when is_playing changes.
+    // This lets both the button and auto-start (from HC signals) control audio.
+    Effect::new(move |_| {
+        let playing = is_playing.get();
+        synth_runner.update_value(|r| {
+            if playing && r.is_none() {
+                // Start
+                if let Ok(ls) = LiveSynth::new() {
+                    let engine = ls.engine();
+                    engine.borrow_mut().set_state(
+                        arousal.get_untracked() as f32,
+                        valence.get_untracked() as f32,
+                        phi.get_untracked() as f32,
+                    );
+                    *r = Some(ls.start());
+                }
+            } else if !playing && r.is_some() {
+                // Stop
+                if let Some(runner) = r.as_ref() {
+                    runner.borrow_mut().stop();
+                }
+                *r = None;
+            }
+        });
+    });
+
+    // Reactive synth state update — whenever arousal/valence/phi change (slider or signal),
+    // push the new state into the running synth engine so audio tracks consciousness live.
+    Effect::new(move |_| {
+        let a = arousal.get() as f32;
+        let v = valence.get() as f32;
+        let p = phi.get() as f32;
+        synth_runner.with_value(|r| {
+            if let Some(runner) = r.as_ref() {
+                runner.borrow().engine().borrow_mut().set_state(a, v, p);
+            }
+        });
     });
 
     // Derived emotion label from V-A quadrant
@@ -355,7 +405,7 @@ pub fn ConsciousnessPage() -> impl IntoView {
                 </div>
             </div>
 
-            // Play/Stop button
+            // Play/Stop button — toggles is_playing; the lifecycle Effect handles the rest
             <div class="consciousness-playback">
                 <button
                     class="btn btn-primary consciousness-play-btn"

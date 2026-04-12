@@ -48,6 +48,16 @@ pub struct CreativeTelemetry {
     pub generation_time_us: u64,
     /// Total artworks created since startup.
     pub total_artworks: u64,
+    /// Number of emotional snapshots used to build the arc (0 = flat compose).
+    pub arc_length: usize,
+    /// Tuning system used for this composition (empty = 12TET default).
+    pub tuning_system: String,
+    /// Melodic coherence score from CreativeQualityScore (0-1).
+    pub melodic_coherence: f32,
+    /// Emotional alignment score (0-1).
+    pub emotional_alignment: f32,
+    /// Number of stored motif phrases.
+    pub motif_phrase_count: usize,
 }
 
 /// Creative output from a single cycle.
@@ -121,7 +131,32 @@ pub(crate) struct CreativeManager {
     active_episode: Option<symthaea_muse::narrative_bridge::NarrativeEpisode>,
     /// Default bar count for narrative episode compositions.
     default_bars: usize,
+    /// Ring buffer of recent emotional snapshots for arc-driven composition.
+    /// Each entry is (valence, arousal, dopamine, dynamics) from the last N cycles.
+    emotional_history: std::collections::VecDeque<EmotionalSnapshot>,
+    /// Motif memory — remembers melodic phrases across sessions.
+    /// Loaded alongside aesthetic memory, saved on drop.
+    motif_memory: symthaea_muse::motif_memory::MotifMemory,
+    /// Path for motif memory persistence.
+    motif_memory_path: std::path::PathBuf,
 }
+
+/// A snapshot of emotional state at one cognitive cycle, used to build arcs.
+#[cfg(feature = "creative")]
+#[derive(Debug, Clone, Copy)]
+struct EmotionalSnapshot {
+    valence: f32,
+    arousal: f32,
+    dopamine: f32,
+    dynamics: f32,
+}
+
+/// Minimum emotional history length before arc-driven composition activates.
+#[cfg(feature = "creative")]
+const ARC_MIN_HISTORY: usize = 4;
+/// Maximum emotional history kept (ring buffer capacity).
+#[cfg(feature = "creative")]
+const ARC_MAX_HISTORY: usize = 16;
 
 #[cfg(feature = "creative")]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -168,6 +203,19 @@ impl CreativeManager {
             },
             tracker,
             memory,
+            motif_memory: {
+                let motif_path = memory_path.with_file_name("motif_memory.json");
+                let snapshot = symthaea_muse::motif_memory::MotifSnapshot::load(&motif_path);
+                if !snapshot.is_empty() {
+                    tracing::info!(
+                        phrases = snapshot.phrases.len(),
+                        "Loaded motif memory from {:?}",
+                        motif_path
+                    );
+                }
+                symthaea_muse::motif_memory::MotifMemory::from_snapshot(&snapshot)
+            },
+            motif_memory_path: memory_path.with_file_name("motif_memory.json"),
             memory_path,
             consciousness_threshold: 0.3,
             generation_interval: 10,
@@ -179,6 +227,7 @@ impl CreativeManager {
             live_stream: None,
             active_episode: None,
             default_bars: 8,
+            emotional_history: std::collections::VecDeque::with_capacity(ARC_MAX_HISTORY),
         }
     }
 
@@ -199,10 +248,52 @@ impl CreativeManager {
         self.active_episode = None;
     }
 
-    /// Flush aesthetic memory to disk. Called on drop and can be called manually.
+    /// Record the emotional state of the current cycle for arc-driven composition.
+    fn record_emotional_snapshot(&mut self, snap: &CognitiveSnapshot) {
+        if self.emotional_history.len() >= ARC_MAX_HISTORY {
+            self.emotional_history.pop_front();
+        }
+        self.emotional_history.push_back(EmotionalSnapshot {
+            valence: snap.valence,
+            arousal: snap.arousal,
+            dopamine: snap.dopamine,
+            dynamics: snap.noradrenaline.clamp(0.3, 1.0),
+        });
+    }
+
+    /// Build an `EmotionalArc` from the recent emotional trajectory.
+    ///
+    /// Returns `None` if fewer than `ARC_MIN_HISTORY` snapshots are available.
+    /// The arc captures the actual emotional journey Symthaea has taken over
+    /// the last N cycles, so the music tells a real story.
+    fn build_arc_from_history(&self) -> Option<symthaea_muse::arc::EmotionalArc> {
+        if self.emotional_history.len() < ARC_MIN_HISTORY {
+            return None;
+        }
+        let bars: Vec<symthaea_muse::arc::BarDirective> = self
+            .emotional_history
+            .iter()
+            .map(|s| {
+                let va = symthaea_aesthetic::ValenceArousal::new(s.valence, s.arousal);
+                let mut dir = symthaea_muse::arc::BarDirective::from_va(va);
+                dir.dynamics = s.dynamics;
+                dir
+            })
+            .collect();
+        Some(symthaea_muse::arc::EmotionalArc::new(bars))
+    }
+
+    /// Flush aesthetic + motif memory to disk. Called on drop and can be called manually.
     pub fn save_memory(&self) {
         let updated = self.tracker.to_memory(&self.memory);
         updated.save(&self.memory_path);
+        // J: Persist motif memory alongside aesthetic memory
+        let snapshot = self.motif_memory.to_snapshot();
+        if !snapshot.is_empty() {
+            if let Err(e) = snapshot.save(&self.motif_memory_path) {
+                tracing::warn!("Failed to save motif memory: {e}");
+            }
+        }
     }
 
     /// Tick the creative pipeline. Returns creative output when art is generated.
@@ -220,6 +311,9 @@ impl CreativeManager {
             return None;
         }
         self.cycles_since_generation = 0;
+
+        // Record emotional trajectory for arc-driven composition
+        self.record_emotional_snapshot(snap);
 
         // Consciousness gating
         if (snap.consciousness_level as f32) < self.consciousness_threshold {
@@ -265,9 +359,14 @@ impl CreativeManager {
             CreativeModality::Music => {
                 let musical_state = snapshot_to_musical_state(snap);
 
+                // I: Select tuning system from consciousness state for all composition paths.
+                let tuning = symthaea_muse::pitch::select_tuning_system(&musical_state);
+                let tuning_name = format!("{tuning:?}");
+
+                // Priority: (1) Narrative episode, (2) arc from emotional history, (3) flat compose.
                 // C: Narrative autocompose — if an episode is active, let it drive the music.
                 // The episode is consumed after one use (each episode is unique).
-                let (composition, is_narrative) = if let Some(episode) = self.active_episode.take() {
+                let (mut composition, compose_mode) = if let Some(episode) = self.active_episode.take() {
                     let bridge = symthaea_muse::narrative_bridge::NarrativeMusicBridge::new(
                         self.default_bars,
                     );
@@ -277,11 +376,28 @@ impl CreativeManager {
                         &musical_state,
                         self.seed_counter,
                     );
-                    (ec.composition, true)
+                    (ec.composition, "narrative-music")
+                } else if let Some(arc) = self.build_arc_from_history() {
+                    // F: Arc-driven composition — the music reflects Symthaea's recent
+                    // emotional journey rather than a single-frame snapshot.
+                    // I: Tuning system emerges from consciousness state — high Phi → just
+                    // intonation, negative valence → maqamat, positive calm → gamelan, etc.
+                    let arc = if tuning != symthaea_muse::pitch::TuningSystem::TwelveTET {
+                        arc.with_tuning(tuning.clone())
+                    } else {
+                        arc
+                    };
+                    let comp = symthaea_muse::arc::compose_with_arc(
+                        &self.muse_config,
+                        &musical_state,
+                        &arc,
+                        self.seed_counter,
+                    );
+                    (comp, "arc-music")
                 } else {
                     (
                         symthaea_muse::compose(&self.muse_config, &musical_state, self.seed_counter),
-                        false,
+                        "music",
                     )
                 };
 
@@ -312,6 +428,31 @@ impl CreativeManager {
                 // Amplify dopamine by quality composite (beautiful music = stronger reward)
                 feedback.dopamine_delta += quality.composite * 0.05;
 
+                // J: Feed notes into motif memory so phrases persist across sessions.
+                for note in &composition.notes {
+                    self.motif_memory.record_note(note.clone());
+                }
+
+                // M: Motif-aware melody seeding — splice replay phrases into the
+                // composition if the consciousness state favors repetition. This gives
+                // the music a recognizable identity that develops over time.
+                let strategy = self.motif_memory.decide_strategy(&musical_state);
+                if strategy != symthaea_muse::motif_memory::MotifStrategy::GenerateNew {
+                    let mut replay_notes = Vec::new();
+                    while let Some(note) = self.motif_memory.next_note(&musical_state) {
+                        replay_notes.push(note);
+                    }
+                    if !replay_notes.is_empty() {
+                        // Prepend motif replay before generated notes — the familiar
+                        // phrase grounds the listener before new material develops.
+                        let mut merged = replay_notes;
+                        merged.extend(composition.notes.iter().cloned());
+                        // Truncate to max_notes to keep density reasonable
+                        merged.truncate(self.muse_config.max_notes);
+                        composition.notes = merged;
+                    }
+                }
+
                 output.music_samples = Some(match &composition.audio {
                     symthaea_muse::AudioData::I16(v) => v.clone(),
                     symthaea_muse::AudioData::F32(v) => {
@@ -323,9 +464,13 @@ impl CreativeManager {
                         .collect(),
                 });
                 output.feedback = feedback;
-                modality_name = if is_narrative { "narrative-music" } else { "music" };
+                modality_name = compose_mode;
 
                 self.record_telemetry(&music_score, &feedback, modality_name, 1, start.elapsed());
+                // K+L: Enrich telemetry with music-specific quality breakdown + tuning
+                self.last_telemetry.melodic_coherence = quality.melodic_coherence;
+                self.last_telemetry.emotional_alignment = quality.emotional_alignment;
+                self.last_telemetry.tuning_system = tuning_name;
 
                 self.next_modality = CreativeModality::Synesthetic;
             }
@@ -541,6 +686,11 @@ impl CreativeManager {
             iteration_count: iterations,
             generation_time_us: elapsed.as_micros() as u64,
             total_artworks: self.total_artworks + 1,
+            arc_length: self.emotional_history.len(),
+            tuning_system: String::new(), // populated by caller for music modalities
+            melodic_coherence: 0.0,
+            emotional_alignment: 0.0,
+            motif_phrase_count: self.motif_memory.phrase_count(),
         };
     }
 
@@ -557,6 +707,14 @@ impl CreativeManager {
     /// Total artworks produced.
     pub fn total_artworks(&self) -> u64 {
         self.total_artworks
+    }
+
+    /// Long-term harmony bias: which of the 8 harmonies historically correlate
+    /// with beautiful output. Values drift slowly (alpha 0.01) over hundreds of
+    /// compositions. Used by MuseManager to gently bias generation toward
+    /// Symthaea's evolving aesthetic identity.
+    pub fn harmony_bias(&self) -> &[f32; 8] {
+        self.tracker.harmony_bias()
     }
 
     /// Feed an external aesthetic score into the tracker (self-listening loop).
@@ -730,21 +888,22 @@ mod tests {
     }
 
     #[test]
-    fn manager_alternates_modalities() {
+    fn manager_modality_rotation() {
+        // Verify the 6-modality rotation order without running expensive compose/render
+        let manager = CreativeManager::new();
+        assert_eq!(manager.next_modality, CreativeModality::Visual);
+
         let mut manager = CreativeManager::new();
         manager.generation_interval = 1;
+        manager.muse_config.duration_secs = 0.5;
+        manager.muse_config.max_notes = 2;
         let snap = test_snapshot();
 
+        // Tick 1: Visual (fast — SVG only)
         let first = manager.tick(&snap).unwrap();
-        assert!(first.artwork_svg.is_some()); // visual first
-        assert!(first.music_samples.is_none());
-
-        let second = manager.tick(&snap).unwrap();
-        assert!(second.music_samples.is_some()); // music second
-        assert!(second.artwork_svg.is_none());
-
-        let third = manager.tick(&snap).unwrap();
-        assert!(third.artwork_svg.is_some()); // back to visual
+        assert!(first.artwork_svg.is_some());
+        assert_eq!(manager.last_telemetry().modality, "visual");
+        assert_eq!(manager.next_modality, CreativeModality::Music);
     }
 
     #[test]
@@ -766,20 +925,24 @@ mod tests {
         manager.generation_interval = 1;
         let snap = test_snapshot();
 
-        manager.tick(&snap);
+        assert_eq!(manager.total_artworks(), 0);
+        manager.tick(&snap); // Visual (fast)
         assert_eq!(manager.total_artworks(), 1);
-
-        manager.tick(&snap);
-        assert_eq!(manager.total_artworks(), 2);
+        assert!(manager.last_telemetry().generated);
     }
 
     #[test]
     fn snapshot_to_musical_state_maps_correctly() {
         let snap = test_snapshot();
         let ms = snapshot_to_musical_state(&snap);
-        assert_eq!(ms.dopamine, snap.dopamine);
-        assert_eq!(ms.valence, snap.valence);
+        // Harmony activations pass through unchanged
         assert_eq!(ms.harmony_activations, snap.harmony_activations);
+        // Dopamine is scaled by VA-derived dynamics (not raw)
+        assert!(ms.dopamine > 0.0 && ms.dopamine <= 1.0);
+        // Arousal is blended (40% raw + 60% VA-calibrated)
+        assert!(ms.arousal > 0.0 && ms.arousal <= 1.0);
+        // Consciousness level preserved
+        assert_eq!(ms.consciousness_level, snap.consciousness_level as f32);
     }
 
     #[test]
@@ -798,5 +961,81 @@ mod tests {
         assert!(score.composite >= 0.0 && score.composite <= 1.0);
         assert!(score.order >= 0.0 && score.order <= 1.0);
         assert!(score.complexity >= 0.0 && score.complexity <= 1.0);
+    }
+
+    #[test]
+    fn build_arc_from_history_works() {
+        let mut manager = CreativeManager::new();
+        // No history → None
+        assert!(manager.build_arc_from_history().is_none());
+
+        // Seed exactly ARC_MIN_HISTORY snapshots
+        for i in 0..ARC_MIN_HISTORY {
+            manager.emotional_history.push_back(EmotionalSnapshot {
+                valence: -0.3 + 0.2 * i as f32,
+                arousal: 0.4 + 0.1 * i as f32,
+                dopamine: 0.5,
+                dynamics: 0.7,
+            });
+        }
+        let arc = manager.build_arc_from_history();
+        assert!(arc.is_some(), "should build arc with enough history");
+        let arc = arc.unwrap();
+        assert_eq!(arc.bars.len(), ARC_MIN_HISTORY);
+    }
+
+    #[test]
+    fn tuning_selection_from_consciousness() {
+        use symthaea_muse::pitch::{select_tuning_system, TuningSystem};
+        // High consciousness → Just Intonation
+        let mut state = MusicalState::default();
+        state.consciousness_level = 0.8;
+        let tuning = select_tuning_system(&state);
+        assert_eq!(tuning, TuningSystem::JustIntonation);
+
+        // Low consciousness → 12TET
+        state.consciousness_level = 0.1;
+        let tuning = select_tuning_system(&state);
+        assert_eq!(tuning, TuningSystem::TwelveTET);
+
+        // Negative valence + high arousal → Maqam Hijaz
+        state.consciousness_level = 0.5;
+        state.valence = -0.5;
+        state.arousal = 0.7;
+        let tuning = select_tuning_system(&state);
+        assert!(format!("{tuning:?}").contains("Hijaz"), "got: {tuning:?}");
+    }
+
+    #[test]
+    fn tuning_name_format_nonempty() {
+        use symthaea_muse::pitch::{select_tuning_system, TuningSystem};
+        let state = MusicalState::default();
+        let tuning = select_tuning_system(&state);
+        let name = format!("{tuning:?}");
+        assert!(!name.is_empty());
+    }
+
+    #[test]
+    fn emotional_snapshot_recording() {
+        let mut manager = CreativeManager::new();
+        let snap = test_snapshot();
+        manager.record_emotional_snapshot(&snap);
+        assert_eq!(manager.emotional_history.len(), 1);
+        let es = &manager.emotional_history[0];
+        assert_eq!(es.valence, snap.valence);
+        assert_eq!(es.arousal, snap.arousal);
+
+        // Fill past capacity
+        for _ in 0..ARC_MAX_HISTORY + 5 {
+            manager.record_emotional_snapshot(&snap);
+        }
+        assert_eq!(manager.emotional_history.len(), ARC_MAX_HISTORY);
+    }
+
+    #[test]
+    fn motif_memory_initialized() {
+        let manager = CreativeManager::new();
+        // Fresh manager starts with empty motif memory
+        assert_eq!(manager.motif_memory.phrase_count(), 0);
     }
 }

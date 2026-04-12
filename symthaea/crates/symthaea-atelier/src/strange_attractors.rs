@@ -287,40 +287,37 @@ pub fn generate(
     let hue_base = snapshot.dopamine * 60.0 + snapshot.serotonin * 240.0;
     let n = points.len();
 
-    let mut children: Vec<SceneNode> = Vec::new();
-
     // Dark background
-    children.push(SceneNode::Rect {
-        x: 0.0,
-        y: 0.0,
-        width: config.width,
-        height: config.height,
-        fill: "hsl(240, 20%, 5%)".to_string(),
-        opacity: 1.0,
-    });
+    let bg = SceneNode::rect(0.0, 0.0, config.width, config.height).with_style(
+        symthaea_canvas::scene_graph::Style {
+            fill: Some(symthaea_canvas::Color::from_hsla(240.0, 0.20, 0.05, 1.0)),
+            ..Default::default()
+        },
+    );
 
     // Render points as tiny translucent circles; color cycles with orbit position
     let step = (n / 3000).max(1); // subsample for SVG performance
+    let mut root = SceneNode::group(Some(
+        &format!("{attractor:?}-attractor").to_lowercase(),
+    ))
+    .with_child(bg);
+
     for (i, p) in points.iter().step_by(step).enumerate() {
         let t = i as f32 / (n / step) as f32;
         let hue = (hue_base + t * 180.0) % 360.0;
-        let lightness = 45.0 + t * 30.0;
+        let lightness = 0.45 + t * 0.30;
         let opacity = 0.15 + consciousness * 0.25;
 
-        children.push(SceneNode::Circle {
-            cx: p[0],
-            cy: p[1],
-            r: 1.0 + consciousness * 0.5,
-            fill: format!("hsl({hue:.0}, 90%, {lightness:.0}%)"),
-            opacity,
-        });
+        let dot = SceneNode::circle(p[0], p[1], 1.0 + consciousness * 0.5).with_style(
+            symthaea_canvas::scene_graph::Style {
+                fill: Some(symthaea_canvas::Color::from_hsla(hue, 0.90, lightness, opacity)),
+                ..Default::default()
+            },
+        );
+        root = root.with_child(dot);
     }
 
-    SceneNode::Group {
-        id: Some(format!("{attractor:?}-attractor").to_lowercase()),
-        children,
-        transform: None,
-    }
+    root
 }
 
 #[cfg(test)]

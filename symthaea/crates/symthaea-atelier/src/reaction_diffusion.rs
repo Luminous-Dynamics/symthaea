@@ -184,17 +184,15 @@ pub fn generate(
     // dopamine → warm (red-orange), serotonin → cool (blue-green)
     let hue_base = snapshot.dopamine * 30.0 + snapshot.serotonin * 180.0;
 
-    let mut children: Vec<SceneNode> = Vec::new();
-
     // Background
-    children.push(SceneNode::Rect {
-        x: 0.0,
-        y: 0.0,
-        width: config.width,
-        height: config.height,
-        fill: format!("hsl({:.0}, 15%, 8%)", hue_base),
-        opacity: 1.0,
-    });
+    let bg = SceneNode::rect(0.0, 0.0, config.width, config.height).with_style(
+        symthaea_canvas::scene_graph::Style {
+            fill: Some(symthaea_canvas::Color::from_hsla(hue_base, 0.15, 0.08, 1.0)),
+            ..Default::default()
+        },
+    );
+
+    let mut root = SceneNode::group(Some("reaction-diffusion")).with_child(bg);
 
     // Sample every other cell for performance (32×32 = 1024 circles)
     let step = 2;
@@ -211,24 +209,20 @@ pub fn generate(
 
             // Hue varies with concentration + position for visual richness
             let hue = (hue_base + v * 60.0 + x as f32 * 0.5) % 360.0;
-            let lightness = 30.0 + v * 55.0;
+            let lightness = 0.30 + v * 0.55;
             let opacity = 0.4 + v * 0.6;
 
-            children.push(SceneNode::Circle {
-                cx,
-                cy,
-                r: radius,
-                fill: format!("hsl({hue:.0}, 75%, {lightness:.0}%)"),
-                opacity,
-            });
+            let dot = SceneNode::circle(cx, cy, radius).with_style(
+                symthaea_canvas::scene_graph::Style {
+                    fill: Some(symthaea_canvas::Color::from_hsla(hue, 0.75, lightness, opacity)),
+                    ..Default::default()
+                },
+            );
+            root = root.with_child(dot);
         }
     }
 
-    SceneNode::Group {
-        id: Some("reaction-diffusion".to_string()),
-        children,
-        transform: None,
-    }
+    root
 }
 
 #[cfg(test)]
