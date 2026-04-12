@@ -29,6 +29,9 @@ use crate::cognitive_loop::managers::muse_manager::CompositionExport;
 /// Default Mycelix-Music upload endpoint (local dev instance).
 const DEFAULT_UPLOAD_URL: &str = "http://localhost:8121/api/upload";
 
+/// Default consciousness trigger endpoint (eval-api bridge to Holochain).
+const DEFAULT_TRIGGER_URL: &str = "http://localhost:8090/api/consciousness-compose";
+
 /// Upload timeout in seconds.
 const UPLOAD_TIMEOUT_SECS: u64 = 30;
 
@@ -156,12 +159,96 @@ fn run_publisher_thread(
     };
 
     while let Ok(export) = rx.recv() {
-        let title = export.title.clone();
+        // Post consciousness trigger to the Holochain bridge (best-effort).
+        // This creates a DHT entry and emits a signal to connected UIs.
+        let trigger_result = post_consciousness_trigger(&client, DEFAULT_TRIGGER_URL, &export);
+        if trigger_result.success {
+            log::debug!(
+                "[music-publisher] consciousness trigger posted → {:?}",
+                trigger_result.cid
+            );
+        } else {
+            log::trace!(
+                "[music-publisher] trigger endpoint unavailable (expected in dev): {:?}",
+                trigger_result.error
+            );
+        }
+
+        // Also upload the WAV to the legacy endpoint (best-effort).
         let result = upload_composition(&client, upload_url, export);
         // Best-effort: if the cognitive loop dropped the receiver, stop.
         if result_tx.send(result).is_err() {
             break;
         }
+    }
+}
+
+/// JSON payload matching the Holochain `ConsciousnessTrigger` zome input.
+///
+/// Posted to the bridge endpoint; the bridge forwards it as a zome call to
+/// `compose_from_consciousness` on the music-bridge coordinator.
+#[derive(serde::Serialize)]
+struct ConsciousnessTriggerPayload {
+    harmony_activations: Vec<f32>,
+    valence: f32,
+    arousal: f32,
+    phi_score: f32,
+    narrative_tags: Vec<String>,
+    duration_secs: Option<f32>,
+}
+
+impl ConsciousnessTriggerPayload {
+    fn from_export(export: &CompositionExport) -> Self {
+        Self {
+            harmony_activations: export.musical_state.harmony_activations.to_vec(),
+            valence: export.musical_state.valence,
+            arousal: export.musical_state.arousal,
+            phi_score: export.musical_state.consciousness_level,
+            narrative_tags: Vec::new(),
+            duration_secs: Some(export.duration_secs),
+        }
+    }
+}
+
+/// Post a consciousness trigger to the bridge endpoint (JSON, not multipart).
+/// This is the Holochain-aware path — the bridge forwards to `compose_from_consciousness`.
+fn post_consciousness_trigger(
+    client: &reqwest::blocking::Client,
+    url: &str,
+    export: &CompositionExport,
+) -> UploadResult {
+    let payload = ConsciousnessTriggerPayload::from_export(export);
+    let title = export.title.clone();
+
+    match client.post(url).json(&payload).send() {
+        Ok(resp) if resp.status().is_success() => {
+            let cid = resp
+                .json::<serde_json::Value>()
+                .ok()
+                .and_then(|v| v["action_hash"].as_str().map(String::from));
+            UploadResult {
+                title,
+                success: true,
+                cid,
+                error: None,
+            }
+        }
+        Ok(resp) => {
+            let status = resp.status();
+            let body = resp.text().unwrap_or_default();
+            UploadResult {
+                title,
+                success: false,
+                cid: None,
+                error: Some(format!("HTTP {status}: {body}")),
+            }
+        }
+        Err(e) => UploadResult {
+            title,
+            success: false,
+            cid: None,
+            error: Some(format!("trigger post failed: {e}")),
+        },
     }
 }
 
