@@ -13,7 +13,7 @@ use crate::types::ManipulatorConfig;
 
 pub use symthaea_core::embodiment::{
     grounding_from_prediction_error, grounding_label, EmbodimentResult, EmbodimentTelemetry,
-    MoralGateInput, MotorSafetyLevel, GROUNDING_SENSORIMOTOR,
+    GroundingEstimator, MoralGateInput, MotorSafetyLevel, GROUNDING_SENSORIMOTOR,
 };
 
 /// Manipulator embodiment bridge.
@@ -28,6 +28,8 @@ pub struct ManipulatorEmbodiment {
     last_control_effort: f32,
     last_prediction_error: f32,
     moral_safety: Option<MotorSafetyLevel>,
+    grounding: GroundingEstimator,
+    last_grounding: u8,
 }
 
 impl ManipulatorEmbodiment {
@@ -44,6 +46,8 @@ impl ManipulatorEmbodiment {
             last_control_effort: 0.0,
             last_prediction_error: 0.0,
             moral_safety: None,
+            grounding: GroundingEstimator::new(),
+            last_grounding: GROUNDING_SENSORIMOTOR,
         }
     }
 
@@ -108,6 +112,10 @@ impl ManipulatorEmbodiment {
         self.last_perception = Some(perception);
         self.total_steps += 1;
 
+        // Compute epistemic grounding from prediction error trend.
+        // Manipulator has no swarm peers, so social grounding is not possible.
+        self.last_grounding = self.grounding.estimate(pred_error, None);
+
         let success = self.simulator.state().is_finite();
 
         EmbodimentResult {
@@ -116,7 +124,7 @@ impl ManipulatorEmbodiment {
             success,
             prediction_error: pred_error,
             safety_level: self.current_safety,
-            epistemic_grounding: GROUNDING_SENSORIMOTOR,
+            epistemic_grounding: self.last_grounding,
             observation_confidence: grounding_from_prediction_error(pred_error),
         }
     }
@@ -138,6 +146,8 @@ impl ManipulatorEmbodiment {
         self.moral_safety = None;
         self.last_control_effort = 0.0;
         self.last_prediction_error = 0.0;
+        self.grounding.reset();
+        self.last_grounding = GROUNDING_SENSORIMOTOR;
     }
 
     pub fn safety_level(&self) -> MotorSafetyLevel {
@@ -156,7 +166,7 @@ impl ManipulatorEmbodiment {
             safety_level: format!("{:?}", self.current_safety),
             platform: "manipulator".to_string(),
             num_actuators: 8,
-            epistemic_grounding: grounding_label(GROUNDING_SENSORIMOTOR).to_string(),
+            epistemic_grounding: grounding_label(self.last_grounding).to_string(),
             observation_confidence: grounding_from_prediction_error(self.last_prediction_error),
             platform_specific: self.platform_telemetry_bytes(),
         }
