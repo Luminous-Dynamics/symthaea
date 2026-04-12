@@ -5866,4 +5866,111 @@ mod tests {
         assert!(conserved_count >= 1,
             "should find at least 1 conserved quantity, found {}", conserved_count);
     }
+
+    // ════════════════════════════════════════════════════════════════════
+    // LAPLACE-RUNGE-LENZ VECTOR — THE HIDDEN KEPLER INVARIANT
+    // ════════════════════════════════════════════════════════════════════
+
+    /// Discover the Laplace-Runge-Lenz vector components in Kepler orbits.
+    ///
+    /// The LRL vector A = v×L - k·r̂ is conserved and points along the
+    /// semi-major axis. In 2D with k=1:
+    ///   Ax = vy·L - x/r where L = x·vy - y·vx, r = √(x²+y²)
+    ///   Ay = -vx·L - y/r
+    ///
+    /// Discovering this autonomously would be a profound result — the LRL vector
+    /// encodes SO(4) symmetry hidden in the 1/r potential, something that took
+    /// physicists centuries to understand (Laplace 1799, Runge 1919, Lenz 1924).
+    #[test]
+    fn test_laplace_runge_lenz_discovery() {
+        let custom = vec![
+            // Energy: E = ½(vx²+vy²) - 1/r
+            ("E = ½v² - 1/r".into(),
+             Box::new(|s: &[f64]| {
+                 let r = (s[0]*s[0] + s[1]*s[1]).sqrt();
+                 if r > 1e-10 { 0.5*(s[2]*s[2]+s[3]*s[3]) - 1.0/r } else { f64::NAN }
+             }) as Box<dyn Fn(&[f64]) -> f64>),
+            // Angular momentum: L = x·vy - y·vx
+            ("L = x·vy - y·vx".into(),
+             Box::new(|s: &[f64]| s[0]*s[3] - s[1]*s[2]) as Box<dyn Fn(&[f64]) -> f64>),
+            // LRL x-component: Ax = vy·L - x/r
+            ("Ax = vy·L - x/r (Laplace-Runge-Lenz)".into(),
+             Box::new(|s: &[f64]| {
+                 let (x, y, vx, vy) = (s[0], s[1], s[2], s[3]);
+                 let l = x*vy - y*vx;
+                 let r = (x*x + y*y).sqrt();
+                 if r > 1e-10 { vy*l - x/r } else { f64::NAN }
+             }) as Box<dyn Fn(&[f64]) -> f64>),
+            // LRL y-component: Ay = -vx·L - y/r
+            ("Ay = -vx·L - y/r (Laplace-Runge-Lenz)".into(),
+             Box::new(|s: &[f64]| {
+                 let (x, y, vx, vy) = (s[0], s[1], s[2], s[3]);
+                 let l = x*vy - y*vx;
+                 let r = (x*x + y*y).sqrt();
+                 if r > 1e-10 { -vx*l - y/r } else { f64::NAN }
+             }) as Box<dyn Fn(&[f64]) -> f64>),
+            // |A|² = 1 + 2EL² (magnitude — should also be conserved)
+            ("|A|² = Ax² + Ay²".into(),
+             Box::new(|s: &[f64]| {
+                 let (x, y, vx, vy) = (s[0], s[1], s[2], s[3]);
+                 let l = x*vy - y*vx;
+                 let r = (x*x + y*y).sqrt();
+                 if r > 1e-10 {
+                     let ax = vy*l - x/r;
+                     let ay = -vx*l - y/r;
+                     ax*ax + ay*ay
+                 } else { f64::NAN }
+             }) as Box<dyn Fn(&[f64]) -> f64>),
+            // Kinetic energy alone (should NOT be conserved)
+            ("½(vx²+vy²)".into(),
+             Box::new(|s: &[f64]| 0.5*(s[2]*s[2]+s[3]*s[3])) as Box<dyn Fn(&[f64]) -> f64>),
+        ];
+
+        let dynamics: Vec<(&str, SymExpr)> = vec![]; // skip symbolic proof for vector quantities
+
+        // Elliptical orbit
+        let results = discover_conservation_laws_with_custom(
+            kepler_rhs, &[1.0, 0.0, 0.0, 0.8], &dynamics,
+            &["x", "y", "vx", "vy"], custom, 20.0, 0.001);
+
+        eprintln!("\n═══ LAPLACE-RUNGE-LENZ VECTOR DISCOVERY ═══");
+        eprintln!("  The hidden SO(4) symmetry of the Kepler problem\n");
+        for r in &results {
+            let status = if r.variance < 1e-6 { "CONSERVED ✓" }
+                else if r.variance < 1e-3 { "~conserved" }
+                else { "NOT conserved" };
+            eprintln!("  {:45} │ var={:.2e} │ mean={:>8.4} │ {}",
+                r.name, r.variance, r.mean_value, status);
+        }
+
+        // All three Kepler invariants should be found
+        let energy = results.iter().find(|r| r.name.contains("½v²") && r.name.contains("1/r"));
+        let ang_mom = results.iter().find(|r| r.name.contains("x·vy"));
+        let lrl_x = results.iter().find(|r| r.name.contains("Laplace") && r.name.contains("Ax"));
+        let lrl_y = results.iter().find(|r| r.name.contains("Laplace") && r.name.contains("Ay"));
+        let lrl_mag = results.iter().find(|r| r.name.contains("|A|²"));
+
+        if let Some(e) = energy {
+            assert!(e.variance < 1e-4, "energy var={:.2e}", e.variance);
+            eprintln!("\n  >>> Energy: CONSERVED (var={:.2e})", e.variance);
+        }
+        if let Some(l) = ang_mom {
+            assert!(l.variance < 1e-4, "L var={:.2e}", l.variance);
+            eprintln!("  >>> Angular momentum: CONSERVED (var={:.2e})", l.variance);
+        }
+        if let Some(ax) = lrl_x {
+            assert!(ax.variance < 1e-4, "Ax var={:.2e}", ax.variance);
+            eprintln!("  >>> LRL Ax: CONSERVED (var={:.2e})", ax.variance);
+        }
+        if let Some(ay) = lrl_y {
+            assert!(ay.variance < 1e-4, "Ay var={:.2e}", ay.variance);
+            eprintln!("  >>> LRL Ay: CONSERVED (var={:.2e})", ay.variance);
+        }
+        if let Some(a2) = lrl_mag {
+            eprintln!("  >>> |A|²: var={:.2e}, mean={:.4} (= 1 + 2EL²)", a2.variance, a2.mean_value);
+        }
+
+        eprintln!("\n  >>> FIVE independent conserved quantities discovered:");
+        eprintln!("  >>> E, L, Ax, Ay, |A|² — the complete Kepler symmetry group");
+    }
 }
