@@ -449,14 +449,24 @@ impl StreamingSynth {
         let _fm_depth = self.state.dopamine * self.config.max_fm_depth;
         let _fm_ratio = 2.0 + self.state.noradrenaline;
         let _rolloff = 1.0 + self.state.serotonin * 0.8;
-        let brightness = BRIGHTNESS_FLOOR + self.state.dopamine * BRIGHTNESS_DA_SCALE;
+        // Brightness: dopamine adds warmth, but HIGH AROUSAL REDUCES BRIGHTNESS
+        // to prevent harsh/arcade-like timbres. High energy music should be
+        // rich but not piercing — the arousal-brightness inverse relationship
+        // matches how real music is mixed (loud passages darken, not brighten).
+        let arousal_dampen = 1.0 - (self.state.arousal.max(0.5) - 0.5) * 1.0; // 1.0 at arousal≤0.5, 0.5 at arousal=1.0
+        let brightness = (BRIGHTNESS_FLOOR + self.state.dopamine * BRIGHTNESS_DA_SCALE * arousal_dampen)
+            .clamp(0.25, 0.75);
 
         // NE → vibrato rate scaling: high stress = faster, more agitated vibrato
-        // Base: 5.3Hz, scales up to 8Hz at max NE (Zentner et al. 2008: urgency → faster modulation)
         let vibrato_rate_scale = 1.0 + self.state.noradrenaline * NE_VIBRATO_RATE_SCALE;
 
-        // NE → harmonic tension bias: high NE shifts brightness toward harshness
-        let ne_brightness_boost = self.state.noradrenaline * NE_BRIGHTNESS_BOOST;
+        // NE → harmonic tension bias: ONLY at moderate arousal, not already-loud scenarios
+        // At high arousal, NE boost stacks with dopamine brightness and creates harshness
+        let ne_brightness_boost = if self.state.arousal > 0.7 {
+            0.0 // suppress at high arousal — already too bright
+        } else {
+            self.state.noradrenaline * NE_BRIGHTNESS_BOOST
+        };
 
         // Prediction error → onset jitter (±samples): surprise makes timing unpredictable
         // Max jitter: ±5ms at PE=1.0 (Vuust & Witek 2014: rhythmic surprise)
@@ -1360,10 +1370,15 @@ impl StreamingSynth {
                     voices_to_spawn.push((1, bass_freq, 0.7));
                 }
                 if spawn_harmony {
-                    // Harmony: perfect 5th above for positive valence, minor 3rd for negative
-                    let harm_ratio = if self.state.valence > 0.0 { 1.4983 } else { 1.1892 }; // P5 or m3
-                    let harm_freq = note.frequency * harm_ratio;
-                    voices_to_spawn.push((2, harm_freq, 0.5));
+                    // Harmony: perfect 5th above for positive valence, minor 3rd for negative.
+                    // CRITICAL: drop an octave if resulting pitch exceeds 1400 Hz to prevent
+                    // ear-piercing stacking when lead melody is already in high register.
+                    let harm_ratio = if self.state.valence > 0.0 { 1.4983 } else { 1.1892 };
+                    let mut harm_freq = note.frequency * harm_ratio;
+                    while harm_freq > 1400.0 {
+                        harm_freq *= 0.5; // drop octave until in safe register
+                    }
+                    voices_to_spawn.push((2, harm_freq.max(110.0), 0.5));
                 }
                 if spawn_ostinato {
                     // Ostinato: same pitch, delayed entry creates echo effect
