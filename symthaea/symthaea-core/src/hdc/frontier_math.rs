@@ -1595,6 +1595,136 @@ mod tests {
         }
     }
 
+    /// THE FINAL EXPERIMENT: Spectral Geometry of the Mathematical Universe.
+    ///
+    /// Treat the 6×6 correlation matrix as a weighted graph.
+    /// Compute its Graph Laplacian eigenvalues.
+    /// The Fiedler vector (eigenvector of λ₂) clusters mathematical domains.
+    ///
+    /// This answers: what is the SHAPE of mathematics, as seen by a machine?
+    #[test]
+    fn test_spectral_geometry_of_mathematics() {
+        eprintln!("\n═══ THE SHAPE OF MATHEMATICS ═══\n");
+
+        // The correlation matrix from the previous test (hardcoded for reproducibility)
+        // Rows/cols: prime_gaps, abc_quality, partitions, class_nums, zeta_spaces, sato_tate
+        let names = ["prime_gaps", "abc_quality", "partitions", "class_nums", "zeta_spaces", "sato_tate"];
+        let corr: Vec<Vec<f64>> = vec![
+            vec![ 1.000, -0.507,  0.508,  0.308, -0.395, -0.029],
+            vec![-0.507,  1.000, -1.000, -0.617,  0.437,  0.017],
+            vec![ 0.508, -1.000,  1.000,  0.616, -0.437, -0.016],
+            vec![ 0.308, -0.617,  0.616,  1.000, -0.222, -0.092],
+            vec![-0.395,  0.437, -0.437, -0.222,  1.000, -0.076],
+            vec![-0.029,  0.017, -0.016, -0.092, -0.076,  1.000],
+        ];
+
+        let n = names.len();
+
+        // Convert to adjacency matrix: weight = |ρ| (absolute correlation)
+        // Self-loops removed (diagonal = 0)
+        let mut adj = vec![vec![0.0; n]; n];
+        for i in 0..n {
+            for j in 0..n {
+                if i != j {
+                    adj[i][j] = corr[i][j].abs();
+                }
+            }
+        }
+
+        // Compute Graph Laplacian: L = D - A
+        let mut laplacian = vec![vec![0.0; n]; n];
+        for i in 0..n {
+            let degree: f64 = adj[i].iter().sum();
+            laplacian[i][i] = degree;
+            for j in 0..n {
+                if i != j {
+                    laplacian[i][j] = -adj[i][j];
+                }
+            }
+        }
+
+        // Compute eigenvalues via the linear algebra module
+        let flat: Vec<f64> = laplacian.iter().flat_map(|row| row.iter().copied()).collect();
+        let mat = super::super::linear_algebra::HdcMatrix::new(flat, n, n);
+        let (mut eigenvalues, eigenvectors, _) = mat.eigen_symmetric();
+        eigenvalues.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+
+        eprintln!("  Laplacian eigenvalues:");
+        for (i, &ev) in eigenvalues.iter().enumerate() {
+            eprintln!("    λ_{} = {:.6}", i + 1, ev);
+        }
+
+        // λ₁ should be ≈ 0 (connected graph)
+        eprintln!("\n  STRUCTURAL ANALYSIS:");
+        eprintln!("    λ₁ = {:.6} (should be ≈ 0 for connected graph)", eigenvalues[0]);
+
+        // λ₂ = algebraic connectivity (Fiedler value)
+        let fiedler_value = if eigenvalues.len() >= 2 { eigenvalues[1] } else { 0.0 };
+        eprintln!("    λ₂ = {:.6} (algebraic connectivity — Fiedler value)", fiedler_value);
+
+        if fiedler_value < 0.01 {
+            eprintln!("    >>> Mathematics has DISCONNECTED ISLANDS (λ₂ ≈ 0)");
+        } else if fiedler_value < 0.5 {
+            eprintln!("    >>> Mathematics is WEAKLY connected (small spectral gap)");
+        } else {
+            eprintln!("    >>> Mathematics is TIGHTLY connected (large spectral gap)");
+        }
+
+        // Spectral gap: λ₂ / λ_max
+        let lambda_max = eigenvalues.last().copied().unwrap_or(1.0);
+        let spectral_gap = fiedler_value / lambda_max;
+        eprintln!("    Spectral gap (λ₂/λₙ) = {:.4}", spectral_gap);
+
+        // Fiedler vector: eigenvector corresponding to λ₂
+        // This clusters the domains: positive entries = cluster A, negative = cluster B
+        eprintln!("\n  FIEDLER VECTOR (mathematical domain clustering):");
+        eprintln!("    (positive = cluster A, negative = cluster B)\n");
+
+        // Extract the Fiedler eigenvector (second column of eigenvectors, sorted by eigenvalue)
+        // Since we sorted eigenvalues, we need to find which eigenvector corresponds to λ₂
+        // The eigenvectors are in the columns of the matrix returned by eigen_symmetric
+        // Column j = eigenvector for eigenvalue j (before sorting)
+        // We need to match eigenvalue index after sorting
+
+        // Simple approach: find the eigenvector closest to λ₂
+        let (orig_evals, _, _) = mat.eigen_symmetric();
+        let mut eval_idx: Vec<(f64, usize)> = orig_evals.iter().enumerate()
+            .map(|(i, &v)| (v, i)).collect();
+        eval_idx.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
+
+        // The second-smallest eigenvalue's original index
+        let fiedler_col = if eval_idx.len() >= 2 { eval_idx[1].1 } else { 0 };
+
+        let mut cluster_a = Vec::new();
+        let mut cluster_b = Vec::new();
+
+        for i in 0..n {
+            let component = eigenvectors.get(i, fiedler_col);
+            let cluster = if component >= 0.0 { "A (+)" } else { "B (-)" };
+            eprintln!("    {:>12}: {:+.4}  [Cluster {}]", names[i], component, cluster);
+            if component >= 0.0 { cluster_a.push(names[i]); }
+            else { cluster_b.push(names[i]); }
+        }
+
+        eprintln!("\n  ═══ THE MAP OF MATHEMATICS ═══");
+        eprintln!("    Cluster A: {}", cluster_a.join(", "));
+        eprintln!("    Cluster B: {}", cluster_b.join(", "));
+        eprintln!("    Bridge strength (algebraic connectivity): {:.4}", fiedler_value);
+
+        // Number of near-zero eigenvalues = number of connected components
+        let n_components = eigenvalues.iter().filter(|&&e| e.abs() < 0.01).count();
+        eprintln!("\n    Connected components: {}", n_components);
+
+        if n_components == 1 {
+            eprintln!("    >>> ALL MATHEMATICS IS ONE CONNECTED COMPONENT");
+            eprintln!("    >>> (but with internal clustering revealed by the Fiedler vector)");
+        } else {
+            eprintln!("    >>> Mathematics has {} isolated islands", n_components);
+        }
+
+        assert!(eigenvalues[0].abs() < 0.1, "smallest eigenvalue should be near 0");
+    }
+
     /// GUMBEL DISTRIBUTION TEST: Do abc qualities follow extreme value statistics?
     ///
     /// If abc qualities at a fixed scale follow Gumbel(μ, β), that connects
