@@ -235,6 +235,17 @@ impl Molecule {
         ])
     }
 
+    /// Formaldehyde (H₂CO): simplest carbonyl compound.
+    /// 3D coordinates from PubChem CID 712.
+    pub fn formaldehyde() -> Self {
+        Self::new(vec![
+            Atom::from_angstrom(8, 0.6123, 0.0, 0.0),
+            Atom::from_angstrom(6, -0.6123, 0.0, 0.0),
+            Atom::from_angstrom(1, -1.2000, 0.2426, -0.8998),
+            Atom::from_angstrom(1, -1.2000, -0.2424, 0.8998),
+        ])
+    }
+
     /// H₂O at experimental geometry (Angstrom → Bohr).
     /// O-H = 0.9572 Å, H-O-H = 104.52°
     pub fn water() -> Self {
