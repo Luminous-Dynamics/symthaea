@@ -42,6 +42,7 @@ members = [
     "crates/symthaea-surgical",
     "crates/symthaea-orbital",
     "crates/symthaea-quadruped",
+    "crates/symthaea-sensors",
     "crates/symthaea-browser",
     "crates/symthaea-hal",
     "crates/symthaea-ssm",
