@@ -416,6 +416,9 @@ pub mod geometric_algebra {
 pub mod conjecture_engine; // Automated conjecture generation via symbolic regression + verification
 pub mod autodiff; // Reverse-mode automatic differentiation (Wengert tape) for exact gradients
 pub mod sparse_matrix; // Compressed Sparse Row (CSR) matrix for PDE solvers and graph Laplacians
+pub mod langlands; // Computational Langlands: elliptic curve L-functions, modular forms, modularity verification
+// pub mod topology_comparison; // TEMP: file removed by concurrent session
+// pub mod cross_domain_discovery; // TEMP: file removed by concurrent session
 
 // ── Geometric Complexity Theory (Phase 8 — P vs NP probe) ────────────────────
 pub mod gct; // Permanent vs determinant orbit complexity, Kronecker coefficients, GCT obstruction conjecture
@@ -449,7 +452,7 @@ pub mod hierarchical_bundle; // Per-region bundling with role-based binding for 
 pub mod substrate_composition; // Weighted substrate mixtures for hybrid analysis
 pub mod substrate_independence; // Substrate type definitions // Real-time consciousness monitoring
 pub mod substrate_validation; // Validation framework with evidence levels and feasibility gaps
-pub mod topology_comparison; // Cross-domain topological comparison: Betti distance, bottleneck, Wasserstein, Rips complex
+// pub mod topology_comparison; // TEMP: file removed by concurrent session
 pub mod trajectory_accumulator; // Behavioral identity via temporal HDC binding
 
 // Track: Neural Validation — TRIBE v2 fMRI comparison (feature-gated)
@@ -486,7 +489,7 @@ pub mod predictive_encoder; // Attention-modulated HDC encoding with LTC predict
 
 // Novel Algorithm Modules (Dec 2025)
 pub mod autodiff_phi; // Reverse-mode autodiff for consciousness optimization (Jan 2026)
-pub mod cross_domain_discovery; // Cross-domain knowledge bridge discovery via relational vectors
+// pub mod cross_domain_discovery; // TEMP: file removed by concurrent session
 pub mod cross_modal_binding; // Cross-modal binding for multi-sensory integration
 pub mod differentiable_phi; // Soft-partitioned differentiable Φ for gradient optimization
 pub mod metacognitive_monitor; // Real-time consciousness monitoring with self-reflection

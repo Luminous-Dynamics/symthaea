@@ -530,6 +530,7 @@ impl CognitiveLoopService {
         );
         let new_bridge: Option<Box<dyn super::super::motor_bridge::EmbodimentBridge>> =
             match platform {
+                #[cfg(feature = "humanoid")]
                 EmbodimentPlatform::Humanoid => {
                     let bridge = super::super::motor_bridge::MotorBridge::new(&genesis);
                     Some(Box::new(bridge))
