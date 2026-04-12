@@ -270,10 +270,16 @@ pub fn random_expr(rng: &mut u64, max_depth: usize) -> Expr {
 pub enum MathDomain {
     NumberTheory,
     Combinatorics,
-    AlgebraicComplexity,  // GCT
-    DynamicalSystems,     // ODEs, attractors
-    SpectralAnalysis,     // FFT
+    AlgebraicComplexity, // GCT
+    DynamicalSystems,    // ODEs, attractors
+    SpectralAnalysis,    // FFT
     Chemistry,
+    // Cross-domain extensions (for formula matching across fields)
+    Biology,
+    Ecology,
+    Economics,
+    Physics,
+    InformationTheory,
 }
 
 /// An observed numerical sequence to mine for patterns.
@@ -735,6 +741,102 @@ impl ConjectureEngine {
         }
         lines.join("\n")
     }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // CROSS-DOMAIN FORMULA MATCHING
+    // ═══════════════════════════════════════════════════════════════════════
+
+    /// Test whether a conjecture's formula fits a sequence from a different domain.
+    ///
+    /// Returns the MSE ratio (cross_mse / training_mse) if the formula
+    /// produces finite predictions on more than half the target data.
+    /// A ratio < 3.0 suggests the same formula governs both domains.
+    pub fn cross_fit(conjecture: &Conjecture, target_seq: &ObservedSequence) -> Option<f64> {
+        if conjecture.domain == target_seq.domain {
+            return None; // Not cross-domain
+        }
+        let cross_mse = compute_mse(&conjecture.formula, &target_seq.data);
+        if !cross_mse.is_finite() || conjecture.training_mse <= 0.0 {
+            return None;
+        }
+        Some(cross_mse / conjecture.training_mse)
+    }
+
+    /// Discover all cross-domain formula matches.
+    ///
+    /// For each conjecture, tests whether its formula fits sequences from
+    /// other domains within a given MSE ratio tolerance. Returns matches
+    /// sorted by quality (lowest MSE ratio first).
+    pub fn discover_cross_domain_formulas(&self, max_mse_ratio: f64) -> Vec<CrossDomainFormulaMatch> {
+        let mut matches = Vec::new();
+
+        for conjecture in &self.conjectures {
+            // Skip low-confidence conjectures
+            if conjecture.confidence < 0.3 {
+                continue;
+            }
+
+            for target_seq in &self.observations {
+                if let Some(mse_ratio) = Self::cross_fit(conjecture, target_seq) {
+                    if mse_ratio < max_mse_ratio {
+                        matches.push(CrossDomainFormulaMatch {
+                            formula_str: conjecture.formula_str.clone(),
+                            source_seq: conjecture.source.clone(),
+                            source_domain: conjecture.domain,
+                            target_seq: target_seq.name.clone(),
+                            target_domain: target_seq.domain,
+                            source_mse: conjecture.training_mse,
+                            target_mse: mse_ratio * conjecture.training_mse,
+                            mse_ratio,
+                            confidence: conjecture.confidence,
+                        });
+                    }
+                }
+            }
+        }
+
+        matches.sort_by(|a, b| {
+            a.mse_ratio
+                .partial_cmp(&b.mse_ratio)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+        matches
+    }
+}
+
+/// A cross-domain formula match: one formula fits data from two different domains.
+#[derive(Debug, Clone)]
+pub struct CrossDomainFormulaMatch {
+    /// The formula (human-readable)
+    pub formula_str: String,
+    /// Source sequence name (where the formula was discovered)
+    pub source_seq: String,
+    /// Source domain
+    pub source_domain: MathDomain,
+    /// Target sequence name (where the formula also fits)
+    pub target_seq: String,
+    /// Target domain
+    pub target_domain: MathDomain,
+    /// MSE on source data
+    pub source_mse: f64,
+    /// MSE on target data
+    pub target_mse: f64,
+    /// Ratio: target_mse / source_mse (lower = better fit)
+    pub mse_ratio: f64,
+    /// Confidence of the source conjecture
+    pub confidence: f64,
+}
+
+impl fmt::Display for CrossDomainFormulaMatch {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{} ({:?}) → {} ({:?}): f(n) ≈ {} [ratio={:.2}]",
+            self.source_seq, self.source_domain,
+            self.target_seq, self.target_domain,
+            self.formula_str, self.mse_ratio
+        )
+    }
 }
 
 impl Default for ConjectureEngine {
@@ -960,6 +1062,46 @@ pub fn observe_lorenz_invariant_candidates(n_points: usize) -> Vec<ObservedSeque
     seqs.push(ObservedSequence::new("lorenz_r2(t)", MathDomain::DynamicalSystems, r2_data));
 
     seqs
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// CROSS-SEQUENCE IDENTITY DISCOVERY
+// ═══════════════════════════════════════════════════════════════════════════
+
+/// Observe Bell numbers B(n) for n=0..max_n.
+pub fn observe_bell_numbers(max_n: usize) -> ObservedSequence {
+    use super::combinatorics::bell;
+    let data: Vec<(f64, f64)> = (0..=max_n)
+        .map(|n| (n as f64, bell(n) as f64))
+        .collect();
+    ObservedSequence::new("bell(n)", MathDomain::Combinatorics, data)
+}
+
+/// Observe the Stirling-sum Σ_{k=0}^{n} S(n,k) for each n.
+/// If this equals B(n), we've found the Bell-Stirling identity.
+pub fn observe_stirling_sum(max_n: usize) -> ObservedSequence {
+    use super::combinatorics::stirling_second;
+    let data: Vec<(f64, f64)> = (0..=max_n)
+        .map(|n| {
+            let sum: u64 = (0..=n).map(|k| stirling_second(n, k)).sum();
+            (n as f64, sum as f64)
+        })
+        .collect();
+    ObservedSequence::new("stirling_sum(n)", MathDomain::Combinatorics, data)
+}
+
+/// Observe the DIFFERENCE B(n) - Σ S(n,k) to verify identity.
+/// Should be exactly zero for all n if B(n) = Σ S(n,k).
+pub fn observe_bell_stirling_residual(max_n: usize) -> ObservedSequence {
+    use super::combinatorics::{bell, stirling_second};
+    let data: Vec<(f64, f64)> = (0..=max_n)
+        .map(|n| {
+            let b = bell(n) as f64;
+            let s_sum: f64 = (0..=n).map(|k| stirling_second(n, k) as f64).sum();
+            (n as f64, (b - s_sum).abs())
+        })
+        .collect();
+    ObservedSequence::new("bell_stirling_residual(n)", MathDomain::Combinatorics, data)
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -1447,5 +1589,137 @@ mod tests {
         assert!((result10 - 55.0).abs() < 1e-10, "Σ k for n=10 should be 55, got {}", result10);
         // Display
         assert_eq!(format!("{}", expr), "Σ_k(k)");
+    }
+
+    /// CROSS-SEQUENCE DISCOVERY: verify B(n) = Σ_{k=0}^{n} S(n,k)
+    ///
+    /// This is the Bell-Stirling identity. Rather than asking the GP regressor
+    /// to discover it (which would require the regressor to invent Stirling
+    /// numbers from scratch), we verify it by direct computation: compute both
+    /// sides and check the residual is zero for all n.
+    ///
+    /// This validates the cross-sequence identity infrastructure.
+    #[test]
+    fn test_bell_stirling_identity() {
+        let residual = observe_bell_stirling_residual(15);
+
+        eprintln!("\n═══ BELL-STIRLING IDENTITY VERIFICATION ═══");
+        eprintln!("Testing: B(n) = Σ_{{k=0}}^n S(n,k) for n=0..15\n");
+
+        let bell_seq = observe_bell_numbers(15);
+        let stirling_seq = observe_stirling_sum(15);
+
+        let mut all_match = true;
+        for i in 0..residual.data.len() {
+            let n = residual.data[i].0 as usize;
+            let b = bell_seq.data[i].1;
+            let s = stirling_seq.data[i].1;
+            let diff = residual.data[i].1;
+            let matches = diff < 1e-10;
+            if !matches { all_match = false; }
+            eprintln!("  n={:2}: B(n)={:>10.0}, Σ S(n,k)={:>10.0}, |diff|={:.0e} {}",
+                n, b, s, diff, if matches { "✓" } else { "✗" });
+        }
+
+        assert!(all_match, "B(n) should equal Σ S(n,k) for all n");
+        eprintln!("\n  >>> VERIFIED: B(n) = Σ_{{k=0}}^n S(n,k) for all n ∈ [0, 15]");
+        eprintln!("  >>> This is the Bell-Stirling identity — proven by exhaustive computation.");
+    }
+
+    /// Test that Bell and Stirling-sum sequences are numerically identical.
+    #[test]
+    fn test_bell_equals_stirling_sum() {
+        use crate::hdc::combinatorics::{bell, stirling_second};
+        for n in 0..=12 {
+            let b = bell(n);
+            let s_sum: u64 = (0..=n).map(|k| stirling_second(n, k)).sum();
+            assert_eq!(b, s_sum, "B({}) = {} ≠ Σ S({},k) = {}", n, b, n, s_sum);
+        }
+    }
+
+    #[test]
+    fn test_cross_fit_same_formula_different_domains() {
+        // Create two sequences from different domains that follow the same law: f(n) = n^2
+        let physics_seq = ObservedSequence::new(
+            "kinetic_energy(v)",
+            MathDomain::Physics,
+            (1..=20).map(|n| (n as f64, (n * n) as f64)).collect(),
+        );
+        let biology_seq = ObservedSequence::new(
+            "population_growth(t)",
+            MathDomain::Biology,
+            (1..=20).map(|n| (n as f64, (n * n) as f64)).collect(),
+        );
+
+        let mut engine = ConjectureEngine::new();
+        engine.observe(physics_seq);
+        engine.observe(biology_seq);
+        engine.generate_conjectures(3);
+
+        // Find any conjecture from Physics domain
+        let physics_conjectures: Vec<&Conjecture> = engine
+            .conjectures
+            .iter()
+            .filter(|c| c.domain == MathDomain::Physics)
+            .collect();
+
+        if let Some(best) = physics_conjectures.first() {
+            // Test cross-fit: physics formula should also fit biology data
+            let bio_seq = &engine.observations[1];
+            let ratio = ConjectureEngine::cross_fit(best, bio_seq);
+            // If the formula is good, ratio should exist and be close to 1.0
+            if let Some(r) = ratio {
+                assert!(
+                    r < 10.0,
+                    "Same-law sequences should have low MSE ratio, got {}",
+                    r
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_cross_fit_rejects_same_domain() {
+        let seq1 = ObservedSequence::new(
+            "seq1", MathDomain::Physics,
+            vec![(1.0, 1.0), (2.0, 4.0), (3.0, 9.0)],
+        );
+        let conjecture = Conjecture {
+            formula: Expr::BinOp(BinOp::Pow, Box::new(Expr::Var("n".into())), Box::new(Expr::Const(2.0))),
+            formula_str: "n^2".to_string(),
+            source: "seq1".to_string(),
+            domain: MathDomain::Physics,
+            training_mse: 0.0,
+            complexity: 3,
+            fitness: 0.003,
+            status: ConjectureStatus::Proposed,
+            confidence: 0.5,
+        };
+        // Same domain → should return None
+        assert!(ConjectureEngine::cross_fit(&conjecture, &seq1).is_none());
+    }
+
+    #[test]
+    fn test_discover_cross_domain_formulas() {
+        let mut engine = ConjectureEngine::new();
+        // Linear law in two different domains
+        engine.observe(ObservedSequence::new(
+            "spring_force(x)", MathDomain::Physics,
+            (1..=20).map(|n| (n as f64, 2.0 * n as f64 + 1.0)).collect(),
+        ));
+        engine.observe(ObservedSequence::new(
+            "cost_function(q)", MathDomain::Economics,
+            (1..=20).map(|n| (n as f64, 2.0 * n as f64 + 1.0)).collect(),
+        ));
+        engine.generate_conjectures(3);
+        engine.verify_numerical();
+
+        let matches = engine.discover_cross_domain_formulas(5.0);
+        // Should find at least the possibility (may or may not depending on GP convergence)
+        // Just verify it doesn't panic and returns valid results
+        for m in &matches {
+            assert_ne!(m.source_domain, m.target_domain);
+            assert!(m.mse_ratio < 5.0);
+        }
     }
 }
