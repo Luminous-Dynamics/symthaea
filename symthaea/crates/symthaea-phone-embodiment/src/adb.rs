@@ -121,6 +121,35 @@ impl AdbDevice {
             .map_err(|e| format!("adb open_url failed: {e}"))?;
         if status.success() { Ok(()) } else { Err("adb open_url non-zero".into()) }
     }
+
+    /// Search YouTube for a query — uses the YouTube deep link.
+    pub fn search_youtube(&self, query: &str) -> Result<(), String> {
+        let encoded = query.replace(' ', "+");
+        let url = format!("https://www.youtube.com/results?search_query={encoded}");
+        self.open_url(&url)
+    }
+
+    /// Search the web via Google.
+    pub fn search_web(&self, query: &str) -> Result<(), String> {
+        let encoded = query.replace(' ', "+");
+        let url = format!("https://www.google.com/search?q={encoded}");
+        self.open_url(&url)
+    }
+
+    /// Launch a specific app by package name.
+    pub fn launch_app(&self, package: &str) -> Result<(), String> {
+        let status = Command::new("adb")
+            .args([
+                "-s", &self.serial,
+                "shell", "monkey",
+                "-p", package,
+                "-c", "android.intent.category.LAUNCHER",
+                "1",
+            ])
+            .status()
+            .map_err(|e| format!("adb launch_app failed: {e}"))?;
+        if status.success() { Ok(()) } else { Err("adb launch_app non-zero".into()) }
+    }
 }
 
 #[cfg(test)]

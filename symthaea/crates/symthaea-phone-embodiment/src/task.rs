@@ -54,6 +54,12 @@ pub enum StepAction {
     Home,
     /// Wait for a state transition (observe only).
     WaitForTransition,
+    /// Search YouTube via deep link (bypasses visual navigation).
+    SearchYouTube(String),
+    /// Search the web via Google.
+    SearchWeb(String),
+    /// Open a URL directly.
+    OpenUrl(String),
 }
 
 /// A complete multi-step task.
@@ -78,12 +84,40 @@ impl Task {
         // Pattern: "open X and search Y"
         if let Some(rest) = desc.strip_prefix("open ") {
             if let Some((app, query)) = rest.split_once(" and search ") {
+                let app = app.trim();
+                let query = query.trim();
+
+                // Intent shortcut for known apps — bypasses visual navigation entirely
+                if app == "youtube" {
+                    return Self {
+                        name: description.to_string(),
+                        steps: vec![TaskStep {
+                            description: format!("YouTube search: {query}"),
+                            target: StepTarget::None,
+                            action: StepAction::SearchYouTube(query.to_string()),
+                            max_attempts: 1,
+                        }],
+                    };
+                }
+                if app == "browser" || app == "chrome" || app == "google" {
+                    return Self {
+                        name: description.to_string(),
+                        steps: vec![TaskStep {
+                            description: format!("Web search: {query}"),
+                            target: StepTarget::None,
+                            action: StepAction::SearchWeb(query.to_string()),
+                            max_attempts: 1,
+                        }],
+                    };
+                }
+
+                // Fallback: visual navigation
                 return Self {
                     name: description.to_string(),
                     steps: vec![
                         TaskStep {
                             description: format!("Find {app}"),
-                            target: StepTarget::AppByName(app.trim().to_string()),
+                            target: StepTarget::AppByName(app.to_string()),
                             action: StepAction::Tap,
                             max_attempts: 3,
                         },
@@ -95,9 +129,6 @@ impl Task {
                         },
                         TaskStep {
                             description: "Tap search icon".to_string(),
-                            // YouTube/most apps: search icon top-right area.
-                            // On 1008×2244 screen → grid (0,14) at 128×128.
-                            // Known screen coordinates: ~(940, 80)
                             target: StepTarget::ScreenCoord { x: 940, y: 80 },
                             action: StepAction::Tap,
                             max_attempts: 2,
@@ -111,7 +142,7 @@ impl Task {
                         TaskStep {
                             description: format!("Type \"{query}\""),
                             target: StepTarget::None,
-                            action: StepAction::Type(query.trim().to_string()),
+                            action: StepAction::Type(query.to_string()),
                             max_attempts: 1,
                         },
                     ],

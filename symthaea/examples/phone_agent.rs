@@ -205,6 +205,27 @@ fn main() {
                     StepAction::WaitForTransition => {
                         println!("  Waiting for screen to settle...");
                     }
+                    StepAction::SearchYouTube(query) => {
+                        println!("  ACTION: YouTube intent search \"{query}\"");
+                        if let Err(e) = phone.adb().search_youtube(query) {
+                            println!("  [ERR] {e}");
+                            continue;
+                        }
+                    }
+                    StepAction::SearchWeb(query) => {
+                        println!("  ACTION: Web search \"{query}\"");
+                        if let Err(e) = phone.adb().search_web(query) {
+                            println!("  [ERR] {e}");
+                            continue;
+                        }
+                    }
+                    StepAction::OpenUrl(url) => {
+                        println!("  ACTION: open URL {url}");
+                        if let Err(e) = phone.adb().open_url(url) {
+                            println!("  [ERR] {e}");
+                            continue;
+                        }
+                    }
                 }
 
                 // Wait and detect transition
