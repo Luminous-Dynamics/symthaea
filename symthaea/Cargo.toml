@@ -986,6 +986,10 @@ name = "dmc_humanoid_stand"
 required-features = ["humanoid"]
 
 [[example]]
+name = "robotics_benchmark_suite"
+# No required-features: gracefully degrades based on enabled platforms
+
+[[example]]
 name = "transfer_flight_to_humanoid"
 required-features = ["flight", "humanoid"]
 
