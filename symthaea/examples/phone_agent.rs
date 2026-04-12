@@ -32,11 +32,16 @@ fn main() {
     println!("╚══════════════════════════════════════════════════════╝");
     println!();
 
-    // Initialize phone bridge
-    let mut phone = symthaea_phone_embodiment::PhoneBridge::new(
+    // Initialize phone bridge at 128×128 for better icon discrimination.
+    // 64×64 runs at 52Hz but can't distinguish icons. 128×128 runs at
+    // ~10Hz but each icon occupies 4-8 patches — enough to tell YouTube
+    // (red play button) from Settings (blue gear) from Soma (green fractal).
+    let mut phone = symthaea_phone_embodiment::PhoneBridge::with_resolution(
         "41201FDJG000UM",
         1008,
         2244,
+        128,
+        128,
     );
 
     // Check device connectivity

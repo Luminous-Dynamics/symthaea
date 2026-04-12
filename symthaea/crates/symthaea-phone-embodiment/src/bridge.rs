@@ -59,13 +59,25 @@ impl PhoneBridge {
     /// * `serial` — ADB device serial (e.g., "41201FDJG000UM")
     /// * `screen_w`, `screen_h` — Native screen resolution
     pub fn new(serial: impl Into<String>, screen_w: u32, screen_h: u32) -> Self {
+        Self::with_resolution(serial, screen_w, screen_h, 64, 64)
+    }
+
+    /// Create a phone bridge with custom vision resolution.
+    ///
+    /// Higher resolution (e.g., 128×128) improves icon discrimination
+    /// at the cost of ~4× processing time. 64×64 fits 20Hz budget;
+    /// 128×128 runs at ~10 Hz but can distinguish individual app icons.
+    pub fn with_resolution(
+        serial: impl Into<String>,
+        screen_w: u32,
+        screen_h: u32,
+        target_w: u32,
+        target_h: u32,
+    ) -> Self {
         let mut cfg = VisionConfig::default();
         cfg.enable_depth = true;
         cfg.enable_object_binding = true;
         cfg.enable_temporal_binding = true;
-
-        let target_w = 64;
-        let target_h = 64;
         let mut vision = VisionManifold::new(cfg, target_w, target_h);
         vision.enable_object_memory(16);
         vision.enable_working_memory(4);
