@@ -218,6 +218,23 @@ impl Molecule {
         )
     }
 
+    /// Glycine (simplest amino acid): H₂N-CH₂-COOH
+    /// 3D coordinates from PubChem CID 750 (Angstrom → Bohr).
+    pub fn glycine() -> Self {
+        Self::new(vec![
+            Atom::from_angstrom(8, -1.6487, 0.6571, -0.0104), // O (carbonyl)
+            Atom::from_angstrom(8, -0.4837, -1.2934, -0.0005), // O (hydroxyl)
+            Atom::from_angstrom(7, 1.9006, -0.0812, -0.0090),  // N (amino)
+            Atom::from_angstrom(6, 0.7341, 0.7867, 0.0079),    // C (alpha)
+            Atom::from_angstrom(6, -0.5023, -0.0691, 0.0120),   // C (carbonyl)
+            Atom::from_angstrom(1, 0.7326, 1.4215, -0.8824),   // H
+            Atom::from_angstrom(1, 0.7464, 1.4088, 0.9069),    // H
+            Atom::from_angstrom(1, 1.8743, -0.6844, -0.8301),  // H
+            Atom::from_angstrom(1, 1.8887, -0.6969, 0.8031),   // H
+            Atom::from_angstrom(1, -2.4447, 0.0839, -0.0260),  // H (OH)
+        ])
+    }
+
     /// H₂O at experimental geometry (Angstrom → Bohr).
     /// O-H = 0.9572 Å, H-O-H = 104.52°
     pub fn water() -> Self {
