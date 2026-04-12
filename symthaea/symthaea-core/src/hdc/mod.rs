@@ -370,6 +370,7 @@ pub mod math_bridge; // Unified math bridge (NumericTower + Complex → single A
 mod math_integration_tests;
 pub mod native_similarity; // O(1) XOR+popcount similarity search (consciousness-native)
 pub mod number_theory;
+pub mod diophantine;
 pub mod numeric_tower; // Unified numeric tower (N -> Z -> Q -> R) with auto-promotion
 pub mod optimization; // Optimization: gradient descent, Nelder-Mead, L-BFGS
 #[cfg(feature = "parallel")]
@@ -414,6 +415,8 @@ pub mod geometric_algebra {
 
 // ── Conjecture Engine — The Ramanujan Protocol ───────────────────────────────
 pub mod conjecture_engine; // Automated conjecture generation via symbolic regression + verification
+#[cfg(feature = "abstract_thought")]
+pub mod abstract_thought; // Meta-HDC concept vectors, dynamic grammar generation, category theory discovery
 pub mod autodiff; // Reverse-mode automatic differentiation (Wengert tape) for exact gradients
 pub mod sparse_matrix; // Compressed Sparse Row (CSR) matrix for PDE solvers and graph Laplacians
 pub mod langlands; // Computational Langlands: elliptic curve L-functions, modular forms, modularity verification
