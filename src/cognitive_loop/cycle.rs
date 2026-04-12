@@ -297,6 +297,19 @@ impl CognitiveLoopService {
                     // Scale motor dt by substrate speed factor (Putnam 1967: substrate independence).
                     // Photonic substrates step physics faster; biological substrates slower.
                     let dt = self.config.cfc_config.delta_t * self.substrate_manager.tau_factor;
+                    // Forward ethics verdict to embodiment bridge (from previous cycle).
+                    // Platforms that override apply_moral_gate() will constrain motor output.
+                    let verdict_u8 = match self.last_ethics_verdict {
+                        super::ethics_engine::EthicalVerdict::Safe => 0,
+                        super::ethics_engine::EthicalVerdict::Caution => 1,
+                        super::ethics_engine::EthicalVerdict::Blocked => 2,
+                    };
+                    bridge.apply_moral_gate(symthaea_core::embodiment::MoralGateInput {
+                        verdict: verdict_u8,
+                        consent_violation: self.stats.consent_violation,
+                        ahimsa_violated: false, // Derived from Blocked verdict
+                    });
+
                     let thought_hv = perception.encoding.encoding_result.hdv.clone();
                     let result = bridge.step(&thought_hv, dt, phi);
                     if result.success {

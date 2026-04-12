@@ -585,39 +585,25 @@ impl CognitiveLoopService {
                     Some(Box::new(bridge))
                 }
                 #[cfg(feature = "helicopter")]
-                EmbodimentPlatform::Helicopter => {
-                    let inner = crate::helicopter::embodiment::HelicopterEmbodiment::new(&genesis);
-                    Some(Box::new(
-                        super::super::constructor::HelicopterBridgeAdapter(inner),
-                    ))
-                }
+                EmbodimentPlatform::Helicopter => Some(Box::new(
+                    crate::helicopter::embodiment::HelicopterEmbodiment::new(&genesis),
+                )),
                 #[cfg(feature = "flight")]
-                EmbodimentPlatform::Quadrotor => {
-                    let inner = crate::flight::embodiment::FlightEmbodiment::new(&genesis);
-                    Some(Box::new(super::super::constructor::FlightBridgeAdapter(
-                        inner,
-                    )))
-                }
+                EmbodimentPlatform::Quadrotor => Some(Box::new(
+                    crate::flight::embodiment::FlightEmbodiment::new(&genesis),
+                )),
                 #[cfg(feature = "vehicle")]
-                EmbodimentPlatform::Vehicle => {
-                    let inner = crate::vehicle::embodiment::VehicleEmbodiment::new(&genesis);
-                    Some(Box::new(super::super::constructor::VehicleBridgeAdapter(
-                        inner,
-                    )))
-                }
+                EmbodimentPlatform::Vehicle => Some(Box::new(
+                    crate::vehicle::embodiment::VehicleEmbodiment::new(&genesis),
+                )),
                 #[cfg(feature = "manipulator")]
-                EmbodimentPlatform::Manipulator => {
-                    let inner =
-                        crate::manipulator::embodiment::ManipulatorEmbodiment::new(&genesis);
-                    Some(Box::new(
-                        super::super::constructor::ManipulatorBridgeAdapter(inner),
-                    ))
-                }
+                EmbodimentPlatform::Manipulator => Some(Box::new(
+                    crate::manipulator::embodiment::ManipulatorEmbodiment::new(&genesis),
+                )),
                 #[cfg(feature = "auv")]
-                EmbodimentPlatform::Auv => {
-                    let inner = crate::auv::embodiment::AuvEmbodiment::new(&genesis);
-                    Some(Box::new(super::super::constructor::AuvBridgeAdapter(inner)))
-                }
+                EmbodimentPlatform::Auv => Some(Box::new(
+                    crate::auv::embodiment::AuvEmbodiment::new(&genesis),
+                )),
                 #[cfg(feature = "exoskeleton")]
                 EmbodimentPlatform::Exoskeleton => Some(Box::new(
                     symthaea_exoskeleton::embodiment::ExoskeletonEmbodiment::new(&genesis),

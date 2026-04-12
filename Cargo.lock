@@ -8192,6 +8192,8 @@ dependencies = [
  "num-traits",
  "png 0.18.1",
  "tiff 0.11.3",
+ "zune-core",
+ "zune-jpeg",
 ]
 
 [[package]]
@@ -15532,6 +15534,7 @@ dependencies = [
  "symthaea-observability",
  "symthaea-orbital",
  "symthaea-phi-search",
+ "symthaea-phone-embodiment",
  "symthaea-physics",
  "symthaea-physics-bridge",
  "symthaea-population",
@@ -16307,6 +16310,16 @@ dependencies = [
  "serde",
  "symthaea-consciousness-topology",
  "symthaea-core",
+]
+
+[[package]]
+name = "symthaea-phone-embodiment"
+version = "0.1.0"
+dependencies = [
+ "image 0.25.10",
+ "serde",
+ "symthaea-core",
+ "symthaea-vision-manifold",
 ]
 
 [[package]]

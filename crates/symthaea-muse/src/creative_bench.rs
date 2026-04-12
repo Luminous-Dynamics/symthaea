@@ -321,6 +321,50 @@ pub fn harmony_diversity(sessions: &[[f32; 8]]) -> f32 {
     (entropy / max_entropy).clamp(0.0, 1.0)
 }
 
+// ─── Melody Extraction ──────────────────────────────────────────────────────
+
+/// Extract the melody voice from a mixed note set (melody + bass + harmony).
+///
+/// Strategy: at each distinct onset time, keep only the highest-pitched note.
+/// Bass and harmony notes are lower in register; the melody is typically the
+/// highest voice. This gives analysis functions (contour, coherence, rhythm)
+/// a clean melodic line to evaluate.
+fn extract_melody(notes: &[Note]) -> Vec<Note> {
+    if notes.is_empty() {
+        return Vec::new();
+    }
+
+    // Group notes by onset time (within 30ms tolerance = same beat)
+    let tolerance = 0.03f32;
+    let mut sorted = notes.to_vec();
+    sorted.sort_by(|a, b| {
+        a.start_time
+            .partial_cmp(&b.start_time)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+
+    let mut melody = Vec::new();
+    let mut group_start = sorted[0].start_time;
+    let mut group_highest = sorted[0];
+
+    for note in &sorted[1..] {
+        if (note.start_time - group_start).abs() < tolerance {
+            // Same onset group — keep the highest pitch
+            if note.frequency > group_highest.frequency {
+                group_highest = *note;
+            }
+        } else {
+            // New group — emit the highest from previous group
+            melody.push(group_highest);
+            group_start = note.start_time;
+            group_highest = *note;
+        }
+    }
+    melody.push(group_highest);
+
+    melody
+}
+
 // ─── Composite Creative Score ─────────────────────────────────────────────────
 
 /// Composite creative quality score for a composition.
@@ -344,8 +388,10 @@ pub struct CreativeQualityScore {
 impl CreativeQualityScore {
     /// Evaluate a composition against a target VA state.
     pub fn evaluate(composition: &Composition, target_va: ValenceArousal) -> Self {
-        let melodic_coherence = melodic_coherence(&composition.notes);
-        let rhythmic_regularity = rhythmic_regularity(&composition.notes);
+        // Extract melody voice for melodic analysis (filters out bass/harmony)
+        let melody = extract_melody(&composition.notes);
+        let melodic_coherence = melodic_coherence(&melody);
+        let rhythmic_regularity = rhythmic_regularity(&melody);
         let emotional_alignment = emotional_alignment(composition, target_va);
         let form_compliance = form_compliance(composition);
 
@@ -1054,11 +1100,14 @@ impl TheoryValidation {
     /// `scale_freqs` is the set of frequencies in the target scale. If empty,
     /// scale adherence is computed against the chromatic scale (always 1.0).
     pub fn validate(notes: &[Note], scale_freqs: &[f32]) -> Self {
+        // Scale adherence checks all notes (bass+harmony should also be in scale)
         let scale_adherence = Self::compute_scale_adherence(notes, scale_freqs);
         let parallel_fifth_avoidance = Self::compute_parallel_fifth_avoidance(notes);
         let rhythmic_quantization = Self::compute_rhythmic_quantization(notes);
-        let voice_range_compliance = Self::compute_voice_range(notes);
-        let phrase_contour_quality = Self::compute_phrase_contour(notes);
+        // Voice range and contour: analyze melody only (not bass/harmony jumps)
+        let melody = extract_melody(notes);
+        let voice_range_compliance = Self::compute_voice_range(&melody);
+        let phrase_contour_quality = Self::compute_phrase_contour(&melody);
 
         let violations = [
             scale_adherence < 0.7,
@@ -1681,6 +1730,7 @@ mod external_validation_tests {
         let mut total_creative = 0.0f32;
         let mut total_audio = 0.0f32;
         let mut total_theory = 0.0f32;
+        let mut total_harmonic = 0.0f32;
 
         eprintln!("\n══════════════════════════════════════════════════");
         eprintln!("  Symthaea Music Quality Benchmark");
@@ -1724,27 +1774,38 @@ mod external_validation_tests {
                 audio.harmonic_to_noise_db,
                 audio.composite
             );
+            let harmonic = HarmonicProgressionScore::evaluate(&comp.notes);
             eprintln!("  Theory:    scale={:.0}% p5={:.0}% grid={:.0}% range={:.0}% contour={:.0}% -> {:.3}",
                 theory.scale_adherence * 100.0, theory.parallel_fifth_avoidance * 100.0,
                 theory.rhythmic_quantization * 100.0, theory.voice_range_compliance * 100.0,
                 theory.phrase_contour_quality * 100.0, theory.composite);
+            eprintln!(
+                "  Harmonic:  strong={:.0}% resolve={:.0}% variety={:.0}% -> {:.3}",
+                harmonic.strong_progressions * 100.0,
+                harmonic.resolution_tendency * 100.0,
+                harmonic.harmonic_variety * 100.0,
+                harmonic.composite
+            );
 
             total_creative += creative.composite;
             total_audio += audio.composite;
             total_theory += theory.composite;
+            total_harmonic += harmonic.composite;
         }
 
         let n = scenarios.len() as f32;
         let avg_creative = total_creative / n;
         let avg_audio = total_audio / n;
         let avg_theory = total_theory / n;
-        let overall = (avg_creative + avg_audio + avg_theory) / 3.0;
+        let avg_harmonic = total_harmonic / n;
+        let overall = (avg_creative + avg_audio + avg_theory + avg_harmonic) / 4.0;
 
         eprintln!("\n══════════════════════════════════════════════════");
         eprintln!("  AVERAGES");
         eprintln!("  Creative Quality: {:.3}", avg_creative);
         eprintln!("  Audio Quality:    {:.3}", avg_audio);
         eprintln!("  Theory Score:     {:.3}", avg_theory);
+        eprintln!("  Harmonic Prog:    {:.3}", avg_harmonic);
         eprintln!("  Overall:          {:.3}", overall);
         eprintln!("══════════════════════════════════════════════════\n");
 

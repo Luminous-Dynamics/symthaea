@@ -1,0 +1,12 @@
+[package]
+name = "symthaea-phone-embodiment"
+version = "0.1.0"
+edition = "2021"
+license = "AGPL-3.0-or-later"
+description = "Phone screen embodiment for Symthaea — ADB-based perception-action loop"
+
+[dependencies]
+symthaea-core = { path = "../../symthaea-core" }
+symthaea-vision-manifold = { path = "../symthaea-vision-manifold" }
+image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
+serde = { version = "1", features = ["derive"] }

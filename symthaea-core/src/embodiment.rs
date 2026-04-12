@@ -92,6 +92,10 @@ pub struct EmbodimentTelemetry {
     pub epistemic_grounding: String,
     /// Observation confidence derived from prediction error.
     pub observation_confidence: f32,
+    /// Platform-specific telemetry bytes (serialized by each platform).
+    /// Empty by default; platforms override `platform_telemetry_bytes()` to populate.
+    #[serde(default)]
+    pub platform_specific: Vec<u8>,
 }
 
 // ── Epistemic Grounding Constants ─────────────────────────────────────────
@@ -225,6 +229,10 @@ pub enum EmbodimentPlatform {
     CareProvider,
     /// Browser agent — web pages as sensory environment via CDP.
     Browser,
+    /// Phone screen — ADB-controlled Android device as sensory environment.
+    Phone,
+    /// Desktop screen — mouse/keyboard control via xdotool/ydotool.
+    Desktop,
 }
 
 // ── Agent Identity ────────────────────────────────────────────────────────
@@ -314,6 +322,14 @@ pub trait EmbodimentBridge: Send + Sync {
     /// to enforce: Blocked → Red, Caution → Yellow cap, consent → Orange,
     /// ahimsa → Red.
     fn apply_moral_gate(&mut self, _gate: MoralGateInput) {}
+
+    /// Platform-specific telemetry bytes for dispatch zome integration.
+    ///
+    /// Default returns empty vec. Override to serialize platform-specific
+    /// sensor data (e.g., joint angles, chemical readings, rotor RPM).
+    fn platform_telemetry_bytes(&self) -> Vec<u8> {
+        Vec::new()
+    }
 }
 
 // ── Moral Gate Input ─────────────────────────────────────────────────

@@ -1322,7 +1322,7 @@ mod tests {
         let arr_input = sequencer.hv_to_input(&input);
 
         // Run many steps through the network — should not blow up
-        let mut net = sequencer.network.borrow_mut();
+        let mut net = sequencer.network.lock().unwrap();
         net.reset();
         for _ in 0..100 {
             let output = net.forward(&arr_input, 1.0);
@@ -1368,7 +1368,10 @@ mod tests {
         // Export and reimport weights
         let weights = sequencer.export_weights();
         assert!(!weights.is_empty());
-        assert_eq!(weights.len(), sequencer.network.borrow().num_parameters());
+        assert_eq!(
+            weights.len(),
+            sequencer.network.lock().unwrap().num_parameters()
+        );
 
         let sequencer2 = CfCCodeSequencer::default();
         sequencer2.import_weights(&weights).unwrap();

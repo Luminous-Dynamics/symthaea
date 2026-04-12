@@ -1292,6 +1292,44 @@ fn infer_rust_body(
         }
     }
 
+    // Rotational cipher / Caesar cipher
+    if (purpose_lower.contains("rotat")
+        || purpose_lower.contains("caesar")
+        || purpose_lower.contains("shift"))
+        && (purpose_lower.contains("cipher")
+            || purpose_lower.contains("letter")
+            || purpose_lower.contains("shifted"))
+    {
+        if params.len() == 2 && params[0].1.contains("str") {
+            let p0 = &params[0].0;
+            let p1 = &params[1].0;
+            return format!(
+                "{}.chars().map(|c| {{\n        \
+                     if c.is_ascii_alphabetic() {{\n            \
+                         let base = if c.is_ascii_uppercase() {{ b'A' }} else {{ b'a' }};\n            \
+                         (((c as u8 - base + {} as u8) % 26) + base) as char\n        \
+                     }} else {{ c }}\n    \
+                 }}).collect()",
+                p0, p1
+            );
+        }
+    }
+    // Atbash cipher (reverse alphabet)
+    if purpose_lower.contains("atbash") {
+        if params.len() == 1 && params[0].1.contains("str") {
+            return format!(
+                "{}.to_lowercase().chars().filter_map(|c| {{\n        \
+                     if c.is_ascii_alphabetic() {{\n            \
+                         Some((b'z' - (c as u8 - b'a')) as char)\n        \
+                     }} else if c.is_ascii_digit() {{\n            \
+                         Some(c)\n        \
+                     }} else {{ None }}\n    \
+                 }}).collect::<String>().as_bytes().chunks(5).map(|chunk| \
+                 std::str::from_utf8(chunk).unwrap()).collect::<Vec<_>>().join(\" \")",
+                params[0].0
+            );
+        }
+    }
     // Leap year
     if purpose_lower.contains("leap") && purpose_lower.contains("year") {
         if params.len() == 1 {

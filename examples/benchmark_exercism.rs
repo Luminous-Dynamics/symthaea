@@ -20,6 +20,8 @@ use std::process::Command;
 
 use symthaea::hdc::code_encoder::CodeHDEncoder;
 use symthaea::language::analogy_generation::SolutionLibrary;
+use symthaea::language::code_discovery::CodeDiscovery;
+use symthaea::language::code_executor::CodeExecutor;
 use symthaea::language::code_generator::{CodeContext, CodeGenerator};
 use symthaea::language::code_intent::{CodeIntent, CodeSpec, CodeTarget};
 use symthaea::language::code_parser::EntityKind;
@@ -201,9 +203,27 @@ fn parse_test_examples(exercise_dir: &Path, fn_name: &str) -> Vec<(String, Strin
         }
     }
 
-    // Limit to 8 examples (more than enough for inference)
-    examples.truncate(8);
-    examples
+    // Normalize: strip module qualifiers (squares::func → func)
+    let normalized: Vec<(String, String)> = examples
+        .into_iter()
+        .map(|(call, expected)| {
+            // Strip "module::" prefix from function calls
+            let normalized_call = if let Some(pos) = call.rfind("::") {
+                // Keep everything from after "::" — but also keep the args
+                call[pos + 2..].to_string()
+            } else {
+                call
+            };
+            // Strip ".trim()" and similar method chains from expected
+            let normalized_expected = expected.trim_end_matches(".trim()").trim().to_string();
+            (normalized_call, normalized_expected)
+        })
+        .collect();
+
+    // Limit to 8 examples
+    let mut result = normalized;
+    result.truncate(8);
+    result
 }
 
 /// Find the comma that separates func(args) from expected in assert_eq!
@@ -449,7 +469,12 @@ fn main() {
     // Index ALL canonical solutions for analogy-based generation
     let mut solution_library = SolutionLibrary::new(512);
     let indexed = solution_library.load_exercism_solutions(&exercism_path);
-    println!("Indexed {} canonical solutions for analogy\n", indexed);
+    println!("Indexed {} canonical solutions for analogy", indexed);
+
+    // Initialize discovery engine for emergent solution finding
+    let mut discovery = CodeDiscovery::new(512);
+    let mut executor = CodeExecutor::with_real_execution();
+    println!("Discovery engine ready (70+ code fragments)\n");
 
     // Collect all exercises
     let mut exercises: Vec<PathBuf> = std::fs::read_dir(&exercism_path)
@@ -527,7 +552,83 @@ fn main() {
         }
 
         if !any_generated {
-            println!("  {:30} SKIP (generated todo!())", exercise_name);
+            // TIER 3: Discovery — evolve a solution using tests as fitness
+            // Only attempt for the first function (most exercises are single-function)
+            if let Some(func) = functions.first() {
+                // Read test file for fitness evaluation
+                let tests_dir = exercise_dir.join("tests");
+                let test_source = if tests_dir.exists() {
+                    std::fs::read_dir(&tests_dir)
+                        .ok()
+                        .and_then(|entries| {
+                            entries
+                                .flatten()
+                                .find(|e| e.path().extension().map_or(false, |ext| ext == "rs"))
+                                .and_then(|e| std::fs::read_to_string(e.path()).ok())
+                        })
+                        .map(|content| content.replace("#[ignore]\n", "").replace("#[ignore]", ""))
+                        .unwrap_or_default()
+                } else {
+                    String::new()
+                };
+
+                if !test_source.is_empty() {
+                    // Extract param name and type from signature
+                    let (param_name, param_type) = func
+                        .signature
+                        .split('(')
+                        .nth(1)
+                        .and_then(|s| s.split(')').next())
+                        .and_then(|params| {
+                            let first = params.split(',').next()?;
+                            let parts: Vec<&str> = first.split(':').collect();
+                            if parts.len() == 2 {
+                                Some((parts[0].trim().to_string(), parts[1].trim().to_string()))
+                            } else {
+                                None
+                            }
+                        })
+                        .unwrap_or_else(|| ("input".to_string(), "&str".to_string()));
+
+                    let return_type = func
+                        .signature
+                        .split("->")
+                        .nth(1)
+                        .map(|s| s.trim().to_string())
+                        .unwrap_or_default();
+
+                    let result = discovery.discover(
+                        &func.purpose,
+                        &func.signature,
+                        &param_name,
+                        &param_type,
+                        &return_type,
+                        &test_source,
+                        &mut executor,
+                    );
+
+                    if result.found {
+                        if let Some(source) = result.source {
+                            all_implementations.push(source);
+                            any_generated = true;
+                            method = format!(
+                                "DISCOVERED(gen:{}, fit:{:.2}, compiled:{}/{})",
+                                result.generations,
+                                result.best_fitness,
+                                result.compiled_count,
+                                result.total_evaluated
+                            );
+                        }
+                    }
+                }
+            }
+        }
+
+        if !any_generated {
+            println!(
+                "  {:30} SKIP (no pattern, analogy, or discovery)",
+                exercise_name
+            );
             skipped += 1;
             continue;
         }

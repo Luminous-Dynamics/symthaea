@@ -60,6 +60,8 @@ pub mod pattern_bootstrap;
 #[cfg(feature = "code_generation")]
 pub mod analogy_generation;
 #[cfg(feature = "code_generation")]
+pub mod code_discovery;
+#[cfg(feature = "code_generation")]
 pub mod code_domain_plugin;
 #[cfg(feature = "code_generation")]
 pub mod code_executor;
@@ -75,6 +77,8 @@ pub mod code_verifier;
 pub mod emitters;
 #[cfg(feature = "code_generation")]
 pub mod epistemic_generation;
+#[cfg(feature = "code_generation")]
+pub mod hv_code_decoder;
 #[cfg(feature = "code_generation")]
 pub mod nix_code_parser;
 #[cfg(feature = "code_generation")]

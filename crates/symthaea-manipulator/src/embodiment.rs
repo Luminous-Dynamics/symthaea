@@ -13,7 +13,7 @@ use crate::types::ManipulatorConfig;
 
 pub use symthaea_core::embodiment::{
     grounding_from_prediction_error, grounding_label, EmbodimentResult, EmbodimentTelemetry,
-    MoralGateInput, MotorSafetyLevel, GROUNDING_SENSORIMOTOR,
+    GroundingEstimator, MoralGateInput, MotorSafetyLevel, GROUNDING_SENSORIMOTOR,
 };
 
 /// Manipulator embodiment bridge.
@@ -28,6 +28,8 @@ pub struct ManipulatorEmbodiment {
     last_control_effort: f32,
     last_prediction_error: f32,
     moral_safety: Option<MotorSafetyLevel>,
+    grounding: GroundingEstimator,
+    last_grounding: u8,
 }
 
 impl ManipulatorEmbodiment {
@@ -44,6 +46,8 @@ impl ManipulatorEmbodiment {
             last_control_effort: 0.0,
             last_prediction_error: 0.0,
             moral_safety: None,
+            grounding: GroundingEstimator::new(),
+            last_grounding: GROUNDING_SENSORIMOTOR,
         }
     }
 
@@ -108,6 +112,10 @@ impl ManipulatorEmbodiment {
         self.last_perception = Some(perception);
         self.total_steps += 1;
 
+        // Compute epistemic grounding from prediction error trend.
+        // Manipulator has no swarm peers, so social grounding is not possible.
+        self.last_grounding = self.grounding.estimate(pred_error, None);
+
         let success = self.simulator.state().is_finite();
 
         EmbodimentResult {
@@ -116,7 +124,7 @@ impl ManipulatorEmbodiment {
             success,
             prediction_error: pred_error,
             safety_level: self.current_safety,
-            epistemic_grounding: GROUNDING_SENSORIMOTOR,
+            epistemic_grounding: self.last_grounding,
             observation_confidence: grounding_from_prediction_error(pred_error),
         }
     }
@@ -138,6 +146,8 @@ impl ManipulatorEmbodiment {
         self.moral_safety = None;
         self.last_control_effort = 0.0;
         self.last_prediction_error = 0.0;
+        self.grounding.reset();
+        self.last_grounding = GROUNDING_SENSORIMOTOR;
     }
 
     pub fn safety_level(&self) -> MotorSafetyLevel {
@@ -156,9 +166,60 @@ impl ManipulatorEmbodiment {
             safety_level: format!("{:?}", self.current_safety),
             platform: "manipulator".to_string(),
             num_actuators: 8,
-            epistemic_grounding: grounding_label(GROUNDING_SENSORIMOTOR).to_string(),
+            epistemic_grounding: grounding_label(self.last_grounding).to_string(),
             observation_confidence: grounding_from_prediction_error(self.last_prediction_error),
+            platform_specific: self.platform_telemetry_bytes(),
         }
+    }
+
+    /// Serialize joint angles and end-effector force as JSON bytes.
+    pub fn platform_telemetry_bytes(&self) -> Vec<u8> {
+        let state = self.simulator.state();
+        serde_json::to_vec(&serde_json::json!({
+            "joint_angles": state.joint_angles,
+            "ee_force": state.end_effector_force,
+            "gripper": state.gripper_opening,
+        }))
+        .unwrap_or_default()
+    }
+}
+
+impl symthaea_core::embodiment::EmbodimentBridge for ManipulatorEmbodiment {
+    fn step(&mut self, hv: &ContinuousHV, dt: f32, phi: f64) -> EmbodimentResult {
+        self.step(hv, dt, phi)
+    }
+    fn encode_perception(&mut self) -> ContinuousHV {
+        self.encode_perception()
+    }
+    fn reset(&mut self) {
+        self.reset()
+    }
+    fn safety_level(&self) -> MotorSafetyLevel {
+        self.safety_level()
+    }
+    fn set_safety_override(&mut self, level: MotorSafetyLevel) {
+        self.set_safety_override(level)
+    }
+    fn clear_safety_override(&mut self) {
+        self.clear_safety_override()
+    }
+    fn platform(&self) -> symthaea_core::embodiment::EmbodimentPlatform {
+        symthaea_core::embodiment::EmbodimentPlatform::Manipulator
+    }
+    fn num_actuators(&self) -> usize {
+        8
+    }
+    fn total_steps(&self) -> usize {
+        self.total_steps()
+    }
+    fn telemetry(&self) -> EmbodimentTelemetry {
+        self.telemetry()
+    }
+    fn apply_moral_gate(&mut self, gate: symthaea_core::embodiment::MoralGateInput) {
+        self.apply_moral_gate(gate)
+    }
+    fn platform_telemetry_bytes(&self) -> Vec<u8> {
+        self.platform_telemetry_bytes()
     }
 }
 

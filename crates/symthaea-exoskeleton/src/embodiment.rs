@@ -122,6 +122,7 @@ impl ExoskeletonEmbodiment {
             num_actuators: NUM_ACTUATORS,
             epistemic_grounding: grounding_label(GROUNDING_SENSORIMOTOR).to_string(),
             observation_confidence: grounding_from_prediction_error(self.last_prediction_error),
+            platform_specific: Vec::new(),
         }
     }
 }

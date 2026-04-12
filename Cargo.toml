@@ -73,6 +73,7 @@ members = [
     "crates/symthaea-memory",
     "crates/symthaea-fabrication-kernel",
     "crates/symthaea-vision-manifold",
+    "crates/symthaea-phone-embodiment",
     "crates/symthaea-foveation",
     "crates/symthaea-phi-oracle",
     "crates/symthaea-pulse",
@@ -323,6 +324,7 @@ symthaea-fabrication-kernel = { path = "crates/symthaea-fabrication-kernel", opt
 
 # Symthaea Vision Manifold - Patch-based HDC video encoding with CfC temporal dynamics
 symthaea-vision-manifold = { path = "crates/symthaea-vision-manifold", optional = true }
+symthaea-phone-embodiment = { path = "crates/symthaea-phone-embodiment", optional = true }
 
 # Symthaea Foveation Bridge - Dorsal surprise → ventral recognition dispatch
 symthaea-foveation = { path = "crates/symthaea-foveation", optional = true }
@@ -546,6 +548,7 @@ vision = ["ort", "hf-hub"]                            # SigLIP image embeddings 
 perception = ["embeddings", "vision"]                 # Full multimodal perception stack
 webcam = []                                           # Live webcam capture (gates cfg blocks in source)
 vision-manifold = ["dep:symthaea-vision-manifold"]    # Patch-based HDC video encoding + CfC temporal manifold
+phone = ["dep:symthaea-phone-embodiment", "vision-manifold"]  # ADB phone screen embodiment
 # REMOVED: vision-manifold-camera (0 cfg gates; requires V4L2 hardware, never tested)
 foveation = ["dep:symthaea-foveation", "vision-manifold"]  # Foveation bridge for active vision (dorsal→ventral dispatch)
 # REMOVED: foveation-perception (0 cfg gates; requires GPU models, never tested)
