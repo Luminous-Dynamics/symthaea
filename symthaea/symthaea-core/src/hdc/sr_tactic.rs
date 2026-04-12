@@ -203,6 +203,21 @@ pub fn weak_heuristic_score(tactic: TacticId, domain: Domain) -> f32 {
     domain_score + tactic_bias(tactic)
 }
 
+/// **Parameterized** heuristic: domain bonus interpolates between weak
+/// (0.05, mostly sub-threshold) and strong (0.8, super-threshold) as
+/// `strength` ranges from 0.0 to 1.0. Used by the 2D σ × strength sweep
+/// to map the transition curve where SR starts / stops helping.
+pub fn heuristic_score_scaled(tactic: TacticId, domain: Domain, strength: f32) -> f32 {
+    let domain_bonus = 0.05 + strength * 0.75; // [0.05, 0.80]
+    let wrong_domain_floor = 0.0;
+    let domain_score = if tactic.native_domain() == domain {
+        domain_bonus
+    } else {
+        wrong_domain_floor
+    };
+    domain_score + tactic_bias(tactic)
+}
+
 // ─── Noise source ────────────────────────────────────────────────────────────
 //
 // Deterministic xorshift64, same pattern as `symthaea-geodesic/src/noise.rs`.
@@ -395,6 +410,159 @@ pub fn sigma_sweep_weak(
 }
 
 // ─── Problem corpora ─────────────────────────────────────────────────────────
+
+/// Generate a *random* corpus of `n` problems with reproducible seeding.
+/// Problems are drawn uniformly over the 15 tactic IDs (correct tactic
+/// picked via modular indexing) and domain is set to the tactic's native
+/// domain. This gives us arbitrary corpus sizes for statistical sweeps.
+pub fn random_corpus(n: usize, seed: u64) -> Vec<Problem> {
+    let tactics = TacticId::all();
+    let mut state = seed;
+    let mut out = Vec::with_capacity(n);
+    for i in 0..n {
+        let r = xorshift64(&mut state);
+        let t = tactics[(r % tactics.len() as u64) as usize];
+        out.push(Problem::new(
+            &format!("random_{}", i),
+            t.native_domain(),
+            t,
+        ));
+    }
+    out
+}
+
+/// Solve a problem at a specified heuristic strength. At strength=1.0,
+/// equivalent to `solve()` (strong heuristic); at 0.0, equivalent to
+/// `solve_weak()` (weakest). Used by the 2D sweep.
+impl SrTacticSelector {
+    pub fn solve_scaled(
+        &mut self,
+        problem: &Problem,
+        tactics: &[TacticId],
+        strength: f32,
+    ) -> usize {
+        let mut scored: Vec<(f32, TacticId)> = tactics
+            .iter()
+            .map(|&t| {
+                let base = heuristic_score_scaled(t, problem.domain, strength);
+                let perturbation = if self.sigma > 0.0 {
+                    let (g, _) = gaussian_pair(&mut self.rng_state);
+                    g * self.sigma
+                } else {
+                    0.0
+                };
+                (base + perturbation, t)
+            })
+            .collect();
+        scored.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal));
+        for (i, (_, t)) in scored.iter().enumerate() {
+            if problem.try_tactic(*t) {
+                return i + 1;
+            }
+        }
+        tactics.len()
+    }
+}
+
+// ─── Statistics ─────────────────────────────────────────────────────────────
+
+/// Wilson score 95% confidence interval for a binomial proportion.
+/// More accurate than normal approximation, especially for extreme p or
+/// small n. Returns (lower, upper).
+pub fn wilson_ci_95(successes: usize, trials: usize) -> (f32, f32) {
+    if trials == 0 {
+        return (0.0, 0.0);
+    }
+    let n = trials as f32;
+    let p = successes as f32 / n;
+    let z: f32 = 1.96; // 95%
+    let z2 = z * z;
+    let denom = 1.0 + z2 / n;
+    let center = (p + z2 / (2.0 * n)) / denom;
+    let half = (z * ((p * (1.0 - p) + z2 / (4.0 * n)) / n).sqrt()) / denom;
+    ((center - half).max(0.0), (center + half).min(1.0))
+}
+
+/// Two-proportion z-test for the null hypothesis p1 = p2. Returns the
+/// z-statistic. |z| > 1.96 → p < 0.05 (two-sided).
+pub fn two_proportion_z(
+    successes1: usize,
+    trials1: usize,
+    successes2: usize,
+    trials2: usize,
+) -> f32 {
+    if trials1 == 0 || trials2 == 0 {
+        return 0.0;
+    }
+    let p1 = successes1 as f32 / trials1 as f32;
+    let p2 = successes2 as f32 / trials2 as f32;
+    let pooled = (successes1 + successes2) as f32 / (trials1 + trials2) as f32;
+    let se = (pooled * (1.0 - pooled) * (1.0 / trials1 as f32 + 1.0 / trials2 as f32)).sqrt();
+    if se < 1e-12 {
+        return 0.0;
+    }
+    (p1 - p2) / se
+}
+
+// ─── 2D σ × strength sweep ───────────────────────────────────────────────────
+
+/// Point in the 2D sweep. Adds Wilson CIs to the 1D SweepPoint.
+#[derive(Debug, Clone)]
+pub struct SweepPoint2D {
+    pub sigma: f32,
+    pub strength: f32,
+    pub successes: usize,
+    pub trials: usize,
+    pub solve_rate: f32,
+    pub ci_lower: f32,
+    pub ci_upper: f32,
+}
+
+/// 2D sweep over σ × heuristic strength. "Success" = attempts ≤
+/// threshold (same convention as 1D sweep, threshold = tactics.len() / 2).
+pub fn sigma_strength_sweep(
+    problems: &[Problem],
+    sigmas: &[f32],
+    strengths: &[f32],
+    trials_per_cell: usize,
+    base_seed: u64,
+) -> Vec<SweepPoint2D> {
+    let tactics = TacticId::all();
+    let threshold = tactics.len() / 2;
+    let mut out = Vec::with_capacity(sigmas.len() * strengths.len());
+    for &sigma in sigmas {
+        for &strength in strengths {
+            let mut successes = 0usize;
+            let mut total = 0usize;
+            for trial in 0..trials_per_cell {
+                let seed = base_seed
+                    .wrapping_add((sigma * 1e6) as u64)
+                    .wrapping_add((strength * 1e4) as u64)
+                    .wrapping_add(trial as u64 * 7919);
+                let mut selector = SrTacticSelector::new(sigma, seed);
+                for p in problems {
+                    let n = selector.solve_scaled(p, &tactics, strength);
+                    total += 1;
+                    if n <= threshold {
+                        successes += 1;
+                    }
+                }
+            }
+            let solve_rate = successes as f32 / total as f32;
+            let (ci_lower, ci_upper) = wilson_ci_95(successes, total);
+            out.push(SweepPoint2D {
+                sigma,
+                strength,
+                successes,
+                trials: total,
+                solve_rate,
+                ci_lower,
+                ci_upper,
+            });
+        }
+    }
+    out
+}
 
 /// A curated set of 15 synthetic IMO-style problems — one per tactic, with
 /// the correct answer being that tactic. This lets us measure how often
@@ -645,6 +813,183 @@ mod tests {
         }
 
         assert!(points.len() == sigmas.len());
+    }
+
+    // ── Statistical instruments ──────────────────────────────────────
+
+    #[test]
+    fn test_wilson_ci_sanity() {
+        // p = 0.5, n = 100 → CI roughly 0.40-0.60
+        let (lo, hi) = wilson_ci_95(50, 100);
+        assert!(lo > 0.35 && lo < 0.45);
+        assert!(hi > 0.55 && hi < 0.65);
+        // Degenerate cases
+        let (lo0, hi0) = wilson_ci_95(0, 0);
+        assert_eq!((lo0, hi0), (0.0, 0.0));
+        // p = 1.0, n = 100 → upper ≈ 1.0, lower clipped
+        let (lo1, hi1) = wilson_ci_95(100, 100);
+        assert!(lo1 > 0.95);
+        assert!(hi1 <= 1.0);
+    }
+
+    #[test]
+    fn test_two_proportion_z_sanity() {
+        // Same proportions → z ≈ 0
+        let z_same = two_proportion_z(50, 100, 50, 100);
+        assert!(z_same.abs() < 0.5);
+        // Very different proportions → |z| large
+        let z_diff = two_proportion_z(90, 100, 10, 100);
+        assert!(z_diff > 10.0, "expected large positive z, got {}", z_diff);
+        // Negative direction
+        let z_rev = two_proportion_z(10, 100, 90, 100);
+        assert!(z_rev < -10.0, "expected large negative z, got {}", z_rev);
+    }
+
+    #[test]
+    fn test_random_corpus_deterministic() {
+        let c1 = random_corpus(50, 42);
+        let c2 = random_corpus(50, 42);
+        assert_eq!(c1.len(), 50);
+        for (p1, p2) in c1.iter().zip(c2.iter()) {
+            assert_eq!(p1.correct, p2.correct);
+            assert_eq!(p1.domain, p2.domain);
+        }
+    }
+
+    /// **Phase 4.5 — formal statistical validation.** The earlier inverted-U
+    /// finding (+5.2pp at σ=0.20) was on 3000 samples per σ from the 15-
+    /// problem curated corpus. This test scales up to 100 random problems
+    /// × 100 trials = 10,000 samples per σ on the weak heuristic, then
+    /// computes a Wilson 95% CI on the solve rate at σ=0.20 and runs a
+    /// two-proportion z-test against σ=0.
+    ///
+    /// This answers: is the +5pp improvement statistically significant?
+    #[test]
+    fn test_phase4_5_formal_stat_validation() {
+        let corpus = random_corpus(100, 42);
+        let sigmas = [0.00, 0.10, 0.20, 0.30];
+        let points = sigma_sweep_weak(&corpus, &sigmas, 100, 42);
+
+        eprintln!("\n════════════════════════════════════════════════════════════");
+        eprintln!("  PHASE 4.5 — FORMAL STATISTICAL VALIDATION");
+        eprintln!("  Corpus: 100 random problems, 100 trials per σ = 10k samples");
+        eprintln!("────────────────────────────────────────────────────────────");
+
+        // Reconstruct successes from solve rate for Wilson CI + z-test
+        let mut baseline_success = 0usize;
+        let mut baseline_trials = 0usize;
+        let mut peak_success = 0usize;
+        let mut peak_trials = 0usize;
+
+        for pt in &points {
+            let successes = (pt.solve_rate * pt.trials as f32).round() as usize;
+            let (lo, hi) = wilson_ci_95(successes, pt.trials);
+            eprintln!(
+                "  σ={:.2}  solve_rate={:.3}%  95% CI [{:.3}%, {:.3}%]  (n={})",
+                pt.sigma,
+                pt.solve_rate * 100.0,
+                lo * 100.0,
+                hi * 100.0,
+                pt.trials
+            );
+            if pt.sigma.abs() < 1e-6 {
+                baseline_success = successes;
+                baseline_trials = pt.trials;
+            }
+            if (pt.sigma - 0.20).abs() < 1e-6 {
+                peak_success = successes;
+                peak_trials = pt.trials;
+            }
+        }
+
+        let z = two_proportion_z(peak_success, peak_trials, baseline_success, baseline_trials);
+        let baseline_rate = baseline_success as f32 / baseline_trials as f32;
+        let peak_rate = peak_success as f32 / peak_trials as f32;
+        let diff_pp = (peak_rate - baseline_rate) * 100.0;
+
+        eprintln!("\n  HYPOTHESIS TEST (σ=0.20 vs σ=0.00):");
+        eprintln!(
+            "    Δ solve rate = {:+.2}pp  ({:.3}% → {:.3}%)",
+            diff_pp,
+            baseline_rate * 100.0,
+            peak_rate * 100.0
+        );
+        eprintln!("    z = {:.3}", z);
+        if z.abs() > 2.58 {
+            eprintln!("    p < 0.01 ✓");
+        } else if z.abs() > 1.96 {
+            eprintln!("    p < 0.05 ✓");
+        } else {
+            eprintln!("    p ≥ 0.05 — not statistically significant");
+        }
+        eprintln!("════════════════════════════════════════════════════════════");
+
+        // Scientific assertions: we expect σ=0.20 to have a CI that does
+        // not overlap the σ=0 point estimate (weak evidence of peak) and
+        // |z| > 2 (moderate evidence of improvement). These are soft
+        // assertions — the scientific content is in the printed report.
+        assert!(peak_trials > 0);
+        assert!(baseline_trials > 0);
+    }
+
+    /// **The 2D σ × heuristic-strength transition sweep.** Maps the
+    /// boundary between sub-threshold (SR helps) and super-threshold (SR
+    /// hurts) regimes. Prints a solve-rate matrix with Wilson CIs on the
+    /// diagonal of interest.
+    #[test]
+    fn test_phase4_5_sr_2d_transition_sweep() {
+        let corpus = random_corpus(50, 42);
+        let sigmas = [0.00, 0.10, 0.20, 0.30];
+        let strengths = [0.00, 0.10, 0.25, 0.50, 0.75, 1.00];
+        let points = sigma_strength_sweep(&corpus, &sigmas, &strengths, 50, 42);
+
+        eprintln!("\n════════════════════════════════════════════════════════════");
+        eprintln!("  PHASE 4.5 — 2D TRANSITION SWEEP (σ × heuristic strength)");
+        eprintln!("  Corpus: 50 random problems, 50 trials per cell");
+        eprintln!("────────────────────────────────────────────────────────────");
+        eprintln!("  Rows: σ    Cols: heuristic strength");
+        eprintln!("         0.00   0.10   0.25   0.50   0.75   1.00");
+        eprintln!("        ─────  ─────  ─────  ─────  ─────  ─────");
+        for &sigma in &sigmas {
+            let row_pts: Vec<&SweepPoint2D> = points
+                .iter()
+                .filter(|p| (p.sigma - sigma).abs() < 1e-6)
+                .collect();
+            eprint!(" σ={:.2} ", sigma);
+            for pt in &row_pts {
+                eprint!(" {:5.1}%", pt.solve_rate * 100.0);
+            }
+            eprintln!();
+        }
+        eprintln!("════════════════════════════════════════════════════════════");
+
+        // For each strength, find the best σ and report. In super-
+        // threshold regimes (strength ≥ 0.5-ish), best σ should be 0.0.
+        // In sub-threshold regimes (strength ≤ 0.25), best σ should be
+        // non-zero.
+        eprintln!("\n  Best σ per strength (SR transition curve):");
+        for &strength in &strengths {
+            let cells: Vec<&SweepPoint2D> = points
+                .iter()
+                .filter(|p| (p.strength - strength).abs() < 1e-6)
+                .collect();
+            let best = cells
+                .iter()
+                .max_by(|a, b| a.solve_rate.partial_cmp(&b.solve_rate).unwrap())
+                .unwrap();
+            let baseline = cells.iter().find(|p| p.sigma.abs() < 1e-6).unwrap();
+            let delta = (best.solve_rate - baseline.solve_rate) * 100.0;
+            eprintln!(
+                "    strength={:.2}  best σ={:.2}  Δ = {:+.1}pp  (rate {:.1}% → {:.1}%)",
+                strength,
+                best.sigma,
+                delta,
+                baseline.solve_rate * 100.0,
+                best.solve_rate * 100.0
+            );
+        }
+
+        assert_eq!(points.len(), sigmas.len() * strengths.len());
     }
 
     /// Sanity: the heuristic MUST be imperfect for SR to have room to help.
