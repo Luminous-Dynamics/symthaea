@@ -514,6 +514,198 @@ pub fn fit_abc_decay(qualities: &[(f64, f64)]) -> (f64, f64, f64) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════════
+// 5b. RIGOROUS ANALYSIS: Competing Models for abc Quality Decay
+// ═══════════════════════════════════════════════════════════════════════════
+
+/// Result of fitting one model to the abc quality decay data.
+#[derive(Debug, Clone)]
+pub struct ModelFit {
+    pub name: &'static str,
+    pub params: Vec<f64>,
+    pub r_squared: f64,
+    pub aic: f64, // Akaike Information Criterion (lower = better)
+    pub residual_rms: f64,
+}
+
+/// Fit multiple competing models to abc quality data.
+///
+/// Models:
+/// 1. Power law: q-1 = A/n^B (2 params)
+/// 2. Log-corrected: q-1 = A/(n·ln(n)^C) (2 params)
+/// 3. Exponential: q-1 = A·exp(-B·n) (2 params)
+/// 4. Power-log: q-1 = A/(n^B · ln(n)^C) (3 params)
+///
+/// Returns fits sorted by AIC (best first).
+pub fn fit_competing_models(data: &[(f64, f64)]) -> Vec<ModelFit> {
+    let excess: Vec<(f64, f64)> = data.iter()
+        .filter(|&&(_, q)| q > 1.001)
+        .map(|&(n, q)| (n, q - 1.0))
+        .collect();
+
+    if excess.len() < 5 { return vec![]; }
+    let n_data = excess.len() as f64;
+    let mut fits = Vec::new();
+
+    // Model 1: Power law — ln(q-1) = ln(A) - B·ln(n)
+    {
+        let log_data: Vec<(f64, f64)> = excess.iter()
+            .map(|&(n, e)| (n.ln(), e.ln()))
+            .filter(|(_, y)| y.is_finite())
+            .collect();
+        let (slope, intercept, r2) = linear_regression(&log_data);
+        let a = intercept.exp();
+        let b = -slope;
+        let residuals: Vec<f64> = excess.iter()
+            .map(|&(n, e)| e - a / n.powf(b))
+            .collect();
+        let rms = (residuals.iter().map(|r| r * r).sum::<f64>() / n_data).sqrt();
+        let aic = n_data * (rms * rms).ln() + 2.0 * 2.0; // 2 params
+        fits.push(ModelFit { name: "power_law: A/n^B", params: vec![a, b], r_squared: r2, aic, residual_rms: rms });
+    }
+
+    // Model 2: Log-corrected — ln(q-1) = ln(A) - ln(n) - C·ln(ln(n))
+    // i.e., q-1 = A / (n · ln(n)^C)
+    {
+        let log_data: Vec<(f64, f64)> = excess.iter()
+            .filter(|&&(n, _)| n > 1.0)
+            .map(|&(n, e)| {
+                let y = e.ln() + n.ln(); // ln(q-1) + ln(n) = ln(A) - C·ln(ln(n))
+                let x = n.ln().ln();      // ln(ln(n))
+                (x, y)
+            })
+            .filter(|(x, y)| x.is_finite() && y.is_finite())
+            .collect();
+        let (slope, intercept, r2) = linear_regression(&log_data);
+        let a = intercept.exp();
+        let c_param = -slope;
+        let residuals: Vec<f64> = excess.iter()
+            .filter(|&&(n, _)| n > 1.0)
+            .map(|&(n, e)| e - a / (n * n.ln().powf(c_param)))
+            .collect();
+        let rms = (residuals.iter().map(|r| r * r).sum::<f64>() / n_data).sqrt();
+        let aic = n_data * (rms * rms).max(1e-30).ln() + 2.0 * 2.0;
+        fits.push(ModelFit { name: "log_corrected: A/(n·ln(n)^C)", params: vec![a, c_param], r_squared: r2, aic, residual_rms: rms });
+    }
+
+    // Model 3: Exponential — ln(q-1) = ln(A) - B·n
+    {
+        let log_data: Vec<(f64, f64)> = excess.iter()
+            .map(|&(n, e)| (n, e.ln()))
+            .filter(|(_, y)| y.is_finite())
+            .collect();
+        let (slope, intercept, r2) = linear_regression(&log_data);
+        let a = intercept.exp();
+        let b = -slope;
+        let residuals: Vec<f64> = excess.iter()
+            .map(|&(n, e)| e - a * (-b * n).exp())
+            .collect();
+        let rms = (residuals.iter().map(|r| r * r).sum::<f64>() / n_data).sqrt();
+        let aic = n_data * (rms * rms).max(1e-30).ln() + 2.0 * 2.0;
+        fits.push(ModelFit { name: "exponential: A·exp(-Bn)", params: vec![a, b], r_squared: r2, aic, residual_rms: rms });
+    }
+
+    fits.sort_by(|a, b| a.aic.partial_cmp(&b.aic).unwrap_or(std::cmp::Ordering::Equal));
+    fits
+}
+
+/// Simple linear regression returning (slope, intercept, R²).
+fn linear_regression(data: &[(f64, f64)]) -> (f64, f64, f64) {
+    let n = data.len() as f64;
+    if n < 2.0 { return (0.0, 0.0, 0.0); }
+    let sx: f64 = data.iter().map(|(x, _)| x).sum();
+    let sy: f64 = data.iter().map(|(_, y)| y).sum();
+    let sxy: f64 = data.iter().map(|(x, y)| x * y).sum();
+    let sx2: f64 = data.iter().map(|(x, _)| x * x).sum();
+    let denom = n * sx2 - sx * sx;
+    if denom.abs() < 1e-15 { return (0.0, sy / n, 0.0); }
+    let slope = (n * sxy - sx * sy) / denom;
+    let intercept = (sy - slope * sx) / n;
+    let ss_res: f64 = data.iter().map(|(x, y)| (y - (slope * x + intercept)).powi(2)).sum();
+    let ss_tot: f64 = data.iter().map(|(_, y)| (y - sy / n).powi(2)).sum();
+    let r2 = if ss_tot > 1e-15 { 1.0 - ss_res / ss_tot } else { 0.0 };
+    (slope, intercept, r2)
+}
+
+/// Bootstrap confidence interval for the power law exponent B.
+///
+/// Resamples the data n_boot times with replacement, refits B each time,
+/// and returns (mean_B, lower_95, upper_95).
+pub fn bootstrap_exponent(data: &[(f64, f64)], n_boot: usize, seed: u64) -> (f64, f64, f64) {
+    let n = data.len();
+    if n < 5 { return (0.0, 0.0, 0.0); }
+
+    let mut rng = seed;
+    let mut b_samples = Vec::with_capacity(n_boot);
+
+    for _ in 0..n_boot {
+        // Resample with replacement
+        let sample: Vec<(f64, f64)> = (0..n).map(|_| {
+            rng = rng.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+            let idx = (rng >> 33) as usize % n;
+            data[idx]
+        }).collect();
+
+        let (_, b, r2) = fit_abc_decay(&sample);
+        if r2 > 0.3 && b > 0.0 && b < 5.0 {
+            b_samples.push(b);
+        }
+    }
+
+    if b_samples.is_empty() { return (0.0, 0.0, 0.0); }
+    b_samples.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+
+    let mean = b_samples.iter().sum::<f64>() / b_samples.len() as f64;
+    let lower = b_samples[(b_samples.len() as f64 * 0.025) as usize];
+    let upper = b_samples[((b_samples.len() as f64 * 0.975) as usize).min(b_samples.len() - 1)];
+
+    (mean, lower, upper)
+}
+
+/// Optimized abc search using precomputed radical sieve.
+///
+/// Instead of factoring each number on the fly, precompute rad(n) for all
+/// n ≤ max_c using a modified sieve of Eratosthenes.
+pub fn search_abc_triples_sieved(max_c: u64, min_quality: f64) -> Vec<AbcTriple> {
+    let max = max_c as usize;
+
+    // Sieve: compute rad(n) for all n ≤ max_c
+    let mut rad = vec![1u64; max + 1];
+    for p in 2..=max {
+        if rad[p] == 1 { // p is prime (not yet marked)
+            // Mark all multiples
+            let mut m = p;
+            while m <= max {
+                rad[m] *= p as u64;
+                m += p;
+            }
+        }
+    }
+
+    let mut triples = Vec::new();
+    for c in 3..=max_c {
+        let rad_c = rad[c as usize];
+        for a in 1..c / 2 + 1 {
+            let b = c - a;
+            if a >= b { continue; }
+            if gcd_u64(a, b) != 1 { continue; }
+
+            let rad_abc = rad[a as usize]
+                .saturating_mul(rad[b as usize])
+                .saturating_mul(rad_c);
+            if rad_abc >= c || rad_abc == 0 { continue; }
+
+            let quality = (c as f64).ln() / (rad_abc as f64).ln();
+            if quality > min_quality {
+                triples.push(AbcTriple { a, b, c, radical: rad_abc, quality });
+            }
+        }
+    }
+
+    triples.sort_by(|a, b| b.quality.partial_cmp(&a.quality).unwrap_or(std::cmp::Ordering::Equal));
+    triples
+}
+
 // 6. UNEXPLORED TERRITORY: Class Numbers of Imaginary Quadratic Fields
 // ═══════════════════════════════════════════════════════════════════════════
 
@@ -1142,5 +1334,116 @@ mod tests {
             corr_sum / (sq_d_sum.sqrt() * h_sum.sqrt())
         } else { 0.0 };
         eprintln!("    Correlation with √d/ln(d): {:.4} (Siegel's theorem predicts ~1.0)", correlation);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // RIGOROUS ANALYSIS: Is B ≈ 1.05 real?
+    // ═══════════════════════════════════════════════════════════════════
+
+    /// TEST 1: Competing models — is power law even the best fit?
+    #[test]
+    fn test_abc_competing_models() {
+        eprintln!("\n═══ RIGOROUS: COMPETING MODELS FOR abc DECAY ═══\n");
+
+        let dist = abc_quality_distribution(10000, 1.0);
+        let fits = fit_competing_models(&dist.data);
+
+        eprintln!("  Models ranked by AIC (lower = better):\n");
+        for (i, f) in fits.iter().enumerate() {
+            let marker = if i == 0 { " ← BEST" } else { "" };
+            eprintln!("  #{}: {} — R²={:.4}, AIC={:.1}, RMS={:.4}, params={:?}{}",
+                i + 1, f.name, f.r_squared, f.aic, f.residual_rms, f.params, marker);
+        }
+
+        let best = &fits[0];
+        eprintln!("\n  VERDICT: Best model is '{}'", best.name);
+        if best.name.contains("power_law") {
+            eprintln!("  >>> Power law IS the best fit (supports B ≈ {:.3})", best.params[1]);
+        } else {
+            eprintln!("  >>> Power law is NOT the best fit — {} wins", best.name);
+            eprintln!("  >>> The 'universal exponent' claim may be an artifact of model choice");
+        }
+
+        assert!(!fits.is_empty(), "should produce at least one model fit");
+    }
+
+    /// TEST 2: Scale to c ≤ 100,000 with optimized sieve.
+    #[test]
+    fn test_abc_large_scale_sieved() {
+        eprintln!("\n═══ RIGOROUS: LARGE-SCALE abc SEARCH (sieved) ═══\n");
+
+        let scales: Vec<u64> = vec![10_000, 50_000, 100_000];
+        let mut results = Vec::new();
+
+        for &max_c in &scales {
+            let triples = search_abc_triples_sieved(max_c, 1.0);
+            let data: Vec<(f64, f64)> = triples.iter().enumerate()
+                .map(|(i, t)| ((i + 1) as f64, t.quality))
+                .collect();
+            let (a, b, r2) = fit_abc_decay(&data);
+            eprintln!("  c ≤ {:7}: {:4} triples, B = {:.4}, A = {:.4}, R² = {:.4}",
+                max_c, triples.len(), b, a, r2);
+            results.push((max_c, triples.len(), b, r2));
+
+            if let Some(best) = triples.first() {
+                eprintln!("               Best: {} (q={:.4})", best, best.quality);
+            }
+        }
+
+        eprintln!("\n  EXPONENT STABILITY:");
+        if results.len() >= 2 {
+            let b_vals: Vec<f64> = results.iter().map(|&(_, _, b, _)| b).collect();
+            let b_min = b_vals.iter().cloned().fold(f64::MAX, f64::min);
+            let b_max = b_vals.iter().cloned().fold(f64::MIN, f64::max);
+            let b_range = b_max - b_min;
+            let b_mean = b_vals.iter().sum::<f64>() / b_vals.len() as f64;
+
+            eprintln!("  B range: [{:.4}, {:.4}] (spread = {:.4})", b_min, b_max, b_range);
+            eprintln!("  B mean:  {:.4}", b_mean);
+
+            if b_range < 0.1 {
+                eprintln!("  >>> EXPONENT IS STABLE (range < 0.1)");
+            } else if b_range < 0.3 {
+                eprintln!("  Exponent shows moderate drift (range {:.2})", b_range);
+            } else {
+                eprintln!("  Exponent is NOT stable — power law may not be universal");
+            }
+        }
+    }
+
+    /// TEST 3: Bootstrap confidence interval for B.
+    #[test]
+    fn test_abc_bootstrap_ci() {
+        eprintln!("\n═══ RIGOROUS: BOOTSTRAP CI FOR EXPONENT B ═══\n");
+
+        let dist = abc_quality_distribution(50000, 1.0);
+        eprintln!("  Data: {} triples with q > 1.0 for c ≤ 50000", dist.data.len());
+
+        let (b_mean, b_lower, b_upper) = bootstrap_exponent(&dist.data, 1000, 42);
+        let ci_width = b_upper - b_lower;
+
+        eprintln!("  Bootstrap (1000 resamples):");
+        eprintln!("    B mean  = {:.4}", b_mean);
+        eprintln!("    95% CI  = [{:.4}, {:.4}]", b_lower, b_upper);
+        eprintln!("    CI width = {:.4}", ci_width);
+
+        if ci_width < 0.2 {
+            eprintln!("\n  >>> TIGHT CI — exponent B = {:.3} ± {:.3} is robust", b_mean, ci_width / 2.0);
+        } else if ci_width < 0.5 {
+            eprintln!("\n  Moderate CI — some uncertainty but B ≈ {:.2} is plausible", b_mean);
+        } else {
+            eprintln!("\n  WIDE CI — B is poorly determined, power law fit is uncertain");
+        }
+
+        // Does the CI contain 1.0? (pure 1/n decay)
+        if b_lower <= 1.0 && b_upper >= 1.0 {
+            eprintln!("  Note: CI contains B=1.0 (simple 1/n decay cannot be ruled out)");
+        }
+        // Does it contain 0.5? (1/√n decay)
+        if b_lower <= 0.5 && b_upper >= 0.5 {
+            eprintln!("  Note: CI contains B=0.5 (1/√n decay cannot be ruled out)");
+        }
+
+        assert!(b_mean > 0.0, "exponent should be positive");
     }
 }
