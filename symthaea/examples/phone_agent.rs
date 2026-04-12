@@ -225,8 +225,24 @@ fn main() {
             }
         }
 
-        // Pause between steps for screen to settle
+        // Pause for screen to settle, then detect state transition
         std::thread::sleep(std::time::Duration::from_millis(800));
+
+        // Re-observe after action to detect state transition
+        if action.is_mutating() {
+            if phone.capture_and_observe(0.033).is_ok() {
+                let (transitioned, confidence) = phone.detect_state_transition();
+                if transitioned {
+                    println!("  [TRANSITION] Screen changed (confidence={confidence:.3})");
+                    // If we had a goal and the screen changed, we likely succeeded
+                    if goal_hv.is_some() {
+                        println!("  [SUCCESS] Goal-directed action caused state transition");
+                    }
+                } else {
+                    println!("  [STABLE] No significant screen change");
+                }
+            }
+        }
         println!();
     }
 

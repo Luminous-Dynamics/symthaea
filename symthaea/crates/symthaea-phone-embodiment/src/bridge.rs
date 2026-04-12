@@ -352,6 +352,32 @@ impl PhoneBridge {
         self.last_match_similarity
     }
 
+    /// Detect whether the last action caused a significant state transition.
+    ///
+    /// Uses imagination surprise and prediction error from the vision manifold
+    /// to determine if the screen changed meaningfully. This is the active
+    /// inference success signal: high surprise = reality changed.
+    ///
+    /// Returns `(is_transition, confidence)`:
+    /// - `is_transition`: true if PE > threshold (screen changed significantly)
+    /// - `confidence`: how confident we are (higher PE = more confident)
+    ///
+    /// Thresholds calibrated from empirical observation:
+    /// - App opening: PE ≈ 0.10–0.20, motion ≈ 0.20–0.40
+    /// - No change: PE ≈ 0.00–0.05
+    pub fn detect_state_transition(&self) -> (bool, f32) {
+        let tel = self.vision.telemetry();
+        let pe = tel.prediction_error;
+        let motion = tel.motion_surprise;
+        let img_surp = tel.imagination_surprise;
+
+        // Combine signals: PE is primary, motion and imagination surprise are secondary
+        let combined = pe * 0.5 + motion * 0.3 + img_surp * 0.2;
+        let threshold = 0.06; // Calibrated from YouTube opening: PE=0.133
+
+        (combined > threshold, combined.min(1.0))
+    }
+
     /// Learn a template from the current screen by extracting a specific patch.
     ///
     /// Instead of encoding a cropped image file (which has resolution mismatch),
@@ -375,6 +401,29 @@ impl PhoneBridge {
         patch_hvs.get(idx).map(|phv| {
             self.vision.encoder().unbind_position(phv, grid_row, grid_col)
         })
+    }
+
+    /// Save a learned template HV to disk for future sessions.
+    ///
+    /// Templates are stored as JSON files containing the raw f32 vector.
+    /// Path: `data/phone-templates/{name}.json`
+    pub fn save_template(&self, name: &str, hv: &ContinuousHV) -> Result<(), String> {
+        let dir = std::path::Path::new("data/phone-templates");
+        std::fs::create_dir_all(dir).map_err(|e| format!("mkdir: {e}"))?;
+        let path = dir.join(format!("{name}.json"));
+        let values = hv.as_slice();
+        let json = serde_json::to_string(values).map_err(|e| format!("serialize: {e}"))?;
+        std::fs::write(&path, json).map_err(|e| format!("write: {e}"))?;
+        Ok(())
+    }
+
+    /// Load a previously saved template HV from disk.
+    pub fn load_template(&self, name: &str) -> Result<ContinuousHV, String> {
+        let path = std::path::Path::new("data/phone-templates").join(format!("{name}.json"));
+        let json = std::fs::read_to_string(&path).map_err(|e| format!("read: {e}"))?;
+        let values: Vec<f32> =
+            serde_json::from_str(&json).map_err(|e| format!("deserialize: {e}"))?;
+        Ok(ContinuousHV::from_vec(values))
     }
 
     /// Learn a template from a screen region by bundling multiple patches.

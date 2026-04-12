@@ -10,3 +10,4 @@ symthaea-core = { path = "../../symthaea-core" }
 symthaea-vision-manifold = { path = "../symthaea-vision-manifold" }
 image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
 serde = { version = "1", features = ["derive"] }
+serde_json = "1"
