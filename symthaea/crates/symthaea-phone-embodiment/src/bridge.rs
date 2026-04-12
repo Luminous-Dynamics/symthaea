@@ -352,6 +352,63 @@ impl PhoneBridge {
         self.last_match_similarity
     }
 
+    /// Learn a template from the current screen by extracting a specific patch.
+    ///
+    /// Instead of encoding a cropped image file (which has resolution mismatch),
+    /// this extracts a single patch HV from the **live screen** at the given
+    /// grid position. The template is already at the correct patch resolution.
+    ///
+    /// # Arguments
+    /// * `grid_row`, `grid_col` — Position on the vision grid where the target
+    ///   object is currently visible. Use the output of a previous observation
+    ///   to identify which patch to learn from.
+    pub fn learn_template_from_screen(
+        &self,
+        grid_row: usize,
+        grid_col: usize,
+    ) -> Option<ContinuousHV> {
+        let patch_hvs = self.vision.last_patch_hvs();
+        let patch_size = 8usize;
+        let grid_cols = self.target_w as usize / patch_size;
+        let idx = grid_row * grid_cols + grid_col;
+
+        patch_hvs.get(idx).map(|phv| {
+            self.vision.encoder().unbind_position(phv, grid_row, grid_col)
+        })
+    }
+
+    /// Learn a template from a screen region by bundling multiple patches.
+    ///
+    /// Bundles appearance HVs from a rectangular region of the grid.
+    pub fn learn_template_from_region(
+        &self,
+        row_start: usize,
+        col_start: usize,
+        rows: usize,
+        cols: usize,
+    ) -> Option<ContinuousHV> {
+        let patch_hvs = self.vision.last_patch_hvs();
+        let patch_size = 8usize;
+        let grid_cols = self.target_w as usize / patch_size;
+        let encoder = self.vision.encoder();
+
+        let mut appearances: Vec<ContinuousHV> = Vec::new();
+        for r in row_start..row_start + rows {
+            for c in col_start..col_start + cols {
+                let idx = r * grid_cols + c;
+                if let Some(phv) = patch_hvs.get(idx) {
+                    appearances.push(encoder.unbind_position(phv, r, c));
+                }
+            }
+        }
+
+        if appearances.is_empty() {
+            return None;
+        }
+        let refs: Vec<&ContinuousHV> = appearances.iter().collect();
+        Some(ContinuousHV::bundle(&refs).normalize())
+    }
+
     /// Execute the proposed action (after user confirmation).
     pub fn confirm_and_execute(&mut self) -> Result<(), String> {
         let action = self.proposed_action.take()

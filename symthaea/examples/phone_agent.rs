@@ -71,25 +71,52 @@ fn main() {
         .and_then(|i| args.get(i + 1))
         .cloned();
 
-    // Load goal template if task specified
+    // Load goal template if task specified.
+    // Strategy: first capture a reference frame, then learn the template
+    // directly from the live screen patches (avoids resolution mismatch).
     let goal_hv: Option<symthaea_core::hdc::ContinuousHV> = task.as_ref().and_then(|task_name| {
-        // Try to load visual template from data/phone-templates/{task}.png
-        let template_path = std::path::Path::new("data/phone-templates")
-            .join(format!("{}.png", task_name.to_lowercase().replace(' ', "_")));
-        if template_path.exists() {
-            match phone.learn_template_from_file(&template_path) {
-                Ok(hv) => {
-                    println!("[Goal] Loaded visual template: {}", template_path.display());
-                    Some(hv)
-                }
-                Err(e) => {
-                    eprintln!("[Goal] Template load failed: {e}");
-                    None
+        // Known app positions on the Pixel home screen (128×128, 16×16 grid).
+        // YouTube icon center: approximately grid row=5, col=8 (spans 2×2 patches)
+        let known_positions: &[(&str, usize, usize, usize, usize)] = &[
+            // (name, row_start, col_start, rows, cols)
+            ("youtube",     4, 8, 2, 2),
+            ("settings",    8, 8, 2, 2),
+            ("clock",       4, 12, 2, 2),
+            ("spotify",     8, 0, 2, 2),
+            ("authenticator", 4, 0, 2, 2),
+        ];
+
+        let name_lower = task_name.to_lowercase();
+        if let Some(&(_, row, col, rows, cols)) = known_positions.iter().find(|(n, _, _, _, _)| *n == name_lower.as_str()) {
+            // Capture a reference frame first to learn the template from
+            println!("[Goal] Learning template from live screen at grid ({row},{col})...");
+            if phone.capture_and_observe(0.033).is_ok() {
+                if let Some(hv) = phone.learn_template_from_region(row, col, rows, cols) {
+                    println!("[Goal] Learned template from {rows}×{cols} patches");
+                    return Some(hv);
                 }
             }
-        } else {
-            println!("[Goal] No template at {}. Using saliency-driven exploration.", template_path.display());
+            println!("[Goal] Failed to learn from screen. Falling back to saliency.");
             None
+        } else {
+            // Try file-based template
+            let template_path = std::path::Path::new("data/phone-templates")
+                .join(format!("{}.png", name_lower.replace(' ', "_")));
+            if template_path.exists() {
+                match phone.learn_template_from_file(&template_path) {
+                    Ok(hv) => {
+                        println!("[Goal] Loaded visual template: {}", template_path.display());
+                        Some(hv)
+                    }
+                    Err(e) => {
+                        eprintln!("[Goal] Template load failed: {e}");
+                        None
+                    }
+                }
+            } else {
+                println!("[Goal] Unknown target \"{task_name}\". Using saliency exploration.");
+                None
+            }
         }
     });
 
