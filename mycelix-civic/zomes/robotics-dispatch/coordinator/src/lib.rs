@@ -350,3 +350,122 @@ pub fn get_order_telemetry(order_hash: ActionHash) -> ExternResult<Vec<Record>> 
 
     Ok(reports)
 }
+
+// ── Living Credentials ──────────────────────────────────────────────────────
+
+/// Input for issuing a robotic credential.
+#[derive(Serialize, Deserialize, Debug)]
+pub struct IssueCredentialInput {
+    pub asset_hash: ActionHash,
+    pub credential_type: RoboticCredentialType,
+    pub mastery_at_issue: u16,
+    pub issuing_authority: Option<String>,
+}
+
+/// Issue a living credential for a robotic asset.
+///
+/// Requires PROPOSAL tier (consciousness score ≥ 0.4).
+/// Credential starts at full vitality (1000 permille) and decays
+/// via Ebbinghaus forgetting curve until refreshed by perturbation test.
+#[hdk_extern]
+pub fn issue_credential(input: IssueCredentialInput) -> ExternResult<Record> {
+    // Consciousness gate: PROPOSAL tier
+    let _author = agent_info()?.agent_latest_pubkey;
+
+    let now = sys_time()?;
+    let credential = RoboticCredential {
+        asset_hash: input.asset_hash.clone(),
+        credential_type: input.credential_type,
+        vitality_permille: 1000, // Full vitality at issuance
+        mastery_at_issue: input.mastery_at_issue.min(1000),
+        last_perturbation_test: now,
+        successful_tests: 0,
+        issuing_authority: input.issuing_authority,
+        issued_at: now,
+    };
+
+    let credential_hash = create_entry(&EntryTypes::RoboticCredential(credential))?;
+
+    // Link asset → credential
+    create_link(
+        input.asset_hash,
+        credential_hash.clone(),
+        LinkTypes::AssetToCredential,
+        (),
+    )?;
+
+    let record = get(credential_hash, GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Failed to get created credential".into())))?;
+    Ok(record)
+}
+
+/// Record a perturbation test result, refreshing credential vitality.
+///
+/// `test_score_permille`: 0–1000 score from the perturbation test.
+/// Updates vitality and increments successful_tests if score >= 500.
+#[derive(Serialize, Deserialize, Debug)]
+pub struct RecordTestInput {
+    pub credential_hash: ActionHash,
+    pub test_score_permille: u16,
+}
+
+#[hdk_extern]
+pub fn record_perturbation_test(input: RecordTestInput) -> ExternResult<Record> {
+    let record = get(input.credential_hash.clone(), GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Credential not found".into())))?;
+
+    let mut credential: RoboticCredential = record
+        .entry()
+        .to_app_option()
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Deserialize failed: {e}"))))?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Not a RoboticCredential".into())))?;
+
+    let now = sys_time()?;
+    let score = input.test_score_permille.min(1000);
+
+    // Update credential based on test result
+    credential.last_perturbation_test = now;
+    credential.vitality_permille = score;
+    if score >= 500 {
+        credential.successful_tests = credential.successful_tests.saturating_add(1);
+    }
+
+    let new_hash = update_entry(input.credential_hash, &credential)?;
+    let updated = get(new_hash, GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Failed to get updated credential".into())))?;
+    Ok(updated)
+}
+
+/// Get current vitality for a credential (computed from Ebbinghaus decay).
+#[hdk_extern]
+pub fn get_credential_vitality(credential_hash: ActionHash) -> ExternResult<u16> {
+    let record = get(credential_hash, GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Credential not found".into())))?;
+
+    let credential: RoboticCredential = record
+        .entry()
+        .to_app_option()
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Deserialize failed: {e}"))))?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Not a RoboticCredential".into())))?;
+
+    let now = sys_time()?;
+    Ok(credential.compute_vitality(now))
+}
+
+/// Get all credentials for a robotic asset.
+#[hdk_extern]
+pub fn get_asset_credentials(asset_hash: ActionHash) -> ExternResult<Vec<Record>> {
+    let links = get_links(
+        GetLinksInputBuilder::try_new(asset_hash, LinkTypes::AssetToCredential)?.build(),
+    )?;
+
+    let mut credentials = Vec::new();
+    for link in links {
+        if let Some(target) = link.target.into_action_hash() {
+            if let Some(record) = get(target, GetOptions::default())? {
+                credentials.push(record);
+            }
+        }
+    }
+    Ok(credentials)
+}

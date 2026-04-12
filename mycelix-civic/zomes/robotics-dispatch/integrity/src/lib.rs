@@ -204,6 +204,92 @@ pub enum OrderStatus {
     Recalled,
 }
 
+// ── Living Credentials ──────────────────────────────────────────────────────
+
+/// A living credential for a robotic asset.
+///
+/// Follows the Ebbinghaus forgetting curve: vitality decays as R(t) = e^(-t/S)
+/// where S = base_stability × mastery_factor × review_multiplier.
+/// Credentials must be refreshed via periodic perturbation tests.
+///
+/// Science: Ebbinghaus (1885) forgetting curve, adapted from mycelix-craft.
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct RoboticCredential {
+    /// The robotic asset this credential belongs to.
+    pub asset_hash: ActionHash,
+    /// Type of certification.
+    pub credential_type: RoboticCredentialType,
+    /// Current vitality (0–1000 permille). Decays over time.
+    pub vitality_permille: u16,
+    /// Mastery level at issuance (0–1000 permille). Drives stability.
+    pub mastery_at_issue: u16,
+    /// Timestamp of last perturbation test (ISO 8601).
+    pub last_perturbation_test: Timestamp,
+    /// Number of successful perturbation tests (drives review multiplier).
+    pub successful_tests: u16,
+    /// Issuing guild or authority (optional).
+    pub issuing_authority: Option<String>,
+    /// When this credential was first issued.
+    pub issued_at: Timestamp,
+}
+
+/// Types of robotic certification.
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+pub enum RoboticCredentialType {
+    /// SAR-certified helicopter (hover stability, wind robustness).
+    SarCertified,
+    /// Water quality sensor calibration (chemical accuracy).
+    WaterQualityCalibrated,
+    /// Manipulator precision (force control, trajectory tracking).
+    ManipulatorPrecision,
+    /// Navigation certified (GPS-denied nav, obstacle avoidance).
+    NavigationCertified,
+    /// Surgical precision (sub-mm accuracy, tremor rejection).
+    SurgicalPrecision,
+    /// Formation flight certified (swarm coordination).
+    FormationFlightCertified,
+    /// Custom certification type.
+    Custom(String),
+}
+
+impl RoboticCredential {
+    /// Base stability in minutes (drives decay rate).
+    const BASE_STABILITY_MINUTES: f64 = 1440.0; // 1 day
+
+    /// Compute current vitality using Ebbinghaus forgetting curve.
+    ///
+    /// R(t) = e^(-t/S) where:
+    /// - t = minutes since last perturbation test
+    /// - S = base × mastery_factor × review_multiplier
+    pub fn compute_vitality(&self, now: Timestamp) -> u16 {
+        let elapsed_us = now.as_micros().saturating_sub(self.last_perturbation_test.as_micros());
+        let elapsed_minutes = elapsed_us as f64 / 60_000_000.0;
+
+        let stability = self.stability_minutes();
+        if stability <= 0.0 {
+            return 0;
+        }
+
+        let retention = (-elapsed_minutes / stability).exp();
+        (retention * 1000.0).clamp(0.0, 1000.0) as u16
+    }
+
+    /// Stability S in minutes (higher = slower decay).
+    pub fn stability_minutes(&self) -> f64 {
+        let mastery_normalized = self.mastery_at_issue as f64 / 1000.0;
+        let mastery_factor = 0.5 + mastery_normalized * 2.0;
+        let review_multiplier = 1.5_f64.powi(self.successful_tests.min(10) as i32);
+        Self::BASE_STABILITY_MINUTES * mastery_factor * review_multiplier
+    }
+
+    /// Minutes until vitality drops to 80% (recommended review time).
+    pub fn next_review_minutes(&self) -> f64 {
+        let s = self.stability_minutes();
+        -s * 0.8_f64.ln() // -S × ln(0.8) ≈ S × 0.223
+    }
+}
+
 // ── Validation ───────────────────────────────────────────────────────────────
 
 /// Entry types for this zome.
@@ -214,6 +300,7 @@ pub enum EntryTypes {
     RoboticAsset(RoboticAsset),
     DispatchOrder(DispatchOrder),
     TelemetryReport(TelemetryReport),
+    RoboticCredential(RoboticCredential),
 }
 
 /// Link types for this zome.
@@ -229,6 +316,8 @@ pub enum LinkTypes {
     OwnerToAsset,
     /// Platform type anchor → RoboticAsset
     PlatformToAsset,
+    /// RoboticAsset → RoboticCredential
+    AssetToCredential,
 }
 
 /// Validate entries on creation.
