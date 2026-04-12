@@ -407,6 +407,47 @@ impl SymbolicRegressor {
     pub fn fit(&mut self, seq: &ObservedSequence, top_k: usize) -> Vec<Conjecture> {
         let (train, _test) = seq.train_test_split();
 
+        // ── Log-space pre-transform ──────────────────────────────────
+        // If data is all positive and grows exponentially, try fitting
+        // in log-space first. This turns a*exp(b*√n) into ln(a)+b*√n
+        // which is trivially discoverable by GP.
+        let all_positive = train.iter().all(|(_, y)| *y > 0.0);
+        let growth = if train.len() >= 2 && train[0].1.abs() > 1e-10 {
+            (train.last().unwrap().1 / train[0].1).abs()
+        } else { 1.0 };
+
+        if all_positive && growth > 50.0 {
+            let log_train: Vec<(f64, f64)> = train.iter()
+                .map(|(x, y)| (*x, y.ln()))
+                .collect();
+            let log_seq = ObservedSequence::new(
+                &format!("log({})", seq.name), seq.domain, log_train.clone());
+
+            // Run a quick GP fit in log-space
+            let mut log_regressor = SymbolicRegressor::new(RegressorConfig {
+                population_size: self.config.population_size / 2,
+                generations: self.config.generations / 2,
+                max_depth: self.config.max_depth.min(4),
+                max_complexity: self.config.max_complexity.min(12),
+                lambda: self.config.lambda,
+                tournament_size: self.config.tournament_size,
+                mutation_rate: self.config.mutation_rate,
+                seed: self.config.seed.wrapping_add(777),
+            });
+            let log_results = log_regressor.fit(&log_seq, 2);
+
+            // If log-space fit is good, wrap in exp() and add to population
+            for lr in &log_results {
+                if lr.training_mse < 1.0 {
+                    let exp_wrapped = Expr::Func(UnaryFn::Exp, Box::new(lr.formula.clone()));
+                    // Replace a random individual with the exp-wrapped log-space formula
+                    self.rng = lcg_step(self.rng);
+                    let idx = self.rng as usize % self.population.len();
+                    self.population[idx] = exp_wrapped;
+                }
+            }
+        }
+
         // ── Asymptotic seeding ─────────────────────────────────────────
         // If the data grows faster than linear, seed the population with
         // exponential/power-law templates to avoid wasting generations.
@@ -1022,6 +1063,28 @@ impl ConjectureEngine {
     pub fn generate_conjectures(&mut self, top_k_per_sequence: usize) -> &[Conjecture] {
         let observations = self.observations.clone();
         for seq in &observations {
+            // ── Phase 0: Recurrence detection (fast, exact) ──────────
+            // Check for simple recurrences BEFORE expensive GP search.
+            // If found, record it as a high-confidence conjecture.
+            if let Some(rec) = detect_recurrence(&seq.data) {
+                self.conjectures.push(Conjecture {
+                    formula: Expr::Var(rec.formula.clone()),
+                    formula_str: rec.formula.clone(),
+                    source: seq.name.clone(),
+                    domain: seq.domain,
+                    training_mse: rec.max_residual,
+                    complexity: rec.order + 1,
+                    fitness: rec.max_residual,
+                    status: if rec.max_residual < 1e-10 {
+                        ConjectureStatus::NumericallyTested { test_mse: 0.0 }
+                    } else {
+                        ConjectureStatus::Proposed
+                    },
+                    confidence: if rec.max_residual < 1e-10 { 0.95 } else { 0.5 },
+                });
+            }
+
+            // ── Phase 1: GP symbolic regression ──────────────────────
             let mut regressor = SymbolicRegressor::new(RegressorConfig {
                 seed: self.config.seed,
                 population_size: self.config.population_size,
@@ -1033,7 +1096,14 @@ impl ConjectureEngine {
                 mutation_rate: self.config.mutation_rate,
             });
             let new_conjectures = regressor.fit(seq, top_k_per_sequence);
-            self.conjectures.extend(new_conjectures);
+
+            // ── Phase 2: Simplify all discovered formulas ────────────
+            for mut c in new_conjectures {
+                let simplified = simplify(&c.formula);
+                c.formula_str = format!("{}", simplified);
+                c.formula = simplified;
+                self.conjectures.push(c);
+            }
         }
         // Sort all conjectures by fitness
         self.conjectures.sort_by(|a, b| {
@@ -1534,6 +1604,58 @@ pub fn observe_bell_stirling_residual(max_n: usize) -> ObservedSequence {
 
 // ═══════════════════════════════════════════════════════════════════════════
 // PHYSICS INVARIANT DISCOVERY
+/// Observe Catalan numbers C(n) = C(2n,n)/(n+1).
+pub fn observe_catalan(max_n: usize) -> ObservedSequence {
+    use super::combinatorics::{catalan, binomial};
+    let data: Vec<(f64, f64)> = (0..=max_n)
+        .map(|n| (n as f64, catalan(n as u64) as f64))
+        .collect();
+    ObservedSequence::new("catalan(n)", MathDomain::Combinatorics, data)
+}
+
+/// Observe derangement numbers D(n).
+pub fn observe_derangements(max_n: usize) -> ObservedSequence {
+    use super::combinatorics::derangement;
+    let data: Vec<(f64, f64)> = (0..=max_n)
+        .map(|n| (n as f64, derangement(n as u64) as f64))
+        .collect();
+    ObservedSequence::new("derangement(n)", MathDomain::Combinatorics, data)
+}
+
+/// Observe D(n)/n! ratio (should converge to 1/e ≈ 0.3679).
+pub fn observe_derangement_ratio(max_n: usize) -> ObservedSequence {
+    use super::combinatorics::derangement;
+    let data: Vec<(f64, f64)> = (1..=max_n)
+        .map(|n| {
+            let d = derangement(n as u64) as f64;
+            let nfact: f64 = (1..=n as u64).map(|i| i as f64).product();
+            (n as f64, d / nfact)
+        })
+        .collect();
+    ObservedSequence::new("derangement_ratio(n)", MathDomain::Combinatorics, data)
+}
+
+/// Observe prime counting function π(n) for n = 1..max_n.
+pub fn observe_prime_counting(max_n: usize) -> ObservedSequence {
+    let mut is_prime = vec![true; max_n + 1];
+    if max_n >= 1 { is_prime[0] = false; }
+    if max_n >= 2 { is_prime[1] = false; }
+    for i in 2..=max_n {
+        if is_prime[i] {
+            let mut j = i * 2;
+            while j <= max_n { is_prime[j] = false; j += i; }
+        }
+    }
+    let mut count = 0u64;
+    let data: Vec<(f64, f64)> = (1..=max_n)
+        .map(|n| {
+            if is_prime[n] { count += 1; }
+            (n as f64, count as f64)
+        })
+        .collect();
+    ObservedSequence::new("prime_counting(n)", MathDomain::NumberTheory, data)
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 
 /// Harmonic oscillator: dx/dt = v, dv/dt = -x.
@@ -2338,5 +2460,75 @@ mod tests {
         }
 
         assert!(!results.is_empty());
+    }
+
+    /// Comprehensive discovery run across all sequence types.
+    /// This produces the results table for the paper.
+    #[test]
+    fn test_comprehensive_discovery() {
+        let mut engine = ConjectureEngine::with_config(RegressorConfig {
+            population_size: 200,
+            generations: 80,
+            max_depth: 4,
+            max_complexity: 15,
+            lambda: 0.001,
+            seed: 42,
+            ..RegressorConfig::default()
+        });
+
+        // Feed all available sequences
+        engine.observe(observe_fibonacci_ratios(30));
+        engine.observe(observe_partitions(25));
+        engine.observe(observe_catalan(15));
+        engine.observe(observe_derangement_ratio(15));
+        engine.observe(observe_prime_counting(100));
+
+        // Run full pipeline
+        engine.generate_conjectures(2);
+        engine.verify_numerical();
+        engine.verify_formal(200);
+
+        eprintln!("\n═══ COMPREHENSIVE DISCOVERY RESULTS ═══\n");
+        let sources = ["fibonacci_ratio(n)", "partition_count(n)",
+                       "catalan(n)", "derangement_ratio(n)", "prime_counting(n)"];
+        for source in &sources {
+            eprintln!("── {} ──", source);
+            let relevant: Vec<_> = engine.conjectures.iter()
+                .filter(|c| c.source == *source)
+                .take(2)
+                .collect();
+            if relevant.is_empty() {
+                eprintln!("  (no conjectures)");
+            }
+            for c in &relevant {
+                eprintln!("  {} | MSE={:.2e} | complexity={} | conf={:.2} | {:?}",
+                    c.formula_str, c.training_mse, c.complexity, c.confidence, c.status);
+            }
+            eprintln!();
+        }
+
+        // Summary stats
+        let total = engine.conjectures.len();
+        let verified = engine.conjectures.iter()
+            .filter(|c| matches!(c.status, ConjectureStatus::NumericallyTested { .. }
+                | ConjectureStatus::FormallyVerified { .. }))
+            .count();
+        let refuted = engine.conjectures.iter()
+            .filter(|c| matches!(c.status, ConjectureStatus::Refuted { .. }))
+            .count();
+        eprintln!("SUMMARY: {} conjectures, {} verified, {} refuted",
+            total, verified, refuted);
+
+        assert!(total > 5, "should generate conjectures across sequences");
+    }
+
+    /// Derangement ratio should converge to 1/e.
+    #[test]
+    fn test_derangement_ratio_converges() {
+        let seq = observe_derangement_ratio(12);
+        let last = seq.data.last().unwrap().1;
+        let inv_e = 1.0 / std::f64::consts::E;
+        assert!((last - inv_e).abs() < 1e-6,
+            "D(12)/12! should ≈ 1/e = {:.6}, got {:.6}", inv_e, last);
     }
 }
