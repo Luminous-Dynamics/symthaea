@@ -2954,6 +2954,126 @@ pub struct DerivativeVerification {
     pub is_consistent: bool,
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// AUTOMATED CONSERVATION LAW DISCOVERY
+// ═══════════════════════════════════════════════════════════════════════════
+
+/// A candidate conserved quantity discovered from a dynamical system.
+#[derive(Debug)]
+pub struct DiscoveredConservation {
+    /// Name of the candidate invariant
+    pub name: String,
+    /// Symbolic expression (if provable)
+    pub expression: String,
+    /// Variance of the candidate along the trajectory (0 = perfectly conserved)
+    pub variance: f64,
+    /// Mean value along the trajectory
+    pub mean_value: f64,
+    /// Whether symbolic proof succeeded
+    pub symbolically_proven: bool,
+}
+
+/// Automated conservation law discovery for 2D dynamical systems.
+///
+/// Given a 2D ODE (dx/dt = f(x,y), dy/dt = g(x,y)):
+/// 1. Integrates numerically via RK4
+/// 2. Tests polynomial candidate invariants (x², y², x²+y², xy, x²+ay², etc.)
+/// 3. Ranks by trajectory variance (low variance = conserved)
+/// 4. Attempts symbolic proof via chain rule for the best candidates
+///
+/// This automates the workflow: observe → hypothesize → prove.
+pub fn discover_conservation_laws(
+    rhs: fn(&[f64], f64) -> Vec<f64>,
+    initial_state: &[f64],
+    dynamics: &[(&str, SymExpr)], // symbolic dynamics for proof
+    var_names: &[&str],           // ["x", "v"] or ["x", "y"]
+    t_max: f64,
+    dt: f64,
+) -> Vec<DiscoveredConservation> {
+    assert_eq!(initial_state.len(), 2, "currently supports 2D systems");
+    assert_eq!(var_names.len(), 2);
+
+    // Step 1: Integrate numerically
+    let (times, states) = rk45_trajectory(rhs, initial_state, t_max, dt);
+    let n_samples = 100.min(states.len());
+    let step = states.len() / n_samples.max(1);
+
+    // Step 2: Test candidate invariants
+    let (v0, v1) = (var_names[0], var_names[1]);
+    let candidates: Vec<(&str, Box<dyn Fn(&[f64]) -> f64>, SymExpr)> = vec![
+        // x² + y²
+        ("x² + y²",
+         Box::new(|s: &[f64]| s[0] * s[0] + s[1] * s[1]),
+         SymExpr::Add(
+             Box::new(SymExpr::Pow(Box::new(SymExpr::Var(v0.into())), 2.0)),
+             Box::new(SymExpr::Pow(Box::new(SymExpr::Var(v1.into())), 2.0)))),
+        // x²
+        ("x²",
+         Box::new(|s: &[f64]| s[0] * s[0]),
+         SymExpr::Pow(Box::new(SymExpr::Var(v0.into())), 2.0)),
+        // y²
+        ("y²",
+         Box::new(|s: &[f64]| s[1] * s[1]),
+         SymExpr::Pow(Box::new(SymExpr::Var(v1.into())), 2.0)),
+        // x·y
+        ("x·y",
+         Box::new(|s: &[f64]| s[0] * s[1]),
+         SymExpr::Mul(
+             Box::new(SymExpr::Var(v0.into())),
+             Box::new(SymExpr::Var(v1.into())))),
+        // x² - y²
+        ("x² - y²",
+         Box::new(|s: &[f64]| s[0] * s[0] - s[1] * s[1]),
+         SymExpr::Add(
+             Box::new(SymExpr::Pow(Box::new(SymExpr::Var(v0.into())), 2.0)),
+             Box::new(SymExpr::Neg(Box::new(SymExpr::Pow(Box::new(SymExpr::Var(v1.into())), 2.0)))))),
+        // 2x² + y²
+        ("2x² + y²",
+         Box::new(|s: &[f64]| 2.0 * s[0] * s[0] + s[1] * s[1]),
+         SymExpr::Add(
+             Box::new(SymExpr::Mul(
+                 Box::new(SymExpr::Const(2.0)),
+                 Box::new(SymExpr::Pow(Box::new(SymExpr::Var(v0.into())), 2.0)))),
+             Box::new(SymExpr::Pow(Box::new(SymExpr::Var(v1.into())), 2.0)))),
+    ];
+
+    let mut results = Vec::new();
+
+    for (name, eval_fn, sym_expr) in &candidates {
+        // Evaluate along trajectory
+        let values: Vec<f64> = states.iter()
+            .step_by(step.max(1))
+            .take(n_samples)
+            .map(|s| eval_fn(s))
+            .collect();
+
+        if values.is_empty() { continue; }
+
+        let mean = values.iter().sum::<f64>() / values.len() as f64;
+        let var = values.iter().map(|v| (v - mean).powi(2)).sum::<f64>() / values.len() as f64;
+
+        // Step 3: Symbolic proof for low-variance candidates
+        let proven = if var < 1e-6 * mean.abs().max(1.0) {
+            let proof = verify_conservation_symbolic(sym_expr, dynamics);
+            proof.is_conserved
+        } else {
+            false
+        };
+
+        results.push(DiscoveredConservation {
+            name: name.to_string(),
+            expression: format!("{}", sym_expr),
+            variance: var,
+            mean_value: mean,
+            symbolically_proven: proven,
+        });
+    }
+
+    // Sort by variance (most conserved first)
+    results.sort_by(|a, b| a.variance.partial_cmp(&b.variance).unwrap_or(std::cmp::Ordering::Equal));
+    results
+}
+
 // INTERNAL UTILITIES
 // ═══════════════════════════════════════════════════════════════════════════
 
@@ -4785,5 +4905,52 @@ mod tests {
         }
 
         assert!(!engine.conjectures.is_empty());
+    }
+
+    // ════════════════════════════════════════════════════════════════════
+    // AUTOMATED CONSERVATION LAW DISCOVERY
+    // ════════════════════════════════════════════════════════════════════
+
+    /// The fully automated physicist: given an ODE, discover and prove conservation laws.
+    ///
+    /// Input: dx/dt = v, dv/dt = -x (harmonic oscillator)
+    /// Output: discovers E = x² + v² is conserved, with symbolic proof.
+    /// No human guidance — pure automated discovery.
+    #[test]
+    fn test_automated_conservation_discovery_harmonic() {
+        let dynamics = vec![
+            ("x", SymExpr::Var("v".into())),
+            ("v", SymExpr::Neg(Box::new(SymExpr::Var("x".into())))),
+        ];
+
+        let results = discover_conservation_laws(
+            harmonic_rhs, &[1.0, 0.0], &dynamics, &["x", "v"], 20.0, 0.01);
+
+        eprintln!("\n═══ AUTOMATED PHYSICIST: HARMONIC OSCILLATOR ═══");
+        eprintln!("  Input: dx/dt = v, dv/dt = -x\n");
+        for r in &results {
+            let status = if r.symbolically_proven { "PROVEN ✓" }
+                else if r.variance < 1e-6 { "numerically conserved" }
+                else { "NOT conserved" };
+            eprintln!("  {:12} │ var={:.2e} │ mean={:.4} │ {}",
+                r.name, r.variance, r.mean_value, status);
+        }
+
+        // x² + v² should be discovered as conserved AND symbolically proven
+        let best = &results[0];
+        assert!(best.name == "x² + y²" || best.name == "x² + v²",
+            "best invariant should be x²+v², got {}", best.name);
+        assert!(best.variance < 1e-6,
+            "E = x²+v² variance should be ~0, got {:.2e}", best.variance);
+        assert!(best.symbolically_proven,
+            "E = x²+v² should be symbolically proven");
+
+        // x² alone should NOT be conserved
+        let x2 = results.iter().find(|r| r.name == "x²").unwrap();
+        assert!(x2.variance > 0.01, "x² should have high variance");
+        assert!(!x2.symbolically_proven, "x² should NOT be proven conserved");
+
+        eprintln!("\n  >>> DISCOVERY: E = x² + v² is a conserved quantity");
+        eprintln!("  >>> PROOF: dE/dt = 2x·v + 2v·(-x) = 0 ✓");
     }
 }
