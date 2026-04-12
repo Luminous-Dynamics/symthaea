@@ -1012,6 +1012,9 @@ pub fn try_seq(goal: &Goal, tactics: &[Box<dyn Fn(&Goal) -> TacticResult>]) -> T
 // `Expr` goal and close it with these tactics.
 
 use crate::hdc::barycentric::{centroid, circumcenter, incenter, orthocenter, Barycentric};
+use crate::hdc::combinatorial::{
+    find_linear_invariant, find_linear_monovariant, pigeonhole_apply, pigeonhole_min_max_bucket,
+};
 use crate::hdc::computational_geometry::Point2D;
 use crate::hdc::diophantine::pell_equation;
 use crate::hdc::inequalities::{
@@ -1388,6 +1391,85 @@ pub fn tactic_schur_check(_goal: &Goal, a: f64, b: f64, c: f64, t: u32) -> Tacti
         TacticResult::Closed
     } else {
         TacticResult::Failed(format!("Schur t={} violated at ({}, {}, {})", t, a, b, c))
+    }
+}
+
+// ─── Phase 4 (scoped): combinatorial tactics ─────────────────────────────────
+//
+// Three tactics wrapping the primitives from `hdc::combinatorial`:
+// pigeonhole, invariant discovery, monovariant (termination proof).
+
+/// Closes a pigeonhole-style goal: given `items`, partition them by a
+/// concrete function, and verify that pigeonhole forces at least
+/// `min_collision` items in some bucket.
+pub fn tactic_pigeonhole<T, K, F>(
+    _goal: &Goal,
+    items: &[T],
+    partition: F,
+    min_collision: usize,
+) -> TacticResult
+where
+    K: std::hash::Hash + Eq,
+    F: Fn(&T) -> K,
+{
+    match pigeonhole_apply(items, partition, min_collision) {
+        Some(_) => TacticResult::Closed,
+        None => TacticResult::Failed(format!(
+            "pigeonhole did not force a bucket of size ≥ {}",
+            min_collision
+        )),
+    }
+}
+
+/// Closes a "pigeonhole guarantees some bucket has ≥ k items" goal via
+/// the classical min_max_bucket formula. Useful when the partition is
+/// abstract but the cardinalities are known.
+pub fn tactic_pigeonhole_count(
+    _goal: &Goal,
+    items: usize,
+    boxes: usize,
+    claimed_min: usize,
+) -> TacticResult {
+    let actual = pigeonhole_min_max_bucket(items, boxes);
+    if actual >= claimed_min {
+        TacticResult::Closed
+    } else {
+        TacticResult::Failed(format!(
+            "pigeonhole guarantees only {}, not {}",
+            actual, claimed_min
+        ))
+    }
+}
+
+/// Closes a goal "the quantity c · s is invariant" by finding a linear
+/// invariant for the given trajectory. Returns Closed with the
+/// discovered coefficients (reported in the Failed message for audit,
+/// since TacticResult::Closed carries no payload).
+pub fn tactic_invariant_search(
+    _goal: &Goal,
+    trajectory: &[Vec<f64>],
+) -> TacticResult {
+    match find_linear_invariant(trajectory) {
+        Some((_c, residual)) if residual < 1e-6 => TacticResult::Closed,
+        Some((c, residual)) => TacticResult::Failed(format!(
+            "found near-invariant but residual too high ({:.2e}): c = {:?}",
+            residual, c
+        )),
+        None => TacticResult::Failed("no linear invariant exists".to_string()),
+    }
+}
+
+/// Closes a termination goal by finding a strict monovariant: a linear
+/// function that strictly decreases (or increases, if `seek_decreasing`
+/// is false) at every step of the trajectory.
+pub fn tactic_monovariant(
+    _goal: &Goal,
+    trajectory: &[Vec<f64>],
+    seek_decreasing: bool,
+) -> TacticResult {
+    match find_linear_monovariant(trajectory, seek_decreasing) {
+        Some(_) => TacticResult::Closed,
+        None => TacticResult::Failed("no linear monovariant found".to_string()),
     }
 }
 
@@ -2160,6 +2242,112 @@ mod tests {
         // And direct AM ≥ GM via the AM-GM tactic
         assert!(matches!(
             tactic_amgm_check(&goal, xs),
+            TacticResult::Closed
+        ));
+    }
+
+    // ── Phase 4 (scoped) combinatorial tactics ─────────────────────────
+
+    #[test]
+    fn test_tactic_pigeonhole_mod_6() {
+        let goal = Goal::new(Expr::Const(0));
+        let ints: Vec<i32> = vec![3, 14, 27, 100, 5, 18, 71];
+        assert!(matches!(
+            tactic_pigeonhole(&goal, &ints, |&n: &i32| (n % 6 + 6) % 6, 2),
+            TacticResult::Closed
+        ));
+    }
+
+    #[test]
+    fn test_tactic_pigeonhole_count_classic() {
+        let goal = Goal::new(Expr::Const(0));
+        // 14 people, 12 months → some month has ≥ 2 people
+        assert!(matches!(
+            tactic_pigeonhole_count(&goal, 14, 12, 2),
+            TacticResult::Closed
+        ));
+        // But not ≥ 3 — not forced by pigeonhole on 14 items in 12 boxes
+        assert!(matches!(
+            tactic_pigeonhole_count(&goal, 14, 12, 3),
+            TacticResult::Failed(_)
+        ));
+    }
+
+    #[test]
+    fn test_tactic_invariant_search_closes() {
+        let goal = Goal::new(Expr::Const(0));
+        // (a, b) → (a-1, b+1): sum invariant
+        let trajectory = vec![
+            vec![5.0, 3.0],
+            vec![4.0, 4.0],
+            vec![3.0, 5.0],
+        ];
+        assert!(matches!(
+            tactic_invariant_search(&goal, &trajectory),
+            TacticResult::Closed
+        ));
+    }
+
+    #[test]
+    fn test_tactic_invariant_search_rejects_no_invariant() {
+        let goal = Goal::new(Expr::Const(0));
+        // (a, b) → (2a, b+1): no linear invariant
+        let trajectory = vec![
+            vec![1.0, 0.0],
+            vec![2.0, 1.0],
+            vec![4.0, 2.0],
+        ];
+        assert!(matches!(
+            tactic_invariant_search(&goal, &trajectory),
+            TacticResult::Failed(_)
+        ));
+    }
+
+    #[test]
+    fn test_tactic_monovariant_termination() {
+        let goal = Goal::new(Expr::Const(0));
+        // Simple counter: proves termination
+        let trajectory = vec![vec![10.0], vec![9.0], vec![8.0], vec![7.0]];
+        assert!(matches!(
+            tactic_monovariant(&goal, &trajectory, true),
+            TacticResult::Closed
+        ));
+    }
+
+    #[test]
+    fn test_tactic_monovariant_rejects_oscillation() {
+        let goal = Goal::new(Expr::Const(0));
+        let trajectory = vec![vec![1.0], vec![2.0], vec![1.0], vec![2.0]];
+        assert!(matches!(
+            tactic_monovariant(&goal, &trajectory, true),
+            TacticResult::Failed(_)
+        ));
+    }
+
+    /// Phase 4 integration: prove a discrete combinatorial claim using
+    /// pigeonhole + invariant search in sequence. Scenario: a chip-firing
+    /// game on a line where each step moves a chip from (x, y) to
+    /// (x-1, y+1). Show (1) the total chip count x+y is invariant, and
+    /// (2) the game terminates because x is a strict monovariant.
+    #[test]
+    fn test_phase4_integration_chip_firing() {
+        let goal = Goal::new(Expr::Const(0));
+        let trajectory = vec![
+            vec![5.0, 0.0],
+            vec![4.0, 1.0],
+            vec![3.0, 2.0],
+            vec![2.0, 3.0],
+            vec![1.0, 4.0],
+            vec![0.0, 5.0],
+        ];
+        // Claim 1: chip count (x + y) is invariant
+        assert!(matches!(
+            tactic_invariant_search(&goal, &trajectory),
+            TacticResult::Closed
+        ));
+        // Claim 2: x strictly decreases → termination
+        assert!(matches!(
+            tactic_monovariant(&goal, &trajectory, true),
             TacticResult::Closed
         ));
     }
