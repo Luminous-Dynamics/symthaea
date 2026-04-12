@@ -26,3 +26,5 @@ pub mod plugin;
 pub mod symtropy_sim;
 #[cfg(feature = "symtropy")]
 pub mod full_frame;
+#[cfg(feature = "hal")]
+pub mod hal_bridge;
