@@ -627,6 +627,32 @@ fn linear_regression(data: &[(f64, f64)]) -> (f64, f64, f64) {
     (slope, intercept, r2)
 }
 
+/// Spearman rank correlation between two sequences.
+/// ρ = 1 - 6Σd²/(n(n²-1)) where d_i = rank(x_i) - rank(y_i).
+fn spearman_correlation(x: &[f64], y: &[f64]) -> f64 {
+    let n = x.len().min(y.len());
+    if n < 3 { return 0.0; }
+
+    // Compute ranks
+    let rank = |v: &[f64]| -> Vec<f64> {
+        let mut indexed: Vec<(usize, f64)> = v.iter().enumerate().map(|(i, &val)| (i, val)).collect();
+        indexed.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
+        let mut ranks = vec![0.0f64; v.len()];
+        for (rank, &(idx, _)) in indexed.iter().enumerate() {
+            ranks[idx] = (rank + 1) as f64;
+        }
+        ranks
+    };
+
+    let rx = rank(&x[..n]);
+    let ry = rank(&y[..n]);
+
+    let sum_d2: f64 = rx.iter().zip(&ry).map(|(a, b)| (a - b).powi(2)).sum();
+    let nf = n as f64;
+
+    1.0 - 6.0 * sum_d2 / (nf * (nf * nf - 1.0))
+}
+
 /// Bootstrap confidence interval for the power law exponent B.
 ///
 /// Resamples the data n_boot times with replacement, refits B each time,
@@ -1445,5 +1471,228 @@ mod tests {
         }
 
         assert!(b_mean > 0.0, "exponent should be positive");
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // DEEP EXPLORATION: Cross-Domain Correlation Matrix
+    // ═══════════════════════════════════════════════════════════════════
+
+    /// Compute Spearman rank correlation between ALL pairs of arithmetic sequences.
+    /// No model assumptions — just raw statistical dependence.
+    /// Any |ρ| > 0.5 between different domains is a genuine lead.
+    #[test]
+    fn test_cross_domain_correlation_matrix() {
+        eprintln!("\n═══ CROSS-DOMAIN CORRELATION MATRIX ═══\n");
+
+        // Generate all sequences, aligned to n = 1..100 where possible
+        let max_n = 100;
+
+        // 1. Prime gaps: gap(k) = p_{k+1} - p_k
+        let primes = {
+            let max = 600usize;
+            let mut is_p = vec![true; max + 1];
+            is_p[0] = false; if max > 0 { is_p[1] = false; }
+            for i in 2..=(max as f64).sqrt() as usize { if is_p[i] { let mut j = i*i; while j <= max { is_p[j] = false; j += i; } } }
+            (2..=max).filter(|&i| is_p[i]).map(|i| i as u64).collect::<Vec<u64>>()
+        };
+        let prime_gaps: Vec<f64> = primes.windows(2).take(max_n)
+            .map(|w| (w[1] - w[0]) as f64).collect();
+
+        // 2. abc qualities (ranked)
+        let abc = super::search_abc_triples(10000, 1.0);
+        let abc_quals: Vec<f64> = abc.iter().take(max_n).map(|t| t.quality).collect();
+
+        // 3. Partition counts p(n)
+        let partitions: Vec<f64> = (1..=max_n)
+            .map(|n| super::super::conjecture_engine::observe_partitions(n).data.last()
+                .map(|&(_, y)| y).unwrap_or(0.0))
+            .collect();
+
+        // 4. Class numbers h(-d) for squarefree d
+        let class_nums: Vec<f64> = (1..=200u64)
+            .filter(|&d| { let mut m = d; let mut p = 2u64; while p*p <= m { if m%(p*p)==0 { return false; } p+=1; } true })
+            .take(max_n)
+            .map(|d| super::class_number(d) as f64)
+            .collect();
+
+        // 5. Zeta zero spacings
+        let zeros = super::find_zeta_zeros(14.0, 300.0, 0.05);
+        let zeta_spaces: Vec<f64> = zeros.windows(2).take(max_n)
+            .map(|w| w[1] - w[0]).collect();
+
+        // 6. Sato-Tate angles for 11a1
+        let curve = super::super::langlands::curve_11a1();
+        let st_data = curve.l_function_coefficients(600);
+        let sato_tate: Vec<f64> = st_data.iter().take(max_n)
+            .map(|&(p, ap)| {
+                let norm = (ap as f64 / (2.0 * (p as f64).sqrt())).max(-1.0).min(1.0);
+                norm.acos()
+            }).collect();
+
+        let sequences: Vec<(&str, &[f64])> = vec![
+            ("prime_gaps", &prime_gaps),
+            ("abc_quality", &abc_quals),
+            ("partitions", &partitions),
+            ("class_nums", &class_nums),
+            ("zeta_spaces", &zeta_spaces),
+            ("sato_tate", &sato_tate),
+        ];
+
+        // Compute Spearman rank correlation for every pair
+        eprintln!("  Sequences: {} (each up to {} values)\n", sequences.len(), max_n);
+
+        // Header
+        eprint!("  {:>12}", "");
+        for (name, _) in &sequences { eprint!(" {:>12}", &name[..name.len().min(12)]); }
+        eprintln!();
+
+        let mut significant_pairs = Vec::new();
+
+        for (i, (name_i, seq_i)) in sequences.iter().enumerate() {
+            eprint!("  {:>12}", &name_i[..name_i.len().min(12)]);
+            for (j, (name_j, seq_j)) in sequences.iter().enumerate() {
+                if i == j {
+                    eprint!(" {:>12}", "1.000");
+                    continue;
+                }
+                let n = seq_i.len().min(seq_j.len());
+                if n < 10 {
+                    eprint!(" {:>12}", "n/a");
+                    continue;
+                }
+                let rho = spearman_correlation(&seq_i[..n], &seq_j[..n]);
+                eprint!(" {:>12.4}", rho);
+
+                if i < j && rho.abs() > 0.3 {
+                    significant_pairs.push((name_i, name_j, rho, n));
+                }
+            }
+            eprintln!();
+        }
+
+        eprintln!("\n  SIGNIFICANT CORRELATIONS (|ρ| > 0.3):");
+        if significant_pairs.is_empty() {
+            eprintln!("    None found (sequences are statistically independent)");
+        } else {
+            for (a, b, rho, n) in &significant_pairs {
+                let strength = if rho.abs() > 0.7 { "STRONG" }
+                    else if rho.abs() > 0.5 { "MODERATE" }
+                    else { "weak" };
+                eprintln!("    {} ↔ {}: ρ = {:.4} ({}, n={})", a, b, rho, strength, n);
+            }
+        }
+
+        // The key question: do any CROSS-DOMAIN pairs show significant correlation?
+        let cross_domain: Vec<_> = significant_pairs.iter()
+            .filter(|(a, b, rho, _)| rho.abs() > 0.5 && a != b)
+            .collect();
+
+        if !cross_domain.is_empty() {
+            eprintln!("\n  >>> CROSS-DOMAIN BRIDGES DETECTED:");
+            for (a, b, rho, n) in &cross_domain {
+                eprintln!("    >>> {} ↔ {}: ρ = {:.4} (n={})", a, b, rho, n);
+            }
+        }
+    }
+
+    /// GUMBEL DISTRIBUTION TEST: Do abc qualities follow extreme value statistics?
+    ///
+    /// If abc qualities at a fixed scale follow Gumbel(μ, β), that connects
+    /// the abc conjecture to the same extreme value theory that governs
+    /// natural extremes (floods, earthquakes, material failure).
+    #[test]
+    fn test_abc_gumbel_distribution() {
+        eprintln!("\n═══ GUMBEL DISTRIBUTION TEST FOR abc QUALITIES ═══\n");
+
+        let triples = super::search_abc_triples(50000, 1.0);
+        let qualities: Vec<f64> = triples.iter().map(|t| t.quality).collect();
+        let n = qualities.len();
+        eprintln!("  {} abc triples with q > 1.0 for c ≤ 50000", n);
+
+        // Fit Gumbel parameters via method of moments:
+        // mean = μ + β·γ (γ = Euler-Mascheroni ≈ 0.5772)
+        // variance = π²β²/6
+        let mean: f64 = qualities.iter().sum::<f64>() / n as f64;
+        let var: f64 = qualities.iter().map(|q| (q - mean).powi(2)).sum::<f64>() / n as f64;
+
+        let euler_gamma = 0.5772156649015329;
+        let beta = (6.0 * var / (std::f64::consts::PI * std::f64::consts::PI)).sqrt();
+        let mu = mean - beta * euler_gamma;
+
+        eprintln!("  Sample: mean={:.4}, var={:.6}", mean, var);
+        eprintln!("  Gumbel fit: μ={:.4}, β={:.4}", mu, beta);
+
+        // Kolmogorov-Smirnov test: compare empirical CDF vs Gumbel CDF
+        let mut sorted = qualities.clone();
+        sorted.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+
+        let mut ks_stat = 0.0f64;
+        for (i, &q) in sorted.iter().enumerate() {
+            let empirical = (i + 1) as f64 / n as f64;
+            let z = (q - mu) / beta;
+            let gumbel_cdf = (-(-z).exp()).exp(); // Gumbel CDF: exp(-exp(-z))
+            let diff = (empirical - gumbel_cdf).abs();
+            ks_stat = ks_stat.max(diff);
+        }
+
+        // KS critical value at 5%: 1.36 / √n
+        let ks_critical = 1.36 / (n as f64).sqrt();
+
+        eprintln!("\n  Kolmogorov-Smirnov test:");
+        eprintln!("    KS statistic: {:.4}", ks_stat);
+        eprintln!("    Critical value (5%): {:.4}", ks_critical);
+
+        if ks_stat < ks_critical {
+            eprintln!("    >>> CANNOT REJECT GUMBEL at 5% significance!");
+            eprintln!("    >>> abc qualities are CONSISTENT with extreme value statistics.");
+            eprintln!("    >>> This connects Diophantine analysis to statistical mechanics.");
+        } else {
+            eprintln!("    Gumbel REJECTED (KS = {:.4} > critical {:.4})", ks_stat, ks_critical);
+            eprintln!("    abc qualities do NOT follow a simple Gumbel distribution.");
+
+            // Try: maybe it's a Gumbel for the EXCESS q - 1?
+            let excess: Vec<f64> = qualities.iter().map(|q| q - 1.0).collect();
+            let ex_mean: f64 = excess.iter().sum::<f64>() / n as f64;
+            let ex_var: f64 = excess.iter().map(|e| (e - ex_mean).powi(2)).sum::<f64>() / n as f64;
+            let ex_beta = (6.0 * ex_var / (std::f64::consts::PI * std::f64::consts::PI)).sqrt();
+            let ex_mu = ex_mean - ex_beta * euler_gamma;
+
+            let mut ex_sorted = excess.clone();
+            ex_sorted.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+
+            let mut ks2 = 0.0f64;
+            for (i, &e) in ex_sorted.iter().enumerate() {
+                let empirical = (i + 1) as f64 / n as f64;
+                let z = (e - ex_mu) / ex_beta;
+                let gumbel_cdf = (-(-z).exp()).exp();
+                ks2 = ks2.max((empirical - gumbel_cdf).abs());
+            }
+
+            eprintln!("\n    Testing EXCESS (q-1) against Gumbel:");
+            eprintln!("    KS for excess: {:.4} (critical: {:.4})", ks2, ks_critical);
+            if ks2 < ks_critical {
+                eprintln!("    >>> Excess q-1 IS Gumbel-distributed!");
+            }
+        }
+
+        // Print histogram vs Gumbel PDF for visual comparison
+        let n_bins = 15;
+        let q_min = sorted[0];
+        let q_max = sorted[n - 1];
+        let bin_width = (q_max - q_min) / n_bins as f64;
+
+        eprintln!("\n  Histogram vs Gumbel PDF:");
+        eprintln!("    q range  | observed | Gumbel PDF");
+        for i in 0..n_bins {
+            let lo = q_min + i as f64 * bin_width;
+            let hi = lo + bin_width;
+            let count = sorted.iter().filter(|&&q| q >= lo && q < hi).count();
+            let density = count as f64 / (n as f64 * bin_width);
+            let mid = (lo + hi) / 2.0;
+            let z = (mid - mu) / beta;
+            let gumbel_pdf = (1.0 / beta) * (-z).exp() * (-(-z).exp()).exp();
+            let match_c = if (density - gumbel_pdf).abs() < gumbel_pdf.max(0.1) * 0.5 { "~" } else { " " };
+            eprintln!("    [{:.3},{:.3}) | {:.4}  | {:.4}  {}", lo, hi, density, gumbel_pdf, match_c);
+        }
     }
 }
