@@ -448,36 +448,15 @@ impl SymbolicRegressor {
             }
         }
 
-        // ── Asymptotic seeding ─────────────────────────────────────────
-        // If the data grows faster than linear, seed the population with
-        // exponential/power-law templates to avoid wasting generations.
-        if train.len() >= 3 {
-            let (_, y_first) = train[0];
-            let (_, y_last) = train[train.len() - 1];
-            let growth = if y_first.abs() > 1e-10 { (y_last / y_first).abs() } else { 1.0 };
-            if growth > 100.0 {
-                // Exponential-looking data: seed with exp(a*n), n^a, a^n templates
-                let seed_count = self.config.population_size / 5;
-                for i in 0..seed_count.min(self.population.len()) {
-                    self.rng = lcg_step(self.rng);
-                    let templates = [
-                        // exp(c * sqrt(n))
-                        Expr::Func(UnaryFn::Exp, Box::new(Expr::BinOp(
-                            BinOp::Mul, Box::new(Expr::Const(1.0)),
-                            Box::new(Expr::Func(UnaryFn::Sqrt, Box::new(Expr::Var("n".into()))))))),
-                        // c * n^a
-                        Expr::BinOp(BinOp::Mul, Box::new(Expr::Const(1.0)),
-                            Box::new(Expr::BinOp(BinOp::Pow, Box::new(Expr::Var("n".into())),
-                                Box::new(Expr::Const(2.0))))),
-                        // c * exp(a * n)
-                        Expr::BinOp(BinOp::Mul, Box::new(Expr::Const(1.0)),
-                            Box::new(Expr::Func(UnaryFn::Exp, Box::new(Expr::BinOp(
-                                BinOp::Mul, Box::new(Expr::Const(0.5)),
-                                Box::new(Expr::Var("n".into()))))))),
-                    ];
-                    self.population[i] = templates[self.rng as usize % templates.len()].clone();
-                }
-            }
+        // ── Template library seeding (#4) ────────────────────────────
+        // Analyze growth class and seed population with appropriate templates.
+        // This replaces blind random initialization with informed structures.
+        let growth_class = analyze_growth(&train);
+        let templates = build_template_library(&growth_class);
+        let seed_count = (self.config.population_size / 4).min(templates.len() * 3);
+        for i in 0..seed_count.min(self.population.len()) {
+            self.rng = lcg_step(self.rng);
+            self.population[i] = templates[self.rng as usize % templates.len()].clone();
         }
 
         for _gen in 0..self.config.generations {
@@ -1131,6 +1110,100 @@ pub fn ratio_sequence(data: &[(f64, f64)]) -> Vec<(f64, f64)> {
             } else { None }
         })
         .collect()
+}
+
+/// Build growth-class-specific template library for GP initialization (#4).
+///
+/// Templates give the GP a head start by providing the right structural
+/// skeleton. Nelder-Mead then optimizes the constants.
+fn build_template_library(growth: &GrowthClass) -> Vec<Expr> {
+    let n = || Box::new(Expr::Var("n".into()));
+    let c = |v: f64| Box::new(Expr::Const(v));
+
+    // Universal templates (always included)
+    let mut templates = vec![
+        // a*n + b (linear)
+        Expr::BinOp(BinOp::Add, Box::new(Expr::BinOp(BinOp::Mul, c(1.0), n())), c(0.0)),
+        // a*n^2 + b*n + c (quadratic)
+        Expr::BinOp(BinOp::Add,
+            Box::new(Expr::BinOp(BinOp::Mul, c(1.0),
+                Box::new(Expr::BinOp(BinOp::Pow, n(), c(2.0))))),
+            Box::new(Expr::BinOp(BinOp::Mul, c(1.0), n()))),
+        // a * n^b (power law)
+        Expr::BinOp(BinOp::Mul, c(1.0), Box::new(Expr::BinOp(BinOp::Pow, n(), c(1.5)))),
+    ];
+
+    match growth {
+        GrowthClass::Constant => {
+            templates.push(Expr::Const(1.0));
+            templates.push(Expr::Const(std::f64::consts::PI));
+            templates.push(Expr::Const(1.0 / std::f64::consts::E));
+        }
+        GrowthClass::Logarithmic => {
+            // a * ln(n) + b
+            templates.push(Expr::BinOp(BinOp::Add,
+                Box::new(Expr::BinOp(BinOp::Mul, c(1.0),
+                    Box::new(Expr::Func(UnaryFn::Log, n())))),
+                c(0.0)));
+            // a * n / ln(n) (prime counting theorem form)
+            templates.push(Expr::BinOp(BinOp::Div,
+                Box::new(Expr::BinOp(BinOp::Mul, c(1.0), n())),
+                Box::new(Expr::Func(UnaryFn::Log, n()))));
+        }
+        GrowthClass::Polynomial(p) => {
+            // a * n^p (with the detected exponent)
+            templates.push(Expr::BinOp(BinOp::Mul, c(1.0),
+                Box::new(Expr::BinOp(BinOp::Pow, n(), c(*p)))));
+            // a * n^p / (b + n) (rational correction)
+            templates.push(Expr::BinOp(BinOp::Div,
+                Box::new(Expr::BinOp(BinOp::Mul, c(1.0),
+                    Box::new(Expr::BinOp(BinOp::Pow, n(), c(*p))))),
+                Box::new(Expr::BinOp(BinOp::Add, c(1.0), n()))));
+            // n * (n+1) / 2 (triangular template)
+            templates.push(Expr::BinOp(BinOp::Div,
+                Box::new(Expr::BinOp(BinOp::Mul, n(),
+                    Box::new(Expr::BinOp(BinOp::Add, n(), c(1.0))))),
+                c(2.0)));
+        }
+        GrowthClass::Exponential => {
+            // a * exp(b * sqrt(n)) / (c * n) — Hardy-Ramanujan
+            templates.push(Expr::BinOp(BinOp::Div,
+                Box::new(Expr::BinOp(BinOp::Mul, c(0.15),
+                    Box::new(Expr::Func(UnaryFn::Exp,
+                        Box::new(Expr::BinOp(BinOp::Mul, c(2.5),
+                            Box::new(Expr::Func(UnaryFn::Sqrt, n())))))))),
+                Box::new(Expr::BinOp(BinOp::Mul, c(1.0), n()))));
+            // a * b^n (geometric)
+            templates.push(Expr::BinOp(BinOp::Mul, c(1.0),
+                Box::new(Expr::BinOp(BinOp::Pow, c(2.0), n()))));
+            // a * exp(b * n) (pure exponential)
+            templates.push(Expr::BinOp(BinOp::Mul, c(1.0),
+                Box::new(Expr::Func(UnaryFn::Exp,
+                    Box::new(Expr::BinOp(BinOp::Mul, c(0.5), n()))))));
+            // C(2n,n)/(n+1) structure (Catalan-like)
+            templates.push(Expr::BinOp(BinOp::Div,
+                Box::new(Expr::BinOp(BinOp::Pow, c(4.0), n())),
+                Box::new(Expr::BinOp(BinOp::Mul,
+                    Box::new(Expr::Func(UnaryFn::Sqrt,
+                        Box::new(Expr::BinOp(BinOp::Mul, c(std::f64::consts::PI), n())))),
+                    Box::new(Expr::BinOp(BinOp::Add, n(), c(1.0)))))));
+        }
+        GrowthClass::SuperExponential => {
+            // Stirling: sqrt(2*pi*n) * (n/e)^n
+            templates.push(Expr::BinOp(BinOp::Mul,
+                Box::new(Expr::Func(UnaryFn::Sqrt,
+                    Box::new(Expr::BinOp(BinOp::Mul, c(6.28), n())))),
+                Box::new(Expr::BinOp(BinOp::Pow,
+                    Box::new(Expr::BinOp(BinOp::Div, n(), c(std::f64::consts::E))),
+                    n()))));
+            // a^n * n^b (mixed)
+            templates.push(Expr::BinOp(BinOp::Mul,
+                Box::new(Expr::BinOp(BinOp::Pow, c(2.0), n())),
+                Box::new(Expr::BinOp(BinOp::Pow, n(), c(1.0)))));
+        }
+    }
+
+    templates
 }
 
 /// Fingerprint an expression by hashing its outputs on sample points.
