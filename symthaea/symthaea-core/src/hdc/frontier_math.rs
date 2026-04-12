@@ -1825,4 +1825,113 @@ mod tests {
             eprintln!("    [{:.3},{:.3}) | {:.4}  | {:.4}  {}", lo, hi, density, gumbel_pdf, match_c);
         }
     }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // DEEP PROBE: Is class_number ↔ partition correlation real?
+    // ═══════════════════════════════════════════════════════════════════
+
+    /// Test whether the ρ = 0.62 correlation between class numbers and
+    /// partition counts survives detrending.
+    ///
+    /// Both sequences grow monotonically, so raw Spearman correlation
+    /// includes shared growth rate. If we subtract the best-fit trend
+    /// from each and correlate the RESIDUALS, we learn whether the
+    /// correlation is real structure or just "both go up."
+    ///
+    /// This is the honest test. If residual ρ ≈ 0, the correlation was
+    /// spurious. If residual ρ > 0.3, there's real arithmetic structure
+    /// connecting class numbers to partitions beyond growth rate.
+    #[test]
+    fn test_class_partition_detrended_correlation() {
+        eprintln!("\n═══ DEEP PROBE: CLASS NUMBERS ↔ PARTITIONS ═══\n");
+        eprintln!("Question: is ρ = 0.62 real structure or just shared growth?\n");
+
+        let max_n = 120;
+
+        // Compute both sequences aligned by index
+        let partitions: Vec<f64> = (1..=max_n)
+            .map(|n| {
+                super::super::conjecture_engine::observe_partitions(n)
+                    .data.last().map(|&(_, y)| y).unwrap_or(0.0)
+            })
+            .collect();
+
+        let squarefree: Vec<u64> = (1..=500u64)
+            .filter(|&d| {
+                let mut p = 2u64;
+                while p * p <= d { if d % (p * p) == 0 { return false; } p += 1; }
+                true
+            })
+            .take(max_n)
+            .collect();
+
+        let class_nums: Vec<f64> = squarefree.iter()
+            .map(|&d| super::class_number(d) as f64)
+            .collect();
+
+        let n = partitions.len().min(class_nums.len());
+        let partitions = &partitions[..n];
+        let class_nums = &class_nums[..n];
+
+        // Raw Spearman correlation
+        let raw_rho = spearman_correlation(partitions, class_nums);
+        eprintln!("  Raw Spearman ρ = {:.4} (n={})", raw_rho, n);
+
+        // Detrend: fit log(y) = a + b·log(x) (power-law trend), subtract
+        let detrend = |seq: &[f64]| -> Vec<f64> {
+            let log_data: Vec<(f64, f64)> = seq.iter().enumerate()
+                .filter(|(_, &y)| y > 0.0)
+                .map(|(i, &y)| ((i as f64 + 1.0).ln(), y.ln()))
+                .collect();
+            let (slope, intercept, _) = super::linear_regression(&log_data);
+
+            seq.iter().enumerate().map(|(i, &y)| {
+                if y > 0.0 {
+                    let predicted = (intercept + slope * (i as f64 + 1.0).ln()).exp();
+                    y - predicted // residual
+                } else {
+                    0.0
+                }
+            }).collect()
+        };
+
+        let part_residuals = detrend(partitions);
+        let class_residuals = detrend(class_nums);
+
+        // Detrended Spearman correlation
+        let detrended_rho = spearman_correlation(&part_residuals, &class_residuals);
+        eprintln!("  Detrended Spearman ρ = {:.4}", detrended_rho);
+
+        // Also try: rank-difference correlation (remove monotonic trend entirely)
+        // by computing first differences Δy = y_{n+1} - y_n and correlating those
+        let diff = |seq: &[f64]| -> Vec<f64> {
+            seq.windows(2).map(|w| w[1] - w[0]).collect()
+        };
+
+        let part_diffs = diff(partitions);
+        let class_diffs = diff(class_nums);
+        let diff_n = part_diffs.len().min(class_diffs.len());
+        let diff_rho = spearman_correlation(&part_diffs[..diff_n], &class_diffs[..diff_n]);
+        eprintln!("  First-difference Spearman ρ = {:.4}", diff_rho);
+
+        eprintln!("\n  VERDICT:");
+        if detrended_rho.abs() > 0.3 {
+            eprintln!("  >>> REAL STRUCTURE: detrended ρ = {:.4} survives trend removal", detrended_rho);
+            eprintln!("  >>> Class numbers and partitions share arithmetic structure");
+            eprintln!("  >>> beyond their common growth rate.");
+        } else if detrended_rho.abs() > 0.15 {
+            eprintln!("  Weak residual correlation ({:.4}) — suggestive but not conclusive", detrended_rho);
+        } else {
+            eprintln!("  >>> SPURIOUS: detrended ρ = {:.4} ≈ 0", detrended_rho);
+            eprintln!("  >>> The raw ρ = {:.4} was entirely due to shared growth rate.", raw_rho);
+            eprintln!("  >>> No deep arithmetic connection detected.");
+        }
+
+        if diff_rho.abs() > 0.2 {
+            eprintln!("  First-difference correlation ({:.4}) suggests local fluctuations", diff_rho);
+            eprintln!("  in class numbers track local fluctuations in partitions.");
+        } else {
+            eprintln!("  First-differences uncorrelated ({:.4}) — growth fluctuations independent.", diff_rho);
+        }
+    }
 }
