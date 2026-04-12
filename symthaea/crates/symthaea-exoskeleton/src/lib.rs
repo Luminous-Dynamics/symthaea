@@ -24,3 +24,5 @@ pub mod training;
 pub mod plugin;
 #[cfg(feature = "symtropy")]
 pub mod symtropy_sim;
+#[cfg(feature = "symtropy")]
+pub mod full_frame;
