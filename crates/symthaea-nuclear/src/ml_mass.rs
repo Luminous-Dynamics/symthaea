@@ -16,8 +16,8 @@
 //! Reference: Niu et al., Phys. Rev. C 97, 034318 (2018).
 
 use crate::ame2020::ame2020_reference_nuclei;
-use crate::duflo_zuker::dz_binding_energy;
 use crate::deformation::frdm_deformation;
+use crate::duflo_zuker::dz_binding_energy;
 use serde::{Deserialize, Serialize};
 
 /// Magic numbers for shell proximity feature.
@@ -58,8 +58,14 @@ fn extract_features(z: u16, n: u16) -> [f64; 12] {
     };
 
     // Shell proximity: distance to nearest magic number
-    let shell_z = MAGIC_Z.iter().map(|&m| (z_f - m).abs()).fold(f64::INFINITY, f64::min);
-    let shell_n = MAGIC_N.iter().map(|&m| (n_f - m).abs()).fold(f64::INFINITY, f64::min);
+    let shell_z = MAGIC_Z
+        .iter()
+        .map(|&m| (z_f - m).abs())
+        .fold(f64::INFINITY, f64::min);
+    let shell_n = MAGIC_N
+        .iter()
+        .map(|&m| (n_f - m).abs())
+        .fold(f64::INFINITY, f64::min);
 
     // Coulomb-like term
     let coulomb = z_f * (z_f - 1.0) / a.powf(1.0 / 3.0);
@@ -68,26 +74,36 @@ fn extract_features(z: u16, n: u16) -> [f64; 12] {
     let surface = a.powf(2.0 / 3.0);
 
     // Valence nucleon product (residual interaction)
-    let np = MAGIC_Z.iter().filter(|&&m| m <= z_f).last().map(|&m| z_f - m).unwrap_or(z_f);
-    let nn = MAGIC_N.iter().filter(|&&m| m <= n_f).last().map(|&m| n_f - m).unwrap_or(n_f);
+    let np = MAGIC_Z
+        .iter()
+        .filter(|&&m| m <= z_f)
+        .last()
+        .map(|&m| z_f - m)
+        .unwrap_or(z_f);
+    let nn = MAGIC_N
+        .iter()
+        .filter(|&&m| m <= n_f)
+        .last()
+        .map(|&m| n_f - m)
+        .unwrap_or(n_f);
     let valence = np * nn;
 
     // Deformation from FRDM lookup
     let (beta2, _) = frdm_deformation(z, n);
 
     [
-        z_f,           // 0: proton number
-        n_f,           // 1: neutron number
-        a,             // 2: mass number
-        isospin,       // 3: (N-Z)/A
-        pairing,       // 4: even-odd
-        shell_z,       // 5: distance to nearest Z magic
-        shell_n,       // 6: distance to nearest N magic
-        coulomb,       // 7: Z(Z-1)/A^(1/3)
-        surface,       // 8: A^(2/3)
-        valence,       // 9: Np × Nn
-        beta2,         // 10: quadrupole deformation
-        a.powf(1.0/3.0), // 11: A^(1/3) (radius proxy)
+        z_f,               // 0: proton number
+        n_f,               // 1: neutron number
+        a,                 // 2: mass number
+        isospin,           // 3: (N-Z)/A
+        pairing,           // 4: even-odd
+        shell_z,           // 5: distance to nearest Z magic
+        shell_n,           // 6: distance to nearest N magic
+        coulomb,           // 7: Z(Z-1)/A^(1/3)
+        surface,           // 8: A^(2/3)
+        valence,           // 9: Np × Nn
+        beta2,             // 10: quadrupole deformation
+        a.powf(1.0 / 3.0), // 11: A^(1/3) (radius proxy)
     ]
 }
 
@@ -107,7 +123,12 @@ impl TreeNode {
     fn predict(&self, features: &[f64; 12]) -> f64 {
         match self {
             TreeNode::Leaf(val) => *val,
-            TreeNode::Split { feature, threshold, left, right } => {
+            TreeNode::Split {
+                feature,
+                threshold,
+                left,
+                right,
+            } => {
                 if features[*feature] <= *threshold {
                     left.predict(features)
                 } else {
@@ -140,7 +161,9 @@ impl RandomForest {
             // Bootstrap sample
             let indices: Vec<usize> = (0..n)
                 .map(|_| {
-                    rng_state = rng_state.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+                    rng_state = rng_state
+                        .wrapping_mul(6364136223846793005)
+                        .wrapping_add(1442695040888963407);
                     (rng_state >> 33) as usize % n
                 })
                 .collect();
@@ -148,7 +171,14 @@ impl RandomForest {
             let boot_features: Vec<_> = indices.iter().map(|&i| features[i]).collect();
             let boot_targets: Vec<_> = indices.iter().map(|&i| targets[i]).collect();
 
-            let tree = Self::build_tree(&boot_features, &boot_targets, 0, max_depth, min_samples, &mut rng_state);
+            let tree = Self::build_tree(
+                &boot_features,
+                &boot_targets,
+                0,
+                max_depth,
+                min_samples,
+                &mut rng_state,
+            );
             trees.push(tree);
         }
 
@@ -187,7 +217,9 @@ impl RandomForest {
         let mut best_score = f64::INFINITY;
 
         for _ in 0..n_features_try {
-            *rng = rng.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+            *rng = rng
+                .wrapping_mul(6364136223846793005)
+                .wrapping_add(1442695040888963407);
             let f_idx = (*rng >> 33) as usize % 12;
 
             // Find best split for this feature
@@ -234,11 +266,15 @@ impl RandomForest {
         }
 
         // Split
-        let (left_feat, left_tgt): (Vec<_>, Vec<_>) = features.iter().zip(targets.iter())
+        let (left_feat, left_tgt): (Vec<_>, Vec<_>) = features
+            .iter()
+            .zip(targets.iter())
             .filter(|(f, _)| f[best_feature] <= best_threshold)
             .map(|(f, &t)| (*f, t))
             .unzip();
-        let (right_feat, right_tgt): (Vec<_>, Vec<_>) = features.iter().zip(targets.iter())
+        let (right_feat, right_tgt): (Vec<_>, Vec<_>) = features
+            .iter()
+            .zip(targets.iter())
             .filter(|(f, _)| f[best_feature] > best_threshold)
             .map(|(f, &t)| (*f, t))
             .unzip();
@@ -251,8 +287,22 @@ impl RandomForest {
         TreeNode::Split {
             feature: best_feature,
             threshold: best_threshold,
-            left: Box::new(Self::build_tree(&left_feat, &left_tgt, depth + 1, max_depth, min_samples, rng)),
-            right: Box::new(Self::build_tree(&right_feat, &right_tgt, depth + 1, max_depth, min_samples, rng)),
+            left: Box::new(Self::build_tree(
+                &left_feat,
+                &left_tgt,
+                depth + 1,
+                max_depth,
+                min_samples,
+                rng,
+            )),
+            right: Box::new(Self::build_tree(
+                &right_feat,
+                &right_tgt,
+                depth + 1,
+                max_depth,
+                min_samples,
+                rng,
+            )),
         }
     }
 
@@ -286,7 +336,9 @@ impl MlMassPredictor {
         let mut residuals = Vec::new();
 
         for nuc in &nuclei {
-            if !nuc.is_measured { continue; }
+            if !nuc.is_measured {
+                continue;
+            }
             let dz_be = dz_binding_energy(nuc.z, nuc.n);
             let residual = nuc.binding_energy_mev - dz_be;
             features.push(extract_features(nuc.z, nuc.n));
@@ -295,11 +347,9 @@ impl MlMassPredictor {
 
         // Train Random Forest on residuals
         let forest = RandomForest::train(
-            &features,
-            &residuals,
-            50,  // 50 trees
-            8,   // max depth 8
-            3,   // min 3 samples per leaf
+            &features, &residuals, 50, // 50 trees
+            8,  // max depth 8
+            3,  // min 3 samples per leaf
         );
 
         Self { forest }
@@ -324,7 +374,10 @@ impl MlMassPredictor {
 
     /// Cross-validation: 5-fold RMS on the training data.
     pub fn cross_validate() -> f64 {
-        let nuclei: Vec<_> = ame2020_reference_nuclei().into_iter().filter(|n| n.is_measured).collect();
+        let nuclei: Vec<_> = ame2020_reference_nuclei()
+            .into_iter()
+            .filter(|n| n.is_measured)
+            .collect();
         let n = nuclei.len();
         let fold_size = n / 5;
         let mut total_sq_error = 0.0;
@@ -339,7 +392,9 @@ impl MlMassPredictor {
             let mut train_targets = Vec::new();
 
             for (i, nuc) in nuclei.iter().enumerate() {
-                if i >= test_start && i < test_end { continue; }
+                if i >= test_start && i < test_end {
+                    continue;
+                }
                 let dz_be = dz_binding_energy(nuc.z, nuc.n);
                 train_features.push(extract_features(nuc.z, nuc.n));
                 train_targets.push(nuc.binding_energy_mev - dz_be);
@@ -389,8 +444,11 @@ mod tests {
         let predictor = MlMassPredictor::new();
         // Should be able to predict
         let pred = predictor.predict(26, 30); // Fe-56
-        assert!(pred.binding_energy > 400.0 && pred.binding_energy < 600.0,
-            "Fe-56 ML prediction = {} MeV, expected ~492", pred.binding_energy);
+        assert!(
+            pred.binding_energy > 400.0 && pred.binding_energy < 600.0,
+            "Fe-56 ML prediction = {} MeV, expected ~492",
+            pred.binding_energy
+        );
     }
 
     #[test]
@@ -402,7 +460,9 @@ mod tests {
         let mut ml_errors = Vec::new();
 
         for nuc in &nuclei {
-            if !nuc.is_measured { continue; }
+            if !nuc.is_measured {
+                continue;
+            }
             let dz_be = dz_binding_energy(nuc.z, nuc.n);
             let ml_pred = predictor.predict(nuc.z, nuc.n);
             dz_errors.push((dz_be - nuc.binding_energy_mev).powi(2));
@@ -412,14 +472,19 @@ mod tests {
         let dz_rms = (dz_errors.iter().sum::<f64>() / dz_errors.len() as f64).sqrt();
         let ml_rms = (ml_errors.iter().sum::<f64>() / ml_errors.len() as f64).sqrt();
 
-        eprintln!("DZ RMS: {:.2} MeV, ML RMS: {:.2} MeV (improvement: {:.1}×)",
-            dz_rms, ml_rms, dz_rms / ml_rms);
+        eprintln!(
+            "DZ RMS: {:.2} MeV, ML RMS: {:.2} MeV (improvement: {:.1}×)",
+            dz_rms,
+            ml_rms,
+            dz_rms / ml_rms
+        );
 
         // ML should improve over DZ (on training data, this should be significant)
         assert!(
             ml_rms < dz_rms,
             "ML ({:.2}) should be better than DZ ({:.2})",
-            ml_rms, dz_rms
+            ml_rms,
+            dz_rms
         );
     }
 
@@ -428,7 +493,7 @@ mod tests {
         let predictor = MlMassPredictor::new();
 
         let near = predictor.predict(82, 126); // Pb-208, well-known
-        let far = predictor.predict(126, 184);  // Z=126, N=184, far from data
+        let far = predictor.predict(126, 184); // Z=126, N=184, far from data
 
         // We can't guarantee uncertainty ordering with a simple RF,
         // but both should produce finite predictions
@@ -444,8 +509,11 @@ mod tests {
         eprintln!("5-fold CV RMS: {:.2} MeV", rms);
         // With only ~55 measured training nuclei, CV may be noisy
         // but should be finite and reasonable
-        assert!(rms.is_finite() && rms > 0.0 && rms < 500.0,
-            "CV RMS = {} should be reasonable", rms);
+        assert!(
+            rms.is_finite() && rms > 0.0 && rms < 500.0,
+            "CV RMS = {} should be reasonable",
+            rms
+        );
     }
 
     /// Scan superheavy region for novel stable isotope candidates using the RF model.
@@ -459,9 +527,14 @@ mod tests {
     fn test_novel_isotope_search() {
         let predictor = MlMassPredictor::new();
 
-        eprintln!("\n=== Novel Isotope Search (DZ10 + RF, CV={:.2} MeV) ===", 0.78);
-        eprintln!("Scanning Z=104-130, N=150-200 ({} isotopes)\n",
-            (130-104+1) * (200-150+1));
+        eprintln!(
+            "\n=== Novel Isotope Search (DZ10 + RF, CV={:.2} MeV) ===",
+            0.78
+        );
+        eprintln!(
+            "Scanning Z=104-130, N=150-200 ({} isotopes)\n",
+            (130 - 104 + 1) * (200 - 150 + 1)
+        );
 
         #[derive(Debug)]
         struct Candidate {
@@ -485,34 +558,46 @@ mod tests {
                 let a = z + n;
 
                 // Skip if clearly unbound
-                if pred.ba < 6.5 { continue; }
+                if pred.ba < 6.5 {
+                    continue;
+                }
 
                 // Two-neutron separation energy: S2n = BE(Z,N) - BE(Z,N-2)
                 let s2n = if n >= 2 {
                     pred.binding_energy - predictor.predict(z, n - 2).binding_energy
-                } else { 0.0 };
+                } else {
+                    0.0
+                };
 
                 // Two-proton separation energy: S2p = BE(Z,N) - BE(Z-2,N)
                 let s2p = if z >= 2 {
                     pred.binding_energy - predictor.predict(z - 2, n).binding_energy
-                } else { 0.0 };
+                } else {
+                    0.0
+                };
 
                 // Alpha-decay Q-value: Q_α = BE(He-4) + BE(Z-2,N-2) - BE(Z,N)
                 let q_alpha = if z >= 2 && n >= 2 {
                     let he4_be = 28.296; // He-4 binding energy
                     let daughter = predictor.predict(z - 2, n - 2).binding_energy;
                     he4_be + daughter - pred.binding_energy
-                } else { 99.0 };
+                } else {
+                    99.0
+                };
 
                 // Interesting if: bound, positive separation energies, low uncertainty
                 if pred.ba > 7.0 && s2n > 0.0 && s2p > 0.0 && pred.uncertainty < 1.5 {
                     candidates.push(Candidate {
-                        z, n, a,
+                        z,
+                        n,
+                        a,
                         be: pred.binding_energy,
                         ba: pred.ba,
                         correction: pred.ml_correction,
                         uncertainty: pred.uncertainty,
-                        s2n, s2p, q_alpha,
+                        s2n,
+                        s2p,
+                        q_alpha,
                     });
                 }
             }
@@ -521,44 +606,85 @@ mod tests {
         // Sort by B/A (most stable first)
         candidates.sort_by(|a, b| b.ba.partial_cmp(&a.ba).unwrap());
 
-        eprintln!("Found {} candidates with B/A > 7.0, S2n > 0, S2p > 0, σ < 1.5 MeV\n", candidates.len());
-        eprintln!("{:>4} {:>4} {:>5} {:>10} {:>8} {:>8} {:>8} {:>8} {:>8} {:>8}",
-            "Z", "N", "A", "BE(MeV)", "B/A", "Corr.", "σ", "S2n", "S2p", "Qα");
+        eprintln!(
+            "Found {} candidates with B/A > 7.0, S2n > 0, S2p > 0, σ < 1.5 MeV\n",
+            candidates.len()
+        );
+        eprintln!(
+            "{:>4} {:>4} {:>5} {:>10} {:>8} {:>8} {:>8} {:>8} {:>8} {:>8}",
+            "Z", "N", "A", "BE(MeV)", "B/A", "Corr.", "σ", "S2n", "S2p", "Qα"
+        );
         eprintln!("{}", "-".repeat(88));
 
         for c in candidates.iter().take(30) {
-            eprintln!("{:>4} {:>4} {:>5} {:>10.2} {:>8.4} {:>8.2} {:>8.2} {:>8.2} {:>8.2} {:>8.2}",
-                c.z, c.n, c.a, c.be, c.ba, c.correction, c.uncertainty, c.s2n, c.s2p, c.q_alpha);
+            eprintln!(
+                "{:>4} {:>4} {:>5} {:>10.2} {:>8.4} {:>8.2} {:>8.2} {:>8.2} {:>8.2} {:>8.2}",
+                c.z, c.n, c.a, c.be, c.ba, c.correction, c.uncertainty, c.s2n, c.s2p, c.q_alpha
+            );
         }
 
         // Group by element and find optimal N for each Z
         eprintln!("\n=== Most Stable Isotope Per Element ===");
-        eprintln!("{:>4} {:>15} {:>5} {:>10} {:>8} {:>8} {:>8}",
-            "Z", "Element", "A", "BE(MeV)", "B/A", "S2n", "Qα");
+        eprintln!(
+            "{:>4} {:>15} {:>5} {:>10} {:>8} {:>8} {:>8}",
+            "Z", "Element", "A", "BE(MeV)", "B/A", "S2n", "Qα"
+        );
         eprintln!("{}", "-".repeat(66));
 
         let element_names = [
-            (104, "Rf"), (105, "Db"), (106, "Sg"), (107, "Bh"), (108, "Hs"),
-            (109, "Mt"), (110, "Ds"), (111, "Rg"), (112, "Cn"), (113, "Nh"),
-            (114, "Fl"), (115, "Mc"), (116, "Lv"), (117, "Ts"), (118, "Og"),
-            (119, "Uue"), (120, "Ubn"), (121, "Ubu"), (122, "Ubb"), (123, "Ubt"),
-            (124, "Ubq"), (125, "Ubp"), (126, "Ubh"), (127, "Ubs"), (128, "Ubo"),
-            (129, "Ube"), (130, "Utn"),
+            (104, "Rf"),
+            (105, "Db"),
+            (106, "Sg"),
+            (107, "Bh"),
+            (108, "Hs"),
+            (109, "Mt"),
+            (110, "Ds"),
+            (111, "Rg"),
+            (112, "Cn"),
+            (113, "Nh"),
+            (114, "Fl"),
+            (115, "Mc"),
+            (116, "Lv"),
+            (117, "Ts"),
+            (118, "Og"),
+            (119, "Uue"),
+            (120, "Ubn"),
+            (121, "Ubu"),
+            (122, "Ubb"),
+            (123, "Ubt"),
+            (124, "Ubq"),
+            (125, "Ubp"),
+            (126, "Ubh"),
+            (127, "Ubs"),
+            (128, "Ubo"),
+            (129, "Ube"),
+            (130, "Utn"),
         ];
 
         for &(z, name) in &element_names {
-            if let Some(best) = candidates.iter().filter(|c| c.z == z).max_by(|a, b| a.ba.partial_cmp(&b.ba).unwrap()) {
-                eprintln!("{:>4} {:>15} {:>5} {:>10.2} {:>8.4} {:>8.2} {:>8.2}",
-                    z, name, best.a, best.be, best.ba, best.s2n, best.q_alpha);
+            if let Some(best) = candidates
+                .iter()
+                .filter(|c| c.z == z)
+                .max_by(|a, b| a.ba.partial_cmp(&b.ba).unwrap())
+            {
+                eprintln!(
+                    "{:>4} {:>15} {:>5} {:>10.2} {:>8.4} {:>8.2} {:>8.2}",
+                    z, name, best.a, best.be, best.ba, best.s2n, best.q_alpha
+                );
             }
         }
 
         // Verify we found at least some candidates
-        assert!(!candidates.is_empty(), "Should find at least some stable superheavy candidates");
+        assert!(
+            !candidates.is_empty(),
+            "Should find at least some stable superheavy candidates"
+        );
 
         // The most stable candidates should be near the predicted island of stability
         let top = &candidates[0];
-        eprintln!("\nTop candidate: Z={}, N={}, A={} with B/A={:.4} MeV, σ={:.2} MeV",
-            top.z, top.n, top.a, top.ba, top.uncertainty);
+        eprintln!(
+            "\nTop candidate: Z={}, N={}, A={} with B/A={:.4} MeV, σ={:.2} MeV",
+            top.z, top.n, top.a, top.ba, top.uncertainty
+        );
     }
 }

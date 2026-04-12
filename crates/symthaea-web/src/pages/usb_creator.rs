@@ -134,9 +134,7 @@ pub fn UsbCreatorPage() -> impl IntoView {
                     scan_results.set(Some(summary));
                 }
                 Err(e) => {
-                    let msg = e
-                        .as_string()
-                        .unwrap_or_else(|| "Scan failed".into());
+                    let msg = e.as_string().unwrap_or_else(|| "Scan failed".into());
                     scan_results.set(Some(format!("Error: {}", msg)));
                 }
             }

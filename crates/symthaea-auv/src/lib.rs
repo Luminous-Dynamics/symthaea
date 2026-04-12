@@ -39,6 +39,7 @@
 
 #![allow(clippy::needless_range_loop)]
 
+pub mod acoustic_modem;
 pub mod chemical_sensors;
 pub mod controller;
 pub mod embodiment;
@@ -46,6 +47,8 @@ pub mod encoder;
 pub mod fep_agent;
 pub mod hydrodynamics;
 pub mod mission;
+pub mod navigation_bridge;
+pub mod navigation_estimator;
 pub mod perturbations;
 pub mod simulator;
 pub mod store_forward;
@@ -55,5 +58,8 @@ pub mod types;
 
 pub use controller::AuvController;
 pub use encoder::AuvHdcEncoder;
+pub use mission::{AuvCommsPolicy, AuvMission, MissionMetrics, MissionTracker, Waypoint};
+pub use navigation_bridge::{AuvNavigationBridge, UnderwaterNavigationSample};
+pub use navigation_estimator::{AuvNavigationEstimate, AuvNavigationEstimator};
 pub use simulator::{AuvPhysicsSimulator, SimpleAuvSimulator};
 pub use types::*;

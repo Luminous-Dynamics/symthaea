@@ -385,12 +385,12 @@ impl HdcLtcBridge {
         let hdc_dim = self.config.hdc_dim;
         let mut output = vec![0.0f32; output_dim];
 
-        // Row-accumulation: iterate rows (HDC elements), accumulate into output
+        // Row-accumulation: iterate rows (HDC elements), accumulate into output.
+        // NOTE: No near-zero skip — the closed-form CfC evolution produces small
+        // but real values in early cycles (e.g., 0.02 * h_inf). Skipping at 1e-10
+        // was dropping legitimate signal, causing zero-vector predictions → PE=1.0.
         for j in 0..hdc_dim {
             let x = hv.values[j];
-            if x.abs() < 1e-10 {
-                continue;
-            } // Skip near-zero elements
             let row = &self.output_projection[j * output_dim..(j + 1) * output_dim];
             for (o, &w) in output.iter_mut().zip(row.iter()) {
                 *o += x * w;

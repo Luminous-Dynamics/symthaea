@@ -97,8 +97,10 @@ pub const COMPRESS_NONE: u8 = 0x00;
 pub const COMPRESS_LZ4: u8 = 0x01;
 
 mod bridge;
+pub mod orchestrator;
 
 pub use bridge::{MeshBridgeActor, MeshBridgeHandle, MeshOutbound};
+pub use orchestrator::{ConsciousnessOutput, DaemonConfig, MeshDaemonOrchestrator};
 use serde::{Deserialize, Serialize};
 use symthaea_core::hdc::BinaryHV;
 

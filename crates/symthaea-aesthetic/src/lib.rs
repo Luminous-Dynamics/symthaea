@@ -33,6 +33,9 @@ pub mod information;
 pub mod novelty;
 pub mod session;
 pub mod synesthesia;
+pub mod valence_arousal;
+
+pub use valence_arousal::{from_core_affect, lerp_va, MusicalParams, ValenceArousal};
 
 use serde::{Deserialize, Serialize};
 
@@ -201,6 +204,57 @@ impl Default for AestheticConfig {
     }
 }
 
+/// Persisted aesthetic memory — survives across sessions.
+///
+/// Stores the EMA baseline and accumulated harmony bias so Symthaea
+/// develops a genuine long-term aesthetic identity.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AestheticMemory {
+    /// EMA of composite scores accumulated across all sessions.
+    pub ema: f32,
+    /// Accumulated harmony bias (which harmonies have historically scored well).
+    pub harmony_bias: [f32; 8],
+    /// Total evaluations ever performed.
+    pub total_evaluations: u64,
+    /// Sessions completed.
+    pub session_count: u32,
+}
+
+impl AestheticMemory {
+    pub fn new() -> Self {
+        Self {
+            ema: 0.5,
+            harmony_bias: [0.0; 8],
+            total_evaluations: 0,
+            session_count: 0,
+        }
+    }
+
+    /// Load from a JSON file, or return a fresh memory if missing/corrupt.
+    pub fn load(path: &std::path::Path) -> Self {
+        std::fs::read_to_string(path)
+            .ok()
+            .and_then(|s| serde_json::from_str(&s).ok())
+            .unwrap_or_default()
+    }
+
+    /// Persist to a JSON file. Silently no-ops on write failure.
+    pub fn save(&self, path: &std::path::Path) {
+        if let Some(parent) = path.parent() {
+            let _ = std::fs::create_dir_all(parent);
+        }
+        if let Ok(json) = serde_json::to_string_pretty(self) {
+            let _ = std::fs::write(path, json);
+        }
+    }
+}
+
+impl Default for AestheticMemory {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// Stateful aesthetic tracker that maintains a running EMA of scores
 /// and produces feedback signals relative to that expectation.
 #[derive(Debug, Clone)]
@@ -208,6 +262,8 @@ pub struct AestheticTracker {
     config: AestheticConfig,
     /// Exponential moving average of composite scores.
     ema: f32,
+    /// Accumulated harmony bias from historical high-scoring works.
+    harmony_bias: [f32; 8],
     /// Total evaluations performed.
     evaluation_count: u64,
 }
@@ -217,8 +273,38 @@ impl AestheticTracker {
         Self {
             config,
             ema: 0.5, // neutral starting expectation
+            harmony_bias: [0.0; 8],
             evaluation_count: 0,
         }
+    }
+
+    /// Create a tracker pre-warmed from persisted memory.
+    ///
+    /// The EMA and harmony bias from previous sessions seed this session,
+    /// so Symthaea's aesthetic expectations carry forward over time.
+    pub fn from_memory(config: AestheticConfig, memory: &AestheticMemory) -> Self {
+        Self {
+            config,
+            ema: memory.ema,
+            harmony_bias: memory.harmony_bias,
+            evaluation_count: memory.total_evaluations,
+        }
+    }
+
+    /// Snapshot current state into an `AestheticMemory` for persistence.
+    pub fn to_memory(&self, previous: &AestheticMemory) -> AestheticMemory {
+        AestheticMemory {
+            ema: self.ema,
+            harmony_bias: self.harmony_bias,
+            total_evaluations: self.evaluation_count,
+            session_count: previous.session_count + 1,
+        }
+    }
+
+    /// The accumulated harmony bias: which harmonies have historically scored well.
+    /// Values in [0, 1] — higher means this harmony correlates with beautiful output.
+    pub fn harmony_bias(&self) -> &[f32; 8] {
+        &self.harmony_bias
     }
 
     /// Process an aesthetic score and produce feedback.
@@ -235,8 +321,8 @@ impl AestheticTracker {
         let delta = score.composite - self.ema;
 
         // Update EMA
-        self.ema = self.ema * (1.0 - self.config.ema_alpha)
-            + score.composite * self.config.ema_alpha;
+        self.ema =
+            self.ema * (1.0 - self.config.ema_alpha) + score.composite * self.config.ema_alpha;
 
         // Dopamine: reward prediction error (positive when exceeding expectation)
         let dopamine_delta = if delta > self.config.reward_threshold {
@@ -261,6 +347,15 @@ impl AestheticTracker {
             harmony_projection[i] = harmony_activations[i] * score.composite;
         }
 
+        // Accumulate long-term harmony bias: EMA toward high-scoring harmony activations.
+        // Alpha 0.01 = very slow drift, building aesthetic identity over many sessions.
+        let bias_alpha = 0.01_f32;
+        for i in 0..8 {
+            let target = harmony_activations[i] * score.composite;
+            self.harmony_bias[i] =
+                self.harmony_bias[i] * (1.0 - bias_alpha) + target * bias_alpha;
+        }
+
         AestheticFeedback {
             dopamine_delta,
             serotonin_delta,
@@ -279,10 +374,93 @@ impl AestheticTracker {
         self.evaluation_count
     }
 
-    /// Reset the tracker to initial state.
+    /// Reset the tracker to initial state (preserves harmony_bias).
     pub fn reset(&mut self) {
         self.ema = 0.5;
         self.evaluation_count = 0;
+        // harmony_bias intentionally preserved — it's long-term taste, not session state
+    }
+
+    // ── Human Feedback API ───────────────────────────────────────────────────
+
+    /// Incorporate human feedback into the aesthetic system.
+    ///
+    /// `rating` is a scalar from -1.0 (terrible) through 0.0 (neutral) to +1.0 (beautiful).
+    /// `harmony_activations` is the harmony state at the time the rated piece was generated.
+    ///
+    /// Human feedback carries 10x more weight than self-evaluation because humans
+    /// are the ground truth for aesthetic quality. The system recalibrates its
+    /// EMA and harmony bias toward the human's judgement.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use symthaea_aesthetic::{AestheticTracker, AestheticConfig};
+    /// let mut tracker = AestheticTracker::new(AestheticConfig::default());
+    /// let harmonies = [0.5, 0.6, 0.4, 0.7, 0.3, 0.5, 0.8, 0.2];
+    /// tracker.human_feedback(0.8, &harmonies); // "that was beautiful"
+    /// ```
+    pub fn human_feedback(
+        &mut self,
+        rating: f32,
+        harmony_activations: &[f32; 8],
+    ) -> AestheticFeedback {
+        let rating = rating.clamp(-1.0, 1.0);
+        // Map rating [-1, 1] to score [0, 1]
+        let score = (rating + 1.0) * 0.5;
+
+        self.evaluation_count += 1;
+
+        let delta = score - self.ema;
+
+        // Human feedback EMA alpha is 10x stronger than self-evaluation.
+        // One "beautiful" from a human shifts expectations more than 10 self-scores.
+        let human_alpha = (self.config.ema_alpha * 10.0).min(0.5);
+        self.ema = self.ema * (1.0 - human_alpha) + score * human_alpha;
+
+        // Harmony bias: human-rated works get 5x stronger bias update.
+        // This is how Symthaea learns "what sounds she likes = what humans like."
+        let human_bias_alpha = 0.05_f32;
+        for i in 0..8 {
+            let target = harmony_activations[i] * score;
+            self.harmony_bias[i] =
+                self.harmony_bias[i] * (1.0 - human_bias_alpha) + target * human_bias_alpha;
+        }
+
+        // Strong dopamine signal: human approval is the ultimate reward
+        let dopamine_delta = delta * self.config.dopamine_scale * 2.0;
+        let serotonin_delta = if rating > 0.3 {
+            rating * self.config.serotonin_scale * 1.5 // warm glow from approval
+        } else if rating < -0.3 {
+            rating * self.config.serotonin_scale * 0.5 // mild serotonin dip
+        } else {
+            0.0
+        };
+
+        let mut harmony_projection = [0.0f32; 8];
+        for i in 0..8 {
+            harmony_projection[i] = harmony_activations[i] * score;
+        }
+
+        AestheticFeedback {
+            dopamine_delta: dopamine_delta.clamp(-0.2, 0.3),
+            serotonin_delta: serotonin_delta.clamp(-0.1, 0.2),
+            surprise_signal: delta.abs() * self.config.surprise_scale,
+            harmony_projection,
+        }
+    }
+
+    /// Batch human feedback: apply multiple ratings at once.
+    ///
+    /// Useful for catching up on feedback from a listening session.
+    pub fn human_feedback_batch(
+        &mut self,
+        ratings: &[(f32, [f32; 8])],
+    ) -> Vec<AestheticFeedback> {
+        ratings
+            .iter()
+            .map(|(rating, harmonies)| self.human_feedback(*rating, harmonies))
+            .collect()
     }
 }
 
@@ -326,7 +504,10 @@ mod tests {
         mid.compute_composite();
         high.compute_composite();
         assert!(mid.composite > low.composite, "mid {mid:?} > low {low:?}");
-        assert!(mid.composite > high.composite, "mid {mid:?} > high {high:?}");
+        assert!(
+            mid.composite > high.composite,
+            "mid {mid:?} > high {high:?}"
+        );
     }
 
     #[test]
@@ -380,10 +561,7 @@ mod tests {
             "should reward exceeding EMA: delta={}",
             feedback.dopamine_delta
         );
-        assert!(
-            tracker.expectation() > ema_before,
-            "EMA should increase"
-        );
+        assert!(tracker.expectation() > ema_before, "EMA should increase");
     }
 
     #[test]

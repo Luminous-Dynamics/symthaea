@@ -84,10 +84,76 @@ impl BackendStats {
     }
 }
 
+/// Code task category for per-category routing (Phase 6).
+///
+/// The dispatcher tracks success rates per category, enabling it to learn
+/// that e.g. native handles arithmetic well but needs LLM for graph algorithms.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum CodeTaskCategory {
+    Arithmetic,
+    StringOps,
+    CollectionOps,
+    BooleanChecks,
+    MathFunctions,
+    Sorting,
+    Search,
+    IteratorChains,
+    ErrorHandling,
+    StructDefinition,
+    TraitDefinition,
+    General,
+}
+
+impl CodeTaskCategory {
+    /// Infer the category from a purpose string.
+    pub fn from_purpose(purpose: &str) -> Self {
+        let p = purpose.to_lowercase();
+        if p.contains("sort") || p.contains("order") || p.contains("arrange") {
+            Self::Sorting
+        } else if p.contains("search") || p.contains("find") || p.contains("lookup") {
+            Self::Search
+        } else if p.contains("add") || p.contains("subtract") || p.contains("multiply")
+            || p.contains("divide") || p.contains("sum") || p.contains("product")
+        {
+            Self::Arithmetic
+        } else if p.contains("reverse") || p.contains("uppercase") || p.contains("lowercase")
+            || p.contains("trim") || p.contains("split") || p.contains("join")
+            || p.contains("replace") || p.contains("string")
+        {
+            Self::StringOps
+        } else if p.contains("filter") || p.contains("map") || p.contains("collect")
+            || p.contains("flatten") || p.contains("zip") || p.contains("chain")
+        {
+            Self::IteratorChains
+        } else if p.contains("is even") || p.contains("is odd") || p.contains("is empty")
+            || p.contains("is positive") || p.contains("is negative") || p.contains("palindrome")
+        {
+            Self::BooleanChecks
+        } else if p.contains("factorial") || p.contains("fibonacci") || p.contains("gcd")
+            || p.contains("sqrt") || p.contains("prime") || p.contains("distance")
+        {
+            Self::MathFunctions
+        } else if p.contains("error") || p.contains("result") || p.contains("parse")
+            || p.contains("validate")
+        {
+            Self::ErrorHandling
+        } else if p.contains("struct") || p.contains("fields") {
+            Self::StructDefinition
+        } else if p.contains("trait") || p.contains("implement") {
+            Self::TraitDefinition
+        } else {
+            Self::General
+        }
+    }
+}
+
 /// Consciousness-routed code generation dispatcher.
 ///
 /// Selects the optimal backend tier based on epistemic status, prediction error,
 /// and metabolic budget. Falls back gracefully: cloud → local → native → simulated.
+///
+/// Phase 6 additions: per-category success tracking, MAGI-style prediction
+/// confidence, and honest "I don't know" refusal path.
 pub struct IntelligentDispatcher {
     /// Local LLM backend (Ollama with qwen2.5-coder:7b).
     local_llm: Arc<dyn LLMBackend>,
@@ -97,6 +163,14 @@ pub struct IntelligentDispatcher {
     native_stats: BackendStats,
     local_stats: BackendStats,
     cloud_stats: BackendStats,
+    /// Phase 6: Per-category native success tracking.
+    /// Enables the dispatcher to learn which categories native handles well.
+    category_native_stats: std::collections::HashMap<CodeTaskCategory, BackendStats>,
+    /// Phase 6: MAGI-style prediction confidence (EMA of prediction accuracy).
+    /// When low, the dispatcher is less confident in its own routing decisions.
+    prediction_confidence: f64,
+    /// Phase 6: Total predictions made
+    prediction_count: u64,
     /// Cumulative energy spent.
     total_energy: f64,
     /// Maximum energy budget (0.0 = unlimited).
@@ -114,6 +188,9 @@ impl IntelligentDispatcher {
             native_stats: BackendStats::default(),
             local_stats: BackendStats::default(),
             cloud_stats: BackendStats::default(),
+            category_native_stats: std::collections::HashMap::new(),
+            prediction_confidence: 0.5, // start with neutral confidence
+            prediction_count: 0,
             total_energy: 0.0,
             energy_budget: 0.0,
             forced_tier: None,
@@ -345,6 +422,131 @@ impl IntelligentDispatcher {
             rate = self.success_rate(tier),
             "Recorded generation outcome"
         );
+    }
+
+    // =========================================================================
+    // Phase 6: Epistemic Gating & Category-Aware Routing
+    // =========================================================================
+
+    /// Select tier with category-aware routing (Phase 6 enhancement).
+    ///
+    /// Uses per-category native success rates to make smarter routing decisions.
+    /// If native has proven itself for this category (>60% success, 5+ attempts),
+    /// routes to native even when base routing would choose LLM.
+    pub fn select_tier_with_category(
+        &mut self,
+        epistemic: EpistemicStatus,
+        prediction_error: f64,
+        consciousness_level: f64,
+        purpose: &str,
+    ) -> BackendTier {
+        let category = CodeTaskCategory::from_purpose(purpose);
+
+        // Get base routing decision
+        let base_tier = self.select_tier(epistemic, prediction_error, consciousness_level);
+
+        // Phase 6: If base says LLM but native has proven itself for this category, use native
+        if base_tier != BackendTier::Native {
+            if let Some(cat_stats) = self.category_native_stats.get(&category) {
+                if cat_stats.attempts >= 5 && cat_stats.success_rate() > 0.6 {
+                    tracing::info!(
+                        target: "symthaea::dispatcher",
+                        category = ?category,
+                        native_rate = cat_stats.success_rate(),
+                        "Phase 6: category-aware override → Native (proven for this category)"
+                    );
+                    return BackendTier::Native;
+                }
+            }
+        }
+
+        base_tier
+    }
+
+    /// Record the outcome of a generation with category tracking (Phase 6).
+    pub fn record_outcome_with_category(
+        &mut self,
+        tier: BackendTier,
+        success: bool,
+        purpose: &str,
+    ) {
+        self.record_outcome(tier, success);
+
+        // Phase 6: also track per-category for native
+        if tier == BackendTier::Native {
+            let category = CodeTaskCategory::from_purpose(purpose);
+            self.category_native_stats
+                .entry(category)
+                .or_default()
+                .record(success);
+        }
+    }
+
+    /// Update MAGI-style prediction confidence based on routing accuracy.
+    ///
+    /// Called after a generation with the predicted tier and whether the
+    /// prediction was correct (code compiled/passed tests).
+    pub fn update_prediction_confidence(&mut self, predicted_success: bool, actual_success: bool) {
+        self.prediction_count += 1;
+        let correct = predicted_success == actual_success;
+        let alpha = 0.1; // EMA smoothing
+        self.prediction_confidence =
+            self.prediction_confidence * (1.0 - alpha) + if correct { 1.0 } else { 0.0 } * alpha;
+    }
+
+    /// Get the current MAGI-style prediction confidence (0.0-1.0).
+    pub fn prediction_confidence(&self) -> f64 {
+        self.prediction_confidence
+    }
+
+    /// Check if the system should honestly refuse to generate code.
+    ///
+    /// Returns `Some(reason)` if the dispatcher recommends an "I don't know" response.
+    /// Conditions:
+    /// - OutOfDomain epistemic status + low prediction confidence
+    /// - All tiers have <20% success rate for this category
+    /// - Budget exhausted
+    pub fn should_refuse(&self, epistemic: EpistemicStatus, purpose: &str) -> Option<String> {
+        // Condition 1: OutOfDomain + low confidence
+        if epistemic == EpistemicStatus::OutOfDomain && self.prediction_confidence < 0.3 {
+            return Some(format!(
+                "Out of domain: '{}' is outside the system's training distribution (confidence: {:.1}%)",
+                purpose,
+                self.prediction_confidence * 100.0
+            ));
+        }
+
+        // Condition 2: All tiers failing for this category
+        let category = CodeTaskCategory::from_purpose(purpose);
+        if let Some(cat_stats) = self.category_native_stats.get(&category) {
+            if cat_stats.attempts >= 10 && cat_stats.success_rate() < 0.2 {
+                let local_rate = self.local_stats.success_rate();
+                let cloud_rate = self.cloud_stats.success_rate();
+                if local_rate < 0.2 && cloud_rate < 0.2 {
+                    return Some(format!(
+                        "All backends consistently fail for {:?} tasks (native: {:.0}%, local: {:.0}%, cloud: {:.0}%)",
+                        category,
+                        cat_stats.success_rate() * 100.0,
+                        local_rate * 100.0,
+                        cloud_rate * 100.0
+                    ));
+                }
+            }
+        }
+
+        // Condition 3: Budget exhausted
+        if self.energy_budget > 0.0 && self.total_energy >= self.energy_budget {
+            return Some("Energy budget exhausted — cannot generate more code this session".to_string());
+        }
+
+        None
+    }
+
+    /// Get native success rate for a specific category.
+    pub fn category_success_rate(&self, category: CodeTaskCategory) -> Option<f64> {
+        self.category_native_stats
+            .get(&category)
+            .map(|s| s.success_rate())
     }
 
     /// Bayesian tier adjustment: if the selected tier has poor success rate

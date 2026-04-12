@@ -9,8 +9,8 @@
 //! Run: cargo run -p symthaea-neuroevolution --example evolve_consciousness_demo
 
 use symthaea_neuroevolution::phi_fitness::{
-    ConsciousnessGenome, ConsciousnessSpecies, EvolutionConfig, EvolutionaryLandscape,
-    run_evolution,
+    run_evolution, ConsciousnessGenome, ConsciousnessSpecies, EvolutionConfig,
+    EvolutionaryLandscape,
 };
 
 fn main() {
@@ -145,11 +145,9 @@ fn find_best_profile(
             fitnesses.push(fitness);
         }
 
-        let species =
-            ConsciousnessSpecies::speciate(&mut population, config.speciation_threshold);
+        let species = ConsciousnessSpecies::speciate(&mut population, config.speciation_threshold);
 
-        let mut next_gen: Vec<ConsciousnessGenome> =
-            Vec::with_capacity(config.population_size);
+        let mut next_gen: Vec<ConsciousnessGenome> = Vec::with_capacity(config.population_size);
 
         // Elitism: keep best from each species
         for sp in &species {
@@ -229,9 +227,11 @@ fn print_trajectory(landscape: &EvolutionaryLandscape) {
         }
         println!();
     }
+    println!("       {}", "-".repeat(phis.len().min(50)));
     println!(
-        "       {}",
-        "-".repeat(phis.len().min(50))
+        "       Gen 0{:>width$}Gen {}",
+        "",
+        phis.len() - 1,
+        width = phis.len().saturating_sub(6)
     );
-    println!("       Gen 0{:>width$}Gen {}", "", phis.len() - 1, width = phis.len().saturating_sub(6));
 }

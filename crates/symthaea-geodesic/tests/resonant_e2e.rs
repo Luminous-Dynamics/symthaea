@@ -80,9 +80,21 @@ fn test_find_addition() {
     println!("Target:  {}", emit_expression(&target));
     println!("Found:   {}", code);
     println!("Score:   {:.4}", score);
-    println!("Match:   {}", if score > 0.95 { "EXACT" } else if score > 0.7 { "CLOSE" } else { "MISS" });
+    println!(
+        "Match:   {}",
+        if score > 0.95 {
+            "EXACT"
+        } else if score > 0.7 {
+            "CLOSE"
+        } else {
+            "MISS"
+        }
+    );
 
-    assert!(score > 0.7, "should find addition pattern, got score {score}");
+    assert!(
+        score > 0.7,
+        "should find addition pattern, got score {score}"
+    );
 }
 
 #[test]
@@ -104,7 +116,10 @@ fn test_find_multiplication() {
     // MUL(x,y) may not exactly match MUL(a,b) in memory due to different
     // atom names. The search finds the nearest operator pattern. Score > 0.5
     // means it found something structurally similar (an Apply with 2 args).
-    assert!(score > 0.5, "should find a binary operator pattern, got score {score}");
+    assert!(
+        score > 0.5,
+        "should find a binary operator pattern, got score {score}"
+    );
 }
 
 #[test]
@@ -123,7 +138,10 @@ fn test_find_comparison() {
     println!("Found:   {}", code);
     println!("Score:   {:.4}", score);
 
-    assert!(score > 0.7, "should find comparison pattern, got score {score}");
+    assert!(
+        score > 0.7,
+        "should find comparison pattern, got score {score}"
+    );
 }
 
 #[test]
@@ -131,10 +149,7 @@ fn test_find_map_pattern() {
     println!("\n=== RESONANT E2E: Find Map Pattern ===\n");
 
     let memory = ProgramMemory::basic();
-    let target = ProgramNode::map(
-        ProgramNode::atom("transform"),
-        ProgramNode::atom("items"),
-    );
+    let target = ProgramNode::map(ProgramNode::atom("transform"), ProgramNode::atom("items"));
 
     let (_, score, code) = resonant_search(&target, &memory, 200);
 
@@ -171,9 +186,27 @@ fn test_generated_code_is_valid_rust() {
 
     let memory = ProgramMemory::basic();
     let targets = vec![
-        ("add", ProgramNode::apply(ProgramNode::op("ADD"), vec![ProgramNode::atom("a"), ProgramNode::atom("b")])),
-        ("sub", ProgramNode::apply(ProgramNode::op("SUB"), vec![ProgramNode::atom("x"), ProgramNode::atom("y")])),
-        ("eq", ProgramNode::apply(ProgramNode::op("EQ"), vec![ProgramNode::atom("a"), ProgramNode::atom("b")])),
+        (
+            "add",
+            ProgramNode::apply(
+                ProgramNode::op("ADD"),
+                vec![ProgramNode::atom("a"), ProgramNode::atom("b")],
+            ),
+        ),
+        (
+            "sub",
+            ProgramNode::apply(
+                ProgramNode::op("SUB"),
+                vec![ProgramNode::atom("x"), ProgramNode::atom("y")],
+            ),
+        ),
+        (
+            "eq",
+            ProgramNode::apply(
+                ProgramNode::op("EQ"),
+                vec![ProgramNode::atom("a"), ProgramNode::atom("b")],
+            ),
+        ),
     ];
 
     for (name, target) in &targets {

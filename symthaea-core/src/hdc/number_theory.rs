@@ -247,6 +247,67 @@ impl NumberTheoryEngine {
         }
         true
     }
+
+    /// Miller-Rabin primality test — deterministic for n < 3.3×10^24.
+    ///
+    /// Unlike Fermat, this correctly rejects Carmichael numbers (561, 1105, 1729).
+    /// Uses known witness sets that make the test deterministic (not probabilistic)
+    /// for numbers up to specific bounds:
+    /// - n < 2,047: witnesses {2}
+    /// - n < 1,373,653: witnesses {2, 3}
+    /// - n < 3,215,031,751: witnesses {2, 3, 5, 7}
+    /// - n < 3,317,044,064,679,887,385,961,981: witnesses {2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37}
+    pub fn miller_rabin(&self, n: u64) -> bool {
+        if n < 2 { return false; }
+        if n == 2 || n == 3 { return true; }
+        if n % 2 == 0 { return false; }
+
+        // Write n-1 = 2^r * d where d is odd
+        let mut d = n - 1;
+        let mut r = 0u32;
+        while d % 2 == 0 {
+            d /= 2;
+            r += 1;
+        }
+
+        // Deterministic witness sets by range
+        let witnesses: &[u64] = if n < 2_047 {
+            &[2]
+        } else if n < 1_373_653 {
+            &[2, 3]
+        } else if n < 3_215_031_751 {
+            &[2, 3, 5, 7]
+        } else {
+            // Covers all u64 values (deterministic for n < 3.3×10^24)
+            &[2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37]
+        };
+
+        let ring = ModularRing::new(n);
+
+        'witness: for &a in witnesses {
+            if a >= n { continue; }
+
+            // Compute a^d mod n
+            let mut x = ring.power(a, d);
+
+            if x == 1 || x == n - 1 {
+                continue 'witness;
+            }
+
+            // Square r-1 times
+            for _ in 0..r - 1 {
+                x = ring.multiply(x, x);
+                if x == n - 1 {
+                    continue 'witness;
+                }
+            }
+
+            // If we never hit n-1, n is composite
+            return false;
+        }
+
+        true
+    }
 }
 
 impl Default for NumberTheoryEngine {
@@ -417,5 +478,65 @@ mod tests {
     fn test_lcm() {
         let engine = NumberTheoryEngine::new();
         assert_eq!(engine.lcm(12, 18), 36);
+    }
+
+    // ── Miller-Rabin tests ──────────────────────────────────────────────
+
+    #[test]
+    fn test_miller_rabin_small_primes() {
+        let engine = NumberTheoryEngine::new();
+        let primes = [2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61, 67, 71, 73, 79, 83, 89, 97];
+        for &p in &primes {
+            assert!(engine.miller_rabin(p), "{} should be prime", p);
+        }
+    }
+
+    #[test]
+    fn test_miller_rabin_composites() {
+        let engine = NumberTheoryEngine::new();
+        let composites = [4, 6, 8, 9, 10, 12, 15, 21, 25, 49, 100, 121, 1000];
+        for &c in &composites {
+            assert!(!engine.miller_rabin(c), "{} should be composite", c);
+        }
+    }
+
+    /// Carmichael numbers fool the Fermat test but NOT Miller-Rabin.
+    /// This is the critical advantage of Miller-Rabin.
+    #[test]
+    fn test_miller_rabin_rejects_carmichael_numbers() {
+        let engine = NumberTheoryEngine::new();
+        // First 10 Carmichael numbers
+        let carmichael = [561, 1105, 1729, 2465, 2821, 6601, 8911, 10585, 15841, 29341];
+        for &c in &carmichael {
+            assert!(!engine.miller_rabin(c),
+                "Carmichael number {} should be rejected by Miller-Rabin", c);
+        }
+
+        // Verify that Fermat INCORRECTLY accepts some Carmichael numbers
+        // (561 = 3×11×17 passes Fermat for witness 2)
+        let fermat_561 = engine.fermat_test(561, &[2]);
+        // Note: 561 actually DOES pass Fermat with witness 2
+        // because 2^560 mod 561 = 1 (this is why Carmichael numbers are dangerous)
+        eprintln!("Fermat(561, [2]) = {} (Carmichael — Fermat may be fooled)", fermat_561);
+        eprintln!("Miller-Rabin(561) = {} (correctly rejects)", engine.miller_rabin(561));
+    }
+
+    #[test]
+    fn test_miller_rabin_large_primes() {
+        let engine = NumberTheoryEngine::new();
+        // Large known primes
+        assert!(engine.miller_rabin(104729));     // 10000th prime
+        assert!(engine.miller_rabin(1_000_003));  // prime just above 1M
+        assert!(engine.miller_rabin(15_485_863)); // 1 millionth prime
+        assert!(!engine.miller_rabin(15_485_864)); // not prime
+    }
+
+    #[test]
+    fn test_miller_rabin_edge_cases() {
+        let engine = NumberTheoryEngine::new();
+        assert!(!engine.miller_rabin(0));
+        assert!(!engine.miller_rabin(1));
+        assert!(engine.miller_rabin(2));
+        assert!(engine.miller_rabin(3));
     }
 }

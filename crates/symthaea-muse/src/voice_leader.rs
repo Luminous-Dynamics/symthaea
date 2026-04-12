@@ -9,15 +9,15 @@
 //! Call-and-response: the lead plays a phrase, then the harmony echoes it
 //! (transposed down a third or fifth) in the next phrase.
 
-use crate::Note;
 use crate::melodic_grammar::MelodicContext;
+use crate::Note;
 
 /// Voice roles with independent behavior.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum VoiceRole {
-    Lead,    // carries melody, highest priority
-    Bass,    // root movement, walking pattern
-    Harmony, // fills between lead and bass, echoes lead
+    Lead,     // carries melody, highest priority
+    Bass,     // root movement, walking pattern
+    Harmony,  // fills between lead and bass, echoes lead
     Ostinato, // repeating pattern
 }
 
@@ -61,7 +61,13 @@ impl VoiceState {
         let freq = note.frequency;
         if let Some(prev) = self.prev_freq {
             self.prev_interval = (freq / prev).log2() * 12.0;
-            self.prev_direction = if freq > prev { 1 } else if freq < prev { -1 } else { 0 };
+            self.prev_direction = if freq > prev {
+                1
+            } else if freq < prev {
+                -1
+            } else {
+                0
+            };
         }
         self.prev_freq = Some(freq);
         self.phrase_notes.push(note);
@@ -105,12 +111,15 @@ pub fn bass_note(
         // Walking: step from previous toward next target
         if let Some(prev) = state.prev_freq {
             // Find nearest scale tone above or below previous
-            let bass_scale: Vec<f32> = scale_tones.iter()
-                .map(|&f| f * bass_octave)
-                .collect();
-            let idx = bass_scale.iter()
+            let bass_scale: Vec<f32> = scale_tones.iter().map(|&f| f * bass_octave).collect();
+            let idx = bass_scale
+                .iter()
                 .enumerate()
-                .min_by(|(_, a), (_, b)| ((**a - prev).abs()).partial_cmp(&((**b - prev).abs())).unwrap())
+                .min_by(|(_, a), (_, b)| {
+                    ((**a - prev).abs())
+                        .partial_cmp(&((**b - prev).abs()))
+                        .unwrap()
+                })
                 .map(|(i, _)| i)
                 .unwrap_or(0);
             // Walk toward root
@@ -129,11 +138,7 @@ pub fn bass_note(
 /// Prefers chord tones that aren't the root or the lead note.
 /// Creates call-and-response by echoing the lead's last phrase
 /// transposed down a third.
-pub fn harmony_note(
-    lead_freq: f32,
-    chord_tones: &[f32],
-    state: &mut VoiceState,
-) -> f32 {
+pub fn harmony_note(lead_freq: f32, chord_tones: &[f32], state: &mut VoiceState) -> f32 {
     // Call-and-response: if echo queue has notes, play from it
     if let Some(echo) = state.echo_queue.first().copied() {
         state.echo_queue.remove(0);
@@ -141,14 +146,17 @@ pub fn harmony_note(
     }
 
     // Pick a chord tone that's below the lead but not the root
-    let candidates: Vec<f32> = chord_tones.iter()
+    let candidates: Vec<f32> = chord_tones
+        .iter()
         .copied()
         .filter(|&f| f < lead_freq * 0.95 && f > lead_freq * 0.4) // below lead, above bass
         .collect();
 
-    if let Some(&best) = candidates.iter()
-        .min_by(|a, b| ((**a - lead_freq * 0.75).abs()).partial_cmp(&((**b - lead_freq * 0.75).abs())).unwrap())
-    {
+    if let Some(&best) = candidates.iter().min_by(|a, b| {
+        ((**a - lead_freq * 0.75).abs())
+            .partial_cmp(&((**b - lead_freq * 0.75).abs()))
+            .unwrap()
+    }) {
         best
     } else {
         // Fallback: lead frequency down a major third
@@ -161,7 +169,8 @@ pub fn harmony_note(
 pub fn setup_call_response(lead_phrase: &[Note], harmony_state: &mut VoiceState) {
     // Transpose down a third (4 semitones)
     let ratio = 2.0f32.powf(-4.0 / 12.0);
-    harmony_state.echo_queue = lead_phrase.iter()
+    harmony_state.echo_queue = lead_phrase
+        .iter()
         .map(|n| Note {
             frequency: n.frequency * ratio,
             start_time: n.start_time,
@@ -178,15 +187,33 @@ mod tests {
     #[test]
     fn bass_plays_root_on_beat_one() {
         let state = VoiceState::new(VoiceRole::Bass);
-        let result = bass_note(261.63, 392.00, 0.0, &state, &[261.63, 293.66, 329.63, 392.00]);
-        assert!((result - 261.63 * 0.5).abs() < 1.0, "bass should play root: {result}");
+        let result = bass_note(
+            261.63,
+            392.00,
+            0.0,
+            &state,
+            &[261.63, 293.66, 329.63, 392.00],
+        );
+        assert!(
+            (result - 261.63 * 0.5).abs() < 1.0,
+            "bass should play root: {result}"
+        );
     }
 
     #[test]
     fn bass_plays_fifth_on_beat_three() {
         let state = VoiceState::new(VoiceRole::Bass);
-        let result = bass_note(261.63, 392.00, 2.0, &state, &[261.63, 293.66, 329.63, 392.00]);
-        assert!((result - 392.00 * 0.5).abs() < 1.0, "bass should play fifth: {result}");
+        let result = bass_note(
+            261.63,
+            392.00,
+            2.0,
+            &state,
+            &[261.63, 293.66, 329.63, 392.00],
+        );
+        assert!(
+            (result - 392.00 * 0.5).abs() < 1.0,
+            "bass should play fifth: {result}"
+        );
     }
 
     #[test]
@@ -201,11 +228,24 @@ mod tests {
     fn call_response_transposes() {
         let mut state = VoiceState::new(VoiceRole::Harmony);
         let phrase = vec![
-            Note { frequency: 440.0, start_time: 0.0, duration: 0.5, velocity: 0.7 },
-            Note { frequency: 493.88, start_time: 0.5, duration: 0.5, velocity: 0.7 },
+            Note {
+                frequency: 440.0,
+                start_time: 0.0,
+                duration: 0.5,
+                velocity: 0.7,
+            },
+            Note {
+                frequency: 493.88,
+                start_time: 0.5,
+                duration: 0.5,
+                velocity: 0.7,
+            },
         ];
         setup_call_response(&phrase, &mut state);
         assert_eq!(state.echo_queue.len(), 2);
-        assert!(state.echo_queue[0].frequency < 440.0, "echo should be transposed down");
+        assert!(
+            state.echo_queue[0].frequency < 440.0,
+            "echo should be transposed down"
+        );
     }
 }

@@ -222,15 +222,24 @@ impl ConsciousnessEngine {
                 // Binding: prefer pipeline's oscillatory binding coherence (actual
                 // gamma-band PLV from OscillatoryBinding) over scaled coherence proxy.
                 // Substrate binding_capability still modulates as a ceiling.
-                let binding = if self.cache.last_pipeline_consciousness > 0.0 {
-                    // Pipeline has run at least once — use its binding metric
-                    // Blend: 60% oscillatory + 40% perceptual coherence for robustness
+                //
+                // SAFETY: When binding subsystem is disabled or binding_capability=0,
+                // fall back to a degraded coherence floor (0.15) from CfC temporal
+                // dynamics. This prevents consciousness death from binding failure.
+                // Discovery: Test B proved binding was a single point of failure.
+                const BINDING_FALLBACK_FLOOR: f64 = 0.15;
+                let raw_binding = if self.cache.last_pipeline_consciousness > 0.0 {
                     let osc_binding = self.cache.last_pipeline_consciousness.min(1.0);
-                    (osc_binding * 0.6 + input.coherence as f64 * 0.4)
-                        * input.binding_capability
+                    (osc_binding * 0.6 + input.coherence as f64 * 0.4) * input.binding_capability
                 } else {
                     input.coherence as f64 * input.binding_capability
                 };
+                // Ensure binding never drops below the coherence-derived floor.
+                // Even without phenomenal binding hardware, temporal coherence
+                // provides a minimal form of information integration.
+                // Use max of: coherence-proportional floor OR absolute minimum.
+                let coherence_floor = BINDING_FALLBACK_FLOOR * input.coherence as f64;
+                let binding = raw_binding.max(coherence_floor).max(BINDING_FALLBACK_FLOOR * 0.5);
                 core_values.insert(CoreComponent::Binding, binding.clamp(0.0, 1.0));
 
                 // Workspace: use GWT broadcast success as primary signal.

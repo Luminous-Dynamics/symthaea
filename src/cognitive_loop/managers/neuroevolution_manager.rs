@@ -143,7 +143,10 @@ impl NeuroevolutionManager {
         }
     }
 
-    pub fn inject_mutations(&mut self, mutations: Vec<symthaea_wisdom::meta_cognition::MutationSuggestion>) {
+    pub fn inject_mutations(
+        &mut self,
+        mutations: Vec<symthaea_wisdom::meta_cognition::MutationSuggestion>,
+    ) {
         self.pending_mutations = mutations;
     }
     /// Process a cognitive cycle: accumulate observations, run evolution on interval.
@@ -174,18 +177,22 @@ impl NeuroevolutionManager {
         // Lamarckian injection: convert MetaCognitive suggestions to bit-range targets
         if !self.pending_mutations.is_empty() {
             use symthaea_wisdom::meta_cognition::MutationTarget;
-            let targets: Vec<(usize, usize, f32)> = self.pending_mutations.iter().map(|s| {
-                let (start, bits) = match s.target {
-                    MutationTarget::FepSurpriseScale => (400, 12),
-                    MutationTarget::FepLrDecay => (412, 12),
-                    MutationTarget::DreamBaseInterval => (436, 10),
-                    MutationTarget::NeuromodArousalDecay => (490, 12),
-                    MutationTarget::HomeostasisPullCruise => (610, 12),
-                    MutationTarget::FlowExplorationIncrement => (562, 12),
-                    MutationTarget::SelfModelWeightHigh => (598, 12),
-                };
-                (start, bits, s.confidence)
-            }).collect();
+            let targets: Vec<(usize, usize, f32)> = self
+                .pending_mutations
+                .iter()
+                .map(|s| {
+                    let (start, bits) = match s.target {
+                        MutationTarget::FepSurpriseScale => (400, 12),
+                        MutationTarget::FepLrDecay => (412, 12),
+                        MutationTarget::DreamBaseInterval => (436, 10),
+                        MutationTarget::NeuromodArousalDecay => (490, 12),
+                        MutationTarget::HomeostasisPullCruise => (610, 12),
+                        MutationTarget::FlowExplorationIncrement => (562, 12),
+                        MutationTarget::SelfModelWeightHigh => (598, 12),
+                    };
+                    (start, bits, s.confidence)
+                })
+                .collect();
             self.engine.inject_lamarckian(&targets);
             self.pending_mutations.clear();
         }
@@ -392,7 +399,10 @@ mod tests {
             efficiency: 0.025,
         });
         // Success: weights applied without panic (no getter exposed, but manager is still functional)
-        assert_eq!(mgr.interval, NEUROEVOLUTION_MANAGER_INTERVAL, "manager should remain valid after setting weights");
+        assert_eq!(
+            mgr.interval, NEUROEVOLUTION_MANAGER_INTERVAL,
+            "manager should remain valid after setting weights"
+        );
     }
 
     #[test]

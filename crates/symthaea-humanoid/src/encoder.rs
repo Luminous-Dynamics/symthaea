@@ -47,8 +47,8 @@ impl PredictiveLayer {
     /// Create a new predictive layer from a genesis seed.
     pub fn new(genesis: &GenesisSeed) -> Self {
         let neuron_config = UnifiedConfig {
-            tau_base: 0.025,    // Match 40Hz physics
-            backbone_tau: 0.4,  // Moderate state dependency
+            tau_base: 0.025,   // Match 40Hz physics
+            backbone_tau: 0.4, // Moderate state dependency
             dimension: HDC_DIMENSION,
             learning_rate: 0.0, // No learning — pure prediction from dynamics
             ..UnifiedConfig::default()
@@ -159,35 +159,61 @@ impl ChannelLayout {
 
         // [1..5] root quaternion
         let quat_start = 1;
-        for _ in 0..4 { ranges.push([-1.0, 1.0]); }
+        for _ in 0..4 {
+            ranges.push([-1.0, 1.0]);
+        }
 
         // [5..5+n] joint angles
         let angles_start = 5;
         // Base 21 DMC21 angle ranges
         let dmc21_angle_ranges: [[f32; 2]; 21] = [
-            [-2.0, 2.0], [-2.0, 2.0], [-2.0, 2.0], // abdomen
-            [-1.5, 1.5], [-1.5, 1.5], [-2.0, 0.5], [-2.5, 0.0], // right leg
-            [-1.0, 1.0], [-1.0, 1.0],
-            [-1.5, 1.5], [-1.5, 1.5], [-2.0, 0.5], [-2.5, 0.0], // left leg
-            [-1.0, 1.0], [-1.0, 1.0],
-            [-2.0, 2.0], [-2.0, 2.0], [-2.5, 0.0], // right arm
-            [-2.0, 2.0], [-2.0, 2.0], [-2.5, 0.0], // left arm
+            [-2.0, 2.0],
+            [-2.0, 2.0],
+            [-2.0, 2.0], // abdomen
+            [-1.5, 1.5],
+            [-1.5, 1.5],
+            [-2.0, 0.5],
+            [-2.5, 0.0], // right leg
+            [-1.0, 1.0],
+            [-1.0, 1.0],
+            [-1.5, 1.5],
+            [-1.5, 1.5],
+            [-2.0, 0.5],
+            [-2.5, 0.0], // left leg
+            [-1.0, 1.0],
+            [-1.0, 1.0],
+            [-2.0, 2.0],
+            [-2.0, 2.0],
+            [-2.5, 0.0], // right arm
+            [-2.0, 2.0],
+            [-2.0, 2.0],
+            [-2.5, 0.0], // left arm
         ];
-        for r in &dmc21_angle_ranges { ranges.push(*r); }
+        for r in &dmc21_angle_ranges {
+            ranges.push(*r);
+        }
         // Extra hand/neck/wrist/spine joint angles
-        for _ in 21..n_joints { ranges.push([-0.35, 1.75]); }
+        for _ in 21..n_joints {
+            ranges.push([-0.35, 1.75]);
+        }
 
         // [5+n..8+n] root linear velocity
         let lin_vel_start = 5 + n_joints;
-        for _ in 0..3 { ranges.push([-10.0, 10.0]); }
+        for _ in 0..3 {
+            ranges.push([-10.0, 10.0]);
+        }
 
         // [8+n..11+n] root angular velocity
         let ang_vel_start = 8 + n_joints;
-        for _ in 0..3 { ranges.push([-20.0, 20.0]); }
+        for _ in 0..3 {
+            ranges.push([-20.0, 20.0]);
+        }
 
         // [11+n..11+2n] joint velocities
         let vel_start = 11 + n_joints;
-        for _ in 0..n_joints { ranges.push([-20.0, 20.0]); }
+        for _ in 0..n_joints {
+            ranges.push([-20.0, 20.0]);
+        }
 
         // [11+2n] head height
         let head_h_start = 11 + 2 * n_joints;
@@ -195,7 +221,9 @@ impl ChannelLayout {
 
         // [12+2n..15+2n] torso vertical
         let torso_start = 12 + 2 * n_joints;
-        for _ in 0..3 { ranges.push([-1.0, 1.0]); }
+        for _ in 0..3 {
+            ranges.push([-1.0, 1.0]);
+        }
 
         // [15+2n..15+2n+ext] extremities
         let ext_start = 15 + 2 * n_joints;
@@ -204,7 +232,8 @@ impl ChannelLayout {
             let is_foot_z = (i == 8 || i == 11) && n_extremities >= 12;
             if is_foot_z {
                 ranges.push([0.0, 0.5]);
-            } else if i % 3 == 2 { // z components of hands
+            } else if i % 3 == 2 {
+                // z components of hands
                 ranges.push([0.0, 2.0]);
             } else {
                 ranges.push([-2.0, 2.0]);
@@ -213,46 +242,116 @@ impl ChannelLayout {
 
         // [15+2n+ext..18+2n+ext] COM velocity
         let com_start = 15 + 2 * n_joints + n_extremities;
-        for _ in 0..3 { ranges.push([-10.0, 10.0]); }
+        for _ in 0..3 {
+            ranges.push([-10.0, 10.0]);
+        }
 
         let num_channels = ranges.len();
 
         // Semantic groups
-        groups.push(ChannelGroup { start: root_h_start, count: 1, weight: 2.0 });
-        groups.push(ChannelGroup { start: quat_start, count: 4, weight: 1.5 });
+        groups.push(ChannelGroup {
+            start: root_h_start,
+            count: 1,
+            weight: 2.0,
+        });
+        groups.push(ChannelGroup {
+            start: quat_start,
+            count: 4,
+            weight: 1.5,
+        });
 
         if n_joints <= 21 {
-            groups.push(ChannelGroup { start: angles_start, count: n_joints, weight: 1.0 });
+            groups.push(ChannelGroup {
+                start: angles_start,
+                count: n_joints,
+                weight: 1.0,
+            });
         } else {
             // Split: base body angles vs hand/extra angles
-            groups.push(ChannelGroup { start: angles_start, count: 21, weight: 1.0 });
-            groups.push(ChannelGroup { start: angles_start + 21, count: n_joints - 21, weight: 1.5 }); // Hand angles weighted higher
+            groups.push(ChannelGroup {
+                start: angles_start,
+                count: 21,
+                weight: 1.0,
+            });
+            groups.push(ChannelGroup {
+                start: angles_start + 21,
+                count: n_joints - 21,
+                weight: 1.5,
+            }); // Hand angles weighted higher
         }
 
-        groups.push(ChannelGroup { start: lin_vel_start, count: 3, weight: 1.5 });
-        groups.push(ChannelGroup { start: ang_vel_start, count: 3, weight: 1.5 });
+        groups.push(ChannelGroup {
+            start: lin_vel_start,
+            count: 3,
+            weight: 1.5,
+        });
+        groups.push(ChannelGroup {
+            start: ang_vel_start,
+            count: 3,
+            weight: 1.5,
+        });
 
         if n_joints <= 21 {
-            groups.push(ChannelGroup { start: vel_start, count: n_joints, weight: 0.8 });
+            groups.push(ChannelGroup {
+                start: vel_start,
+                count: n_joints,
+                weight: 0.8,
+            });
         } else {
-            groups.push(ChannelGroup { start: vel_start, count: 21, weight: 0.8 });
-            groups.push(ChannelGroup { start: vel_start + 21, count: n_joints - 21, weight: 0.8 });
+            groups.push(ChannelGroup {
+                start: vel_start,
+                count: 21,
+                weight: 0.8,
+            });
+            groups.push(ChannelGroup {
+                start: vel_start + 21,
+                count: n_joints - 21,
+                weight: 0.8,
+            });
         }
 
-        groups.push(ChannelGroup { start: head_h_start, count: 1, weight: 2.0 });
-        groups.push(ChannelGroup { start: torso_start, count: 3, weight: 1.5 });
-        groups.push(ChannelGroup { start: ext_start, count: n_extremities, weight: 0.5 });
-        groups.push(ChannelGroup { start: com_start, count: 3, weight: 1.0 });
+        groups.push(ChannelGroup {
+            start: head_h_start,
+            count: 1,
+            weight: 2.0,
+        });
+        groups.push(ChannelGroup {
+            start: torso_start,
+            count: 3,
+            weight: 1.5,
+        });
+        groups.push(ChannelGroup {
+            start: ext_start,
+            count: n_extremities,
+            weight: 0.5,
+        });
+        groups.push(ChannelGroup {
+            start: com_start,
+            count: 3,
+            weight: 1.0,
+        });
 
         // Extra hand centroid features get moderate weight
         if n_extremities > 12 {
             // Override the extremities group to split base + hand centroids
             let last = groups.len() - 2; // extremities group
-            groups[last] = ChannelGroup { start: ext_start, count: 12, weight: 0.5 };
-            groups.push(ChannelGroup { start: ext_start + 12, count: n_extremities - 12, weight: 1.0 });
+            groups[last] = ChannelGroup {
+                start: ext_start,
+                count: 12,
+                weight: 0.5,
+            };
+            groups.push(ChannelGroup {
+                start: ext_start + 12,
+                count: n_extremities - 12,
+                weight: 1.0,
+            });
         }
 
-        Self { num_channels, ranges, groups }
+        Self {
+            num_channels,
+            ranges,
+            groups,
+        }
     }
 }
 
@@ -451,7 +550,11 @@ impl HumanoidHdcEncoder {
     /// Genesis seed format `"humanoid::channel::{i}"` is identical for channels 0-71
     /// across all morphologies. Channels 72+ get new seeds that don't collide.
     /// This means: for Dmc21, encoding output is bit-identical to `new()`.
-    pub fn new_for(genesis: &GenesisSeed, num_levels: usize, morphology: HumanoidMorphology) -> Self {
+    pub fn new_for(
+        genesis: &GenesisSeed,
+        num_levels: usize,
+        morphology: HumanoidMorphology,
+    ) -> Self {
         let layout = ChannelLayout::for_morphology(morphology);
         let n = layout.num_channels;
 
@@ -534,7 +637,9 @@ impl HumanoidHdcEncoder {
         let k = ((normalized * self.num_levels as f32) as usize).min(self.num_levels - 1);
         let dim = buf.len();
         // Zero the buffer
-        for v in buf.iter_mut() { *v = 0.0; }
+        for v in buf.iter_mut() {
+            *v = 0.0;
+        }
         // Accumulate level vectors 0..=k
         for l in 0..=k {
             let lv = self.level_vectors[l].as_slice();
@@ -546,7 +651,9 @@ impl HumanoidHdcEncoder {
         let norm: f32 = buf.iter().map(|v| v * v).sum::<f32>().sqrt();
         if norm > 1e-8 {
             let inv = 1.0 / norm;
-            for v in buf.iter_mut() { *v *= inv; }
+            for v in buf.iter_mut() {
+                *v *= inv;
+            }
         }
     }
 
@@ -618,7 +725,9 @@ impl HumanoidHdcEncoder {
         let norm: f32 = result.iter().map(|v| v * v).sum::<f32>().sqrt();
         if norm > 1e-8 {
             let inv = 1.0 / norm;
-            for v in result.iter_mut() { *v *= inv; }
+            for v in result.iter_mut() {
+                *v *= inv;
+            }
         }
 
         let raw_hv = ContinuousHV::from_vec(result);
@@ -644,7 +753,9 @@ impl HumanoidHdcEncoder {
             let weight = self.channel_weight(i) * (1.0 - self.derivative_weight);
             let scale = weight * (normalized * 2.0 - 1.0);
             let base = self.base_vectors[i].as_slice();
-            for j in 0..dim { result[j] += scale * base[j]; }
+            for j in 0..dim {
+                result[j] += scale * base[j];
+            }
         }
 
         if self.predictive.is_none() {
@@ -654,20 +765,29 @@ impl HumanoidHdcEncoder {
                     let delta = channels[i] - prev[i];
                     let [min, max] = if i < self.layout.ranges.len() {
                         self.layout.ranges[i]
-                    } else { [-2.0, 2.0] };
+                    } else {
+                        [-2.0, 2.0]
+                    };
                     let range = max - min;
                     let normalized_delta = ((delta / range) + 0.5).clamp(0.0, 1.0);
                     let weight = self.channel_weight(i) * self.derivative_weight;
                     let scale = weight * (normalized_delta * 2.0 - 1.0);
                     let deriv_base = self.deriv_base_vectors[i].as_slice();
-                    for j in 0..dim { result[j] += scale * deriv_base[j]; }
+                    for j in 0..dim {
+                        result[j] += scale * deriv_base[j];
+                    }
                 }
             }
         }
 
         self.prev_channels = Some(channels);
         let norm: f32 = result.iter().map(|v| v * v).sum::<f32>().sqrt();
-        if norm > 1e-8 { let inv = 1.0 / norm; for v in result.iter_mut() { *v *= inv; } }
+        if norm > 1e-8 {
+            let inv = 1.0 / norm;
+            for v in result.iter_mut() {
+                *v *= inv;
+            }
+        }
 
         let raw_hv = ContinuousHV::from_vec(result);
         if let Some(ref mut pred) = self.predictive {
@@ -693,13 +813,19 @@ impl HumanoidHdcEncoder {
     /// Current prediction error from the predictive layer [0, 1].
     /// Returns 0.0 if no predictive layer is active.
     pub fn prediction_error(&self) -> f32 {
-        self.predictive.as_ref().map(|p| p.prediction_error).unwrap_or(0.0)
+        self.predictive
+            .as_ref()
+            .map(|p| p.prediction_error)
+            .unwrap_or(0.0)
     }
 
     /// Current confidence (1 - smoothed PE) from the predictive layer [0, 1].
     /// Returns 1.0 if no predictive layer is active.
     pub fn confidence(&self) -> f32 {
-        self.predictive.as_ref().map(|p| p.confidence).unwrap_or(1.0)
+        self.predictive
+            .as_ref()
+            .map(|p| p.confidence)
+            .unwrap_or(1.0)
     }
 
     /// Whether this encoder has a predictive layer.
@@ -857,7 +983,10 @@ mod tests {
         let state = HumanoidState::standing_for(HumanoidMorphology::Dexterous53);
         let hv1 = enc1.encode(&state);
         let hv2 = enc2.encode(&state);
-        assert!((hv1.similarity(&hv2) - 1.0).abs() < 1e-5, "Same genesis+morph = identical");
+        assert!(
+            (hv1.similarity(&hv2) - 1.0).abs() < 1e-5,
+            "Same genesis+morph = identical"
+        );
     }
 
     #[test]
@@ -869,7 +998,10 @@ mod tests {
         // (they're interleaved in the joint_angles section)
         let hand_angle_ch = 5 + 21; // first hand angle channel
         let weight = enc.channel_weight(hand_angle_ch);
-        assert!((weight - 1.5).abs() < 1e-6, "Hand angle weight should be 1.5, got {weight}");
+        assert!(
+            (weight - 1.5).abs() < 1e-6,
+            "Hand angle weight should be 1.5, got {weight}"
+        );
     }
 
     // ── Predictive Layer Tests ──
@@ -985,9 +1117,11 @@ mod tests {
             let state = HumanoidState::standing_for(morph);
             let channels = state.to_channels();
             assert_eq!(
-                layout.num_channels, channels.len(),
+                layout.num_channels,
+                channels.len(),
                 "{morph:?}: layout says {} channels but to_channels() produces {}",
-                layout.num_channels, channels.len()
+                layout.num_channels,
+                channels.len()
             );
         }
     }

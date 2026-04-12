@@ -66,7 +66,9 @@ impl RewardLearningBenchmark {
         let criterion = 0.8;
 
         for _trial in 0..40 {
-            let choice = if lapse_rate > 0.0 && (next_seed(&mut rng) % 10000) as f64 / 10000.0 < lapse_rate {
+            let choice = if lapse_rate > 0.0
+                && (next_seed(&mut rng) % 10000) as f64 / 10000.0 < lapse_rate
+            {
                 (next_seed(&mut rng) % 2) as usize // random lapse
             } else {
                 softmax_choice(&q_values, base_temperature, &mut rng)
@@ -95,7 +97,9 @@ impl RewardLearningBenchmark {
             // RPE is high (unexpected non-reward increases uncertainty → exploration)
             let temperature = base_temperature + recent_rpe_magnitude * 0.15;
 
-            let choice = if lapse_rate > 0.0 && (next_seed(&mut rng) % 10000) as f64 / 10000.0 < lapse_rate {
+            let choice = if lapse_rate > 0.0
+                && (next_seed(&mut rng) % 10000) as f64 / 10000.0 < lapse_rate
+            {
                 (next_seed(&mut rng) % 2) as usize
             } else {
                 softmax_choice(&q_values, temperature, &mut rng)

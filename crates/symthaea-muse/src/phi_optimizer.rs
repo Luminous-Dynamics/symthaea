@@ -189,21 +189,29 @@ mod tests {
         opt.modulate_state(&mut state);
 
         assert!(state.arousal > orig_arousal, "should increase arousal");
-        assert!(state.prediction_error > orig_pred, "should increase prediction error");
+        assert!(
+            state.prediction_error > orig_pred,
+            "should increase prediction error"
+        );
     }
 
     #[test]
     fn maximize_stabilizes_when_phi_high() {
         let mut opt = PhiOptimizer::new(PhiTarget::Maximize);
         // Converge EMA to high Phi
-        for _ in 0..20 { opt.update_phi(0.88); }
+        for _ in 0..20 {
+            opt.update_phi(0.88);
+        }
 
         let mut state = MusicalState::default();
         let orig_arousal = state.arousal;
         opt.modulate_state(&mut state);
 
         // Should not significantly change (within convergence zone)
-        assert!((state.arousal - orig_arousal).abs() < 0.05, "should stabilize near target");
+        assert!(
+            (state.arousal - orig_arousal).abs() < 0.05,
+            "should stabilize near target"
+        );
     }
 
     #[test]
@@ -211,20 +219,30 @@ mod tests {
         let mut opt = PhiOptimizer::new(PhiTarget::Minimize);
         opt.update_phi(0.7); // Phi above minimize target
 
-        let mut state = MusicalState { arousal: 0.6, prediction_error: 0.5, ..Default::default() };
+        let mut state = MusicalState {
+            arousal: 0.6,
+            prediction_error: 0.5,
+            ..Default::default()
+        };
         opt.modulate_state(&mut state);
 
-        assert!(state.harmony_activations[7] > 0.3, "should increase stillness");
+        assert!(
+            state.harmony_activations[7] > 0.3,
+            "should increase stillness"
+        );
     }
 
     #[test]
     fn specific_target() {
         let mut opt = PhiOptimizer::new(PhiTarget::Specific(0.5));
         opt.update_phi(0.3); // below target
-        assert!(opt.phi_error > 0.0, "error should be positive when below target");
+        assert!(
+            opt.phi_error > 0.0,
+            "error should be positive when below target"
+        );
 
         opt.update_phi(0.7); // above target
-        // After EMA smoothing, error direction depends on history
+                             // After EMA smoothing, error direction depends on history
         let metrics = opt.metrics();
         assert!(metrics.phi_ema > 0.3, "EMA should track upward");
     }
@@ -233,7 +251,9 @@ mod tests {
     fn stagnation_injects_exploration() {
         let mut opt = PhiOptimizer::new(PhiTarget::Maximize);
         // Stagnate at moderate Phi
-        for _ in 0..30 { opt.update_phi(0.5); }
+        for _ in 0..30 {
+            opt.update_phi(0.5);
+        }
 
         assert!(opt.stagnation_counter > 10, "should detect stagnation");
 
@@ -241,7 +261,10 @@ mod tests {
         let orig_pred = state.prediction_error;
         opt.modulate_state(&mut state);
 
-        assert!(state.prediction_error > orig_pred + 0.04, "should inject exploration");
+        assert!(
+            state.prediction_error > orig_pred + 0.04,
+            "should inject exploration"
+        );
     }
 
     #[test]
@@ -250,7 +273,9 @@ mod tests {
         opt.update_phi(0.0);
 
         let mut state = MusicalState {
-            arousal: 0.99, dopamine: 0.99, prediction_error: 0.99,
+            arousal: 0.99,
+            dopamine: 0.99,
+            prediction_error: 0.99,
             ..Default::default()
         };
         opt.modulate_state(&mut state);

@@ -10,7 +10,6 @@
 //! This replaces hand-coded rules with patterns learned from Bach, Beethoven,
 //! Chopin, and 3,000 folk songs.
 
-
 /// Trained weights from the melody predictor.
 /// Layout: [8 intervals | 8 durations | beat_pos | phrase_pos | valence | arousal] → interval
 const INTERVAL_WEIGHTS: [f32; 20] = [
@@ -19,7 +18,7 @@ const INTERVAL_WEIGHTS: [f32; 20] = [
     // Duration context weights (dur[-8] to dur[-1])
     0.0003, -0.0005, 0.0002, -0.0008, 0.0004, -0.0003, 0.0011, 0.0029,
     // Position weights
-    0.0015, // beat_position
+    0.0015,  // beat_position
     -0.0022, // phrase_position (tends toward resolution at end)
     0.0018,  // valence (major → ascending)
     0.0008,  // arousal
@@ -147,8 +146,13 @@ impl MelodyPredictor {
             return target;
         }
 
-        scale_tones.iter()
-            .min_by(|a, b| ((**a - target).abs()).partial_cmp(&((**b - target).abs())).unwrap())
+        scale_tones
+            .iter()
+            .min_by(|a, b| {
+                ((**a - target).abs())
+                    .partial_cmp(&((**b - target).abs()))
+                    .unwrap()
+            })
             .copied()
             .unwrap_or(target)
     }
@@ -175,8 +179,14 @@ mod tests {
         pred.record(3.0, 1.0);
 
         let (interval, duration) = pred.predict(0.0, 0.5, 0.5, 0.5);
-        assert!(interval.is_finite(), "interval should be finite: {interval}");
-        assert!(duration.is_finite() && duration > 0.0, "duration should be positive: {duration}");
+        assert!(
+            interval.is_finite(),
+            "interval should be finite: {interval}"
+        );
+        assert!(
+            duration.is_finite() && duration > 0.0,
+            "duration should be positive: {duration}"
+        );
     }
 
     #[test]
@@ -188,7 +198,10 @@ mod tests {
         }
         let (interval, _) = pred.predict(1.0, 0.3, 0.5, 0.5);
         // iv[-1] weight is +0.185, so ascending context should predict ascending
-        assert!(interval > 0.0, "ascending context should predict ascending: {interval}");
+        assert!(
+            interval > 0.0,
+            "ascending context should predict ascending: {interval}"
+        );
     }
 
     #[test]
@@ -198,7 +211,10 @@ mod tests {
             pred.record(-2.0, 1.0); // all descending
         }
         let (interval, _) = pred.predict(1.0, 0.3, 0.0, 0.5);
-        assert!(interval < 0.0, "descending context should predict descending: {interval}");
+        assert!(
+            interval < 0.0,
+            "descending context should predict descending: {interval}"
+        );
     }
 
     #[test]
@@ -210,7 +226,10 @@ mod tests {
 
         let (_, dur_low) = pred.predict(0.0, 0.5, 0.0, 0.2);
         let (_, dur_high) = pred.predict(0.0, 0.5, 0.0, 0.9);
-        assert!(dur_high < dur_low, "high arousal should predict shorter: high={dur_high} low={dur_low}");
+        assert!(
+            dur_high < dur_low,
+            "high arousal should predict shorter: high={dur_high} low={dur_low}"
+        );
     }
 
     #[test]
@@ -218,7 +237,7 @@ mod tests {
         let pred = MelodyPredictor::new();
         let scale = vec![261.63, 293.66, 329.63, 349.23, 392.00, 440.00];
         let result = pred.interval_to_freq(261.63, 4.5, &scale); // ~4.5 semitones up from C
-        // Should snap to E (329.63) which is 4 semitones up
+                                                                 // Should snap to E (329.63) which is 4 semitones up
         assert!((result - 329.63).abs() < 1.0, "should snap to E: {result}");
     }
 }

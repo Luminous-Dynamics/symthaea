@@ -901,8 +901,14 @@ mod tests {
         let snapshot = make_snapshot(-0.5, 0.8, 1);
         let output = manager.process(&snapshot);
         // Output deltas should be finite (strategy-dependent magnitude)
-        assert!(output.valence_delta.is_finite(), "valence_delta should be finite");
-        assert!(output.confidence_delta.is_finite(), "confidence_delta should be finite");
+        assert!(
+            output.valence_delta.is_finite(),
+            "valence_delta should be finite"
+        );
+        assert!(
+            output.confidence_delta.is_finite(),
+            "confidence_delta should be finite"
+        );
     }
 
     #[test]

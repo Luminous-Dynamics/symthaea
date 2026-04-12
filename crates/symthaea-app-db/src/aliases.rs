@@ -605,7 +605,10 @@ mod tests {
         assert_eq!(lookup_alias("home-manager"), Some("home-manager"));
         assert_eq!(lookup_alias("nix-direnv"), Some("nix-direnv"));
         assert_eq!(lookup_alias("nh"), Some("nh"));
-        assert_eq!(lookup_alias("nix-output-monitor"), Some("nix-output-monitor"));
+        assert_eq!(
+            lookup_alias("nix-output-monitor"),
+            Some("nix-output-monitor")
+        );
         assert_eq!(lookup_alias("nom"), Some("nix-output-monitor"));
     }
 
@@ -735,11 +738,7 @@ mod tests {
     #[test]
     fn test_alias_count() {
         let count = all_aliases().len();
-        assert!(
-            count >= 200,
-            "Expected at least 200 aliases, got {}",
-            count
-        );
+        assert!(count >= 200, "Expected at least 200 aliases, got {}", count);
     }
 
     #[test]
@@ -768,11 +767,18 @@ mod tests {
     #[test]
     fn suggest_returns_results() {
         let suggestions = suggest_similar("firef");
-        assert!(!suggestions.is_empty(), "Should suggest packages for 'firef'");
+        assert!(
+            !suggestions.is_empty(),
+            "Should suggest packages for 'firef'"
+        );
     }
 
     #[test]
     fn alias_count_minimum() {
-        assert!(all_aliases().len() >= 200, "Should have at least 200 aliases, got {}", all_aliases().len());
+        assert!(
+            all_aliases().len() >= 200,
+            "Should have at least 200 aliases, got {}",
+            all_aliases().len()
+        );
     }
 }

@@ -42,7 +42,14 @@ fn main() {
 
     println!("═══════════════════════════════════════════════════════════════");
     println!("  JEPA A/B Test — Real Cognitive Loop");
-    println!("  JEPA: {}", if jepa_enabled { "ENABLED" } else { "DISABLED (baseline)" });
+    println!(
+        "  JEPA: {}",
+        if jepa_enabled {
+            "ENABLED"
+        } else {
+            "DISABLED (baseline)"
+        }
+    );
     println!("  {} cycles, {} unique inputs", NUM_CYCLES, INPUTS.len());
     println!("═══════════════════════════════════════════════════════════════\n");
 
@@ -87,14 +94,24 @@ fn main() {
     let mean_coh: f32 = coherence_trajectory.iter().sum::<f32>() / NUM_CYCLES as f32;
     let final_phi = *phi_trajectory.last().unwrap_or(&0.0);
     let first_20_phi: f64 = phi_trajectory[..20].iter().sum::<f64>() / 20.0;
-    let last_20_phi: f64 = phi_trajectory[phi_trajectory.len()-20..].iter().sum::<f64>() / 20.0;
+    let last_20_phi: f64 = phi_trajectory[phi_trajectory.len() - 20..]
+        .iter()
+        .sum::<f64>()
+        / 20.0;
 
     println!("  Results:");
     println!("    Mean Φ:          {:.4}", mean_phi);
     println!("    Final Φ:         {:.4}", final_phi);
-    println!("    Φ improvement:   {:.4} → {:.4} ({:+.1}%)",
-        first_20_phi, last_20_phi,
-        if first_20_phi > 1e-6 { (last_20_phi - first_20_phi) / first_20_phi * 100.0 } else { 0.0 });
+    println!(
+        "    Φ improvement:   {:.4} → {:.4} ({:+.1}%)",
+        first_20_phi,
+        last_20_phi,
+        if first_20_phi > 1e-6 {
+            (last_20_phi - first_20_phi) / first_20_phi * 100.0
+        } else {
+            0.0
+        }
+    );
     println!("    Mean PE:         {:.4}", mean_pe);
     println!("    Mean Coherence:  {:.4}", mean_coh);
     println!("    Learning cycles: {}/{}", total_learning, NUM_CYCLES);
@@ -103,27 +120,46 @@ fn main() {
     {
         let mean_jepa_pe: f32 = jepa_pe_trajectory.iter().sum::<f32>() / NUM_CYCLES as f32;
         let first_20_jpe: f32 = jepa_pe_trajectory[..20].iter().sum::<f32>() / 20.0;
-        let last_20_jpe: f32 = jepa_pe_trajectory[jepa_pe_trajectory.len()-20..].iter().sum::<f32>() / 20.0;
+        let last_20_jpe: f32 = jepa_pe_trajectory[jepa_pe_trajectory.len() - 20..]
+            .iter()
+            .sum::<f32>()
+            / 20.0;
         println!("\n  JEPA Telemetry:");
         println!("    Mean latent PE:  {:.4}", mean_jepa_pe);
-        println!("    JEPA PE trend:   {:.4} → {:.4}", first_20_jpe, last_20_jpe);
+        println!(
+            "    JEPA PE trend:   {:.4} → {:.4}",
+            first_20_jpe, last_20_jpe
+        );
     }
 
     // Trajectory samples
     println!("\n  Trajectory (every 20 cycles):");
     #[cfg(feature = "jepa")]
-    println!("  {:>6}  {:>8}  {:>8}  {:>8}  {:>10}", "Cycle", "Phi", "PE", "Coh", "JEPA_PE");
+    println!(
+        "  {:>6}  {:>8}  {:>8}  {:>8}  {:>10}",
+        "Cycle", "Phi", "PE", "Coh", "JEPA_PE"
+    );
     #[cfg(not(feature = "jepa"))]
     println!("  {:>6}  {:>8}  {:>8}  {:>8}", "Cycle", "Phi", "PE", "Coh");
 
     for i in (0..NUM_CYCLES).step_by(20) {
         #[cfg(feature = "jepa")]
-        println!("  {:>6}  {:>8.4}  {:>8.4}  {:>8.4}  {:>10.4}",
-            i + 1, phi_trajectory[i], pe_trajectory[i], coherence_trajectory[i],
-            jepa_pe_trajectory[i]);
+        println!(
+            "  {:>6}  {:>8.4}  {:>8.4}  {:>8.4}  {:>10.4}",
+            i + 1,
+            phi_trajectory[i],
+            pe_trajectory[i],
+            coherence_trajectory[i],
+            jepa_pe_trajectory[i]
+        );
         #[cfg(not(feature = "jepa"))]
-        println!("  {:>6}  {:>8.4}  {:>8.4}  {:>8.4}",
-            i + 1, phi_trajectory[i], pe_trajectory[i], coherence_trajectory[i]);
+        println!(
+            "  {:>6}  {:>8.4}  {:>8.4}  {:>8.4}",
+            i + 1,
+            phi_trajectory[i],
+            pe_trajectory[i],
+            coherence_trajectory[i]
+        );
     }
 
     // JSON for automated comparison

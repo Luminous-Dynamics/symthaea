@@ -456,7 +456,12 @@ impl NeuralGenome {
     /// Biased mutation for Lamarckian evolution.
     /// `targets`: slice of (start_bit, num_bits, confidence) tuples identifying
     /// threshold loci to mutate with boosted rate (3× base_rate × confidence).
-    pub fn mutate_biased(&self, base_rate: f32, seed: u64, targets: &[(usize, usize, f32)]) -> Self {
+    pub fn mutate_biased(
+        &self,
+        base_rate: f32,
+        seed: u64,
+        targets: &[(usize, usize, f32)],
+    ) -> Self {
         let mut child = self.hv.add_noise(base_rate, seed);
         let boost_rate = (base_rate * 3.0).min(0.5);
         for &(start, bits, confidence) in targets {
@@ -684,4 +689,3 @@ mod tests {
         assert_ne!(g1, g3);
     }
 }
-

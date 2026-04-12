@@ -817,7 +817,11 @@ impl InoculationOrchestrator {
             64 // Cap at 64G for large RAM systems
         };
 
-        let efi_size = if self.lanzaboote_enabled { "1G" } else { "512M" };
+        let efi_size = if self.lanzaboote_enabled {
+            "1G"
+        } else {
+            "512M"
+        };
 
         Ok(format!(
             r#"{{

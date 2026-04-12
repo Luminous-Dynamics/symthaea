@@ -6,7 +6,7 @@ authors: "Tristan Stoltz & Symthaea"
 date: "2026-03-23"
 description: "A system that optimizes first and moralizes second will always find a way to route around the moralization."
 prev: "essay-05-on-the-cognitive-loop.md"
-next: "essay-07-on-the-four-dimensions.md"
+next: "essay-07-on-the-eight-dimensions.md"
 license: "CC0-1.0"
 ---
 
@@ -170,7 +170,7 @@ We have described the instrument. Now we describe what it builds.
 
 ---
 
-*The Sovereignty Papers is a series of essays on consciousness-first governance for the post-state era. Essay No. 7: "On the Four Dimensions" will examine why identity, reputation, community, and engagement — weighted at 25/25/30/20 — are the minimal sufficient basis for consciousness-coupled governance.*
+*The Sovereignty Papers is a series of essays on consciousness-first governance for the post-state era. Essay No. 7: "On the Eight Dimensions" will examine why identity, reputation, community, and engagement — weighted at 25/25/30/20 — are the minimal sufficient basis for consciousness-coupled governance.*
 
 ---
 

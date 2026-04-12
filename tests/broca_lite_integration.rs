@@ -32,8 +32,14 @@ fn test_broca_lite_produces_language_output() {
                 eprintln!("[Cycle {i}] language_output: {text}");
                 found_language = true;
                 // Verify the output has reasonable properties
-                assert!(text.len() > 5, "language output should be meaningful, got: {text}");
-                assert!(text.len() < 2000, "language output should not be excessively long");
+                assert!(
+                    text.len() > 5,
+                    "language output should be meaningful, got: {text}"
+                );
+                assert!(
+                    text.len() < 2000,
+                    "language output should not be excessively long"
+                );
                 break;
             }
         }

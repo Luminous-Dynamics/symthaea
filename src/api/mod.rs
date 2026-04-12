@@ -33,15 +33,17 @@ pub mod state;
 pub mod ws;
 
 use crate::api::state::AppState;
+use crate::control_plane::parse_bearer_token;
 use axum::{
     extract::DefaultBodyLimit,
-    extract::{ws::WebSocketUpgrade, Request},
+    extract::{ws::WebSocketUpgrade, Request, State},
     http::{HeaderMap, Method, StatusCode},
     middleware,
-    response::Response,
+    response::{IntoResponse, Response},
     routing::{get, post},
     Router,
 };
+use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use tower_http::cors::CorsLayer;
@@ -58,6 +60,8 @@ pub struct ApiConfig {
     pub max_body_bytes: usize,
     /// Max number of in-flight requests before backpressure.
     pub max_in_flight_requests: usize,
+    /// Optional JSONL audit log path.
+    pub audit_log_path: Option<PathBuf>,
 }
 
 impl Default for ApiConfig {
@@ -70,23 +74,22 @@ impl Default for ApiConfig {
             bearer_token: None,
             max_body_bytes: 16 * 1024 * 1024,
             max_in_flight_requests: 32,
+            audit_log_path: None,
         }
     }
 }
 
-/// Authentication middleware that checks for Bearer token on mutating endpoints.
+/// Authentication middleware that checks for Bearer token on protected endpoints.
 ///
-/// Health and GET leaderboard/dataset endpoints are public.
-/// POST endpoints require authentication when a bearer token is configured.
+/// Health and read-only public catalog endpoints remain public.
+/// Audit access and mutating endpoints require authentication when a bearer token is configured.
 async fn auth_middleware(
+    State(state): State<Arc<AppState>>,
     headers: HeaderMap,
     request: Request,
     next: middleware::Next,
 ) -> Result<Response, StatusCode> {
-    let state = request.extensions().get::<Arc<AppState>>();
-
-    // Extract configured token from app state
-    let required_token = state.and_then(|s| s.bearer_token());
+    let required_token = state.bearer_token();
 
     // If no token is configured, allow everything (development mode)
     let Some(expected_token) = required_token else {
@@ -99,30 +102,30 @@ async fn auth_middleware(
         return Ok(next.run(request).await);
     }
 
-    // Allow public GET endpoints without auth
+    // Allow public catalog endpoints without auth. Results remain on the GET allowlist
+    // because the handler performs per-submission privacy checks.
     let method = request.method().clone();
-    if method == Method::GET
-        && (path.starts_with("/v1/leaderboard")
-            || path.starts_with("/v1/datasets")
-            || path.starts_with("/v1/results"))
-    {
+    if route_is_public_without_auth(&method, path) {
         return Ok(next.run(request).await);
     }
 
     // For all other endpoints, require Bearer token
-    let auth_header = headers.get("authorization").and_then(|v| v.to_str().ok());
+    let auth_header = headers
+        .get("authorization")
+        .and_then(|v| v.to_str().ok())
+        .and_then(parse_bearer_token);
 
     match auth_header {
-        Some(value) if value.starts_with("Bearer ") => {
-            let token = &value[7..];
-            if token == expected_token {
-                Ok(next.run(request).await)
-            } else {
-                Err(StatusCode::UNAUTHORIZED)
-            }
-        }
+        Some(token) if token == expected_token => Ok(next.run(request).await),
         _ => Err(StatusCode::UNAUTHORIZED),
     }
+}
+
+fn route_is_public_without_auth(method: &Method, path: &str) -> bool {
+    *method == Method::GET
+        && (path.starts_with("/v1/leaderboard")
+            || path.starts_with("/v1/datasets")
+            || path.starts_with("/v1/results"))
 }
 
 /// Build a CORS layer with restricted origins.
@@ -176,6 +179,7 @@ pub fn create_router_with_config(config: ApiConfig) -> Router {
         .route("/v1/datasets/:dataset_id", get(handlers::get_dataset))
         .route("/v1/compare", post(handlers::compare_models))
         .route("/v1/dimensional-sweep", post(handlers::dimensional_sweep))
+        .route("/v1/audit/events", get(handlers::get_audit_events))
         // Metrics endpoints
         .route("/metrics", get(handlers::metrics_prometheus)) // Prometheus scrape endpoint
         .route("/v1/metrics", get(handlers::metrics_json)) // JSON metrics
@@ -183,7 +187,10 @@ pub fn create_router_with_config(config: ApiConfig) -> Router {
         .route("/health", get(handlers::health_check))
         .route("/v1/health", get(handlers::health_check))
         // Security layers
-        .layer(middleware::from_fn(auth_middleware))
+        .layer(middleware::from_fn_with_state(
+            state.clone(),
+            auth_middleware,
+        ))
         .layer(cors)
         .layer(DefaultBodyLimit::max(config.max_body_bytes))
         // Add shared state
@@ -220,10 +227,13 @@ pub fn create_demo_router() -> Result<Router, Box<dyn std::error::Error>> {
     create_demo_router_with_config(ApiConfig::default())
 }
 
-/// Create a demo router with custom security configuration.
-pub fn create_demo_router_with_config(config: ApiConfig) -> Result<Router, Box<dyn std::error::Error>> {
-    let runner = demo_runner::DemoRunner::new()?;
-    let runner = Arc::new(Mutex::new(runner));
+/// Internal router builder — accepts a pre-built, already-Arc-wrapped runner.
+/// Separated from `create_demo_router_with_config` so `serve_demo_with_config`
+/// can do async P2P init on the runner *before* it is wrapped in Mutex.
+fn build_demo_router(
+    runner: Arc<Mutex<demo_runner::DemoRunner>>,
+    config: ApiConfig,
+) -> Result<Router, Box<dyn std::error::Error>> {
     let state = Arc::new(AppState::new_with_config(&config));
     let cors = build_cors_layer(&config);
 
@@ -243,12 +253,56 @@ pub fn create_demo_router_with_config(config: ApiConfig) -> Result<Router, Box<d
         .route("/v1/datasets/:dataset_id", get(handlers::get_dataset))
         .route("/v1/compare", post(handlers::compare_models))
         .route("/v1/dimensional-sweep", post(handlers::dimensional_sweep))
+        .route("/v1/audit/events", get(handlers::get_audit_events))
         // Metrics
         .route("/metrics", get(handlers::metrics_prometheus))
         .route("/v1/metrics", get(handlers::metrics_json))
         // Health
         .route("/health", get(handlers::health_check))
         .route("/v1/health", get(handlers::health_check));
+
+    // Iroh P2P ticket endpoint — returns JSON EndpointAddr for peer bootstrap.
+    // GET /v1/iroh/node-addr → {"node_id": "<hex>", "ticket": "<json-endpoint-addr>"}
+    let ticket_runner = runner.clone();
+    let app = app.route(
+        "/v1/iroh/node-addr",
+        get(move || {
+            let runner = ticket_runner.clone();
+            async move {
+                let guard = runner.lock().await;
+                let node_id = guard.iroh_node_id();
+                #[cfg(all(feature = "identity", feature = "swarm"))]
+                {
+                    match guard.iroh_ticket() {
+                        Some(Ok(ticket)) => (
+                            StatusCode::OK,
+                            axum::Json(serde_json::json!({
+                                "node_id": node_id,
+                                "ticket": ticket,
+                            })),
+                        )
+                            .into_response(),
+                        Some(Err(e)) => (StatusCode::INTERNAL_SERVER_ERROR, e).into_response(),
+                        None => (
+                            StatusCode::SERVICE_UNAVAILABLE,
+                            "P2P not initialised — start with swarm+identity features",
+                        )
+                            .into_response(),
+                    }
+                }
+                #[cfg(not(all(feature = "identity", feature = "swarm")))]
+                (
+                    StatusCode::NOT_IMPLEMENTED,
+                    axum::Json(serde_json::json!({
+                        "node_id": node_id,
+                        "ticket": null,
+                        "note": "swarm+identity features not enabled",
+                    })),
+                )
+                    .into_response()
+            }
+        }),
+    );
 
     // WebSocket route — captures the runner Arc (clone per-request for Fn trait)
     let ws_runner = runner.clone();
@@ -268,12 +322,23 @@ pub fn create_demo_router_with_config(config: ApiConfig) -> Result<Router, Box<d
     };
 
     let app = app
-        .layer(middleware::from_fn(auth_middleware))
+        .layer(middleware::from_fn_with_state(
+            state.clone(),
+            auth_middleware,
+        ))
         .layer(cors)
         .layer(DefaultBodyLimit::max(config.max_body_bytes))
         .with_state(state);
 
     Ok(app)
+}
+
+/// Create a demo router with custom security configuration.
+pub fn create_demo_router_with_config(
+    config: ApiConfig,
+) -> Result<Router, Box<dyn std::error::Error>> {
+    let runner = Arc::new(Mutex::new(demo_runner::DemoRunner::new()?));
+    build_demo_router(runner, config)
 }
 
 /// Start the demo server with WebSocket and static file serving.
@@ -286,11 +351,127 @@ pub async fn serve_demo_with_config(
     addr: &str,
     config: ApiConfig,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let app = create_demo_router_with_config(config)?;
+    // Build runner before wrapping so we can do async P2P/mesh init.
+    let mut runner = demo_runner::DemoRunner::new()?;
+    #[cfg(all(feature = "identity", feature = "swarm"))]
+    runner.enable_p2p().await;
+    #[cfg(feature = "mesh")]
+    runner.enable_mesh_daemon().await;
+    let app = build_demo_router(Arc::new(Mutex::new(runner)), config)?;
     let listener = tokio::net::TcpListener::bind(addr).await?;
     println!("Symthaea Demo running at http://{}", addr);
     println!("  Live visualization: http://{}", addr);
     println!("  WebSocket endpoint: ws://{}/v1/ws/live", addr);
     axum::serve(listener, app).await?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use axum::body::Body;
+    use axum::http::Request;
+    use tower::util::ServiceExt;
+
+    fn authed_router() -> Router {
+        create_router_with_config(ApiConfig {
+            bearer_token: Some("test-token".to_string()),
+            ..ApiConfig::default()
+        })
+    }
+
+    #[test]
+    fn route_policy_marks_public_get_routes() {
+        assert!(route_is_public_without_auth(
+            &Method::GET,
+            "/v1/leaderboard"
+        ));
+        assert!(route_is_public_without_auth(&Method::GET, "/v1/datasets"));
+        assert!(route_is_public_without_auth(
+            &Method::GET,
+            "/v1/results/submission-1"
+        ));
+        assert!(!route_is_public_without_auth(
+            &Method::GET,
+            "/v1/audit/events"
+        ));
+        assert!(!route_is_public_without_auth(&Method::POST, "/v1/submit"));
+    }
+
+    #[tokio::test]
+    async fn public_routes_remain_accessible_without_auth() {
+        let app = authed_router();
+
+        for request in [
+            Request::builder()
+                .uri("/health")
+                .body(Body::empty())
+                .expect("health request"),
+            Request::builder()
+                .uri("/v1/leaderboard")
+                .body(Body::empty())
+                .expect("leaderboard request"),
+            Request::builder()
+                .uri("/v1/datasets")
+                .body(Body::empty())
+                .expect("datasets request"),
+            Request::builder()
+                .uri("/v1/results/non-existent")
+                .body(Body::empty())
+                .expect("results request"),
+        ] {
+            let response = app.clone().oneshot(request).await.expect("route response");
+            assert_ne!(response.status(), StatusCode::UNAUTHORIZED);
+        }
+    }
+
+    #[tokio::test]
+    async fn protected_routes_require_auth_when_configured() {
+        let app = authed_router();
+
+        for request in [
+            Request::builder()
+                .uri("/v1/audit/events")
+                .body(Body::empty())
+                .expect("audit request"),
+            Request::builder()
+                .method(Method::POST)
+                .uri("/v1/submit")
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    r#"{"model_name":"test-model","topology_type":"ring","n_nodes":8}"#,
+                ))
+                .expect("submit request"),
+            Request::builder()
+                .method(Method::POST)
+                .uri("/v1/compare")
+                .header("content-type", "application/json")
+                .body(Body::from(r#"{"model_a":"a","model_b":"b"}"#))
+                .expect("compare request"),
+        ] {
+            let response = app.clone().oneshot(request).await.expect("route response");
+            assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+        }
+    }
+
+    #[tokio::test]
+    async fn authenticated_submit_is_not_rejected_by_middleware() {
+        let app = authed_router();
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method(Method::POST)
+                    .uri("/v1/submit")
+                    .header("content-type", "application/json")
+                    .header("authorization", "Bearer test-token")
+                    .body(Body::from(
+                        r#"{"model_name":"auth-model","topology_type":"ring","n_nodes":8}"#,
+                    ))
+                    .expect("submit request"),
+            )
+            .await
+            .expect("route response");
+
+        assert_ne!(response.status(), StatusCode::UNAUTHORIZED);
+    }
 }

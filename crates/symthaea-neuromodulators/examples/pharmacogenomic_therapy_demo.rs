@@ -17,8 +17,7 @@
 
 use std::collections::HashMap;
 use symthaea_neuromodulators::pharmacogenomics::{
-    AncestryGroup, CypEnzyme, DrugClass, GeneticVariant, MetabolizerPhenotype, PgxProfile,
-    Zygosity,
+    AncestryGroup, CypEnzyme, DrugClass, GeneticVariant, MetabolizerPhenotype, PgxProfile, Zygosity,
 };
 use symthaea_neuromodulators::research_bridge::ResearchModulation;
 
@@ -123,11 +122,11 @@ fn run_session(name: &str, profile: PgxProfile) {
     for tick in 0..100 {
         // Phase-dependent inputs
         let (threat, cortisol, allostatic, sleeping, sleep_q) = match tick {
-            0..=19 => (0.05, 0.1, 0.1, false, 0.0),         // mild baseline stress
-            20..=39 => (0.05, 0.1, 0.1, false, 0.0),         // SSRI on board, same stress
-            40..=59 => (0.7, 0.6, 0.3, false, 0.0),          // threat exposure therapy
-            60..=79 => (0.0, 0.05, 0.15, true, 0.8),         // sleep recovery
-            80..=99 => (0.1, 0.15, 0.12, false, 0.0),        // mild follow-up
+            0..=19 => (0.05, 0.1, 0.1, false, 0.0), // mild baseline stress
+            20..=39 => (0.05, 0.1, 0.1, false, 0.0), // SSRI on board, same stress
+            40..=59 => (0.7, 0.6, 0.3, false, 0.0), // threat exposure therapy
+            60..=79 => (0.0, 0.05, 0.15, true, 0.8), // sleep recovery
+            80..=99 => (0.1, 0.15, 0.12, false, 0.0), // mild follow-up
             _ => (0.0, 0.0, 0.0, false, 0.0),
         };
 
@@ -190,26 +189,16 @@ fn run_session(name: &str, profile: PgxProfile) {
 // ── Main ────────────────────────────────────────────────────────────────
 
 fn main() {
-    println!(
-        "╔══════════════════════════════════════════════════════╗"
-    );
-    println!(
-        "║  Pharmacogenomic Consciousness Therapy Demo          ║"
-    );
-    println!(
-        "╠══════════════════════════════════════════════════════╣"
-    );
-    println!(
-        "║  B→F→A→H: PGx + PNI → Neuromod bath → Consciousness ║"
-    );
-    println!(
-        "║  Comparing 3 genetic profiles under same protocol    ║"
-    );
-    println!(
-        "╚══════════════════════════════════════════════════════╝"
-    );
+    println!("╔══════════════════════════════════════════════════════╗");
+    println!("║  Pharmacogenomic Consciousness Therapy Demo          ║");
+    println!("╠══════════════════════════════════════════════════════╣");
+    println!("║  B→F→A→H: PGx + PNI → Neuromod bath → Consciousness ║");
+    println!("║  Comparing 3 genetic profiles under same protocol    ║");
+    println!("╚══════════════════════════════════════════════════════╝");
     println!();
-    println!("Protocol: Baseline(0-19) → SSRI(20-39) → Threat(40-59) → Sleep(60-79) → Follow-up(80-99)");
+    println!(
+        "Protocol: Baseline(0-19) → SSRI(20-39) → Threat(40-59) → Sleep(60-79) → Follow-up(80-99)"
+    );
     println!();
 
     run_session(
@@ -246,7 +235,11 @@ fn main() {
             label,
             resp.peak_concentration,
             resp.effective_half_life,
-            if resp.accumulation_warning { "YES" } else { "no" },
+            if resp.accumulation_warning {
+                "YES"
+            } else {
+                "no"
+            },
             cs.phi_baseline_modifier,
             cs.dopamine_clearance_rate,
         );

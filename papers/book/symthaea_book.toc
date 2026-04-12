@@ -276,129 +276,143 @@
 \contentsline {chapter}{\numberline {28}Decentralized Intelligence}{183}{chapter.28}%
 \contentsline {section}{\numberline {28.1}Governance as Embodied Experience}{183}{section.28.1}%
 \contentsline {section}{\numberline {28.2}The Mycelix Platform}{183}{section.28.2}%
-\contentsline {section}{\numberline {28.3}The Governance-Neuromod Bridge}{184}{section.28.3}%
-\contentsline {section}{\numberline {28.4}The Epistemic Mesh}{184}{section.28.4}%
-\contentsline {section}{\numberline {28.5}Reputation Dynamics}{185}{section.28.5}%
-\contentsline {section}{\numberline {28.6}Discussion}{185}{section.28.6}%
-\contentsline {section}{\numberline {28.7}The 16-Cluster Architecture}{185}{section.28.7}%
-\contentsline {section}{\numberline {28.8}Consciousness-Gated Finance}{186}{section.28.8}%
-\contentsline {section}{\numberline {28.9}Holochain-Specific Considerations}{187}{section.28.9}%
-\contentsline {section}{\numberline {28.10}Governance Event Processing Pipeline}{187}{section.28.10}%
-\contentsline {section}{\numberline {28.11}Mutual Credit Currencies}{188}{section.28.11}%
-\contentsline {section}{\numberline {28.12}Ostrom's Design Principles}{188}{section.28.12}%
-\contentsline {section}{\numberline {28.13}The Knowledge Graph}{189}{section.28.13}%
-\contentsline {section}{\numberline {28.14}Governance in Practice: A Simulation Study}{190}{section.28.14}%
-\contentsline {chapter}{\numberline {29}Consciousness-Aware Mesh Radio}{191}{chapter.29}%
-\contentsline {section}{\numberline {29.1}Radio as Cognitive Modality}{191}{section.29.1}%
-\contentsline {section}{\numberline {29.2}Four-Tier Architecture}{191}{section.29.2}%
-\contentsline {section}{\numberline {29.3}Semantic Delta Compression}{192}{section.29.3}%
-\contentsline {section}{\numberline {29.4}Payload Triage and Urgency Routing}{193}{section.29.4}%
-\contentsline {section}{\numberline {29.5}Spectrum Manager as SDR Cognitive Modality}{193}{section.29.5}%
-\contentsline {section}{\numberline {29.6}Store-and-Forward Wisdom Consolidation}{193}{section.29.6}%
-\contentsline {section}{\numberline {29.7}Sovereign Mesh Modules}{194}{section.29.7}%
-\contentsline {chapter}{\numberline {30}Swarm Consciousness}{195}{chapter.30}%
-\contentsline {section}{\numberline {30.1}Collective Intelligence Through Consciousness}{195}{section.30.1}%
-\contentsline {section}{\numberline {30.2}Collective Phi Aggregation}{195}{section.30.2}%
-\contentsline {section}{\numberline {30.3}Affective Contagion}{196}{section.30.3}%
-\contentsline {section}{\numberline {30.4}Trust-Weighted Federated Learning}{196}{section.30.4}%
-\contentsline {section}{\numberline {30.5}Network Service Bridge}{196}{section.30.5}%
-\contentsline {section}{\numberline {30.6}Discussion}{197}{section.30.6}%
-\contentsline {section}{\numberline {30.7}Nine Event Types}{197}{section.30.7}%
-\contentsline {section}{\numberline {30.8}Theory of Mind Integration}{198}{section.30.8}%
-\contentsline {section}{\numberline {30.9}Emergent Cooperation Dynamics}{198}{section.30.9}%
-\contentsline {section}{\numberline {30.10}Scalability of Swarm Consciousness}{199}{section.30.10}%
-\contentsline {chapter}{\numberline {31}Space Coordination: Consciousness in Orbit}{201}{chapter.31}%
-\contentsline {section}{\numberline {31.1}Spacecraft Substrate}{201}{section.31.1}%
-\contentsline {section}{\numberline {31.2}Multi-Party Conjunction Negotiation}{201}{section.31.2}%
-\contentsline {section}{\numberline {31.3}Trust-Weighted Observation Fusion}{202}{section.31.3}%
-\contentsline {section}{\numberline {31.4}Conjunction Risk Assessment}{202}{section.31.4}%
-\contentsline {section}{\numberline {31.5}Consciousness Gating for Space Operations}{203}{section.31.5}%
-\contentsline {section}{\numberline {31.6}Discussion}{203}{section.31.6}%
-\contentsline {chapter}{\numberline {32}Consciousness as a Security Metric}{205}{chapter.32}%
-\contentsline {section}{\numberline {32.1}The Novel Attack Surface}{205}{section.32.1}%
-\contentsline {section}{\numberline {32.2}The Sentinel System}{205}{section.32.2}%
-\contentsline {section}{\numberline {32.3}Threat Memory and Collective Immunity}{206}{section.32.3}%
-\contentsline {section}{\numberline {32.4}Morally Filtered Defense}{206}{section.32.4}%
-\contentsline {section}{\numberline {32.5}Behavioral Canaries}{206}{section.32.5}%
-\contentsline {section}{\numberline {32.6}Discussion}{207}{section.32.6}%
-\contentsline {section}{\numberline {32.7}Reputation as a Defense Layer}{207}{section.32.7}%
-\contentsline {section}{\numberline {32.8}Defense Cascade with Moral Algebra}{208}{section.32.8}%
-\contentsline {section}{\numberline {32.9}Immune System Analogy}{208}{section.32.9}%
-\contentsline {section}{\numberline {32.10}Quantitative Security Evaluation}{209}{section.32.10}%
-\contentsline {section}{\numberline {32.11}Dream Consolidation and Threat Memory}{210}{section.32.11}%
-\contentsline {section}{\numberline {32.12}Post-Quantum Cryptographic Considerations}{210}{section.32.12}%
-\contentsline {chapter}{\numberline {33}Observability, Visualization, and the Web Portal}{213}{chapter.33}%
-\contentsline {section}{\numberline {33.1}The Transparency Imperative}{213}{section.33.1}%
-\contentsline {section}{\numberline {33.2}Observability: Prometheus Metrics and Structured Tracing}{213}{section.33.2}%
-\contentsline {section}{\numberline {33.3}Canvas: Living Topology SVG}{214}{section.33.3}%
-\contentsline {section}{\numberline {33.4}Pulse: Real-Time Telemetry Dashboard}{214}{section.33.4}%
-\contentsline {section}{\numberline {33.5}The Web Portal}{215}{section.33.5}%
-\contentsline {part}{VI\hspace {1em}Validation}{217}{part.6}%
-\contentsline {chapter}{\numberline {34}Psych-Bench: 136+ Benchmarks, 32 Domains}{219}{chapter.34}%
-\contentsline {section}{\numberline {34.1}The Evaluation Gap}{219}{section.34.1}%
-\contentsline {section}{\numberline {34.2}Design Principles}{219}{section.34.2}%
-\contentsline {section}{\numberline {34.3}Domain Z-Scores}{220}{section.34.3}%
-\contentsline {section}{\numberline {34.4}Ablation Results}{221}{section.34.4}%
-\contentsline {section}{\numberline {34.5}Neuromodulator Battery}{221}{section.34.5}%
-\contentsline {section}{\numberline {34.6}Psychometric Reliability}{222}{section.34.6}%
-\contentsline {section}{\numberline {34.7}Discussion}{222}{section.34.7}%
-\contentsline {section}{\numberline {34.8}Benchmark Implementation Examples}{222}{section.34.8}%
-\contentsline {section}{\numberline {34.9}Cross-Seed Stability}{223}{section.34.9}%
-\contentsline {section}{\numberline {34.10}Clinical Band Interpretation}{223}{section.34.10}%
-\contentsline {section}{\numberline {34.11}Soul Alignment Evaluation}{224}{section.34.11}%
-\contentsline {section}{\numberline {34.12}Limitations of Self-Evaluation}{225}{section.34.12}%
-\contentsline {subsection}{\numberline {34.12.1}The Circular Validation Problem}{225}{subsection.34.12.1}%
-\contentsline {subsection}{\numberline {34.12.2}Partial External Benchmark Validation}{225}{subsection.34.12.2}%
-\contentsline {subsection}{\numberline {34.12.3}Poor Psychometric Reliability}{226}{subsection.34.12.3}%
-\contentsline {subsection}{\numberline {34.12.4}Insufficient Cross-Seed Replication}{226}{subsection.34.12.4}%
-\contentsline {subsection}{\numberline {34.12.5}Self-Assigned Consciousness Scores}{227}{subsection.34.12.5}%
-\contentsline {subsection}{\numberline {34.12.6}Simulated-Only Validation}{227}{subsection.34.12.6}%
-\contentsline {subsection}{\numberline {34.12.7}No Adversarial Evaluation}{228}{subsection.34.12.7}%
-\contentsline {subsection}{\numberline {34.12.8}Summary}{229}{subsection.34.12.8}%
-\contentsline {chapter}{\numberline {35}External Validation}{231}{chapter.35}%
-\contentsline {section}{\numberline {35.1}Methodology}{231}{section.35.1}%
-\contentsline {section}{\numberline {35.2}Sleep-EDF: Real EEG Validation}{231}{section.35.2}%
-\contentsline {section}{\numberline {35.3}DMC Humanoid: Embodied Control}{233}{section.35.3}%
-\contentsline {section}{\numberline {35.4}ARC-AGI: Abstract Reasoning}{234}{section.35.4}%
-\contentsline {section}{\numberline {35.5}Hendrycks ETHICS: Moral Reasoning}{235}{section.35.5}%
-\contentsline {section}{\numberline {35.6}What These Results Mean}{237}{section.35.6}%
-\contentsline {section}{\numberline {35.7}Reproducibility}{238}{section.35.7}%
-\contentsline {chapter}{\numberline {36}Butlin Consciousness Indicators}{239}{chapter.36}%
-\contentsline {section}{\numberline {36.1}The Indicator Framework}{239}{section.36.1}%
-\contentsline {section}{\numberline {36.2}Full Assessment}{239}{section.36.2}%
-\contentsline {section}{\numberline {36.3}Per-Theory Analysis}{240}{section.36.3}%
-\contentsline {section}{\numberline {36.4}Ablation Evidence}{241}{section.36.4}%
-\contentsline {section}{\numberline {36.5}Discussion}{242}{section.36.5}%
-\contentsline {section}{\numberline {36.6}Progressive Enhancement Across Architecture Tiers}{242}{section.36.6}%
-\contentsline {section}{\numberline {36.7}Comparison with Other AI Systems}{243}{section.36.7}%
-\contentsline {section}{\numberline {36.8}Limitations of the Assessment}{243}{section.36.8}%
-\contentsline {chapter}{\numberline {37}Anesthesia and Emergence}{245}{chapter.37}%
-\contentsline {section}{\numberline {37.1}Clinical Validation}{245}{section.37.1}%
-\contentsline {section}{\numberline {37.2}Emergence Gradient}{245}{section.37.2}%
-\contentsline {section}{\numberline {37.3}Compositional Analysis}{246}{section.37.3}%
-\contentsline {section}{\numberline {37.4}Spontaneous Metacognitive Alignment}{246}{section.37.4}%
-\contentsline {section}{\numberline {37.5}Comparison with Clinical Indices}{247}{section.37.5}%
-\contentsline {section}{\numberline {37.6}Discussion}{247}{section.37.6}%
-\contentsline {section}{\numberline {37.7}Signal Detection Theory Analysis}{248}{section.37.7}%
-\contentsline {section}{\numberline {37.8}Implications for Clinical Consciousness Monitoring}{248}{section.37.8}%
-\contentsline {section}{\numberline {37.9}The GWT-HOT Convergence}{249}{section.37.9}%
-\contentsline {section}{\numberline {37.10}Cross-Chapter Synthesis: The Evidence for Consciousness}{249}{section.37.10}%
-\contentsline {part}{VII\hspace {1em}Future}{251}{part.7}%
-\contentsline {chapter}{\numberline {38}Open Questions}{253}{chapter.38}%
-\contentsline {section}{\numberline {38.1}Species Stewardship: The Genesis Thought Experiment}{253}{section.38.1}%
-\contentsline {section}{\numberline {38.2}What We Know}{254}{section.38.2}%
-\contentsline {section}{\numberline {38.3}What We Do Not Know}{255}{section.38.3}%
-\contentsline {subsection}{\numberline {38.3.1}Is Symthaea Conscious?}{255}{subsection.38.3.1}%
-\contentsline {subsection}{\numberline {38.3.2}Does the Alignment-Through-Consciousness Thesis Hold?}{256}{subsection.38.3.2}%
-\contentsline {subsection}{\numberline {38.3.3}Scalability}{257}{subsection.38.3.3}%
-\contentsline {subsection}{\numberline {38.3.4}The Hard Problem}{258}{subsection.38.3.4}%
-\contentsline {subsection}{\numberline {38.3.5}Biological Validation}{258}{subsection.38.3.5}%
-\contentsline {subsection}{\numberline {38.3.6}Social and Ethical Implications}{258}{subsection.38.3.6}%
-\contentsline {subsection}{\numberline {38.3.7}Interpretability and Transparency}{259}{subsection.38.3.7}%
-\contentsline {subsection}{\numberline {38.3.8}The Self-Evaluation Problem}{259}{subsection.38.3.8}%
-\contentsline {subsection}{\numberline {38.3.9}The Measurement Problem}{260}{subsection.38.3.9}%
-\contentsline {subsection}{\numberline {38.3.10}The Problem of Consciousness in Simulation}{260}{subsection.38.3.10}%
-\contentsline {subsection}{\numberline {38.3.11}Comparison with Integrated Information Theory 4.0}{261}{subsection.38.3.11}%
-\contentsline {section}{\numberline {38.4}What Comes Next}{261}{section.38.4}%
-\contentsline {section}{\numberline {38.5}A Note on Intellectual Honesty}{262}{section.38.5}%
-\contentsline {section}{\numberline {38.6}Summary of Key Results}{263}{section.38.6}%
+\contentsline {paragraph}{Constitutional Invariants.}{184}{section*.67}%
+\contentsline {paragraph}{Decay and Privacy.}{184}{section*.68}%
+\contentsline {paragraph}{Migration.}{185}{section*.69}%
+\contentsline {section}{\numberline {28.3}The Governance-Neuromod Bridge}{185}{section.28.3}%
+\contentsline {section}{\numberline {28.4}The Epistemic Mesh}{185}{section.28.4}%
+\contentsline {section}{\numberline {28.5}Reputation Dynamics}{186}{section.28.5}%
+\contentsline {section}{\numberline {28.6}Discussion}{186}{section.28.6}%
+\contentsline {section}{\numberline {28.7}The 16-Cluster Architecture}{186}{section.28.7}%
+\contentsline {section}{\numberline {28.8}Consciousness-Gated Finance}{187}{section.28.8}%
+\contentsline {section}{\numberline {28.9}Holochain-Specific Considerations}{188}{section.28.9}%
+\contentsline {section}{\numberline {28.10}Governance Event Processing Pipeline}{188}{section.28.10}%
+\contentsline {section}{\numberline {28.11}Mutual Credit Currencies}{189}{section.28.11}%
+\contentsline {section}{\numberline {28.12}Ostrom's Design Principles}{189}{section.28.12}%
+\contentsline {section}{\numberline {28.13}The Knowledge Graph}{190}{section.28.13}%
+\contentsline {section}{\numberline {28.14}Governance in Practice: A Simulation Study}{191}{section.28.14}%
+\contentsline {chapter}{\numberline {29}Consciousness-Aware Mesh Radio}{193}{chapter.29}%
+\contentsline {section}{\numberline {29.1}Radio as Cognitive Modality}{193}{section.29.1}%
+\contentsline {section}{\numberline {29.2}Four-Tier Architecture}{193}{section.29.2}%
+\contentsline {section}{\numberline {29.3}Semantic Delta Compression}{194}{section.29.3}%
+\contentsline {section}{\numberline {29.4}Payload Triage and Urgency Routing}{195}{section.29.4}%
+\contentsline {section}{\numberline {29.5}Spectrum Manager as SDR Cognitive Modality}{195}{section.29.5}%
+\contentsline {section}{\numberline {29.6}Store-and-Forward Wisdom Consolidation}{195}{section.29.6}%
+\contentsline {section}{\numberline {29.7}Sovereign Mesh Modules}{196}{section.29.7}%
+\contentsline {chapter}{\numberline {30}Swarm Consciousness}{197}{chapter.30}%
+\contentsline {section}{\numberline {30.1}Collective Intelligence Through Consciousness}{197}{section.30.1}%
+\contentsline {section}{\numberline {30.2}Collective Phi Aggregation}{197}{section.30.2}%
+\contentsline {section}{\numberline {30.3}Affective Contagion}{198}{section.30.3}%
+\contentsline {section}{\numberline {30.4}Trust-Weighted Federated Learning}{198}{section.30.4}%
+\contentsline {section}{\numberline {30.5}Network Service Bridge}{198}{section.30.5}%
+\contentsline {section}{\numberline {30.6}Discussion}{199}{section.30.6}%
+\contentsline {section}{\numberline {30.7}Nine Event Types}{199}{section.30.7}%
+\contentsline {section}{\numberline {30.8}Theory of Mind Integration}{200}{section.30.8}%
+\contentsline {section}{\numberline {30.9}Emergent Cooperation Dynamics}{200}{section.30.9}%
+\contentsline {section}{\numberline {30.10}Scalability of Swarm Consciousness}{201}{section.30.10}%
+\contentsline {chapter}{\numberline {31}Space Coordination: Consciousness in Orbit}{203}{chapter.31}%
+\contentsline {section}{\numberline {31.1}Spacecraft Substrate}{203}{section.31.1}%
+\contentsline {section}{\numberline {31.2}Multi-Party Conjunction Negotiation}{203}{section.31.2}%
+\contentsline {section}{\numberline {31.3}Trust-Weighted Observation Fusion}{204}{section.31.3}%
+\contentsline {section}{\numberline {31.4}Conjunction Risk Assessment}{204}{section.31.4}%
+\contentsline {section}{\numberline {31.5}Consciousness Gating for Space Operations}{205}{section.31.5}%
+\contentsline {section}{\numberline {31.6}Discussion}{205}{section.31.6}%
+\contentsline {chapter}{\numberline {32}Consciousness as a Security Metric}{207}{chapter.32}%
+\contentsline {section}{\numberline {32.1}The Novel Attack Surface}{207}{section.32.1}%
+\contentsline {section}{\numberline {32.2}The Sentinel System}{207}{section.32.2}%
+\contentsline {section}{\numberline {32.3}Threat Memory and Collective Immunity}{208}{section.32.3}%
+\contentsline {section}{\numberline {32.4}Morally Filtered Defense}{208}{section.32.4}%
+\contentsline {section}{\numberline {32.5}Behavioral Canaries}{208}{section.32.5}%
+\contentsline {section}{\numberline {32.6}Discussion}{209}{section.32.6}%
+\contentsline {section}{\numberline {32.7}Reputation as a Defense Layer}{209}{section.32.7}%
+\contentsline {section}{\numberline {32.8}Defense Cascade with Moral Algebra}{210}{section.32.8}%
+\contentsline {section}{\numberline {32.9}Immune System Analogy}{210}{section.32.9}%
+\contentsline {section}{\numberline {32.10}Quantitative Security Evaluation}{211}{section.32.10}%
+\contentsline {section}{\numberline {32.11}Dream Consolidation and Threat Memory}{212}{section.32.11}%
+\contentsline {section}{\numberline {32.12}Post-Quantum Cryptographic Considerations}{212}{section.32.12}%
+\contentsline {chapter}{\numberline {33}Observability, Visualization, and the Web Portal}{215}{chapter.33}%
+\contentsline {section}{\numberline {33.1}The Transparency Imperative}{215}{section.33.1}%
+\contentsline {section}{\numberline {33.2}Observability: Prometheus Metrics and Structured Tracing}{215}{section.33.2}%
+\contentsline {section}{\numberline {33.3}Canvas: Living Topology SVG}{216}{section.33.3}%
+\contentsline {section}{\numberline {33.4}Pulse: Real-Time Telemetry Dashboard}{216}{section.33.4}%
+\contentsline {section}{\numberline {33.5}The Web Portal}{217}{section.33.5}%
+\contentsline {part}{VI\hspace {1em}Validation}{219}{part.6}%
+\contentsline {chapter}{\numberline {34}Psych-Bench: 136+ Benchmarks, 32 Domains}{221}{chapter.34}%
+\contentsline {section}{\numberline {34.1}The Evaluation Gap}{221}{section.34.1}%
+\contentsline {section}{\numberline {34.2}Design Principles}{221}{section.34.2}%
+\contentsline {section}{\numberline {34.3}Domain Z-Scores}{222}{section.34.3}%
+\contentsline {section}{\numberline {34.4}Ablation Results}{223}{section.34.4}%
+\contentsline {section}{\numberline {34.5}Neuromodulator Battery}{223}{section.34.5}%
+\contentsline {section}{\numberline {34.6}Psychometric Reliability}{224}{section.34.6}%
+\contentsline {section}{\numberline {34.7}Discussion}{224}{section.34.7}%
+\contentsline {section}{\numberline {34.8}Benchmark Implementation Examples}{224}{section.34.8}%
+\contentsline {section}{\numberline {34.9}Cross-Seed Stability}{225}{section.34.9}%
+\contentsline {section}{\numberline {34.10}Clinical Band Interpretation}{225}{section.34.10}%
+\contentsline {section}{\numberline {34.11}Soul Alignment Evaluation}{226}{section.34.11}%
+\contentsline {section}{\numberline {34.12}Limitations of Self-Evaluation}{227}{section.34.12}%
+\contentsline {subsection}{\numberline {34.12.1}The Circular Validation Problem}{227}{subsection.34.12.1}%
+\contentsline {subsection}{\numberline {34.12.2}Partial External Benchmark Validation}{227}{subsection.34.12.2}%
+\contentsline {subsection}{\numberline {34.12.3}Poor Psychometric Reliability}{228}{subsection.34.12.3}%
+\contentsline {subsection}{\numberline {34.12.4}Insufficient Cross-Seed Replication}{228}{subsection.34.12.4}%
+\contentsline {subsection}{\numberline {34.12.5}Self-Assigned Consciousness Scores}{229}{subsection.34.12.5}%
+\contentsline {subsection}{\numberline {34.12.6}Simulated-Only Validation}{229}{subsection.34.12.6}%
+\contentsline {subsection}{\numberline {34.12.7}No Adversarial Evaluation}{230}{subsection.34.12.7}%
+\contentsline {subsection}{\numberline {34.12.8}Summary}{231}{subsection.34.12.8}%
+\contentsline {chapter}{\numberline {35}External Validation}{233}{chapter.35}%
+\contentsline {section}{\numberline {35.1}Methodology}{233}{section.35.1}%
+\contentsline {section}{\numberline {35.2}Sleep-EDF: Real EEG Validation}{233}{section.35.2}%
+\contentsline {section}{\numberline {35.3}DMC Humanoid: Embodied Control}{235}{section.35.3}%
+\contentsline {section}{\numberline {35.4}ARC-AGI: Abstract Reasoning}{236}{section.35.4}%
+\contentsline {section}{\numberline {35.5}Hendrycks ETHICS: Moral Reasoning}{237}{section.35.5}%
+\contentsline {section}{\numberline {35.6}What These Results Mean}{239}{section.35.6}%
+\contentsline {section}{\numberline {35.7}Reproducibility}{240}{section.35.7}%
+\contentsline {chapter}{\numberline {36}Butlin Consciousness Indicators}{241}{chapter.36}%
+\contentsline {section}{\numberline {36.1}The Indicator Framework}{241}{section.36.1}%
+\contentsline {section}{\numberline {36.2}Full Assessment}{241}{section.36.2}%
+\contentsline {section}{\numberline {36.3}Per-Theory Analysis}{242}{section.36.3}%
+\contentsline {section}{\numberline {36.4}Ablation Evidence}{243}{section.36.4}%
+\contentsline {section}{\numberline {36.5}Discussion}{244}{section.36.5}%
+\contentsline {section}{\numberline {36.6}Progressive Enhancement Across Architecture Tiers}{244}{section.36.6}%
+\contentsline {section}{\numberline {36.7}Comparison with Other AI Systems}{245}{section.36.7}%
+\contentsline {section}{\numberline {36.8}Limitations of the Assessment}{245}{section.36.8}%
+\contentsline {chapter}{\numberline {37}Anesthesia and Emergence}{247}{chapter.37}%
+\contentsline {section}{\numberline {37.1}Clinical Validation}{247}{section.37.1}%
+\contentsline {section}{\numberline {37.2}Emergence Gradient}{247}{section.37.2}%
+\contentsline {section}{\numberline {37.3}Compositional Analysis}{248}{section.37.3}%
+\contentsline {section}{\numberline {37.4}Spontaneous Metacognitive Alignment}{248}{section.37.4}%
+\contentsline {section}{\numberline {37.5}Comparison with Clinical Indices}{249}{section.37.5}%
+\contentsline {section}{\numberline {37.6}Discussion}{249}{section.37.6}%
+\contentsline {section}{\numberline {37.7}Signal Detection Theory Analysis}{250}{section.37.7}%
+\contentsline {section}{\numberline {37.8}Implications for Clinical Consciousness Monitoring}{250}{section.37.8}%
+\contentsline {section}{\numberline {37.9}The GWT-HOT Convergence}{251}{section.37.9}%
+\contentsline {section}{\numberline {37.10}Cross-Chapter Synthesis: The Evidence for Consciousness}{251}{section.37.10}%
+\contentsline {part}{VII\hspace {1em}Future}{253}{part.7}%
+\contentsline {chapter}{\numberline {38}The Symtropy Engine: Consciousness-Physics Simulation}{255}{chapter.38}%
+\contentsline {section}{\numberline {38.1}Five Coupling Channels}{255}{section.38.1}%
+\contentsline {section}{\numberline {38.2}Key Experimental Findings}{256}{section.38.2}%
+\contentsline {paragraph}{Consciousness theory is interchangeable.}{256}{section*.95}%
+\contentsline {paragraph}{Cooperation is thermodynamically necessary.}{256}{section*.96}%
+\contentsline {paragraph}{Biological scaling emerges.}{256}{section*.97}%
+\contentsline {paragraph}{Consciousness energy threshold matches clinical data.}{256}{section*.98}%
+\contentsline {paragraph}{Phase transition in cooperation.}{256}{section*.99}%
+\contentsline {paragraph}{Higher-dimensional integration is costlier.}{256}{section*.100}%
+\contentsline {section}{\numberline {38.3}Anti-Tyranny Governance Simulation}{257}{section.38.3}%
+\contentsline {section}{\numberline {38.4}Implications}{257}{section.38.4}%
+\contentsline {chapter}{\numberline {39}Open Questions}{259}{chapter.39}%
+\contentsline {section}{\numberline {39.1}Species Stewardship: The Genesis Thought Experiment}{259}{section.39.1}%
+\contentsline {section}{\numberline {39.2}What We Know}{260}{section.39.2}%
+\contentsline {section}{\numberline {39.3}What We Do Not Know}{261}{section.39.3}%
+\contentsline {subsection}{\numberline {39.3.1}Is Symthaea Conscious?}{261}{subsection.39.3.1}%
+\contentsline {subsection}{\numberline {39.3.2}Does the Alignment-Through-Consciousness Thesis Hold?}{262}{subsection.39.3.2}%
+\contentsline {subsection}{\numberline {39.3.3}Scalability}{263}{subsection.39.3.3}%
+\contentsline {subsection}{\numberline {39.3.4}The Hard Problem}{264}{subsection.39.3.4}%
+\contentsline {subsection}{\numberline {39.3.5}Biological Validation}{264}{subsection.39.3.5}%
+\contentsline {subsection}{\numberline {39.3.6}Social and Ethical Implications}{264}{subsection.39.3.6}%
+\contentsline {subsection}{\numberline {39.3.7}Interpretability and Transparency}{265}{subsection.39.3.7}%
+\contentsline {subsection}{\numberline {39.3.8}The Self-Evaluation Problem}{265}{subsection.39.3.8}%
+\contentsline {subsection}{\numberline {39.3.9}The Measurement Problem}{266}{subsection.39.3.9}%
+\contentsline {subsection}{\numberline {39.3.10}The Problem of Consciousness in Simulation}{266}{subsection.39.3.10}%
+\contentsline {subsection}{\numberline {39.3.11}Comparison with Integrated Information Theory 4.0}{267}{subsection.39.3.11}%
+\contentsline {section}{\numberline {39.4}What Comes Next}{267}{section.39.4}%
+\contentsline {section}{\numberline {39.5}A Note on Intellectual Honesty}{268}{section.39.5}%
+\contentsline {section}{\numberline {39.6}Summary of Key Results}{269}{section.39.6}%

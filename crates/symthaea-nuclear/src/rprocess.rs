@@ -172,8 +172,8 @@ impl Default for RProcessConfig {
 #[derive(Debug, Clone)]
 struct NuclideData {
     binding_energy: f64,
-    sn: f64,       // neutron separation energy (MeV)
-    q_beta: f64,   // Q-value for beta-minus decay (MeV)
+    sn: f64,        // neutron separation energy (MeV)
+    q_beta: f64,    // Q-value for beta-minus decay (MeV)
     beta_rate: f64, // beta-decay rate (s^-1)
 }
 
@@ -379,7 +379,8 @@ impl RProcessNetwork {
         let cap_rate = self.capture_rate(nuc, conditions);
 
         // Waiting point: beta faster than capture, and S_n is low
-        data.beta_rate > cap_rate || data.sn < conditions.temperature_gk * K_BOLTZMANN_MEV_PER_GK * 20.0
+        data.beta_rate > cap_rate
+            || data.sn < conditions.temperature_gk * K_BOLTZMANN_MEV_PER_GK * 20.0
     }
 
     /// Run the full r-process simulation.
@@ -647,10 +648,7 @@ impl RProcessNetwork {
     /// Q_heat(t) = Σ_i Q_decay_i × λ_i × Y_i × exp(-λ_i × t)
     ///
     /// Evaluated from 1 hour to 100 days post-merger.
-    fn compute_heating_curve(
-        &mut self,
-        abundances: &HashMap<Nuclide, f64>,
-    ) -> Vec<HeatingPoint> {
+    fn compute_heating_curve(&mut self, abundances: &HashMap<Nuclide, f64>) -> Vec<HeatingPoint> {
         let mut curve = Vec::new();
 
         // Time grid: logarithmic from 1 hour to 100 days
@@ -721,10 +719,7 @@ impl RProcessNetwork {
     /// Solar r-process residuals from Arlandini et al. (1999) and
     /// Sneden et al. (2008). Values are log-scale relative abundances
     /// normalized to Si=10^6.
-    fn compute_solar_comparison(
-        &self,
-        predicted: &[MassAbundance],
-    ) -> Vec<SolarComparison> {
+    fn compute_solar_comparison(&self, predicted: &[MassAbundance]) -> Vec<SolarComparison> {
         // Solar r-process residual abundances (log10, normalized).
         // Selected values at key mass numbers from Arlandini et al. (1999).
         let solar_data: Vec<(u16, f64)> = vec![
@@ -767,10 +762,7 @@ impl RProcessNetwork {
             (238, 4.0e-3),
         ];
 
-        let pred_map: HashMap<u16, f64> = predicted
-            .iter()
-            .map(|m| (m.a, m.abundance))
-            .collect();
+        let pred_map: HashMap<u16, f64> = predicted.iter().map(|m| (m.a, m.abundance)).collect();
 
         // Normalize predicted to match solar at A=130 (reference point)
         let norm_factor = if let Some(pred_130) = pred_map.get(&130) {
@@ -872,18 +864,14 @@ impl RProcessNetwork {
 /// Map Z to element symbol.
 fn element_symbol(z: u16) -> &'static str {
     const SYMBOLS: &[&str] = &[
-        "n", "H", "He", "Li", "Be", "B", "C", "N", "O", "F", "Ne",
-        "Na", "Mg", "Al", "Si", "P", "S", "Cl", "Ar", "K", "Ca",
-        "Sc", "Ti", "V", "Cr", "Mn", "Fe", "Co", "Ni", "Cu", "Zn",
-        "Ga", "Ge", "As", "Se", "Br", "Kr", "Rb", "Sr", "Y", "Zr",
-        "Nb", "Mo", "Tc", "Ru", "Rh", "Pd", "Ag", "Cd", "In", "Sn",
-        "Sb", "Te", "I", "Xe", "Cs", "Ba", "La", "Ce", "Pr", "Nd",
-        "Pm", "Sm", "Eu", "Gd", "Tb", "Dy", "Ho", "Er", "Tm", "Yb",
-        "Lu", "Hf", "Ta", "W", "Re", "Os", "Ir", "Pt", "Au", "Hg",
-        "Tl", "Pb", "Bi", "Po", "At", "Rn", "Fr", "Ra", "Ac", "Th",
-        "Pa", "U", "Np", "Pu", "Am", "Cm", "Bk", "Cf", "Es", "Fm",
-        "Md", "No", "Lr", "Rf", "Db", "Sg", "Bh", "Hs", "Mt", "Ds",
-        "Rg", "Cn", "Nh", "Fl", "Mc", "Lv", "Ts", "Og", "Uue", "Ubn",
+        "n", "H", "He", "Li", "Be", "B", "C", "N", "O", "F", "Ne", "Na", "Mg", "Al", "Si", "P",
+        "S", "Cl", "Ar", "K", "Ca", "Sc", "Ti", "V", "Cr", "Mn", "Fe", "Co", "Ni", "Cu", "Zn",
+        "Ga", "Ge", "As", "Se", "Br", "Kr", "Rb", "Sr", "Y", "Zr", "Nb", "Mo", "Tc", "Ru", "Rh",
+        "Pd", "Ag", "Cd", "In", "Sn", "Sb", "Te", "I", "Xe", "Cs", "Ba", "La", "Ce", "Pr", "Nd",
+        "Pm", "Sm", "Eu", "Gd", "Tb", "Dy", "Ho", "Er", "Tm", "Yb", "Lu", "Hf", "Ta", "W", "Re",
+        "Os", "Ir", "Pt", "Au", "Hg", "Tl", "Pb", "Bi", "Po", "At", "Rn", "Fr", "Ra", "Ac", "Th",
+        "Pa", "U", "Np", "Pu", "Am", "Cm", "Bk", "Cf", "Es", "Fm", "Md", "No", "Lr", "Rf", "Db",
+        "Sg", "Bh", "Hs", "Mt", "Ds", "Rg", "Cn", "Nh", "Fl", "Mc", "Lv", "Ts", "Og", "Uue", "Ubn",
     ];
     if (z as usize) < SYMBOLS.len() {
         SYMBOLS[z as usize]
@@ -927,9 +915,15 @@ mod tests {
         let mut net = make_network();
         // A nucleus with Q_beta ~ 5 MeV should have t_half ~ 0.1 s
         let t = net.beta_half_life(28, 50);
-        eprintln!("t_half(Ni-78) = {t:.4} s (Q_beta = {:.3} MeV)", net.q_beta(28, 50));
+        eprintln!(
+            "t_half(Ni-78) = {t:.4} s (Q_beta = {:.3} MeV)",
+            net.q_beta(28, 50)
+        );
         assert!(t > 0.0, "Half-life must be positive");
-        assert!(t < 1.0e10, "Half-life should be finite for neutron-rich nucleus");
+        assert!(
+            t < 1.0e10,
+            "Half-life should be finite for neutron-rich nucleus"
+        );
     }
 
     #[test]
@@ -938,19 +932,31 @@ mod tests {
         let conditions = RProcessConditions::default();
         let path = net.find_rprocess_path(&conditions, 26..=80);
 
-        eprintln!("\n=== R-Process Path (T={:.1} GK, n_n={:.0e}) ===",
-            conditions.temperature_gk, conditions.neutron_density);
+        eprintln!(
+            "\n=== R-Process Path (T={:.1} GK, n_n={:.0e}) ===",
+            conditions.temperature_gk, conditions.neutron_density
+        );
         for nuc in &path {
             let data = net.get_data(*nuc);
-            eprintln!("  {} (Z={:3}, N={:3}, A={:3}) — S_n={:.2} MeV, Q_β={:.2} MeV",
-                nuc, nuc.z, nuc.n, nuc.a(), data.sn, data.q_beta);
+            eprintln!(
+                "  {} (Z={:3}, N={:3}, A={:3}) — S_n={:.2} MeV, Q_β={:.2} MeV",
+                nuc,
+                nuc.z,
+                nuc.n,
+                nuc.a(),
+                data.sn,
+                data.q_beta
+            );
         }
 
         assert!(!path.is_empty(), "R-process path should not be empty");
         // Path should extend well beyond Fe
         let max_z = path.iter().map(|n| n.z).max().unwrap_or(0);
         eprintln!("Path extends to Z={max_z}");
-        assert!(max_z > 40, "Path should reach beyond Zr (Z=40), got Z={max_z}");
+        assert!(
+            max_z > 40,
+            "Path should reach beyond Zr (Z=40), got Z={max_z}"
+        );
     }
 
     #[test]
@@ -1004,7 +1010,10 @@ mod tests {
         // Total abundance should be roughly conserved
         let total: f64 = result.abundances.iter().map(|m| m.abundance).sum();
         eprintln!("\nTotal abundance: {total:.4} (should be ~1.0)");
-        assert!(total > 0.01, "Total abundance should be significant: {total}");
+        assert!(
+            total > 0.01,
+            "Total abundance should be significant: {total}"
+        );
     }
 
     #[test]
@@ -1083,10 +1092,14 @@ mod tests {
         let result = net.simulate(&config);
 
         eprintln!("\n=== Kilonova Heating Curve ===");
-        eprintln!("{:>12} {:>14} {:>14} {:>8}",
-            "Time", "Q_heat", "Metzger", "Ratio");
-        eprintln!("{:>12} {:>14} {:>14} {:>8}",
-            "(days)", "(erg/s/g)", "(erg/s/g)", "");
+        eprintln!(
+            "{:>12} {:>14} {:>14} {:>8}",
+            "Time", "Q_heat", "Metzger", "Ratio"
+        );
+        eprintln!(
+            "{:>12} {:>14} {:>14} {:>8}",
+            "(days)", "(erg/s/g)", "(erg/s/g)", ""
+        );
 
         for hp in &result.heating_curve {
             let days = hp.time_s / 86400.0;
@@ -1141,8 +1154,10 @@ mod tests {
         let result = net.simulate(&config);
 
         eprintln!("\n=== Solar R-Process Comparison ===");
-        eprintln!("{:>5} {:>12} {:>12} {:>8} {}",
-            "A", "Predicted", "Solar", "Ratio", "Match");
+        eprintln!(
+            "{:>5} {:>12} {:>12} {:>8} {}",
+            "A", "Predicted", "Solar", "Ratio", "Match"
+        );
 
         for sc in &result.solar_comparison {
             let match_quality = if sc.ratio > 0.0 {
@@ -1168,7 +1183,11 @@ mod tests {
             .iter()
             .filter(|sc| sc.predicted > 0.0)
             .count();
-        eprintln!("\nNonzero predictions: {}/{}", nonzero, result.solar_comparison.len());
+        eprintln!(
+            "\nNonzero predictions: {}/{}",
+            nonzero,
+            result.solar_comparison.len()
+        );
     }
 
     #[test]
@@ -1199,7 +1218,10 @@ mod tests {
         let data = net.get_data(nuc);
 
         eprintln!("\n=== (n,γ)⇌(γ,n) Equilibrium Test at Sn-132 ===");
-        eprintln!("T = {:.1} GK, n_n = {:.0e}", conditions.temperature_gk, conditions.neutron_density);
+        eprintln!(
+            "T = {:.1} GK, n_n = {:.0e}",
+            conditions.temperature_gk, conditions.neutron_density
+        );
         eprintln!("S_n = {:.3} MeV", data.sn);
         eprintln!("λ(n,γ) = {:.3e} s⁻¹", cap);
         eprintln!("λ(γ,n) = {:.3e} s⁻¹", photo);
@@ -1231,8 +1253,14 @@ mod tests {
         eprintln!("Drop at N=126→127: {:.3} MeV", sn_126 - sn_127);
 
         // S_n at the magic number should be large (tightly bound)
-        assert!(sn_82 > 3.0, "S_n at N=82 shell closure should be large: {sn_82}");
-        assert!(sn_126 > 3.0, "S_n at N=126 shell closure should be large: {sn_126}");
+        assert!(
+            sn_82 > 3.0,
+            "S_n at N=82 shell closure should be large: {sn_82}"
+        );
+        assert!(
+            sn_126 > 3.0,
+            "S_n at N=126 shell closure should be large: {sn_126}"
+        );
     }
 
     #[test]

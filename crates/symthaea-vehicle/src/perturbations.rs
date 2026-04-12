@@ -6,7 +6,7 @@
 //! These perturbations brutally attack the vehicle's sensor and physics model
 //! to force robust adaptation through Active Inference. The philosophy:
 //! if she can survive black ice at 100 km/h in simulation, she can handle
-//! a wet road in Roodepoort.
+//! a wet road in any city.
 
 use serde::{Deserialize, Serialize};
 

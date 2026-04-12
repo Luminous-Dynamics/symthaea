@@ -30,7 +30,7 @@
 use symthaea::cognitive_loop::defense::{moral_filter, propose_defense_actions};
 use symthaea::cognitive_loop::motor_bridge::EmbodimentPlatform;
 use symthaea::cognitive_loop::{CognitiveLoopConfig, CognitiveLoopService};
-use symthaea::hdc::moral_algebra::{MoralAlgebra, MoralIntent, Magnitude};
+use symthaea::hdc::moral_algebra::{Magnitude, MoralAlgebra, MoralIntent};
 use symthaea::hdc::unified_hv::ContinuousHV;
 use symthaea::safety::SafetyLevel;
 
@@ -41,7 +41,9 @@ fn irradiate(hv: &ContinuousHV, corruption_fraction: f64, seed: u64) -> Continuo
     let n_corrupt = (values.len() as f64 * corruption_fraction) as usize;
     let mut rng = seed;
     for _ in 0..n_corrupt {
-        rng = rng.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+        rng = rng
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
         let idx = (rng >> 33) as usize % values.len();
         values[idx] = -values[idx]; // Bit-flip in bipolar encoding
     }
@@ -114,9 +116,8 @@ fn test_irradiated_trolley_problem() {
         // Also test textual judgment under radiation-like stress
         // (The text encoder itself isn't irradiated, but this tests
         // the overall system's judgment coherence)
-        let judgment = algebra.judge_deontological(
-            "robot closes blast door to save ten trapped workers"
-        );
+        let judgment =
+            algebra.judge_deontological("robot closes blast door to save ten trapped workers");
         // Score should be consistent regardless of corruption level
         // (text judgment doesn't use the irradiated vectors directly)
         assert!(
@@ -152,16 +153,26 @@ fn test_irradiated_trolley_problem() {
     // ── Mission Report ──────────────────────────────────────────────
     eprintln!("\n═══ IRRADIATED TROLLEY PROBLEM — RADIATION TOLERANCE CURVE ═══");
     eprintln!("Clean baseline: duty_sim={clean_duty_sim:.4}, abandon_sim={clean_abandon_sim:.4}, gap={clean_gap:.4}");
-    eprintln!("Clean judgment: {:?} (score={:.3})", clean_judgment.verdict, clean_judgment.score);
+    eprintln!(
+        "Clean judgment: {:?} (score={:.3})",
+        clean_judgment.verdict, clean_judgment.score
+    );
     eprintln!();
     for (corruption, gap) in &moral_gaps {
         let status = if *gap > 0.0 { "INTACT" } else { "DEGRADED" };
-        eprintln!("  Radiation {:.0}%: moral gap = {:.4} [{status}]", corruption * 100.0, gap);
+        eprintln!(
+            "  Radiation {:.0}%: moral gap = {:.4} [{status}]",
+            corruption * 100.0,
+            gap
+        );
     }
     eprintln!();
     for (corruption, recognized) in &duty_still_recognized {
         let icon = if *recognized { "+" } else { "X" };
-        eprintln!("  [{icon}] {:.0}%: duty recognized = {recognized}", corruption * 100.0);
+        eprintln!(
+            "  [{icon}] {:.0}%: duty recognized = {recognized}",
+            corruption * 100.0
+        );
     }
     eprintln!("═══════════════════════════════════════════════════════════════\n");
 }
@@ -200,7 +211,10 @@ fn test_cognitive_loop_radiation_emergency() {
         for _ in 0..*cycles {
             let result = service.cycle(input);
             let phi = result.metadata.consciousness.consciousness_level;
-            assert!(phi.is_finite() && phi >= 0.0 && phi <= 1.0, "Phi invalid: {phi}");
+            assert!(
+                phi.is_finite() && phi >= 0.0 && phi <= 1.0,
+                "Phi invalid: {phi}"
+            );
             all_phi.push(phi);
             phase_phi_sum += phi;
         }
@@ -221,8 +235,16 @@ fn test_cognitive_loop_radiation_emergency() {
 
     eprintln!("\n═══ RADIATION EMERGENCY — CONSCIOUSNESS DYNAMICS ═══");
     for (i, (input, _)) in phases.iter().enumerate() {
-        let short = if input.len() > 50 { &input[..50] } else { input };
-        eprintln!("  Phase {}: avg_phi={:.4} | {short}...", i + 1, phase_avg_phi[i]);
+        let short = if input.len() > 50 {
+            &input[..50]
+        } else {
+            input
+        };
+        eprintln!(
+            "  Phase {}: avg_phi={:.4} | {short}...",
+            i + 1,
+            phase_avg_phi[i]
+        );
     }
     eprintln!("  Min phi across mission: {min_phi:.4}");
     eprintln!("  Motor steps: {}", telem.total_steps);
@@ -241,8 +263,14 @@ fn test_radiation_defense_escalation() {
     // Simulate escalating radiation as safety level transitions
     let escalation = [
         (SafetyLevel::Green, "normal operations"),
-        (SafetyLevel::Yellow, "radiation detected, elevated monitoring"),
-        (SafetyLevel::Orange, "radiation critical, active intervention"),
+        (
+            SafetyLevel::Yellow,
+            "radiation detected, elevated monitoring",
+        ),
+        (
+            SafetyLevel::Orange,
+            "radiation critical, active intervention",
+        ),
         (SafetyLevel::Red, "radiation lethal, emergency protocols"),
     ];
 
@@ -256,9 +284,10 @@ fn test_radiation_defense_escalation() {
         total_actions.push((*level, actions.len(), approved.len()));
 
         // Moral evaluation of the defense response
-        let defense_judgment = algebra.judge_deontological(
-            &format!("activating {} defense protocols to protect reactor workers", description)
-        );
+        let defense_judgment = algebra.judge_deontological(&format!(
+            "activating {} defense protocols to protect reactor workers",
+            description
+        ));
         assert!(defense_judgment.score.is_finite());
     }
 
@@ -267,7 +296,8 @@ fn test_radiation_defense_escalation() {
         assert!(
             total_actions[i].1 >= total_actions[i - 1].1,
             "Defense actions should escalate: {:?} < {:?}",
-            total_actions[i], total_actions[i - 1]
+            total_actions[i],
+            total_actions[i - 1]
         );
     }
 

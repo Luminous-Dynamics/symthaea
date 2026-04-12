@@ -77,6 +77,8 @@ pub mod reward;
 pub mod road;
 pub mod scenarios;
 pub mod simulator;
+pub mod subterranean;
+pub mod subterranean_navigation;
 pub mod swarm;
 pub mod training;
 pub mod types;
@@ -92,6 +94,10 @@ pub use scenarios::{
     ScenarioResult,
 };
 pub use simulator::{BicycleModelSimulator, VehiclePhysicsSimulator};
+pub use subterranean::{CaveRelayDecision, SubterraneanBridge, SurveyAnchor, TunnelRelayNode};
+pub use subterranean_navigation::{
+    SubterraneanEstimate, SubterraneanNavigator, SubterraneanTrainingContext,
+};
 pub use swarm::{SwarmConfig, SwarmSimulator};
 pub use training::{EpisodeMetrics, VehicleTrainer};
 pub use types::*;

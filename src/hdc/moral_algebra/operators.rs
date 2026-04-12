@@ -109,7 +109,10 @@ impl MoralAlgebra {
     }
 
     /// Set a learned moral prototype classifier for the 4th ensemble signal.
-    pub fn set_learned_classifier(&mut self, c: super::super::moral_prototypes::MoralPrototypeClassifier) {
+    pub fn set_learned_classifier(
+        &mut self,
+        c: super::super::moral_prototypes::MoralPrototypeClassifier,
+    ) {
         self.learned_classifier = Some(c);
     }
 

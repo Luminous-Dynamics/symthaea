@@ -12,7 +12,9 @@ fn save_to_storage(key: &str, value: &str) {
     }
 }
 fn load_from_storage(key: &str) -> Option<String> {
-    web_sys::window().and_then(|w| w.local_storage().ok().flatten()).and_then(|s| s.get_item(key).ok().flatten())
+    web_sys::window()
+        .and_then(|w| w.local_storage().ok().flatten())
+        .and_then(|s| s.get_item(key).ok().flatten())
 }
 /// Session-only storage for credentials (cleared on tab close)
 fn save_to_session(key: &str, value: &str) {
@@ -21,7 +23,9 @@ fn save_to_session(key: &str, value: &str) {
     }
 }
 fn load_from_session(key: &str) -> Option<String> {
-    web_sys::window().and_then(|w| w.session_storage().ok().flatten()).and_then(|s| s.get_item(key).ok().flatten())
+    web_sys::window()
+        .and_then(|w| w.session_storage().ok().flatten())
+        .and_then(|s| s.get_item(key).ok().flatten())
 }
 
 // ═══════════════════════════════════════════════════════
@@ -68,9 +72,12 @@ pub fn ManagePage() -> impl IntoView {
     }
 
     // Connection form
-    let relay_url = RwSignal::new(load_from_storage("mg_relay_url").unwrap_or_else(|| "ws://127.0.0.1:8094".into()));
+    let relay_url = RwSignal::new(
+        load_from_storage("mg_relay_url").unwrap_or_else(|| "ws://127.0.0.1:8094".into()),
+    );
     let relay_token = RwSignal::new(load_from_session("mg_token").unwrap_or_default());
-    let ssh_host = RwSignal::new(load_from_storage("mg_host").unwrap_or_else(|| "127.0.0.1".into()));
+    let ssh_host =
+        RwSignal::new(load_from_storage("mg_host").unwrap_or_else(|| "127.0.0.1".into()));
     let ssh_port = RwSignal::new(load_from_storage("mg_port").unwrap_or_else(|| "22".into()));
     let ssh_pass = RwSignal::new(String::new());
 
@@ -100,94 +107,105 @@ pub fn ManagePage() -> impl IntoView {
 
         let ws = match web_sys::WebSocket::new(&url) {
             Ok(ws) => ws,
-            Err(_) => { conn.set(ConnState::Failed("Invalid WebSocket URL".into())); return; }
+            Err(_) => {
+                conn.set(ConnState::Failed("Invalid WebSocket URL".into()));
+                return;
+            }
         };
 
         let ws_clone = ws.clone();
         let onopen = wasm_bindgen::closure::Closure::<dyn Fn()>::new(move || {
-            send_ws(&ws_clone, &serde_json::json!({"action":"auth","token":token.clone()}));
+            send_ws(
+                &ws_clone,
+                &serde_json::json!({"action":"auth","token":token.clone()}),
+            );
         });
         ws.set_onopen(Some(onopen.as_ref().unchecked_ref()));
         onopen.forget();
 
         let ws_clone2 = ws.clone();
-        let onmessage = wasm_bindgen::closure::Closure::<dyn Fn(web_sys::MessageEvent)>::new(move |ev: web_sys::MessageEvent| {
-            let data = ev.data().as_string().unwrap_or_default();
-            let msg: serde_json::Value = match serde_json::from_str(&data) {
-                Ok(v) => v,
-                Err(_) => return,
-            };
-            let msg_type = msg["type"].as_str().unwrap_or("");
+        let onmessage = wasm_bindgen::closure::Closure::<dyn Fn(web_sys::MessageEvent)>::new(
+            move |ev: web_sys::MessageEvent| {
+                let data = ev.data().as_string().unwrap_or_default();
+                let msg: serde_json::Value = match serde_json::from_str(&data) {
+                    Ok(v) => v,
+                    Err(_) => return,
+                };
+                let msg_type = msg["type"].as_str().unwrap_or("");
 
-            match msg_type {
-                "authed" => {
-                    // Now connect SSH
-                    send_ws(&ws_clone2, &serde_json::json!({
-                        "action": "connect",
-                        "host": host.clone(),
-                        "port": port.parse::<u16>().unwrap_or(22),
-                        "username": "root",
-                        "password": pass.clone(),
-                    }));
-                }
-                "connected" => {
-                    conn.set(ConnState::Connected);
-                    action_status.set("Connected to NixOS machine".into());
-                }
-                "generations" => {
-                    if let Some(d) = msg["data"].as_str() {
-                        generations.set(d.lines().map(|l| l.to_string()).collect::<Vec<_>>());
-                        // Store raw JSON for parsing in the view
-                        generations.set(vec![d.to_string()]);
+                match msg_type {
+                    "authed" => {
+                        // Now connect SSH
+                        send_ws(
+                            &ws_clone2,
+                            &serde_json::json!({
+                                "action": "connect",
+                                "host": host.clone(),
+                                "port": port.parse::<u16>().unwrap_or(22),
+                                "username": "root",
+                                "password": pass.clone(),
+                            }),
+                        );
                     }
-                }
-                "services" => {
-                    if let Some(d) = msg["data"].as_str() {
-                        services.set(vec![d.to_string()]);
+                    "connected" => {
+                        conn.set(ConnState::Connected);
+                        action_status.set("Connected to NixOS machine".into());
                     }
-                }
-                "gc_analysis" => {
-                    gc_data.set(msg["data"].as_str().map(|s| s.to_string()));
-                }
-                "config" => {
-                    if let Some(d) = msg["data"].as_str() {
-                        config_text.set(d.to_string());
+                    "generations" => {
+                        if let Some(d) = msg["data"].as_str() {
+                            generations.set(d.lines().map(|l| l.to_string()).collect::<Vec<_>>());
+                            // Store raw JSON for parsing in the view
+                            generations.set(vec![d.to_string()]);
+                        }
                     }
-                }
-                "inventory" => {
-                    if let Some(d) = msg["data"].as_str() {
-                        inventory_data.set(Some(d.to_string()));
+                    "services" => {
+                        if let Some(d) = msg["data"].as_str() {
+                            services.set(vec![d.to_string()]);
+                        }
                     }
-                }
-                "images" => {
-                    if let Some(d) = msg["data"].as_str() {
-                        log_lines.update(|l| l.push(format!("Available images:\n{}", d)));
+                    "gc_analysis" => {
+                        gc_data.set(msg["data"].as_str().map(|s| s.to_string()));
                     }
-                }
-                "output" => {
-                    if let Some(d) = msg["data"].as_str() {
-                        log_lines.update(|l| l.push(d.to_string()));
+                    "config" => {
+                        if let Some(d) = msg["data"].as_str() {
+                            config_text.set(d.to_string());
+                        }
                     }
-                }
-                "exit" => {
-                    let code = msg["code"].as_i64().unwrap_or(-1);
-                    if code == 0 {
-                        action_status.set("Action completed successfully".into());
-                    } else {
-                        action_status.set(format!("Action failed (exit code {})", code));
+                    "inventory" => {
+                        if let Some(d) = msg["data"].as_str() {
+                            inventory_data.set(Some(d.to_string()));
+                        }
                     }
-                }
-                "error" => {
-                    let m = msg["message"].as_str().unwrap_or("Unknown error");
-                    if conn.get() != ConnState::Connected {
-                        conn.set(ConnState::Failed(m.to_string()));
-                    } else {
-                        action_status.set(format!("Error: {}", m));
+                    "images" => {
+                        if let Some(d) = msg["data"].as_str() {
+                            log_lines.update(|l| l.push(format!("Available images:\n{}", d)));
+                        }
                     }
+                    "output" => {
+                        if let Some(d) = msg["data"].as_str() {
+                            log_lines.update(|l| l.push(d.to_string()));
+                        }
+                    }
+                    "exit" => {
+                        let code = msg["code"].as_i64().unwrap_or(-1);
+                        if code == 0 {
+                            action_status.set("Action completed successfully".into());
+                        } else {
+                            action_status.set(format!("Action failed (exit code {})", code));
+                        }
+                    }
+                    "error" => {
+                        let m = msg["message"].as_str().unwrap_or("Unknown error");
+                        if conn.get() != ConnState::Connected {
+                            conn.set(ConnState::Failed(m.to_string()));
+                        } else {
+                            action_status.set(format!("Error: {}", m));
+                        }
+                    }
+                    _ => {}
                 }
-                _ => {}
-            }
-        });
+            },
+        );
         ws.set_onmessage(Some(onmessage.as_ref().unchecked_ref()));
         onmessage.forget();
 

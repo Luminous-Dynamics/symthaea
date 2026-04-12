@@ -57,8 +57,7 @@ impl SwarmSnapshot {
         if self.pairwise_similarities.is_empty() {
             return 0.0;
         }
-        self.pairwise_similarities.iter().sum::<f32>()
-            / self.pairwise_similarities.len() as f32
+        self.pairwise_similarities.iter().sum::<f32>() / self.pairwise_similarities.len() as f32
     }
 
     fn max_coherence(&self) -> f32 {
@@ -113,10 +112,17 @@ fn compute_snapshot(tick: u64, states: &[MindState], n_byzantine: usize) -> Swar
         for j in (i + 1)..n {
             // Guard against dimension mismatch (cognitive loop may expand dims)
             if states[i].current_thought.dim() == states[j].current_thought.dim() {
-                pairwise.push(states[i].current_thought.similarity(&states[j].current_thought));
+                pairwise.push(
+                    states[i]
+                        .current_thought
+                        .similarity(&states[j].current_thought),
+                );
             } else {
                 // Truncate to smaller dimension for comparison
-                let min_dim = states[i].current_thought.dim().min(states[j].current_thought.dim());
+                let min_dim = states[i]
+                    .current_thought
+                    .dim()
+                    .min(states[j].current_thought.dim());
                 let a = ContinuousHV::from_slice(&states[i].current_thought.as_slice()[..min_dim]);
                 let b = ContinuousHV::from_slice(&states[j].current_thought.as_slice()[..min_dim]);
                 pairwise.push(a.similarity(&b));
@@ -193,9 +199,9 @@ async fn run_experiment(n_agents: usize, n_ticks: usize, byzantine_fraction: f64
     println!("{}", SwarmSnapshot::csv_header());
 
     // Phase boundaries
-    let phase1_end = n_ticks / 5;           // Independent (20%)
-    let phase2_end = n_ticks * 3 / 5;       // Shared experience (40%)
-    let _phase3_end = n_ticks;              // Byzantine resilience (40%)
+    let phase1_end = n_ticks / 5; // Independent (20%)
+    let phase2_end = n_ticks * 3 / 5; // Shared experience (40%)
+    let _phase3_end = n_ticks; // Byzantine resilience (40%)
 
     for tick in 0..n_ticks as u64 {
         // Determine stimuli
@@ -228,7 +234,10 @@ async fn run_experiment(n_agents: usize, n_ticks: usize, byzantine_fraction: f64
                 } else {
                     // Byzantine: rapid random noise
                     handle
-                        .perceive(ContinuousHV::random(dim, seed + 800000 + tick * 100 + i as u64))
+                        .perceive(ContinuousHV::random(
+                            dim,
+                            seed + 800000 + tick * 100 + i as u64,
+                        ))
                         .await;
                 }
             }
@@ -281,7 +290,10 @@ async fn run_experiment(n_agents: usize, n_ticks: usize, byzantine_fraction: f64
 
     eprintln!();
     eprintln!("--- Final State ---");
-    eprintln!("  Mean consciousness: {:.4}", final_snapshot.mean_consciousness());
+    eprintln!(
+        "  Mean consciousness: {:.4}",
+        final_snapshot.mean_consciousness()
+    );
     eprintln!("  Mean coherence: {:.4}", final_snapshot.mean_coherence());
     eprintln!("  Emergence ratio: {:.4}", final_snapshot.emergence_ratio());
 
@@ -439,9 +451,9 @@ async fn run_partial_experiment(n_agents: usize, n_ticks: usize, seed: u64) -> (
         .map(|i| ContinuousHV::random(dim, seed + 100_000 + i as u64))
         .collect();
 
-    let phase1_end = n_ticks / 4;     // 25% fragment-only perception
+    let phase1_end = n_ticks / 4; // 25% fragment-only perception
     let phase2_end = n_ticks * 3 / 4; // 50% social integration
-    // remaining 25% = convergence measurement
+                                      // remaining 25% = convergence measurement
 
     // CSV header
     println!("tick,n_agents,phase,mean_consciousness,mean_coherence,emergence_ratio");
@@ -483,7 +495,9 @@ async fn run_partial_experiment(n_agents: usize, n_ticks: usize, seed: u64) -> (
 
             println!(
                 "{},{},{},{:.6},{:.6},{:.6}",
-                tick, n_agents, phase,
+                tick,
+                n_agents,
+                phase,
                 snapshot.mean_consciousness(),
                 snapshot.mean_coherence(),
                 snapshot.emergence_ratio()
@@ -555,12 +569,28 @@ async fn main() {
     let mut i = 1;
     while i < args.len() {
         match args[i].as_str() {
-            "--agents" => { i += 1; n_agents = args[i].parse().unwrap_or(10); }
-            "--ticks" => { i += 1; n_ticks = args[i].parse().unwrap_or(200); }
-            "--byzantine" => { i += 1; byzantine = args[i].parse().unwrap_or(0.0); }
-            "--seed" => { i += 1; seed = args[i].parse().unwrap_or(42); }
-            "--scaling" => { scaling = true; }
-            "--partial" => { partial = true; }
+            "--agents" => {
+                i += 1;
+                n_agents = args[i].parse().unwrap_or(10);
+            }
+            "--ticks" => {
+                i += 1;
+                n_ticks = args[i].parse().unwrap_or(200);
+            }
+            "--byzantine" => {
+                i += 1;
+                byzantine = args[i].parse().unwrap_or(0.0);
+            }
+            "--seed" => {
+                i += 1;
+                seed = args[i].parse().unwrap_or(42);
+            }
+            "--scaling" => {
+                scaling = true;
+            }
+            "--partial" => {
+                partial = true;
+            }
             "--help" | "-h" => {
                 eprintln!("Swarm Consciousness Emergence Experiment");
                 eprintln!();

@@ -5,11 +5,15 @@
 //!
 //! Configuration for the hybrid Iroh + Holochain swarm network.
 
+use crate::domain::DomainProfile;
 use serde::{Deserialize, Serialize};
 
 /// Main swarm configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SwarmConfig {
+    /// Environment profile that constrains transport and localization behavior.
+    pub domain: DomainProfile,
+
     /// Port to listen on (0 = OS-assigned)
     pub listen_port: u16,
 
@@ -99,6 +103,7 @@ impl Default for CryptoConfig {
 impl Default for SwarmConfig {
     fn default() -> Self {
         Self {
+            domain: DomainProfile::default(),
             listen_port: 0, // OS-assigned for flexibility
             enable_mdns: true,
             enable_derp: true,
@@ -125,6 +130,14 @@ impl SwarmConfig {
             enable_derp: false,
             bootstrap_peers: vec![],
             require_handshake: false,
+            ..Default::default()
+        }
+    }
+
+    /// Create a config for a specific operating domain.
+    pub fn for_domain(domain: DomainProfile) -> Self {
+        Self {
+            domain,
             ..Default::default()
         }
     }
@@ -156,6 +169,21 @@ impl SwarmConfig {
         }
     }
 
+    /// Create config for underwater deployments.
+    pub fn underwater() -> Self {
+        Self::for_domain(DomainProfile::underwater())
+    }
+
+    /// Create config for subterranean deployments.
+    pub fn subterranean() -> Self {
+        Self::for_domain(DomainProfile::subterranean())
+    }
+
+    /// Create config for deep-space or interplanetary deployments.
+    pub fn deep_space() -> Self {
+        Self::for_domain(DomainProfile::deep_space())
+    }
+
     /// Add a bootstrap peer to the configuration
     pub fn add_bootstrap_peer(&mut self, peer: impl Into<String>) {
         self.bootstrap_peers.push(peer.into());
@@ -180,9 +208,7 @@ pub const MYCELIX_BOOTSTRAP_NODES_PRIMARY: &[&str] = &[
 ];
 
 /// Fallback bootstrap nodes operated by community partners.
-pub const MYCELIX_BOOTSTRAP_NODES_FALLBACK: &[&str] = &[
-    "iroh://bootstrap.mycelix.community:4433",
-];
+pub const MYCELIX_BOOTSTRAP_NODES_FALLBACK: &[&str] = &["iroh://bootstrap.mycelix.community:4433"];
 
 /// Combined bootstrap nodes (primary + fallback) for backward compatibility.
 pub const MYCELIX_BOOTSTRAP_NODES: &[&str] = &[
@@ -197,14 +223,12 @@ pub const MYCELIX_BOOTSTRAP_NODES: &[&str] = &[
 /// replace the compiled-in defaults. This enables runtime configuration
 /// without recompilation.
 fn bootstrap_nodes_from_env() -> Option<Vec<String>> {
-    std::env::var("MYCELIX_BOOTSTRAP_NODES")
-        .ok()
-        .map(|val| {
-            val.split(',')
-                .map(|s| s.trim().to_string())
-                .filter(|s| !s.is_empty())
-                .collect()
-        })
+    std::env::var("MYCELIX_BOOTSTRAP_NODES").ok().map(|val| {
+        val.split(',')
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty())
+            .collect()
+    })
 }
 
 /// Bootstrap node configuration for different environments
@@ -379,7 +403,10 @@ mod tests {
     #[test]
     fn test_bootstrap_config_has_primary_and_fallback() {
         let config = BootstrapConfig::default();
-        assert!(!config.primary.is_empty(), "Default must have primary nodes");
+        assert!(
+            !config.primary.is_empty(),
+            "Default must have primary nodes"
+        );
         assert!(
             !config.fallback.is_empty(),
             "Default must have fallback nodes"

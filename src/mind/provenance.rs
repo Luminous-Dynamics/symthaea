@@ -292,8 +292,12 @@ mod tests {
         let b = ProvenanceTag::from_episodic(100, 0.8);
         let merged = a.merge(&b);
 
-        assert!(merged.contributing_sources.contains(&InformationSource::EpisodicMemory));
-        assert!(merged.contributing_sources.contains(&InformationSource::KnowledgeGraph));
+        assert!(merged
+            .contributing_sources
+            .contains(&InformationSource::EpisodicMemory));
+        assert!(merged
+            .contributing_sources
+            .contains(&InformationSource::KnowledgeGraph));
     }
 
     #[test]
@@ -308,12 +312,18 @@ mod tests {
     fn test_serde_roundtrip() {
         let tag = ProvenanceTag::from_reasoning(
             42,
-            vec![InformationSource::KnowledgeGraph, InformationSource::EpisodicMemory],
+            vec![
+                InformationSource::KnowledgeGraph,
+                InformationSource::EpisodicMemory,
+            ],
         );
         let json = serde_json::to_string(&tag).unwrap();
         let restored: ProvenanceTag = serde_json::from_str(&json).unwrap();
         assert_eq!(restored.source, tag.source);
-        assert_eq!(restored.contributing_sources.len(), tag.contributing_sources.len());
+        assert_eq!(
+            restored.contributing_sources.len(),
+            tag.contributing_sources.len()
+        );
         assert_eq!(restored.produced_at_cycle, 42);
     }
 
@@ -329,7 +339,9 @@ mod tests {
         let input = ProvenanceTag::user_input(100);
         let broca = ProvenanceTag::from_broca(101, Some(&input));
         assert_eq!(broca.source, InformationSource::BrocaGeneration);
-        assert!(broca.contributing_sources.contains(&InformationSource::UserInput));
+        assert!(broca
+            .contributing_sources
+            .contains(&InformationSource::UserInput));
         assert!(broca.attribution_confidence < 1.0); // decayed
     }
 

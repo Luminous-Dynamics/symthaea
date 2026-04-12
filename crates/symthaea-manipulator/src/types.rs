@@ -21,7 +21,15 @@ pub struct ManipulatorState {
 impl ManipulatorState {
     pub fn home() -> Self {
         Self {
-            joint_angles: [0.0, 0.0, 0.0, -std::f64::consts::FRAC_PI_2, 0.0, std::f64::consts::FRAC_PI_2, 0.0],
+            joint_angles: [
+                0.0,
+                0.0,
+                0.0,
+                -std::f64::consts::FRAC_PI_2,
+                0.0,
+                std::f64::consts::FRAC_PI_2,
+                0.0,
+            ],
             joint_velocities: [0.0; NUM_JOINTS],
             end_effector_position: [0.3, 0.0, 0.5],
             end_effector_force: [0.0; 3],
@@ -31,10 +39,18 @@ impl ManipulatorState {
 
     pub fn to_channels(&self) -> [f32; NUM_STATE_CHANNELS] {
         let mut c = [0.0f32; NUM_STATE_CHANNELS];
-        for i in 0..NUM_JOINTS { c[i] = self.joint_angles[i] as f32; }
-        for i in 0..NUM_JOINTS { c[NUM_JOINTS + i] = self.joint_velocities[i] as f32; }
-        for i in 0..3 { c[14 + i] = self.end_effector_position[i] as f32; }
-        for i in 0..3 { c[17 + i] = self.end_effector_force[i] as f32; }
+        for i in 0..NUM_JOINTS {
+            c[i] = self.joint_angles[i] as f32;
+        }
+        for i in 0..NUM_JOINTS {
+            c[NUM_JOINTS + i] = self.joint_velocities[i] as f32;
+        }
+        for i in 0..3 {
+            c[14 + i] = self.end_effector_position[i] as f32;
+        }
+        for i in 0..3 {
+            c[17 + i] = self.end_effector_force[i] as f32;
+        }
         c[20] = self.gripper_opening as f32;
         c
     }
@@ -42,6 +58,17 @@ impl ManipulatorState {
     pub fn is_finite(&self) -> bool {
         self.joint_angles.iter().all(|v| v.is_finite())
             && self.end_effector_position.iter().all(|v| v.is_finite())
+    }
+
+    /// Domain-specific bounds check for physically plausible arm state.
+    ///
+    /// Returns `true` if all joint angles are within their limits (±2.9 rad
+    /// for Panda-class joints) and end-effector is within reach envelope.
+    pub fn is_bounded(&self) -> bool {
+        self.is_finite()
+            && self.joint_angles.iter().all(|&a| a.abs() < 3.0)
+            && self.joint_velocities.iter().all(|&v| v.abs() < 10.0)
+            && self.end_effector_position.iter().all(|&p| p.abs() < 2.0)
     }
 }
 
@@ -53,10 +80,17 @@ pub struct ManipulatorCommand {
 }
 
 impl ManipulatorCommand {
-    pub fn zero() -> Self { Self { joint_torques: [0.0; NUM_JOINTS], gripper: 0.5 } }
+    pub fn zero() -> Self {
+        Self {
+            joint_torques: [0.0; NUM_JOINTS],
+            gripper: 0.5,
+        }
+    }
 
     pub fn clamped(mut self) -> Self {
-        for t in &mut self.joint_torques { *t = t.clamp(-1.0, 1.0); }
+        for t in &mut self.joint_torques {
+            *t = t.clamp(-1.0, 1.0);
+        }
         self.gripper = self.gripper.clamp(0.0, 1.0);
         self
     }
@@ -115,7 +149,10 @@ mod tests {
 
     #[test]
     fn test_command_clamped() {
-        let cmd = ManipulatorCommand { joint_torques: [2.0; NUM_JOINTS], gripper: 1.5 };
+        let cmd = ManipulatorCommand {
+            joint_torques: [2.0; NUM_JOINTS],
+            gripper: 1.5,
+        };
         let clamped = cmd.clamped();
         assert!(clamped.joint_torques.iter().all(|&t| t <= 1.0));
         assert!(clamped.gripper <= 1.0);

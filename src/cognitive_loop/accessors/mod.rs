@@ -148,7 +148,9 @@ mod tests {
         s.set_social_signals(0.8, 0.3, 0.7, 5, 0.6);
         assert!((s.behavior.social_mgr.social.social_trust - 0.8).abs() < f32::EPSILON);
         assert!((s.behavior.social_mgr.social.social_cooperation_rate - 0.3).abs() < f32::EPSILON);
-        assert!((s.behavior.social_mgr.social.social_prediction_accuracy - 0.7).abs() < f32::EPSILON);
+        assert!(
+            (s.behavior.social_mgr.social.social_prediction_accuracy - 0.7).abs() < f32::EPSILON
+        );
         assert_eq!(s.behavior.social_mgr.social.social_models_count, 5);
         assert!((s.behavior.social_mgr.social.social_mean_trust - 0.6).abs() < f32::EPSILON);
     }
@@ -438,8 +440,14 @@ mod tests {
         let mut s = make_service();
         s.clamp_neuromod_levels(Some(0.5), None, Some(1.0), None);
         let snap = s.neuromod_snapshot();
-        assert!(snap.da_effective.is_finite(), "DA should be finite after clamp");
-        assert!(snap.sht_effective.is_finite(), "5HT should be finite after clamp");
+        assert!(
+            snap.da_effective.is_finite(),
+            "DA should be finite after clamp"
+        );
+        assert!(
+            snap.sht_effective.is_finite(),
+            "5HT should be finite after clamp"
+        );
     }
 
     #[test]
@@ -547,7 +555,10 @@ mod tests {
         let q = s.coupling_quality();
         // Initially should be InsufficientData (no cycles run)
         assert!(
-            matches!(q, crate::cognitive_loop::routing::CouplingQuality::InsufficientData),
+            matches!(
+                q,
+                crate::cognitive_loop::routing::CouplingQuality::InsufficientData
+            ),
             "coupling should be InsufficientData before any cycles, got {q:?}"
         );
     }
@@ -719,6 +730,9 @@ mod tests {
 
         // At least verify returned values are finite
         assert!(valence.is_finite(), "emotional_valence should be finite");
-        assert!(confidence.is_finite(), "prediction_confidence should be finite");
+        assert!(
+            confidence.is_finite(),
+            "prediction_confidence should be finite"
+        );
     }
 }

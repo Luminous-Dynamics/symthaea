@@ -74,13 +74,11 @@ pub fn emit_expression(node: &ProgramNode) -> String {
 
         ProgramNode::Apply { func, args } => emit_apply(func, args),
 
-        ProgramNode::Sequence(steps) => {
-            steps
-                .iter()
-                .map(|s| emit_expression(s))
-                .collect::<Vec<_>>()
-                .join(";\n    ")
-        }
+        ProgramNode::Sequence(steps) => steps
+            .iter()
+            .map(|s| emit_expression(s))
+            .collect::<Vec<_>>()
+            .join(";\n    "),
 
         ProgramNode::Branch {
             condition,
@@ -149,9 +147,7 @@ pub fn emit_expression(node: &ProgramNode) -> String {
             format!("{src}.collect::<Vec<_>>()")
         }
 
-        ProgramNode::Abstract(_examples) => {
-            "todo!(\"abstract pattern\")".to_string()
-        }
+        ProgramNode::Abstract(_examples) => "todo!(\"abstract pattern\")".to_string(),
     }
 }
 
@@ -213,10 +209,7 @@ mod tests {
 
     #[test]
     fn test_emit_apply_func() {
-        let node = ProgramNode::apply(
-            ProgramNode::atom("compute"),
-            vec![ProgramNode::atom("a")],
-        );
+        let node = ProgramNode::apply(ProgramNode::atom("compute"), vec![ProgramNode::atom("a")]);
         assert_eq!(emit_expression(&node), "compute(a)");
     }
 
@@ -227,10 +220,7 @@ mod tests {
             ProgramNode::atom("then"),
             ProgramNode::atom("els"),
         );
-        assert_eq!(
-            emit_expression(&node),
-            "if cond { then } else { els }"
-        );
+        assert_eq!(emit_expression(&node), "if cond { then } else { els }");
     }
 
     #[test]
@@ -259,19 +249,13 @@ mod tests {
 
     #[test]
     fn test_emit_not_op() {
-        let node = ProgramNode::apply(
-            ProgramNode::op("NOT"),
-            vec![ProgramNode::atom("flag")],
-        );
+        let node = ProgramNode::apply(ProgramNode::op("NOT"), vec![ProgramNode::atom("flag")]);
         assert_eq!(emit_expression(&node), "!flag");
     }
 
     #[test]
     fn test_emit_map() {
-        let node = ProgramNode::map(
-            ProgramNode::atom("double"),
-            ProgramNode::atom("items"),
-        );
+        let node = ProgramNode::map(ProgramNode::atom("double"), ProgramNode::atom("items"));
         let code = emit_expression(&node);
         assert!(code.contains("iter().map"), "should use iterator map");
         assert!(code.contains("double"), "should reference the function");

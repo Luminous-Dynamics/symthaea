@@ -138,7 +138,8 @@ impl WindModel {
 
         // 4. Aerodynamic drag force = -0.5 × ρ × Cd×A × |v_rel| × v_rel
         let rho = 1.225; // kg/m³ at sea level
-        let speed_sq = relative[0] * relative[0] + relative[1] * relative[1] + relative[2] * relative[2];
+        let speed_sq =
+            relative[0] * relative[0] + relative[1] * relative[1] + relative[2] * relative[2];
         let speed = speed_sq.sqrt();
         let drag_factor = -0.5 * rho * drag_area * speed;
 
@@ -254,7 +255,11 @@ mod tests {
         // Force should be in +x direction (wind pushes vehicle with the wind)
         // Actually: relative airspeed = 0 - 10 = -10, drag = -0.5*rho*CdA*|v|*v
         // drag_x = -0.5 * 1.225 * 2.0 * 10.0 * (-10.0) = +12.25 N
-        assert!(force.force[0] > 0.0, "Wind should push vehicle: Fx={}", force.force[0]);
+        assert!(
+            force.force[0] > 0.0,
+            "Wind should push vehicle: Fx={}",
+            force.force[0]
+        );
     }
 
     #[test]
@@ -295,10 +300,16 @@ mod tests {
     fn test_ground_effect_increases_near_ground() {
         let wind = WindModel::calm();
         let ratio_high = wind.ground_effect_ratio(100.0); // High altitude
-        let ratio_low = wind.ground_effect_ratio(5.0);    // One rotor radius
+        let ratio_low = wind.ground_effect_ratio(5.0); // One rotor radius
 
-        assert!((ratio_high - 1.0).abs() < 0.01, "High altitude: no ground effect");
-        assert!(ratio_low > 1.0, "Low altitude: ground effect should augment thrust");
+        assert!(
+            (ratio_high - 1.0).abs() < 0.01,
+            "High altitude: no ground effect"
+        );
+        assert!(
+            ratio_low > 1.0,
+            "Low altitude: ground effect should augment thrust"
+        );
         assert!(ratio_low > ratio_high);
     }
 
@@ -306,7 +317,10 @@ mod tests {
     fn test_ground_effect_capped() {
         let wind = WindModel::calm();
         let ratio = wind.ground_effect_ratio(0.5); // Very close to ground
-        assert!(ratio <= 1.3, "Ground effect should be capped: ratio={ratio}");
+        assert!(
+            ratio <= 1.3,
+            "Ground effect should be capped: ratio={ratio}"
+        );
     }
 
     #[test]

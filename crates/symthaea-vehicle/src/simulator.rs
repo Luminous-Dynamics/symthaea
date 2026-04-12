@@ -727,4 +727,58 @@ mod tests {
             max_change
         );
     }
+
+    mod proptest_physics {
+        use super::*;
+        use proptest::prelude::*;
+
+        proptest! {
+            /// Arbitrary commands and timesteps must never produce NaN/Inf.
+            #[test]
+            fn arbitrary_inputs_stay_finite(
+                steering in -1.0f32..1.0,
+                throttle in 0.0f32..1.0,
+                brake in 0.0f32..1.0,
+                dt in 0.001f64..0.02,
+                steps in 1usize..500,
+            ) {
+                let mut sim = BicycleModelSimulator::at_speed(10.0);
+                let cmd = VehicleCommand { steering, throttle, brake };
+                for _ in 0..steps {
+                    sim.step(&cmd, dt);
+                }
+                prop_assert!(sim.state().is_finite(), "Vehicle state diverged: speed={}", sim.state().speed);
+            }
+
+            /// Speed must never go negative (vehicle doesn't reverse from braking).
+            #[test]
+            fn speed_never_negative(
+                brake in 0.5f32..1.0,
+                dt in 0.001f64..0.02,
+            ) {
+                let mut sim = BicycleModelSimulator::at_speed(5.0);
+                let cmd = VehicleCommand { steering: 0.0, throttle: 0.0, brake };
+                for _ in 0..1000 {
+                    sim.step(&cmd, dt);
+                }
+                prop_assert!(sim.state().speed >= 0.0, "Speed went negative: {}", sim.state().speed);
+            }
+
+            /// Friction scaling must not cause divergence.
+            #[test]
+            fn friction_scaling_stays_finite(
+                friction in 0.01f64..2.0,
+                steering in -1.0f32..1.0,
+                throttle in 0.0f32..1.0,
+            ) {
+                let mut sim = BicycleModelSimulator::at_speed(15.0);
+                sim.set_friction_scale(friction);
+                let cmd = VehicleCommand { steering, throttle, brake: 0.0 };
+                for _ in 0..200 {
+                    sim.step(&cmd, 0.005);
+                }
+                prop_assert!(sim.state().is_finite(), "Diverged at friction={friction}: speed={}", sim.state().speed);
+            }
+        }
+    }
 }

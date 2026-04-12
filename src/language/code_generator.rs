@@ -873,6 +873,170 @@ impl CodeGenerator {
             }
         }
 
+        // Phase 5: Borrow-check heuristics
+        let borrow_warnings = Self::check_borrow_heuristics(source);
+        warnings.extend(borrow_warnings);
+
+        // Phase 5: Iterator type consistency
+        let iter_warnings = Self::check_iterator_consistency(source, ret_type);
+        warnings.extend(iter_warnings);
+
+        warnings
+    }
+
+    /// Phase 5: Lightweight borrow-check heuristics.
+    ///
+    /// Catches common Rust borrow errors without running rustc:
+    /// - Use after move (variable used after being passed by value)
+    /// - Mutable + immutable borrow conflicts (simple cases)
+    /// - Return of reference to local variable
+    fn check_borrow_heuristics(source: &str) -> Vec<String> {
+        let mut warnings = Vec::new();
+        let lines: Vec<&str> = source.lines().collect();
+
+        // Track variables that have been moved (passed to functions/methods consuming ownership)
+        let mut moved_vars: Vec<String> = Vec::new();
+
+        for (i, line) in lines.iter().enumerate() {
+            let trimmed = line.trim();
+
+            // Skip comments
+            if trimmed.starts_with("//") {
+                continue;
+            }
+
+            // Detect moves: into_iter(), sort() on owned, passing to function that takes T (not &T)
+            if trimmed.contains(".into_iter()") || trimmed.contains(".into_sorted()") {
+                // Extract the variable name before the method call
+                if let Some(var) = trimmed.split('.').next() {
+                    let var = var.trim().trim_start_matches("let ").trim();
+                    if !var.is_empty() && var.chars().all(|c| c.is_alphanumeric() || c == '_') {
+                        moved_vars.push(var.to_string());
+                    }
+                }
+            }
+
+            // Check if a moved variable is used again
+            for moved_var in &moved_vars {
+                if i > 0 && trimmed.contains(moved_var.as_str()) {
+                    // Only warn if it's a USE, not the move itself
+                    let prev_lines = &lines[..i];
+                    let was_moved_before = prev_lines.iter().any(|l| {
+                        l.contains(&format!("{}.into_iter()", moved_var))
+                            || l.contains(&format!("{}.into_sorted()", moved_var))
+                    });
+                    if was_moved_before && !trimmed.contains("into_iter") {
+                        warnings.push(format!(
+                            "BORROW_HINT(line {}): '{}' may have been moved earlier (into_iter/sort consumes ownership)",
+                            i + 1,
+                            moved_var
+                        ));
+                    }
+                }
+            }
+
+            // Detect return of reference to local
+            if trimmed.starts_with("&") && !trimmed.contains("&self") && !trimmed.contains("&mut self") {
+                // Check if this looks like a return of a local ref
+                let is_last_expr = i == lines.len() - 2; // second to last (before closing brace)
+                if is_last_expr && !trimmed.contains("&str") && !trimmed.contains("&[") {
+                    warnings.push(format!(
+                        "BORROW_HINT(line {}): returning a reference — ensure the referent outlives the return",
+                        i + 1
+                    ));
+                }
+            }
+
+            // Detect simultaneous mutable and immutable borrows (simple heuristic)
+            if trimmed.contains("&mut ") {
+                // Check if an immutable borrow of the same variable exists nearby
+                if let Some(var_after_mut) = trimmed.split("&mut ").nth(1) {
+                    let var_name: String = var_after_mut
+                        .chars()
+                        .take_while(|c| c.is_alphanumeric() || *c == '_')
+                        .collect();
+                    if !var_name.is_empty() {
+                        // Check surrounding lines for immutable borrow
+                        let window_start = i.saturating_sub(3);
+                        let window_end = (i + 4).min(lines.len());
+                        for j in window_start..window_end {
+                            if j != i {
+                                let other = lines[j].trim();
+                                if other.contains(&format!("&{}", var_name))
+                                    && !other.contains("&mut")
+                                    && !other.starts_with("//")
+                                {
+                                    warnings.push(format!(
+                                        "BORROW_HINT(lines {}-{}): possible simultaneous &mut and & borrow of '{}'",
+                                        i + 1,
+                                        j + 1,
+                                        var_name
+                                    ));
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        warnings
+    }
+
+    /// Phase 5: Check iterator chain type consistency.
+    ///
+    /// Verifies that iterator adapters produce types compatible with the
+    /// return type and with each other.
+    fn check_iterator_consistency(source: &str, ret_type: &str) -> Vec<String> {
+        let mut warnings = Vec::new();
+
+        // .iter() produces &T, but .collect::<Vec<T>>() needs owned T
+        // Common fix: .cloned() or .copied() before .collect()
+        if source.contains(".iter()") && source.contains(".collect()") {
+            if !source.contains(".cloned()")
+                && !source.contains(".copied()")
+                && !source.contains(".map(")
+                && !source.contains("to_vec()")
+                && !source.contains("to_string()")
+            {
+                // Check if return type expects owned values
+                if ret_type.contains("Vec<") && !ret_type.contains("Vec<&") {
+                    warnings.push(
+                        "TYPE_HINT: .iter().collect() produces Vec<&T> but return expects Vec<T>. Consider .cloned() or .copied()".to_string()
+                    );
+                }
+            }
+        }
+
+        // .filter() preserves reference level — if source has .filter() without .cloned()
+        // and collects to Vec<T>, that's a type error
+        if source.contains(".filter(") && source.contains(".collect()") {
+            if source.contains(".iter().filter(")
+                && !source.contains(".cloned()")
+                && !source.contains(".copied()")
+            {
+                if ret_type.contains("Vec<") && !ret_type.contains("Vec<&") {
+                    warnings.push(
+                        "TYPE_HINT: .iter().filter().collect() produces Vec<&&T>. Add .cloned() before .collect()".to_string()
+                    );
+                }
+            }
+        }
+
+        // .sum() requires Sum trait — usually works on numeric types
+        if source.contains(".sum()") && source.contains(".iter()") {
+            if !source.contains("::<") {
+                // May need turbofish: .sum::<i32>()
+                if !ret_type.is_empty() && !ret_type.contains("()") {
+                    warnings.push(format!(
+                        "TYPE_HINT: .iter().sum() may need turbofish .sum::<{}>() for type inference",
+                        ret_type
+                    ));
+                }
+            }
+        }
+
         warnings
     }
 
@@ -958,7 +1122,11 @@ impl CodeGenerator {
         let similar_refs: Vec<&ContinuousHV> = similar_hvs.iter().collect();
 
         // 3. CfC plan (informed by primitive composition + MCTS confidence)
-        let mut plan = self.sequencer.plan_structure(&intent_hv, &similar_refs);
+        // Use purpose text for direct keyword-based pattern detection (more reliable
+        // than HDC similarity with byte-hash encoding)
+        let mut plan =
+            self.sequencer
+                .plan_structure_with_purpose(&intent_hv, &similar_refs, &spec.purpose);
 
         // If MCTS confidence is high, boost low-confidence plan steps
         // (the reasoning engine has already vetted this direction)

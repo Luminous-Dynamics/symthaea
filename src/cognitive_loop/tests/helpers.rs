@@ -757,7 +757,10 @@ fn cosine_f32_nan_input_produces_finite_or_zero() {
     // NaN arithmetic is NaN, but clamped to [-1,1] — result may be NaN or clamped.
     // Key: the function should not panic. If finite, must be in [-1,1].
     if sim.is_finite() {
-        assert!(sim >= -1.0 && sim <= 1.0, "finite cosine must be in [-1,1], got {sim}");
+        assert!(
+            sim >= -1.0 && sim <= 1.0,
+            "finite cosine must be in [-1,1], got {sim}"
+        );
     }
 }
 

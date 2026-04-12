@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Quick test of CognitiveMoralClassifier on a few examples.
 
-use symthaea::hdc::cognitive_moral_classifier::CognitiveMoralClassifier;
 use std::time::Instant;
+use symthaea::hdc::cognitive_moral_classifier::CognitiveMoralClassifier;
 
 fn main() {
     let clf = CognitiveMoralClassifier::new();
@@ -32,16 +32,25 @@ fn main() {
         if let Some(features) = clf.encode(text) {
             let elapsed = start.elapsed();
             let moral_score = features[0];
-            let predicted = if moral_score > 0.1 { 1 }
-                else if moral_score < -0.1 { -1 }
-                else { 0 };
+            let predicted = if moral_score > 0.1 {
+                1
+            } else if moral_score < -0.1 {
+                -1
+            } else {
+                0
+            };
 
             let ok = predicted == *expected;
-            if ok { correct += 1; }
+            if ok {
+                correct += 1;
+            }
 
-            println!("  {} moral_score={:+.4} predicted={:+} expected={:+} [{:.1}s] {}",
+            println!(
+                "  {} moral_score={:+.4} predicted={:+} expected={:+} [{:.1}s] {}",
                 if ok { "✓" } else { "✗" },
-                moral_score, predicted, expected,
+                moral_score,
+                predicted,
+                expected,
                 elapsed.as_secs_f32(),
                 &text[..text.len().min(50)]
             );
@@ -50,5 +59,10 @@ fn main() {
         }
     }
 
-    println!("\nResult: {}/{} ({:.0}%)", correct, total, correct as f32 / total as f32 * 100.0);
+    println!(
+        "\nResult: {}/{} ({:.0}%)",
+        correct,
+        total,
+        correct as f32 / total as f32 * 100.0
+    );
 }

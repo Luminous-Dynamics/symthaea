@@ -760,7 +760,10 @@ impl MultiPrototypeClassifier {
                         .unwrap_or(0);
 
                     // Push correct toward sample
-                    for (pv, &ev) in protos[*correct_class][correct_idx].iter_mut().zip(enc.iter()) {
+                    for (pv, &ev) in protos[*correct_class][correct_idx]
+                        .iter_mut()
+                        .zip(enc.iter())
+                    {
                         *pv += lr * ev;
                     }
                     // Pull wrong away
@@ -790,7 +793,10 @@ impl MultiPrototypeClassifier {
                 for (ci, cp) in protos.iter().enumerate() {
                     for p in cp {
                         let s = dot_product(enc, p);
-                        if s > vs { vs = s; pred = ci; }
+                        if s > vs {
+                            vs = s;
+                            pred = ci;
+                        }
                     }
                 }
                 if pred == *label {

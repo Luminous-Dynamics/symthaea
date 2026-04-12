@@ -121,19 +121,32 @@ mod tests {
         let mean = sum / n as f32;
         let variance = sum_sq / n as f32 - mean * mean;
         assert!(mean.abs() < 0.3, "mean should be near 0: {mean}");
-        assert!(variance > 0.2 && variance < 3.0, "variance should be near 1: {variance}");
+        assert!(
+            variance > 0.2 && variance < 3.0,
+            "variance should be near 1: {variance}"
+        );
     }
 
     #[test]
     fn beat_one_accent() {
-        let mut note = Note { frequency: 440.0, start_time: 0.0, duration: 0.5, velocity: 0.7 };
+        let mut note = Note {
+            frequency: 440.0,
+            start_time: 0.0,
+            duration: 0.5,
+            velocity: 0.7,
+        };
         humanize(&mut note, 0.0, 0.5, 42);
         assert!(note.velocity > 0.6, "beat 1 should be accented");
     }
 
     #[test]
     fn legato_extends_duration() {
-        let mut note = Note { frequency: 440.0, start_time: 0.0, duration: 0.5, velocity: 0.7 };
+        let mut note = Note {
+            frequency: 440.0,
+            start_time: 0.0,
+            duration: 0.5,
+            velocity: 0.7,
+        };
         let orig_dur = note.duration;
         humanize(&mut note, 1.0, 0.5, 42);
         assert!(note.duration > orig_dur, "legato should extend duration");
@@ -142,7 +155,12 @@ mod tests {
     #[test]
     fn velocity_stays_bounded() {
         for seed in 0..100 {
-            let mut note = Note { frequency: 440.0, start_time: 0.0, duration: 0.5, velocity: 0.9 };
+            let mut note = Note {
+                frequency: 440.0,
+                start_time: 0.0,
+                duration: 0.5,
+                velocity: 0.9,
+            };
             humanize(&mut note, 0.0, 0.5, seed);
             assert!(note.velocity >= 0.05 && note.velocity <= 1.0);
         }

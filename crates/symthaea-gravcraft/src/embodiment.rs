@@ -81,11 +81,7 @@ impl GravcraftEmbodiment {
         }
 
         // Compute control effort (sum of absolute amplitudes)
-        let effort: f64 = cmd
-            .amplifiers
-            .iter()
-            .map(|(a, _, _, _)| a.abs())
-            .sum();
+        let effort: f64 = cmd.amplifiers.iter().map(|(a, _, _, _)| a.abs()).sum();
         self.last_control_effort = effort as f32;
 
         // Step the simulator

@@ -108,9 +108,16 @@ mod tests {
 
         let rms = (total_sq / count as f64).sqrt();
         let dz = (total_dz_sq / count as f64).sqrt();
-        eprintln!("5-fold CV overall: HDC RMS={:.2} MeV, DZ RMS={:.2} MeV, N={}", rms, dz, count);
+        eprintln!(
+            "5-fold CV overall: HDC RMS={:.2} MeV, DZ RMS={:.2} MeV, N={}",
+            rms, dz, count
+        );
 
-        assert!(rms.is_finite() && rms > 0.0 && rms < 500.0, "HDC CV RMS={}", rms);
+        assert!(
+            rms.is_finite() && rms > 0.0 && rms < 500.0,
+            "HDC CV RMS={}",
+            rms
+        );
     }
 
     // ── 2. Proton holdout ───────────────────────────────────────────────
@@ -165,12 +172,13 @@ mod tests {
         let rms = hdc_rms(&predictor, &test);
         let dz = dz_rms(&test);
 
-        eprintln!(
-            "  HDC RMS={:.2} MeV, DZ RMS={:.2} MeV",
-            rms, dz
-        );
+        eprintln!("  HDC RMS={:.2} MeV, DZ RMS={:.2} MeV", rms, dz);
 
-        assert!(rms.is_finite() && rms > 0.0, "Chain holdout HDC RMS={}", rms);
+        assert!(
+            rms.is_finite() && rms > 0.0,
+            "Chain holdout HDC RMS={}",
+            rms
+        );
     }
 
     // ── 4. Frontier holdout (N/Z >= 1.4) ────────────────────────────────
@@ -205,12 +213,13 @@ mod tests {
         let rms = hdc_rms(&predictor, &test);
         let dz = dz_rms(&test);
 
-        eprintln!(
-            "  HDC RMS={:.2} MeV, DZ RMS={:.2} MeV",
-            rms, dz
-        );
+        eprintln!("  HDC RMS={:.2} MeV, DZ RMS={:.2} MeV", rms, dz);
 
-        assert!(rms.is_finite() && rms > 0.0, "Frontier holdout HDC RMS={}", rms);
+        assert!(
+            rms.is_finite() && rms > 0.0,
+            "Frontier holdout HDC RMS={}",
+            rms
+        );
     }
 
     // ── 5. Superheavy holdout (Z >= 100) ────────────────────────────────
@@ -237,11 +246,12 @@ mod tests {
         let rms = hdc_rms(&predictor, &test);
         let dz = dz_rms(&test);
 
-        eprintln!(
-            "  HDC RMS={:.2} MeV, DZ RMS={:.2} MeV",
-            rms, dz
-        );
+        eprintln!("  HDC RMS={:.2} MeV, DZ RMS={:.2} MeV", rms, dz);
 
-        assert!(rms.is_finite() && rms > 0.0, "Superheavy holdout HDC RMS={}", rms);
+        assert!(
+            rms.is_finite() && rms > 0.0,
+            "Superheavy holdout HDC RMS={}",
+            rms
+        );
     }
 }

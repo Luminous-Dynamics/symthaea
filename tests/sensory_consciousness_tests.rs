@@ -160,7 +160,11 @@ fn test_sudden_event_disrupts_consciousness() {
     }
 
     // All values finite
-    for (phase, data) in [("phase1", &phase1_phi), ("phase2", &phase2_phi), ("phase3", &phase3_phi)] {
+    for (phase, data) in [
+        ("phase1", &phase1_phi),
+        ("phase2", &phase2_phi),
+        ("phase3", &phase3_phi),
+    ] {
         for (i, phi) in data.iter().enumerate() {
             assert!(phi.is_finite(), "NaN in {phase} at cycle {i}");
         }
@@ -203,7 +207,8 @@ fn test_gradual_environmental_change() {
     }
 
     // No sudden jumps (max cycle-to-cycle change should be bounded)
-    let max_jump = phi_history.windows(2)
+    let max_jump = phi_history
+        .windows(2)
         .map(|w| (w[1] - w[0]).abs())
         .fold(0.0f64, f64::max);
 
@@ -249,7 +254,9 @@ fn test_multimodal_fusion_affects_consciousness() {
     }
 
     // Measure trajectory difference
-    let phi_diffs: Vec<f64> = visual_phi.iter().zip(&fused_phi)
+    let phi_diffs: Vec<f64> = visual_phi
+        .iter()
+        .zip(&fused_phi)
         .map(|(v, f)| (v - f).abs())
         .collect();
     let max_diff = phi_diffs.iter().cloned().fold(0.0f64, f64::max);
@@ -341,7 +348,9 @@ fn test_sensory_consciousness_input_variance() {
 
     // Count varying inputs
     let varying = [phi_var > 1e-8, coh_var > 1e-8, flow_var > 1e-8]
-        .iter().filter(|&&v| v).count();
+        .iter()
+        .filter(|&&v| v)
+        .count();
 
     // After modality-agnostic wiring, phi should vary with sensory input.
     assert!(
@@ -350,17 +359,34 @@ fn test_sensory_consciousness_input_variance() {
     );
 
     eprintln!("\n═══ SENSORY TEST 5: 4-INPUT VARIANCE AUDIT ═══");
-    eprintln!("  Phi variance:        {phi_var:.8}  {}", if phi_var > 1e-8 { "VARIES" } else { "CONSTANT" });
-    eprintln!("  Coherence variance:  {coh_var:.8}  {}", if coh_var > 1e-8 { "VARIES" } else { "CONSTANT" });
-    eprintln!("  Flow variance:       {flow_var:.8}  {}", if flow_var > 1e-8 { "VARIES" } else { "CONSTANT" });
+    eprintln!(
+        "  Phi variance:        {phi_var:.8}  {}",
+        if phi_var > 1e-8 { "VARIES" } else { "CONSTANT" }
+    );
+    eprintln!(
+        "  Coherence variance:  {coh_var:.8}  {}",
+        if coh_var > 1e-8 { "VARIES" } else { "CONSTANT" }
+    );
+    eprintln!(
+        "  Flow variance:       {flow_var:.8}  {}",
+        if flow_var > 1e-8 {
+            "VARIES"
+        } else {
+            "CONSTANT"
+        }
+    );
     eprintln!("  Varying inputs: {varying}/3");
     if varying >= 3 {
         eprintln!("  VERDICT: Consciousness is multi-dimensional with sensory input!");
     } else if varying >= 2 {
         eprintln!("  VERDICT: Consciousness is partially multi-dimensional.");
     } else {
-        eprintln!("  FINDING: Consciousness remains low-dimensional even with varied sensory input.");
-        eprintln!("  This suggests CfC tau convergence and flow entry need longer sustained engagement.");
+        eprintln!(
+            "  FINDING: Consciousness remains low-dimensional even with varied sensory input."
+        );
+        eprintln!(
+            "  This suggests CfC tau convergence and flow entry need longer sustained engagement."
+        );
     }
     eprintln!("═══════════════════════════════════════════════\n");
 }

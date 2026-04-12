@@ -6,8 +6,8 @@
 //! wind down. Without this, notes are uniformly distributed regardless of
 //! section — the music doesn't breathe.
 
-use std::collections::VecDeque;
 use crate::structure::SectionType;
+use std::collections::VecDeque;
 
 /// Section-aware density targets (inter-onset interval in milliseconds).
 pub struct DensityTarget {
@@ -19,10 +19,26 @@ pub struct DensityTarget {
 impl DensityTarget {
     fn for_section(section: SectionType) -> Self {
         match section {
-            SectionType::Ambient => Self { min_ioi_ms: 500.0, max_ioi_ms: 1200.0, target_ioi_ms: 700.0 },
-            SectionType::Exploratory => Self { min_ioi_ms: 250.0, max_ioi_ms: 600.0, target_ioi_ms: 400.0 },
-            SectionType::Developmental => Self { min_ioi_ms: 300.0, max_ioi_ms: 700.0, target_ioi_ms: 500.0 },
-            SectionType::Climactic => Self { min_ioi_ms: 150.0, max_ioi_ms: 400.0, target_ioi_ms: 250.0 },
+            SectionType::Ambient => Self {
+                min_ioi_ms: 500.0,
+                max_ioi_ms: 1200.0,
+                target_ioi_ms: 700.0,
+            },
+            SectionType::Exploratory => Self {
+                min_ioi_ms: 250.0,
+                max_ioi_ms: 600.0,
+                target_ioi_ms: 400.0,
+            },
+            SectionType::Developmental => Self {
+                min_ioi_ms: 300.0,
+                max_ioi_ms: 700.0,
+                target_ioi_ms: 500.0,
+            },
+            SectionType::Climactic => Self {
+                min_ioi_ms: 150.0,
+                max_ioi_ms: 400.0,
+                target_ioi_ms: 250.0,
+            },
         }
     }
 }
@@ -65,13 +81,19 @@ impl DensityRegulator {
 
     /// Mean inter-onset interval in milliseconds.
     pub fn mean_ioi_ms(&self) -> f32 {
-        if self.recent_onsets.len() < 2 { return self.current_target.target_ioi_ms; }
-        let iois: Vec<f32> = self.recent_onsets.iter()
+        if self.recent_onsets.len() < 2 {
+            return self.current_target.target_ioi_ms;
+        }
+        let iois: Vec<f32> = self
+            .recent_onsets
+            .iter()
             .zip(self.recent_onsets.iter().skip(1))
             .map(|(a, b)| (b - a) * 1000.0)
             .filter(|&ioi| ioi > 0.0)
             .collect();
-        if iois.is_empty() { return self.current_target.target_ioi_ms; }
+        if iois.is_empty() {
+            return self.current_target.target_ioi_ms;
+        }
         iois.iter().sum::<f32>() / iois.len() as f32
     }
 
@@ -122,7 +144,7 @@ mod tests {
     fn sparse_onset_recommends_reduce() {
         let mut reg = DensityRegulator::new();
         reg.set_section(SectionType::Climactic); // wants dense (250ms)
-        // Record onsets 2 seconds apart (very sparse)
+                                                 // Record onsets 2 seconds apart (very sparse)
         reg.record_onset(0.0);
         reg.record_onset(2.0);
         reg.record_onset(4.0);
@@ -134,7 +156,7 @@ mod tests {
     fn dense_onset_recommends_rest() {
         let mut reg = DensityRegulator::new();
         reg.set_section(SectionType::Ambient); // wants sparse (700ms)
-        // Record onsets 50ms apart (very dense)
+                                               // Record onsets 50ms apart (very dense)
         for i in 0..20 {
             reg.record_onset(i as f32 * 0.05);
         }
@@ -162,6 +184,9 @@ mod tests {
             reg.record_onset(i as f32 * 0.5); // 500ms apart (normal)
         }
         let adjusted = reg.adjust_cadence(4);
-        assert!(adjusted >= 1 && adjusted <= 16, "cadence should be bounded: {adjusted}");
+        assert!(
+            adjusted >= 1 && adjusted <= 16,
+            "cadence should be bounded: {adjusted}"
+        );
     }
 }

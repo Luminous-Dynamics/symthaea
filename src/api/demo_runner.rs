@@ -27,6 +27,9 @@ pub struct DemoRunner {
     /// Whether to run vision manifold each cycle.
     #[cfg(feature = "vision-manifold")]
     pub vision_enabled: bool,
+    /// Optional mesh daemon orchestrator (spawned edge consciousness kernel).
+    #[cfg(feature = "mesh")]
+    pub mesh_daemon: Option<crate::swarm::mesh::MeshDaemonOrchestrator>,
 }
 
 impl DemoRunner {
@@ -48,7 +51,40 @@ impl DemoRunner {
             vision: None,
             #[cfg(feature = "vision-manifold")]
             vision_enabled: false,
+            #[cfg(feature = "mesh")]
+            mesh_daemon: None,
         })
+    }
+
+    /// Spawn the mesh daemon subprocess (spore-mesh-daemon).
+    ///
+    /// Gracefully degrades: if the binary is not found, logs a warning and continues.
+    #[cfg(feature = "mesh")]
+    pub async fn enable_mesh_daemon(&mut self) {
+        use crate::swarm::mesh::{DaemonConfig, MeshDaemonOrchestrator};
+
+        let config = DaemonConfig::default();
+        match MeshDaemonOrchestrator::spawn(config).await {
+            Ok(orch) => {
+                tracing::info!("Mesh daemon spawned (spore-mesh-daemon, 15Hz edge kernel)");
+                self.mesh_daemon = Some(orch);
+            }
+            Err(e) => {
+                tracing::warn!(error = %e, "Mesh daemon not available — running without local mesh kernel");
+            }
+        }
+    }
+
+    /// Drain consciousness outputs from the mesh daemon and return as SwarmEvents.
+    ///
+    /// Called each tick from the WebSocket handler. Returns empty vec if no daemon.
+    #[cfg(feature = "mesh")]
+    pub fn drain_mesh_daemon(&mut self) -> Vec<crate::swarm::mesh::ConsciousnessOutput> {
+        if let Some(ref mut daemon) = self.mesh_daemon {
+            daemon.drain_outputs()
+        } else {
+            Vec::new()
+        }
     }
 
     /// Enable the vision manifold with a mock camera source.
@@ -63,6 +99,65 @@ impl DemoRunner {
     #[cfg(feature = "vision-manifold")]
     pub fn disable_vision(&mut self) {
         self.vision_enabled = false;
+    }
+
+    /// Enable Iroh P2P swarm and spawn inbound accept loop.
+    ///
+    /// Call this once after construction, before the demo router is built.
+    /// Silently degrades to local-only if attestation fails or the feature is disabled.
+    #[cfg(all(feature = "identity", feature = "swarm"))]
+    pub async fn enable_p2p(&mut self) {
+        match self.service.enable_network_attestation().await {
+            Ok(()) => {
+                tracing::info!("Demo: Iroh P2P swarm active");
+                if let Some(svc) = self.service.network_service().cloned() {
+                    let node_id = svc.node_id();
+                    if !node_id.is_empty() {
+                        tracing::info!("Demo: Iroh node ID: {}", node_id);
+                    }
+                    match svc.create_ticket() {
+                        Ok(ticket) => tracing::info!("Demo: bootstrap ticket (share with peers): {}", ticket),
+                        Err(e) => tracing::debug!(error = %e, "Demo: ticket not available yet"),
+                    }
+                    tokio::spawn(svc.accept_connections());
+                }
+            }
+            Err(e) => {
+                tracing::warn!(error = %e, "Demo: P2P disabled — running local-only");
+            }
+        }
+    }
+
+    /// Return the Iroh node's JSON-serialised EndpointAddr ticket (for peer bootstrap).
+    ///
+    /// Returns `None` when the `swarm` + `identity` features are not enabled or P2P
+    /// has not been initialised. Returns `Some(Err(...))` if the node is initialised
+    /// but ticket creation fails (e.g. endpoint not yet bound).
+    #[cfg(all(feature = "identity", feature = "swarm"))]
+    pub fn iroh_ticket(&self) -> Option<Result<String, String>> {
+        self.service
+            .network_service()
+            .map(|svc| svc.create_ticket().map_err(|e| e.to_string()))
+    }
+
+    /// Get a cloneable reference to the NetworkService (for async broadcast from WS handler).
+    pub fn network_service_arc(&self) -> Option<&std::sync::Arc<crate::swarm::NetworkService>> {
+        self.service.network_service()
+    }
+
+    /// Get the swarm event sender for injecting mesh daemon consciousness updates.
+    pub fn swarm_event_sender(
+        &self,
+    ) -> std::sync::mpsc::Sender<crate::cognitive_loop::managers::swarm_manager::SwarmEvent> {
+        self.service.swarm_event_sender()
+    }
+
+    /// Node ID (hex-encoded EndpointId public key) — available without the full ticket.
+    pub fn iroh_node_id(&self) -> String {
+        self.service
+            .network_service()
+            .map(|svc| svc.node_id())
+            .unwrap_or_default()
     }
 
     /// Set the text input for the next cycle.
@@ -137,6 +232,13 @@ impl DemoRunner {
             sleep_pressure: m.neuromod.neuromod_sleep_pressure,
             active_injection_count: m.neuromod.active_injection_count,
             attractor_detected: m.neuromod.neuromod_attractor_detected,
+            // Swarm P2P telemetry (Iroh)
+            swarm_peers: self.service.swarm_connected_peers() as u32,
+            network_mean_phi: self
+                .service
+                .network_service()
+                .map(|svc| svc.network_mean_phi())
+                .unwrap_or(0.0),
             // Mesh telemetry
             mesh_health_score: m.mesh.mesh_health_score,
             mesh_peer_count: m.mesh.mesh_peer_count,

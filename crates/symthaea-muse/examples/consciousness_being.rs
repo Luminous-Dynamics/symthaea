@@ -15,7 +15,9 @@
 #[cfg(not(feature = "voice"))]
 fn main() {
     println!("Requires --features voice");
-    println!("Run: cargo run --release --features voice -p symthaea-muse --example consciousness_being");
+    println!(
+        "Run: cargo run --release --features voice -p symthaea-muse --example consciousness_being"
+    );
 }
 
 #[cfg(feature = "voice")]
@@ -63,9 +65,8 @@ fn main() {
         prediction_error: 0.1,
     };
 
-    let mut all_samples: Vec<[f32; 2]> = Vec::with_capacity(
-        sample_rate as usize * duration as usize,
-    );
+    let mut all_samples: Vec<[f32; 2]> =
+        Vec::with_capacity(sample_rate as usize * duration as usize);
 
     println!("Rendering {:.0}s consciousness journey...\n", duration);
 
@@ -90,7 +91,7 @@ fn main() {
             state.noradrenaline = 0.1 + phase_t * 0.2;
             state.harmony_activations[1] = 0.3 + phase_t * 0.4; // warmth rising
             state.harmony_activations[2] = 0.3 + phase_t * 0.4; // stability
-            state.harmony_activations[6] = phase_t * 0.5;        // progression
+            state.harmony_activations[6] = phase_t * 0.5; // progression
         } else if t < 65.0 {
             // Phase 3: Peak integration (45-65s)
             let phase_t = (t - 45.0) / 20.0;
@@ -125,10 +126,15 @@ fn main() {
         all_samples.extend_from_slice(&chunk);
 
         if chunk_idx % (chunks_per_second * 10) == 0 {
-            let phase = if t < 20.0 { "Stillness" }
-                else if t < 45.0 { "Awakening" }
-                else if t < 65.0 { "Peak" }
-                else { "Return" };
+            let phase = if t < 20.0 {
+                "Stillness"
+            } else if t < 45.0 {
+                "Awakening"
+            } else if t < 65.0 {
+                "Peak"
+            } else {
+                "Return"
+            };
             println!(
                 "  [{:5.1}s] {:10} Ψ={:.2} A={:.2} V={:+.2}",
                 t, phase, state.consciousness_level, state.arousal, state.valence
@@ -151,12 +157,16 @@ fn main() {
     let mut writer = hound::WavWriter::create(&path, spec).expect("create WAV");
     for pair in &all_samples {
         for &s in pair {
-            writer.write_sample((s * 32767.0).clamp(-32768.0, 32767.0) as i16).expect("write");
+            writer
+                .write_sample((s * 32767.0).clamp(-32768.0, 32767.0) as i16)
+                .expect("write");
         }
     }
     writer.finalize().expect("finalize");
 
-    let size_mb = std::fs::metadata(&path).map(|m| m.len() as f32 / 1048576.0).unwrap_or(0.0);
+    let size_mb = std::fs::metadata(&path)
+        .map(|m| m.len() as f32 / 1048576.0)
+        .unwrap_or(0.0);
     println!("\nOutput: {} ({:.1} MB)", path.display(), size_mb);
     println!("Play: aplay {}", path.display());
 }

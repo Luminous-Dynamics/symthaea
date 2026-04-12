@@ -83,11 +83,7 @@ impl PhonemeCentroids {
     /// Loss = -log(exp(h · c_pos / T) / Σ_k exp(h · c_k / T))
     ///
     /// Returns (loss, ∂loss/∂hidden_state).
-    pub fn contrastive_loss(
-        &self,
-        hidden: &[f32],
-        label: &str,
-    ) -> (f32, Vec<f32>) {
+    pub fn contrastive_loss(&self, hidden: &[f32], label: &str) -> (f32, Vec<f32>) {
         // Compute logits (dot product / temperature) for all centroids
         let mut logits: Vec<(String, f32)> = Vec::with_capacity(self.centroids.len());
         let mut max_logit = f32::NEG_INFINITY;
@@ -285,7 +281,10 @@ mod tests {
         assert!(loss.is_finite(), "Loss should be finite: {}", loss);
         assert!(loss >= 0.0, "Loss should be non-negative: {}", loss);
         assert_eq!(grad.len(), 8, "Gradient should match hidden dim");
-        assert!(grad.iter().all(|g| g.is_finite()), "Gradients should be finite");
+        assert!(
+            grad.iter().all(|g| g.is_finite()),
+            "Gradients should be finite"
+        );
     }
 
     #[test]
@@ -304,7 +303,8 @@ mod tests {
         assert!(
             loss_correct < loss_wrong,
             "Correct label should have lower loss: correct={}, wrong={}",
-            loss_correct, loss_wrong
+            loss_correct,
+            loss_wrong
         );
     }
 
@@ -332,7 +332,10 @@ mod tests {
             assert!(
                 diff < 0.01,
                 "Gradient mismatch at dim {}: analytic={:.6}, numerical={:.6}, diff={:.6}",
-                d, analytic_grad[d], numerical, diff
+                d,
+                analytic_grad[d],
+                numerical,
+                diff
             );
         }
     }
@@ -369,17 +372,20 @@ mod tests {
             .collect();
 
         // Train 5 iterations and verify loss decreases
-        let (loss_0, _, _) = train_utterance(&mut ltc, &centroids, &mel_frames, &frame_labels, &config);
+        let (loss_0, _, _) =
+            train_utterance(&mut ltc, &centroids, &mel_frames, &frame_labels, &config);
         for _ in 0..4 {
             train_utterance(&mut ltc, &centroids, &mel_frames, &frame_labels, &config);
         }
-        let (loss_5, _, _) = train_utterance(&mut ltc, &centroids, &mel_frames, &frame_labels, &config);
+        let (loss_5, _, _) =
+            train_utterance(&mut ltc, &centroids, &mel_frames, &frame_labels, &config);
 
         // Loss should decrease (or at minimum not increase drastically)
         assert!(
             loss_5 < loss_0 + 0.5,
             "Loss should decrease over training: initial={:.4}, final={:.4}",
-            loss_0, loss_5
+            loss_0,
+            loss_5
         );
     }
 }

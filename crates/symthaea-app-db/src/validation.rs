@@ -30,9 +30,7 @@ pub fn validate_hostname(s: &str) -> Result<String, String> {
         .chars()
         .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
     {
-        return Err(
-            "Hostname can only contain lowercase letters, numbers, and hyphens".into(),
-        );
+        return Err("Hostname can only contain lowercase letters, numbers, and hyphens".into());
     }
     Ok(s)
 }
@@ -58,8 +56,7 @@ pub fn validate_username(s: &str) -> Result<String, String> {
         .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_' || c == '-')
     {
         return Err(
-            "Username can only contain lowercase letters, numbers, underscores, and hyphens"
-                .into(),
+            "Username can only contain lowercase letters, numbers, underscores, and hyphens".into(),
         );
     }
     if s == "root" {
@@ -78,9 +75,8 @@ pub fn validate_timezone(s: &str) -> Result<(), String> {
         return Ok(());
     }
     if s.contains('/')
-        && s.chars().all(|c| {
-            c.is_ascii_alphanumeric() || c == '/' || c == '_' || c == '-' || c == '+'
-        })
+        && s.chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '/' || c == '_' || c == '-' || c == '+')
     {
         return Ok(());
     }
@@ -89,47 +85,9 @@ pub fn validate_timezone(s: &str) -> Result<(), String> {
 
 /// Known XKB keyboard layouts.
 const KNOWN_KEYBOARDS: &[&str] = &[
-    "us",
-    "gb",
-    "de",
-    "fr",
-    "es",
-    "it",
-    "pt",
-    "br-abnt2",
-    "ru",
-    "jp",
-    "kr",
-    "se",
-    "no",
-    "dk",
-    "fi",
-    "nl",
-    "be",
-    "ch",
-    "at",
-    "pl",
-    "cz",
-    "hu",
-    "ro",
-    "bg",
-    "hr",
-    "sk",
-    "si",
-    "lt",
-    "lv",
-    "ee",
-    "tr",
-    "il",
-    "ar",
-    "in",
-    "th",
-    "cn",
-    "tw",
-    "za",
-    "dvorak",
-    "colemak",
-    "neo",
+    "us", "gb", "de", "fr", "es", "it", "pt", "br-abnt2", "ru", "jp", "kr", "se", "no", "dk", "fi",
+    "nl", "be", "ch", "at", "pl", "cz", "hu", "ro", "bg", "hr", "sk", "si", "lt", "lv", "ee", "tr",
+    "il", "ar", "in", "th", "cn", "tw", "za", "dvorak", "colemak", "neo",
 ];
 
 /// Validate a keyboard layout string. Unknown layouts pass (user may know better).
@@ -171,7 +129,10 @@ pub fn validate_step1(
     if let Err(e) = validate_keyboard(keyboard) {
         warnings.push(e); // keyboard is a warning, not blocking
     }
-    if validate_keyboard(keyboard).is_ok() && !is_known_keyboard(keyboard) && !keyboard.trim().is_empty() {
+    if validate_keyboard(keyboard).is_ok()
+        && !is_known_keyboard(keyboard)
+        && !keyboard.trim().is_empty()
+    {
         warnings.push(format!(
             "\"{}\" is not a recognized XKB layout. It may still work if your system supports it.",
             keyboard.trim()
@@ -386,8 +347,18 @@ mod tests {
 
     #[test]
     fn timezone_common_values() {
-        for tz in &["UTC", "America/New_York", "Europe/London", "Asia/Tokyo", "Australia/Sydney"] {
-            assert!(validate_timezone(tz).is_ok(), "Timezone '{}' should be valid", tz);
+        for tz in &[
+            "UTC",
+            "America/New_York",
+            "Europe/London",
+            "Asia/Tokyo",
+            "Australia/Sydney",
+        ] {
+            assert!(
+                validate_timezone(tz).is_ok(),
+                "Timezone '{}' should be valid",
+                tz
+            );
         }
     }
 

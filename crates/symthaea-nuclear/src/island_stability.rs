@@ -113,13 +113,7 @@ impl StabilityLandscape {
     }
 
     /// Generate a stability map for a rectangular region of the nuclear chart.
-    pub fn stability_map(
-        &self,
-        z_min: u16,
-        z_max: u16,
-        n_min: u16,
-        n_max: u16,
-    ) -> StabilityMap {
+    pub fn stability_map(&self, z_min: u16, z_max: u16, n_min: u16, n_max: u16) -> StabilityMap {
         let mut entries = Vec::new();
 
         for z in z_min..=z_max {
@@ -140,9 +134,7 @@ impl StabilityLandscape {
     /// This is the specific test for Lazar's Element 115 claims:
     /// does the shell model predict any stable isotopes?
     pub fn evaluate_moscovium_isotopes(&self) -> Vec<IsotopeStability> {
-        (170..=184)
-            .map(|n| self.evaluate_isotope(115, n))
-            .collect()
+        (170..=184).map(|n| self.evaluate_isotope(115, n)).collect()
     }
 
     /// Find stability islands in a map.
@@ -332,11 +324,8 @@ impl StabilityLandscape {
 
         for z in z_min..=z_max {
             // Find all isotopes for this element
-            let isotopes: Vec<&IsotopeStability> = map
-                .entries
-                .iter()
-                .filter(|e| e.z == z)
-                .collect();
+            let isotopes: Vec<&IsotopeStability> =
+                map.entries.iter().filter(|e| e.z == z).collect();
 
             if isotopes.is_empty() {
                 continue;
@@ -462,7 +451,11 @@ mod tests {
         let landscape = StabilityLandscape::default();
         let mc_isotopes = landscape.evaluate_moscovium_isotopes();
 
-        assert_eq!(mc_isotopes.len(), 15, "Should evaluate Mc-285 through Mc-299");
+        assert_eq!(
+            mc_isotopes.len(),
+            15,
+            "Should evaluate Mc-285 through Mc-299"
+        );
 
         // All Mc isotopes should have positive binding energy
         for iso in &mc_isotopes {

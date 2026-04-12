@@ -60,19 +60,24 @@ fn main() {
         consciousness_level: 0.2,
         arousal: 0.15,
         dopamine: 0.2,
-        serotonin: 0.6,      // warm, calm
+        serotonin: 0.6, // warm, calm
         noradrenaline: 0.1,
         harmony_activations: [
-            0.3, 0.1, 0.1, 0.1,  // low coherence
-            0.1, 0.1, 0.1, 0.4,  // moderate stillness
+            0.3, 0.1, 0.1, 0.1, // low coherence
+            0.1, 0.1, 0.1, 0.4, // moderate stillness
         ],
-        valence: 0.1,          // slightly positive
+        valence: 0.1,           // slightly positive
         prediction_error: 0.15, // some curiosity
     };
 
-    println!("Rendering {} chunks ({:.0}s)...\n", total_chunks, total_duration_secs);
-    println!("  Seed: Ψ={:.2}, arousal={:.2}, valence={:.2}\n",
-        state.consciousness_level, state.arousal, state.valence);
+    println!(
+        "Rendering {} chunks ({:.0}s)...\n",
+        total_chunks, total_duration_secs
+    );
+    println!(
+        "  Seed: Ψ={:.2}, arousal={:.2}, valence={:.2}\n",
+        state.consciousness_level, state.arousal, state.valence
+    );
 
     let mut last_section = String::new();
 
@@ -138,29 +143,39 @@ fn main() {
         // Print section transitions
         let section = section_name(progress);
         if section != last_section {
-            println!("  ──── {} ────  (Ψ={:.2}, beauty={:.2})",
-                section, state.consciousness_level, state.valence);
+            println!(
+                "  ──── {} ────  (Ψ={:.2}, beauty={:.2})",
+                section, state.consciousness_level, state.valence
+            );
             last_section = section.clone();
         }
         if chunk_idx % 500 == 0 {
-            println!("  [{:.0}%] Ψ={:.2} a={:.2} v={:.2} da={:.2} still={:.2}",
+            println!(
+                "  [{:.0}%] Ψ={:.2} a={:.2} v={:.2} da={:.2} still={:.2}",
                 progress * 100.0,
-                state.consciousness_level, state.arousal, state.valence,
-                state.dopamine, state.harmony_activations[7]);
+                state.consciousness_level,
+                state.arousal,
+                state.valence,
+                state.dopamine,
+                state.harmony_activations[7]
+            );
         }
     }
 
     // Auto-master: LUFS normalization, corrective EQ, limiting
     println!("\nAuto-mastering...");
     let master_config = symthaea_muse::auto_master::MasteringConfig::default();
-    let master_result = symthaea_muse::auto_master::auto_master(
-        &mut all_samples, sample_rate, &master_config,
-    );
+    let master_result =
+        symthaea_muse::auto_master::auto_master(&mut all_samples, sample_rate, &master_config);
     println!("  Input LUFS:  {:.1}", master_result.input_lufs);
     println!("  Output LUFS: {:.1}", master_result.output_lufs);
     println!("  Gain: {:.1} dB", master_result.gain_applied_db);
-    println!("  EQ corrections: low={:.1}dB mid={:.1}dB high={:.1}dB",
-        master_result.eq_corrections[0], master_result.eq_corrections[1], master_result.eq_corrections[2]);
+    println!(
+        "  EQ corrections: low={:.1}dB mid={:.1}dB high={:.1}dB",
+        master_result.eq_corrections[0],
+        master_result.eq_corrections[1],
+        master_result.eq_corrections[2]
+    );
 
     // Write WAV
     let path = dir.join("consciousness_demo_3min.wav");
@@ -171,29 +186,54 @@ fn main() {
     let fe_history = synth.free_energy_history();
     let early_fe = if fe_history.len() > 20 {
         fe_history[..20].iter().sum::<f64>() / 20.0
-    } else { 0.0 };
+    } else {
+        0.0
+    };
     let late_fe = if fe_history.len() > 20 {
-        fe_history[fe_history.len()-20..].iter().sum::<f64>() / 20.0
-    } else { 0.0 };
+        fe_history[fe_history.len() - 20..].iter().sum::<f64>() / 20.0
+    } else {
+        0.0
+    };
 
     println!("\n╔══════════════════════════════════════════════════════════════╗");
     println!("║  Free Composition Complete                                 ║");
     println!("╠══════════════════════════════════════════════════════════════╣");
-    println!("║  Duration:  {:.1}s ({:.1} minutes)                          ║", duration, duration / 60.0);
-    println!("║  Samples:   {}                                     ║", all_samples.len());
-    println!("║  FEP cycles: {}                                         ║", synth.fep_cycles());
-    println!("║  FE learning: {:.4} → {:.4} (Δ={:.4})                  ║", early_fe, late_fe, early_fe - late_fe);
+    println!(
+        "║  Duration:  {:.1}s ({:.1} minutes)                          ║",
+        duration,
+        duration / 60.0
+    );
+    println!(
+        "║  Samples:   {}                                     ║",
+        all_samples.len()
+    );
+    println!(
+        "║  FEP cycles: {}                                         ║",
+        synth.fep_cycles()
+    );
+    println!(
+        "║  FE learning: {:.4} → {:.4} (Δ={:.4})                  ║",
+        early_fe,
+        late_fe,
+        early_fe - late_fe
+    );
     println!("║  Output:    {}          ║", path.display());
     println!("╚══════════════════════════════════════════════════════════════╝");
     println!("\nPlay: aplay {}", path.display());
 }
 
 fn section_name(progress: f32) -> String {
-    if progress < 0.20 { "Exposition".into() }
-    else if progress < 0.40 { "Development".into() }
-    else if progress < 0.60 { "Climax".into() }
-    else if progress < 0.80 { "Recapitulation".into() }
-    else { "Coda".into() }
+    if progress < 0.20 {
+        "Exposition".into()
+    } else if progress < 0.40 {
+        "Development".into()
+    } else if progress < 0.60 {
+        "Climax".into()
+    } else if progress < 0.80 {
+        "Recapitulation".into()
+    } else {
+        "Coda".into()
+    }
 }
 
 fn write_wav(path: &std::path::Path, audio: &AudioData, sample_rate: u32) {

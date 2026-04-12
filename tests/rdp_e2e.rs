@@ -73,9 +73,7 @@ fn test_e2e_server_to_client_frame_flow() {
 
     // Forward server frames to client.
     for frame in frames_received {
-        client_inbound_tx
-            .send(ClientInbound::Frame(frame))
-            .unwrap();
+        client_inbound_tx.send(ClientInbound::Frame(frame)).unwrap();
     }
 
     let updated = client.poll();

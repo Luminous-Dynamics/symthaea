@@ -25,7 +25,11 @@ pub struct StochasticResidual {
 
 impl StochasticResidual {
     pub fn new(seed: u32) -> Self {
-        Self { noise_state: seed, lp_state: 0.0, bp_state: [0.0; 2] }
+        Self {
+            noise_state: seed,
+            lp_state: 0.0,
+            bp_state: [0.0; 2],
+        }
     }
 
     /// Generate one sample of filtered noise appropriate for the instrument.
@@ -36,11 +40,15 @@ impl StochasticResidual {
     /// `sample_rate`: audio sample rate
     pub fn tick(&mut self, brightness: f32, body_freq: f32, amount: f32, sample_rate: f32) -> f32 {
         // Generate white noise
-        self.noise_state = self.noise_state.wrapping_mul(1103515245).wrapping_add(12345);
+        self.noise_state = self
+            .noise_state
+            .wrapping_mul(1103515245)
+            .wrapping_add(12345);
         let noise = (self.noise_state >> 16) as f32 / 32768.0 - 1.0;
 
         // Low-pass filter (brightness control)
-        let lp_coeff = (std::f32::consts::TAU * (500.0 + brightness * 4000.0) / sample_rate).min(0.99);
+        let lp_coeff =
+            (std::f32::consts::TAU * (500.0 + brightness * 4000.0) / sample_rate).min(0.99);
         self.lp_state += lp_coeff * (noise - self.lp_state);
 
         // Body resonance (bandpass at body_freq)
@@ -82,8 +90,11 @@ pub fn constrain_pitch_range(freq: f32, center_freq: f32, max_range_semitones: f
     } else {
         // Hard clamp to boundary then octave-fold inward
         let mut f = freq.clamp(min_freq * 0.5, max_freq * 2.0);
-        while f > max_freq { f /= 2.0; }
-        while f < min_freq { f *= 2.0;
+        while f > max_freq {
+            f /= 2.0;
+        }
+        while f < min_freq {
+            f *= 2.0;
         }
         f
     }
@@ -106,12 +117,12 @@ pub fn body_resonance(instrument: &str) -> f32 {
 /// Noise amount by instrument (how much stochastic residual).
 pub fn noise_amount(instrument: &str) -> f32 {
     match instrument {
-        "piano" => 0.03,   // hammer noise
-        "violin" => 0.06,  // bow scrape
+        "piano" => 0.03,  // hammer noise
+        "violin" => 0.06, // bow scrape
         "cello" => 0.05,
-        "guitar" => 0.04,  // pick/finger noise
-        "flute" => 0.08,   // breath noise (significant)
-        "bell" => 0.01,    // minimal
+        "guitar" => 0.04, // pick/finger noise
+        "flute" => 0.08,  // breath noise (significant)
+        "bell" => 0.01,   // minimal
         _ => 0.03,
     }
 }
@@ -135,20 +146,20 @@ impl ProductionEQ {
             "prog_metal" => Self {
                 highpass_hz: 80.0,
                 mud_cut_db: -3.0,
-                presence_boost_db: 3.0,  // pick attack, articulation
+                presence_boost_db: 3.0, // pick attack, articulation
                 air_boost_db: 1.0,
             },
             "jazz" => Self {
                 highpass_hz: 60.0,
-                mud_cut_db: -1.5,        // less aggressive
+                mud_cut_db: -1.5, // less aggressive
                 presence_boost_db: 1.0,
-                air_boost_db: 2.0,       // warmth + air
+                air_boost_db: 2.0, // warmth + air
             },
             "ambient" => Self {
                 highpass_hz: 40.0,
                 mud_cut_db: -1.0,
-                presence_boost_db: 0.0,  // no harsh presence
-                air_boost_db: 3.0,       // lots of air
+                presence_boost_db: 0.0, // no harsh presence
+                air_boost_db: 3.0,      // lots of air
             },
             "funk" => Self {
                 highpass_hz: 60.0,
@@ -176,7 +187,9 @@ mod tests {
         let mut has_signal = false;
         for _ in 0..1000 {
             let s = res.tick(0.5, 400.0, 0.05, 44100.0);
-            if s.abs() > 0.001 { has_signal = true; }
+            if s.abs() > 0.001 {
+                has_signal = true;
+            }
         }
         assert!(has_signal, "residual should produce signal");
     }
@@ -194,7 +207,10 @@ mod tests {
         let too_high = 1760.0; // A6, 24 semitones up
         let constrained = constrain_pitch_range(too_high, center, 14.0);
         let distance = (constrained / center).log2() * 12.0;
-        assert!(distance.abs() <= 7.5, "should be within range: {distance} semitones");
+        assert!(
+            distance.abs() <= 7.5,
+            "should be within range: {distance} semitones"
+        );
     }
 
     #[test]
@@ -202,6 +218,9 @@ mod tests {
         let center = 440.0;
         let in_range = 493.88; // B4, 2 semitones up
         let result = constrain_pitch_range(in_range, center, 14.0);
-        assert!((result - in_range).abs() < 1.0, "should not change in-range pitch");
+        assert!(
+            (result - in_range).abs() < 1.0,
+            "should not change in-range pitch"
+        );
     }
 }

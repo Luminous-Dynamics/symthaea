@@ -446,7 +446,7 @@ impl CodingAgent {
                         .push(format!("Quality gate rejected code: {quality_issue}"));
                     if let Some(tier) = self.generation_tiers.last().copied() {
                         if let Some(ref mut dispatcher) = self.dispatcher {
-                            dispatcher.record_outcome(tier, false);
+                            dispatcher.record_outcome_with_category(tier, false, &self.task);
                         }
                     }
                     self.generated_code = None;

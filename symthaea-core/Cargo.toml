@@ -2,9 +2,16 @@
 name = "symthaea-core"
 version = "0.5.0"
 edition = "2021"
-authors = ["Luminous Dynamics"]
-description = "Core primitives for Symthaea: HDC, Phi Engine, and basic Consciousness structures"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Core primitives for Symthaea: 16,384D hyperdimensional computing, Phi engine, LTC neural dynamics, and consciousness structures. The foundation for 85+ symthaea crates."
 license = "AGPL-3.0-or-later"
+repository = "https://github.com/luminous-dynamics/symthaea"
+keywords = ["hdc", "phi", "neuroscience", "simulation", "consciousness"]
+categories = ["science", "simulation", "algorithms"]
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
 
 [dependencies]
 ndarray = { workspace = true }
@@ -14,18 +21,20 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
 uuid = { workspace = true }
-# im removed: planned for immutable data structures but never imported
 bincode = { workspace = true }
 rayon = { workspace = true, optional = true }
 anyhow = { workspace = true }
 blake3 = { workspace = true }
-sha3 = "0.10"  # SHAKE-256 Keccak sponge for deterministic genesis
-ordered-float = "4.2"  # Orderable floats for heap-based top-k selection
+sha3 = "0.10"
+ordered-float = "4.2"
 parking_lot = { workspace = true }
 once_cell = { workspace = true }
 nalgebra = { workspace = true }
-bumpalo = "3.16"  # Arena allocation
+bumpalo = "3.16"
 chrono = { workspace = true }
+
+# Geometric Algebra (optional — provides bivectors, rotors, N-dimensional transforms)
+symtropy-math = { version = "0.1", optional = true }
 
 # Multi-Database Consciousness Architecture (optional dependencies)
 # Qdrant: Sensory Cortex - ultra-fast vector similarity for perception
@@ -43,7 +52,7 @@ duckdb = { version = "1.1", features = ["bundled"], optional = true }
 tokio = { version = "1.35", features = ["rt", "sync", "time"], optional = true }
 
 # ONNX Runtime for semantic encoder (requires `embeddings` feature)
-ort = { version = "2.0.0-rc.10", features = ["half", "load-dynamic", "ndarray"], optional = true }
+ort = { version = "=2.0.0-rc.10", features = ["half", "load-dynamic", "ndarray"], optional = true }  # Pinned RC; upgrade to 2.0.0 stable when released
 tokenizers = { version = "0.21", optional = true }
 hf-hub = { version = "0.4", optional = true }
 
@@ -55,6 +64,10 @@ tokio = { version = "1.35", features = ["rt-multi-thread", "macros"] }  # For as
 [[example]]
 name = "primitive_showcase"
 path = "examples/primitive_showcase.rs"
+
+[[example]]
+name = "cross_domain_query"
+path = "examples/cross_domain_query.rs"
 
 # scaling_study_demo: module not yet wired into physics/mod.rs; exclude from default build
 [[example]]
@@ -130,8 +143,10 @@ datalog = []                                 # Prefrontal Cortex: recursive reas
 lance = ["dep:tokio"]                         # Long-Term Memory: multimodal storage (lancedb dep pending upgrade)
 duck = ["dep:duckdb"]                        # Epistemic Auditor: analytics/Phi stats
 complex_cfc = []                             # Complex-valued CfC neuron with native oscillation
+geometric-algebra = ["dep:symtropy-math"]     # N-dimensional geometric algebra: bivectors, rotors, transforms
 _scaling_study = []                          # Gate for scaling_study_demo example
 epistemic = []                               # Epistemic substrate profiles and knowledge validation
 neural_validation = []                       # TRIBE v2 fMRI comparison: cortical activation maps, Glasser parcellation, HRF
+synthesis-trait = []                         # Unified CodeSynthesisBackend trait for cross-backend code generation
 
 # full-databases removed: aggregate never referenced (enable individual features: qdrant, datalog, lance, duck)

@@ -22,13 +22,34 @@ pub struct TimeSignature {
 }
 
 impl TimeSignature {
-    pub const FOUR_FOUR: Self = Self { numerator: 4, denominator: 4 };
-    pub const THREE_FOUR: Self = Self { numerator: 3, denominator: 4 };
-    pub const FIVE_FOUR: Self = Self { numerator: 5, denominator: 4 };
-    pub const SEVEN_EIGHT: Self = Self { numerator: 7, denominator: 8 };
-    pub const SIX_EIGHT: Self = Self { numerator: 6, denominator: 8 };
-    pub const NINE_EIGHT: Self = Self { numerator: 9, denominator: 8 };
-    pub const FIVE_EIGHT: Self = Self { numerator: 5, denominator: 8 };
+    pub const FOUR_FOUR: Self = Self {
+        numerator: 4,
+        denominator: 4,
+    };
+    pub const THREE_FOUR: Self = Self {
+        numerator: 3,
+        denominator: 4,
+    };
+    pub const FIVE_FOUR: Self = Self {
+        numerator: 5,
+        denominator: 4,
+    };
+    pub const SEVEN_EIGHT: Self = Self {
+        numerator: 7,
+        denominator: 8,
+    };
+    pub const SIX_EIGHT: Self = Self {
+        numerator: 6,
+        denominator: 8,
+    };
+    pub const NINE_EIGHT: Self = Self {
+        numerator: 9,
+        denominator: 8,
+    };
+    pub const FIVE_EIGHT: Self = Self {
+        numerator: 5,
+        denominator: 8,
+    };
 
     /// Beats per bar as float (for timing calculations).
     pub fn beats_per_bar(&self) -> f32 {
@@ -39,13 +60,13 @@ impl TimeSignature {
     /// 7/8 = 2+2+3, 5/4 = 3+2, etc.
     pub fn groupings(&self) -> Vec<u8> {
         match (self.numerator, self.denominator) {
-            (7, 8) => vec![2, 2, 3],     // AAL, Dream Theater style
-            (5, 4) => vec![3, 2],         // Take Five, Sting
+            (7, 8) => vec![2, 2, 3], // AAL, Dream Theater style
+            (5, 4) => vec![3, 2],    // Take Five, Sting
             (5, 8) => vec![3, 2],
-            (9, 8) => vec![3, 3, 3],      // compound triple
-            (6, 8) => vec![3, 3],          // compound duple
-            (3, 4) => vec![3],             // waltz
-            (4, 4) => vec![4],             // standard
+            (9, 8) => vec![3, 3, 3], // compound triple
+            (6, 8) => vec![3, 3],    // compound duple
+            (3, 4) => vec![3],       // waltz
+            (4, 4) => vec![4],       // standard
             (n, _) => {
                 // Generic: split into 2s and 3s
                 let mut groups = Vec::new();
@@ -132,7 +153,7 @@ impl GroovePocket {
         Self {
             swing: dopamine * 0.3 * (1.0 - arousal * 0.5), // swing reduces at high arousal
             laid_back: serotonin * 0.2 * (1.0 - arousal * 0.7), // tight at high arousal
-            ghost_notes: dopamine * 0.4, // funk = ghost notes
+            ghost_notes: dopamine * 0.4,                   // funk = ghost notes
         }
     }
 
@@ -218,12 +239,16 @@ impl SyncopationPattern {
             }
         }
 
-        Self { onset_positions: onsets, accents }
+        Self {
+            onset_positions: onsets,
+            accents,
+        }
     }
 
     /// Get the next onset position after the given beat position.
     pub fn next_onset(&self, current_beat: f32) -> Option<(f32, f32)> {
-        self.onset_positions.iter()
+        self.onset_positions
+            .iter()
             .zip(self.accents.iter())
             .find(|(&pos, _)| pos > current_beat + 0.01)
             .map(|(&pos, &accent)| (pos, accent))
@@ -235,18 +260,18 @@ impl SyncopationPattern {
 pub enum ExtendedChordType {
     Major,
     Minor,
-    Major7,       // Cmaj7 (jazzy, Steven Wilson)
-    Minor7,       // Cm7 (jazz standard)
-    Dominant7,    // C7 (blues, funk — RHCP)
-    Minor9,       // Cm9 (neo-soul, Spalding)
-    Major9,       // Cmaj9 (dreamy, Pink Floyd)
-    Sus2,         // Csus2 (open, atmospheric)
-    Sus4,         // Csus4 (tension)
-    Diminished7,  // Cdim7 (tension, Dream Theater)
-    Augmented,    // Caug (mysterious)
-    Add9,         // Cadd9 (bright, Yvette Young)
-    Minor11,      // Cm11 (deep jazz)
-    Dominant9,    // C9 (funk, Vulfpeck)
+    Major7,      // Cmaj7 (jazzy, Steven Wilson)
+    Minor7,      // Cm7 (jazz standard)
+    Dominant7,   // C7 (blues, funk — RHCP)
+    Minor9,      // Cm9 (neo-soul, Spalding)
+    Major9,      // Cmaj9 (dreamy, Pink Floyd)
+    Sus2,        // Csus2 (open, atmospheric)
+    Sus4,        // Csus4 (tension)
+    Diminished7, // Cdim7 (tension, Dream Theater)
+    Augmented,   // Caug (mysterious)
+    Add9,        // Cadd9 (bright, Yvette Young)
+    Minor11,     // Cm11 (deep jazz)
+    Dominant9,   // C9 (funk, Vulfpeck)
 }
 
 impl ExtendedChordType {
@@ -260,8 +285,8 @@ impl ExtendedChordType {
             Self::Dominant7 => vec![1.0, 1.2599, 1.4983, 1.7818], // 1, M3, P5, m7
             Self::Minor9 => vec![1.0, 1.1892, 1.4983, 1.7818, 2.2449], // 1, m3, P5, m7, M9
             Self::Major9 => vec![1.0, 1.2599, 1.4983, 1.8877, 2.2449], // 1, M3, P5, M7, M9
-            Self::Sus2 => vec![1.0, 1.1225, 1.4983], // 1, M2, P5
-            Self::Sus4 => vec![1.0, 1.3348, 1.4983], // 1, P4, P5
+            Self::Sus2 => vec![1.0, 1.1225, 1.4983],  // 1, M2, P5
+            Self::Sus4 => vec![1.0, 1.3348, 1.4983],  // 1, P4, P5
             Self::Diminished7 => vec![1.0, 1.1892, 1.4142, 1.6818], // 1, m3, dim5, dim7
             Self::Augmented => vec![1.0, 1.2599, 1.5874], // 1, M3, aug5
             Self::Add9 => vec![1.0, 1.2599, 1.4983, 2.2449], // 1, M3, P5, M9
@@ -280,15 +305,30 @@ impl ExtendedChordType {
 
         // High consciousness + jazz influence = extended chords
         if psi > 0.7 && dopamine > 0.5 {
-            if valence > 0.3 { Self::Major9 } // bright, dreamy
-            else { Self::Minor9 } // deep, Spalding
+            if valence > 0.3 {
+                Self::Major9
+            }
+            // bright, dreamy
+            else {
+                Self::Minor9
+            } // deep, Spalding
         } else if psi > 0.6 && serotonin > 0.5 {
-            if valence > 0.0 { Self::Major7 } // Steven Wilson
-            else { Self::Minor7 } // jazz standard
+            if valence > 0.0 {
+                Self::Major7
+            }
+            // Steven Wilson
+            else {
+                Self::Minor7
+            } // jazz standard
         } else if pe > 0.6 {
             // High tension = dissonant chords
-            if pe > 0.8 { Self::Diminished7 } // Dream Theater tension
-            else { Self::Augmented } // mysterious
+            if pe > 0.8 {
+                Self::Diminished7
+            }
+            // Dream Theater tension
+            else {
+                Self::Augmented
+            } // mysterious
         } else if dopamine > 0.6 {
             Self::Dominant9 // funk, Vulfpeck
         } else if serotonin > 0.6 && valence > 0.0 {
@@ -357,38 +397,67 @@ mod tests {
             ..Default::default()
         };
         let ts = select_time_signature(&state);
-        assert!(ts.numerator != 4 || ts.denominator != 4, "high complexity should give odd meter");
+        assert!(
+            ts.numerator != 4 || ts.denominator != 4,
+            "high complexity should give odd meter"
+        );
     }
 
     #[test]
     fn low_consciousness_stays_four_four() {
-        let state = MusicalState { consciousness_level: 0.2, ..Default::default() };
+        let state = MusicalState {
+            consciousness_level: 0.2,
+            ..Default::default()
+        };
         let ts = select_time_signature(&state);
         assert_eq!(ts, TimeSignature::FOUR_FOUR);
     }
 
     #[test]
     fn groove_pocket_laid_back_with_serotonin() {
-        let state = MusicalState { serotonin: 0.8, arousal: 0.3, ..Default::default() };
+        let state = MusicalState {
+            serotonin: 0.8,
+            arousal: 0.3,
+            ..Default::default()
+        };
         let groove = GroovePocket::from_state(&state);
-        assert!(groove.laid_back > 0.05, "high serotonin should be laid-back: {}", groove.laid_back);
+        assert!(
+            groove.laid_back > 0.05,
+            "high serotonin should be laid-back: {}",
+            groove.laid_back
+        );
     }
 
     #[test]
     fn groove_tighter_at_high_arousal() {
-        let relaxed = MusicalState { serotonin: 0.8, arousal: 0.2, ..Default::default() };
-        let intense = MusicalState { serotonin: 0.8, arousal: 0.9, ..Default::default() };
+        let relaxed = MusicalState {
+            serotonin: 0.8,
+            arousal: 0.2,
+            ..Default::default()
+        };
+        let intense = MusicalState {
+            serotonin: 0.8,
+            arousal: 0.9,
+            ..Default::default()
+        };
         let g_relaxed = GroovePocket::from_state(&relaxed);
         let g_intense = GroovePocket::from_state(&intense);
-        assert!(g_intense.laid_back < g_relaxed.laid_back,
-            "high arousal should be tighter: intense={} relaxed={}", g_intense.laid_back, g_relaxed.laid_back);
+        assert!(
+            g_intense.laid_back < g_relaxed.laid_back,
+            "high arousal should be tighter: intense={} relaxed={}",
+            g_intense.laid_back,
+            g_relaxed.laid_back
+        );
     }
 
     #[test]
     fn syncopation_generates_onsets() {
         let ts = TimeSignature::SEVEN_EIGHT;
         let pattern = SyncopationPattern::generate(&ts, 0.5, 42);
-        assert!(!pattern.onset_positions.is_empty(), "should generate onsets");
+        assert!(
+            !pattern.onset_positions.is_empty(),
+            "should generate onsets"
+        );
         assert_eq!(pattern.onset_positions.len(), pattern.accents.len());
     }
 
@@ -401,18 +470,33 @@ mod tests {
 
     #[test]
     fn tempo_range_wide() {
-        let slow = MusicalState { arousal: 0.0, harmony_activations: [0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.8], ..Default::default() };
-        let fast = MusicalState { arousal: 0.9, consciousness_level: 0.9, ..Default::default() };
+        let slow = MusicalState {
+            arousal: 0.0,
+            harmony_activations: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.8],
+            ..Default::default()
+        };
+        let fast = MusicalState {
+            arousal: 0.9,
+            consciousness_level: 0.9,
+            ..Default::default()
+        };
         let t_slow = select_tempo(&slow);
         let t_fast = select_tempo(&fast);
         assert!(t_slow < 70.0, "should be slow: {t_slow}");
         assert!(t_fast > 140.0, "should be fast: {t_fast}");
-        assert!(t_fast - t_slow > 80.0, "range should be wide: {t_slow}-{t_fast}");
+        assert!(
+            t_fast - t_slow > 80.0,
+            "range should be wide: {t_slow}-{t_fast}"
+        );
     }
 
     #[test]
     fn high_dopamine_gives_funk_chord() {
-        let state = MusicalState { dopamine: 0.8, consciousness_level: 0.5, ..Default::default() };
+        let state = MusicalState {
+            dopamine: 0.8,
+            consciousness_level: 0.5,
+            ..Default::default()
+        };
         let chord = ExtendedChordType::from_state(&state, 1.0);
         assert_eq!(chord, ExtendedChordType::Dominant9); // funk!
     }

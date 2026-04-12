@@ -124,7 +124,9 @@ impl HumanoidController {
         let total_weights = num_outputs * BOTTLENECK_DIM;
         let weight_hv = genesis.hv("humanoid::output_weights_v2", total_weights);
         let mut output_weights = weight_hv.values;
-        for w in &mut output_weights { *w *= 0.1; }
+        for w in &mut output_weights {
+            *w *= 0.1;
+        }
         let output_bias = vec![0.0f32; num_outputs];
 
         Self {
@@ -152,7 +154,10 @@ impl HumanoidController {
 
         // 3. Bottleneck: 16384→64 via fixed random projections (dot products)
         let mut bottleneck = vec![0.0f32; BOTTLENECK_DIM];
-        for (b, proj) in bottleneck.iter_mut().zip(self.bottleneck_projections.iter()) {
+        for (b, proj) in bottleneck
+            .iter_mut()
+            .zip(self.bottleneck_projections.iter())
+        {
             *b = proj.similarity(&output_hv); // Cosine similarity = normalized dot product
         }
         // Apply tanh nonlinearity — this is what enables learning nonlinear control laws
@@ -200,7 +205,10 @@ impl HumanoidController {
 
         // Forward pass through bottleneck (recompute for gradient)
         let mut bottleneck = vec![0.0f32; BOTTLENECK_DIM];
-        for (b, proj) in bottleneck.iter_mut().zip(self.bottleneck_projections.iter()) {
+        for (b, proj) in bottleneck
+            .iter_mut()
+            .zip(self.bottleneck_projections.iter())
+        {
             *b = proj.similarity(&output_hv);
         }
         let mut bottleneck_activated = vec![0.0f32; BOTTLENECK_DIM];
@@ -245,7 +253,8 @@ impl HumanoidController {
         for i in 0..self.num_outputs {
             let row_offset = i * BOTTLENECK_DIM;
             for j in 0..BOTTLENECK_DIM {
-                self.output_weights[row_offset + j] -= output_lr * d_raw[i] * bottleneck_activated[j];
+                self.output_weights[row_offset + j] -=
+                    output_lr * d_raw[i] * bottleneck_activated[j];
             }
             self.output_bias[i] -= output_lr * d_raw[i];
         }
@@ -466,12 +475,7 @@ impl HumanoidController {
 
         let num_outputs = config.morphology.num_actuators();
         let mut output_bias = vec![0.0f32; num_outputs];
-        for (i, &v) in checkpoint
-            .output_bias
-            .iter()
-            .enumerate()
-            .take(num_outputs)
-        {
+        for (i, &v) in checkpoint.output_bias.iter().enumerate().take(num_outputs) {
             output_bias[i] = v;
         }
 

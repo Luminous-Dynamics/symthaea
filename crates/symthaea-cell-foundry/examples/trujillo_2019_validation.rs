@@ -107,14 +107,14 @@ fn trujillo_data_points() -> Vec<ValidationDataPoint> {
             day: 30,
             description: "Early proliferation; no spontaneous activity reported",
             metrics: OrganoidMetrics {
-                cell_count: 5_000,         // ESTIMATED
-                neuron_count: 200,         // ESTIMATED — few neurons at this stage
-                neural_fraction: 0.04,     // ESTIMATED
-                synapse_count: 50,         // ESTIMATED — minimal connectivity
-                synapse_density: 0.25,     // ESTIMATED
-                mean_firing_rate_hz: 0.0,  // REPORTED (no activity)
+                cell_count: 5_000,        // ESTIMATED
+                neuron_count: 200,        // ESTIMATED — few neurons at this stage
+                neural_fraction: 0.04,    // ESTIMATED
+                synapse_count: 50,        // ESTIMATED — minimal connectivity
+                synapse_density: 0.25,    // ESTIMATED
+                mean_firing_rate_hz: 0.0, // REPORTED (no activity)
                 spontaneous_activity_index: 0.0,
-                phi_estimate: 0.0,         // ESTIMATED (no integration)
+                phi_estimate: 0.0, // ESTIMATED (no integration)
                 oscillation_detected: false,
                 stage: DevelopmentalStage::NeuralInduction,
                 ethics_status: EthicsStatus::PreConscious,
@@ -132,14 +132,14 @@ fn trujillo_data_points() -> Vec<ValidationDataPoint> {
             day: 60,
             description: "Rare bursts every ~20 s (REPORTED)",
             metrics: OrganoidMetrics {
-                cell_count: 15_000,        // ESTIMATED
-                neuron_count: 1_500,       // ESTIMATED
-                neural_fraction: 0.10,     // ESTIMATED
-                synapse_count: 3_000,      // ESTIMATED
-                synapse_density: 2.0,      // ESTIMATED
-                mean_firing_rate_hz: 0.05, // REPORTED — burst every 20 s ≈ 0.05 Hz
+                cell_count: 15_000,               // ESTIMATED
+                neuron_count: 1_500,              // ESTIMATED
+                neural_fraction: 0.10,            // ESTIMATED
+                synapse_count: 3_000,             // ESTIMATED
+                synapse_density: 2.0,             // ESTIMATED
+                mean_firing_rate_hz: 0.05,        // REPORTED — burst every 20 s ≈ 0.05 Hz
                 spontaneous_activity_index: 0.15, // ESTIMATED
-                phi_estimate: 0.0,         // ESTIMATED (negligible integration)
+                phi_estimate: 0.0,                // ESTIMATED (negligible integration)
                 oscillation_detected: false,
                 stage: DevelopmentalStage::Patterning,
                 ethics_status: EthicsStatus::PreConscious,
@@ -163,14 +163,14 @@ fn trujillo_data_points() -> Vec<ValidationDataPoint> {
             day: 120,
             description: "Short 300-500 ms bursts (REPORTED)",
             metrics: OrganoidMetrics {
-                cell_count: 50_000,        // ESTIMATED
-                neuron_count: 10_000,      // ESTIMATED
-                neural_fraction: 0.20,     // ESTIMATED
-                synapse_count: 60_000,     // ESTIMATED
-                synapse_density: 6.0,      // ESTIMATED
-                mean_firing_rate_hz: 0.5,  // ESTIMATED — bursts more frequent
+                cell_count: 50_000,              // ESTIMATED
+                neuron_count: 10_000,            // ESTIMATED
+                neural_fraction: 0.20,           // ESTIMATED
+                synapse_count: 60_000,           // ESTIMATED
+                synapse_density: 6.0,            // ESTIMATED
+                mean_firing_rate_hz: 0.5,        // ESTIMATED — bursts more frequent
                 spontaneous_activity_index: 0.4, // ESTIMATED
-                phi_estimate: 0.02,        // ESTIMATED (emerging integration)
+                phi_estimate: 0.02,              // ESTIMATED (emerging integration)
                 oscillation_detected: false,
                 stage: DevelopmentalStage::MaturationI,
                 ethics_status: EthicsStatus::PreConscious,
@@ -196,25 +196,25 @@ fn trujillo_data_points() -> Vec<ValidationDataPoint> {
             day: 180,
             description: "Steady 2-3 Hz rhythm; nested theta-gamma oscillations (REPORTED)",
             metrics: OrganoidMetrics {
-                cell_count: 200_000,       // ESTIMATED
-                neuron_count: 50_000,      // ESTIMATED
-                neural_fraction: 0.25,     // ESTIMATED
-                synapse_count: 500_000,    // ESTIMATED
-                synapse_density: 10.0,     // ESTIMATED
-                mean_firing_rate_hz: 2.5,  // REPORTED — 2-3 Hz steady rhythm
+                cell_count: 200_000,             // ESTIMATED
+                neuron_count: 50_000,            // ESTIMATED
+                neural_fraction: 0.25,           // ESTIMATED
+                synapse_count: 500_000,          // ESTIMATED
+                synapse_density: 10.0,           // ESTIMATED
+                mean_firing_rate_hz: 2.5,        // REPORTED — 2-3 Hz steady rhythm
                 spontaneous_activity_index: 0.7, // ESTIMATED
-                phi_estimate: 0.05,        // ESTIMATED (moderate integration)
-                oscillation_detected: true,  // REPORTED
+                phi_estimate: 0.05,              // ESTIMATED (moderate integration)
+                oscillation_detected: true,      // REPORTED
                 stage: DevelopmentalStage::MaturationII,
                 ethics_status: EthicsStatus::PreConscious,
             },
             lfp: Some(LocalFieldPotential {
                 samples: vec![0.0; 64],
-                delta_power: 0.15,  // REPORTED (1-4 Hz = delta band dominant)
-                theta_power: 0.10,  // REPORTED (nested theta oscillations)
-                alpha_power: 0.03,  // ESTIMATED
-                beta_power: 0.01,   // ESTIMATED
-                gamma_power: 0.04,  // REPORTED (nested gamma oscillations)
+                delta_power: 0.15, // REPORTED (1-4 Hz = delta band dominant)
+                theta_power: 0.10, // REPORTED (nested theta oscillations)
+                alpha_power: 0.03, // ESTIMATED
+                beta_power: 0.01,  // ESTIMATED
+                gamma_power: 0.04, // REPORTED (nested gamma oscillations)
             }),
         },
         // -----------------------------------------------------------
@@ -228,25 +228,25 @@ fn trujillo_data_points() -> Vec<ValidationDataPoint> {
             day: 240,
             description: "Complex irregular patterns; neonatal EEG resemblance (REPORTED)",
             metrics: OrganoidMetrics {
-                cell_count: 500_000,       // ESTIMATED
-                neuron_count: 120_000,     // ESTIMATED
-                neural_fraction: 0.24,     // ESTIMATED
-                synapse_count: 1_500_000,  // ESTIMATED
-                synapse_density: 12.5,     // ESTIMATED
-                mean_firing_rate_hz: 8.0,  // ESTIMATED — interpolated 2.5→18
+                cell_count: 500_000,              // ESTIMATED
+                neuron_count: 120_000,            // ESTIMATED
+                neural_fraction: 0.24,            // ESTIMATED
+                synapse_count: 1_500_000,         // ESTIMATED
+                synapse_density: 12.5,            // ESTIMATED
+                mean_firing_rate_hz: 8.0,         // ESTIMATED — interpolated 2.5→18
                 spontaneous_activity_index: 0.85, // ESTIMATED
-                phi_estimate: 0.08,        // ESTIMATED (growing integration)
+                phi_estimate: 0.08,               // ESTIMATED (growing integration)
                 oscillation_detected: true,
                 stage: DevelopmentalStage::MaturationII,
                 ethics_status: EthicsStatus::PreConscious,
             },
             lfp: Some(LocalFieldPotential {
                 samples: vec![0.0; 64],
-                delta_power: 0.12,  // ESTIMATED — plateau/decline per Fig 3
-                theta_power: 0.12,  // ESTIMATED — strong theta
-                alpha_power: 0.06,  // ESTIMATED — emerging alpha
-                beta_power: 0.03,   // ESTIMATED
-                gamma_power: 0.06,  // ESTIMATED — HFOs nested in delta
+                delta_power: 0.12, // ESTIMATED — plateau/decline per Fig 3
+                theta_power: 0.12, // ESTIMATED — strong theta
+                alpha_power: 0.06, // ESTIMATED — emerging alpha
+                beta_power: 0.03,  // ESTIMATED
+                gamma_power: 0.06, // ESTIMATED — HFOs nested in delta
             }),
         },
         // -----------------------------------------------------------
@@ -262,25 +262,25 @@ fn trujillo_data_points() -> Vec<ValidationDataPoint> {
             day: 300,
             description: "~18 Hz firing; resembles preterm neonatal EEG 25-38 wk (REPORTED)",
             metrics: OrganoidMetrics {
-                cell_count: 1_000_000,     // ESTIMATED
-                neuron_count: 250_000,     // ESTIMATED
-                neural_fraction: 0.25,     // ESTIMATED
-                synapse_count: 4_000_000,  // ESTIMATED
-                synapse_density: 16.0,     // ESTIMATED
-                mean_firing_rate_hz: 18.0, // REPORTED — ~18 Hz at 10 months
+                cell_count: 1_000_000,            // ESTIMATED
+                neuron_count: 250_000,            // ESTIMATED
+                neural_fraction: 0.25,            // ESTIMATED
+                synapse_count: 4_000_000,         // ESTIMATED
+                synapse_density: 16.0,            // ESTIMATED
+                mean_firing_rate_hz: 18.0,        // REPORTED — ~18 Hz at 10 months
                 spontaneous_activity_index: 0.95, // ESTIMATED
-                phi_estimate: 0.12,        // ESTIMATED (substantial integration)
+                phi_estimate: 0.12,               // ESTIMATED (substantial integration)
                 oscillation_detected: true,
                 stage: DevelopmentalStage::MaturationII,
                 ethics_status: EthicsStatus::PreConscious,
             },
             lfp: Some(LocalFieldPotential {
                 samples: vec![0.0; 64],
-                delta_power: 0.10,  // ESTIMATED — plateau phase
-                theta_power: 0.14,  // ESTIMATED — strong
-                alpha_power: 0.08,  // ESTIMATED — present
-                beta_power: 0.05,   // ESTIMATED — emerging
-                gamma_power: 0.08,  // ESTIMATED — HFOs 100-400 Hz nested
+                delta_power: 0.10, // ESTIMATED — plateau phase
+                theta_power: 0.14, // ESTIMATED — strong
+                alpha_power: 0.08, // ESTIMATED — present
+                beta_power: 0.05,  // ESTIMATED — emerging
+                gamma_power: 0.08, // ESTIMATED — HFOs 100-400 Hz nested
             }),
         },
     ]
@@ -311,14 +311,14 @@ fn sharf_data_points() -> Vec<ValidationDataPoint> {
             day: 120,
             description: "Freshly sectioned onto CMOS MEA; sparse initial spiking (REPORTED)",
             metrics: OrganoidMetrics {
-                cell_count: 80_000,        // ESTIMATED — 500 um slice
-                neuron_count: 15_000,      // ESTIMATED
-                neural_fraction: 0.19,     // ESTIMATED
-                synapse_count: 40_000,     // ESTIMATED
-                synapse_density: 2.7,      // ESTIMATED
-                mean_firing_rate_hz: 0.2,  // ESTIMATED — sparse spiking post-plating
+                cell_count: 80_000,              // ESTIMATED — 500 um slice
+                neuron_count: 15_000,            // ESTIMATED
+                neural_fraction: 0.19,           // ESTIMATED
+                synapse_count: 40_000,           // ESTIMATED
+                synapse_density: 2.7,            // ESTIMATED
+                mean_firing_rate_hz: 0.2,        // ESTIMATED — sparse spiking post-plating
                 spontaneous_activity_index: 0.2, // ESTIMATED
-                phi_estimate: 0.01,        // ESTIMATED (minimal integration)
+                phi_estimate: 0.01,              // ESTIMATED (minimal integration)
                 oscillation_detected: false,
                 stage: DevelopmentalStage::MaturationI,
                 ethics_status: EthicsStatus::PreConscious,
@@ -345,14 +345,14 @@ fn sharf_data_points() -> Vec<ValidationDataPoint> {
             day: 135,
             description: "Spontaneous spiking onset ~2 wk post-plating; 131 units (REPORTED)",
             metrics: OrganoidMetrics {
-                cell_count: 80_000,        // ESTIMATED
-                neuron_count: 15_000,      // ESTIMATED
-                neural_fraction: 0.19,     // ESTIMATED
-                synapse_count: 55_000,     // ESTIMATED — growing
-                synapse_density: 3.7,      // ESTIMATED
-                mean_firing_rate_hz: 0.8,  // ESTIMATED — early spontaneous spiking
+                cell_count: 80_000,               // ESTIMATED
+                neuron_count: 15_000,             // ESTIMATED
+                neural_fraction: 0.19,            // ESTIMATED
+                synapse_count: 55_000,            // ESTIMATED — growing
+                synapse_density: 3.7,             // ESTIMATED
+                mean_firing_rate_hz: 0.8,         // ESTIMATED — early spontaneous spiking
                 spontaneous_activity_index: 0.35, // ESTIMATED
-                phi_estimate: 0.015,       // ESTIMATED
+                phi_estimate: 0.015,              // ESTIMATED
                 oscillation_detected: false,
                 stage: DevelopmentalStage::MaturationII,
                 ethics_status: EthicsStatus::PreConscious,
@@ -384,25 +384,25 @@ fn sharf_data_points() -> Vec<ValidationDataPoint> {
             day: 180,
             description: "Synchronized bursts; 224 units; functional connectivity (REPORTED)",
             metrics: OrganoidMetrics {
-                cell_count: 100_000,       // ESTIMATED
-                neuron_count: 25_000,      // ESTIMATED
-                neural_fraction: 0.25,     // ESTIMATED
-                synapse_count: 200_000,    // ESTIMATED
-                synapse_density: 8.0,      // ESTIMATED
-                mean_firing_rate_hz: 3.0,  // ESTIMATED — synchronized bursting regime
+                cell_count: 100_000,              // ESTIMATED
+                neuron_count: 25_000,             // ESTIMATED
+                neural_fraction: 0.25,            // ESTIMATED
+                synapse_count: 200_000,           // ESTIMATED
+                synapse_density: 8.0,             // ESTIMATED
+                mean_firing_rate_hz: 3.0,         // ESTIMATED — synchronized bursting regime
                 spontaneous_activity_index: 0.65, // ESTIMATED
-                phi_estimate: 0.04,        // ESTIMATED (emerging integration)
-                oscillation_detected: true,  // REPORTED — theta oscillations detected
+                phi_estimate: 0.04,               // ESTIMATED (emerging integration)
+                oscillation_detected: true,       // REPORTED — theta oscillations detected
                 stage: DevelopmentalStage::MaturationII,
                 ethics_status: EthicsStatus::PreConscious,
             },
             lfp: Some(LocalFieldPotential {
                 samples: vec![0.0; 64],
-                delta_power: 0.10,  // ESTIMATED
-                theta_power: 0.08,  // REPORTED — theta (4-8 Hz) dominant in LFP
-                alpha_power: 0.02,  // ESTIMATED
-                beta_power: 0.01,   // ESTIMATED
-                gamma_power: 0.02,  // ESTIMATED
+                delta_power: 0.10, // ESTIMATED
+                theta_power: 0.08, // REPORTED — theta (4-8 Hz) dominant in LFP
+                alpha_power: 0.02, // ESTIMATED
+                beta_power: 0.01,  // ESTIMATED
+                gamma_power: 0.02, // ESTIMATED
             }),
         },
         // -----------------------------------------------------------
@@ -422,28 +422,29 @@ fn sharf_data_points() -> Vec<ValidationDataPoint> {
             label: "7 months",
             months: 7,
             day: 210,
-            description: "Peak activity; theta phase-locking 28% of units; ~400 ms coherence (REPORTED)",
+            description:
+                "Peak activity; theta phase-locking 28% of units; ~400 ms coherence (REPORTED)",
             metrics: OrganoidMetrics {
-                cell_count: 120_000,       // ESTIMATED
-                neuron_count: 30_000,      // ESTIMATED
-                neural_fraction: 0.25,     // ESTIMATED
-                synapse_count: 400_000,    // ESTIMATED
-                synapse_density: 13.3,     // ESTIMATED
-                mean_firing_rate_hz: 6.0,  // ESTIMATED — peak activity stage
+                cell_count: 120_000,              // ESTIMATED
+                neuron_count: 30_000,             // ESTIMATED
+                neural_fraction: 0.25,            // ESTIMATED
+                synapse_count: 400_000,           // ESTIMATED
+                synapse_density: 13.3,            // ESTIMATED
+                mean_firing_rate_hz: 6.0,         // ESTIMATED — peak activity stage
                 spontaneous_activity_index: 0.85, // ESTIMATED
-                phi_estimate: 0.07,        // ESTIMATED (substantial integration implied
-                                           // by phase-locking and network topology)
-                oscillation_detected: true,  // REPORTED
+                phi_estimate: 0.07,               // ESTIMATED (substantial integration implied
+                // by phase-locking and network topology)
+                oscillation_detected: true, // REPORTED
                 stage: DevelopmentalStage::MaturationII,
                 ethics_status: EthicsStatus::PreConscious,
             },
             lfp: Some(LocalFieldPotential {
                 samples: vec![0.0; 64],
-                delta_power: 0.12,  // ESTIMATED
-                theta_power: 0.14,  // REPORTED — theta dominant, phase-locked to spikes
-                alpha_power: 0.04,  // ESTIMATED
-                beta_power: 0.02,   // ESTIMATED
-                gamma_power: 0.05,  // ESTIMATED — some higher-frequency activity
+                delta_power: 0.12, // ESTIMATED
+                theta_power: 0.14, // REPORTED — theta dominant, phase-locked to spikes
+                alpha_power: 0.04, // ESTIMATED
+                beta_power: 0.02,  // ESTIMATED
+                gamma_power: 0.05, // ESTIMATED — some higher-frequency activity
             }),
         },
         // -----------------------------------------------------------
@@ -464,26 +465,26 @@ fn sharf_data_points() -> Vec<ValidationDataPoint> {
             day: 210,
             description: "Diazepam: +40% edge density, reduced theta correlations (REPORTED)",
             metrics: OrganoidMetrics {
-                cell_count: 120_000,       // ESTIMATED — same organoid
-                neuron_count: 30_000,      // ESTIMATED
-                neural_fraction: 0.25,     // ESTIMATED
-                synapse_count: 400_000,    // ESTIMATED
-                synapse_density: 13.3,     // ESTIMATED
-                mean_firing_rate_hz: 5.0,  // ESTIMATED — slightly reduced by BZD
+                cell_count: 120_000,              // ESTIMATED — same organoid
+                neuron_count: 30_000,             // ESTIMATED
+                neural_fraction: 0.25,            // ESTIMATED
+                synapse_count: 400_000,           // ESTIMATED
+                synapse_density: 13.3,            // ESTIMATED
+                mean_firing_rate_hz: 5.0,         // ESTIMATED — slightly reduced by BZD
                 spontaneous_activity_index: 0.80, // ESTIMATED — more uniform but active
-                phi_estimate: 0.05,        // ESTIMATED — reduced integration from
-                                           // GABAergic uniformity (less theta coupling)
+                phi_estimate: 0.05,               // ESTIMATED — reduced integration from
+                // GABAergic uniformity (less theta coupling)
                 oscillation_detected: true,
                 stage: DevelopmentalStage::MaturationII,
                 ethics_status: EthicsStatus::PreConscious,
             },
             lfp: Some(LocalFieldPotential {
                 samples: vec![0.0; 64],
-                delta_power: 0.10,  // ESTIMATED
-                theta_power: 0.06,  // ESTIMATED — "dramatic reduction" in theta
-                alpha_power: 0.03,  // ESTIMATED
-                beta_power: 0.02,   // ESTIMATED
-                gamma_power: 0.03,  // ESTIMATED
+                delta_power: 0.10, // ESTIMATED
+                theta_power: 0.06, // ESTIMATED — "dramatic reduction" in theta
+                alpha_power: 0.03, // ESTIMATED
+                beta_power: 0.02,  // ESTIMATED
+                gamma_power: 0.03, // ESTIMATED
             }),
         },
     ]
@@ -562,10 +563,7 @@ fn run_validation(
     println!();
 
     // Detailed breakdown per stage
-    println!(
-        "  DETAILED INDICATOR DETECTION — {}",
-        study_name
-    );
+    println!("  DETAILED INDICATOR DETECTION — {}", study_name);
     println!("{}", "-".repeat(60));
 
     for (i, assessment) in &assessments {
@@ -803,9 +801,7 @@ fn main() {
     let s_t2 = first_month_at_tier(&sharf_points, &sharf_assessments, 2);
     let s_t3 = first_month_at_tier(&sharf_points, &sharf_assessments, 3);
 
-    let fmt = |v: Option<u32>| -> String {
-        v.map_or("N/R".to_string(), |m| format!("{} mo", m))
-    };
+    let fmt = |v: Option<u32>| -> String { v.map_or("N/R".to_string(), |m| format!("{} mo", m)) };
 
     println!(
         "  {:<20} {:<10} {:>10} {:>10} {:>10}  {:<20}",

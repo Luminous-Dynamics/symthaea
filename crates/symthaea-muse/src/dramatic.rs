@@ -5,8 +5,8 @@
 //! Strategic silence, tempo breathing, key modulation, sub-bass,
 //! texture layering, and strong endings.
 
-use crate::MusicalState;
 use crate::composer_mind::SectionArc;
+use crate::MusicalState;
 
 /// Dramatic state tracked across the composition.
 pub struct DramaticState {
@@ -75,7 +75,7 @@ impl DramaticState {
             }
             SectionArc::Climax => {
                 self.target_density = 0.8 + psi * 0.2; // nearly full
-                // Slight accelerando at peak
+                                                       // Slight accelerando at peak
                 self.tempo_factor = 1.05 + arousal * 0.05;
                 // Key modulation: up a half step for emotional lift
                 self.target_key_shift = 1;
@@ -148,7 +148,12 @@ impl DramaticState {
     }
 
     /// Render sub-bass for one chunk. Returns mono samples.
-    pub fn render_sub_bass(&mut self, chunk_len: usize, sample_rate: f32, kick_active: bool) -> Vec<f32> {
+    pub fn render_sub_bass(
+        &mut self,
+        chunk_len: usize,
+        sample_rate: f32,
+        kick_active: bool,
+    ) -> Vec<f32> {
         let freq = 45.0; // deep sub-bass
         let volume = if kick_active {
             self.sub_bass_volume * 1.5 // louder when kick hits
@@ -185,13 +190,17 @@ impl DramaticState {
 /// Vibrato generator for richer instrument sounds.
 pub struct Vibrato {
     phase: f32,
-    rate: f32,   // Hz (typically 5-7 Hz)
-    depth: f32,  // cents (typically 10-30)
+    rate: f32,  // Hz (typically 5-7 Hz)
+    depth: f32, // cents (typically 10-30)
 }
 
 impl Vibrato {
     pub fn new(rate: f32, depth_cents: f32) -> Self {
-        Self { phase: 0.0, rate, depth: depth_cents }
+        Self {
+            phase: 0.0,
+            rate,
+            depth: depth_cents,
+        }
     }
 
     /// Get frequency multiplier for current sample.
@@ -210,14 +219,20 @@ impl Vibrato {
 
 /// Noise transient for attack realism.
 pub fn attack_noise(sample_idx: usize, attack_samples: usize, brightness: f32) -> f32 {
-    if sample_idx >= attack_samples { return 0.0; }
+    if sample_idx >= attack_samples {
+        return 0.0;
+    }
 
     let progress = sample_idx as f32 / attack_samples as f32;
     let envelope = (1.0 - progress).powi(3); // fast decay
 
     // Simple noise (LCG)
-    let noise = ((sample_idx as u32).wrapping_mul(1103515245).wrapping_add(12345) >> 16) as f32
-        / 32768.0 - 1.0;
+    let noise = ((sample_idx as u32)
+        .wrapping_mul(1103515245)
+        .wrapping_add(12345)
+        >> 16) as f32
+        / 32768.0
+        - 1.0;
 
     noise * envelope * brightness * 0.15
 }
@@ -236,7 +251,10 @@ mod tests {
 
     #[test]
     fn key_shift_modulates_frequency() {
-        let state = DramaticState { key_shift: 2, ..DramaticState::new() };
+        let state = DramaticState {
+            key_shift: 2,
+            ..DramaticState::new()
+        };
         let shifted = state.apply_key_shift(440.0);
         // 2 semitones up from A4 = B4 ≈ 493.88
         assert!((shifted - 493.88).abs() < 1.0, "should be ~B4: {shifted}");
@@ -244,9 +262,12 @@ mod tests {
 
     #[test]
     fn dynamics_exaggeration() {
-        let state = DramaticState { dynamic_range: 2.0, ..DramaticState::new() };
+        let state = DramaticState {
+            dynamic_range: 2.0,
+            ..DramaticState::new()
+        };
         let quiet = state.apply_dynamics(0.3, 0.5); // below average
-        let loud = state.apply_dynamics(0.8, 0.5);  // above average
+        let loud = state.apply_dynamics(0.8, 0.5); // above average
         assert!(quiet < 0.3, "quiet should be quieter: {quiet}");
         assert!(loud > 0.8, "loud should be louder: {loud}");
     }
@@ -254,7 +275,11 @@ mod tests {
     #[test]
     fn texture_starts_sparse() {
         let state = DramaticState::new();
-        assert!(state.max_voices() <= 3, "should start sparse: {}", state.max_voices());
+        assert!(
+            state.max_voices() <= 3,
+            "should start sparse: {}",
+            state.max_voices()
+        );
     }
 
     #[test]
@@ -262,7 +287,10 @@ mod tests {
         let mut state = DramaticState::new();
         state.sub_bass_volume = 0.01;
         let bass = state.render_sub_bass(441, 44100.0, false);
-        assert!(bass.iter().any(|&s| s.abs() > 0.001), "should produce signal");
+        assert!(
+            bass.iter().any(|&s| s.abs() > 0.001),
+            "should produce signal"
+        );
     }
 
     #[test]
@@ -275,7 +303,10 @@ mod tests {
             min = min.min(m);
             max = max.max(m);
         }
-        assert!(max > 1.0 && min < 1.0, "vibrato should modulate above and below 1.0");
+        assert!(
+            max > 1.0 && min < 1.0,
+            "vibrato should modulate above and below 1.0"
+        );
     }
 
     #[test]

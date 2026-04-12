@@ -48,6 +48,7 @@ pub mod types;
 // ── MuJoCo-dependent modules ──
 #[cfg(feature = "mujoco")]
 pub mod mujoco_sim;
+pub mod navigation_estimator;
 #[cfg(feature = "mujoco")]
 pub mod scenarios;
 #[cfg(feature = "mujoco")]
@@ -62,6 +63,7 @@ pub mod swarm;
 pub use controller::FlightController;
 pub use encoder::QuadrotorHdcEncoder;
 pub use fep_agent::ActiveInferenceFlightAgent;
+pub use navigation_estimator::{FlightNavigationEstimate, FlightNavigationEstimator};
 pub use perturbations::{FlightPerturbation, PerturbationSchedule};
 pub use simulator::{PhysicsSimulator, SimplePhysicsSimulator};
 pub use training::FlightTrainer;

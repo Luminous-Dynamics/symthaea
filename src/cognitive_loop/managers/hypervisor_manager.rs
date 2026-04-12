@@ -136,10 +136,7 @@ pub enum SupervisoryEvent {
         affected_peers: Vec<String>,
     },
     /// Supervisor recommends quarantine of a peer.
-    QuarantineRecommendation {
-        peer_id: String,
-        reason: String,
-    },
+    QuarantineRecommendation { peer_id: String, reason: String },
 }
 
 /// Telemetry snapshot for `CycleMetadata`.
@@ -209,18 +206,30 @@ impl HypervisorManager {
     }
 
     /// Inject a subordinate state update (from swarm event).
-    pub fn update_subordinate(&mut self, peer_id: String, phi: f64, coherence: f32, arousal: f32, reputation: f64, cycle: u64) {
-        if self.subordinates.len() >= MAX_SUBORDINATES && !self.subordinates.contains_key(&peer_id) {
+    pub fn update_subordinate(
+        &mut self,
+        peer_id: String,
+        phi: f64,
+        coherence: f32,
+        arousal: f32,
+        reputation: f64,
+        cycle: u64,
+    ) {
+        if self.subordinates.len() >= MAX_SUBORDINATES && !self.subordinates.contains_key(&peer_id)
+        {
             return; // At capacity, reject unknown peers
         }
-        self.subordinates.insert(peer_id.clone(), SubordinateState {
-            peer_id,
-            phi,
-            coherence,
-            arousal,
-            last_update_cycle: cycle,
-            reputation,
-        });
+        self.subordinates.insert(
+            peer_id.clone(),
+            SubordinateState {
+                peer_id,
+                phi,
+                coherence,
+                arousal,
+                last_update_cycle: cycle,
+                reputation,
+            },
+        );
     }
 
     /// Set own reputation (from external trust system).
@@ -235,7 +244,9 @@ impl HypervisorManager {
 
     /// Get telemetry snapshot.
     pub fn telemetry(&self, cycle: u64) -> HypervisorTelemetry {
-        let stale = self.subordinates.values()
+        let stale = self
+            .subordinates
+            .values()
             .filter(|s| s.is_stale(cycle))
             .count();
         HypervisorTelemetry {
@@ -300,7 +311,9 @@ impl HypervisorManager {
 
     /// Aggregate subordinate consciousness (staleness-weighted mean).
     fn aggregate_subordinates(&mut self, cycle: u64) {
-        let active: Vec<&SubordinateState> = self.subordinates.values()
+        let active: Vec<&SubordinateState> = self
+            .subordinates
+            .values()
             .filter(|s| !s.is_stale(cycle))
             .collect();
 
@@ -315,7 +328,8 @@ impl HypervisorManager {
         let mut weighted_coherence = 0.0f64;
 
         for sub in &active {
-            let w = sub.reputation * (-((cycle - sub.last_update_cycle) as f64) / STALENESS_TAU).exp();
+            let w =
+                sub.reputation * (-((cycle - sub.last_update_cycle) as f64) / STALENESS_TAU).exp();
             total_weight += w;
             weighted_phi += w * sub.phi;
             weighted_coherence += w * sub.coherence as f64;
@@ -340,7 +354,9 @@ impl HypervisorManager {
 
     /// Emit heartbeat event (supervisor only).
     fn emit_heartbeat(&mut self, cycle: u64) {
-        let active_count = self.subordinates.values()
+        let active_count = self
+            .subordinates
+            .values()
             .filter(|s| !s.is_stale(cycle))
             .count();
         self.pending_events.push(SupervisoryEvent::Heartbeat {
@@ -411,7 +427,8 @@ impl CognitiveSubsystem for HypervisorManager {
 
             HypervisorRole::Subordinate => {
                 // Check supervisor heartbeat timeout
-                let supervisor_stale = cycle.saturating_sub(self.last_supervisor_heartbeat) > HEARTBEAT_TIMEOUT;
+                let supervisor_stale =
+                    cycle.saturating_sub(self.last_supervisor_heartbeat) > HEARTBEAT_TIMEOUT;
                 if supervisor_stale {
                     // Lost supervisor — trigger re-election next interval
                     self.epoch_start_cycle = 0;

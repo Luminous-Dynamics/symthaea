@@ -24,7 +24,11 @@ fn main() {
         } else {
             symthaea_voice::VoiceEngine::Formant
         };
-        let engine_name = if cfg!(feature = "kokoro") { "Kokoro" } else { "Formant" };
+        let engine_name = if cfg!(feature = "kokoro") {
+            "Kokoro"
+        } else {
+            "Formant"
+        };
 
         let prosody = symthaea_voice::VoiceProsody {
             arousal: *arousal,
@@ -35,7 +39,11 @@ fn main() {
 
         println!("  \"{text}\"  [{engine_name}]");
         let audio = symthaea_voice::speak_with_engine(text, &prosody, sr, engine);
-        println!("    → {} samples ({:.1}s)", audio.len(), audio.len() as f32 / sr as f32);
+        println!(
+            "    → {} samples ({:.1}s)",
+            audio.len(),
+            audio.len() as f32 / sr as f32
+        );
 
         all_audio.extend_from_slice(&audio);
         // 400ms pause between phrases (breathing room)
@@ -54,14 +62,19 @@ fn write_wav(path: &str, audio: &[f32], sr: u32) {
     let data_len = (audio.len() * 2) as u32;
     let file_len = 36 + data_len;
     let mut f = std::fs::File::create(path).expect("create WAV");
-    f.write_all(b"RIFF").ok(); f.write_all(&file_len.to_le_bytes()).ok();
-    f.write_all(b"WAVE").ok(); f.write_all(b"fmt ").ok();
-    f.write_all(&16u32.to_le_bytes()).ok(); f.write_all(&1u16.to_le_bytes()).ok();
+    f.write_all(b"RIFF").ok();
+    f.write_all(&file_len.to_le_bytes()).ok();
+    f.write_all(b"WAVE").ok();
+    f.write_all(b"fmt ").ok();
+    f.write_all(&16u32.to_le_bytes()).ok();
+    f.write_all(&1u16.to_le_bytes()).ok();
     f.write_all(&1u16.to_le_bytes()).ok();
     f.write_all(&sr.to_le_bytes()).ok();
     f.write_all(&(sr * 2).to_le_bytes()).ok();
-    f.write_all(&2u16.to_le_bytes()).ok(); f.write_all(&16u16.to_le_bytes()).ok();
-    f.write_all(b"data").ok(); f.write_all(&data_len.to_le_bytes()).ok();
+    f.write_all(&2u16.to_le_bytes()).ok();
+    f.write_all(&16u16.to_le_bytes()).ok();
+    f.write_all(b"data").ok();
+    f.write_all(&data_len.to_le_bytes()).ok();
     for &s in audio {
         let i = (s * 32767.0).clamp(-32768.0, 32767.0) as i16;
         f.write_all(&i.to_le_bytes()).ok();

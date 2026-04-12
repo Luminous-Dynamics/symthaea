@@ -21,27 +21,31 @@
 //! - Oganessian & Utyonkov (2015). Superheavy element synthesis. *Nuclear Physics A*.
 //! - Ring & Schuck (2004). *The Nuclear Many-Body Problem*. Springer.
 
+mod active_learning;
 pub mod ame2020;
+mod blind_validation;
+mod conformal;
 pub mod constants;
-pub mod deformation;
-pub mod discovery;
-pub mod duflo_zuker;
-pub mod encoder;
-pub mod fission_barrier;
-pub mod hdc_mass;
-pub mod hfb;
 mod deep_analysis;
+pub mod deformation;
 mod discoveries;
 mod discoveries2;
 mod discoveries3;
-mod conformal;
+pub mod discovery;
+pub mod duflo_zuker;
+pub mod element_embeddings;
+pub mod encoder;
 mod exploration;
 mod figure_data;
+pub mod fission_barrier;
 pub mod fundamental;
 mod hard_validation;
+pub mod hdc_mass;
+pub mod hdc_strategies;
 mod hdc_validation;
-pub mod isotope_properties;
+pub mod hfb;
 pub mod island_stability;
+pub mod isotope_properties;
 pub mod mass_formula;
 pub mod medical_isotopes;
 pub mod ml_mass;
@@ -49,16 +53,14 @@ pub mod nuclear_forensics;
 pub mod reactor;
 pub mod rprocess;
 pub mod shell_model;
-pub mod element_embeddings;
 pub mod space_nuclear;
 mod symbolic_regression;
-mod active_learning;
 
 pub use ame2020::*;
 pub use constants::*;
 pub use deformation::*;
-pub use duflo_zuker::*;
 pub use discovery::*;
+pub use duflo_zuker::*;
 pub use encoder::*;
 pub use island_stability::*;
 pub use mass_formula::*;

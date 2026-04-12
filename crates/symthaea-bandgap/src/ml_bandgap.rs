@@ -271,10 +271,8 @@ impl RandomForest {
             for i in (0..values.len()).step_by(step) {
                 let threshold = values[i];
 
-                let (left_sum, left_sq, left_n, right_sum, right_sq, right_n) = features
-                    .iter()
-                    .zip(targets.iter())
-                    .fold(
+                let (left_sum, left_sq, left_n, right_sum, right_sq, right_n) =
+                    features.iter().zip(targets.iter()).fold(
                         (0.0f64, 0.0f64, 0usize, 0.0f64, 0.0f64, 0usize),
                         |(ls, lsq, ln, rs, rsq, rn), (feat, &tgt)| {
                             if feat[f_idx] <= threshold {
@@ -290,12 +288,9 @@ impl RandomForest {
                 }
 
                 // Weighted variance reduction
-                let left_var =
-                    left_sq / left_n as f64 - (left_sum / left_n as f64).powi(2);
-                let right_var =
-                    right_sq / right_n as f64 - (right_sum / right_n as f64).powi(2);
-                let score =
-                    left_n as f64 * left_var.max(0.0) + right_n as f64 * right_var.max(0.0);
+                let left_var = left_sq / left_n as f64 - (left_sum / left_n as f64).powi(2);
+                let right_var = right_sq / right_n as f64 - (right_sum / right_n as f64).powi(2);
+                let score = left_n as f64 * left_var.max(0.0) + right_n as f64 * right_var.max(0.0);
 
                 if score < best_score {
                     best_score = score;
@@ -354,11 +349,8 @@ impl RandomForest {
     fn predict(&self, features: &[f64; N_FEATURES]) -> (f64, f64) {
         let predictions: Vec<f64> = self.trees.iter().map(|t| t.predict(features)).collect();
         let mean = predictions.iter().sum::<f64>() / predictions.len() as f64;
-        let variance = predictions
-            .iter()
-            .map(|p| (p - mean).powi(2))
-            .sum::<f64>()
-            / predictions.len() as f64;
+        let variance =
+            predictions.iter().map(|p| (p - mean).powi(2)).sum::<f64>() / predictions.len() as f64;
         (mean, variance.sqrt())
     }
 }

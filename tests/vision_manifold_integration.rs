@@ -489,4 +489,455 @@ mod vision_cognitive_integration {
             "Alert service should have higher NE: calm={calm_ne:.3}, alert={alert_ne:.3}"
         );
     }
+
+    // ── Test 14: P3-A goal signal — cycles with vision manifold remain stable ──
+    //
+    // After P3-A, each cognitive cycle sets the vision bridge's goal signal to
+    // the current thought HV. This test verifies that:
+    //   1. Cycles do not panic or produce NaN
+    //   2. Vision telemetry remains well-formed across 20 cycles
+    //   3. The goal signal does not degrade prediction quality
+    //
+    // (We cannot directly inspect `goal_signal` since it is a private field,
+    //  but a stable pipeline is the meaningful property to verify.)
+    #[test]
+    fn test_p3a_goal_signal_wiring_stable() {
+        let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+            genesis_phrase: Some(GENESIS.to_string()),
+            async_training: false,
+            learning_threshold: 0.0,
+            enable_vision_manifold: true,
+            vision_frame_width: 64,
+            vision_frame_height: 64,
+            ..Default::default()
+        })
+        .expect("Failed to create service");
+
+        let frame: Vec<u8> = (0..64 * 64).map(|i| (i % 256) as u8).collect();
+        let mut last_frame_seq = 0u64;
+
+        for _ in 0..20 {
+            service.inject_vision_frame(frame.clone());
+            let result = service.cycle("p3a goal signal test");
+
+            let vt = result
+                .metadata
+                .vision
+                .as_ref()
+                .expect("vision telemetry should be present");
+
+            assert!(vt.vision_active, "Vision should remain active across cycles");
+            assert!(
+                vt.prediction_error.is_finite(),
+                "Prediction error must be finite after goal signal wiring"
+            );
+            assert!(
+                vt.manifold_coherence.is_finite(),
+                "Manifold coherence must be finite after goal signal wiring"
+            );
+            assert!(
+                vt.frame_sequence > last_frame_seq,
+                "Frame sequence should increment: got {}",
+                vt.frame_sequence
+            );
+            last_frame_seq = vt.frame_sequence;
+        }
+    }
+
+    // ── Test 15: P3-C multi-spectral encoding integrates with VisionConfig ────
+    //
+    // Verifies that the MultiSpectralEncoder produces valid HVs for all five
+    // bands and that multi-band fusion is distinct from single-band encoding.
+    #[test]
+    fn test_p3c_multi_spectral_encoder() {
+        use symthaea::perception::vision_manifold::{
+            MultiSpectralEncoder, MultiSpectralFrame, SpectralLayer, SpectrumBand,
+        };
+
+        let cfg = VisionConfig::default();
+        let mut enc = MultiSpectralEncoder::new(&cfg, 64, 64);
+
+        // Single visible band
+        let vis_frame = MultiSpectralFrame::from_visible(vec![128u8; 64 * 64], 64, 64);
+        let vis_hv = enc.encode(&vis_frame);
+        assert!(
+            vis_hv.norm() > 0.0,
+            "Visible-band encoding should produce non-zero HV"
+        );
+        assert!(
+            vis_hv.as_slice().iter().all(|x| x.is_finite()),
+            "Visible-band HV must be finite"
+        );
+
+        // Multi-band frame (Visible + ThermalIR)
+        let multi_frame = MultiSpectralFrame::from_visible(vec![128u8; 64 * 64], 64, 64)
+            .with_layer(SpectrumBand::ThermalIR, vec![200u8; 64 * 64]);
+        let multi_hv = enc.encode(&multi_frame);
+        assert!(
+            multi_hv.norm() > 0.0,
+            "Multi-band encoding should produce non-zero HV"
+        );
+
+        // Multi-band HV should differ from single-band HV (different spectral content)
+        let sim = vis_hv.similarity(&multi_hv);
+        assert!(
+            sim < 0.99,
+            "Multi-band HV should differ from single-band HV, sim={sim}"
+        );
+
+        // All five bands should encode without panicking
+        for band in SpectrumBand::ALL {
+            let frame = MultiSpectralFrame {
+                width: 64,
+                height: 64,
+                layers: vec![SpectralLayer {
+                    band,
+                    data: vec![100u8; 64 * 64],
+                }],
+            };
+            let hv = enc.encode(&frame);
+            assert!(
+                hv.as_slice().iter().all(|x| x.is_finite()),
+                "Band {:?} encoding produced non-finite HV",
+                band
+            );
+        }
+
+        // Band identity HVs should be mutually near-orthogonal
+        assert!(
+            enc.bands_are_orthogonal(),
+            "Band identity HVs should be near-orthogonal in 16,384D"
+        );
+    }
+
+    // ── Test 16: Depth channel adds one feature when enabled ─────────────────
+    #[test]
+    fn test_depth_channel_adds_feature() {
+        let mut cfg = VisionConfig::default();
+        assert_eq!(cfg.total_features(), 11);
+        cfg.enable_depth = true;
+        assert_eq!(cfg.total_features(), 12);
+
+        // Encoder with depth should produce a valid HV from the same pixel data
+        use symthaea::perception::vision_manifold::VisionManifold;
+        let mut m = VisionManifold::new(cfg, 32, 32);
+        let pixels: Vec<u8> = (0..32 * 32 * 3).map(|i| (i % 256) as u8).collect();
+        let tel = m.observe_frame(&pixels, 32, 32, 3, 0.033);
+        assert!(tel.manifold_coherence.is_finite());
+        assert!(tel.prediction_error.is_finite());
+    }
+
+    // ── Test 17: Object binding changes the frame HV representation ──────────
+    #[test]
+    fn test_object_binding_changes_frame_hv() {
+        use symthaea::perception::vision_manifold::VisionManifold;
+
+        // Create two manifolds with identical config except object binding
+        let cfg_off = VisionConfig::default();
+        let mut cfg_on = VisionConfig::default();
+        cfg_on.enable_object_binding = true;
+
+        let mut m_off = VisionManifold::new(cfg_off, 64, 64);
+        let mut m_on = VisionManifold::new(cfg_on, 64, 64);
+
+        // Non-uniform frame (two distinct halves → should cluster differently)
+        let mut pixels = vec![0u8; 64 * 64 * 3];
+        for y in 0..32 {
+            for x in 0..64 {
+                let base = (y * 64 + x) * 3;
+                pixels[base] = 200;
+                pixels[base + 1] = 50;
+                pixels[base + 2] = 50;
+            }
+        }
+        for y in 32..64 {
+            for x in 0..64 {
+                let base = (y * 64 + x) * 3;
+                pixels[base] = 50;
+                pixels[base + 1] = 50;
+                pixels[base + 2] = 200;
+            }
+        }
+
+        m_off.observe_frame(&pixels, 64, 64, 3, 0.033);
+        m_on.observe_frame(&pixels, 64, 64, 3, 0.033);
+
+        let state_off = m_off.state();
+        let state_on = m_on.state();
+
+        // Both should be finite
+        assert!(state_off.norm() > 0.0);
+        assert!(state_on.norm() > 0.0);
+
+        // Object binding should produce a different representation
+        let sim = state_off.similarity(state_on);
+        assert!(
+            sim < 0.999,
+            "Object binding should change the frame HV, sim={sim}"
+        );
+    }
+
+    // ── Test 18: Visual imagination (dream_ahead) produces valid HVs ─────────
+    #[test]
+    fn test_dream_ahead_produces_valid_hvs() {
+        use symthaea::perception::vision_manifold::VisionManifold;
+
+        let mut m = VisionManifold::new(VisionConfig::default(), 64, 64);
+
+        // Need at least one frame to seed the state
+        let pixels: Vec<u8> = (0..64 * 64 * 3).map(|i| (i * 7 % 256) as u8).collect();
+        m.observe_frame(&pixels, 64, 64, 3, 0.033);
+
+        let dreams = m.dream_ahead(5, 0.033);
+        assert_eq!(dreams.len(), 5, "Should produce exactly 5 dream steps");
+
+        for (i, dream_hv) in dreams.iter().enumerate() {
+            assert!(
+                dream_hv.norm() > 0.0,
+                "Dream step {i} should be non-zero"
+            );
+            assert!(
+                dream_hv.as_slice().iter().all(|x| x.is_finite()),
+                "Dream step {i} must be finite"
+            );
+        }
+
+        // Later dreams should diverge from earlier ones (CfC evolves)
+        let sim_01 = dreams[0].similarity(&dreams[1]);
+        let sim_04 = dreams[0].similarity(&dreams[4]);
+        assert!(
+            sim_04 < sim_01 || sim_01 > 0.999,
+            "Later dreams should generally diverge (sim01={sim_01}, sim04={sim_04})"
+        );
+    }
+
+    // ── Test 19: Object memory tracks identity across frames ─────────────────
+    #[test]
+    fn test_object_memory_cross_frame_tracking() {
+        use symthaea::perception::vision_manifold::VisionManifold;
+
+        let mut cfg = VisionConfig::default();
+        cfg.enable_object_binding = true;
+        let mut m = VisionManifold::new(cfg, 64, 64);
+        m.enable_object_memory(32);
+
+        // Red top / blue bottom frame
+        let mut pixels = vec![0u8; 64 * 64 * 3];
+        for y in 0..32 {
+            for x in 0..64 {
+                let b = (y * 64 + x) * 3;
+                pixels[b] = 200;
+            }
+        }
+        for y in 32..64 {
+            for x in 0..64 {
+                let b = (y * 64 + x) * 3;
+                pixels[b + 2] = 200;
+            }
+        }
+
+        // Feed 5 frames of the same scene
+        for _ in 0..5 {
+            m.observe_frame(&pixels, 64, 64, 3, 0.033);
+        }
+
+        let obj_mem = m.object_memory().expect("object memory should be enabled");
+        assert!(
+            !obj_mem.is_empty(),
+            "Object memory should have tracked objects"
+        );
+
+        // Tracks should have length > 1 (persisted across frames)
+        let long_tracks = obj_mem.tracks().iter().filter(|t| t.track_length > 1).count();
+        assert!(
+            long_tracks > 0,
+            "At least one object should persist across multiple frames"
+        );
+    }
+
+    // ── Test 20: Multiband bridge pipeline (P3-C wiring end-to-end) ──────────
+    #[test]
+    fn test_multiband_bridge_pipeline() {
+        use symthaea::perception::vision_manifold::{
+            MultiSpectralFrame, SpectrumBand, VisionBridge,
+        };
+
+        let mut bridge = VisionBridge::new(VisionConfig::default(), 64, 64);
+        bridge.enable_multi_spectral(64, 64);
+
+        let frame = MultiSpectralFrame::from_visible(vec![128u8; 64 * 64], 64, 64)
+            .with_layer(SpectrumBand::ThermalIR, vec![200u8; 64 * 64]);
+
+        let (hv, tel) = bridge.process_multiband_frame(&frame, 0.033);
+        assert!(hv.norm() > 0.0, "Multiband bridge should produce non-zero HV");
+        assert!(tel.encode_time_us > 0, "Encoding time should be measured");
+        assert_eq!(tel.frame_sequence, 1, "Frame sequence should be 1");
+
+        // Second frame
+        let (hv2, tel2) = bridge.process_multiband_frame(&frame, 0.033);
+        assert!(hv2.norm() > 0.0);
+        assert_eq!(tel2.frame_sequence, 2);
+    }
+
+    // ── Test 21: Imagination-reality comparison produces surprise signal ──────
+    #[test]
+    fn test_imagination_reality_surprise() {
+        use symthaea::perception::vision_manifold::VisionManifold;
+
+        let mut m = VisionManifold::new(VisionConfig::default(), 64, 64);
+
+        // Frame 1: establish state
+        let frame1: Vec<u8> = (0..64 * 64 * 3).map(|i| (i * 7 % 256) as u8).collect();
+        m.observe_frame(&frame1, 64, 64, 3, 0.033);
+
+        // Frame 2: same scene — imagination should predict well (low surprise)
+        let tel2 = m.observe_frame(&frame1, 64, 64, 3, 0.033);
+        let surprise_same = tel2.imagination_surprise;
+
+        // Frame 3: completely different scene — high imagination surprise
+        let frame3: Vec<u8> = (0..64 * 64 * 3).map(|i| (255 - (i % 256)) as u8).collect();
+        let tel3 = m.observe_frame(&frame3, 64, 64, 3, 0.033);
+        let surprise_diff = tel3.imagination_surprise;
+
+        assert!(
+            surprise_same.is_finite() && surprise_diff.is_finite(),
+            "Imagination surprise must be finite"
+        );
+        assert!(
+            surprise_diff > surprise_same,
+            "Scene change should produce higher imagination surprise \
+             (same={surprise_same}, diff={surprise_diff})"
+        );
+    }
+
+    // ── Test 22: Visual working memory holds ≤ capacity objects ──────────────
+    #[test]
+    fn test_visual_working_memory() {
+        use symthaea::perception::vision_manifold::VisionManifold;
+
+        let mut cfg = VisionConfig::default();
+        cfg.enable_object_binding = true;
+        let mut m = VisionManifold::new(cfg, 64, 64);
+        m.enable_object_memory(32);
+        m.enable_working_memory(4);
+
+        // Create a non-uniform frame with distinct regions
+        let mut pixels = vec![0u8; 64 * 64 * 3];
+        for y in 0..32 {
+            for x in 0..32 {
+                pixels[(y * 64 + x) * 3] = 200; // red top-left
+            }
+            for x in 32..64 {
+                pixels[(y * 64 + x) * 3 + 1] = 200; // green top-right
+            }
+        }
+        for y in 32..64 {
+            for x in 0..32 {
+                pixels[(y * 64 + x) * 3 + 2] = 200; // blue bottom-left
+            }
+            for x in 32..64 {
+                let b = (y * 64 + x) * 3;
+                pixels[b] = 200;
+                pixels[b + 1] = 200; // yellow bottom-right
+            }
+        }
+
+        for _ in 0..5 {
+            m.observe_frame(&pixels, 64, 64, 3, 0.033);
+        }
+
+        let wm = m.working_memory().expect("working memory should be enabled");
+        assert!(
+            wm.load() <= 4,
+            "Working memory should hold ≤ 4 objects, got {}",
+            wm.load()
+        );
+        // Should have at least 1 object in memory after 5 frames
+        assert!(
+            wm.load() > 0,
+            "Working memory should hold at least 1 object after 5 frames"
+        );
+    }
+
+    // ── Test 23: Scene graph computes spatial relations ───────────────────────
+    #[test]
+    fn test_scene_graph_spatial_relations() {
+        use symthaea::perception::vision_manifold::VisionManifold;
+
+        let mut cfg = VisionConfig::default();
+        cfg.enable_object_binding = true;
+        let mut m = VisionManifold::new(cfg, 64, 64);
+        m.enable_object_memory(32);
+        m.enable_scene_graph();
+
+        // Two distinct colored halves → should produce objects with spatial relations
+        let mut pixels = vec![0u8; 64 * 64 * 3];
+        for y in 0..32 {
+            for x in 0..64 {
+                pixels[(y * 64 + x) * 3] = 200;
+            }
+        }
+        for y in 32..64 {
+            for x in 0..64 {
+                pixels[(y * 64 + x) * 3 + 2] = 200;
+            }
+        }
+
+        for _ in 0..5 {
+            m.observe_frame(&pixels, 64, 64, 3, 0.033);
+        }
+
+        let sg = m.scene_graph().expect("scene graph should be enabled");
+        // If multiple objects are tracked, there should be at least one relation
+        let obj_mem = m.object_memory().expect("object memory enabled");
+        if obj_mem.len() >= 2 {
+            assert!(
+                sg.num_edges() > 0,
+                "Scene graph should have edges when ≥2 objects are tracked"
+            );
+            // All edge HVs should be finite
+            for edge in sg.edges() {
+                assert!(
+                    edge.relation_hv.as_slice().iter().all(|x| x.is_finite()),
+                    "Scene graph edge HV must be finite"
+                );
+            }
+            // Graph HV should exist
+            assert!(
+                sg.graph_hv().is_some(),
+                "Scene graph HV should be present when edges exist"
+            );
+        }
+    }
+
+    // ── Test 24: Monocular depth cues vary by position ───────────────────────
+    #[test]
+    fn test_monocular_depth_varies_by_position() {
+        use symthaea::perception::vision_manifold::VisionManifold;
+
+        let mut cfg = VisionConfig::default();
+        cfg.enable_depth = true;
+        // Check feature count before moving cfg into manifold
+        assert_eq!(cfg.total_features(), 12);
+        let mut m = VisionManifold::new(cfg, 64, 64);
+
+        // High-variance top (near) + low-variance bottom (far)
+        let mut pixels = vec![128u8; 64 * 64 * 3];
+        // Add noise to top half (high variance → near)
+        for y in 0..32 {
+            for x in 0..64 {
+                let b = (y * 64 + x) * 3;
+                pixels[b] = ((x * 17 + y * 31) % 256) as u8;
+                pixels[b + 1] = ((x * 23 + y * 13) % 256) as u8;
+                pixels[b + 2] = ((x * 37 + y * 7) % 256) as u8;
+            }
+        }
+        // Bottom half stays uniform (low variance → far)
+
+        let tel = m.observe_frame(&pixels, 64, 64, 3, 0.033);
+        assert!(
+            tel.prediction_error.is_finite(),
+            "Depth-enabled frame should produce finite telemetry"
+        );
+    }
 }

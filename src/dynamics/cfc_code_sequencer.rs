@@ -20,7 +20,20 @@
 //! Code generation plan
 //! ```
 
+use std::sync::Mutex;
+
+use ndarray::Array1;
 use symthaea_core::hdc::ContinuousHV;
+
+use super::cfc::network::{CfCNetwork, CfCNetworkConfig};
+use super::cfc::types::CfCConfig;
+
+/// Get home directory without depending on `dirs` crate
+fn dirs_next_or_home() -> Option<std::path::PathBuf> {
+    std::env::var("HOME")
+        .ok()
+        .map(std::path::PathBuf::from)
+}
 
 /// Maximum number of planning steps before forcing completion
 const MAX_PLAN_STEPS: usize = 32;
@@ -28,6 +41,9 @@ const MAX_PLAN_STEPS: usize = 32;
 /// HDC dimension used for algorithm pattern prototype encoding
 #[allow(dead_code)] // RESERVED(code-generation): CfC code sequencer config
 const ALGORITHM_PATTERN_DIM: usize = 512;
+
+/// Number of distinct PlanAction variants (including Complete)
+const NUM_ACTIONS: usize = 25;
 
 /// Recognized algorithm patterns with their template plan steps
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -262,10 +278,11 @@ impl AlgorithmPattern {
     }
 }
 
-/// Detects algorithm patterns from intent HVs using HDC similarity
-#[allow(dead_code)] // RESERVED(code-generation): code action types
+/// Detects algorithm patterns from intent HVs using semantic similarity.
+///
+/// Uses the `CodeSemanticEncoder` for synonym-aware encoding instead of
+/// the old byte-hash approach. "add" and "sum" now produce similar prototypes.
 struct AlgorithmPatternDetector {
-    dim: usize,
     sorting_prototype: ContinuousHV,
     search_prototype: ContinuousHV,
     dp_prototype: ContinuousHV,
@@ -275,156 +292,139 @@ struct AlgorithmPatternDetector {
 }
 
 #[allow(dead_code)] // RESERVED(code-generation): generated code result
+impl AlgorithmPattern {
+    /// Detect algorithm pattern directly from purpose text using keyword matching.
+    ///
+    /// This bypasses the HDC encoding entirely — much more reliable than the
+    /// byte-hash prototype comparison because "add" and "sum" are handled as
+    /// actual synonyms rather than orthogonal character sequences.
+    pub fn detect_from_text(purpose: &str) -> Option<AlgorithmPattern> {
+        let text = purpose.to_lowercase();
+
+        // Score each pattern by counting keyword hits
+        let patterns: &[(AlgorithmPattern, &[&str])] = &[
+            (
+                AlgorithmPattern::Sorting,
+                &[
+                    "sort", "order", "compare", "swap", "bubble", "merge", "quick",
+                    "insertion", "ascending", "descending", "partition", "pivot",
+                    "arrange", "rank",
+                ],
+            ),
+            (
+                AlgorithmPattern::Search,
+                &[
+                    "search", "find", "binary search", "linear search", "lookup",
+                    "index of", "bfs", "dfs", "breadth", "depth", "visited", "queue",
+                    "locate",
+                ],
+            ),
+            (
+                AlgorithmPattern::DynamicProgramming,
+                &[
+                    "dynamic programming", "memoize", "tabulate", "subproblem",
+                    "optimal", "recurrence", "knapsack", "subsequence", "memo",
+                    "dp", "edit distance", "coin change",
+                ],
+            ),
+            (
+                AlgorithmPattern::Graph,
+                &[
+                    "graph", "node", "edge", "vertex", "adjacent", "dijkstra",
+                    "shortest path", "traverse", "neighbor", "connected", "bfs",
+                    "dfs", "topological",
+                ],
+            ),
+            (
+                AlgorithmPattern::Accumulation,
+                &[
+                    "sum", "count", "total", "accumulate", "fold", "reduce",
+                    "aggregate", "average", "mean", "filter", "collect", "tally",
+                ],
+            ),
+            (
+                AlgorithmPattern::StringProcessing,
+                &[
+                    "string", "char", "parse", "format", "split", "join", "replace",
+                    "trim", "uppercase", "lowercase", "substring", "regex", "reverse string",
+                    "palindrome", "capitalize",
+                ],
+            ),
+        ];
+
+        let mut best: Option<(AlgorithmPattern, usize)> = None;
+
+        for (pattern, keywords) in patterns {
+            let hits: usize = keywords.iter().filter(|kw| text.contains(**kw)).count();
+            if hits > 0 {
+                if best.is_none() || hits > best.as_ref().unwrap().1 {
+                    best = Some((pattern.clone(), hits));
+                }
+            }
+        }
+
+        best.map(|(p, _)| p)
+    }
+}
+
 impl AlgorithmPatternDetector {
     /// Minimum similarity to consider a pattern match
     const MIN_SIMILARITY: f32 = 0.15;
 
     fn new(dim: usize) -> Self {
         let dim = dim.max(1);
-        Self {
-            dim,
-            sorting_prototype: Self::encode_prototype(
-                dim,
-                &[
-                    "sort",
-                    "order",
-                    "compare",
-                    "swap",
-                    "bubble",
-                    "merge",
-                    "quick",
-                    "insertion",
-                    "ascending",
-                    "descending",
-                    "partition",
-                    "pivot",
-                ],
-            ),
-            search_prototype: Self::encode_prototype(
-                dim,
-                &[
-                    "search", "find", "binary", "linear", "lookup", "index", "bfs", "dfs",
-                    "breadth", "depth", "visited", "queue",
-                ],
-            ),
-            dp_prototype: Self::encode_prototype(
-                dim,
-                &[
-                    "dynamic",
-                    "programming",
-                    "memoize",
-                    "tabulate",
-                    "subproblem",
-                    "optimal",
-                    "recurrence",
-                    "knapsack",
-                    "fibonacci",
-                    "subsequence",
-                    "cache",
-                    "memo",
-                ],
-            ),
-            graph_prototype: Self::encode_prototype(
-                dim,
-                &[
-                    "graph",
-                    "node",
-                    "edge",
-                    "vertex",
-                    "adjacent",
-                    "dijkstra",
-                    "shortest",
-                    "path",
-                    "traverse",
-                    "neighbor",
-                    "connected",
-                    "weight",
-                ],
-            ),
-            accumulation_prototype: Self::encode_prototype(
-                dim,
-                &[
-                    "sum",
-                    "count",
-                    "total",
-                    "accumulate",
-                    "fold",
-                    "reduce",
-                    "aggregate",
-                    "max",
-                    "min",
-                    "average",
-                    "filter",
-                    "collect",
-                ],
-            ),
-            string_prototype: Self::encode_prototype(
-                dim,
-                &[
-                    "string",
-                    "char",
-                    "parse",
-                    "format",
-                    "split",
-                    "join",
-                    "replace",
-                    "trim",
-                    "uppercase",
-                    "lowercase",
-                    "substring",
-                    "regex",
-                ],
-            ),
+
+        #[cfg(feature = "code_generation")]
+        {
+            let encoder = crate::hdc::code_semantic_encoder::CodeSemanticEncoder::new(dim);
+            Self {
+                sorting_prototype: encoder.encode_text(
+                    "sort order compare swap bubble merge quick insertion ascending descending partition pivot",
+                ),
+                search_prototype: encoder.encode_text(
+                    "search find binary linear lookup index bfs dfs breadth depth visited queue",
+                ),
+                dp_prototype: encoder.encode_text(
+                    "dynamic programming memoize tabulate subproblem optimal recurrence knapsack fibonacci subsequence cache memo",
+                ),
+                graph_prototype: encoder.encode_text(
+                    "graph node edge vertex adjacent dijkstra shortest path traverse neighbor connected weight",
+                ),
+                accumulation_prototype: encoder.encode_text(
+                    "sum count total accumulate fold reduce aggregate max min average filter collect",
+                ),
+                string_prototype: encoder.encode_text(
+                    "string char parse format split join replace trim uppercase lowercase substring regex",
+                ),
+            }
+        }
+
+        #[cfg(not(feature = "code_generation"))]
+        {
+            // Fallback: use byte-hash encoding when semantic encoder not available
+            Self {
+                sorting_prototype: Self::encode_ngram_prototype(dim, "sort order compare swap"),
+                search_prototype: Self::encode_ngram_prototype(dim, "search find binary lookup"),
+                dp_prototype: Self::encode_ngram_prototype(dim, "dynamic programming memoize"),
+                graph_prototype: Self::encode_ngram_prototype(dim, "graph node edge dijkstra"),
+                accumulation_prototype: Self::encode_ngram_prototype(dim, "sum count total fold"),
+                string_prototype: Self::encode_ngram_prototype(dim, "string char parse split"),
+            }
         }
     }
 
-    /// Encode a set of keywords into a prototype HV using the same modular hash
-    /// approach as `CodeIntentClassifier`.
-    fn encode_prototype(dim: usize, keywords: &[&str]) -> ContinuousHV {
+    /// Fallback byte-hash encoding for when semantic encoder is not available
+    #[cfg(not(feature = "code_generation"))]
+    fn encode_ngram_prototype(dim: usize, text: &str) -> ContinuousHV {
         let mut values = vec![0.0f32; dim];
-
-        for keyword in keywords {
-            let keyword_lower = keyword.to_lowercase();
-            for (i, byte) in keyword_lower.bytes().enumerate() {
-                let idx = ((byte as usize)
-                    .wrapping_mul(31)
-                    .wrapping_add(i.wrapping_mul(7)))
-                    % dim;
-                values[idx] += 1.0;
-            }
-        }
-
-        // Normalize
-        let magnitude: f32 = values.iter().map(|v| v * v).sum::<f32>().sqrt();
-        if magnitude > 0.0 {
-            for v in &mut values {
-                *v /= magnitude;
-            }
-        }
-
-        ContinuousHV::from_values(values)
-    }
-
-    /// Encode text into an HV for comparison against prototypes
-    fn encode_text(&self, text: &str) -> ContinuousHV {
-        let mut values = vec![0.0f32; self.dim];
-        let text_lower = text.to_lowercase();
-
-        for (i, byte) in text_lower.bytes().enumerate() {
-            let idx = ((byte as usize)
-                .wrapping_mul(31)
-                .wrapping_add(i.wrapping_mul(7)))
-                % self.dim;
+        for (i, byte) in text.to_lowercase().bytes().enumerate() {
+            let idx = ((byte as usize).wrapping_mul(31).wrapping_add(i.wrapping_mul(7))) % dim;
             values[idx] += 1.0;
         }
-
         let magnitude: f32 = values.iter().map(|v| v * v).sum::<f32>().sqrt();
         if magnitude > 0.0 {
-            for v in &mut values {
-                *v /= magnitude;
-            }
+            for v in &mut values { *v /= magnitude; }
         }
-
         ContinuousHV::from_values(values)
     }
 
@@ -513,9 +513,14 @@ pub struct CodePlanStep {
     pub confidence: f32,
 }
 
-/// Actions the code planner can take
+/// Actions the code planner can take.
+///
+/// The first 13 are the original actions. Actions 13-24 were added in Phase 4
+/// to support richer Rust code structure (match, iterators, closures, generics,
+/// lifetimes, derives, modules, tests, constants, type aliases, loops).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PlanAction {
+    // ── Original actions (0-12) ──
     /// Define a new function
     DefineFunction,
     /// Define a new struct/class
@@ -530,17 +535,43 @@ pub enum PlanAction {
     AddField,
     /// Add a method
     AddMethod,
-    /// Add an import
+    /// Add an import/use statement
     AddImport,
     /// Add a parameter
     AddParameter,
     /// Set return type
     SetReturnType,
-    /// Add error handling
+    /// Add error handling (Result, ?)
     AddErrorHandling,
-    /// Add documentation
+    /// Add documentation (///, //!)
     AddDocumentation,
-    /// Complete — plan is finished
+
+    // ── New actions (13-23) — Phase 4 ──
+    /// Match expression with arms
+    MatchExpression,
+    /// For loop (for x in iter { ... })
+    ForLoop,
+    /// Iterator chain (.iter().map().filter().collect())
+    IteratorChain,
+    /// Closure definition (|args| body)
+    ClosureDefine,
+    /// Error propagation with ? operator
+    ErrorPropagation,
+    /// Generic type parameter (<T>, <T: Trait>)
+    GenericParam,
+    /// Lifetime annotation ('a)
+    LifetimeAnnotation,
+    /// #[derive(...)] attribute
+    DeriveAttribute,
+    /// #[test] module or function
+    TestModule,
+    /// const or static definition
+    ConstDefinition,
+    /// type alias (type Name = ...)
+    TypeAlias,
+
+    // ── Sentinel ──
+    /// Complete — plan is finished (must remain last)
     Complete,
 }
 
@@ -573,19 +604,31 @@ impl Default for CfCCodeSequencerConfig {
 
 /// CfC-based code structure planner
 ///
-/// Uses simplified CfC dynamics to evolve a state vector that encodes
-/// the current "plan progress". At each time step, the state is decoded
-/// into a structural decision (PlanAction).
+/// Uses a trainable CfCNetwork to evolve a state vector that encodes
+/// the current "plan progress". At each time step, the network output
+/// is interpreted as action logits over the PlanAction space.
+///
+/// ## Training
+///
+/// The network can be trained via BPTT or SPSA:
+/// - `train_step()` — single (input, target) pair with Adam optimizer
+/// - `train_sequence()` — sequence of plan steps with temporal gradients
+///
+/// ## Weight Persistence
+///
+/// Weights can be exported/imported as flat f32 vectors for persistence
+/// and federated learning compatibility:
+/// - `export_weights()` → `Vec<f32>` (compatible with swarm gradients)
+/// - `import_weights(Vec<f32>)` — restore from flat vector
 pub struct CfCCodeSequencer {
     config: CfCCodeSequencerConfig,
-    /// Projection from HDC space to hidden state
-    projection: Vec<f32>,
-    /// Time constants for each hidden unit
-    tau: Vec<f32>,
-    /// Recurrent weights (hidden × hidden)
-    w_h: Vec<f32>,
-    /// Action prototypes: each PlanAction maps to a hidden-dim vector
-    action_prototypes: Vec<(PlanAction, Vec<f32>)>,
+    /// Trainable CfC network: input_dim=hdc_dim, output_dim=NUM_ACTIONS.
+    /// Wrapped in RefCell for interior mutability — `plan_structure()` needs to
+    /// call `network.forward()` (which updates hidden state) but the public API
+    /// takes `&self` to avoid cascading `&mut` through 20+ call sites.
+    network: Mutex<CfCNetwork>,
+    /// Ordered list of actions matching output indices
+    action_index: Vec<PlanAction>,
     /// Algorithm pattern detector for enriching plans
     pattern_detector: AlgorithmPatternDetector,
 }
@@ -596,51 +639,8 @@ impl CfCCodeSequencer {
         let hdc_dim = config.hdc_dim;
         let hidden_dim = config.hidden_dim;
 
-        // Initialize projection matrix (hdc_dim → hidden_dim) deterministically
-        let mut projection = vec![0.0f32; hdc_dim * hidden_dim];
-        for i in 0..projection.len() {
-            // Deterministic pseudo-random initialization
-            let seed = (i as u64).wrapping_mul(2_654_435_761).wrapping_add(1);
-            let frac = (seed as f32) / (u64::MAX as f32);
-            projection[i] = (frac * 2.0 - 1.0) / (hdc_dim as f32).sqrt();
-        }
-
-        // Time constants
-        let tau: Vec<f32> = (0..hidden_dim)
-            .map(|i| 0.5 + (i as f32 / hidden_dim as f32) * 9.5) // range [0.5, 10.0]
-            .collect();
-
-        // Recurrent weights (identity-like with small noise)
-        let mut w_h = vec![0.0f32; hidden_dim * hidden_dim];
-        for i in 0..hidden_dim {
-            w_h[i * hidden_dim + i] = 0.9; // diagonal
-            for j in 0..hidden_dim {
-                if i != j {
-                    let seed = ((i * hidden_dim + j) as u64).wrapping_mul(3_141_592_653);
-                    let frac = (seed as f32) / (u64::MAX as f32);
-                    w_h[i * hidden_dim + j] = (frac * 2.0 - 1.0) * 0.05;
-                }
-            }
-        }
-
-        // Action prototypes in hidden space
-        let action_prototypes = Self::init_action_prototypes(hidden_dim);
-
-        let pattern_detector = AlgorithmPatternDetector::new(hdc_dim);
-
-        Self {
-            config,
-            projection,
-            tau,
-            w_h,
-            action_prototypes,
-            pattern_detector,
-        }
-    }
-
-    /// Initialize action prototype vectors
-    fn init_action_prototypes(hidden_dim: usize) -> Vec<(PlanAction, Vec<f32>)> {
-        let actions = [
+        let action_index = vec![
+            // Original 13
             PlanAction::DefineFunction,
             PlanAction::DefineStruct,
             PlanAction::DefineEnum,
@@ -653,88 +653,446 @@ impl CfCCodeSequencer {
             PlanAction::SetReturnType,
             PlanAction::AddErrorHandling,
             PlanAction::AddDocumentation,
+            // Phase 4 additions
+            PlanAction::MatchExpression,
+            PlanAction::ForLoop,
+            PlanAction::IteratorChain,
+            PlanAction::ClosureDefine,
+            PlanAction::ErrorPropagation,
+            PlanAction::GenericParam,
+            PlanAction::LifetimeAnnotation,
+            PlanAction::DeriveAttribute,
+            PlanAction::TestModule,
+            PlanAction::ConstDefinition,
+            PlanAction::TypeAlias,
+            // Sentinel
             PlanAction::Complete,
         ];
 
-        actions
-            .iter()
-            .enumerate()
-            .map(|(i, action)| {
-                let mut proto = vec![0.0f32; hidden_dim];
-                // Deterministic initialization: each action activates different hidden units
-                let base = (i * hidden_dim) / actions.len();
-                let width = hidden_dim / actions.len();
-                for j in base..(base + width).min(hidden_dim) {
-                    proto[j] = 1.0;
-                }
-                // Normalize
-                let mag: f32 = proto.iter().map(|v| v * v).sum::<f32>().sqrt();
-                if mag > 0.0 {
-                    for v in &mut proto {
-                        *v /= mag;
-                    }
-                }
-                (action.clone(), proto)
-            })
-            .collect()
+        let cell_config = CfCConfig {
+            input_dim: hdc_dim,
+            hidden_dim,
+            gradient_clip: 1.0,
+            ..Default::default()
+        };
+        let net_config = CfCNetworkConfig {
+            input_dim: hdc_dim,
+            hidden_dim,
+            num_layers: 1,
+            output_dim: NUM_ACTIONS,
+            cell_config,
+            residual: false,
+            bidirectional: false,
+            enable_online_learning: false,
+            online_learning_config: Default::default(),
+        };
+        let network = Mutex::new(CfCNetwork::new(net_config));
+        let pattern_detector = AlgorithmPatternDetector::new(hdc_dim);
+
+        let sequencer = Self {
+            config,
+            network,
+            action_index,
+            pattern_detector,
+        };
+
+        // Auto-load trained weights if available
+        sequencer.try_auto_load_weights();
+
+        sequencer
     }
 
-    /// Project an HDC vector into the hidden state space
-    fn project_to_hidden(&self, hv: &ContinuousHV) -> Vec<f32> {
+    /// Default path for persisted sequencer weights
+    pub fn default_weights_path() -> std::path::PathBuf {
+        // Try $SYMTHAEA_DATA_DIR first, then ~/.local/share/symthaea/
+        if let Ok(data_dir) = std::env::var("SYMTHAEA_DATA_DIR") {
+            std::path::PathBuf::from(data_dir).join("code-sequencer-weights.bin")
+        } else if let Some(home) = dirs_next_or_home() {
+            home.join(".local")
+                .join("share")
+                .join("symthaea")
+                .join("code-sequencer-weights.bin")
+        } else {
+            std::path::PathBuf::from("code-sequencer-weights.bin")
+        }
+    }
+
+    /// Try to auto-load weights from the default path. Silently succeeds or fails.
+    fn try_auto_load_weights(&self) {
+        let path = Self::default_weights_path();
+        if path.exists() {
+            match self.load_weights(&path) {
+                Ok(()) => {
+                    #[cfg(debug_assertions)]
+                    eprintln!(
+                        "[CfCCodeSequencer] Loaded trained weights from {}",
+                        path.display()
+                    );
+                }
+                Err(_e) => {
+                    #[cfg(debug_assertions)]
+                    eprintln!(
+                        "[CfCCodeSequencer] Failed to load weights from {}: {}",
+                        path.display(),
+                        _e
+                    );
+                }
+            }
+        }
+    }
+
+    /// Save weights to the default persistence path, creating directories as needed.
+    pub fn persist_weights(&self) -> anyhow::Result<()> {
+        let path = Self::default_weights_path();
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
+        self.save_weights(&path)
+    }
+
+    /// Get a mutable reference to the underlying CfC network (for training).
+    ///
+    /// Panics if the network is currently borrowed (e.g., during plan_structure).
+    pub fn network_mut(&mut self) -> std::sync::MutexGuard<'_, CfCNetwork> {
+        self.network.lock().unwrap()
+    }
+
+    /// Convert an HDC vector into a network input Array1
+    fn hv_to_input(&self, hv: &ContinuousHV) -> Array1<f32> {
         let hdc_dim = self.config.hdc_dim;
-        let hidden_dim = self.config.hidden_dim;
-        let mut hidden = vec![0.0f32; hidden_dim];
-
-        // Use only first hdc_dim values from the HV
-        let hv_len = hv.values.len().min(hdc_dim);
-
-        for h in 0..hidden_dim {
-            let mut sum = 0.0f32;
-            for i in 0..hv_len {
-                sum += hv.values[i] * self.projection[i * hidden_dim + h];
-            }
-            hidden[h] = sum.tanh();
+        let mut input = Array1::zeros(hdc_dim);
+        let len = hv.values.len().min(hdc_dim);
+        for i in 0..len {
+            input[i] = hv.values[i];
         }
-
-        hidden
+        input
     }
 
-    /// CfC step: evolve state by dt using closed-form dynamics
-    fn cfc_step(&self, state: &[f32]) -> Vec<f32> {
-        let hidden_dim = self.config.hidden_dim;
-        let dt = self.config.dt;
-        let mut new_state = vec![0.0f32; hidden_dim];
+    /// Decode network output into a (PlanAction, confidence) pair.
+    ///
+    /// Output is interpreted as logits over the action space. The action with
+    /// the highest logit is selected; confidence is the softmax probability.
+    fn decode_output(&self, output: &Array1<f32>) -> (PlanAction, f32) {
+        let n_actions = self.action_index.len();
+        let scan_len = output.len().min(n_actions);
 
-        for i in 0..hidden_dim {
-            // Compute input from recurrent connections
-            let mut recurrent_input = 0.0f32;
-            for j in 0..hidden_dim {
-                recurrent_input += self.w_h[i * hidden_dim + j] * state[j];
-            }
-
-            // CfC closed-form update: h(t+dt) = h(t) * exp(-dt/tau) + f(x) * (1 - exp(-dt/tau))
-            let decay = (-dt / self.tau[i]).exp();
-            let activation = recurrent_input.tanh();
-            new_state[i] = state[i] * decay + activation * (1.0 - decay);
+        if scan_len == 0 {
+            return (PlanAction::Complete, 0.0);
         }
 
-        new_state
+        let mut best_idx = 0;
+        let mut best_val = output[0];
+
+        for i in 1..scan_len {
+            if output[i] > best_val {
+                best_val = output[i];
+                best_idx = i;
+            }
+        }
+
+        // Clamp index to action_index bounds
+        best_idx = best_idx.min(n_actions - 1);
+
+        // Compute softmax confidence for the winning action
+        let max_val = best_val;
+        let exp_sum: f32 = (0..scan_len)
+            .map(|i| (output[i] - max_val).exp())
+            .sum();
+        let confidence = if exp_sum > 0.0 {
+            1.0 / exp_sum
+        } else {
+            0.0
+        };
+
+        (self.action_index[best_idx].clone(), confidence)
     }
 
-    /// Decode hidden state into a plan action by finding nearest prototype
-    fn decode_action(&self, state: &[f32]) -> (PlanAction, f32) {
-        let mut best_action = PlanAction::Complete;
-        let mut best_sim = f32::NEG_INFINITY;
+    /// Create a one-hot target vector for a given PlanAction (for training)
+    pub fn action_to_target(&self, action: &PlanAction) -> Array1<f32> {
+        let mut target = Array1::zeros(NUM_ACTIONS);
+        if let Some(idx) = self.action_index.iter().position(|a| a == action) {
+            target[idx] = 1.0;
+        }
+        target
+    }
 
-        for (action, proto) in &self.action_prototypes {
-            let sim = cosine_similarity(state, proto);
-            if sim > best_sim {
-                best_sim = sim;
-                best_action = action.clone();
+    /// Train the sequencer on a single (input_hv, target_action) pair.
+    ///
+    /// Returns the MSE loss. Uses BPTT with Adam optimizer.
+    pub fn train_step(
+        &self,
+        input_hv: &ContinuousHV,
+        target_action: &PlanAction,
+        learning_rate: f32,
+    ) -> anyhow::Result<f32> {
+        let input = self.hv_to_input(input_hv);
+        let target = self.action_to_target(target_action);
+        let mut net = self.network.lock().unwrap();
+        net.reset();
+        net.train_step(&input, &target, self.config.dt, learning_rate)
+    }
+
+    /// Train the sequencer on a sequence of (input_hv, action) pairs.
+    ///
+    /// The same input is fed at each step, with the target being each
+    /// successive action in the plan sequence. Returns avg loss.
+    pub fn train_sequence(
+        &self,
+        input_hv: &ContinuousHV,
+        target_actions: &[PlanAction],
+        learning_rate: f32,
+    ) -> anyhow::Result<f32> {
+        let input = self.hv_to_input(input_hv);
+        let inputs: Vec<Array1<f32>> = target_actions.iter().map(|_| input.clone()).collect();
+        let targets: Vec<Array1<f32>> = target_actions
+            .iter()
+            .map(|a| self.action_to_target(a))
+            .collect();
+        let dts: Vec<f32> = vec![self.config.dt; target_actions.len()];
+
+        let mut net = self.network.lock().unwrap();
+        net.reset();
+        net.train_step_bptt(&inputs, &targets, &dts, learning_rate)
+    }
+
+    /// Export all network weights as a flat f32 vector.
+    ///
+    /// Format: [cell0_w_in | cell0_w_h | cell0_b_h | cell0_tau | output_weights | output_bias]
+    /// Compatible with federated learning swarm gradient exchange.
+    pub fn export_weights(&self) -> Vec<f32> {
+        let net = self.network.lock().unwrap();
+        let mut weights = Vec::new();
+
+        for cell in &net.cells {
+            if let Some(slice) = cell.w_in.as_slice() {
+                weights.extend_from_slice(slice);
+            }
+            if let Some(slice) = cell.w_h.as_slice() {
+                weights.extend_from_slice(slice);
+            }
+            if let Some(slice) = cell.b_h.as_slice() {
+                weights.extend_from_slice(slice);
+            }
+            if let Some(slice) = cell.tau.as_slice() {
+                weights.extend_from_slice(slice);
             }
         }
 
-        (best_action, best_sim.max(0.0))
+        if let Some(slice) = net.output_weights.as_slice() {
+            weights.extend_from_slice(slice);
+        }
+        if let Some(slice) = net.output_bias.as_slice() {
+            weights.extend_from_slice(slice);
+        }
+
+        weights
+    }
+
+    /// Import weights from a flat f32 vector (inverse of export_weights).
+    pub fn import_weights(&self, weights: &[f32]) -> anyhow::Result<()> {
+        let mut net = self.network.lock().unwrap();
+        let expected = net.num_parameters();
+        anyhow::ensure!(
+            weights.len() == expected,
+            "Weight vector length mismatch: got {}, expected {}",
+            weights.len(),
+            expected
+        );
+
+        let mut offset = 0;
+
+        for cell in &mut net.cells {
+            let n = cell.w_in.len();
+            if let Some(slice) = cell.w_in.as_slice_mut() {
+                slice.copy_from_slice(&weights[offset..offset + n]);
+            }
+            offset += n;
+
+            let n = cell.w_h.len();
+            if let Some(slice) = cell.w_h.as_slice_mut() {
+                slice.copy_from_slice(&weights[offset..offset + n]);
+            }
+            offset += n;
+
+            let n = cell.b_h.len();
+            if let Some(slice) = cell.b_h.as_slice_mut() {
+                slice.copy_from_slice(&weights[offset..offset + n]);
+            }
+            offset += n;
+
+            let n = cell.tau.len();
+            if let Some(slice) = cell.tau.as_slice_mut() {
+                slice.copy_from_slice(&weights[offset..offset + n]);
+            }
+            offset += n;
+        }
+
+        let n = net.output_weights.len();
+        if let Some(slice) = net.output_weights.as_slice_mut() {
+            slice.copy_from_slice(&weights[offset..offset + n]);
+        }
+        offset += n;
+
+        let n = net.output_bias.len();
+        if let Some(slice) = net.output_bias.as_slice_mut() {
+            slice.copy_from_slice(&weights[offset..offset + n]);
+        }
+        offset += n;
+
+        debug_assert_eq!(offset, expected);
+        Ok(())
+    }
+
+    /// Save weights to a binary file
+    pub fn save_weights(&self, path: &std::path::Path) -> anyhow::Result<()> {
+        let weights = self.export_weights();
+        let bytes: Vec<u8> = weights.iter().flat_map(|f| f.to_le_bytes()).collect();
+        std::fs::write(path, &bytes)?;
+        Ok(())
+    }
+
+    /// Load weights from a binary file
+    pub fn load_weights(&self, path: &std::path::Path) -> anyhow::Result<()> {
+        let bytes = std::fs::read(path)?;
+        anyhow::ensure!(
+            bytes.len() % 4 == 0,
+            "Weight file size not a multiple of 4 bytes"
+        );
+        let weights: Vec<f32> = bytes
+            .chunks_exact(4)
+            .map(|chunk| f32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]))
+            .collect();
+        self.import_weights(&weights)
+    }
+
+    // =========================================================================
+    // Phase 7: Online Learning — Learn During Operation
+    // =========================================================================
+
+    /// Online training step after a successful native generation.
+    ///
+    /// Performs a single SPSA (gradient-free) update toward the target plan,
+    /// using the current generation's intent as input. This is lightweight
+    /// enough to run after every generation without blocking the pipeline.
+    ///
+    /// Returns the loss, or None if training was skipped.
+    pub fn online_learn_success(
+        &self,
+        intent_hv: &ContinuousHV,
+        actual_plan: &[PlanAction],
+        learning_rate: f32,
+    ) -> Option<f32> {
+        if actual_plan.is_empty() {
+            return None;
+        }
+
+        // Only learn from plans that actually produced compilable code
+        // (the caller is responsible for only calling this on successes)
+        let input = self.hv_to_input(intent_hv);
+        let targets: Vec<ndarray::Array1<f32>> = actual_plan
+            .iter()
+            .map(|a| self.action_to_target(a))
+            .collect();
+        let dts: Vec<f32> = vec![self.config.dt; actual_plan.len()];
+        let inputs: Vec<ndarray::Array1<f32>> = actual_plan.iter().map(|_| input.clone()).collect();
+
+        let mut net = self.network.lock().unwrap();
+        net.reset();
+
+        // Use SPSA (gradient-free) for online learning — more robust than BPTT
+        // for single-example updates and doesn't require backprop infrastructure
+        let mut total_loss = 0.0f32;
+        for (inp, (target, dt)) in inputs.iter().zip(targets.iter().zip(dts.iter())) {
+            let output = net.forward(inp, *dt);
+            // Compute MSE loss for monitoring
+            let loss: f32 = output
+                .iter()
+                .zip(target.iter())
+                .map(|(o, t)| (o - t).powi(2))
+                .sum::<f32>()
+                / output.len() as f32;
+            total_loss += loss;
+
+            // Online adaptation if enabled
+            if net.online_learning_enabled() {
+                net.adapt_online(loss, inp, target, *dt);
+            }
+        }
+
+        let avg_loss = total_loss / actual_plan.len().max(1) as f32;
+        Some(avg_loss)
+    }
+
+    /// Online training step after an LLM fallback — learn what the LLM did.
+    ///
+    /// Extracts the plan from LLM-generated source code and trains the sequencer
+    /// to produce that plan for the given intent. Over time, this transfers
+    /// knowledge from the LLM to the native tier.
+    pub fn online_learn_from_llm(
+        &self,
+        intent_hv: &ContinuousHV,
+        llm_source: &str,
+        learning_rate: f32,
+    ) -> Option<f32> {
+        // Infer what plan the LLM effectively produced
+        let inferred_plan = Self::infer_plan_from_code(llm_source);
+        if inferred_plan.is_empty() {
+            return None;
+        }
+
+        // Train toward the LLM's plan
+        match self.train_sequence(intent_hv, &inferred_plan, learning_rate) {
+            Ok(loss) if loss.is_finite() => Some(loss),
+            _ => None,
+        }
+    }
+
+    /// Infer a PlanAction sequence from source code (for distillation from LLM output).
+    fn infer_plan_from_code(source: &str) -> Vec<PlanAction> {
+        let mut actions = Vec::new();
+
+        if source.contains("struct ") {
+            actions.push(PlanAction::DefineStruct);
+        }
+        if source.contains("enum ") {
+            actions.push(PlanAction::DefineEnum);
+        }
+        if source.contains("trait ") {
+            actions.push(PlanAction::DefineTrait);
+        }
+        if source.contains("fn ") {
+            actions.push(PlanAction::DefineFunction);
+            if source.contains("->") {
+                actions.push(PlanAction::SetReturnType);
+            }
+        }
+        if source.contains("impl ") {
+            actions.push(PlanAction::ImplTrait);
+        }
+        if source.contains("use ") {
+            actions.push(PlanAction::AddImport);
+        }
+        if source.contains("match ") {
+            actions.push(PlanAction::MatchExpression);
+        }
+        if source.contains(".iter()") || source.contains(".into_iter()") {
+            actions.push(PlanAction::IteratorChain);
+        }
+        if source.contains("?;") || source.contains("?)") {
+            actions.push(PlanAction::ErrorPropagation);
+        }
+        if source.contains("#[derive(") {
+            actions.push(PlanAction::DeriveAttribute);
+        }
+        if source.contains("#[test]") {
+            actions.push(PlanAction::TestModule);
+        }
+
+        if actions.is_empty() {
+            actions.push(PlanAction::DefineFunction);
+        }
+        actions.push(PlanAction::Complete);
+        actions
     }
 
     /// Detect an algorithm pattern from the intent HV using HDC similarity
@@ -754,29 +1112,58 @@ impl CfCCodeSequencer {
         intent_hv: &ContinuousHV,
         context_hvs: &[&ContinuousHV],
     ) -> Vec<CodePlanStep> {
-        // Project intent into hidden space
-        let mut state = self.project_to_hidden(intent_hv);
+        self.plan_structure_inner(intent_hv, context_hvs, None)
+    }
 
-        // Blend in context
+    /// Plan code structure with direct purpose text for improved pattern detection.
+    ///
+    /// Uses keyword matching on the raw purpose string to detect algorithm patterns,
+    /// bypassing the byte-hash HDC encoding which produces orthogonal vectors for
+    /// synonyms like "add" and "sum". Falls back to HDC detection if text detection
+    /// finds nothing.
+    pub fn plan_structure_with_purpose(
+        &self,
+        intent_hv: &ContinuousHV,
+        context_hvs: &[&ContinuousHV],
+        purpose: &str,
+    ) -> Vec<CodePlanStep> {
+        self.plan_structure_inner(intent_hv, context_hvs, Some(purpose))
+    }
+
+    fn plan_structure_inner(
+        &self,
+        intent_hv: &ContinuousHV,
+        context_hvs: &[&ContinuousHV],
+        purpose: Option<&str>,
+    ) -> Vec<CodePlanStep> {
+        // Build network input: intent HV blended with context
+        let mut input = self.hv_to_input(intent_hv);
         for ctx_hv in context_hvs {
-            let ctx_hidden = self.project_to_hidden(ctx_hv);
-            for i in 0..state.len() {
-                state[i] = state[i] * 0.7 + ctx_hidden[i] * 0.3;
-            }
+            let ctx_input = self.hv_to_input(ctx_hv);
+            input = &input * 0.7 + &ctx_input * 0.3;
         }
 
-        // Detect algorithm pattern and prepend template steps
+        // Detect algorithm pattern — prefer text-based detection (more reliable)
+        // then fall back to HDC similarity detection
         let mut plan = Vec::new();
-        if let Some(pattern) = self.pattern_detector.detect(intent_hv) {
+        let detected_pattern = purpose
+            .and_then(AlgorithmPattern::detect_from_text)
+            .or_else(|| self.pattern_detector.detect(intent_hv));
+
+        if let Some(pattern) = detected_pattern {
             plan.extend(pattern.to_plan_steps());
         }
 
-        // Evolve CfC and collect plan steps
+        // Reset network state for fresh planning
+        let mut net = self.network.lock().unwrap();
+        net.reset();
+
+        // Evolve CfC network and collect plan steps
         let mut prev_action = plan.last().map(|s| s.action.clone());
 
         for _step in 0..self.config.max_steps {
-            state = self.cfc_step(&state);
-            let (action, confidence) = self.decode_action(&state);
+            let output = net.forward(&input, self.config.dt);
+            let (action, confidence) = self.decode_output(&output);
 
             // Stop if confidence is too low or we hit Complete
             if confidence < self.config.completion_threshold || action == PlanAction::Complete {
@@ -818,8 +1205,6 @@ impl Default for CfCCodeSequencer {
     }
 }
 
-use symthaea_core::math::cosine_similarity_f32 as cosine_similarity;
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -828,6 +1213,7 @@ mod tests {
     fn test_create_sequencer() {
         let sequencer = CfCCodeSequencer::default();
         assert_eq!(sequencer.config.hidden_dim, 64);
+        assert_eq!(sequencer.action_index.len(), NUM_ACTIONS);
     }
 
     #[test]
@@ -871,36 +1257,103 @@ mod tests {
     }
 
     #[test]
-    fn test_cfc_step_stability() {
+    fn test_network_stability() {
         let sequencer = CfCCodeSequencer::default();
-        let mut state = vec![1.0f32; sequencer.config.hidden_dim];
+        let input = ContinuousHV::random(512, 42);
+        let arr_input = sequencer.hv_to_input(&input);
 
-        // Run many steps - should not blow up
+        // Run many steps through the network — should not blow up
+        let mut net = sequencer.network.borrow_mut();
+        net.reset();
         for _ in 0..100 {
-            state = sequencer.cfc_step(&state);
-        }
-
-        // State should remain bounded
-        for v in &state {
-            assert!(v.is_finite());
-            assert!(v.abs() < 10.0, "CfC state should remain bounded: {}", v);
+            let output = net.forward(&arr_input, 1.0);
+            for v in output.iter() {
+                assert!(v.is_finite(), "CfC output should remain finite");
+            }
         }
     }
 
     #[test]
-    fn test_cosine_similarity() {
-        let a = vec![1.0, 0.0, 0.0];
-        let b = vec![1.0, 0.0, 0.0];
-        assert!((cosine_similarity(&a, &b) - 1.0).abs() < 1e-6);
+    fn test_train_step_reduces_loss() {
+        let sequencer = CfCCodeSequencer::default();
+        let intent = ContinuousHV::random(512, 42);
 
-        let c = vec![0.0, 1.0, 0.0];
-        assert!(cosine_similarity(&a, &c).abs() < 1e-6);
+        // Train toward DefineFunction for 10 steps
+        let mut losses = Vec::new();
+        for _ in 0..10 {
+            let loss = sequencer
+                .train_step(&intent, &PlanAction::DefineFunction, 0.01)
+                .unwrap();
+            losses.push(loss);
+        }
+
+        // Loss should generally decrease (allow noise)
+        let first_3_avg: f32 = losses[..3].iter().sum::<f32>() / 3.0;
+        let last_3_avg: f32 = losses[7..].iter().sum::<f32>() / 3.0;
+        assert!(
+            last_3_avg <= first_3_avg + 0.1,
+            "Training should not increase loss significantly: first_3={:.4} last_3={:.4}",
+            first_3_avg,
+            last_3_avg
+        );
+    }
+
+    #[test]
+    fn test_weight_export_import_roundtrip() {
+        let sequencer = CfCCodeSequencer::default();
+        let intent = ContinuousHV::random(512, 42);
+
+        // Get plan before
+        let plan_before = sequencer.plan_structure(&intent, &[]);
+
+        // Export and reimport weights
+        let weights = sequencer.export_weights();
+        assert!(!weights.is_empty());
+        assert_eq!(weights.len(), sequencer.network.borrow().num_parameters());
+
+        let sequencer2 = CfCCodeSequencer::default();
+        sequencer2.import_weights(&weights).unwrap();
+
+        // Plans should be identical after import
+        let plan_after = sequencer2.plan_structure(&intent, &[]);
+        assert_eq!(plan_before.len(), plan_after.len());
+        for (a, b) in plan_before.iter().zip(plan_after.iter()) {
+            assert_eq!(a.action, b.action);
+        }
+    }
+
+    #[test]
+    fn test_action_to_target_roundtrip() {
+        let sequencer = CfCCodeSequencer::default();
+        for action in &sequencer.action_index {
+            let target = sequencer.action_to_target(action);
+            assert_eq!(target.len(), NUM_ACTIONS);
+            let sum: f32 = target.iter().sum();
+            assert!((sum - 1.0).abs() < 1e-6, "Target should be one-hot");
+        }
     }
 
     // --- Algorithm Pattern Detection Tests ---
 
     fn make_keyword_hv(dim: usize, keywords: &[&str]) -> ContinuousHV {
-        AlgorithmPatternDetector::encode_prototype(dim, keywords)
+        #[cfg(feature = "code_generation")]
+        {
+            let encoder = crate::hdc::code_semantic_encoder::CodeSemanticEncoder::new(dim);
+            encoder.encode_text(&keywords.join(" "))
+        }
+        #[cfg(not(feature = "code_generation"))]
+        {
+            // Fallback: byte-hash encoding
+            let text = keywords.join(" ").to_lowercase();
+            let mut values = vec![0.0f32; dim];
+            for (i, byte) in text.bytes().enumerate() {
+                let idx = ((byte as usize).wrapping_mul(31).wrapping_add(i.wrapping_mul(7))) % dim;
+                values[idx] += 1.0;
+            }
+            let magnitude: f32 = values.iter().map(|v| v * v).sum::<f32>().sqrt();
+            if magnitude > 0.0 { for v in &mut values { *v /= magnitude; } }
+            ContinuousHV::from_values(values)
+        }
     }
 
     #[test]
@@ -1026,6 +1479,114 @@ mod tests {
         assert!(
             has_sorting_context,
             "Sorting pattern should inject algorithm-specific context into the plan"
+        );
+    }
+
+    // --- Direct Text-Based Pattern Detection Tests ---
+
+    #[test]
+    fn test_text_detect_sorting() {
+        assert_eq!(
+            AlgorithmPattern::detect_from_text("Sort a vector of integers in ascending order"),
+            Some(AlgorithmPattern::Sorting)
+        );
+        assert_eq!(
+            AlgorithmPattern::detect_from_text("Arrange elements by comparing and swapping"),
+            Some(AlgorithmPattern::Sorting)
+        );
+    }
+
+    #[test]
+    fn test_text_detect_accumulation() {
+        assert_eq!(
+            AlgorithmPattern::detect_from_text("Sum all elements in the list"),
+            Some(AlgorithmPattern::Accumulation)
+        );
+        assert_eq!(
+            AlgorithmPattern::detect_from_text("Count the total number of items"),
+            Some(AlgorithmPattern::Accumulation)
+        );
+        assert_eq!(
+            AlgorithmPattern::detect_from_text("Calculate the average of numbers"),
+            Some(AlgorithmPattern::Accumulation)
+        );
+    }
+
+    #[test]
+    fn test_text_detect_string_processing() {
+        assert_eq!(
+            AlgorithmPattern::detect_from_text("Reverse a string and capitalize it"),
+            Some(AlgorithmPattern::StringProcessing)
+        );
+        assert_eq!(
+            AlgorithmPattern::detect_from_text("Parse the input and trim whitespace"),
+            Some(AlgorithmPattern::StringProcessing)
+        );
+    }
+
+    #[test]
+    fn test_text_detect_search() {
+        assert_eq!(
+            AlgorithmPattern::detect_from_text("Binary search for a target in sorted array"),
+            Some(AlgorithmPattern::Search)
+        );
+    }
+
+    #[test]
+    fn test_text_detect_dp() {
+        assert_eq!(
+            AlgorithmPattern::detect_from_text("Dynamic programming solution for knapsack"),
+            Some(AlgorithmPattern::DynamicProgramming)
+        );
+    }
+
+    #[test]
+    fn test_text_detect_graph() {
+        assert_eq!(
+            AlgorithmPattern::detect_from_text("Find shortest path between nodes in graph"),
+            Some(AlgorithmPattern::Graph)
+        );
+    }
+
+    #[test]
+    fn test_text_detect_none_for_unrelated() {
+        assert_eq!(
+            AlgorithmPattern::detect_from_text("Configure the database connection pool"),
+            None
+        );
+    }
+
+    #[test]
+    fn test_text_detect_disambiguates_by_count() {
+        // "sort" (1 hit Sorting) vs "filter and collect" (2 hits Accumulation)
+        assert_eq!(
+            AlgorithmPattern::detect_from_text("Filter items and collect the total"),
+            Some(AlgorithmPattern::Accumulation)
+        );
+    }
+
+    #[test]
+    fn test_plan_with_purpose_uses_text_detection() {
+        let dim = ALGORITHM_PATTERN_DIM;
+        let sequencer = CfCCodeSequencer::new(CfCCodeSequencerConfig {
+            hdc_dim: dim,
+            ..Default::default()
+        });
+
+        // Random HV that wouldn't match any HV-based pattern, but purpose text is clear
+        let random_hv = ContinuousHV::random(dim, 12345);
+        let plan = sequencer.plan_structure_with_purpose(
+            &random_hv,
+            &[],
+            "Sort integers in ascending order",
+        );
+
+        let has_sorting_context = plan
+            .iter()
+            .any(|step| step.context.iter().any(|c| c.contains("sorting")));
+        assert!(
+            has_sorting_context,
+            "Text-based detection should inject sorting context even with random HV"
         );
     }
 

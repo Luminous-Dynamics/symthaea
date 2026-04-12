@@ -1,12 +1,13 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
-use super::*;
 use super::super::super::subsystem_trait::{output_flags, CognitiveSubsystem, CycleSnapshot};
 use super::super::super::thresholds::{
     RADIO_BEACON_INTERVAL_CYCLES, RADIO_BEACON_SIZE, RADIO_CRYPTO_NONCE_SIZE,
     RADIO_SYNTHETIC_SNR_BASE, RADIO_SYNTHETIC_SNR_ISOLATED,
 };
+use super::*;
+use crate::domain::DomainProfile;
 
 // ── RadioTier profiles ───────────────────────────────────────────────
 
@@ -140,9 +141,7 @@ fn test_classifier_emergency_routes_regional() {
         RoutingDecision::Routed { tier, .. } => {
             // Emergency can go to any tier, but should prefer best available
             assert!(
-                tier == RadioTier::Local
-                    || tier == RadioTier::Metro
-                    || tier == RadioTier::Regional
+                tier == RadioTier::Local || tier == RadioTier::Metro || tier == RadioTier::Regional
             );
         }
         _ => panic!("Expected Routed"),
@@ -193,6 +192,55 @@ fn test_classifier_small_payload_fits_metro() {
             assert_eq!(tier, RadioTier::Local);
             assert!(!fragmented);
         }
+        _ => panic!("Expected Routed"),
+    }
+}
+
+#[test]
+fn test_classifier_underwater_avoids_local_mesh() {
+    let mut c = PayloadClassifier::default();
+    c.set_domain_profile(DomainProfile::underwater());
+
+    let decision = c.route(PayloadClass::ConsciousnessDelta, 100, 1).unwrap();
+    match decision {
+        RoutingDecision::Routed { tier, .. } => assert_eq!(tier, RadioTier::Metro),
+        _ => panic!("Expected Routed"),
+    }
+}
+
+#[test]
+fn test_classifier_subterranean_allows_store_and_forward_fragmentation() {
+    let mut c = PayloadClassifier::default();
+    c.set_domain_profile(DomainProfile::subterranean());
+    c.set_tier_available(RadioTier::Local, false);
+
+    let decision = c.route(PayloadClass::BulkSync, 2048, 1).unwrap();
+    match decision {
+        RoutingDecision::Routed {
+            tier,
+            fragmented,
+            estimated_fragments,
+        } => {
+            assert_eq!(tier, RadioTier::Metro);
+            assert!(fragmented);
+            assert!(estimated_fragments > 1);
+        }
+        _ => panic!("Expected Routed"),
+    }
+}
+
+#[test]
+fn test_classifier_deep_space_uses_interplanetary_when_available() {
+    let mut c = PayloadClassifier::default();
+    c.set_domain_profile(DomainProfile::deep_space());
+    c.set_tier_available(RadioTier::Local, false);
+    c.set_tier_available(RadioTier::Metro, false);
+    c.set_tier_available(RadioTier::Regional, false);
+    c.set_tier_available(RadioTier::Interplanetary, true);
+
+    let decision = c.route(PayloadClass::Discovery, 64, 1).unwrap();
+    match decision {
+        RoutingDecision::Routed { tier, .. } => assert_eq!(tier, RadioTier::Interplanetary),
         _ => panic!("Expected Routed"),
     }
 }
@@ -845,7 +893,8 @@ fn test_aimd_skips_unavailable_tiers() {
     let initial = sm.tier_budgets()[2];
     sm.tick_aimd();
     assert_eq!(
-        sm.tier_budgets()[2], initial,
+        sm.tier_budgets()[2],
+        initial,
         "Down tier budget should not change"
     );
 }

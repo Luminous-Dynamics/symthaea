@@ -110,7 +110,8 @@ pub fn combined_metric(
         total_shift[2] += shift[2];
     }
 
-    let magnitude = (total_shift[0].powi(2) + total_shift[1].powi(2) + total_shift[2].powi(2)).sqrt();
+    let magnitude =
+        (total_shift[0].powi(2) + total_shift[1].powi(2) + total_shift[2].powi(2)).sqrt();
 
     (total_shift, magnitude)
 }
@@ -146,7 +147,11 @@ mod tests {
         let focal = [10.0, 0.0, 0.0];
         let shift = amplifier_metric_shift(pos, focal, 0.05, &config);
         // Shift should point from focal toward position (negative x direction)
-        assert!(shift[0] < 0.0, "Shift should point toward focal: {:?}", shift);
+        assert!(
+            shift[0] < 0.0,
+            "Shift should point toward focal: {:?}",
+            shift
+        );
     }
 
     #[test]
@@ -154,13 +159,17 @@ mod tests {
         let config = GravcraftConfig::default();
         let craft_pos = [0.0, 0.0, 0.0];
         let cmds = [
-            (0.05, 10.0, 0.0, 0.0),              // Forward (+x)
-            (0.05, 10.0, 2.094, 0.0),             // 120° (left-back)
-            (0.05, 10.0, 4.189, 0.0),             // 240° (right-back)
+            (0.05, 10.0, 0.0, 0.0),   // Forward (+x)
+            (0.05, 10.0, 2.094, 0.0), // 120° (left-back)
+            (0.05, 10.0, 4.189, 0.0), // 240° (right-back)
         ];
         let (shift, mag) = combined_metric(craft_pos, craft_pos, &cmds, &config);
         // Three symmetric amplifiers should partially cancel
-        assert!(mag < 0.15, "Symmetric amplifiers should partially cancel: mag={}", mag);
+        assert!(
+            mag < 0.15,
+            "Symmetric amplifiers should partially cancel: mag={}",
+            mag
+        );
         assert!(shift.iter().all(|v| v.is_finite()));
     }
 }

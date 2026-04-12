@@ -20,7 +20,8 @@
 use symthaea_muse::wake_protocol::{WakeProtocol, HARMONY_NAMES, WAKE_ORDER};
 
 fn main() {
-    let wav_path = std::env::args().nth(1)
+    let wav_path = std::env::args()
+        .nth(1)
         .unwrap_or_else(|| "data/muse_wav/harmonies/00_wake_melody.wav".to_string());
 
     println!("╔══════════════════════════════════════════════════════════════╗");
@@ -44,27 +45,28 @@ fn main() {
     let spec = reader.spec();
     let sample_rate = spec.sample_rate;
     let channels = spec.channels as usize;
-    println!("  Format: {}Hz, {} channels, {}-bit", sample_rate, channels, spec.bits_per_sample);
+    println!(
+        "  Format: {}Hz, {} channels, {}-bit",
+        sample_rate, channels, spec.bits_per_sample
+    );
     println!();
 
     // Read all samples and convert to mono f32
     let samples: Vec<f32> = match spec.sample_format {
         hound::SampleFormat::Int => {
             let max = (1 << (spec.bits_per_sample - 1)) as f32;
-            reader.samples::<i32>()
+            reader
+                .samples::<i32>()
                 .map(|s| s.unwrap_or(0) as f32 / max)
                 .collect()
         }
-        hound::SampleFormat::Float => {
-            reader.samples::<f32>()
-                .map(|s| s.unwrap_or(0.0))
-                .collect()
-        }
+        hound::SampleFormat::Float => reader.samples::<f32>().map(|s| s.unwrap_or(0.0)).collect(),
     };
 
     // Mix to mono
     let mono: Vec<f32> = if channels > 1 {
-        samples.chunks(channels)
+        samples
+            .chunks(channels)
             .map(|ch| ch.iter().sum::<f32>() / channels as f32)
             .collect()
     } else {
@@ -93,15 +95,16 @@ fn main() {
         // Print on phase change or every 4 seconds
         if result.phase != last_phase || i % 4 == 0 {
             let safety_str = match result.safety {
-                0 => "\x1b[32mGreen\x1b[0m",  // green
-                1 => "\x1b[33mYellow\x1b[0m", // yellow
+                0 => "\x1b[32mGreen\x1b[0m",        // green
+                1 => "\x1b[33mYellow\x1b[0m",       // yellow
                 2 => "\x1b[38;5;208mOrange\x1b[0m", // orange
-                3 => "\x1b[31mRed\x1b[0m",    // red
+                3 => "\x1b[31mRed\x1b[0m",          // red
                 _ => "???",
             };
             let match_sym = if result.harmony_matches { "✓" } else { "✗" };
 
-            println!("  │ {:5.1}s  │  {:<32} │ {} {:<27} │ {:.2} │ {:>6} │",
+            println!(
+                "  │ {:5.1}s  │  {:<32} │ {} {:<27} │ {:.2} │ {:>6} │",
                 time,
                 result.expected_harmony,
                 match_sym,
@@ -129,7 +132,8 @@ fn main() {
     }
 
     println!();
-    println!("  Final state: Ψ={:.2}, Phase={}/8, Safety={}",
+    println!(
+        "  Final state: Ψ={:.2}, Phase={}/8, Safety={}",
         protocol.consciousness(),
         protocol.phase(),
         match protocol.safety() {
@@ -138,5 +142,6 @@ fn main() {
             2 => "Orange",
             3 => "Red",
             _ => "???",
-        });
+        }
+    );
 }

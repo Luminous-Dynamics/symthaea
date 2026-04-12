@@ -79,10 +79,12 @@ fn run_with_label(name: &str, overrides: Option<Overrides>) -> RunResult {
         phi_values.push(phi);
         total_pe += result.prediction_error as f64;
         total_coh += result.metadata.prediction_coherence as f64;
-        if result.learning_occurred { learn_count += 1; }
+        if result.learning_occurred {
+            learn_count += 1;
+        }
 
         if (i + 1) % 200 == 0 {
-            let recent_phi: f64 = phi_values[phi_values.len()-50..].iter().sum::<f64>() / 50.0;
+            let recent_phi: f64 = phi_values[phi_values.len() - 50..].iter().sum::<f64>() / 50.0;
             println!("    cycle {}: Φ={:.4} (recent 50 avg)", i + 1, recent_phi);
         }
     }
@@ -91,7 +93,7 @@ fn run_with_label(name: &str, overrides: Option<Overrides>) -> RunResult {
     let mean_phi = phi_values.iter().sum::<f64>() / n;
     let final_phi = *phi_values.last().unwrap_or(&0.0);
     let first_100 = phi_values[..100].iter().sum::<f64>() / 100.0;
-    let last_100 = phi_values[CYCLES-100..].iter().sum::<f64>() / 100.0;
+    let last_100 = phi_values[CYCLES - 100..].iter().sum::<f64>() / 100.0;
 
     RunResult {
         name: name.to_string(),
@@ -121,7 +123,11 @@ struct Overrides {
 fn main() {
     println!("═══════════════════════════════════════════════════════════════");
     println!("  Three-Way Threshold Comparison");
-    println!("  {} cycles per configuration, {} unique inputs", CYCLES, INPUTS.len());
+    println!(
+        "  {} cycles per configuration, {} unique inputs",
+        CYCLES,
+        INPUTS.len()
+    );
     println!("═══════════════════════════════════════════════════════════════\n");
 
     // Run 1: Defaults
@@ -129,77 +135,147 @@ fn main() {
     let defaults = run_with_label("Defaults", None);
 
     // Run 2: Consistency-evolved (from evolve_thresholds output)
-    println!("\n  [2/3] Running CONSISTENCY-EVOLVED ({} cycles)...", CYCLES);
-    let consistency = run_with_label("Consistency", Some(Overrides {
-        fep_surprise_scale: 6.75,
-        fep_lr_decay: 0.872,
-        neuromod_d2_baseline: 0.599,
-        neuromod_ne_phasic_threshold: 0.162,
-        neuromod_arousal_ema_decay: 0.883,
-        homeostasis_recalibrate_high: 1.160,
-        homeostasis_recalibrate_low: 0.923,
-        frustration_dampen_threshold: 0.701,
-        self_model_weight_high: 0.672,
-        homeostasis_pull_cruise: 0.689,
-    }));
+    println!(
+        "\n  [2/3] Running CONSISTENCY-EVOLVED ({} cycles)...",
+        CYCLES
+    );
+    let consistency = run_with_label(
+        "Consistency",
+        Some(Overrides {
+            fep_surprise_scale: 6.75,
+            fep_lr_decay: 0.872,
+            neuromod_d2_baseline: 0.599,
+            neuromod_ne_phasic_threshold: 0.162,
+            neuromod_arousal_ema_decay: 0.883,
+            homeostasis_recalibrate_high: 1.160,
+            homeostasis_recalibrate_low: 0.923,
+            frustration_dampen_threshold: 0.701,
+            self_model_weight_high: 0.672,
+            homeostasis_pull_cruise: 0.689,
+        }),
+    );
 
     // Run 3: Spectral-Phi-evolved (from evolve_for_phi with spectral proxy)
-    println!("\n  [3/3] Running SPECTRAL-PHI-EVOLVED ({} cycles)...", CYCLES);
-    let spectral = run_with_label("Spectral-Phi", Some(Overrides {
-        fep_surprise_scale: 1.055,
-        fep_lr_decay: 0.926,
-        neuromod_d2_baseline: 0.861,
-        neuromod_ne_phasic_threshold: 0.681,
-        neuromod_arousal_ema_decay: 0.898,
-        homeostasis_recalibrate_high: 1.232,
-        homeostasis_recalibrate_low: 0.703,
-        frustration_dampen_threshold: 0.490,
-        self_model_weight_high: 0.763,
-        homeostasis_pull_cruise: 1.498,
-    }));
+    println!(
+        "\n  [3/3] Running SPECTRAL-PHI-EVOLVED ({} cycles)...",
+        CYCLES
+    );
+    let spectral = run_with_label(
+        "Spectral-Phi",
+        Some(Overrides {
+            fep_surprise_scale: 1.055,
+            fep_lr_decay: 0.926,
+            neuromod_d2_baseline: 0.861,
+            neuromod_ne_phasic_threshold: 0.681,
+            neuromod_arousal_ema_decay: 0.898,
+            homeostasis_recalibrate_high: 1.232,
+            homeostasis_recalibrate_low: 0.703,
+            frustration_dampen_threshold: 0.490,
+            self_model_weight_high: 0.763,
+            homeostasis_pull_cruise: 1.498,
+        }),
+    );
 
     // Run 4: CLS-evolved "vigilant learner" (from evolve_cls)
     println!("\n  [4/4] Running CLS-EVOLVED ({} cycles)...", CYCLES);
-    let cls_evolved = run_with_label("CLS-Evolved", Some(Overrides {
-        fep_surprise_scale: 9.360,
-        fep_lr_decay: 0.922,
-        neuromod_d2_baseline: 0.244,
-        neuromod_ne_phasic_threshold: 0.197,
-        neuromod_arousal_ema_decay: 0.936,
-        homeostasis_recalibrate_high: 1.273,
-        homeostasis_recalibrate_low: 0.725,
-        frustration_dampen_threshold: 0.490,
-        self_model_weight_high: 0.423,
-        homeostasis_pull_cruise: 1.440,
-    }));
+    let cls_evolved = run_with_label(
+        "CLS-Evolved",
+        Some(Overrides {
+            fep_surprise_scale: 9.360,
+            fep_lr_decay: 0.922,
+            neuromod_d2_baseline: 0.244,
+            neuromod_ne_phasic_threshold: 0.197,
+            neuromod_arousal_ema_decay: 0.936,
+            homeostasis_recalibrate_high: 1.273,
+            homeostasis_recalibrate_low: 0.725,
+            frustration_dampen_threshold: 0.490,
+            self_model_weight_high: 0.423,
+            homeostasis_pull_cruise: 1.440,
+        }),
+    );
 
     // Results table
     println!("\n═══════════════════════════════════════════════════════════════");
     println!("  Results (4-way comparison)");
     println!("═══════════════════════════════════════════════════════════════\n");
 
-    println!("  {:>16}  {:>8}  {:>8}  {:>8}  {:>8}", "Metric", "Default", "Consist", "Spectr", "CLS-Evo");
+    println!(
+        "  {:>16}  {:>8}  {:>8}  {:>8}  {:>8}",
+        "Metric", "Default", "Consist", "Spectr", "CLS-Evo"
+    );
     println!("  {}", "-".repeat(56));
 
     fn row(name: &str, a: f64, b: f64, c: f64, d: f64) {
-        let db = if a.abs() > 1e-6 { (b - a) / a * 100.0 } else { 0.0 };
-        let dc = if a.abs() > 1e-6 { (c - a) / a * 100.0 } else { 0.0 };
-        let dd = if a.abs() > 1e-6 { (d - a) / a * 100.0 } else { 0.0 };
-        println!("  {:>16}  {:>8.4}  {:>+7.1}%  {:>+7.1}%  {:>+7.1}%",
-            name, a, db, dc, dd);
+        let db = if a.abs() > 1e-6 {
+            (b - a) / a * 100.0
+        } else {
+            0.0
+        };
+        let dc = if a.abs() > 1e-6 {
+            (c - a) / a * 100.0
+        } else {
+            0.0
+        };
+        let dd = if a.abs() > 1e-6 {
+            (d - a) / a * 100.0
+        } else {
+            0.0
+        };
+        println!(
+            "  {:>16}  {:>8.4}  {:>+7.1}%  {:>+7.1}%  {:>+7.1}%",
+            name, a, db, dc, dd
+        );
     }
 
-    row("Mean Φ", defaults.mean_phi, consistency.mean_phi, spectral.mean_phi, cls_evolved.mean_phi);
-    row("Final Φ", defaults.final_phi, consistency.final_phi, spectral.final_phi, cls_evolved.final_phi);
-    row("First 100 Φ", defaults.first_100_phi, consistency.first_100_phi, spectral.first_100_phi, cls_evolved.first_100_phi);
-    row("Last 100 Φ", defaults.last_100_phi, consistency.last_100_phi, spectral.last_100_phi, cls_evolved.last_100_phi);
-    row("Mean PE", defaults.mean_pe, consistency.mean_pe, spectral.mean_pe, cls_evolved.mean_pe);
-    row("Mean Coherence", defaults.mean_coherence, consistency.mean_coherence, spectral.mean_coherence, cls_evolved.mean_coherence);
+    row(
+        "Mean Φ",
+        defaults.mean_phi,
+        consistency.mean_phi,
+        spectral.mean_phi,
+        cls_evolved.mean_phi,
+    );
+    row(
+        "Final Φ",
+        defaults.final_phi,
+        consistency.final_phi,
+        spectral.final_phi,
+        cls_evolved.final_phi,
+    );
+    row(
+        "First 100 Φ",
+        defaults.first_100_phi,
+        consistency.first_100_phi,
+        spectral.first_100_phi,
+        cls_evolved.first_100_phi,
+    );
+    row(
+        "Last 100 Φ",
+        defaults.last_100_phi,
+        consistency.last_100_phi,
+        spectral.last_100_phi,
+        cls_evolved.last_100_phi,
+    );
+    row(
+        "Mean PE",
+        defaults.mean_pe,
+        consistency.mean_pe,
+        spectral.mean_pe,
+        cls_evolved.mean_pe,
+    );
+    row(
+        "Mean Coherence",
+        defaults.mean_coherence,
+        consistency.mean_coherence,
+        spectral.mean_coherence,
+        cls_evolved.mean_coherence,
+    );
 
     // Winner determination
     println!("\n  Winner (by last 100 Φ):");
     let results = [&defaults, &consistency, &spectral, &cls_evolved];
-    let best = results.iter().max_by(|a, b|
-        a.last_100_phi.partial_cmp(&b.last_100_phi).unwrap()).unwrap();
+    let best = results
+        .iter()
+        .max_by(|a, b| a.last_100_phi.partial_cmp(&b.last_100_phi).unwrap())
+        .unwrap();
     println!("    {} — Φ={:.4}", best.name, best.last_100_phi);
 }

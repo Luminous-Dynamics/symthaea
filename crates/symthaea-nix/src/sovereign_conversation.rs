@@ -21,8 +21,8 @@ use crate::encoding::codebook::NixCodebook;
 use crate::encoding::user_input_encoder::UserInputEncoder;
 use crate::mind::active_inference::NixActiveInference;
 use crate::sovereign_config::{
-    ConfigDecision, HardwareProfile, MigrationData, SovereignConfig,
-    SovereignConfigGenerator, UserChoices,
+    ConfigDecision, HardwareProfile, MigrationData, SovereignConfig, SovereignConfigGenerator,
+    UserChoices,
 };
 
 /// What Symthaea knows about the user's intent so far.
@@ -34,8 +34,8 @@ pub struct ConversationState {
     pub known_timezone: Option<String>,
     pub known_keyboard: Option<String>,
     pub known_encryption: Option<bool>,
-    pub known_use_cases: Vec<String>,     // "music", "development", "gaming", etc.
-    pub known_packages: Vec<String>,       // explicitly requested packages
+    pub known_use_cases: Vec<String>, // "music", "development", "gaming", etc.
+    pub known_packages: Vec<String>,  // explicitly requested packages
 
     /// Confidence in each dimension (0.0 = unknown, 1.0 = certain)
     pub confidence_desktop: f32,
@@ -118,10 +118,19 @@ impl SovereignConversation {
 
         // Hardware summary
         if !self.hardware.gpu_vendor.is_empty() && self.hardware.gpu_vendor != "unknown" {
-            msg.push(format!("  GPU: {} {}", self.hardware.gpu_vendor.to_uppercase(), self.hardware.gpu_model));
+            msg.push(format!(
+                "  GPU: {} {}",
+                self.hardware.gpu_vendor.to_uppercase(),
+                self.hardware.gpu_model
+            ));
         }
         if !self.hardware.existing_os.is_empty() {
-            let os_names: Vec<String> = self.hardware.existing_os.iter().map(|o| o.name.clone()).collect();
+            let os_names: Vec<String> = self
+                .hardware
+                .existing_os
+                .iter()
+                .map(|o| o.name.clone())
+                .collect();
             msg.push(format!("  Existing OS: {}", os_names.join(", ")));
         }
         if self.hardware.has_tpm {
@@ -130,13 +139,25 @@ impl SovereignConversation {
 
         // Migration insights
         if !self.migration.editors.is_empty() {
-            msg.push(format!("  Your editors: {}", self.migration.editors.join(", ")));
+            msg.push(format!(
+                "  Your editors: {}",
+                self.migration.editors.join(", ")
+            ));
         }
-        if self.migration.rust_projects > 0 || self.migration.node_projects > 0 || self.migration.python_venvs > 0 {
+        if self.migration.rust_projects > 0
+            || self.migration.node_projects > 0
+            || self.migration.python_venvs > 0
+        {
             let mut langs = Vec::new();
-            if self.migration.rust_projects > 0 { langs.push("Rust"); }
-            if self.migration.node_projects > 0 { langs.push("Node.js"); }
-            if self.migration.python_venvs > 0 { langs.push("Python"); }
+            if self.migration.rust_projects > 0 {
+                langs.push("Rust");
+            }
+            if self.migration.node_projects > 0 {
+                langs.push("Node.js");
+            }
+            if self.migration.python_venvs > 0 {
+                langs.push("Python");
+            }
             msg.push(format!("  Development: {}", langs.join(", ")));
         }
         if self.migration.has_daw {
@@ -174,10 +195,16 @@ impl SovereignConversation {
 
         // Check for confirmation
         if self.state.confidence_use_case > 0.5
-            && (lower.contains("looks good") || lower.contains("perfect") || lower.contains("yes")
-                || lower.contains("go ahead") || lower.contains("install") || lower.contains("deploy")
-                || lower.contains("let's do it") || lower.contains("confirmed"))
-            && self.state.turns.len() > 3 // not the first response
+            && (lower.contains("looks good")
+                || lower.contains("perfect")
+                || lower.contains("yes")
+                || lower.contains("go ahead")
+                || lower.contains("install")
+                || lower.contains("deploy")
+                || lower.contains("let's do it")
+                || lower.contains("confirmed"))
+            && self.state.turns.len() > 3
+        // not the first response
         {
             self.state.confirmed = true;
             return self.generate_final_config();
@@ -225,8 +252,7 @@ impl SovereignConversation {
             return; // Too short to be an app list
         }
 
-        let looks_like_list =
-            input.contains("---") ||           // brew companion format
+        let looks_like_list = input.contains("---") ||           // brew companion format
             input.contains("winget") ||        // winget mention
             lines.iter().any(|l| l.starts_with("ii ")) || // dpkg
             lines.iter().any(|l| l.contains("Id") && l.contains("Version")) || // winget header
@@ -260,19 +286,28 @@ impl SovereignConversation {
                     }
                     self.migration.has_daw = true;
                 }
-                crate::app_database::AppCategory::Gaming | crate::app_database::AppCategory::GamingTools => {
+                crate::app_database::AppCategory::Gaming
+                | crate::app_database::AppCategory::GamingTools => {
                     if !self.state.known_use_cases.contains(&"gaming".to_string()) {
                         self.state.known_use_cases.push("gaming".into());
                     }
                 }
-                crate::app_database::AppCategory::IDE | crate::app_database::AppCategory::Editor |
-                crate::app_database::AppCategory::Container | crate::app_database::AppCategory::DevTools => {
-                    if !self.state.known_use_cases.contains(&"development".to_string()) {
+                crate::app_database::AppCategory::IDE
+                | crate::app_database::AppCategory::Editor
+                | crate::app_database::AppCategory::Container
+                | crate::app_database::AppCategory::DevTools => {
+                    if !self
+                        .state
+                        .known_use_cases
+                        .contains(&"development".to_string())
+                    {
                         self.state.known_use_cases.push("development".into());
                     }
                 }
-                crate::app_database::AppCategory::Creative2D | crate::app_database::AppCategory::Creative3D |
-                crate::app_database::AppCategory::Video | crate::app_database::AppCategory::Photo => {
+                crate::app_database::AppCategory::Creative2D
+                | crate::app_database::AppCategory::Creative3D
+                | crate::app_database::AppCategory::Video
+                | crate::app_database::AppCategory::Photo => {
                     if !self.state.known_use_cases.contains(&"creative".to_string()) {
                         self.state.known_use_cases.push("creative".into());
                     }
@@ -282,7 +317,9 @@ impl SovereignConversation {
 
             // Add specific packages to migration data
             match matched.entry.category {
-                crate::app_database::AppCategory::Container => { self.migration.docker_images = 1; }
+                crate::app_database::AppCategory::Container => {
+                    self.migration.docker_images = 1;
+                }
                 _ => {}
             }
         }
@@ -290,7 +327,8 @@ impl SovereignConversation {
         // Add detected editors
         for matched in &report.matched {
             match matched.entry.category {
-                crate::app_database::AppCategory::IDE | crate::app_database::AppCategory::Editor => {
+                crate::app_database::AppCategory::IDE
+                | crate::app_database::AppCategory::Editor => {
                     let name = matched.entry.primary.nix_pkg.to_string();
                     if !self.migration.editors.contains(&name) {
                         self.migration.editors.push(name);
@@ -312,19 +350,28 @@ impl SovereignConversation {
         };
 
         let mut msg = Vec::new();
-        msg.push(format!("I found **{} apps** in your list.\n", report.total_apps));
+        msg.push(format!(
+            "I found **{} apps** in your list.\n",
+            report.total_apps
+        ));
 
         // Count by quality
-        let native_count = report.matched.iter()
+        let native_count = report
+            .matched
+            .iter()
             .filter(|m| m.entry.primary.quality.confidence() >= 0.9)
             .count();
-        let alt_count = report.matched.iter()
+        let alt_count = report
+            .matched
+            .iter()
             .filter(|m| {
                 let c = m.entry.primary.quality.confidence();
                 c >= 0.5 && c < 0.9
             })
             .count();
-        let no_equiv = report.matched.iter()
+        let no_equiv = report
+            .matched
+            .iter()
             .filter(|m| m.entry.primary.quality.confidence() < 0.2)
             .count();
 
@@ -334,10 +381,16 @@ impl SovereignConversation {
             msg.push(format!("  **{}** have no Linux equivalent", no_equiv));
         }
         if !report.unmatched.is_empty() {
-            msg.push(format!("  **{}** I couldn't identify (may still be in nixpkgs)", report.unmatched.len()));
+            msg.push(format!(
+                "  **{}** I couldn't identify (may still be in nixpkgs)",
+                report.unmatched.len()
+            ));
         }
 
-        msg.push(format!("\nMigration readiness: **{:.0}%**", report.readiness_score * 100.0));
+        msg.push(format!(
+            "\nMigration readiness: **{:.0}%**",
+            report.readiness_score * 100.0
+        ));
 
         // Show bundles detected
         if !report.suggested_bundles.is_empty() {
@@ -351,11 +404,20 @@ impl SovereignConversation {
         msg.push("\nKey apps:".into());
         for matched in report.matched.iter().take(8) {
             let quality = matched.entry.primary.quality;
-            let icon = if quality.confidence() >= 0.9 { "✓" }
-                       else if quality.confidence() >= 0.5 { "~" }
-                       else { "✗" };
-            msg.push(format!("  {} {} → {} ({})",
-                icon, matched.source_name, matched.entry.primary.display_name, quality.label()));
+            let icon = if quality.confidence() >= 0.9 {
+                "✓"
+            } else if quality.confidence() >= 0.5 {
+                "~"
+            } else {
+                "✗"
+            };
+            msg.push(format!(
+                "  {} {} → {} ({})",
+                icon,
+                matched.source_name,
+                matched.entry.primary.display_name,
+                quality.label()
+            ));
         }
 
         msg.push("\nNow tell me — what's most important to you about this system?".into());
@@ -378,14 +440,46 @@ impl SovereignConversation {
     fn extract_intent(&mut self, lower: &str) {
         // Use cases
         let use_case_patterns = [
-            (&["music", "audio", "produce", "daw", "recording", "studio"] as &[&str], "music"),
+            (
+                &["music", "audio", "produce", "daw", "recording", "studio"] as &[&str],
+                "music",
+            ),
             (&["game", "gaming", "steam", "play"], "gaming"),
-            (&["code", "develop", "programming", "software", "rust", "python", "node", "web"], "development"),
+            (
+                &[
+                    "code",
+                    "develop",
+                    "programming",
+                    "software",
+                    "rust",
+                    "python",
+                    "node",
+                    "web",
+                ],
+                "development",
+            ),
             (&["server", "deploy", "host", "backend", "api"], "server"),
-            (&["design", "art", "photo", "video", "creative", "edit"], "creative"),
-            (&["office", "email", "browse", "document", "school", "work"], "general"),
+            (
+                &["design", "art", "photo", "video", "creative", "edit"],
+                "creative",
+            ),
+            (
+                &["office", "email", "browse", "document", "school", "work"],
+                "general",
+            ),
             (&["privacy", "secure", "encrypt", "anonymous"], "privacy"),
-            (&["science", "data", "research", "jupyter", "analysis", "ml", "machine learning"], "data_science"),
+            (
+                &[
+                    "science",
+                    "data",
+                    "research",
+                    "jupyter",
+                    "analysis",
+                    "ml",
+                    "machine learning",
+                ],
+                "data_science",
+            ),
         ];
 
         for (keywords, use_case) in &use_case_patterns {
@@ -398,16 +492,37 @@ impl SovereignConversation {
         }
 
         // Desktop preferences
-        if lower.contains("gnome") { self.state.known_desktop = Some("gnome".into()); self.state.confidence_desktop = 1.0; }
-        if lower.contains("kde") || lower.contains("plasma") { self.state.known_desktop = Some("plasma".into()); self.state.confidence_desktop = 1.0; }
-        if lower.contains("hyprland") || lower.contains("tiling") { self.state.known_desktop = Some("hyprland".into()); self.state.confidence_desktop = 1.0; }
-        if lower.contains("sway") { self.state.known_desktop = Some("sway".into()); self.state.confidence_desktop = 1.0; }
-        if lower.contains("xfce") || lower.contains("lightweight") { self.state.known_desktop = Some("xfce".into()); self.state.confidence_desktop = 1.0; }
-        if lower.contains("no desktop") || lower.contains("no gui") || lower.contains("terminal only") || lower.contains("headless") {
-            self.state.known_desktop = Some("none".into()); self.state.confidence_desktop = 1.0;
+        if lower.contains("gnome") {
+            self.state.known_desktop = Some("gnome".into());
+            self.state.confidence_desktop = 1.0;
+        }
+        if lower.contains("kde") || lower.contains("plasma") {
+            self.state.known_desktop = Some("plasma".into());
+            self.state.confidence_desktop = 1.0;
+        }
+        if lower.contains("hyprland") || lower.contains("tiling") {
+            self.state.known_desktop = Some("hyprland".into());
+            self.state.confidence_desktop = 1.0;
+        }
+        if lower.contains("sway") {
+            self.state.known_desktop = Some("sway".into());
+            self.state.confidence_desktop = 1.0;
+        }
+        if lower.contains("xfce") || lower.contains("lightweight") {
+            self.state.known_desktop = Some("xfce".into());
+            self.state.confidence_desktop = 1.0;
+        }
+        if lower.contains("no desktop")
+            || lower.contains("no gui")
+            || lower.contains("terminal only")
+            || lower.contains("headless")
+        {
+            self.state.known_desktop = Some("none".into());
+            self.state.confidence_desktop = 1.0;
         }
         if lower.contains("simple") || lower.contains("just works") || lower.contains("easy") {
-            self.state.known_desktop = Some("gnome".into()); self.state.confidence_desktop = 0.7;
+            self.state.known_desktop = Some("gnome".into());
+            self.state.confidence_desktop = 0.7;
         }
 
         // Encryption
@@ -420,9 +535,23 @@ impl SovereignConversation {
 
         // Specific packages
         let package_mentions = [
-            "firefox", "chrome", "steam", "discord", "spotify", "vscode",
-            "docker", "podman", "nginx", "postgresql", "blender", "gimp",
-            "obs", "kdenlive", "ardour", "audacity", "jupyter",
+            "firefox",
+            "chrome",
+            "steam",
+            "discord",
+            "spotify",
+            "vscode",
+            "docker",
+            "podman",
+            "nginx",
+            "postgresql",
+            "blender",
+            "gimp",
+            "obs",
+            "kdenlive",
+            "ardour",
+            "audacity",
+            "jupyter",
         ];
         for pkg in &package_mentions {
             if lower.contains(pkg) && !self.state.known_packages.contains(&pkg.to_string()) {
@@ -432,7 +561,8 @@ impl SovereignConversation {
     }
 
     fn ask_about_use_case(&mut self) -> ConversationResponse {
-        let msg = "I want to get this right. Can you tell me more about what you'll use this for?\n\n\
+        let msg =
+            "I want to get this right. Can you tell me more about what you'll use this for?\n\n\
             For example:\n\
             - \"I write code in Rust and Python\"\n\
             - \"I produce music and need low-latency audio\"\n\
@@ -461,20 +591,34 @@ impl SovereignConversation {
         let (suggestion, reasoning) = if use_cases.contains(&"server".to_string()) {
             self.state.known_desktop = Some("none".into());
             self.state.confidence_desktop = 0.9;
-            ("none (CLI only)", "You mentioned this is a server — no desktop environment needed. Saves resources.")
+            (
+                "none (CLI only)",
+                "You mentioned this is a server — no desktop environment needed. Saves resources.",
+            )
         } else if use_cases.contains(&"gaming".to_string()) {
             self.state.known_desktop = Some("plasma".into());
             self.state.confidence_desktop = 0.7;
-            ("KDE Plasma", "Good gaming integration with Steam, and very customizable.")
-        } else if use_cases.contains(&"music".to_string()) || use_cases.contains(&"creative".to_string()) {
+            (
+                "KDE Plasma",
+                "Good gaming integration with Steam, and very customizable.",
+            )
+        } else if use_cases.contains(&"music".to_string())
+            || use_cases.contains(&"creative".to_string())
+        {
             self.state.known_desktop = Some("gnome".into());
             self.state.confidence_desktop = 0.7;
-            ("GNOME", "Clean interface that stays out of your way during creative work.")
+            (
+                "GNOME",
+                "Clean interface that stays out of your way during creative work.",
+            )
         } else if use_cases.contains(&"development".to_string()) {
             if gpu == "nvidia" {
                 self.state.known_desktop = Some("gnome".into());
                 self.state.confidence_desktop = 0.6;
-                ("GNOME", "Best NVIDIA+Wayland support. Or if you prefer tiling: Hyprland.")
+                (
+                    "GNOME",
+                    "Best NVIDIA+Wayland support. Or if you prefer tiling: Hyprland.",
+                )
             } else {
                 self.state.known_desktop = Some("hyprland".into());
                 self.state.confidence_desktop = 0.5;
@@ -490,7 +634,10 @@ impl SovereignConversation {
             ("GNOME", "Polished, accessible, works well out of the box.")
         };
 
-        let mut msg = format!("Based on what you've told me, I'd suggest **{}**.\n\n", suggestion);
+        let mut msg = format!(
+            "Based on what you've told me, I'd suggest **{}**.\n\n",
+            suggestion
+        );
         msg.push_str(&format!("Reasoning: {}\n\n", reasoning));
         msg.push_str("Does that work for you? Or would you prefer something else?\n");
         msg.push_str("Options: GNOME, KDE Plasma, Hyprland (tiling), Sway (tiling), XFCE (lightweight), or no desktop.");
@@ -549,7 +696,9 @@ impl SovereignConversation {
     fn show_preview(&mut self) -> ConversationResponse {
         self.enrich_migration_from_apps();
         let choices = self.build_choices();
-        let config = self.generator.generate(&self.hardware, &choices, &self.migration);
+        let config = self
+            .generator
+            .generate(&self.hardware, &choices, &self.migration);
 
         let mut msg = String::new();
         msg.push_str("Here's what I'm configuring for you:\n\n");
@@ -586,7 +735,9 @@ impl SovereignConversation {
     fn generate_final_config(&mut self) -> ConversationResponse {
         self.enrich_migration_from_apps();
         let choices = self.build_choices();
-        let config = self.generator.generate(&self.hardware, &choices, &self.migration);
+        let config = self
+            .generator
+            .generate(&self.hardware, &choices, &self.migration);
 
         let mut msg = config.welcome_message.clone();
         msg.push_str("\n\nYour configuration is ready. Deploying now.");
@@ -630,7 +781,8 @@ impl SovereignConversation {
                     crate::app_database::AppCategory::Container => {
                         self.migration.docker_images = self.migration.docker_images.max(1);
                     }
-                    crate::app_database::AppCategory::DevTools | crate::app_database::AppCategory::IDE => {
+                    crate::app_database::AppCategory::DevTools
+                    | crate::app_database::AppCategory::IDE => {
                         // Check if it's a specific language tool
                         let pkg = matched.entry.primary.nix_pkg;
                         if pkg.contains("rust") || pkg == "cargo" {
@@ -659,10 +811,26 @@ impl SovereignConversation {
     fn build_choices(&self) -> UserChoices {
         UserChoices {
             hostname: String::new(), // from portal UI
-            desktop: self.state.known_desktop.clone().unwrap_or_else(|| "gnome".into()),
-            gpu_driver: self.state.known_gpu.clone().unwrap_or_else(|| "auto".into()),
-            timezone: self.state.known_timezone.clone().unwrap_or_else(|| "UTC".into()),
-            keyboard: self.state.known_keyboard.clone().unwrap_or_else(|| "us".into()),
+            desktop: self
+                .state
+                .known_desktop
+                .clone()
+                .unwrap_or_else(|| "gnome".into()),
+            gpu_driver: self
+                .state
+                .known_gpu
+                .clone()
+                .unwrap_or_else(|| "auto".into()),
+            timezone: self
+                .state
+                .known_timezone
+                .clone()
+                .unwrap_or_else(|| "UTC".into()),
+            keyboard: self
+                .state
+                .known_keyboard
+                .clone()
+                .unwrap_or_else(|| "us".into()),
             encryption: self.state.known_encryption.unwrap_or(false),
             ..Default::default()
         }
@@ -686,8 +854,18 @@ mod tests {
     #[test]
     fn test_greeting_acknowledges_hardware() {
         let mut conv = SovereignConversation::new(
-            HardwareProfile { gpu_vendor: "nvidia".into(), gpu_model: "RTX 3060".into(), has_tpm: true, ..Default::default() },
-            MigrationData { git_user: "Tristan".into(), editors: vec!["neovim".into()], rust_projects: 3, ..Default::default() },
+            HardwareProfile {
+                gpu_vendor: "nvidia".into(),
+                gpu_model: "RTX 3060".into(),
+                has_tpm: true,
+                ..Default::default()
+            },
+            MigrationData {
+                git_user: "Tristan".into(),
+                editors: vec!["neovim".into()],
+                rust_projects: 3,
+                ..Default::default()
+            },
         );
 
         let greeting = conv.greet();
@@ -703,8 +881,14 @@ mod tests {
     #[test]
     fn test_music_use_case_flow() {
         let mut conv = SovereignConversation::new(
-            HardwareProfile { gpu_vendor: "amd".into(), ..Default::default() },
-            MigrationData { has_daw: true, ..Default::default() },
+            HardwareProfile {
+                gpu_vendor: "amd".into(),
+                ..Default::default()
+            },
+            MigrationData {
+                has_daw: true,
+                ..Default::default()
+            },
         );
 
         let _greeting = conv.greet();
@@ -717,10 +901,8 @@ mod tests {
 
     #[test]
     fn test_server_gets_no_desktop() {
-        let mut conv = SovereignConversation::new(
-            HardwareProfile::default(),
-            MigrationData::default(),
-        );
+        let mut conv =
+            SovereignConversation::new(HardwareProfile::default(), MigrationData::default());
 
         let _greeting = conv.greet();
         let resp = conv.respond("It's a headless server for hosting APIs");
@@ -731,10 +913,8 @@ mod tests {
 
     #[test]
     fn test_explicit_desktop_choice() {
-        let mut conv = SovereignConversation::new(
-            HardwareProfile::default(),
-            MigrationData::default(),
-        );
+        let mut conv =
+            SovereignConversation::new(HardwareProfile::default(), MigrationData::default());
 
         let _greeting = conv.greet();
         let _resp1 = conv.respond("I want to do some coding");
@@ -747,7 +927,10 @@ mod tests {
     #[test]
     fn test_confirmation_generates_config() {
         let mut conv = SovereignConversation::new(
-            HardwareProfile { gpu_vendor: "intel".into(), ..Default::default() },
+            HardwareProfile {
+                gpu_vendor: "intel".into(),
+                ..Default::default()
+            },
             MigrationData::default(),
         );
 
@@ -765,13 +948,12 @@ mod tests {
 
     #[test]
     fn test_multi_use_case_detection() {
-        let mut conv = SovereignConversation::new(
-            HardwareProfile::default(),
-            MigrationData::default(),
-        );
+        let mut conv =
+            SovereignConversation::new(HardwareProfile::default(), MigrationData::default());
 
         let _greeting = conv.greet();
-        let _resp = conv.respond("I do gaming with Steam and also some Python data science with Jupyter");
+        let _resp =
+            conv.respond("I do gaming with Steam and also some Python data science with Jupyter");
 
         let uses = &conv.state().known_use_cases;
         assert!(uses.contains(&"gaming".to_string()));
@@ -783,7 +965,10 @@ mod tests {
     #[test]
     fn test_encryption_question_when_tpm_available() {
         let mut conv = SovereignConversation::new(
-            HardwareProfile { has_tpm: true, ..Default::default() },
+            HardwareProfile {
+                has_tpm: true,
+                ..Default::default()
+            },
             MigrationData::default(),
         );
 
@@ -798,10 +983,8 @@ mod tests {
 
     #[test]
     fn test_conversation_history_preserved() {
-        let mut conv = SovereignConversation::new(
-            HardwareProfile::default(),
-            MigrationData::default(),
-        );
+        let mut conv =
+            SovereignConversation::new(HardwareProfile::default(), MigrationData::default());
 
         conv.greet();
         conv.respond("I write Rust code");
@@ -815,15 +998,16 @@ mod tests {
 
     #[test]
     fn test_privacy_user_gets_sway() {
-        let mut conv = SovereignConversation::new(
-            HardwareProfile::default(),
-            MigrationData::default(),
-        );
+        let mut conv =
+            SovereignConversation::new(HardwareProfile::default(), MigrationData::default());
 
         let _greeting = conv.greet();
         let resp = conv.respond("I need a secure, privacy-focused system with encryption");
 
-        assert!(conv.state().known_use_cases.contains(&"privacy".to_string()));
+        assert!(conv
+            .state()
+            .known_use_cases
+            .contains(&"privacy".to_string()));
         assert!(conv.state().known_encryption == Some(true));
     }
 }

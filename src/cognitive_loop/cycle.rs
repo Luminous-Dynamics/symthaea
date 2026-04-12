@@ -123,9 +123,10 @@ impl CognitiveLoopService {
             // Flow → boost exploration (user engaged, safe to explore)
             // Science: Yerkes-Dodson (1908) — moderate arousal optimal for learning
             if state.frustration > super::thresholds::FRUSTRATION_DAMPEN_THRESHOLD {
-                self.carryover.quality.last_exploration_bonus *=
-                    1.0 - super::thresholds::FRUSTRATION_DAMPEN_GAIN
-                        * (state.frustration - super::thresholds::FRUSTRATION_DAMPEN_THRESHOLD) as f32;
+                self.carryover.quality.last_exploration_bonus *= 1.0
+                    - super::thresholds::FRUSTRATION_DAMPEN_GAIN
+                        * (state.frustration - super::thresholds::FRUSTRATION_DAMPEN_THRESHOLD)
+                            as f32;
             }
             if state.is_in_flow() {
                 self.carryover.quality.last_exploration_bonus +=
@@ -214,7 +215,47 @@ impl CognitiveLoopService {
             Err(blocked) => return *blocked,
         };
 
-        // ═══════════════════════════════════════════════════════════════════
+        // P3-A: Cognition -> Vision goal signal
+        // The current thought HV becomes the top-down task vector for the
+        // next frame: what Symthaea just perceived shapes what she looks for.
+        // Rao & Ballard (1999): top-down predictions drive bottom-up attention.
+        #[cfg(feature = "vision-manifold")]
+        if let Some(ref mut bridge) = self.sensorimotor.vision_sensory.vision_bridge {
+            let thought_hv = perception.encoding.encoding_result.hdv.clone();
+            // EMA drift (α=0.05): gently nudge the goal template toward the current
+            // thought rather than hard-replacing it each cycle. Prevents attentional
+            // thrashing when thoughts shift faster than the visual system can track.
+            bridge.update_goal_from_cognition(&thought_hv, 0.05);
+
+            // P4-B: Phi-modulated visual attention — consciousness level modulates
+            // the attention boost factor. High Phi → broad exploratory attention
+            // (0.8), low Phi → narrow conservative focus (0.2).
+            // Science: Luck et al. (1997) — arousal/ACh modulates V1/V4 gain.
+            let phi = self.carryover.history.consciousness_level as f32;
+            let phi_boost = 0.2 + 0.6 * phi.clamp(0.0, 1.0);
+            bridge.set_attention_boost(phi_boost);
+
+            // P6-A: Feed imagination surprise into VisionManager for FEP integration.
+            // When reality diverges from imagination, the system increases exploration.
+            self.vision_manager
+                .set_imagination_surprise(bridge.imagination_surprise());
+
+            // P6-B: Blend visual context into the thought HV.
+            // The scene context (working memory + scene graph + state) colors
+            // the current thought with what the system is visually attending to.
+            // Desimone & Duncan (1995): biased competition — attention shapes perception.
+            if let Some(context_hv) = bridge.scene_context_hv() {
+                let thought_hv = perception.encoding.encoding_result.hdv.clone();
+                perception.encoding.encoding_result.hdv =
+                    symthaea_core::hdc::ContinuousHV::weighted_bundle(
+                        &[&thought_hv, &context_hv],
+                        &[0.85, 0.15],
+                    )
+                    .normalize();
+            }
+        }
+
+        // ===================================================================
         // PHASE 2: DYNAMICS
         // CfC step, prediction, FEP, training, parallel post-processing
         // ═══════════════════════════════════════════════════════════════════
@@ -233,31 +274,31 @@ impl CognitiveLoopService {
         // PHASE 2.5: EMBODIMENT
         // Motor output → physics sim → proprioceptive HV → next cycle blend
         // Science: Lakoff & Johnson (1999) embodied cognition, Varela (1991) enactivism
+        // Platform-agnostic: works for all 10 robotics platforms via EmbodimentBridge trait.
         // ═══════════════════════════════════════════════════════════════════
-        #[cfg(feature = "humanoid")]
         {
             let cycle_num = self.stats.total_cycles as usize;
             let interval = self.config.embodiment_step_interval.max(1);
             if cycle_num % interval == 0 {
                 if let Some(mut bridge) = self.sensorimotor.embodiment_bridge.take() {
-                let phi = self.carryover.history.consciousness_level;
-                let dt = self.config.cfc_config.delta_t;
-                let thought_hv = perception.encoding.encoding_result.hdv.clone();
-                let result = bridge.step(&thought_hv, dt, phi);
-                if result.success {
-                    let proprioceptive_hv = bridge.encode_perception();
-                    let w = self.config.embodiment_blend_weight;
-                    if w > 0.0 {
-                        perception
-                            .encoding
-                            .encoding_result
-                            .hdv
-                            .lerp_in_place(&proprioceptive_hv, 1.0 - w, w);
+                    let phi = self.carryover.history.consciousness_level;
+                    let dt = self.config.cfc_config.delta_t;
+                    let thought_hv = perception.encoding.encoding_result.hdv.clone();
+                    let result = bridge.step(&thought_hv, dt, phi);
+                    if result.success {
+                        let proprioceptive_hv = bridge.encode_perception();
+                        let w = self.config.embodiment_blend_weight;
+                        if w > 0.0 {
+                            perception.encoding.encoding_result.hdv.lerp_in_place(
+                                &proprioceptive_hv,
+                                1.0 - w,
+                                w,
+                            );
+                        }
+                        self.sensorimotor.last_proprioceptive_hv = Some(proprioceptive_hv);
                     }
-                    self.sensorimotor.last_proprioceptive_hv = Some(proprioceptive_hv);
-                }
-                self.sensorimotor.embodiment_telemetry = bridge.telemetry();
-                self.sensorimotor.embodiment_bridge = Some(bridge);
+                    self.sensorimotor.embodiment_telemetry = bridge.telemetry();
+                    self.sensorimotor.embodiment_bridge = Some(bridge);
                 }
             }
         }
@@ -395,7 +436,11 @@ impl CognitiveLoopService {
             );
 
             // ── Gate 5: Embodiment motor halt carry-forward ──────────────
-            #[cfg(feature = "humanoid")]
+            // Platform-agnostic: applies to all 10 robotics platforms.
+            #[cfg(any(feature = "humanoid", feature = "helicopter", feature = "flight",
+                      feature = "vehicle", feature = "auv", feature = "manipulator",
+                      feature = "exoskeleton", feature = "surgical", feature = "orbital",
+                      feature = "quadruped"))]
             if let Some(ref mut bridge) = self.sensorimotor.embodiment_bridge {
                 use crate::cognitive_loop::motor_bridge::MotorSafetyLevel;
                 if safety_result.motor_halt {
@@ -436,13 +481,17 @@ impl CognitiveLoopService {
                     }
                     super::defense::DefenseActionKind::RestrictMotorToReadOnly => {
                         // Restrict motor output to read-only via safety level gate
-                        if let Some(ref mut bridge) = self.sensorimotor.motor_rendering.output_bridge {
+                        if let Some(ref mut bridge) =
+                            self.sensorimotor.motor_rendering.output_bridge
+                        {
                             bridge.set_safety_level(crate::safety::SafetyLevel::Orange);
                         }
                     }
                     super::defense::DefenseActionKind::HaltMotor => {
                         // Halt all motor output via safety level gate
-                        if let Some(ref mut bridge) = self.sensorimotor.motor_rendering.output_bridge {
+                        if let Some(ref mut bridge) =
+                            self.sensorimotor.motor_rendering.output_bridge
+                        {
                             bridge.set_safety_level(crate::safety::SafetyLevel::Red);
                         }
                     }
@@ -621,6 +670,37 @@ impl CognitiveLoopService {
                     );
                 }
             }
+        }
+
+        // ═══════════════════════════════════════════════════════════════════
+        // PHASE 3.7: SCIENTIFIC METHOD
+        // observe → hypothesize → predict → test → update_beliefs
+        // Bayesian belief updates accumulate across cycles.
+        // Science: Popper (1959), Bayes (1763), Jaynes (2003)
+        // ═══════════════════════════════════════════════════════════════════
+        #[cfg(feature = "scientific_method")]
+        {
+            // Observation: prediction error encodes how surprising the current
+            // input is relative to the system's internal model.
+            let pe = dynamics.core.prediction_error as f64;
+            let phi = feedback.consciousness.consciousness_level;
+            self.scientific_method_engine.observe(
+                vec![pe, phi],
+                "prediction_error_and_consciousness",
+            );
+
+            // Predict what the standing hypothesis (id 0) expects.
+            let predicted = self.scientific_method_engine.predict(0);
+
+            // The "observed value" for coherence is 1 − prediction_error (clipped
+            // to [0, 1]): low PE means high coherence, confirming the hypothesis.
+            let observed_coherence = (1.0 - pe).clamp(0.0, 1.0);
+
+            // Test and update Bayesian posterior.
+            self.scientific_method_engine.test_hypothesis(0, observed_coherence, predicted);
+
+            // Batch-recompute lifecycle status for all hypotheses.
+            self.scientific_method_engine.update_beliefs();
         }
 
         // ═══════════════════════════════════════════════════════════════════

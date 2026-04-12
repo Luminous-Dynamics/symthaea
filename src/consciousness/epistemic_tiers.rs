@@ -47,12 +47,12 @@ use crate::hdc::binary_hv::BinaryHV;
 use crate::hdc::primitive_system::PrimitiveSystem;
 
 // Re-export canonical epistemic types from the shared crate.
+/// Canonical shared coordinate type (includes Prismatic context).
+pub use symthaea_epistemic_types::EpistemicCoordinate as SharedEpistemicCoordinate;
 pub use symthaea_epistemic_types::{
     EmpiricalLevel, EpistemicContext, EpistemicProvenance, FactCheckResult, FactCheckVerdict,
     GroundingLevel, MaterialityLevel, NormativeLevel,
 };
-/// Canonical shared coordinate type (includes Prismatic context).
-pub use symthaea_epistemic_types::EpistemicCoordinate as SharedEpistemicCoordinate;
 
 /// Complete epistemic coordinate in 3D space
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -157,7 +157,9 @@ impl EpistemicCoordinate {
                 EmpiricalTier::E0Null => EmpiricalLevel::E0Null,
                 EmpiricalTier::E1Testimonial => EmpiricalLevel::E1Testimonial,
                 EmpiricalTier::E2PrivatelyVerifiable => EmpiricalLevel::E2PrivatelyVerifiable,
-                EmpiricalTier::E3CryptographicallyProven => EmpiricalLevel::E3CryptographicallyProven,
+                EmpiricalTier::E3CryptographicallyProven => {
+                    EmpiricalLevel::E3CryptographicallyProven
+                }
                 EmpiricalTier::E4PubliclyReproducible => EmpiricalLevel::E4PubliclyReproducible,
             },
             match self.normative {

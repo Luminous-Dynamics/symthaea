@@ -234,7 +234,8 @@ impl CognitiveLoopService {
                         if best_match_sim > RESONATOR_SIMILARITY_PRIME_THRESHOLD {
                             self.adjust_confidence(
                                 "resonator_recall_prime",
-                                best_match_sim * super::super::thresholds::RESONATOR_RECALL_PRIME_SCALE,
+                                best_match_sim
+                                    * super::super::thresholds::RESONATOR_RECALL_PRIME_SCALE,
                             );
                             resonator_wm_primed = true;
                         }
@@ -243,7 +244,8 @@ impl CognitiveLoopService {
                             if let Some(ref mut replay) = self.memory.episodic_persistence.replay {
                                 replay.boost_causal_consolidation(
                                     &match_timestamps,
-                                    super::super::thresholds::RESONATOR_CAUSAL_CONSOLIDATION_BOOST as f64,
+                                    super::super::thresholds::RESONATOR_CAUSAL_CONSOLIDATION_BOOST
+                                        as f64,
                                 );
                                 resonator_reconsolidated = match_timestamps.len();
                             }

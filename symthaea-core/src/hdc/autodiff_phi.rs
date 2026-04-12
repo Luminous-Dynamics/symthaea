@@ -55,6 +55,7 @@
 //! println!("Final Phi: {:.4}", history.last().unwrap().phi);
 //! ```
 
+use crate::hdc::statistics::Xorshift64;
 use serde::{Deserialize, Serialize};
 use std::f64::consts::PI;
 
@@ -317,6 +318,8 @@ pub struct AutodiffPhiEngine {
     tape: ComputationTape,
     /// Cached similarity gradients: d(sim[i][j])/d(node[i][k])
     sim_grad_cache: Vec<Vec<Vec<f64>>>,
+    /// PRNG for Gumbel noise sampling in soft partitions (Jang et al. 2016)
+    rng: Xorshift64,
 }
 
 impl AutodiffPhiEngine {
@@ -326,6 +329,7 @@ impl AutodiffPhiEngine {
             config,
             tape: ComputationTape::new(),
             sim_grad_cache: Vec::new(),
+            rng: Xorshift64::new(42),
         }
     }
 
@@ -624,6 +628,17 @@ impl AutodiffPhiEngine {
                 let logit = affinity / self.config.temperature;
                 logits.push(logit);
             }
+
+            // Gumbel-Softmax: add Gumbel(0,1) noise to logits for stochastic
+            // differentiable partitioning (Jang et al. 2016, Maddison et al. 2016).
+            // g = -log(-log(u)), u ~ Uniform(0,1)
+            let logits: Vec<f64> = logits
+                .iter()
+                .map(|&l| {
+                    let u = self.rng.next_f64().clamp(1e-10, 1.0 - 1e-10);
+                    l + (-(-u.ln()).ln()) // Add Gumbel noise
+                })
+                .collect();
 
             // Softmax normalization
             let max_logit = logits.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
@@ -1157,11 +1172,7 @@ impl PhiLbfgsOptimizer {
         let final_phi = final_result.phi;
 
         // Compute sparsity
-        let near_zero_count = opt_result
-            .x
-            .iter()
-            .filter(|v| v.abs() < 0.01)
-            .count();
+        let near_zero_count = opt_result.x.iter().filter(|v| v.abs() < 0.01).count();
         let sparsity = near_zero_count as f64 / total_vars.max(1) as f64;
 
         PhiLbfgsResult {
@@ -1370,11 +1381,20 @@ mod tests {
 
         let result = optimizer.optimize(&mut network);
 
-        assert!(result.initial_phi.is_finite(), "Initial Phi should be finite");
+        assert!(
+            result.initial_phi.is_finite(),
+            "Initial Phi should be finite"
+        );
         assert!(result.final_phi.is_finite(), "Final Phi should be finite");
-        assert!(result.initial_phi >= 0.0, "Initial Phi should be non-negative");
+        assert!(
+            result.initial_phi >= 0.0,
+            "Initial Phi should be non-negative"
+        );
         assert!(result.final_phi >= 0.0, "Final Phi should be non-negative");
-        assert!(result.sparsity >= 0.0 && result.sparsity <= 1.0, "Sparsity should be in [0,1]");
+        assert!(
+            result.sparsity >= 0.0 && result.sparsity <= 1.0,
+            "Sparsity should be in [0,1]"
+        );
         assert!(result.iterations > 0, "Should take at least 1 iteration");
     }
 
@@ -1459,7 +1479,10 @@ mod tests {
         // After optimization + normalization, all values should be finite
         for node in &network.nodes {
             for &v in &node.values {
-                assert!(v.is_finite(), "Node values should be finite after optimization");
+                assert!(
+                    v.is_finite(),
+                    "Node values should be finite after optimization"
+                );
             }
         }
     }

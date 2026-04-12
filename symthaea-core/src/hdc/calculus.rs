@@ -575,6 +575,255 @@ pub fn func(name: &str, arg: TermType) -> TermType {
     }
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// TRANSCENDENTAL INTEGRATION
+// ═══════════════════════════════════════════════════════════════════════════
+
+/// Symbolic integration of transcendental functions.
+///
+/// Handles standard integral forms:
+/// - ∫ sin(x) dx = -cos(x)
+/// - ∫ cos(x) dx = sin(x)
+/// - ∫ exp(x) dx = exp(x)
+/// - ∫ 1/x dx = ln(|x|)
+/// - ∫ x^n dx = x^(n+1)/(n+1) for n ≠ -1
+/// - ∫ (f + g) dx = ∫f dx + ∫g dx (linearity)
+/// - ∫ c·f dx = c · ∫f dx (constant factor)
+/// - ∫ sin(ax+b) dx = -cos(ax+b)/a (linear substitution)
+/// - ∫ cos(ax+b) dx = sin(ax+b)/a (linear substitution)
+/// - ∫ exp(ax+b) dx = exp(ax+b)/a (linear substitution)
+///
+/// Returns None if the integral cannot be computed symbolically.
+pub fn integrate_symbolic(term: &TermType, variable: &str) -> Option<TermType> {
+    match term {
+        // ∫ c dx = c*x
+        TermType::Constant(c) => {
+            Some(TermType::BinaryOp {
+                op: SymbolicOp::Mul,
+                left: Box::new(TermType::Constant(*c)),
+                right: Box::new(TermType::Variable(variable.to_string())),
+            })
+        }
+
+        // ∫ x dx = x²/2
+        TermType::Variable(v) if v == variable => {
+            Some(TermType::BinaryOp {
+                op: SymbolicOp::Div,
+                left: Box::new(TermType::BinaryOp {
+                    op: SymbolicOp::Pow,
+                    left: Box::new(TermType::Variable(variable.to_string())),
+                    right: Box::new(TermType::Constant(2)),
+                }),
+                right: Box::new(TermType::Constant(2)),
+            })
+        }
+
+        // ∫ y dx = y*x (other variable treated as constant)
+        TermType::Variable(v) => {
+            Some(TermType::BinaryOp {
+                op: SymbolicOp::Mul,
+                left: Box::new(TermType::Variable(v.clone())),
+                right: Box::new(TermType::Variable(variable.to_string())),
+            })
+        }
+
+        // ∫ (f + g) dx = ∫f dx + ∫g dx
+        TermType::BinaryOp { op: SymbolicOp::Add, left, right } => {
+            let il = integrate_symbolic(left, variable)?;
+            let ir = integrate_symbolic(right, variable)?;
+            Some(TermType::BinaryOp { op: SymbolicOp::Add, left: Box::new(il), right: Box::new(ir) })
+        }
+
+        // ∫ (f - g) dx = ∫f dx - ∫g dx
+        TermType::BinaryOp { op: SymbolicOp::Sub, left, right } => {
+            let il = integrate_symbolic(left, variable)?;
+            let ir = integrate_symbolic(right, variable)?;
+            Some(TermType::BinaryOp { op: SymbolicOp::Sub, left: Box::new(il), right: Box::new(ir) })
+        }
+
+        // ∫ c*f dx = c * ∫f dx (constant factor)
+        TermType::BinaryOp { op: SymbolicOp::Mul, left, right } => {
+            if !contains_variable(left, variable) {
+                // Left is constant w.r.t. variable
+                let ir = integrate_symbolic(right, variable)?;
+                Some(TermType::BinaryOp { op: SymbolicOp::Mul, left: left.clone(), right: Box::new(ir) })
+            } else if !contains_variable(right, variable) {
+                // Right is constant
+                let il = integrate_symbolic(left, variable)?;
+                Some(TermType::BinaryOp { op: SymbolicOp::Mul, left: Box::new(il), right: right.clone() })
+            } else {
+                None // Integration by parts would be needed
+            }
+        }
+
+        // ∫ x^n dx = x^(n+1)/(n+1) for constant n ≠ -1
+        TermType::BinaryOp { op: SymbolicOp::Pow, left, right } => {
+            if let (TermType::Variable(v), TermType::Constant(n)) = (left.as_ref(), right.as_ref()) {
+                if v == variable && *n != -1 {
+                    let n1 = n + 1;
+                    Some(TermType::BinaryOp {
+                        op: SymbolicOp::Div,
+                        left: Box::new(TermType::BinaryOp {
+                            op: SymbolicOp::Pow,
+                            left: Box::new(TermType::Variable(variable.to_string())),
+                            right: Box::new(TermType::Constant(n1)),
+                        }),
+                        right: Box::new(TermType::Constant(n1)),
+                    })
+                } else if v == variable && *n == -1 {
+                    // ∫ x^(-1) dx = ln(x)
+                    Some(func("ln", TermType::Variable(variable.to_string())))
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        }
+
+        // ∫ neg(f) dx = -(∫f dx) — BinaryOp with Neg op (shouldn't happen, but handle it)
+        TermType::BinaryOp { op: SymbolicOp::Neg, left, .. } => {
+            let il = integrate_symbolic(left, variable)?;
+            Some(negate(il))
+        }
+
+        // ∫ 1/f dx — check for 1/x = ln(x)
+        TermType::BinaryOp { op: SymbolicOp::Div, left, right } => {
+            if let TermType::Constant(1) = left.as_ref() {
+                if let TermType::Variable(v) = right.as_ref() {
+                    if v == variable {
+                        return Some(func("ln", TermType::Variable(variable.to_string())));
+                    }
+                }
+            }
+            // ∫ f/c dx = (1/c) * ∫f dx
+            if !contains_variable(right, variable) {
+                let il = integrate_symbolic(left, variable)?;
+                Some(TermType::BinaryOp { op: SymbolicOp::Div, left: Box::new(il), right: right.clone() })
+            } else {
+                None
+            }
+        }
+
+        // ∫ sin(f) dx, ∫ cos(f) dx, ∫ exp(f) dx
+        TermType::Function { name, arg } => {
+            integrate_transcendental(name, arg, variable)
+        }
+
+        // Unary operation (negation): ∫ (-f) dx = -(∫ f dx)
+        TermType::UnaryOp { operand, .. } => {
+            let inner = integrate_symbolic(operand, variable)?;
+            Some(negate(inner))
+        }
+    }
+}
+
+/// Integrate transcendental functions with linear argument substitution.
+///
+/// For f(ax + b), uses the substitution u = ax + b, du = a dx:
+/// ∫ f(ax+b) dx = F(ax+b) / a
+fn integrate_transcendental(name: &str, arg: &TermType, variable: &str) -> Option<TermType> {
+    // Check if argument is the simple variable
+    if let TermType::Variable(v) = arg {
+        if v == variable {
+            return match name {
+                "sin" => Some(negate(func("cos", TermType::Variable(variable.to_string())))),
+                "cos" => Some(func("sin", TermType::Variable(variable.to_string()))),
+                "exp" => Some(func("exp", TermType::Variable(variable.to_string()))),
+                "ln" => {
+                    // ∫ ln(x) dx = x*ln(x) - x
+                    let x = TermType::Variable(variable.to_string());
+                    Some(TermType::BinaryOp {
+                        op: SymbolicOp::Sub,
+                        left: Box::new(TermType::BinaryOp {
+                            op: SymbolicOp::Mul,
+                            left: Box::new(x.clone()),
+                            right: Box::new(func("ln", x.clone())),
+                        }),
+                        right: Box::new(x),
+                    })
+                }
+                _ => None,
+            };
+        }
+    }
+
+    // Check for linear argument: a*x + b
+    if let Some((a_coeff, _b_const)) = extract_linear_arg(arg, variable) {
+        if a_coeff == 0 { return None; }
+
+        let antideriv = match name {
+            "sin" => Some(negate(func("cos", arg.clone()))),
+            "cos" => Some(func("sin", arg.clone())),
+            "exp" => Some(func("exp", arg.clone())),
+            _ => None,
+        }?;
+
+        // Divide by the coefficient: ∫ f(ax+b) dx = F(ax+b) / a
+        return Some(TermType::BinaryOp {
+            op: SymbolicOp::Div,
+            left: Box::new(antideriv),
+            right: Box::new(TermType::Constant(a_coeff)),
+        });
+    }
+
+    None
+}
+
+/// Check if a TermType contains the given variable.
+fn contains_variable(term: &TermType, variable: &str) -> bool {
+    match term {
+        TermType::Constant(_) => false,
+        TermType::Variable(v) => v == variable,
+        TermType::BinaryOp { left, right, .. } => {
+            contains_variable(left, variable) || contains_variable(right, variable)
+        }
+        TermType::UnaryOp { operand, .. } => contains_variable(operand, variable),
+        TermType::Function { arg, .. } => contains_variable(arg, variable),
+    }
+}
+
+/// Try to extract linear form a*x + b from a TermType.
+/// Returns Some((a, b)) if the expression is linear in the variable.
+fn extract_linear_arg(term: &TermType, variable: &str) -> Option<(i64, i64)> {
+    match term {
+        // Just x → (1, 0)
+        TermType::Variable(v) if v == variable => Some((1, 0)),
+        // Just c → (0, c)
+        TermType::Constant(c) => Some((0, *c)),
+        // a * x → (a, 0)
+        TermType::BinaryOp { op: SymbolicOp::Mul, left, right } => {
+            match (left.as_ref(), right.as_ref()) {
+                (TermType::Constant(a), TermType::Variable(v)) if v == variable => Some((*a, 0)),
+                (TermType::Variable(v), TermType::Constant(a)) if v == variable => Some((*a, 0)),
+                _ => None,
+            }
+        }
+        // a*x + b
+        TermType::BinaryOp { op: SymbolicOp::Add, left, right } => {
+            let (a1, b1) = extract_linear_arg(left, variable)?;
+            let (a2, b2) = extract_linear_arg(right, variable)?;
+            Some((a1 + a2, b1 + b2))
+        }
+        // a*x - b
+        TermType::BinaryOp { op: SymbolicOp::Sub, left, right } => {
+            let (a1, b1) = extract_linear_arg(left, variable)?;
+            let (a2, b2) = extract_linear_arg(right, variable)?;
+            Some((a1 - a2, b1 - b2))
+        }
+        _ => None,
+    }
+}
+
+/// Negate a TermType: -expr = 0 - expr
+fn negate(term: TermType) -> TermType {
+    TermType::BinaryOp {
+        op: SymbolicOp::Sub,
+        left: Box::new(TermType::Constant(0)),
+        right: Box::new(term),
+    }
+}
+
 /// Helper: construct a SymbolicExpr for a function application
 pub fn func_expr(name: &str, arg: &SymbolicExpr, primitives: &PrimitiveSystem) -> SymbolicExpr {
     let fn_seed = seed_from_name(&format!("FN_{name}"));
@@ -1207,5 +1456,144 @@ mod tests {
             TermType::Function { name, .. } => assert_eq!(name, "sinh"),
             _ => panic!("Expected sinh(x), got {:?}", result),
         }
+    }
+
+    // ── Transcendental integration tests ────────────────────────────────
+
+    #[test]
+    fn test_integrate_constant() {
+        // ∫ 5 dx = 5x
+        let result = integrate_symbolic(&TermType::Constant(5), "x");
+        assert!(result.is_some(), "should integrate constant");
+    }
+
+    #[test]
+    fn test_integrate_variable() {
+        // ∫ x dx = x²/2
+        let result = integrate_symbolic(&TermType::Variable("x".to_string()), "x");
+        assert!(result.is_some(), "should integrate x");
+    }
+
+    #[test]
+    fn test_integrate_sin() {
+        // ∫ sin(x) dx = -cos(x)
+        let sin_x = func("sin", TermType::Variable("x".to_string()));
+        let result = integrate_symbolic(&sin_x, "x");
+        assert!(result.is_some(), "should integrate sin(x)");
+        let r = result.unwrap();
+        // Should contain cos
+        let s = format!("{:?}", r);
+        assert!(s.contains("cos"), "∫sin(x) should produce cos: {:?}", r);
+    }
+
+    #[test]
+    fn test_integrate_cos() {
+        // ∫ cos(x) dx = sin(x)
+        let cos_x = func("cos", TermType::Variable("x".to_string()));
+        let result = integrate_symbolic(&cos_x, "x");
+        assert!(result.is_some(), "should integrate cos(x)");
+        let r = result.unwrap();
+        let s = format!("{:?}", r);
+        assert!(s.contains("sin"), "∫cos(x) should produce sin: {:?}", r);
+    }
+
+    #[test]
+    fn test_integrate_exp() {
+        // ∫ exp(x) dx = exp(x)
+        let exp_x = func("exp", TermType::Variable("x".to_string()));
+        let result = integrate_symbolic(&exp_x, "x");
+        assert!(result.is_some(), "should integrate exp(x)");
+        let r = result.unwrap();
+        let s = format!("{:?}", r);
+        assert!(s.contains("exp"), "∫exp(x) should produce exp: {:?}", r);
+    }
+
+    #[test]
+    fn test_integrate_ln() {
+        // ∫ ln(x) dx = x*ln(x) - x
+        let ln_x = func("ln", TermType::Variable("x".to_string()));
+        let result = integrate_symbolic(&ln_x, "x");
+        assert!(result.is_some(), "should integrate ln(x)");
+    }
+
+    #[test]
+    fn test_integrate_one_over_x() {
+        // ∫ 1/x dx = ln(x)
+        let one_over_x = TermType::BinaryOp {
+            op: SymbolicOp::Div,
+            left: Box::new(TermType::Constant(1)),
+            right: Box::new(TermType::Variable("x".to_string())),
+        };
+        let result = integrate_symbolic(&one_over_x, "x");
+        assert!(result.is_some(), "should integrate 1/x");
+        let r = result.unwrap();
+        let s = format!("{:?}", r);
+        assert!(s.contains("ln"), "∫1/x should produce ln: {:?}", r);
+    }
+
+    #[test]
+    fn test_integrate_power() {
+        // ∫ x^3 dx = x^4/4
+        let x_cubed = TermType::BinaryOp {
+            op: SymbolicOp::Pow,
+            left: Box::new(TermType::Variable("x".to_string())),
+            right: Box::new(TermType::Constant(3)),
+        };
+        let result = integrate_symbolic(&x_cubed, "x");
+        assert!(result.is_some(), "should integrate x^3");
+    }
+
+    #[test]
+    fn test_integrate_sum() {
+        // ∫ (sin(x) + cos(x)) dx = -cos(x) + sin(x)
+        let sum = TermType::BinaryOp {
+            op: SymbolicOp::Add,
+            left: Box::new(func("sin", TermType::Variable("x".to_string()))),
+            right: Box::new(func("cos", TermType::Variable("x".to_string()))),
+        };
+        let result = integrate_symbolic(&sum, "x");
+        assert!(result.is_some(), "should integrate sin(x) + cos(x)");
+    }
+
+    #[test]
+    fn test_integrate_constant_times_function() {
+        // ∫ 3*sin(x) dx = 3*(-cos(x)) = -3*cos(x)
+        let three_sin = TermType::BinaryOp {
+            op: SymbolicOp::Mul,
+            left: Box::new(TermType::Constant(3)),
+            right: Box::new(func("sin", TermType::Variable("x".to_string()))),
+        };
+        let result = integrate_symbolic(&three_sin, "x");
+        assert!(result.is_some(), "should integrate 3*sin(x)");
+    }
+
+    #[test]
+    fn test_integrate_linear_substitution() {
+        // ∫ sin(2x + 1) dx = -cos(2x + 1)/2
+        let linear_arg = TermType::BinaryOp {
+            op: SymbolicOp::Add,
+            left: Box::new(TermType::BinaryOp {
+                op: SymbolicOp::Mul,
+                left: Box::new(TermType::Constant(2)),
+                right: Box::new(TermType::Variable("x".to_string())),
+            }),
+            right: Box::new(TermType::Constant(1)),
+        };
+        let sin_2x1 = func("sin", linear_arg);
+        let result = integrate_symbolic(&sin_2x1, "x");
+        assert!(result.is_some(), "should integrate sin(2x+1) via linear substitution");
+    }
+
+    /// Fundamental theorem verification: d/dx ∫f = f for transcendentals
+    #[test]
+    fn test_fundamental_theorem_sin() {
+        let prims = PrimitiveSystem::global();
+        // ∫ sin(x) dx = -cos(x). d/dx(-cos(x)) should = sin(x)
+        let sin_x = func("sin", TermType::Variable("x".to_string()));
+        let integral = integrate_symbolic(&sin_x, "x").unwrap();
+        let derivative = SymbolicDifferentiator::diff_recursive(&integral, "x", prims);
+        // The derivative of -cos(x) = sin(x). Verify by structure.
+        let s = format!("{:?}", derivative);
+        assert!(s.contains("sin"), "d/dx(∫sin(x)dx) should recover sin: {:?}", derivative);
     }
 }

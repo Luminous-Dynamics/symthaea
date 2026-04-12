@@ -134,10 +134,7 @@ fn print_table2_equity_gap(engine: &PgxHealthEquityEngine) {
         "{:<14}| {:<8}| {:<10}| {:<24}| Underserved Populations",
         "Drug", "Gene", "Gap Score", "Most Affected"
     );
-    println!(
-        "{:-<14}|{:-<9}|{:-<11}|{:-<25}|{:-<30}",
-        "", "", "", "", ""
-    );
+    println!("{:-<14}|{:-<9}|{:-<11}|{:-<25}|{:-<30}", "", "", "", "", "");
 
     for &(drug, gene) in DRUG_GENE_PAIRS {
         let analysis = engine.equity_analysis(drug, gene);
@@ -202,10 +199,7 @@ fn print_table3_clinical_impact(engine: &PgxHealthEquityEngine) {
         "{:<14}| {:<8}| {:>13} | {:<24}| Risk Description",
         "Drug", "Gene", "Total At Risk", "Most Affected Group"
     );
-    println!(
-        "{:-<14}|{:-<9}|{:-<15}|{:-<25}|{:-<30}",
-        "", "", "", "", ""
-    );
+    println!("{:-<14}|{:-<9}|{:-<15}|{:-<25}|{:-<30}", "", "", "", "", "");
 
     for &(drug, gene) in DRUG_GENE_PAIRS {
         let analysis = engine.equity_analysis(drug, gene);
@@ -227,12 +221,22 @@ fn print_table3_clinical_impact(engine: &PgxHealthEquityEngine) {
             // At-risk = those with actionable phenotypes
             let actionable_frac = if is_prodrug {
                 // Prodrugs: UM (toxicity) + PM (no efficacy)
-                dist.get(&MetabolizerPhenotype::UltraRapid).copied().unwrap_or(0.0)
-                    + dist.get(&MetabolizerPhenotype::Poor).copied().unwrap_or(0.0)
+                dist.get(&MetabolizerPhenotype::UltraRapid)
+                    .copied()
+                    .unwrap_or(0.0)
+                    + dist
+                        .get(&MetabolizerPhenotype::Poor)
+                        .copied()
+                        .unwrap_or(0.0)
             } else {
                 // Active drugs: PM (toxicity) + UM (sub-therapeutic)
-                dist.get(&MetabolizerPhenotype::Poor).copied().unwrap_or(0.0)
-                    + dist.get(&MetabolizerPhenotype::UltraRapid).copied().unwrap_or(0.0)
+                dist.get(&MetabolizerPhenotype::Poor)
+                    .copied()
+                    .unwrap_or(0.0)
+                    + dist
+                        .get(&MetabolizerPhenotype::UltraRapid)
+                        .copied()
+                        .unwrap_or(0.0)
             };
 
             let at_risk = pop * actionable_frac;
@@ -242,16 +246,28 @@ fn print_table3_clinical_impact(engine: &PgxHealthEquityEngine) {
                 worst_count = at_risk;
                 worst_group = anc;
                 worst_risk_desc = if is_prodrug {
-                    let um = dist.get(&MetabolizerPhenotype::UltraRapid).copied().unwrap_or(0.0);
-                    let pm = dist.get(&MetabolizerPhenotype::Poor).copied().unwrap_or(0.0);
+                    let um = dist
+                        .get(&MetabolizerPhenotype::UltraRapid)
+                        .copied()
+                        .unwrap_or(0.0);
+                    let pm = dist
+                        .get(&MetabolizerPhenotype::Poor)
+                        .copied()
+                        .unwrap_or(0.0);
                     if um > pm {
                         "Toxicity risk (UM)".to_string()
                     } else {
                         "No efficacy (PM)".to_string()
                     }
                 } else {
-                    let pm = dist.get(&MetabolizerPhenotype::Poor).copied().unwrap_or(0.0);
-                    let um = dist.get(&MetabolizerPhenotype::UltraRapid).copied().unwrap_or(0.0);
+                    let pm = dist
+                        .get(&MetabolizerPhenotype::Poor)
+                        .copied()
+                        .unwrap_or(0.0);
+                    let um = dist
+                        .get(&MetabolizerPhenotype::UltraRapid)
+                        .copied()
+                        .unwrap_or(0.0);
                     if pm > um {
                         "Toxicity risk (PM)".to_string()
                     } else {
@@ -320,10 +336,7 @@ fn print_admixed_population_analysis(engine: &PgxHealthEquityEngine) {
     let admixed_genes = &["CYP2D6", "CYP2C19", "CYP3A5"];
 
     // Header
-    print!(
-        "{:<24}| {:<32}|",
-        "Population", "Composition"
-    );
+    print!("{:<24}| {:<32}|", "Population", "Composition");
     for &gene in admixed_genes {
         print!(" {} PM |", gene);
     }
@@ -339,7 +352,10 @@ fn print_admixed_population_analysis(engine: &PgxHealthEquityEngine) {
         print!("{:<24}| {:<32}|", pop.name, comp_str);
         for &gene in admixed_genes {
             let dist = engine.admixed_metabolizer_distribution(gene, pop);
-            let pm = dist.get(&MetabolizerPhenotype::Poor).copied().unwrap_or(0.0);
+            let pm = dist
+                .get(&MetabolizerPhenotype::Poor)
+                .copied()
+                .unwrap_or(0.0);
             print!("    {:5.1}%  |", pm * 100.0);
         }
         println!();
@@ -357,12 +373,18 @@ fn print_admixed_population_analysis(engine: &PgxHealthEquityEngine) {
     ];
     for (name, anc) in &pure_groups {
         let dist = engine.metabolizer_distribution("CYP2D6", *anc);
-        let pm = dist.get(&MetabolizerPhenotype::Poor).copied().unwrap_or(0.0);
+        let pm = dist
+            .get(&MetabolizerPhenotype::Poor)
+            .copied()
+            .unwrap_or(0.0);
         println!("  {:<28} PM = {:5.1}%", name, pm * 100.0);
     }
     for pop in &populations {
         let dist = engine.admixed_metabolizer_distribution("CYP2D6", pop);
-        let pm = dist.get(&MetabolizerPhenotype::Poor).copied().unwrap_or(0.0);
+        let pm = dist
+            .get(&MetabolizerPhenotype::Poor)
+            .copied()
+            .unwrap_or(0.0);
         println!("  {:<28} PM = {:5.1}%", pop.name, pm * 100.0);
     }
 
@@ -447,11 +469,21 @@ fn print_key_findings(engine: &PgxHealthEquityEngine) {
             if let Some(risk) = analysis.population_risk.get(&anc) {
                 let dist = &risk.phenotype_distribution;
                 let frac = if is_prodrug {
-                    dist.get(&MetabolizerPhenotype::UltraRapid).copied().unwrap_or(0.0)
-                        + dist.get(&MetabolizerPhenotype::Poor).copied().unwrap_or(0.0)
+                    dist.get(&MetabolizerPhenotype::UltraRapid)
+                        .copied()
+                        .unwrap_or(0.0)
+                        + dist
+                            .get(&MetabolizerPhenotype::Poor)
+                            .copied()
+                            .unwrap_or(0.0)
                 } else {
-                    dist.get(&MetabolizerPhenotype::Poor).copied().unwrap_or(0.0)
-                        + dist.get(&MetabolizerPhenotype::UltraRapid).copied().unwrap_or(0.0)
+                    dist.get(&MetabolizerPhenotype::Poor)
+                        .copied()
+                        .unwrap_or(0.0)
+                        + dist
+                            .get(&MetabolizerPhenotype::UltraRapid)
+                            .copied()
+                            .unwrap_or(0.0)
                 };
                 grand_total += pop * frac;
             }
@@ -470,8 +502,16 @@ fn print_key_findings(engine: &PgxHealthEquityEngine) {
         let mut all_pm = Vec::new();
         for &(anc, _) in ANCESTRY_ORDER {
             let dist = engine.metabolizer_distribution(gene, anc);
-            all_um.push(dist.get(&MetabolizerPhenotype::UltraRapid).copied().unwrap_or(0.0));
-            all_pm.push(dist.get(&MetabolizerPhenotype::Poor).copied().unwrap_or(0.0));
+            all_um.push(
+                dist.get(&MetabolizerPhenotype::UltraRapid)
+                    .copied()
+                    .unwrap_or(0.0),
+            );
+            all_pm.push(
+                dist.get(&MetabolizerPhenotype::Poor)
+                    .copied()
+                    .unwrap_or(0.0),
+            );
         }
         let um_range = all_um.iter().cloned().fold(0.0_f64, f64::max)
             - all_um.iter().cloned().fold(1.0_f64, f64::min);

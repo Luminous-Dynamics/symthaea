@@ -185,9 +185,13 @@ pub fn App() -> impl IntoView {
                 }
                 "pipeline_progress" => {
                     let stage = js_sys::Reflect::get(&data, &"stage".into())
-                        .ok().and_then(|v| v.as_string()).unwrap_or_default();
+                        .ok()
+                        .and_then(|v| v.as_string())
+                        .unwrap_or_default();
                     let pct = js_sys::Reflect::get(&data, &"percent".into())
-                        .ok().and_then(|v| v.as_f64()).unwrap_or(0.0) as u32;
+                        .ok()
+                        .and_then(|v| v.as_f64())
+                        .unwrap_or(0.0) as u32;
                     let status = match stage.as_str() {
                         "downloading" => format!("downloading {}%", pct),
                         "verifying" => "verifying integrity".to_string(),
@@ -286,7 +290,10 @@ pub fn App() -> impl IntoView {
         }
     }
 
-    #[cfg(all(feature = "installer", not(any(feature = "usb-creator", feature = "manage"))))]
+    #[cfg(all(
+        feature = "installer",
+        not(any(feature = "usb-creator", feature = "manage"))
+    ))]
     {
         view! {
             <main style="display: block;">

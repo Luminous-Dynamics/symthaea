@@ -233,6 +233,20 @@ impl VehicleState {
             && self.mesh_confidence.is_finite()
     }
 
+    /// Domain-specific bounds check for physically plausible vehicle state.
+    ///
+    /// Returns `true` if the state is within reasonable physical limits:
+    /// - Speed: [0, 80] m/s (~180 mph, absolute road vehicle limit)
+    /// - Yaw rate: [-3, 3] rad/s (reasonable for any road vehicle)
+    /// - Lateral velocity: [-20, 20] m/s (extreme drift scenarios)
+    pub fn is_bounded(&self) -> bool {
+        self.is_finite()
+            && self.speed >= 0.0
+            && self.speed < 80.0
+            && self.yaw_rate.abs() < 3.0
+            && self.lateral_velocity.abs() < 20.0
+    }
+
     /// Inject straight-road context: lateral_offset = position_y, curvature = 0.
     ///
     /// Call this before encoding when no road model is defined (Phase A).

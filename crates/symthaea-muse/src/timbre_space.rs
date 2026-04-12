@@ -56,16 +56,66 @@ impl TimbreManifold {
 
         // Generate timbres across emotional space
         let configs = [
-            (-0.8, 0.1, "dark_pad",     vec![1.0, 0.1, 0.05, 0.02, 0.01, 0.005, 0.002, 0.001]),
-            (-0.5, 0.6, "tense_brass",  vec![1.0, 0.7, 0.5, 0.4, 0.3, 0.2, 0.15, 0.1]),
-            (-0.3, 0.9, "harsh_lead",   vec![1.0, 0.8, 0.6, 0.5, 0.4, 0.35, 0.3, 0.25]),
-            ( 0.0, 0.0, "neutral_sine", vec![1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]),
-            ( 0.0, 0.5, "warm_organ",   vec![1.0, 0.5, 0.25, 0.12, 0.06, 0.03, 0.015, 0.0]),
-            ( 0.3, 0.3, "soft_flute",   vec![1.0, 0.2, 0.05, 0.01, 0.0, 0.0, 0.0, 0.0]),
-            ( 0.5, 0.5, "bright_bell",  vec![1.0, 0.3, 0.5, 0.2, 0.4, 0.1, 0.3, 0.05]),
-            ( 0.7, 0.2, "glass_chime",  vec![1.0, 0.1, 0.3, 0.05, 0.2, 0.02, 0.1, 0.01]),
-            ( 0.8, 0.7, "joyful_choir", vec![1.0, 0.4, 0.3, 0.25, 0.15, 0.1, 0.08, 0.05]),
-            ( 0.9, 0.9, "radiant_full", vec![1.0, 0.6, 0.4, 0.3, 0.25, 0.2, 0.15, 0.12]),
+            (
+                -0.8,
+                0.1,
+                "dark_pad",
+                vec![1.0, 0.1, 0.05, 0.02, 0.01, 0.005, 0.002, 0.001],
+            ),
+            (
+                -0.5,
+                0.6,
+                "tense_brass",
+                vec![1.0, 0.7, 0.5, 0.4, 0.3, 0.2, 0.15, 0.1],
+            ),
+            (
+                -0.3,
+                0.9,
+                "harsh_lead",
+                vec![1.0, 0.8, 0.6, 0.5, 0.4, 0.35, 0.3, 0.25],
+            ),
+            (
+                0.0,
+                0.0,
+                "neutral_sine",
+                vec![1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+            ),
+            (
+                0.0,
+                0.5,
+                "warm_organ",
+                vec![1.0, 0.5, 0.25, 0.12, 0.06, 0.03, 0.015, 0.0],
+            ),
+            (
+                0.3,
+                0.3,
+                "soft_flute",
+                vec![1.0, 0.2, 0.05, 0.01, 0.0, 0.0, 0.0, 0.0],
+            ),
+            (
+                0.5,
+                0.5,
+                "bright_bell",
+                vec![1.0, 0.3, 0.5, 0.2, 0.4, 0.1, 0.3, 0.05],
+            ),
+            (
+                0.7,
+                0.2,
+                "glass_chime",
+                vec![1.0, 0.1, 0.3, 0.05, 0.2, 0.02, 0.1, 0.01],
+            ),
+            (
+                0.8,
+                0.7,
+                "joyful_choir",
+                vec![1.0, 0.4, 0.3, 0.25, 0.15, 0.1, 0.08, 0.05],
+            ),
+            (
+                0.9,
+                0.9,
+                "radiant_full",
+                vec![1.0, 0.6, 0.4, 0.3, 0.25, 0.2, 0.15, 0.12],
+            ),
         ];
 
         for (valence, arousal, label, partials) in configs {
@@ -97,7 +147,10 @@ impl TimbreManifold {
         }
 
         // Find 3 nearest centroids by emotional distance
-        let mut distances: Vec<(usize, f32)> = self.points.iter().enumerate()
+        let mut distances: Vec<(usize, f32)> = self
+            .points
+            .iter()
+            .enumerate()
             .map(|(i, p)| {
                 let dv = p.valence - valence;
                 let da = p.arousal - arousal;
@@ -110,7 +163,8 @@ impl TimbreManifold {
         let total_weight: f32 = top3.iter().map(|(_, d)| 1.0 / (d + 0.01)).sum();
 
         // Weighted interpolation of partial amplitudes
-        let max_partials = top3.iter()
+        let max_partials = top3
+            .iter()
             .map(|(i, _)| self.points[*i].partials.len())
             .max()
             .unwrap_or(1);
@@ -131,7 +185,8 @@ impl TimbreManifold {
 
     /// Get the nearest timbre label for a given emotional state.
     pub fn nearest_label(&self, valence: f32, arousal: f32) -> &str {
-        self.points.iter()
+        self.points
+            .iter()
             .min_by(|a, b| {
                 let da = (a.valence - valence).powi(2) + (a.arousal - arousal).powi(2);
                 let db = (b.valence - valence).powi(2) + (b.arousal - arousal).powi(2);
@@ -153,7 +208,12 @@ impl TimbreManifold {
 }
 
 /// Encode a timbre (partials + emotional coords) as a 16,384D HV.
-fn encode_timbre(genesis: &GenesisSeed, partials: &[f32], valence: f32, arousal: f32) -> ContinuousHV {
+fn encode_timbre(
+    genesis: &GenesisSeed,
+    partials: &[f32],
+    valence: f32,
+    arousal: f32,
+) -> ContinuousHV {
     let mut result = ContinuousHV::zero(HDC_DIMENSION);
 
     // Encode each partial amplitude
@@ -230,7 +290,10 @@ mod tests {
         assert!(partials.len() >= 4);
         assert!(partials[0] > 0.5, "fundamental should be strong");
         // Second partial should be moderate (between sine=0 and bell=0.3)
-        assert!(partials[1] > 0.0 && partials[1] < 0.8, "blended second partial");
+        assert!(
+            partials[1] > 0.0 && partials[1] < 0.8,
+            "blended second partial"
+        );
     }
 
     #[test]
@@ -254,6 +317,9 @@ mod tests {
 
         let sim_close = hv1.similarity(&hv2);
         let sim_far = hv1.similarity(&hv3);
-        assert!(sim_close > sim_far, "similar timbres should be closer: {sim_close} vs {sim_far}");
+        assert!(
+            sim_close > sim_far,
+            "similar timbres should be closer: {sim_close} vs {sim_far}"
+        );
     }
 }

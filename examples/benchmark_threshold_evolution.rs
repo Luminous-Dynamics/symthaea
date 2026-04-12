@@ -24,8 +24,7 @@ fn main() {
 fn main() {
     use symthaea::cognitive_loop::{CognitiveLoopConfig, CognitiveLoopService};
     use symthaea_neuroevolution::{
-        NeuralGenome, ThresholdPhenotype,
-        threshold_genome::evaluate_threshold_fitness,
+        threshold_genome::evaluate_threshold_fitness, NeuralGenome, ThresholdPhenotype,
     };
 
     println!("═══════════════════════════════════════════════════════════════");
@@ -35,9 +34,18 @@ fn main() {
     // ── Phase 1: Evolve thresholds ──────────────────────────────────────
     println!("  Phase 1: Evolving thresholds (20 generations, pop=30)...");
     let evolved = evolve_best_thresholds(30, 20, 42);
-    println!("    Best fitness: {:.4}", evaluate_threshold_fitness(&evolved));
-    println!("    FEP surprise scale: {:.2} (default: 3.00)", evolved.fep_surprise_scale);
-    println!("    Dream base interval: {} (default: 100)", evolved.dream_base_interval);
+    println!(
+        "    Best fitness: {:.4}",
+        evaluate_threshold_fitness(&evolved)
+    );
+    println!(
+        "    FEP surprise scale: {:.2} (default: 3.00)",
+        evolved.fep_surprise_scale
+    );
+    println!(
+        "    Dream base interval: {} (default: 100)",
+        evolved.dream_base_interval
+    );
     println!();
 
     // ── Phase 2: Run baseline cognitive loop ────────────────────────────
@@ -55,14 +63,28 @@ fn main() {
     println!("  Comparison");
     println!("═══════════════════════════════════════════════════════════════\n");
 
-    println!("  {:>25}  {:>10}  {:>10}  {:>8}",
-        "Metric", "Baseline", "Evolved", "Delta");
+    println!(
+        "  {:>25}  {:>10}  {:>10}  {:>8}",
+        "Metric", "Baseline", "Evolved", "Delta"
+    );
     println!("  {}", "-".repeat(55));
     compare_row("Avg Phi (Ψ)", baseline.avg_phi, evolved_stats.avg_phi);
     compare_row("Avg PE", baseline.avg_pe, evolved_stats.avg_pe);
-    compare_row("Avg Consciousness", baseline.avg_consciousness, evolved_stats.avg_consciousness);
-    compare_row("Avg Coherence", baseline.avg_coherence, evolved_stats.avg_coherence);
-    compare_row("Learning cycles", baseline.learning_cycles as f64, evolved_stats.learning_cycles as f64);
+    compare_row(
+        "Avg Consciousness",
+        baseline.avg_consciousness,
+        evolved_stats.avg_consciousness,
+    );
+    compare_row(
+        "Avg Coherence",
+        baseline.avg_coherence,
+        evolved_stats.avg_coherence,
+    );
+    compare_row(
+        "Learning cycles",
+        baseline.learning_cycles as f64,
+        evolved_stats.learning_cycles as f64,
+    );
     compare_row("Final Phi", baseline.final_phi, evolved_stats.final_phi);
 }
 
@@ -77,7 +99,10 @@ struct LoopStats {
 }
 
 #[cfg(feature = "neuroevolution")]
-fn run_cognitive_loop(cycles: usize, thresholds: Option<&symthaea_neuroevolution::ThresholdPhenotype>) -> LoopStats {
+fn run_cognitive_loop(
+    cycles: usize,
+    thresholds: Option<&symthaea_neuroevolution::ThresholdPhenotype>,
+) -> LoopStats {
     use symthaea::cognitive_loop::{CognitiveLoopConfig, CognitiveLoopService};
 
     let mut config = CognitiveLoopConfig::default();
@@ -87,8 +112,12 @@ fn run_cognitive_loop(cycles: usize, thresholds: Option<&symthaea_neuroevolution
         Err(e) => {
             eprintln!("Failed to create CognitiveLoopService: {e}");
             return LoopStats {
-                avg_phi: 0.0, avg_pe: 0.0, avg_consciousness: 0.0,
-                avg_coherence: 0.0, learning_cycles: 0, final_phi: 0.0,
+                avg_phi: 0.0,
+                avg_pe: 0.0,
+                avg_consciousness: 0.0,
+                avg_coherence: 0.0,
+                learning_cycles: 0,
+                final_phi: 0.0,
             };
         }
     };
@@ -98,8 +127,10 @@ fn run_cognitive_loop(cycles: usize, thresholds: Option<&symthaea_neuroevolution
     // precedence over compile-time defaults at every usage site.
     if let Some(t) = thresholds {
         service.threshold_overrides_mut().apply_from_phenotype(t);
-        println!("    Applied {} threshold overrides",
-            service.threshold_overrides().active_count());
+        println!(
+            "    Applied {} threshold overrides",
+            service.threshold_overrides().active_count()
+        );
     }
 
     // Diverse input corpus to drive state changes
@@ -150,17 +181,30 @@ fn run_cognitive_loop(cycles: usize, thresholds: Option<&symthaea_neuroevolution
 }
 
 #[cfg(feature = "neuroevolution")]
-fn evolve_best_thresholds(pop_size: usize, generations: usize, seed: u64) -> symthaea_neuroevolution::ThresholdPhenotype {
-    use symthaea_neuroevolution::{NeuralGenome, threshold_genome::evaluate_threshold_fitness};
+fn evolve_best_thresholds(
+    pop_size: usize,
+    generations: usize,
+    seed: u64,
+) -> symthaea_neuroevolution::ThresholdPhenotype {
+    use symthaea_neuroevolution::{threshold_genome::evaluate_threshold_fitness, NeuralGenome};
 
     struct Rng(u64);
     impl Rng {
-        fn new(seed: u64) -> Self { Self(seed ^ 0x9E3779B97F4A7C15) }
-        fn next(&mut self) -> u64 {
-            self.0 ^= self.0 << 13; self.0 ^= self.0 >> 7; self.0 ^= self.0 << 17; self.0
+        fn new(seed: u64) -> Self {
+            Self(seed ^ 0x9E3779B97F4A7C15)
         }
-        fn next_f64(&mut self) -> f64 { (self.next() >> 11) as f64 / ((1u64 << 53) as f64) }
-        fn next_usize(&mut self, max: usize) -> usize { (self.next() % max as u64) as usize }
+        fn next(&mut self) -> u64 {
+            self.0 ^= self.0 << 13;
+            self.0 ^= self.0 >> 7;
+            self.0 ^= self.0 << 17;
+            self.0
+        }
+        fn next_f64(&mut self) -> f64 {
+            (self.next() >> 11) as f64 / ((1u64 << 53) as f64)
+        }
+        fn next_usize(&mut self, max: usize) -> usize {
+            (self.next() % max as u64) as usize
+        }
     }
 
     let mut rng = Rng::new(seed);
@@ -199,9 +243,15 @@ fn evolve_best_thresholds(pop_size: usize, generations: usize, seed: u64) -> sym
 
 #[cfg(feature = "neuroevolution")]
 fn print_stats(label: &str, stats: &LoopStats) {
-    println!("{}  Φ={:.4}  PE={:.4}  C={:.4}  coh={:.4}  learn={}",
-        label, stats.avg_phi, stats.avg_pe, stats.avg_consciousness,
-        stats.avg_coherence, stats.learning_cycles);
+    println!(
+        "{}  Φ={:.4}  PE={:.4}  C={:.4}  coh={:.4}  learn={}",
+        label,
+        stats.avg_phi,
+        stats.avg_pe,
+        stats.avg_consciousness,
+        stats.avg_coherence,
+        stats.learning_cycles
+    );
 }
 
 #[cfg(feature = "neuroevolution")]
@@ -212,6 +262,8 @@ fn compare_row(name: &str, baseline: f64, evolved: f64) {
         0.0
     };
     let sign = if delta >= 0.0 { "+" } else { "" };
-    println!("  {:>25}  {:>10.4}  {:>10.4}  {:>7.1}%",
-        name, baseline, evolved, delta);
+    println!(
+        "  {:>25}  {:>10.4}  {:>10.4}  {:>7.1}%",
+        name, baseline, evolved, delta
+    );
 }

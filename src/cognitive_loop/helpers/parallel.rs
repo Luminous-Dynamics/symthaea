@@ -442,26 +442,38 @@ pub(in crate::cognitive_loop) fn parallel_consciousness_branch_a(
         recent_hvs.pop_front();
     }
     recent_hvs.push_back(hv16_cached);
-    let (consciousness_profile_composite, synergy_enhanced_composite, emergent_properties_count, new_profile, new_synergy, new_emergent) =
-        if total_cycles % 47 == 0 && has_primitive_processor {
-            let profile =
-                crate::consciousness::consciousness_profile::ConsciousnessProfile::from_components(
-                    recent_hvs.make_contiguous(),
-                );
-            let composite = profile.composite;
-            let synergy =
-                crate::consciousness::dimension_synergies::SynergyProfile::from_base(profile);
-            (
-                composite,
-                synergy.enhanced_composite,
-                synergy.emergent_properties.len(),
-                Some(composite),
-                Some(synergy.enhanced_composite),
-                Some(synergy.emergent_properties.len()),
-            )
-        } else {
-            (last_profile_composite, last_synergy_composite, last_emergent_count, None, None, None)
-        };
+    let (
+        consciousness_profile_composite,
+        synergy_enhanced_composite,
+        emergent_properties_count,
+        new_profile,
+        new_synergy,
+        new_emergent,
+    ) = if total_cycles % 47 == 0 && has_primitive_processor {
+        let profile =
+            crate::consciousness::consciousness_profile::ConsciousnessProfile::from_components(
+                recent_hvs.make_contiguous(),
+            );
+        let composite = profile.composite;
+        let synergy = crate::consciousness::dimension_synergies::SynergyProfile::from_base(profile);
+        (
+            composite,
+            synergy.enhanced_composite,
+            synergy.emergent_properties.len(),
+            Some(composite),
+            Some(synergy.enhanced_composite),
+            Some(synergy.emergent_properties.len()),
+        )
+    } else {
+        (
+            last_profile_composite,
+            last_synergy_composite,
+            last_emergent_count,
+            None,
+            None,
+            None,
+        )
+    };
     let consciousness_profile_timing = t.elapsed().as_micros() as u64;
 
     ConsciousnessMetricsBranchA {
@@ -592,39 +604,44 @@ pub(in crate::cognitive_loop) fn parallel_consciousness_branch_b(
 
     // ── Epistemic conflict ──────────────────────────────────────────────
     let t = Instant::now();
-    let (epistemic_phi_eff, epistemic_conflict_count, new_phi_eff, new_conflict_count, epi_override) =
-        if let (Some(ref mut detector), Some(ref calibrator)) =
-            (epistemic_conflict_detector, theory_calibrator)
-        {
-            if total_cycles % 97 == 0 && total_cycles > 0 {
-                use crate::consciousness::epistemic_conflict::{
-                    compute_phi_eff, ConflictMatrix, MultiTheoryMetrics,
-                };
-                let metrics = MultiTheoryMetrics {
-                    phi: unified_psi,
-                    gwt: coherence as f64 * 0.8,
-                    ast: coherence as f64,
-                    pp: 1.0 - prediction_error as f64,
-                    rpt: coherence as f64 * 0.9,
-                    embodiment: body_phi_modulation,
-                    unified: unified_psi,
-                };
-                let matrix: ConflictMatrix = detector.detect(&metrics);
-                let phi_eff_result = compute_phi_eff(&metrics, calibrator);
-                let override_flag = matrix.conflicts.len() > 5;
-                (
-                    phi_eff_result.phi_eff,
-                    matrix.conflicts.len(),
-                    Some(phi_eff_result.phi_eff),
-                    Some(matrix.conflicts.len()),
-                    override_flag,
-                )
-            } else {
-                (last_phi_eff, 0, None, None, false)
-            }
+    let (
+        epistemic_phi_eff,
+        epistemic_conflict_count,
+        new_phi_eff,
+        new_conflict_count,
+        epi_override,
+    ) = if let (Some(ref mut detector), Some(ref calibrator)) =
+        (epistemic_conflict_detector, theory_calibrator)
+    {
+        if total_cycles % 97 == 0 && total_cycles > 0 {
+            use crate::consciousness::epistemic_conflict::{
+                compute_phi_eff, ConflictMatrix, MultiTheoryMetrics,
+            };
+            let metrics = MultiTheoryMetrics {
+                phi: unified_psi,
+                gwt: coherence as f64 * 0.8,
+                ast: coherence as f64,
+                pp: 1.0 - prediction_error as f64,
+                rpt: coherence as f64 * 0.9,
+                embodiment: body_phi_modulation,
+                unified: unified_psi,
+            };
+            let matrix: ConflictMatrix = detector.detect(&metrics);
+            let phi_eff_result = compute_phi_eff(&metrics, calibrator);
+            let override_flag = matrix.conflicts.len() > 5;
+            (
+                phi_eff_result.phi_eff,
+                matrix.conflicts.len(),
+                Some(phi_eff_result.phi_eff),
+                Some(matrix.conflicts.len()),
+                override_flag,
+            )
         } else {
-            (0.0, 0, None, None, false)
-        };
+            (last_phi_eff, 0, None, None, false)
+        }
+    } else {
+        (0.0, 0, None, None, false)
+    };
     let epistemic_conflict_timing = t.elapsed().as_micros() as u64;
 
     ConsciousnessMetricsBranchB {

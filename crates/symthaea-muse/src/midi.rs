@@ -99,8 +99,7 @@ impl Composition {
 
         // Sort by tick (NoteOff before NoteOn at same tick for cleanliness)
         events.sort_by(|a, b| {
-            a.0.cmp(&b.0)
-                .then(a.1.cmp(&b.1)) // 0x80 < 0x90
+            a.0.cmp(&b.0).then(a.1.cmp(&b.1)) // 0x80 < 0x90
         });
 
         let mut last_tick = 0u32;
@@ -126,17 +125,32 @@ impl Composition {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{AudioData, Note};
     use crate::structure::SectionType;
+    use crate::{AudioData, Note};
 
     fn test_comp() -> Composition {
         Composition {
             audio: AudioData::F32(vec![0.0; 100]),
             sample_rate: 44100,
             notes: vec![
-                Note { frequency: 261.63, start_time: 0.0, duration: 0.5, velocity: 0.8 },
-                Note { frequency: 440.0, start_time: 0.5, duration: 0.5, velocity: 0.7 },
-                Note { frequency: 329.63, start_time: 1.0, duration: 0.25, velocity: 0.6 },
+                Note {
+                    frequency: 261.63,
+                    start_time: 0.0,
+                    duration: 0.5,
+                    velocity: 0.8,
+                },
+                Note {
+                    frequency: 440.0,
+                    start_time: 0.5,
+                    duration: 0.5,
+                    velocity: 0.7,
+                },
+                Note {
+                    frequency: 329.63,
+                    start_time: 1.0,
+                    duration: 0.25,
+                    velocity: 0.6,
+                },
             ],
             duration_secs: 2.0,
             section: SectionType::Developmental,

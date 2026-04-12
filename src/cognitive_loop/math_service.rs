@@ -1,5 +1,4 @@
 #![allow(dead_code)]
-
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
@@ -73,6 +72,10 @@ pub enum MathProblemType {
     GraphTheory,
     /// Differential equations (IVP, BVP, PDE)
     DifferentialEquation,
+    /// Chemistry (stoichiometry, thermochemistry, kinetics)
+    Chemistry,
+    /// Proof construction (tactic-based theorem proving)
+    Proof,
     /// General arithmetic
     Arithmetic,
     /// Unknown
@@ -95,6 +98,8 @@ impl MathProblemType {
             Self::Geometry => "Geometry",
             Self::GraphTheory => "GraphTheory",
             Self::DifferentialEquation => "DifferentialEquation",
+            Self::Chemistry => "Chemistry",
+            Self::Proof => "Proof",
             Self::Arithmetic => "Arithmetic",
             Self::Unknown => "Unknown",
         }
@@ -432,9 +437,16 @@ impl MathService {
         if lower.contains("fft") || lower.contains("fourier") || lower.contains("spectrum") {
             return MathProblemType::SignalAnalysis;
         }
+        if lower.contains("prove")
+            || lower.contains("theorem")
+            || lower.contains("show that")
+            || lower.contains("by induction")
+            || lower.contains("by contradiction")
+        {
+            return MathProblemType::Proof;
+        }
         if lower.contains("satisf")
             || lower.contains("tautolog")
-            || lower.contains("prove")
             || lower.contains("logic")
             || lower.contains("proposition")
         {
@@ -463,6 +475,19 @@ impl MathService {
             || lower.contains("topological")
         {
             return MathProblemType::GraphTheory;
+        }
+        if lower.contains("molar mass")
+            || lower.contains("stoichiom")
+            || lower.contains("enthalpy")
+            || lower.contains("gibbs")
+            || lower.contains("equilibrium constant")
+            || lower.contains("arrhenius")
+            || lower.contains("reaction rate")
+            || lower.contains("thermochem")
+            || lower.contains("combustion")
+            || lower.contains("hess")
+        {
+            return MathProblemType::Chemistry;
         }
         if lower.contains("add")
             || lower.contains("multiply")
@@ -1241,6 +1266,133 @@ impl MathService {
         response
     }
 
+    /// Compute chemistry: molar mass, Hess's law, Gibbs, Arrhenius.
+    ///
+    /// Extracts a formula or compound name from the query text and computes
+    /// molar mass as a baseline. More specific queries (enthalpy, Gibbs, kinetics)
+    /// are dispatched to the appropriate chemistry engine function.
+    pub fn compute_chemistry(&mut self, text: &str) -> MathResponse {
+        use symthaea_core::hdc::chemistry::{all_elements, molar_mass, thermochemical_database, hess_law, gibbs_free_energy};
+
+        let lower = text.to_lowercase();
+        let elements = all_elements();
+        let db = thermochemical_database();
+
+        // Try to extract a chemical formula from the text (e.g., "H2O", "NaCl", "CH4")
+        let formula = extract_formula(text);
+
+        let (answer, numerical, phi) = if lower.contains("gibbs") || lower.contains("spontan") {
+            // Gibbs free energy query — needs ΔH and ΔS from thermochemical DB
+            if let Some(ref f) = formula {
+                let phase_formula = format!("{}(g)", f); // try gas phase
+                let dh = db.iter().find(|d| d.formula == phase_formula).map(|d| d.delta_hf_kj_mol);
+                let ds = db.iter().find(|d| d.formula == phase_formula).map(|d| d.delta_sf_j_mol_k);
+                if let (Some(dh), Some(ds)) = (dh, ds) {
+                    let dg = gibbs_free_energy(dh, 298.15, ds);
+                    (format!("ΔG°({}) = {:.2} kJ/mol at 298.15 K", f, dg), Some(dg), 0.7)
+                } else {
+                    (format!("No thermochemical data for {}", f), None, 0.2)
+                }
+            } else {
+                ("No chemical formula found in query".into(), None, 0.1)
+            }
+        } else if lower.contains("molar mass") || lower.contains("molecular weight") {
+            if let Some(ref f) = formula {
+                match molar_mass(f, &elements) {
+                    Ok(mm) => (format!("M({}) = {:.3} g/mol", f, mm), Some(mm), 0.8),
+                    Err(e) => (format!("Error: {}", e), None, 0.1),
+                }
+            } else {
+                ("No chemical formula found in query".into(), None, 0.1)
+            }
+        } else if lower.contains("enthalpy") || lower.contains("hess") || lower.contains("combustion") {
+            // Default: try to find ΔH°f for the formula
+            if let Some(ref f) = formula {
+                let phase_formula = format!("{}(g)", f);
+                if let Some(entry) = db.iter().find(|d| d.formula == phase_formula || d.formula == *f) {
+                    (format!("ΔH°f({}) = {:.3} kJ/mol", entry.formula, entry.delta_hf_kj_mol),
+                     Some(entry.delta_hf_kj_mol), 0.7)
+                } else {
+                    (format!("No enthalpy data for {}", f), None, 0.2)
+                }
+            } else {
+                ("No chemical formula found in query".into(), None, 0.1)
+            }
+        } else {
+            // Default: compute molar mass if formula found
+            if let Some(ref f) = formula {
+                match molar_mass(f, &elements) {
+                    Ok(mm) => (format!("M({}) = {:.3} g/mol", f, mm), Some(mm), 0.6),
+                    Err(e) => (format!("Chemistry query: {}", e), None, 0.1),
+                }
+            } else {
+                ("Chemistry query received but no formula extracted".into(), None, 0.1)
+            }
+        };
+
+        self.record_solve(MathProblemType::Chemistry, phi);
+
+        let encoding = BinaryHV::random(seed_from_name(&format!("CHEM_{}", formula.as_deref().unwrap_or("unknown"))));
+
+        let response = MathResponse {
+            answer,
+            numerical_result: numerical,
+            vector_result: None,
+            encoding,
+            phi,
+            confidence: if numerical.is_some() { 0.9 } else { 0.3 },
+            multipath_verified: false,
+            problem_type: MathProblemType::Chemistry,
+            epistemic_caveat: Some("Values from NIST-JANAF thermochemical tables".into()),
+            error_bound: None,
+        };
+        self.store_episode(&response, "chemistry");
+        response
+    }
+
+    /// Attempt to construct a proof for a mathematical statement.
+    ///
+    /// Uses the TacticProver from symthaea-core to search for a proof via
+    /// automated tactic application (intro, assumption, ring, omega, norm_num,
+    /// simp, contradiction, induction). Returns a proof script if found.
+    pub fn construct_proof(&mut self, conjecture: &str) -> MathResponse {
+        use symthaea_core::hdc::tactics::{Expr, Goal, TacticProver};
+
+        // Parse the conjecture into a Goal and attempt automated proof search.
+        let goal = Goal::new(Expr::Var(conjecture.to_string()));
+        let prover = TacticProver::new(50); // max 50 steps depth
+        let result = prover.prove(&goal);
+
+        let (answer, phi) = if let Some(script) = &result {
+            (
+                format!("Proof found ({} steps):\n{}", script.len(), script.join("\n")),
+                0.8 + 0.01 * script.len().min(20) as f64,
+            )
+        } else {
+            ("No proof found within search depth".to_string(), 0.2)
+        };
+        let found = result.is_some();
+
+        self.record_solve(MathProblemType::Proof, phi);
+
+        let encoding = BinaryHV::random(seed_from_name(&format!("PROOF_{}", &conjecture[..conjecture.len().min(32)])));
+
+        let response = MathResponse {
+            answer,
+            numerical_result: None,
+            vector_result: None,
+            encoding,
+            phi,
+            confidence: if found { 0.95 } else { 0.1 },
+            multipath_verified: found,
+            problem_type: MathProblemType::Proof,
+            epistemic_caveat: Some("Tactic-based proof search; depth-limited".into()),
+            error_bound: None,
+        };
+        self.store_episode(&response, "proof");
+        response
+    }
+
     /// Get service telemetry
     pub fn telemetry(&self) -> &MathServiceTelemetry {
         &self.telemetry
@@ -1574,6 +1726,36 @@ impl MathService {
         self.telemetry.average_confidence =
             self.telemetry.total_confidence / self.telemetry.problems_solved.max(1) as f64;
     }
+}
+
+/// Extract a chemical formula from free text (e.g., "H2O", "NaCl", "CH4").
+/// Looks for patterns of uppercase letter followed by optional lowercase + digits.
+fn extract_formula(text: &str) -> Option<String> {
+    // Match patterns like H2O, NaCl, CH3COOH, Ca(OH)2
+    let mut best: Option<String> = None;
+    for word in text.split_whitespace() {
+        // Strip punctuation from word boundaries
+        let clean = word.trim_matches(|c: char| !c.is_alphanumeric() && c != '(' && c != ')');
+        if clean.len() < 2 {
+            continue;
+        }
+        // Must start with uppercase and contain at least one lowercase or digit
+        let first = clean.chars().next().unwrap_or(' ');
+        if !first.is_ascii_uppercase() {
+            continue;
+        }
+        // Check if it looks like a formula: uppercase + (lowercase|digit|parentheses)
+        let has_chem_pattern = clean.chars().skip(1).any(|c| c.is_ascii_lowercase() || c.is_ascii_digit());
+        let has_non_alpha = clean.chars().any(|c| c.is_ascii_digit());
+        let all_valid = clean.chars().all(|c| c.is_ascii_alphanumeric() || c == '(' || c == ')');
+        if all_valid && (has_chem_pattern || has_non_alpha) {
+            // Prefer longer formulas (more specific)
+            if best.as_ref().map_or(true, |b| clean.len() > b.len()) {
+                best = Some(clean.to_string());
+            }
+        }
+    }
+    best
 }
 
 // ─── Tests ───────────────────────────────────────────────────────────────────

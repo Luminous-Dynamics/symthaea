@@ -2,11 +2,20 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 /*!
-Resonator-Based Φ Calculator - Dynamic Consciousness Emergence
+Resonator-Based Integration Calculator — Coupled Oscillator Dynamics
 
-Revolutionary improvement: Instead of static eigenvalue computation, model consciousness
-as emerging through iterative resonance between components. This captures the *dynamics*
-of consciousness rather than just a snapshot.
+**NOTE**: This measures resonance dynamics (coupled oscillator convergence), NOT IIT
+integrated information (Φ). The integration metric internally uses the Laplacian
+spectral gap, which has r = -0.62 correlation with true IIT Φ.
+
+Use this for modeling dynamic synchronization and emergence. For IIT Φ measurement,
+use `TieredPhi` with `ExhaustivePartition` or `SampledPartition`.
+
+## What This Actually Measures
+
+Convergence dynamics of coupled oscillators — how quickly components synchronize
+and what stable resonance patterns emerge. This captures temporal structure that
+static Φ calculations miss, but it is NOT a valid IIT Φ approximation.
 
 ## Core Insight
 

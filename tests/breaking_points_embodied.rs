@@ -47,7 +47,8 @@ fn test_consciousness_stability_under_sustained_stress() {
     assert!(
         nonzero > 50,
         "STABILITY FAILURE: Consciousness flatlined for {}/{} cycles",
-        100 - nonzero, 100
+        100 - nonzero,
+        100
     );
 
     let min_phi = phi_history.iter().cloned().fold(f64::MAX, f64::min);

@@ -20,13 +20,13 @@
 
 use symthaea_core::genesis::GenesisSeed;
 use symthaea_core::hdc::hdc_ltc_unified::{
-    HdcLtcUnifiedNetwork, HdcLtcUnifiedNeuron, UnifiedConfig, UnifiedActivation,
+    HdcLtcUnifiedNetwork, HdcLtcUnifiedNeuron, UnifiedActivation, UnifiedConfig,
     UnifiedNetworkConfig,
 };
 use symthaea_core::hdc::unified_hv::{ContinuousHV, HDC_DIMENSION};
 
 #[cfg(feature = "gpu")]
-use candle_core::{Device, DType, Tensor};
+use candle_core::{DType, Device, Tensor};
 
 /// Multi-neuron phoneme recognizer using HdcLtcUnifiedNetwork.
 ///
@@ -137,7 +137,8 @@ impl PhonemeHdcLtc {
         }
 
         let n = prototypes.len();
-        let flat: Vec<f32> = prototypes.iter()
+        let flat: Vec<f32> = prototypes
+            .iter()
             .flat_map(|(_, hv)| hv.values.iter().copied())
             .collect();
 
@@ -179,11 +180,7 @@ impl PhonemeHdcLtc {
         output: &ContinuousHV,
         cache: &GpuProtoCache,
     ) -> Result<Vec<f32>, candle_core::Error> {
-        let query = Tensor::from_vec(
-            output.values.clone(),
-            (1, HDC_DIMENSION),
-            &cache.device,
-        )?;
+        let query = Tensor::from_vec(output.values.clone(), (1, HDC_DIMENSION), &cache.device)?;
         // logits = proto_matrix @ query^T → [n_phonemes, 1]
         let logits = cache.matrix.matmul(&query.t()?)?;
         let logits = logits.squeeze(1)?.affine(self.logit_scale as f64, 0.0)?;
@@ -205,7 +202,10 @@ impl PhonemeHdcLtc {
         }
 
         let confidence = (best_logit / self.logit_scale + 1.0) / 2.0; // normalize to [0, 1]
-        (self.prototypes[best_idx].0.clone(), confidence.clamp(0.0, 1.0))
+        (
+            self.prototypes[best_idx].0.clone(),
+            confidence.clamp(0.0, 1.0),
+        )
     }
 
     /// Train one step: evolve network, then update each neuron via backward.

@@ -142,7 +142,11 @@ impl ClassAccuracy {
     pub fn q3(&self) -> f64 {
         let total: usize = self.class_total.iter().sum();
         let correct: usize = self.class_correct.iter().sum();
-        if total == 0 { 0.0 } else { correct as f64 / total as f64 }
+        if total == 0 {
+            0.0
+        } else {
+            correct as f64 / total as f64
+        }
     }
 
     /// Per-class accuracy for a given class.
@@ -171,9 +175,7 @@ mod tests {
 
     /// Extract feature vectors for all residues in a sequence.
     fn extract_all(seq: &[AminoAcid]) -> Vec<[f64; crate::features::N_FEATURES]> {
-        (0..seq.len())
-            .map(|i| extract_features(seq, i))
-            .collect()
+        (0..seq.len()).map(|i| extract_features(seq, i)).collect()
     }
 
     // --- Unit tests for metrics ---
@@ -236,7 +238,7 @@ mod tests {
         assert_eq!(cm[0][0], 1); // H->H
         assert_eq!(cm[1][1], 1); // E->E
         assert_eq!(cm[2][2], 1); // C->C
-        // Off-diagonal should be zero
+                                 // Off-diagonal should be zero
         assert_eq!(cm[0][1], 0);
         assert_eq!(cm[0][2], 0);
         assert_eq!(cm[1][0], 0);
@@ -303,14 +305,15 @@ mod tests {
         eprintln!("--- Chou-Fasman Baseline ---");
         eprintln!("  Total residues: {}", total_residues);
         eprintln!("  Q3: {:.1}%", q3 * 100.0);
-        eprintln!("  Q_H: {:.1}%, Q_E: {:.1}%, Q_C: {:.1}%", q_h * 100.0, q_e * 100.0, q_c * 100.0);
+        eprintln!(
+            "  Q_H: {:.1}%, Q_E: {:.1}%, Q_C: {:.1}%",
+            q_h * 100.0,
+            q_e * 100.0,
+            q_c * 100.0
+        );
 
         // Chou-Fasman typically achieves 50-60% Q3
-        assert!(
-            q3 > 0.20,
-            "Chou-Fasman Q3 too low: {:.1}%",
-            q3 * 100.0
-        );
+        assert!(q3 > 0.20, "Chou-Fasman Q3 too low: {:.1}%", q3 * 100.0);
         assert!(total_residues >= 1000);
     }
 
@@ -361,14 +364,14 @@ mod tests {
 
         eprintln!("--- RF Predictor (train/test split) ---");
         eprintln!("  Train proteins: {}, Test proteins: {}", split, n - split);
-        eprintln!("  Train residues: {}, Test residues: {}", train_labels.len(), total_residues);
+        eprintln!(
+            "  Train residues: {}, Test residues: {}",
+            train_labels.len(),
+            total_residues
+        );
         eprintln!("  Q3: {:.1}%", q3 * 100.0);
 
-        assert!(
-            q3 > 0.15,
-            "RF Q3 on test set too low: {:.1}%",
-            q3 * 100.0
-        );
+        assert!(q3 > 0.15, "RF Q3 on test set too low: {:.1}%", q3 * 100.0);
     }
 
     #[test]
@@ -382,7 +385,11 @@ mod tests {
 
         for fold in 0..k {
             let test_start = fold * fold_size;
-            let test_end = if fold == k - 1 { n } else { test_start + fold_size };
+            let test_end = if fold == k - 1 {
+                n
+            } else {
+                test_start + fold_size
+            };
 
             let mut train_features = Vec::new();
             let mut train_labels = Vec::new();
@@ -433,7 +440,11 @@ mod tests {
         for (i, &q) in q3_scores.iter().enumerate() {
             eprintln!("  Fold {}: Q3 = {:.1}%", i + 1, q * 100.0);
         }
-        eprintln!("  Mean Q3: {:.1}% +/- {:.1}%", mean_q3 * 100.0, std_q3 * 100.0);
+        eprintln!(
+            "  Mean Q3: {:.1}% +/- {:.1}%",
+            mean_q3 * 100.0,
+            std_q3 * 100.0
+        );
 
         assert!(
             mean_q3 > 0.15,

@@ -420,12 +420,22 @@ impl HumanoidTrainer {
                     HumanoidTask::Run => {
                         pd_running_baseline(&state, &self.pd_gains, gait_phase, target_speed)
                     }
-                    HumanoidTask::Reach => {
-                        pd_reaching_baseline(&state, &self.pd_gains, self.config.object_position, self.config.reach_hand)
-                    }
+                    HumanoidTask::Reach => pd_reaching_baseline(
+                        &state,
+                        &self.pd_gains,
+                        self.config.object_position,
+                        self.config.reach_hand,
+                    ),
                     HumanoidTask::Grasp => {
-                        let grasp_phase = (step as f64 / self.config.steps_per_episode as f64).min(1.0);
-                        pd_grasping_baseline(&state, &self.pd_gains, self.config.object_position, self.config.reach_hand, grasp_phase)
+                        let grasp_phase =
+                            (step as f64 / self.config.steps_per_episode as f64).min(1.0);
+                        pd_grasping_baseline(
+                            &state,
+                            &self.pd_gains,
+                            self.config.object_position,
+                            self.config.reach_hand,
+                            grasp_phase,
+                        )
                     }
                 };
                 for i in 0..NUM_ACTUATORS {
@@ -516,12 +526,21 @@ impl HumanoidTrainer {
                     HumanoidTask::Run => {
                         pd_running_baseline(&state, &self.pd_gains, gait_phase, target_speed)
                     }
-                    HumanoidTask::Reach => {
-                        pd_reaching_baseline(&state, &self.pd_gains, self.config.object_position, self.config.reach_hand)
-                    }
+                    HumanoidTask::Reach => pd_reaching_baseline(
+                        &state,
+                        &self.pd_gains,
+                        self.config.object_position,
+                        self.config.reach_hand,
+                    ),
                     HumanoidTask::Grasp => {
                         let gp = (step as f64 / self.config.steps_per_episode as f64).min(1.0);
-                        pd_grasping_baseline(&state, &self.pd_gains, self.config.object_position, self.config.reach_hand, gp)
+                        pd_grasping_baseline(
+                            &state,
+                            &self.pd_gains,
+                            self.config.object_position,
+                            self.config.reach_hand,
+                            gp,
+                        )
                     }
                 };
                 // Reward-modulated BPTT: scale gradient by standing_reward so the
@@ -748,9 +767,8 @@ impl HumanoidTrainer {
 
         let genesis = self.genesis.clone();
         let num_levels = self.config.num_levels;
-        let mut encoder = HumanoidHdcEncoder::new_predictive(
-            &genesis, num_levels, self.config.morphology,
-        );
+        let mut encoder =
+            HumanoidHdcEncoder::new_predictive(&genesis, num_levels, self.config.morphology);
         let mut controller = self
             .initial_controller
             .take()
@@ -819,9 +837,8 @@ impl HumanoidTrainer {
 
         let genesis = self.genesis.clone();
         let num_levels = self.config.num_levels;
-        let mut encoder = HumanoidHdcEncoder::new_predictive(
-            &genesis, num_levels, self.config.morphology,
-        );
+        let mut encoder =
+            HumanoidHdcEncoder::new_predictive(&genesis, num_levels, self.config.morphology);
         let mut controller = self
             .initial_controller
             .take()

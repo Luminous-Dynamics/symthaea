@@ -147,7 +147,9 @@ impl BrowserHdcEncoder {
 fn text_to_hv(text: &str) -> ContinuousHV {
     let mut result = ContinuousHV::zero(HDC_DIMENSION);
     for (pos, ch) in text.chars().enumerate() {
-        let seed = (ch as u64).wrapping_mul(0x517CC1B727220A95).wrapping_add(pos as u64);
+        let seed = (ch as u64)
+            .wrapping_mul(0x517CC1B727220A95)
+            .wrapping_add(pos as u64);
         let char_hv = ContinuousHV::random(HDC_DIMENSION, seed);
         result = add_scaled(&result, &char_hv, 1.0);
     }

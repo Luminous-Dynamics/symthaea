@@ -82,7 +82,8 @@ impl CognitiveLoopService {
         self.set_exploration(
             "d2_flexibility",
             (NEUROMOD_D2_FLEXIBILITY_BASELINE
-                + (self.behavior.curiosity_drive.exploration_urge - NEUROMOD_D2_FLEXIBILITY_BASELINE)
+                + (self.behavior.curiosity_drive.exploration_urge
+                    - NEUROMOD_D2_FLEXIBILITY_BASELINE)
                     * flex_scale as f64) as f32,
         );
 
@@ -90,7 +91,8 @@ impl CognitiveLoopService {
         self.adjust_confidence("neuromod_serotonin", self.neuromod.bath.confidence_delta());
 
         // ACh → attention sensitivity + threshold
-        self.behavior.adaptive_behavior.attention_sensitivity *= self.neuromod.bath.attention_factor();
+        self.behavior.adaptive_behavior.attention_sensitivity *=
+            self.neuromod.bath.attention_factor();
         self.behavior.adaptive_behavior.attention_sensitivity =
             self.behavior.adaptive_behavior.attention_sensitivity.clamp(
                 NEUROMOD_ATTENTION_SENSITIVITY_MIN,
@@ -127,7 +129,8 @@ impl CognitiveLoopService {
         if ne_ph > NEUROMOD_AROUSAL_PHASIC_THRESHOLD {
             self.behavior.emotion_contagion.arousal += ne_ph * NEUROMOD_AROUSAL_PHASIC_SPIKE;
         }
-        self.behavior.emotion_contagion.arousal = self.behavior.emotion_contagion.arousal.clamp(0.0, 1.0);
+        self.behavior.emotion_contagion.arousal =
+            self.behavior.emotion_contagion.arousal.clamp(0.0, 1.0);
         let ne_arousal_feedback = self.behavior.emotion_contagion.arousal - ne_arousal_before;
 
         // #7: Confidence crash detection → 5-HT emergency dip (Cools et al. 2008)
@@ -145,18 +148,19 @@ impl CognitiveLoopService {
         self.carryover.quality.prev_confidence_for_crash = self.prediction_confidence;
 
         // #8: Exploration cost → 5-HT depletion (Tops et al. 2009)
-        let exploration_sht_drain =
-            if self.behavior.curiosity_drive.exploration_urge > NEUROMOD_EXPLORATION_DRAIN_BASELINE {
-                let drain = (self.behavior.curiosity_drive.exploration_urge
-                    - NEUROMOD_EXPLORATION_DRAIN_BASELINE)
-                    * NEUROMOD_EXPLORATION_DRAIN_FACTOR;
-                self.neuromod
-                    .bath
-                    .apply_exploration_cost(self.behavior.curiosity_drive.exploration_urge as f32);
-                drain as f32
-            } else {
-                0.0
-            };
+        let exploration_sht_drain = if self.behavior.curiosity_drive.exploration_urge
+            > NEUROMOD_EXPLORATION_DRAIN_BASELINE
+        {
+            let drain = (self.behavior.curiosity_drive.exploration_urge
+                - NEUROMOD_EXPLORATION_DRAIN_BASELINE)
+                * NEUROMOD_EXPLORATION_DRAIN_FACTOR;
+            self.neuromod
+                .bath
+                .apply_exploration_cost(self.behavior.curiosity_drive.exploration_urge as f32);
+            drain as f32
+        } else {
+            0.0
+        };
 
         // #11: GABA global inhibition (Olsen & Sieghart 2009)
         let gaba_inhibition = self.neuromod.bath.global_inhibition();

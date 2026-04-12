@@ -6,9 +6,12 @@
 use crate::controller::AuvController;
 use crate::encoder::AuvHdcEncoder;
 use crate::fep_agent::ActiveInferenceAuvAgent;
+use crate::navigation_bridge::{AuvNavigationBridge, UnderwaterNavigationSample};
+use crate::navigation_estimator::{AuvNavigationEstimate, AuvNavigationEstimator};
 use crate::simulator::{AuvPhysicsSimulator, SimpleAuvSimulator};
 use crate::store_forward::StoreForwardBuffer;
 use crate::types::AuvConfig;
+use positioning::Measurement;
 
 /// Episode metrics.
 #[derive(Debug, Clone, Default)]
@@ -16,6 +19,9 @@ pub struct EpisodeMetrics {
     pub mean_depth_error: f64,
     pub mean_control_effort: f32,
     pub mean_speed: f64,
+    pub navigation_measurements_emitted: usize,
+    pub final_navigation_sigma_m: f64,
+    pub final_navigation_position_error_m: f64,
     pub samples_collected: usize,
     pub steps_survived: usize,
     pub exceeded_crush_depth: bool,
@@ -28,6 +34,9 @@ pub struct AuvTrainer {
     fep_agent: ActiveInferenceAuvAgent,
     simulator: SimpleAuvSimulator,
     store_forward: StoreForwardBuffer,
+    navigation_bridge: AuvNavigationBridge,
+    navigation_estimator: AuvNavigationEstimator,
+    episode_navigation_measurements: Vec<Measurement>,
     config: AuvConfig,
     target_depth: f64,
 }
@@ -41,6 +50,9 @@ impl AuvTrainer {
             fep_agent: ActiveInferenceAuvAgent::new(),
             simulator: SimpleAuvSimulator::new(),
             store_forward: StoreForwardBuffer::default_capacity(),
+            navigation_bridge: AuvNavigationBridge::new("auv_trainer"),
+            navigation_estimator: AuvNavigationEstimator::new([0.0, 0.0, target_depth], 25.0),
+            episode_navigation_measurements: Vec::new(),
             config,
             target_depth,
         }
@@ -58,20 +70,41 @@ impl AuvTrainer {
         self.encoder.reset();
         self.fep_agent.reset();
         self.store_forward.clear();
+        self.navigation_estimator
+            .reset([0.0, 0.0, self.target_depth], 25.0);
+        self.episode_navigation_measurements.clear();
 
         for step in 0..self.config.steps_per_episode {
             let hv = self.encoder.encode(self.simulator.state());
 
             if step % self.config.cognitive_interval == 0 {
-                self.store_forward.update_blackout(self.simulator.state().depth);
+                self.store_forward
+                    .update_blackout(self.simulator.state().depth);
                 self.fep_agent.set_blackout(self.store_forward.in_blackout);
-                let _fep = self.fep_agent.tick(self.simulator.state(), self.target_depth);
+                let _fep = self
+                    .fep_agent
+                    .tick(self.simulator.state(), self.target_depth);
             }
 
             let cmd = self.controller.forward(&hv, dt as f32);
             self.simulator.step(&cmd, dt);
 
             let state = self.simulator.state();
+            if step % self.config.cognitive_interval == 0 {
+                let sample = UnderwaterNavigationSample {
+                    dvl_velocity_body_mps: Some(state.linear_velocity),
+                    sonar_relative_fix_m: None,
+                };
+                let measurements = self.navigation_bridge.measurements_from_state(
+                    state,
+                    step as f64 * dt,
+                    &sample,
+                );
+                metrics.navigation_measurements_emitted += measurements.len();
+                self.navigation_estimator.ingest_measurements(&measurements);
+                self.episode_navigation_measurements.extend(measurements);
+            }
+
             depth_error_sum += (state.depth - self.target_depth).abs();
             effort_sum += cmd.control_effort();
             speed_sum += state.speed();
@@ -95,13 +128,19 @@ impl AuvTrainer {
                 metrics.exceeded_crush_depth = true;
                 break;
             }
-            if !state.is_finite() { break; }
+            if !state.is_finite() {
+                break;
+            }
         }
 
         let n = metrics.steps_survived.max(1) as f64;
         metrics.mean_depth_error = depth_error_sum / n;
         metrics.mean_control_effort = effort_sum / n as f32;
         metrics.mean_speed = speed_sum / n;
+        let estimate = self.navigation_estimator.estimate();
+        metrics.final_navigation_sigma_m = estimate.position_sigma_m;
+        metrics.final_navigation_position_error_m =
+            position_error(&estimate, self.simulator.state());
         metrics
     }
 
@@ -112,6 +151,21 @@ impl AuvTrainer {
     pub fn store_forward_buffer(&self) -> &StoreForwardBuffer {
         &self.store_forward
     }
+
+    pub fn episode_navigation_measurements(&self) -> &[Measurement] {
+        &self.episode_navigation_measurements
+    }
+
+    pub fn navigation_estimate(&self) -> AuvNavigationEstimate {
+        self.navigation_estimator.estimate()
+    }
+}
+
+fn position_error(estimate: &AuvNavigationEstimate, state: &crate::types::AuvState) -> f64 {
+    let dx = estimate.position_m[0] - state.position[0];
+    let dy = estimate.position_m[1] - state.position[1];
+    let dz = estimate.position_m[2] - state.position[2];
+    (dx * dx + dy * dy + dz * dz).sqrt()
 }
 
 #[cfg(test)]
@@ -145,5 +199,17 @@ mod tests {
         let mut trainer = AuvTrainer::new(config, 10.0);
         trainer.run_episode();
         assert!(trainer.store_forward_buffer().total_collected() > 0);
+    }
+
+    #[test]
+    fn test_episode_emits_navigation_measurements() {
+        let mut config = AuvConfig::default();
+        config.steps_per_episode = 100;
+        let mut trainer = AuvTrainer::new(config, 10.0);
+        let metrics = trainer.run_episode();
+        assert!(metrics.navigation_measurements_emitted > 0);
+        assert!(!trainer.episode_navigation_measurements().is_empty());
+        assert!(metrics.final_navigation_sigma_m.is_finite());
+        assert!(metrics.final_navigation_position_error_m.is_finite());
     }
 }

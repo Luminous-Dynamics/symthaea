@@ -8,8 +8,8 @@
 #[cfg(test)]
 mod tests {
     use crate::ame2020::ame2020_reference_nuclei;
-    use crate::duflo_zuker::dz_binding_energy;
     use crate::deformation::frdm_deformation;
+    use crate::duflo_zuker::dz_binding_energy;
     use crate::ml_mass::MlMassPrediction;
 
     // Re-implement the forest training inline since we need custom splits.
@@ -23,22 +23,45 @@ mod tests {
         let n_f = n as f64;
         let a = z_f + n_f;
         let isospin = (n_f - z_f) / a;
-        let pairing = if z % 2 == 0 && n % 2 == 0 { 1.0 }
-            else if z % 2 == 1 && n % 2 == 1 { -1.0 }
-            else { 0.0 };
-        let shell_z = MAGIC_Z.iter().map(|m| (z_f - m).abs()).fold(f64::MAX, f64::min);
-        let shell_n = MAGIC_N.iter().map(|m| (n_f - m).abs()).fold(f64::MAX, f64::min);
+        let pairing = if z % 2 == 0 && n % 2 == 0 {
+            1.0
+        } else if z % 2 == 1 && n % 2 == 1 {
+            -1.0
+        } else {
+            0.0
+        };
+        let shell_z = MAGIC_Z
+            .iter()
+            .map(|m| (z_f - m).abs())
+            .fold(f64::MAX, f64::min);
+        let shell_n = MAGIC_N
+            .iter()
+            .map(|m| (n_f - m).abs())
+            .fold(f64::MAX, f64::min);
         let coulomb = z_f * (z_f - 1.0) / a.powf(1.0 / 3.0);
         let surface = a.powf(2.0 / 3.0);
         let np_valence = {
-            let vp = MAGIC_Z.iter().filter(|&&m| z_f >= m).last().map(|m| z_f - m).unwrap_or(z_f);
-            let vn = MAGIC_N.iter().filter(|&&m| n_f >= m).last().map(|m| n_f - m).unwrap_or(n_f);
+            let vp = MAGIC_Z
+                .iter()
+                .filter(|&&m| z_f >= m)
+                .last()
+                .map(|m| z_f - m)
+                .unwrap_or(z_f);
+            let vn = MAGIC_N
+                .iter()
+                .filter(|&&m| n_f >= m)
+                .last()
+                .map(|m| n_f - m)
+                .unwrap_or(n_f);
             vp * vn
         };
         let (beta2, _) = frdm_deformation(z, n);
         let radius = a.powf(1.0 / 3.0);
 
-        [z_f, n_f, a, isospin, pairing, shell_z, shell_n, coulomb, surface, np_valence, beta2, radius]
+        [
+            z_f, n_f, a, isospin, pairing, shell_z, shell_n, coulomb, surface, np_valence, beta2,
+            radius,
+        ]
     }
 
     /// Simple decision tree for residual prediction (same as ml_mass.rs).
@@ -71,7 +94,9 @@ mod tests {
     ) -> Vec<DecisionTree> {
         use std::collections::HashMap;
         let n = features.len();
-        if n == 0 { return Vec::new(); }
+        if n == 0 {
+            return Vec::new();
+        }
 
         let mut trees = Vec::new();
         let seed_base = 42u64;
@@ -79,17 +104,21 @@ mod tests {
         for t in 0..n_trees {
             // Bootstrap sample
             let mut rng_state = seed_base.wrapping_mul(t as u64 + 1).wrapping_add(7);
-            let mut indices: Vec<usize> = (0..n).map(|_| {
-                rng_state = rng_state.wrapping_mul(6364136223846793005).wrapping_add(1);
-                (rng_state >> 33) as usize % n
-            }).collect();
+            let mut indices: Vec<usize> = (0..n)
+                .map(|_| {
+                    rng_state = rng_state.wrapping_mul(6364136223846793005).wrapping_add(1);
+                    (rng_state >> 33) as usize % n
+                })
+                .collect();
 
             // Build tree with greedy splits
             let mut splits = Vec::new();
             let mut remaining: Vec<usize> = indices;
 
             for _depth in 0..max_depth {
-                if remaining.len() < min_leaf * 2 { break; }
+                if remaining.len() < min_leaf * 2 {
+                    break;
+                }
 
                 // Find best split
                 let mut best_feat = 0;
@@ -101,10 +130,13 @@ mod tests {
                 // Try a subset of features (sqrt(12) ≈ 3-4)
                 let n_try = 4;
                 for fi in 0..12 {
-                    if (fi + t) % 3 != 0 && fi < 12 - n_try { continue; } // subsample features
+                    if (fi + t) % 3 != 0 && fi < 12 - n_try {
+                        continue;
+                    } // subsample features
 
                     // Sort by feature value
-                    let mut vals: Vec<(f64, f64)> = remaining.iter()
+                    let mut vals: Vec<(f64, f64)> = remaining
+                        .iter()
                         .map(|&i| (features[i][fi], targets[i]))
                         .collect();
                     vals.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
@@ -116,7 +148,9 @@ mod tests {
                         let left: Vec<f64> = vals[..si].iter().map(|v| v.1).collect();
                         let right: Vec<f64> = vals[si..].iter().map(|v| v.1).collect();
 
-                        if left.len() < min_leaf || right.len() < min_leaf { continue; }
+                        if left.len() < min_leaf || right.len() < min_leaf {
+                            continue;
+                        }
 
                         let left_mean = left.iter().sum::<f64>() / left.len() as f64;
                         let right_mean = right.iter().sum::<f64>() / right.len() as f64;
@@ -135,14 +169,21 @@ mod tests {
                     }
                 }
 
-                if best_score == f64::MAX { break; }
+                if best_score == f64::MAX {
+                    break;
+                }
 
                 splits.push((best_feat, best_thresh, best_left_mean, best_right_mean));
 
                 // Continue with the larger partition
-                let (left_idx, right_idx): (Vec<_>, Vec<_>) = remaining.iter()
+                let (left_idx, right_idx): (Vec<_>, Vec<_>) = remaining
+                    .iter()
                     .partition(|&&i| features[i][best_feat] <= best_thresh);
-                remaining = if left_idx.len() > right_idx.len() { left_idx } else { right_idx };
+                remaining = if left_idx.len() > right_idx.len() {
+                    left_idx
+                } else {
+                    right_idx
+                };
             }
 
             trees.push(DecisionTree { splits });
@@ -152,13 +193,17 @@ mod tests {
     }
 
     fn rf_predict(trees: &[DecisionTree], features: &[f64; 12]) -> f64 {
-        if trees.is_empty() { return 0.0; }
+        if trees.is_empty() {
+            return 0.0;
+        }
         let predictions: Vec<f64> = trees.iter().map(|t| t.predict(features)).collect();
         predictions.iter().sum::<f64>() / predictions.len() as f64
     }
 
     fn compute_rms(errors: &[f64]) -> f64 {
-        if errors.is_empty() { return 0.0; }
+        if errors.is_empty() {
+            return 0.0;
+        }
         (errors.iter().map(|e| e * e).sum::<f64>() / errors.len() as f64).sqrt()
     }
 
@@ -168,7 +213,8 @@ mod tests {
 
     #[test]
     fn validate_standard_cv() {
-        let nuclei: Vec<_> = ame2020_reference_nuclei().into_iter()
+        let nuclei: Vec<_> = ame2020_reference_nuclei()
+            .into_iter()
             .filter(|n| n.is_measured && n.z >= 3 && n.n >= 3)
             .collect();
         let n = nuclei.len();
@@ -183,7 +229,9 @@ mod tests {
             let mut train_f = Vec::new();
             let mut train_t = Vec::new();
             for (i, nuc) in nuclei.iter().enumerate() {
-                if i >= test_start && i < test_end { continue; }
+                if i >= test_start && i < test_end {
+                    continue;
+                }
                 let dz = dz_binding_energy(nuc.z, nuc.n);
                 train_f.push(extract_features(nuc.z, nuc.n));
                 train_t.push(nuc.binding_energy_mev - dz);
@@ -211,7 +259,8 @@ mod tests {
 
     #[test]
     fn validate_proton_holdout() {
-        let nuclei: Vec<_> = ame2020_reference_nuclei().into_iter()
+        let nuclei: Vec<_> = ame2020_reference_nuclei()
+            .into_iter()
             .filter(|n| n.is_measured && n.z >= 3 && n.n >= 3)
             .collect();
 
@@ -223,7 +272,10 @@ mod tests {
 
         let mut overall_errors = Vec::new();
 
-        eprintln!("{:>4} {:>8} {:>10} {:>10}", "Z", "N_test", "RMS(MeV)", "DZ_RMS");
+        eprintln!(
+            "{:>4} {:>8} {:>10} {:>10}",
+            "Z", "N_test", "RMS(MeV)", "DZ_RMS"
+        );
         eprintln!("{}", "-".repeat(36));
 
         for &holdout_z in &test_elements {
@@ -241,7 +293,9 @@ mod tests {
                 }
             }
 
-            if test_nuclei.is_empty() { continue; }
+            if test_nuclei.is_empty() {
+                continue;
+            }
 
             let trees = train_rf(&train_f, &train_t, 50, 8, 3);
 
@@ -256,13 +310,22 @@ mod tests {
 
             let rms = compute_rms(&errors);
             let dz_rms = compute_rms(&dz_errors);
-            eprintln!("{:>4} {:>8} {:>10.3} {:>10.3}", holdout_z, test_nuclei.len(), rms, dz_rms);
+            eprintln!(
+                "{:>4} {:>8} {:>10.3} {:>10.3}",
+                holdout_z,
+                test_nuclei.len(),
+                rms,
+                dz_rms
+            );
             overall_errors.extend(errors);
         }
 
         let overall_rms = compute_rms(&overall_errors);
-        eprintln!("\nOverall proton-holdout RMS: {:.3} MeV ({} nuclei)",
-            overall_rms, overall_errors.len());
+        eprintln!(
+            "\nOverall proton-holdout RMS: {:.3} MeV ({} nuclei)",
+            overall_rms,
+            overall_errors.len()
+        );
     }
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -271,7 +334,8 @@ mod tests {
 
     #[test]
     fn validate_chain_holdout() {
-        let nuclei: Vec<_> = ame2020_reference_nuclei().into_iter()
+        let nuclei: Vec<_> = ame2020_reference_nuclei()
+            .into_iter()
             .filter(|n| n.is_measured && n.z >= 3 && n.n >= 3)
             .collect();
 
@@ -290,12 +354,16 @@ mod tests {
         let mut holdout_dz_errors = Vec::new();
 
         for (&z, chain) in &by_z {
-            if z % 5 != 0 { continue; } // holdout Z=5,10,15,...
+            if z % 5 != 0 {
+                continue;
+            } // holdout Z=5,10,15,...
 
             let mut train_f = Vec::new();
             let mut train_t = Vec::new();
             for nuc in &nuclei {
-                if nuc.z == z { continue; }
+                if nuc.z == z {
+                    continue;
+                }
                 let dz = dz_binding_energy(nuc.z, nuc.n);
                 train_f.push(extract_features(nuc.z, nuc.n));
                 train_t.push(nuc.binding_energy_mev - dz);
@@ -314,7 +382,10 @@ mod tests {
 
         let rms = compute_rms(&holdout_errors);
         let dz_rms = compute_rms(&holdout_dz_errors);
-        eprintln!("Chain-holdout RMS: {:.3} MeV (DZ baseline: {:.3})", rms, dz_rms);
+        eprintln!(
+            "Chain-holdout RMS: {:.3} MeV (DZ baseline: {:.3})",
+            rms, dz_rms
+        );
         eprintln!("Nuclei in holdout: {}", holdout_errors.len());
     }
 
@@ -324,7 +395,8 @@ mod tests {
 
     #[test]
     fn validate_frontier_holdout() {
-        let nuclei: Vec<_> = ame2020_reference_nuclei().into_iter()
+        let nuclei: Vec<_> = ame2020_reference_nuclei()
+            .into_iter()
             .filter(|n| n.is_measured && n.z >= 3 && n.n >= 3)
             .collect();
 
@@ -348,8 +420,16 @@ mod tests {
             }
         }
 
-        eprintln!("Training set: {} nuclei (N/Z < {:.1})", train_f.len(), threshold);
-        eprintln!("Test set:     {} nuclei (N/Z >= {:.1})", test_nuclei.len(), threshold);
+        eprintln!(
+            "Training set: {} nuclei (N/Z < {:.1})",
+            train_f.len(),
+            threshold
+        );
+        eprintln!(
+            "Test set:     {} nuclei (N/Z >= {:.1})",
+            test_nuclei.len(),
+            threshold
+        );
 
         let trees = train_rf(&train_f, &train_t, 50, 8, 3);
 
@@ -377,7 +457,8 @@ mod tests {
 
     #[test]
     fn validate_superheavy_holdout() {
-        let nuclei: Vec<_> = ame2020_reference_nuclei().into_iter()
+        let nuclei: Vec<_> = ame2020_reference_nuclei()
+            .into_iter()
             .filter(|n| n.is_measured && n.z >= 3 && n.n >= 3)
             .collect();
 
@@ -404,7 +485,10 @@ mod tests {
         eprintln!("Test:     {} nuclei (Z >= {})", test_nuclei.len(), z_cut);
 
         if test_nuclei.is_empty() {
-            eprintln!("No measured superheavy nuclei in AME2020 with Z >= {}", z_cut);
+            eprintln!(
+                "No measured superheavy nuclei in AME2020 with Z >= {}",
+                z_cut
+            );
             return;
         }
 
@@ -412,23 +496,34 @@ mod tests {
 
         let mut errors = Vec::new();
         let mut dz_errors = Vec::new();
-        eprintln!("\n{:>4} {:>4} {:>10} {:>10} {:>10}",
-            "Z", "A", "Pred(MeV)", "Exp(MeV)", "Err(MeV)");
+        eprintln!(
+            "\n{:>4} {:>4} {:>10} {:>10} {:>10}",
+            "Z", "A", "Pred(MeV)", "Exp(MeV)", "Err(MeV)"
+        );
         eprintln!("{}", "-".repeat(42));
 
         for (nuc, dz) in &test_nuclei {
             let feat = extract_features(nuc.z, nuc.n);
             let pred = dz + rf_predict(&trees, &feat);
             let err = pred - nuc.binding_energy_mev;
-            eprintln!("{:>4} {:>4} {:>10.2} {:>10.2} {:>10.2}",
-                nuc.z, nuc.z + nuc.n, pred, nuc.binding_energy_mev, err);
+            eprintln!(
+                "{:>4} {:>4} {:>10.2} {:>10.2} {:>10.2}",
+                nuc.z,
+                nuc.z + nuc.n,
+                pred,
+                nuc.binding_energy_mev,
+                err
+            );
             errors.push(err);
             dz_errors.push(dz - nuc.binding_energy_mev);
         }
 
         let rms = compute_rms(&errors);
         let dz_rms = compute_rms(&dz_errors);
-        eprintln!("\nSuperheavy holdout RMS: {:.3} MeV (DZ: {:.3})", rms, dz_rms);
+        eprintln!(
+            "\nSuperheavy holdout RMS: {:.3} MeV (DZ: {:.3})",
+            rms, dz_rms
+        );
     }
 
     // ═══════════════════════════════════════════════════════════════════════

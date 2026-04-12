@@ -55,19 +55,34 @@ impl KokoroEngine {
 
         let api = match hf_hub::api::sync::Api::new() {
             Ok(a) => a,
-            Err(e) => { warn!("HF API init failed: {}", e); return None; }
+            Err(e) => {
+                warn!("HF API init failed: {}", e);
+                return None;
+            }
         };
         let repo = api.model(config.repo_id.clone());
 
         let model_path = match repo.get(&config.model_filename) {
-            Ok(p) => { info!("Model at: {:?}", p); p },
-            Err(e) => { warn!("Model download failed: {}", e); return None; }
+            Ok(p) => {
+                info!("Model at: {:?}", p);
+                p
+            }
+            Err(e) => {
+                warn!("Model download failed: {}", e);
+                return None;
+            }
         };
         let session = match ort::session::Session::builder()
             .and_then(|mut b| b.commit_from_file(&model_path))
         {
-            Ok(s) => { info!("ONNX session created"); s },
-            Err(e) => { warn!("ONNX session failed: {}", e); return None; }
+            Ok(s) => {
+                info!("ONNX session created");
+                s
+            }
+            Err(e) => {
+                warn!("ONNX session failed: {}", e);
+                return None;
+            }
         };
 
         let voices = match repo.get(&config.voices_filename) {
@@ -75,7 +90,11 @@ impl KokoroEngine {
                 info!("Voice file at: {:?}", path);
                 let data = std::fs::read(&path).unwrap_or_default();
                 let v = parse_voice_pack(&data);
-                info!("Loaded {} voice(s), embed dim={}", v.len(), v.first().map(|x| x.len()).unwrap_or(0));
+                info!(
+                    "Loaded {} voice(s), embed dim={}",
+                    v.len(),
+                    v.first().map(|x| x.len()).unwrap_or(0)
+                );
                 v
             }
             Err(e) => {
@@ -85,7 +104,13 @@ impl KokoroEngine {
         };
 
         info!("Kokoro loaded: {} voices", voices.len());
-        Some(Self { session, voices, config, speed: None, voice_blend: None })
+        Some(Self {
+            session,
+            voices,
+            config,
+            speed: None,
+            voice_blend: None,
+        })
     }
 
     #[cfg(not(feature = "kokoro"))]
@@ -97,8 +122,16 @@ impl KokoroEngine {
     #[cfg(feature = "kokoro")]
     pub fn synthesize(&mut self, text: &str, voice_id: Option<usize>) -> Option<Vec<f32>> {
         let raw_ids = text_to_kokoro_ids(text);
-        info!("Kokoro synthesize: '{}' → {} tokens: {:?}", text, raw_ids.len(), &raw_ids);
-        if raw_ids.is_empty() { warn!("No phoneme IDs!"); return None; }
+        info!(
+            "Kokoro synthesize: '{}' → {} tokens: {:?}",
+            text,
+            raw_ids.len(),
+            &raw_ids
+        );
+        if raw_ids.is_empty() {
+            warn!("No phoneme IDs!");
+            return None;
+        }
 
         // Pad with 0 at start and end (model expects this)
         let mut phoneme_ids = Vec::with_capacity(raw_ids.len() + 2);
@@ -108,7 +141,9 @@ impl KokoroEngine {
 
         // Voice indexing: voices[token_count] for base voice
         let token_count = phoneme_ids.len().min(self.voices.len().saturating_sub(1));
-        let base_voice = self.voices.get(token_count)
+        let base_voice = self
+            .voices
+            .get(token_count)
             .or_else(|| self.voices.last())
             .or_else(|| self.voices.first())?;
 
@@ -123,10 +158,15 @@ impl KokoroEngine {
 
             // Interpolate: 70% base (token-indexed) + 30% consciousness-blended
             let t = 0.3;
-            let blended: Vec<f32> = base_voice.iter().zip(blend_voice.iter())
+            let blended: Vec<f32> = base_voice
+                .iter()
+                .zip(blend_voice.iter())
                 .map(|(&a, &b)| a * (1.0 - t) + b * t)
                 .collect();
-            info!("Voice blend: base={}, blend={} (v={:.2} a={:.2})", token_count, blend_idx, valence, arousal);
+            info!(
+                "Voice blend: base={}, blend={} (v={:.2} a={:.2})",
+                token_count, blend_idx, valence, arousal
+            );
             blended
         } else {
             info!("Voice index: {} (token count)", token_count);
@@ -136,36 +176,47 @@ impl KokoroEngine {
         let seq_len = phoneme_ids.len();
         let input_ids: Vec<i64> = phoneme_ids.iter().map(|&id| id as i64).collect();
 
-        let ids_tensor = ort::value::Tensor::from_array(
-            (vec![1i64, seq_len as i64], input_ids)
-        ).ok()?;
+        let ids_tensor =
+            ort::value::Tensor::from_array((vec![1i64, seq_len as i64], input_ids)).ok()?;
         let embed_len = voice_embed.len();
-        let style_tensor = ort::value::Tensor::from_array(
-            (vec![1i64, embed_len as i64], voice_embed)
-        ).ok()?;
+        let style_tensor =
+            ort::value::Tensor::from_array((vec![1i64, embed_len as i64], voice_embed)).ok()?;
         // LIQUID KOKORO: consciousness drives speech rate
         // High arousal/confidence = faster (1.1x), low/confused = slower (0.75x)
         let speed = self.speed.unwrap_or(0.9);
-        let speed_tensor = ort::value::Tensor::from_array(
-            (vec![1i64], vec![speed])
-        ).ok()?;
+        let speed_tensor = ort::value::Tensor::from_array((vec![1i64], vec![speed])).ok()?;
 
-        let outputs = self.session.run(ort::inputs![
-            "input_ids" => ids_tensor,
-            "style" => style_tensor,
-            "speed" => speed_tensor,
-        ]).ok()?;
+        let outputs = self
+            .session
+            .run(ort::inputs![
+                "input_ids" => ids_tensor,
+                "style" => style_tensor,
+                "speed" => speed_tensor,
+            ])
+            .ok()?;
 
         // Extract audio output with detailed logging
         if let Some(out) = outputs.get("audio") {
             if let Ok((shape, data)) = out.try_extract_tensor::<f32>() {
-                info!("Kokoro output 'audio': shape={:?}, samples={}", shape, data.len());
-                if !data.is_empty() { return Some(data.to_vec()); }
+                info!(
+                    "Kokoro output 'audio': shape={:?}, samples={}",
+                    shape,
+                    data.len()
+                );
+                if !data.is_empty() {
+                    return Some(data.to_vec());
+                }
             }
         }
         if let Ok((shape, data)) = outputs[0].try_extract_tensor::<f32>() {
-            info!("Kokoro output[0]: shape={:?}, samples={}", shape, data.len());
-            if !data.is_empty() { return Some(data.to_vec()); }
+            info!(
+                "Kokoro output[0]: shape={:?}, samples={}",
+                shape,
+                data.len()
+            );
+            if !data.is_empty() {
+                return Some(data.to_vec());
+            }
         }
         warn!("Kokoro produced no audio");
         None
@@ -176,7 +227,9 @@ impl KokoroEngine {
         None
     }
 
-    pub fn sample_rate(&self) -> u32 { self.config.sample_rate }
+    pub fn sample_rate(&self) -> u32 {
+        self.config.sample_rate
+    }
 }
 
 /// Convert text to Kokoro token IDs.
@@ -194,10 +247,14 @@ fn text_to_kokoro_ids(text: &str) -> Vec<u32> {
             if !clean.is_empty() {
                 let phonemes = crate::g2p::text_to_phonemes(&clean);
                 for ph in &phonemes {
-                    if ph.ipa != " " { ipa.push_str(ph.ipa); }
+                    if ph.ipa != " " {
+                        ipa.push_str(ph.ipa);
+                    }
                 }
             }
-            if let Some(p) = punct { ipa.push_str(p); }
+            if let Some(p) = punct {
+                ipa.push_str(p);
+            }
             ipa.push(' ');
         }
         ipa.trim().to_string()
@@ -211,7 +268,7 @@ fn text_to_kokoro_ids(text: &str) -> Vec<u32> {
     while i < chars.len() {
         // Check for diphthongs (2-char sequences → Kokoro uppercase tokens)
         if i + 1 < chars.len() {
-            let pair = format!("{}{}", chars[i], chars[i+1]);
+            let pair = format!("{}{}", chars[i], chars[i + 1]);
             if let Some(token) = diphthong_to_kokoro(&pair) {
                 ids.extend(token);
                 i += 2;
@@ -222,7 +279,10 @@ fn text_to_kokoro_ids(text: &str) -> Vec<u32> {
         if let Some(id) = char_to_kokoro_id(chars[i]) {
             ids.push(id);
         } else {
-            warn!("Unknown char '{}' (U+{:04X}) — skipped", chars[i], chars[i] as u32);
+            warn!(
+                "Unknown char '{}' (U+{:04X}) — skipped",
+                chars[i], chars[i] as u32
+            );
         }
         i += 1;
     }
@@ -233,11 +293,11 @@ fn text_to_kokoro_ids(text: &str) -> Vec<u32> {
 /// Map diphthongs to Kokoro's uppercase token pairs.
 fn diphthong_to_kokoro(pair: &str) -> Option<Vec<u32>> {
     match pair {
-        "aɪ" => Some(vec![24, 25]),   // A + I (as in "I", "my", "light")
-        "eɪ" => Some(vec![47, 25]),   // e + I (as in "say", "day")
-        "oʊ" => Some(vec![57, 39]),   // o + W (as in "go", "slow")
-        "aʊ" => Some(vec![43, 39]),   // a + W (as in "how", "now")
-        "ɔɪ" => Some(vec![76, 25]),   // ɔ + I (as in "boy", "joy")
+        "aɪ" => Some(vec![24, 25]), // A + I (as in "I", "my", "light")
+        "eɪ" => Some(vec![47, 25]), // e + I (as in "say", "day")
+        "oʊ" => Some(vec![57, 39]), // o + W (as in "go", "slow")
+        "aʊ" => Some(vec![43, 39]), // a + W (as in "how", "now")
+        "ɔɪ" => Some(vec![76, 25]), // ɔ + I (as in "boy", "joy")
         _ => None,
     }
 }
@@ -247,43 +307,77 @@ fn diphthong_to_kokoro(pair: &str) -> Option<Vec<u32>> {
 fn char_to_kokoro_id(ch: char) -> Option<u32> {
     match ch {
         '$' => Some(0),
-        ';' => Some(1), ':' => Some(2), ',' => Some(3), '.' => Some(4),
-        '!' => Some(5), '?' => Some(6),
+        ';' => Some(1),
+        ':' => Some(2),
+        ',' => Some(3),
+        '.' => Some(4),
+        '!' => Some(5),
+        '?' => Some(6),
         ' ' => Some(16),
-        'A' => Some(24), 'I' => Some(25),
-        'O' => Some(31), 'Q' => Some(33), 'S' => Some(35), 'T' => Some(36),
-        'W' => Some(39), 'Y' => Some(41),
-        'a' => Some(43), 'b' => Some(44), 'c' => Some(45), 'd' => Some(46),
-        'e' => Some(47), 'f' => Some(48), 'h' => Some(50),
-        'i' => Some(51), 'j' => Some(52), 'k' => Some(53), 'l' => Some(54),
-        'm' => Some(55), 'n' => Some(56), 'o' => Some(57), 'p' => Some(58),
-        'q' => Some(59), 'r' => Some(60), 's' => Some(61), 't' => Some(62),
-        'u' => Some(63), 'v' => Some(64), 'w' => Some(65), 'x' => Some(66),
-        'y' => Some(67), 'z' => Some(68),
-        'ɑ' => Some(69), 'ɐ' => Some(70), 'ɒ' => Some(71), 'æ' => Some(72),
-        'ɔ' => Some(76), 'ð' => Some(81), 'ə' => Some(83),
-        'ɚ' => Some(85), 'ɛ' => Some(86), 'ɜ' => Some(87),
+        'A' => Some(24),
+        'I' => Some(25),
+        'O' => Some(31),
+        'Q' => Some(33),
+        'S' => Some(35),
+        'T' => Some(36),
+        'W' => Some(39),
+        'Y' => Some(41),
+        'a' => Some(43),
+        'b' => Some(44),
+        'c' => Some(45),
+        'd' => Some(46),
+        'e' => Some(47),
+        'f' => Some(48),
+        'h' => Some(50),
+        'i' => Some(51),
+        'j' => Some(52),
+        'k' => Some(53),
+        'l' => Some(54),
+        'm' => Some(55),
+        'n' => Some(56),
+        'o' => Some(57),
+        'p' => Some(58),
+        'q' => Some(59),
+        'r' => Some(60),
+        's' => Some(61),
+        't' => Some(62),
+        'u' => Some(63),
+        'v' => Some(64),
+        'w' => Some(65),
+        'x' => Some(66),
+        'y' => Some(67),
+        'z' => Some(68),
+        'ɑ' => Some(69),
+        'ɐ' => Some(70),
+        'ɒ' => Some(71),
+        'æ' => Some(72),
+        'ɔ' => Some(76),
+        'ð' => Some(81),
+        'ə' => Some(83),
+        'ɚ' => Some(85),
+        'ɛ' => Some(86),
+        'ɜ' => Some(87),
         'ɡ' => Some(92),
         'ɪ' => Some(102),
         'ŋ' => Some(112),
-        'ʃ' => Some(35), // same as 'S'
-        'ʌ' => Some(138),   // CORRECT: ʌ=138, NOT 63 (u)
-        'ʊ' => Some(135),   // CORRECT: ʊ=135
-        'ʒ' => Some(147),   // CORRECT: ʒ=147
-        'θ' => Some(119),   // CORRECT: θ=119
-        'ɹ' => Some(123),   // CORRECT: ɹ=123
-        'ː' => Some(158),   // CORRECT: ː=158 — DO NOT SKIP (controls vowel length!)
-        'ˈ' => Some(156),   // primary stress
-        'ˌ' => Some(157),   // secondary stress
-        'ʔ' => Some(148),   // glottal stop
-        'ɾ' => Some(125),   // tap
-        'ʃ' => Some(131),   // ʃ=131
+        'ʃ' => Some(35),        // same as 'S'
+        'ʌ' => Some(138),       // CORRECT: ʌ=138, NOT 63 (u)
+        'ʊ' => Some(135),       // CORRECT: ʊ=135
+        'ʒ' => Some(147),       // CORRECT: ʒ=147
+        'θ' => Some(119),       // CORRECT: θ=119
+        'ɹ' => Some(123),       // CORRECT: ɹ=123
+        'ː' => Some(158),       // CORRECT: ː=158 — DO NOT SKIP (controls vowel length!)
+        'ˈ' => Some(156),       // primary stress
+        'ˌ' => Some(157),       // secondary stress
+        'ʔ' => Some(148),       // glottal stop
+        'ɾ' => Some(125),       // tap
+        'ʃ' => Some(131),       // ʃ=131
         'ʧ' | 'ʨ' => Some(133), // affricate
-        'ʤ' => Some(82),    // voiced affricate
-        'ɚ' => Some(85),    // rhotacized schwa (espeak uses this)
-        'ɐ' => Some(70),    // near-open central (espeak uses this)
-        'ʲ' => Some(164),   // palatalization (espeak adds this)
-        'ʰ' => Some(162),   // aspiration
+        'ʤ' => Some(82),        // voiced affricate
+        'ɚ' => Some(85),        // rhotacized schwa (espeak uses this)
+        'ɐ' => Some(70),        // near-open central (espeak uses this)
+        'ʲ' => Some(164),       // palatalization (espeak adds this)
+        'ʰ' => Some(162),       // aspiration
         _ => None,
     }
 }
@@ -295,10 +389,14 @@ fn espeak_ipa(text: &str) -> Option<String> {
         .output()
         .ok()?;
 
-    if !output.status.success() { return None; }
+    if !output.status.success() {
+        return None;
+    }
 
     let ipa = String::from_utf8_lossy(&output.stdout).trim().to_string();
-    if ipa.is_empty() { return None; }
+    if ipa.is_empty() {
+        return None;
+    }
 
     info!("espeak IPA: '{}'", ipa);
     Some(ipa)
@@ -325,68 +423,67 @@ fn split_punctuation(word: &str) -> (String, Option<&'static str>) {
 fn ipa_to_kokoro_tokens(ipa: &str) -> Vec<u32> {
     match ipa {
         // Vowels
-        "ɑ" | "ɑː" => vec![69],     // ɑ
-        "æ"         => vec![72],     // æ
-        "ʌ"         => vec![63],     // u (closest approximation)
-        "ɒ"         => vec![71],     // ɒ
-        "ɔ" | "ɔː" => vec![76],     // ɔ
-        "ə"         => vec![83],     // ə
-        "ɜː"       => vec![87],     // ɜ
-        "ɛ"         => vec![86],     // ɛ
-        "ɪ"         => vec![102],    // ɪ
-        "iː" | "i"  => vec![51],    // i
-        "ʊ"         => vec![63],     // u
-        "uː" | "u"  => vec![63],    // u
+        "ɑ" | "ɑː" => vec![69], // ɑ
+        "æ" => vec![72],        // æ
+        "ʌ" => vec![63],        // u (closest approximation)
+        "ɒ" => vec![71],        // ɒ
+        "ɔ" | "ɔː" => vec![76], // ɔ
+        "ə" => vec![83],        // ə
+        "ɜː" => vec![87],       // ɜ
+        "ɛ" => vec![86],        // ɛ
+        "ɪ" => vec![102],       // ɪ
+        "iː" | "i" => vec![51], // i
+        "ʊ" => vec![63],        // u
+        "uː" | "u" => vec![63], // u
         // Diphthongs
-        "eɪ"        => vec![47, 102], // e + ɪ
-        "aɪ"        => vec![24, 25],  // A + I (Kokoro diphthong tokens)
-        "oʊ"        => vec![57, 63],  // o + u
-        "aʊ"        => vec![43, 63],  // a + u
-        "ɔɪ"        => vec![76, 102], // ɔ + ɪ
+        "eɪ" => vec![47, 102], // e + ɪ
+        "aɪ" => vec![24, 25],  // A + I (Kokoro diphthong tokens)
+        "oʊ" => vec![57, 63],  // o + u
+        "aʊ" => vec![43, 63],  // a + u
+        "ɔɪ" => vec![76, 102], // ɔ + ɪ
         // Consonants
-        "b"         => vec![44],
-        "d"         => vec![46],
-        "f"         => vec![48],
-        "ɡ"         => vec![92],     // ɡ
-        "h"         => vec![50],
-        "k"         => vec![53],
-        "l"         => vec![54],
-        "m"         => vec![55],
-        "n"         => vec![56],
-        "ŋ"         => vec![112],    // ŋ
-        "p"         => vec![58],
-        "ɹ"         => vec![60],     // r
-        "s"         => vec![61],
-        "t"         => vec![62],
-        "v"         => vec![64],
-        "w"         => vec![65],
-        "j"         => vec![52],     // j
-        "z"         => vec![68],
-        "ʃ"         => vec![35],     // S (Kokoro uses uppercase for IPA ʃ)
-        "ʒ"         => vec![68],     // z (approximation)
-        "θ"         => vec![36],     // T (Kokoro uses uppercase for IPA θ)
-        "ð"         => vec![81],     // ð
-        "tʃ"        => vec![20],     // ʦ approximation
-        "dʒ"        => vec![82],     // ʤ
+        "b" => vec![44],
+        "d" => vec![46],
+        "f" => vec![48],
+        "ɡ" => vec![92], // ɡ
+        "h" => vec![50],
+        "k" => vec![53],
+        "l" => vec![54],
+        "m" => vec![55],
+        "n" => vec![56],
+        "ŋ" => vec![112], // ŋ
+        "p" => vec![58],
+        "ɹ" => vec![60], // r
+        "s" => vec![61],
+        "t" => vec![62],
+        "v" => vec![64],
+        "w" => vec![65],
+        "j" => vec![52], // j
+        "z" => vec![68],
+        "ʃ" => vec![35],  // S (Kokoro uses uppercase for IPA ʃ)
+        "ʒ" => vec![68],  // z (approximation)
+        "θ" => vec![36],  // T (Kokoro uses uppercase for IPA θ)
+        "ð" => vec![81],  // ð
+        "tʃ" => vec![20], // ʦ approximation
+        "dʒ" => vec![82], // ʤ
         // Silence/space
-        " "         => vec![16],     // space
-        ""          => vec![],
+        " " => vec![16], // space
+        "" => vec![],
         // Punctuation
-        "."         => vec![4],
-        ","         => vec![3],
-        "!"         => vec![5],
-        "?"         => vec![6],
+        "." => vec![4],
+        "," => vec![3],
+        "!" => vec![5],
+        "?" => vec![6],
         // Compound
-        "ks"        => vec![53, 61], // k + s
+        "ks" => vec![53, 61], // k + s
         // Default: try character-level
-        other => {
-            other.chars().filter_map(|c| {
-                match c {
-                    'a'..='z' => Some(c as u32 - 'a' as u32 + 43),
-                    _ => None,
-                }
-            }).collect()
-        }
+        other => other
+            .chars()
+            .filter_map(|c| match c {
+                'a'..='z' => Some(c as u32 - 'a' as u32 + 43),
+                _ => None,
+            })
+            .collect(),
     }
 }
 
@@ -398,13 +495,22 @@ fn parse_voice_pack(data: &[u8]) -> Vec<Vec<f32>> {
         return vec![vec![0.0f32; embed_dim]];
     }
     let num_voices = data.len() / bytes_per_embed;
-    (0..num_voices).map(|i| {
-        let start = i * bytes_per_embed;
-        (0..embed_dim).map(|j| {
-            let offset = start + j * 4;
-            f32::from_le_bytes([data[offset], data[offset+1], data[offset+2], data[offset+3]])
-        }).collect()
-    }).collect()
+    (0..num_voices)
+        .map(|i| {
+            let start = i * bytes_per_embed;
+            (0..embed_dim)
+                .map(|j| {
+                    let offset = start + j * 4;
+                    f32::from_le_bytes([
+                        data[offset],
+                        data[offset + 1],
+                        data[offset + 2],
+                        data[offset + 3],
+                    ])
+                })
+                .collect()
+        })
+        .collect()
 }
 
 #[cfg(test)]

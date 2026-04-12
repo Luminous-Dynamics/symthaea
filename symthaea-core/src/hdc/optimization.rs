@@ -41,6 +41,9 @@ const ARMIJO_C1: f64 = 1e-4;
 const ARMIJO_SHRINK: f64 = 0.5;
 const ARMIJO_MAX_BACKTRACKS: usize = 30;
 const FINITE_DIFF_EPS: f64 = 1e-7;
+/// Default gradient clipping norm. Prevents catastrophic steps in
+/// ill-conditioned problems (e.g., exp(100x) near x=0).
+const DEFAULT_GRADIENT_CLIP_NORM: f64 = 100.0;
 
 // ─── ObjectiveFunction Trait ─────────────────────────────────────────────────
 
@@ -59,16 +62,35 @@ pub trait ObjectiveFunction {
     }
 }
 
+/// Clip gradient vector to a maximum L2 norm, rescaling if needed.
+/// Returns the (possibly clipped) gradient and its norm.
+fn clip_gradient(g: &mut [f64], max_norm: f64) -> f64 {
+    let norm: f64 = g.iter().map(|v| v * v).sum::<f64>().sqrt();
+    if norm > max_norm && norm > 0.0 {
+        let scale = max_norm / norm;
+        for gi in g.iter_mut() {
+            *gi *= scale;
+        }
+        max_norm
+    } else {
+        norm
+    }
+}
+
 /// Compute the gradient via central finite differences.
+/// Uses adaptive per-component step size: eps_i = sqrt(machine_eps) * max(|x_i|, 1)
+/// for better accuracy across different variable scales (Nocedal & Wright 2006, §8.1).
 fn numerical_gradient<F: Fn(&[f64]) -> f64>(f: &F, x: &[f64]) -> Vec<f64> {
     let n = x.len();
     let mut grad = vec![0.0; n];
     let mut x_plus = x.to_vec();
     let mut x_minus = x.to_vec();
+    let base_eps = f64::EPSILON.sqrt(); // ~1.49e-8, optimal for central differences
     for i in 0..n {
-        x_plus[i] = x[i] + FINITE_DIFF_EPS;
-        x_minus[i] = x[i] - FINITE_DIFF_EPS;
-        grad[i] = (f(&x_plus) - f(&x_minus)) / (2.0 * FINITE_DIFF_EPS);
+        let eps_i = base_eps * x[i].abs().max(1.0);
+        x_plus[i] = x[i] + eps_i;
+        x_minus[i] = x[i] - eps_i;
+        grad[i] = (f(&x_plus) - f(&x_minus)) / (2.0 * eps_i);
         x_plus[i] = x[i];
         x_minus[i] = x[i];
     }
@@ -261,8 +283,9 @@ impl OptimizationEngine {
 
         for iter in 0..MAX_ITERATIONS {
             let fx = f(&x);
-            let g = grad(&x);
-            let grad_norm: f64 = g.iter().map(|gi| gi * gi).sum::<f64>().sqrt();
+            let mut g = grad(&x);
+            // Clip gradient to prevent catastrophic steps from extreme gradients
+            let grad_norm = clip_gradient(&mut g, DEFAULT_GRADIENT_CLIP_NORM);
 
             history.push(OptStep {
                 iteration: iter,
@@ -488,6 +511,7 @@ impl OptimizationEngine {
 
         let mut x = x0.to_vec();
         let mut g = grad(&x);
+        clip_gradient(&mut g, DEFAULT_GRADIENT_CLIP_NORM);
         let mut history = Vec::new();
 
         // Storage for L-BFGS two-loop recursion
@@ -589,13 +613,18 @@ impl OptimizationEngine {
                 .zip(r.iter())
                 .map(|(xi, ri)| xi - step * ri)
                 .collect();
-            let g_new = grad(&x_new);
+            let mut g_new = grad(&x_new);
+            clip_gradient(&mut g_new, DEFAULT_GRADIENT_CLIP_NORM);
 
             let s: Vec<f64> = x_new.iter().zip(x.iter()).map(|(a, b)| a - b).collect();
             let y: Vec<f64> = g_new.iter().zip(g.iter()).map(|(a, b)| a - b).collect();
             let sy: f64 = s.iter().zip(y.iter()).map(|(si, yi)| si * yi).sum();
 
-            if sy > 1e-15 {
+            // Scale curvature check relative to step and gradient magnitudes
+            // to avoid rejecting valid updates on large-scale problems
+            let s_norm = s.iter().map(|v| v * v).sum::<f64>().sqrt();
+            let y_norm = y.iter().map(|v| v * v).sum::<f64>().sqrt();
+            if sy > 1e-10 * s_norm * y_norm {
                 if s_history.len() >= m {
                     s_history.remove(0);
                     y_history.remove(0);
@@ -754,6 +783,363 @@ impl OptimizationEngine {
             x_hv = x_hv.bind(&comp);
         }
         opt_prim.bind(&val_hv).bind(&x_hv)
+    }
+}
+
+// ─── Wolfe Line Search ───────────────────────────────────────────────────────
+
+/// Wolfe conditions line search for L-BFGS and trust-region methods.
+///
+/// Finds step length α satisfying the strong Wolfe conditions:
+/// 1. Sufficient decrease (Armijo): f(x + α*d) ≤ f(x) + c1*α*∇f(x)ᵀd
+/// 2. Curvature: |∇f(x + α*d)ᵀd| ≤ c2 * |∇f(x)ᵀd|
+///
+/// Algorithm: bracketing + zoom (Nocedal & Wright §3.5, 2006).
+pub fn wolfe_line_search<F, G>(
+    f: &F,
+    grad: &G,
+    x: &[f64],
+    direction: &[f64],
+    f0: f64,
+    grad0: &[f64],
+    c1: f64,
+    c2: f64,
+    max_iter: usize,
+) -> f64
+where
+    F: Fn(&[f64]) -> f64,
+    G: Fn(&[f64]) -> Vec<f64>,
+{
+    let n = x.len();
+    let derphi0: f64 = grad0.iter().zip(direction).map(|(g, d)| g * d).sum();
+    if derphi0 >= 0.0 {
+        return 1e-4; // direction is not a descent direction
+    }
+
+    let mut alpha_prev = 0.0;
+    let mut alpha = 1.0;
+    let alpha_max = 50.0;
+    let mut f_prev = f0;
+
+    let x_alpha = |a: f64| -> Vec<f64> { (0..n).map(|i| x[i] + a * direction[i]).collect() };
+    let derphi = |a: f64| -> f64 {
+        let xn = x_alpha(a);
+        let g = grad(&xn);
+        g.iter().zip(direction).map(|(gi, di)| gi * di).sum()
+    };
+
+    for _iter in 0..max_iter {
+        let xa = x_alpha(alpha);
+        let fa = f(&xa);
+
+        if fa > f0 + c1 * alpha * derphi0 || (_iter > 0 && fa >= f_prev) {
+            return wolfe_zoom(f, &derphi, x, direction, alpha_prev, alpha, f0, derphi0, c1, c2, &x_alpha);
+        }
+
+        let da = derphi(alpha);
+        if da.abs() <= -c2 * derphi0 {
+            return alpha; // Strong Wolfe satisfied
+        }
+
+        if da >= 0.0 {
+            return wolfe_zoom(f, &derphi, x, direction, alpha, alpha_prev, f0, derphi0, c1, c2, &x_alpha);
+        }
+
+        alpha_prev = alpha;
+        f_prev = fa;
+        alpha = (alpha * 2.0).min(alpha_max);
+    }
+    alpha
+}
+
+fn wolfe_zoom<F, D, XA>(
+    f: &F,
+    derphi: &D,
+    _x: &[f64],
+    _direction: &[f64],
+    mut alpha_lo: f64,
+    mut alpha_hi: f64,
+    f0: f64,
+    derphi0: f64,
+    c1: f64,
+    c2: f64,
+    x_alpha: &XA,
+) -> f64
+where
+    F: Fn(&[f64]) -> f64,
+    D: Fn(f64) -> f64,
+    XA: Fn(f64) -> Vec<f64>,
+{
+    let f_lo = f(&x_alpha(alpha_lo));
+    for _ in 0..20 {
+        let alpha_j = (alpha_lo + alpha_hi) / 2.0; // bisection
+        let fj = f(&x_alpha(alpha_j));
+        if fj > f0 + c1 * alpha_j * derphi0 || fj >= f_lo {
+            alpha_hi = alpha_j;
+        } else {
+            let dj = derphi(alpha_j);
+            if dj.abs() <= -c2 * derphi0 {
+                return alpha_j;
+            }
+            if dj * (alpha_hi - alpha_lo) >= 0.0 {
+                alpha_hi = alpha_lo;
+            }
+            alpha_lo = alpha_j;
+        }
+    }
+    alpha_lo
+}
+
+// ─── Levenberg-Marquardt ──────────────────────────────────────────────────────
+
+/// Result of a Levenberg-Marquardt nonlinear least squares solve.
+#[derive(Debug, Clone)]
+pub struct LMResult {
+    /// Solution parameters.
+    pub params: Vec<f64>,
+    /// Residual vector at solution: r_i = y_i - f(x_i; params).
+    pub residuals: Vec<f64>,
+    /// Sum of squared residuals.
+    pub sse: f64,
+    /// Number of iterations taken.
+    pub iterations: usize,
+    /// Whether convergence criteria were met.
+    pub converged: bool,
+    /// Final damping parameter λ.
+    pub lambda_final: f64,
+}
+
+/// Levenberg-Marquardt algorithm for nonlinear least squares.
+///
+/// Minimizes ‖r(p)‖² where r: ℝⁿ → ℝᵐ is a vector of residuals.
+/// Blends Gauss-Newton (fast near solution) with gradient descent (robust far away)
+/// via a damping parameter λ:
+///   (JᵀJ + λI) Δp = -Jᵀr
+/// λ is adapted based on the ratio of actual to predicted reduction.
+pub struct LevenbergMarquardt;
+
+impl LevenbergMarquardt {
+    /// Fit a model by minimizing nonlinear least squares.
+    ///
+    /// # Arguments
+    /// * `residual_fn` — function mapping params → residual vector
+    /// * `p0` — initial parameter guess
+    /// * `tol` — convergence threshold on gradient norm
+    /// * `max_iter` — maximum iterations
+    pub fn fit<R>(residual_fn: R, p0: &[f64], tol: f64, max_iter: usize) -> LMResult
+    where
+        R: Fn(&[f64]) -> Vec<f64>,
+    {
+        let n = p0.len();
+        let mut p = p0.to_vec();
+        let mut lambda = 1e-3;
+        let eps = 1e-8; // finite difference step for Jacobian
+
+        let r = residual_fn(&p);
+        let m = r.len();
+        let mut sse = r.iter().map(|ri| ri * ri).sum::<f64>();
+        let mut converged = false;
+
+        for iter in 0..max_iter {
+            let r = residual_fn(&p);
+            sse = r.iter().map(|ri| ri * ri).sum::<f64>();
+
+            // Compute Jacobian via finite differences: J[i][j] = ∂r_i/∂p_j
+            let mut jac = vec![vec![0.0f64; n]; m];
+            for j in 0..n {
+                let mut p_plus = p.clone();
+                p_plus[j] += eps;
+                let r_plus = residual_fn(&p_plus);
+                for i in 0..m {
+                    jac[i][j] = (r_plus[i] - r[i]) / eps;
+                }
+            }
+
+            // JᵀJ (n×n) and Jᵀr (n×1)
+            let mut jtj = vec![vec![0.0f64; n]; n];
+            let mut jtr = vec![0.0f64; n];
+            for i in 0..m {
+                for j in 0..n {
+                    jtr[j] += jac[i][j] * r[i];
+                    for k in 0..n {
+                        jtj[j][k] += jac[i][j] * jac[i][k];
+                    }
+                }
+            }
+
+            // Check gradient norm for convergence
+            let grad_norm: f64 = jtr.iter().map(|v| v * v).sum::<f64>().sqrt();
+            if grad_norm < tol {
+                converged = true;
+                break;
+            }
+
+            // Solve (JᵀJ + λI)Δp = -Jᵀr via Gaussian elimination
+            let mut a = jtj.clone();
+            for j in 0..n {
+                a[j][j] += lambda;
+            }
+            let neg_jtr: Vec<f64> = jtr.iter().map(|v| -v).collect();
+            let delta = match Self::solve_linear(&a, &neg_jtr) {
+                Some(d) => d,
+                None => break,
+            };
+
+            let p_new: Vec<f64> = (0..n).map(|j| p[j] + delta[j]).collect();
+            let r_new = residual_fn(&p_new);
+            let sse_new = r_new.iter().map(|ri| ri * ri).sum::<f64>();
+
+            // Predicted reduction (from Gauss-Newton model)
+            let predicted: f64 = delta
+                .iter()
+                .zip(&jtr)
+                .map(|(d, g)| d * (lambda * d - g))
+                .sum::<f64>();
+            let rho = if predicted.abs() > 1e-15 { (sse - sse_new) / predicted } else { 0.0 };
+
+            if rho > 0.0 {
+                // Accept step
+                p = p_new;
+                sse = sse_new;
+                // Reduce λ (more Gauss-Newton)
+                lambda *= (1.0_f64 / 3.0).max(1.0 - (2.0 * rho - 1.0).powi(3));
+                lambda = lambda.max(1e-15);
+            } else {
+                // Reject step, increase λ (more gradient descent)
+                lambda *= 10.0;
+                lambda = lambda.min(1e12);
+            }
+
+            let _ = iter; // suppress warning
+        }
+
+        let r_final = residual_fn(&p);
+        sse = r_final.iter().map(|ri| ri * ri).sum::<f64>();
+
+        LMResult {
+            params: p,
+            residuals: r_final,
+            sse,
+            iterations: max_iter,
+            converged,
+            lambda_final: lambda,
+        }
+    }
+
+    /// Gaussian elimination solver for Ax = b (in-place, n ≤ 100).
+    fn solve_linear(a: &[Vec<f64>], b: &[f64]) -> Option<Vec<f64>> {
+        let n = b.len();
+        let mut aug: Vec<Vec<f64>> = (0..n).map(|i| {
+            let mut row = a[i].clone();
+            row.push(b[i]);
+            row
+        }).collect();
+
+        for col in 0..n {
+            // Partial pivoting
+            let max_row = (col..n)
+                .max_by(|&r1, &r2| aug[r1][col].abs().partial_cmp(&aug[r2][col].abs()).unwrap())?;
+            aug.swap(col, max_row);
+            if aug[col][col].abs() < 1e-14 { return None; }
+            let pivot = aug[col][col];
+            for k in col..=n { aug[col][k] /= pivot; }
+            for row in 0..n {
+                if row != col {
+                    let factor = aug[row][col];
+                    for k in col..=n { aug[row][k] -= factor * aug[col][k]; }
+                }
+            }
+        }
+        Some((0..n).map(|i| aug[i][n]).collect())
+    }
+}
+
+/// Augmented Lagrangian method for constrained optimization.
+///
+/// Minimizes f(x) subject to equality constraints h_i(x) = 0.
+/// Solves: min_x L_ρ(x, λ) = f(x) + Σ λᵢhᵢ(x) + (ρ/2)Σ hᵢ(x)²
+/// Multipliers updated: λᵢ ← λᵢ + ρ * hᵢ(x*)
+pub fn augmented_lagrangian<F, G, H>(
+    f: F,
+    grad_f: G,
+    constraints: &[H],
+    x0: &[f64],
+    tol: f64,
+    max_outer: usize,
+) -> OptResult
+where
+    F: Fn(&[f64]) -> f64,
+    G: Fn(&[f64]) -> Vec<f64>,
+    H: Fn(&[f64]) -> f64,
+{
+    let n = x0.len();
+    let m = constraints.len();
+    let mut x = x0.to_vec();
+    let mut lambda = vec![0.0f64; m];
+    let mut rho = 1.0f64;
+
+    for outer in 0..max_outer {
+        // Minimize augmented Lagrangian via gradient descent
+        let al_grad = |xk: &[f64]| -> Vec<f64> {
+            let gf = grad_f(xk);
+            let mut g = gf;
+            for i in 0..m {
+                let hi = constraints[i](xk);
+                // ∂L/∂x += (λᵢ + ρ*hᵢ) * ∂hᵢ/∂x (finite diff for constraint gradient)
+                let eps = 1e-7;
+                for j in 0..n {
+                    let mut xp = xk.to_vec();
+                    xp[j] += eps;
+                    let dhi = (constraints[i](&xp) - hi) / eps;
+                    g[j] += (lambda[i] + rho * hi) * dhi;
+                }
+            }
+            g
+        };
+        let al_f = |xk: &[f64]| -> f64 {
+            let mut val = f(xk);
+            for i in 0..m {
+                let hi = constraints[i](xk);
+                val += lambda[i] * hi + 0.5 * rho * hi * hi;
+            }
+            val
+        };
+
+        // Gradient descent on augmented Lagrangian
+        let mut lr = 0.01;
+        for _step in 0..500 {
+            let g = al_grad(&x);
+            let gn: f64 = g.iter().map(|v| v * v).sum::<f64>().sqrt();
+            if gn < tol { break; }
+            for j in 0..n { x[j] -= lr * g[j] / gn.max(1e-12); }
+            lr *= 0.999;
+        }
+
+        // Update multipliers
+        let constraint_viol: f64 = (0..m).map(|i| constraints[i](&x).powi(2)).sum::<f64>().sqrt();
+        for i in 0..m {
+            lambda[i] += rho * constraints[i](&x);
+        }
+        rho = (rho * 1.5).min(1e6);
+
+        if constraint_viol < tol { break; }
+        let _ = outer;
+    }
+
+    let fx = f(&x);
+    let gf = grad_f(&x);
+    let grad_norm: f64 = gf.iter().map(|v| v * v).sum::<f64>().sqrt();
+    let converged = grad_norm < tol * 10.0;
+
+    OptResult {
+        x: x.clone(),
+        fx,
+        history: vec![],
+        iterations: max_outer,
+        converged,
+        method: OptMethod::GradientDescent,
+        phi: 0.0,
+        encoding: OptimizationEngine::encode_point(&x, fx),
     }
 }
 
@@ -1147,6 +1533,86 @@ mod tests {
             sim < 0.6,
             "Different optima should have different encodings: {}",
             sim
+        );
+    }
+
+    // ── Levenberg-Marquardt tests ─────────────────────────────────────────
+
+    #[test]
+    fn test_lm_linear_residuals() {
+        // Fit y = a*x + b to (0,1),(1,3),(2,5),(3,7) → a=2, b=1
+        let xs = [0.0f64, 1.0, 2.0, 3.0];
+        let ys = [1.0f64, 3.0, 5.0, 7.0];
+        let residual_fn = |p: &[f64]| -> Vec<f64> {
+            xs.iter().zip(ys.iter()).map(|(&x, &y)| y - (p[0] * x + p[1])).collect()
+        };
+        let result = LevenbergMarquardt::fit(residual_fn, &[0.0, 0.0], 1e-8, 200);
+        assert!(result.sse < 1e-6, "LM should fit linear data exactly, SSE={}", result.sse);
+        assert!((result.params[0] - 2.0).abs() < 0.01, "slope should be ~2, got {}", result.params[0]);
+        assert!((result.params[1] - 1.0).abs() < 0.01, "intercept should be ~1, got {}", result.params[1]);
+    }
+
+    #[test]
+    fn test_lm_rosenbrock() {
+        // Rosenbrock as nonlinear LS: r1 = 10*(x1 - x0²), r2 = 1 - x0 → min at (1,1)
+        let residual_fn = |p: &[f64]| -> Vec<f64> {
+            vec![10.0 * (p[1] - p[0] * p[0]), 1.0 - p[0]]
+        };
+        let result = LevenbergMarquardt::fit(residual_fn, &[-1.2, 1.0], 1e-8, 500);
+        assert!(result.sse < 1e-6, "LM Rosenbrock SSE should be near 0, got {}", result.sse);
+    }
+
+    #[test]
+    fn test_lm_converges_from_bad_init() {
+        // y = exp(-a*x): fit to data with bad initial guess
+        let xs = [0.0f64, 1.0, 2.0, 3.0];
+        let ys: Vec<f64> = xs.iter().map(|&x| (-0.5 * x).exp()).collect();
+        let residual_fn = |p: &[f64]| -> Vec<f64> {
+            xs.iter().zip(ys.iter()).map(|(&x, &y)| y - (-p[0] * x).exp()).collect()
+        };
+        let result = LevenbergMarquardt::fit(residual_fn, &[5.0], 1e-8, 300);
+        assert!((result.params[0] - 0.5).abs() < 0.01, "LM should recover a≈0.5, got {}", result.params[0]);
+    }
+
+    // ── Wolfe line search tests ───────────────────────────────────────────
+
+    #[test]
+    fn test_wolfe_sufficient_decrease() {
+        let f = |x: &[f64]| x[0] * x[0] + x[1] * x[1];
+        let g = |x: &[f64]| vec![2.0 * x[0], 2.0 * x[1]];
+        let x0 = [3.0, 4.0];
+        let grad0 = g(&x0);
+        let dir = [-grad0[0], -grad0[1]]; // steepest descent
+        let alpha = wolfe_line_search(&f, &g, &x0, &dir, f(&x0), &grad0, 1e-4, 0.9, 20);
+        // After step, f should decrease
+        let x_new = [x0[0] + alpha * dir[0], x0[1] + alpha * dir[1]];
+        assert!(f(&x_new) < f(&x0), "Wolfe step should decrease objective");
+        assert!(alpha > 0.0, "Wolfe alpha should be positive");
+    }
+
+    #[test]
+    fn test_wolfe_returns_finite_alpha() {
+        let f = |x: &[f64]| (x[0] - 2.0).powi(2);
+        let g = |x: &[f64]| vec![2.0 * (x[0] - 2.0)];
+        let x0 = [5.0];
+        let grad0 = g(&x0);
+        let dir = [-grad0[0]];
+        let alpha = wolfe_line_search(&f, &g, &x0, &dir, f(&x0), &grad0, 1e-4, 0.9, 20);
+        assert!(alpha.is_finite() && alpha > 0.0, "Wolfe alpha should be finite and positive");
+    }
+
+    // ── Augmented Lagrangian tests ────────────────────────────────────────
+
+    #[test]
+    fn test_augmented_lagrangian_equality_constraint() {
+        // Minimize x² + y² subject to x + y - 1 = 0 → solution: x=y=0.5
+        let f = |x: &[f64]| x[0] * x[0] + x[1] * x[1];
+        let gf = |x: &[f64]| vec![2.0 * x[0], 2.0 * x[1]];
+        let c = |x: &[f64]| x[0] + x[1] - 1.0;
+        let result = augmented_lagrangian(&f, &gf, &[c], &[2.0, 0.0], 1e-4, 30);
+        assert!(
+            (result.x[0] - 0.5).abs() < 0.1 && (result.x[1] - 0.5).abs() < 0.1,
+            "AL should find x≈y≈0.5, got ({:.3},{:.3})", result.x[0], result.x[1]
         );
     }
 }

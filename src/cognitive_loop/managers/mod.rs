@@ -116,6 +116,11 @@ pub(crate) use sentinel_manager::{
 #[cfg(feature = "neuroevolution")]
 pub use neuroevolution_manager::{NeuroevolutionManager, NeuroevolutionTelemetry};
 
+#[cfg(feature = "muse")]
+pub mod music_publisher;
+#[cfg(feature = "muse")]
+pub use music_publisher::{MusicPublisher, UploadResult};
+
 #[cfg(feature = "ssm_language")]
 pub mod language_manager;
 #[cfg(feature = "ssm_language")]

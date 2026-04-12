@@ -97,24 +97,23 @@ impl DecompositionPredictor {
     /// under reference conditions: 25 C, 55% moisture, 21% O2).
     fn base_half_life(category: WasteCategory) -> f64 {
         match category {
-            WasteCategory::Organic => 30.0,           // food waste
-            WasteCategory::Paper => 60.0,              // office paper
-            WasteCategory::Cardboard => 90.0,          // corrugated
-            WasteCategory::Wood => 365.0,              // untreated lumber
-            WasteCategory::Textiles => 180.0,          // cotton/natural fibers
+            WasteCategory::Organic => 30.0,   // food waste
+            WasteCategory::Paper => 60.0,     // office paper
+            WasteCategory::Cardboard => 90.0, // corrugated
+            WasteCategory::Wood => 365.0,     // untreated lumber
+            WasteCategory::Textiles => 180.0, // cotton/natural fibers
             WasteCategory::PlasticPET
             | WasteCategory::PlasticHDPE
             | WasteCategory::PlasticPP
             | WasteCategory::PlasticPS
             | WasteCategory::PlasticOther => 36_500.0, // ~100 years
-            WasteCategory::Aluminum => 73_000.0,       // ~200 years
-            WasteCategory::Steel => 18_250.0,          // ~50 years (rusting)
-            WasteCategory::GlassClear
-            | WasteCategory::GlassColored => 365_000.0, // ~1000 years
-            WasteCategory::Rubber => 36_500.0,         // ~100 years
-            WasteCategory::Electronic => 36_500.0,     // ~100 years
-            WasteCategory::Hazardous => 18_250.0,      // varies widely
-            WasteCategory::Mixed => 3_650.0,           // ~10 years average
+            WasteCategory::Aluminum => 73_000.0, // ~200 years
+            WasteCategory::Steel => 18_250.0, // ~50 years (rusting)
+            WasteCategory::GlassClear | WasteCategory::GlassColored => 365_000.0, // ~1000 years
+            WasteCategory::Rubber => 36_500.0, // ~100 years
+            WasteCategory::Electronic => 36_500.0, // ~100 years
+            WasteCategory::Hazardous => 18_250.0, // varies widely
+            WasteCategory::Mixed => 3_650.0,  // ~10 years average
         }
     }
 

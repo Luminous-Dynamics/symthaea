@@ -299,7 +299,6 @@ pub enum AccuracyTrend {
     Insufficient, // Not enough data
 }
 
-
 /// A suggested threshold mutation from the meta-cognitive layer.
 #[derive(Debug, Clone)]
 pub struct MutationSuggestion {
@@ -376,7 +375,11 @@ impl MetaCognitiveLayer {
                 reason: "low error with plateaued accuracy suggests consolidation gap",
             });
         }
-        suggestions.sort_by(|a, b| b.confidence.partial_cmp(&a.confidence).unwrap_or(std::cmp::Ordering::Equal));
+        suggestions.sort_by(|a, b| {
+            b.confidence
+                .partial_cmp(&a.confidence)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
         suggestions.truncate(3);
         suggestions
     }

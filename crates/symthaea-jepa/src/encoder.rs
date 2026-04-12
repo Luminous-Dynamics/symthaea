@@ -73,11 +73,7 @@ impl ContextEncoder {
     /// - weight_grad: [latent_dim × input_dim] for encoder weight update
     /// - bias_grad: [latent_dim] for bias update
     /// - input_grad: [input_dim] for backprop (unused currently, reserved)
-    pub fn backward(
-        &self,
-        hv: &ContinuousHV,
-        latent_grad: &[f32],
-    ) -> (Vec<f32>, Vec<f32>) {
+    pub fn backward(&self, hv: &ContinuousHV, latent_grad: &[f32]) -> (Vec<f32>, Vec<f32>) {
         let x = &hv.values;
 
         // Recompute pre-activation for SiLU derivative

@@ -95,7 +95,8 @@ impl JepaEngine {
     pub fn new(config: JepaConfig, seed: u64) -> Self {
         let context = ContextEncoder::new(config.input_dim, config.latent_dim, seed);
         let target = TargetEncoder::from_context(&context);
-        let predictor = LatentPredictor::new(config.latent_dim, config.num_actions, seed.wrapping_add(42));
+        let predictor =
+            LatentPredictor::new(config.latent_dim, config.num_actions, seed.wrapping_add(42));
         let state = JepaState::new(config.latent_dim);
         Self {
             context,
@@ -163,14 +164,18 @@ impl JepaEngine {
 
         // Backward through predictor
         let output_grad = cosine_loss_gradient(&z_hat, &z_star);
-        let latent_grad = self.predictor.backward(&z_t, action, &output_grad, learning_rate);
+        let latent_grad = self
+            .predictor
+            .backward(&z_t, action, &output_grad, learning_rate);
 
         // Backward through context encoder
         let (weight_grad, bias_grad) = self.context.backward(current_hv, &latent_grad);
-        self.context.apply_gradients(&weight_grad, &bias_grad, learning_rate, 1e-5);
+        self.context
+            .apply_gradients(&weight_grad, &bias_grad, learning_rate, 1e-5);
 
         // EMA update target encoder (no gradient)
-        self.target.update_from_context(&self.context, self.config.ema_momentum);
+        self.target
+            .update_from_context(&self.context, self.config.ema_momentum);
 
         // Update state
         self.state.last_pe = prediction_error(&z_hat, &z_star);
@@ -227,7 +232,10 @@ mod tests {
         let hv = random_hv(1);
         let latent = engine.context.encode(&hv);
         assert_eq!(latent.len(), 128, "latent should be 128D");
-        assert!(latent.iter().all(|v| v.is_finite()), "all values should be finite");
+        assert!(
+            latent.iter().all(|v| v.is_finite()),
+            "all values should be finite"
+        );
     }
 
     #[test]

@@ -16,6 +16,15 @@ use mujoco_rs::prelude::*;
 use crate::simulator::PhysicsSimulator;
 use crate::types::{FlightState, QuadrotorCommand};
 
+/// Errors that can occur during MuJoCo simulator initialization.
+#[derive(Debug)]
+pub enum SimulatorError {
+    /// Failed to load MJCF model from file path.
+    ModelLoadFailed(String),
+    /// Failed to parse MJCF XML string.
+    ModelParseFailed(String),
+}
+
 /// MuJoCo-based physics simulator for the Crazyflie 2 quadrotor.
 ///
 /// Loads an MJCF model and provides step-accurate simulation with full
@@ -34,10 +43,12 @@ pub struct MuJoCoSimulator {
 
 impl MuJoCoSimulator {
     /// Create a new MuJoCo simulator from an MJCF XML path.
-    pub fn new(model_path: &str) -> Self {
+    pub fn new(model_path: &str) -> Result<Self, SimulatorError> {
         let model = Arc::new(
             MjModel::from_xml(model_path)
-                .unwrap_or_else(|e| panic!("Failed to load MJCF model '{}': {:?}", model_path, e)),
+                .map_err(|e| SimulatorError::ModelLoadFailed(
+                    format!("{}: {:?}", model_path, e),
+                ))?,
         );
         let body_id = Self::find_body_id(&model, "cf2");
         let data = MjData::new(Arc::clone(&model));
@@ -53,14 +64,14 @@ impl MuJoCoSimulator {
         // Forward kinematics to populate xpos/xquat from qpos
         sim.data.forward();
         sim.extract_state();
-        sim
+        Ok(sim)
     }
 
     /// Create a MuJoCo simulator from an XML string.
-    pub fn from_xml_string(xml: &str) -> Self {
+    pub fn from_xml_string(xml: &str) -> Result<Self, SimulatorError> {
         let model = Arc::new(
             MjModel::from_xml_string(xml)
-                .unwrap_or_else(|e| panic!("Failed to parse MJCF XML: {:?}", e)),
+                .map_err(|e| SimulatorError::ModelParseFailed(format!("{:?}", e)))?,
         );
         let body_id = Self::find_body_id(&model, "cf2");
         let data = MjData::new(Arc::clone(&model));
@@ -76,18 +87,18 @@ impl MuJoCoSimulator {
         // Forward kinematics to populate xpos/xquat from qpos
         sim.data.forward();
         sim.extract_state();
-        sim
+        Ok(sim)
     }
 
     /// Create from the primitive Crazyflie 2 asset (zero mesh deps).
-    pub fn from_primitive() -> Self {
+    pub fn from_primitive() -> Result<Self, SimulatorError> {
         let path = concat!(env!("CARGO_MANIFEST_DIR"), "/assets/cf2_simple.xml");
         Self::new(path)
     }
 
     /// Create from the vendored Crazyflie 2 asset.
     /// Alias for `from_primitive()` — the primitive model is our default.
-    pub fn from_vendored() -> Self {
+    pub fn from_vendored() -> Result<Self, SimulatorError> {
         Self::from_primitive()
     }
 
@@ -327,7 +338,7 @@ mod tests {
     #[test]
     #[ignore] // Requires MuJoCo library
     fn test_mujoco_primitive_loads() {
-        let sim = MuJoCoSimulator::from_primitive();
+        let sim = MuJoCoSimulator::from_primitive().unwrap();
         assert!(sim.state().altitude() > 0.0);
         assert!(sim.body_mass() > 0.0);
     }
@@ -335,7 +346,7 @@ mod tests {
     #[test]
     #[ignore] // Requires MuJoCo library
     fn test_mujoco_hover_maintains_altitude() {
-        let mut sim = MuJoCoSimulator::from_primitive();
+        let mut sim = MuJoCoSimulator::from_primitive().unwrap();
         let cmd = QuadrotorCommand::hover();
         for _ in 0..500 {
             sim.step(&cmd, 0.002);
@@ -350,7 +361,7 @@ mod tests {
     #[test]
     #[ignore] // Requires MuJoCo library
     fn test_mujoco_external_force() {
-        let mut sim = MuJoCoSimulator::from_primitive();
+        let mut sim = MuJoCoSimulator::from_primitive().unwrap();
         sim.apply_external_force([0.1, 0.0, 0.0]);
         let cmd = QuadrotorCommand::hover();
         sim.step(&cmd, 0.002);
@@ -361,7 +372,7 @@ mod tests {
     #[test]
     #[ignore] // Requires MuJoCo library
     fn test_mujoco_reset() {
-        let mut sim = MuJoCoSimulator::from_primitive();
+        let mut sim = MuJoCoSimulator::from_primitive().unwrap();
         let cmd = QuadrotorCommand::zero();
         for _ in 0..100 {
             sim.step(&cmd, 0.002);
@@ -373,7 +384,7 @@ mod tests {
     #[test]
     #[ignore] // Requires MuJoCo library
     fn test_mujoco_mass_change() {
-        let mut sim = MuJoCoSimulator::from_primitive();
+        let mut sim = MuJoCoSimulator::from_primitive().unwrap();
         let original_mass = sim.body_mass();
         sim.set_body_mass(original_mass * 1.5);
         assert!((sim.body_mass() - original_mass * 1.5).abs() < 1e-6);
@@ -382,7 +393,7 @@ mod tests {
     #[test]
     #[ignore] // Requires MuJoCo library
     fn test_mujoco_body_position() {
-        let sim = MuJoCoSimulator::from_primitive();
+        let sim = MuJoCoSimulator::from_primitive().unwrap();
         let pos = sim.body_position("cf2");
         assert!(pos[2] > 0.0); // Should be above ground
     }
@@ -391,7 +402,7 @@ mod tests {
     #[ignore] // Requires MuJoCo library
     fn test_sacrifice_scene_loads() {
         let path = concat!(env!("CARGO_MANIFEST_DIR"), "/assets/cf2_sacrifice.xml");
-        let sim = MuJoCoSimulator::new(path);
+        let sim = MuJoCoSimulator::new(path).unwrap();
         // Should have all bodies
         let drone_pos = sim.body_position("cf2");
         let human_pos = sim.body_position("human");

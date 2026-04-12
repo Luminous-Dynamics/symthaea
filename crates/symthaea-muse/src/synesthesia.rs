@@ -57,7 +57,7 @@ pub struct SynestheticAudioParams {
 
 /// Synesthetic encoder: binds visual features to audio HV via HDC operations.
 pub struct SynestheticEncoder {
-    hue_basis: Vec<ContinuousHV>,     // 12 pitch-class basis HVs
+    hue_basis: Vec<ContinuousHV>, // 12 pitch-class basis HVs
     sat_basis: ContinuousHV,
     light_basis: ContinuousHV,
     angular_basis: ContinuousHV,
@@ -90,7 +90,8 @@ impl SynestheticEncoder {
         let hue_idx = ((vis.hue * 12.0) as usize).min(11);
         let hue_frac = vis.hue * 12.0 - hue_idx as f32;
         let next_idx = (hue_idx + 1) % 12;
-        let hue_hv = self.hue_basis[hue_idx].scale(1.0 - hue_frac)
+        let hue_hv = self.hue_basis[hue_idx]
+            .scale(1.0 - hue_frac)
             .add(&self.hue_basis[next_idx].scale(hue_frac));
 
         // Bind all features
@@ -124,11 +125,7 @@ impl SynestheticEncoder {
 
     /// Cross-modal similarity: how "similar" does a visual feature
     /// sound to an audio feature? Returns cosine similarity [-1, 1].
-    pub fn cross_modal_similarity(
-        &self,
-        visual: &VisualFeatures,
-        audio_hv: &ContinuousHV,
-    ) -> f32 {
+    pub fn cross_modal_similarity(&self, visual: &VisualFeatures, audio_hv: &ContinuousHV) -> f32 {
         let visual_hv = self.encode_visual(visual);
         visual_hv.similarity(audio_hv)
     }
@@ -172,28 +169,55 @@ mod tests {
         let enc = SynestheticEncoder::new(&test_genesis());
 
         // Red (hue=0) → C (pitch_class=0)
-        let red = VisualFeatures { hue: 0.0, ..Default::default() };
+        let red = VisualFeatures {
+            hue: 0.0,
+            ..Default::default()
+        };
         assert_eq!(enc.visual_to_audio(&red).pitch_class, 0);
 
         // Blue (hue=0.67) → Ab (pitch_class=8)
-        let blue = VisualFeatures { hue: 0.67, ..Default::default() };
+        let blue = VisualFeatures {
+            hue: 0.67,
+            ..Default::default()
+        };
         assert_eq!(enc.visual_to_audio(&blue).pitch_class, 8);
     }
 
     #[test]
     fn saturation_maps_to_brightness() {
         let enc = SynestheticEncoder::new(&test_genesis());
-        let grey = VisualFeatures { saturation: 0.0, ..Default::default() };
-        let vivid = VisualFeatures { saturation: 1.0, ..Default::default() };
+        let grey = VisualFeatures {
+            saturation: 0.0,
+            ..Default::default()
+        };
+        let vivid = VisualFeatures {
+            saturation: 1.0,
+            ..Default::default()
+        };
         assert!(enc.visual_to_audio(&vivid).brightness > enc.visual_to_audio(&grey).brightness);
     }
 
     #[test]
     fn similar_colors_similar_hvs() {
         let enc = SynestheticEncoder::new(&test_genesis());
-        let red1 = VisualFeatures { hue: 0.0, saturation: 0.5, lightness: 0.5, ..Default::default() };
-        let red2 = VisualFeatures { hue: 0.02, saturation: 0.55, lightness: 0.48, ..Default::default() };
-        let blue = VisualFeatures { hue: 0.67, saturation: 0.5, lightness: 0.5, ..Default::default() };
+        let red1 = VisualFeatures {
+            hue: 0.0,
+            saturation: 0.5,
+            lightness: 0.5,
+            ..Default::default()
+        };
+        let red2 = VisualFeatures {
+            hue: 0.02,
+            saturation: 0.55,
+            lightness: 0.48,
+            ..Default::default()
+        };
+        let blue = VisualFeatures {
+            hue: 0.67,
+            saturation: 0.5,
+            lightness: 0.5,
+            ..Default::default()
+        };
 
         let hv_r1 = enc.encode_visual(&red1);
         let hv_r2 = enc.encode_visual(&red2);
@@ -201,14 +225,22 @@ mod tests {
 
         let sim_close = hv_r1.similarity(&hv_r2);
         let sim_far = hv_r1.similarity(&hv_b);
-        assert!(sim_close > sim_far, "similar colors should be closer: {sim_close} vs {sim_far}");
+        assert!(
+            sim_close > sim_far,
+            "similar colors should be closer: {sim_close} vs {sim_far}"
+        );
     }
 
     #[test]
     fn cross_modal_similarity_works() {
         let genesis = test_genesis();
         let enc = SynestheticEncoder::new(&genesis);
-        let vis = VisualFeatures { hue: 0.0, saturation: 0.5, lightness: 0.5, ..Default::default() };
+        let vis = VisualFeatures {
+            hue: 0.0,
+            saturation: 0.5,
+            lightness: 0.5,
+            ..Default::default()
+        };
         let audio_hv = genesis.hv("some_audio", HDC_DIMENSION);
         let sim = enc.cross_modal_similarity(&vis, &audio_hv);
         assert!(sim.is_finite());
@@ -218,8 +250,12 @@ mod tests {
     #[test]
     fn apply_modulation_stays_bounded() {
         let params = SynestheticAudioParams {
-            pitch_class: 5, brightness: 1.0, velocity: 1.0,
-            staccato: 1.0, harmonic_density: 1.0, tempo_scale: 2.0,
+            pitch_class: 5,
+            brightness: 1.0,
+            velocity: 1.0,
+            staccato: 1.0,
+            harmonic_density: 1.0,
+            tempo_scale: 2.0,
         };
         let mut state = crate::MusicalState::default();
         apply_synesthetic_modulation(&params, &mut state, 1.0);

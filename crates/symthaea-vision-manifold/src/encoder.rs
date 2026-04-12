@@ -385,6 +385,50 @@ impl PatchHdcEncoder {
             }
         }
 
+        // Opponent color features: model V1 double-opponent cells (Hubel & Wiesel 1968).
+        //
+        // Red–green (R–G) and blue–yellow (B–Y) opponent channels capture color
+        // contrast in a perceptually meaningful basis. Values are mapped from
+        // [-1, 1] to [0, 1] so they fit the feature quantizer.
+        //
+        //   rg = 0.5 means pure achromatic (R ≈ G)
+        //   rg > 0.5 means red bias; rg < 0.5 means green bias
+        //   by = 0.5 means achromatic; by > 0.5 means blue bias; by < 0.5 means yellow bias
+        if self.config.enable_opponent_color {
+            if channels >= 3 {
+                // mean_r / mean_g / mean_b are already normalized to [0, 1]
+                let rg = (mean_r - mean_g + 1.0) / 2.0; // [0, 1]
+                let by = (mean_b - 0.5 * (mean_r + mean_g) + 1.0) / 2.0; // [0, 1]
+                features.push(rg.clamp(0.0, 1.0));
+                features.push(by.clamp(0.0, 1.0));
+            } else {
+                // Grayscale: opponent channels are neutral
+                features.push(0.5);
+                features.push(0.5);
+            }
+        }
+
+        // Depth channel: monocular depth cues when no sensor data is available.
+        //
+        // Two cues combined (Cutting & Vishton 1995):
+        // 1. **Texture gradient** — variance decreases with distance (Gibson 1950):
+        //    `texture_depth = 1.0 - variance` (low variance → far away)
+        // 2. **Relative vertical position** — objects lower in frame are closer
+        //    (perspective assumption for ground-plane scenes):
+        //    `position_depth = patch_y / frame_height` (0 = top/far, 1 = bottom/near)
+        //
+        // Final depth = 0.6 * texture + 0.4 * position (texture-dominant blend).
+        // Values in [0, 1]: 0 = near, 1 = far.
+        if self.config.enable_depth {
+            let texture_depth = (1.0 - variance).clamp(0.0, 1.0);
+            let frame_height = (width as f32 / self.config.patch_size as f32)
+                .max(1.0)
+                * self.config.patch_size as f32;
+            let position_depth = 1.0 - (patch_y as f32 / frame_height.max(1.0)).clamp(0.0, 1.0);
+            let depth = (0.6 * texture_depth + 0.4 * position_depth).clamp(0.0, 1.0);
+            features.push(depth);
+        }
+
         features
     }
 
@@ -482,6 +526,81 @@ impl PatchHdcEncoder {
 
     pub fn grid_for(&self, width: u32, height: u32) -> PatchGrid {
         PatchGrid::new(width, height, self.config.patch_size)
+    }
+
+    /// Compute per-patch stereo disparity from left and right camera frames.
+    ///
+    /// Uses block-matching: for each patch in the left frame, find the best
+    /// horizontal match in the right frame (within `max_disparity` pixels).
+    /// Disparity ∝ 1/depth (closer objects have larger disparity).
+    ///
+    /// Returns per-patch depth values in [0, 1] where 0 = near, 1 = far.
+    /// The values can be injected into the depth feature channel.
+    ///
+    /// # Arguments
+    /// * `left`, `right` — Grayscale pixel buffers (same dimensions)
+    /// * `width`, `height` — Frame dimensions
+    /// * `max_disparity` — Maximum horizontal search range in pixels (default: 16)
+    pub fn compute_stereo_depth(
+        &self,
+        left: &[u8],
+        right: &[u8],
+        width: u32,
+        height: u32,
+        max_disparity: usize,
+    ) -> Vec<f32> {
+        let grid = self.grid_for(width, height);
+        let ps = self.config.patch_size;
+        let stride = width as usize;
+        let mut depths = Vec::with_capacity(grid.num_patches());
+
+        for row in 0..grid.rows {
+            for col in 0..grid.cols {
+                let py = row * ps;
+                let px = col * ps;
+
+                // Compute mean luminance of left patch
+                let left_mean = Self::patch_mean_lum(left, stride, px, py, ps);
+
+                // Search for best match in right frame (horizontal only, epipolar)
+                let mut best_disparity = 0usize;
+                let mut best_sad = f32::MAX;
+
+                let search_start = px.saturating_sub(max_disparity);
+                let search_end = px; // disparity is always leftward for standard stereo
+
+                for d_px in search_start..=search_end {
+                    let right_mean = Self::patch_mean_lum(right, stride, d_px, py, ps);
+                    let sad = (left_mean - right_mean).abs();
+                    if sad < best_sad {
+                        best_sad = sad;
+                        best_disparity = px - d_px;
+                    }
+                }
+
+                // Disparity → depth: large disparity = near (0), zero disparity = far (1)
+                let max_d = max_disparity.max(1) as f32;
+                let depth = 1.0 - (best_disparity as f32 / max_d).clamp(0.0, 1.0);
+                depths.push(depth);
+            }
+        }
+        depths
+    }
+
+    /// Mean luminance of a patch region.
+    fn patch_mean_lum(pixels: &[u8], stride: usize, px: usize, py: usize, ps: usize) -> f32 {
+        let mut sum = 0.0f32;
+        let mut count = 0.0f32;
+        for dy in 0..ps {
+            for dx in 0..ps {
+                let idx = (py + dy) * stride + (px + dx);
+                if idx < pixels.len() {
+                    sum += pixels[idx] as f32;
+                    count += 1.0;
+                }
+            }
+        }
+        if count > 0.0 { sum / count } else { 0.0 }
     }
 
     pub fn max_rows(&self) -> usize {
@@ -1192,8 +1311,8 @@ mod tests {
         let mut cfg = VisionConfig::default();
         cfg.enable_motion = false;
         let enc = PatchHdcEncoder::new(&cfg, 64, 64);
-        // Without motion, total features = 5 + 2 color = 7
-        assert_eq!(enc.feature_weights().len(), 7);
+        // Without motion: 5 base + 2 color + 2 opponent = 9
+        assert_eq!(enc.feature_weights().len(), 9);
     }
 
     // === Color Features ===
@@ -1223,8 +1342,8 @@ mod tests {
         let mut cfg = VisionConfig::default();
         cfg.enable_color = false;
         let enc = PatchHdcEncoder::new(&cfg, 64, 64);
-        // Without color, total features = 5 + 2 motion = 7
-        assert_eq!(enc.feature_weights().len(), 7);
+        // Without YCbCr: 5 base + 2 motion + 2 opponent = 9
+        assert_eq!(enc.feature_weights().len(), 9);
     }
 
     #[test]
@@ -1232,9 +1351,94 @@ mod tests {
         let mut cfg = VisionConfig::default();
         cfg.enable_motion = false;
         cfg.enable_color = false;
+        cfg.enable_opponent_color = false;
         let enc = PatchHdcEncoder::new(&cfg, 64, 64);
         // Base only = 5
         assert_eq!(enc.feature_weights().len(), 5);
+    }
+
+    // === Opponent Color Features ===
+
+    #[test]
+    fn test_opponent_color_feature_count() {
+        let cfg = VisionConfig::default();
+        let enc = PatchHdcEncoder::new(&cfg, 64, 64);
+        // Default: 5 base + 2 motion + 2 color + 2 opponent = 11
+        assert_eq!(enc.feature_weights().len(), 11);
+    }
+
+    #[test]
+    fn test_opponent_color_disabled() {
+        let mut cfg = VisionConfig::default();
+        cfg.enable_opponent_color = false;
+        let enc = PatchHdcEncoder::new(&cfg, 64, 64);
+        // Without opponent: 5 + 2 motion + 2 color = 9
+        assert_eq!(enc.feature_weights().len(), 9);
+    }
+
+    #[test]
+    fn test_opponent_red_vs_green_discrimination() {
+        let cfg = VisionConfig::default();
+        let mut enc = PatchHdcEncoder::new(&cfg, 64, 64);
+
+        // Pure red frame: high rg_opponent (R >> G)
+        let red_frame: Vec<u8> = (0..64 * 64).flat_map(|_| vec![255u8, 0, 0]).collect();
+        let (hv_red, _) = enc.encode_frame(&red_frame, 64, 64, 3);
+        enc.prev_patch_lum.clear();
+
+        // Pure green frame: low rg_opponent (G >> R)
+        let green_frame: Vec<u8> = (0..64 * 64).flat_map(|_| vec![0u8, 255, 0]).collect();
+        let (hv_green, _) = enc.encode_frame(&green_frame, 64, 64, 3);
+
+        // Opponent channels should make red and green clearly distinct
+        let sim = hv_red.similarity(&hv_green);
+        assert!(
+            sim < 0.9,
+            "Red and green should be distinguishable via opponent channels: sim={sim}"
+        );
+    }
+
+    #[test]
+    fn test_opponent_blue_vs_yellow_discrimination() {
+        let cfg = VisionConfig::default();
+        let mut enc = PatchHdcEncoder::new(&cfg, 64, 64);
+
+        // Pure blue frame: high by_opponent
+        let blue_frame: Vec<u8> = (0..64 * 64).flat_map(|_| vec![0u8, 0, 255]).collect();
+        let (hv_blue, _) = enc.encode_frame(&blue_frame, 64, 64, 3);
+        enc.prev_patch_lum.clear();
+
+        // Yellow = R+G full, B=0: low by_opponent
+        let yellow_frame: Vec<u8> = (0..64 * 64).flat_map(|_| vec![255u8, 255, 0]).collect();
+        let (hv_yellow, _) = enc.encode_frame(&yellow_frame, 64, 64, 3);
+
+        let sim = hv_blue.similarity(&hv_yellow);
+        assert!(
+            sim < 0.9,
+            "Blue and yellow should be distinguishable via opponent channels: sim={sim}"
+        );
+    }
+
+    #[test]
+    fn test_opponent_achromatic_is_neutral() {
+        // Gray frame should produce neutral (≈0.5) opponent values.
+        // With opponent channels, gray should not look like red or blue.
+        let cfg = VisionConfig::default();
+        let mut enc = PatchHdcEncoder::new(&cfg, 64, 64);
+
+        let gray_frame: Vec<u8> = (0..64 * 64).flat_map(|_| vec![128u8, 128, 128]).collect();
+        let (hv_gray, _) = enc.encode_frame(&gray_frame, 64, 64, 3);
+        enc.prev_patch_lum.clear();
+
+        let red_frame: Vec<u8> = (0..64 * 64).flat_map(|_| vec![255u8, 0, 0]).collect();
+        let (hv_red, _) = enc.encode_frame(&red_frame, 64, 64, 3);
+
+        // Gray and red should be distinguishable
+        let sim = hv_gray.similarity(&hv_red);
+        assert!(
+            sim < 0.98,
+            "Achromatic gray should differ from pure red: sim={sim}"
+        );
     }
 
     // === Attention-Weighted Encoding ===

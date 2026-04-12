@@ -37,67 +37,65 @@ impl Genre {
         match self {
             Self::ProgMetal => MusicalState {
                 consciousness_level: 0.85, // high complexity
-                arousal: 0.75,              // energetic
-                valence: 0.2,               // slightly dark
-                dopamine: 0.7,              // bright, technical
-                serotonin: 0.2,             // not laid-back
-                noradrenaline: 0.6,         // edge, intensity
-                prediction_error: 0.6,      // surprising, complex
+                arousal: 0.75,             // energetic
+                valence: 0.2,              // slightly dark
+                dopamine: 0.7,             // bright, technical
+                serotonin: 0.2,            // not laid-back
+                noradrenaline: 0.6,        // edge, intensity
+                prediction_error: 0.6,     // surprising, complex
                 harmony_activations: [
-                    0.4, 0.3, 0.5, 0.3,    // moderate coherence, high creative
-                    0.5, 0.4, 0.8, 0.1,    // high evolutionary progression
+                    0.4, 0.3, 0.5, 0.3, // moderate coherence, high creative
+                    0.5, 0.4, 0.8, 0.1, // high evolutionary progression
                 ],
             },
             Self::Jazz => MusicalState {
                 consciousness_level: 0.7,
                 arousal: 0.4,
                 valence: 0.3,
-                dopamine: 0.6,              // colorful harmony
-                serotonin: 0.6,             // warm, relaxed
+                dopamine: 0.6,  // colorful harmony
+                serotonin: 0.6, // warm, relaxed
                 noradrenaline: 0.2,
-                prediction_error: 0.4,      // moderate surprise
+                prediction_error: 0.4, // moderate surprise
                 harmony_activations: [
-                    0.6, 0.5, 0.4, 0.6,    // high coherence, infinite play
+                    0.6, 0.5, 0.4, 0.6, // high coherence, infinite play
                     0.4, 0.3, 0.5, 0.3,
                 ],
             },
             Self::ProgressiveAtmospheric => MusicalState {
                 consciousness_level: 0.6,
-                arousal: 0.25,              // slow build
-                valence: 0.1,               // neutral to dark
+                arousal: 0.25, // slow build
+                valence: 0.1,  // neutral to dark
                 dopamine: 0.3,
-                serotonin: 0.7,             // warm, atmospheric
+                serotonin: 0.7, // warm, atmospheric
                 noradrenaline: 0.15,
-                prediction_error: 0.2,      // gradual surprise
+                prediction_error: 0.2, // gradual surprise
                 harmony_activations: [
-                    0.5, 0.3, 0.3, 0.2,
-                    0.3, 0.4, 0.4, 0.5,    // moderate stillness
+                    0.5, 0.3, 0.3, 0.2, 0.3, 0.4, 0.4, 0.5, // moderate stillness
                 ],
             },
             Self::FunkGroove => MusicalState {
                 consciousness_level: 0.5,
-                arousal: 0.6,               // energetic but not aggressive
-                valence: 0.5,               // positive
-                dopamine: 0.8,              // bright, funky
-                serotonin: 0.5,             // warm groove
+                arousal: 0.6,   // energetic but not aggressive
+                valence: 0.5,   // positive
+                dopamine: 0.8,  // bright, funky
+                serotonin: 0.5, // warm groove
                 noradrenaline: 0.2,
-                prediction_error: 0.3,      // pocket, not chaotic
+                prediction_error: 0.3, // pocket, not chaotic
                 harmony_activations: [
-                    0.7, 0.3, 0.3, 0.7,    // high coherence + infinite play
+                    0.7, 0.3, 0.3, 0.7, // high coherence + infinite play
                     0.4, 0.3, 0.3, 0.1,
                 ],
             },
             Self::AmbientContemplative => MusicalState {
                 consciousness_level: 0.4,
-                arousal: 0.1,               // very calm
-                valence: 0.15,              // slightly melancholy
+                arousal: 0.1,  // very calm
+                valence: 0.15, // slightly melancholy
                 dopamine: 0.15,
-                serotonin: 0.8,             // very warm
+                serotonin: 0.8, // very warm
                 noradrenaline: 0.05,
-                prediction_error: 0.1,      // minimal surprise
+                prediction_error: 0.1, // minimal surprise
                 harmony_activations: [
-                    0.3, 0.2, 0.2, 0.1,
-                    0.2, 0.3, 0.2, 0.8,    // high stillness
+                    0.3, 0.2, 0.2, 0.1, 0.2, 0.3, 0.2, 0.8, // high stillness
                 ],
             },
             Self::ClassicRock => MusicalState {
@@ -106,49 +104,46 @@ impl Genre {
                 valence: 0.35,
                 dopamine: 0.5,
                 serotonin: 0.4,
-                noradrenaline: 0.5,         // raw energy
+                noradrenaline: 0.5, // raw energy
                 prediction_error: 0.35,
-                harmony_activations: [
-                    0.5, 0.4, 0.4, 0.3,
-                    0.5, 0.4, 0.5, 0.15,
-                ],
+                harmony_activations: [0.5, 0.4, 0.4, 0.3, 0.5, 0.4, 0.5, 0.15],
             },
             Self::ElectronicPsych => MusicalState {
                 consciousness_level: 0.6,
                 arousal: 0.5,
-                valence: 0.4,               // positive, dreamy
+                valence: 0.4, // positive, dreamy
                 dopamine: 0.6,
                 serotonin: 0.5,
                 noradrenaline: 0.3,
-                prediction_error: 0.45,     // psychedelic surprise
+                prediction_error: 0.45, // psychedelic surprise
                 harmony_activations: [
-                    0.4, 0.5, 0.5, 0.5,    // explorative
+                    0.4, 0.5, 0.5, 0.5, // explorative
                     0.3, 0.4, 0.4, 0.3,
                 ],
             },
             Self::Classical => MusicalState {
                 consciousness_level: 0.65,
-                arousal: 0.35,              // moderate, controlled
-                valence: 0.15,              // slightly melancholy (minor key feel)
-                dopamine: 0.3,              // not flashy
-                serotonin: 0.55,            // warm
+                arousal: 0.35,   // moderate, controlled
+                valence: 0.15,   // slightly melancholy (minor key feel)
+                dopamine: 0.3,   // not flashy
+                serotonin: 0.55, // warm
                 noradrenaline: 0.15,
-                prediction_error: 0.25,     // structured, some surprise
+                prediction_error: 0.25, // structured, some surprise
                 harmony_activations: [
-                    0.6, 0.4, 0.3, 0.2,    // good coherence
-                    0.3, 0.4, 0.5, 0.3,    // moderate progression
+                    0.6, 0.4, 0.3, 0.2, // good coherence
+                    0.3, 0.4, 0.5, 0.3, // moderate progression
                 ],
             },
             Self::IslandGroove => MusicalState {
                 consciousness_level: 0.4,
                 arousal: 0.35,
-                valence: 0.6,               // warm, positive
+                valence: 0.6, // warm, positive
                 dopamine: 0.4,
-                serotonin: 0.75,            // very laid-back
+                serotonin: 0.75, // very laid-back
                 noradrenaline: 0.1,
-                prediction_error: 0.15,     // predictable, comforting
+                prediction_error: 0.15, // predictable, comforting
                 harmony_activations: [
-                    0.6, 0.3, 0.2, 0.5,    // coherent + playful
+                    0.6, 0.3, 0.2, 0.5, // coherent + playful
                     0.3, 0.2, 0.2, 0.4,
                 ],
             },
@@ -173,23 +168,29 @@ impl Genre {
     /// Suggested duration in seconds.
     pub fn duration_secs(&self) -> f32 {
         match self {
-            Self::ProgMetal => 360.0,             // 6 min (prog suites)
+            Self::ProgMetal => 360.0,              // 6 min (prog suites)
             Self::Jazz => 300.0,                   // 5 min
             Self::ProgressiveAtmospheric => 480.0, // 8 min (long builds)
             Self::FunkGroove => 240.0,             // 4 min
             Self::AmbientContemplative => 420.0,   // 7 min
             Self::ClassicRock => 270.0,            // 4.5 min
             Self::ElectronicPsych => 360.0,        // 6 min
-            Self::Classical => 300.0,               // 5 min
+            Self::Classical => 300.0,              // 5 min
             Self::IslandGroove => 240.0,           // 4 min
         }
     }
 
     pub fn all() -> &'static [Genre] {
         &[
-            Self::ProgMetal, Self::Jazz, Self::ProgressiveAtmospheric,
-            Self::FunkGroove, Self::AmbientContemplative, Self::ClassicRock,
-            Self::ElectronicPsych, Self::IslandGroove, Self::Classical,
+            Self::ProgMetal,
+            Self::Jazz,
+            Self::ProgressiveAtmospheric,
+            Self::FunkGroove,
+            Self::AmbientContemplative,
+            Self::ClassicRock,
+            Self::ElectronicPsych,
+            Self::IslandGroove,
+            Self::Classical,
         ]
     }
 
@@ -235,7 +236,10 @@ mod tests {
     fn ambient_is_calm() {
         let state = Genre::AmbientContemplative.seed_state();
         assert!(state.arousal < 0.2, "ambient should be calm");
-        assert!(state.harmony_activations[7] > 0.6, "ambient should have stillness");
+        assert!(
+            state.harmony_activations[7] > 0.6,
+            "ambient should have stillness"
+        );
     }
 
     #[test]

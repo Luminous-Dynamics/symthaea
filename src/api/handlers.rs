@@ -7,9 +7,10 @@ use crate::api::{
     models::*,
     state::{AppState, Submission, SubmissionRequestStored},
 };
+use crate::control_plane::parse_bearer_token;
 use axum::{
     extract::{Path, Query, State},
-    http::StatusCode,
+    http::{HeaderMap, StatusCode},
     Json,
 };
 use serde::Deserialize;
@@ -17,6 +18,7 @@ use std::sync::Arc;
 use symthaea_core::hdc::{
     consciousness_topology_generators::ConsciousnessTopology, ContinuousHV, HDC_DIMENSION,
 };
+use tracing::{info, warn};
 use uuid::Uuid;
 
 const MAX_TOPOLOGY_NODES: usize = 256;
@@ -304,6 +306,26 @@ pub async fn submit_model(
         ));
     }
 
+    if request.public == Some(false) && state.bearer_token().is_none() {
+        let _ = state.record_audit(
+            "private_submission_rejected",
+            &request.model_name,
+            "private submissions require bearer auth configuration",
+        );
+        warn!(
+            target: "symthaea_api_audit",
+            event = "private_submission_rejected",
+            model_name = %request.model_name,
+            reason = "private submissions require bearer auth configuration"
+        );
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(ApiError::bad_request(
+                "private submissions require API bearer auth to be configured",
+            )),
+        ));
+    }
+
     let custom = match custom_input(&request) {
         Ok(custom) => custom,
         Err(err) => return Err((StatusCode::BAD_REQUEST, Json(err))),
@@ -399,6 +421,21 @@ pub async fn submit_model(
         .write()
         .await
         .insert(submission_id, submission);
+    let _ = state.record_audit(
+        "submission_enqueued",
+        &request.model_name,
+        &format!(
+            "submission_id={submission_id} public={}",
+            request.public.unwrap_or(true)
+        ),
+    );
+    info!(
+        target: "symthaea_api_audit",
+        event = "submission_enqueued",
+        submission_id = %submission_id,
+        model_name = %request.model_name,
+        public = request.public.unwrap_or(true)
+    );
 
     // Estimate processing time based on node count
     let n_nodes = match &custom {
@@ -413,18 +450,26 @@ pub async fn submit_model(
         _ => 300,
     };
 
-    let process_inline = n_nodes <= 16;
-    if process_inline {
-        if let Some(submission) = state.submissions.write().await.get_mut(&submission_id) {
-            submission.status = SubmissionStatus::Processing;
-        }
-
-        let state = Arc::clone(&state);
-        let request = request.clone();
-        tokio::task::spawn_blocking(move || {
-            process_submission_inline(&state, submission_id, &request);
-        });
+    if let Some(submission) = state.submissions.write().await.get_mut(&submission_id) {
+        submission.status = SubmissionStatus::Processing;
     }
+    let _ = state.record_audit(
+        "submission_processing_started",
+        &request.model_name,
+        &format!("submission_id={submission_id} estimated_time_seconds={estimated_time}"),
+    );
+    info!(
+        target: "symthaea_api_audit",
+        event = "submission_processing_started",
+        submission_id = %submission_id,
+        estimated_time_seconds = estimated_time
+    );
+
+    let processing_state = Arc::clone(&state);
+    let request = request.clone();
+    tokio::task::spawn_blocking(move || {
+        process_submission_inline(&processing_state, submission_id, &request);
+    });
 
     // Get queue position
     let queue_position = state
@@ -435,12 +480,8 @@ pub async fn submit_model(
         .filter(|s| s.status == SubmissionStatus::Queued)
         .count() as u32;
 
-    let response_status = if process_inline {
-        SubmissionStatus::Processing
-    } else {
-        SubmissionStatus::Queued
-    };
-    let response_queue_position = if process_inline { 0 } else { queue_position };
+    let response_status = SubmissionStatus::Processing;
+    let response_queue_position = queue_position;
 
     Ok((
         StatusCode::ACCEPTED,
@@ -459,6 +500,18 @@ fn process_submission_inline(state: &AppState, submission_id: Uuid, request: &Su
     let (node_representations, _n_nodes) = match build_node_representations(request) {
         Ok(values) => values,
         Err(_) => {
+            let _ = state.record_audit(
+                "submission_failed",
+                &request.model_name,
+                &format!("submission_id={submission_id} failed to build node representations"),
+            );
+            warn!(
+                target: "symthaea_api_audit",
+                event = "submission_failed",
+                submission_id = %submission_id,
+                model_name = %request.model_name,
+                reason = "failed to build node representations"
+            );
             if let Some(submission) = state.submissions.blocking_write().get_mut(&submission_id) {
                 submission.status = SubmissionStatus::Failed;
             }
@@ -521,6 +574,18 @@ fn process_submission_inline(state: &AppState, submission_id: Uuid, request: &Su
 
     // Store result
     state.results.blocking_write().insert(submission_id, result);
+    let _ = state.record_audit(
+        "submission_completed",
+        &request.model_name,
+        &format!("submission_id={submission_id} phi={connectivity}"),
+    );
+    info!(
+        target: "symthaea_api_audit",
+        event = "submission_completed",
+        submission_id = %submission_id,
+        model_name = %request.model_name,
+        phi = connectivity
+    );
 
     // Update submission status
     if let Some(sub) = state.submissions.blocking_write().get_mut(&submission_id) {
@@ -531,9 +596,45 @@ fn process_submission_inline(state: &AppState, submission_id: Uuid, request: &Su
 /// Get evaluation results
 pub async fn get_results(
     State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
     Path(submission_id): Path<Uuid>,
     Query(_params): Query<std::collections::HashMap<String, String>>,
 ) -> Result<Json<EvaluationResult>, (StatusCode, Json<ApiError>)> {
+    let expected_token = state.bearer_token();
+    let provided_token = headers
+        .get("authorization")
+        .and_then(|v| v.to_str().ok())
+        .and_then(parse_bearer_token);
+
+    let submission_is_public = state
+        .submissions
+        .read()
+        .await
+        .get(&submission_id)
+        .map(|submission| submission.request.public)
+        .unwrap_or(true);
+
+    if !submission_is_public && expected_token != provided_token {
+        let _ = state.record_audit(
+            "private_result_denied",
+            &submission_id.to_string(),
+            "authorization required for private submission",
+        );
+        warn!(
+            target: "symthaea_api_audit",
+            event = "private_result_denied",
+            submission_id = %submission_id
+        );
+        return Err((
+            StatusCode::UNAUTHORIZED,
+            Json(ApiError {
+                code: "UNAUTHORIZED".to_string(),
+                message: "Authorization required for private submission".to_string(),
+                details: None,
+            }),
+        ));
+    }
+
     // Check if result exists
     if let Some(result) = state.results.read().await.get(&submission_id) {
         return Ok(Json(result.clone()));
@@ -590,7 +691,14 @@ pub async fn get_leaderboard(
     let offset = params.offset.unwrap_or(0);
 
     let entries = state.get_leaderboard(limit, offset).await;
-    let total = state.results.read().await.len() + state.baselines.len();
+    let public_submission_count = state
+        .submissions
+        .read()
+        .await
+        .values()
+        .filter(|submission| submission.request.public)
+        .count();
+    let total = public_submission_count + state.baselines.len();
 
     Json(LeaderboardResponse {
         total_submissions: total as u32,
@@ -823,21 +931,43 @@ pub async fn dimensional_sweep(
         )
     })?;
 
-    let submission_id = Uuid::new_v4();
-    let now = chrono::Utc::now();
-
-    // For now, return a queued response
-    // In production, this would start an async job
-    Ok((
-        StatusCode::ACCEPTED,
-        Json(SubmissionResponse {
-            submission_id,
-            status: SubmissionStatus::Queued,
-            estimated_time_seconds: 60,
-            position_in_queue: 1,
-            created_at: now,
+    let _ = state;
+    warn!(
+        target: "symthaea_api_audit",
+        event = "not_implemented",
+        endpoint = "dimensional_sweep"
+    );
+    let _ = state.record_audit(
+        "not_implemented",
+        "dimensional_sweep",
+        "dimensional_sweep endpoint is not implemented",
+    );
+    Err((
+        StatusCode::NOT_IMPLEMENTED,
+        Json(ApiError {
+            code: "NOT_IMPLEMENTED".to_string(),
+            message: "dimensional_sweep is not implemented yet".to_string(),
+            details: None,
         }),
     ))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct AuditQuery {
+    #[serde(default = "default_audit_limit")]
+    limit: usize,
+}
+
+fn default_audit_limit() -> usize {
+    50
+}
+
+pub async fn get_audit_events(
+    State(state): State<Arc<AppState>>,
+    Query(query): Query<AuditQuery>,
+) -> Result<Json<AuditEventsResponse>, (StatusCode, Json<ApiError>)> {
+    let events = state.audit_events(query.limit.min(500));
+    Ok(Json(AuditEventsResponse { events }))
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════

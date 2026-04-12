@@ -35,30 +35,58 @@ pub struct PerturbationSchedule {
 }
 
 impl PerturbationSchedule {
-    pub fn new() -> Self { Self::default() }
+    pub fn new() -> Self {
+        Self::default()
+    }
 
-    pub fn add(mut self, perturbation: AuvPerturbation, start: usize, clear: Option<usize>) -> Self {
-        self.entries.push(ScheduledPerturbation { perturbation, start_step: start, clear_step: clear });
+    pub fn add(
+        mut self,
+        perturbation: AuvPerturbation,
+        start: usize,
+        clear: Option<usize>,
+    ) -> Self {
+        self.entries.push(ScheduledPerturbation {
+            perturbation,
+            start_step: start,
+            clear_step: clear,
+        });
         self
     }
 
     /// Strong lateral current at step 300.
     pub fn current_shift() -> Self {
-        Self::new().add(AuvPerturbation::CurrentShift { force: [20.0, 10.0, 0.0] }, 300, Some(800))
+        Self::new().add(
+            AuvPerturbation::CurrentShift {
+                force: [20.0, 10.0, 0.0],
+            },
+            300,
+            Some(800),
+        )
     }
 
     /// Thruster 0 failure at step 500 (permanent).
     pub fn thruster_failure() -> Self {
-        Self::new().add(AuvPerturbation::ThrusterFailure { thruster_index: 0 }, 500, None)
+        Self::new().add(
+            AuvPerturbation::ThrusterFailure { thruster_index: 0 },
+            500,
+            None,
+        )
     }
 
     /// Entanglement at step 200.
     pub fn entanglement() -> Self {
-        Self::new().add(AuvPerturbation::Entanglement { drag_multiplier: 3.0 }, 200, Some(600))
+        Self::new().add(
+            AuvPerturbation::Entanglement {
+                drag_multiplier: 3.0,
+            },
+            200,
+            Some(600),
+        )
     }
 
     pub fn active_at(&self, step: usize) -> Vec<&AuvPerturbation> {
-        self.entries.iter()
+        self.entries
+            .iter()
             .filter(|e| step >= e.start_step && e.clear_step.map_or(true, |c| step < c))
             .map(|e| &e.perturbation)
             .collect()

@@ -14,7 +14,7 @@ async fn main() {
     // 1. PHASE 1: HIGH NOON (Day Phase)
     println!("\n[PHASE 1] TIME: 14:00 (Peak Day)");
     // In a real system, time is automatic. For the demo, we'll assume handle.tick()
-    // uses the current time. Since it's currently nearly 6 AM in Roodepoort,
+    // uses the current time. Since it's currently nearly 6 AM locally,
     // it's already Dawn! Let's simulate the night shift.
 
     let state = handle.snapshot().await;

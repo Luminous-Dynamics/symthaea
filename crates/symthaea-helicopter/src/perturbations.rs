@@ -40,7 +40,12 @@ impl PerturbationSchedule {
     }
 
     /// Add a perturbation to the schedule.
-    pub fn add(mut self, perturbation: HelicopterPerturbation, start: usize, clear: Option<usize>) -> Self {
+    pub fn add(
+        mut self,
+        perturbation: HelicopterPerturbation,
+        start: usize,
+        clear: Option<usize>,
+    ) -> Self {
         self.entries.push(ScheduledPerturbation {
             perturbation,
             start_step: start,

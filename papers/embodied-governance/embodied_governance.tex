@@ -131,16 +131,21 @@ Cross-cluster communication uses \texttt{CallTargetCell::OtherRole} within a uni
 
 \subsection{Consciousness-Gated Access}
 
-Mycelix implements a consciousness-gated access model where governance privileges are determined by a 4-dimensional participant profile:
+Mycelix implements a consciousness-gated access model where governance privileges are determined by an 8-dimensional sovereign profile:
 
-\begin{definition}[Consciousness Profile]
-A participant's consciousness profile is a 4-tuple $(I, R, C, E) \in [0,1]^4$ where:
+\begin{definition}[Sovereign Profile]
+A participant's sovereign profile is an 8-tuple $(D_0, \ldots, D_7) \in [0,1]^8$ where:
 \begin{itemize}
-  \item $I$ = identity verification depth (DID credentials, MFA, biometrics)
-  \item $R$ = reputation score (accumulated from governance participation, peer attestation)
-  \item $C$ = community engagement (reciprocity history, mutual aid participation)
-  \item $E$ = civic participation (voting frequency, proposal quality, council service)
+  \item $D_0$ = epistemic integrity (truth-telling track record, knowledge cluster)
+  \item $D_1$ = thermodynamic yield (physical energy contribution, energy/grid)
+  \item $D_2$ = network resilience (node uptime, bandwidth, mesh-time)
+  \item $D_3$ = economic velocity (anti-hoarding TEND circulation, finance)
+  \item $D_4$ = civic participation (voting, jury duty, proposals, governance)
+  \item $D_5$ = stewardship \& care (verified commons labor, attribution)
+  \item $D_6$ = semantic resonance (FL Hamming consensus alignment, core-FL)
+  \item $D_7$ = domain competence (peer-verified expertise with Ebbinghaus decay, craft)
 \end{itemize}
+Each dimension is measured from a primary source cluster. No single dimension's weight can exceed 50\% (constitutional invariant). All dimensions decay exponentially without engagement ($\lambda_{\min} = 0.001$/day, $\lambda_{\max} = 0.020$/day). AI agents are constitutionally capped at Steward tier.
 \end{definition}
 
 The composite score $S = w_I I + w_R R + w_C C + w_E E$ (with weights $w_I = 0.2$, $w_R = 0.3$, $w_C = 0.25$, $w_E = 0.25$) determines the participant's tier (Table~\ref{tab:tiers}):

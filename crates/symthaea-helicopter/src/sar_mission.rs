@@ -125,11 +125,27 @@ pub fn grid_search_waypoints(
 
     while lon <= ne.lon {
         if going_north {
-            waypoints.push(GeoPoint { lat: sw.lat, lon, alt: altitude });
-            waypoints.push(GeoPoint { lat: ne.lat, lon, alt: altitude });
+            waypoints.push(GeoPoint {
+                lat: sw.lat,
+                lon,
+                alt: altitude,
+            });
+            waypoints.push(GeoPoint {
+                lat: ne.lat,
+                lon,
+                alt: altitude,
+            });
         } else {
-            waypoints.push(GeoPoint { lat: ne.lat, lon, alt: altitude });
-            waypoints.push(GeoPoint { lat: sw.lat, lon, alt: altitude });
+            waypoints.push(GeoPoint {
+                lat: ne.lat,
+                lon,
+                alt: altitude,
+            });
+            waypoints.push(GeoPoint {
+                lat: sw.lat,
+                lon,
+                alt: altitude,
+            });
         }
         going_north = !going_north;
         lon += lon_step;
@@ -148,7 +164,11 @@ pub fn expanding_square_waypoints(
     expansion: f64,
     num_legs: usize,
 ) -> Vec<GeoPoint> {
-    let mut waypoints = vec![GeoPoint { lat: center.lat, lon: center.lon, alt: altitude }];
+    let mut waypoints = vec![GeoPoint {
+        lat: center.lat,
+        lon: center.lon,
+        alt: altitude,
+    }];
     let lat_per_m = 1.0 / 111_320.0;
     let lon_per_m = 1.0 / (111_320.0 * center.lat.to_radians().cos());
 
@@ -156,10 +176,10 @@ pub fn expanding_square_waypoints(
     let mut leg_length = initial_leg;
     // Directions: N, E, S, W (repeat with expanding legs)
     let directions: [(f64, f64); 4] = [
-        (lat_per_m, 0.0),          // North
-        (0.0, lon_per_m),          // East
-        (-lat_per_m, 0.0),         // South
-        (0.0, -lon_per_m),         // West
+        (lat_per_m, 0.0),  // North
+        (0.0, lon_per_m),  // East
+        (-lat_per_m, 0.0), // South
+        (0.0, -lon_per_m), // West
     ];
 
     for i in 0..num_legs {
@@ -327,15 +347,31 @@ mod tests {
 
     #[test]
     fn test_geo_point_distance() {
-        let a = GeoPoint { lat: 0.0, lon: 0.0, alt: 0.0 };
-        let b = GeoPoint { lat: 0.0, lon: 0.0, alt: 100.0 };
+        let a = GeoPoint {
+            lat: 0.0,
+            lon: 0.0,
+            alt: 0.0,
+        };
+        let b = GeoPoint {
+            lat: 0.0,
+            lon: 0.0,
+            alt: 100.0,
+        };
         assert!((a.distance_to(&b) - 100.0).abs() < 0.1);
     }
 
     #[test]
     fn test_geo_point_distance_horizontal() {
-        let a = GeoPoint { lat: 30.0, lon: -97.0, alt: 0.0 };
-        let b = GeoPoint { lat: 30.001, lon: -97.0, alt: 0.0 };
+        let a = GeoPoint {
+            lat: 30.0,
+            lon: -97.0,
+            alt: 0.0,
+        };
+        let b = GeoPoint {
+            lat: 30.001,
+            lon: -97.0,
+            alt: 0.0,
+        };
         let dist = a.distance_to(&b);
         // ~111m per 0.001 degree latitude
         assert!(dist > 100.0 && dist < 120.0, "dist={dist}");
@@ -343,8 +379,16 @@ mod tests {
 
     #[test]
     fn test_grid_search_waypoints() {
-        let sw = GeoPoint { lat: 30.0, lon: -97.0, alt: 0.0 };
-        let ne = GeoPoint { lat: 30.005, lon: -96.995, alt: 0.0 };
+        let sw = GeoPoint {
+            lat: 30.0,
+            lon: -97.0,
+            alt: 0.0,
+        };
+        let ne = GeoPoint {
+            lat: 30.005,
+            lon: -96.995,
+            alt: 0.0,
+        };
         let waypoints = grid_search_waypoints(&sw, &ne, 50.0, 100.0);
         assert!(waypoints.len() >= 4, "Should have at least 2 lanes");
         assert!(waypoints.iter().all(|wp| (wp.alt - 50.0).abs() < 0.01));
@@ -352,19 +396,37 @@ mod tests {
 
     #[test]
     fn test_grid_search_alternating_direction() {
-        let sw = GeoPoint { lat: 0.0, lon: 0.0, alt: 0.0 };
-        let ne = GeoPoint { lat: 1.0, lon: 1.0, alt: 0.0 };
+        let sw = GeoPoint {
+            lat: 0.0,
+            lon: 0.0,
+            alt: 0.0,
+        };
+        let ne = GeoPoint {
+            lat: 1.0,
+            lon: 1.0,
+            alt: 0.0,
+        };
         let waypoints = grid_search_waypoints(&sw, &ne, 50.0, 50_000.0);
         // First lane goes S→N, second goes N→S (lawn-mower)
         if waypoints.len() >= 4 {
-            assert!(waypoints[0].lat < waypoints[1].lat, "First lane should go north");
-            assert!(waypoints[2].lat > waypoints[3].lat, "Second lane should go south");
+            assert!(
+                waypoints[0].lat < waypoints[1].lat,
+                "First lane should go north"
+            );
+            assert!(
+                waypoints[2].lat > waypoints[3].lat,
+                "Second lane should go south"
+            );
         }
     }
 
     #[test]
     fn test_expanding_square_waypoints() {
-        let center = GeoPoint { lat: 30.0, lon: -97.0, alt: 0.0 };
+        let center = GeoPoint {
+            lat: 30.0,
+            lon: -97.0,
+            alt: 0.0,
+        };
         let waypoints = expanding_square_waypoints(&center, 50.0, 100.0, 50.0, 8);
         assert_eq!(waypoints.len(), 9); // center + 8 legs
         assert!(waypoints.iter().all(|wp| (wp.alt - 50.0).abs() < 0.01));
@@ -372,12 +434,19 @@ mod tests {
 
     #[test]
     fn test_expanding_square_expands() {
-        let center = GeoPoint { lat: 30.0, lon: -97.0, alt: 0.0 };
+        let center = GeoPoint {
+            lat: 30.0,
+            lon: -97.0,
+            alt: 0.0,
+        };
         let waypoints = expanding_square_waypoints(&center, 50.0, 100.0, 50.0, 8);
         // Later waypoints should be farther from center
         let dist_first = center.distance_to(&waypoints[1]);
         let dist_last = center.distance_to(&waypoints[waypoints.len() - 1]);
-        assert!(dist_last > dist_first, "Square should expand: first={dist_first}, last={dist_last}");
+        assert!(
+            dist_last > dist_first,
+            "Square should expand: first={dist_first}, last={dist_last}"
+        );
     }
 
     #[test]
@@ -423,15 +492,25 @@ mod tests {
 
         // Simple 2-waypoint mission at hover altitude
         let waypoints = vec![
-            GeoPoint { lat: 0.0, lon: 0.0, alt: 20.0 },
-            GeoPoint { lat: 0.0, lon: 0.0, alt: 30.0 },
+            GeoPoint {
+                lat: 0.0,
+                lon: 0.0,
+                alt: 20.0,
+            },
+            GeoPoint {
+                lat: 0.0,
+                lon: 0.0,
+                alt: 30.0,
+            },
         ];
 
         let metrics = run_grid_search(
-            &mut sim, &mut ctrl, &mut enc,
+            &mut sim,
+            &mut ctrl,
+            &mut enc,
             &waypoints,
             1.0 / 300.0,
-            300, // 1 second
+            300,    // 1 second
             1000.0, // Very loose tolerance for testing
         );
 

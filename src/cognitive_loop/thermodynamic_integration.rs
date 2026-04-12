@@ -176,7 +176,8 @@ impl ThermodynamicIntegration {
         }
 
         if input.has_hfe {
-            self.state.update_hfe(input.hfe_total, input.hfe_complexity, input.hfe_accuracy);
+            self.state
+                .update_hfe(input.hfe_total, input.hfe_complexity, input.hfe_accuracy);
         }
 
         self.state.update_energy(
@@ -267,8 +268,7 @@ impl ThermodynamicIntegration {
         // Science: Crooks (1999) — divergence between nonequilibrium and model free energy
         // indicates model inaccuracy → boost learning to correct.
         let divergence = self.bridge.jarzynski_hfe_divergence;
-        if divergence.is_finite()
-            && divergence > thresholds::THERMO_JARZYNSKI_DIVERGENCE_THRESHOLD
+        if divergence.is_finite() && divergence > thresholds::THERMO_JARZYNSKI_DIVERGENCE_THRESHOLD
         {
             let correction = (divergence * 0.5).min(2.0);
             feedback.hfe_lr_adjustment = correction;
@@ -279,9 +279,7 @@ impl ThermodynamicIntegration {
         // 4d: Onsager asymmetry → coherence-seeking response
         // Science: Onsager (1931) — asymmetric transport = decoupled dimensions.
         let asymmetry = self.bridge.onsager_asymmetry;
-        if asymmetry.is_finite()
-            && asymmetry > thresholds::THERMO_ONSAGER_ASYMMETRY_THRESHOLD
-        {
+        if asymmetry.is_finite() && asymmetry > thresholds::THERMO_ONSAGER_ASYMMETRY_THRESHOLD {
             feedback.exploration_factor *= thresholds::THERMO_ONSAGER_COHERENCE_DAMPING;
         }
 
@@ -354,7 +352,7 @@ impl ThermodynamicIntegration {
                 s.effective_temperature.max(0.01) * 300.0, // Scale to Kelvin range
                 s.entropy_production_rate.abs().max(0.001) * 101325.0, // Scale to Pa range
                 (1.0 - s.criticality_distance).max(0.001) * 0.001, // Scale to m³ range
-                s.order_parameter.max(0.001) * 1000.0, // Scale to Joules range
+                s.order_parameter.max(0.001) * 1000.0,     // Scale to Joules range
             )
             .vector;
 
@@ -509,7 +507,7 @@ mod tests {
         let mut ti = ThermodynamicIntegration::default();
         let mut input = default_input();
         input.analyzer_temperature = 1.5; // High temp → high Carnot
-        // Run several cycles to build up Onsager history and stabilize
+                                          // Run several cycles to build up Onsager history and stabilize
         for _ in 0..5 {
             ti.run_cycle(&input);
         }

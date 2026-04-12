@@ -13,7 +13,6 @@
 //! - Stay in a 14-semitone range
 //! - Follow the chord progression naturally
 
-
 /// Evolvable melody parameters — the evolutionary tuner optimizes these.
 #[derive(Debug, Clone)]
 pub struct MelodyParams {
@@ -116,8 +115,14 @@ impl TasteMelody {
             self.seed = self.seed.wrapping_mul(2654435761);
             let base_len = 4 + ((self.seed >> 20) % 4) as usize;
             // Ascending phrases longer to balance direction
-            self.phrase_length = if self.ascending { base_len + self.params.ascending_bonus } else { base_len };
-            if consciousness > 0.7 { self.phrase_length += 1; }
+            self.phrase_length = if self.ascending {
+                base_len + self.params.ascending_bonus
+            } else {
+                base_len
+            };
+            if consciousness > 0.7 {
+                self.phrase_length += 1;
+            }
         }
 
         // Interval size from evolvable parameters
@@ -181,17 +186,24 @@ impl TasteMelody {
 
         // Chord tone attraction on strong beats
         if prefer_chord {
-            if let Some(&nearest_chord) = chord_tones.iter()
-                .min_by(|a, b| ((**a - freq).abs()).partial_cmp(&((**b - freq).abs())).unwrap())
-            {
+            if let Some(&nearest_chord) = chord_tones.iter().min_by(|a, b| {
+                ((**a - freq).abs())
+                    .partial_cmp(&((**b - freq).abs()))
+                    .unwrap()
+            }) {
                 // Only snap if within a third (4 semitones)
                 let distance = ((nearest_chord / freq).log2() * 12.0).abs();
                 if distance < 4.0 {
                     freq = nearest_chord;
                     // Update scale_pos to match
-                    if let Some(idx) = scale_tones.iter()
+                    if let Some(idx) = scale_tones
+                        .iter()
                         .enumerate()
-                        .min_by(|(_, a), (_, b)| ((**a - freq).abs()).partial_cmp(&((**b - freq).abs())).unwrap())
+                        .min_by(|(_, a), (_, b)| {
+                            ((**a - freq).abs())
+                                .partial_cmp(&((**b - freq).abs()))
+                                .unwrap()
+                        })
                         .map(|(i, _)| i)
                     {
                         self.scale_pos = idx;
@@ -296,7 +308,12 @@ pub fn build_scale(root_semitones: i32, major: bool) -> Vec<f32> {
     build_scale_with(root_semitones, major, 440.0, 12.0)
 }
 
-pub fn build_scale_with(root_semitones: i32, major: bool, center_hz: f32, half_range_semi: f32) -> Vec<f32> {
+pub fn build_scale_with(
+    root_semitones: i32,
+    major: bool,
+    center_hz: f32,
+    half_range_semi: f32,
+) -> Vec<f32> {
     let intervals = if major {
         &[0, 2, 4, 5, 7, 9, 11] // major scale
     } else {
@@ -340,9 +357,15 @@ mod tests {
         }
 
         // Count repeated
-        let repeated = freqs.windows(2).filter(|w| (w[0] - w[1]).abs() < 1.0).count();
+        let repeated = freqs
+            .windows(2)
+            .filter(|w| (w[0] - w[1]).abs() < 1.0)
+            .count();
         let repeated_pct = repeated as f32 / 99.0 * 100.0;
-        assert!(repeated_pct < 25.0, "repeated should be <25%: {repeated_pct:.0}%");
+        assert!(
+            repeated_pct < 25.0,
+            "repeated should be <25%: {repeated_pct:.0}%"
+        );
     }
 
     #[test]
@@ -357,15 +380,19 @@ mod tests {
         for _ in 0..200 {
             let f = gen.next_freq(&scale, &chord, 0.5, 0.5);
             if prev > 0.0 {
-                if f > prev + 1.0 { ascending += 1; }
+                if f > prev + 1.0 {
+                    ascending += 1;
+                }
                 total += 1;
             }
             prev = f;
         }
 
         let asc_pct = ascending as f32 / total as f32 * 100.0;
-        assert!(asc_pct > 30.0 && asc_pct < 70.0,
-            "ascending should be 30-70%: {asc_pct:.0}%");
+        assert!(
+            asc_pct > 30.0 && asc_pct < 70.0,
+            "ascending should be 30-70%: {asc_pct:.0}%"
+        );
     }
 
     #[test]
@@ -377,7 +404,10 @@ mod tests {
         for _ in 0..200 {
             let f = gen.next_freq(&scale, &chord, 0.5, 0.5);
             let midi = ((12.0 * (f / 440.0).log2() + 69.0).round() as i32).clamp(0, 127);
-            assert!(midi >= 50 && midi <= 85, "note out of range: MIDI {midi}, freq {f}");
+            assert!(
+                midi >= 50 && midi <= 85,
+                "note out of range: MIDI {midi}, freq {f}"
+            );
         }
     }
 
@@ -392,18 +422,33 @@ mod tests {
             let f = gen.next_freq(&scale, &chord, 0.5, 0.5);
             pitches.insert((f * 10.0) as i32); // bin to 0.1 Hz
         }
-        assert!(pitches.len() >= 8, "should use ≥8 unique pitches: {}", pitches.len());
+        assert!(
+            pitches.len() >= 8,
+            "should use ≥8 unique pitches: {}",
+            pitches.len()
+        );
     }
 
     #[test]
     fn build_scale_reasonable() {
         let scale = build_scale(0, true);
-        assert!(scale.len() >= 10, "scale should have ≥10 tones: {}", scale.len());
-        assert!(scale.len() <= 25, "scale shouldn't be huge: {}", scale.len());
+        assert!(
+            scale.len() >= 10,
+            "scale should have ≥10 tones: {}",
+            scale.len()
+        );
+        assert!(
+            scale.len() <= 25,
+            "scale shouldn't be huge: {}",
+            scale.len()
+        );
         // All should be in range
         for &f in &scale {
             let midi = ((12.0 * (f / 440.0).log2() + 69.0).round() as i32);
-            assert!(midi >= 48 && midi <= 84, "scale tone out of range: MIDI {midi}");
+            assert!(
+                midi >= 48 && midi <= 84,
+                "scale tone out of range: MIDI {midi}"
+            );
         }
     }
 }

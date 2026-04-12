@@ -12,6 +12,7 @@
 //! its own `MuJoCoSimulator` (which owns both model and data).
 
 use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 use parking_lot::Mutex;
 use rayon::prelude::*;
@@ -34,7 +35,9 @@ pub struct SwarmExperienceBuffer {
     /// Stored as flattened state channels + command values.
     buffer: Mutex<Vec<([f32; 13], QuadrotorCommand)>>,
     max_size: usize,
-    write_pos: Mutex<usize>,
+    /// Ring buffer write position. AtomicUsize eliminates the second lock
+    /// and removes any deadlock possibility from the double-lock pattern.
+    write_pos: AtomicUsize,
 }
 
 impl SwarmExperienceBuffer {
@@ -43,21 +46,20 @@ impl SwarmExperienceBuffer {
         Self {
             buffer: Mutex::new(Vec::with_capacity(max_size)),
             max_size,
-            write_pos: Mutex::new(0),
+            write_pos: AtomicUsize::new(0),
         }
     }
 
     /// Store an experience (thread-safe).
     pub fn store(&self, state_channels: [f32; 13], command: QuadrotorCommand) {
         let mut buf = self.buffer.lock();
-        let mut pos = self.write_pos.lock();
+        let pos = self.write_pos.fetch_add(1, Ordering::Relaxed);
 
         if buf.len() < self.max_size {
             buf.push((state_channels, command));
         } else {
-            buf[*pos % self.max_size] = (state_channels, command);
+            buf[pos % self.max_size] = (state_channels, command);
         }
-        *pos = pos.wrapping_add(1);
     }
 
     /// Sample N random experiences from the buffer (thread-safe).
@@ -160,7 +162,8 @@ pub fn train_swarm(config: &SwarmConfig) -> SwarmResult {
         .into_par_iter()
         .map(|drone_id| {
             // Each drone gets its own MuJoCo instance
-            let mut sim = MuJoCoSimulator::from_primitive();
+            let mut sim = MuJoCoSimulator::from_primitive()
+                .expect("Failed to load MuJoCo primitive model for swarm drone");
 
             // Deterministic RNG per drone
             let mut rng_state = (drone_id as u64).wrapping_mul(2654435761).wrapping_add(42);

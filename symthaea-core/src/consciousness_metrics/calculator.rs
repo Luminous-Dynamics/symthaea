@@ -738,16 +738,30 @@ impl TruePhiCalculator {
         }
     }
 
-    /// Fast Φ estimation for real-time use
+    /// Fast effective information (EI) estimation for real-time use.
     ///
-    /// Skips MIP search, uses simplified calculation
+    /// **WARNING**: This computes total mutual information, NOT IIT Φ.
+    /// True Φ = system_EI - min_partition_EI (requires MIP search).
+    /// This method skips the partition step and returns raw EI only.
+    ///
+    /// For actual Φ, use `TieredPhi` with `ExhaustivePartition` or
+    /// `SampledPartition` tiers.
+    #[deprecated(note = "returns raw EI, not IIT Φ — use TieredPhi for actual Φ")]
     pub fn compute_phi_fast(&self, components: &[ContinuousHV]) -> f64 {
+        self.compute_effective_information_normalized(components)
+    }
+
+    /// Normalized effective information (total MI / theoretical max).
+    ///
+    /// Returns a [0, 1] scalar measuring raw information content.
+    /// This is NOT integrated information (Φ) — it does not account
+    /// for the Minimum Information Partition.
+    pub fn compute_effective_information_normalized(&self, components: &[ContinuousHV]) -> f64 {
         if components.len() < 2 {
             return 0.0;
         }
 
-        // Just compute total effective information
-        // This correlates with full Φ but is much faster
+        // Total effective information (sum of pairwise MI)
         let ei = self.effective_information(components);
 
         // Normalize by theoretical maximum

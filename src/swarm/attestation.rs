@@ -95,6 +95,11 @@ impl AttestationManager {
         &self.public_key_hex
     }
 
+    /// Get this node's signing key (for handshake responder operations).
+    pub fn signing_key(&self) -> &ed25519_dalek::SigningKey {
+        &self.signing_key
+    }
+
     /// Number of trusted signers.
     pub fn trusted_signer_count(&self) -> usize {
         self.trusted_signers.len()

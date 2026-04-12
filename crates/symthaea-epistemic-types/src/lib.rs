@@ -303,7 +303,12 @@ impl EpistemicCoordinate {
         normative: NormativeLevel,
         materiality: MaterialityLevel,
     ) -> Self {
-        Self::new(empirical, normative, materiality, EpistemicContext::Standard)
+        Self::new(
+            empirical,
+            normative,
+            materiality,
+            EpistemicContext::Standard,
+        )
     }
 
     /// Weakest possible coordinate (E0/N0/M0/Standard).

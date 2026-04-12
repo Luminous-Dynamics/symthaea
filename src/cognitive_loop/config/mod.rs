@@ -51,6 +51,10 @@ pub struct CognitiveLoopConfig {
     /// Experience buffer size
     pub buffer_size: usize,
 
+    /// Communication and localization policy for the current operating domain.
+    #[serde(default)]
+    pub domain_profile: crate::domain::DomainProfile,
+
     /// Whether to enable background consolidation
     pub enable_consolidation: bool,
 
@@ -112,6 +116,14 @@ pub struct CognitiveLoopConfig {
     /// When `None` (default), memories exist only in-memory for the session lifetime.
     #[serde(default)]
     pub memory_db_path: Option<String>,
+
+    /// Path to persist aesthetic identity (AestheticTracker EMA + harmony bias) across sessions.
+    ///
+    /// When `Some`, the CreativeManager saves and loads this file on construction/drop,
+    /// so Symthaea's taste develops cumulatively over months rather than resetting each session.
+    /// When `None`, defaults to `.claude/aesthetic_memory.json`.
+    #[serde(default)]
+    pub aesthetic_memory_path: Option<String>,
 
     /// Path to the DuckDB database for the epistemic auditor (audit trail).
     /// When `Some`, consciousness telemetry is buffered and periodically flushed
@@ -676,29 +688,42 @@ pub struct CognitiveLoopConfig {
     pub fhe_aggregation_interval: usize,
 
     // ── Embodiment Bridge ────────────────────────────────────────────────
+    /// Override the attention budget (microseconds) used for cycle-time enforcement.
+    /// When `Some(us)`, replaces the default 50ms `ATTENTION_BUDGET_US` constant.
+    /// Set to a large value (e.g., 60_000_000 = 60s) for offline telemetry / debug
+    /// builds where cycles naturally exceed the real-time budget without indicating
+    /// a problem. Prevents the budget-exceeded → safety-escalation doom loop.
+    #[serde(default)]
+    pub attention_budget_override_us: Option<u64>,
+
     /// Which embodiment platform to use for proprioceptive loop closure.
     /// Default: `None` (disembodied cognitive loop).
-    #[cfg(feature = "humanoid")]
+    #[cfg(any(feature = "humanoid", feature = "helicopter", feature = "flight", feature = "vehicle", feature = "auv", feature = "manipulator", feature = "exoskeleton", feature = "surgical", feature = "orbital", feature = "quadruped"))]
     #[serde(default)]
     pub embodiment_platform: super::motor_bridge::EmbodimentPlatform,
 
-    /// Blend weight for proprioceptive HV injection (0.0–1.0). Default: 0.2.
-    #[cfg(feature = "humanoid")]
+    /// Blend weight for proprioceptive HV injection (0.0–1.0). Default: 0.1.
+    ///
+    /// Empirically optimized via 11-point sweep (0.0–1.0):
+    /// weight=0.1 → Phi=0.757, weight=0.2 → ~0.62, weight=0.3 → ~0.44.
+    /// Light proprioceptive feedback grounds consciousness; heavy feedback
+    /// floods the CfC with prediction errors that reduce Phi.
+    #[cfg(any(feature = "humanoid", feature = "helicopter", feature = "flight", feature = "vehicle", feature = "auv", feature = "manipulator", feature = "exoskeleton", feature = "surgical", feature = "orbital", feature = "quadruped"))]
     #[serde(default = "default_embodiment_blend")]
     pub embodiment_blend_weight: f32,
 
     /// Embodiment step interval in cognitive cycles. Default: 1.
-    #[cfg(feature = "humanoid")]
+    #[cfg(any(feature = "humanoid", feature = "helicopter", feature = "flight", feature = "vehicle", feature = "auv", feature = "manipulator", feature = "exoskeleton", feature = "surgical", feature = "orbital", feature = "quadruped"))]
     #[serde(default = "default_embodiment_interval")]
     pub embodiment_step_interval: usize,
 }
 
-#[cfg(feature = "humanoid")]
+#[cfg(any(feature = "humanoid", feature = "helicopter", feature = "flight", feature = "vehicle", feature = "auv", feature = "manipulator", feature = "exoskeleton", feature = "surgical", feature = "orbital", feature = "quadruped"))]
 fn default_embodiment_blend() -> f32 {
-    0.2
+    0.1 // Optimized via weight sweep: 0.1 → Phi=0.757 (was 0.2 → ~0.62)
 }
 
-#[cfg(feature = "humanoid")]
+#[cfg(any(feature = "humanoid", feature = "helicopter", feature = "flight", feature = "vehicle", feature = "auv", feature = "manipulator", feature = "exoskeleton", feature = "surgical", feature = "orbital", feature = "quadruped"))]
 fn default_embodiment_interval() -> usize {
     1
 }
@@ -718,6 +743,7 @@ impl Default for CognitiveLoopConfig {
                 crate::dynamics::hierarchical_cfc::HierarchicalCfCConfig::default(),
             learning_threshold: 0.05,
             buffer_size: 1000,
+            domain_profile: crate::domain::DomainProfile::default(),
             enable_consolidation: true,
             target_frequency: 50.0, // 50 Hz
             max_cycles_before_reset: 100000,
@@ -730,6 +756,7 @@ impl Default for CognitiveLoopConfig {
             episodic_replay_training: true,
             memory_graduation: true,
             memory_db_path: None,
+            aesthetic_memory_path: None,
             epistemic_auditor_db_path: None,
             episodic_replay_config: crate::memory::episodic_replay::EpisodicReplayConfig::default(),
             enable_surprise_exploration: true,
@@ -857,11 +884,12 @@ impl Default for CognitiveLoopConfig {
             fhe_threshold_k: 3,
             #[cfg(feature = "fhe-wisdom")]
             fhe_aggregation_interval: 100,
-            #[cfg(feature = "humanoid")]
+            attention_budget_override_us: None,
+            #[cfg(any(feature = "humanoid", feature = "helicopter", feature = "flight", feature = "vehicle", feature = "auv", feature = "manipulator", feature = "exoskeleton", feature = "surgical", feature = "orbital", feature = "quadruped"))]
             embodiment_platform: super::motor_bridge::EmbodimentPlatform::None,
-            #[cfg(feature = "humanoid")]
-            embodiment_blend_weight: 0.2,
-            #[cfg(feature = "humanoid")]
+            #[cfg(any(feature = "humanoid", feature = "helicopter", feature = "flight", feature = "vehicle", feature = "auv", feature = "manipulator", feature = "exoskeleton", feature = "surgical", feature = "orbital", feature = "quadruped"))]
+            embodiment_blend_weight: 0.1,
+            #[cfg(any(feature = "humanoid", feature = "helicopter", feature = "flight", feature = "vehicle", feature = "auv", feature = "manipulator", feature = "exoskeleton", feature = "surgical", feature = "orbital", feature = "quadruped"))]
             embodiment_step_interval: 1,
         }
     }
@@ -914,6 +942,58 @@ impl CognitiveLoopConfig {
     pub fn with_system_timezone(mut self) -> Self {
         self.timezone_offset_hours = crate::chronobiology::Biorhythm::detect_system_timezone();
         self
+    }
+
+    /// Override the active operating domain.
+    pub fn with_domain_profile(mut self, domain_profile: crate::domain::DomainProfile) -> Self {
+        self.domain_profile = domain_profile;
+        self
+    }
+
+    /// Create a configuration scoped to a specific operating domain.
+    pub fn for_domain(domain_profile: crate::domain::DomainProfile) -> Self {
+        Self {
+            domain_profile,
+            ..Default::default()
+        }
+    }
+
+    /// Create configuration for a platform's preferred operating domain.
+    pub fn for_platform(platform: symthaea_core::embodiment::EmbodimentPlatform) -> Self {
+        let capability = crate::domain::PlatformCapabilityProfile::for_platform(platform);
+        let mut config = Self {
+            domain_profile: capability.preferred_domain_profile(),
+            ..Default::default()
+        };
+        #[cfg(any(feature = "humanoid", feature = "helicopter", feature = "flight", feature = "vehicle", feature = "auv", feature = "manipulator", feature = "exoskeleton", feature = "surgical", feature = "orbital", feature = "quadruped"))]
+        {
+            config.embodiment_platform = platform;
+        }
+        config
+    }
+
+    /// Create configuration for an explicit platform/domain pairing.
+    ///
+    /// Unsupported combinations fall back to the platform's preferred domain.
+    pub fn for_platform_domain(
+        platform: symthaea_core::embodiment::EmbodimentPlatform,
+        domain_profile: crate::domain::DomainProfile,
+    ) -> Self {
+        let capability = crate::domain::PlatformCapabilityProfile::for_platform(platform);
+        let resolved_domain = if capability.supports_domain(&domain_profile.kind) {
+            domain_profile
+        } else {
+            capability.preferred_domain_profile()
+        };
+        let mut config = Self {
+            domain_profile: resolved_domain,
+            ..Default::default()
+        };
+        #[cfg(any(feature = "humanoid", feature = "helicopter", feature = "flight", feature = "vehicle", feature = "auv", feature = "manipulator", feature = "exoskeleton", feature = "surgical", feature = "orbital", feature = "quadruped"))]
+        {
+            config.embodiment_platform = platform;
+        }
+        config
     }
 
     /// Create configuration with HdcLtcUnified backend
@@ -1267,6 +1347,8 @@ impl CognitiveLoopConfig {
 #[allow(clippy::field_reassign_with_default)]
 mod tests {
     use super::*;
+    use crate::domain::DomainProfile;
+    use symthaea_core::embodiment::EmbodimentPlatform;
 
     // ═══════════════════════════════════════════════════════════════════════
     // CfCConfig validation
@@ -1354,6 +1436,35 @@ mod tests {
     #[test]
     fn config_default_validates() {
         assert!(CognitiveLoopConfig::default().validate().is_ok());
+    }
+
+    #[test]
+    fn config_domain_defaults_to_empty() {
+        let c = CognitiveLoopConfig::default();
+        assert_eq!(c.domain_profile.kind, "");
+    }
+
+    #[test]
+    fn config_for_domain_overrides_default_domain() {
+        let c = CognitiveLoopConfig::for_domain(DomainProfile::underwater());
+        assert_eq!(c.domain_profile.kind, "underwater");
+    }
+
+    #[test]
+    fn config_for_platform_uses_platform_preferred_domain() {
+        let c = CognitiveLoopConfig::for_platform(EmbodimentPlatform::Auv);
+        assert_eq!(c.domain_profile.kind, "underwater");
+        #[cfg(any(feature = "humanoid", feature = "helicopter", feature = "flight", feature = "vehicle", feature = "auv", feature = "manipulator", feature = "exoskeleton", feature = "surgical", feature = "orbital", feature = "quadruped"))]
+        assert_eq!(c.embodiment_platform, EmbodimentPlatform::Auv);
+    }
+
+    #[test]
+    fn unsupported_platform_domain_pair_falls_back_to_preferred_domain() {
+        let c = CognitiveLoopConfig::for_platform_domain(
+            EmbodimentPlatform::Auv,
+            DomainProfile::deep_space(),
+        );
+        assert_eq!(c.domain_profile.kind, "underwater");
     }
 
     #[test]

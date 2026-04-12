@@ -112,7 +112,7 @@ Luminous Dynamics\\
 % ============================================================
 \begin{abstract}
 \noindent
-We present \psychbench{}, a psychological benchmark suite comprising 141 benchmarks across 27 cognitive domains for evaluating Holographic Liquid Brain (\hlb{}) architectures---systems combining Hyperdimensional Computing, Liquid Time-Constant networks, Integrated Information Theory, and Active Inference. Existing AI evaluation frameworks lack psychometric infrastructure (HELM), cover narrow domains (ARC), omit normative human comparison (BIG-Bench), or ignore neuromodulatory effects (CogBench). \psychbench{} addresses all four gaps with: (1)~implementations of established paradigms (Stroop, WCST, N-back, and 138 others) with psychometric assessment infrastructure including ICC reliability, speed-accuracy tradeoff curves, and adaptive staircases; (2)~normative anchoring against 130+ published human baselines enabling z-score and clinical-band interpretation; (3)~a 17-benchmark neuromodulator evaluation framework testing dose-response curves, tolerance/withdrawal dynamics, behavioral knockouts, and multi-transmitter synergy; and (4)~a 14-indicator consciousness evaluation derived from six theories. All stimuli share a unified holographic encoding via five HDC adapter types, enabling cross-modal comparison. Demonstration on the \symthaea{} \hlb{} reveals a grand mean z-score of $+1.261$ across 27 cognitive domains (27/27 above human mean, 0 below), with cross-seed stability SD~$= 0.019$ (3 seeds). Particular strengths emerge in Clinical ($z = +2.00$), InstitutionalReasoning ($z = +2.25$), SustainedAttention ($z = +2.19$), Speech ($z = +2.13$), Motor ($z = +2.12$), and Security ($z = +2.00$). Psychometric analysis reveals a gradient of reliability from Excellent to Poor (3 Excellent, 2 Good, 14 Poor across 19 evaluated benchmarks), selective sensitivity to working-memory and encoding-noise ablation, and accuracy-pressure tradeoffs in 4 of 8 tested benchmarks. Implemented in ${\sim}20{,}000$ lines of Rust with 1,283 unit tests, \psychbench{} is open-source and fully deterministic.
+We present \psychbench{}, a psychological benchmark suite comprising 141 benchmarks across 27 cognitive domains for evaluating Holographic Liquid Brain (\hlb{}) architectures---systems combining Hyperdimensional Computing, Liquid Time-Constant networks, Integrated Information Theory, and Active Inference. Existing AI evaluation frameworks lack psychometric infrastructure (HELM), cover narrow domains (ARC), omit normative human comparison (BIG-Bench), or ignore neuromodulatory effects (CogBench). \psychbench{} addresses all four gaps with: (1)~implementations of established paradigms (Stroop, WCST, N-back, and 138 others) with psychometric assessment infrastructure including ICC reliability, speed-accuracy tradeoff curves, and adaptive staircases; (2)~normative anchoring against 130+ published human baselines enabling z-score and clinical-band interpretation; (3)~a 15-benchmark neuromodulator evaluation framework testing dose-response curves, tolerance/withdrawal dynamics, behavioral knockouts, and multi-transmitter synergy; and (4)~a 14-indicator consciousness evaluation derived from six theories. All stimuli share a unified holographic encoding via five HDC adapter types, enabling cross-modal comparison. Demonstration on the \symthaea{} \hlb{} reveals a grand mean z-score of $+1.261$ across 27 cognitive domains (27/27 above human mean, 0 below), with cross-seed stability SD~$= 0.019$ (3 seeds). Particular strengths emerge in Clinical ($z = +2.00$), InstitutionalReasoning ($z = +2.25$), SustainedAttention ($z = +2.19$), Speech ($z = +2.13$), Motor ($z = +2.12$), and Security ($z = +2.00$). Psychometric analysis reveals a gradient of reliability from Excellent to Poor (3 Excellent, 2 Good, 14 Poor across 19 evaluated benchmarks), selective sensitivity to working-memory and encoding-noise ablation, and accuracy-pressure tradeoffs in 4 of 8 tested benchmarks. Implemented in ${\sim}90{,}000$ lines of Rust with 1,240+ unit tests, \psychbench{} is open-source and fully deterministic.
 \end{abstract}
 
 \paragraph{Keywords:} cognitive benchmark, holographic computing, liquid neural networks, neuromodulation, psychometrics, consciousness evaluation, hyperdimensional computing
@@ -140,7 +140,7 @@ The fundamental challenge is methodological: how should we evaluate cognitive ar
 Our contributions are:
 \begin{enumerate}[nosep]
     \item A 141-benchmark cognitive battery covering 27 cognitive domains including executive function, working memory, attention, social cognition, motor learning, language, metacognition, reasoning, clinical psychology, institutional reasoning, mathematics, causal reasoning, spatial cognition, and specialized sub-batteries for affect, creativity, inhibition, consciousness, speech, substrate independence, security (FHE), and game-theoretic social cognition.
-    \item A 17-benchmark neuromodulator evaluation framework---the first to test pharmacological manipulations (dose-response curves, injection challenges, tolerance/withdrawal, antagonist profiles, multi-transmitter synergy) in an AI benchmark context.
+    \item A 15-benchmark neuromodulator evaluation framework---the first to test pharmacological manipulations (dose-response curves, injection challenges, tolerance/withdrawal, antagonist profiles, multi-transmitter synergy) in an AI benchmark context.
     \item A psychometric infrastructure providing ICC(3,1) reliability, ex-Gaussian RT decomposition~\citep{heathcote1996fitting}, Wickelgren SAT curves~\citep{wickelgren1977speed}, adaptive staircases~\citep{levitt1971transformed}, and normative z-score comparison with clinical interpretation bands~\citep{cicchetti1994guidelines}.
     \item A 14-indicator consciousness evaluation derived from Butlin et al.'s~\citep{butlin2023consciousness} six-theory framework, with ablation matrices linking architectural features to indicator presence.
 \end{enumerate}
@@ -225,9 +225,9 @@ Our contributions are:
 
 \subsection{Benchmark Trait and Configuration}
 
-All benchmarks implement the \texttt{PsychBenchmark} trait, which defines a uniform interface for stimulus presentation, response collection, and metric computation. The trait requires three methods: \texttt{name()} returning a domain-qualified identifier (e.g., \texttt{"Executive::Stroop"}), \texttt{run(config)} executing the full experimental procedure under a given \texttt{BenchmarkConfig}, and \texttt{expected\_metrics()} listing the metric names and their directionality (higher-is-better or lower-is-better).
+All benchmarks implement the \texttt{PsychBenchmark} trait, which defines a uniform interface for stimulus presentation, response collection, and metric computation. The trait requires two methods: \texttt{name()} returning a domain-qualified identifier (e.g., \texttt{"Executive::Stroop"}) and \texttt{run(config)} executing the full experimental procedure under a given \texttt{BenchmarkConfig}. Optional methods include \texttt{run\_ablation()} for component-isolation experiments and \texttt{provenance()} for benchmark metadata.
 
-The \texttt{BenchmarkConfig} structure controls 17 parameters spanning four categories. \emph{HDC parameters}: \texttt{dimension} (default 512), \texttt{ssm\_backend} (state-space model alternative). \emph{Experimental parameters}: \texttt{trials\_per\_condition} (default 20), \texttt{seed} (default 42), \texttt{time\_pressure} (0.0--1.0 for SAT curves), \texttt{difficulty} (0.0--1.0 ramp). \emph{Architecture parameters}: \texttt{working\_memory\_capacity} (default 7), \texttt{enable\_social} (Theory of Mind), \texttt{enable\_fep} (Active Inference), \texttt{planning\_horizon} (FEP lookahead), \texttt{action\_temperature} (softmax temperature). \emph{Adaptive parameters}: \texttt{adaptive\_trials}, \texttt{min\_trials}, \texttt{max\_trials}, \texttt{precision\_target} (CI half-width / $|$mean$|$). A deterministic trial-level seed function ensures reproducibility: \texttt{trial\_seed(benchmark, condition, trial)} produces a unique seed per trial while maintaining cross-run consistency.
+The \texttt{BenchmarkConfig} structure controls 25 parameters spanning four categories. \emph{HDC parameters}: \texttt{dimension} (default 512), \texttt{ssm\_backend} (state-space model alternative). \emph{Experimental parameters}: \texttt{trials\_per\_condition} (default 20), \texttt{seed} (default 42), \texttt{time\_pressure} (0.0--1.0 for SAT curves), \texttt{difficulty} (0.0--1.0 ramp). \emph{Architecture parameters}: \texttt{working\_memory\_capacity} (default 7), \texttt{enable\_social} (Theory of Mind), \texttt{enable\_fep} (Active Inference), \texttt{planning\_horizon} (FEP lookahead), \texttt{action\_temperature} (softmax temperature). \emph{Adaptive parameters}: \texttt{adaptive\_trials}, \texttt{min\_trials}, \texttt{max\_trials}, \texttt{precision\_target} (CI half-width / $|$mean$|$). A deterministic trial-level seed function ensures reproducibility: \texttt{trial\_seed(benchmark, condition, trial)} produces a unique seed per trial while maintaining cross-run consistency.
 
 \subsection{Holographic Stimulus Encoding}
 
@@ -327,7 +327,7 @@ The \texttt{BaselineCollection} contains 130+ human baselines organized by domai
 };
 \end{axis}
 \end{tikzpicture}
-\caption{Benchmark count by domain across all 28 domain categories (27 domains plus Neuromod sub-battery). The neuromodulator evaluation framework (17 benchmarks) is the largest single domain, reflecting its novel contribution. Reasoning (11), Mathematics (10), CogBench (8), InstitutionalReasoning (7), and Social (7) provide additional depth. Eight domains map to the cognitive profile radar chart; the remainder are specialized sub-batteries including Clinical, Security (FHE), Speech, Binding, Substrate, Spatial, CausalReasoning, Consciousness, and WorM domains.}
+\caption{Benchmark count by domain across all 28 domain categories (27 domains plus Neuromod sub-battery). The neuromodulator evaluation framework (15 benchmarks) is the largest single domain, reflecting its novel contribution. Reasoning (11), Mathematics (10), CogBench (8), InstitutionalReasoning (7), and Social (7) provide additional depth. Eight domains map to the cognitive profile radar chart; the remainder are specialized sub-batteries including Clinical, Security (FHE), Speech, Binding, Substrate, Spatial, CausalReasoning, Consciousness, and WorM domains.}
 \label{fig:domain_matrix}
 \end{figure}
 
@@ -371,7 +371,7 @@ The \texttt{BaselineCollection} contains 130+ human baselines organized by domai
 
 \paragraph{Security (6 benchmarks).} HDC-FHE (Fully Homomorphic Encryption) evaluation: encrypted classification, collective aggregation, encrypted learning, cross-mask privacy, encrypted binding, and scaling analysis.
 
-\paragraph{Neuromodulator Evaluation (17 benchmarks).} Detailed in Section~\ref{sec:neuromod}.
+\paragraph{Neuromodulator Evaluation (15 benchmarks).} Detailed in Section~\ref{sec:neuromod}.
 
 % --- Table 1: Complete Benchmark Inventory ---
 \begin{table}[p]
@@ -430,7 +430,7 @@ Inhibition & Stop Signal & Response inhibition & SSRT (ticks) & --- \\
 \section{Neuromodulator Evaluation Framework}
 \label{sec:neuromod}
 
-The neuromodulator evaluation framework is \psychbench{}'s most novel contribution. While existing benchmarks evaluate \emph{what} an architecture can do, this framework evaluates \emph{how neuromodulatory dynamics modulate what it does}---analogous to pharmacological challenge studies in neuroscience~\citep{doya2002metalearning}. The framework comprises 17 benchmarks organized into four categories (Table~\ref{tab:neuromod}).
+The neuromodulator evaluation framework is \psychbench{}'s most novel contribution. While existing benchmarks evaluate \emph{what} an architecture can do, this framework evaluates \emph{how neuromodulatory dynamics modulate what it does}---analogous to pharmacological challenge studies in neuroscience~\citep{doya2002metalearning}. The framework comprises 15 benchmarks organized into four categories (Table~\ref{tab:neuromod}).
 
 % --- Table 4: Neuromodulator Benchmark Summary ---
 \begin{table}[t]
@@ -1037,10 +1037,10 @@ for d in &profile.domains {
 \paragraph{HTML report generation.} Self-contained HTML reports with embedded SVG visualizations:
 
 \begin{lstlisting}
-use symthaea_psych_bench::harness::html::HtmlReport;
+use symthaea_psych_bench::harness::html;
 
-let html = HtmlReport::from_report(&report);
-std::fs::write("report.html", html.render()).unwrap();
+let report_html = html::generate_report(&report, false);
+std::fs::write("report.html", report_html).unwrap();
 \end{lstlisting}
 
 \paragraph{Neuromodulator sweep.} Pharmacological profiles can be applied to any benchmark subset. The dissociation matrix identifies transmitter-behavior double dissociations:
@@ -1076,7 +1076,7 @@ All APIs are deterministic given a fixed seed, enabling exact replication. The f
 \toprule
 \textbf{Suite} & \textbf{Psychometrics} & \textbf{Normative} & \textbf{Neuromod} & \textbf{Consciousness} & \textbf{Domains} & \textbf{Language} \\
 \midrule
-\psychbench{} & \checkmark & \checkmark & \checkmark & \checkmark & 26 & Rust \\
+\psychbench{} & \checkmark & \checkmark & \checkmark & \checkmark & 27 & Rust \\
 CogBench~\citep{codaforno2024cogbench} & --- & Partial & --- & --- & 1 & Python \\
 ARC~\citep{chollet2019measure} & --- & --- & --- & --- & 1 & JSON \\
 HELM~\citep{liang2023holistic} & --- & --- & --- & --- & 7 & Python \\
@@ -1118,7 +1118,7 @@ PsychBench~\citep{hagendorff2023machine} & Partial & --- & --- & --- & 5 & Pytho
 \section{Conclusion}
 \label{sec:conclusion}
 
-\psychbench{} provides the first comprehensive cognitive benchmark suite designed for Holographic Liquid Brain architectures. With 141 benchmarks across 27 domains, psychometric assessment infrastructure, normative human comparison against 130+ published baselines, a 17-benchmark neuromodulator evaluation framework, and 14-indicator consciousness evaluation, the suite enables multi-dimensional characterization of neuroscience-inspired cognitive architectures. The demonstration on the \symthaea{} \hlb{} reveals both the suite's strengths and its current limitations: the architecture produces a characteristic cognitive profile with a grand mean z-score of $+1.261$ (27/27 domains above human mean, SD~$= 0.019$ across 3 seeds) and particular strengths in InstitutionalReasoning ($z = +2.25$), SustainedAttention ($z = +2.19$), Speech ($z = +2.13$), Motor ($z = +2.32$), and Clinical ($z = +2.00$) that is interpretable and reproducible. The psychometric validation reveals a reliability gradient (3 Excellent, 2 Good, 14 Poor across 19 evaluated benchmarks; Table~\ref{tab:psychometrics}), with the prevalence of Poor ICC values reflecting that most benchmarks are structurally invariant to the individual-differences parameters (lapse rate, encoding noise) used to model between-subject variance---a finding that itself identifies which cognitive dimensions are genuinely sensitive to parameter variation versus architecturally fixed. These findings are themselves informative---they identify precisely where the architecture and the evaluation framework need improvement. Implemented in ${\sim}20{,}000$ lines of Rust with 1,283 unit tests and full determinism, \psychbench{} is open-source and designed for iterative refinement by the growing community of researchers building brain-inspired cognitive architectures.
+\psychbench{} provides the first comprehensive cognitive benchmark suite designed for Holographic Liquid Brain architectures. With 141 benchmarks across 27 domains, psychometric assessment infrastructure, normative human comparison against 130+ published baselines, a 15-benchmark neuromodulator evaluation framework, and 14-indicator consciousness evaluation, the suite enables multi-dimensional characterization of neuroscience-inspired cognitive architectures. The demonstration on the \symthaea{} \hlb{} reveals both the suite's strengths and its current limitations: the architecture produces a characteristic cognitive profile with a grand mean z-score of $+1.261$ (27/27 domains above human mean, SD~$= 0.019$ across 3 seeds) and particular strengths in InstitutionalReasoning ($z = +2.25$), SustainedAttention ($z = +2.19$), Speech ($z = +2.13$), Motor ($z = +2.12$), and Clinical ($z = +2.00$) that is interpretable and reproducible. The psychometric validation reveals a reliability gradient (3 Excellent, 2 Good, 14 Poor across 19 evaluated benchmarks; Table~\ref{tab:psychometrics}), with the prevalence of Poor ICC values reflecting that most benchmarks are structurally invariant to the individual-differences parameters (lapse rate, encoding noise) used to model between-subject variance---a finding that itself identifies which cognitive dimensions are genuinely sensitive to parameter variation versus architecturally fixed. These findings are themselves informative---they identify precisely where the architecture and the evaluation framework need improvement. Implemented in ${\sim}90{,}000$ lines of Rust with 1,240+ unit tests and full determinism, \psychbench{} is open-source and designed for iterative refinement by the growing community of researchers building brain-inspired cognitive architectures.
 
 % ============================================================
 % OPEN PRACTICES STATEMENT

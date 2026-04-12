@@ -106,7 +106,11 @@ fn main() {
         .unwrap_or(100);
 
     let mut projects = data.projects;
-    projects.sort_by(|a, b| b.capacity_mw.partial_cmp(&a.capacity_mw).unwrap_or(std::cmp::Ordering::Equal));
+    projects.sort_by(|a, b| {
+        b.capacity_mw
+            .partial_cmp(&a.capacity_mw)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
     let top_projects: Vec<_> = projects.into_iter().take(max_projects).collect();
     eprintln!("Evaluating top {} by capacity...", top_projects.len());
 
@@ -114,12 +118,12 @@ fn main() {
     // This represents the evaluating Symthaea instance's state
     let mut evaluator = AssetEvaluator::new();
     let snapshot = ConsciousnessSnapshot::new(
-        0.72,  // phi — moderate-high integration
-        0.70,  // meta_awareness
-        0.80,  // self_model_accuracy
-        0.85,  // coherence
-        0.30,  // affective_valence (neutral-positive)
-        0.65,  // care_activation
+        0.72, // phi — moderate-high integration
+        0.70, // meta_awareness
+        0.80, // self_model_accuracy
+        0.85, // coherence
+        0.30, // affective_valence (neutral-positive)
+        0.65, // care_activation
     );
 
     let mut scored: Vec<ScoredProject> = Vec::new();
@@ -129,8 +133,18 @@ fn main() {
     for (i, project) in top_projects.iter().enumerate() {
         // Build impact claims from real data
         let mut impact_claims = vec![
-            format!("Hydroelectric retrofit of existing {} dam",
-                if project.metadata.as_ref().map_or(false, |m| m.is_existing_dam) { "active" } else { "inactive" }),
+            format!(
+                "Hydroelectric retrofit of existing {} dam",
+                if project
+                    .metadata
+                    .as_ref()
+                    .map_or(false, |m| m.is_existing_dam)
+                {
+                    "active"
+                } else {
+                    "inactive"
+                }
+            ),
             format!("Capacity: {:.1} MW of clean energy", project.capacity_mw),
         ];
 
@@ -142,11 +156,23 @@ fn main() {
 
         if let Some(ref meta) = project.metadata {
             if meta.dam_height > 0 {
-                impact_claims.push(format!("Dam height: {} ft, storage: {} acre-ft", meta.dam_height, meta.storage));
+                impact_claims.push(format!(
+                    "Dam height: {} ft, storage: {} acre-ft",
+                    meta.dam_height, meta.storage
+                ));
             }
             if meta.year_built > 0 {
-                impact_claims.push(format!("Built {}, {} infrastructure", meta.year_built,
-                    if meta.year_built < 1960 { "heritage" } else if meta.year_built < 1990 { "mature" } else { "modern" }));
+                impact_claims.push(format!(
+                    "Built {}, {} infrastructure",
+                    meta.year_built,
+                    if meta.year_built < 1960 {
+                        "heritage"
+                    } else if meta.year_built < 1990 {
+                        "mature"
+                    } else {
+                        "modern"
+                    }
+                ));
             }
             if !meta.hazard_class.is_empty() {
                 impact_claims.push(format!("Hazard classification: {}", meta.hazard_class));
@@ -181,7 +207,9 @@ fn main() {
             name: project.name.clone(),
             state: project.location.state.clone(),
             capacity_mw: project.capacity_mw,
-            retrofit_potential: project.metadata.as_ref()
+            retrofit_potential: project
+                .metadata
+                .as_ref()
                 .map_or("unknown".into(), |m| m.retrofit_potential.clone()),
             phi_score: score.phi_score,
             harmony_alignment: score.harmony_alignment,
@@ -206,16 +234,34 @@ fn main() {
 
     // Score distribution
     let high = scored.iter().filter(|s| s.phi_score >= 0.7).count();
-    let mid = scored.iter().filter(|s| s.phi_score >= 0.4 && s.phi_score < 0.7).count();
+    let mid = scored
+        .iter()
+        .filter(|s| s.phi_score >= 0.4 && s.phi_score < 0.7)
+        .count();
     let low = scored.iter().filter(|s| s.phi_score < 0.4).count();
-    eprintln!("Distribution: {} Aligned, {} Emerging, {} Nascent", high, mid, low);
+    eprintln!(
+        "Distribution: {} Aligned, {} Emerging, {} Nascent",
+        high, mid, low
+    );
 
     // Top 10
-    scored.sort_by(|a, b| b.harmony_alignment.partial_cmp(&a.harmony_alignment).unwrap_or(std::cmp::Ordering::Equal));
+    scored.sort_by(|a, b| {
+        b.harmony_alignment
+            .partial_cmp(&a.harmony_alignment)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
     eprintln!("\nTop 10 by Harmony Alignment:");
     for (i, s) in scored.iter().take(10).enumerate() {
-        eprintln!("  {}. {} ({}, {:.1} MW) — Phi: {:.3}, Harmony: {:.3}, {:?}",
-            i + 1, s.name, s.state, s.capacity_mw, s.phi_score, s.harmony_alignment, s.recommendation);
+        eprintln!(
+            "  {}. {} ({}, {:.1} MW) — Phi: {:.3}, Harmony: {:.3}, {:?}",
+            i + 1,
+            s.name,
+            s.state,
+            s.capacity_mw,
+            s.phi_score,
+            s.harmony_alignment,
+            s.recommendation
+        );
     }
 
     // Output full JSON to stdout

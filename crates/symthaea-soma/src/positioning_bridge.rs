@@ -21,12 +21,9 @@
 //! - Known safe location → serotonin (calm)
 
 use positioning::{
-    PositionFilter, FilterConfig, FilterState,
-    PedestrianDeadReckoning, PdrConfig,
-    Earth, CelestialBody,
-    RangeEstimate, RangingMethod,
-    trilaterate_3d, PositionEstimate,
-    gdop,
+    gdop, CelestialBody, Earth, FilterConfig, GaussianEstimate3D, Measurement,
+    MeasurementProvenance, PdrConfig, PedestrianDeadReckoning, PeerEstimate3D, PositionFilter,
+    PublishableEstimate3D, RangeEstimate, ReferenceFrame,
 };
 use serde::{Deserialize, Serialize};
 
@@ -134,6 +131,18 @@ pub struct PositioningBridge {
     cached_gdop: f64,
     /// Total position updates received.
     update_count: u64,
+    /// Shared measurement stream for downstream all-domain routing.
+    pending_measurements: Vec<Measurement>,
+}
+
+impl PublishableEstimate3D for PositioningBridge {
+    fn position_mean_m(&self) -> [f64; 3] {
+        self.filter.position()
+    }
+
+    fn position_sigma_m(&self) -> f64 {
+        self.filter.position_sigma()
+    }
 }
 
 impl PositioningBridge {
@@ -143,6 +152,7 @@ impl PositioningBridge {
             position_noise: config.ekf_position_noise,
             velocity_noise: 0.01,
             max_covariance: 1e8,
+            innovation_gate_sigma: 4.0,
         };
         Self {
             config,
@@ -157,17 +167,40 @@ impl PositioningBridge {
             body: Earth,
             cached_gdop: f64::INFINITY,
             update_count: 0,
+            pending_measurements: Vec::new(),
         }
+    }
+
+    fn covariance_diag3(sigma_m: f64) -> [f64; 9] {
+        let var = sigma_m * sigma_m;
+        [var, 0.0, 0.0, 0.0, var, 0.0, 0.0, 0.0, var]
+    }
+
+    fn push_measurement(&mut self, measurement: Measurement) {
+        self.pending_measurements.push(measurement);
+    }
+
+    /// Drain mobile-originating measurements in the shared positioning format.
+    pub fn drain_measurements(&mut self) -> Vec<Measurement> {
+        std::mem::take(&mut self.pending_measurements)
     }
 
     /// Feed a GPS reading from the phone's receiver.
     pub fn update_gps(&mut self, lat: f64, lon: f64, alt: f64, accuracy_m: f32) {
         let ecef = self.body.geodetic_to_cartesian(lat, lon, alt);
+        let timestamp_s = self.current_tick as f64;
+        self.push_measurement(Measurement::absolute_position(
+            timestamp_s,
+            ReferenceFrame::Ecef,
+            ecef,
+            Self::covariance_diag3(accuracy_m as f64),
+            MeasurementProvenance::local("soma_gps", "gnss"),
+        ));
         self.filter.update(
             &ecef, // Treat GPS as a "zero-range" measurement to the true position
             0.0,   // range = 0 (GPS gives position directly)
             accuracy_m as f64,
-            1.0,   // Full trust in GPS
+            1.0, // Full trust in GPS
         );
         // Actually, GPS gives position directly — just set the filter state
         self.filter.state.state[0] = ecef[0];
@@ -180,8 +213,11 @@ impl PositioningBridge {
         self.filter.state.covariance[14] = var;
 
         self.last_gps = Some(GpsReading {
-            latitude_deg: lat, longitude_deg: lon, altitude_m: alt,
-            accuracy_m, timestamp_s: self.current_tick as f64,
+            latitude_deg: lat,
+            longitude_deg: lon,
+            altitude_m: alt,
+            accuracy_m,
+            timestamp_s,
         });
         self.gps_available = true;
         // Reset PDR origin on GPS fix (drift correction)
@@ -199,24 +235,88 @@ impl PositioningBridge {
             self.config.ble_ref_rssi_dbm,
             self.config.ble_path_loss_exponent,
         );
+        self.push_measurement(Measurement::range(
+            self.current_tick as f64,
+            ReferenceFrame::Ecef,
+            est.distance_m,
+            est.sigma_m,
+            MeasurementProvenance {
+                source_id: "soma_ble".to_string(),
+                peer_id: Some(peer_id.to_string()),
+                technology: "ble_rssi".to_string(),
+                admitted: true,
+                trust_hint: Some(0.4),
+                los_confidence: Some(0.2),
+            },
+        ));
         self.apply_range(peer_id, est);
     }
 
     /// Feed a UWB time-of-flight measurement.
     pub fn update_uwb_range(&mut self, peer_id: &str, tof_ns: f64) {
         let est = positioning::ranging::uwb_tof_to_range(tof_ns);
+        self.push_measurement(Measurement::range(
+            self.current_tick as f64,
+            ReferenceFrame::Ecef,
+            est.distance_m,
+            est.sigma_m,
+            MeasurementProvenance {
+                source_id: "soma_uwb".to_string(),
+                peer_id: Some(peer_id.to_string()),
+                technology: "uwb_tof".to_string(),
+                admitted: true,
+                trust_hint: Some(0.9),
+                los_confidence: Some(0.95),
+            },
+        ));
         self.apply_range(peer_id, est);
     }
 
     /// Feed a WiFi RTT measurement.
     pub fn update_wifi_rtt(&mut self, ap_id: &str, rtt_ns: f64) {
         let est = positioning::ranging::wifi_rtt_to_range(rtt_ns);
+        self.push_measurement(Measurement::range(
+            self.current_tick as f64,
+            ReferenceFrame::Ecef,
+            est.distance_m,
+            est.sigma_m,
+            MeasurementProvenance {
+                source_id: "soma_wifi".to_string(),
+                peer_id: Some(ap_id.to_string()),
+                technology: "wifi_rtt".to_string(),
+                admitted: true,
+                trust_hint: Some(0.7),
+                los_confidence: Some(0.7),
+            },
+        ));
         self.apply_range(ap_id, est);
     }
 
     /// Register or update a nearby anchor.
-    pub fn register_anchor(&mut self, peer_id: String, lat: f64, lon: f64, alt: f64, accuracy_m: f64, trust: f64) {
+    pub fn register_anchor(
+        &mut self,
+        peer_id: String,
+        lat: f64,
+        lon: f64,
+        alt: f64,
+        accuracy_m: f64,
+        trust: f64,
+    ) {
         let ecef = self.body.geodetic_to_cartesian(lat, lon, alt);
+        self.push_measurement(Measurement::absolute_position(
+            self.current_tick as f64,
+            ReferenceFrame::Ecef,
+            ecef,
+            Self::covariance_diag3(accuracy_m),
+            MeasurementProvenance {
+                source_id: "soma_anchor_registry".to_string(),
+                peer_id: Some(peer_id.clone()),
+                technology: "peer_anchor".to_string(),
+                admitted: trust >= 0.5,
+                trust_hint: Some(trust),
+                los_confidence: None,
+            },
+        ));
         // Update existing or insert new
         if let Some(anchor) = self.anchors.iter_mut().find(|a| a.peer_id == peer_id) {
             anchor.position_ecef = ecef;
@@ -248,7 +348,13 @@ impl PositioningBridge {
         dt_s: f64,
     ) {
         // Always feed PDR (even with GPS — maintains stride calibration)
-        self.pdr.step(accel_magnitude, rotation_rate, barometer_hpa, step_delta, dt_s);
+        self.pdr.step(
+            accel_magnitude,
+            rotation_rate,
+            barometer_hpa,
+            step_delta,
+            dt_s,
+        );
 
         // Apply magnetometer correction when available
         if let (Some(heading), Some(accuracy)) = (magnetic_heading_deg, magnetic_accuracy_deg) {
@@ -257,7 +363,27 @@ impl PositioningBridge {
 
         // Feed barometer to EKF for altitude
         if barometer_hpa > 100.0 {
-            self.filter.update_barometer(barometer_hpa as f64, 1013.25, 1.0);
+            let altitude_m =
+                positioning::dead_reckoning::barometric_altitude(barometer_hpa as f64, 1013.25);
+            self.push_measurement(Measurement::absolute_position(
+                self.current_tick as f64,
+                ReferenceFrame::Enu,
+                [0.0, 0.0, altitude_m],
+                Self::covariance_diag3(1.0),
+                MeasurementProvenance::local("soma_barometer", "barometer"),
+            ));
+            self.filter
+                .update_barometer(barometer_hpa as f64, 1013.25, 1.0);
+        }
+
+        if step_delta > 0 {
+            self.push_measurement(Measurement::relative_position(
+                self.current_tick as f64,
+                ReferenceFrame::VehicleBody,
+                [step_delta as f64 * 0.75, 0.0, 0.0],
+                Self::covariance_diag3(self.pdr.get_drift_estimate().max(1.0)),
+                MeasurementProvenance::local("soma_pdr", "pdr"),
+            ));
         }
 
         // In dead reckoning mode, use PDR to drive the EKF
@@ -266,11 +392,7 @@ impl PositioningBridge {
                 let [east, north] = self.pdr.get_position();
                 let alt = self.pdr.get_altitude();
                 // Convert relative PDR position to ECEF (approximate: add local ENU offset)
-                let estimated_ecef = [
-                    origin[0] + east,
-                    origin[1] + north,
-                    origin[2] + alt,
-                ];
+                let estimated_ecef = [origin[0] + east, origin[1] + north, origin[2] + alt];
                 // PDR sigma grows with drift
                 let pdr_sigma = self.pdr.get_drift_estimate().max(2.0);
                 // Feed to EKF as a position measurement
@@ -292,7 +414,8 @@ impl PositioningBridge {
         self.filter.predict(dt_s);
 
         // Expire stale anchors (not seen for 60 ticks)
-        self.anchors.retain(|a| self.current_tick - a.last_seen_tick < 60);
+        self.anchors
+            .retain(|a| self.current_tick - a.last_seen_tick < 60);
 
         // Check if GPS is still fresh
         if let Some(gps) = &self.last_gps {
@@ -319,6 +442,20 @@ impl PositioningBridge {
         self.filter.position_sigma()
     }
 
+    /// Get the current local state in conservative Gaussian form for swarm sharing.
+    pub fn gaussian_estimate(&self) -> GaussianEstimate3D {
+        PublishableEstimate3D::gaussian_estimate(self)
+    }
+
+    /// Build a peer-shareable estimate for the current mobile state.
+    pub fn peer_estimate(
+        &self,
+        peer_id: impl Into<String>,
+        confidence: Option<f64>,
+    ) -> PeerEstimate3D {
+        PublishableEstimate3D::peer_estimate(self, peer_id, confidence)
+    }
+
     /// Get current positioning mode.
     pub fn get_mode(&self) -> PositioningMode {
         self.mode
@@ -337,8 +474,12 @@ impl PositioningBridge {
     /// Generate BLE anchor payload for broadcasting position to peers.
     /// Returns None if we don't have a good enough position to share.
     pub fn get_anchor_payload(&self) -> Option<Vec<u8>> {
-        if !self.config.broadcast_as_anchor { return None; }
-        if self.get_sigma() > 100.0 { return None; } // Too uncertain
+        if !self.config.broadcast_as_anchor {
+            return None;
+        }
+        if self.get_sigma() > 100.0 {
+            return None;
+        } // Too uncertain
 
         let (lat, lon, alt) = self.get_position();
         let sigma = self.get_sigma() as f32;
@@ -355,7 +496,9 @@ impl PositioningBridge {
 
     /// Parse incoming BLE anchor payload from a peer.
     pub fn receive_anchor_payload(&mut self, peer_id: &str, payload: &[u8]) {
-        if payload.len() < 25 || payload[0] != 1 { return; }
+        if payload.len() < 25 || payload[0] != 1 {
+            return;
+        }
         let lat = f64::from_le_bytes(payload[1..9].try_into().unwrap_or([0; 8]));
         let lon = f64::from_le_bytes(payload[9..17].try_into().unwrap_or([0; 8]));
         let sigma = f32::from_le_bytes(payload[17..21].try_into().unwrap_or([0; 4]));
@@ -363,8 +506,12 @@ impl PositioningBridge {
 
         if lat.abs() <= 90.0 && lon.abs() <= 180.0 && sigma > 0.0 {
             self.register_anchor(
-                peer_id.to_string(), lat, lon, 0.0,
-                sigma as f64, trust as f64,
+                peer_id.to_string(),
+                lat,
+                lon,
+                0.0,
+                sigma as f64,
+                trust as f64,
             );
         }
     }
@@ -390,13 +537,21 @@ impl PositioningBridge {
         let sigma = self.get_sigma();
         let drift = self.pdr.get_drift_estimate();
         // High uncertainty OR high drift → NE (alertness)
-        let ne = if sigma > 50.0 || drift > 30.0 { 0.1 }
-                 else if sigma > 10.0 || drift > 10.0 { 0.03 }
-                 else { 0.0 };
+        let ne = if sigma > 50.0 || drift > 30.0 {
+            0.1
+        } else if sigma > 10.0 || drift > 10.0 {
+            0.03
+        } else {
+            0.0
+        };
         // Novel location → DA (exploration)
         let da = if self.update_count < 10 { 0.05 } else { 0.0 };
         // Low uncertainty AND low drift → 5-HT (calm/safety)
-        let serotonin = if sigma < 5.0 && drift < 5.0 { 0.02 } else { 0.0 };
+        let serotonin = if sigma < 5.0 && drift < 5.0 {
+            0.02
+        } else {
+            0.0
+        };
         (ne, da, serotonin)
     }
 
@@ -440,9 +595,8 @@ impl PositioningBridge {
             self.cached_gdop = f64::INFINITY;
             return;
         }
-        let anchor_positions: Vec<[f64; 3]> = self.anchors.iter()
-            .map(|a| a.position_ecef)
-            .collect();
+        let anchor_positions: Vec<[f64; 3]> =
+            self.anchors.iter().map(|a| a.position_ecef).collect();
         let pos = self.filter.position();
         self.cached_gdop = gdop(&anchor_positions, &pos);
     }
@@ -511,6 +665,22 @@ mod tests {
         let mut bridge2 = PositioningBridge::new(PositioningConfig::default());
         bridge2.receive_anchor_payload("peer1", &payload);
         assert_eq!(bridge2.anchor_count(), 1);
+    }
+
+    #[test]
+    fn mobile_bridge_emits_shared_measurements() {
+        let mut bridge = PositioningBridge::new(PositioningConfig::default());
+        bridge.update_gps(-26.2041, 28.0473, 1753.0, 5.0);
+        bridge.update_imu(1.2, 0.1, 1008.0, 2, Some(90.0), Some(10.0), 1.0);
+        let measurements = bridge.drain_measurements();
+        assert!(measurements.iter().any(|m| matches!(
+            m.modality,
+            positioning::MeasurementModality::AbsolutePosition
+        )));
+        assert!(measurements.iter().any(|m| matches!(
+            m.modality,
+            positioning::MeasurementModality::RelativePosition
+        )));
     }
 
     #[test]

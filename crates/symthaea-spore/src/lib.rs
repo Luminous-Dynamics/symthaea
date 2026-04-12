@@ -40,6 +40,7 @@
 
 #![deny(unsafe_code)]
 
+pub mod app_migration;
 pub mod boot_consciousness;
 pub mod broca;
 #[cfg(feature = "broca-full")]
@@ -48,6 +49,7 @@ pub mod broca_full;
 pub mod broca_pipeline;
 pub mod compass;
 pub mod config;
+pub mod daily_ritual;
 pub mod dream;
 pub mod dream_journal;
 pub mod engine;
@@ -60,8 +62,6 @@ pub mod security;
 pub mod sovereign;
 pub mod topology;
 pub mod wellbeing_profiles;
-pub mod app_migration;
-pub mod daily_ritual;
 
 pub mod hardware_probe;
 pub mod neuroevolution;

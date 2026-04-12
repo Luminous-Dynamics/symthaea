@@ -182,8 +182,12 @@ mod tests {
     #[test]
     fn test_high_uncertainty_domain_gets_priority() {
         let mut prioritizer = ClaimPrioritizer::new(PrioritizerConfig::default());
-        prioritizer.domain_uncertainty.insert("speculative".to_string(), 0.9);
-        prioritizer.domain_uncertainty.insert("general".to_string(), 0.1);
+        prioritizer
+            .domain_uncertainty
+            .insert("speculative".to_string(), 0.9);
+        prioritizer
+            .domain_uncertainty
+            .insert("general".to_string(), 0.1);
 
         let epistemic_high = prioritizer.epistemic_value("speculative");
         let epistemic_low = prioritizer.epistemic_value("general");
@@ -206,15 +210,26 @@ mod tests {
 
     #[test]
     fn test_domain_inference() {
-        assert_eq!(ClaimPrioritizer::infer_domain("This is about health risks"), "health");
-        assert_eq!(ClaimPrioritizer::infer_domain("A legal precedent was set"), "legal");
-        assert_eq!(ClaimPrioritizer::infer_domain("Random fact about cats"), "general");
+        assert_eq!(
+            ClaimPrioritizer::infer_domain("This is about health risks"),
+            "health"
+        );
+        assert_eq!(
+            ClaimPrioritizer::infer_domain("A legal precedent was set"),
+            "legal"
+        );
+        assert_eq!(
+            ClaimPrioritizer::infer_domain("Random fact about cats"),
+            "general"
+        );
     }
 
     #[test]
     fn test_uncertainty_update_correct_reduces() {
         let mut prioritizer = ClaimPrioritizer::new(PrioritizerConfig::default());
-        prioritizer.domain_uncertainty.insert("test".to_string(), 0.8);
+        prioritizer
+            .domain_uncertainty
+            .insert("test".to_string(), 0.8);
         prioritizer.update_domain_uncertainty("test", true);
         assert!(prioritizer.domain_uncertainty["test"] < 0.8);
     }
@@ -222,7 +237,9 @@ mod tests {
     #[test]
     fn test_uncertainty_update_incorrect_increases() {
         let mut prioritizer = ClaimPrioritizer::new(PrioritizerConfig::default());
-        prioritizer.domain_uncertainty.insert("test".to_string(), 0.5);
+        prioritizer
+            .domain_uncertainty
+            .insert("test".to_string(), 0.5);
         prioritizer.update_domain_uncertainty("test", false);
         assert!(prioritizer.domain_uncertainty["test"] > 0.5);
     }

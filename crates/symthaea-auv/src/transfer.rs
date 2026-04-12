@@ -20,18 +20,58 @@ pub struct ChannelMapping {
 pub fn default_quadrotor_to_auv_mapping() -> Vec<ChannelMapping> {
     vec![
         // Position: flight[0..3] → AUV[0..3]
-        ChannelMapping { source_ch: 0, target_ch: 0, weight: 1.0 },
-        ChannelMapping { source_ch: 1, target_ch: 1, weight: 1.0 },
-        ChannelMapping { source_ch: 2, target_ch: 2, weight: 1.5 }, // Altitude→depth (critical)
+        ChannelMapping {
+            source_ch: 0,
+            target_ch: 0,
+            weight: 1.0,
+        },
+        ChannelMapping {
+            source_ch: 1,
+            target_ch: 1,
+            weight: 1.0,
+        },
+        ChannelMapping {
+            source_ch: 2,
+            target_ch: 2,
+            weight: 1.5,
+        }, // Altitude→depth (critical)
         // Quaternion: flight[3..7] → AUV[3..7]
-        ChannelMapping { source_ch: 3, target_ch: 3, weight: 1.8 },
-        ChannelMapping { source_ch: 4, target_ch: 4, weight: 1.8 },
-        ChannelMapping { source_ch: 5, target_ch: 5, weight: 1.8 },
-        ChannelMapping { source_ch: 6, target_ch: 6, weight: 1.8 },
+        ChannelMapping {
+            source_ch: 3,
+            target_ch: 3,
+            weight: 1.8,
+        },
+        ChannelMapping {
+            source_ch: 4,
+            target_ch: 4,
+            weight: 1.8,
+        },
+        ChannelMapping {
+            source_ch: 5,
+            target_ch: 5,
+            weight: 1.8,
+        },
+        ChannelMapping {
+            source_ch: 6,
+            target_ch: 6,
+            weight: 1.8,
+        },
         // Linear velocity: flight[7..10] → AUV[7..10]
-        ChannelMapping { source_ch: 7, target_ch: 7, weight: 0.8 }, // Lower weight (drag-dominated)
-        ChannelMapping { source_ch: 8, target_ch: 8, weight: 0.8 },
-        ChannelMapping { source_ch: 9, target_ch: 9, weight: 0.8 },
+        ChannelMapping {
+            source_ch: 7,
+            target_ch: 7,
+            weight: 0.8,
+        }, // Lower weight (drag-dominated)
+        ChannelMapping {
+            source_ch: 8,
+            target_ch: 8,
+            weight: 0.8,
+        },
+        ChannelMapping {
+            source_ch: 9,
+            target_ch: 9,
+            weight: 0.8,
+        },
     ]
 }
 

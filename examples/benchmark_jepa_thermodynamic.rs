@@ -50,7 +50,10 @@ struct BenchmarkResult {
 impl BenchmarkResult {
     fn from_trajectory(name: String, pe_trajectory: Vec<f32>, total_energy: f64) -> Self {
         let initial_pe = pe_trajectory[..20].iter().sum::<f32>() / 20.0;
-        let final_pe = pe_trajectory[pe_trajectory.len() - 20..].iter().sum::<f32>() / 20.0;
+        let final_pe = pe_trajectory[pe_trajectory.len() - 20..]
+            .iter()
+            .sum::<f32>()
+            / 20.0;
         let pe_reduction = initial_pe - final_pe;
         let energy_per_pe = if pe_reduction > 1e-6 {
             total_energy / pe_reduction as f64
@@ -204,8 +207,10 @@ fn run_jepa(dim: usize) -> BenchmarkResult {
 fn main() {
     println!("═══════════════════════════════════════════════════════════════");
     println!("  JEPA Thermodynamic Benchmark (Fair Comparison)");
-    println!("  {}D input (CfC-matched), {}D latent, {} cycles",
-        INPUT_DIM, LATENT_DIM, NUM_CYCLES);
+    println!(
+        "  {}D input (CfC-matched), {}D latent, {} cycles",
+        INPUT_DIM, LATENT_DIM, NUM_CYCLES
+    );
     println!("═══════════════════════════════════════════════════════════════\n");
 
     let naive = run_naive(INPUT_DIM);
@@ -217,19 +222,51 @@ fn main() {
     println!("│ Metric              │ Naive            │ Linear (obs)     │ JEPA (latent)    │");
     println!("├─────────────────────┼──────────────────┼──────────────────┼──────────────────┤");
     for (label, results) in [
-        ("Total energy (J)", vec![naive.total_energy_joules, linear.total_energy_joules, jepa.total_energy_joules]),
-        ("Initial PE", vec![naive.initial_pe as f64, linear.initial_pe as f64, jepa.initial_pe as f64]),
-        ("Final PE", vec![naive.final_pe as f64, linear.final_pe as f64, jepa.final_pe as f64]),
-        ("PE reduction", vec![naive.pe_reduction as f64, linear.pe_reduction as f64, jepa.pe_reduction as f64]),
+        (
+            "Total energy (J)",
+            vec![
+                naive.total_energy_joules,
+                linear.total_energy_joules,
+                jepa.total_energy_joules,
+            ],
+        ),
+        (
+            "Initial PE",
+            vec![
+                naive.initial_pe as f64,
+                linear.initial_pe as f64,
+                jepa.initial_pe as f64,
+            ],
+        ),
+        (
+            "Final PE",
+            vec![
+                naive.final_pe as f64,
+                linear.final_pe as f64,
+                jepa.final_pe as f64,
+            ],
+        ),
+        (
+            "PE reduction",
+            vec![
+                naive.pe_reduction as f64,
+                linear.pe_reduction as f64,
+                jepa.pe_reduction as f64,
+            ],
+        ),
     ] {
         println!(
             "│ {:<19} │ {:>16.4e} │ {:>16.4e} │ {:>16.4e} │",
             label, results[0], results[1], results[2]
         );
     }
-    println!("│ {:<19} │ {:>16.4e} │ {:>16.4e} │ {:>16.4e} │",
+    println!(
+        "│ {:<19} │ {:>16.4e} │ {:>16.4e} │ {:>16.4e} │",
         "J / PE-reduction",
-        naive.energy_per_pe_reduction, linear.energy_per_pe_reduction, jepa.energy_per_pe_reduction);
+        naive.energy_per_pe_reduction,
+        linear.energy_per_pe_reduction,
+        jepa.energy_per_pe_reduction
+    );
     println!("└─────────────────────┴──────────────────┴──────────────────┴──────────────────┘");
 
     // JEPA vs Linear comparison
@@ -250,7 +287,10 @@ fn main() {
 
     // PE trajectory samples
     println!("\n  PE trajectory (sampled every 200 cycles):");
-    println!("  {:>6}  {:>10}  {:>10}  {:>10}", "Cycle", "Naive", "Linear", "JEPA");
+    println!(
+        "  {:>6}  {:>10}  {:>10}  {:>10}",
+        "Cycle", "Naive", "Linear", "JEPA"
+    );
     for i in (0..NUM_CYCLES).step_by(200) {
         println!(
             "  {:>6}  {:>10.4}  {:>10.4}  {:>10.4}",
@@ -265,8 +305,14 @@ fn main() {
     println!("\n--- JSON ---");
     println!(
         r#"{{"dim": {}, "latent": {}, "cycles": {}, "naive_final_pe": {:.6}, "linear_final_pe": {:.6}, "jepa_final_pe": {:.6}, "naive_energy": {:.2e}, "linear_energy": {:.2e}, "jepa_energy": {:.2e}}}"#,
-        INPUT_DIM, LATENT_DIM, NUM_CYCLES,
-        naive.final_pe, linear.final_pe, jepa.final_pe,
-        naive.total_energy_joules, linear.total_energy_joules, jepa.total_energy_joules,
+        INPUT_DIM,
+        LATENT_DIM,
+        NUM_CYCLES,
+        naive.final_pe,
+        linear.final_pe,
+        jepa.final_pe,
+        naive.total_energy_joules,
+        linear.total_energy_joules,
+        jepa.total_energy_joules,
     );
 }

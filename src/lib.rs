@@ -178,6 +178,7 @@ if snapshot.in_flow {
 - [`swarm`]: Distributed consciousness via Iroh + Holochain
 - [`voice`]: Text-to-speech with consciousness-modulated pacing
 - [`action`]: Motor cortex for command execution
+- [`control_plane`]: Shared auth, protocol, and audit helpers for remote interfaces
 
 ### Memory and Learning
 - [`memory`]: Hippocampal and working memory systems
@@ -274,6 +275,18 @@ Key types are re-exported at the crate root for convenience:
 )]
 
 // ============================================================================
+// Feature Flag Guards
+// ============================================================================
+
+#[cfg(all(feature = "broca_lite", feature = "ssm_language"))]
+compile_error!(
+    "Features `broca_lite` and `ssm_language` are mutually exclusive. \
+     broca_lite provides lightweight generation via symthaea-spore; \
+     ssm_language provides full CfC-HDC generation via symthaea-broca. \
+     Enable only one."
+);
+
+// ============================================================================
 // Unified Error Types
 // ============================================================================
 
@@ -315,6 +328,9 @@ pub mod unified_ltc;
 
 // HDC-LTC Unified Network Bridge (alternative to CfC)
 pub mod hdc_ltc_bridge;
+
+// Cross-environment transport and localization policy
+pub mod domain;
 
 // Dynamics: attractor networks, temporal evolution
 pub mod dynamics;
@@ -388,6 +404,7 @@ pub mod integration;
 
 // Action (depends on consciousness module - now enabled)
 pub mod action;
+pub mod control_plane;
 
 // Coding Agent: multi-step consciousness-gated coding loop
 #[cfg(feature = "code_generation")]
@@ -520,6 +537,15 @@ pub mod scientific_method;
 pub mod web_research;
 
 pub mod knowledge;
+
+// Z3 Formal Verification Bridge (Phase 4B — math/science plan)
+// Dual-mode: subprocess z3 binary (SMTLIB2) when available, internal DPLL fallback always.
+// Domain-specific verifiers for ODE solutions, Einstein condition, CSP solutions.
+pub mod z3_bridge;
+
+// Proof State: goal trees, tactic engine, proof search (Phase 5 math plan)
+// ProofTree struct with goal stack, tactic application, backtracking search.
+pub mod proof_state;
 
 // ============================================================================
 // Re-exports for Convenience

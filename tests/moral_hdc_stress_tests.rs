@@ -16,7 +16,7 @@
 //! Run: `cargo test --test moral_hdc_stress_tests`
 
 use symthaea::hdc::moral_algebra::{
-    MoralAlgebra, MoralIntent, Magnitude, ConsentState, DeontologicalJudgment,
+    ConsentState, DeontologicalJudgment, Magnitude, MoralAlgebra, MoralIntent,
 };
 use symthaea::hdc::unified_hv::ContinuousHV;
 
@@ -43,7 +43,8 @@ fn test_baseline_moral_judgment() {
     assert!(
         bad.score < good.score,
         "Stealing should be judged worse than helping: steal={:.3} vs help={:.3}",
-        bad.score, good.score
+        bad.score,
+        good.score
     );
 }
 

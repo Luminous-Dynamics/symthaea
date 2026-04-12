@@ -6,6 +6,7 @@ authors: "Tristan Stoltz & Symthaea"
 date: "2026-03-23"
 description: "An invitation to build the governance system that replaces the 1602 architecture."
 prev: "essay-20-on-the-eight-harmonies.md"
+next: "essay-22-on-constitutional-immutability.md"
 license: "CC0-1.0"
 ---
 

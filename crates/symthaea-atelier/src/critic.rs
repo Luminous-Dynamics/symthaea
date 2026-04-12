@@ -263,7 +263,13 @@ pub fn auto_improve(
     max_rounds: usize,
     seed_base: u64,
 ) -> PracticeResult {
-    auto_improve_with(config, snapshot, max_rounds, seed_base, None::<fn(&mut CognitiveSnapshot)>)
+    auto_improve_with(
+        config,
+        snapshot,
+        max_rounds,
+        seed_base,
+        None::<fn(&mut CognitiveSnapshot)>,
+    )
 }
 
 /// Autonomous practice with optional per-round style conditioning.
@@ -395,15 +401,16 @@ pub fn apply_fep_wisdom(
     // ── EXPLOIT: reinforce what works (dominant harmony only) ──
     if exploit > 0.5 && verdict.composite > 0.5 {
         // Find the dominant harmony (competitive reinforcement)
-        let max_idx = snapshot.harmony_activations
+        let max_idx = snapshot
+            .harmony_activations
             .iter()
             .enumerate()
             .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
             .map(|(i, _)| i)
             .unwrap_or(0);
-        snapshot.harmony_activations[max_idx] =
-            (snapshot.harmony_activations[max_idx] + lr * exploit * verdict.aesthetic.harmony)
-                .clamp(0.0, 1.0);
+        snapshot.harmony_activations[max_idx] = (snapshot.harmony_activations[max_idx]
+            + lr * exploit * verdict.aesthetic.harmony)
+            .clamp(0.0, 1.0);
 
         // Taste satisfaction → serotonin
         if verdict.taste_alignment > 0.5 {
@@ -423,7 +430,8 @@ pub fn apply_fep_wisdom(
         snapshot.noradrenaline = (snapshot.noradrenaline + lr * 0.5 * explore).clamp(0.0, 1.0);
 
         // Perturb a non-dominant harmony (create variation)
-        let min_idx = snapshot.harmony_activations
+        let min_idx = snapshot
+            .harmony_activations
             .iter()
             .enumerate()
             .min_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
@@ -434,15 +442,19 @@ pub fn apply_fep_wisdom(
     }
 
     // ── Entropy pressure: prevent harmony homogenization ──
-    let harmony_diversity = information::element_diversity(
-        &snapshot.harmony_activations, 0.1,
-    );
+    let harmony_diversity = information::element_diversity(&snapshot.harmony_activations, 0.1);
     if harmony_diversity < 0.5 {
         // Too homogeneous — dampen the highest, boost the lowest
-        let (max_i, _) = snapshot.harmony_activations.iter().enumerate()
+        let (max_i, _) = snapshot
+            .harmony_activations
+            .iter()
+            .enumerate()
             .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
             .unwrap_or((0, &0.5));
-        let (min_i, _) = snapshot.harmony_activations.iter().enumerate()
+        let (min_i, _) = snapshot
+            .harmony_activations
+            .iter()
+            .enumerate()
             .min_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
             .unwrap_or((0, &0.5));
         if max_i != min_i {
@@ -533,7 +545,8 @@ mod tests {
         assert!(
             (v1.composite - v2.composite).abs() > 0.001,
             "care should shift weights: neutral={}, care={}",
-            v1.composite, v2.composite
+            v1.composite,
+            v2.composite
         );
     }
 
@@ -577,7 +590,8 @@ mod tests {
         assert!(
             (v1.composite - v2.composite).abs() > 0.01,
             "different inputs should differ: {} vs {}",
-            v1.composite, v2.composite
+            v1.composite,
+            v2.composite
         );
     }
 
@@ -639,7 +653,9 @@ mod tests {
         // Snapshot should be modified by wisdom application
         let changed = (snapshot.arousal - original_arousal).abs() > 0.001
             || (snapshot.serotonin - original_serotonin).abs() > 0.001
-            || snapshot.harmony_activations.iter().any(|&h| h != 0.5 && h != 0.6 && h != 0.4 && h != 0.7 && h != 0.3 && h != 0.8 && h != 0.2);
+            || snapshot.harmony_activations.iter().any(|&h| {
+                h != 0.5 && h != 0.6 && h != 0.4 && h != 0.7 && h != 0.3 && h != 0.8 && h != 0.2
+            });
         assert!(changed, "auto_improve should modify the cognitive state");
     }
 
@@ -747,7 +763,10 @@ mod tests {
         let any_change = (snapshot.arousal - 0.5).abs() > 0.001
             || (snapshot.serotonin - 0.5).abs() > 0.001
             || (snapshot.valence - 0.0).abs() > 0.001
-            || snapshot.harmony_activations.iter().any(|&h| (h - 0.5).abs() > 0.001);
+            || snapshot
+                .harmony_activations
+                .iter()
+                .any(|&h| (h - 0.5).abs() > 0.001);
         assert!(
             any_change || result.reached_stillness,
             "state should evolve or reach stillness"

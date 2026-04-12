@@ -189,16 +189,22 @@ mod tests {
 
         // Below threshold.
         let result = gate.request_approval(
-            "T1", "agent1", "device1",
-            SupportCategory::Security, TicketPriority::Critical,
+            "T1",
+            "agent1",
+            "device1",
+            SupportCategory::Security,
+            TicketPriority::Critical,
             0.1, // Below 0.3
         );
         assert!(result.is_none());
 
         // Above threshold.
         let result = gate.request_approval(
-            "T1", "agent1", "device1",
-            SupportCategory::Security, TicketPriority::Critical,
+            "T1",
+            "agent1",
+            "device1",
+            SupportCategory::Security,
+            TicketPriority::Critical,
             0.5,
         );
         assert!(result.is_some());
@@ -209,8 +215,11 @@ mod tests {
     fn test_approval_lifecycle() {
         let mut gate = GovernanceGate::new();
         gate.request_approval(
-            "T2", "agent2", "device2",
-            SupportCategory::Security, TicketPriority::High,
+            "T2",
+            "agent2",
+            "device2",
+            SupportCategory::Security,
+            TicketPriority::High,
             0.4,
         );
 
@@ -224,8 +233,11 @@ mod tests {
     fn test_denial() {
         let mut gate = GovernanceGate::new();
         gate.request_approval(
-            "T3", "agent3", "device3",
-            SupportCategory::Network, TicketPriority::Critical,
+            "T3",
+            "agent3",
+            "device3",
+            SupportCategory::Network,
+            TicketPriority::Critical,
             0.5,
         );
 

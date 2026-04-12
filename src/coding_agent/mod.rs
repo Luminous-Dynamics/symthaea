@@ -41,8 +41,16 @@ pub mod error_knowledge;
 mod experience;
 mod generation;
 mod geodesic_gate;
+/// MAGI Loop bridge for self-improving code generation predictions.
+pub mod magi_code_bridge;
 mod planning;
 mod prompts;
+/// Code self-modification — generates new auto-fix rules from error patterns.
+/// Closes the recursive self-improvement loop: observe failures → hypothesize
+/// fixes → validate → integrate → permanently improve.
+pub mod self_modification;
+/// Self-test generation — agent writes its own #[test] modules.
+pub mod test_generation;
 
 use crate::action::primitives::{
     Atom, DispatchTier, Molecule, MoleculeExecutor, PlanProfile, PrimitiveValue,
@@ -726,13 +734,15 @@ impl CodingAgent {
         if reasoning.should_defer() && self.phase == TaskPhase::Generating {
             self.consciousness_deferrals += 1;
             self.observations.push(format!(
-                "Reasoning deferral: confidence={:.2}", reasoning.reasoning_confidence
+                "Reasoning deferral: confidence={:.2}",
+                reasoning.reasoning_confidence
             ));
             return;
         }
         if reasoning.should_diagnose() && self.phase == TaskPhase::Generating {
             self.observations.push(format!(
-                "Reasoning diagnosis: confidence={:.2}", reasoning.reasoning_confidence
+                "Reasoning diagnosis: confidence={:.2}",
+                reasoning.reasoning_confidence
             ));
             self.phase = TaskPhase::Understanding;
             return;

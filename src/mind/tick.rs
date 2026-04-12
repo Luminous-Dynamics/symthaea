@@ -457,7 +457,8 @@ impl ContinuousMind {
 
             // Active knowledge bundling: collect peer thoughts for WM integration.
             // Trust-weighted: only bundle from agents with positive trust.
-            let trust = sc.get_relationship(&msg.agent_id)
+            let trust = sc
+                .get_relationship(&msg.agent_id)
                 .map(|r| r.trust)
                 .unwrap_or(0.5);
             if trust > 0.3 {

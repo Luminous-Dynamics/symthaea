@@ -149,8 +149,15 @@ impl HumanoidState {
     /// Number of channels produced by `to_channels()`.
     pub fn num_channels(&self) -> usize {
         // 1 + 4 + n_joints + 3 + 3 + n_joints + 1 + 3 + n_extremities + 3
-        1 + 4 + self.joint_angles.len() + 3 + 3 + self.joint_velocities.len()
-            + 1 + 3 + self.extremities.len() + 3
+        1 + 4
+            + self.joint_angles.len()
+            + 3
+            + 3
+            + self.joint_velocities.len()
+            + 1
+            + 3
+            + self.extremities.len()
+            + 3
     }
 
     /// Number of actuated joints in this state.
@@ -275,7 +282,11 @@ impl HumanoidCommand {
 
     /// Clamp all torques to [-1, 1].
     pub fn clamped(self) -> Self {
-        let torques: Vec<f32> = self.torques.into_iter().map(|t| t.clamp(-1.0, 1.0)).collect();
+        let torques: Vec<f32> = self
+            .torques
+            .into_iter()
+            .map(|t| t.clamp(-1.0, 1.0))
+            .collect();
         Self { torques }
     }
 
@@ -295,7 +306,10 @@ impl HumanoidCommand {
 
     /// Add exploration noise, then clamp.
     pub fn with_noise(self, noise: &[f32]) -> Self {
-        let torques: Vec<f32> = self.torques.iter().zip(noise.iter())
+        let torques: Vec<f32> = self
+            .torques
+            .iter()
+            .zip(noise.iter())
             .map(|(&t, &n)| (t + n).clamp(-1.0, 1.0))
             .collect();
         Self { torques }
@@ -751,7 +765,8 @@ pub fn pd_reaching_baseline(
     }
     if elbow < n {
         let err = elbow_target - state.joint_angles[elbow];
-        cmd.torques[elbow] = (gains.kp[elbow] * err - gains.kd[elbow] * state.joint_velocities[elbow]) as f32;
+        cmd.torques[elbow] =
+            (gains.kp[elbow] * err - gains.kd[elbow] * state.joint_velocities[elbow]) as f32;
         cmd.torques[elbow] = cmd.torques[elbow].clamp(-1.0, 1.0);
     }
 

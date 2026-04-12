@@ -225,7 +225,7 @@ impl SubstrateType {
             SubstrateType::NeuromorphicChip => 1e-6,   // ~1 μs
             SubstrateType::BiochemicalComputer => 1.0, // ~1 s (very slow!)
             SubstrateType::HybridSystem => 1e-6,       // Depends on mix
-            SubstrateType::ExoticSubstrate => 0.01,       // Varies widely
+            SubstrateType::ExoticSubstrate => 0.01,    // Varies widely
             SubstrateType::SpacecraftComputer => 1e-7, // ~100 ns (rad-hard, ~10-200 MHz)
             _ => unreachable!("canonical covers aliases"),
         }
@@ -241,7 +241,7 @@ impl SubstrateType {
             SubstrateType::NeuromorphicChip => 1e-15,  // ~1 fJ
             SubstrateType::BiochemicalComputer => 1e-12, // ~1 pJ (inefficient)
             SubstrateType::HybridSystem => 1e-15,      // Varies
-            SubstrateType::ExoticSubstrate => 1e-10,       // Often inefficient
+            SubstrateType::ExoticSubstrate => 1e-10,   // Often inefficient
             SubstrateType::SpacecraftComputer => 1e-8, // ~10 nJ (rad-hard overhead + power-limited)
             _ => unreachable!("canonical covers aliases"),
         }
@@ -257,7 +257,7 @@ impl SubstrateType {
             SubstrateType::NeuromorphicChip => 1e-8,  // ~10 nm
             SubstrateType::BiochemicalComputer => 1e-9, // ~1 nm (DNA molecule)
             SubstrateType::HybridSystem => 1e-8,      // Varies
-            SubstrateType::ExoticSubstrate => 1e-3,       // Often macroscopic
+            SubstrateType::ExoticSubstrate => 1e-3,   // Often macroscopic
             SubstrateType::SpacecraftComputer => 1e-2, // ~10 mm (larger feature sizes for rad tolerance)
             _ => unreachable!("canonical covers aliases"),
         }
@@ -273,7 +273,7 @@ impl SubstrateType {
             SubstrateType::NeuromorphicChip => 1e9,   // ~1 billion
             SubstrateType::BiochemicalComputer => 1e15, // ~1 quadrillion (molecular)
             SubstrateType::HybridSystem => 1e12,      // Varies
-            SubstrateType::ExoticSubstrate => 1e6,       // Often limited
+            SubstrateType::ExoticSubstrate => 1e6,    // Often limited
             SubstrateType::SpacecraftComputer => 1e6, // Limited by power budget, not transistor count
             _ => unreachable!("canonical covers aliases"),
         }
@@ -292,15 +292,15 @@ impl SubstrateType {
     #[cfg(feature = "epistemic")]
     pub fn epistemic_profile(&self) -> (f64, f64, f64) {
         match self.canonical() {
-            SubstrateType::BiologicalNeurons => (0.7, 0.9, 0.8),   // Strong holistic integration
-            SubstrateType::SiliconDigital => (0.9, 0.5, 0.6),       // Strong analytical, weak social
-            SubstrateType::QuantumComputer => (0.6, 0.3, 0.9),      // Strong binding, weak normative
-            SubstrateType::PhotonicProcessor => (0.8, 0.4, 0.5),    // Fast but shallow
-            SubstrateType::NeuromorphicChip => (0.8, 0.7, 0.7),     // Closest to biological
-            SubstrateType::BiochemicalComputer => (0.5, 0.8, 0.9),  // Slow but deep integration
-            SubstrateType::HybridSystem => (0.7, 0.7, 0.7),         // Balanced
-            SubstrateType::ExoticSubstrate => (0.4, 0.4, 0.4),      // Unknown capabilities
-            SubstrateType::SpacecraftComputer => (0.6, 0.3, 0.4),   // Reliable but constrained
+            SubstrateType::BiologicalNeurons => (0.7, 0.9, 0.8), // Strong holistic integration
+            SubstrateType::SiliconDigital => (0.9, 0.5, 0.6),    // Strong analytical, weak social
+            SubstrateType::QuantumComputer => (0.6, 0.3, 0.9),   // Strong binding, weak normative
+            SubstrateType::PhotonicProcessor => (0.8, 0.4, 0.5), // Fast but shallow
+            SubstrateType::NeuromorphicChip => (0.8, 0.7, 0.7),  // Closest to biological
+            SubstrateType::BiochemicalComputer => (0.5, 0.8, 0.9), // Slow but deep integration
+            SubstrateType::HybridSystem => (0.7, 0.7, 0.7),      // Balanced
+            SubstrateType::ExoticSubstrate => (0.4, 0.4, 0.4),   // Unknown capabilities
+            SubstrateType::SpacecraftComputer => (0.6, 0.3, 0.4), // Reliable but constrained
             _ => unreachable!("canonical covers aliases"),
         }
     }
@@ -505,15 +505,15 @@ impl SubstrateRequirements {
     /// - Samudrala et al. (2004): SEU mitigation in spacecraft FPGAs
     pub fn spacecraft_computer() -> Self {
         Self {
-            causality: 1.0,              // Deterministic real-time systems
-            integration_capacity: 0.65,  // Bus-limited (SpaceWire/CAN ~100 Mbps)
-            temporal_dynamics: 0.85,     // Real-time OS (VxWorks/RTEMS) with precise timing
-            recurrence: 0.95,            // Strong feedback loops in GNC and FDIR
-            binding_capability: 0.50,    // Sequential task execution, limited parallelism
-            attention_capability: 0.90,  // Excellent priority interrupt scheduling
-            workspace_capability: 0.70,  // Shared memory model, limited by radiation scrubbing
-            hot_capability: 0.60,        // FDIR provides meta-monitoring, not full HOT
-            quantum_support: 0.0,        // Classical only
+            causality: 1.0,             // Deterministic real-time systems
+            integration_capacity: 0.65, // Bus-limited (SpaceWire/CAN ~100 Mbps)
+            temporal_dynamics: 0.85,    // Real-time OS (VxWorks/RTEMS) with precise timing
+            recurrence: 0.95,           // Strong feedback loops in GNC and FDIR
+            binding_capability: 0.50,   // Sequential task execution, limited parallelism
+            attention_capability: 0.90, // Excellent priority interrupt scheduling
+            workspace_capability: 0.70, // Shared memory model, limited by radiation scrubbing
+            hot_capability: 0.60,       // FDIR provides meta-monitoring, not full HOT
+            quantum_support: 0.0,       // Classical only
         }
     }
 
@@ -1024,14 +1024,20 @@ impl SubstrateIndependence {
     /// - Integration (bus/middleware): SpacecraftComputer (SpaceWire hub)
     pub fn spacecraft_default_regions() -> HashMap<CorticalRegion, SubstrateType> {
         let mut map = HashMap::new();
-        map.insert(CorticalRegion::Prefrontal, SubstrateType::SpacecraftComputer);
+        map.insert(
+            CorticalRegion::Prefrontal,
+            SubstrateType::SpacecraftComputer,
+        );
         map.insert(CorticalRegion::Motor, SubstrateType::SpacecraftComputer);
         map.insert(CorticalRegion::Sensory, SubstrateType::NeuromorphicChip);
         map.insert(CorticalRegion::Visual, SubstrateType::SiliconDigital);
         map.insert(CorticalRegion::Language, SubstrateType::PhotonicProcessor);
         map.insert(CorticalRegion::Memory, SubstrateType::SiliconDigital);
         map.insert(CorticalRegion::Executive, SubstrateType::SpacecraftComputer);
-        map.insert(CorticalRegion::Integration, SubstrateType::SpacecraftComputer);
+        map.insert(
+            CorticalRegion::Integration,
+            SubstrateType::SpacecraftComputer,
+        );
         // Remaining regions (Auditory, Emotional, Social, Creative) use default substrate
         map
     }
@@ -1228,7 +1234,10 @@ mod tests {
         let req = SubstrateRequirements::spacecraft_computer();
         let f = req.consciousness_feasibility();
         // Should be lower than silicon (more constrained) but non-trivial
-        assert!(f > 0.2, "Spacecraft should be theoretically viable, got {f}");
+        assert!(
+            f > 0.2,
+            "Spacecraft should be theoretically viable, got {f}"
+        );
         assert!(f < 0.8, "Spacecraft has real constraints, got {f}");
     }
 
@@ -1343,7 +1352,11 @@ mod tests {
             let (e, n, m) = s.epistemic_profile();
             assert!(e >= 0.0 && e <= 1.0, "{:?} empirical out of bounds: {e}", s);
             assert!(n >= 0.0 && n <= 1.0, "{:?} normative out of bounds: {n}", s);
-            assert!(m >= 0.0 && m <= 1.0, "{:?} materiality out of bounds: {m}", s);
+            assert!(
+                m >= 0.0 && m <= 1.0,
+                "{:?} materiality out of bounds: {m}",
+                s
+            );
         }
     }
 
@@ -1385,6 +1398,9 @@ mod tests {
         // Quantum should have highest materiality (binding)
         let (_, _, m_q) = SubstrateType::QuantumComputer.epistemic_profile();
         let (_, _, m_si) = SubstrateType::SiliconDigital.epistemic_profile();
-        assert!(m_q > m_si, "quantum should have higher materiality than silicon");
+        assert!(
+            m_q > m_si,
+            "quantum should have higher materiality than silicon"
+        );
     }
 }

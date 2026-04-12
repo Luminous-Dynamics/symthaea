@@ -168,15 +168,39 @@ fn main() {
     let full_matrix = build_matrix(n, &full_edges);
 
     let results = vec![
-        analyze_pattern("Feedforward (Hierarchical Chain)", "8 nodes in a chain, no feedback", &ff_matrix, threshold),
-        analyze_pattern("Recurrent (Cycle)", "8 nodes in a closed loop with feedback", &cyc_matrix, threshold),
-        analyze_pattern("Modular (Two Clusters)", "4+4 nodes, dense within, sparse bridge", &mod_matrix, threshold),
-        analyze_pattern("Fully Integrated (Complete K8)", "8 fully connected nodes", &full_matrix, threshold),
+        analyze_pattern(
+            "Feedforward (Hierarchical Chain)",
+            "8 nodes in a chain, no feedback",
+            &ff_matrix,
+            threshold,
+        ),
+        analyze_pattern(
+            "Recurrent (Cycle)",
+            "8 nodes in a closed loop with feedback",
+            &cyc_matrix,
+            threshold,
+        ),
+        analyze_pattern(
+            "Modular (Two Clusters)",
+            "4+4 nodes, dense within, sparse bridge",
+            &mod_matrix,
+            threshold,
+        ),
+        analyze_pattern(
+            "Fully Integrated (Complete K8)",
+            "8 fully connected nodes",
+            &full_matrix,
+            threshold,
+        ),
     ];
 
     // Print individual results
     for (i, r) in results.iter().enumerate() {
-        println!("\u{2550}\u{2550}\u{2550} Pattern {}: {} \u{2550}\u{2550}\u{2550}", i + 1, r.name);
+        println!(
+            "\u{2550}\u{2550}\u{2550} Pattern {}: {} \u{2550}\u{2550}\u{2550}",
+            i + 1,
+            r.name
+        );
         println!("  {}", r.description);
         println!("  Edges: {} | Triangles: {}", r.num_edges, r.num_triangles);
         println!(
@@ -217,7 +241,10 @@ fn main() {
         "{:<28} | {:>8} | {:>10} | {:>10} | {:>9}",
         "Pattern", "Phi_topo", "\u{03b2}\u{2081} (loops)", "\u{03b2}\u{2082} (voids)", "Harmonic%"
     );
-    println!("{:-<28}-+-{:-<8}-+-{:-<10}-+-{:-<10}-+-{:-<9}", "", "", "", "", "");
+    println!(
+        "{:-<28}-+-{:-<8}-+-{:-<10}-+-{:-<10}-+-{:-<9}",
+        "", "", "", "", ""
+    );
     for r in &results {
         println!(
             "{:<28} | {:>8.3} | {:>10} | {:>10} | {:>8.1}%",

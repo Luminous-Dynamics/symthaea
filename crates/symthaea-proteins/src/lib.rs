@@ -23,8 +23,8 @@
 //!   hydropathic character of a protein. *J. Mol. Biol.*, 157, 105-132.
 
 pub mod amino_acid;
+pub mod benchmark;
 pub mod cb513;
 pub mod chou_fasman;
 pub mod features;
 pub mod rf_ssp;
-pub mod benchmark;

@@ -109,7 +109,7 @@ impl BrowserBridge {
         self.total_steps += 1;
 
         EmbodimentResult {
-            num_actuators: 4, // navigate, click, type, scroll
+            num_actuators: 4,    // navigate, click, type, scroll
             control_effort: 0.0, // browser has no physical effort
             success: self.last_observation.is_some(),
             prediction_error: pred_error,

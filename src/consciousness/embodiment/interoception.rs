@@ -124,20 +124,14 @@ impl InteroceptiveInferenceEngine {
     /// - `actual_valence`: Current emotional valence [-1, 1]
     /// - `actual_arousal`: Current arousal level [0, 1]
     /// - `physiological_stress`: Aggregate stress signal [0, 1]
-    pub fn update(
-        &mut self,
-        actual_valence: f64,
-        actual_arousal: f64,
-        physiological_stress: f64,
-    ) {
+    pub fn update(&mut self, actual_valence: f64, actual_arousal: f64, physiological_stress: f64) {
         // Interoceptive prediction error
         let valence_pe = (actual_valence - self.predicted_valence).abs();
         let arousal_pe = (actual_arousal - self.predicted_arousal).abs();
         let raw_pe = (valence_pe + arousal_pe) / 2.0;
 
         // EMA smooth
-        self.interoceptive_pe =
-            self.alpha * raw_pe + (1.0 - self.alpha) * self.interoceptive_pe;
+        self.interoceptive_pe = self.alpha * raw_pe + (1.0 - self.alpha) * self.interoceptive_pe;
 
         // Update predictions (simple EMA predictor — learns body patterns)
         self.predicted_valence =

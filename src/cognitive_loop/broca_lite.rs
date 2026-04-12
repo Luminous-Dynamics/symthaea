@@ -186,6 +186,14 @@ impl BrocaLiteManager {
     ) -> Option<LiteGenerationResult> {
         None
     }
+
+    pub fn generate_from_signals_with_input(
+        &mut self,
+        _signals: &BrocaConsciousnessSignals,
+        _input_text: Option<&str>,
+    ) -> Option<LiteGenerationResult> {
+        None
+    }
 }
 
 #[cfg(test)]
@@ -241,7 +249,10 @@ mod tests {
         signals.emotional_arousal = 0.4;
         signals.emotional_warmth = 0.5;
         let result = manager.generate_from_signals(&signals);
-        assert!(result.is_some(), "should generate text at moderate consciousness");
+        assert!(
+            result.is_some(),
+            "should generate text at moderate consciousness"
+        );
         let text = result.unwrap().text;
         assert!(!text.is_empty(), "generated text should not be empty");
     }
@@ -356,10 +367,15 @@ mod tests {
         eprintln!("[Self-ref] {}", r_self.text);
 
         // Input should change the output (different intent channels → different patterns)
-        let unique_count = [&r_neutral.text, &r_question.text, &r_positive.text, &r_self.text]
-            .iter()
-            .collect::<std::collections::HashSet<_>>()
-            .len();
+        let unique_count = [
+            &r_neutral.text,
+            &r_question.text,
+            &r_positive.text,
+            &r_self.text,
+        ]
+        .iter()
+        .collect::<std::collections::HashSet<_>>()
+        .len();
         assert!(
             unique_count >= 2,
             "different inputs should produce different outputs, got {} unique from 4",

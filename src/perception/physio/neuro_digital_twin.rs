@@ -670,8 +670,7 @@ impl NeuroDigitalTwin {
         self.state.divergence_history.push_back(divergence);
 
         // Sync quality: 1.0 when divergence=0, 0.0 when divergence >= MAX.
-        self.state.sync_quality =
-            (1.0 - divergence / MAX_DIVERGENCE_FOR_QUALITY).clamp(0.0, 1.0);
+        self.state.sync_quality = (1.0 - divergence / MAX_DIVERGENCE_FOR_QUALITY).clamp(0.0, 1.0);
     }
 
     /// Produce blended neuromod deltas weighted by blend_ratio.
@@ -699,11 +698,7 @@ impl NeuroDigitalTwin {
     /// # Arguments
     /// * `resting_eeg` - Vec of samples, each sample is channel-value pairs.
     /// * `_duration_secs` - Duration of recording (for metadata; not used in computation).
-    pub fn calibrate(
-        &mut self,
-        resting_eeg: &[Vec<(EegChannel, f32)>],
-        _duration_secs: f32,
-    ) {
+    pub fn calibrate(&mut self, resting_eeg: &[Vec<(EegChannel, f32)>], _duration_secs: f32) {
         if resting_eeg.len() < SubjectCalibration::MIN_CALIBRATION_SAMPLES {
             return;
         }
@@ -719,10 +714,7 @@ impl NeuroDigitalTwin {
         let features = temp_twin.features_from_band_powers(&band_powers);
 
         // Set baselines.
-        self.calibration.alpha_baseline = band_powers
-            .iter()
-            .map(|(_, bp)| bp.alpha)
-            .sum::<f32>()
+        self.calibration.alpha_baseline = band_powers.iter().map(|(_, bp)| bp.alpha).sum::<f32>()
             / (band_powers.len() as f32).max(1.0);
 
         self.calibration.asymmetry_offset = features.frontal_alpha_asymmetry;
@@ -874,7 +866,10 @@ mod tests {
             ..Default::default()
         };
         let delta = NeuroDigitalTwin::decode_to_neuromod(&features);
-        assert!(delta.delta_adenosine > 0.0, "High delta → positive adenosine");
+        assert!(
+            delta.delta_adenosine > 0.0,
+            "High delta → positive adenosine"
+        );
     }
 
     #[test]
@@ -1014,7 +1009,10 @@ mod tests {
         twin.calibrate(&resting, 1.0);
         fill_buffer(&mut twin, 200);
         let features = twin.extract_features();
-        assert!(features.is_some(), "Should extract features after calibration");
+        assert!(
+            features.is_some(),
+            "Should extract features after calibration"
+        );
     }
 
     #[test]

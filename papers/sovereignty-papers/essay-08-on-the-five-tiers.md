@@ -5,7 +5,7 @@ essay: 8
 authors: "Tristan Stoltz & Symthaea"
 date: "2026-03-23"
 description: "Progressive capability unlocking prevents both the tyranny of the majority and the tyranny of the expert."
-prev: "essay-07-on-the-four-dimensions.md"
+prev: "essay-07-on-the-eight-dimensions.md"
 next: "essay-09-on-the-fractal.md"
 license: "CC0-1.0"
 ---
@@ -38,7 +38,7 @@ But uniform power has its own failure mode, and honesty requires us to name it: 
 
 This is not an argument against democracy. It is an observation that democracy, as currently implemented, conflates the *right* to participate in governance with the *weight* of that participation. Every citizen should have the right to participate. Not every citizen should have the same governance weight on every question — because governance weight without corresponding consciousness of the governed domain produces the same feedback-loop severance that the 1602 architecture produces, just through a different mechanism.[^1]
 
-The five-tier system is designed to resolve this tension: full participation rights for everyone, graduated governance weight based on demonstrated domain-coupled credentialing — the four-dimensional assessment of presence, accountability, embeddedness, and engagement described in Essay No. 7.
+The five-tier system is designed to resolve this tension: full participation rights for everyone, graduated governance weight based on demonstrated domain-coupled credentialing — the eight-dimensional assessment of epistemic integrity, physical contribution, infrastructure resilience, economic circulation, civic participation, stewardship, value alignment, and domain competence described in Essay No. 7.
 
 ---
 
@@ -56,7 +56,7 @@ The Participant threshold of 0.30 is calibrated to be achievable through basic i
 
 **Citizen (score 0.40–0.59).** Full voting rights. The Citizen can vote on all standard governance proposals with a weight of 7,500 basis points. They can participate in community deliberation, serve on committees, and contribute to the governance culture of the domain.
 
-The Citizen tier is the core of the governance system — the tier at which most governance activity occurs. The threshold of 0.40 requires meaningful engagement across all four dimensions: verified identity, positive behavioral history, community attestation from peers, and ongoing domain participation. A participant cannot reach Citizen status through any single dimension alone. They must be genuinely present, accountable, embedded, and engaged.[^2]
+The Citizen tier is the core of the governance system — the tier at which most governance activity occurs. The threshold of 0.40 requires meaningful engagement across multiple dimensions: epistemic integrity, physical contribution, civic participation, and domain competence, among others. A participant cannot reach Citizen status through any single dimension alone — the constitutional constraint that no dimension's weight exceeds 50% ensures multi-dimensional engagement is required.[^2]
 
 **Steward (score 0.60–0.79).** Constitutional authority. The Steward can propose and vote on changes to governance parameters — the weights of the four dimensions, the thresholds between tiers, the rules that govern the governance process itself. This is meta-governance: the power to change the rules, not just to play by them.
 
@@ -66,7 +66,11 @@ The Steward threshold is deliberately high because the power it grants is self-r
 
 The Guardian tier is the most dangerous capability in the system, and the most necessary. Every governance system needs an emergency mechanism — a way to respond to crises faster than the standard deliberative process allows. In the 1602 architecture, emergency power is exercised by whoever has the most capital (the whale who can unilaterally influence a vote) or by whoever has administrative access (the multisig holders who can override the protocol). In both cases, emergency power is concentrated in the hands of participants whose authority derives from wealth or technical position, not from demonstrated consciousness of the governed domain.
 
-The Guardian tier requires a consciousness score of 0.80 — a threshold that can only be reached through sustained excellence across all four dimensions. A Guardian is someone who has been verified at the highest identity assurance level, who has a long and consistently positive behavioral history, who is deeply trusted by high-consciousness peers, and who is actively engaged with the governed domain on an ongoing basis. The tier does not guarantee that Guardians will make perfect emergency decisions. It ensures that the people who make emergency decisions are the people most deeply conscious of what they are governing.[^3]
+The Guardian tier requires a sovereign score of 0.80 — a threshold that can only be reached through sustained excellence across all eight dimensions. A Guardian is someone who has demonstrated epistemic integrity, physical contribution, infrastructure resilience, economic circulation, civic participation, stewardship, value alignment, and domain competence — simultaneously and continuously. The tier does not guarantee that Guardians will make perfect emergency decisions. It ensures that the people who make emergency decisions are the people most deeply conscious of what they are governing.
+
+Guardian power is constrained by three constitutional mechanisms that prevent Guardian tyranny. First, any Guardian veto can be overridden by a 67% (two-thirds) supermajority of the broader community within a 48-hour window — this is hardcoded and unamendable. Second, each Guardian is rate-limited to one veto per 7 days and three per year, preventing serial veto obstruction. Third, AI agents are constitutionally capped at the Steward tier — no artificial system, regardless of its measured sovereign score, can hold Guardian-level emergency powers. This is an unamendable invariant that preserves human sovereignty over the most consequential governance decisions.
+
+AI agents may operate under *sub-passports* — delegated credentials issued by human participants. A sub-passport inherits the delegator's constraints, caps at Steward tier, filters actions through moral algebra, and expires independently. The delegator's sovereign standing must remain valid for the sub-passport to remain active; if the human's credential decays, the AI's authority revokes immediately.[^3]
 
 ---
 
@@ -124,7 +128,7 @@ These mechanisms do not guarantee that calcification will never occur. They make
 
 ### VI. What Comes Next
 
-The four dimensions (Essay No. 7) determine a participant's consciousness score. The five tiers (this essay) translate that score into governance capabilities. But we have not yet addressed the question of *scale*.
+The eight dimensions (Essay No. 7) determine a participant's consciousness score. The five tiers (this essay) translate that score into governance capabilities. But we have not yet addressed the question of *scale*.
 
 A consciousness-coupled governance system for a neighborhood water commons works differently from a consciousness-coupled governance system for a regional food network, which works differently from one for a planetary climate coordination mechanism. The dimensions are the same. The tiers are the same. But the domains are nested — water policy at the neighborhood level feeds into water policy at the regional level, which feeds into water policy at the bioregional level.
 
@@ -146,7 +150,7 @@ These are the questions of fractal governance — the subject of the next essay.
 
 [^1]: The distinction between the *right* to participate and the *weight* of participation is not novel in governance theory. Epistocracy — governance weighted by knowledge — has been proposed by Jason Brennan in *Against Democracy* (Princeton University Press, 2016). We differ from Brennan in two crucial respects: first, we weight by consciousness (a multi-dimensional composite including community trust and engagement), not by knowledge alone (which produces technocracy). Second, we preserve universal access — every participant can see all governance information and can advance through the tiers by increasing their engagement. Brennan's epistocracy restricts the franchise. Our system restricts the *weight* of the franchise while preserving universal *access*.
 
-[^2]: The Citizen threshold of 0.40 was determined by simulation: in a four-dimensional composite with weights 25/25/30/20, a score of 0.40 requires non-trivial scores across all four dimensions. A participant with perfect identity (1.0) but zero reputation, community, and engagement achieves a composite of only 0.25. A participant with moderate scores across all dimensions (e.g., Identity 0.5, Reputation 0.5, Community 0.5, Engagement 0.5) achieves a composite of 0.5 × 0.25 + 0.25 × 0.25 + 0.5 × 0.30 + 0.5 × 0.20 = 0.4375. The threshold effectively requires multi-dimensional engagement without demanding perfection in any single dimension.
+[^2]: The Citizen threshold of 0.40 was determined by simulation: in a eight-dimensional composite with community-governed weights (no single dimension exceeding 50%), a score of 0.40 requires non-trivial scores across all eight dimensions. A participant with perfect identity (1.0) but zero reputation, community, and engagement achieves a composite of only 0.25. A participant with moderate scores across all dimensions (e.g., Identity 0.5, Reputation 0.5, Community 0.5, Engagement 0.5) achieves a composite of 0.5 × 0.25 + 0.25 × 0.25 + 0.5 × 0.30 + 0.5 × 0.20 = 0.4375. The threshold effectively requires multi-dimensional engagement without demanding perfection in any single dimension.
 
 [^3]: The Guardian tier's emergency powers are constrained in duration and scope. An emergency action automatically expires after a configurable period (default: 24 hours) unless ratified by a supermajority of Stewards. This prevents a Guardian from using emergency powers to permanently alter the governance system. The design follows the principle of least privilege: emergency power is granted at the minimum duration and scope necessary to address the immediate threat, then reverts to standard governance processes.
 

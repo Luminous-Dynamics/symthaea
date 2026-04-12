@@ -173,12 +173,18 @@ impl MorphogeneticField {
     /// inside a unit sphere.
     pub fn new(num_cells: usize, seed: u64) -> Self {
         let mut rng = StdRng::seed_from_u64(seed);
-        let cells: Vec<OrganoidCell> = (0..num_cells).map(|_| OrganoidCell::new_random(&mut rng)).collect();
+        let cells: Vec<OrganoidCell> = (0..num_cells)
+            .map(|_| OrganoidCell::new_random(&mut rng))
+            .collect();
         let n = cells.len();
         // Initial morphogen concentrations — small random perturbation around
         // a uniform steady state so Turing instability can amplify patterns.
-        let activator: Vec<f32> = (0..n).map(|_| 1.0 + rng.gen_range(-0.05..0.05f32)).collect();
-        let inhibitor: Vec<f32> = (0..n).map(|_| 1.0 + rng.gen_range(-0.05..0.05f32)).collect();
+        let activator: Vec<f32> = (0..n)
+            .map(|_| 1.0 + rng.gen_range(-0.05..0.05f32))
+            .collect();
+        let inhibitor: Vec<f32> = (0..n)
+            .map(|_| 1.0 + rng.gen_range(-0.05..0.05f32))
+            .collect();
         let consciousness_potential = vec![0.0f32; n];
         let local_phi = vec![0.0f64; n];
         let connectivity_matrix = vec![vec![0.0f64; n]; n];
@@ -276,7 +282,9 @@ impl MorphogeneticField {
             let cell = &mut self.cells[i];
 
             // Only progenitors can differentiate.
-            if !cell.cell_type.is_progenitor() && cell.cell_type != OrganoidCellType::Undifferentiated {
+            if !cell.cell_type.is_progenitor()
+                && cell.cell_type != OrganoidCellType::Undifferentiated
+            {
                 continue;
             }
 
@@ -534,7 +542,10 @@ impl NeuralOrganoid {
     /// reaction-diffusion step → compute phi → update stage → check ethics.
     pub fn advance_day(&mut self) {
         // If the experiment is halted, do nothing.
-        if matches!(self.ethics_status, OrganoidEthicsStatus::ExperimentHalted(_)) {
+        if matches!(
+            self.ethics_status,
+            OrganoidEthicsStatus::ExperimentHalted(_)
+        ) {
             return;
         }
 
@@ -606,7 +617,10 @@ impl NeuralOrganoid {
     /// Update the ethics status based on current global phi.
     pub fn check_ethics(&mut self) {
         // Don't un-halt.
-        if matches!(self.ethics_status, OrganoidEthicsStatus::ExperimentHalted(_)) {
+        if matches!(
+            self.ethics_status,
+            OrganoidEthicsStatus::ExperimentHalted(_)
+        ) {
             return;
         }
 
@@ -741,8 +755,16 @@ mod tests {
         }
         // The activator field should NOT be uniform — check that max and min
         // differ by a meaningful amount (the initial perturbation is +-0.05).
-        let min = field.activator.iter().cloned().fold(f32::INFINITY, f32::min);
-        let max = field.activator.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
+        let min = field
+            .activator
+            .iter()
+            .cloned()
+            .fold(f32::INFINITY, f32::min);
+        let max = field
+            .activator
+            .iter()
+            .cloned()
+            .fold(f32::NEG_INFINITY, f32::max);
         let range = max - min;
         assert!(
             range > 1e-4,

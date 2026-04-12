@@ -3,9 +3,9 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Manipulator controller: HdcLtcUnifiedNetwork + output projection (16,384D → 8D).
 
+use crate::types::{ManipulatorCommand, ManipulatorConfig, NUM_JOINTS};
 use symthaea_core::genesis::GenesisSeed;
 use symthaea_core::hdc::{ContinuousHV, HdcLtcUnifiedNetwork, UnifiedConfig, UnifiedNetworkConfig};
-use crate::types::{ManipulatorCommand, ManipulatorConfig, NUM_JOINTS};
 
 const HDC_DIM: usize = symthaea_core::hdc::HDC_DIMENSION;
 const NUM_OUTPUTS: usize = NUM_JOINTS + 1; // 7 joints + 1 gripper
@@ -33,12 +33,23 @@ impl ManipulatorController {
             skip_connections: false,
         };
         let network = HdcLtcUnifiedNetwork::from_genesis(net_config, genesis);
-        let weight_hv = ContinuousHV::from_genesis(genesis, "manipulator::output_weights", NUM_OUTPUTS * HDC_DIM);
+        let weight_hv = ContinuousHV::from_genesis(
+            genesis,
+            "manipulator::output_weights",
+            NUM_OUTPUTS * HDC_DIM,
+        );
         let mut output_weights: Vec<f32> = weight_hv.as_slice().to_vec();
-        for w in &mut output_weights { *w *= 0.01; }
+        for w in &mut output_weights {
+            *w *= 0.01;
+        }
         let output_bias = [0.0; NUM_OUTPUTS]; // Zero torque at rest
 
-        Self { network, output_weights, output_bias, learning_rate: config.learning_rate }
+        Self {
+            network,
+            output_weights,
+            output_bias,
+            learning_rate: config.learning_rate,
+        }
     }
 
     pub fn forward(&mut self, sensor_hv: &ContinuousHV, dt: f32) -> ManipulatorCommand {
@@ -49,22 +60,38 @@ impl ManipulatorController {
         for i in 0..NUM_OUTPUTS {
             let offset = i * HDC_DIM;
             let mut sum = 0.0f32;
-            for j in 0..HDC_DIM { sum += self.output_weights[offset + j] * hv[j]; }
+            for j in 0..HDC_DIM {
+                sum += self.output_weights[offset + j] * hv[j];
+            }
             raw[i] = sum + self.output_bias[i];
         }
         let mut torques = [0.0f32; NUM_JOINTS];
-        for i in 0..NUM_JOINTS { torques[i] = fast_tanh(raw[i]); }
+        for i in 0..NUM_JOINTS {
+            torques[i] = fast_tanh(raw[i]);
+        }
         let gripper = fast_sigmoid(raw[NUM_JOINTS]);
-        ManipulatorCommand { joint_torques: torques, gripper }.clamped()
+        ManipulatorCommand {
+            joint_torques: torques,
+            gripper,
+        }
+        .clamped()
     }
 
-    pub fn reset(&mut self) { self.network.reset(); }
+    pub fn reset(&mut self) {
+        self.network.reset();
+    }
 }
 
 fn fast_tanh(x: f32) -> f32 {
-    if x.abs() > 4.97 { x.signum() } else { x * (27.0 + x * x) / (27.0 + 9.0 * x * x) }
+    if x.abs() > 4.97 {
+        x.signum()
+    } else {
+        x * (27.0 + x * x) / (27.0 + 9.0 * x * x)
+    }
 }
-fn fast_sigmoid(x: f32) -> f32 { 0.5 * (1.0 + fast_tanh(x * 0.5)) }
+fn fast_sigmoid(x: f32) -> f32 {
+    0.5 * (1.0 + fast_tanh(x * 0.5))
+}
 
 #[cfg(test)]
 mod tests {
@@ -76,7 +103,9 @@ mod tests {
         let mut ctrl = ManipulatorController::new(&genesis, &ManipulatorConfig::default());
         let hv = ContinuousHV::random(HDC_DIM, 42);
         let cmd = ctrl.forward(&hv, 0.002);
-        for &t in &cmd.joint_torques { assert!(t >= -1.0 && t <= 1.0); }
+        for &t in &cmd.joint_torques {
+            assert!(t >= -1.0 && t <= 1.0);
+        }
         assert!(cmd.gripper >= 0.0 && cmd.gripper <= 1.0);
     }
 

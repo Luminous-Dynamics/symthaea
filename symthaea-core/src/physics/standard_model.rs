@@ -783,20 +783,12 @@ mod tests {
     #[test]
     fn test_ckm_unitarity() {
         let dev = mixing_matrix_unitarity_deviation(&CKM);
-        assert!(
-            dev < 0.01,
-            "CKM unitarity deviation too large: {}",
-            dev
-        );
+        assert!(dev < 0.01, "CKM unitarity deviation too large: {}", dev);
     }
 
     #[test]
     fn test_pmns_unitarity() {
         let dev = mixing_matrix_unitarity_deviation(&PMNS);
-        assert!(
-            dev < 0.05,
-            "PMNS unitarity deviation too large: {}",
-            dev
-        );
+        assert!(dev < 0.05, "PMNS unitarity deviation too large: {}", dev);
     }
 }

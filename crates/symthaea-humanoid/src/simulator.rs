@@ -772,7 +772,11 @@ impl HumanoidPhysicsSimulator for SimpleHumanoidSimulator {
             self.state.joint_angles[i] += self.state.joint_velocities[i] * dt;
 
             // Per-joint anatomical limits with velocity clamping at stops
-            let [lo, hi] = if i < self.joint_limits.len() { self.joint_limits[i] } else { [-3.14, 3.14] };
+            let [lo, hi] = if i < self.joint_limits.len() {
+                self.joint_limits[i]
+            } else {
+                [-3.14, 3.14]
+            };
             if self.state.joint_angles[i] < lo {
                 self.state.joint_angles[i] = lo;
                 self.state.joint_velocities[i] = self.state.joint_velocities[i].max(0.0);
@@ -1116,7 +1120,11 @@ impl HumanoidPhysicsSimulator for SimpleHumanoidSimulator {
         // Perturb joint angles within anatomical limits (DMC21 base joints)
         let n = self.state.joint_angles.len().min(JOINT_LIMITS.len());
         for i in 0..n {
-            let [lo, hi] = if i < self.joint_limits.len() { self.joint_limits[i] } else { [-3.14, 3.14] };
+            let [lo, hi] = if i < self.joint_limits.len() {
+                self.joint_limits[i]
+            } else {
+                [-3.14, 3.14]
+            };
             let range = hi - lo;
             self.state.joint_angles[i] += perturbation * next_f64() * range * 0.03;
             self.state.joint_angles[i] = self.state.joint_angles[i].clamp(lo, hi);
@@ -2035,9 +2043,16 @@ mod tests {
             sim.step(&cmd, 0.025);
         }
         let state = sim.state();
-        assert!(state.root_height > 0.5, "Should still be standing: h={}", state.root_height);
+        assert!(
+            state.root_height > 0.5,
+            "Should still be standing: h={}",
+            state.root_height
+        );
         // Hand centroids should be computed (not all zero after stepping)
-        assert!(state.extremities.iter().all(|x| x.is_finite()), "All extremities should be finite");
+        assert!(
+            state.extremities.iter().all(|x| x.is_finite()),
+            "All extremities should be finite"
+        );
     }
 
     #[test]

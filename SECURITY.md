@@ -31,6 +31,18 @@ Include a description of the vulnerability, steps to reproduce, and any relevant
 - `cargo-audit` scans for known vulnerabilities in dependencies
 - `cargo-deny` enforces license and advisory policies
 
+## Control-Plane Hardening
+
+- The service daemon uses a versioned JSON-line protocol with bearer auth for privileged requests.
+- The benchmark API uses HTTP bearer auth for protected routes and handler-level privacy checks for result access.
+- `execute_gated` is intentionally read-only over the daemon control plane.
+- Reserved daemon verbs must stay explicitly documented as `not_implemented` until they are real.
+- Control-plane changes should keep these CI jobs green:
+  - `Hardened Lib Regressions`
+  - `Hardened Daemon Regressions`
+  - `Hardened API Regressions`
+  - `Hardened Nix Regressions`
+
 ## Disclosure Policy
 
 We follow coordinated disclosure. Please allow us reasonable time to address reported issues before any public disclosure.

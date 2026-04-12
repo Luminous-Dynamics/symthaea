@@ -182,8 +182,8 @@ impl HierarchicalLevel {
         // Blanket: closed blanket → trust priors more (0.5-1.0 range)
         let blanket_mod = 0.5 + 0.5 * blanket_factor.clamp(0.0, 1.0);
 
-        self.precision = (base_precision * phi_mod * intero_mod * blanket_mod)
-            .clamp(0.01, 10.0); // Guard bounds
+        self.precision = (base_precision * phi_mod * intero_mod * blanket_mod).clamp(0.01, 10.0);
+        // Guard bounds
     }
 }
 
@@ -285,12 +285,7 @@ impl HierarchicalFreeEnergy {
     /// - Interoceptive factor (valence/arousal modulation)
     /// - Blanket factor (Markov blanket permeability)
     #[cfg(feature = "unified_precision")]
-    pub fn update_precisions(
-        &mut self,
-        phi_factor: f64,
-        intero_factor: f64,
-        blanket_factor: f64,
-    ) {
+    pub fn update_precisions(&mut self, phi_factor: f64, intero_factor: f64, blanket_factor: f64) {
         let decay = self.config.precision_decay;
         // Pre-computed base precisions: decay^0=1.0, decay^1, decay^2, decay^3
         // Avoids repeated powi() on the hot path.
@@ -520,15 +515,17 @@ impl HierarchicalFreeEnergy {
     /// combines:
     ///
     /// ```text
-    /// G(π) = epistemic_value(π)  +  pragmatic_value(π)
+    /// G(π) = epistemic_cost(π)  −  pragmatic_alignment(π)
+    ///      = ||prediction_error||  −  cos(policy, top_beliefs)
     /// ```
     ///
-    /// - **Epistemic value** (information gain): how much a policy is expected
-    ///   to reduce uncertainty, estimated as the magnitude of the prediction
-    ///   error the policy would produce (larger error ⇒ more to learn).
+    /// - **Epistemic cost** (prediction error magnitude): higher error means
+    ///   more information to learn, raising G. This encourages exploration of
+    ///   uncertain states when epistemic cost dominates.
     ///
-    /// - **Pragmatic value** (goal-directed): alignment of predicted outcome
-    ///   with the current beliefs at the top level (a proxy for preferences C).
+    /// - **Pragmatic alignment** (negative cosine similarity): higher alignment
+    ///   with top-level beliefs (preferences C) lowers G, encouraging
+    ///   goal-directed exploitation.
     ///
     /// Returns one G(π) score per policy.  *Lower* G is preferred (it is a
     /// free energy, so the agent seeks to minimise it).

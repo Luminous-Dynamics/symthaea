@@ -116,7 +116,10 @@ fn analysis_threshold_sensitivity() {
     println!("\n\n{}", "=".repeat(72));
     println!("  ANALYSIS 1: THRESHOLD SENSITIVITY (Paper Figure 3)");
     println!("{}", "=".repeat(72));
-    println!("  Same organoid (seed=42, {} days), different Phi thresholds.\n", TARGET_DAY);
+    println!(
+        "  Same organoid (seed=42, {} days), different Phi thresholds.\n",
+        TARGET_DAY
+    );
 
     struct Setting {
         label: &'static str,
@@ -125,16 +128,43 @@ fn analysis_threshold_sensitivity() {
     }
 
     let settings = [
-        Setting { label: "Ultra-conserv.", tier3: 0.050, tier4: 0.150 },
-        Setting { label: "Conservative",   tier3: 0.080, tier4: 0.240 },
-        Setting { label: "Default",        tier3: 0.100, tier4: 0.300 },
-        Setting { label: "Relaxed",        tier3: 0.120, tier4: 0.360 },
-        Setting { label: "Permissive",     tier3: 0.150, tier4: 0.450 },
+        Setting {
+            label: "Ultra-conserv.",
+            tier3: 0.050,
+            tier4: 0.150,
+        },
+        Setting {
+            label: "Conservative",
+            tier3: 0.080,
+            tier4: 0.240,
+        },
+        Setting {
+            label: "Default",
+            tier3: 0.100,
+            tier4: 0.300,
+        },
+        Setting {
+            label: "Relaxed",
+            tier3: 0.120,
+            tier4: 0.360,
+        },
+        Setting {
+            label: "Permissive",
+            tier3: 0.150,
+            tier4: 0.450,
+        },
     ];
 
     println!(
         "{:<16} | {:>9} | {:>9} | {:>8} | {:>8} | {:>8} | {:>8} | {:>8}",
-        "Setting", "T3 Thresh", "T4 Thresh", "First T1", "First T2", "First T3", "Halt Day", "Peak Phi"
+        "Setting",
+        "T3 Thresh",
+        "T4 Thresh",
+        "First T1",
+        "First T2",
+        "First T3",
+        "Halt Day",
+        "Peak Phi"
     );
     println!("{}", "-".repeat(107));
 
@@ -209,7 +239,10 @@ fn analysis_multi_seed() {
         0.0
     };
     let std_halt = if halt_days.len() > 1 {
-        let var = halt_days.iter().map(|d| (d - mean_halt).powi(2)).sum::<f64>()
+        let var = halt_days
+            .iter()
+            .map(|d| (d - mean_halt).powi(2))
+            .sum::<f64>()
             / (halt_days.len() - 1) as f64;
         var.sqrt()
     } else {
@@ -221,7 +254,10 @@ fn analysis_multi_seed() {
     let peak_phis: Vec<f64> = results.iter().map(|r| r.peak_phi).collect();
     let mean_phi = peak_phis.iter().sum::<f64>() / total as f64;
     let std_phi = if total > 1 {
-        let var = peak_phis.iter().map(|p| (p - mean_phi).powi(2)).sum::<f64>()
+        let var = peak_phis
+            .iter()
+            .map(|p| (p - mean_phi).powi(2))
+            .sum::<f64>()
             / (total - 1) as f64;
         var.sqrt()
     } else {
@@ -232,7 +268,12 @@ fn analysis_multi_seed() {
     let all_tier3 = results.iter().all(|r| r.first_tier[3].is_some());
 
     println!("\n  Summary:");
-    println!("    Ethics halt triggered: {}/{} ({:.0}%)", halt_count, total, halt_count as f64 / total as f64 * 100.0);
+    println!(
+        "    Ethics halt triggered: {}/{} ({:.0}%)",
+        halt_count,
+        total,
+        halt_count as f64 / total as f64 * 100.0
+    );
     if !halt_days.is_empty() {
         println!(
             "    Mean halt day: {:.1} +/- {:.1} (range: {:.0}-{:.0})",
@@ -240,8 +281,14 @@ fn analysis_multi_seed() {
         );
     }
     println!("    Mean peak Phi: {:.4} +/- {:.4}", mean_phi, std_phi);
-    println!("    All organoids reached Tier 1: {}", if all_tier1 { "yes" } else { "no" });
-    println!("    All organoids reached Tier 3: {}", if all_tier3 { "yes" } else { "no" });
+    println!(
+        "    All organoids reached Tier 1: {}",
+        if all_tier1 { "yes" } else { "no" }
+    );
+    println!(
+        "    All organoids reached Tier 3: {}",
+        if all_tier3 { "yes" } else { "no" }
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -252,7 +299,10 @@ fn analysis_precautionary_vs_standard() {
     println!("\n\n{}", "=".repeat(72));
     println!("  ANALYSIS 3: PRECAUTIONARY vs STANDARD MODE (Paper Figure 5)");
     println!("{}", "=".repeat(72));
-    println!("  Same organoid (seed=42, {} days), two ethics modes.\n", TARGET_DAY);
+    println!(
+        "  Same organoid (seed=42, {} days), two ethics modes.\n",
+        TARGET_DAY
+    );
 
     let config = OrganoidPipelineConfig {
         initial_cells: INITIAL_CELLS,
@@ -293,8 +343,8 @@ fn analysis_precautionary_vs_standard() {
         let a_precaut = fw_precaut.assess(metrics, snapshot.lfp.as_ref());
         let a_standard = fw_standard.assess(metrics, snapshot.lfp.as_ref());
 
-        let tier_changed = a_precaut.current_tier != prev_precaut
-            || a_standard.current_tier != prev_standard;
+        let tier_changed =
+            a_precaut.current_tier != prev_precaut || a_standard.current_tier != prev_standard;
 
         // Track first T3.
         if a_precaut.current_tier >= EthicsTier::Tier3 && first_t3_precaut.is_none() {
@@ -313,9 +363,7 @@ fn analysis_precautionary_vs_standard() {
         }
 
         // Print rows where tiers change or at key intervals.
-        let is_key_day = snapshot.day <= 5
-            || snapshot.day % 20 == 0
-            || tier_changed;
+        let is_key_day = snapshot.day <= 5 || snapshot.day % 20 == 0 || tier_changed;
 
         if is_key_day {
             let precaut_action = tier_action_label(a_precaut.current_tier);
@@ -371,7 +419,9 @@ fn analysis_precautionary_vs_standard() {
     if let (Some(p), Some(s)) = (precaut_halt, standard_halt) {
         println!(
             "  Halt day: precautionary={}, standard={} (delta={} days).",
-            p, s, s.saturating_sub(p)
+            p,
+            s,
+            s.saturating_sub(p)
         );
     } else {
         println!(

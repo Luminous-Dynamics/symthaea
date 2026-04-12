@@ -45,7 +45,7 @@ pub use backend::ProofBackend;
 pub use dilithium::DilithiumKeypair;
 pub use domain::DomainTag;
 pub use error::{ZkpError, ZkpResult};
-pub use consciousness::{ConsciousnessProofRequest, ConsciousnessProofResult, ConsciousnessTier};
+pub use consciousness::{ConsciousnessProofRequest, ConsciousnessProofResult, CivicTier};
 pub use fixed_point::{FixedPoint, Q16_16_SCALE};
 pub use pogq::{simulate_pogq, DualBackendComparison, PoGQPublicInputs, PoGQResult, PoGQWitness};
 pub use types::{

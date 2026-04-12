@@ -38,7 +38,10 @@ fn test_abyssal_dive_and_ascent() {
         assert!(state.is_finite(), "NaN during dive at step {i}");
     }
     let dive_depth = sim.state().depth;
-    assert!(dive_depth > 0.0, "Should have descended: depth={dive_depth}");
+    assert!(
+        dive_depth > 0.0,
+        "Should have descended: depth={dive_depth}"
+    );
 
     // Phase 2: Ascend with full thrust (500 steps)
     let ascend_cmd = AuvCommand {
@@ -79,16 +82,13 @@ fn test_thermal_downdraft_resistance() {
     // A thermal downdraft can generate ~200N of force on a torpedo AUV
     for i in 0..200 {
         sim.apply_external_force([0.0, 0.0, 200.0]); // Downward force
-        // AUV fights with upward thrust
+                                                     // AUV fights with upward thrust
         let fight_cmd = AuvCommand {
             thrusters: [0.3, 0.3, 0.0, 0.0, -1.0, -1.0, 0.0, 0.0],
         };
         sim.step(&fight_cmd, 0.01);
         let state = sim.state();
-        assert!(
-            state.is_finite(),
-            "NaN during downdraft at step {i}"
-        );
+        assert!(state.is_finite(), "NaN during downdraft at step {i}");
     }
 
     // Phase 3: Downdraft passes — recover
@@ -104,7 +104,10 @@ fn test_thermal_downdraft_resistance() {
     // All state should be valid after the ordeal
     let final_state = sim.state();
     assert!(final_state.is_finite());
-    assert!(final_state.speed() < 10.0, "Speed should be bounded after recovery");
+    assert!(
+        final_state.speed() < 10.0,
+        "Speed should be bounded after recovery"
+    );
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -178,10 +181,7 @@ fn test_asymmetric_thruster_failure() {
         };
         sim.step(&failed_cmd, 0.01);
         let state = sim.state();
-        assert!(
-            state.is_finite(),
-            "NaN with asymmetric thrust at step {i}"
-        );
+        assert!(state.is_finite(), "NaN with asymmetric thrust at step {i}");
     }
 
     // Vehicle should still be in a valid state despite yaw drift
@@ -189,11 +189,7 @@ fn test_asymmetric_thruster_failure() {
     assert!(state.is_finite());
     // Angular velocity should be bounded (clamped, not divergent)
     for w in &state.angular_velocity {
-        assert!(
-            w.abs() <= 3.5,
-            "Angular velocity should be bounded: {}",
-            w
-        );
+        assert!(w.abs() <= 3.5, "Angular velocity should be bounded: {}", w);
     }
 }
 
@@ -255,10 +251,7 @@ fn test_multi_axis_extreme_maneuver() {
     for i in 0..500 {
         sim.step(&extreme_cmd, 0.01);
         let state = sim.state();
-        assert!(
-            state.is_finite(),
-            "NaN during extreme maneuver at step {i}"
-        );
+        assert!(state.is_finite(), "NaN during extreme maneuver at step {i}");
     }
 
     let state = sim.state();
@@ -284,13 +277,28 @@ fn test_long_duration_mission() {
     let mut sim = SimpleAuvSimulator::new();
 
     let mission_phases: Vec<(AuvCommand, usize)> = vec![
-        (AuvCommand::forward(0.5), 1000),        // Cruise
-        (AuvCommand { thrusters: [0.3, 0.3, 0.0, 0.0, 0.5, 0.5, 0.0, 0.0] }, 500), // Dive
-        (AuvCommand::forward(0.8), 1000),         // Fast cruise
-        (AuvCommand { thrusters: [0.0, 0.0, 0.5, -0.5, 0.0, 0.0, 0.0, 0.0] }, 500), // Lateral maneuver
-        (AuvCommand { thrusters: [0.3, 0.3, 0.0, 0.0, -0.5, -0.5, 0.0, 0.0] }, 500), // Ascend
-        (AuvCommand::forward(0.3), 1000),         // Slow return
-        (AuvCommand::zero(), 500),                // Station keeping
+        (AuvCommand::forward(0.5), 1000), // Cruise
+        (
+            AuvCommand {
+                thrusters: [0.3, 0.3, 0.0, 0.0, 0.5, 0.5, 0.0, 0.0],
+            },
+            500,
+        ), // Dive
+        (AuvCommand::forward(0.8), 1000), // Fast cruise
+        (
+            AuvCommand {
+                thrusters: [0.0, 0.0, 0.5, -0.5, 0.0, 0.0, 0.0, 0.0],
+            },
+            500,
+        ), // Lateral maneuver
+        (
+            AuvCommand {
+                thrusters: [0.3, 0.3, 0.0, 0.0, -0.5, -0.5, 0.0, 0.0],
+            },
+            500,
+        ), // Ascend
+        (AuvCommand::forward(0.3), 1000), // Slow return
+        (AuvCommand::zero(), 500),        // Station keeping
     ];
 
     let mut total_steps = 0;

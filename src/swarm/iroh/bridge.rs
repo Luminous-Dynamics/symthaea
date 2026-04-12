@@ -330,29 +330,35 @@ impl IrohBridgeActor {
                         0.0,
                     );
 
-                    // Sign the CV if attestation is configured
+                    // Sign the CV if attestation is configured.
+                    // Note: RwLockReadGuard must be dropped before .await (Send bound).
                     #[cfg(feature = "identity")]
                     let send_result = if let Some(ref attestation) = self.attestation {
-                        let mgr = attestation.read();
-                        match mgr.attest(&cv) {
-                            Ok(attested) => {
-                                // Send attested CV (signature + signer key included)
-                                let attested_bytes = match bincode::serialize(&attested) {
-                                    Ok(b) => b,
-                                    Err(e) => {
-                                        tracing::warn!(
-                                            peer = peer_id,
-                                            "Failed to serialize attested CV: {e}"
-                                        );
-                                        continue;
+                        let attestation_ok = {
+                            let mgr = attestation.read();
+                            match mgr.attest(&cv) {
+                                Ok(_attested) => {
+                                    match bincode::serialize(&_attested) {
+                                        Ok(_b) => true,
+                                        Err(e) => {
+                                            tracing::warn!(
+                                                peer = peer_id,
+                                                "Failed to serialize attested CV: {e}"
+                                            );
+                                            false
+                                        }
                                     }
-                                };
-                                channel.send_consciousness(&cv).await
+                                }
+                                Err(e) => {
+                                    tracing::warn!("Failed to attest CV: {e}");
+                                    true // still send unsigned
+                                }
                             }
-                            Err(e) => {
-                                tracing::warn!("Failed to attest CV: {e}");
-                                channel.send_consciousness(&cv).await
-                            }
+                        }; // mgr dropped here — before .await
+                        if attestation_ok {
+                            channel.send_consciousness(&cv).await
+                        } else {
+                            continue;
                         }
                     } else {
                         channel.send_consciousness(&cv).await
@@ -417,7 +423,10 @@ mod tests {
         // Should not panic even though channel capacity is 4 (excess messages are dropped)
         handle.flush_outbox(messages);
         // Success: no panic on overflow — handle remains alive
-        assert!(handle.is_alive(), "handle should remain alive after overflow flush");
+        assert!(
+            handle.is_alive(),
+            "handle should remain alive after overflow flush"
+        );
     }
 
     #[test]

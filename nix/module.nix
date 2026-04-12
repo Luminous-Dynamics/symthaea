@@ -46,7 +46,7 @@ in {
     metricsInterval = mkOption {
       type = types.int;
       default = 500;
-      description = "Metrics broadcast interval in milliseconds.";
+      description = "Main service loop interval in milliseconds.";
     };
 
     openFirewall = mkOption {
@@ -121,6 +121,16 @@ in {
       "d '/run/symthaea' 0755 ${cfg.user} ${cfg.group} -"
     ];
 
+    services.logrotate.settings."${cfg.dataDir}/logs/service-audit.jsonl" = {
+      frequency = "weekly";
+      rotate = 8;
+      compress = true;
+      missingok = true;
+      notifempty = true;
+      copytruncate = true;
+      su = "${cfg.user} ${cfg.group}";
+    };
+
     # Systemd socket activation
     systemd.sockets.symthaea = {
       description = "Symthaea IPC Socket";
@@ -149,7 +159,7 @@ in {
         Type = "simple";
         User = cfg.user;
         Group = cfg.group;
-        ExecStart = "${cfg.package}/bin/symthaea-service --socket ${cfg.socketPath} --interval ${toString cfg.metricsInterval}";
+        ExecStart = "${cfg.package}/bin/symthaea --socket ${cfg.socketPath} --loop-interval ${toString cfg.metricsInterval} --state-file ${cfg.dataDir}/state/symthaea-state.bin";
         Restart = "on-failure";
         RestartSec = 5;
 
@@ -177,6 +187,7 @@ in {
         # Environment
         Environment = [
           "SYMTHAEA_DATA_DIR=${cfg.dataDir}"
+          "SYMTHAEA_SERVICE_AUDIT_LOG_PATH=${cfg.dataDir}/logs/service-audit.jsonl"
           "RUST_LOG=symthaea=info"
         ];
       };

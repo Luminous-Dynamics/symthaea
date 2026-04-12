@@ -26,6 +26,7 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 
 use crate::consciousness::holon_receiver::{HolonResponse, SomaMessage};
+use crate::control_plane::parse_bearer_token;
 
 /// Shared state for the Holon HTTP handlers.
 ///
@@ -43,6 +44,8 @@ pub struct HolonHttpState {
     pub consciousness_level: std::sync::atomic::AtomicU32, // f32 bits
     /// Number of connected Soma peers.
     pub peer_count: std::sync::atomic::AtomicU32,
+    /// Whether Iroh P2P swarm is active (set to true after enable_network_attestation succeeds).
+    pub iroh_active: std::sync::atomic::AtomicBool,
     /// Latest collective QOL summary JSON (updated by consciousness loop).
     pub telemetry_json: std::sync::Mutex<String>,
 }
@@ -55,6 +58,7 @@ impl HolonHttpState {
             outbound: std::sync::Mutex::new(Vec::new()),
             consciousness_level: std::sync::atomic::AtomicU32::new(0.0f32.to_bits()),
             peer_count: std::sync::atomic::AtomicU32::new(0),
+            iroh_active: std::sync::atomic::AtomicBool::new(false),
             telemetry_json: std::sync::Mutex::new("{}".to_string()),
         }
     }
@@ -142,7 +146,7 @@ fn token_from_query(req: &Request) -> Option<String> {
 
 fn token_from_headers(headers: &HeaderMap) -> Option<String> {
     if let Some(value) = headers.get("authorization").and_then(|v| v.to_str().ok()) {
-        if let Some(token) = value.strip_prefix("Bearer ") {
+        if let Some(token) = parse_bearer_token(value) {
             let token = token.trim();
             if !token.is_empty() {
                 return Some(token.to_string());
@@ -338,11 +342,7 @@ async fn holon_telemetry(State(state): State<SharedHolonState>) -> impl IntoResp
         .lock()
         .map(|g| g.clone())
         .unwrap_or_else(|_| "{}".to_string());
-    (
-        StatusCode::OK,
-        [("content-type", "application/json")],
-        json,
-    )
+    (StatusCode::OK, [("content-type", "application/json")], json)
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -428,6 +428,9 @@ struct StatusResponse {
     consciousness: f32,
     has_tts: bool,
     has_broca: bool,
+    swarm_peers: u32,
+    iroh_active: bool,
+    federation_enabled: bool,
 }
 
 async fn holon_status(State(state): State<SharedHolonState>) -> Json<StatusResponse> {
@@ -436,6 +439,13 @@ async fn holon_status(State(state): State<SharedHolonState>) -> Json<StatusRespo
         consciousness: state.get_consciousness(),
         has_tts: cfg!(feature = "voice-tts"),
         has_broca: cfg!(feature = "ssm_language"),
+        swarm_peers: state
+            .peer_count
+            .load(std::sync::atomic::Ordering::Relaxed),
+        iroh_active: state
+            .iroh_active
+            .load(std::sync::atomic::Ordering::Relaxed),
+        federation_enabled: cfg!(feature = "swarm"),
     })
 }
 
@@ -573,10 +583,7 @@ async fn holon_broca(
             task_type: "broca".to_string(),
             payload: req.prompt.clone(),
         };
-        state
-            .inbound_tx
-            .send((req.source.clone(), msg))
-            .is_ok()
+        state.inbound_tx.send((req.source.clone(), msg)).is_ok()
     } else {
         false
     };
@@ -646,10 +653,7 @@ async fn holon_converse(
             task_type: "converse".to_string(),
             payload: req.text.clone(),
         };
-        state
-            .inbound_tx
-            .send((req.source.clone(), msg))
-            .is_ok()
+        state.inbound_tx.send((req.source.clone(), msg)).is_ok()
     } else {
         false
     };
@@ -747,7 +751,7 @@ async fn holon_search(
     // Fast path: Prism local epistemic search (sub-ms, offline, no network)
     #[cfg(feature = "prism_search")]
     {
-        let engine = plexus_search::SearchEngine::with_seed_claims();
+        let engine = prism_search::SearchEngine::with_seed_claims();
         let local_results = engine.search(&req.query, req.max_results);
         if !local_results.is_empty() {
             let claims: Vec<SearchClaimSummary> = local_results
@@ -767,9 +771,11 @@ async fn holon_search(
                 .collect();
 
             // If local results have good epistemic quality, return without web fetch
-            let avg_sim: f32 =
-                local_results.iter().map(|r| r.query_similarity).sum::<f32>()
-                    / local_results.len() as f32;
+            let avg_sim: f32 = local_results
+                .iter()
+                .map(|r| r.query_similarity)
+                .sum::<f32>()
+                / local_results.len() as f32;
             if avg_sim > 0.3 {
                 return Json(SearchResponse {
                     claims,

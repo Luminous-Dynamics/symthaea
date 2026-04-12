@@ -81,11 +81,27 @@ fn main() {
     println!("\n── Final State ─────────────────────────────────────────────────\n");
     let s = svc.thermodynamic_state();
     let b = svc.thermodynamic_bridge();
-    println!("  Entropy={:.4}  FE={:.4}  Temp={:.4}  Health={:.4}", s.canonical_entropy, s.canonical_free_energy, s.effective_temperature, s.dissipative_health);
-    println!("  Order={:.4}  Lambda={:.4}  HFE={:.4}", s.order_parameter, s.lambda_parameter, s.hierarchical_free_energy);
-    println!("  Carnot={:.4}  Attention_bits={:.1}  Landauer={:.4}", b.carnot_efficiency, b.attention_demon_bits, b.memory_landauer_cost);
-    println!("  Onsager={:.6}  Jarzynski_dF={:.6}  Prigogine={}", b.onsager_asymmetry, b.jarzynski_free_energy, b.prigogine_violated);
-    println!("  Insight_prob={:.6}  Memory_suppressed={}", b.insight_probability, svc.thermodynamic_memory_suppressed());
+    println!(
+        "  Entropy={:.4}  FE={:.4}  Temp={:.4}  Health={:.4}",
+        s.canonical_entropy, s.canonical_free_energy, s.effective_temperature, s.dissipative_health
+    );
+    println!(
+        "  Order={:.4}  Lambda={:.4}  HFE={:.4}",
+        s.order_parameter, s.lambda_parameter, s.hierarchical_free_energy
+    );
+    println!(
+        "  Carnot={:.4}  Attention_bits={:.1}  Landauer={:.4}",
+        b.carnot_efficiency, b.attention_demon_bits, b.memory_landauer_cost
+    );
+    println!(
+        "  Onsager={:.6}  Jarzynski_dF={:.6}  Prigogine={}",
+        b.onsager_asymmetry, b.jarzynski_free_energy, b.prigogine_violated
+    );
+    println!(
+        "  Insight_prob={:.6}  Memory_suppressed={}",
+        b.insight_probability,
+        svc.thermodynamic_memory_suppressed()
+    );
     println!("  Regime={:?}  Phase={:?}", s.regime, s.consciousness_phase);
     println!("\n  ✓ Observatory complete (60 cycles)");
 }

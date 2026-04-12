@@ -77,6 +77,28 @@ impl FlightState {
         (wx * wx + wy * wy + wz * wz).sqrt()
     }
 
+    /// Whether all state values are finite (NaN/Inf check).
+    pub fn is_finite(&self) -> bool {
+        self.position.iter().all(|v| v.is_finite())
+            && self.quaternion.iter().all(|v| v.is_finite())
+            && self.linear_velocity.iter().all(|v| v.is_finite())
+            && self.angular_velocity.iter().all(|v| v.is_finite())
+    }
+
+    /// Domain-specific bounds check for physically plausible flight state.
+    ///
+    /// Returns `true` if the state is within reasonable physical limits:
+    /// - Altitude: [0, 10000] m (ground to ~33,000 ft)
+    /// - Speed: [0, 50] m/s (~110 mph, reasonable for quadrotor)
+    /// - Angular rate: [0, 20] rad/s
+    pub fn is_bounded(&self) -> bool {
+        self.is_finite()
+            && self.position[2] >= 0.0
+            && self.position[2] < 10_000.0
+            && self.speed() < 50.0
+            && self.angular_speed() < 20.0
+    }
+
     /// Pack the 13 state channels into an f32 array for HDC encoding.
     pub fn to_channels(&self) -> [f32; 13] {
         [

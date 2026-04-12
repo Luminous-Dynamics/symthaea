@@ -1,0 +1,7 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc 662ecae3e3c7e137230ecaf30c1f4db15cbb826676f46a40e86a7fd59db1b785 # shrinks to steering = -0.40261003, steps = 201

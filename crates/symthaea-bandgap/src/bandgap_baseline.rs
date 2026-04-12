@@ -52,7 +52,8 @@ pub fn electronegativity_bandgap(composition: &[(u8, f64)]) -> f64 {
     }
 
     // Separate cation-like and anion-like species based on electronegativity
-    let mean_en: f64 = composition.iter()
+    let mean_en: f64 = composition
+        .iter()
         .map(|&(z, f)| electronegativity(z) * f)
         .sum();
 
@@ -81,7 +82,8 @@ pub fn electronegativity_bandgap(composition: &[(u8, f64)]) -> f64 {
     let delta_en = anion_en - cation_en;
 
     // Average covalent radius
-    let r_avg: f64 = composition.iter()
+    let r_avg: f64 = composition
+        .iter()
         .map(|&(z, f)| {
             let r = if (z as usize) < COVALENT_RADIUS.len() {
                 COVALENT_RADIUS[z as usize]
@@ -93,7 +95,8 @@ pub fn electronegativity_bandgap(composition: &[(u8, f64)]) -> f64 {
         .sum();
 
     // Check if d-block elements are present (reduces gap due to d-orbital contributions)
-    let d_block_fraction: f64 = composition.iter()
+    let d_block_fraction: f64 = composition
+        .iter()
         .filter(|&&(z, _)| element_block(z) == 2)
         .map(|&(_, f)| f)
         .sum();
@@ -210,7 +213,10 @@ mod tests {
     #[test]
     fn test_elemental_diamond() {
         let eg = electronegativity_bandgap(&[(6, 1.0)]);
-        assert!((eg - 5.5).abs() < 0.5, "Diamond baseline = {eg}, expected ~5.5");
+        assert!(
+            (eg - 5.5).abs() < 0.5,
+            "Diamond baseline = {eg}, expected ~5.5"
+        );
     }
 
     #[test]

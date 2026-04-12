@@ -112,10 +112,7 @@ impl RunMetrics {
 
     /// Final prediction error (convergence indicator)
     fn final_prediction_error(&self) -> f32 {
-        self.prediction_errors
-            .last()
-            .cloned()
-            .unwrap_or(1.0)
+        self.prediction_errors.last().cloned().unwrap_or(1.0)
     }
 
     /// Prediction error reduction ratio (initial / final)
@@ -124,8 +121,7 @@ impl RunMetrics {
             return 1.0;
         }
         // Compare first 10 to last 10
-        let first_10: f32 =
-            self.prediction_errors[..10].iter().sum::<f32>() / 10.0;
+        let first_10: f32 = self.prediction_errors[..10].iter().sum::<f32>() / 10.0;
         let last_10: f32 = self.prediction_errors[self.prediction_errors.len() - 10..]
             .iter()
             .sum::<f32>()
@@ -191,38 +187,128 @@ fn run_evaluation() -> RunMetrics {
         // Accumulate module timings for profiling
         let mt = &result.metadata.module_timings_us;
         *metrics.module_timing_sums.entry("gwt").or_insert(0) += mt.gwt;
-        *metrics.module_timing_sums.entry("meta_cognition").or_insert(0) += mt.meta_cognition;
-        *metrics.module_timing_sums.entry("narrative_self").or_insert(0) += mt.narrative_self;
-        *metrics.module_timing_sums.entry("dream_replay").or_insert(0) += mt.dream_replay;
-        *metrics.module_timing_sums.entry("moral_algebra").or_insert(0) += mt.moral_algebra;
-        *metrics.module_timing_sums.entry("consciousness_eq_v2").or_insert(0) += mt.consciousness_equation_v2;
-        *metrics.module_timing_sums.entry("phenomenal_binding").or_insert(0) += mt.phenomenal_binding;
-        *metrics.module_timing_sums.entry("hierarchical_fe").or_insert(0) += mt.hierarchical_free_energy;
-        *metrics.module_timing_sums.entry("attention_schema").or_insert(0) += mt.attention_schema;
-        *metrics.module_timing_sums.entry("consciousness_resonance").or_insert(0) += mt.consciousness_resonance;
-        *metrics.module_timing_sums.entry("temporal_consciousness").or_insert(0) += mt.temporal_consciousness;
-        *metrics.module_timing_sums.entry("embodied_cognition").or_insert(0) += mt.embodied_cognition;
-        *metrics.module_timing_sums.entry("consciousness_thermo").or_insert(0) += mt.consciousness_thermodynamics;
+        *metrics
+            .module_timing_sums
+            .entry("meta_cognition")
+            .or_insert(0) += mt.meta_cognition;
+        *metrics
+            .module_timing_sums
+            .entry("narrative_self")
+            .or_insert(0) += mt.narrative_self;
+        *metrics
+            .module_timing_sums
+            .entry("dream_replay")
+            .or_insert(0) += mt.dream_replay;
+        *metrics
+            .module_timing_sums
+            .entry("moral_algebra")
+            .or_insert(0) += mt.moral_algebra;
+        *metrics
+            .module_timing_sums
+            .entry("consciousness_eq_v2")
+            .or_insert(0) += mt.consciousness_equation_v2;
+        *metrics
+            .module_timing_sums
+            .entry("phenomenal_binding")
+            .or_insert(0) += mt.phenomenal_binding;
+        *metrics
+            .module_timing_sums
+            .entry("hierarchical_fe")
+            .or_insert(0) += mt.hierarchical_free_energy;
+        *metrics
+            .module_timing_sums
+            .entry("attention_schema")
+            .or_insert(0) += mt.attention_schema;
+        *metrics
+            .module_timing_sums
+            .entry("consciousness_resonance")
+            .or_insert(0) += mt.consciousness_resonance;
+        *metrics
+            .module_timing_sums
+            .entry("temporal_consciousness")
+            .or_insert(0) += mt.temporal_consciousness;
+        *metrics
+            .module_timing_sums
+            .entry("embodied_cognition")
+            .or_insert(0) += mt.embodied_cognition;
+        *metrics
+            .module_timing_sums
+            .entry("consciousness_thermo")
+            .or_insert(0) += mt.consciousness_thermodynamics;
         *metrics.module_timing_sums.entry("prefrontal").or_insert(0) += mt.prefrontal;
-        *metrics.module_timing_sums.entry("cross_modal_binding").or_insert(0) += mt.cross_modal_binding;
-        *metrics.module_timing_sums.entry("resonator_recall").or_insert(0) += mt.resonator_recall;
+        *metrics
+            .module_timing_sums
+            .entry("cross_modal_binding")
+            .or_insert(0) += mt.cross_modal_binding;
+        *metrics
+            .module_timing_sums
+            .entry("resonator_recall")
+            .or_insert(0) += mt.resonator_recall;
         // Core pipeline phases (the missing 78%)
-        *metrics.module_timing_sums.entry("CORE_hdc_encode").or_insert(0) += mt.core_hdc_encode;
-        *metrics.module_timing_sums.entry("CORE_compress").or_insert(0) += mt.core_compress;
-        *metrics.module_timing_sums.entry("CORE_semantic_lookup").or_insert(0) += mt.core_semantic_lookup;
-        *metrics.module_timing_sums.entry("CORE_cfc_step").or_insert(0) += mt.core_cfc_step;
-        *metrics.module_timing_sums.entry("CORE_predict").or_insert(0) += mt.core_predict;
-        *metrics.module_timing_sums.entry("CORE_training").or_insert(0) += mt.core_training;
-        *metrics.module_timing_sums.entry("CORE_parallel_post").or_insert(0) += mt.core_parallel_postprocess;
-        *metrics.module_timing_sums.entry("CORE_spectral_mip").or_insert(0) += mt.spectral_mip;
-        *metrics.module_timing_sums.entry("CORE_consciousness_engine").or_insert(0) += mt.consciousness_engine;
-        *metrics.module_timing_sums.entry("CORE_ethics_engine").or_insert(0) += mt.ethics_engine;
-        *metrics.module_timing_sums.entry("CORE_ethics_moral").or_insert(0) += mt.ethics_engine_moral;
-        *metrics.module_timing_sums.entry("CORE_ethics_value").or_insert(0) += mt.ethics_engine_value;
-        *metrics.module_timing_sums.entry("CORE_ethics_harmonies").or_insert(0) += mt.ethics_engine_harmonies;
-        *metrics.module_timing_sums.entry("CORE_metadata_assembly").or_insert(0) += mt.metadata_assembly;
-        *metrics.module_timing_sums.entry("cross_modal_binding").or_insert(0) += mt.cross_modal_binding;
-        *metrics.module_timing_sums.entry("resonator_recall").or_insert(0) += mt.resonator_recall;
+        *metrics
+            .module_timing_sums
+            .entry("CORE_hdc_encode")
+            .or_insert(0) += mt.core_hdc_encode;
+        *metrics
+            .module_timing_sums
+            .entry("CORE_compress")
+            .or_insert(0) += mt.core_compress;
+        *metrics
+            .module_timing_sums
+            .entry("CORE_semantic_lookup")
+            .or_insert(0) += mt.core_semantic_lookup;
+        *metrics
+            .module_timing_sums
+            .entry("CORE_cfc_step")
+            .or_insert(0) += mt.core_cfc_step;
+        *metrics
+            .module_timing_sums
+            .entry("CORE_predict")
+            .or_insert(0) += mt.core_predict;
+        *metrics
+            .module_timing_sums
+            .entry("CORE_training")
+            .or_insert(0) += mt.core_training;
+        *metrics
+            .module_timing_sums
+            .entry("CORE_parallel_post")
+            .or_insert(0) += mt.core_parallel_postprocess;
+        *metrics
+            .module_timing_sums
+            .entry("CORE_spectral_mip")
+            .or_insert(0) += mt.spectral_mip;
+        *metrics
+            .module_timing_sums
+            .entry("CORE_consciousness_engine")
+            .or_insert(0) += mt.consciousness_engine;
+        *metrics
+            .module_timing_sums
+            .entry("CORE_ethics_engine")
+            .or_insert(0) += mt.ethics_engine;
+        *metrics
+            .module_timing_sums
+            .entry("CORE_ethics_moral")
+            .or_insert(0) += mt.ethics_engine_moral;
+        *metrics
+            .module_timing_sums
+            .entry("CORE_ethics_value")
+            .or_insert(0) += mt.ethics_engine_value;
+        *metrics
+            .module_timing_sums
+            .entry("CORE_ethics_harmonies")
+            .or_insert(0) += mt.ethics_engine_harmonies;
+        *metrics
+            .module_timing_sums
+            .entry("CORE_metadata_assembly")
+            .or_insert(0) += mt.metadata_assembly;
+        *metrics
+            .module_timing_sums
+            .entry("cross_modal_binding")
+            .or_insert(0) += mt.cross_modal_binding;
+        *metrics
+            .module_timing_sums
+            .entry("resonator_recall")
+            .or_insert(0) += mt.resonator_recall;
     }
 
     metrics
@@ -231,27 +317,32 @@ fn run_evaluation() -> RunMetrics {
 fn main() {
     println!("╔══════════════════════════════════════════════════════════════════╗");
     println!("║  Consciousness Feature Runtime Evaluation                       ║");
-    println!("║  Running {} cognitive loop cycles with active features            ║", NUM_CYCLES);
+    println!(
+        "║  Running {} cognitive loop cycles with active features            ║",
+        NUM_CYCLES
+    );
     println!("╚══════════════════════════════════════════════════════════════════╝");
     println!();
 
     // Report active features
     println!("Active features:");
     let features = [
-        ("structured_bottleneck", cfg!(feature = "structured_bottleneck")),
+        (
+            "structured_bottleneck",
+            cfg!(feature = "structured_bottleneck"),
+        ),
         ("ctc_wiring", cfg!(feature = "ctc_wiring")),
         ("continuous_hot", cfg!(feature = "continuous_hot")),
         ("unified_precision", cfg!(feature = "unified_precision")),
-        ("interoceptive_inference", cfg!(feature = "interoceptive_inference")),
+        (
+            "interoceptive_inference",
+            cfg!(feature = "interoceptive_inference"),
+        ),
         ("england_dissipation", cfg!(feature = "england_dissipation")),
         ("iit4", cfg!(feature = "iit4")),
     ];
     for (name, active) in &features {
-        println!(
-            "  [{}]  {}",
-            if *active { "ON" } else { "off" },
-            name
-        );
+        println!("  [{}]  {}", if *active { "ON" } else { "off" }, name);
     }
     println!();
 
@@ -324,10 +415,7 @@ fn main() {
 
     println!();
     println!("═══ PERFORMANCE ═══");
-    println!(
-        "  Throughput:      {:.1} Hz",
-        metrics.cycles_per_second()
-    );
+    println!("  Throughput:      {:.1} Hz", metrics.cycles_per_second());
     println!(
         "  Avg cycle time:  {:.0} µs",
         metrics.total_cycle_time_us as f64 / NUM_CYCLES as f64
@@ -341,7 +429,9 @@ fn main() {
     );
     println!(
         "  P99 cycle:       {:.0} µs",
-        sorted.get((sorted.len() as f64 * 0.99) as usize).unwrap_or(&0)
+        sorted
+            .get((sorted.len() as f64 * 0.99) as usize)
+            .unwrap_or(&0)
     );
 
     // ── Module Timing Profile ────────────────────────────────────────────
@@ -379,18 +469,12 @@ fn main() {
         "  Convergence:      {:.3} (PE reduction ratio / 5)",
         convergence_score
     );
-    println!(
-        "  GWT activity:     {:.3} (broadcast rate × 5)",
-        gwt_score
-    );
-    println!(
-        "  Throughput:       {:.3} (Hz / 50)",
-        throughput_score
-    );
+    println!("  GWT activity:     {:.3} (broadcast rate × 5)", gwt_score);
+    println!("  Throughput:       {:.3} (Hz / 50)", throughput_score);
 
-    let composite = (consciousness_score + stability_score + convergence_score
-        + gwt_score + throughput_score)
-        / 5.0;
+    let composite =
+        (consciousness_score + stability_score + convergence_score + gwt_score + throughput_score)
+            / 5.0;
     println!();
     println!("  COMPOSITE SCORE:  {:.3}", composite);
 

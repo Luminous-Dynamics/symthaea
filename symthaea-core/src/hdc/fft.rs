@@ -356,6 +356,328 @@ impl FftEngine {
     }
 }
 
+// ─── Bluestein Chirp-Z Transform ─────────────────────────────────────────────
+
+/// Chirp-Z transform: computes DFT for arbitrary N via Bluestein's algorithm.
+///
+/// Pads to next power of 2, applies chirp modulation, radix-2 FFT, demodulates.
+/// Returns the complex spectrum as `Vec<(re, im)>`.
+pub fn chirp_z_dft(input: &[f64]) -> Vec<(f64, f64)> {
+    let n = input.len();
+    if n == 0 {
+        return Vec::new();
+    }
+
+    // Chirp sequence: w[k] = e^{jπk²/N}
+    let chirp: Vec<Complex> = (0..n)
+        .map(|k| {
+            let angle = std::f64::consts::PI * (k * k) as f64 / n as f64;
+            Complex::new(angle.cos(), angle.sin())
+        })
+        .collect();
+
+    // Modulate input: a[k] = x[k] * conj(chirp[k])
+    let a_mod: Vec<Complex> = input
+        .iter()
+        .enumerate()
+        .map(|(k, &x)| Complex::from_real(x) * chirp[k].conjugate())
+        .collect();
+
+    // The convolution kernel h[k] = chirp[k] for 0 ≤ k < N
+    // Pad both to next power of 2 ≥ 2N-1
+    let pad_len = (2 * n - 1).next_power_of_two();
+
+    let mut a_padded: Vec<Complex> = a_mod;
+    a_padded.resize(pad_len, Complex::zero());
+
+    let mut h_padded: Vec<Complex> = chirp.clone();
+    h_padded.resize(pad_len, Complex::zero());
+    // Add conjugate-reflected chirp at the end for linear convolution
+    for k in 1..n {
+        let angle = std::f64::consts::PI * (k * k) as f64 / n as f64;
+        let idx = pad_len - k;
+        h_padded[idx] = Complex::new(angle.cos(), angle.sin());
+    }
+
+    // FFT both, multiply, IFFT
+    let fa = FftEngine::fft_recursive(&a_padded, false);
+    let fh = FftEngine::fft_recursive(&h_padded, false);
+    let product: Vec<Complex> = fa.iter().zip(fh.iter()).map(|(&a, &b)| a * b).collect();
+    let mut conv = FftEngine::fft_recursive(&product, true);
+    let scale = 1.0 / pad_len as f64;
+    for c in &mut conv {
+        c.re *= scale;
+        c.im *= scale;
+    }
+
+    // Demodulate output: X[k] = conv[k] * conj(chirp[k])
+    (0..n)
+        .map(|k| {
+            let c = conv[k] * chirp[k].conjugate();
+            (c.re, c.im)
+        })
+        .collect()
+}
+
+// ─── Window Functions ─────────────────────────────────────────────────────────
+
+/// Hann window: w[k] = 0.5 * (1 - cos(2πk/(n-1)))
+pub fn window_hann(n: usize) -> Vec<f64> {
+    if n == 0 {
+        return Vec::new();
+    }
+    if n == 1 {
+        return vec![1.0];
+    }
+    let denom = (n - 1) as f64;
+    (0..n)
+        .map(|k| 0.5 * (1.0 - (2.0 * std::f64::consts::PI * k as f64 / denom).cos()))
+        .collect()
+}
+
+/// Hamming window: w[k] = 0.54 - 0.46 * cos(2πk/(n-1))
+pub fn window_hamming(n: usize) -> Vec<f64> {
+    if n == 0 {
+        return Vec::new();
+    }
+    if n == 1 {
+        return vec![1.0];
+    }
+    let denom = (n - 1) as f64;
+    (0..n)
+        .map(|k| 0.54 - 0.46 * (2.0 * std::f64::consts::PI * k as f64 / denom).cos())
+        .collect()
+}
+
+/// Blackman window (3-term): w[k] = 0.42 - 0.5*cos(2πk/(n-1)) + 0.08*cos(4πk/(n-1))
+pub fn window_blackman(n: usize) -> Vec<f64> {
+    if n == 0 {
+        return Vec::new();
+    }
+    if n == 1 {
+        return vec![1.0];
+    }
+    let denom = (n - 1) as f64;
+    (0..n)
+        .map(|k| {
+            let t = 2.0 * std::f64::consts::PI * k as f64 / denom;
+            0.42 - 0.5 * t.cos() + 0.08 * (2.0 * t).cos()
+        })
+        .collect()
+}
+
+/// Bartlett (triangular) window: w[k] = 1 - |2k/(n-1) - 1|
+pub fn window_bartlett(n: usize) -> Vec<f64> {
+    if n == 0 {
+        return Vec::new();
+    }
+    if n == 1 {
+        return vec![1.0];
+    }
+    let denom = (n - 1) as f64;
+    (0..n)
+        .map(|k| 1.0 - (2.0 * k as f64 / denom - 1.0).abs())
+        .collect()
+}
+
+/// Kaiser-Bessel window using modified Bessel function I₀.
+///
+/// I₀(x) ≈ 1 + Σ_{k=1}^{20} (x/2)^{2k} / (k!)²
+pub fn window_kaiser(n: usize, beta: f64) -> Vec<f64> {
+    if n == 0 {
+        return Vec::new();
+    }
+    if n == 1 {
+        return vec![1.0];
+    }
+    let denom = (n - 1) as f64;
+    let i0_beta = bessel_i0(beta);
+    (0..n)
+        .map(|k| {
+            let arg = beta * (1.0 - (2.0 * k as f64 / denom - 1.0).powi(2)).sqrt();
+            bessel_i0(arg) / i0_beta
+        })
+        .collect()
+}
+
+/// Modified Bessel function of the first kind, order 0.
+///
+/// I₀(x) ≈ 1 + Σ_{k=1}^{25} (x/2)^{2k} / (k!)²
+fn bessel_i0(x: f64) -> f64 {
+    let mut sum = 1.0;
+    let mut term = 1.0;
+    let x_half = x / 2.0;
+    for k in 1..=25 {
+        term *= x_half * x_half / (k * k) as f64;
+        sum += term;
+        if term < 1e-15 * sum {
+            break;
+        }
+    }
+    sum
+}
+
+/// Apply a window to a signal (element-wise multiplication).
+pub fn apply_window(signal: &[f64], window: &[f64]) -> Vec<f64> {
+    signal
+        .iter()
+        .zip(window.iter())
+        .map(|(&s, &w)| s * w)
+        .collect()
+}
+
+/// Energy correction factor for a window: 1 / mean(w²).
+pub fn window_energy_correction(window: &[f64]) -> f64 {
+    if window.is_empty() {
+        return 1.0;
+    }
+    let mean_sq = window.iter().map(|&w| w * w).sum::<f64>() / window.len() as f64;
+    if mean_sq < 1e-15 {
+        1.0
+    } else {
+        1.0 / mean_sq
+    }
+}
+
+// ─── 2D FFT ──────────────────────────────────────────────────────────────────
+
+/// 2D FFT via row-column decomposition.
+///
+/// Applies 1D FFT to each row, then to each column of the result.
+pub fn fft_2d(input: &[Vec<f64>]) -> Vec<Vec<(f64, f64)>> {
+    if input.is_empty() {
+        return Vec::new();
+    }
+    let rows = input.len();
+    let cols = input[0].len();
+
+    // Step 1: FFT each row
+    let row_transformed: Vec<Vec<Complex>> = input
+        .iter()
+        .map(|row| {
+            let result = FftEngine::fft(row);
+            result.spectrum.into_iter().take(cols.next_power_of_two()).collect()
+        })
+        .collect();
+
+    // Step 2: FFT each column of the row-transformed result
+    let n_rows_padded = rows.next_power_of_two();
+    let n_cols_padded = cols.next_power_of_two();
+
+    let mut output = vec![vec![(0.0f64, 0.0f64); n_cols_padded]; n_rows_padded];
+
+    for col in 0..n_cols_padded {
+        let col_signal: Vec<Complex> = (0..row_transformed.len())
+            .map(|row| {
+                row_transformed[row]
+                    .get(col)
+                    .copied()
+                    .unwrap_or(Complex::zero())
+            })
+            .collect();
+        let col_result = FftEngine::fft_complex(&col_signal);
+        for (row, c) in col_result.spectrum.iter().take(n_rows_padded).enumerate() {
+            output[row][col] = (c.re, c.im);
+        }
+    }
+
+    output
+}
+
+/// 2D Inverse FFT via column-row decomposition.
+pub fn ifft_2d(input: &[Vec<(f64, f64)>]) -> Vec<Vec<f64>> {
+    if input.is_empty() {
+        return Vec::new();
+    }
+    let rows = input.len();
+    let cols = input[0].len();
+
+    // Step 1: IFFT each column
+    let col_transformed: Vec<Vec<Complex>> = (0..cols)
+        .map(|col| {
+            let col_signal: Vec<Complex> = (0..rows)
+                .map(|row| {
+                    let (re, im) = input[row].get(col).copied().unwrap_or((0.0, 0.0));
+                    Complex::new(re, im)
+                })
+                .collect();
+            let result = FftEngine::ifft(&col_signal);
+            result.spectrum
+        })
+        .collect();
+
+    // Step 2: IFFT each row
+    (0..rows)
+        .map(|row| {
+            let row_signal: Vec<Complex> = (0..cols)
+                .map(|col| {
+                    col_transformed[col]
+                        .get(row)
+                        .copied()
+                        .unwrap_or(Complex::zero())
+                })
+                .collect();
+            let result = FftEngine::ifft(&row_signal);
+            result.spectrum.iter().take(cols).map(|c| c.re).collect()
+        })
+        .collect()
+}
+
+// ─── Spectral Utilities ───────────────────────────────────────────────────────
+
+/// Spectral centroid: center of mass of the magnitude spectrum.
+///
+/// Returns frequency in Hz: Σ(|X[k]| * f[k]) / Σ|X[k]|
+pub fn spectral_centroid(spectrum: &[(f64, f64)], sample_rate: f64) -> f64 {
+    let n = spectrum.len();
+    if n == 0 {
+        return 0.0;
+    }
+    let freq_res = sample_rate / n as f64;
+    let (weighted_sum, total) = spectrum
+        .iter()
+        .enumerate()
+        .fold((0.0, 0.0), |(ws, t), (k, (re, im))| {
+            let mag = (re * re + im * im).sqrt();
+            (ws + mag * k as f64 * freq_res, t + mag)
+        });
+    if total < 1e-15 {
+        0.0
+    } else {
+        weighted_sum / total
+    }
+}
+
+/// Peak frequency: the frequency bin with highest magnitude.
+pub fn peak_frequency(spectrum: &[(f64, f64)], sample_rate: f64) -> f64 {
+    let n = spectrum.len();
+    if n == 0 {
+        return 0.0;
+    }
+    let freq_res = sample_rate / n as f64;
+    // Only look at first half (positive frequencies)
+    let half = n / 2;
+    let peak_bin = spectrum[..half]
+        .iter()
+        .enumerate()
+        .max_by(|(_, (re1, im1)), (_, (re2, im2))| {
+            let m1 = re1 * re1 + im1 * im1;
+            let m2 = re2 * re2 + im2 * im2;
+            m1.partial_cmp(&m2).unwrap_or(std::cmp::Ordering::Equal)
+        })
+        .map(|(k, _)| k)
+        .unwrap_or(0);
+    peak_bin as f64 * freq_res
+}
+
+/// Frequency resolution: bin width in Hz = sample_rate / n.
+pub fn frequency_resolution(n: usize, sample_rate: f64) -> f64 {
+    if n == 0 {
+        return 0.0;
+    }
+    sample_rate / n as f64
+}
+
 // ─── Tests ───────────────────────────────────────────────────────────────────
 
 #[cfg(test)]
@@ -655,5 +977,132 @@ mod tests {
         let product = c * conj;
         assert!((product.re - 25.0).abs() < TOL);
         assert!(product.im.abs() < TOL);
+    }
+
+    // ── Bluestein chirp-Z ───────────────────────────────────────────────
+
+    #[test]
+    fn test_chirp_z_matches_fft_on_power_of_2() {
+        let signal = vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0];
+        let chirp = chirp_z_dft(&signal);
+        let fft_result = FftEngine::fft(&signal);
+        // Compare magnitudes
+        for (i, (c, f)) in chirp.iter().zip(fft_result.spectrum.iter()).enumerate() {
+            let chirp_mag = (c.0 * c.0 + c.1 * c.1).sqrt();
+            let fft_mag = f.magnitude();
+            assert!(
+                (chirp_mag - fft_mag).abs() < 1e-6,
+                "Chirp-Z vs FFT mismatch at bin {}: {} vs {}",
+                i,
+                chirp_mag,
+                fft_mag
+            );
+        }
+    }
+
+    // ── Window functions ─────────────────────────────────────────────────
+
+    #[test]
+    fn test_hann_window_endpoints() {
+        let w = window_hann(8);
+        assert_eq!(w.len(), 8);
+        // First and last samples should be 0
+        assert!(w[0].abs() < 1e-10, "Hann window starts at 0");
+        assert!(w[7].abs() < 1e-10, "Hann window ends at 0");
+    }
+
+    #[test]
+    fn test_hann_window_sum_approx_n_over_2() {
+        let n = 1024;
+        let w = window_hann(n);
+        let sum: f64 = w.iter().sum();
+        // Sum of Hann window ≈ n/2
+        assert!(
+            (sum - n as f64 / 2.0).abs() < 2.0,
+            "Hann sum {} should be near {}", sum, n as f64 / 2.0
+        );
+    }
+
+    #[test]
+    fn test_blackman_window_length() {
+        let w = window_blackman(64);
+        assert_eq!(w.len(), 64);
+        // All values in [0, 1]
+        for &v in &w {
+            assert!(v >= -0.01 && v <= 1.01, "Blackman value {} out of range", v);
+        }
+    }
+
+    #[test]
+    fn test_window_apply_length() {
+        let signal = vec![1.0; 32];
+        let w = window_hann(32);
+        let windowed = apply_window(&signal, &w);
+        assert_eq!(windowed.len(), 32);
+    }
+
+    #[test]
+    fn test_kaiser_window_symmetric() {
+        let w = window_kaiser(16, 5.0);
+        assert_eq!(w.len(), 16);
+        // Kaiser is symmetric
+        for i in 0..8 {
+            assert!((w[i] - w[15 - i]).abs() < 1e-10, "Kaiser not symmetric at index {}", i);
+        }
+    }
+
+    // ── 2D FFT ──────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_fft_2d_roundtrip() {
+        let input = vec![
+            vec![1.0, 2.0, 3.0, 4.0],
+            vec![5.0, 6.0, 7.0, 8.0],
+            vec![9.0, 10.0, 11.0, 12.0],
+            vec![13.0, 14.0, 15.0, 16.0],
+        ];
+        let spectrum = fft_2d(&input);
+        let recovered = ifft_2d(&spectrum);
+        for i in 0..4 {
+            for j in 0..4 {
+                assert!(
+                    (input[i][j] - recovered[i][j]).abs() < 1e-6,
+                    "2D FFT round-trip failed at [{},{}]: {} vs {}",
+                    i, j, input[i][j], recovered[i][j]
+                );
+            }
+        }
+    }
+
+    // ── Spectral utilities ───────────────────────────────────────────────
+
+    #[test]
+    fn test_spectral_centroid_pure_tone() {
+        // A 440 Hz tone in a 1024-sample signal at 44100 Hz sample rate
+        let n = 1024;
+        let sample_rate = 44100.0;
+        let freq = 440.0;
+        let signal: Vec<f64> = (0..n)
+            .map(|i| (2.0 * std::f64::consts::PI * freq * i as f64 / sample_rate).sin())
+            .collect();
+        let fft = FftEngine::fft(&signal);
+        let spectrum_pairs: Vec<(f64, f64)> = fft
+            .spectrum
+            .iter()
+            .map(|c| (c.re, c.im))
+            .collect();
+        // Peak frequency should be near 440 Hz
+        let peak = peak_frequency(&spectrum_pairs, sample_rate);
+        assert!(
+            (peak - freq).abs() < sample_rate / n as f64 * 2.0,
+            "Peak frequency {} should be near {} Hz",
+            peak, freq
+        );
+    }
+
+    #[test]
+    fn test_frequency_resolution() {
+        let res = frequency_resolution(1024, 44100.0);
+        assert!((res - 44100.0 / 1024.0).abs() < 1e-6);
     }
 }

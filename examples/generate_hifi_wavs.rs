@@ -18,55 +18,107 @@ fn main() {
     println!("Generating Hi-Fi comparison WAV files...\n");
 
     let rich_state = MusicalState {
-        consciousness_level: 0.8, arousal: 0.5, dopamine: 0.6,
-        serotonin: 0.4, noradrenaline: 0.3,
+        consciousness_level: 0.8,
+        arousal: 0.5,
+        dopamine: 0.6,
+        serotonin: 0.4,
+        noradrenaline: 0.3,
         harmony_activations: [0.7, 0.5, 0.6, 0.4, 0.3, 0.5, 0.6, 0.3],
-        valence: 0.3, prediction_error: 0.2,
+        valence: 0.3,
+        prediction_error: 0.2,
     };
 
     // ── A/B: Old vs New ──
     println!("1. A/B Comparison");
     let old_cfg = MuseConfig {
-        duration_secs: 8.0, max_notes: 24, output_format: OutputFormat::Mono16,
-        num_partials: 4, enable_antialiasing: false, melody_mode: MelodyMode::Classic,
-        cfc_layer_sizes: vec![4, 4], ..Default::default()
+        duration_secs: 8.0,
+        max_notes: 24,
+        output_format: OutputFormat::Mono16,
+        num_partials: 4,
+        enable_antialiasing: false,
+        melody_mode: MelodyMode::Classic,
+        cfc_layer_sizes: vec![4, 4],
+        ..Default::default()
     };
     let new_cfg = MuseConfig {
-        duration_secs: 8.0, max_notes: 24, melody_mode: MelodyMode::Neural,
+        duration_secs: 8.0,
+        max_notes: 24,
+        melody_mode: MelodyMode::Neural,
         ..Default::default()
     };
     let old = compose(&old_cfg, &rich_state, 42);
     let new = compose(&new_cfg, &rich_state, 42);
-    write_wav(&dir.join("A_old_mono_4partial.wav"), &old.audio, old.sample_rate);
-    write_wav(&dir.join("B_new_stereo_8partial.wav"), &new.audio, new.sample_rate);
+    write_wav(
+        &dir.join("A_old_mono_4partial.wav"),
+        &old.audio,
+        old.sample_rate,
+    );
+    write_wav(
+        &dir.join("B_new_stereo_8partial.wav"),
+        &new.audio,
+        new.sample_rate,
+    );
     println!("   A_old_mono_4partial.wav  ({} samples)", old.audio.len());
-    println!("   B_new_stereo_8partial.wav ({} samples)\n", new.audio.len());
+    println!(
+        "   B_new_stereo_8partial.wav ({} samples)\n",
+        new.audio.len()
+    );
 
     // ── Consciousness Variation ──
     println!("2. Consciousness Variation");
     let states = [
-        ("calm_contemplative", MusicalState {
-            consciousness_level: 0.9, arousal: 0.1, serotonin: 0.8,
-            harmony_activations: [0.3, 0.2, 0.4, 0.1, 0.3, 0.5, 0.2, 0.9],
-            ..Default::default()
-        }),
-        ("focused_creative", MusicalState {
-            consciousness_level: 0.7, arousal: 0.4, dopamine: 0.7,
-            harmony_activations: [0.5, 0.6, 0.7, 0.8, 0.4, 0.3, 0.6, 0.2],
-            valence: 0.5, ..Default::default()
-        }),
-        ("intense_urgent", MusicalState {
-            consciousness_level: 0.3, arousal: 0.9, noradrenaline: 0.9, dopamine: 0.8,
-            harmony_activations: [0.2, 0.1, 0.3, 0.9, 0.1, 0.1, 0.8, 0.0],
-            valence: -0.3, prediction_error: 0.7, ..Default::default()
-        }),
-        ("joyful_expansive", MusicalState {
-            consciousness_level: 0.85, arousal: 0.6, dopamine: 0.9, serotonin: 0.3,
-            harmony_activations: [0.8, 0.9, 0.7, 0.6, 0.8, 0.7, 0.5, 0.3],
-            valence: 0.8, ..Default::default()
-        }),
+        (
+            "calm_contemplative",
+            MusicalState {
+                consciousness_level: 0.9,
+                arousal: 0.1,
+                serotonin: 0.8,
+                harmony_activations: [0.3, 0.2, 0.4, 0.1, 0.3, 0.5, 0.2, 0.9],
+                ..Default::default()
+            },
+        ),
+        (
+            "focused_creative",
+            MusicalState {
+                consciousness_level: 0.7,
+                arousal: 0.4,
+                dopamine: 0.7,
+                harmony_activations: [0.5, 0.6, 0.7, 0.8, 0.4, 0.3, 0.6, 0.2],
+                valence: 0.5,
+                ..Default::default()
+            },
+        ),
+        (
+            "intense_urgent",
+            MusicalState {
+                consciousness_level: 0.3,
+                arousal: 0.9,
+                noradrenaline: 0.9,
+                dopamine: 0.8,
+                harmony_activations: [0.2, 0.1, 0.3, 0.9, 0.1, 0.1, 0.8, 0.0],
+                valence: -0.3,
+                prediction_error: 0.7,
+                ..Default::default()
+            },
+        ),
+        (
+            "joyful_expansive",
+            MusicalState {
+                consciousness_level: 0.85,
+                arousal: 0.6,
+                dopamine: 0.9,
+                serotonin: 0.3,
+                harmony_activations: [0.8, 0.9, 0.7, 0.6, 0.8, 0.7, 0.5, 0.3],
+                valence: 0.8,
+                ..Default::default()
+            },
+        ),
     ];
-    let var_cfg = MuseConfig { duration_secs: 6.0, max_notes: 20, ..Default::default() };
+    let var_cfg = MuseConfig {
+        duration_secs: 6.0,
+        max_notes: 20,
+        ..Default::default()
+    };
     for (name, state) in &states {
         let comp = compose(&var_cfg, state, 42);
         let path = dir.join(format!("consciousness_{name}.wav"));
@@ -80,7 +132,11 @@ fn main() {
     {
         use symthaea_muse::streaming::StreamingSynth;
         let mut synth = StreamingSynth::new(
-            MuseConfig { duration_secs: 10.0, max_notes: 32, ..Default::default() },
+            MuseConfig {
+                duration_secs: 10.0,
+                max_notes: 32,
+                ..Default::default()
+            },
             44100,
         );
         synth.update_state(&rich_state);
@@ -95,11 +151,16 @@ fn main() {
         let audio = AudioData::StereoF32(all_samples);
         let path = dir.join("streaming_full_pipeline.wav");
         write_wav(&path, &audio, 44100);
-        println!("   streaming_full_pipeline.wav ({} samples, {:.1}s)",
-            audio.len(), audio.len() as f32 / 44100.0);
+        println!(
+            "   streaming_full_pipeline.wav ({} samples, {:.1}s)",
+            audio.len(),
+            audio.len() as f32 / 44100.0
+        );
         let features = synth.feedback_features();
-        println!("   Feedback: centroid={:.3}, flux={:.3}, entropy={:.3}",
-            features.spectral_centroid, features.spectral_flux, features.rhythm_entropy);
+        println!(
+            "   Feedback: centroid={:.3}, flux={:.3}, entropy={:.3}",
+            features.spectral_centroid, features.spectral_flux, features.rhythm_entropy
+        );
     }
     println!();
 
@@ -114,7 +175,9 @@ fn write_wav(path: &std::path::Path, audio: &AudioData, sample_rate: u32) {
     let (channels, bits, data): (u16, u16, Vec<u8>) = match audio {
         AudioData::I16(samples) => {
             let mut d = Vec::with_capacity(samples.len() * 2);
-            for &s in samples { d.extend_from_slice(&s.to_le_bytes()); }
+            for &s in samples {
+                d.extend_from_slice(&s.to_le_bytes());
+            }
             (1, 16, d)
         }
         AudioData::F32(samples) => {
@@ -147,7 +210,7 @@ fn write_wav(path: &std::path::Path, audio: &AudioData, sample_rate: u32) {
     f.write_all(b"WAVE").ok();
     f.write_all(b"fmt ").ok();
     f.write_all(&16u32.to_le_bytes()).ok(); // fmt chunk size
-    f.write_all(&1u16.to_le_bytes()).ok();  // PCM
+    f.write_all(&1u16.to_le_bytes()).ok(); // PCM
     f.write_all(&channels.to_le_bytes()).ok();
     f.write_all(&sample_rate.to_le_bytes()).ok();
     f.write_all(&byte_rate.to_le_bytes()).ok();

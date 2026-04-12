@@ -122,9 +122,7 @@ pub fn classify_prediction(
         PhysicsDomain::NuclearPhysics
         | PhysicsDomain::Electromagnetism
         | PhysicsDomain::StatisticalMechanics => 2, // Persistent
-        PhysicsDomain::FluidDynamics
-        | PhysicsDomain::Thermodynamics
-        | PhysicsDomain::Optics => 1, // Temporal
+        PhysicsDomain::FluidDynamics | PhysicsDomain::Thermodynamics | PhysicsDomain::Optics => 1, // Temporal
         _ => 0, // Ephemeral (modified gravity, speculative)
     };
 
@@ -239,7 +237,11 @@ mod tests {
     fn test_lazar_classification() {
         let results = mock_results(&[
             ("Yukawa Potential", 0.60, PhysicsDomain::NuclearPhysics),
-            ("Schwarzschild Metric", 0.58, PhysicsDomain::GeneralRelativity),
+            (
+                "Schwarzschild Metric",
+                0.58,
+                PhysicsDomain::GeneralRelativity,
+            ),
         ]);
         let d = classify_lazar_gravity_a(&results);
         assert_eq!(d.lem.empirical, 0); // E0: zero confidence
@@ -250,27 +252,19 @@ mod tests {
 
     #[test]
     fn test_arts_parts_classification() {
-        let results = mock_results(&[
-            ("Waveguide Dispersion", 0.915, PhysicsDomain::Optics),
-        ]);
+        let results = mock_results(&[("Waveguide Dispersion", 0.915, PhysicsDomain::Optics)]);
         let d = classify_arts_parts_waveguide(&results);
         assert_eq!(d.lem.empirical, 0); // E0: 0.15 confidence < 0.3
         assert_eq!(d.lem.normative, 3); // N3: 0.915 ≈ axiomatic (it IS a waveguide)
         assert_eq!(d.lem.materiality, 1); // M1: optics = temporal
         assert!(!d.is_novel); // 0.915 >> 0.5
-        // Key insight: the PHYSICS is known (N3), but the CLAIM is unverified (E0)
+                              // Key insight: the PHYSICS is known (N3), but the CLAIM is unverified (E0)
     }
 
     #[test]
     fn test_discovery_tags() {
         let results = mock_results(&[("Yukawa", 0.3, PhysicsDomain::NuclearPhysics)]);
-        let d = classify_prediction(
-            "test",
-            PhysicsDomain::NuclearPhysics,
-            0.5,
-            &results,
-            false,
-        );
+        let d = classify_prediction("test", PhysicsDomain::NuclearPhysics, 0.5, &results, false);
         assert!(d.tags.contains(&"NuclearPhysics".to_string()));
         assert!(d.tags.contains(&"novel-prediction".to_string())); // 0.3 < 0.5
     }

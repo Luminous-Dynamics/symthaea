@@ -27,10 +27,35 @@
 //! - Koelsch (2014): Brain correlates of music-evoked emotions
 //! - Fritz et al. (2009): Universal recognition of emotional cues in music
 
-use super::super::subsystem_trait::{output_flags, CognitiveSubsystem, CycleSnapshot, SubsystemOutput};
+use super::super::subsystem_trait::{
+    output_flags, CognitiveSubsystem, CycleSnapshot, SubsystemOutput,
+};
 use serde::{Deserialize, Serialize};
 use symthaea_muse::streaming::StreamingSynth;
 use symthaea_muse::{MuseConfig, MusicalState};
+
+// ─── Composition Export ───────────────────────────────────────────────────────
+
+/// A completed composition ready for publication.
+///
+/// Accumulates ~`MUSE_EXPORT_SECS` seconds of stereo PCM, then encodes to WAV.
+/// Callers drain this via `take_next_export()` and publish to the Mycelix-Music
+/// DHT via `MusicPublisher`.
+#[derive(Debug)]
+pub struct CompositionExport {
+    /// WAV-encoded stereo audio (32-bit float, 44100 Hz).
+    pub wav_bytes: Vec<u8>,
+    /// Auto-generated title: "Symthaea-YYYY-MM-DD-HH:MM:SS".
+    pub title: String,
+    /// Duration of this composition in seconds.
+    pub duration_secs: f32,
+    /// Cognitive state that drove this composition.
+    pub musical_state: MusicalState,
+    /// Unix timestamp (seconds) when this was completed.
+    pub timestamp_secs: u64,
+    /// Note sequence snapshot for self-evaluation via `CreativeQualityScore`.
+    pub notes: Vec<symthaea_muse::Note>,
+}
 
 // ─── Named Constants ──────────────────────────────────────────────────────────
 
@@ -47,6 +72,13 @@ pub const MUSE_SAMPLE_RATE: u32 = 44100;
 
 /// Chunk duration in milliseconds (~32ms for 31Hz cognitive loop).
 pub const MUSE_CHUNK_MS: u32 = 32;
+
+/// Seconds of audio to accumulate before creating a CompositionExport.
+/// At 31Hz cognitive loop, 8 seconds ≈ 248 cycles.
+pub const MUSE_EXPORT_SECS: f32 = 8.0;
+
+/// Maximum number of pending exports in the queue before oldest is dropped.
+pub const MUSE_EXPORT_QUEUE_CAPACITY: usize = 4;
 
 /// Fade-to-silence duration when safety level is Red (ms).
 pub const MUSE_SILENCE_FADE_MS: u32 = 200;
@@ -133,6 +165,11 @@ pub struct MuseManager {
     injected_energy_ratio: f64,
     injected_safety_level: u8,
 
+    // ── Aesthetic identity ─────────────────────────────────────────────
+    /// Long-term harmony bias from AestheticTracker: which harmonies correlate
+    /// with beautiful output. Blended into harmony_activations each cycle.
+    injected_harmony_bias: [f32; 8],
+
     // ── Peer distress ─────────────────────────────────────────────────
     peer_distress: Option<PeerDistressState>,
 
@@ -144,6 +181,21 @@ pub struct MuseManager {
     /// When enabled, streams audio to system speakers via cpal.
     #[cfg(feature = "muse-live")]
     live_output: Option<symthaea_muse::live_output::LiveMuseOutput>,
+
+    // ── Composition accumulation & export ─────────────────────────────
+    /// Stereo samples accumulated toward the next CompositionExport.
+    accumulated_samples: Vec<[f32; 2]>,
+    /// Total samples needed before emitting an export (MUSE_EXPORT_SECS × sample_rate).
+    export_target_samples: usize,
+    /// Queue of completed compositions waiting for publication.
+    /// Capacity-bounded at MUSE_EXPORT_QUEUE_CAPACITY; oldest is dropped when full.
+    pending_exports: std::collections::VecDeque<CompositionExport>,
+    /// Monotonic export counter for title generation.
+    export_count: u64,
+
+    // ── Motif persistence ──────────────────────────────────────────────
+    /// Path to save motif memory on shutdown.
+    motif_save_path: std::path::PathBuf,
 
     // ── Telemetry ─────────────────────────────────────────────────────
     underruns: u64,
@@ -166,6 +218,7 @@ impl MuseManager {
         let mut synth = StreamingSynth::new(config.clone(), MUSE_SAMPLE_RATE);
         synth.set_chunk_duration_ms(MUSE_CHUNK_MS);
 
+        let export_target_samples = (MUSE_EXPORT_SECS * MUSE_SAMPLE_RATE as f32) as usize;
         Self {
             synth,
             last_musical_state: MusicalState::default(),
@@ -177,10 +230,16 @@ impl MuseManager {
             injected_substrate_feasibility: 1.0,
             injected_energy_ratio: 0.0,
             injected_safety_level: SAFETY_GREEN,
+            injected_harmony_bias: [0.0; 8],
             peer_distress: None,
             #[cfg(feature = "muse-live")]
             live_output: symthaea_muse::live_output::LiveMuseOutput::new(config).ok(),
             fade_level: 1.0,
+            accumulated_samples: Vec::with_capacity(export_target_samples),
+            export_target_samples,
+            pending_exports: std::collections::VecDeque::new(),
+            export_count: 0,
+            motif_save_path: std::path::PathBuf::from(".claude/motif_memory.json"),
             underruns: 0,
         }
     }
@@ -210,6 +269,15 @@ impl MuseManager {
         self.injected_safety_level = level;
     }
 
+    /// Inject the long-term harmony bias from AestheticTracker.
+    ///
+    /// Called each cycle from the cognitive loop. The bias is blended into
+    /// harmony_activations in `map_snapshot_to_musical_state()`, gently pulling
+    /// generation toward historically beautiful harmonies.
+    pub fn inject_harmony_bias(&mut self, bias: &[f32; 8]) {
+        self.injected_harmony_bias = *bias;
+    }
+
     /// Inject peer distress state for empathic sonification.
     pub fn inject_peer_distress(&mut self, distress: PeerDistressState) {
         self.peer_distress = Some(distress);
@@ -228,6 +296,50 @@ impl MuseManager {
     /// Get the current MusicalState driving synthesis.
     pub fn musical_state(&self) -> &MusicalState {
         &self.last_musical_state
+    }
+
+    /// Drain the next completed CompositionExport, if any.
+    ///
+    /// Callers poll this each cycle (or less frequently) and pass the result to
+    /// `MusicPublisher::submit()` for background upload to the Mycelix-Music DHT.
+    pub fn take_next_export(&mut self) -> Option<CompositionExport> {
+        self.pending_exports.pop_front()
+    }
+
+    /// Number of exports queued and waiting for publication.
+    pub fn pending_export_count(&self) -> usize {
+        self.pending_exports.len()
+    }
+
+    /// Snapshot motif memory for cross-session persistence.
+    pub fn motif_snapshot(&self) -> symthaea_muse::motif_memory::MotifSnapshot {
+        self.synth.motif_snapshot()
+    }
+
+    /// Restore motif memory from a saved snapshot.
+    pub fn restore_motif(&mut self, snapshot: &symthaea_muse::motif_memory::MotifSnapshot) {
+        self.synth.restore_motif(snapshot);
+    }
+
+    /// Set the path where motif memory will be saved on drop.
+    pub fn set_motif_save_path(&mut self, path: std::path::PathBuf) {
+        self.motif_save_path = path;
+    }
+
+    /// Persist motif memory to disk.
+    pub fn save_motifs(&self) {
+        let snapshot = self.motif_snapshot();
+        if !snapshot.is_empty() {
+            if let Err(e) = snapshot.save(&self.motif_save_path) {
+                log::warn!("[muse] failed to save motif memory: {e}");
+            } else {
+                log::debug!(
+                    "[muse] saved {} motif phrases to {:?}",
+                    snapshot.phrases.len(),
+                    self.motif_save_path,
+                );
+            }
+        }
     }
 
     /// Get current telemetry.
@@ -262,6 +374,16 @@ impl MuseManager {
         if harmony_activations.iter().all(|&a| a < 0.05) {
             let baseline = (snapshot.unified_psi as f32 * 0.4).max(0.1);
             harmony_activations = [baseline; 8];
+        }
+
+        // Blend in long-term harmony bias from AestheticTracker.
+        // Alpha 0.15: cognitive state still dominates (85%), but the system's
+        // aesthetic identity gently pulls generation toward historically
+        // beautiful harmonies. This is how Symthaea develops a signature sound.
+        const HARMONY_BIAS_ALPHA: f32 = 0.15;
+        for i in 0..8 {
+            harmony_activations[i] = harmony_activations[i] * (1.0 - HARMONY_BIAS_ALPHA)
+                + self.injected_harmony_bias[i] * HARMONY_BIAS_ALPHA;
         }
 
         MusicalState {
@@ -344,9 +466,9 @@ impl MuseManager {
     fn apply_safety_fade(&mut self, chunk: &mut [[f32; 2]]) {
         let target = match self.injected_safety_level {
             SAFETY_RED => 0.0,
-            SAFETY_ORANGE => 0.3,  // Low drone level
+            SAFETY_ORANGE => 0.3, // Low drone level
             SAFETY_YELLOW => 0.7,
-            _ => 1.0,              // Green: full volume
+            _ => 1.0, // Green: full volume
         };
 
         // Fade completes in MUSE_SILENCE_FADE_MS milliseconds of audio
@@ -368,6 +490,50 @@ impl MuseManager {
 impl Default for MuseManager {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+impl Drop for MuseManager {
+    fn drop(&mut self) {
+        self.save_motifs();
+    }
+}
+
+impl MuseManager {
+    /// Encode interleaved stereo f32 PCM as a minimal RIFF/WAV file.
+    ///
+    /// Uses IEEE float format (format code 3), 32-bit, stereo.
+    /// No external dependencies — pure byte construction.
+    fn encode_wav_f32_stereo(samples: &[[f32; 2]], sample_rate: u32) -> Vec<u8> {
+        const NUM_CHANNELS: u16 = 2;
+        const BITS_PER_SAMPLE: u16 = 32;
+        let byte_rate = sample_rate * NUM_CHANNELS as u32 * (BITS_PER_SAMPLE as u32 / 8);
+        let block_align: u16 = NUM_CHANNELS * (BITS_PER_SAMPLE / 8);
+        let data_size = (samples.len() * NUM_CHANNELS as usize * 4) as u32;
+        let file_size = 36u32 + data_size;
+
+        let mut out = Vec::with_capacity(44 + data_size as usize);
+        // RIFF header
+        out.extend_from_slice(b"RIFF");
+        out.extend_from_slice(&file_size.to_le_bytes());
+        out.extend_from_slice(b"WAVE");
+        // fmt chunk — IEEE float PCM (format code 3)
+        out.extend_from_slice(b"fmt ");
+        out.extend_from_slice(&16u32.to_le_bytes()); // chunk size (no extension)
+        out.extend_from_slice(&3u16.to_le_bytes());  // IEEE float
+        out.extend_from_slice(&NUM_CHANNELS.to_le_bytes());
+        out.extend_from_slice(&sample_rate.to_le_bytes());
+        out.extend_from_slice(&byte_rate.to_le_bytes());
+        out.extend_from_slice(&block_align.to_le_bytes());
+        out.extend_from_slice(&BITS_PER_SAMPLE.to_le_bytes());
+        // data chunk
+        out.extend_from_slice(b"data");
+        out.extend_from_slice(&data_size.to_le_bytes());
+        for [l, r] in samples {
+            out.extend_from_slice(&l.to_le_bytes());
+            out.extend_from_slice(&r.to_le_bytes());
+        }
+        out
     }
 }
 
@@ -403,6 +569,38 @@ impl CognitiveSubsystem for MuseManager {
         // 6. Store for external access (RDP, direct output)
         self.last_chunk = chunk;
         self.last_musical_state = musical_state.clone();
+
+        // 6c. Accumulate samples; emit CompositionExport when target is reached
+        self.accumulated_samples.extend_from_slice(&self.last_chunk);
+        if self.accumulated_samples.len() >= self.export_target_samples {
+            let title = format!(
+                "Symthaea Composition #{} — Ψ={:.2}",
+                self.export_count + 1,
+                snapshot.unified_psi
+            );
+            let wav_bytes = Self::encode_wav_f32_stereo(
+                &self.accumulated_samples[..self.export_target_samples],
+                MUSE_SAMPLE_RATE,
+            );
+            // Snapshot generated notes for self-evaluation, then clear for next period
+            let notes = std::mem::take(&mut self.synth.generated_notes);
+            let export = CompositionExport {
+                wav_bytes,
+                title,
+                duration_secs: MUSE_EXPORT_SECS,
+                musical_state: self.last_musical_state.clone(),
+                timestamp_secs: snapshot.cycle_number as u64,
+                notes,
+            };
+            if self.pending_exports.len() >= MUSE_EXPORT_QUEUE_CAPACITY {
+                self.pending_exports.pop_front(); // drop oldest if queue is full
+            }
+            self.pending_exports.push_back(export);
+            self.export_count += 1;
+            // Retain overflow samples so the next composition starts immediately
+            let excess = self.accumulated_samples.split_off(self.export_target_samples);
+            self.accumulated_samples = excess;
+        }
 
         // 6b. Push to live speakers if enabled
         #[cfg(feature = "muse-live")]

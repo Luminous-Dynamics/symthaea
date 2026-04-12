@@ -109,6 +109,34 @@ impl SurpriseMap {
         &self.grid
     }
 
+    /// Inject cross-scale predictive errors as additional free-energy signal.
+    ///
+    /// Called after `update()` when a `PredictiveCodingHierarchy` is active.
+    /// Adds `weight * error[i]` to each patch's accumulated surprise, capped at
+    /// the same steady-state maximum as the temporal surprise.
+    ///
+    /// This makes the surprise map reflect both:
+    /// - **Temporal change** (frame-to-frame): from `update()`
+    /// - **Scale inconsistency** (coarse fails to predict fine): from this call
+    ///
+    /// # Arguments
+    /// * `patch_errors` — Per-patch cross-scale prediction error (0.0–1.0). Length
+    ///   may differ from the grid count; excess entries are ignored, missing ones
+    ///   receive no injection.
+    /// * `weight` — Mixing weight for the injected signal (0.0 = no injection,
+    ///   1.0 = full cross-scale signal). Typical value: 0.3.
+    pub fn inject_cross_scale_error(&mut self, patch_errors: &[f32], weight: f32) {
+        if weight < 1e-6 || patch_errors.is_empty() {
+            return;
+        }
+        let max_surprise = 1.0 / (1.0 - self.decay).max(0.01);
+        let n = patch_errors.len().min(self.surprise.len());
+        for i in 0..n {
+            self.surprise[i] += weight * patch_errors[i].clamp(0.0, 1.0);
+            self.surprise[i] = self.surprise[i].min(max_surprise);
+        }
+    }
+
     /// Reset all surprise to zero.
     pub fn reset(&mut self) {
         self.surprise.fill(0.0);
@@ -286,6 +314,78 @@ mod tests {
         assert_eq!(sm.grid().cols, 4);
         assert_eq!(sm.grid().rows, 4);
         assert_eq!(sm.grid().patch_size, 8);
+    }
+
+    // === P2-A: Cross-Scale Predictive Error Injection ===
+
+    #[test]
+    fn test_inject_cross_scale_increases_surprise() {
+        let grid = make_grid();
+        let mut sm = SurpriseMap::new(grid, 0.9, 0.3);
+
+        // Start with zero surprise
+        assert_eq!(sm.max_surprise(), 0.0);
+
+        // Inject 1.0 error at all 16 patches with weight 0.5
+        let errors = vec![1.0f32; 16];
+        sm.inject_cross_scale_error(&errors, 0.5);
+
+        // Each patch should now have 0.5 surprise
+        for &s in &sm.attention_map().values {
+            assert!(
+                (s - 0.5).abs() < 1e-6,
+                "Each patch should have 0.5 surprise, got {s}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_inject_cross_scale_zero_weight_is_noop() {
+        let grid = make_grid();
+        let mut sm = SurpriseMap::new(grid, 0.9, 0.3);
+
+        let errors = vec![1.0f32; 16];
+        sm.inject_cross_scale_error(&errors, 0.0);
+        assert_eq!(sm.max_surprise(), 0.0);
+    }
+
+    #[test]
+    fn test_inject_cross_scale_bounded_by_steady_state() {
+        let decay = 0.9;
+        let grid = make_grid();
+        let mut sm = SurpriseMap::new(grid, decay, 0.3);
+        let max_allowed = 1.0 / (1.0 - decay);
+
+        // Inject many times to try to overflow
+        let errors = vec![1.0f32; 16];
+        for _ in 0..200 {
+            sm.inject_cross_scale_error(&errors, 1.0);
+        }
+
+        for &s in &sm.attention_map().values {
+            assert!(
+                s <= max_allowed + 1e-6,
+                "Surprise should be bounded: {s} > {max_allowed}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_inject_cross_scale_partial_patch_count() {
+        let grid = make_grid(); // 16 patches
+        let mut sm = SurpriseMap::new(grid, 0.9, 0.3);
+
+        // Only 4 error values — should update first 4 patches, leave others at 0
+        let errors = vec![1.0f32; 4];
+        sm.inject_cross_scale_error(&errors, 0.5);
+
+        let values = sm.attention_map().values;
+        for &s in &values[..4] {
+            assert!((s - 0.5).abs() < 1e-6);
+        }
+        for &s in &values[4..] {
+            assert_eq!(s, 0.0, "Patches beyond error count should be untouched");
+        }
     }
 
     #[test]

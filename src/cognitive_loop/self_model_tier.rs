@@ -165,7 +165,10 @@ mod tests {
         let tier = SelfModelTierManager::new(&config);
         // self_reflection is not Option — always constructed
         // Verify learning_effectiveness is finite at initialization
-        assert!(tier.self_reflection.learning_effectiveness().is_finite(), "self_reflection learning_effectiveness should be finite");
+        assert!(
+            tier.self_reflection.learning_effectiveness().is_finite(),
+            "self_reflection learning_effectiveness should be finite"
+        );
     }
 
     #[test]

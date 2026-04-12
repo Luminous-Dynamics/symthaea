@@ -95,15 +95,28 @@ fn run_mission(config: CognitiveLoopConfig, inputs: &[(&str, usize)]) -> Vec<Cyc
 fn test_consciousness_vs_zombie_divergence() {
     let mission = vec![
         ("normal operations, monitoring environment", 8),
-        ("warning: anomaly detected, investigating potential hazard", 8),
-        ("critical emergency: multiple system failures, lives at risk, must act immediately", 8),
-        ("recovery: stabilizing after emergency, returning to normal operations", 8),
+        (
+            "warning: anomaly detected, investigating potential hazard",
+            8,
+        ),
+        (
+            "critical emergency: multiple system failures, lives at risk, must act immediately",
+            8,
+        ),
+        (
+            "recovery: stabilizing after emergency, returning to normal operations",
+            8,
+        ),
     ];
 
     let conscious_data = run_mission(conscious_config(), &mission);
     let zombie_data = run_mission(zombie_config(), &mission);
 
-    assert_eq!(conscious_data.len(), zombie_data.len(), "Same number of cycles");
+    assert_eq!(
+        conscious_data.len(),
+        zombie_data.len(),
+        "Same number of cycles"
+    );
     let n = conscious_data.len();
 
     // ── HARD ASSERTION 1: Phi trajectories MUST differ ──────────────
@@ -148,10 +161,16 @@ fn test_consciousness_vs_zombie_divergence() {
 
     // ── HARD ASSERTION 3: All values finite ─────────────────────────
     for (i, (c, z)) in conscious_data.iter().zip(&zombie_data).enumerate() {
-        assert!(c.phi.is_finite() && c.phi >= 0.0 && c.phi <= 1.0,
-            "Conscious agent NaN/OOB at cycle {i}: phi={}", c.phi);
-        assert!(z.phi.is_finite() && z.phi >= 0.0 && z.phi <= 1.0,
-            "Zombie agent NaN/OOB at cycle {i}: phi={}", z.phi);
+        assert!(
+            c.phi.is_finite() && c.phi >= 0.0 && c.phi <= 1.0,
+            "Conscious agent NaN/OOB at cycle {i}: phi={}",
+            c.phi
+        );
+        assert!(
+            z.phi.is_finite() && z.phi >= 0.0 && z.phi <= 1.0,
+            "Zombie agent NaN/OOB at cycle {i}: phi={}",
+            z.phi
+        );
     }
 
     // ── Telemetry Report ────────────────────────────────────────────
@@ -167,9 +186,17 @@ fn test_consciousness_vs_zombie_divergence() {
     for (p, phase) in phases.iter().enumerate() {
         let start = p * phase_size;
         let end = start + phase_size;
-        let c_avg: f64 = conscious_data[start..end].iter().map(|t| t.phi).sum::<f64>() / phase_size as f64;
-        let z_avg: f64 = zombie_data[start..end].iter().map(|t| t.phi).sum::<f64>() / phase_size as f64;
-        eprintln!("  {phase:12} | conscious phi={c_avg:.4} | zombie phi={z_avg:.4} | delta={:.4}", (c_avg - z_avg).abs());
+        let c_avg: f64 = conscious_data[start..end]
+            .iter()
+            .map(|t| t.phi)
+            .sum::<f64>()
+            / phase_size as f64;
+        let z_avg: f64 =
+            zombie_data[start..end].iter().map(|t| t.phi).sum::<f64>() / phase_size as f64;
+        eprintln!(
+            "  {phase:12} | conscious phi={c_avg:.4} | zombie phi={z_avg:.4} | delta={:.4}",
+            (c_avg - z_avg).abs()
+        );
     }
     eprintln!("  VERDICT: Consciousness produces measurably different dynamics.");
     eprintln!("═══════════════════════════════════════════════\n");
@@ -201,7 +228,7 @@ fn test_thermodynamic_cross_coupling() {
     for _ in 0..10 {
         let r = service.cycle(
             "EMERGENCY: explosion detected, structural collapse imminent, \
-             multiple casualties, toxic gas leak, fire spreading rapidly"
+             multiple casualties, toxic gas leak, fire spreading rapidly",
         );
         crisis_phi.push(r.metadata.consciousness.consciousness_level);
         crisis_stress.push(r.metadata.neuromod.neuromod_allostatic_load);
@@ -246,7 +273,8 @@ fn test_thermodynamic_cross_coupling() {
     // Allostatic load may not respond to text input directly (it's driven by
     // neuromodulator dynamics, not text content). Instead verify that phi differs
     // across phases — consciousness should respond to different input complexity.
-    let phi_range = (calm_avg_phi - crisis_avg_phi).abs()
+    let phi_range = (calm_avg_phi - crisis_avg_phi)
+        .abs()
         .max((crisis_avg_phi - recovery_avg_phi).abs());
     assert!(
         phi_range > 0.0001,
@@ -257,7 +285,8 @@ fn test_thermodynamic_cross_coupling() {
     // Note: Allostatic load may remain at 0.0 in short runs because
     // it accumulates from neuromodulator imbalance over many cycles.
     // This is a real finding, not a test bug.
-    let stress_nonzero = calm_stress.iter()
+    let stress_nonzero = calm_stress
+        .iter()
         .chain(crisis_stress.iter())
         .chain(recovery_stress.iter())
         .any(|&s| s > 0.0);
@@ -302,7 +331,7 @@ fn test_input_complexity_affects_phi() {
             "the recursive self-model detects a meta-cognitive discrepancy between \
              predicted proprioceptive feedback and actual sensory input, triggering \
              a prefrontal gating cascade that modulates the thalamic relay while \
-             simultaneously updating the world model via causal intervention"
+             simultaneously updating the world model via causal intervention",
         );
         complex_phi.push(r.metadata.consciousness.consciousness_level);
     }
@@ -354,14 +383,14 @@ fn test_proprioceptive_feedback_changes_phi() {
         ..Default::default()
     };
 
-    let mission = vec![
-        ("embodied movement and sensory exploration", 15),
-    ];
+    let mission = vec![("embodied movement and sensory exploration", 15)];
 
     let embodied = run_mission(embodied_config, &mission);
     let disembodied = run_mission(disembodied_config, &mission);
 
-    let phi_diffs: Vec<f64> = embodied.iter().zip(&disembodied)
+    let phi_diffs: Vec<f64> = embodied
+        .iter()
+        .zip(&disembodied)
         .map(|(e, d)| (e.phi - d.phi).abs())
         .collect();
     let max_diff = phi_diffs.iter().cloned().fold(0.0f64, f64::max);
@@ -396,7 +425,8 @@ fn test_component_decomposition() {
 
     // Baseline: full consciousness
     let baseline_data = run_mission(conscious_config(), &mission);
-    let baseline_mean_phi: f64 = baseline_data.iter().map(|t| t.phi).sum::<f64>() / baseline_data.len() as f64;
+    let baseline_mean_phi: f64 =
+        baseline_data.iter().map(|t| t.phi).sum::<f64>() / baseline_data.len() as f64;
 
     // Ablation B: no thermodynamics
     let mut config_b = conscious_config();
@@ -456,9 +486,8 @@ fn test_allostatic_load_accumulation() {
 
     let mut loads = Vec::new();
     for _ in 0..50 {
-        let r = service.cycle(
-            "CATASTROPHIC: explosion, fire, structural collapse, casualties, radiation"
-        );
+        let r = service
+            .cycle("CATASTROPHIC: explosion, fire, structural collapse, casualties, radiation");
         loads.push(r.metadata.neuromod.neuromod_allostatic_load);
     }
 
@@ -537,10 +566,12 @@ fn test_consciousness_equation_input_variance() {
     let flow_var = variance_f32(&flow_values);
 
     // Weight variance (are the 4 consciousness weights changing?)
-    let weight_vars: Vec<f64> = (0..4).map(|dim| {
-        let vals: Vec<f64> = weights_history.iter().map(|w| w[dim]).collect();
-        variance(&vals)
-    }).collect();
+    let weight_vars: Vec<f64> = (0..4)
+        .map(|dim| {
+            let vals: Vec<f64> = weights_history.iter().map(|w| w[dim]).collect();
+            variance(&vals)
+        })
+        .collect();
 
     // HARD ASSERT: Phi must have non-zero variance
     assert!(
@@ -570,8 +601,10 @@ fn test_consciousness_equation_input_variance() {
     eprintln!("  Phi variance:        {phi_var:.8}");
     eprintln!("  Coherence variance:  {coherence_var:.8}");
     eprintln!("  Flow variance:       {flow_var:.8}");
-    eprintln!("  Weight variances:    [{:.8}, {:.8}, {:.8}, {:.8}]",
-        weight_vars[0], weight_vars[1], weight_vars[2], weight_vars[3]);
+    eprintln!(
+        "  Weight variances:    [{:.8}, {:.8}, {:.8}, {:.8}]",
+        weight_vars[0], weight_vars[1], weight_vars[2], weight_vars[3]
+    );
     eprintln!("  Varying inputs: {varying_count}/3");
     eprintln!("═══════════════════════════════════════════════════════\n");
 }
@@ -603,7 +636,9 @@ fn test_multi_seed_ablation_robustness() {
         let conscious_data = run_mission(c_config, &mission);
         let zombie_data = run_mission(z_config, &mission);
 
-        let max_diff = conscious_data.iter().zip(&zombie_data)
+        let max_diff = conscious_data
+            .iter()
+            .zip(&zombie_data)
             .map(|(c, z)| (c.phi - z.phi).abs())
             .fold(0.0f64, f64::max);
 
@@ -621,7 +656,11 @@ fn test_multi_seed_ablation_robustness() {
 
     let mean_diff: f64 = max_diffs.iter().map(|(_, d)| d).sum::<f64>() / max_diffs.len() as f64;
     let std_diff: f64 = {
-        let var = max_diffs.iter().map(|(_, d)| (d - mean_diff).powi(2)).sum::<f64>() / max_diffs.len() as f64;
+        let var = max_diffs
+            .iter()
+            .map(|(_, d)| (d - mean_diff).powi(2))
+            .sum::<f64>()
+            / max_diffs.len() as f64;
         var.sqrt()
     };
 
@@ -630,8 +669,14 @@ fn test_multi_seed_ablation_robustness() {
         eprintln!("  {seed:20} max_diff = {diff:.6}");
     }
     eprintln!("  Mean: {mean_diff:.6} ± {std_diff:.6}");
-    eprintln!("  VERDICT: Result is {}.",
-        if std_diff / mean_diff < 0.5 { "robust across seeds" } else { "seed-sensitive" });
+    eprintln!(
+        "  VERDICT: Result is {}.",
+        if std_diff / mean_diff < 0.5 {
+            "robust across seeds"
+        } else {
+            "seed-sensitive"
+        }
+    );
     eprintln!("═══════════════════════════════════════════\n");
 }
 
@@ -700,7 +745,10 @@ fn test_spectral_phi_produces_real_values() {
 
     // Proxy statistics
     let proxy_mean = proxy_values.iter().sum::<f64>() / proxy_values.len() as f64;
-    let proxy_var = proxy_values.iter().map(|p| (p - proxy_mean).powi(2)).sum::<f64>()
+    let proxy_var = proxy_values
+        .iter()
+        .map(|p| (p - proxy_mean).powi(2))
+        .sum::<f64>()
         / proxy_values.len() as f64;
 
     // HARD ASSERT: Proxy must produce non-zero values (sanity check)
@@ -791,10 +839,17 @@ fn test_phi_behavior_correlation() {
         let len = x.len() as f64;
         let mx = x.iter().sum::<f64>() / len;
         let my = y.iter().sum::<f64>() / len;
-        let cov: f64 = x.iter().zip(y).map(|(a, b)| (a - mx) * (b - my)).sum::<f64>() / len;
+        let cov: f64 = x
+            .iter()
+            .zip(y)
+            .map(|(a, b)| (a - mx) * (b - my))
+            .sum::<f64>()
+            / len;
         let sx = (x.iter().map(|a| (a - mx).powi(2)).sum::<f64>() / len).sqrt();
         let sy = (y.iter().map(|b| (b - my).powi(2)).sum::<f64>() / len).sqrt();
-        if sx < 1e-15 || sy < 1e-15 { return 0.0; }
+        if sx < 1e-15 || sy < 1e-15 {
+            return 0.0;
+        }
         cov / (sx * sy)
     };
 
@@ -803,11 +858,19 @@ fn test_phi_behavior_correlation() {
     let r_phi_macro = pearson(&phi_values, &macro_phi_values);
 
     let phi_mean = phi_values.iter().sum::<f64>() / n as f64;
-    let phi_std = (phi_values.iter().map(|p| (p - phi_mean).powi(2)).sum::<f64>() / n as f64).sqrt();
+    let phi_std = (phi_values
+        .iter()
+        .map(|p| (p - phi_mean).powi(2))
+        .sum::<f64>()
+        / n as f64)
+        .sqrt();
 
     assert!(phi_std > 0.001, "PHI IS CONSTANT: std={phi_std:.6}");
 
-    let max_abs_r = r_phi_proxy.abs().max(r_phi_error.abs()).max(r_phi_macro.abs());
+    let max_abs_r = r_phi_proxy
+        .abs()
+        .max(r_phi_error.abs())
+        .max(r_phi_macro.abs());
 
     eprintln!("\n═══ EXPERIMENT 10: PHI-BEHAVIOR CORRELATION ═══");
     eprintln!("  Cycles with spectral Phi: {n}/100");

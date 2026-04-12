@@ -255,7 +255,12 @@ mod tests {
         let mut ku = KnownUnknowns::default();
         let cap = ku.capacity;
         for i in 0..cap + 5 {
-            ku.register_unknown(&format!("domain_{i}"), (i as f64) / (cap as f64), 0.5, i as u64);
+            ku.register_unknown(
+                &format!("domain_{i}"),
+                (i as f64) / (cap as f64),
+                0.5,
+                i as u64,
+            );
         }
         assert_eq!(ku.count(), cap);
     }

@@ -24,7 +24,11 @@ mod tests {
         let pred = predictor();
         let nuclei = ame2020_reference_nuclei();
 
-        eprintln!("\n{} GLOBAL COULOMB CORRECTION {}", "=".repeat(20), "=".repeat(20));
+        eprintln!(
+            "\n{} GLOBAL COULOMB CORRECTION {}",
+            "=".repeat(20),
+            "=".repeat(20)
+        );
 
         let mut sum_rx = 0.0_f64;
         let mut sum_xx = 0.0_f64;
@@ -89,7 +93,11 @@ mod tests {
             .map(|n| ((n.z, n.n), n.binding_energy_mev))
             .collect();
 
-        eprintln!("\n{} CLUSTER RADIOACTIVITY {}", "=".repeat(20), "=".repeat(20));
+        eprintln!(
+            "\n{} CLUSTER RADIOACTIVITY {}",
+            "=".repeat(20),
+            "=".repeat(20)
+        );
 
         // Clusters: (name, Z_c, N_c, BE_c)
         let clusters: &[(&str, u16, u16, f64)] = &[
@@ -159,8 +167,14 @@ mod tests {
             let a_daughter = c.daughter_z + c.daughter_n;
             eprintln!(
                 "A={:>3}  {:>4} {:>4}  {:>8}  A={:>3}  {:>4} {:>4}  {:>10.3}",
-                a_parent, c.parent_z, c.parent_n, c.cluster_name,
-                a_daughter, c.daughter_z, c.daughter_n, c.q_value
+                a_parent,
+                c.parent_z,
+                c.parent_n,
+                c.cluster_name,
+                a_daughter,
+                c.daughter_z,
+                c.daughter_n,
+                c.q_value
             );
         }
     }
@@ -174,12 +188,18 @@ mod tests {
         let pred = predictor();
         let nuclei = ame2020_reference_nuclei();
 
-        eprintln!("\n{} MODEL COMPARISON BY REGION {}", "=".repeat(20), "=".repeat(20));
+        eprintln!(
+            "\n{} MODEL COMPARISON BY REGION {}",
+            "=".repeat(20),
+            "=".repeat(20)
+        );
 
         let magic_numbers: &[u16] = &[2, 8, 20, 28, 50, 82, 126];
 
         fn is_near_magic(val: u16, magics: &[u16]) -> bool {
-            magics.iter().any(|&m| (val as i32 - m as i32).unsigned_abs() as u16 <= 3)
+            magics
+                .iter()
+                .any(|&m| (val as i32 - m as i32).unsigned_abs() as u16 <= 3)
         }
 
         struct Entry {
@@ -220,8 +240,14 @@ mod tests {
         // Group by mass region
         let regions: &[(&str, Box<dyn Fn(u16) -> bool>)] = &[
             ("Light (A<40)", Box::new(|a: u16| a < 40)),
-            ("Medium (40-120)", Box::new(|a: u16| (40..=120).contains(&a))),
-            ("Heavy (120-210)", Box::new(|a: u16| (120..=210).contains(&a))),
+            (
+                "Medium (40-120)",
+                Box::new(|a: u16| (40..=120).contains(&a)),
+            ),
+            (
+                "Heavy (120-210)",
+                Box::new(|a: u16| (120..=210).contains(&a)),
+            ),
             ("Actinides (A>210)", Box::new(|a: u16| a > 210)),
         ];
 
@@ -244,7 +270,12 @@ mod tests {
             let rf_rms = (group.iter().map(|e| e.rf_err * e.rf_err).sum::<f64>() / n).sqrt();
             eprintln!(
                 "{:<22} {:>5}  {:>10.4} {:>10.4}  {:>10.4} {:>10.4}",
-                label, group.len(), dz_mean, dz_rms, rf_mean, rf_rms
+                label,
+                group.len(),
+                dz_mean,
+                dz_rms,
+                rf_mean,
+                rf_rms
             );
         }
 
@@ -257,8 +288,18 @@ mod tests {
         eprintln!("{}", "-".repeat(75));
 
         for (label, filter_fn) in &[
-            ("Near-magic", Box::new(|e: &&Entry| is_near_magic(e.z, magic_numbers) || is_near_magic(e.n, magic_numbers)) as Box<dyn Fn(&&Entry) -> bool>),
-            ("Mid-shell", Box::new(|e: &&Entry| !is_near_magic(e.z, magic_numbers) && !is_near_magic(e.n, magic_numbers)) as Box<dyn Fn(&&Entry) -> bool>),
+            (
+                "Near-magic",
+                Box::new(|e: &&Entry| {
+                    is_near_magic(e.z, magic_numbers) || is_near_magic(e.n, magic_numbers)
+                }) as Box<dyn Fn(&&Entry) -> bool>,
+            ),
+            (
+                "Mid-shell",
+                Box::new(|e: &&Entry| {
+                    !is_near_magic(e.z, magic_numbers) && !is_near_magic(e.n, magic_numbers)
+                }) as Box<dyn Fn(&&Entry) -> bool>,
+            ),
         ] {
             let group: Vec<&Entry> = entries.iter().filter(|e| filter_fn(e)).collect();
             if group.is_empty() {
@@ -271,7 +312,12 @@ mod tests {
             let rf_rms = (group.iter().map(|e| e.rf_err * e.rf_err).sum::<f64>() / n).sqrt();
             eprintln!(
                 "{:<22} {:>5}  {:>10.4} {:>10.4}  {:>10.4} {:>10.4}",
-                label, group.len(), dz_mean, dz_rms, rf_mean, rf_rms
+                label,
+                group.len(),
+                dz_mean,
+                dz_rms,
+                rf_mean,
+                rf_rms
             );
         }
 
@@ -316,7 +362,11 @@ mod tests {
 
     #[test]
     fn gross_theory_beta_decay() {
-        eprintln!("\n{} GROSS THEORY BETA DECAY {}", "=".repeat(20), "=".repeat(20));
+        eprintln!(
+            "\n{} GROSS THEORY BETA DECAY {}",
+            "=".repeat(20),
+            "=".repeat(20)
+        );
 
         let alpha_fs = 1.0 / 137.036; // fine structure constant
         let c_gross = 6000.0; // Sargent constant (seconds)
@@ -367,7 +417,11 @@ mod tests {
             .map(|n| ((n.z, n.n), n.binding_energy_mev))
             .collect();
 
-        eprintln!("\n{} NUCLEAR STATISTICAL EQUILIBRIUM {}", "=".repeat(18), "=".repeat(18));
+        eprintln!(
+            "\n{} NUCLEAR STATISTICAL EQUILIBRIUM {}",
+            "=".repeat(18),
+            "=".repeat(18)
+        );
 
         let temperatures_gk = [7.0, 8.0, 9.0, 10.0];
 
@@ -395,8 +449,14 @@ mod tests {
             }
 
             // Normalize via log-sum-exp
-            let max_log = abundances.iter().map(|&(_, _, ly)| ly).fold(f64::NEG_INFINITY, f64::max);
-            let sum_exp: f64 = abundances.iter().map(|&(_, _, ly)| (ly - max_log).exp()).sum();
+            let max_log = abundances
+                .iter()
+                .map(|&(_, _, ly)| ly)
+                .fold(f64::NEG_INFINITY, f64::max);
+            let sum_exp: f64 = abundances
+                .iter()
+                .map(|&(_, _, ly)| (ly - max_log).exp())
+                .sum();
             let log_norm = max_log + sum_exp.ln();
 
             let mut normed: Vec<(u16, u16, f64)> = abundances
@@ -426,7 +486,11 @@ mod tests {
             .map(|n| ((n.z, n.n), n.binding_energy_mev))
             .collect();
 
-        eprintln!("\n{} NEUTRON STAR CRUST LATTICE {}", "=".repeat(18), "=".repeat(18));
+        eprintln!(
+            "\n{} NEUTRON STAR CRUST LATTICE {}",
+            "=".repeat(18),
+            "=".repeat(18)
+        );
 
         let e2 = 1.44_f64; // MeV·fm (e^2 in natural units)
         let pi = std::f64::consts::PI;
@@ -472,7 +536,13 @@ mod tests {
             if let Some((z, n, neg_be_a, e_lat_a, e_tot_a)) = best {
                 eprintln!(
                     "{:>10.1e} {:>4} {:>4} {:>4}  {:>12.4} {:>12.4} {:>12.4}",
-                    n_b, z, n, z + n, neg_be_a, e_lat_a, e_tot_a
+                    n_b,
+                    z,
+                    n,
+                    z + n,
+                    neg_be_a,
+                    e_lat_a,
+                    e_tot_a
                 );
             }
         }

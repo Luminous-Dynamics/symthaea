@@ -77,7 +77,9 @@ fn main() {
 
         let zcr = if chunk.len() > 1 {
             let mono: Vec<f32> = chunk.iter().map(|p| (p[0] + p[1]) * 0.5).collect();
-            mono.windows(2).filter(|w| w[0].signum() != w[1].signum()).count() as f32
+            mono.windows(2)
+                .filter(|w| w[0].signum() != w[1].signum())
+                .count() as f32
                 / mono.len() as f32
         } else {
             0.0
@@ -97,14 +99,23 @@ fn main() {
         });
 
         if cycle % 50 == 0 {
-            println!("  cycle={:3}  Ψ={:.3}  V={:+.3}  A={:.3}  RMS={:.4}  ZCR={:.3}",
-                cycle, snap.consciousness_level, snap.emotional_valence,
-                snap.emotional_arousal, rms, zcr);
+            println!(
+                "  cycle={:3}  Ψ={:.3}  V={:+.3}  A={:.3}  RMS={:.4}  ZCR={:.3}",
+                cycle,
+                snap.consciousness_level,
+                snap.emotional_valence,
+                snap.emotional_arousal,
+                rms,
+                zcr
+            );
         }
     }
 
     // ── Correlations ─────────────────────────────────────────────────────
-    println!("\n═══ Live Cognitive Loop Correlations (n={}) ═══\n", log.len());
+    println!(
+        "\n═══ Live Cognitive Loop Correlations (n={}) ═══\n",
+        log.len()
+    );
 
     let psi: Vec<f32> = log.iter().map(|r| r.psi).collect();
     let arousal: Vec<f32> = log.iter().map(|r| r.arousal).collect();
@@ -125,9 +136,20 @@ fn main() {
         use std::io::Write;
         let _ = writeln!(f, "cycle,psi,arousal,valence,pe,da,5ht,ne,rms,zcr");
         for r in &log {
-            let _ = writeln!(f, "{},{:.4},{:.4},{:.4},{:.4},{:.4},{:.4},{:.4},{:.6},{:.4}",
-                r.cycle, r.psi, r.arousal, r.valence, r.prediction_error,
-                r.dopamine, r.serotonin, r.noradrenaline, r.rms, r.zcr);
+            let _ = writeln!(
+                f,
+                "{},{:.4},{:.4},{:.4},{:.4},{:.4},{:.4},{:.4},{:.6},{:.4}",
+                r.cycle,
+                r.psi,
+                r.arousal,
+                r.valence,
+                r.prediction_error,
+                r.dopamine,
+                r.serotonin,
+                r.noradrenaline,
+                r.rms,
+                r.zcr
+            );
         }
         println!("\n  Saved {csv_path} ({} rows)", log.len());
     }
@@ -164,8 +186,20 @@ fn print_corr(name: &str, x: &[f32], y: &[f32]) {
         sxx += dx * dx;
         syy += dy * dy;
     }
-    let r = if sxx > 0.0 && syy > 0.0 { sxy / (sxx * syy).sqrt() } else { 0.0 };
+    let r = if sxx > 0.0 && syy > 0.0 {
+        sxy / (sxx * syy).sqrt()
+    } else {
+        0.0
+    };
     let r2 = r * r;
-    let rating = if r2 > 0.5 { "STRONG" } else if r2 > 0.3 { "MODERATE" } else if r2 > 0.1 { "WEAK" } else { "NONE" };
+    let rating = if r2 > 0.5 {
+        "STRONG"
+    } else if r2 > 0.3 {
+        "MODERATE"
+    } else if r2 > 0.1 {
+        "WEAK"
+    } else {
+        "NONE"
+    };
     println!("  {:<35} r={:+.3}  R²={:.4}  [{}]", name, r, r2, rating);
 }

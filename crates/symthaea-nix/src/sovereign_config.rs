@@ -25,7 +25,7 @@ use std::collections::HashMap;
 /// Hardware profile detected by probe_hardware.
 #[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
 pub struct HardwareProfile {
-    pub gpu_vendor: String,     // "nvidia", "amd", "intel", "unknown"
+    pub gpu_vendor: String, // "nvidia", "amd", "intel", "unknown"
     pub gpu_model: String,
     pub gpu_hybrid: bool,
     pub has_wifi: bool,
@@ -33,7 +33,7 @@ pub struct HardwareProfile {
     pub has_secure_boot: bool,
     pub setup_mode: bool,
     pub efi_available: bool,
-    pub arch: String,           // "x86_64", "aarch64"
+    pub arch: String, // "x86_64", "aarch64"
     pub is_apple: bool,
     pub has_bitlocker: bool,
     pub existing_os: Vec<DetectedOS>,
@@ -44,7 +44,7 @@ pub struct HardwareProfile {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct DetectedOS {
     pub name: String,
-    pub os_type: String,  // "windows", "linux", "macos"
+    pub os_type: String, // "windows", "linux", "macos"
     pub device: String,
 }
 
@@ -52,11 +52,11 @@ pub struct DetectedOS {
 #[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
 pub struct UserChoices {
     pub hostname: String,
-    pub desktop: String,        // "gnome", "plasma", "hyprland", "sway", "xfce", "none"
-    pub gpu_driver: String,     // "nvidia", "nvidia-open", "amdgpu", "modesetting", "auto", "none"
+    pub desktop: String, // "gnome", "plasma", "hyprland", "sway", "xfce", "none"
+    pub gpu_driver: String, // "nvidia", "nvidia-open", "amdgpu", "modesetting", "auto", "none"
     pub timezone: String,
     pub keyboard: String,
-    pub layout: String,         // "single", "single-luks", "alongside", etc.
+    pub layout: String, // "single", "single-luks", "alongside", etc.
     pub encryption: bool,
     pub secure_boot: bool,
     pub tpm2_unlock: bool,
@@ -69,11 +69,11 @@ pub struct MigrationData {
     pub git_email: String,
     pub git_prefers_rebase: bool,
     pub git_alias_count: usize,
-    pub shell_type: String,     // "bash", "zsh", "zsh-omz", "zsh-starship"
+    pub shell_type: String, // "bash", "zsh", "zsh-omz", "zsh-starship"
     pub shell_alias_count: usize,
     pub ssh_key_count: usize,
     pub ssh_host_count: usize,
-    pub editors: Vec<String>,   // ["neovim", "vscode", ...]
+    pub editors: Vec<String>, // ["neovim", "vscode", ...]
     pub has_daw: bool,
     pub docker_images: usize,
     pub rust_projects: usize,
@@ -208,15 +208,26 @@ impl SovereignConfigGenerator {
             value: "true".into(),
             reasoning: "Firewall is always enabled by default for security.".into(),
             confidence: 1.0,
-            consequences: vec!["Incoming connections are blocked unless explicitly allowed.".into()],
-            alternatives: vec![("false".into(), "Disabling the firewall exposes all services to the network.".into())],
+            consequences: vec![
+                "Incoming connections are blocked unless explicitly allowed.".into(),
+            ],
+            alternatives: vec![(
+                "false".into(),
+                "Disabling the firewall exposes all services to the network.".into(),
+            )],
         });
 
         // ── Step 7: Reason about Nix settings ──
-        nix_options.push(("nix.settings.experimental-features".into(), "[ \"nix-command\" \"flakes\" ]".into()));
+        nix_options.push((
+            "nix.settings.experimental-features".into(),
+            "[ \"nix-command\" \"flakes\" ]".into(),
+        ));
         nix_options.push(("nix.gc.automatic".into(), "true".into()));
         nix_options.push(("nix.gc.dates".into(), "\"weekly\"".into()));
-        nix_options.push(("nix.gc.options".into(), "\"--delete-older-than 30d\"".into()));
+        nix_options.push((
+            "nix.gc.options".into(),
+            "\"--delete-older-than 30d\"".into(),
+        ));
 
         // ── Step 8: Check causal graph for conflicts ──
         let conflicts = self.check_conflicts(&nix_options);
@@ -279,28 +290,47 @@ impl SovereignConfigGenerator {
         match choices.desktop.as_str() {
             "gnome" => {
                 options.push(("services.xserver.enable".into(), "true".into()));
-                options.push(("services.xserver.displayManager.gdm.enable".into(), "true".into()));
-                options.push(("services.xserver.desktopManager.gnome.enable".into(), "true".into()));
+                options.push((
+                    "services.xserver.displayManager.gdm.enable".into(),
+                    "true".into(),
+                ));
+                options.push((
+                    "services.xserver.desktopManager.gnome.enable".into(),
+                    "true".into(),
+                ));
 
                 reasoning = if hardware.gpu_vendor == "nvidia" {
                     "GNOME with GDM — has the best NVIDIA+Wayland support among desktop environments. GDM handles NVIDIA EGLStreams natively.".into()
                 } else {
-                    "GNOME — modern, polished, great accessibility support. Wayland by default.".into()
+                    "GNOME — modern, polished, great accessibility support. Wayland by default."
+                        .into()
                 };
 
-                alternatives.push(("plasma".into(), "KDE Plasma is more customizable but heavier.".into()));
-                alternatives.push(("hyprland".into(), "Hyprland is a tiling compositor — powerful but steep learning curve.".into()));
+                alternatives.push((
+                    "plasma".into(),
+                    "KDE Plasma is more customizable but heavier.".into(),
+                ));
+                alternatives.push((
+                    "hyprland".into(),
+                    "Hyprland is a tiling compositor — powerful but steep learning curve.".into(),
+                ));
             }
             "plasma" => {
                 options.push(("services.xserver.enable".into(), "true".into()));
                 options.push(("services.displayManager.sddm.enable".into(), "true".into()));
-                options.push(("services.desktopManager.plasma6.enable".into(), "true".into()));
+                options.push((
+                    "services.desktopManager.plasma6.enable".into(),
+                    "true".into(),
+                ));
                 reasoning = "KDE Plasma 6 — highly customizable, good Wayland support, familiar to Windows users.".into();
             }
             "hyprland" => {
                 options.push(("programs.hyprland.enable".into(), "true".into()));
                 options.push(("services.displayManager.sddm.enable".into(), "true".into()));
-                options.push(("services.displayManager.sddm.wayland.enable".into(), "true".into()));
+                options.push((
+                    "services.displayManager.sddm.wayland.enable".into(),
+                    "true".into(),
+                ));
                 reasoning = "Hyprland — dynamic tiling Wayland compositor. Fast, beautiful animations, keyboard-driven workflow.".into();
 
                 if hardware.gpu_vendor == "nvidia" {
@@ -310,13 +340,23 @@ impl SovereignConfigGenerator {
             "sway" => {
                 options.push(("programs.sway.enable".into(), "true".into()));
                 options.push(("services.displayManager.sddm.enable".into(), "true".into()));
-                options.push(("services.displayManager.sddm.wayland.enable".into(), "true".into()));
-                reasoning = "Sway — i3-compatible Wayland compositor. Stable, minimal, efficient.".into();
+                options.push((
+                    "services.displayManager.sddm.wayland.enable".into(),
+                    "true".into(),
+                ));
+                reasoning =
+                    "Sway — i3-compatible Wayland compositor. Stable, minimal, efficient.".into();
             }
             "xfce" => {
                 options.push(("services.xserver.enable".into(), "true".into()));
-                options.push(("services.xserver.displayManager.lightdm.enable".into(), "true".into()));
-                options.push(("services.xserver.desktopManager.xfce.enable".into(), "true".into()));
+                options.push((
+                    "services.xserver.displayManager.lightdm.enable".into(),
+                    "true".into(),
+                ));
+                options.push((
+                    "services.xserver.desktopManager.xfce.enable".into(),
+                    "true".into(),
+                ));
 
                 reasoning = if hardware.total_disk_gb < 64 {
                     "XFCE — lightweight, perfect for your smaller disk. Uses less RAM and storage than GNOME or KDE.".into()
@@ -325,7 +365,9 @@ impl SovereignConfigGenerator {
                 };
             }
             _ => {
-                reasoning = "No desktop environment — server/CLI only. Lighter, uses less resources.".into();
+                reasoning =
+                    "No desktop environment — server/CLI only. Lighter, uses less resources."
+                        .into();
             }
         }
 
@@ -365,7 +407,10 @@ impl SovereignConfigGenerator {
 
         match driver.as_str() {
             "nvidia" => {
-                options.push(("services.xserver.videoDrivers".into(), "[ \"nvidia\" ]".into()));
+                options.push((
+                    "services.xserver.videoDrivers".into(),
+                    "[ \"nvidia\" ]".into(),
+                ));
                 options.push(("hardware.nvidia.modesetting.enable".into(), "true".into()));
                 options.push(("hardware.nvidia.open".into(), "false".into()));
                 options.push(("hardware.graphics.enable".into(), "true".into()));
@@ -378,33 +423,54 @@ impl SovereignConfigGenerator {
 
                 // Check causal graph: NVIDIA + Wayland implications
                 if choices.desktop == "hyprland" || choices.desktop == "sway" {
-                    warnings.push("NVIDIA + Wayland tiling compositors may have occasional tearing. \
-                                   Consider GBM_BACKEND=nvidia-drm if you see issues.".into());
+                    warnings.push(
+                        "NVIDIA + Wayland tiling compositors may have occasional tearing. \
+                                   Consider GBM_BACKEND=nvidia-drm if you see issues."
+                            .into(),
+                    );
                 }
 
                 if hardware.gpu_hybrid {
                     // Generate NVIDIA PRIME offload config for hybrid laptops
                     options.push(("hardware.nvidia.prime.offload.enable".into(), "true".into()));
-                    options.push(("hardware.nvidia.prime.offload.enableOffloadCmd".into(), "true".into()));
+                    options.push((
+                        "hardware.nvidia.prime.offload.enableOffloadCmd".into(),
+                        "true".into(),
+                    ));
                     // Default bus IDs — should be detected from lspci
-                    options.push(("hardware.nvidia.prime.intelBusId".into(), "\"PCI:0:2:0\"".into()));
-                    options.push(("hardware.nvidia.prime.nvidiaBusId".into(), "\"PCI:1:0:0\"".into()));
-                    reasoning.push_str(" Hybrid graphics detected — PRIME offload mode configured. \
-                                        Use `nvidia-offload` prefix to run apps on the dGPU.");
+                    options.push((
+                        "hardware.nvidia.prime.intelBusId".into(),
+                        "\"PCI:0:2:0\"".into(),
+                    ));
+                    options.push((
+                        "hardware.nvidia.prime.nvidiaBusId".into(),
+                        "\"PCI:1:0:0\"".into(),
+                    ));
+                    reasoning.push_str(
+                        " Hybrid graphics detected — PRIME offload mode configured. \
+                                        Use `nvidia-offload` prefix to run apps on the dGPU.",
+                    );
                     warnings.push("Hybrid GPU: bus IDs defaulted to PCI:0:2:0 (Intel) and PCI:1:0:0 (NVIDIA). \
                                    Verify with `lspci | grep VGA` and adjust if different.".into());
                 }
             }
             "nvidia-open" => {
-                options.push(("services.xserver.videoDrivers".into(), "[ \"nvidia\" ]".into()));
+                options.push((
+                    "services.xserver.videoDrivers".into(),
+                    "[ \"nvidia\" ]".into(),
+                ));
                 options.push(("hardware.nvidia.modesetting.enable".into(), "true".into()));
                 options.push(("hardware.nvidia.open".into(), "true".into()));
                 options.push(("hardware.graphics.enable".into(), "true".into()));
                 reasoning = "NVIDIA open kernel module — recommended for RTX 30xx/40xx series. \
-                             Better Wayland integration than proprietary.".into();
+                             Better Wayland integration than proprietary."
+                    .into();
             }
             "amdgpu" | "amd" => {
-                options.push(("services.xserver.videoDrivers".into(), "[ \"amdgpu\" ]".into()));
+                options.push((
+                    "services.xserver.videoDrivers".into(),
+                    "[ \"amdgpu\" ]".into(),
+                ));
                 options.push(("hardware.graphics.enable".into(), "true".into()));
                 options.push(("hardware.graphics.enable32Bit".into(), "true".into()));
                 reasoning = format!(
@@ -416,7 +482,8 @@ impl SovereignConfigGenerator {
             "intel" | "modesetting" => {
                 options.push(("hardware.graphics.enable".into(), "true".into()));
                 reasoning = "Intel integrated graphics — works out of the box with modesetting. \
-                             No proprietary drivers needed.".into();
+                             No proprietary drivers needed."
+                    .into();
             }
             _ => {
                 reasoning = "No GPU driver configured — using default modesetting.".into();
@@ -430,7 +497,9 @@ impl SovereignConfigGenerator {
                 value: driver.clone(),
                 reasoning,
                 confidence: 0.85,
-                consequences: vec!["GPU acceleration available for desktop and applications.".into()],
+                consequences: vec![
+                    "GPU acceleration available for desktop and applications.".into()
+                ],
                 alternatives,
             },
             warnings,
@@ -456,7 +525,8 @@ impl SovereignConfigGenerator {
                 options.push(("services.pipewire.jack.enable".into(), "true".into()));
                 "PipeWire with JACK bridge — detected DAW configuration on your previous system. \
                  JACK bridge enables low-latency audio for music production. \
-                 rtkit ensures real-time priority for audio threads.".into()
+                 rtkit ensures real-time priority for audio threads."
+                    .into()
             } else {
                 "PipeWire — modern audio server replacing PulseAudio. \
                  Better Bluetooth audio, lower latency, and compatibility with both PulseAudio and ALSA apps.".into()
@@ -470,7 +540,11 @@ impl SovereignConfigGenerator {
                     reasoning,
                     confidence: 0.95,
                     consequences: vec!["All audio apps work through PipeWire.".into()],
-                    alternatives: vec![("pulseaudio".into(), "Legacy audio server. Only if PipeWire has issues with specific hardware.".into())],
+                    alternatives: vec![(
+                        "pulseaudio".into(),
+                        "Legacy audio server. Only if PipeWire has issues with specific hardware."
+                            .into(),
+                    )],
                 },
                 warnings: Vec::new(),
             }
@@ -493,8 +567,16 @@ impl SovereignConfigGenerator {
     fn reason_about_locale(&self, choices: &UserChoices) -> ReasonedOptions {
         let mut options = Vec::new();
 
-        let tz = if choices.timezone.is_empty() { "UTC" } else { &choices.timezone };
-        let kb = if choices.keyboard.is_empty() { "us" } else { &choices.keyboard };
+        let tz = if choices.timezone.is_empty() {
+            "UTC"
+        } else {
+            &choices.timezone
+        };
+        let kb = if choices.keyboard.is_empty() {
+            "us"
+        } else {
+            &choices.keyboard
+        };
 
         options.push(("time.timeZone".into(), format!("\"{}\"", tz)));
         options.push(("i18n.defaultLocale".into(), "\"en_US.UTF-8\"".into()));
@@ -517,7 +599,8 @@ impl SovereignConfigGenerator {
 
     fn check_conflicts(&self, options: &[(String, String)]) -> Vec<String> {
         let mut warnings = Vec::new();
-        let option_set: HashMap<&str, &str> = options.iter()
+        let option_set: HashMap<&str, &str> = options
+            .iter()
             .map(|(k, v)| (k.as_str(), v.as_str()))
             .collect();
 
@@ -550,8 +633,12 @@ impl SovereignConfigGenerator {
 
     fn reason_about_packages(&self, migration: &MigrationData) -> Vec<String> {
         let mut packages = vec![
-            "vim".into(), "git".into(), "curl".into(), "wget".into(),
-            "htop".into(), "btrfs-progs".into(),
+            "vim".into(),
+            "git".into(),
+            "curl".into(),
+            "wget".into(),
+            "htop".into(),
+            "btrfs-progs".into(),
         ];
 
         // Add packages based on detected development environment
@@ -596,11 +683,7 @@ impl SovereignConfigGenerator {
         packages
     }
 
-    fn render_sovereign_config(
-        &self,
-        options: &[(String, String)],
-        packages: &[String],
-    ) -> String {
+    fn render_sovereign_config(&self, options: &[(String, String)], packages: &[String]) -> String {
         let mut lines = Vec::new();
         lines.push("# Generated by Symthaea — Sovereign Inoculation".to_string());
         lines.push("# Each option was chosen by reasoning about your hardware,".to_string());
@@ -619,19 +702,25 @@ impl SovereignConfigGenerator {
 
         for (path, value) in options {
             let line = format!("  {} = {};", path, value);
-            if path.starts_with("services.xserver") || path.starts_with("services.displayManager")
-                || path.starts_with("services.desktopManager") || path.starts_with("programs.hyprland")
-                || path.starts_with("programs.sway") || path.starts_with("hardware.nvidia")
+            if path.starts_with("services.xserver")
+                || path.starts_with("services.displayManager")
+                || path.starts_with("services.desktopManager")
+                || path.starts_with("programs.hyprland")
+                || path.starts_with("programs.sway")
+                || path.starts_with("hardware.nvidia")
                 || path.starts_with("hardware.graphics")
             {
                 display.push(line);
-            } else if path.starts_with("services.pipewire") || path.starts_with("services.pulseaudio")
+            } else if path.starts_with("services.pipewire")
+                || path.starts_with("services.pulseaudio")
                 || path.starts_with("security.rtkit")
             {
                 audio.push(line);
             } else if path.starts_with("networking") {
                 network.push(line);
-            } else if path.starts_with("time.") || path.starts_with("i18n.") || path.starts_with("console.")
+            } else if path.starts_with("time.")
+                || path.starts_with("i18n.")
+                || path.starts_with("console.")
                 || path.contains("xkb")
             {
                 locale.push(line);
@@ -711,18 +800,32 @@ impl SovereignConfigGenerator {
         // What we brought
         let mut brought = Vec::new();
         if !migration.git_user.is_empty() {
-            let workflow = if migration.git_prefers_rebase { "rebase" } else { "merge" };
-            brought.push(format!("your git identity ({}, {} workflow)", migration.git_user, workflow));
+            let workflow = if migration.git_prefers_rebase {
+                "rebase"
+            } else {
+                "merge"
+            };
+            brought.push(format!(
+                "your git identity ({}, {} workflow)",
+                migration.git_user, workflow
+            ));
         }
         if migration.ssh_key_count > 0 {
-            brought.push(format!("your {} SSH key{}", migration.ssh_key_count,
-                if migration.ssh_key_count > 1 { "s" } else { "" }));
+            brought.push(format!(
+                "your {} SSH key{}",
+                migration.ssh_key_count,
+                if migration.ssh_key_count > 1 { "s" } else { "" }
+            ));
         }
         if !migration.editors.is_empty() {
-            brought.push(format!("your editor setup ({})", migration.editors.join(", ")));
+            brought.push(format!(
+                "your editor setup ({})",
+                migration.editors.join(", ")
+            ));
         }
         if migration.has_daw {
-            brought.push("your audio production setup (PipeWire configured for low-latency)".into());
+            brought
+                .push("your audio production setup (PipeWire configured for low-latency)".into());
         }
 
         if !brought.is_empty() {
@@ -734,23 +837,35 @@ impl SovereignConfigGenerator {
         lines.push("Here's what I configured and why:".into());
         for decision in decisions {
             if !decision.reasoning.is_empty() && decision.confidence > 0.5 {
-                lines.push(format!("  {} — {}", decision.option_path, decision.reasoning));
+                lines.push(format!(
+                    "  {} — {}",
+                    decision.option_path, decision.reasoning
+                ));
             }
         }
         lines.push(String::new());
 
         // Dev environment
         if migration.rust_projects > 0 {
-            lines.push("I see you write Rust. I added rustc, cargo, and rust-analyzer. \
-                        Try `nix develop` for per-project toolchains — no rustup needed.".into());
+            lines.push(
+                "I see you write Rust. I added rustc, cargo, and rust-analyzer. \
+                        Try `nix develop` for per-project toolchains — no rustup needed."
+                    .into(),
+            );
         } else if migration.docker_images > 0 {
-            lines.push("I noticed your Docker setup. NixOS can run containers, but try `nix develop` \
-                        for reproducible dev environments without the overhead.".into());
+            lines.push(
+                "I noticed your Docker setup. NixOS can run containers, but try `nix develop` \
+                        for reproducible dev environments without the overhead."
+                    .into(),
+            );
         }
 
         lines.push(String::new());
         lines.push("Your first command: `sudo nixos-rebuild switch`".into());
-        lines.push("Your safety net: boot the previous generation from the boot menu if anything breaks.".into());
+        lines.push(
+            "Your safety net: boot the previous generation from the boot menu if anything breaks."
+                .into(),
+        );
 
         lines.join("\n")
     }
@@ -817,7 +932,11 @@ mod tests {
         // Decisions should have reasoning
         assert!(!config.decisions.is_empty());
         for d in &config.decisions {
-            assert!(!d.reasoning.is_empty(), "Decision '{}' has no reasoning", d.option_path);
+            assert!(
+                !d.reasoning.is_empty(),
+                "Decision '{}' has no reasoning",
+                d.option_path
+            );
         }
     }
 
@@ -825,7 +944,9 @@ mod tests {
     fn test_generate_server_no_desktop() {
         let mut gen = SovereignConfigGenerator::new();
         let config = gen.generate(
-            &HardwareProfile { ..Default::default() },
+            &HardwareProfile {
+                ..Default::default()
+            },
             &UserChoices {
                 hostname: "server".into(),
                 desktop: "none".into(),
@@ -869,7 +990,10 @@ mod tests {
         // Should have JACK bridge for DAW
         assert!(config.sovereign_config_nix.contains("jack.enable"));
         // Welcome should mention audio production
-        assert!(config.welcome_message.contains("audio production") || config.welcome_message.contains("low-latency"));
+        assert!(
+            config.welcome_message.contains("audio production")
+                || config.welcome_message.contains("low-latency")
+        );
     }
 
     #[test]
@@ -877,7 +1001,10 @@ mod tests {
         let mut gen = SovereignConfigGenerator::new();
         let config = gen.generate(
             &HardwareProfile::default(),
-            &UserChoices { desktop: "gnome".into(), ..Default::default() },
+            &UserChoices {
+                desktop: "gnome".into(),
+                ..Default::default()
+            },
             &MigrationData {
                 git_user: "Alice".into(),
                 git_prefers_rebase: true,
@@ -914,7 +1041,10 @@ mod tests {
         let open_braces = nix.chars().filter(|&c| c == '{').count();
         let close_braces = nix.chars().filter(|&c| c == '}').count();
         if open_braces != close_braces {
-            return Err(format!("Unbalanced braces: {} open, {} close", open_braces, close_braces));
+            return Err(format!(
+                "Unbalanced braces: {} open, {} close",
+                open_braces, close_braces
+            ));
         }
 
         // Must have NixOS module header
@@ -933,12 +1063,19 @@ mod tests {
         for desktop in &desktops {
             let config = gen.generate(
                 &HardwareProfile::default(),
-                &UserChoices { desktop: desktop.to_string(), ..Default::default() },
+                &UserChoices {
+                    desktop: desktop.to_string(),
+                    ..Default::default()
+                },
                 &MigrationData::default(),
             );
 
-            validate_nix_syntax(&config.sovereign_config_nix)
-                .unwrap_or_else(|e| panic!("Invalid Nix for desktop '{}': {}\n\nGenerated:\n{}", desktop, e, config.sovereign_config_nix));
+            validate_nix_syntax(&config.sovereign_config_nix).unwrap_or_else(|e| {
+                panic!(
+                    "Invalid Nix for desktop '{}': {}\n\nGenerated:\n{}",
+                    desktop, e, config.sovereign_config_nix
+                )
+            });
         }
     }
 
@@ -974,7 +1111,12 @@ mod tests {
 
             // Every decision should have reasoning
             for d in &config.decisions {
-                assert!(!d.reasoning.is_empty(), "GPU '{}' decision '{}' has no reasoning", driver, d.option_path);
+                assert!(
+                    !d.reasoning.is_empty(),
+                    "GPU '{}' decision '{}' has no reasoning",
+                    driver,
+                    d.option_path
+                );
             }
         }
     }
@@ -987,9 +1129,23 @@ mod tests {
     fn test_persona_maya_student() {
         let mut gen = SovereignConfigGenerator::new();
         let config = gen.generate(
-            &HardwareProfile { gpu_vendor: "intel".into(), efi_available: true, total_disk_gb: 256, ..Default::default() },
-            &UserChoices { hostname: "maya-nixos".into(), desktop: "gnome".into(), timezone: "America/New_York".into(), ..Default::default() },
-            &MigrationData { git_user: "Maya Chen".into(), editors: vec!["vscode".into()], ..Default::default() },
+            &HardwareProfile {
+                gpu_vendor: "intel".into(),
+                efi_available: true,
+                total_disk_gb: 256,
+                ..Default::default()
+            },
+            &UserChoices {
+                hostname: "maya-nixos".into(),
+                desktop: "gnome".into(),
+                timezone: "America/New_York".into(),
+                ..Default::default()
+            },
+            &MigrationData {
+                git_user: "Maya Chen".into(),
+                editors: vec!["vscode".into()],
+                ..Default::default()
+            },
         );
         validate_nix_syntax(&config.sovereign_config_nix).unwrap();
         assert!(config.sovereign_config_nix.contains("gnome.enable"));
@@ -1002,11 +1158,27 @@ mod tests {
     fn test_persona_kai_developer() {
         let mut gen = SovereignConfigGenerator::new();
         let config = gen.generate(
-            &HardwareProfile { gpu_vendor: "intel".into(), has_tpm: true, total_disk_gb: 1000, ..Default::default() },
-            &UserChoices { desktop: "hyprland".into(), encryption: true, secure_boot: true, timezone: "Asia/Tokyo".into(), ..Default::default() },
+            &HardwareProfile {
+                gpu_vendor: "intel".into(),
+                has_tpm: true,
+                total_disk_gb: 1000,
+                ..Default::default()
+            },
+            &UserChoices {
+                desktop: "hyprland".into(),
+                encryption: true,
+                secure_boot: true,
+                timezone: "Asia/Tokyo".into(),
+                ..Default::default()
+            },
             &MigrationData {
-                git_user: "Kai Tanaka".into(), git_prefers_rebase: true, ssh_key_count: 3,
-                editors: vec!["neovim".into()], docker_images: 12, rust_projects: 5, ..Default::default()
+                git_user: "Kai Tanaka".into(),
+                git_prefers_rebase: true,
+                ssh_key_count: 3,
+                editors: vec!["neovim".into()],
+                docker_images: 12,
+                rust_projects: 5,
+                ..Default::default()
             },
         );
         validate_nix_syntax(&config.sovereign_config_nix).unwrap();
@@ -1023,8 +1195,19 @@ mod tests {
     fn test_persona_jordan_gamer() {
         let mut gen = SovereignConfigGenerator::new();
         let config = gen.generate(
-            &HardwareProfile { gpu_vendor: "nvidia".into(), gpu_model: "NVIDIA RTX 4070".into(), gpu_hybrid: false, total_disk_gb: 2000, ..Default::default() },
-            &UserChoices { desktop: "plasma".into(), gpu_driver: "nvidia".into(), timezone: "America/Los_Angeles".into(), ..Default::default() },
+            &HardwareProfile {
+                gpu_vendor: "nvidia".into(),
+                gpu_model: "NVIDIA RTX 4070".into(),
+                gpu_hybrid: false,
+                total_disk_gb: 2000,
+                ..Default::default()
+            },
+            &UserChoices {
+                desktop: "plasma".into(),
+                gpu_driver: "nvidia".into(),
+                timezone: "America/Los_Angeles".into(),
+                ..Default::default()
+            },
             &MigrationData::default(),
         );
         validate_nix_syntax(&config.sovereign_config_nix).unwrap();
@@ -1038,9 +1221,24 @@ mod tests {
     fn test_persona_river_musician() {
         let mut gen = SovereignConfigGenerator::new();
         let config = gen.generate(
-            &HardwareProfile { gpu_vendor: "amd".into(), gpu_model: "AMD RX 6600".into(), ..Default::default() },
-            &UserChoices { desktop: "gnome".into(), gpu_driver: "amdgpu".into(), timezone: "Europe/London".into(), keyboard: "gb".into(), ..Default::default() },
-            &MigrationData { has_daw: true, editors: vec!["vim".into()], ssh_key_count: 1, ..Default::default() },
+            &HardwareProfile {
+                gpu_vendor: "amd".into(),
+                gpu_model: "AMD RX 6600".into(),
+                ..Default::default()
+            },
+            &UserChoices {
+                desktop: "gnome".into(),
+                gpu_driver: "amdgpu".into(),
+                timezone: "Europe/London".into(),
+                keyboard: "gb".into(),
+                ..Default::default()
+            },
+            &MigrationData {
+                has_daw: true,
+                editors: vec!["vim".into()],
+                ssh_key_count: 1,
+                ..Default::default()
+            },
         );
         validate_nix_syntax(&config.sovereign_config_nix).unwrap();
         assert!(config.sovereign_config_nix.contains("jack.enable"));
@@ -1053,42 +1251,91 @@ mod tests {
     fn test_persona_sam_sysadmin() {
         let mut gen = SovereignConfigGenerator::new();
         let config = gen.generate(
-            &HardwareProfile { disk_count: 2, total_disk_gb: 4000, ..Default::default() },
-            &UserChoices { hostname: "prod-web-03".into(), desktop: "none".into(), gpu_driver: "none".into(), ..Default::default() },
-            &MigrationData { docker_images: 15, ssh_key_count: 8, editors: vec!["vim".into()], ..Default::default() },
+            &HardwareProfile {
+                disk_count: 2,
+                total_disk_gb: 4000,
+                ..Default::default()
+            },
+            &UserChoices {
+                hostname: "prod-web-03".into(),
+                desktop: "none".into(),
+                gpu_driver: "none".into(),
+                ..Default::default()
+            },
+            &MigrationData {
+                docker_images: 15,
+                ssh_key_count: 8,
+                editors: vec!["vim".into()],
+                ..Default::default()
+            },
         );
         validate_nix_syntax(&config.sovereign_config_nix).unwrap();
         assert!(!config.sovereign_config_nix.contains("gnome"));
         assert!(!config.sovereign_config_nix.contains("pipewire.enable"));
         assert!(config.sovereign_config_nix.contains("docker"));
         // Firewall must always be enabled
-        assert!(config.sovereign_config_nix.contains("firewall.enable = true"));
+        assert!(config
+            .sovereign_config_nix
+            .contains("firewall.enable = true"));
     }
 
     #[test]
     fn test_persona_alex_privacy() {
         let mut gen = SovereignConfigGenerator::new();
         let config = gen.generate(
-            &HardwareProfile { gpu_vendor: "intel".into(), has_tpm: true, efi_available: true, ..Default::default() },
-            &UserChoices { desktop: "sway".into(), encryption: true, secure_boot: true, timezone: "Europe/Berlin".into(), keyboard: "de".into(), ..Default::default() },
-            &MigrationData { ssh_key_count: 2, editors: vec!["vim".into()], ..Default::default() },
+            &HardwareProfile {
+                gpu_vendor: "intel".into(),
+                has_tpm: true,
+                efi_available: true,
+                ..Default::default()
+            },
+            &UserChoices {
+                desktop: "sway".into(),
+                encryption: true,
+                secure_boot: true,
+                timezone: "Europe/Berlin".into(),
+                keyboard: "de".into(),
+                ..Default::default()
+            },
+            &MigrationData {
+                ssh_key_count: 2,
+                editors: vec!["vim".into()],
+                ..Default::default()
+            },
         );
         validate_nix_syntax(&config.sovereign_config_nix).unwrap();
         assert!(config.sovereign_config_nix.contains("sway.enable"));
         assert!(config.sovereign_config_nix.contains("\"de\""));
         assert!(config.sovereign_config_nix.contains("Europe/Berlin"));
-        assert!(config.sovereign_config_nix.contains("firewall.enable = true"));
+        assert!(config
+            .sovereign_config_nix
+            .contains("firewall.enable = true"));
     }
 
     #[test]
     fn test_persona_avery_data_scientist() {
         let mut gen = SovereignConfigGenerator::new();
         let config = gen.generate(
-            &HardwareProfile { gpu_vendor: "nvidia".into(), gpu_model: "NVIDIA RTX 3060 Laptop".into(), gpu_hybrid: true, ..Default::default() },
-            &UserChoices { desktop: "gnome".into(), gpu_driver: "nvidia".into(), encryption: true, timezone: "Europe/Amsterdam".into(), ..Default::default() },
+            &HardwareProfile {
+                gpu_vendor: "nvidia".into(),
+                gpu_model: "NVIDIA RTX 3060 Laptop".into(),
+                gpu_hybrid: true,
+                ..Default::default()
+            },
+            &UserChoices {
+                desktop: "gnome".into(),
+                gpu_driver: "nvidia".into(),
+                encryption: true,
+                timezone: "Europe/Amsterdam".into(),
+                ..Default::default()
+            },
             &MigrationData {
-                git_user: "Avery Nguyen".into(), editors: vec!["vscode".into()],
-                docker_images: 5, python_venvs: 8, ssh_key_count: 2, ..Default::default()
+                git_user: "Avery Nguyen".into(),
+                editors: vec!["vscode".into()],
+                docker_images: 5,
+                python_venvs: 8,
+                ssh_key_count: 2,
+                ..Default::default()
             },
         );
         validate_nix_syntax(&config.sovereign_config_nix).unwrap();
@@ -1098,7 +1345,10 @@ mod tests {
         assert!(config.sovereign_config_nix.contains("vscode"));
         assert!(config.welcome_message.contains("Avery"));
         // Should warn about hybrid graphics
-        assert!(!config.warnings.is_empty(), "Should warn about hybrid graphics");
+        assert!(
+            !config.warnings.is_empty(),
+            "Should warn about hybrid graphics"
+        );
     }
 
     // ═══════════════════════════════════════════════════════
@@ -1115,7 +1365,9 @@ mod tests {
         );
         validate_nix_syntax(&config.sovereign_config_nix).unwrap();
         // Should still produce valid config with sensible defaults
-        assert!(config.sovereign_config_nix.contains("firewall.enable = true"));
+        assert!(config
+            .sovereign_config_nix
+            .contains("firewall.enable = true"));
         assert!(config.sovereign_config_nix.contains("flakes"));
         assert!(!config.decisions.is_empty());
     }
@@ -1128,12 +1380,19 @@ mod tests {
         for desktop in &desktops {
             let config = gen.generate(
                 &HardwareProfile::default(),
-                &UserChoices { desktop: desktop.to_string(), ..Default::default() },
+                &UserChoices {
+                    desktop: desktop.to_string(),
+                    ..Default::default()
+                },
                 &MigrationData::default(),
             );
             // Every config should have at least 3 decisions (desktop, GPU, audio/firewall)
-            assert!(config.decisions.len() >= 3,
-                "Desktop '{}' has only {} decisions", desktop, config.decisions.len());
+            assert!(
+                config.decisions.len() >= 3,
+                "Desktop '{}' has only {} decisions",
+                desktop,
+                config.decisions.len()
+            );
         }
     }
 
@@ -1141,26 +1400,54 @@ mod tests {
     fn test_nvidia_hybrid_warning() {
         let mut gen = SovereignConfigGenerator::new();
         let config = gen.generate(
-            &HardwareProfile { gpu_vendor: "nvidia".into(), gpu_hybrid: true, ..Default::default() },
-            &UserChoices { desktop: "gnome".into(), gpu_driver: "nvidia".into(), ..Default::default() },
+            &HardwareProfile {
+                gpu_vendor: "nvidia".into(),
+                gpu_hybrid: true,
+                ..Default::default()
+            },
+            &UserChoices {
+                desktop: "gnome".into(),
+                gpu_driver: "nvidia".into(),
+                ..Default::default()
+            },
             &MigrationData::default(),
         );
         // Should produce a warning about hybrid graphics
-        assert!(config.warnings.iter().any(|w| w.to_lowercase().contains("hybrid")),
-            "Missing hybrid graphics warning. Warnings: {:?}", config.warnings);
+        assert!(
+            config
+                .warnings
+                .iter()
+                .any(|w| w.to_lowercase().contains("hybrid")),
+            "Missing hybrid graphics warning. Warnings: {:?}",
+            config.warnings
+        );
     }
 
     #[test]
     fn test_nvidia_wayland_tiling_warning() {
         let mut gen = SovereignConfigGenerator::new();
         let config = gen.generate(
-            &HardwareProfile { gpu_vendor: "nvidia".into(), ..Default::default() },
-            &UserChoices { desktop: "hyprland".into(), gpu_driver: "nvidia".into(), ..Default::default() },
+            &HardwareProfile {
+                gpu_vendor: "nvidia".into(),
+                ..Default::default()
+            },
+            &UserChoices {
+                desktop: "hyprland".into(),
+                gpu_driver: "nvidia".into(),
+                ..Default::default()
+            },
             &MigrationData::default(),
         );
         // Should warn about NVIDIA + tiling Wayland
-        assert!(config.warnings.iter().any(|w| w.to_lowercase().contains("tearing") || w.to_lowercase().contains("wayland")),
-            "Missing NVIDIA+tiling warning. Warnings: {:?}", config.warnings);
+        assert!(
+            config
+                .warnings
+                .iter()
+                .any(|w| w.to_lowercase().contains("tearing")
+                    || w.to_lowercase().contains("wayland")),
+            "Missing NVIDIA+tiling warning. Warnings: {:?}",
+            config.warnings
+        );
     }
 
     #[test]
@@ -1168,7 +1455,10 @@ mod tests {
         let mut gen = SovereignConfigGenerator::new();
         let config = gen.generate(
             &HardwareProfile::default(),
-            &UserChoices { desktop: "gnome".into(), ..Default::default() },
+            &UserChoices {
+                desktop: "gnome".into(),
+                ..Default::default()
+            },
             &MigrationData {
                 rust_projects: 2,
                 node_projects: 3,
@@ -1193,7 +1483,10 @@ mod tests {
         let mut gen = SovereignConfigGenerator::new();
         let config = gen.generate(
             &HardwareProfile::default(),
-            &UserChoices { desktop: "gnome".into(), ..Default::default() },
+            &UserChoices {
+                desktop: "gnome".into(),
+                ..Default::default()
+            },
             &MigrationData {
                 editors: vec!["vim".into(), "vim".into()], // duplicate
                 ..Default::default()
@@ -1201,20 +1494,36 @@ mod tests {
         );
         // vim should appear once (it's in default packages already)
         let vim_count = config.sovereign_config_nix.matches("    vim").count();
-        assert!(vim_count <= 1, "vim appears {} times (should be ≤1)", vim_count);
+        assert!(
+            vim_count <= 1,
+            "vim appears {} times (should be ≤1)",
+            vim_count
+        );
     }
 
     #[test]
     fn test_config_has_comments() {
         let mut gen = SovereignConfigGenerator::new();
         let config = gen.generate(
-            &HardwareProfile { gpu_vendor: "nvidia".into(), ..Default::default() },
-            &UserChoices { desktop: "gnome".into(), gpu_driver: "nvidia".into(), ..Default::default() },
+            &HardwareProfile {
+                gpu_vendor: "nvidia".into(),
+                ..Default::default()
+            },
+            &UserChoices {
+                desktop: "gnome".into(),
+                gpu_driver: "nvidia".into(),
+                ..Default::default()
+            },
             &MigrationData::default(),
         );
         // Config should have section comments
-        assert!(config.sovereign_config_nix.contains("# Generated by Symthaea"));
-        assert!(config.sovereign_config_nix.contains("# Display & GPU") || config.sovereign_config_nix.contains("# Audio"));
+        assert!(config
+            .sovereign_config_nix
+            .contains("# Generated by Symthaea"));
+        assert!(
+            config.sovereign_config_nix.contains("# Display & GPU")
+                || config.sovereign_config_nix.contains("# Audio")
+        );
         assert!(config.sovereign_config_nix.contains("# Packages"));
     }
 
@@ -1222,14 +1531,28 @@ mod tests {
     fn test_xfce_for_small_disk() {
         let mut gen = SovereignConfigGenerator::new();
         let config = gen.generate(
-            &HardwareProfile { total_disk_gb: 32, ..Default::default() },
-            &UserChoices { desktop: "xfce".into(), ..Default::default() },
+            &HardwareProfile {
+                total_disk_gb: 32,
+                ..Default::default()
+            },
+            &UserChoices {
+                desktop: "xfce".into(),
+                ..Default::default()
+            },
             &MigrationData::default(),
         );
         // Reasoning should mention lightweight/smaller disk
-        let de_decision = config.decisions.iter().find(|d| d.option_path.contains("desktop")).unwrap();
-        assert!(de_decision.reasoning.to_lowercase().contains("small") || de_decision.reasoning.to_lowercase().contains("light"),
-            "XFCE on small disk should mention lightweight. Got: {}", de_decision.reasoning);
+        let de_decision = config
+            .decisions
+            .iter()
+            .find(|d| d.option_path.contains("desktop"))
+            .unwrap();
+        assert!(
+            de_decision.reasoning.to_lowercase().contains("small")
+                || de_decision.reasoning.to_lowercase().contains("light"),
+            "XFCE on small disk should mention lightweight. Got: {}",
+            de_decision.reasoning
+        );
     }
 
     #[test]
@@ -1237,7 +1560,10 @@ mod tests {
         let mut gen = SovereignConfigGenerator::new();
         let config = gen.generate(
             &HardwareProfile::default(),
-            &UserChoices { desktop: "gnome".into(), ..Default::default() },
+            &UserChoices {
+                desktop: "gnome".into(),
+                ..Default::default()
+            },
             &MigrationData::default(),
         );
         assert!(config.welcome_message.contains("Welcome home"));
@@ -1249,25 +1575,50 @@ mod tests {
         let mut gen = SovereignConfigGenerator::new();
         let config = gen.generate(
             &HardwareProfile::default(),
-            &UserChoices { desktop: "gnome".into(), ..Default::default() },
-            &MigrationData { docker_images: 10, ..Default::default() },
+            &UserChoices {
+                desktop: "gnome".into(),
+                ..Default::default()
+            },
+            &MigrationData {
+                docker_images: 10,
+                ..Default::default()
+            },
         );
-        assert!(config.welcome_message.contains("Docker") || config.welcome_message.contains("docker") || config.welcome_message.contains("nix develop"));
+        assert!(
+            config.welcome_message.contains("Docker")
+                || config.welcome_message.contains("docker")
+                || config.welcome_message.contains("nix develop")
+        );
     }
 
     #[test]
     fn test_confidence_levels() {
         let mut gen = SovereignConfigGenerator::new();
         let config = gen.generate(
-            &HardwareProfile { gpu_vendor: "nvidia".into(), ..Default::default() },
-            &UserChoices { desktop: "gnome".into(), gpu_driver: "nvidia".into(), ..Default::default() },
+            &HardwareProfile {
+                gpu_vendor: "nvidia".into(),
+                ..Default::default()
+            },
+            &UserChoices {
+                desktop: "gnome".into(),
+                gpu_driver: "nvidia".into(),
+                ..Default::default()
+            },
             &MigrationData::default(),
         );
         for d in &config.decisions {
-            assert!(d.confidence >= 0.0 && d.confidence <= 1.0,
-                "Confidence out of range for '{}': {}", d.option_path, d.confidence);
-            assert!(d.confidence >= 0.5,
-                "Low confidence ({}) for '{}' — should be confident in its choices", d.confidence, d.option_path);
+            assert!(
+                d.confidence >= 0.0 && d.confidence <= 1.0,
+                "Confidence out of range for '{}': {}",
+                d.option_path,
+                d.confidence
+            );
+            assert!(
+                d.confidence >= 0.5,
+                "Low confidence ({}) for '{}' — should be confident in its choices",
+                d.confidence,
+                d.option_path
+            );
         }
     }
 }

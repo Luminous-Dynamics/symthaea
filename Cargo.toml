@@ -37,6 +37,11 @@ members = [
     "crates/symthaea-vocal-tract",
     "crates/symthaea-voice",
     "crates/symthaea-vehicle",
+    # New platforms (uncomment after creating crates):
+    "crates/symthaea-exoskeleton",
+    "crates/symthaea-surgical",
+    "crates/symthaea-orbital",
+    "crates/symthaea-quadruped",
     "crates/symthaea-browser",
     "crates/symthaea-hal",
     "crates/symthaea-ssm",
@@ -57,6 +62,10 @@ members = [
     "crates/symthaea-bandgap",
     "crates/symthaea-gravcraft",
     "crates/symthaea-nuclear",
+    "crates/symthaea-quantum-chemistry",
+    "crates/symthaea-particle-physics",
+    "crates/symthaea-continuum-physics",
+    "crates/symthaea-frontier-physics",
     "crates/symthaea-proteins",
     "crates/symthaea-bandgap",
     "crates/symthaea-physics-catalog",
@@ -178,6 +187,8 @@ symthaea-causal-reasoning = { path = "crates/symthaea-causal-reasoning", default
 # Symthaea FEP - Free Energy Principle active inference (always enabled)
 symthaea-fep = { path = "crates/symthaea-fep" }
 
+# Shared positioning and peer-fusion primitives
+
 # Symthaea Dream - Counterfactual Dream Engine (always enabled)
 symthaea-dream = { path = "crates/symthaea-dream" }
 
@@ -249,6 +260,11 @@ symthaea-auv = { path = "crates/symthaea-auv", optional = true }
 
 # Symthaea Manipulator - HDC-LTC consciousness-coupled industrial arm control
 symthaea-manipulator = { path = "crates/symthaea-manipulator", optional = true }
+# New platforms (uncomment after creating crates with scripts/new-platform.sh):
+symthaea-exoskeleton = { path = "crates/symthaea-exoskeleton", optional = true }
+symthaea-surgical = { path = "crates/symthaea-surgical", optional = true }
+symthaea-orbital = { path = "crates/symthaea-orbital", optional = true }
+symthaea-quadruped = { path = "crates/symthaea-quadruped", optional = true }
 
 # Symthaea HAL - Hardware abstraction layer (PCA9685 servo, I2C sensors, safety)
 symthaea-hal = { path = "crates/symthaea-hal", optional = true }
@@ -301,6 +317,7 @@ symthaea-jepa = { path = "crates/symthaea-jepa", optional = true }
 symthaea-materials = { path = "crates/symthaea-materials", optional = true }
 symthaea-nuclear = { path = "crates/symthaea-nuclear", optional = true }
 symthaea-nuclear-forensics = { path = "crates/symthaea-nuclear-forensics", optional = true }
+symthaea-quantum-chemistry = { path = "crates/symthaea-quantum-chemistry", optional = true }
 symthaea-fabrication-kernel = { path = "crates/symthaea-fabrication-kernel", optional = true }
 
 # Symthaea Vision Manifold - Patch-based HDC video encoding with CfC temporal dynamics
@@ -344,7 +361,7 @@ candle-transformers = { version = "0.8", optional = true }
 # REMOVED: libp2p (declared but never used - 0 integration lines)
 # Architecture: Cortex (Holochain) for trust + Synapse (Iroh) for real-time
 # Iroh 0.95+ has unified the crates - iroh-net is deprecated
-iroh = { version = "0.96", optional = true }
+iroh = { version = "0.97", optional = true }
 
 # LanceDB: Columnar vector storage backend (optional)
 # Implementation: src/databases/lance_client.rs
@@ -365,7 +382,7 @@ sha3 = { version = "0.10", optional = true }  # For gradient hashing
 # Prism epistemic search (local, offline, 16,384-bit BinaryHV)
 
 # Web Research & Epistemic Verification (Track 6)
-reqwest = { version = "0.13", features = ["json", "rustls"], default-features = false }
+reqwest = { version = "0.13", features = ["json", "multipart", "rustls"], default-features = false }
 scraper = "0.25"
 # html2text removed: scraper is used for HTML parsing, html2text never imported
 
@@ -415,7 +432,7 @@ ed25519-dalek = { version = "2.1", features = ["serde", "rand_core"], optional =
 sha2 = { version = "0.10", optional = true }   # MFDI credential hashing
 chrono = { workspace = true }
 regex = { workspace = true }
-wasmtime = { version = "25.0", optional = true }
+wasmtime = { version = "29.0", optional = true }
 
 # bumpalo removed from main crate: only used in symthaea-core
 
@@ -430,10 +447,11 @@ tree-sitter = { workspace = true }
 syn = { version = "2.0", features = ["full", "visit"] }  # Rust syntax parsing (self-analysis)
 ignore = "0.4"       # .gitignore-aware file walking
 urlencoding = "2.1"
+shlex = "1.3"
 
 # Week 12 Phase 2a: Voice Output (Larynx) - Kokoro TTS (optional)
 # Also used for Qwen3-Embedding and SigLIP vision models
-ort = { version = "2.0.0-rc.10", features = ["half", "load-dynamic", "ndarray"], optional = true }  # ONNX Runtime
+ort = { version = "=2.0.0-rc.10", features = ["half", "load-dynamic", "ndarray"], optional = true }  # ONNX Runtime (pinned RC; upgrade to 2.0.0 stable when released)
 # futures removed: voice-tts-async feature never implemented in source
 rodio = { version = "0.19", default-features = false, optional = true }  # Audio playback (no backends by default)
 cpal = { version = "0.17", optional = true }      # Low-level audio I/O (live-voice)
@@ -491,7 +509,7 @@ turbo-quant = []  # PolarQuant HDC vector compression (hv_compression.rs, memory
 
 # ── Binary build gates ──────────────────────────────────────────────
 # These enable optional dependencies for specific binaries.
-service = ["clap"]                          # symthaea-service binary
+service = ["clap"]                          # symthaea service daemon binary
 shell = ["crossterm", "ratatui"]            # symthaea-shell TUI binary
 gui = ["eframe", "egui"]                    # symthaea-gui binary
 demo = ["clap", "ctrlc"]                    # Demo binaries (CLI args + signal handling)
@@ -587,6 +605,11 @@ vehicle = ["dep:symthaea-vehicle"]         # HDC-LTC autonomous vehicle control 
 browser-agent = ["dep:symthaea-browser"]  # Consciousness-driven browser agent via CDP + HDC encoding
 auv = ["dep:symthaea-auv"]                 # HDC-LTC autonomous underwater vehicle control
 manipulator = ["dep:symthaea-manipulator"] # HDC-LTC consciousness-coupled industrial arm control
+# New platforms (uncomment after creating crates):
+exoskeleton = ["dep:symthaea-exoskeleton"]
+surgical = ["dep:symthaea-surgical"]
+orbital = ["dep:symthaea-orbital"]
+quadruped = ["dep:symthaea-quadruped"]
 hal = ["dep:symthaea-hal", "humanoid"]    # Hardware abstraction layer (PCA9685 servos, I2C sensors, safety interlocks)
 ssm-power = ["dep:symthaea-ssm", "mesh", "school_learning"]  # Diagonal SSM sensor integration (power stream)
 ssm-power-hal = ["ssm-power", "hal", "symthaea-hal/linux", "dep:linux-embedded-hal"]
@@ -634,7 +657,7 @@ reasoning_engine = ["magi_loop", "symthaea-causal-reasoning/counterfactual"]
 
 # ── Code Understanding & Generation ─────────────────────────────────
 # Subsumes former code_understanding feature (tree-sitter parsers + code generation).
-code_generation = ["tree-sitter-rust", "tree-sitter-python"]
+code_generation = ["tree-sitter-rust", "tree-sitter-python", "symthaea-core/synthesis-trait"]
 geodesic_synthesis = ["dep:symthaea-geodesic"]  # GCS verification gate for CodingAgent (PDG topology + execution oracle)
 wasm-sandbox = ["dep:wasmtime"]
 
@@ -648,7 +671,7 @@ integration_module = []         # Integration module (cfg-gated in lib.rs)
 observability_module = ["dep:symthaea-observability"]  # Observability (cfg-gated in gwt_integration + lib.rs)
 support = ["dep:symthaea-support"]                     # IT support intelligence (triage, diagnostics, knowledge, privacy, actions, prediction)
 web_research_module = []        # Web research epistemic verification (cfg-gated in lib.rs)
-prism_search = ["dep:plexus-common", "dep:plexus-search"]  # Prism epistemic search (local, offline)
+prism_search = ["dep:prism-common", "dep:prism-search"]  # Prism epistemic search (local, offline)
 unstable-examples = []          # UNTESTED: quarantine gate for examples with stale APIs (never enabled by default, gates test files only)
 
 # ── Genesis Pipeline (DNA-to-Human species stewardship) ───────────
@@ -660,24 +683,27 @@ population = ["dep:symthaea-population"]                # Population genetics, b
 genesis = ["genomics", "cell-foundry", "ectogenesis", "nurture", "population"]  # Full DNA-to-human pipeline
 
 # ── Genesis Mission Challenges (DOE 2026) ─────────────────────────
-fusion-twin = ["physics"]
+# Safety-agents is required for all mission features to ensure safety checks
+# are never silently compiled away (see src/safety/mod.rs cfg gates).
+fusion-twin = ["physics", "safety-agents"]
 safety-agents = []
-materials = ["dep:symthaea-materials"]
-nuclear = ["dep:symthaea-nuclear"]                      # Computational nuclear structure: mass formula, shell model, island of stability
-nuclear-forensics = ["dep:symthaea-nuclear-forensics"]
-water-prediction = ["cell-foundry"]
+materials = ["dep:symthaea-materials", "safety-agents"]
+nuclear = ["dep:symthaea-nuclear", "safety-agents"]     # Computational nuclear structure: mass formula, shell model, island of stability
+nuclear-forensics = ["dep:symthaea-nuclear-forensics", "safety-agents"]
+quantum-consciousness = ["dep:symthaea-quantum-chemistry"]  # Ground consciousness in Schrödinger equation (10 theories × molecular wavefunction)
+water-prediction = ["cell-foundry", "safety-agents"]
 physics-bridge = ["physics", "dep:symthaea-physics-bridge"]  # HDC semantic physics bridge + guided design exploration
 analogy-engine = []   # Cross-domain analogy detection in cognitive loop (AnalogyEngine from symthaea-core)
 ucl-frames = []       # UCL cross-domain semantic frame detection in cognitive loop
-grid-scaling = ["physics"]
-fission-reactor = ["physics"]
-accelerator = ["physics"]
-threat-assessment = ["physics"]
-datacenter = ["physics"]
-experiment-planner = ["cell-foundry"]
+grid-scaling = ["physics", "safety-agents"]
+fission-reactor = ["physics", "safety-agents"]
+accelerator = ["physics", "safety-agents"]
+threat-assessment = ["physics", "safety-agents"]
+datacenter = ["physics", "safety-agents"]
+experiment-planner = ["cell-foundry", "safety-agents"]
 strategic-materials = ["materials"]
 critical-minerals = ["materials"]
-advanced-manufacturing = ["dep:symthaea-fabrication-kernel"]
+advanced-manufacturing = ["dep:symthaea-fabrication-kernel", "safety-agents"]
 proliferation-safeguards = ["nuclear-forensics"]
 
 
@@ -785,6 +811,7 @@ symthaea-humanoid = { path = "crates/symthaea-humanoid" }
 symthaea-mycelix-conductor = { path = "crates/symthaea-mycelix-conductor" }
 symthaea-epistemic-types = { path = "crates/symthaea-epistemic-types" }
 tempfile = "3.8"  # For perception tests
+tower = { version = "0.5", features = ["util"] }  # Router oneshot helpers in integration tests
 
 # Binaries
 # Note: Some binaries require specific features or external crates
@@ -829,6 +856,11 @@ required-features = ["demo"]
 name = "symthaea-demo"
 path = "src/bin/symthaea-demo.rs"
 required-features = ["api_module"]
+
+[[bin]]
+name = "symthaea-watch"
+path = "src/bin/symthaea-watch.rs"
+required-features = ["api_module", "service"]
 
 [[bin]]
 name = "symthaea-multi-embodiment-demo"
@@ -956,6 +988,22 @@ required-features = ["code_generation"]
 
 [[example]]
 name = "benchmark_code_primitives"
+required-features = ["code_generation"]
+
+[[example]]
+name = "train_code_sequencer"
+required-features = ["code_generation"]
+
+[[example]]
+name = "run_code_benchmark"
+required-features = ["code_generation"]
+
+[[example]]
+name = "benchmark_humaneval_verified"
+required-features = ["code_generation"]
+
+[[example]]
+name = "benchmark_exercism"
 required-features = ["code_generation"]
 
 [[example]]
@@ -1513,6 +1561,11 @@ harness = false
 required-features = ["neural-bridge"]
 
 [[bench]]
+name = "vision_manifold"
+harness = false
+required-features = ["vision-manifold"]
+
+[[bench]]
 name = "hdc_benchmarks"
 harness = false
 
@@ -1580,5 +1633,9 @@ inherits = "release"
 # serde_derive =1.0.228. holochain_serialized_bytes pins serde =1.0.219
 # (→ serde_derive =1.0.219). This local crate re-exports serde, bridging
 # the gap until holochain releases a serde_core-compatible version.
+[[example]]
+name = "debug_exercism"
+required-features = ["code_generation"]
+
 [patch.crates-io]
 serde_core = { path = "crates/serde-core-shim" }

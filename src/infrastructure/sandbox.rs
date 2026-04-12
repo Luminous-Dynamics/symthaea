@@ -11,6 +11,7 @@ use std::fs;
 use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
+use std::thread;
 use std::time::{Duration, Instant};
 use wait_timeout::ChildExt;
 
@@ -253,6 +254,17 @@ impl Sandbox {
             .take()
             .ok_or_else(|| SandboxError::ExecutionFailed("Missing stderr pipe".to_string()))?;
 
+        let stdout_handle = thread::spawn(move || {
+            let mut stdout_buf = Vec::new();
+            let _ = stdout.read_to_end(&mut stdout_buf);
+            stdout_buf
+        });
+        let stderr_handle = thread::spawn(move || {
+            let mut stderr_buf = Vec::new();
+            let _ = stderr.read_to_end(&mut stderr_buf);
+            stderr_buf
+        });
+
         let status = match child
             .wait_timeout(self.timeout)
             .map_err(|e| SandboxError::ExecutionFailed(e.to_string()))?
@@ -261,18 +273,18 @@ impl Sandbox {
             None => {
                 let _ = child.kill();
                 let _ = child.wait();
+                let _ = stdout_handle.join();
+                let _ = stderr_handle.join();
                 return Err(SandboxError::Timeout);
             }
         };
 
-        let mut stdout_buf = Vec::new();
-        let mut stderr_buf = Vec::new();
-        stdout
-            .read_to_end(&mut stdout_buf)
-            .map_err(|e| SandboxError::ExecutionFailed(e.to_string()))?;
-        stderr
-            .read_to_end(&mut stderr_buf)
-            .map_err(|e| SandboxError::ExecutionFailed(e.to_string()))?;
+        let stdout_buf = stdout_handle
+            .join()
+            .map_err(|_| SandboxError::ExecutionFailed("stdout reader panicked".to_string()))?;
+        let stderr_buf = stderr_handle
+            .join()
+            .map_err(|_| SandboxError::ExecutionFailed("stderr reader panicked".to_string()))?;
 
         Ok(SandboxResult {
             command: format!("{} {}", command, args.join(" ")),
@@ -759,6 +771,30 @@ mod tests {
         let mut sandbox = Sandbox::new();
         let err = sandbox.run("nix", &["--version"]).unwrap_err();
         assert!(matches!(err, SandboxError::RealExecutionDisabled));
+    }
+
+    #[test]
+    fn test_real_execution_handles_large_stdout() {
+        let root = tempfile::tempdir().unwrap();
+        let script = root.path().join("emit.sh");
+        fs::write(
+            &script,
+            "#!/bin/sh\ncount=0\nwhile [ \"$count\" -lt 5000 ]; do\n  echo line-$count\n  count=$((count + 1))\ndone\n",
+        )
+        .unwrap();
+
+        let mut sandbox = SandboxConfig::new()
+            .root(root.path())
+            .allow("sh")
+            .enable_real_execution()
+            .timeout(Duration::from_secs(5))
+            .build();
+        sandbox.init().unwrap();
+
+        let result = sandbox.run("sh", &[script.to_str().unwrap()]).unwrap();
+        assert!(result.success());
+        assert!(result.stdout.contains("line-0"));
+        assert!(result.stdout.contains("line-4999"));
     }
 
     #[test]

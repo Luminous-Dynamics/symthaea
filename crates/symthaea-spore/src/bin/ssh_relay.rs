@@ -28,8 +28,8 @@ use symthaea_spore::security::{
 };
 
 // TLS support
-use tokio_rustls::TlsAcceptor;
 use rustls::ServerConfig;
+use tokio_rustls::TlsAcceptor;
 
 /// Execute a shell command locally and return stdout/stderr + exit status.
 /// Replaces the previous SSH-to-localhost pattern.
@@ -211,39 +211,39 @@ struct ClientMessage {
     command: String,
     // Install-specific fields
     #[serde(default)]
-    disk: String,           // e.g., "/dev/nvme0n1"
+    disk: String, // e.g., "/dev/nvme0n1"
     #[serde(default)]
-    layout: String,         // "single", "dual", "alongside", "sata", "vps"
+    layout: String, // "single", "dual", "alongside", "sata", "vps"
     #[serde(default)]
-    fast_disk: String,      // For dual-disk: fast drive
+    fast_disk: String, // For dual-disk: fast drive
     #[serde(default)]
-    standard_disk: String,  // For dual-disk: standard drive
+    standard_disk: String, // For dual-disk: standard drive
     #[serde(default)]
     hostname: String,
     #[serde(default)]
-    configuration_nix: String,  // Generated configuration.nix content from browser
+    configuration_nix: String, // Generated configuration.nix content from browser
     #[serde(default)]
-    flake_nix: String,      // Generated flake.nix content
+    flake_nix: String, // Generated flake.nix content
     #[serde(default)]
-    disko_nix: String,      // Generated disko-config.nix content
+    disko_nix: String, // Generated disko-config.nix content
     #[serde(default)]
-    hardware_nix: String,   // Generated hardware-configuration.nix content
+    hardware_nix: String, // Generated hardware-configuration.nix content
     #[serde(default)]
-    secure_boot: bool,      // Enable Secure Boot (lanzaboote + sbctl)
+    secure_boot: bool, // Enable Secure Boot (lanzaboote + sbctl)
     #[serde(default)]
-    tpm2_unlock: bool,      // Enable TPM2 auto-unlock (requires LUKS + systemd initrd)
+    tpm2_unlock: bool, // Enable TPM2 auto-unlock (requires LUKS + systemd initrd)
     #[serde(default)]
-    fido2_unlock: bool,     // Enable FIDO2/YubiKey unlock (requires LUKS + systemd initrd)
+    fido2_unlock: bool, // Enable FIDO2/YubiKey unlock (requires LUKS + systemd initrd)
     #[serde(default)]
-    desktop: String,        // Desktop environment: gnome, plasma, hyprland, sway, xfce, none
+    desktop: String, // Desktop environment: gnome, plasma, hyprland, sway, xfce, none
     #[serde(default)]
-    gpu_driver: String,     // GPU driver: nvidia, nvidia-open, amdgpu, modesetting, none
+    gpu_driver: String, // GPU driver: nvidia, nvidia-open, amdgpu, modesetting, none
     #[serde(default)]
-    timezone: String,       // e.g., "America/Chicago"
+    timezone: String, // e.g., "America/Chicago"
     #[serde(default)]
-    keyboard: String,       // e.g., "us", "de", "dvorak"
+    keyboard: String, // e.g., "us", "de", "dvorak"
     #[serde(default)]
-    user_password: String,  // User account password (set via chpasswd after install)
+    user_password: String, // User account password (set via chpasswd after install)
     /// Additional disks for RAID/ZFS multi-disk layouts (comma-separated or JSON array)
     #[serde(default)]
     extra_disks: Vec<String>,
@@ -276,7 +276,8 @@ fi
 
 /// Pre-install disk snapshot (partition table + UUIDs — always, instant).
 fn disk_snapshot(disk: &str) -> String {
-    format!(r#"
+    format!(
+        r#"
 # ── Pre-Install Disk Snapshot (Tier 1: instant) ──
 echo "STAGE: Saving disk snapshot..."
 SNAPSHOT_DIR="/tmp/symthaea-pre-install-snapshot"
@@ -288,7 +289,9 @@ lsblk -f > "$SNAPSHOT_DIR/lsblk.txt" 2>/dev/null
 fdisk -l {disk} > "$SNAPSHOT_DIR/fdisk.txt" 2>/dev/null
 echo "  Snapshot saved to $SNAPSHOT_DIR"
 echo "  Partition table can be restored with: sfdisk {disk} < partition-table.dump"
-"#, disk = disk)
+"#,
+        disk = disk
+    )
 }
 
 fn secure_boot_postinstall() -> &'static str {
@@ -382,14 +385,22 @@ fn generate_system_config(msg: &ClientMessage) -> String {
     let mut config = String::new();
 
     // Timezone
-    let tz = if msg.timezone.is_empty() { "UTC" } else { &msg.timezone };
+    let tz = if msg.timezone.is_empty() {
+        "UTC"
+    } else {
+        &msg.timezone
+    };
     config.push_str(&format!("  time.timeZone = \"{}\";\n", tz));
 
     // Locale
     config.push_str("  i18n.defaultLocale = \"en_US.UTF-8\";\n");
 
     // Keyboard
-    let kb = if msg.keyboard.is_empty() { "us" } else { &msg.keyboard };
+    let kb = if msg.keyboard.is_empty() {
+        "us"
+    } else {
+        &msg.keyboard
+    };
     config.push_str(&format!("  console.keyMap = \"{}\";\n", kb));
     config.push_str(&format!("  services.xserver.xkb.layout = \"{}\";\n", kb));
 
@@ -468,7 +479,8 @@ fi
 /// Generate shell commands that write the correct bootloader config to configuration.nix.
 /// Called after nixos-generate-config, patches the bootloader section based on detected boot mode.
 fn bootloader_patch_commands(disk_var: &str) -> String {
-    format!(r#"
+    format!(
+        r#"
 # Patch bootloader config based on detected boot mode
 if [ "$BOOT_MODE" = "bios" ]; then
   echo "  Configuring GRUB for BIOS boot..."
@@ -476,13 +488,16 @@ if [ "$BOOT_MODE" = "bios" ]; then
   sed -i '/boot.loader.grub.enable/a\  boot.loader.grub.device = "{disk}";' /mnt/etc/nixos/configuration.nix 2>/dev/null || true
   sed -i '/canTouchEfiVariables/d' /mnt/etc/nixos/configuration.nix 2>/dev/null || true
 fi
-"#, disk = disk_var)
+"#,
+        disk = disk_var
+    )
 }
 
 /// Generate boot partition creation commands based on boot mode.
 /// EFI: 512MB FAT32 ESP. BIOS: 1MB BIOS boot + 512MB ext4 /boot.
 fn boot_partition_commands(disk_var: &str, boot_part_num: u32) -> String {
-    format!(r#"
+    format!(
+        r#"
 if [ "$BOOT_MODE" = "efi" ]; then
   sgdisk -n {n}:0:+512M -t {n}:EF00 -c {n}:boot "{disk}"
 else
@@ -490,13 +505,18 @@ else
   sgdisk -n {n}:0:+1M -t {n}:EF02 -c {n}:bios-boot "{disk}"
   sgdisk -n {next}:0:+512M -t {next}:8300 -c {next}:boot "{disk}"
 fi
-"#, n = boot_part_num, next = boot_part_num + 1, disk = disk_var)
+"#,
+        n = boot_part_num,
+        next = boot_part_num + 1,
+        disk = disk_var
+    )
 }
 
 /// Format and mount the boot partition based on boot mode.
 /// EFI: mkfs.vfat + mount to /boot. BIOS: mkfs.ext4 + mount to /boot.
 fn boot_format_mount(boot_part_var: &str) -> String {
-    format!(r#"
+    format!(
+        r#"
 if [ "$BOOT_MODE" = "efi" ]; then
   mkfs.vfat -F 32 "{boot}"
 else
@@ -506,7 +526,9 @@ else
 fi
 mkdir -p /mnt/boot
 mount "{boot}" /mnt/boot
-"#, boot = boot_part_var)
+"#,
+        boot = boot_part_var
+    )
 }
 
 /// Generate a shell snippet that patches configuration.nix with system config (DE, GPU, locale).
@@ -602,17 +624,25 @@ fn config_write_commands(
 
     if !browser_config.is_empty() {
         // Browser config pre-staged via tokio::fs::write — no heredoc, no injection
-        out.push_str(&format!("cp {}/configuration.nix /mnt/etc/nixos/configuration.nix\n", staging));
+        out.push_str(&format!(
+            "cp {}/configuration.nix /mnt/etc/nixos/configuration.nix\n",
+            staging
+        ));
     } else {
         // Server-generated fallback — safe to use heredoc (not user input)
         out.push_str("cat > /mnt/etc/nixos/configuration.nix << 'NIXCONF'\n");
         out.push_str(fallback_config);
-        if !fallback_config.ends_with('\n') { out.push('\n'); }
+        if !fallback_config.ends_with('\n') {
+            out.push('\n');
+        }
         out.push_str("NIXCONF\n");
     }
 
     if !browser_flake.is_empty() {
-        out.push_str(&format!("cp {}/flake.nix /mnt/etc/nixos/flake.nix\n", staging));
+        out.push_str(&format!(
+            "cp {}/flake.nix /mnt/etc/nixos/flake.nix\n",
+            staging
+        ));
     }
 
     out.push_str(&format!("rm -rf {}\n", staging));
@@ -657,12 +687,17 @@ fn generate_install_script(msg: &ClientMessage, session_id: u64) -> String {
     // SECURITY: All user inputs (disk, hostname, timezone, keyboard, desktop, gpu_driver)
     // MUST be validated by the caller before reaching this function.
     // See validate_disk_path(), validate_hostname_relay(), sanitize_input().
-    let hostname = if msg.hostname.is_empty() { "guardian" } else { &msg.hostname };
+    let hostname = if msg.hostname.is_empty() {
+        "guardian"
+    } else {
+        &msg.hostname
+    };
 
     match msg.layout.as_str() {
         "alongside" => {
             // Alongside Windows/Linux: find free space, reuse existing ESP, install
-            let mut script = format!(r#"set -eo pipefail
+            let mut script = format!(
+                r#"set -eo pipefail
 echo "=== Symthaea Sovereign Birth: Alongside Existing OS ==="
 
 DISK="{disk}"
@@ -840,7 +875,9 @@ fi
 # Step 5: Write NixOS configuration
 echo "STAGE: Generating configuration..."
 nixos-generate-config --root /mnt
-"#, disk = msg.disk);
+"#,
+                disk = msg.disk
+            );
 
             // Append configuration.nix (and optionally flake.nix) via heredoc —
             // avoids passing Nix braces through format!().
@@ -951,7 +988,8 @@ echo "COMPLETE"
         "single" | "" => {
             // Full disk wipe → direct partition → nixos-install
             // Uses sgdisk + mkfs directly (no disko download needed on live ISO)
-            let mut script = format!(r#"set -eo pipefail
+            let mut script = format!(
+                r#"set -eo pipefail
 echo "=== Symthaea Sovereign Birth: Single Disk ==="
 {boot_detect}
 
@@ -1023,7 +1061,10 @@ mount -o subvol=@swap,noatime "$ROOT" /mnt/swap
 echo "STAGE: Generating configuration..."
 mkdir -p /mnt/etc/nixos
 nixos-generate-config --root /mnt || echo "WARNING: nixos-generate-config failed (may be normal for some layouts)"
-"#, disk = msg.disk, boot_detect = boot_mode_detection());
+"#,
+                disk = msg.disk,
+                boot_detect = boot_mode_detection()
+            );
 
             // Append configuration.nix (and optionally flake.nix) via heredoc —
             // avoids passing Nix braces through format!().
@@ -1136,7 +1177,8 @@ echo "COMPLETE"
 
         "single-zfs" => {
             // Full disk wipe → ZFS pool with datasets → nixos-install
-            let mut script = format!(r#"set -eo pipefail
+            let mut script = format!(
+                r#"set -eo pipefail
 echo "=== NixForHumanity: Single Disk (ZFS) ==="
 
 DISK="{disk}"
@@ -1214,7 +1256,9 @@ nixos-generate-config --root /mnt || echo "WARNING: nixos-generate-config issue 
 
 # Write hostId to hardware-configuration.nix (required for ZFS)
 echo '  networking.hostId = "deadbeef";' >> /mnt/etc/nixos/hardware-configuration.nix 2>/dev/null || true
-"#, disk = msg.disk);
+"#,
+                disk = msg.disk
+            );
 
             let fallback_zfs = format!(
                 "{{ config, pkgs, ... }}:\n{{\n  imports = [ ./hardware-configuration.nix ];\n  networking.hostName = \"{hostname}\";\n  boot.loader.systemd-boot.enable = true;\n  boot.loader.efi.canTouchEfiVariables = true;\n  boot.supportedFilesystems = [ \"zfs\" ];\n  boot.zfs.devNodes = \"/dev/disk/by-id\";\n  networking.hostId = \"deadbeef\";\n  services.zfs.autoScrub.enable = true;\n  services.zfs.trim.enable = true;\n  users.users.{hostname} = {{ isNormalUser = true; extraGroups = [ \"wheel\" \"video\" \"networkmanager\" ]; initialPassword = \"changeme\"; }};\n  environment.systemPackages = with pkgs; [ vim git curl wget htop ];\n  system.stateVersion = \"25.05\";\n}}",
@@ -1229,7 +1273,8 @@ echo '  networking.hostId = "deadbeef";' >> /mnt/etc/nixos/hardware-configuratio
             script.push_str(&bootloader_patch_commands(&msg.disk));
 
             // ZFS doesn't need separate swap file setup — zvol already created
-            script.push_str(&format!(r#"
+            script.push_str(&format!(
+                r#"
 # Step 6: Install
 echo "STAGE: Installing NixOS..."
 nixos-install --no-root-passwd 2>&1
@@ -1245,15 +1290,22 @@ echo "=== NixOS Installed (ZFS) ==="
 echo "Reboot: sudo reboot"
 echo "Login as: {hostname} / changeme"
 echo "COMPLETE"
-"#, hostname = hostname));
+"#,
+                hostname = hostname
+            ));
             script
         }
 
         "single-luks" => {
             // Full disk wipe → LUKS2 encryption → btrfs → nixos-install
             // Passphrase is passed via the 'command' field (repurposed)
-            let passphrase = if msg.command.is_empty() { "changeme" } else { &msg.command };
-            let mut script = format!(r#"set -eo pipefail
+            let passphrase = if msg.command.is_empty() {
+                "changeme"
+            } else {
+                &msg.command
+            };
+            let mut script = format!(
+                r#"set -eo pipefail
 echo "=== Symthaea Sovereign Birth: Encrypted Single Disk ==="
 
 # Step 1: Wipe and partition
@@ -1320,7 +1372,10 @@ mount -o subvol=@swap,noatime /dev/mapper/cryptroot /mnt/swap
 # Step 6: Generate hardware config + write NixOS config with LUKS
 echo "STAGE: Generating configuration..."
 nixos-generate-config --root /mnt
-"#, disk = msg.disk, passphrase = passphrase);
+"#,
+                disk = msg.disk,
+                passphrase = passphrase
+            );
 
             // Append configuration.nix (and optionally flake.nix) via heredoc.
             // NOTE: The fallback LUKS config uses an *unquoted* heredoc (NIXCONF without
@@ -1332,7 +1387,10 @@ nixos-generate-config --root /mnt
                 let staging = format!("/tmp/symthaea-config-{}", session_id);
                 script.push_str(&format!("mkdir -p /mnt/etc/nixos\ncp {}/configuration.nix /mnt/etc/nixos/configuration.nix\n", staging));
                 if !msg.flake_nix.is_empty() {
-                    script.push_str(&format!("cp {}/flake.nix /mnt/etc/nixos/flake.nix\n", staging));
+                    script.push_str(&format!(
+                        "cp {}/flake.nix /mnt/etc/nixos/flake.nix\n",
+                        staging
+                    ));
                 }
                 script.push_str(&format!("rm -rf {}\n", staging));
             } else {
@@ -1462,7 +1520,8 @@ echo "COMPLETE"
         "dual" => {
             // Dual-disk: fast drive for data (btrfs), standard for OS (ext4)
             // Direct partitioning — no disko download needed
-            let mut script = format!(r#"set -eo pipefail
+            let mut script = format!(
+                r#"set -eo pipefail
 echo "=== Symthaea Sovereign Birth: Dual NVMe ==="
 
 # Step 1: Partition standard drive (OS)
@@ -1516,7 +1575,10 @@ mount -o subvol=@snapshots,compress=zstd:3,noatime "$FAST_DATA" /mnt/.snapshots
 # Step 6: Generate config + write ours
 echo "STAGE: Generating configuration..."
 nixos-generate-config --root /mnt
-"#, fast = msg.fast_disk, standard = msg.standard_disk);
+"#,
+                fast = msg.fast_disk,
+                standard = msg.standard_disk
+            );
 
             let fallback_dual = format!(
                 "{{ config, pkgs, ... }}:\n\
@@ -1555,7 +1617,8 @@ nixos-generate-config --root /mnt
             ));
             script.push_str(&bootloader_patch_commands(&msg.standard_disk));
 
-            script.push_str(&format!(r#"
+            script.push_str(&format!(
+                r#"
 # Step 7: Create swap file on fast drive
 echo "STAGE: Configuring swap..."
 fallocate -l 64G /mnt/swap/swapfile
@@ -1578,13 +1641,16 @@ echo "=== Sovereign Birth Complete ==="
 echo "Reboot the machine: sudo reboot"
 echo "Login as: {hostname} / changeme"
 echo "COMPLETE"
-"#, hostname = hostname));
+"#,
+                hostname = hostname
+            ));
             script
         }
 
         "raid1-btrfs" => {
             // btrfs RAID1 across two disks (mirrored data + metadata)
-            let mut script = format!(r#"set -eo pipefail
+            let mut script = format!(
+                r#"set -eo pipefail
 echo "=== Symthaea Sovereign Birth: btrfs RAID1 ==="
 
 DISK1="{fast_disk}"
@@ -1652,7 +1718,10 @@ mount -o subvol=@swap,noatime "$R1" /mnt/swap
 
 echo "STAGE: Generating configuration..."
 nixos-generate-config --root /mnt
-"#, fast_disk = msg.fast_disk, standard_disk = msg.standard_disk);
+"#,
+                fast_disk = msg.fast_disk,
+                standard_disk = msg.standard_disk
+            );
 
             let fallback_raid1_btrfs = format!(
                 "{{ config, pkgs, ... }}:\n\
@@ -1685,7 +1754,8 @@ nixos-generate-config --root /mnt
             ));
             script.push_str(&bootloader_patch_commands(&msg.disk));
 
-            script.push_str(&format!(r#"
+            script.push_str(&format!(
+                r#"
 echo "STAGE: Configuring swap..."
 fallocate -l 16G /mnt/swap/swapfile
 chmod 600 /mnt/swap/swapfile
@@ -1707,13 +1777,16 @@ echo "=== Sovereign Birth Complete (btrfs RAID1) ==="
 echo "Data is mirrored across both disks."
 echo "Login as: {hostname} / changeme"
 echo "COMPLETE"
-"#, hostname = hostname));
+"#,
+                hostname = hostname
+            ));
             script
         }
 
         "raid1-mdadm" => {
             // mdadm RAID1 mirror with btrfs on top
-            let mut script = format!(r#"set -eo pipefail
+            let mut script = format!(
+                r#"set -eo pipefail
 echo "=== Symthaea Sovereign Birth: mdadm RAID1 ==="
 
 DISK1="{fast_disk}"
@@ -1777,7 +1850,10 @@ nixos-generate-config --root /mnt
 # Save mdadm config
 mkdir -p /mnt/etc
 mdadm --detail --scan >> /mnt/etc/mdadm.conf
-"#, fast_disk = msg.fast_disk, standard_disk = msg.standard_disk);
+"#,
+                fast_disk = msg.fast_disk,
+                standard_disk = msg.standard_disk
+            );
 
             let fallback_raid1_mdadm = format!(
                 "{{ config, pkgs, ... }}:\n\
@@ -1813,7 +1889,8 @@ mdadm --detail --scan >> /mnt/etc/mdadm.conf
             ));
             script.push_str(&bootloader_patch_commands(&msg.disk));
 
-            script.push_str(&format!(r#"
+            script.push_str(&format!(
+                r#"
 echo "STAGE: Configuring swap..."
 fallocate -l 16G /mnt/swap/swapfile
 chmod 600 /mnt/swap/swapfile
@@ -1832,12 +1909,13 @@ echo "=== Sovereign Birth Complete (mdadm RAID1) ==="
 echo "Data is mirrored. If one disk fails, the other continues."
 echo "Login as: {hostname} / changeme"
 echo "COMPLETE"
-"#, hostname = hostname));
+"#,
+                hostname = hostname
+            ));
             script
         }
 
         // ── Multi-disk RAID layouts ──
-
         "raid5-mdadm" | "raid6-mdadm" | "raid10-mdadm" => {
             let raid_level = match msg.layout.as_str() {
                 "raid5-mdadm" => "5",
@@ -1856,13 +1934,16 @@ echo "COMPLETE"
             if all_disks.len() < min_disks {
                 return format!(
                     "echo 'ERROR: RAID{} requires at least {} disks, got {}'; exit 1",
-                    raid_level, min_disks, all_disks.len()
+                    raid_level,
+                    min_disks,
+                    all_disks.len()
                 );
             }
             let disk_list = all_disks.join(" ");
             let n_disks = all_disks.len();
 
-            let mut script = format!(r#"set -eo pipefail
+            let mut script = format!(
+                r#"set -eo pipefail
 echo "=== Symthaea Sovereign Birth: RAID{level} (mdadm, {n} disks) ==="
 {boot_detect}
 
@@ -1922,7 +2003,12 @@ mount -o subvol=@log,compress=zstd:3,noatime /dev/md0 /mnt/var/log
 echo "STAGE: Generating configuration..."
 nixos-generate-config --root /mnt
 mdadm --detail --scan >> /mnt/etc/mdadm.conf 2>/dev/null || true
-"#, level = raid_level, n = n_disks, disks = disk_list, boot_detect = boot_mode_detection());
+"#,
+                level = raid_level,
+                n = n_disks,
+                disks = disk_list,
+                boot_detect = boot_mode_detection()
+            );
 
             let fallback_config = format!(
                 "{{ config, pkgs, ... }}:\n{{\n  imports = [ ./hardware-configuration.nix ];\n  \
@@ -1942,17 +2028,18 @@ mdadm --detail --scan >> /mnt/etc/mdadm.conf 2>/dev/null || true
                 session_id,
             ));
             script.push_str(&bootloader_patch_commands(&msg.disk));
-            script.push_str(r#"
+            script.push_str(
+                r#"
 echo "STAGE: Installing NixOS..."
 nixos-install --no-root-passwd 2>&1
 echo "STAGE: Verifying..."
 echo "COMPLETE"
-"#);
+"#,
+            );
             script
         }
 
         // ── ZFS multi-disk layouts ──
-
         "zfs-mirror" | "zfs-raidz" | "zfs-raidz2" => {
             let zfs_type = match msg.layout.as_str() {
                 "zfs-mirror" => "mirror",
@@ -1971,13 +2058,16 @@ echo "COMPLETE"
             if all_disks.len() < min_disks {
                 return format!(
                     "echo 'ERROR: ZFS {} requires at least {} disks, got {}'; exit 1",
-                    zfs_type, min_disks, all_disks.len()
+                    zfs_type,
+                    min_disks,
+                    all_disks.len()
                 );
             }
             let disk_list = all_disks.join(" ");
             let n_disks = all_disks.len();
 
-            let mut script = format!(r#"set -eo pipefail
+            let mut script = format!(
+                r#"set -eo pipefail
 echo "=== Symthaea Sovereign Birth: ZFS {ztype} ({n} disks) ==="
 {boot_detect}
 
@@ -2036,7 +2126,12 @@ mount -t zfs rpool/var/log /mnt/var/log
 # Step 5: Generate config
 echo "STAGE: Generating configuration..."
 nixos-generate-config --root /mnt
-"#, ztype = zfs_type, n = n_disks, disks = disk_list, boot_detect = boot_mode_detection());
+"#,
+                ztype = zfs_type,
+                n = n_disks,
+                disks = disk_list,
+                boot_detect = boot_mode_detection()
+            );
 
             let fallback_config = format!(
                 "{{ config, pkgs, ... }}:\n{{\n  imports = [ ./hardware-configuration.nix ];\n  \
@@ -2058,13 +2153,15 @@ nixos-generate-config --root /mnt
                 session_id,
             ));
             script.push_str(&bootloader_patch_commands(&msg.disk));
-            script.push_str(r#"
+            script.push_str(
+                r#"
 echo "STAGE: Installing NixOS..."
 nixos-install --no-root-passwd 2>&1
 echo "STAGE: Verifying..."
 zpool status rpool
 echo "COMPLETE"
-"#);
+"#,
+            );
             script
         }
 
@@ -2207,8 +2304,16 @@ fn parse_lsblk(json_str: &str) -> Vec<DiskInfo> {
             if dtype != "disk" {
                 return None;
             }
-            let name = dev.get("name").and_then(|v| v.as_str()).unwrap_or("").to_string();
-            let size = dev.get("size").and_then(|v| v.as_str()).unwrap_or("").to_string();
+            let name = dev
+                .get("name")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string();
+            let size = dev
+                .get("size")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string();
             let model = dev
                 .get("model")
                 .and_then(|v| v.as_str())
@@ -2250,7 +2355,10 @@ async fn handle_connection(
     // Only allow connections from localhost, 127.0.0.1, or our known domains.
     let origin_check = |req: &tungstenite::handshake::server::Request,
                         resp: tungstenite::handshake::server::Response|
-        -> Result<tungstenite::handshake::server::Response, tungstenite::handshake::server::ErrorResponse> {
+     -> Result<
+        tungstenite::handshake::server::Response,
+        tungstenite::handshake::server::ErrorResponse,
+    > {
         if let Some(origin) = req.headers().get("origin") {
             let origin_str = origin.to_str().unwrap_or("");
             let allowed = origin_str.starts_with("http://localhost")
@@ -2262,8 +2370,13 @@ async fn handle_connection(
                 || origin_str.contains("mycelix.net")
                 || origin_str.contains("relationalharmonics.org");
             if !allowed {
-                eprintln!("[{}] Rejected WebSocket: disallowed Origin '{}'", peer_addr, origin_str);
-                let mut resp = tungstenite::handshake::server::ErrorResponse::new(Some("Forbidden origin".into()));
+                eprintln!(
+                    "[{}] Rejected WebSocket: disallowed Origin '{}'",
+                    peer_addr, origin_str
+                );
+                let mut resp = tungstenite::handshake::server::ErrorResponse::new(Some(
+                    "Forbidden origin".into(),
+                ));
                 *resp.status_mut() = tungstenite::http::StatusCode::FORBIDDEN;
                 return Err(resp);
             }
@@ -2324,10 +2437,14 @@ async fn handle_connection_ws<S: tokio::io::AsyncRead + tokio::io::AsyncWrite + 
         if !authed {
             // Check if this IP is blocked due to too many failed auth attempts
             if tracker.lock().await.is_blocked(&peer_addr) {
-                eprintln!("[{}] Blocked after too many failed auth attempts", peer_addr);
+                eprintln!(
+                    "[{}] Blocked after too many failed auth attempts",
+                    peer_addr
+                );
                 let _ = ws_tx
                     .send(Message::Text(
-                        RelayMessage::error("Too many failed auth attempts. Try again later.").to_json(),
+                        RelayMessage::error("Too many failed auth attempts. Try again later.")
+                            .to_json(),
                     ))
                     .await;
                 break;
@@ -2384,12 +2501,15 @@ async fn handle_connection_ws<S: tokio::io::AsyncRead + tokio::io::AsyncWrite + 
 
                 // No SSH needed — relay runs directly on the target machine
                 eprintln!("[{}] Connection acknowledged (local mode)", peer_addr);
-                let _ = ws_tx.send(Message::Text(
-                    serde_json::json!({
-                        "type": "connected",
-                        "message": "Connected to target (local relay)"
-                    }).to_string()
-                )).await;
+                let _ = ws_tx
+                    .send(Message::Text(
+                        serde_json::json!({
+                            "type": "connected",
+                            "message": "Connected to target (local relay)"
+                        })
+                        .to_string(),
+                    ))
+                    .await;
             }
 
             // Intentionally disabled: this relay is not a general-purpose RCE gateway.
@@ -2411,11 +2531,7 @@ async fn handle_connection_ws<S: tokio::io::AsyncRead + tokio::io::AsyncWrite + 
                         let disks = parse_lsblk(&result.stdout);
                         let disks_json =
                             serde_json::to_string(&disks).unwrap_or_else(|_| "[]".into());
-                        eprintln!(
-                            "[{}] Found {} disks",
-                            peer_addr,
-                            disks.len()
-                        );
+                        eprintln!("[{}] Found {} disks", peer_addr, disks.len());
                         let _ = ws_tx
                             .send(Message::Text(RelayMessage::disks(&disks_json).to_json()))
                             .await;
@@ -2451,7 +2567,9 @@ async fn handle_connection_ws<S: tokio::io::AsyncRead + tokio::io::AsyncWrite + 
                     match validate_disk_path(&client_msg.disk) {
                         Ok(d) => d,
                         Err(e) => {
-                            let _ = ws_tx.send(Message::Text(RelayMessage::error(&e).to_json())).await;
+                            let _ = ws_tx
+                                .send(Message::Text(RelayMessage::error(&e).to_json()))
+                                .await;
                             continue;
                         }
                     }
@@ -2459,44 +2577,58 @@ async fn handle_connection_ws<S: tokio::io::AsyncRead + tokio::io::AsyncWrite + 
                 let hostname = match validate_hostname_relay(&client_msg.hostname) {
                     Ok(h) => h,
                     Err(e) => {
-                        let _ = ws_tx.send(Message::Text(RelayMessage::error(&e).to_json())).await;
+                        let _ = ws_tx
+                            .send(Message::Text(RelayMessage::error(&e).to_json()))
+                            .await;
                         continue;
                     }
                 };
                 // Validate optional fields that reach shell/Nix config
                 if !client_msg.timezone.is_empty() {
                     if let Err(e) = sanitize_input(&client_msg.timezone, "timezone", true) {
-                        let _ = ws_tx.send(Message::Text(RelayMessage::error(&e).to_json())).await;
+                        let _ = ws_tx
+                            .send(Message::Text(RelayMessage::error(&e).to_json()))
+                            .await;
                         continue;
                     }
                 }
                 if !client_msg.keyboard.is_empty() {
                     if let Err(e) = sanitize_input(&client_msg.keyboard, "keyboard", false) {
-                        let _ = ws_tx.send(Message::Text(RelayMessage::error(&e).to_json())).await;
+                        let _ = ws_tx
+                            .send(Message::Text(RelayMessage::error(&e).to_json()))
+                            .await;
                         continue;
                     }
                 }
                 if !client_msg.desktop.is_empty() {
                     if let Err(e) = sanitize_input(&client_msg.desktop, "desktop", false) {
-                        let _ = ws_tx.send(Message::Text(RelayMessage::error(&e).to_json())).await;
+                        let _ = ws_tx
+                            .send(Message::Text(RelayMessage::error(&e).to_json()))
+                            .await;
                         continue;
                     }
                 }
                 if !client_msg.gpu_driver.is_empty() {
                     if let Err(e) = sanitize_input(&client_msg.gpu_driver, "gpu_driver", false) {
-                        let _ = ws_tx.send(Message::Text(RelayMessage::error(&e).to_json())).await;
+                        let _ = ws_tx
+                            .send(Message::Text(RelayMessage::error(&e).to_json()))
+                            .await;
                         continue;
                     }
                 }
                 if !client_msg.fast_disk.is_empty() {
                     if let Err(e) = validate_disk_path(&client_msg.fast_disk) {
-                        let _ = ws_tx.send(Message::Text(RelayMessage::error(&e).to_json())).await;
+                        let _ = ws_tx
+                            .send(Message::Text(RelayMessage::error(&e).to_json()))
+                            .await;
                         continue;
                     }
                 }
                 if !client_msg.standard_disk.is_empty() {
                     if let Err(e) = validate_disk_path(&client_msg.standard_disk) {
-                        let _ = ws_tx.send(Message::Text(RelayMessage::error(&e).to_json())).await;
+                        let _ = ws_tx
+                            .send(Message::Text(RelayMessage::error(&e).to_json()))
+                            .await;
                         continue;
                     }
                 }
@@ -2504,9 +2636,12 @@ async fn handle_connection_ws<S: tokio::io::AsyncRead + tokio::io::AsyncWrite + 
                 // Validate extra disks for RAID/ZFS multi-disk layouts
                 for extra_disk in &client_msg.extra_disks {
                     if let Err(e) = validate_disk_path(extra_disk) {
-                        let _ = ws_tx.send(Message::Text(
-                            RelayMessage::error(&format!("Invalid extra disk: {}", e)).to_json(),
-                        )).await;
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                RelayMessage::error(&format!("Invalid extra disk: {}", e))
+                                    .to_json(),
+                            ))
+                            .await;
                         continue;
                     }
                 }
@@ -2549,10 +2684,19 @@ async fn handle_connection_ws<S: tokio::io::AsyncRead + tokio::io::AsyncWrite + 
                 if !client_msg.configuration_nix.is_empty() {
                     use symthaea_spore::security::validate_nix_pure_eval;
                     if let Err(e) = validate_nix_pure_eval(&client_msg.configuration_nix) {
-                        eprintln!("[{}] Nix pure-eval rejected browser config: {}", peer_addr, e);
-                        let _ = ws_tx.send(Message::Text(
-                            RelayMessage::output(&format!("WARNING: Nix config validation: {}", e), "stderr").to_json(),
-                        )).await;
+                        eprintln!(
+                            "[{}] Nix pure-eval rejected browser config: {}",
+                            peer_addr, e
+                        );
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                RelayMessage::output(
+                                    &format!("WARNING: Nix config validation: {}", e),
+                                    "stderr",
+                                )
+                                .to_json(),
+                            ))
+                            .await;
                         // Continue anyway — pure-eval may reject valid NixOS modules
                         // that use impure features like <nixpkgs>. This is advisory, not blocking.
                     }
@@ -2607,10 +2751,14 @@ async fn handle_connection_ws<S: tokio::io::AsyncRead + tokio::io::AsyncWrite + 
                 // Set user password via temp file (avoids shell injection)
                 if !client_msg.user_password.is_empty() {
                     // SECURITY: reject passwords containing newlines (breaks chpasswd format)
-                    if client_msg.user_password.contains('\n') || client_msg.user_password.contains('\r') {
-                        let _ = ws_tx.send(Message::Text(
-                            RelayMessage::error("Password must not contain newlines").to_json(),
-                        )).await;
+                    if client_msg.user_password.contains('\n')
+                        || client_msg.user_password.contains('\r')
+                    {
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                RelayMessage::error("Password must not contain newlines").to_json(),
+                            ))
+                            .await;
                         continue;
                     }
                     // Escape single quotes in password for safe shell embedding
@@ -2619,9 +2767,15 @@ async fn handle_connection_ws<S: tokio::io::AsyncRead + tokio::io::AsyncWrite + 
                     let _ = run_cmd(&format!(
                         "printf '%s' '{}' > {} && chmod 600 {}",
                         escaped_pw, pw_file, pw_file
-                    )).await;
-                    let username = if client_msg.username.is_empty() { "user" } else { &client_msg.username };
-                    let pw_script = format!(r#"
+                    ))
+                    .await;
+                    let username = if client_msg.username.is_empty() {
+                        "user"
+                    } else {
+                        &client_msg.username
+                    };
+                    let pw_script = format!(
+                        r#"
 # ── Set User Password ──
 echo "STAGE: Setting user password..."
 if [ -f {pw_file} ]; then
@@ -2630,7 +2784,10 @@ if [ -f {pw_file} ]; then
     rm -f {pw_file}
     echo "  User password set."
 fi
-"#, pw_file = pw_file, username = username);
+"#,
+                        pw_file = pw_file,
+                        username = username
+                    );
                     if let Some(pos) = script.rfind("echo \"COMPLETE\"") {
                         script.insert_str(pos, &pw_script);
                     } else {
@@ -2641,7 +2798,11 @@ fi
                 eprintln!(
                     "[{}] Starting automated {} install on {} (session {})",
                     peer_addr,
-                    if client_msg.layout.is_empty() { "single" } else { &client_msg.layout },
+                    if client_msg.layout.is_empty() {
+                        "single"
+                    } else {
+                        &client_msg.layout
+                    },
                     &disk,
                     session_id
                 );
@@ -2659,9 +2820,12 @@ fi
                         let _ = run_cmd(&format!("chmod +x {}", script_path)).await;
                     }
                     Err(e) => {
-                        let _ = ws_tx.send(Message::Text(
-                            RelayMessage::error(&format!("Failed to write script: {}", e)).to_json(),
-                        )).await;
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                RelayMessage::error(&format!("Failed to write script: {}", e))
+                                    .to_json(),
+                            ))
+                            .await;
                         continue;
                     }
                 }
@@ -2671,7 +2835,8 @@ fi
                     Ok(r) if r.exit_status == 0 => {
                         let _ = ws_tx
                             .send(Message::Text(
-                                RelayMessage::output("Install script uploaded.", "stdout").to_json(),
+                                RelayMessage::output("Install script uploaded.", "stdout")
+                                    .to_json(),
                             ))
                             .await;
                     }
@@ -2700,8 +2865,7 @@ fi
                 // Execute the install script in background, tail the log for streaming.
                 // The script runs with output redirected to a log file,
                 // while we poll the log file for new lines.
-                let _ = run_cmd(&format!("bash {} > {} 2>&1 &", script_path, log_path))
-                    .await;
+                let _ = run_cmd(&format!("bash {} > {} 2>&1 &", script_path, log_path)).await;
                 let _ = ws_tx
                     .send(Message::Text(
                         RelayMessage::output("Installation started. Streaming output...", "stdout")
@@ -2716,10 +2880,12 @@ fi
                     tokio::time::sleep(std::time::Duration::from_secs(3)).await;
 
                     let tail_result = run_cmd(&format!(
-                            "wc -l < {} 2>/dev/null && tail -n +{} {} 2>/dev/null",
-                            log_path, last_lines + 1, log_path
-                        ))
-                        .await;
+                        "wc -l < {} 2>/dev/null && tail -n +{} {} 2>/dev/null",
+                        log_path,
+                        last_lines + 1,
+                        log_path
+                    ))
+                    .await;
 
                     match tail_result {
                         Ok(result) if result.exit_status == 0 => {
@@ -2735,19 +2901,28 @@ fi
                                         // Parse STAGE: markers
                                         if line.starts_with("STAGE: ") {
                                             let stage_text = &line[7..];
-                                            let stage = if stage_text.contains("Prepar") || stage_text.contains("environment") {
+                                            let stage = if stage_text.contains("Prepar")
+                                                || stage_text.contains("environment")
+                                            {
                                                 NixosAnywhereStage::Connecting
                                             } else if stage_text.contains("Partition") {
                                                 NixosAnywhereStage::Partitioning
-                                            } else if stage_text.contains("Format") || stage_text.contains("btrfs") || stage_text.contains("subvol") {
+                                            } else if stage_text.contains("Format")
+                                                || stage_text.contains("btrfs")
+                                                || stage_text.contains("subvol")
+                                            {
                                                 NixosAnywhereStage::Partitioning
                                             } else if stage_text.contains("Mount") {
                                                 NixosAnywhereStage::Partitioning
-                                            } else if stage_text.contains("Generat") || stage_text.contains("config") {
+                                            } else if stage_text.contains("Generat")
+                                                || stage_text.contains("config")
+                                            {
                                                 NixosAnywhereStage::Configuring
                                             } else if stage_text.contains("Install") {
                                                 NixosAnywhereStage::Installing
-                                            } else if stage_text.contains("swap") || stage_text.contains("Verif") {
+                                            } else if stage_text.contains("swap")
+                                                || stage_text.contains("Verif")
+                                            {
                                                 NixosAnywhereStage::Configuring
                                             } else if stage_text.contains("FirstBreath") {
                                                 NixosAnywhereStage::Complete
@@ -2795,10 +2970,12 @@ fi
                     if let Ok(check) = run_cmd(&format!("pgrep -f {}", script_path)).await {
                         if check.exit_status != 0 && last_lines > 0 {
                             // Script finished but no COMPLETE marker — check exit code
-                            if let Ok(exit_check) = run_cmd(&format!("tail -1 {}", log_path)).await {
+                            if let Ok(exit_check) = run_cmd(&format!("tail -1 {}", log_path)).await
+                            {
                                 let _ = ws_tx
                                     .send(Message::Text(
-                                        RelayMessage::output(&exit_check.stdout, "stdout").to_json(),
+                                        RelayMessage::output(&exit_check.stdout, "stdout")
+                                            .to_json(),
                                     ))
                                     .await;
                             }
@@ -2809,86 +2986,95 @@ fi
 
                 let exit_code = if complete { 0 } else { 1 };
                 let _ = ws_tx
-                    .send(Message::Text(
-                        RelayMessage::exit(exit_code).to_json(),
-                    ))
+                    .send(Message::Text(RelayMessage::exit(exit_code).to_json()))
                     .await;
 
                 // SECURITY: Clean up temporary files containing sensitive data
                 let _ = run_cmd(&format!(
                     "rm -f {} {} /tmp/sovereign-user-pw-{}",
                     script_path, log_path, session_id
-                )).await;
-                eprintln!("[{}] Session {} temp files cleaned up", peer_addr, session_id);
+                ))
+                .await;
+                eprintln!(
+                    "[{}] Session {} temp files cleaned up",
+                    peer_addr, session_id
+                );
 
                 // LEGACY: The old blocking path (kept for reference)
                 // This is what we replaced with the log-polling approach above.
                 if false {
-                match run_cmd("bash /tmp/symthaea-install.sh 2>&1").await {
-                    Ok(result) => {
-                        for line in result.stdout.lines().chain(result.stderr.lines()) {
-                            if line.trim().is_empty() {
-                                continue;
-                            }
+                    match run_cmd("bash /tmp/symthaea-install.sh 2>&1").await {
+                        Ok(result) => {
+                            for line in result.stdout.lines().chain(result.stderr.lines()) {
+                                if line.trim().is_empty() {
+                                    continue;
+                                }
 
-                            // Parse STAGE: markers for progress
-                            if line.starts_with("STAGE: ") {
-                                let stage_text = &line[7..];
-                                let stage = if stage_text.contains("Detect") || stage_text.contains("free space") {
-                                    NixosAnywhereStage::Connecting
-                                } else if stage_text.contains("Partition") {
-                                    NixosAnywhereStage::Partitioning
-                                } else if stage_text.contains("Format") || stage_text.contains("btrfs") {
-                                    NixosAnywhereStage::Partitioning
-                                } else if stage_text.contains("Mount") {
-                                    NixosAnywhereStage::Partitioning
-                                } else if stage_text.contains("Install") {
-                                    NixosAnywhereStage::Installing
-                                } else if stage_text.contains("Configur") || stage_text.contains("swap") {
-                                    NixosAnywhereStage::Configuring
-                                } else if stage_text.contains("FirstBreath") {
-                                    NixosAnywhereStage::Complete
-                                } else {
-                                    NixosAnywhereStage::Installing
-                                };
+                                // Parse STAGE: markers for progress
+                                if line.starts_with("STAGE: ") {
+                                    let stage_text = &line[7..];
+                                    let stage = if stage_text.contains("Detect")
+                                        || stage_text.contains("free space")
+                                    {
+                                        NixosAnywhereStage::Connecting
+                                    } else if stage_text.contains("Partition") {
+                                        NixosAnywhereStage::Partitioning
+                                    } else if stage_text.contains("Format")
+                                        || stage_text.contains("btrfs")
+                                    {
+                                        NixosAnywhereStage::Partitioning
+                                    } else if stage_text.contains("Mount") {
+                                        NixosAnywhereStage::Partitioning
+                                    } else if stage_text.contains("Install") {
+                                        NixosAnywhereStage::Installing
+                                    } else if stage_text.contains("Configur")
+                                        || stage_text.contains("swap")
+                                    {
+                                        NixosAnywhereStage::Configuring
+                                    } else if stage_text.contains("FirstBreath") {
+                                        NixosAnywhereStage::Complete
+                                    } else {
+                                        NixosAnywhereStage::Installing
+                                    };
+
+                                    let _ = ws_tx
+                                        .send(Message::Text(
+                                            RelayMessage::progress(&stage).to_json(),
+                                        ))
+                                        .await;
+                                }
+
+                                // Also check for nixos-anywhere stage markers
+                                if let Some(stage) = parse_stage(line) {
+                                    let _ = ws_tx
+                                        .send(Message::Text(
+                                            RelayMessage::progress(&stage).to_json(),
+                                        ))
+                                        .await;
+                                }
 
                                 let _ = ws_tx
                                     .send(Message::Text(
-                                        RelayMessage::progress(&stage).to_json(),
-                                    ))
-                                    .await;
-                            }
-
-                            // Also check for nixos-anywhere stage markers
-                            if let Some(stage) = parse_stage(line) {
-                                let _ = ws_tx
-                                    .send(Message::Text(
-                                        RelayMessage::progress(&stage).to_json(),
+                                        RelayMessage::output(line, "stdout").to_json(),
                                     ))
                                     .await;
                             }
 
                             let _ = ws_tx
                                 .send(Message::Text(
-                                    RelayMessage::output(line, "stdout").to_json(),
+                                    RelayMessage::exit(result.exit_status as i32).to_json(),
                                 ))
                                 .await;
                         }
-
-                        let _ = ws_tx
-                            .send(Message::Text(
-                                RelayMessage::exit(result.exit_status as i32).to_json(),
-                            ))
-                            .await;
+                        Err(e) => {
+                            let _ = ws_tx
+                                .send(Message::Text(
+                                    RelayMessage::error(&format!("Install failed: {}", e))
+                                        .to_json(),
+                                ))
+                                .await;
+                        }
                     }
-                    Err(e) => {
-                        let _ = ws_tx
-                            .send(Message::Text(
-                                RelayMessage::error(&format!("Install failed: {}", e)).to_json(),
-                            ))
-                            .await;
-                    }
-                }
                 } // end if false (legacy blocking path)
             }
 
@@ -2897,7 +3083,8 @@ fi
             "pre_install_check" => {
                 eprintln!("[{}] Running pre-install checks...", peer_addr);
                 let disk = client_msg.disk.clone();
-                let check_script = format!(r#"
+                let check_script = format!(
+                    r#"
 echo '{{"checks": ['
 
 # 1. EFI vs BIOS
@@ -2983,23 +3170,36 @@ else
 fi
 
 echo ']}}'
-"#, disk = disk);
+"#,
+                    disk = disk
+                );
                 match run_cmd(&check_script).await {
                     Ok(result) if result.exit_status == 0 => {
-                        let _ = ws_tx.send(Message::Text(format!(
-                            "{{\"type\":\"checklist\",\"data\":{}}}",
-                            result.stdout.trim()
-                        ))).await;
+                        let _ = ws_tx
+                            .send(Message::Text(format!(
+                                "{{\"type\":\"checklist\",\"data\":{}}}",
+                                result.stdout.trim()
+                            )))
+                            .await;
                     }
                     Ok(result) => {
-                        let _ = ws_tx.send(Message::Text(
-                            RelayMessage::error(&format!("Pre-install check failed: {}", result.stderr)).to_json(),
-                        )).await;
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                RelayMessage::error(&format!(
+                                    "Pre-install check failed: {}",
+                                    result.stderr
+                                ))
+                                .to_json(),
+                            ))
+                            .await;
                     }
                     Err(e) => {
-                        let _ = ws_tx.send(Message::Text(
-                            RelayMessage::error(&format!("Pre-install check error: {}", e)).to_json(),
-                        )).await;
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                RelayMessage::error(&format!("Pre-install check error: {}", e))
+                                    .to_json(),
+                            ))
+                            .await;
                     }
                 }
             }
@@ -3323,7 +3523,9 @@ echo '}'
                     Ok(result) if result.exit_status == 0 => {
                         eprintln!("[{}] Hardware probe complete", peer_addr);
                         // Strip ANSI escape codes and control chars that corrupt JSON
-                        let clean: String = result.stdout.chars()
+                        let clean: String = result
+                            .stdout
+                            .chars()
                             .filter(|c| !c.is_control() || *c == '\n' || *c == '\t')
                             .collect();
                         let _ = ws_tx
@@ -3490,8 +3692,7 @@ echo ']'
                     Err(e) => {
                         let _ = ws_tx
                             .send(Message::Text(
-                                RelayMessage::error(&format!("App scan failed: {}", e))
-                                    .to_json(),
+                                RelayMessage::error(&format!("App scan failed: {}", e)).to_json(),
                             ))
                             .await;
                     }
@@ -3697,8 +3898,7 @@ echo '}'
                     Err(e) => {
                         let _ = ws_tx
                             .send(Message::Text(
-                                RelayMessage::error(&format!("Deep scan failed: {}", e))
-                                    .to_json(),
+                                RelayMessage::error(&format!("Deep scan failed: {}", e)).to_json(),
                             ))
                             .await;
                     }
@@ -3828,7 +4028,6 @@ echo '],"total_size":"'"$TOTAL_SIZE"'"}'
             // ═══════════════════════════════════════════════════════
             // Post-install NixOS management actions
             // ═══════════════════════════════════════════════════════
-
             "list_generations" => {
                 eprintln!("[{}] Listing generations...", peer_addr);
                 match run_cmd(r#"nix-env --list-generations -p /nix/var/nix/profiles/system 2>/dev/null | awk '{num=$1; date=$2" "$3" "$4; cur=""; if(/\(current\)/) cur=",\"current\":true"; if(NR>1) printf ","; printf "{\"number\":%s,\"date\":\"%s\"%s}", num, date, cur}' | awk 'BEGIN{print "["} {print} END{print "]"}'"#).await {
@@ -3844,22 +4043,42 @@ echo '],"total_size":"'"$TOTAL_SIZE"'"}'
             "rollback" => {
                 eprintln!("[{}] Rolling back...", peer_addr);
                 match run_cmd("nixos-rebuild switch --rollback 2>&1").await {
-                    Ok(r) => { let _ = ws_tx.send(Message::Text(serde_json::json!({"type":"exit","code":r.exit_status,"data":r.stdout.chars().take(2000).collect::<String>()}).to_string())).await; }
-                    Err(e) => { let _ = ws_tx.send(Message::Text(RelayMessage::error(&format!("Rollback failed: {}", e)).to_json())).await; }
+                    Ok(r) => {
+                        let _ = ws_tx.send(Message::Text(serde_json::json!({"type":"exit","code":r.exit_status,"data":r.stdout.chars().take(2000).collect::<String>()}).to_string())).await;
+                    }
+                    Err(e) => {
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                RelayMessage::error(&format!("Rollback failed: {}", e)).to_json(),
+                            ))
+                            .await;
+                    }
                 }
             }
 
             "switch_generation" => {
                 let gen = &client_msg.command;
                 if gen.is_empty() || !gen.chars().all(|c| c.is_ascii_digit()) {
-                    let _ = ws_tx.send(Message::Text(RelayMessage::error("Invalid generation number").to_json())).await;
+                    let _ = ws_tx
+                        .send(Message::Text(
+                            RelayMessage::error("Invalid generation number").to_json(),
+                        ))
+                        .await;
                     continue;
                 }
                 eprintln!("[{}] Switching to generation {}...", peer_addr, gen);
                 let cmd = format!("nix-env --switch-generation {} -p /nix/var/nix/profiles/system && /nix/var/nix/profiles/system/bin/switch-to-configuration switch 2>&1", gen);
                 match run_cmd(&cmd).await {
-                    Ok(r) => { let _ = ws_tx.send(Message::Text(serde_json::json!({"type":"exit","code":r.exit_status,"data":r.stdout.chars().take(2000).collect::<String>()}).to_string())).await; }
-                    Err(e) => { let _ = ws_tx.send(Message::Text(RelayMessage::error(&format!("Switch failed: {}", e)).to_json())).await; }
+                    Ok(r) => {
+                        let _ = ws_tx.send(Message::Text(serde_json::json!({"type":"exit","code":r.exit_status,"data":r.stdout.chars().take(2000).collect::<String>()}).to_string())).await;
+                    }
+                    Err(e) => {
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                RelayMessage::error(&format!("Switch failed: {}", e)).to_json(),
+                            ))
+                            .await;
+                    }
                 }
             }
 
@@ -3878,7 +4097,9 @@ echo '],"total_size":"'"$TOTAL_SIZE"'"}'
             "service_action" => {
                 let action = &client_msg.command;
                 let service = &client_msg.hostname;
-                if !["start","stop","restart","reload","enable","disable"].contains(&action.as_str()) {
+                if !["start", "stop", "restart", "reload", "enable", "disable"]
+                    .contains(&action.as_str())
+                {
                     let _ = ws_tx.send(Message::Text(RelayMessage::error(&format!("Invalid action '{}'. Use: start, stop, restart, reload, enable, disable", action)).to_json())).await;
                     continue;
                 }
@@ -3886,15 +4107,25 @@ echo '],"total_size":"'"$TOTAL_SIZE"'"}'
                 let service = match sanitize_input(service, "service name", false) {
                     Ok(s) => s,
                     Err(e) => {
-                        let _ = ws_tx.send(Message::Text(RelayMessage::error(&e).to_json())).await;
+                        let _ = ws_tx
+                            .send(Message::Text(RelayMessage::error(&e).to_json()))
+                            .await;
                         continue;
                     }
                 };
                 eprintln!("[{}] {} {}...", peer_addr, action, service);
                 let cmd = format!("systemctl {} {}.service 2>&1", action, service);
                 match run_cmd(&cmd).await {
-                    Ok(r) => { let _ = ws_tx.send(Message::Text(serde_json::json!({"type":"exit","code":r.exit_status,"data":r.stdout}).to_string())).await; }
-                    Err(e) => { let _ = ws_tx.send(Message::Text(RelayMessage::error(&format!("Failed: {}", e)).to_json())).await; }
+                    Ok(r) => {
+                        let _ = ws_tx.send(Message::Text(serde_json::json!({"type":"exit","code":r.exit_status,"data":r.stdout}).to_string())).await;
+                    }
+                    Err(e) => {
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                RelayMessage::error(&format!("Failed: {}", e)).to_json(),
+                            ))
+                            .await;
+                    }
                 }
             }
 
@@ -3916,11 +4147,35 @@ printf '{"store_bytes":%s,"reclaimable_bytes":%s,"dead_paths":%s,"gc_roots":%s,"
 "#;
                 match run_cmd(script).await {
                     Ok(r) if r.exit_status == 0 => {
-                        let clean: String = r.stdout.chars().filter(|c| !c.is_control() || *c == '\n').collect();
-                        let _ = ws_tx.send(Message::Text(serde_json::json!({"type":"gc_analysis","data":clean}).to_string())).await;
+                        let clean: String = r
+                            .stdout
+                            .chars()
+                            .filter(|c| !c.is_control() || *c == '\n')
+                            .collect();
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                serde_json::json!({"type":"gc_analysis","data":clean}).to_string(),
+                            ))
+                            .await;
                     }
-                    Ok(r) => { let _ = ws_tx.send(Message::Text(RelayMessage::error(&format!("Analysis failed: {}", &r.stderr[..r.stderr.len().min(200)])).to_json())).await; }
-                    Err(e) => { let _ = ws_tx.send(Message::Text(RelayMessage::error(&format!("Analysis failed: {}", e)).to_json())).await; }
+                    Ok(r) => {
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                RelayMessage::error(&format!(
+                                    "Analysis failed: {}",
+                                    &r.stderr[..r.stderr.len().min(200)]
+                                ))
+                                .to_json(),
+                            ))
+                            .await;
+                    }
+                    Err(e) => {
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                RelayMessage::error(&format!("Analysis failed: {}", e)).to_json(),
+                            ))
+                            .await;
+                    }
                 }
             }
 
@@ -3932,19 +4187,38 @@ printf '{"store_bytes":%s,"reclaimable_bytes":%s,"dead_paths":%s,"gc_roots":%s,"
                     .unwrap_or(0);
                 let gc_log = format!("/tmp/symthaea-gc-{}.log", gc_session_id);
                 let _ = run_cmd(&format!("touch {} && chmod 600 {}", gc_log, gc_log)).await;
-                let _ = run_cmd(&format!("nix-collect-garbage -d --delete-older-than 30d > {} 2>&1 &", gc_log)).await;
-                let _ = ws_tx.send(Message::Text(RelayMessage::output("Garbage collection started...", "stdout").to_json())).await;
+                let _ = run_cmd(&format!(
+                    "nix-collect-garbage -d --delete-older-than 30d > {} 2>&1 &",
+                    gc_log
+                ))
+                .await;
+                let _ = ws_tx
+                    .send(Message::Text(
+                        RelayMessage::output("Garbage collection started...", "stdout").to_json(),
+                    ))
+                    .await;
                 let mut last_lines = 0u64;
                 loop {
                     tokio::time::sleep(std::time::Duration::from_secs(2)).await;
-                    if let Ok(result) = run_cmd(&format!("wc -l < {} 2>/dev/null && tail -n +{} {} 2>/dev/null", gc_log, last_lines + 1, gc_log)).await {
+                    if let Ok(result) = run_cmd(&format!(
+                        "wc -l < {} 2>/dev/null && tail -n +{} {} 2>/dev/null",
+                        gc_log,
+                        last_lines + 1,
+                        gc_log
+                    ))
+                    .await
+                    {
                         if result.exit_status == 0 {
                             let lines: Vec<&str> = result.stdout.lines().collect();
                             if let Some(first) = lines.first() {
                                 if let Ok(total) = first.trim().parse::<u64>() {
                                     for line in &lines[1..] {
                                         if !line.trim().is_empty() {
-                                            let _ = ws_tx.send(Message::Text(RelayMessage::output(line, "stdout").to_json())).await;
+                                            let _ = ws_tx
+                                                .send(Message::Text(
+                                                    RelayMessage::output(line, "stdout").to_json(),
+                                                ))
+                                                .await;
                                         }
                                     }
                                     last_lines = total;
@@ -3953,10 +4227,16 @@ printf '{"store_bytes":%s,"reclaimable_bytes":%s,"dead_paths":%s,"gc_roots":%s,"
                         }
                     }
                     if let Ok(check) = run_cmd("pgrep -f nix-collect-garbage").await {
-                        if check.exit_status != 0 && last_lines > 0 { break; }
+                        if check.exit_status != 0 && last_lines > 0 {
+                            break;
+                        }
                     }
                 }
-                let _ = ws_tx.send(Message::Text(serde_json::json!({"type":"exit","code":0}).to_string())).await;
+                let _ = ws_tx
+                    .send(Message::Text(
+                        serde_json::json!({"type":"exit","code":0}).to_string(),
+                    ))
+                    .await;
             }
 
             "diagnose" => {
@@ -3982,10 +4262,24 @@ echo '}'
 "#;
                 match run_cmd(script).await {
                     Ok(r) => {
-                        let clean: String = r.stdout.chars().filter(|c| !c.is_control() || *c == '\n').collect();
-                        let _ = ws_tx.send(Message::Text(serde_json::json!({"type":"diagnose","data":clean}).to_string())).await;
+                        let clean: String = r
+                            .stdout
+                            .chars()
+                            .filter(|c| !c.is_control() || *c == '\n')
+                            .collect();
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                serde_json::json!({"type":"diagnose","data":clean}).to_string(),
+                            ))
+                            .await;
                     }
-                    Err(e) => { let _ = ws_tx.send(Message::Text(RelayMessage::error(&format!("Diagnose failed: {}", e)).to_json())).await; }
+                    Err(e) => {
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                RelayMessage::error(&format!("Diagnose failed: {}", e)).to_json(),
+                            ))
+                            .await;
+                    }
                 }
             }
 
@@ -3993,16 +4287,37 @@ echo '}'
                 eprintln!("[{}] Reading config...", peer_addr);
                 match run_cmd("cat /etc/nixos/configuration.nix 2>/dev/null").await {
                     Ok(r) if r.exit_status == 0 => {
-                        let _ = ws_tx.send(Message::Text(serde_json::json!({"type":"config","data":r.stdout}).to_string())).await;
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                serde_json::json!({"type":"config","data":r.stdout}).to_string(),
+                            ))
+                            .await;
                     }
-                    Ok(_) => { let _ = ws_tx.send(Message::Text(RelayMessage::error("Cannot read /etc/nixos/configuration.nix").to_json())).await; }
-                    Err(e) => { let _ = ws_tx.send(Message::Text(RelayMessage::error(&format!("Failed: {}", e)).to_json())).await; }
+                    Ok(_) => {
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                RelayMessage::error("Cannot read /etc/nixos/configuration.nix")
+                                    .to_json(),
+                            ))
+                            .await;
+                    }
+                    Err(e) => {
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                RelayMessage::error(&format!("Failed: {}", e)).to_json(),
+                            ))
+                            .await;
+                    }
                 }
             }
 
             "write_config" => {
                 if client_msg.configuration_nix.is_empty() {
-                    let _ = ws_tx.send(Message::Text(RelayMessage::error("Missing configuration_nix").to_json())).await;
+                    let _ = ws_tx
+                        .send(Message::Text(
+                            RelayMessage::error("Missing configuration_nix").to_json(),
+                        ))
+                        .await;
                     continue;
                 }
                 eprintln!("[{}] Writing config + rebuilding...", peer_addr);
@@ -4019,10 +4334,15 @@ echo '}'
                     wc_config_path, client_msg.configuration_nix
                 );
                 if let Err(e) = run_cmd(&upload).await {
-                    let _ = ws_tx.send(Message::Text(RelayMessage::error(&format!("Upload failed: {}", e)).to_json())).await;
+                    let _ = ws_tx
+                        .send(Message::Text(
+                            RelayMessage::error(&format!("Upload failed: {}", e)).to_json(),
+                        ))
+                        .await;
                     continue;
                 }
-                let rebuild_script = format!(r#"set -eo pipefail
+                let rebuild_script = format!(
+                    r#"set -eo pipefail
 cp /etc/nixos/configuration.nix /etc/nixos/configuration.nix.bak
 cp {config} /etc/nixos/configuration.nix
 if ! nix-instantiate --parse /etc/nixos/configuration.nix > /dev/null 2>&1; then
@@ -4033,26 +4353,50 @@ fi
 echo "Config validated. Rebuilding..."
 nixos-rebuild switch 2>&1
 echo "REBUILD_COMPLETE"
-"#, config = wc_config_path);
-                let _ = run_cmd(&format!("touch {} && chmod 600 {}", wc_log_path, wc_log_path)).await;
+"#,
+                    config = wc_config_path
+                );
+                let _ = run_cmd(&format!(
+                    "touch {} && chmod 600 {}",
+                    wc_log_path, wc_log_path
+                ))
+                .await;
                 let _ = run_cmd(&format!(
                     "cat > {} << 'SCRIPTEOF'\n{}\nSCRIPTEOF\nchmod +x {}\nbash {} > {} 2>&1 &",
                     wc_script_path, rebuild_script, wc_script_path, wc_script_path, wc_log_path
-                )).await;
-                let _ = ws_tx.send(Message::Text(RelayMessage::output("Rebuilding system...", "stdout").to_json())).await;
+                ))
+                .await;
+                let _ = ws_tx
+                    .send(Message::Text(
+                        RelayMessage::output("Rebuilding system...", "stdout").to_json(),
+                    ))
+                    .await;
                 let mut last_lines = 0u64;
                 let mut complete = false;
                 loop {
                     tokio::time::sleep(std::time::Duration::from_secs(3)).await;
-                    if let Ok(result) = run_cmd(&format!("wc -l < {} 2>/dev/null && tail -n +{} {} 2>/dev/null", wc_log_path, last_lines + 1, wc_log_path)).await {
+                    if let Ok(result) = run_cmd(&format!(
+                        "wc -l < {} 2>/dev/null && tail -n +{} {} 2>/dev/null",
+                        wc_log_path,
+                        last_lines + 1,
+                        wc_log_path
+                    ))
+                    .await
+                    {
                         if result.exit_status == 0 {
                             let lines: Vec<&str> = result.stdout.lines().collect();
                             if let Some(first) = lines.first() {
                                 if let Ok(total) = first.trim().parse::<u64>() {
                                     for line in &lines[1..] {
                                         if !line.trim().is_empty() {
-                                            let _ = ws_tx.send(Message::Text(RelayMessage::output(line, "stdout").to_json())).await;
-                                            if line.contains("REBUILD_COMPLETE") { complete = true; }
+                                            let _ = ws_tx
+                                                .send(Message::Text(
+                                                    RelayMessage::output(line, "stdout").to_json(),
+                                                ))
+                                                .await;
+                                            if line.contains("REBUILD_COMPLETE") {
+                                                complete = true;
+                                            }
                                         }
                                     }
                                     last_lines = total;
@@ -4060,13 +4404,21 @@ echo "REBUILD_COMPLETE"
                             }
                         }
                     }
-                    if complete { break; }
+                    if complete {
+                        break;
+                    }
                     if let Ok(check) = run_cmd(&format!("pgrep -f {}", wc_script_path)).await {
-                        if check.exit_status != 0 && last_lines > 0 { break; }
+                        if check.exit_status != 0 && last_lines > 0 {
+                            break;
+                        }
                     }
                 }
                 let exit_code = if complete { 0 } else { 1 };
-                let _ = ws_tx.send(Message::Text(serde_json::json!({"type":"exit","code":exit_code}).to_string())).await;
+                let _ = ws_tx
+                    .send(Message::Text(
+                        serde_json::json!({"type":"exit","code":exit_code}).to_string(),
+                    ))
+                    .await;
             }
 
             // ── PXE / Network Boot ──
@@ -4085,22 +4437,31 @@ echo "REBUILD_COMPLETE"
                 "#;
                 match run_cmd(script).await {
                     Ok(r) if r.exit_status == 0 => {
-                        let _ = ws_tx.send(Message::Text(
-                            serde_json::json!({
-                                "type": "netboot_info",
-                                "data": r.stdout.trim()
-                            }).to_string()
-                        )).await;
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                serde_json::json!({
+                                    "type": "netboot_info",
+                                    "data": r.stdout.trim()
+                                })
+                                .to_string(),
+                            ))
+                            .await;
                     }
                     Ok(r) => {
-                        let _ = ws_tx.send(Message::Text(
-                            RelayMessage::error(&format!("netboot_info failed: {}", r.stderr)).to_json()
-                        )).await;
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                RelayMessage::error(&format!("netboot_info failed: {}", r.stderr))
+                                    .to_json(),
+                            ))
+                            .await;
                     }
                     Err(e) => {
-                        let _ = ws_tx.send(Message::Text(
-                            RelayMessage::error(&format!("netboot_info error: {}", e)).to_json()
-                        )).await;
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                RelayMessage::error(&format!("netboot_info error: {}", e))
+                                    .to_json(),
+                            ))
+                            .await;
                     }
                 }
             }
@@ -4108,7 +4469,6 @@ echo "REBUILD_COMPLETE"
             // ═══════════════════════════════════════════════════════
             // Tier 3: Disk cloning & Machine inventory
             // ═══════════════════════════════════════════════════════
-
             "create_image" => {
                 eprintln!("[{}] Creating system image...", peer_addr);
                 let script = r#"
@@ -4153,20 +4513,40 @@ echo "COMPLETE"
                     .unwrap_or(0);
                 let img_log = format!("/tmp/symthaea-image-{}.log", img_session_id);
                 let _ = run_cmd(&format!("touch {} && chmod 600 {}", img_log, img_log)).await;
-                let _ = run_cmd(&format!("bash -c '{}' > {} 2>&1 &", script.replace('\'', "'\\''"), img_log)).await;
-                let _ = ws_tx.send(Message::Text(RelayMessage::output("Creating system image...", "stdout").to_json())).await;
+                let _ = run_cmd(&format!(
+                    "bash -c '{}' > {} 2>&1 &",
+                    script.replace('\'', "'\\''"),
+                    img_log
+                ))
+                .await;
+                let _ = ws_tx
+                    .send(Message::Text(
+                        RelayMessage::output("Creating system image...", "stdout").to_json(),
+                    ))
+                    .await;
                 // Stream output (same polling pattern as install)
                 let mut last_lines = 0u64;
                 loop {
                     tokio::time::sleep(std::time::Duration::from_secs(3)).await;
-                    if let Ok(result) = run_cmd(&format!("wc -l < {} 2>/dev/null && tail -n +{} {} 2>/dev/null", img_log, last_lines + 1, img_log)).await {
+                    if let Ok(result) = run_cmd(&format!(
+                        "wc -l < {} 2>/dev/null && tail -n +{} {} 2>/dev/null",
+                        img_log,
+                        last_lines + 1,
+                        img_log
+                    ))
+                    .await
+                    {
                         if result.exit_status == 0 {
                             let lines: Vec<&str> = result.stdout.lines().collect();
                             if let Some(first) = lines.first() {
                                 if let Ok(total) = first.trim().parse::<u64>() {
                                     for line in &lines[1..] {
                                         if !line.trim().is_empty() {
-                                            let _ = ws_tx.send(Message::Text(RelayMessage::output(line, "stdout").to_json())).await;
+                                            let _ = ws_tx
+                                                .send(Message::Text(
+                                                    RelayMessage::output(line, "stdout").to_json(),
+                                                ))
+                                                .await;
                                         }
                                     }
                                     last_lines = total;
@@ -4174,23 +4554,36 @@ echo "COMPLETE"
                             }
                         }
                     }
-                    if let Ok(check) = run_cmd("pgrep -f 'btrfs send' || pgrep -f 'tar -czf'").await {
-                        if check.exit_status != 0 && last_lines > 0 { break; }
+                    if let Ok(check) = run_cmd("pgrep -f 'btrfs send' || pgrep -f 'tar -czf'").await
+                    {
+                        if check.exit_status != 0 && last_lines > 0 {
+                            break;
+                        }
                     }
                 }
-                let _ = ws_tx.send(Message::Text(serde_json::json!({"type":"exit","code":0}).to_string())).await;
+                let _ = ws_tx
+                    .send(Message::Text(
+                        serde_json::json!({"type":"exit","code":0}).to_string(),
+                    ))
+                    .await;
             }
 
             "restore_image" => {
                 let image_path = match sanitize_input(&client_msg.command, "image path", true) {
                     Ok(p) => p,
                     Err(e) => {
-                        let _ = ws_tx.send(Message::Text(RelayMessage::error(&e).to_json())).await;
+                        let _ = ws_tx
+                            .send(Message::Text(RelayMessage::error(&e).to_json()))
+                            .await;
                         continue;
                     }
                 };
-                eprintln!("[{}] Restoring system image from {}...", peer_addr, image_path);
-                let script = format!(r#"
+                eprintln!(
+                    "[{}] Restoring system image from {}...",
+                    peer_addr, image_path
+                );
+                let script = format!(
+                    r#"
 set -eo pipefail
 echo "STAGE: Restoring system image..."
 if [ -f "{path}/system.btrfs.zst" ]; then
@@ -4208,24 +4601,42 @@ cp "{path}/configuration.nix" /mnt/etc/nixos/ 2>/dev/null || true
 cp "{path}/hardware-configuration.nix" /mnt/etc/nixos/ 2>/dev/null || true
 echo "STAGE: Image restored"
 echo "COMPLETE"
-"#, path = image_path);
+"#,
+                    path = image_path
+                );
                 match run_cmd(&script).await {
                     Ok(r) => {
                         let _ = ws_tx.send(Message::Text(serde_json::json!({"type":"exit","code":r.exit_status,"data":r.stdout}).to_string())).await;
                     }
                     Err(e) => {
-                        let _ = ws_tx.send(Message::Text(RelayMessage::error(&format!("Restore failed: {}", e)).to_json())).await;
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                RelayMessage::error(&format!("Restore failed: {}", e)).to_json(),
+                            ))
+                            .await;
                     }
                 }
             }
 
             "list_images" => {
-                match run_cmd("ls -la /tmp/nixforhumanity-image-* 2>/dev/null | head -20 || echo '[]'").await {
+                match run_cmd(
+                    "ls -la /tmp/nixforhumanity-image-* 2>/dev/null | head -20 || echo '[]'",
+                )
+                .await
+                {
                     Ok(r) => {
-                        let _ = ws_tx.send(Message::Text(serde_json::json!({"type":"images","data":r.stdout}).to_string())).await;
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                serde_json::json!({"type":"images","data":r.stdout}).to_string(),
+                            ))
+                            .await;
                     }
                     Err(e) => {
-                        let _ = ws_tx.send(Message::Text(RelayMessage::error(&format!("List failed: {}", e)).to_json())).await;
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                RelayMessage::error(&format!("List failed: {}", e)).to_json(),
+                            ))
+                            .await;
                     }
                 }
             }
@@ -4255,14 +4666,34 @@ echo '}'
 "#;
                 match run_cmd(script).await {
                     Ok(r) if r.exit_status == 0 => {
-                        let clean: String = r.stdout.chars().filter(|c| !c.is_control() || *c == '\n').collect();
-                        let _ = ws_tx.send(Message::Text(serde_json::json!({"type":"inventory","data":clean}).to_string())).await;
+                        let clean: String = r
+                            .stdout
+                            .chars()
+                            .filter(|c| !c.is_control() || *c == '\n')
+                            .collect();
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                serde_json::json!({"type":"inventory","data":clean}).to_string(),
+                            ))
+                            .await;
                     }
                     Ok(r) => {
-                        let _ = ws_tx.send(Message::Text(RelayMessage::error(&format!("Inventory failed: {}", &r.stderr[..r.stderr.len().min(200)])).to_json())).await;
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                RelayMessage::error(&format!(
+                                    "Inventory failed: {}",
+                                    &r.stderr[..r.stderr.len().min(200)]
+                                ))
+                                .to_json(),
+                            ))
+                            .await;
                     }
                     Err(e) => {
-                        let _ = ws_tx.send(Message::Text(RelayMessage::error(&format!("Inventory failed: {}", e)).to_json())).await;
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                RelayMessage::error(&format!("Inventory failed: {}", e)).to_json(),
+                            ))
+                            .await;
                     }
                 }
             }
@@ -4270,22 +4701,33 @@ echo '}'
             // ── WiFi scanning and connection ──
             "scan_wifi" => {
                 eprintln!("[{}] Scanning WiFi...", peer_addr);
-                match run_cmd("nmcli -t -f SSID,SIGNAL,SECURITY device wifi list 2>/dev/null").await {
+                match run_cmd("nmcli -t -f SSID,SIGNAL,SECURITY device wifi list 2>/dev/null").await
+                {
                     Ok(r) if r.exit_status == 0 => {
-                        let _ = ws_tx.send(Message::Text(
-                            serde_json::json!({"type": "wifi_list", "data": r.stdout}).to_string()
-                        )).await;
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                serde_json::json!({"type": "wifi_list", "data": r.stdout})
+                                    .to_string(),
+                            ))
+                            .await;
                     }
                     Ok(r) => {
-                        let _ = ws_tx.send(Message::Text(
-                            RelayMessage::error(&format!("WiFi scan failed: {}",
-                                r.stderr.chars().take(200).collect::<String>())).to_json()
-                        )).await;
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                RelayMessage::error(&format!(
+                                    "WiFi scan failed: {}",
+                                    r.stderr.chars().take(200).collect::<String>()
+                                ))
+                                .to_json(),
+                            ))
+                            .await;
                     }
                     Err(e) => {
-                        let _ = ws_tx.send(Message::Text(
-                            RelayMessage::error(&format!("WiFi scan failed: {}", e)).to_json()
-                        )).await;
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                RelayMessage::error(&format!("WiFi scan failed: {}", e)).to_json(),
+                            ))
+                            .await;
                     }
                 }
             }
@@ -4295,12 +4737,15 @@ echo '}'
                 let ssid = client_msg.hostname.trim().to_string();
                 let wifi_pw = &client_msg.command;
                 if ssid.is_empty() {
-                    let _ = ws_tx.send(Message::Text(
-                        RelayMessage::error("WiFi SSID is required").to_json()
-                    )).await;
+                    let _ = ws_tx
+                        .send(Message::Text(
+                            RelayMessage::error("WiFi SSID is required").to_json(),
+                        ))
+                        .await;
                 } else {
                     eprintln!("[{}] Connecting to WiFi: {}", peer_addr, ssid);
-                    let cmd = format!("nmcli device wifi connect '{}' password '{}'",
+                    let cmd = format!(
+                        "nmcli device wifi connect '{}' password '{}'",
                         ssid.replace('\'', "'\\''"),
                         wifi_pw.replace('\'', "'\\''")
                     );
@@ -4313,9 +4758,12 @@ echo '}'
                             }).to_string())).await;
                         }
                         Err(e) => {
-                            let _ = ws_tx.send(Message::Text(
-                                RelayMessage::error(&format!("WiFi connection failed: {}", e)).to_json()
-                            )).await;
+                            let _ = ws_tx
+                                .send(Message::Text(
+                                    RelayMessage::error(&format!("WiFi connection failed: {}", e))
+                                        .to_json(),
+                                ))
+                                .await;
                         }
                     }
                 }
@@ -4324,21 +4772,28 @@ echo '}'
             "search_packages" => {
                 let query = client_msg.command.trim();
                 if query.is_empty() {
-                    let _ = ws_tx.send(Message::Text(
-                        RelayMessage::error("Missing search query").to_json()
-                    )).await;
+                    let _ = ws_tx
+                        .send(Message::Text(
+                            RelayMessage::error("Missing search query").to_json(),
+                        ))
+                        .await;
                     continue;
                 }
                 eprintln!("[{}] Searching packages: {}", peer_addr, query);
                 // Sanitize query: allow only alphanumeric, dash, underscore, dot, space
-                let safe_query: String = query.chars()
-                    .filter(|c| c.is_alphanumeric() || *c == '-' || *c == '_' || *c == '.' || *c == ' ')
+                let safe_query: String = query
+                    .chars()
+                    .filter(|c| {
+                        c.is_alphanumeric() || *c == '-' || *c == '_' || *c == '.' || *c == ' '
+                    })
                     .take(100)
                     .collect();
                 if safe_query.is_empty() {
-                    let _ = ws_tx.send(Message::Text(
-                        RelayMessage::error("Invalid search query").to_json()
-                    )).await;
+                    let _ = ws_tx
+                        .send(Message::Text(
+                            RelayMessage::error("Invalid search query").to_json(),
+                        ))
+                        .await;
                     continue;
                 }
                 let cmd = format!(
@@ -4353,10 +4808,10 @@ echo '}'
                         if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(&r.stdout) {
                             if let Some(obj) = parsed.as_object() {
                                 for (attr, info) in obj.iter().take(30) {
-                                    let pname = info.get("pname")
-                                        .and_then(|v| v.as_str())
-                                        .unwrap_or("");
-                                    let desc = info.get("description")
+                                    let pname =
+                                        info.get("pname").and_then(|v| v.as_str()).unwrap_or("");
+                                    let desc = info
+                                        .get("description")
                                         .and_then(|v| v.as_str())
                                         .unwrap_or("");
                                     // Extract short attr name from legacyPackages.x86_64-linux.pkgname
@@ -4369,10 +4824,15 @@ echo '}'
                                 }
                             }
                         }
-                        let _ = ws_tx.send(Message::Text(serde_json::json!({
-                            "type": "packages",
-                            "data": results
-                        }).to_string())).await;
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                serde_json::json!({
+                                    "type": "packages",
+                                    "data": results
+                                })
+                                .to_string(),
+                            ))
+                            .await;
                     }
                     Ok(r) => {
                         // Fallback: nix-env query
@@ -4384,7 +4844,8 @@ echo '}'
                             Ok(r2) if r2.exit_status == 0 && !r2.stdout.trim().is_empty() => {
                                 let mut results = Vec::new();
                                 for line in r2.stdout.lines().take(30) {
-                                    let parts: Vec<&str> = line.splitn(2, char::is_whitespace).collect();
+                                    let parts: Vec<&str> =
+                                        line.splitn(2, char::is_whitespace).collect();
                                     if let Some(attr) = parts.first() {
                                         results.push(serde_json::json!({
                                             "attr": attr.rsplit('.').next().unwrap_or(attr),
@@ -4393,25 +4854,35 @@ echo '}'
                                         }));
                                     }
                                 }
-                                let _ = ws_tx.send(Message::Text(serde_json::json!({
-                                    "type": "packages",
-                                    "data": results
-                                }).to_string())).await;
+                                let _ = ws_tx
+                                    .send(Message::Text(
+                                        serde_json::json!({
+                                            "type": "packages",
+                                            "data": results
+                                        })
+                                        .to_string(),
+                                    ))
+                                    .await;
                             }
                             _ => {
-                                let _ = ws_tx.send(Message::Text(
-                                    RelayMessage::error(&format!(
-                                        "Package search returned no results: {}",
-                                        r.stderr.chars().take(200).collect::<String>()
-                                    )).to_json()
-                                )).await;
+                                let _ = ws_tx
+                                    .send(Message::Text(
+                                        RelayMessage::error(&format!(
+                                            "Package search returned no results: {}",
+                                            r.stderr.chars().take(200).collect::<String>()
+                                        ))
+                                        .to_json(),
+                                    ))
+                                    .await;
                             }
                         }
                     }
                     Err(e) => {
-                        let _ = ws_tx.send(Message::Text(
-                            RelayMessage::error(&format!("Search failed: {}", e)).to_json()
-                        )).await;
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                RelayMessage::error(&format!("Search failed: {}", e)).to_json(),
+                            ))
+                            .await;
                     }
                 }
             }
@@ -4423,20 +4894,33 @@ echo '}'
             "validate_packages" => {
                 let packages_str = &client_msg.command;
                 if packages_str.is_empty() {
-                    let _ = ws_tx.send(Message::Text(RelayMessage::error("No packages to validate").to_json())).await;
+                    let _ = ws_tx
+                        .send(Message::Text(
+                            RelayMessage::error("No packages to validate").to_json(),
+                        ))
+                        .await;
                     continue;
                 }
                 eprintln!("[{}] Validating packages...", peer_addr);
 
-                let packages: Vec<&str> = packages_str.split(',').map(|s| s.trim()).filter(|s| !s.is_empty()).collect();
+                let packages: Vec<&str> = packages_str
+                    .split(',')
+                    .map(|s| s.trim())
+                    .filter(|s| !s.is_empty())
+                    .collect();
                 let mut valid = Vec::new();
                 let mut invalid = Vec::new();
                 let mut suggestions: Vec<String> = Vec::new();
 
                 for pkg in &packages {
                     // Sanitize: strip shell-dangerous characters
-                    let pkg_clean: String = pkg.chars().filter(|c| !matches!(c, '\'' | ';' | '"' | '`' | '$' | '|' | '&')).collect();
-                    if pkg_clean.is_empty() { continue; }
+                    let pkg_clean: String = pkg
+                        .chars()
+                        .filter(|c| !matches!(c, '\'' | ';' | '"' | '`' | '$' | '|' | '&'))
+                        .collect();
+                    if pkg_clean.is_empty() {
+                        continue;
+                    }
 
                     // Check if package exists in nixpkgs via nix eval
                     let check_cmd = format!(
@@ -4445,7 +4929,9 @@ echo '}'
                     );
                     match run_cmd(&check_cmd).await {
                         Ok(r) => {
-                            if r.stdout.contains("EXISTS") || (r.exit_status == 0 && !r.stdout.contains("MISSING")) {
+                            if r.stdout.contains("EXISTS")
+                                || (r.exit_status == 0 && !r.stdout.contains("MISSING"))
+                            {
                                 valid.push(pkg_clean.clone());
                             } else {
                                 invalid.push(pkg_clean.clone());
@@ -4457,14 +4943,26 @@ echo '}'
                                 if let Ok(sr) = run_cmd(&suggest_cmd).await {
                                     if !sr.stdout.is_empty() && sr.stdout.trim() != "{}" {
                                         // Extract first few attribute names from JSON
-                                        if let Ok(val) = serde_json::from_str::<serde_json::Value>(&sr.stdout) {
+                                        if let Ok(val) =
+                                            serde_json::from_str::<serde_json::Value>(&sr.stdout)
+                                        {
                                             if let Some(obj) = val.as_object() {
-                                                let alts: Vec<String> = obj.keys()
+                                                let alts: Vec<String> = obj
+                                                    .keys()
                                                     .take(3)
-                                                    .map(|k| k.rsplit('.').next().unwrap_or(k).to_string())
+                                                    .map(|k| {
+                                                        k.rsplit('.')
+                                                            .next()
+                                                            .unwrap_or(k)
+                                                            .to_string()
+                                                    })
                                                     .collect();
                                                 if !alts.is_empty() {
-                                                    suggestions.push(format!("{}: try {}", pkg_clean, alts.join(", ")));
+                                                    suggestions.push(format!(
+                                                        "{}: try {}",
+                                                        pkg_clean,
+                                                        alts.join(", ")
+                                                    ));
                                                 }
                                             }
                                         }
@@ -4472,7 +4970,9 @@ echo '}'
                                 }
                             }
                         }
-                        Err(_) => { invalid.push(pkg_clean); }
+                        Err(_) => {
+                            invalid.push(pkg_clean);
+                        }
                     }
                 }
 
@@ -4554,7 +5054,9 @@ fn usage() {
     eprintln!("  ssh-relay [--port <port>] [--bind <addr>] [--token <token>] [--pxe [port]]");
     eprintln!();
     eprintln!("Options:");
-    eprintln!("  --pxe [port]   Also serve NixOS kernel+initrd over HTTP for PXE boot (default: 8080)");
+    eprintln!(
+        "  --pxe [port]   Also serve NixOS kernel+initrd over HTTP for PXE boot (default: 8080)"
+    );
     eprintln!();
     eprintln!("Security defaults:");
     eprintln!("  - Binds to 127.0.0.1 only");
@@ -4581,7 +5083,11 @@ async fn main() {
                     port = p;
                 }
             }
-            "--bind" => { if let Some(a) = args.next() { bind_addr = a; } }
+            "--bind" => {
+                if let Some(a) = args.next() {
+                    bind_addr = a;
+                }
+            }
             "--token" => token = args.next(),
             "--tls" => enable_tls = true,
             "--tls-cert" => tls_cert_path = args.next(),
@@ -4591,7 +5097,7 @@ async fn main() {
                 pxe_port = Some(
                     args.next()
                         .and_then(|p| p.parse::<u16>().ok())
-                        .unwrap_or(8080)
+                        .unwrap_or(8080),
                 );
             }
             "--help" | "-h" => {
@@ -4672,7 +5178,14 @@ async fn main() {
     let scheme = if tls_acceptor.is_some() { "wss" } else { "ws" };
     eprintln!("NixForHumanity Relay listening on {}://{}", scheme, addr);
     eprintln!("  Mode: local (no SSH)");
-    eprintln!("  TLS: {}", if tls_acceptor.is_some() { "enabled (self-signed)" } else { "disabled (use --tls to enable)" });
+    eprintln!(
+        "  TLS: {}",
+        if tls_acceptor.is_some() {
+            "enabled (self-signed)"
+        } else {
+            "disabled (use --tls to enable)"
+        }
+    );
     eprintln!("  Auth token: {}", auth_token);
     eprintln!("  Protocol: auth → connect → (discover_disks/install/...) → disconnect");
     eprintln!("  Session timeout: 30 minutes");
@@ -4685,11 +5198,19 @@ async fn main() {
             // Find kernel and initrd in the nix store
             let kernel_result = run_cmd("ls /nix/store/*/bzImage 2>/dev/null | head -1").await;
             let initrd_result = run_cmd("ls /nix/store/*/initrd 2>/dev/null | head -1").await;
-            let kernel_path = kernel_result.ok().map(|r| r.stdout.trim().to_string()).unwrap_or_default();
-            let initrd_path = initrd_result.ok().map(|r| r.stdout.trim().to_string()).unwrap_or_default();
+            let kernel_path = kernel_result
+                .ok()
+                .map(|r| r.stdout.trim().to_string())
+                .unwrap_or_default();
+            let initrd_path = initrd_result
+                .ok()
+                .map(|r| r.stdout.trim().to_string())
+                .unwrap_or_default();
 
             if kernel_path.is_empty() || initrd_path.is_empty() {
-                eprintln!("PXE: NixOS kernel/initrd not found in nix store. PXE server not started.");
+                eprintln!(
+                    "PXE: NixOS kernel/initrd not found in nix store. PXE server not started."
+                );
                 eprintln!("PXE: Build the ISO first: nix-build nix/installer-iso.nix");
                 return;
             }
@@ -4707,10 +5228,16 @@ async fn main() {
                 }
             };
 
-            eprintln!("PXE: Serving kernel+initrd on http://{}:{}", pxe_bind, pxe_p);
+            eprintln!(
+                "PXE: Serving kernel+initrd on http://{}:{}",
+                pxe_bind, pxe_p
+            );
             eprintln!("PXE:   kernel: {}", kernel_path);
             eprintln!("PXE:   initrd: {}", initrd_path);
-            eprintln!("PXE: For dnsmasq, add: dhcp-boot=pxelinux.0,,{}:{}", pxe_bind, pxe_p);
+            eprintln!(
+                "PXE: For dnsmasq, add: dhcp-boot=pxelinux.0,,{}:{}",
+                pxe_bind, pxe_p
+            );
 
             // Serve the directory with python3
             let serve_cmd = format!(
@@ -4735,16 +5262,28 @@ async fn main() {
                         let peer_ref = peer.clone();
                         let origin_check = |req: &tungstenite::handshake::server::Request,
                                             resp: tungstenite::handshake::server::Response|
-                            -> Result<tungstenite::handshake::server::Response, tungstenite::handshake::server::ErrorResponse> {
+                         -> Result<
+                            tungstenite::handshake::server::Response,
+                            tungstenite::handshake::server::ErrorResponse,
+                        > {
                             if let Some(origin) = req.headers().get("origin") {
                                 let o = origin.to_str().unwrap_or("");
-                                let ok = o.starts_with("http://localhost") || o.starts_with("https://localhost")
-                                    || o.starts_with("http://127.0.0.1") || o.starts_with("https://127.0.0.1")
-                                    || o.contains("luminousdynamics.io") || o.contains("nixforhumanity.org")
-                                    || o.contains("mycelix.net") || o.contains("relationalharmonics.org");
+                                let ok = o.starts_with("http://localhost")
+                                    || o.starts_with("https://localhost")
+                                    || o.starts_with("http://127.0.0.1")
+                                    || o.starts_with("https://127.0.0.1")
+                                    || o.contains("luminousdynamics.io")
+                                    || o.contains("nixforhumanity.org")
+                                    || o.contains("mycelix.net")
+                                    || o.contains("relationalharmonics.org");
                                 if !ok {
-                                    eprintln!("[{}] Rejected TLS WebSocket: disallowed Origin '{}'", peer_ref, o);
-                                    let mut r = tungstenite::handshake::server::ErrorResponse::new(Some("Forbidden origin".into()));
+                                    eprintln!(
+                                        "[{}] Rejected TLS WebSocket: disallowed Origin '{}'",
+                                        peer_ref, o
+                                    );
+                                    let mut r = tungstenite::handshake::server::ErrorResponse::new(
+                                        Some("Forbidden origin".into()),
+                                    );
                                     *r.status_mut() = tungstenite::http::StatusCode::FORBIDDEN;
                                     return Err(r);
                                 }
@@ -4753,7 +5292,10 @@ async fn main() {
                         };
                         let ws_stream = match accept_hdr_async(tls_stream, origin_check).await {
                             Ok(ws) => ws,
-                            Err(e) => { eprintln!("[{}] TLS WebSocket upgrade failed: {}", peer, e); return; }
+                            Err(e) => {
+                                eprintln!("[{}] TLS WebSocket upgrade failed: {}", peer, e);
+                                return;
+                            }
                         };
                         handle_connection_ws(ws_stream, peer, tracker, auth).await;
                     }

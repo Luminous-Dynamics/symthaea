@@ -144,19 +144,13 @@ mod tests {
     #[test]
     fn perfect_golden_ratio() {
         let score = golden_ratio_score(PHI);
-        assert!(
-            (score - 1.0).abs() < 0.01,
-            "perfect ratio score = {score}"
-        );
+        assert!((score - 1.0).abs() < 0.01, "perfect ratio score = {score}");
     }
 
     #[test]
     fn inverse_golden_also_perfect() {
         let score = golden_ratio_score(INV_PHI);
-        assert!(
-            (score - 1.0).abs() < 0.01,
-            "inverse ratio score = {score}"
-        );
+        assert!((score - 1.0).abs() < 0.01, "inverse ratio score = {score}");
     }
 
     #[test]

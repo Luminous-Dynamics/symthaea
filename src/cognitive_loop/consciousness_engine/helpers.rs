@@ -176,7 +176,12 @@ impl ConsciousnessEngine {
             + w.pipeline * pipeline
             + w.multimodal * multimodal_phi;
 
-        unified.clamp(0.0, 1.0)
+        // Consciousness floor: prevent total consciousness death.
+        // Even with all subsystems at zero, the temporal continuity of the
+        // CfC network provides a baseline level of information processing.
+        // 0.05 = minimal but nonzero consciousness (enough for Red safety level).
+        const CONSCIOUSNESS_FLOOR: f64 = 0.05;
+        unified.max(CONSCIOUSNESS_FLOOR).clamp(0.0, 1.0)
     }
 
     /// Populate a ConsciousnessCache from the engine's internal cache.

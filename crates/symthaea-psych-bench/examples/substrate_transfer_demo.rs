@@ -108,9 +108,7 @@ fn main() {
     let report = matrix.realizability_report();
 
     println!("\n\x1b[1m═══ Realizability Report ═══\x1b[0m\n");
-    println!(
-        "Substrate Rankings (by best preservation as target):"
-    );
+    println!("Substrate Rankings (by best preservation as target):");
     for (i, (substrate, score)) in report.substrate_rankings.iter().enumerate() {
         println!("  {}. {:?}:  {:.4}", i + 1, substrate, score);
     }
@@ -165,11 +163,7 @@ fn run_transfer(scenario: &TransferScenario) -> TransferProtocol {
     for &domain in CognitiveDomain::ALL {
         let base = baseline_by_domain.get(&domain).copied().unwrap_or(0.0);
         let post = post_by_domain.get(&domain).copied().unwrap_or(0.0);
-        let pct = if base > 0.0 {
-            post / base * 100.0
-        } else {
-            0.0
-        };
+        let pct = if base > 0.0 { post / base * 100.0 } else { 0.0 };
         let color = if pct >= 95.0 {
             "\x1b[32m" // green
         } else if pct >= 80.0 {
@@ -231,9 +225,7 @@ fn apply_scenario_degradation(
 }
 
 /// Simple per-domain mean aggregation for display.
-fn aggregate_simple(
-    scores: &[BenchmarkScore],
-) -> std::collections::HashMap<CognitiveDomain, f64> {
+fn aggregate_simple(scores: &[BenchmarkScore]) -> std::collections::HashMap<CognitiveDomain, f64> {
     let mut sums: std::collections::HashMap<CognitiveDomain, (f64, usize)> =
         std::collections::HashMap::new();
     for s in scores {

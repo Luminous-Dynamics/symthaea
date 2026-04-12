@@ -52,10 +52,7 @@ pub enum ServerInbound {
         events: Vec<InputEvent>,
     },
     /// Received frame acknowledgment.
-    FrameAck {
-        session_id: String,
-        frame_id: u64,
-    },
+    FrameAck { session_id: String, frame_id: u64 },
     /// Received consciousness attestation.
     Attestation {
         session_id: String,
@@ -64,10 +61,7 @@ pub enum ServerInbound {
         signature: Vec<u8>,
     },
     /// Client disconnected.
-    Disconnected {
-        session_id: String,
-        reason: String,
-    },
+    Disconnected { session_id: String, reason: String },
 }
 
 /// Sync handle for the RDP server, called from the 50Hz tick loop.
@@ -200,9 +194,9 @@ impl RdpServerHandle {
                     session_key,
                     config,
                 } => {
-                    if let Some(id) =
-                        self.sessions
-                            .create_session(&peer_id, config.clone(), false)
+                    if let Some(id) = self
+                        .sessions
+                        .create_session(&peer_id, config.clone(), false)
                     {
                         if let Some(session) = self.sessions.session_mut(&id) {
                             session.on_connected();
@@ -225,10 +219,7 @@ impl RdpServerHandle {
                         self.force_full_frame = true;
                     }
                 }
-                ServerInbound::Input {
-                    session_id,
-                    events,
-                } => {
+                ServerInbound::Input { session_id, events } => {
                     // Check consciousness gate before accepting input.
                     let can_forward = self
                         .sessions
@@ -340,8 +331,7 @@ impl RdpServerHandle {
                 let frames = session.drain_outbound();
                 for frame in frames {
                     // Serialize frame.
-                    let serialized =
-                        serde_json::to_vec(&frame).unwrap_or_default();
+                    let serialized = serde_json::to_vec(&frame).unwrap_or_default();
 
                     // Encrypt with session key.
                     let data = if let Some(_key) = session.encryption_key() {
@@ -384,8 +374,8 @@ impl RdpServerHandle {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::super::rdp_capture::TestCapture;
+    use super::*;
 
     #[test]
     fn test_server_tick_no_sessions_no_capture() {

@@ -10,8 +10,8 @@
 //! Low Ψ = Formant (raw, emerging). High Ψ = Kokoro (clear, articulate).
 
 pub mod cmudict;
-pub mod g2p;
 pub mod formants;
+pub mod g2p;
 #[cfg(feature = "kokoro")]
 pub mod kokoro;
 pub mod ltc_voice;
@@ -58,7 +58,9 @@ pub fn speak_with_engine(
 /// Pure Rust formant synthesis.
 fn speak_formant(text: &str, prosody: &VoiceProsody, sample_rate: u32) -> Vec<f32> {
     let phonemes = g2p::text_to_phonemes(text);
-    if phonemes.is_empty() { return Vec::new(); }
+    if phonemes.is_empty() {
+        return Vec::new();
+    }
     let frames = formants::phonemes_to_frames(&phonemes, prosody, sample_rate);
     vocoder::synthesize(&frames, sample_rate)
 }
@@ -68,8 +70,8 @@ fn speak_formant(text: &str, prosody: &VoiceProsody, sample_rate: u32) -> Vec<f3
 fn speak_kokoro(text: &str, prosody: &VoiceProsody, sample_rate: u32) -> Vec<f32> {
     #[cfg(feature = "kokoro")]
     {
-        use std::sync::OnceLock;
         use std::sync::Mutex;
+        use std::sync::OnceLock;
 
         static KOKORO: OnceLock<Mutex<Option<kokoro::KokoroEngine>>> = OnceLock::new();
 
@@ -106,7 +108,9 @@ fn speak_kokoro(text: &str, prosody: &VoiceProsody, sample_rate: u32) -> Vec<f32
 /// Vocal processing chain: normalize → presence EQ → compress.
 /// Makes the neural voice crisp, loud, and present.
 fn vocal_chain(audio: &mut Vec<f32>) {
-    if audio.is_empty() { return; }
+    if audio.is_empty() {
+        return;
+    }
 
     // 0. Fade-in first 10ms to eliminate boundary clicks
     let fade_in_samples = (24000.0 * 0.01) as usize; // 10ms at 24kHz
@@ -119,7 +123,9 @@ fn vocal_chain(audio: &mut Vec<f32>) {
     if peak > 0.001 {
         let target = 0.89; // -1 dBFS
         let gain = target / peak;
-        for s in audio.iter_mut() { *s *= gain; }
+        for s in audio.iter_mut() {
+            *s *= gain;
+        }
     }
 
     // 2. Presence EQ: high-shelf boost above 4kHz (+4dB)
@@ -142,8 +148,11 @@ fn vocal_chain(audio: &mut Vec<f32>) {
     for s in audio.iter_mut() {
         let level = s.abs();
         // Envelope follower
-        if level > env { env += attack * (level - env); }
-        else { env += release * (level - env); }
+        if level > env {
+            env += attack * (level - env);
+        } else {
+            env += release * (level - env);
+        }
 
         // Gain reduction
         if env > threshold {
@@ -158,7 +167,9 @@ fn vocal_chain(audio: &mut Vec<f32>) {
     let post_peak = audio.iter().map(|s| s.abs()).fold(0.0f32, f32::max);
     if post_peak > 0.001 && post_peak < 0.85 {
         let makeup = 0.85 / post_peak;
-        for s in audio.iter_mut() { *s *= makeup; }
+        for s in audio.iter_mut() {
+            *s *= makeup;
+        }
     }
 
     // 5. Tail padding: 300ms silence so words don't clip at the end
@@ -190,19 +201,23 @@ fn vocal_chain(audio: &mut Vec<f32>) {
 
 /// Simple linear resampling.
 fn resample(input: &[f32], from_rate: u32, to_rate: u32) -> Vec<f32> {
-    if from_rate == to_rate { return input.to_vec(); }
+    if from_rate == to_rate {
+        return input.to_vec();
+    }
     let ratio = to_rate as f64 / from_rate as f64;
     let output_len = (input.len() as f64 * ratio) as usize;
-    (0..output_len).map(|i| {
-        let src_pos = i as f64 / ratio;
-        let idx = src_pos as usize;
-        let frac = (src_pos - idx as f64) as f32;
-        if idx + 1 < input.len() {
-            input[idx] * (1.0 - frac) + input[idx + 1] * frac
-        } else {
-            input.get(idx).copied().unwrap_or(0.0)
-        }
-    }).collect()
+    (0..output_len)
+        .map(|i| {
+            let src_pos = i as f64 / ratio;
+            let idx = src_pos as usize;
+            let frac = (src_pos - idx as f64) as f32;
+            if idx + 1 < input.len() {
+                input[idx] * (1.0 - frac) + input[idx + 1] * frac
+            } else {
+                input.get(idx).copied().unwrap_or(0.0)
+            }
+        })
+        .collect()
 }
 
 /// Synthesize using static formant lookup (legacy API).
@@ -216,7 +231,12 @@ mod tests {
 
     #[test]
     fn speak_produces_audio() {
-        let prosody = VoiceProsody { arousal: 0.5, valence: 0.3, consciousness: 0.7, serotonin: 0.5 };
+        let prosody = VoiceProsody {
+            arousal: 0.5,
+            valence: 0.3,
+            consciousness: 0.7,
+            serotonin: 0.5,
+        };
         let audio = speak("hello world", &prosody, 44100);
         assert!(!audio.is_empty());
         assert!(audio.iter().any(|&s| s.abs() > 0.001));
@@ -230,8 +250,22 @@ mod tests {
 
     #[test]
     fn arousal_affects_length() {
-        let calm = speak("hello", &VoiceProsody { arousal: 0.1, ..Default::default() }, 44100);
-        let excited = speak("hello", &VoiceProsody { arousal: 0.9, ..Default::default() }, 44100);
+        let calm = speak(
+            "hello",
+            &VoiceProsody {
+                arousal: 0.1,
+                ..Default::default()
+            },
+            44100,
+        );
+        let excited = speak(
+            "hello",
+            &VoiceProsody {
+                arousal: 0.9,
+                ..Default::default()
+            },
+            44100,
+        );
         assert!(excited.len() < calm.len());
     }
 

@@ -212,9 +212,10 @@ pub fn sample_at_time(timeline: &AnimationTimeline, time: f32) -> CognitiveSnaps
     if time <= timeline.keyframes[0].time {
         return timeline.keyframes[0].snapshot.clone();
     }
-    // After last keyframe
-    if time >= timeline.keyframes.last().unwrap().time {
-        return timeline.keyframes.last().unwrap().snapshot.clone();
+    // After last keyframe (safe: len >= 2 guaranteed by guards above)
+    let last_kf = &timeline.keyframes[timeline.keyframes.len() - 1];
+    if time >= last_kf.time {
+        return last_kf.snapshot.clone();
     }
 
     // Find bracketing keyframes
@@ -238,7 +239,7 @@ pub fn sample_at_time(timeline: &AnimationTimeline, time: f32) -> CognitiveSnaps
         }
     }
 
-    timeline.keyframes.last().unwrap().snapshot.clone()
+    last_kf.snapshot.clone()
 }
 
 /// Render the full animation timeline as a sequence of SVG strings.

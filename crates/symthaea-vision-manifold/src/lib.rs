@@ -1,5 +1,4 @@
 #![deny(unsafe_code)]
-
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
@@ -35,20 +34,25 @@ pub mod camera;
 pub mod encoder;
 pub mod manifold;
 pub mod predictive;
+pub mod spectrum;
 pub mod training;
 pub mod types;
 
 pub use attention::SurpriseMap;
-pub use bridge::{CrossManifoldPredictor, VisionBridge};
+pub use bridge::{CognitiveGoalSignal, CrossManifoldPredictor, VisionBridge};
 #[cfg(feature = "camera")]
 pub use camera::CameraSource;
 pub use camera::{CameraManifold, CapturedFrame, MockCameraSource};
 pub use encoder::{MotionField, MultiScaleEncoder, PatchHdcEncoder};
-pub use manifold::{HorizonAccuracy, SceneMemory, VisionManifold};
+pub use manifold::{
+    HorizonAccuracy, ObjectMemory, ObjectTrackingResult, SceneMemory, TrackedObject,
+    VisualSceneGraph, VisualWorkingMemory, VisionManifold, WorkingMemorySlot,
+};
 pub use predictive::{PredictiveCodingHierarchy, PredictiveOutput};
+pub use spectrum::{MultiSpectralEncoder, MultiSpectralFrame, SpectralLayer, SpectrumBand};
 pub use training::{BpttResult, ManifoldTrainer};
 pub use types::{
-    AttentionMap, LearningConfig, ManifoldHealth, ManifoldState, MultiScaleConfig, PatchGrid,
-    SalientRegion, ScaleHealth, SceneMatch, SceneMemoryState, TrainingConfig, TrainingMethod,
-    VisionConfig, VisionTelemetry,
+    AttentionMap, LearningConfig, ManifoldHealth, ManifoldState, MultiScaleConfig, ObjectHypothesis,
+    PatchGrid, SalientRegion, ScaleHealth, SceneGraphEdge, SceneMatch, SceneMemoryState,
+    SpatialRelation, TrainingConfig, TrainingMethod, VisionConfig, VisionTelemetry,
 };

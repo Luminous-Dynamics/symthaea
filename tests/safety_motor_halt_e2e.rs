@@ -44,10 +44,7 @@ fn test_cold_start_triggers_motor_halt() {
     // Cycle 1: phi ≈ 0 → safety enforcement computes Red → carry-forward sets override
     let r1 = service.cycle("safety test: cold start cycle 1");
     let phi1 = r1.metadata.consciousness.consciousness_level;
-    assert!(
-        phi1 < 0.15,
-        "Cold-start phi should be near 0, got {phi1}"
-    );
+    assert!(phi1 < 0.15, "Cold-start phi should be near 0, got {phi1}");
 
     // Cycle 2: embodiment step uses the Red override from cycle 1
     let r2 = service.cycle("safety test: cold start cycle 2");

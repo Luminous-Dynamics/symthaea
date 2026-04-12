@@ -5,8 +5,8 @@
 use std::borrow::Cow;
 use std::time::Instant;
 
-use super::super::helpers;
 use super::super::feedback_state::Priority;
+use super::super::helpers;
 use super::super::phase_results::PerceptionPhaseResult;
 #[cfg(feature = "cpg")]
 use super::super::thresholds::CPG_SYNC_TAU_FLOOR;
@@ -336,11 +336,12 @@ impl CognitiveLoopService {
         if self.config.enable_substrate_encoding_noise {
             let spectral_entropy = self.spectral_manager.telemetry().spectral_entropy;
             if spectral_entropy > super::super::thresholds::SPECTRAL_ENTROPY_THRESHOLD {
-                let overflow = (spectral_entropy - super::super::thresholds::SPECTRAL_ENTROPY_THRESHOLD)
+                let overflow = (spectral_entropy
+                    - super::super::thresholds::SPECTRAL_ENTROPY_THRESHOLD)
                     / super::super::thresholds::SPECTRAL_ENTROPY_THRESHOLD;
                 // spectral_frac: 1.0 at threshold, MASK_FLOOR at 2× threshold
-                let spectral_frac =
-                    (1.0 - overflow as f32).max(super::super::thresholds::SPECTRAL_ENTROPY_MASK_FLOOR);
+                let spectral_frac = (1.0 - overflow as f32)
+                    .max(super::super::thresholds::SPECTRAL_ENTROPY_MASK_FLOOR);
                 // Don't over-mask: use the maximum of substrate and spectral fractions
                 let substrate_frac = self.substrate_manager.effective_dim_fraction();
                 let frac = substrate_frac.max(spectral_frac);
@@ -379,12 +380,10 @@ impl CognitiveLoopService {
             // Normalize both vectors to JEPA's input_dim (pad with zeros or truncate)
             let mut current_vec = input_array.to_vec();
             current_vec.resize(jepa_dim, 0.0);
-            let current_hv =
-                symthaea_core::hdc::unified_hv::ContinuousHV::from_vec(current_vec);
+            let current_hv = symthaea_core::hdc::unified_hv::ContinuousHV::from_vec(current_vec);
             let mut next_vec = prediction.clone();
             next_vec.resize(jepa_dim, 0.0);
-            let next_hv =
-                symthaea_core::hdc::unified_hv::ContinuousHV::from_vec(next_vec);
+            let next_hv = symthaea_core::hdc::unified_hv::ContinuousHV::from_vec(next_vec);
 
             // Use last cycle's FEP action (stored on fep module after each FEP step).
             // CfC planning runs before this cycle's FEP, so we use the previous action.
@@ -402,24 +401,26 @@ impl CognitiveLoopService {
         // Return the buffer to CLS for reuse next cycle (zero-alloc swap)
         self.cfc_input_buffer = input_array;
 
-        let prediction_coherence =
-            if self.stats.total_cycles % super::super::thresholds::PREDICTION_COHERENCE_INTERVAL == 0 {
-                let coh = Self::compute_prediction_coherence_from_cache(&raw_predictions);
-                self.stats.avg_prediction_coherence = self.stats.avg_prediction_coherence
-                    * COHERENCE_PREDICTION_EMA
-                    + coh * (1.0 - COHERENCE_PREDICTION_EMA);
-                if coh < COHERENCE_LOW_THRESHOLD {
-                    let coh_dampen = (COHERENCE_LOW_THRESHOLD - coh) * COHERENCE_LOW_DAMPEN_SCALE;
-                    self.scale_confidence("pred_coherence_low", 1.0 - coh_dampen);
-                }
-                if coh > COHERENCE_HIGH_THRESHOLD {
-                    let coh_boost = (coh - COHERENCE_HIGH_THRESHOLD) * COHERENCE_CONFIDENCE_BOOST;
-                    self.adjust_confidence("pred_coherence_high", coh_boost);
-                }
-                coh
-            } else {
-                self.stats.avg_prediction_coherence
-            };
+        let prediction_coherence = if self.stats.total_cycles
+            % super::super::thresholds::PREDICTION_COHERENCE_INTERVAL
+            == 0
+        {
+            let coh = Self::compute_prediction_coherence_from_cache(&raw_predictions);
+            self.stats.avg_prediction_coherence = self.stats.avg_prediction_coherence
+                * COHERENCE_PREDICTION_EMA
+                + coh * (1.0 - COHERENCE_PREDICTION_EMA);
+            if coh < COHERENCE_LOW_THRESHOLD {
+                let coh_dampen = (COHERENCE_LOW_THRESHOLD - coh) * COHERENCE_LOW_DAMPEN_SCALE;
+                self.scale_confidence("pred_coherence_low", 1.0 - coh_dampen);
+            }
+            if coh > COHERENCE_HIGH_THRESHOLD {
+                let coh_boost = (coh - COHERENCE_HIGH_THRESHOLD) * COHERENCE_CONFIDENCE_BOOST;
+                self.adjust_confidence("pred_coherence_high", coh_boost);
+            }
+            coh
+        } else {
+            self.stats.avg_prediction_coherence
+        };
 
         // 5b. Epistemic vs aleatoric uncertainty decomposition.
         // Epistemic (model uncertainty): prediction disagreement across horizons — reducible
@@ -471,7 +472,8 @@ impl CognitiveLoopService {
             epistemic_uncertainty
         };
         if eu_for_exploration > EPISTEMIC_EXPLORE_THRESHOLD
-            && self.stats.total_cycles % super::super::thresholds::EPISTEMIC_MODULATION_INTERVAL == 0
+            && self.stats.total_cycles % super::super::thresholds::EPISTEMIC_MODULATION_INTERVAL
+                == 0
         {
             let mut epistemic_explore =
                 (eu_for_exploration - EPISTEMIC_EXPLORE_THRESHOLD) * EPISTEMIC_EXPLORE_SCALE;
@@ -482,7 +484,8 @@ impl CognitiveLoopService {
             }
             self.adjust_exploration("epistemic_uncertainty", epistemic_explore);
         } else if eu_for_exploration < EPISTEMIC_LOW_THRESHOLD
-            && self.stats.total_cycles % super::super::thresholds::EPISTEMIC_MODULATION_INTERVAL == 0
+            && self.stats.total_cycles % super::super::thresholds::EPISTEMIC_MODULATION_INTERVAL
+                == 0
         {
             // Low epistemic uncertainty → dampen exploration (model is confident).
             self.adjust_exploration("epistemic_low", -EPISTEMIC_LOW_DAMPEN);
@@ -541,7 +544,8 @@ impl CognitiveLoopService {
         if level_errors.len() >= 2 && self.stats.total_cycles > DYNAMICS_STARTUP_WARMUP_CYCLES {
             let sensory_error = level_errors[0];
             let abstract_error = level_errors[level_errors.len() - 1];
-            if abstract_error > sensory_error * super::super::thresholds::WORLD_MODEL_CONFUSION_RATIO
+            if abstract_error
+                > sensory_error * super::super::thresholds::WORLD_MODEL_CONFUSION_RATIO
                 && abstract_error > super::super::thresholds::WORLD_MODEL_ERROR_FLOOR
             {
                 self.adjust_exploration_pri(

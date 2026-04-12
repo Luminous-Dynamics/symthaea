@@ -80,19 +80,10 @@ pub fn speaking_rate(phonemes: &[PhonemeInfo]) -> f32 {
         return 0.0;
     }
 
-    let non_silence: usize = phonemes
-        .iter()
-        .filter(|p| !is_silence(&p.phoneme))
-        .count();
+    let non_silence: usize = phonemes.iter().filter(|p| !is_silence(&p.phoneme)).count();
 
-    let total_duration = phonemes
-        .last()
-        .map(|p| p.end)
-        .unwrap_or(0.0)
-        - phonemes
-            .first()
-            .map(|p| p.start)
-            .unwrap_or(0.0);
+    let total_duration = phonemes.last().map(|p| p.end).unwrap_or(0.0)
+        - phonemes.first().map(|p| p.start).unwrap_or(0.0);
 
     if total_duration > 0.01 {
         non_silence as f32 / total_duration as f32
@@ -265,8 +256,7 @@ fn is_voiced(phoneme: &str) -> bool {
 
     // All vowels are voiced
     let vowels = [
-        "AA", "AE", "AH", "AO", "AW", "AY", "EH", "ER", "EY", "IH", "IY", "OW", "OY", "UH",
-        "UW",
+        "AA", "AE", "AH", "AO", "AW", "AY", "EH", "ER", "EY", "IH", "IY", "OW", "OY", "UH", "UW",
     ];
     if vowels.contains(&upper.as_str()) {
         return true;

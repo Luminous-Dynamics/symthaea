@@ -216,9 +216,9 @@ pub mod master_consciousness_equation;
 pub mod multi_objective_evolution;
 pub mod negation_detector;
 pub mod pac;
-pub mod synthetic_states;
 #[cfg(feature = "epistemic")]
 pub mod sacred_stillness;
+pub mod synthetic_states;
 
 // ============================================================================
 // Reasoning engine subsystems (cfg-gated)
@@ -488,12 +488,12 @@ pub use epistemic_tiers::{
 pub use fep_active_inference::{
     ActionSelectionResult, ActiveInferenceAgent, ActiveInferenceAgentConfig,
     ActiveInferenceAgentStats, ActiveInferenceSummary, BlanketPermeability, BlanketTelemetry,
-    CognitiveLoopFEPBridge, CognitiveLoopFEPResult, EligibilityTraces,
-    ExpectedFreeEnergyComputer, ExpectedFreeEnergyResult, FreeEnergyCalculator,
-    FreeEnergyComponents, GenerativeModel, HiddenState, MarkovBoundaryOperator, MarkovPartition,
-    ModelConfidenceTracker, Observation, PerceptionResult, PermeabilityInputs,
-    PrecisionEstimator, StateTransition, SwarmCoalition, TemporalDifferenceLearner,
-    TemporalDifferenceLearningConfig, TemporalDifferenceLearningStats, TopologyBoundaryInputs,
+    CognitiveLoopFEPBridge, CognitiveLoopFEPResult, EligibilityTraces, ExpectedFreeEnergyComputer,
+    ExpectedFreeEnergyResult, FreeEnergyCalculator, FreeEnergyComponents, GenerativeModel,
+    HiddenState, MarkovBoundaryOperator, MarkovPartition, ModelConfidenceTracker, Observation,
+    PerceptionResult, PermeabilityInputs, PrecisionEstimator, StateTransition, SwarmCoalition,
+    TemporalDifferenceLearner, TemporalDifferenceLearningConfig, TemporalDifferenceLearningStats,
+    TopologyBoundaryInputs,
 };
 pub use harmonics::{FiduciaryHarmonic, HarmonicField, HarmonicResolver};
 pub use hierarchical_ltc::{HierarchicalConfig, HierarchicalLTC};

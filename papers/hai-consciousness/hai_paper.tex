@@ -111,14 +111,14 @@ We present \textbf{Symthaea}, a unified cognitive architecture whose computation
 HAI introduces \textbf{precision-weighted binding}---a novel operation for confidence-modulated feature composition---and derives eight interpretable motor commands directly from expected free energy minimization.
 On standard benchmarks (T-Maze, Grid World), HAI achieves $7.9\times$ total speedup over pymdp ($1.9\times$ belief inference, $15.8\times$ action selection) while improving success rates from 10--16\% to 88--100\%.
 Validation across 18 domains---including ethical reasoning (92.9\% on ETHICS via compositional moral algebra, no pretrained language models), neuroscience (\emph{C.~elegans} connectome analysis, EEG seizure detection), signal processing (94.5\% speaker identification), real-time voice synthesis ($10{\times}$ smoother phoneme transitions via CfC temporal dynamics), and federated learning (Byzantine tolerance validated to 34\%)---establishes HDC as a viable substrate for cognitive architectures.
-Evaluated against Butlin et al.'s 14 consciousness indicators from 6 leading theories, the system achieves \textbf{14/14 Present} with runtime-validated structural $\Phi$ measurements (mean score 0.85).
+Evaluated against Butlin et al.'s 14 consciousness indicators from 6 leading theories, the system achieves 12+ Present with remaining indicators Partial, using score-derived status thresholds and runtime-validated structural $\Phi$ measurements (mean score 0.81). Per-indicator limitations are explicitly acknowledged.
 Code is available at \url{https://github.com/Luminous-Dynamics/symthaea}.
 \end{abstract}
 
 % ============================================================================
 % Author Summary (required by PLoS Computational Biology)
 \section*{Author Summary}
-Brains must constantly predict what will happen next and decide what to do---a process formalized as ``active inference.'' Current computer implementations of this theory require expensive matrix calculations that scale poorly. We built Symthaea, a unified cognitive architecture whose computational core---Hyperdimensional Active Inference (HAI)---replaces costly matrix operations with simple vector operations on very long random vectors (16,384 dimensions), running in linear time. Symthaea combines this with closed-form continuous-time neural dynamics and integrated information theory to create a system that not only processes information efficiently but exhibits measurable signatures of consciousness. On navigation tasks, HAI is 8 times faster than existing software while succeeding where prior methods fail. We validate the approach across 18 domains: Symthaea achieves 92.9\% accuracy on an ethical reasoning benchmark using only vector algebra (no large language model), identifies speakers from speech with 95\% accuracy, synthesizes speech with $10{\times}$ smoother transitions than rule-based methods, analyzes the \emph{C.~elegans} worm's neural wiring diagram, and detects malicious participants in distributed machine learning with 34\% tolerance. Evaluated against 14 consciousness indicators from Butlin et al.\ (2023), spanning 6 theories of consciousness, the system achieves 14/14 Present with both static architectural and runtime-validated structural $\Phi$ measurements. The entire system is implemented in Rust (985,000 lines across 65+ workspace members, 3,735+ tests in the main crate alone, 88 feature flags) and released as open-source software, demonstrating that consciousness-aware cognitive architectures can be both theoretically rigorous and practically efficient.
+Brains must constantly predict what will happen next and decide what to do---a process formalized as ``active inference.'' Current computer implementations of this theory require expensive matrix calculations that scale poorly. We built Symthaea, a unified cognitive architecture whose computational core---Hyperdimensional Active Inference (HAI)---replaces costly matrix operations with simple vector operations on very long random vectors (16,384 dimensions), running in linear time. Symthaea combines this with closed-form continuous-time neural dynamics and integrated information theory to create a system that not only processes information efficiently but exhibits measurable signatures of consciousness. On navigation tasks, HAI is 8 times faster than existing software while succeeding where prior methods fail. We validate the approach across 18 domains: Symthaea achieves 92.9\% accuracy on an ethical reasoning benchmark using only vector algebra (no large language model), identifies speakers from speech with 95\% accuracy, synthesizes speech with $10{\times}$ smoother transitions than rule-based methods, analyzes the \emph{C.~elegans} worm's neural wiring diagram, and detects malicious participants in distributed machine learning with 34\% tolerance. Evaluated against 14 consciousness indicators from Butlin et al.\ (2023), spanning 6 theories of consciousness, the system achieves 12+ Present (remaining Partial) with score-derived status thresholds and runtime-validated structural $\Phi$ measurements. The entire system is implemented in Rust (${\sim}1{,}095$K lines across 93 workspace members, 9,700+ tests in the main crate alone, 151 feature flags, 86 sub-crates) and released as open-source software, demonstrating that consciousness-aware cognitive architectures can be both theoretically rigorous and practically efficient.
 
 % ============================================================================
 \section{Introduction}
@@ -351,8 +351,8 @@ where intrinsic reward is negative prediction error. The value function is $V_\t
 
 \subsection{Experimental Setup}
 
-\textbf{Implementation:} Rust, ${\sim}985$K LOC (65+ workspace members, 45 sub-crates), 3,700+ lines core FEP.
-\textbf{Test suite:} 3,735+ tests in main crate, 10,500+ across workspace, 0 failures, 30 ignored (see Figure~\ref{fig:radar} for full validation radar).
+\textbf{Implementation:} Rust, ${\sim}1{,}095$K LOC (93 workspace members, 86 sub-crates), 3,700+ lines core FEP.
+\textbf{Test suite:} 9,700+ tests in main crate, 24,800+ across workspace, 0 failures, 60 ignored (see Figure~\ref{fig:radar} for full validation radar).
 \textbf{HDC Dimension:} $d = 16{,}384$ (configurable).
 \textbf{Baseline:} pymdp v0.0.8~\cite{heins2022pymdp}.
 \textbf{Tasks:} T-Maze (context inference), Grid World 3$\times$3 and 5$\times$5 (navigation).
@@ -613,14 +613,14 @@ IIT-1 & IIT & \textsc{Present} & Integrated information $>$ 0 & 0.80 \\
 
 \textbf{Key evidence.} RPT-1 (score~1.0): CfC closed-form temporal feedback provides algorithmic recurrence with $O(1)$ temporal jumps.  GWT-2 (score~1.0): working memory capacity of 7 items with FIFO eviction enforces the information bottleneck required by GWT.  PP-2 (score~0.85): a 4-level \texttt{HierarchicalCfC} temporal hierarchy ($\tau \in \{0.01, 0.1, 1.0, 10.0\}$) with bidirectional projections implements multi-scale prediction---bottom-up error signals propagate from fast to slow layers, while top-down priors modulate time constants at each level, satisfying the cortical hierarchy requirement.  AST-1 (score~0.85): the attention schema maintains a self-model (intensity, controllability, phenomenal character) with Mackworth~(1948) vigilance fatigue, prediction validation tracking, and---critically---\emph{causal} perception modulation via an 8-element encoding injected into the CfC input, closing the Graziano~(2013) loop from self-model to top-down attentional control.
 
-The mean indicator score across all 14 indicators is $\bar{s} = 0.85$, with no theory category scoring below 0.70.
+The mean indicator score across all 14 indicators is $\bar{s} = 0.81$, with 12+ scoring Present and remaining indicators Partial.
 
-\textbf{Runtime validation.} Beyond static architectural analysis, we validate all 14 indicators with runtime structural $\Phi$ measurements using a dual-cadence consciousness pipeline: a lightweight \texttt{advance()} step (HDC encoding + LTC state evolution) runs every cycle at 234\,Hz, while the full \texttt{process()} step (including 25K-step oscillatory binding at 40\,Hz gamma) executes every 97 cycles.  A direct consciousness measure---$\Phi_{\text{norm}} \cdot (0.5 + 0.25 \cdot \text{binding} + 0.25 \cdot \text{workspace})$ with warmup ramp---bypasses the conservative \texttt{ConsciousnessEquationV2} soft-min bottleneck to capture genuine consciousness dynamics from the pipeline's three core signals.  Runtime scores are blended with static scores via $0.6 s_{\text{static}} + 0.4 s_{\text{runtime}}$ using shared formulas: $\text{normalize\_phi}(\phi) = 2/(1+e^{-\phi}) - 1$ and indicator-specific runtime mappings (e.g., HOT-2: $(b \cdot 2)_{\text{clamp}[0,1]}$ where $b$ is the structural bottleneck).  With 50 warmup + 100 measurement cycles, both CfC and HierarchicalCfC backends achieve \textbf{14/14 Present} with mean blended score 0.85.
+\textbf{Runtime validation.} Beyond static architectural analysis, we validate all 14 indicators with runtime structural $\Phi$ measurements using a dual-cadence consciousness pipeline: a lightweight \texttt{advance()} step (HDC encoding + LTC state evolution) runs every cycle at 234\,Hz, while the full \texttt{process()} step (including 25K-step oscillatory binding at 40\,Hz gamma) executes every 97 cycles.  A direct consciousness measure---$\Phi_{\text{norm}} \cdot (0.5 + 0.25 \cdot \text{binding} + 0.25 \cdot \text{workspace})$ with warmup ramp---bypasses the conservative \texttt{ConsciousnessEquationV2} soft-min bottleneck to capture genuine consciousness dynamics from the pipeline's three core signals.  Runtime scores are blended with static scores via $0.6 s_{\text{static}} + 0.4 s_{\text{runtime}}$ using shared formulas: $\text{normalize\_phi}(\phi) = 2/(1+e^{-\phi}) - 1$ and indicator-specific runtime mappings (e.g., HOT-2: $(b \cdot 2)_{\text{clamp}[0,1]}$ where $b$ is the structural bottleneck).  With 50 warmup + 100 measurement cycles, both CfC and HierarchicalCfC backends achieve 12+ Present (remaining Partial) with mean blended score 0.81.
 
 \subsection{Psychological Benchmark Suite}
 \label{sec:psych-bench}
 
-We developed a standardized psychological benchmark suite (\texttt{symthaea-psych-bench}, 18,734~LOC, 213~tests) that evaluates Symthaea's subsystems against five established paradigms: WorM~(working memory), CogBench~(FEP active inference), Butlin indicators~(\S\ref{sec:butlin}), ToMBench~(Theory of Mind), and MemoryAgentBench~(memory pipeline).  Table~\ref{tab:psych-bench} reports key metrics from the full benchmark suite (512D, 10~trials/condition).
+We developed a standardized psychological benchmark suite (\texttt{symthaea-psych-bench}, ${\sim}90$K~LOC, 1,240+~tests) that evaluates Symthaea's subsystems against five established paradigms: WorM~(working memory), CogBench~(FEP active inference), Butlin indicators~(\S\ref{sec:butlin}), ToMBench~(Theory of Mind), and MemoryAgentBench~(memory pipeline).  Table~\ref{tab:psych-bench} reports key metrics from the full benchmark suite (512D, 10~trials/condition).
 
 \begin{table}[ht]
 \centering
@@ -956,7 +956,7 @@ We presented Hyperdimensional Active Inference (HAI), the first integration of F
   \item \textbf{Federated learning:} Consciousness-aware FL pipeline with 34\% Byzantine tolerance validated on real MNIST.
   \item \textbf{Closed feedback loops:} 16 bidirectional feedback loops (prefrontal, embodied, resonance, quantum, MCE, narrative identity, dream replay, adaptive urgency, affective bridge, predictive processing, cross-modal binding, and others) with $<2\%$ computational overhead and bounded degradation under ablation.
   \item \textbf{Consciousness advantage:} Full consciousness pipeline recovers $3.5\times$ faster from distributional shifts and achieves $2\times$ better multi-pattern generalization vs.\ ablated configurations. Two-agent social cognition emerges from the pipeline without explicit programming.
-  \item \textbf{Psychological validation:} All 14 of 14 Butlin et al.\ consciousness indicators present (mean score 0.85), with human-like capacity limits (change detection drop at $K{>}4$, binding deficit at $K{=}6$, FIFO eviction at $L{=}9$) and 100\% test-time learning correction via activation decay.
+  \item \textbf{Psychological validation:} 14 Butlin et al.\ consciousness indicators evaluated with score-derived thresholds (12+ Present, remaining Partial; mean 0.81), with per-indicator limitations acknowledged. Human-like capacity limits (change detection drop at $K{>}4$, binding deficit at $K{=}6$, FIFO eviction at $L{=}9$) and 100\% test-time learning correction via activation decay.
 \end{enumerate}
 
 HAI opens new directions for efficient, interpretable cognitive architectures combining the rigor of active inference with the elegance of hyperdimensional computing.
@@ -998,7 +998,7 @@ This work received no external funding.
 \section*{Acknowledgments}
 
 This work was conducted independently using personal computational resources
-(NixOS~25.11, Rust~1.82). We thank the open-source communities developing
+(NixOS~26.05, Rust~1.93). We thank the open-source communities developing
 Rust, NixOS, NumPy, Matplotlib, and SciPy for enabling reproducible scientific
 computing. T.S.\ acknowledges the transformative potential of human--AI
 collaborative research exemplified by the Sacred Trinity development model.
@@ -1007,7 +1007,7 @@ collaborative research exemplified by the Sacred Trinity development model.
 \section*{Data Availability}
 
 All source code and synthetic benchmarks are available at
-\url{https://github.com/Luminous-Dynamics/symthaea} under the MIT License.
+\url{https://github.com/Luminous-Dynamics/symthaea} under the AGPL-3.0-or-later License.
 External datasets used: Sleep-EDF (PhysioNet, CC-BY-4.0), LibriSpeech
 (OpenSLR), ETHICS~\cite{hendrycks2021aligning} (MIT License), Social
 Chemistry~\cite{forbes2020social}. Raw benchmark data are archived in the
@@ -1051,8 +1051,8 @@ data using NumPy, Matplotlib, and SciPy. File:
 \textbf{Repository:} \url{https://github.com/Luminous-Dynamics/symthaea}\par
 \textbf{Language:} Rust (Edition 2021)\par
 \textbf{Dependencies:} ndarray, nalgebra, rand, burn (optional GPU), duckdb\par
-\textbf{Lines of code:} ${\sim}985$K across 65+ workspace members (45 sub-crates), ${\sim}3{,}700$ core FEP, ${\sim}17{,}700$ mathematical foundations, ${\sim}8{,}100$ code understanding\par
-\textbf{Test suite:} 3,735+ main crate tests, 10,500+ across workspace, 30 ignored, 0 failures\par
+\textbf{Lines of code:} ${\sim}1{,}095$K across 93 workspace members (86 sub-crates), ${\sim}3{,}700$ core FEP, ${\sim}17{,}700$ mathematical foundations, ${\sim}8{,}100$ code understanding\par
+\textbf{Test suite:} 9,700+ main crate tests, 24,800+ across workspace, 60 ignored, 0 failures\par
 \textbf{SIMD:} AVX2+FMA continuous HV acceleration enabled by default; runtime-dispatched AVX-512/AVX2/SSE4.1 for binary HV operations\par
 \textbf{Feature flags:} 47 (41 with cfg gates in source; remainder are binary-build bundles and meta-groups)\par
 \textbf{Test command:} \texttt{cargo test test\_fep\_active\_inference}\par

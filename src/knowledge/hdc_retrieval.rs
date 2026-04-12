@@ -259,8 +259,14 @@ mod tests {
         // Bound vector should be different from both inputs
         let sim_thought = bound.cosine_similarity(&thought);
         let sim_claim = bound.cosine_similarity(&claim);
-        assert!(sim_thought < 0.3, "bound should differ from thought: {sim_thought}");
-        assert!(sim_claim < 0.3, "bound should differ from claim: {sim_claim}");
+        assert!(
+            sim_thought < 0.3,
+            "bound should differ from thought: {sim_thought}"
+        );
+        assert!(
+            sim_claim < 0.3,
+            "bound should differ from claim: {sim_claim}"
+        );
     }
 
     #[test]

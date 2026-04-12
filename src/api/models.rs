@@ -3,6 +3,7 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! API request and response models
 
+use crate::control_plane::AuditEvent;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -271,6 +272,12 @@ pub struct ApiError {
     pub code: String,
     pub message: String,
     pub details: Option<serde_json::Value>,
+}
+
+/// Audit event list response
+#[derive(Debug, Clone, Serialize)]
+pub struct AuditEventsResponse {
+    pub events: Vec<AuditEvent>,
 }
 
 impl ApiError {

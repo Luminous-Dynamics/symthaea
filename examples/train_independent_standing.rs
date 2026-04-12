@@ -22,14 +22,14 @@ fn main() {
 
 #[cfg(feature = "humanoid")]
 fn run() {
-    use symthaea_humanoid::encoder::HumanoidHdcEncoder;
+    use std::time::Instant;
+    use symthaea_core::genesis::GenesisSeed;
     use symthaea_humanoid::controller::HumanoidController;
+    use symthaea_humanoid::encoder::HumanoidHdcEncoder;
     use symthaea_humanoid::fep_agent::{ActiveInferenceHumanoidAgent, HumanoidFepConfig};
     use symthaea_humanoid::simulator::{HumanoidPhysicsSimulator, SimpleHumanoidSimulator};
     use symthaea_humanoid::training::HumanoidTrainer;
     use symthaea_humanoid::types::*;
-    use symthaea_core::genesis::GenesisSeed;
-    use std::time::Instant;
 
     println!("╔══════════════════════════════════════════════════════════════╗");
     println!("║  Training Independent Standing                              ║");
@@ -51,7 +51,10 @@ fn run() {
         ..HumanoidConfig::default()
     };
 
-    println!("  Config: {} episodes, LR={}, Stand only", config.num_episodes, config.learning_rate);
+    println!(
+        "  Config: {} episodes, LR={}, Stand only",
+        config.num_episodes, config.learning_rate
+    );
     println!("  Curriculum: PD 0.8→0 over first 60 episodes, then 140 at PD=0");
     println!();
 
@@ -62,16 +65,27 @@ fn run() {
     let train_time = start.elapsed();
 
     println!();
-    println!("━━━ Training Complete ({:.1} min) ━━━", train_time.as_secs_f64() / 60.0);
+    println!(
+        "━━━ Training Complete ({:.1} min) ━━━",
+        train_time.as_secs_f64() / 60.0
+    );
 
     // Report learning curve
     println!();
-    println!("{:>5} {:>12} {:>10} {:>10} {:>8}",
-        "Ep", "StandReward", "HeadHt", "Upright", "Effort");
+    println!(
+        "{:>5} {:>12} {:>10} {:>10} {:>8}",
+        "Ep", "StandReward", "HeadHt", "Upright", "Effort"
+    );
     for (i, m) in metrics.iter().enumerate() {
         if i % 20 == 0 || i == metrics.len() - 1 {
-            println!("{:>5} {:>12.4} {:>10.4} {:>10.4} {:>8.4}",
-                i, m.avg_standing_reward, m.avg_head_height, m.avg_uprightness, m.avg_control_effort);
+            println!(
+                "{:>5} {:>12.4} {:>10.4} {:>10.4} {:>8.4}",
+                i,
+                m.avg_standing_reward,
+                m.avg_head_height,
+                m.avg_uprightness,
+                m.avg_control_effort
+            );
         }
     }
 
@@ -98,13 +112,23 @@ fn run() {
         sim.step(&cmd, dt);
 
         let s = sim.state();
-        let reward = if s.head_height >= 1.2 { 1.0 } else { (s.head_height / 1.2).max(0.0) }
-            * s.torso_vertical[2].max(0.0);
+        let reward = if s.head_height >= 1.2 {
+            1.0
+        } else {
+            (s.head_height / 1.2).max(0.0)
+        } * s.torso_vertical[2].max(0.0);
         total_reward += reward;
-        if s.head_height < min_height { min_height = s.head_height; }
-        if s.head_height >= 0.8 { steps_standing += 1; }
+        if s.head_height < min_height {
+            min_height = s.head_height;
+        }
+        if s.head_height >= 0.8 {
+            steps_standing += 1;
+        }
         if s.head_height < 0.5 && !fell {
-            println!("  *** FELL at step {} (head={:.3}) ***", step, s.head_height);
+            println!(
+                "  *** FELL at step {} (head={:.3}) ***",
+                step, s.head_height
+            );
             fell = true;
         }
     }
@@ -116,8 +140,14 @@ fn run() {
     println!("  Results ({} steps, no PD):", eval_steps);
     println!("    Mean standing reward: {:.4}", mean_reward);
     println!("    Min head height:      {:.4} m", min_height);
-    println!("    Steps standing:       {} / {} ({:.1}%)", steps_standing, eval_steps, standing_pct);
-    println!("    Fell:                 {}", if fell { "YES" } else { "NO" });
+    println!(
+        "    Steps standing:       {} / {} ({:.1}%)",
+        steps_standing, eval_steps, standing_pct
+    );
+    println!(
+        "    Fell:                 {}",
+        if fell { "YES" } else { "NO" }
+    );
 
     // Also evaluate WITH PD blend for comparison
     println!();
@@ -145,11 +175,18 @@ fn run() {
         sim.step(&cmd, dt);
 
         let s = sim.state();
-        let reward = if s.head_height >= 1.2 { 1.0 } else { (s.head_height / 1.2).max(0.0) }
-            * s.torso_vertical[2].max(0.0);
+        let reward = if s.head_height >= 1.2 {
+            1.0
+        } else {
+            (s.head_height / 1.2).max(0.0)
+        } * s.torso_vertical[2].max(0.0);
         total_reward_pd += reward;
-        if s.head_height >= 0.8 { steps_standing_pd += 1; }
-        if s.head_height < 0.5 && !fell_pd { fell_pd = true; }
+        if s.head_height >= 0.8 {
+            steps_standing_pd += 1;
+        }
+        if s.head_height < 0.5 && !fell_pd {
+            fell_pd = true;
+        }
     }
 
     let mean_reward_pd = total_reward_pd / eval_steps as f64;
@@ -157,11 +194,23 @@ fn run() {
 
     println!("  Results ({} steps, 50% PD blend):", eval_steps);
     println!("    Mean standing reward: {:.4}", mean_reward_pd);
-    println!("    Steps standing:       {} / {} ({:.1}%)", steps_standing_pd, eval_steps, standing_pct_pd);
-    println!("    Fell:                 {}", if fell_pd { "YES" } else { "NO" });
+    println!(
+        "    Steps standing:       {} / {} ({:.1}%)",
+        steps_standing_pd, eval_steps, standing_pct_pd
+    );
+    println!(
+        "    Fell:                 {}",
+        if fell_pd { "YES" } else { "NO" }
+    );
 
     println!();
     println!("━━━ Summary ━━━");
-    println!("  Controller alone: {:.4} reward, {:.1}% standing, fell={}", mean_reward, standing_pct, fell);
-    println!("  With PD blend:    {:.4} reward, {:.1}% standing, fell={}", mean_reward_pd, standing_pct_pd, fell_pd);
+    println!(
+        "  Controller alone: {:.4} reward, {:.1}% standing, fell={}",
+        mean_reward, standing_pct, fell
+    );
+    println!(
+        "  With PD blend:    {:.4} reward, {:.1}% standing, fell={}",
+        mean_reward_pd, standing_pct_pd, fell_pd
+    );
 }

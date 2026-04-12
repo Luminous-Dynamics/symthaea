@@ -94,10 +94,15 @@ pub fn run_ablation(state: &MusicalState, chunks: usize) -> Vec<AblationResult> 
 }
 
 fn run_config<F>(label: &str, state: &MusicalState, chunks: usize, configure: F) -> AblationResult
-where F: FnOnce(&mut StreamingSynth)
+where
+    F: FnOnce(&mut StreamingSynth),
 {
     let mut synth = StreamingSynth::new(
-        MuseConfig { duration_secs: 30.0, max_notes: 32, ..Default::default() },
+        MuseConfig {
+            duration_secs: 30.0,
+            max_notes: 32,
+            ..Default::default()
+        },
         44100,
     );
     synth.update_state(state);
@@ -110,14 +115,22 @@ where F: FnOnce(&mut StreamingSynth)
     }
 
     let metrics = compute_metrics(&all_samples);
-    AblationResult { label: label.to_string(), metrics, chunks }
+    AblationResult {
+        label: label.to_string(),
+        metrics,
+        chunks,
+    }
 }
 
 fn compute_metrics(samples: &[[f32; 2]]) -> AudioQualityMetrics {
     if samples.is_empty() {
         return AudioQualityMetrics {
-            rms: 0.0, peak: 0.0, dynamic_range_db: 0.0,
-            stereo_width: 0.0, spectral_richness: 0.0, temporal_coherence: 0.0,
+            rms: 0.0,
+            peak: 0.0,
+            dynamic_range_db: 0.0,
+            stereo_width: 0.0,
+            spectral_richness: 0.0,
+            temporal_coherence: 0.0,
         };
     }
 
@@ -152,7 +165,11 @@ fn compute_metrics(samples: &[[f32; 2]]) -> AudioQualityMetrics {
     let stereo_width = 1.0 - correlation.clamp(0.0, 1.0);
 
     // Spectral richness: DFT of first 256 samples, count non-trivial bins
-    let mono: Vec<f32> = samples.iter().take(256).map(|s| (s[0] + s[1]) * 0.5).collect();
+    let mono: Vec<f32> = samples
+        .iter()
+        .take(256)
+        .map(|s| (s[0] + s[1]) * 0.5)
+        .collect();
     let spectral_richness = if mono.len() >= 64 {
         let half = mono.len() / 2;
         let mut magnitudes = Vec::with_capacity(half);
@@ -189,12 +206,23 @@ fn compute_metrics(samples: &[[f32; 2]]) -> AudioQualityMetrics {
             autocorr += mono[i] * mono[i + lag];
             energy += mono[i] * mono[i];
         }
-        if energy > 1e-8 { (autocorr / energy).clamp(0.0, 1.0) } else { 0.0 }
+        if energy > 1e-8 {
+            (autocorr / energy).clamp(0.0, 1.0)
+        } else {
+            0.0
+        }
     } else {
         0.0
     };
 
-    AudioQualityMetrics { rms, peak, dynamic_range_db, stereo_width, spectral_richness, temporal_coherence }
+    AudioQualityMetrics {
+        rms,
+        peak,
+        dynamic_range_db,
+        stereo_width,
+        spectral_richness,
+        temporal_coherence,
+    }
 }
 
 #[cfg(test)]
@@ -204,7 +232,8 @@ mod tests {
     #[test]
     fn ablation_produces_results() {
         let state = MusicalState {
-            consciousness_level: 0.7, arousal: 0.5,
+            consciousness_level: 0.7,
+            arousal: 0.5,
             harmony_activations: [0.6, 0.5, 0.4, 0.3, 0.5, 0.6, 0.4, 0.5],
             ..Default::default()
         };
@@ -213,20 +242,27 @@ mod tests {
         assert_eq!(results.len(), 6, "should have 6 ablation configs");
         for r in &results {
             assert!(r.metrics.rms.is_finite(), "{}: RMS not finite", r.label);
-            assert!(r.metrics.stereo_width >= 0.0, "{}: negative stereo width", r.label);
+            assert!(
+                r.metrics.stereo_width >= 0.0,
+                "{}: negative stereo width",
+                r.label
+            );
         }
 
         // Baseline should have wider stereo than no_binaural
         let baseline = &results[0];
         let no_bin = results.iter().find(|r| r.label == "no_binaural").unwrap();
-        eprintln!("  Ablation: baseline stereo={:.4}, no_binaural stereo={:.4}",
-            baseline.metrics.stereo_width, no_bin.metrics.stereo_width);
+        eprintln!(
+            "  Ablation: baseline stereo={:.4}, no_binaural stereo={:.4}",
+            baseline.metrics.stereo_width, no_bin.metrics.stereo_width
+        );
     }
 
     #[test]
     fn binaural_increases_stereo_width() {
         let state = MusicalState {
-            consciousness_level: 0.7, arousal: 0.5,
+            consciousness_level: 0.7,
+            arousal: 0.5,
             harmony_activations: [0.6; 8],
             ..Default::default()
         };
@@ -240,7 +276,8 @@ mod tests {
         assert!(
             baseline.metrics.stereo_width >= no_bin.metrics.stereo_width - 0.1,
             "binaural should not reduce stereo: with={:.4}, without={:.4}",
-            baseline.metrics.stereo_width, no_bin.metrics.stereo_width
+            baseline.metrics.stereo_width,
+            no_bin.metrics.stereo_width
         );
     }
 }

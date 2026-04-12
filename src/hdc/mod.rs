@@ -341,6 +341,10 @@ pub mod learned_encoding;
 #[cfg(feature = "code_generation")]
 pub mod code_encoder;
 
+/// Semantic encoder with synonym-aware programming concept codebook.
+#[cfg(feature = "code_generation")]
+pub mod code_semantic_encoder;
+
 /// Algebraic operations on code hypervectors (similarity, analogy, compose).
 #[cfg(feature = "code_generation")]
 pub mod code_algebra;
@@ -348,6 +352,10 @@ pub mod code_algebra;
 /// Project-level HDC memory for codebase indexing and retrieval.
 #[cfg(feature = "code_generation")]
 pub mod code_memory;
+
+/// Bridge between BinaryHV and ContinuousHV for unified code synthesis pipeline.
+#[cfg(feature = "code_generation")]
+pub mod hv_bridge;
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // LOCAL MODULES - Moral Reasoning

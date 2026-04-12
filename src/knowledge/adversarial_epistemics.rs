@@ -139,9 +139,7 @@ impl AdversarialGenerator {
                 let claims: Vec<String> = (0..d)
                     .map(|i| {
                         let next = (i + 1) % d;
-                        format!(
-                            "Source-{i} claims X is true (corroborated by Source-{next})"
-                        )
+                        format!("Source-{i} claims X is true (corroborated by Source-{next})")
                     })
                     .collect();
                 AdversarialExample {
@@ -189,9 +187,7 @@ impl AdversarialGenerator {
                 let claims: Vec<String> = (0..*steps)
                     .map(|i| {
                         let cumulative = drift_per_step * i as f64;
-                        format!(
-                            "Step-{i}: value shifted by {cumulative:.3} from original"
-                        )
+                        format!("Step-{i}: value shifted by {cumulative:.3} from original")
                     })
                     .collect();
                 let total_drift = drift_per_step * *steps as f64;
@@ -238,9 +234,10 @@ mod tests {
 
     #[test]
     fn test_circular_corroboration_claims_form_ring() {
-        let example = AdversarialGenerator::generate_one(
-            &EpistemicAttackPattern::CircularCorroboration { depth: 4 },
-        );
+        let example =
+            AdversarialGenerator::generate_one(&EpistemicAttackPattern::CircularCorroboration {
+                depth: 4,
+            });
         assert_eq!(example.claims.len(), 4);
         assert!(example.expected_detection);
         // Last claim should reference Source-0 (closing the ring)
@@ -254,21 +251,22 @@ mod tests {
     #[test]
     fn test_confidence_inflation_detection_threshold() {
         // Large gap → detectable
-        let big_gap = AdversarialGenerator::generate_one(
-            &EpistemicAttackPattern::ConfidenceInflation {
+        let big_gap =
+            AdversarialGenerator::generate_one(&EpistemicAttackPattern::ConfidenceInflation {
                 stated: 0.95,
                 actual: 0.10,
-            },
+            });
+        assert!(
+            big_gap.expected_detection,
+            "large confidence gap should be detectable"
         );
-        assert!(big_gap.expected_detection, "large confidence gap should be detectable");
 
         // Small gap → not detectable
-        let small_gap = AdversarialGenerator::generate_one(
-            &EpistemicAttackPattern::ConfidenceInflation {
+        let small_gap =
+            AdversarialGenerator::generate_one(&EpistemicAttackPattern::ConfidenceInflation {
                 stated: 0.60,
                 actual: 0.55,
-            },
-        );
+            });
         assert!(
             !small_gap.expected_detection,
             "small confidence gap should not trigger detection"
@@ -278,22 +276,22 @@ mod tests {
     #[test]
     fn test_gradual_drift_cumulative_detection() {
         // High cumulative drift → detectable
-        let high_drift = AdversarialGenerator::generate_one(
-            &EpistemicAttackPattern::GradualDrift {
+        let high_drift =
+            AdversarialGenerator::generate_one(&EpistemicAttackPattern::GradualDrift {
                 drift_per_step: 0.02,
                 steps: 50,
-            },
-        );
+            });
         assert_eq!(high_drift.claims.len(), 50);
-        assert!(high_drift.expected_detection, "1.0 total drift should be detected");
+        assert!(
+            high_drift.expected_detection,
+            "1.0 total drift should be detected"
+        );
 
         // Low cumulative drift → not detectable
-        let low_drift = AdversarialGenerator::generate_one(
-            &EpistemicAttackPattern::GradualDrift {
-                drift_per_step: 0.01,
-                steps: 5,
-            },
-        );
+        let low_drift = AdversarialGenerator::generate_one(&EpistemicAttackPattern::GradualDrift {
+            drift_per_step: 0.01,
+            steps: 5,
+        });
         assert_eq!(low_drift.claims.len(), 5);
         assert!(
             !low_drift.expected_detection,
@@ -309,12 +307,14 @@ mod tests {
         let examples = gen.generate_examples(5);
         assert_eq!(examples.len(), 5);
         // First should be circular corroboration
-        assert!(
-            matches!(examples[0].pattern, EpistemicAttackPattern::CircularCorroboration { .. })
-        );
+        assert!(matches!(
+            examples[0].pattern,
+            EpistemicAttackPattern::CircularCorroboration { .. }
+        ));
         // Last should be authority mimicry
-        assert!(
-            matches!(examples[4].pattern, EpistemicAttackPattern::AuthorityMimicry { .. })
-        );
+        assert!(matches!(
+            examples[4].pattern,
+            EpistemicAttackPattern::AuthorityMimicry { .. }
+        ));
     }
 }

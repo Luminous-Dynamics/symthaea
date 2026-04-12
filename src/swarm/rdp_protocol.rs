@@ -78,9 +78,13 @@ pub enum AudioEncoding {
 impl AudioEncoding {
     /// Select encoding based on peer consciousness level.
     pub fn from_phi(phi: f32) -> Self {
-        if phi > 0.7 { Self::RawF32Stereo }
-        else if phi > 0.4 { Self::RawI16Stereo }
-        else { Self::MuLawMono }
+        if phi > 0.7 {
+            Self::RawF32Stereo
+        } else if phi > 0.4 {
+            Self::RawI16Stereo
+        } else {
+            Self::MuLawMono
+        }
     }
 }
 

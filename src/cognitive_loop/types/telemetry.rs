@@ -2522,6 +2522,12 @@ pub struct FepTelemetry {
 /// the original JSON format for backwards compatibility.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct MeshTelemetry {
+    /// Number of connected Iroh P2P swarm peers (from NetworkService).
+    pub swarm_peer_count: u32,
+    /// Mean Phi across all connected swarm peers (0.0 when no peers).
+    pub network_mean_phi: f64,
+    /// Network consciousness coherence — how aligned peer phi values are (0.0–1.0).
+    pub network_coherence: f64,
     /// Mesh network composite health score (0.0–1.0, 0.0 when mesh disabled).
     pub mesh_health_score: f32,
     /// Number of active mesh peers (0 when mesh disabled).

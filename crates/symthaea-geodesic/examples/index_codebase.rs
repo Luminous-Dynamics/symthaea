@@ -21,10 +21,7 @@ fn main() {
         PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("src")
     };
 
-    let max_files: usize = args
-        .get(2)
-        .and_then(|s| s.parse().ok())
-        .unwrap_or(500);
+    let max_files: usize = args.get(2).and_then(|s| s.parse().ok()).unwrap_or(500);
 
     println!("=== Codebase Indexing into ProgramManifold ===");
     println!("Root: {}", root.display());
@@ -60,21 +57,22 @@ fn main() {
 
     // Query: what does the manifold think "sort" looks like?
     println!("\n=== Query Tests ===");
-    let test_queries = [
-        "sort",
-        "search",
-        "parse",
-        "encode",
-        "validate",
-    ];
+    let test_queries = ["sort", "search", "parse", "encode", "validate"];
 
     for query in &test_queries {
         let query_hv = symthaea_core::hdc::binary_hv::BinaryHV::random(
-            query.bytes().fold(0u64, |a, b| a.wrapping_mul(31).wrapping_add(b as u64)),
+            query
+                .bytes()
+                .fold(0u64, |a, b| a.wrapping_mul(31).wrapping_add(b as u64)),
         );
         match manifold.nearest_fiber(&query_hv) {
             Some(fiber) => {
-                let names: Vec<&str> = fiber.points.iter().take(3).map(|p| p.name.as_str()).collect();
+                let names: Vec<&str> = fiber
+                    .points
+                    .iter()
+                    .take(3)
+                    .map(|p| p.name.as_str())
+                    .collect();
                 let has_source = fiber.points.iter().filter(|p| p.source.is_some()).count();
                 println!(
                     "  '{}' → fiber with {} points ({} with source): {:?}",

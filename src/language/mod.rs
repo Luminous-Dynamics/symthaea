@@ -44,6 +44,18 @@ pub mod ssm_backend;
 // Intelligent code generation dispatch (consciousness-routed backend selection)
 pub mod intelligent_dispatcher;
 
+// Machine-verifiable code certificates — the competitive moat
+#[cfg(feature = "code_generation")]
+pub mod code_certificate;
+
+// Unified code orchestrator — routes requests through native backends before LLM fallback
+#[cfg(feature = "code_generation")]
+pub mod code_orchestrator;
+
+// Pattern library bootstrap — parse Rust source files to populate HDC pattern library
+#[cfg(feature = "code_generation")]
+pub mod pattern_bootstrap;
+
 // Code understanding & generation (Phase: Consciousness-Aware Code)
 #[cfg(feature = "code_generation")]
 pub mod code_domain_plugin;
@@ -70,6 +82,16 @@ pub mod program_node_translator;
 pub mod python_parser;
 #[cfg(feature = "code_generation")]
 pub mod rust_parser;
+#[cfg(feature = "code_generation")]
+pub mod analogy_generation;
+#[cfg(feature = "code_generation")]
+pub mod sequencer_benchmark;
+#[cfg(feature = "code_generation")]
+pub mod sequencer_training;
+#[cfg(feature = "code_generation")]
+pub mod type_causal_model;
+#[cfg(feature = "code_generation")]
+pub mod verified_generation;
 #[cfg(feature = "code_generation")]
 pub mod triune_intent;
 

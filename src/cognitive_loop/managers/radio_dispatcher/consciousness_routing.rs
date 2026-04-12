@@ -597,8 +597,7 @@ impl StoreAndForward {
 
         // Drain at most `max_items` from the front of the buffer.
         let drain_count = self.offline_buffer.len().min(max_items);
-        let batch: Vec<OfflineExperience> =
-            self.offline_buffer.drain(..drain_count).collect();
+        let batch: Vec<OfflineExperience> = self.offline_buffer.drain(..drain_count).collect();
 
         let mean_salience = if batch.is_empty() {
             0.0

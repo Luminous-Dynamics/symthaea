@@ -372,11 +372,11 @@ pub mod native_similarity; // O(1) XOR+popcount similarity search (consciousness
 pub mod number_theory;
 pub mod numeric_tower; // Unified numeric tower (N -> Z -> Q -> R) with auto-promotion
 pub mod optimization; // Optimization: gradient descent, Nelder-Mead, L-BFGS
-pub mod power_flow; // DC Optimal Power Flow: B·θ=P solver, OPF, N-1 contingency, PTDF
 #[cfg(feature = "parallel")]
 pub mod parallel_hv; // Rayon parallel batch operations (7x faster on 8 cores)
 #[cfg(test)]
 mod phi_feedback_integration_tests;
+pub mod power_flow; // DC Optimal Power Flow: B·θ=P solver, OPF, N-1 contingency, PTDF
 pub mod primitive_dashboard; // Real-time primitive usage monitoring
 pub mod primitive_system; // Ontological primitives system with 7 semantic domains
 pub mod program_algebra; // HDC program algebra — hyperdimensional IR for code
@@ -388,6 +388,44 @@ pub mod real_arithmetic;
 pub mod root_finding; // Root finding: bisection, Newton-Raphson, Brent
 pub mod sparse_hv; // Sparse HDC for memory-efficient low-density vectors
 pub mod statistics; // Statistics & probability: distributions, hypothesis testing, Bayesian inference
+
+// ── New Math Domains (April 2026) ────────────────────────────────────────────
+pub mod algebraic_combinatorics; // Symmetric functions, Schur polynomials, Young tableaux, RSK
+pub mod algebraic_geometry;      // Varieties, Bezout, elliptic curve group law, rational points
+pub mod category_theory;         // Functors, natural transformations, adjunctions, Yoneda, monads
+pub mod chemistry;               // Periodic table, stoichiometry, thermochemistry, kinetics
+pub mod combinatorics;           // Generating functions, Burnside/Polya, Stirling, Ramsey, matroids
+pub mod complex_analysis;        // Cauchy, residues, conformal maps, power series, Mobius transforms
+pub mod functional_analysis;     // Banach/Hilbert spaces, bounded operators, spectral theorem
+pub mod game_theory;             // Nash equilibria, minimax, Shapley, VCG, Sprague-Grundy
+pub mod information_geometry;    // Fisher info, natural gradient, KL divergence, stat manifolds
+pub mod lie_theory;              // Lie algebras, exponential map, root systems, representations
+pub mod measure_probability;     // Measure spaces, martingales, Brownian motion, Ito calculus
+pub mod polynomial_algebra;      // Groebner bases, Buchberger, ideal membership, resultants
+pub mod tactics;                 // Proof tactics: ring, omega, induct, norm_num, cases
+
+// ── Geometric Algebra (via symtropy-math) ────────────────────────────────────
+// N-dimensional bivectors, rotors, transforms, collision shapes.
+// Re-exported under feature gate for use in robotics crates and Einstein search.
+#[cfg(feature = "geometric-algebra")]
+pub mod geometric_algebra {
+    pub use symtropy_math::*;
+}
+
+// ── Conjecture Engine — The Ramanujan Protocol ───────────────────────────────
+pub mod conjecture_engine; // Automated conjecture generation via symbolic regression + verification
+pub mod autodiff; // Reverse-mode automatic differentiation (Wengert tape) for exact gradients
+// pub mod sparse_matrix; // TEMP: file removed by concurrent session — recreate from autodiff.rs pattern
+// pub mod topology_comparison; // TEMP: file removed by concurrent session
+// pub mod cross_domain_discovery; // TEMP: file removed by concurrent session
+
+// ── Geometric Complexity Theory (Phase 8 — P vs NP probe) ────────────────────
+pub mod gct; // Permanent vs determinant orbit complexity, Kronecker coefficients, GCT obstruction conjecture
+
+// ── Einstein Manifold Search (Phase 6) ───────────────────────────────────────
+pub mod riemannian_geometry; // MetricTensor, Riemann/Ricci tensors, Ricci flow, Einstein condition
+pub mod ricci_flow;          // Normalized Ricci flow evolution, singularity detection, convergence
+pub mod einstein_search;     // HDC-guided moduli space search for exotic Einstein metrics on S⁴
 pub mod ucl_cross_domain_frames; // UCL cross-domain semantic frames (TRADE, CONFLICT, FEEDBACK_LOOP, etc.) // Thread-local memory pools for BinaryHV/ContinuousHV (10-100x faster allocation)
 
 // Property-based tests for HDC invariants
@@ -413,6 +451,7 @@ pub mod hierarchical_bundle; // Per-region bundling with role-based binding for 
 pub mod substrate_composition; // Weighted substrate mixtures for hybrid analysis
 pub mod substrate_independence; // Substrate type definitions // Real-time consciousness monitoring
 pub mod substrate_validation; // Validation framework with evidence levels and feasibility gaps
+// pub mod topology_comparison; // TEMP: file removed by concurrent session
 pub mod trajectory_accumulator; // Behavioral identity via temporal HDC binding
 
 // Track: Neural Validation — TRIBE v2 fMRI comparison (feature-gated)
@@ -424,9 +463,9 @@ pub mod glasser_parcellation; // Glasser atlas 360→12 CorticalRegion mapping
 pub mod hemodynamic; // HRF convolution for BOLD signal comparison
 
 // Track 6: Language module dependencies
+pub mod deepnsm_integration; // DeepNSM corpus: 44K NSM explication triplets for grounding
 pub mod full_stack_consciousness; // Full stack: Understanding + ActiveInference + Memory + Counterfactuals
 pub mod grounded_understanding; // True understanding via semantic primes + embodiment
-pub mod deepnsm_integration; // DeepNSM corpus: 44K NSM explication triplets for grounding
 pub mod unified_conscious_being;
 pub mod unified_understanding; // Complete understanding pipeline (predictive + narrative + ToM)
 pub mod universal_semantics; // Universal semantic primes (Wierzbicka) // Complete unified being: A+B+C+D+E+F integration
@@ -449,6 +488,7 @@ pub mod predictive_encoder; // Attention-modulated HDC encoding with LTC predict
 
 // Novel Algorithm Modules (Dec 2025)
 pub mod autodiff_phi; // Reverse-mode autodiff for consciousness optimization (Jan 2026)
+// pub mod cross_domain_discovery; // TEMP: file removed by concurrent session
 pub mod cross_modal_binding; // Cross-modal binding for multi-sensory integration
 pub mod differentiable_phi; // Soft-partitioned differentiable Φ for gradient optimization
 pub mod metacognitive_monitor; // Real-time consciousness monitoring with self-reflection

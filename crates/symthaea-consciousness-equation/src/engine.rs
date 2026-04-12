@@ -185,7 +185,9 @@ impl MasterConsciousnessEquation {
     }
 
     /// Softmin function: softmin(x; τ) = Σ(xᵢ × exp(-xᵢ/τ)) / Σ(exp(-xᵢ/τ))
-    /// This is a smooth minimum that identifies the bottleneck
+    /// This is a smooth minimum that identifies the bottleneck.
+    /// Numerically stabilized: clamps exponents to prevent overflow, and falls
+    /// back to hard-min when the result is non-finite.
     fn softmin_with_name(&self, factors: &[(&str, f64)]) -> (f64, String) {
         let tau = self.config.softmin_tau;
         let epsilon = self.config.epsilon;
@@ -196,7 +198,9 @@ impl MasterConsciousnessEquation {
         let mut min_name = "Unknown".to_string();
 
         for (name, val) in factors {
-            let weight = (-val / tau).exp();
+            // Clamp exponent to prevent overflow/underflow: exp(709.78) is f64::MAX,
+            // exp(-745) is the smallest positive subnormal. Use ±700 for safety margin.
+            let weight = (-val / tau).clamp(-700.0, 700.0).exp();
             weighted_sum += val * weight;
             weight_sum += weight;
 
@@ -207,7 +211,9 @@ impl MasterConsciousnessEquation {
         }
 
         let softmin = if weight_sum > epsilon {
-            weighted_sum / weight_sum
+            let raw = weighted_sum / weight_sum;
+            // Fall back to hard-min if val*weight overflowed
+            if raw.is_finite() { raw } else { min_val }
         } else {
             min_val
         };
@@ -215,9 +221,16 @@ impl MasterConsciousnessEquation {
         (softmin, min_name)
     }
 
-    /// Sigmoid function: σ(x) = 1 / (1 + exp(-x))
+    /// Sigmoid function: σ(x) = 1 / (1 + exp(-5x))
+    /// Numerically stable: avoids exp() overflow for large |x| by branching on sign.
     fn sigmoid(&self, x: f64) -> f64 {
-        1.0 / (1.0 + (-x * 5.0).exp()) // Scaled for [0,1] inputs
+        let z = x * 5.0; // Scaled for [0,1] inputs
+        if z >= 0.0 {
+            1.0 / (1.0 + (-z).exp())
+        } else {
+            let e = z.exp();
+            e / (1.0 + e)
+        }
     }
 
     /// Compute weighted sum: Σ(wᵢ × Cᵢ × γᵢ) / Σ(wᵢ)
@@ -751,5 +764,167 @@ mod tests {
             "Default component weights should total to ~1.0, got {}",
             total
         );
+    }
+
+    #[test]
+    fn test_softmin_extreme_values_no_nan() {
+        let eq = MasterConsciousnessEquation::default();
+        // Very large positive values — softmin exponent would overflow without clamping
+        let factors = vec![
+            ("A", 1e300_f64),
+            ("B", 1e300_f64),
+        ];
+        let (result, _) = eq.softmin_with_name(&factors);
+        assert!(result.is_finite(), "softmin with extreme positive inputs should be finite, got {}", result);
+
+        // Very large negative values
+        let factors_neg = vec![
+            ("A", -1e300_f64),
+            ("B", -1e300_f64),
+        ];
+        let (result_neg, _) = eq.softmin_with_name(&factors_neg);
+        assert!(result_neg.is_finite(), "softmin with extreme negative inputs should be finite, got {}", result_neg);
+
+        // Tiny tau with moderate values
+        let mut eq_tiny = MasterConsciousnessEquation::default();
+        eq_tiny.update_config({
+            let mut c = MasterEquationConfig::default();
+            c.softmin_tau = 1e-10;
+            c
+        });
+        let factors_mod = vec![("A", 0.5), ("B", 0.8)];
+        let (result_tiny, _) = eq_tiny.softmin_with_name(&factors_mod);
+        assert!(result_tiny.is_finite(), "softmin with tiny tau should be finite, got {}", result_tiny);
+    }
+
+    #[test]
+    fn test_sigmoid_extreme_values_no_nan() {
+        let eq = MasterConsciousnessEquation::default();
+        // Large positive — should saturate to 1.0
+        let s_pos = eq.sigmoid(200.0);
+        assert!((s_pos - 1.0).abs() < 1e-10, "sigmoid(200) should be ~1.0, got {}", s_pos);
+        assert!(s_pos.is_finite());
+
+        // Large negative — should saturate to 0.0
+        let s_neg = eq.sigmoid(-200.0);
+        assert!(s_neg.abs() < 1e-10, "sigmoid(-200) should be ~0.0, got {}", s_neg);
+        assert!(s_neg.is_finite());
+
+        // Normal value — should match original formula
+        let s_mid = eq.sigmoid(0.5);
+        let expected = 1.0 / (1.0 + (-2.5_f64).exp());
+        assert!((s_mid - expected).abs() < 1e-10, "sigmoid(0.5) should be {}, got {}", expected, s_mid);
+    }
+
+    /// Weight sensitivity analysis: sweep each weight ±50% and measure impact.
+    ///
+    /// Documents which weights the consciousness score is most sensitive to.
+    /// Results guide future weight tuning and identify double-counting effects.
+    #[test]
+    fn test_weight_sensitivity_analysis() {
+        let baseline_inputs = ConsciousnessInputs {
+            phi: 0.6,
+            broadcast: 0.5,
+            working_memory: 0.5,
+            attention: 0.6,
+            recurrence: 0.5,
+            embodiment: 0.5,
+            knowledge: 0.4,
+            synchrony: 0.7,
+        };
+
+        // Compute baseline
+        let mut eq = MasterConsciousnessEquation::default();
+        let baseline = eq.compute(&baseline_inputs);
+        let c0 = baseline.consciousness_level;
+
+        // Weight names and their default values for sweeping
+        let weight_names = [
+            "phi", "broadcast", "working_memory", "attention",
+            "recurrence", "embodiment", "knowledge",
+            "embodiment_factor", "narrative", "social",
+        ];
+        let default_weights = [0.15, 0.10, 0.10, 0.12, 0.10, 0.10, 0.08, 0.10, 0.08, 0.07];
+
+        let mut sensitivities = Vec::new();
+
+        for (i, &name) in weight_names.iter().enumerate() {
+            let w0 = default_weights[i];
+
+            // Sweep +50%
+            let mut config_up = MasterEquationConfig::default();
+            let w_up = &mut config_up.component_weights;
+            match name {
+                "phi" => w_up.phi = w0 * 1.5,
+                "broadcast" => w_up.broadcast = w0 * 1.5,
+                "working_memory" => w_up.working_memory = w0 * 1.5,
+                "attention" => w_up.attention = w0 * 1.5,
+                "recurrence" => w_up.recurrence = w0 * 1.5,
+                "embodiment" => w_up.embodiment = w0 * 1.5,
+                "knowledge" => w_up.knowledge = w0 * 1.5,
+                "embodiment_factor" => w_up.embodiment_factor = w0 * 1.5,
+                "narrative" => w_up.narrative = w0 * 1.5,
+                "social" => w_up.social = w0 * 1.5,
+                _ => unreachable!(),
+            }
+            let mut eq_up = MasterConsciousnessEquation::new(config_up);
+            let c_up = eq_up.compute(&baseline_inputs).consciousness_level;
+
+            // Sweep -50%
+            let mut config_down = MasterEquationConfig::default();
+            let w_dn = &mut config_down.component_weights;
+            match name {
+                "phi" => w_dn.phi = w0 * 0.5,
+                "broadcast" => w_dn.broadcast = w0 * 0.5,
+                "working_memory" => w_dn.working_memory = w0 * 0.5,
+                "attention" => w_dn.attention = w0 * 0.5,
+                "recurrence" => w_dn.recurrence = w0 * 0.5,
+                "embodiment" => w_dn.embodiment = w0 * 0.5,
+                "knowledge" => w_dn.knowledge = w0 * 0.5,
+                "embodiment_factor" => w_dn.embodiment_factor = w0 * 0.5,
+                "narrative" => w_dn.narrative = w0 * 0.5,
+                "social" => w_dn.social = w0 * 0.5,
+                _ => unreachable!(),
+            }
+            let mut eq_dn = MasterConsciousnessEquation::new(config_down);
+            let c_dn = eq_dn.compute(&baseline_inputs).consciousness_level;
+
+            // Sensitivity coefficient: (c_up - c_dn) / (w_up - w_dn) normalized by c0
+            let delta_c = c_up - c_dn;
+            let sensitivity = if c0 > 1e-10 { delta_c / c0 } else { 0.0 };
+            sensitivities.push((name, sensitivity, c_dn, c0, c_up));
+        }
+
+        // Verify all results are finite and consciousness stays in [0, 1]
+        for (name, sens, c_dn, _c0, c_up) in &sensitivities {
+            assert!(sens.is_finite(), "Sensitivity for {name} is non-finite");
+            assert!(*c_dn >= 0.0 && *c_dn <= 1.0, "{name} c_dn out of range: {c_dn}");
+            assert!(*c_up >= 0.0 && *c_up <= 1.0, "{name} c_up out of range: {c_up}");
+        }
+
+        // The equation should respond to weight changes (not be constant)
+        let total_sensitivity: f64 = sensitivities.iter().map(|(_, s, _, _, _)| s.abs()).sum();
+        assert!(
+            total_sensitivity > 0.01,
+            "Total sensitivity should be non-trivial, got {total_sensitivity}"
+        );
+
+        // Verify M, N, Soc double-counting is bounded:
+        // Their sensitivity should not be > 2× the average of other weights
+        // (since they appear in both weighted sum and modulation)
+        let core_sensitivities: Vec<f64> = sensitivities[..7]
+            .iter()
+            .map(|(_, s, _, _, _)| s.abs())
+            .collect();
+        let avg_core = core_sensitivities.iter().sum::<f64>() / core_sensitivities.len() as f64;
+
+        for &(name, sens, _, _, _) in &sensitivities[7..] {
+            assert!(
+                sens.abs() < avg_core * 3.0,
+                "Double-counted factor {name} sensitivity ({:.4}) exceeds 3× core average ({:.4})",
+                sens.abs(),
+                avg_core
+            );
+        }
     }
 }

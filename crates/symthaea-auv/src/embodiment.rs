@@ -62,35 +62,67 @@ impl AuvEmbodiment {
         let gain = self.current_safety.motor_gain();
         let mut cmd = self.controller.forward(thought_hv, dt);
         if gain < 1.0 {
-            for t in &mut cmd.thrusters { *t *= gain; }
+            for t in &mut cmd.thrusters {
+                *t *= gain;
+            }
         }
         self.last_control_effort = cmd.control_effort();
         self.simulator.step(&cmd, dt as f64);
         let perception = self.encoder.encode(self.simulator.state());
         let pred_error = if let Some(ref prev) = self.last_perception {
             (1.0 - perception.similarity(prev).max(0.0)).min(1.0)
-        } else { 0.0_f32 };
+        } else {
+            0.0_f32
+        };
         self.last_prediction_error = pred_error;
         self.last_perception = Some(perception);
         self.total_steps += 1;
         let success = self.simulator.state().is_finite();
-        EmbodimentResult { num_actuators: 8, control_effort: self.last_control_effort, success, prediction_error: pred_error, safety_level: self.current_safety, epistemic_grounding: GROUNDING_SENSORIMOTOR, observation_confidence: grounding_from_prediction_error(pred_error) }
+        EmbodimentResult {
+            num_actuators: 8,
+            control_effort: self.last_control_effort,
+            success,
+            prediction_error: pred_error,
+            safety_level: self.current_safety,
+            epistemic_grounding: GROUNDING_SENSORIMOTOR,
+            observation_confidence: grounding_from_prediction_error(pred_error),
+        }
     }
 
     pub fn encode_perception(&mut self) -> ContinuousHV {
         let p = self.encoder.encode(self.simulator.state());
-        self.last_perception = Some(p.clone()); p
+        self.last_perception = Some(p.clone());
+        p
     }
     pub fn reset(&mut self) {
-        self.simulator.reset(10.0); self.controller.reset(); self.encoder.reset();
-        self.last_perception = None; self.total_steps = 0; self.current_safety = MotorSafetyLevel::Green;
-        self.safety_override = None; self.last_control_effort = 0.0; self.last_prediction_error = 0.0;
+        self.simulator.reset(10.0);
+        self.controller.reset();
+        self.encoder.reset();
+        self.last_perception = None;
+        self.total_steps = 0;
+        self.current_safety = MotorSafetyLevel::Green;
+        self.safety_override = None;
+        self.last_control_effort = 0.0;
+        self.last_prediction_error = 0.0;
     }
-    pub fn safety_level(&self) -> MotorSafetyLevel { self.current_safety }
-    pub fn total_steps(&self) -> usize { self.total_steps }
+    pub fn safety_level(&self) -> MotorSafetyLevel {
+        self.current_safety
+    }
+    pub fn total_steps(&self) -> usize {
+        self.total_steps
+    }
 
     pub fn telemetry(&self) -> EmbodimentTelemetry {
-        EmbodimentTelemetry { total_steps: self.total_steps as u64, control_effort: self.last_control_effort, prediction_error: self.last_prediction_error, safety_level: format!("{:?}", self.current_safety), platform: "auv".to_string(), num_actuators: 8, epistemic_grounding: grounding_label(GROUNDING_SENSORIMOTOR).to_string(), observation_confidence: grounding_from_prediction_error(self.last_prediction_error) }
+        EmbodimentTelemetry {
+            total_steps: self.total_steps as u64,
+            control_effort: self.last_control_effort,
+            prediction_error: self.last_prediction_error,
+            safety_level: format!("{:?}", self.current_safety),
+            platform: "auv".to_string(),
+            num_actuators: 8,
+            epistemic_grounding: grounding_label(GROUNDING_SENSORIMOTOR).to_string(),
+            observation_confidence: grounding_from_prediction_error(self.last_prediction_error),
+        }
     }
 }
 

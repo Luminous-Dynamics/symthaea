@@ -8,8 +8,12 @@ description = "Free Energy Principle active inference — generative models, pre
 license = "AGPL-3.0-or-later"
 repository = "https://github.com/Luminous-Dynamics/symthaea"
 homepage = "https://luminousdynamics.org"
-keywords = ["active-inference", "free-energy-principle", "neuroscience", "ai", "consciousness"]
+keywords = ["active-inference", "fep", "neuroscience", "ai", "consciousness"]
 categories = ["science", "algorithms"]
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
 
 [dependencies]
 serde = { workspace = true }

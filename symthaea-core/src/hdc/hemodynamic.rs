@@ -26,7 +26,9 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-use super::cortical_activation::{CorticalActivationMap, CorticalActivationTimeseries, ActivationSource};
+use super::cortical_activation::{
+    ActivationSource, CorticalActivationMap, CorticalActivationTimeseries,
+};
 use super::substrate_independence::CorticalRegion;
 
 // ============================================================================
@@ -144,12 +146,20 @@ pub fn convolve_timeseries(
     let stride = stride.max(1);
 
     let n_input = ts.maps.len();
-    let n_output = if stride > 0 { (n_input + stride - 1) / stride } else { n_input };
+    let n_output = if stride > 0 {
+        (n_input + stride - 1) / stride
+    } else {
+        n_input
+    };
 
     // Convolve each region independently.
     let mut convolved_regions: HashMap<CorticalRegion, Vec<f64>> = HashMap::new();
     for region in CorticalRegion::ALL {
-        let signal: Vec<f64> = ts.region_timeseries(region).into_iter().map(|x| x as f64).collect();
+        let signal: Vec<f64> = ts
+            .region_timeseries(region)
+            .into_iter()
+            .map(|x| x as f64)
+            .collect();
         let conv = kernel.convolve(&signal);
         convolved_regions.insert(region, conv);
     }
@@ -241,7 +251,11 @@ mod tests {
         // Kernel should have ~32s * 31Hz = ~992 samples.
         assert!(kernel.samples.len() > 900 && kernel.samples.len() < 1100);
         // Peak should be normalized to ~1.0.
-        let max = kernel.samples.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
+        let max = kernel
+            .samples
+            .iter()
+            .cloned()
+            .fold(f64::NEG_INFINITY, f64::max);
         assert!((max - 1.0).abs() < 0.01, "Peak should be ~1.0, got {max}");
     }
 
@@ -271,7 +285,10 @@ mod tests {
         let kernel = HrfKernel::new(&config, 31.0);
         // There should be negative values after the peak (undershoot).
         let has_negative = kernel.samples.iter().any(|&x| x < -0.01);
-        assert!(has_negative, "HRF should have an undershoot (negative values)");
+        assert!(
+            has_negative,
+            "HRF should have an undershoot (negative values)"
+        );
     }
 
     #[test]

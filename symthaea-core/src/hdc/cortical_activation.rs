@@ -54,10 +54,7 @@ pub struct CorticalActivationMap {
 impl CorticalActivationMap {
     /// Create a new activation map with all regions at zero.
     pub fn zeros(source: ActivationSource, timestamp_cycles: u64) -> Self {
-        let activations = CorticalRegion::ALL
-            .iter()
-            .map(|r| (*r, 0.0))
-            .collect();
+        let activations = CorticalRegion::ALL.iter().map(|r| (*r, 0.0)).collect();
         Self {
             activations,
             timestamp_cycles,
@@ -103,7 +100,11 @@ impl CorticalActivationMap {
         let a = self.to_vec();
         let b = other.to_vec();
 
-        let dot: f64 = a.iter().zip(b.iter()).map(|(x, y)| *x as f64 * *y as f64).sum();
+        let dot: f64 = a
+            .iter()
+            .zip(b.iter())
+            .map(|(x, y)| *x as f64 * *y as f64)
+            .sum();
         let mag_a: f64 = a.iter().map(|x| (*x as f64).powi(2)).sum::<f64>().sqrt();
         let mag_b: f64 = b.iter().map(|x| (*x as f64).powi(2)).sum::<f64>().sqrt();
 
@@ -265,8 +266,7 @@ impl EegPowerMap {
         let powers = CorticalRegion::ALL
             .iter()
             .map(|r| {
-                let bands: HashMap<EegBand, f32> =
-                    EegBand::ALL.iter().map(|b| (*b, 0.0)).collect();
+                let bands: HashMap<EegBand, f32> = EegBand::ALL.iter().map(|b| (*b, 0.0)).collect();
                 (*r, bands)
             })
             .collect();
@@ -474,7 +474,10 @@ mod tests {
         a.set(CorticalRegion::Auditory, 0.4);
         let b = a.clone();
         let sim = a.cosine_similarity(&b);
-        assert!((sim - 1.0).abs() < 1e-6, "identical maps should have cosine=1, got {sim}");
+        assert!(
+            (sim - 1.0).abs() < 1e-6,
+            "identical maps should have cosine=1, got {sim}"
+        );
     }
 
     #[test]
@@ -484,7 +487,10 @@ mod tests {
         let mut b = CorticalActivationMap::zeros(ActivationSource::FmriPredicted, 0);
         b.set(CorticalRegion::Auditory, 1.0);
         let sim = a.cosine_similarity(&b);
-        assert!(sim.abs() < 1e-6, "orthogonal maps should have cosine=0, got {sim}");
+        assert!(
+            sim.abs() < 1e-6,
+            "orthogonal maps should have cosine=0, got {sim}"
+        );
     }
 
     #[test]
@@ -507,7 +513,10 @@ mod tests {
             b.set(*r, v * 2.0); // max = 1.0, still within clamp range
         }
         let r = a.pearson_correlation(&b);
-        assert!((r - 1.0).abs() < 1e-6, "perfectly correlated should give r=1, got {r}");
+        assert!(
+            (r - 1.0).abs() < 1e-6,
+            "perfectly correlated should give r=1, got {r}"
+        );
     }
 
     #[test]
@@ -519,7 +528,10 @@ mod tests {
             b.set(*r, 1.0 - (i as f32 + 1.0) / 12.0);
         }
         let r = a.pearson_correlation(&b);
-        assert!((r - (-1.0)).abs() < 1e-6, "anti-correlated should give r=-1, got {r}");
+        assert!(
+            (r - (-1.0)).abs() < 1e-6,
+            "anti-correlated should give r=-1, got {r}"
+        );
     }
 
     #[test]
@@ -532,7 +544,10 @@ mod tests {
             b.set(*r, ((i as f32 + 1.0) / 12.0).powi(2));
         }
         let rho = a.spearman_rank_correlation(&b);
-        assert!((rho - 1.0).abs() < 1e-6, "same rank order should give rho=1, got {rho}");
+        assert!(
+            (rho - 1.0).abs() < 1e-6,
+            "same rank order should give rho=1, got {rho}"
+        );
     }
 
     #[test]

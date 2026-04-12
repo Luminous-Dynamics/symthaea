@@ -19,13 +19,21 @@ pub struct SearchResult {
 /// Search the catalog by query string.
 ///
 /// Encodes the query as an HV and finds nearest neighbors.
-pub fn search_by_text(catalog: &PhysicsCatalog, query: &str, max_results: usize) -> Vec<SearchResult> {
+pub fn search_by_text(
+    catalog: &PhysicsCatalog,
+    query: &str,
+    max_results: usize,
+) -> Vec<SearchResult> {
     let query_hv = HV::from_name(query);
     search_by_hv(catalog, &query_hv, max_results)
 }
 
 /// Search by pre-computed HV.
-pub fn search_by_hv(catalog: &PhysicsCatalog, query_hv: &HV, max_results: usize) -> Vec<SearchResult> {
+pub fn search_by_hv(
+    catalog: &PhysicsCatalog,
+    query_hv: &HV,
+    max_results: usize,
+) -> Vec<SearchResult> {
     let mut results: Vec<SearchResult> = catalog
         .entries()
         .iter()
@@ -37,7 +45,11 @@ pub fn search_by_hv(catalog: &PhysicsCatalog, query_hv: &HV, max_results: usize)
         })
         .collect();
 
-    results.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+    results.sort_by(|a, b| {
+        b.score
+            .partial_cmp(&a.score)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
     results.truncate(max_results);
     results
 }
@@ -62,7 +74,11 @@ pub fn search_in_domain(
         })
         .collect();
 
-    results.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+    results.sort_by(|a, b| {
+        b.score
+            .partial_cmp(&a.score)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
     results.truncate(max_results);
     results
 }

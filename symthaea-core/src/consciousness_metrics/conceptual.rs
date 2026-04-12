@@ -195,17 +195,33 @@ impl ConceptualStructureCalculator {
             0.0
         };
 
-        // Cause and effect information
+        // Cause information: MI between mechanism and context (mechanism → context)
+        let context_bundle = if !context.is_empty() {
+            let refs: Vec<&ContinuousHV> = context.iter().collect();
+            ContinuousHV::bundle(&refs)
+        } else {
+            mech_bundle.clone()
+        };
         let cause_info = self.estimator.mutual_information_fast(
             &mech_bundle,
-            &if !context.is_empty() {
-                let refs: Vec<&ContinuousHV> = context.iter().collect();
-                ContinuousHV::bundle(&refs)
-            } else {
-                mech_bundle.clone()
-            },
+            &context_bundle,
         );
-        let effect_info = cause_info; // Simplified: symmetric for static analysis
+
+        // Effect information: how much the mechanism constrains the context
+        // (effect repertoire). Computed separately from cause to satisfy
+        // IIT 4.0 (Albantakis et al. 2023) requirement for asymmetric
+        // cause-effect structure. Uses intrinsic information of the context
+        // as a proxy: higher intrinsic info = mechanism constrains context more.
+        // NOTE: Full IIT 4.0 compliance requires temporal transition data
+        // (see temporal.rs for the complete implementation with separate
+        // cause_information / effect_information using transition matrices).
+        let effect_info = {
+            let iit4_calc = IIT4Calculator::new();
+            // Effect = how much the mechanism specifies the context's future state
+            // Proxy: intrinsic information (specificity) of the context given
+            // that it's coupled to this mechanism
+            iit4_calc.intrinsic_information(&context_bundle)
+        };
 
         Concept {
             mechanism: mechanism.to_vec(),

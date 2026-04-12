@@ -150,9 +150,9 @@ impl HumanoidMorphology {
         let extra_dof = self.num_actuators() - 21;
         let extra_features = match self {
             Self::Dmc21 => 0,
-            Self::Dexterous53 => 6,      // 2 hand centroid positions
-            Self::WithNeckWrist => 9,     // + 3 gaze direction
-            Self::FullSpine => 9,         // same computed features
+            Self::Dexterous53 => 6,   // 2 hand centroid positions
+            Self::WithNeckWrist => 9, // + 3 gaze direction
+            Self::FullSpine => 9,     // same computed features
         };
         72 + extra_dof * 2 + extra_features
     }
@@ -161,23 +161,51 @@ impl HumanoidMorphology {
 // ─── DMC21 Constants (existing 21-DOF parameters) ───
 
 pub const DMC21_JOINT_NAMES: [&str; 21] = [
-    "abdomen_y", "abdomen_z", "abdomen_x",
-    "right_hip_x", "right_hip_z", "right_hip_y", "right_knee",
-    "right_ankle_x", "right_ankle_y",
-    "left_hip_x", "left_hip_z", "left_hip_y", "left_knee",
-    "left_ankle_x", "left_ankle_y",
-    "right_shoulder1", "right_shoulder2", "right_elbow",
-    "left_shoulder1", "left_shoulder2", "left_elbow",
+    "abdomen_y",
+    "abdomen_z",
+    "abdomen_x",
+    "right_hip_x",
+    "right_hip_z",
+    "right_hip_y",
+    "right_knee",
+    "right_ankle_x",
+    "right_ankle_y",
+    "left_hip_x",
+    "left_hip_z",
+    "left_hip_y",
+    "left_knee",
+    "left_ankle_x",
+    "left_ankle_y",
+    "right_shoulder1",
+    "right_shoulder2",
+    "right_elbow",
+    "left_shoulder1",
+    "left_shoulder2",
+    "left_elbow",
 ];
 
 pub const DMC21_JOINT_LIMITS: [[f64; 2]; 21] = [
-    [-1.31, 0.52], [-0.79, 0.79], [-0.61, 0.61], // abdomen
-    [-0.44, 0.09], [-1.05, 0.61], [-1.92, 0.35], [-2.79, 0.03], // right leg
-    [-0.87, 0.87], [-0.87, 0.87],
-    [-0.44, 0.09], [-1.05, 0.61], [-1.92, 0.35], [-2.79, 0.03], // left leg
-    [-0.87, 0.87], [-0.87, 0.87],
-    [-1.48, 1.05], [-1.48, 1.05], [-1.57, 0.87], // right arm
-    [-1.05, 1.48], [-1.05, 1.48], [-1.57, 0.87], // left arm
+    [-1.31, 0.52],
+    [-0.79, 0.79],
+    [-0.61, 0.61], // abdomen
+    [-0.44, 0.09],
+    [-1.05, 0.61],
+    [-1.92, 0.35],
+    [-2.79, 0.03], // right leg
+    [-0.87, 0.87],
+    [-0.87, 0.87],
+    [-0.44, 0.09],
+    [-1.05, 0.61],
+    [-1.92, 0.35],
+    [-2.79, 0.03], // left leg
+    [-0.87, 0.87],
+    [-0.87, 0.87],
+    [-1.48, 1.05],
+    [-1.48, 1.05],
+    [-1.57, 0.87], // right arm
+    [-1.05, 1.48],
+    [-1.05, 1.48],
+    [-1.57, 0.87], // left arm
 ];
 
 const DMC21_INERTIAS: [f64; 21] = [
@@ -205,19 +233,13 @@ const DMC21_TORQUE_SCALES: [f64; 21] = [
 ];
 
 const DMC21_KP: [f64; 21] = [
-    100.0, 100.0, 100.0,
-    100.0, 100.0, 100.0, 120.0, 80.0, 80.0,
-    100.0, 100.0, 100.0, 120.0, 80.0, 80.0,
-    40.0, 40.0, 40.0,
-    40.0, 40.0, 40.0,
+    100.0, 100.0, 100.0, 100.0, 100.0, 100.0, 120.0, 80.0, 80.0, 100.0, 100.0, 100.0, 120.0, 80.0,
+    80.0, 40.0, 40.0, 40.0, 40.0, 40.0, 40.0,
 ];
 
 const DMC21_KD: [f64; 21] = [
-    10.0, 10.0, 10.0,
-    10.0, 10.0, 10.0, 12.0, 8.0, 8.0,
-    10.0, 10.0, 10.0, 12.0, 8.0, 8.0,
-    4.0, 4.0, 4.0,
-    4.0, 4.0, 4.0,
+    10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 12.0, 8.0, 8.0, 10.0, 10.0, 10.0, 12.0, 8.0, 8.0, 4.0, 4.0,
+    4.0, 4.0, 4.0, 4.0,
 ];
 
 // ─── Hand Joint Constants (32 DOF: 16 per hand) ───
@@ -225,48 +247,81 @@ const DMC21_KD: [f64; 21] = [
 /// Right hand (16) + Left hand (16) = 32 joint names.
 const HAND_JOINT_NAMES: [&str; 32] = [
     // Right hand (16 DOF)
-    "r_thumb_cmc_abd", "r_thumb_cmc_flex", "r_thumb_mcp", "r_thumb_ip",
-    "r_index_mcp_abd", "r_index_mcp_flex", "r_index_pip", "r_index_dip",
-    "r_middle_mcp_abd", "r_middle_mcp_flex", "r_middle_pip",
-    "r_ring_mcp_flex", "r_ring_pip",
-    "r_pinky_mcp_flex", "r_pinky_pip", "r_pinky_abd",
+    "r_thumb_cmc_abd",
+    "r_thumb_cmc_flex",
+    "r_thumb_mcp",
+    "r_thumb_ip",
+    "r_index_mcp_abd",
+    "r_index_mcp_flex",
+    "r_index_pip",
+    "r_index_dip",
+    "r_middle_mcp_abd",
+    "r_middle_mcp_flex",
+    "r_middle_pip",
+    "r_ring_mcp_flex",
+    "r_ring_pip",
+    "r_pinky_mcp_flex",
+    "r_pinky_pip",
+    "r_pinky_abd",
     // Left hand (16 DOF, mirror)
-    "l_thumb_cmc_abd", "l_thumb_cmc_flex", "l_thumb_mcp", "l_thumb_ip",
-    "l_index_mcp_abd", "l_index_mcp_flex", "l_index_pip", "l_index_dip",
-    "l_middle_mcp_abd", "l_middle_mcp_flex", "l_middle_pip",
-    "l_ring_mcp_flex", "l_ring_pip",
-    "l_pinky_mcp_flex", "l_pinky_pip", "l_pinky_abd",
+    "l_thumb_cmc_abd",
+    "l_thumb_cmc_flex",
+    "l_thumb_mcp",
+    "l_thumb_ip",
+    "l_index_mcp_abd",
+    "l_index_mcp_flex",
+    "l_index_pip",
+    "l_index_dip",
+    "l_middle_mcp_abd",
+    "l_middle_mcp_flex",
+    "l_middle_pip",
+    "l_ring_mcp_flex",
+    "l_ring_pip",
+    "l_pinky_mcp_flex",
+    "l_pinky_pip",
+    "l_pinky_abd",
 ];
 
 /// Hand joint limits (radians). Anatomically based.
 const HAND_JOINT_LIMITS: [[f64; 2]; 32] = [
     // Right thumb
-    [-0.26, 0.87],   // CMC abd: -15° to 50°
-    [-0.17, 1.22],   // CMC flex: -10° to 70°
-    [0.0, 1.57],     // MCP: 0° to 90°
-    [0.0, 1.22],     // IP: 0° to 70°
+    [-0.26, 0.87], // CMC abd: -15° to 50°
+    [-0.17, 1.22], // CMC flex: -10° to 70°
+    [0.0, 1.57],   // MCP: 0° to 90°
+    [0.0, 1.22],   // IP: 0° to 70°
     // Right index
-    [-0.35, 0.35],   // MCP abd: ±20°
-    [0.0, 1.57],     // MCP flex: 0° to 90°
-    [0.0, 1.75],     // PIP: 0° to 100°
-    [0.0, 1.22],     // DIP: 0° to 70° (coupled: 0.67 × PIP)
+    [-0.35, 0.35], // MCP abd: ±20°
+    [0.0, 1.57],   // MCP flex: 0° to 90°
+    [0.0, 1.75],   // PIP: 0° to 100°
+    [0.0, 1.22],   // DIP: 0° to 70° (coupled: 0.67 × PIP)
     // Right middle
-    [-0.26, 0.26],   // MCP abd: ±15°
-    [0.0, 1.57],     // MCP flex: 0° to 90°
-    [0.0, 1.75],     // PIP: 0° to 100°
+    [-0.26, 0.26], // MCP abd: ±15°
+    [0.0, 1.57],   // MCP flex: 0° to 90°
+    [0.0, 1.75],   // PIP: 0° to 100°
     // Right ring
-    [0.0, 1.57],     // MCP flex: 0° to 90°
-    [0.0, 1.75],     // PIP: 0° to 100°
+    [0.0, 1.57], // MCP flex: 0° to 90°
+    [0.0, 1.75], // PIP: 0° to 100°
     // Right pinky
-    [0.0, 1.57],     // MCP flex: 0° to 90°
-    [0.0, 1.75],     // PIP: 0° to 100°
-    [-0.35, 0.35],   // abd: ±20°
+    [0.0, 1.57],   // MCP flex: 0° to 90°
+    [0.0, 1.75],   // PIP: 0° to 100°
+    [-0.35, 0.35], // abd: ±20°
     // Left hand (mirror)
-    [-0.26, 0.87], [-0.17, 1.22], [0.0, 1.57], [0.0, 1.22],
-    [-0.35, 0.35], [0.0, 1.57], [0.0, 1.75], [0.0, 1.22],
-    [-0.26, 0.26], [0.0, 1.57], [0.0, 1.75],
-    [0.0, 1.57], [0.0, 1.75],
-    [0.0, 1.57], [0.0, 1.75], [-0.35, 0.35],
+    [-0.26, 0.87],
+    [-0.17, 1.22],
+    [0.0, 1.57],
+    [0.0, 1.22],
+    [-0.35, 0.35],
+    [0.0, 1.57],
+    [0.0, 1.75],
+    [0.0, 1.22],
+    [-0.26, 0.26],
+    [0.0, 1.57],
+    [0.0, 1.75],
+    [0.0, 1.57],
+    [0.0, 1.75],
+    [0.0, 1.57],
+    [0.0, 1.75],
+    [-0.35, 0.35],
 ];
 
 /// Hand joint inertias — very low (finger segments are light).
@@ -285,19 +340,23 @@ const HAND_KD: [f64; 32] = [2.0; 32];
 // ─── Neck + Wrist Constants (7 DOF) ───
 
 const NECK_WRIST_JOINT_NAMES: [&str; 7] = [
-    "neck_pan", "neck_tilt", "neck_roll",
-    "r_wrist_flex", "r_wrist_dev",
-    "l_wrist_flex", "l_wrist_dev",
+    "neck_pan",
+    "neck_tilt",
+    "neck_roll",
+    "r_wrist_flex",
+    "r_wrist_dev",
+    "l_wrist_flex",
+    "l_wrist_dev",
 ];
 
 const NECK_WRIST_JOINT_LIMITS: [[f64; 2]; 7] = [
-    [-1.40, 1.40],   // neck pan: ±80°
-    [-1.05, 1.05],   // neck tilt: ±60°
-    [-0.70, 0.70],   // neck roll: ±40°
-    [-1.40, 1.40],   // r_wrist flex: ±80°
-    [-0.35, 0.35],   // r_wrist dev: ±20°
-    [-1.40, 1.40],   // l_wrist flex
-    [-0.35, 0.35],   // l_wrist dev
+    [-1.40, 1.40], // neck pan: ±80°
+    [-1.05, 1.05], // neck tilt: ±60°
+    [-0.70, 0.70], // neck roll: ±40°
+    [-1.40, 1.40], // r_wrist flex: ±80°
+    [-0.35, 0.35], // r_wrist dev: ±20°
+    [-1.40, 1.40], // l_wrist flex
+    [-0.35, 0.35], // l_wrist dev
 ];
 
 const NECK_WRIST_INERTIAS: [f64; 7] = [0.02, 0.02, 0.02, 0.005, 0.005, 0.005, 0.005];
@@ -309,15 +368,17 @@ const NECK_WRIST_KD: [f64; 7] = [5.0, 5.0, 5.0, 3.0, 3.0, 3.0, 3.0];
 // ─── Spine Constants (4 DOF) ───
 
 const SPINE_JOINT_NAMES: [&str; 4] = [
-    "lumbar_flex", "lumbar_lateral",
-    "thoracic_flex", "thoracic_lateral",
+    "lumbar_flex",
+    "lumbar_lateral",
+    "thoracic_flex",
+    "thoracic_lateral",
 ];
 
 const SPINE_JOINT_LIMITS: [[f64; 2]; 4] = [
-    [-0.79, 0.79],   // lumbar flex: ±45°
-    [-0.52, 0.52],   // lumbar lateral: ±30°
-    [-0.52, 0.52],   // thoracic flex: ±30°
-    [-0.35, 0.35],   // thoracic lateral: ±20°
+    [-0.79, 0.79], // lumbar flex: ±45°
+    [-0.52, 0.52], // lumbar lateral: ±30°
+    [-0.52, 0.52], // thoracic flex: ±30°
+    [-0.35, 0.35], // thoracic lateral: ±20°
 ];
 
 const SPINE_INERTIAS: [f64; 4] = [0.10, 0.10, 0.08, 0.08];
@@ -350,7 +411,9 @@ pub enum HandSide {
 }
 
 impl Default for HandSide {
-    fn default() -> Self { Self::Right }
+    fn default() -> Self {
+        Self::Right
+    }
 }
 
 /// Finger segment lengths in meters: [proximal, middle, distal].
@@ -379,7 +442,11 @@ pub fn compute_hand_centroid(
     hand_joints: &[f64],
     forward_dir: [f64; 3],
 ) -> [f64; 3] {
-    assert!(hand_joints.len() >= 16, "Need 16 hand joint angles, got {}", hand_joints.len());
+    assert!(
+        hand_joints.len() >= 16,
+        "Need 16 hand joint angles, got {}",
+        hand_joints.len()
+    );
 
     let mut centroid = [0.0f64; 3];
     let mut joint_offset = 0;
@@ -435,17 +502,17 @@ fn finger_fk(
 
     // Extract abduction (first joint for thumb/index/middle, last for pinky)
     let abd = match finger_idx {
-        0 => joints[0],            // thumb CMC_abd
-        1 => joints[0],            // index MCP_abd
-        2 => joints[0],            // middle MCP_abd
-        4 => joints[2],            // pinky abd (last DOF)
-        _ => 0.0,                  // ring: no abd
+        0 => joints[0], // thumb CMC_abd
+        1 => joints[0], // index MCP_abd
+        2 => joints[0], // middle MCP_abd
+        4 => joints[2], // pinky abd (last DOF)
+        _ => 0.0,       // ring: no abd
     };
 
     // Extract flexion angles for the 3 segments
     let (flex1, flex2, flex3) = match finger_idx {
-        0 => (joints[1], joints[2], joints[3]),           // thumb: CMC_flex, MCP, IP
-        1 => (joints[1], joints[2], joints[3]),           // index: MCP_flex, PIP, DIP
+        0 => (joints[1], joints[2], joints[3]), // thumb: CMC_flex, MCP, IP
+        1 => (joints[1], joints[2], joints[3]), // index: MCP_flex, PIP, DIP
         2 => (joints[1], joints[2], joints[2] * DIP_PIP_COUPLING_RATIO), // middle: coupled DIP
         3 => (joints[0], joints[1], joints[1] * DIP_PIP_COUPLING_RATIO), // ring: coupled DIP
         _ => (joints[0], joints[1], joints[1] * DIP_PIP_COUPLING_RATIO), // pinky: coupled DIP
@@ -530,7 +597,10 @@ mod tests {
     fn dexterous53_channels_increase() {
         let dmc = HumanoidMorphology::Dmc21.num_channels();
         let dex = HumanoidMorphology::Dexterous53.num_channels();
-        assert!(dex > dmc, "Dexterous should have more channels: dmc={dmc}, dex={dex}");
+        assert!(
+            dex > dmc,
+            "Dexterous should have more channels: dmc={dmc}, dex={dex}"
+        );
         // 72 + 32*2 + 6 = 142
         assert_eq!(dex, 142);
     }
@@ -558,10 +628,7 @@ mod tests {
             HumanoidMorphology::FullSpine,
         ] {
             for (i, [min, max]) in morph.joint_limits().iter().enumerate() {
-                assert!(
-                    min < max,
-                    "{morph:?} joint {i}: min ({min}) >= max ({max})"
-                );
+                assert!(min < max, "{morph:?} joint {i}: min ({min}) >= max ({max})");
             }
         }
     }
@@ -569,8 +636,16 @@ mod tests {
     #[test]
     fn hand_joint_names_are_prefixed() {
         let names = HumanoidMorphology::Dexterous53.joint_names();
-        assert!(names[21].starts_with("r_thumb"), "First hand joint: {}", names[21]);
-        assert!(names[37].starts_with("l_thumb"), "First left hand joint: {}", names[37]);
+        assert!(
+            names[21].starts_with("r_thumb"),
+            "First hand joint: {}",
+            names[21]
+        );
+        assert!(
+            names[37].starts_with("l_thumb"),
+            "First left hand joint: {}",
+            names[37]
+        );
     }
 
     #[test]
@@ -595,33 +670,43 @@ mod tests {
         let forward = [1.0, 0.0, 0.0];
         let centroid = compute_hand_centroid(base, &joints, forward);
         // Centroid should be forward of base (extended fingers)
-        assert!(centroid[0] > base[0], "Centroid x={:.3} should be ahead of base x={:.3}", centroid[0], base[0]);
+        assert!(
+            centroid[0] > base[0],
+            "Centroid x={:.3} should be ahead of base x={:.3}",
+            centroid[0],
+            base[0]
+        );
     }
 
     #[test]
     fn hand_fk_closed_fist_curls_down() {
         let base = [0.3, -0.17, 0.8];
         // All flexion joints at ~1.2 rad (~70°)
-        let joints = [0.0, 1.2, 1.2, 1.0,  // thumb
-                      0.0, 1.2, 1.2, 0.8,  // index
-                      0.0, 1.2, 1.2,        // middle
-                      1.2, 1.2,              // ring
-                      1.2, 1.2, 0.0];       // pinky
+        let joints = [
+            0.0, 1.2, 1.2, 1.0, // thumb
+            0.0, 1.2, 1.2, 0.8, // index
+            0.0, 1.2, 1.2, // middle
+            1.2, 1.2, // ring
+            1.2, 1.2, 0.0,
+        ]; // pinky
         let forward = [1.0, 0.0, 0.0];
         let centroid = compute_hand_centroid(base, &joints, forward);
         // Closed fist: fingertips should be below the base (curled down)
-        assert!(centroid[2] < base[2], "Closed fist z={:.3} should be below base z={:.3}", centroid[2], base[2]);
+        assert!(
+            centroid[2] < base[2],
+            "Closed fist z={:.3} should be below base z={:.3}",
+            centroid[2],
+            base[2]
+        );
     }
 
     #[test]
     fn hand_fk_centroid_is_finite() {
         let base = [0.3, -0.17, 0.8];
         // Various joint angles
-        let joints = [0.1, 0.5, 0.3, 0.2,
-                      -0.1, 0.8, 0.6, 0.4,
-                      0.0, 0.7, 0.5,
-                      0.6, 0.4,
-                      0.5, 0.3, 0.1];
+        let joints = [
+            0.1, 0.5, 0.3, 0.2, -0.1, 0.8, 0.6, 0.4, 0.0, 0.7, 0.5, 0.6, 0.4, 0.5, 0.3, 0.1,
+        ];
         let forward = [1.0, 0.0, 0.0];
         let centroid = compute_hand_centroid(base, &joints, forward);
         assert!(centroid[0].is_finite());

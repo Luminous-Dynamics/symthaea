@@ -277,8 +277,8 @@ impl RootFindingEngine {
                 };
             }
 
-            if dfx.abs() < 1e-15 {
-                // Derivative too small
+            if dfx.abs() < 1e-12 * fx.abs().max(1.0) {
+                // Derivative too small relative to function value
                 steps.push(RootStep {
                     iteration: iter + 1,
                     x,
@@ -501,7 +501,7 @@ impl RootFindingEngine {
             }
 
             let denom = fcurr - fprev;
-            if denom.abs() < 1e-15 {
+            if denom.abs() < 1e-12 * fcurr.abs().max(1.0) {
                 return Err(RootFindingError::ZeroDerivative {
                     x: xcurr,
                     fx: fcurr,

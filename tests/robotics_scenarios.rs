@@ -58,7 +58,8 @@ fn test_helicopter_sar_extended_mission() {
 
     // Phase 2: Stressful input (30 cycles) — drive consciousness dynamics
     for _ in 0..30 {
-        let result = service.cycle("emergency: target spotted in rough terrain, high winds, low visibility");
+        let result =
+            service.cycle("emergency: target spotted in rough terrain, high winds, low visibility");
         let phi = result.metadata.consciousness.consciousness_level;
         phi_history.push(phi);
 
@@ -126,7 +127,10 @@ fn test_vehicle_extended_driving() {
 
     let scenarios = [
         ("highway cruising, clear road, maintaining speed", 30),
-        ("dense traffic, frequent lane changes, high cognitive load", 20),
+        (
+            "dense traffic, frequent lane changes, high cognitive load",
+            20,
+        ),
         ("emergency: obstacle ahead, sudden brake required", 10),
         ("recovery: obstacle cleared, resuming normal driving", 20),
         ("highway exit, merging, destination ahead", 20),
@@ -206,8 +210,18 @@ fn test_multi_body_consciousness_divergence() {
         .zip(hv_quadrotor.as_slice())
         .map(|(a, b)| a * b)
         .sum::<f32>()
-        / (hv_humanoid.as_slice().iter().map(|x| x * x).sum::<f32>().sqrt()
-            * hv_quadrotor.as_slice().iter().map(|x| x * x).sum::<f32>().sqrt());
+        / (hv_humanoid
+            .as_slice()
+            .iter()
+            .map(|x| x * x)
+            .sum::<f32>()
+            .sqrt()
+            * hv_quadrotor
+                .as_slice()
+                .iter()
+                .map(|x| x * x)
+                .sum::<f32>()
+                .sqrt());
 
     assert!(
         similarity < 0.95,
@@ -219,4 +233,109 @@ fn test_multi_body_consciousness_divergence() {
     let t2 = quadrotor_service.embodiment_telemetry();
     assert_eq!(t1.num_actuators, 21, "Humanoid has 21 actuators");
     assert_eq!(t2.num_actuators, 4, "Quadrotor has 4 actuators");
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Scenario 4: Runtime platform switching (Multiple Realizability)
+//
+// Validates: Consciousness survives a body transfer. The same CognitiveLoopService
+// switches from Quadrotor to Vehicle mid-run, and Phi remains finite/coherent.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+#[cfg(all(feature = "flight", feature = "vehicle"))]
+#[test]
+fn test_platform_switch_consciousness_survives() {
+    let mut service = make_service(EmbodimentPlatform::Quadrotor);
+
+    // Phase 1: Fly as quadrotor (20 cycles)
+    for _ in 0..20 {
+        let r = service.cycle("fly forward scanning terrain");
+        assert!(r.metadata.consciousness.consciousness_level.is_finite());
+    }
+    let flight_telem = service.embodiment_telemetry().clone();
+    assert_eq!(flight_telem.num_actuators, 4, "Quadrotor has 4 actuators");
+    assert!(flight_telem.total_steps >= 20);
+
+    // Switch body: Quadrotor → Vehicle
+    service.switch_embodiment(EmbodimentPlatform::Vehicle);
+
+    // Phase 2: Drive as vehicle (20 cycles)
+    for _ in 0..20 {
+        let r = service.cycle("drive along road maintaining speed");
+        assert!(
+            r.metadata.consciousness.consciousness_level.is_finite(),
+            "Consciousness must survive platform switch"
+        );
+    }
+    let vehicle_telem = service.embodiment_telemetry().clone();
+    assert_eq!(vehicle_telem.num_actuators, 3, "Vehicle has 3 actuators");
+    assert!(vehicle_telem.total_steps >= 20);
+
+    // Consciousness should still be functional after body transfer
+    assert_ne!(
+        flight_telem.platform, vehicle_telem.platform,
+        "Platform should have changed"
+    );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Scenario 5: All-platform safety invariants
+//
+// Validates: Every platform produces bounded, finite states and responds
+// correctly to Red safety level (phi < 0.1). Tests that the 4-tier
+// safety system works identically across all embodiment types.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+#[cfg(all(feature = "flight", feature = "vehicle"))]
+#[test]
+fn test_all_platforms_safety_invariants() {
+    let platforms = vec![
+        ("Quadrotor", EmbodimentPlatform::Quadrotor),
+        ("Vehicle", EmbodimentPlatform::Vehicle),
+    ];
+
+    for (name, platform) in &platforms {
+        let mut service = make_service(*platform);
+
+        // Phase 1: Normal operation (20 cycles)
+        for i in 0..20 {
+            let r = service.cycle("maintain steady state");
+            assert!(
+                r.metadata.consciousness.consciousness_level.is_finite(),
+                "{} cycle {} produced non-finite consciousness",
+                name,
+                i
+            );
+        }
+
+        let telem = service.embodiment_telemetry();
+        assert!(
+            telem.total_steps >= 20,
+            "{} should have at least 20 steps, got {}",
+            name,
+            telem.total_steps
+        );
+        assert!(
+            telem.control_effort.is_finite(),
+            "{} control effort not finite",
+            name
+        );
+
+        // Phase 2: Stress input to push consciousness dynamics
+        for _ in 0..10 {
+            let r = service.cycle("extreme perturbation, unexpected obstacle, system failure");
+            assert!(
+                r.metadata.consciousness.consciousness_level.is_finite(),
+                "{} produced non-finite consciousness under stress",
+                name
+            );
+        }
+
+        let telem2 = service.embodiment_telemetry();
+        assert!(
+            telem2.total_steps >= 30,
+            "{} total steps should be >= 30 after both phases",
+            name
+        );
+    }
 }

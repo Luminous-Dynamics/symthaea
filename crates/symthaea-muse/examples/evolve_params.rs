@@ -16,18 +16,26 @@ fn main() {
 
     let config = symthaea_muse::param_tuner::TunerConfig::default();
 
-    println!("Evolving {} parameters across {} individuals for {} generations...\n",
+    println!(
+        "Evolving {} parameters across {} individuals for {} generations...\n",
         symthaea_muse::param_tuner::default_params().len(),
         config.population_size,
-        config.max_generations);
+        config.max_generations
+    );
 
     let result = symthaea_muse::param_tuner::evolve(&config);
 
     println!("\n╔══════════════════════════════════════════════════════════════╗");
     println!("║  Evolution Complete                                        ║");
     println!("╠══════════════════════════════════════════════════════════════╣");
-    println!("║  Best fitness: {:.4}                                       ║", result.best_fitness);
-    println!("║  Generations:  {}                                          ║", result.generations);
+    println!(
+        "║  Best fitness: {:.4}                                       ║",
+        result.best_fitness
+    );
+    println!(
+        "║  Generations:  {}                                          ║",
+        result.generations
+    );
     println!("╚══════════════════════════════════════════════════════════════╝\n");
 
     println!("Optimal parameters:");

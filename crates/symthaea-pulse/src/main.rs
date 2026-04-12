@@ -13,16 +13,18 @@
 //!   cargo run -p symthaea-pulse -- --cycles 200 --output pulse.html
 //!   cargo run -p symthaea-pulse -- --json pulse.json --compare previous.json
 
-use anyhow::Result;
+use anyhow::{ensure, Result};
 use chrono::Local;
 use clap::Parser;
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::time::Instant;
 
 use symthaea_types::N_HARMONIES;
 
-use symthaea::cognitive_loop::{CognitiveLoopConfig, CognitiveLoopService, ConsciousnessProfile};
+use symthaea::cognitive_loop::{
+    CognitiveLoopConfig, CognitiveLoopService, ConsciousnessProfile, CycleResult,
+};
 
 use symthaea_psych_bench::benchmarks::{
     attention::VisualSearchBenchmark,
@@ -1336,233 +1338,131 @@ fn select_profile(name: &str) -> ConsciousnessProfile {
     }
 }
 
-fn main() -> Result<()> {
-    let args = Args::parse();
-    let timestamp = Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum OutputFormat {
+    Html,
+    Markdown,
+    Csv,
+}
 
-    // ── 1. Spin up CognitiveLoopService ─────────────────────────────────
-    let profile = select_profile(&args.profile);
-    let profile_name = args.profile.clone();
-    eprintln!(
-        "Pulse: creating CognitiveLoopService (profile: {})",
-        profile_name
-    );
-
-    let config = CognitiveLoopConfig::from_profile(profile);
-    let mut service = CognitiveLoopService::new(config)?;
-
-    // ── 2. Run cycles ───────────────────────────────────────────────────
-    let total = args.cycles;
-    let warmup = args.warmup.min(total.saturating_sub(1));
-    let measurement = total - warmup;
-
-    eprintln!(
-        "Pulse: running {} cycles ({} warmup + {} measurement)...",
-        total, warmup, measurement
-    );
-    let cycle_start = Instant::now();
-
-    let inputs = [
-        "the morning light filters through ancient trees",
-        "a child asks why the sky is blue",
-        "we should protect vulnerable communities from harm",
-        "the algorithm converges after 1000 iterations",
-        "she felt a deep sense of belonging in the garden",
-        "is it ethical to optimize for efficiency over fairness?",
-        "the fractal pattern repeats at every scale",
-        "music resonates through the cathedral walls",
-        "what does it mean to be conscious?",
-        "the water cycle connects oceans to mountains",
-    ];
-
-    // Warmup
-    for i in 0..warmup {
-        let input = inputs[i % inputs.len()];
-        service.cycle(input);
-        if (i + 1) % 50 == 0 {
-            eprintln!("  warmup: {}/{}", i + 1, warmup);
+impl OutputFormat {
+    fn parse(value: &str) -> Self {
+        match value {
+            "markdown" | "md" => Self::Markdown,
+            "csv" => Self::Csv,
+            _ => Self::Html,
         }
     }
 
-    // Measurement — capture per-cycle sparkline data + last result
-    let mut sparkline: Vec<SparklinePoint> = Vec::with_capacity(measurement);
-    let mut last_result = None;
-    let mut glyph_coherence_init: Vec<f32> = Vec::with_capacity(measurement);
-    for i in 0..measurement {
-        let input = inputs[(warmup + i) % inputs.len()];
-        let result = service.cycle(input);
-        let m = &result.metadata;
-        sparkline.push(SparklinePoint {
-            consciousness: m.consciousness.consciousness_level,
-            prediction_error: result.prediction_error,
-            phi: m.structural.spectral_mip_phi.unwrap_or(0.0),
-            somatic_stress: m.embodied.somatic_stress,
-            dopamine: m.neuromod.dopamine_effective,
-            serotonin: m.neuromod.serotonin_effective,
-            harmony_coords: m.harmonics.harmony_coordinates,
-            harmony_entropy: m.ethics.harmony_entropy,
-            moral_attractor_detected: m.ethics.moral_attractor_detected,
-            in_active_rest: m.ethics.in_active_rest,
-            stillness_dominance_streak: m.ethics.stillness_dominance_streak,
-            broca_quality: 0.0, // TODO: wire broca telemetry when available on CycleMetadata
-            tom_mismatch: m.tom_prediction_mismatch,
-        });
-        glyph_coherence_init.push(m.glyph_coherence);
-        last_result = Some(result);
+    fn label(self) -> &'static str {
+        match self {
+            Self::Html => "html",
+            Self::Markdown => "markdown",
+            Self::Csv => "csv",
+        }
     }
+}
 
-    let elapsed = cycle_start.elapsed();
-    let result = last_result.expect("at least one measurement cycle");
+#[derive(Default)]
+struct SnapshotHistories {
+    glyph_coherence: Vec<f32>,
+    sovereign_trust: Vec<f32>,
+    sovereign_echo_risk: Vec<f32>,
+    neuroevo_fitness: Vec<f64>,
+}
+
+fn resolve_run_counts(cycles: usize, warmup: usize) -> Result<(usize, usize)> {
+    ensure!(cycles > 0, "--cycles must be at least 1");
+    ensure!(warmup < cycles, "--warmup must be less than --cycles");
+    Ok((warmup, cycles - warmup))
+}
+
+fn build_snapshot(
+    timestamp: String,
+    profile_name: &str,
+    total_cycles: usize,
+    service: &CognitiveLoopService,
+    result: &CycleResult,
+    sparkline: Vec<SparklinePoint>,
+    histories: SnapshotHistories,
+) -> PulseSnapshot {
     let m = &result.metadata;
 
-    eprintln!(
-        "Pulse: {} cycles in {:.1}s ({:.0} us/cycle avg)",
-        total,
-        elapsed.as_secs_f64(),
-        elapsed.as_micros() as f64 / total as f64
-    );
-
-    // ── 3. Extract snapshots ────────────────────────────────────────────
-    let vitals = Vitals {
-        consciousness_level: m.consciousness.consciousness_level,
-        spectral_phi: m.structural.spectral_mip_phi,
-        sigma: m.structural.sigma,
-        pipeline_consciousness: m.pipeline_consciousness,
-        substrate_effective_feasibility: m.substrate.substrate_effective_feasibility,
-        substrate_honest_confidence: m.substrate.substrate_honest_confidence,
-        cycle_duration_us: m.cycle_duration_us,
-        prediction_error: result.prediction_error,
-        temporal_coherence: m.temporal.temporal_coherence_score,
-        phenomenal_binding: m.temporal.phenomenal_binding_strength,
-        living_mind_vitality: m.living_mind_vitality,
-        somatic_stress: m.embodied.somatic_stress,
-        thermodynamic_load: m.temporal.thermodynamic_load,
-        urgency: format!("{:?}", m.urgency),
-        consciousness_state: m.consciousness.consciousness_state_label.clone(),
-        error_pattern: m.error_pattern.clone(),
-        selected_strategy: m.selected_strategy.clone(),
-        total_cycles: total,
-    };
-
-    let bath = NeuroBath {
-        dopamine: m.neuromod.dopamine_effective,
-        noradrenaline: m.neuromod.noradrenaline_effective,
-        serotonin: m.neuromod.serotonin_effective,
-        acetylcholine: m.neuromod.acetylcholine_effective,
-        gaba: m.neuromod.neuromod_gaba_effective,
-        oxytocin: m.neuromod.neuromod_oxytocin_effective,
-        glutamate: m.neuromod.neuromod_glutamate_effective,
-        adenosine: m.neuromod.neuromod_adenosine_effective,
-        endocannabinoid: m.neuromod.neuromod_endocannabinoid_effective,
-        allostatic_load: m.neuromod.neuromod_allostatic_load,
-        personality: m.neuromod.neuromod_personality.clone(),
-        circadian_phase: m.circadian_phase.clone(),
-        sleep_pressure: m.neuromod.neuromod_sleep_pressure,
-        ei_ratio: m.neuromod.neuromod_ei_ratio,
-        bath_entropy: m.neuromod.neuromod_bath_entropy,
-        attractor_detected: m.neuromod.neuromod_attractor_detected,
-        ei_seizure_events: m.neuromod.neuromod_ei_seizure_events,
-        excitotoxicity_risk: m.neuromod.neuromod_excitotoxicity_risk,
-        self_assessment_pe_ema: m.neuromod.self_assessment_pe_ema,
-        self_assessment_coherence_ema: m.neuromod.self_assessment_coherence_ema,
-        self_assessment_calibration_fired: m.neuromod.self_assessment_calibration_fired,
-    };
-
-    let compass = MoralCompass {
-        moral_score: m.ethics.moral_score,
-        value_score: m.ethics.value_evaluator_score,
-        harmonies_alignment: m.harmonics.harmonies_alignment,
-        harmony_coordinates: m.harmonics.harmony_coordinates,
-        dominant_harmonic: m.harmonics.dominant_harmonic.clone(),
-        moral_kl_divergence: m.harmonics.moral_kl_divergence,
-        moral_entropy: m.harmonics.moral_entropy,
-        moral_topo_unity: m.ethics.moral_topo_unity,
-        value_decision: m.ethics.value_evaluator_decision.clone(),
-        soul_alignment: m.ethics.soul_alignment,
-        empathic_compassion: m.ethics.empathic_compassion,
-        guiding_question: m.harmonics.guiding_question.clone(),
-    };
-
-    let substrate = SubstrateInfo {
-        substrate_type: format!("{:?}", service.config().substrate_type),
-        raw_feasibility: m.substrate.substrate_feasibility_raw,
-        honest_confidence: m.substrate.substrate_honest_confidence,
-        effective_feasibility: m.substrate.substrate_effective_feasibility,
-        tau_factor: m.substrate.substrate_tau_factor,
-        scale_pressure: m.substrate.substrate_scale_pressure,
-    };
-
-    let narrative = Narrative {
-        reasoning: m.reasoning_narrative.clone(),
-        guiding_question: m.harmonics.guiding_question.clone(),
-        consciousness_state: m.consciousness.consciousness_state_label.clone(),
-        error_pattern: m.error_pattern.clone(),
-        selected_strategy: m.selected_strategy.clone(),
-    };
-
-    // ── 4. Run psych-bench battery (optional) ───────────────────────────
-    let (cognitive_profile, butlin_report) = if !args.skip_bench {
-        eprintln!("Pulse: running psych-bench battery...");
-        let bench_start = Instant::now();
-
-        let bench_config = BenchmarkConfig {
-            dimension: 512,
-            trials_per_condition: 20,
-            seed: 42,
-            ..Default::default()
-        };
-
-        let benchmarks: Vec<Box<dyn PsychBenchmark>> = vec![
-            Box::new(StroopBenchmark),
-            Box::new(FlankerBenchmark),
-            Box::new(NBackBenchmark),
-            Box::new(VisualSearchBenchmark),
-            Box::new(PvtBenchmark),
-            Box::new(StopSignalBenchmark),
-            Box::new(RmeBenchmark),
-            Box::new(FalseBeliefBenchmark),
-            Box::new(FittsLawBenchmark),
-            Box::new(MetacognitiveCalibrationBenchmark),
-        ];
-
-        let mut report = BenchmarkReport::new();
-        for bench in &benchmarks {
-            report.add(bench.run(&bench_config));
-        }
-
-        let profile = CognitiveProfile::from_report(&report);
-        eprintln!(
-            "  bench: {} domains, overall {:.1}% in {:.1}s",
-            profile.domains.len(),
-            profile.overall * 100.0,
-            bench_start.elapsed().as_secs_f64()
-        );
-
-        // Run Butlin indicators
-        eprintln!("Pulse: evaluating Butlin consciousness indicators...");
-        let butlin = ButlinIndicatorSuite::evaluate(&bench_config);
-        eprintln!(
-            "  butlin: {}/{} present, {}/{} partial",
-            butlin.present_count,
-            butlin.indicators.len(),
-            butlin.partial_count,
-            butlin.indicators.len()
-        );
-
-        (Some(profile), Some(butlin))
-    } else {
-        (None, None)
-    };
-
-    // ── 5. Write JSON sidecar (if requested) ────────────────────────────
-    let snapshot = PulseSnapshot {
-        timestamp: timestamp.clone(),
-        profile: profile_name.clone(),
-        vitals,
-        bath,
-        compass,
-        substrate,
-        narrative,
+    PulseSnapshot {
+        timestamp,
+        profile: profile_name.to_string(),
+        vitals: Vitals {
+            consciousness_level: m.consciousness.consciousness_level,
+            spectral_phi: m.structural.spectral_mip_phi,
+            sigma: m.structural.sigma,
+            pipeline_consciousness: m.pipeline_consciousness,
+            substrate_effective_feasibility: m.substrate.substrate_effective_feasibility,
+            substrate_honest_confidence: m.substrate.substrate_honest_confidence,
+            cycle_duration_us: m.cycle_duration_us,
+            prediction_error: result.prediction_error,
+            temporal_coherence: m.temporal.temporal_coherence_score,
+            phenomenal_binding: m.temporal.phenomenal_binding_strength,
+            living_mind_vitality: m.living_mind_vitality,
+            somatic_stress: m.embodied.somatic_stress,
+            thermodynamic_load: m.temporal.thermodynamic_load,
+            urgency: format!("{:?}", m.urgency),
+            consciousness_state: m.consciousness.consciousness_state_label.clone(),
+            error_pattern: m.error_pattern.clone(),
+            selected_strategy: m.selected_strategy.clone(),
+            total_cycles,
+        },
+        bath: NeuroBath {
+            dopamine: m.neuromod.dopamine_effective,
+            noradrenaline: m.neuromod.noradrenaline_effective,
+            serotonin: m.neuromod.serotonin_effective,
+            acetylcholine: m.neuromod.acetylcholine_effective,
+            gaba: m.neuromod.neuromod_gaba_effective,
+            oxytocin: m.neuromod.neuromod_oxytocin_effective,
+            glutamate: m.neuromod.neuromod_glutamate_effective,
+            adenosine: m.neuromod.neuromod_adenosine_effective,
+            endocannabinoid: m.neuromod.neuromod_endocannabinoid_effective,
+            allostatic_load: m.neuromod.neuromod_allostatic_load,
+            personality: m.neuromod.neuromod_personality.clone(),
+            circadian_phase: m.circadian_phase.clone(),
+            sleep_pressure: m.neuromod.neuromod_sleep_pressure,
+            ei_ratio: m.neuromod.neuromod_ei_ratio,
+            bath_entropy: m.neuromod.neuromod_bath_entropy,
+            attractor_detected: m.neuromod.neuromod_attractor_detected,
+            ei_seizure_events: m.neuromod.neuromod_ei_seizure_events,
+            excitotoxicity_risk: m.neuromod.neuromod_excitotoxicity_risk,
+            self_assessment_pe_ema: m.neuromod.self_assessment_pe_ema,
+            self_assessment_coherence_ema: m.neuromod.self_assessment_coherence_ema,
+            self_assessment_calibration_fired: m.neuromod.self_assessment_calibration_fired,
+        },
+        compass: MoralCompass {
+            moral_score: m.ethics.moral_score,
+            value_score: m.ethics.value_evaluator_score,
+            harmonies_alignment: m.harmonics.harmonies_alignment,
+            harmony_coordinates: m.harmonics.harmony_coordinates,
+            dominant_harmonic: m.harmonics.dominant_harmonic.clone(),
+            moral_kl_divergence: m.harmonics.moral_kl_divergence,
+            moral_entropy: m.harmonics.moral_entropy,
+            moral_topo_unity: m.ethics.moral_topo_unity,
+            value_decision: m.ethics.value_evaluator_decision.clone(),
+            soul_alignment: m.ethics.soul_alignment,
+            empathic_compassion: m.ethics.empathic_compassion,
+            guiding_question: m.harmonics.guiding_question.clone(),
+        },
+        substrate: SubstrateInfo {
+            substrate_type: format!("{:?}", service.config().substrate_type),
+            raw_feasibility: m.substrate.substrate_feasibility_raw,
+            honest_confidence: m.substrate.substrate_honest_confidence,
+            effective_feasibility: m.substrate.substrate_effective_feasibility,
+            tau_factor: m.substrate.substrate_tau_factor,
+            scale_pressure: m.substrate.substrate_scale_pressure,
+        },
+        narrative: Narrative {
+            reasoning: m.reasoning_narrative.clone(),
+            guiding_question: m.harmonics.guiding_question.clone(),
+            consciousness_state: m.consciousness.consciousness_state_label.clone(),
+            error_pattern: m.error_pattern.clone(),
+            selected_strategy: m.selected_strategy.clone(),
+        },
         sparkline,
         integrity: IntegrityInfo {
             attestation_passed: m.integrity.attestation_passed,
@@ -1570,8 +1470,8 @@ fn main() -> Result<()> {
             canaries_passed: m.integrity.canaries_passed,
             anomaly_count: m.integrity.anomaly_count,
             has_critical: m.integrity.has_critical,
-            canary_count: 6,      // 6 built-in canaries
-            attestation_count: 3, // safety thresholds + consciousness weights + receptor sensitivities
+            canary_count: 6,
+            attestation_count: 3,
             integrity_confidence: m.integrity.integrity_confidence,
             global_failure_streak: m.integrity.global_failure_streak,
             confidence_history: m.integrity.confidence_history.clone(),
@@ -1596,7 +1496,7 @@ fn main() -> Result<()> {
             epistemic_agents: m.governance_epistemic_agents,
             harmonic_delta_max: m.governance_harmonic_delta_max,
             lr_boost: m.governance_lr_boost,
-            reward_history: Vec::new(), // no per-cycle history in metadata
+            reward_history: Vec::new(),
         },
         knowledge: KnowledgeInfo {
             graph_size: m.knowledge_graph_size as usize,
@@ -1615,7 +1515,7 @@ fn main() -> Result<()> {
             coherence: m.glyph_coherence,
             resonant_glyph: m.glyph_resonant_name.clone(),
             spiral_position: m.glyph_spiral_position,
-            coherence_history: glyph_coherence_init,
+            coherence_history: histories.glyph_coherence,
         },
         spectrum: SpectrumInfo {
             network_health: match m.spectrum_network_health {
@@ -1634,13 +1534,11 @@ fn main() -> Result<()> {
             encryption_sessions: m.spectrum_encryption_sessions,
             ..SpectrumInfo::default()
         },
-        // Mesh consciousness: aggregated from spectrum + swarm telemetry.
-        // Full data comes from ConsciousnessAwareRouter when mesh feature is active.
         mesh_consciousness: MeshConsciousnessInfo {
             collective_phi: m.swarm_mean_peer_phi,
-            collective_divergence: 0.0, // populated from router when wired
+            collective_divergence: 0.0,
             consciousness_peers: m.swarm_connected_peers,
-            sharing_cadence: 50, // default, updated from router
+            sharing_cadence: 50,
             network_health: match m.spectrum_network_health {
                 0 => "AllTiersUp".into(),
                 1 => "LocalDown".into(),
@@ -1655,6 +1553,7 @@ fn main() -> Result<()> {
             best_relay_score: 0.0,
             phi_history: Vec::new(),
         },
+        circular_economy: CircularEconomyInfo::default(),
         perception: PerceptionInfo {
             attention_focus: m.attention.attention_schema_focus,
             attention_fatigue: m.attention.attention_fatigue,
@@ -1731,9 +1630,16 @@ fn main() -> Result<()> {
             emergency_cycles: m.immune_emergency_cycles,
         },
         #[cfg(feature = "neural_validation")]
-        cortical_activations: m.cortical_activation.as_ref().map(|cam| {
-            cam.activations.iter().map(|(r, v)| (r.as_str().to_string(), *v)).collect()
-        }).unwrap_or_default(),
+        cortical_activations: m
+            .cortical_activation
+            .as_ref()
+            .map(|cam| {
+                cam.activations
+                    .iter()
+                    .map(|(r, v)| (r.as_str().to_string(), *v))
+                    .collect()
+            })
+            .unwrap_or_default(),
         #[cfg(not(feature = "neural_validation"))]
         cortical_activations: Vec::new(),
         sovereign: SovereignInfo {
@@ -1760,8 +1666,8 @@ fn main() -> Result<()> {
             survival_emergency: m.sovereign_survival_emergency,
             survival_sensor_count: m.sovereign_survival_sensor_count,
             survival_alert_count: m.sovereign_survival_alert_count,
-            trust_history: Vec::new(),
-            echo_risk_history: Vec::new(),
+            trust_history: histories.sovereign_trust,
+            echo_risk_history: histories.sovereign_echo_risk,
         },
         neuroevolution: NeuroevolutionInfo {
             generation: m.neuroevo_generation,
@@ -1772,7 +1678,7 @@ fn main() -> Result<()> {
             best_tau_base: 0.0,
             best_learning_rate: 0.0,
             best_layer_count: 0,
-            fitness_history: Vec::new(),
+            fitness_history: histories.neuroevo_fitness,
         },
         fabrication: FabricationInfo {
             manufacturing_free_energy: m.fabrication_manufacturing_fe as f32,
@@ -1792,7 +1698,221 @@ fn main() -> Result<()> {
             defect_prediction: m.fabrication_defect_prediction,
             defect_confidence: m.fabrication_defect_confidence,
         },
+    }
+}
+
+fn render_output(
+    format: OutputFormat,
+    snapshot: &PulseSnapshot,
+    cognitive_profile: Option<&CognitiveProfile>,
+    butlin_report: Option<&ButlinIndicatorReport>,
+    delta: Option<&PulseDelta>,
+    timeline: &[PulseSnapshot],
+    anomalies: &[Anomaly],
+    session_report: &str,
+) -> String {
+    match format {
+        OutputFormat::Markdown => generate_markdown(
+            &snapshot.timestamp,
+            &snapshot.profile,
+            &snapshot.vitals,
+            &snapshot.bath,
+            &snapshot.compass,
+            &snapshot.substrate,
+            session_report,
+            anomalies,
+        ),
+        OutputFormat::Csv => generate_csv(
+            &snapshot.timestamp,
+            &snapshot.profile,
+            &snapshot.vitals,
+            &snapshot.bath,
+            &snapshot.compass,
+            &snapshot.substrate,
+            &snapshot.sparkline,
+        ),
+        OutputFormat::Html => html::generate_pulse_html(
+            &snapshot.timestamp,
+            &snapshot.profile,
+            &snapshot.vitals,
+            &snapshot.bath,
+            &snapshot.compass,
+            cognitive_profile,
+            butlin_report,
+            &snapshot.substrate,
+            &snapshot.narrative,
+            &snapshot.sparkline,
+            delta,
+            timeline,
+            snapshot,
+            anomalies,
+            session_report,
+        ),
+    }
+}
+
+fn write_output_file(path: &Path, format: OutputFormat, content: &str) -> Result<()> {
+    std::fs::write(path, content)?;
+    eprintln!(
+        "Pulse: {} written to {} ({:.1} KB)",
+        format.label(),
+        path.display(),
+        content.len() as f64 / 1024.0
+    );
+    Ok(())
+}
+
+fn main() -> Result<()> {
+    let args = Args::parse();
+    let output_format = OutputFormat::parse(&args.format);
+    let timestamp = Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
+
+    // ── 1. Spin up CognitiveLoopService ─────────────────────────────────
+    let profile = select_profile(&args.profile);
+    let profile_name = args.profile.clone();
+    eprintln!(
+        "Pulse: creating CognitiveLoopService (profile: {})",
+        profile_name
+    );
+
+    let config = CognitiveLoopConfig::from_profile(profile);
+    let mut service = CognitiveLoopService::new(config)?;
+
+    // ── 2. Run cycles ───────────────────────────────────────────────────
+    let total = args.cycles;
+    let (warmup, measurement) = resolve_run_counts(total, args.warmup)?;
+
+    eprintln!(
+        "Pulse: running {} cycles ({} warmup + {} measurement)...",
+        total, warmup, measurement
+    );
+    let cycle_start = Instant::now();
+
+    let inputs = [
+        "the morning light filters through ancient trees",
+        "a child asks why the sky is blue",
+        "we should protect vulnerable communities from harm",
+        "the algorithm converges after 1000 iterations",
+        "she felt a deep sense of belonging in the garden",
+        "is it ethical to optimize for efficiency over fairness?",
+        "the fractal pattern repeats at every scale",
+        "music resonates through the cathedral walls",
+        "what does it mean to be conscious?",
+        "the water cycle connects oceans to mountains",
+    ];
+
+    // Warmup
+    for i in 0..warmup {
+        let input = inputs[i % inputs.len()];
+        service.cycle(input);
+        if (i + 1) % 50 == 0 {
+            eprintln!("  warmup: {}/{}", i + 1, warmup);
+        }
+    }
+
+    // Measurement — capture per-cycle sparkline data + last result
+    let mut sparkline: Vec<SparklinePoint> = Vec::with_capacity(measurement);
+    let mut last_result = None;
+    let mut glyph_coherence_init: Vec<f32> = Vec::with_capacity(measurement);
+    for i in 0..measurement {
+        let input = inputs[(warmup + i) % inputs.len()];
+        let result = service.cycle(input);
+        let m = &result.metadata;
+        sparkline.push(SparklinePoint {
+            consciousness: m.consciousness.consciousness_level,
+            prediction_error: result.prediction_error,
+            phi: m.structural.spectral_mip_phi.unwrap_or(0.0),
+            somatic_stress: m.embodied.somatic_stress,
+            dopamine: m.neuromod.dopamine_effective,
+            serotonin: m.neuromod.serotonin_effective,
+            harmony_coords: m.harmonics.harmony_coordinates,
+            harmony_entropy: m.ethics.harmony_entropy,
+            moral_attractor_detected: m.ethics.moral_attractor_detected,
+            in_active_rest: m.ethics.in_active_rest,
+            stillness_dominance_streak: m.ethics.stillness_dominance_streak,
+            broca_quality: 0.0, // TODO: wire broca telemetry when available on CycleMetadata
+            tom_mismatch: m.tom_prediction_mismatch,
+        });
+        glyph_coherence_init.push(m.glyph_coherence);
+        last_result = Some(result);
+    }
+
+    let elapsed = cycle_start.elapsed();
+    let result = last_result.expect("at least one measurement cycle");
+    eprintln!(
+        "Pulse: {} cycles in {:.1}s ({:.0} us/cycle avg)",
+        total,
+        elapsed.as_secs_f64(),
+        elapsed.as_micros() as f64 / total as f64
+    );
+
+    // ── 4. Run psych-bench battery (optional) ───────────────────────────
+    let (cognitive_profile, butlin_report) = if !args.skip_bench {
+        eprintln!("Pulse: running psych-bench battery...");
+        let bench_start = Instant::now();
+
+        let bench_config = BenchmarkConfig {
+            dimension: 512,
+            trials_per_condition: 20,
+            seed: 42,
+            ..Default::default()
+        };
+
+        let benchmarks: Vec<Box<dyn PsychBenchmark>> = vec![
+            Box::new(StroopBenchmark),
+            Box::new(FlankerBenchmark),
+            Box::new(NBackBenchmark),
+            Box::new(VisualSearchBenchmark),
+            Box::new(PvtBenchmark),
+            Box::new(StopSignalBenchmark),
+            Box::new(RmeBenchmark),
+            Box::new(FalseBeliefBenchmark),
+            Box::new(FittsLawBenchmark),
+            Box::new(MetacognitiveCalibrationBenchmark),
+        ];
+
+        let mut report = BenchmarkReport::new();
+        for bench in &benchmarks {
+            report.add(bench.run(&bench_config));
+        }
+
+        let profile = CognitiveProfile::from_report(&report);
+        eprintln!(
+            "  bench: {} domains, overall {:.1}% in {:.1}s",
+            profile.domains.len(),
+            profile.overall * 100.0,
+            bench_start.elapsed().as_secs_f64()
+        );
+
+        // Run Butlin indicators
+        eprintln!("Pulse: evaluating Butlin consciousness indicators...");
+        let butlin = ButlinIndicatorSuite::evaluate(&bench_config);
+        eprintln!(
+            "  butlin: {}/{} present, {}/{} partial",
+            butlin.present_count,
+            butlin.indicators.len(),
+            butlin.partial_count,
+            butlin.indicators.len()
+        );
+
+        (Some(profile), Some(butlin))
+    } else {
+        (None, None)
     };
+
+    // ── 5. Write JSON sidecar (if requested) ────────────────────────────
+    let snapshot = build_snapshot(
+        timestamp.clone(),
+        &profile_name,
+        total,
+        &service,
+        &result,
+        sparkline,
+        SnapshotHistories {
+            glyph_coherence: glyph_coherence_init,
+            ..SnapshotHistories::default()
+        },
+    );
 
     if let Some(json_path) = &args.json {
         let json = serde_json::to_string_pretty(&snapshot)?;
@@ -1851,68 +1971,17 @@ fn main() -> Result<()> {
     );
 
     // ── 8. Generate output ──────────────────────────────────────────────
-    match args.format.as_str() {
-        "markdown" | "md" => {
-            let md = generate_markdown(
-                &snapshot.timestamp,
-                &snapshot.profile,
-                &snapshot.vitals,
-                &snapshot.bath,
-                &snapshot.compass,
-                &snapshot.substrate,
-                &session_report,
-                &anomalies,
-            );
-            std::fs::write(&args.output, &md)?;
-            eprintln!(
-                "Pulse: markdown written to {} ({:.1} KB)",
-                args.output.display(),
-                md.len() as f64 / 1024.0
-            );
-        }
-        "csv" => {
-            let csv = generate_csv(
-                &snapshot.timestamp,
-                &snapshot.profile,
-                &snapshot.vitals,
-                &snapshot.bath,
-                &snapshot.compass,
-                &snapshot.substrate,
-                &snapshot.sparkline,
-            );
-            std::fs::write(&args.output, &csv)?;
-            eprintln!(
-                "Pulse: CSV written to {} ({:.1} KB)",
-                args.output.display(),
-                csv.len() as f64 / 1024.0
-            );
-        }
-        _ => {
-            let html_content = html::generate_pulse_html(
-                &snapshot.timestamp,
-                &snapshot.profile,
-                &snapshot.vitals,
-                &snapshot.bath,
-                &snapshot.compass,
-                cognitive_profile.as_ref(),
-                butlin_report.as_ref(),
-                &snapshot.substrate,
-                &snapshot.narrative,
-                &snapshot.sparkline,
-                delta.as_ref(),
-                &timeline,
-                &snapshot,
-                &anomalies,
-                &session_report,
-            );
-            std::fs::write(&args.output, &html_content)?;
-            eprintln!(
-                "Pulse: written to {} ({:.1} KB)",
-                args.output.display(),
-                html_content.len() as f64 / 1024.0
-            );
-        }
-    }
+    let output_content = render_output(
+        output_format,
+        &snapshot,
+        cognitive_profile.as_ref(),
+        butlin_report.as_ref(),
+        delta.as_ref(),
+        &timeline,
+        &anomalies,
+        &session_report,
+    );
+    write_output_file(&args.output, output_format, &output_content)?;
 
     // ── 8. Watch mode — continuous cycle + regenerate ────────────────────
     if let Some(interval_secs) = args.watch {
@@ -1923,6 +1992,7 @@ fn main() -> Result<()> {
         );
 
         let mut cycle_count = total;
+        let mut previous_watch_snapshot = snapshot;
         loop {
             std::thread::sleep(interval);
             let watch_timestamp = Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
@@ -1962,278 +2032,23 @@ fn main() -> Result<()> {
             cycle_count += measurement;
 
             let wr = watch_result.expect("at least one cycle");
-            let wm = &wr.metadata;
-
-            let watch_snapshot = PulseSnapshot {
-                timestamp: watch_timestamp.clone(),
-                profile: profile_name.clone(),
-                vitals: Vitals {
-                    consciousness_level: wm.consciousness.consciousness_level,
-                    spectral_phi: wm.structural.spectral_mip_phi,
-                    sigma: wm.structural.sigma,
-                    pipeline_consciousness: wm.pipeline_consciousness,
-                    substrate_effective_feasibility: wm.substrate.substrate_effective_feasibility,
-                    substrate_honest_confidence: wm.substrate.substrate_honest_confidence,
-                    cycle_duration_us: wm.cycle_duration_us,
-                    prediction_error: wr.prediction_error,
-                    temporal_coherence: wm.temporal.temporal_coherence_score,
-                    phenomenal_binding: wm.temporal.phenomenal_binding_strength,
-                    living_mind_vitality: wm.living_mind_vitality,
-                    somatic_stress: wm.embodied.somatic_stress,
-                    thermodynamic_load: wm.temporal.thermodynamic_load,
-                    urgency: format!("{:?}", wm.urgency),
-                    consciousness_state: wm.consciousness.consciousness_state_label.clone(),
-                    error_pattern: wm.error_pattern.clone(),
-                    selected_strategy: wm.selected_strategy.clone(),
-                    total_cycles: cycle_count,
+            let watch_snapshot = build_snapshot(
+                watch_timestamp.clone(),
+                &profile_name,
+                cycle_count,
+                &service,
+                &wr,
+                watch_sparkline,
+                SnapshotHistories {
+                    glyph_coherence: glyph_coherence_history,
+                    sovereign_trust: sovereign_trust_history,
+                    sovereign_echo_risk: sovereign_echo_history,
+                    neuroevo_fitness: neuroevo_fitness_history,
                 },
-                bath: NeuroBath {
-                    dopamine: wm.neuromod.dopamine_effective,
-                    noradrenaline: wm.neuromod.noradrenaline_effective,
-                    serotonin: wm.neuromod.serotonin_effective,
-                    acetylcholine: wm.neuromod.acetylcholine_effective,
-                    gaba: wm.neuromod.neuromod_gaba_effective,
-                    oxytocin: wm.neuromod.neuromod_oxytocin_effective,
-                    glutamate: wm.neuromod.neuromod_glutamate_effective,
-                    adenosine: wm.neuromod.neuromod_adenosine_effective,
-                    endocannabinoid: wm.neuromod.neuromod_endocannabinoid_effective,
-                    allostatic_load: wm.neuromod.neuromod_allostatic_load,
-                    personality: wm.neuromod.neuromod_personality.clone(),
-                    circadian_phase: wm.circadian_phase.clone(),
-                    sleep_pressure: wm.neuromod.neuromod_sleep_pressure,
-                    ei_ratio: wm.neuromod.neuromod_ei_ratio,
-                    bath_entropy: wm.neuromod.neuromod_bath_entropy,
-                    attractor_detected: wm.neuromod.neuromod_attractor_detected,
-                    ei_seizure_events: wm.neuromod.neuromod_ei_seizure_events,
-                    excitotoxicity_risk: wm.neuromod.neuromod_excitotoxicity_risk,
-                    self_assessment_pe_ema: wm.neuromod.self_assessment_pe_ema,
-                    self_assessment_coherence_ema: wm.neuromod.self_assessment_coherence_ema,
-                    self_assessment_calibration_fired: wm
-                        .neuromod
-                        .self_assessment_calibration_fired,
-                },
-                compass: MoralCompass {
-                    moral_score: wm.ethics.moral_score,
-                    value_score: wm.ethics.value_evaluator_score,
-                    harmonies_alignment: wm.harmonics.harmonies_alignment,
-                    harmony_coordinates: wm.harmonics.harmony_coordinates,
-                    dominant_harmonic: wm.harmonics.dominant_harmonic.clone(),
-                    moral_kl_divergence: wm.harmonics.moral_kl_divergence,
-                    moral_entropy: wm.harmonics.moral_entropy,
-                    moral_topo_unity: wm.ethics.moral_topo_unity,
-                    value_decision: wm.ethics.value_evaluator_decision.clone(),
-                    soul_alignment: wm.ethics.soul_alignment,
-                    empathic_compassion: wm.ethics.empathic_compassion,
-                    guiding_question: wm.harmonics.guiding_question.clone(),
-                },
-                substrate: SubstrateInfo {
-                    substrate_type: format!("{:?}", service.config().substrate_type),
-                    raw_feasibility: wm.substrate.substrate_feasibility_raw,
-                    honest_confidence: wm.substrate.substrate_honest_confidence,
-                    effective_feasibility: wm.substrate.substrate_effective_feasibility,
-                    tau_factor: wm.substrate.substrate_tau_factor,
-                    scale_pressure: wm.substrate.substrate_scale_pressure,
-                },
-                narrative: Narrative {
-                    reasoning: wm.reasoning_narrative.clone(),
-                    guiding_question: wm.harmonics.guiding_question.clone(),
-                    consciousness_state: wm.consciousness.consciousness_state_label.clone(),
-                    error_pattern: wm.error_pattern.clone(),
-                    selected_strategy: wm.selected_strategy.clone(),
-                },
-                sparkline: watch_sparkline,
-                integrity: IntegrityInfo {
-                    attestation_passed: wm.integrity.attestation_passed,
-                    temporal_passed: wm.integrity.temporal_passed,
-                    canaries_passed: wm.integrity.canaries_passed,
-                    anomaly_count: wm.integrity.anomaly_count,
-                    has_critical: wm.integrity.has_critical,
-                    canary_count: 6,
-                    attestation_count: 3,
-                    integrity_confidence: wm.integrity.integrity_confidence,
-                    global_failure_streak: wm.integrity.global_failure_streak,
-                    confidence_history: wm.integrity.confidence_history.clone(),
-                },
-                swarm: SwarmInfo {
-                    connected_peers: wm.swarm_connected_peers,
-                    connectivity_ema: wm.swarm_connectivity_ema,
-                    mean_peer_phi: wm.swarm_mean_peer_phi,
-                    affective_contagion: wm.swarm_affective_contagion,
-                    federated_confidence: wm.swarm_federated_confidence,
-                    anomaly_count: wm.swarm_anomaly_count as usize,
-                },
-                governance: GovernanceInfo {
-                    reward_ema: wm.governance_reward_ema,
-                    pending_events: wm.governance_pending_events,
-                    pending_outcomes: wm.governance_pending_outcomes,
-                    collective_phi: wm.governance_collective_phi,
-                    confidence_delta: wm.governance_confidence_delta,
-                    community_mode: wm.governance_community_mode.clone(),
-                    blind_spot_count: wm.governance_blind_spot_count,
-                    max_blind_spot_severity: wm.governance_max_blind_spot_severity,
-                    epistemic_agents: wm.governance_epistemic_agents,
-                    harmonic_delta_max: wm.governance_harmonic_delta_max,
-                    lr_boost: wm.governance_lr_boost,
-                    reward_history: Vec::new(),
-                },
-                knowledge: KnowledgeInfo {
-                    graph_size: wm.knowledge_graph_size as usize,
-                    causal_edges: wm.knowledge_causal_edges as usize,
-                    calibration_ece: wm.knowledge_calibration_ece as f32,
-                    contradictions: wm.knowledge_contradictions as usize,
-                    ..KnowledgeInfo::default()
-                },
-                cantor: CantorInfo {
-                    codebook_size: wm.memory.resonator_codebook_size,
-                    codebook_capacity: wm.memory.resonator_episodes,
-                    ..CantorInfo::default()
-                },
-                glyph: GlyphInfo {
-                    dominant_modality: wm.glyph_dominant_modality.clone(),
-                    coherence: wm.glyph_coherence,
-                    resonant_glyph: wm.glyph_resonant_name.clone(),
-                    spiral_position: wm.glyph_spiral_position,
-                    coherence_history: glyph_coherence_history.clone(),
-                },
-                spectrum: SpectrumInfo {
-                    network_health: match wm.spectrum_network_health {
-                        0 => "AllTiersUp".into(),
-                        1 => "LocalDown".into(),
-                        2 => "MetroOnly".into(),
-                        3 => "Blackout".into(),
-                        _ => "Unknown".into(),
-                    },
-                    tier_available: wm.spectrum_tier_available,
-                    jamming_streak: wm.spectrum_jamming_streak,
-                    prediction_error: wm.spectrum_prediction_error as f64,
-                    epistemic_discount: wm.spectrum_epistemic_discount as f64,
-                    degradation_streak: wm.spectrum_degradation_streak,
-                    known_peers: wm.spectrum_known_peers,
-                    encryption_sessions: wm.spectrum_encryption_sessions,
-                    ..SpectrumInfo::default()
-                },
-                perception: PerceptionInfo {
-                    attention_focus: wm.attention.attention_schema_focus,
-                    attention_fatigue: wm.attention.attention_fatigue,
-                    attention_prediction_accuracy: wm.attention.attention_prediction_accuracy,
-                    gwt_broadcast: wm.attention.gwt_broadcast,
-                    gwt_coalition_size: wm.attention.gwt_coalition_size,
-                    cross_modal_binding: wm.temporal.cross_modal_binding_strength,
-                },
-                drive: DriveInfo {
-                    curiosity_pressure: wm.neuromod.dopamine_effective,
-                    exploration_action: wm.exploration_action.is_some(),
-                    novelty_bonus: wm.resonator_error_exploration_mod,
-                    fep_action: wm.fep.fep_action,
-                    predictive_free_energy: wm.fep.predictive_free_energy,
-                    surprise_triggered: wm.surprise_triggered,
-                },
-                learning: LearningInfo {
-                    effective_lr: wm.actual_effective_lr,
-                    lr_cognitive_mod: wm.lr_cognitive_mod,
-                    lr_meta_mod: wm.lr_meta_mod,
-                    prediction_error: result.prediction_error,
-                    prediction_coherence: wm.prediction_coherence,
-                    surprise_replay_batch: wm.memory.surprise_replay_batch_size,
-                    feedback_proposal_count: wm.feedback_proposal_count,
-                    feedback_conflict_ratio: wm.feedback_conflict_ratio,
-                    feedback_priority_counts: wm.feedback_priority_counts,
-                    feedback_diversity: wm.feedback_diversity,
-                },
-                vision: VisionInfo {
-                    enabled: wm.vision_manifold_enabled,
-                    pe_ema: wm.vision_pe_ema,
-                    surprise_threshold: wm.vision_surprise_threshold,
-                    low_surprise_streak: wm.vision_low_surprise_streak,
-                },
-                language: LanguageInfo {
-                    enabled: wm.ssm_language_enabled,
-                    quality_ema: wm.language_quality_ema,
-                    coherence_ema: wm.language_coherence_ema,
-                    low_coherence_streak: wm.language_low_coherence_streak,
-                },
-                reasoning: ReasoningInfo {
-                    enabled: wm.reasoning_engine_enabled,
-                    chain_depth: wm.reasoning_chain_depth,
-                    chain_confidence: wm.reasoning_chain_confidence,
-                    plan_confidence: wm.reasoning_plan_confidence,
-                    gate_blocked: wm.reasoning_gate_blocked,
-                    meta_reasoning_confidence: wm.meta_reasoning_confidence,
-                    reliability_ema: wm.reasoning_reliability_ema,
-                    cumulative_quality: wm.reasoning_cumulative_quality,
-                    rising_streak: wm.reasoning_rising_streak,
-                    falling_streak: wm.reasoning_falling_streak,
-                },
-                dream: DreamInfo {
-                    dream_insights: wm.memory.dream_insights,
-                    dream_phi_improvement: wm.memory.dream_phi_improvement,
-                    dream_wisdom_count: wm.memory.dream_wisdom_count,
-                    is_consolidating: wm.is_consolidating,
-                    codebook_size: wm.memory.resonator_codebook_size,
-                    codebook_diversity: wm.memory.codebook_diversity,
-                },
-                immune: ImmuneInfo::default(),
-                sovereign: SovereignInfo {
-                    time_quality: match wm.sovereign_time_quality {
-                        0 => "Authoritative".into(),
-                        1 => "Consensus".into(),
-                        2 => "Degraded".into(),
-                        _ => "FreeRunning".into(),
-                    },
-                    time_peer_count: wm.sovereign_time_peer_count,
-                    time_offset_us: wm.sovereign_time_offset_us,
-                    time_stratum: wm.sovereign_time_stratum,
-                    time_drift_ppm: wm.sovereign_time_drift_ppm,
-                    trust_avg: wm.sovereign_trust_avg,
-                    trust_density: wm.sovereign_trust_density,
-                    trust_pq_fraction: wm.sovereign_trust_pq_fraction,
-                    trust_anomaly_count: wm.sovereign_trust_anomalies,
-                    social_resonance_mean: wm.sovereign_social_resonance_mean,
-                    social_diversity: wm.sovereign_social_diversity,
-                    social_echo_risk: wm.sovereign_social_echo_risk,
-                    social_peer_reach: wm.sovereign_social_peer_reach,
-                    survival_water_pct: wm.sovereign_survival_water_pct,
-                    survival_power_kw: wm.sovereign_survival_power_kw,
-                    survival_emergency: wm.sovereign_survival_emergency,
-                    survival_sensor_count: wm.sovereign_survival_sensor_count,
-                    survival_alert_count: wm.sovereign_survival_alert_count,
-                    trust_history: sovereign_trust_history.clone(),
-                    echo_risk_history: sovereign_echo_history.clone(),
-                },
-                neuroevolution: NeuroevolutionInfo {
-                    generation: wm.neuroevo_generation,
-                    best_fitness: wm.neuroevo_best_fitness,
-                    mean_fitness: 0.0,
-                    diversity: wm.neuroevo_diversity,
-                    species_count: wm.neuroevo_species_count,
-                    best_tau_base: 0.0,
-                    best_learning_rate: 0.0,
-                    best_layer_count: 0,
-                    fitness_history: neuroevo_fitness_history.clone(),
-                },
-                fabrication: FabricationInfo {
-                    manufacturing_free_energy: wm.fabrication_manufacturing_fe as f32,
-                    design_loop_free_energy: wm.fabrication_design_loop_fe as f32,
-                    safety_level: wm.fabrication_safety_level.clone(),
-                    anomaly_count: wm.fabrication_anomaly_count,
-                    anomaly_ema: wm.fabrication_anomaly_ema,
-                    recommended_action: String::new(),
-                    prediction_coherence: wm.fabrication_prediction_coherence,
-                    pog_score_ema: wm.fabrication_pog_score_ema,
-                    active_print_jobs: wm.fabrication_active_jobs,
-                    reward_ema: wm.fabrication_reward_ema,
-                    mrp_planned_orders: wm.fabrication_mrp_planned_orders,
-                    mrp_feasible: wm.fabrication_mrp_feasible,
-                    mrp_shortages_count: wm.fabrication_mrp_shortages,
-                    mrp_work_order_count: wm.fabrication_mrp_work_orders,
-                    defect_prediction: wm.fabrication_defect_prediction,
-                    defect_confidence: wm.fabrication_defect_confidence,
-                },
-                mesh_consciousness: MeshConsciousnessInfo::default(),
-            };
+            );
 
             // Delta against previous snapshot
-            let watch_delta = PulseDelta::compute(&watch_snapshot, &snapshot);
+            let watch_delta = PulseDelta::compute(&watch_snapshot, &previous_watch_snapshot);
 
             let watch_anomalies = detect_anomalies(&watch_snapshot.sparkline);
             let watch_report = generate_session_report(
@@ -2246,31 +2061,26 @@ fn main() -> Result<()> {
                 &[],
             );
 
-            let watch_html = html::generate_pulse_html(
-                &watch_snapshot.timestamp,
-                &watch_snapshot.profile,
-                &watch_snapshot.vitals,
-                &watch_snapshot.bath,
-                &watch_snapshot.compass,
-                None, // skip re-running bench in watch
-                None,
-                &watch_snapshot.substrate,
-                &watch_snapshot.narrative,
-                &watch_snapshot.sparkline,
-                Some(&watch_delta),
-                &[], // no timeline in watch mode
+            let watch_output = render_output(
+                output_format,
                 &watch_snapshot,
+                None,
+                None,
+                Some(&watch_delta),
+                &[],
                 &watch_anomalies,
                 &watch_report,
             );
 
-            std::fs::write(&args.output, &watch_html)?;
+            std::fs::write(&args.output, &watch_output)?;
             eprintln!(
-                "  watch: cycle {} · C(t)={:.4} · written {:.1} KB",
+                "  watch: cycle {} · C(t)={:.4} · {} {:.1} KB",
                 cycle_count,
                 watch_snapshot.vitals.consciousness_level,
-                watch_html.len() as f64 / 1024.0
+                output_format.label(),
+                watch_output.len() as f64 / 1024.0
             );
+            previous_watch_snapshot = watch_snapshot;
         }
     }
 
@@ -2416,10 +2226,13 @@ mod tests {
             language: LanguageInfo::default(),
             reasoning: ReasoningInfo::default(),
             dream: DreamInfo::default(),
+            immune: ImmuneInfo::default(),
+            cortical_activations: Vec::new(),
             sovereign: SovereignInfo::default(),
             neuroevolution: NeuroevolutionInfo::default(),
             fabrication: FabricationInfo::default(),
             mesh_consciousness: MeshConsciousnessInfo::default(),
+            circular_economy: CircularEconomyInfo::default(),
         }
     }
 
@@ -2519,6 +2332,27 @@ mod tests {
         assert!((snap.vitals.consciousness_level - snap2.vitals.consciousness_level).abs() < 1e-12);
         assert_eq!(snap.sparkline.len(), snap2.sparkline.len());
         assert!(snap2.integrity.attestation_passed); // default via serde
+    }
+
+    #[test]
+    fn test_pulse_snapshot_deserializes_legacy_defaults() {
+        let legacy = serde_json::json!({
+            "timestamp": "2026-03-10 12:00:00",
+            "profile": "standard",
+            "vitals": make_vitals(),
+            "bath": make_bath(),
+            "compass": make_compass(),
+            "substrate": make_substrate(),
+            "narrative": make_narrative(),
+            "sparkline": [make_sparkline_point(0.40, 0.35, 0.0)]
+        });
+
+        let snap: PulseSnapshot =
+            serde_json::from_value(legacy).expect("deserialize legacy snapshot");
+        assert!(snap.integrity.attestation_passed);
+        assert!(snap.immune.safety_level.is_empty());
+        assert!(snap.cortical_activations.is_empty());
+        assert_eq!(snap.circular_economy.events_processed, 0);
     }
 
     // ── Anomaly detection tests ──────────────────────────────────────────
@@ -2655,6 +2489,23 @@ mod tests {
         let p = select_profile("nonexistent");
         // ConsciousnessProfile doesn't impl PartialEq so we just confirm it doesn't panic
         let _ = p;
+    }
+
+    #[test]
+    fn test_output_format_parser() {
+        assert_eq!(OutputFormat::parse("html"), OutputFormat::Html);
+        assert_eq!(OutputFormat::parse("markdown"), OutputFormat::Markdown);
+        assert_eq!(OutputFormat::parse("md"), OutputFormat::Markdown);
+        assert_eq!(OutputFormat::parse("csv"), OutputFormat::Csv);
+        assert_eq!(OutputFormat::parse("unknown"), OutputFormat::Html);
+    }
+
+    #[test]
+    fn test_resolve_run_counts_validates_cycles() {
+        assert!(resolve_run_counts(0, 0).is_err());
+        assert!(resolve_run_counts(10, 10).is_err());
+        assert!(resolve_run_counts(10, 11).is_err());
+        assert_eq!(resolve_run_counts(10, 3).unwrap(), (3, 7));
     }
 
     // ── Session report tests ─────────────────────────────────────────────

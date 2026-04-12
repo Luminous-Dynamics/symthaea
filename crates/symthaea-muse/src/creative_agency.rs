@@ -16,8 +16,8 @@
 //!     ↓                                     ↑
 //!   Taste model (learned preferences)  ←───┘
 
+use crate::{MusicalState, Note};
 use std::collections::VecDeque;
-use crate::{Note, MusicalState};
 
 /// A rated musical phrase — the system's judgment of its own creation.
 #[derive(Debug, Clone)]
@@ -64,11 +64,17 @@ pub enum QualityTier {
 
 impl QualityTier {
     pub fn from_score(score: f32) -> Self {
-        if score >= 0.85 { Self::Masterpiece }
-        else if score >= 0.70 { Self::Great }
-        else if score >= 0.50 { Self::Good }
-        else if score >= 0.30 { Self::Acceptable }
-        else { Self::Rejected }
+        if score >= 0.85 {
+            Self::Masterpiece
+        } else if score >= 0.70 {
+            Self::Great
+        } else if score >= 0.50 {
+            Self::Good
+        } else if score >= 0.30 {
+            Self::Acceptable
+        } else {
+            Self::Rejected
+        }
     }
 }
 
@@ -148,7 +154,9 @@ impl CreativeJournal {
         }
 
         // Has a recent good phrase → develop it
-        if self.history.back()
+        if self
+            .history
+            .back()
             .map(|p| p.beauty_score > 0.5)
             .unwrap_or(false)
         {
@@ -156,16 +164,18 @@ impl CreativeJournal {
         }
 
         // Default: explore if low consciousness, develop if high
-        if psi > 0.5 { CreativeIntent::Develop } else { CreativeIntent::Explore }
+        if psi > 0.5 {
+            CreativeIntent::Develop
+        } else {
+            CreativeIntent::Explore
+        }
     }
 
     /// Submit a candidate phrase for evaluation. Returns its beauty score.
-    pub fn evaluate_phrase(
-        &mut self,
-        notes: &[Note],
-        state: &MusicalState,
-    ) -> f32 {
-        if notes.is_empty() { return 0.0; }
+    pub fn evaluate_phrase(&mut self, notes: &[Note], state: &MusicalState) -> f32 {
+        if notes.is_empty() {
+            return 0.0;
+        }
 
         // Compute dimensions
         let melodic_interest = score_melodic_interest(notes);
@@ -213,7 +223,9 @@ impl CreativeJournal {
             self.gems.push_back(rated);
             if self.gems.len() > MAX_GEMS {
                 // Remove lowest-scored gem
-                if let Some(min_idx) = self.gems.iter()
+                if let Some(min_idx) = self
+                    .gems
+                    .iter()
                     .enumerate()
                     .min_by(|(_, a), (_, b)| a.beauty_score.partial_cmp(&b.beauty_score).unwrap())
                     .map(|(i, _)| i)
@@ -224,8 +236,15 @@ impl CreativeJournal {
         }
 
         // Update taste based on what scored well (online learning)
-        self.update_taste(beauty, melodic_interest, harmonic_alignment,
-            contour_quality, emotional_match, rhythmic_flow, surprise_value);
+        self.update_taste(
+            beauty,
+            melodic_interest,
+            harmonic_alignment,
+            contour_quality,
+            emotional_match,
+            rhythmic_flow,
+            surprise_value,
+        );
 
         beauty
     }
@@ -235,15 +254,19 @@ impl CreativeJournal {
         self.candidates.push((notes, score));
         if self.candidates.len() > MAX_CANDIDATES {
             // Drop lowest-scored
-            self.candidates.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
+            self.candidates
+                .sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
             self.candidates.truncate(MAX_CANDIDATES);
         }
     }
 
     /// Select the best candidate from the pool. Clears the pool.
     pub fn select_best(&mut self) -> Option<Vec<Note>> {
-        if self.candidates.is_empty() { return None; }
-        self.candidates.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
+        if self.candidates.is_empty() {
+            return None;
+        }
+        self.candidates
+            .sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
         let best = self.candidates.remove(0);
         self.candidates.clear();
         Some(best.0)
@@ -251,21 +274,24 @@ impl CreativeJournal {
 
     /// Get the system's best gem for performance (highest-rated).
     pub fn best_gem(&self) -> Option<&RatedPhrase> {
-        self.gems.iter().max_by(|a, b| a.beauty_score.partial_cmp(&b.beauty_score).unwrap())
+        self.gems
+            .iter()
+            .max_by(|a, b| a.beauty_score.partial_cmp(&b.beauty_score).unwrap())
     }
 
     /// Get a gem matching the current emotional quality (for contextual performance).
-    pub fn gem_for_emotion(&self, emotion: crate::emotional_gestures::EmotionalQuality) -> Option<&RatedPhrase> {
-        self.gems.iter()
+    pub fn gem_for_emotion(
+        &self,
+        emotion: crate::emotional_gestures::EmotionalQuality,
+    ) -> Option<&RatedPhrase> {
+        self.gems
+            .iter()
             .filter(|g| g.intended_emotion == emotion)
             .max_by(|a, b| a.beauty_score.partial_cmp(&b.beauty_score).unwrap())
     }
 
     /// Online taste learning: shift weights toward dimensions that correlate with high beauty.
-    fn update_taste(
-        &mut self, beauty: f32,
-        mi: f32, ha: f32, cq: f32, em: f32, rf: f32, sv: f32,
-    ) {
+    fn update_taste(&mut self, beauty: f32, mi: f32, ha: f32, cq: f32, em: f32, rf: f32, sv: f32) {
         let lr = 0.01; // learning rate
         let reward = beauty - self.beauty_ema; // positive if above expectation
 
@@ -278,9 +304,12 @@ impl CreativeJournal {
         self.taste.surprise_value += lr * reward * sv;
 
         // Normalize weights to sum to 1.0
-        let sum = self.taste.melodic_interest + self.taste.harmonic_alignment
-            + self.taste.contour_quality + self.taste.emotional_match
-            + self.taste.rhythmic_flow + self.taste.surprise_value;
+        let sum = self.taste.melodic_interest
+            + self.taste.harmonic_alignment
+            + self.taste.contour_quality
+            + self.taste.emotional_match
+            + self.taste.rhythmic_flow
+            + self.taste.surprise_value;
         if sum > 0.01 {
             self.taste.melodic_interest /= sum;
             self.taste.harmonic_alignment /= sum;
@@ -291,9 +320,15 @@ impl CreativeJournal {
         }
     }
 
-    pub fn gem_count(&self) -> usize { self.gems.len() }
-    pub fn beauty_ema(&self) -> f32 { self.beauty_ema }
-    pub fn current_taste(&self) -> &TasteWeights { &self.taste }
+    pub fn gem_count(&self) -> usize {
+        self.gems.len()
+    }
+    pub fn beauty_ema(&self) -> f32 {
+        self.beauty_ema
+    }
+    pub fn current_taste(&self) -> &TasteWeights {
+        &self.taste
+    }
 
     pub fn reset(&mut self) {
         self.gems.clear();
@@ -307,7 +342,9 @@ impl CreativeJournal {
 // ─── Scoring Functions ──────────────────────────────────────────────────────
 
 fn score_melodic_interest(notes: &[Note]) -> f32 {
-    if notes.len() < 2 { return 0.3; }
+    if notes.len() < 2 {
+        return 0.3;
+    }
 
     // Pitch variety: unique pitches / total notes
     let mut pitches: Vec<i32> = notes.iter().map(|n| (n.frequency * 10.0) as i32).collect();
@@ -316,14 +353,18 @@ fn score_melodic_interest(notes: &[Note]) -> f32 {
     let variety = pitches.len() as f32 / notes.len() as f32;
 
     // Interval variety: how many different intervals
-    let intervals: Vec<i32> = notes.windows(2)
+    let intervals: Vec<i32> = notes
+        .windows(2)
         .map(|w| ((w[1].frequency / w[0].frequency).log2() * 12.0).round() as i32)
         .collect();
     let mut unique_intervals = intervals.clone();
     unique_intervals.sort();
     unique_intervals.dedup();
-    let int_variety = if intervals.is_empty() { 0.5 }
-        else { unique_intervals.len() as f32 / intervals.len() as f32 };
+    let int_variety = if intervals.is_empty() {
+        0.5
+    } else {
+        unique_intervals.len() as f32 / intervals.len() as f32
+    };
 
     // Berlyne: moderate variety is best (not monotonous, not random)
     let optimal_variety = 1.0 - (variety - 0.6).abs() * 2.0;
@@ -331,27 +372,35 @@ fn score_melodic_interest(notes: &[Note]) -> f32 {
 }
 
 fn score_contour(notes: &[Note]) -> f32 {
-    if notes.len() < 3 { return 0.3; }
+    if notes.len() < 3 {
+        return 0.3;
+    }
 
     // Look for arc: ascending first half, descending second half
     let mid = notes.len() / 2;
     let first_half = &notes[..mid];
     let second_half = &notes[mid..];
 
-    let ascending_count = first_half.windows(2)
+    let ascending_count = first_half
+        .windows(2)
         .filter(|w| w[1].frequency > w[0].frequency)
         .count();
-    let descending_count = second_half.windows(2)
+    let descending_count = second_half
+        .windows(2)
         .filter(|w| w[1].frequency < w[0].frequency)
         .count();
 
     let first_asc_ratio = if first_half.len() > 1 {
         ascending_count as f32 / (first_half.len() - 1) as f32
-    } else { 0.5 };
+    } else {
+        0.5
+    };
 
     let second_desc_ratio = if second_half.len() > 1 {
         descending_count as f32 / (second_half.len() - 1) as f32
-    } else { 0.5 };
+    } else {
+        0.5
+    };
 
     // Arc quality: both halves should have clear direction
     ((first_asc_ratio + second_desc_ratio) / 2.0).clamp(0.0, 1.0)
@@ -359,15 +408,19 @@ fn score_contour(notes: &[Note]) -> f32 {
 
 fn score_emotional_match(notes: &[Note], state: &MusicalState) -> f32 {
     let gesture = crate::emotional_gestures::gesture_for_emotion(
-        crate::emotional_gestures::detect_emotion(state)
+        crate::emotional_gestures::detect_emotion(state),
     );
 
-    if notes.len() < 2 { return 0.3; }
+    if notes.len() < 2 {
+        return 0.3;
+    }
 
     // Check if melody direction matches gesture preference
-    let ascending = notes.windows(2)
+    let ascending = notes
+        .windows(2)
         .filter(|w| w[1].frequency > w[0].frequency)
-        .count() as f32 / (notes.len() - 1) as f32;
+        .count() as f32
+        / (notes.len() - 1) as f32;
     let direction_score = if gesture.direction_bias > 0.0 {
         ascending // joy wants ascending
     } else if gesture.direction_bias < 0.0 {
@@ -385,17 +438,23 @@ fn score_emotional_match(notes: &[Note], state: &MusicalState) -> f32 {
 }
 
 fn score_rhythmic_flow(notes: &[Note]) -> f32 {
-    if notes.len() < 3 { return 0.3; }
+    if notes.len() < 3 {
+        return 0.3;
+    }
 
     // Inter-onset intervals
-    let iois: Vec<f32> = notes.windows(2)
+    let iois: Vec<f32> = notes
+        .windows(2)
         .map(|w| (w[1].start_time - w[0].start_time).max(0.001))
         .collect();
 
     // Regularity: low coefficient of variation
     let mean = iois.iter().sum::<f32>() / iois.len() as f32;
-    if mean < 0.001 { return 0.5; }
-    let cv = (iois.iter().map(|i| (i - mean).powi(2)).sum::<f32>() / iois.len() as f32).sqrt() / mean;
+    if mean < 0.001 {
+        return 0.5;
+    }
+    let cv =
+        (iois.iter().map(|i| (i - mean).powi(2)).sum::<f32>() / iois.len() as f32).sqrt() / mean;
 
     // Some variety is good (not perfectly metronomic), but not too much
     let optimal_cv = 1.0 - (cv - 0.2).abs() * 2.0;
@@ -403,19 +462,24 @@ fn score_rhythmic_flow(notes: &[Note]) -> f32 {
 }
 
 fn score_surprise(notes: &[Note], history: &VecDeque<RatedPhrase>) -> f32 {
-    if history.is_empty() || notes.len() < 2 { return 0.5; }
+    if history.is_empty() || notes.len() < 2 {
+        return 0.5;
+    }
 
     // Pitch centroid of this phrase
     let centroid = notes.iter().map(|n| n.frequency).sum::<f32>() / notes.len() as f32;
 
     // Compare to recent history centroids
-    let hist_centroids: Vec<f32> = history.iter()
+    let hist_centroids: Vec<f32> = history
+        .iter()
         .rev()
         .take(10)
         .map(|p| p.notes.iter().map(|n| n.frequency).sum::<f32>() / p.notes.len().max(1) as f32)
         .collect();
 
-    if hist_centroids.is_empty() { return 0.5; }
+    if hist_centroids.is_empty() {
+        return 0.5;
+    }
 
     let mean_centroid = hist_centroids.iter().sum::<f32>() / hist_centroids.len() as f32;
     let dist = (centroid - mean_centroid).abs() / mean_centroid.max(1.0);
@@ -429,13 +493,22 @@ mod tests {
     use super::*;
 
     fn n(freq: f32, start: f32, dur: f32) -> Note {
-        Note { frequency: freq, start_time: start, duration: dur, velocity: 0.7 }
+        Note {
+            frequency: freq,
+            start_time: start,
+            duration: dur,
+            velocity: 0.7,
+        }
     }
 
     #[test]
     fn journal_starts_exploring() {
         let journal = CreativeJournal::new();
-        let state = MusicalState { consciousness_level: 0.3, prediction_error: 0.6, ..Default::default() };
+        let state = MusicalState {
+            consciousness_level: 0.3,
+            prediction_error: 0.6,
+            ..Default::default()
+        };
         assert_eq!(journal.creative_intent(&state), CreativeIntent::Explore);
     }
 
@@ -463,9 +536,14 @@ mod tests {
         let mut journal = CreativeJournal::new();
         // Create a phrase with good contour (ascending then descending)
         let notes = vec![
-            n(261.63, 0.0, 0.5), n(293.66, 0.5, 0.5), n(329.63, 1.0, 0.5),
-            n(349.23, 1.5, 0.5), n(392.00, 2.0, 0.5), // ascending
-            n(349.23, 2.5, 0.5), n(329.63, 3.0, 0.5), n(293.66, 3.5, 0.5), // descending
+            n(261.63, 0.0, 0.5),
+            n(293.66, 0.5, 0.5),
+            n(329.63, 1.0, 0.5),
+            n(349.23, 1.5, 0.5),
+            n(392.00, 2.0, 0.5), // ascending
+            n(349.23, 2.5, 0.5),
+            n(329.63, 3.0, 0.5),
+            n(293.66, 3.5, 0.5), // descending
         ];
         let state = MusicalState {
             consciousness_level: 0.7,
@@ -490,18 +568,27 @@ mod tests {
         for i in 0..50 {
             let (notes, state) = if i % 2 == 0 {
                 // "Good" phrase: many unique pitches, high harmony
-                (vec![
-                    n(261.63 + i as f32 * 30.0, 0.0, 0.5),
-                    n(329.63, 0.5, 0.5),
-                    n(392.00, 1.0, 0.5),
-                    n(440.00, 1.5, 0.5),
-                ], MusicalState { harmony_activations: [0.9; 8], ..Default::default() })
+                (
+                    vec![
+                        n(261.63 + i as f32 * 30.0, 0.0, 0.5),
+                        n(329.63, 0.5, 0.5),
+                        n(392.00, 1.0, 0.5),
+                        n(440.00, 1.5, 0.5),
+                    ],
+                    MusicalState {
+                        harmony_activations: [0.9; 8],
+                        ..Default::default()
+                    },
+                )
             } else {
                 // "Bad" phrase: monotone, low harmony
-                (vec![
-                    n(261.63, 0.0, 0.5),
-                    n(261.63, 0.5, 0.5),
-                ], MusicalState { harmony_activations: [0.1; 8], ..Default::default() })
+                (
+                    vec![n(261.63, 0.0, 0.5), n(261.63, 0.5, 0.5)],
+                    MusicalState {
+                        harmony_activations: [0.1; 8],
+                        ..Default::default()
+                    },
+                )
             };
             journal.evaluate_phrase(&notes, &state);
         }
@@ -511,7 +598,10 @@ mod tests {
             + (journal.taste.harmonic_alignment - initial.harmonic_alignment).abs()
             + (journal.taste.contour_quality - initial.contour_quality).abs()
             + (journal.taste.surprise_value - initial.surprise_value).abs();
-        assert!(total_change > 0.01, "taste should evolve: total_change={total_change}");
+        assert!(
+            total_change > 0.01,
+            "taste should evolve: total_change={total_change}"
+        );
     }
 
     #[test]
@@ -522,7 +612,10 @@ mod tests {
         journal.add_candidate(vec![n(329.63, 0.0, 0.5)], 0.5);
 
         let best = journal.select_best().unwrap();
-        assert!((best[0].frequency - 440.00).abs() < 1.0, "should select highest scored");
+        assert!(
+            (best[0].frequency - 440.00).abs() < 1.0,
+            "should select highest scored"
+        );
     }
 
     #[test]

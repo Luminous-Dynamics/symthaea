@@ -45,7 +45,7 @@ impl SimpleHelicopterSimulator {
             mass: 500.0,
             inertia: [1500.0, 1500.0, 2000.0],
             external_force: [0.0; 3],
-            drag_coeff: 0.15,      // Higher drag than quadrotor (larger body)
+            drag_coeff: 0.15, // Higher drag than quadrotor (larger body)
             angular_damping: 2.0,
         }
     }
@@ -97,11 +97,16 @@ impl HelicopterPhysicsSimulator for SimpleHelicopterSimulator {
         let fy = 2.0 * (y * z - w * x) * thrust + self.external_force[1];
         let fz = (1.0 - 2.0 * (x * x + y * y)) * thrust + self.external_force[2];
 
-        // 4. Linear acceleration
+        // 4. Linear acceleration with quadratic drag: F_drag = -c × |v| × v
+        // Quadratic drag better models aerodynamic forces at helicopter speeds
+        // (Fossen 2011). The drag coefficient absorbs 0.5 × ρ × Cd × A / mass.
         let drag = self.drag_coeff / self.mass;
-        let ax = fx / self.mass - drag * self.state.linear_velocity[0];
-        let ay = fy / self.mass - drag * self.state.linear_velocity[1];
-        let az = fz / self.mass - g - drag * self.state.linear_velocity[2];
+        let vx = self.state.linear_velocity[0];
+        let vy = self.state.linear_velocity[1];
+        let vz = self.state.linear_velocity[2];
+        let ax = fx / self.mass - drag * vx.abs() * vx;
+        let ay = fy / self.mass - drag * vy.abs() * vy;
+        let az = fz / self.mass - g - drag * vz.abs() * vz;
 
         // 5. Semi-implicit Euler
         self.state.linear_velocity[0] += ax * dt;

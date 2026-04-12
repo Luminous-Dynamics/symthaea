@@ -39,11 +39,17 @@ fn test_motor_authority_breaking_point() {
     );
 
     let bp = breaking_phi.unwrap();
-    assert!(bp <= 0.11, "Motor breaking point should be at phi ~0.1: got {bp}");
+    assert!(
+        bp <= 0.11,
+        "Motor breaking point should be at phi ~0.1: got {bp}"
+    );
 
     for (phi, gain, _) in &gains {
         if *phi > 0.1 {
-            assert!(*gain > 0.0, "Motor gain should be non-zero above 0.1: phi={phi}, gain={gain}");
+            assert!(
+                *gain > 0.0,
+                "Motor gain should be non-zero above 0.1: phi={phi}, gain={gain}"
+            );
         }
     }
 
@@ -83,7 +89,7 @@ fn test_defense_proportionality_breaking_point() {
         ratios.push((level, self_protective, affects_others));
     }
 
-    for (level, self_prot, _, ) in &ratios {
+    for (level, self_prot, _) in &ratios {
         if !matches!(level, SafetyLevel::Green) {
             assert!(
                 *self_prot > 0,

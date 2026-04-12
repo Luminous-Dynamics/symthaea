@@ -7,9 +7,9 @@
 
 /// Simple 3-band parametric EQ.
 pub struct ParametricEQ {
-    low_gain: f32,   // dB boost/cut at 200Hz
-    mid_gain: f32,   // dB boost/cut at 1kHz
-    high_gain: f32,  // dB boost/cut at 5kHz
+    low_gain: f32,  // dB boost/cut at 200Hz
+    mid_gain: f32,  // dB boost/cut at 1kHz
+    high_gain: f32, // dB boost/cut at 5kHz
     low_state: [f32; 2],
     mid_state: [f32; 2],
     high_state: [f32; 2],
@@ -28,7 +28,9 @@ impl ParametricEQ {
     }
 
     /// Flat EQ (no boost/cut).
-    pub fn flat() -> Self { Self::new(0.0, 0.0, 0.0) }
+    pub fn flat() -> Self {
+        Self::new(0.0, 0.0, 0.0)
+    }
 
     /// Process one sample through 3-band EQ.
     pub fn process(&mut self, input: f32, sample_rate: f32) -> f32 {
@@ -51,8 +53,8 @@ impl ParametricEQ {
 
 /// Stereo compressor with sidechain from mid channel.
 pub struct Compressor {
-    threshold: f32,   // linear amplitude
-    ratio: f32,       // compression ratio (e.g., 4.0 = 4:1)
+    threshold: f32, // linear amplitude
+    ratio: f32,     // compression ratio (e.g., 4.0 = 4:1)
     attack_coeff: f32,
     release_coeff: f32,
     makeup_gain: f32, // linear
@@ -65,7 +67,14 @@ impl Compressor {
     /// - ratio: compression ratio (e.g., 3.0)
     /// - attack_ms, release_ms: envelope timing
     /// - makeup_db: gain applied after compression
-    pub fn new(sample_rate: u32, threshold_db: f32, ratio: f32, attack_ms: f32, release_ms: f32, makeup_db: f32) -> Self {
+    pub fn new(
+        sample_rate: u32,
+        threshold_db: f32,
+        ratio: f32,
+        attack_ms: f32,
+        release_ms: f32,
+        makeup_db: f32,
+    ) -> Self {
         let sr = sample_rate as f32;
         Self {
             threshold: 10.0f32.powf(threshold_db / 20.0),
@@ -85,7 +94,11 @@ impl Compressor {
     /// Process stereo pair, returning compressed pair.
     pub fn process(&mut self, l: f32, r: f32) -> (f32, f32) {
         let level = ((l * l + r * r) * 0.5).sqrt(); // RMS of stereo pair
-        let coeff = if level > self.envelope { self.attack_coeff } else { self.release_coeff };
+        let coeff = if level > self.envelope {
+            self.attack_coeff
+        } else {
+            self.release_coeff
+        };
         self.envelope = coeff * self.envelope + (1.0 - coeff) * level;
 
         let gain = if self.envelope > self.threshold {
@@ -136,8 +149,8 @@ impl Limiter {
         if target_atten < self.attenuation {
             self.attenuation = target_atten;
         } else {
-            self.attenuation = self.release_coeff * self.attenuation
-                + (1.0 - self.release_coeff) * target_atten;
+            self.attenuation =
+                self.release_coeff * self.attenuation + (1.0 - self.release_coeff) * target_atten;
         }
 
         (l * self.attenuation, r * self.attenuation)
@@ -189,15 +202,22 @@ mod tests {
         let input = 0.5;
         // After a few samples to stabilize filters
         let mut out = 0.0;
-        for _ in 0..100 { out = eq.process(input, 44100.0); }
-        assert!((out - input).abs() < 0.05, "flat EQ should pass through: {out}");
+        for _ in 0..100 {
+            out = eq.process(input, 44100.0);
+        }
+        assert!(
+            (out - input).abs() < 0.05,
+            "flat EQ should pass through: {out}"
+        );
     }
 
     #[test]
     fn compressor_reduces_loud_signals() {
         let mut comp = Compressor::gentle(44100);
         // Feed loud signal
-        for _ in 0..100 { comp.process(0.8, 0.8); }
+        for _ in 0..100 {
+            comp.process(0.8, 0.8);
+        }
         let (l, r) = comp.process(0.8, 0.8);
         // With -12dB threshold (~0.25) and 3:1 ratio, 0.8 should be compressed
         // Makeup gain (+3dB ~1.41) partially compensates

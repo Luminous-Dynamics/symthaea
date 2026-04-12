@@ -30,7 +30,14 @@ pub enum MotorSafetyLevel {
 
 impl MotorSafetyLevel {
     /// Determine safety level from current Phi value.
+    ///
+    /// Non-finite inputs (NaN, Inf, -Inf) map to `Red` (emergency stop).
+    /// This is intentional: if the consciousness measurement is corrupt,
+    /// the safest response is full motor shutdown.
     pub fn from_phi(phi: f64) -> Self {
+        if !phi.is_finite() {
+            return Self::Red;
+        }
         if phi > 0.6 {
             Self::Green
         } else if phi > 0.3 {
@@ -130,10 +137,44 @@ pub enum EmbodimentPlatform {
     Helicopter,
     Auv,
     Manipulator,
+    /// Lower-limb exoskeleton — shared authority with human user.
+    Exoskeleton,
+    /// Surgical robot — sub-mm RCM-constrained precision.
+    Surgical,
+    /// Orbital servicing arm — zero-g dual-body dynamics.
+    Orbital,
+    /// Legged quadruped — CPG-modulated locomotion.
+    Quadruped,
     /// Virtual caregiver agent — no physical embodiment.
     CareProvider,
     /// Browser agent — web pages as sensory environment via CDP.
     Browser,
+}
+
+// ── Agent Identity ────────────────────────────────────────────────────────
+
+/// Platform-agnostic agent identity for embodied components.
+///
+/// In Holochain contexts this maps to a uhCAk... Ed25519 public key.
+/// In standalone Symthaea it is a blake3 hash of the genesis seed.
+/// This keeps `symthaea-core` free of Holochain dependencies.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct AgentIdentity(pub String);
+
+impl AgentIdentity {
+    pub fn new(id: impl Into<String>) -> Self {
+        Self(id.into())
+    }
+
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl std::fmt::Display for AgentIdentity {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.0)
+    }
 }
 
 // ── Embodiment Bridge Trait ────────────────────────────────────────────────
@@ -173,6 +214,103 @@ pub trait EmbodimentBridge: Send + Sync {
 
     /// Get telemetry for CycleMetadata.
     fn telemetry(&self) -> EmbodimentTelemetry;
+
+    /// Platform-agnostic agent identity for trust and coordination.
+    ///
+    /// Default returns a placeholder; platform crates should override with
+    /// a deterministic identity derived from their genesis seed.
+    fn agent_identity(&self) -> AgentIdentity {
+        AgentIdentity::new("unset")
+    }
+
+    /// Physical reliability score (0.0–1.0) for reputation/trust gating.
+    ///
+    /// 1.0 = fully reliable sensor/actuator chain. Platforms with degraded
+    /// hardware should report lower values.
+    fn physical_reliability(&self) -> f64 {
+        1.0
+    }
+}
+
+// ── Platform Plugin System ───────────────────────────────────────────────
+
+/// Factory + metadata for a robotics platform.
+///
+/// Each platform crate exports a `pub struct XPlugin;` implementing this trait.
+/// The cognitive loop's constructor collects all enabled plugins into a
+/// `PlatformRegistry` and dispatches bridge creation by `EmbodimentPlatform`.
+///
+/// This reduces "add a platform" to 3 steps:
+/// 1. Add variant to `EmbodimentPlatform`
+/// 2. Add feature flag + optional dep to Cargo.toml
+/// 3. Register the plugin in the constructor's `build_registry()`
+pub trait PlatformPlugin: Send + Sync {
+    /// Which platform this plugin provides.
+    fn platform(&self) -> EmbodimentPlatform;
+
+    /// Feature name for diagnostics (e.g., "helicopter", "exoskeleton").
+    fn feature_name(&self) -> &'static str;
+
+    /// Number of actuators for this platform.
+    fn num_actuators(&self) -> usize;
+
+    /// Create a new embodiment bridge from a genesis seed.
+    fn create_bridge(&self, genesis: &crate::genesis::GenesisSeed) -> Box<dyn EmbodimentBridge>;
+}
+
+/// Compile-time platform registry.
+///
+/// Collects `PlatformPlugin` implementations registered by feature-gated
+/// platform crates. The constructor calls `create_bridge()` on the matching
+/// plugin to instantiate the correct embodiment.
+pub struct PlatformRegistry {
+    plugins: Vec<Box<dyn PlatformPlugin>>,
+}
+
+impl PlatformRegistry {
+    /// Create an empty registry.
+    pub fn new() -> Self {
+        Self { plugins: Vec::new() }
+    }
+
+    /// Register a platform plugin.
+    pub fn register(&mut self, plugin: Box<dyn PlatformPlugin>) {
+        self.plugins.push(plugin);
+    }
+
+    /// Create an embodiment bridge for the given platform.
+    /// Returns `None` if no plugin is registered for that platform.
+    pub fn create_bridge(
+        &self,
+        platform: EmbodimentPlatform,
+        genesis: &crate::genesis::GenesisSeed,
+    ) -> Option<Box<dyn EmbodimentBridge>> {
+        self.plugins
+            .iter()
+            .find(|p| p.platform() == platform)
+            .map(|p| p.create_bridge(genesis))
+    }
+
+    /// List all registered platforms.
+    pub fn registered_platforms(&self) -> Vec<EmbodimentPlatform> {
+        self.plugins.iter().map(|p| p.platform()).collect()
+    }
+
+    /// Number of registered plugins.
+    pub fn len(&self) -> usize {
+        self.plugins.len()
+    }
+
+    /// Whether the registry is empty.
+    pub fn is_empty(&self) -> bool {
+        self.plugins.is_empty()
+    }
+}
+
+impl Default for PlatformRegistry {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 #[cfg(test)]
@@ -217,6 +355,19 @@ mod tests {
         // Clamping: values outside [0,1] are clamped
         assert!((grounding_from_prediction_error(-0.5) - 1.0).abs() < f32::EPSILON);
         assert!((grounding_from_prediction_error(1.5) - 0.0).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn test_from_phi_non_finite_returns_red() {
+        assert_eq!(MotorSafetyLevel::from_phi(f64::NAN), MotorSafetyLevel::Red);
+        assert_eq!(MotorSafetyLevel::from_phi(f64::INFINITY), MotorSafetyLevel::Red);
+        assert_eq!(MotorSafetyLevel::from_phi(f64::NEG_INFINITY), MotorSafetyLevel::Red);
+    }
+
+    #[test]
+    fn test_from_phi_negative_returns_red() {
+        assert_eq!(MotorSafetyLevel::from_phi(-1.0), MotorSafetyLevel::Red);
+        assert_eq!(MotorSafetyLevel::from_phi(-100.0), MotorSafetyLevel::Red);
     }
 
     #[test]

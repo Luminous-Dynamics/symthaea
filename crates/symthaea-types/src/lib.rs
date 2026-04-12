@@ -436,7 +436,10 @@ mod tests {
         fn partial_eq_different_variants() {
             assert_ne!(Harmony::ResonantCoherence, Harmony::SacredStillness);
             assert_ne!(Harmony::IntegralWisdom, Harmony::InfinitePlay);
-            assert_ne!(Harmony::PanSentientFlourishing, Harmony::EvolutionaryProgression);
+            assert_ne!(
+                Harmony::PanSentientFlourishing,
+                Harmony::EvolutionaryProgression
+            );
         }
 
         #[test]
@@ -494,7 +497,10 @@ mod tests {
         #[test]
         fn display_matches_name_for_each_variant() {
             assert_eq!(Harmony::ResonantCoherence.to_string(), "Resonant Coherence");
-            assert_eq!(Harmony::PanSentientFlourishing.to_string(), "Pan-Sentient Flourishing");
+            assert_eq!(
+                Harmony::PanSentientFlourishing.to_string(),
+                "Pan-Sentient Flourishing"
+            );
             assert_eq!(Harmony::IntegralWisdom.to_string(), "Integral Wisdom");
             assert_eq!(Harmony::InfinitePlay.to_string(), "Infinite Play");
             assert_eq!(
@@ -879,7 +885,11 @@ mod tests {
                 .collect();
             weights.sort();
             weights.dedup();
-            assert_eq!(weights.len(), 3, "Expected 3 distinct weight tiers, got {weights:?}");
+            assert_eq!(
+                weights.len(),
+                3,
+                "Expected 3 distinct weight tiers, got {weights:?}"
+            );
         }
     }
 

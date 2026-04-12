@@ -249,7 +249,11 @@ impl HdcCifar10Classifier {
 
     /// Normalize prototypes after training
     fn finalize(&mut self) {
-        for (proto, &count) in self.class_prototypes.iter_mut().zip(self.class_counts.iter()) {
+        for (proto, &count) in self
+            .class_prototypes
+            .iter_mut()
+            .zip(self.class_counts.iter())
+        {
             if let Some(p) = proto {
                 if count > 1 {
                     p.scale_in_place(1.0 / count as f32);
@@ -371,7 +375,11 @@ fn main() {
 
     let mut classifier = HdcCifar10Classifier::new(dim, n_levels);
 
-    println!("Training on {} images (subset of {})...", train_subset, train_images.len());
+    println!(
+        "Training on {} images (subset of {})...",
+        train_subset,
+        train_images.len()
+    );
     let t = Instant::now();
     classifier.train(
         &train_images[..train_subset.min(train_images.len())],
@@ -387,7 +395,11 @@ fn main() {
             &train_images[..train_subset.min(train_images.len())],
             &train_labels[..train_subset.min(train_labels.len())],
         );
-        println!("  Retrain pass {}: {:.1}s", pass + 1, t.elapsed().as_secs_f64());
+        println!(
+            "  Retrain pass {}: {:.1}s",
+            pass + 1,
+            t.elapsed().as_secs_f64()
+        );
     }
     println!();
 
@@ -417,13 +429,22 @@ fn main() {
     let accuracy = correct as f64 / total as f64;
     let eval_time = t.elapsed();
 
-    println!("  Time: {:.1}s ({:.0} images/sec)\n", eval_time.as_secs_f64(), total as f64 / eval_time.as_secs_f64());
+    println!(
+        "  Time: {:.1}s ({:.0} images/sec)\n",
+        eval_time.as_secs_f64(),
+        total as f64 / eval_time.as_secs_f64()
+    );
 
     // ── Results ─────────────────────────────────────────────────────
     println!("═══════════════════════════════════════════════════════════════");
     println!("RESULTS");
     println!("═══════════════════════════════════════════════════════════════");
-    println!("  Overall accuracy: {:.2}% ({}/{})", accuracy * 100.0, correct, total);
+    println!(
+        "  Overall accuracy: {:.2}% ({}/{})",
+        accuracy * 100.0,
+        correct,
+        total
+    );
     println!("  Random baseline:  10.0%");
     println!("  CNN SOTA:         96.5%+ (EfficientNet)");
     println!();
@@ -445,8 +466,10 @@ fn main() {
     }
 
     println!();
-    println!("  Configuration: dim={}, levels={}, retrains={}, train_subset={}",
-        dim, n_levels, n_retrains, train_subset);
+    println!(
+        "  Configuration: dim={}, levels={}, retrains={}, train_subset={}",
+        dim, n_levels, n_retrains, train_subset
+    );
 
     // ── Save results ────────────────────────────────────────────────
     let results = serde_json::json!({

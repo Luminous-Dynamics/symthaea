@@ -27,20 +27,28 @@ pub struct FrequencyBalance {
 }
 
 impl FrequencyBalance {
-    pub fn total(&self) -> f32 { self.low_energy + self.mid_energy + self.high_energy }
-    pub fn low_ratio(&self) -> f32 { self.low_energy / self.total().max(1e-10) }
-    pub fn mid_ratio(&self) -> f32 { self.mid_energy / self.total().max(1e-10) }
-    pub fn high_ratio(&self) -> f32 { self.high_energy / self.total().max(1e-10) }
+    pub fn total(&self) -> f32 {
+        self.low_energy + self.mid_energy + self.high_energy
+    }
+    pub fn low_ratio(&self) -> f32 {
+        self.low_energy / self.total().max(1e-10)
+    }
+    pub fn mid_ratio(&self) -> f32 {
+        self.mid_energy / self.total().max(1e-10)
+    }
+    pub fn high_ratio(&self) -> f32 {
+        self.high_energy / self.total().max(1e-10)
+    }
 }
 
 /// Mastering configuration.
 pub struct MasteringConfig {
-    pub target_lufs: f32,            // -14.0
-    pub limiter_ceiling_db: f32,     // -1.0
-    pub target_low_ratio: f32,       // 0.30
-    pub target_mid_ratio: f32,       // 0.45
-    pub target_high_ratio: f32,      // 0.25
-    pub eq_max_correction_db: f32,   // 6.0
+    pub target_lufs: f32,          // -14.0
+    pub limiter_ceiling_db: f32,   // -1.0
+    pub target_low_ratio: f32,     // 0.30
+    pub target_mid_ratio: f32,     // 0.45
+    pub target_high_ratio: f32,    // 0.25
+    pub eq_max_correction_db: f32, // 6.0
 }
 
 impl Default for MasteringConfig {
@@ -72,7 +80,12 @@ pub struct MasteringResult {
 /// Uses K-weighted RMS over 400ms gated windows.
 pub fn measure_lufs(samples: &[[f32; 2]], sample_rate: u32) -> LufsResult {
     if samples.is_empty() {
-        return LufsResult { integrated: -70.0, peak_db: -70.0, rms_db: -70.0, crest_factor_db: 0.0 };
+        return LufsResult {
+            integrated: -70.0,
+            peak_db: -70.0,
+            rms_db: -70.0,
+            crest_factor_db: 0.0,
+        };
     }
 
     let window_size = (sample_rate as f32 * 0.4) as usize; // 400ms
@@ -94,11 +107,20 @@ pub fn measure_lufs(samples: &[[f32; 2]], sample_rate: u32) -> LufsResult {
 
     let total_mean_power = total_power / samples.len() as f64;
     let rms = (total_mean_power as f32).sqrt();
-    let rms_db = if rms > 1e-10 { 20.0 * rms.log10() } else { -70.0 };
-    let peak_db = if peak > 1e-10 { 20.0 * peak.log10() } else { -70.0 };
+    let rms_db = if rms > 1e-10 {
+        20.0 * rms.log10()
+    } else {
+        -70.0
+    };
+    let peak_db = if peak > 1e-10 {
+        20.0 * peak.log10()
+    } else {
+        -70.0
+    };
 
     // Absolute gate: exclude blocks below -70 LUFS
-    let gated: Vec<f32> = block_powers.iter()
+    let gated: Vec<f32> = block_powers
+        .iter()
         .copied()
         .filter(|&p| p > 1e-7) // ~-70 dBFS
         .collect();
@@ -109,7 +131,8 @@ pub fn measure_lufs(samples: &[[f32; 2]], sample_rate: u32) -> LufsResult {
         let mean = gated.iter().sum::<f32>() / gated.len() as f32;
         // Relative gate: exclude blocks below -10 dB of ungated mean
         let relative_threshold = mean * 0.1; // -10 dB
-        let final_blocks: Vec<f32> = gated.iter()
+        let final_blocks: Vec<f32> = gated
+            .iter()
             .copied()
             .filter(|&p| p >= relative_threshold)
             .collect();
@@ -236,11 +259,13 @@ mod tests {
 
     fn sine_wave(freq: f32, duration_secs: f32, amplitude: f32, sr: u32) -> Vec<[f32; 2]> {
         let n = (duration_secs * sr as f32) as usize;
-        (0..n).map(|i| {
-            let t = i as f32 / sr as f32;
-            let s = amplitude * (t * freq * std::f32::consts::TAU).sin();
-            [s, s]
-        }).collect()
+        (0..n)
+            .map(|i| {
+                let t = i as f32 / sr as f32;
+                let s = amplitude * (t * freq * std::f32::consts::TAU).sin();
+                [s, s]
+            })
+            .collect()
     }
 
     #[test]
@@ -251,8 +276,16 @@ mod tests {
         let result = measure_lufs(&samples, 44100);
         // LUFS = -0.691 + 10*log10(mean_power), for sine: mean_power = A²/2
         // Expected: -0.691 + 10*log10(0.01/2) ≈ -0.691 + (-23.01) ≈ -23.7
-        assert!(result.integrated < -18.0, "should be quiet: {}", result.integrated);
-        assert!(result.integrated > -28.0, "should be audible: {}", result.integrated);
+        assert!(
+            result.integrated < -18.0,
+            "should be quiet: {}",
+            result.integrated
+        );
+        assert!(
+            result.integrated > -28.0,
+            "should be audible: {}",
+            result.integrated
+        );
     }
 
     #[test]
@@ -261,27 +294,45 @@ mod tests {
         let config = MasteringConfig::default();
         let result = auto_master(&mut samples, 44100, &config);
 
-        assert!(result.output_lufs > result.input_lufs, "should be louder after mastering");
-        assert!(result.gain_applied_db > 0.0, "should have applied positive gain");
+        assert!(
+            result.output_lufs > result.input_lufs,
+            "should be louder after mastering"
+        );
+        assert!(
+            result.gain_applied_db > 0.0,
+            "should have applied positive gain"
+        );
     }
 
     #[test]
     fn limiter_respects_ceiling() {
         let mut samples = sine_wave(440.0, 1.0, 0.9, 44100);
-        let config = MasteringConfig { target_lufs: -6.0, ..Default::default() };
+        let config = MasteringConfig {
+            target_lufs: -6.0,
+            ..Default::default()
+        };
         auto_master(&mut samples, 44100, &config);
 
         let ceiling = 10.0f32.powf(-1.0 / 20.0);
-        let max_peak = samples.iter().flat_map(|s| [s[0].abs(), s[1].abs()])
+        let max_peak = samples
+            .iter()
+            .flat_map(|s| [s[0].abs(), s[1].abs()])
             .fold(0.0f32, f32::max);
-        assert!(max_peak <= ceiling + 0.01, "peak should be below ceiling: {max_peak}");
+        assert!(
+            max_peak <= ceiling + 0.01,
+            "peak should be below ceiling: {max_peak}"
+        );
     }
 
     #[test]
     fn frequency_balance_detects_bass() {
         let samples = sine_wave(80.0, 1.0, 0.5, 44100); // pure bass
         let balance = analyze_balance(&samples, 44100);
-        assert!(balance.low_energy > balance.high_energy,
-            "bass sine should have more low energy: low={} high={}", balance.low_energy, balance.high_energy);
+        assert!(
+            balance.low_energy > balance.high_energy,
+            "bass sine should have more low energy: low={} high={}",
+            balance.low_energy,
+            balance.high_energy
+        );
     }
 }

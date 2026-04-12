@@ -278,7 +278,10 @@ fn test_emotion_in_service() {
     // and the unified valence should be non-NaN. We don't require positive because
     // somatic signals, prediction error, and homeostatic pulls can dominate a single cycle.
     let valence = service.emotional_valence();
-    assert!(valence.is_finite(), "emotional valence should be finite after cycle");
+    assert!(
+        valence.is_finite(),
+        "emotional valence should be finite after cycle"
+    );
 }
 
 #[test]

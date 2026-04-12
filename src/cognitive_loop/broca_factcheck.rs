@@ -203,7 +203,10 @@ impl BrocaFactcheckBridge {
         self.claim_tx = Some(Mutex::new(claim_tx));
         self.verdict_rx = Some(Mutex::new(verdict_rx));
         self.connected = true;
-        FactcheckChannels { claim_rx, verdict_tx }
+        FactcheckChannels {
+            claim_rx,
+            verdict_tx,
+        }
     }
 
     /// Mark the bridge as connected to a live conductor.
@@ -391,11 +394,7 @@ impl BrocaFactcheckBridge {
             }
 
             // Remove from pending queue if present
-            if let Some(pos) = self
-                .pending_claims
-                .iter()
-                .position(|c| *c == result.claim)
-            {
+            if let Some(pos) = self.pending_claims.iter().position(|c| *c == result.claim) {
                 self.pending_claims.remove(pos);
             }
 
@@ -490,11 +489,7 @@ impl FactcheckConductorTask {
     }
 
     /// Blocking event loop: drain claims, query conductor, send verdicts.
-    fn run_blocking(
-        channels: FactcheckChannels,
-        _conductor_url: &str,
-        _app_id: &str,
-    ) {
+    fn run_blocking(channels: FactcheckChannels, _conductor_url: &str, _app_id: &str) {
         // TODO: Connect to HolochainConductor via WebSocket when conductor is available.
         // For now, this provides the scaffolding — claims are received, and Unknown
         // verdicts are returned so the bridge pipeline is exercised end-to-end.
@@ -587,7 +582,12 @@ mod tests {
     fn test_extract_claims_max_limit() {
         // Generate more than MAX_CLAIMS_PER_GENERATION sentences
         let sentences: Vec<String> = (0..20)
-            .map(|i| format!("Claim number {} is a declarative statement about something.", i))
+            .map(|i| {
+                format!(
+                    "Claim number {} is a declarative statement about something.",
+                    i
+                )
+            })
             .collect();
         let text = sentences.join(" ");
         let claims = BrocaFactcheckBridge::extract_claims(&text);
@@ -597,7 +597,10 @@ mod tests {
     #[test]
     fn test_submit_and_pending() {
         let mut bridge = BrocaFactcheckBridge::new();
-        let claims = vec!["Claim A is true.".to_string(), "Claim B is true.".to_string()];
+        let claims = vec![
+            "Claim A is true.".to_string(),
+            "Claim B is true.".to_string(),
+        ];
         let queued = bridge.submit_for_verification(&claims);
         assert_eq!(queued, 2);
         assert_eq!(bridge.pending_count(), 2);
@@ -729,7 +732,8 @@ mod tests {
         let mut bridge = BrocaFactcheckBridge::new();
 
         // First generation: no verdicts yet, just extracts claims
-        let text = "The speed of light is approximately 299,792 km/s. Gravity pulls objects toward Earth.";
+        let text =
+            "The speed of light is approximately 299,792 km/s. Gravity pulls objects toward Earth.";
         let modulation = bridge.on_broca_generation(text, 1);
         assert!(!modulation.suppress);
         assert_eq!(modulation.confidence_scale, 1.0); // No verdicts yet
@@ -815,9 +819,7 @@ mod tests {
         let channels = bridge.create_channels();
 
         // Submit a claim — it should arrive on the channel
-        bridge.submit_for_verification(&[
-            "The Nile is the longest river in Africa.".to_string(),
-        ]);
+        bridge.submit_for_verification(&["The Nile is the longest river in Africa.".to_string()]);
 
         // The conductor side should receive the claim
         let received = channels.claim_rx.try_recv().unwrap();

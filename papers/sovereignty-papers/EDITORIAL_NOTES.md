@@ -21,7 +21,7 @@ These are near-duplicate formulations that should be varied or consolidated:
 
 2. **"Every generation believes it has transcended the failures of the previous one."** Appears in Essay 1 (Section V) and Essay 2 is structured around this theme. The explicit statement in Essay 1 is sufficient. Essay 2 demonstrates it rather than stating it — which is better.
 
-3. **Description of the four-dimensional credential** is re-explained from scratch in Essays 3, 7, 10, and summarized in 12, 13, 14, 15, 21. By Essay 10, the reader has encountered this explanation four times. Later essays should reference "the four-dimensional credential (Essay No. 7)" rather than re-explaining the dimensions.
+3. **Description of the sovereign credential** is re-explained from scratch in Essays 3, 7, 10, and summarized in 12, 13, 14, 15, 21. By Essay 10, the reader has encountered this explanation multiple times. Later essays should reference "the eight-dimensional sovereign credential (Essay No. 7)" rather than re-explaining the dimensions. Note: Essay 7 was rewritten in April 2026 to describe the 8D model; earlier essays (1-4) still reference the original 4D model as historical context, which is appropriate since Essay 7 explains the evolution from 4D to 8D.
 
 4. **The 24-hour credential expiry** is explained as a new concept in Essays 5, 7, 8, 10, 13, 14. The first full explanation (Essay 5/7) should stand; later essays should reference it. By Essay 14, a single phrase — "the 24-hour credential expiry described in Essay No. 7" — is sufficient.
 

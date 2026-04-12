@@ -22,6 +22,17 @@ pub struct VisionConfig {
     pub enable_motion: bool,
     /// Enable color features (mean_cb, mean_cr from YCbCr). Default: true.
     pub enable_color: bool,
+    /// Enable opponent color features (rg_opponent, by_opponent). Default: true.
+    ///
+    /// Models V1 double-opponent cells: red–green and blue–yellow channels.
+    /// These capture color contrast in a perceptually meaningful basis and
+    /// directly improve saliency detection for color-distinctive regions
+    /// (e.g., a red apple on a green table).
+    ///
+    /// Adds 2 features when enabled. Values mapped to [0, 1]:
+    /// - `rg_opponent = (mean_r - mean_g + 1.0) / 2.0`
+    /// - `by_opponent = (mean_b - 0.5*(mean_r + mean_g) + 1.0) / 2.0`
+    pub enable_opponent_color: bool,
     /// Base time constant for CfC dynamics in seconds (default: 0.5).
     ///
     /// Valid range: (0.001, 100.0). Controls how quickly the manifold state
@@ -48,9 +59,39 @@ pub struct VisionConfig {
     /// Enable the predictive coding hierarchy in `observe_frame()` (default: false).
     ///
     /// When enabled, a two-level predictive coding hierarchy (Rao & Ballard 1999)
-    /// processes each frame: coarse scale predicts fine scale, and prediction errors
-    /// modulate the surprise map. Adds ~2x compute cost per frame.
+    /// processes each frame: coarse scale predicts fine scale, and cross-scale
+    /// prediction errors are injected into the surprise map as additional free-energy
+    /// signal. Adds ~2x compute cost per frame.
     pub enable_predictive_hierarchy: bool,
+    /// Enable temporal patch binding in CfC equilibrium (default: false).
+    ///
+    /// When enabled, consecutive patch HVs are bound with cyclic permutation:
+    /// `temporal_patch[i] = ρ(prev_patch[i]) ⊗ curr_patch[i]`
+    ///
+    /// This gives the manifold temporal identity — the same object at the same
+    /// location across frames produces consistent HVs even under minor appearance
+    /// variation. Non-commutativity (`A⊗B ≠ B⊗A`) encodes temporal direction.
+    ///
+    /// Reference: Plate (1995) holographic reduced representations;
+    /// Kanerva (2009) hyperdimensional computing.
+    pub enable_temporal_binding: bool,
+    /// Enable depth channel per patch (default: false).
+    ///
+    /// When enabled, adds 1 feature per patch representing estimated depth
+    /// (0.0 = near, 1.0 = far). Without a depth sensor the encoder uses a
+    /// neutral stub value of 0.5. Connect real depth data via
+    /// `observe_frame_with_depth()` on the manifold or bridge.
+    pub enable_depth: bool,
+    /// Enable object-level relational binding in `observe_frame()` (default: false).
+    ///
+    /// When enabled, the scene HV is computed via object-centric binding:
+    /// `scene_hv = bundle(position_hv[centroid] ⊗ object_hv)` for each
+    /// spatial cluster, rather than a plain patch bag-of-words. This encodes
+    /// *where* each perceptual object is, not just *what* patches are present.
+    ///
+    /// Patches are grouped into object hypotheses by spatial proximity and
+    /// HDC cosine similarity. Each cluster contributes one bound HV.
+    pub enable_object_binding: bool,
     /// Learning configuration for adaptive encoding weights.
     pub learning: LearningConfig,
     /// Multi-scale configuration for spatial pyramid encoding.
@@ -60,7 +101,7 @@ pub struct VisionConfig {
 }
 
 impl VisionConfig {
-    /// Total number of features per patch (base + motion + color).
+    /// Total number of features per patch (base + motion + color + opponent).
     pub fn total_features(&self) -> usize {
         let mut n = self.num_features;
         if self.enable_motion {
@@ -68,6 +109,12 @@ impl VisionConfig {
         }
         if self.enable_color {
             n += 2; // mean_cb, mean_cr
+        }
+        if self.enable_opponent_color {
+            n += 2; // rg_opponent, by_opponent (V1 double-opponent cells)
+        }
+        if self.enable_depth {
+            n += 1; // mean_z (depth estimate, stub = 0.5 without a sensor)
         }
         n
     }
@@ -154,12 +201,16 @@ impl Default for VisionConfig {
             num_features: 5,
             enable_motion: true,
             enable_color: true,
+            enable_opponent_color: true,
             tau_base: 0.5,
             surprise_threshold: 0.3,
             surprise_decay: 0.9,
             seed: 42_000,
             input_blend: 0.7,
             enable_predictive_hierarchy: false,
+            enable_temporal_binding: false,
+            enable_depth: false,
+            enable_object_binding: false,
             learning: LearningConfig::default(),
             multi_scale: MultiScaleConfig::default(),
             training: TrainingConfig::default(),
@@ -320,6 +371,17 @@ pub struct VisionTelemetry {
     /// Cosine similarity of the scene recognition match (0.0 if no match).
     #[serde(default)]
     pub scene_recognition_similarity: f32,
+    /// Temporal imagination surprise: prediction error between dream_ahead(1)
+    /// and actual observation. 0 = perfect prediction, 1 = maximum surprise.
+    /// Only populated when imagination comparison is active on the bridge.
+    #[serde(default)]
+    pub imagination_surprise: f32,
+    /// Number of objects currently held in visual working memory.
+    #[serde(default)]
+    pub working_memory_load: usize,
+    /// Number of spatial relations in the scene graph.
+    #[serde(default)]
+    pub scene_graph_edges: usize,
 }
 
 /// Per-patch spatial attention/surprise map.
@@ -498,6 +560,67 @@ pub struct ManifoldHealth {
     pub is_healthy: bool,
 }
 
+/// A perceptual object hypothesis formed by clustering spatially-adjacent patches.
+///
+/// Used by the object-level binding pipeline (`enable_object_binding = true`).
+/// Patches are grouped by spatial proximity and HDC similarity; each cluster
+/// produces one `ObjectHypothesis` whose centroid determines the position HV
+/// used in the scene binding: `position_hv ⊗ object_hv`.
+#[derive(Debug, Clone)]
+pub struct ObjectHypothesis {
+    /// Row of the cluster centroid in the PatchGrid.
+    pub centroid_row: usize,
+    /// Column of the cluster centroid in the PatchGrid.
+    pub centroid_col: usize,
+    /// Patch indices belonging to this cluster.
+    pub patch_indices: Vec<usize>,
+    /// Mean saliency of patches in this cluster.
+    pub saliency: f32,
+    /// Object HV: bundle of all member patch HVs (normalized).
+    pub hv: symthaea_core::hdc::ContinuousHV,
+}
+
+/// Spatial relation between two objects in the scene graph.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum SpatialRelation {
+    Above,
+    Below,
+    LeftOf,
+    RightOf,
+    Near,
+    Far,
+    Overlapping,
+}
+
+impl SpatialRelation {
+    /// All supported relations.
+    pub const ALL: [Self; 7] = [
+        Self::Above,
+        Self::Below,
+        Self::LeftOf,
+        Self::RightOf,
+        Self::Near,
+        Self::Far,
+        Self::Overlapping,
+    ];
+}
+
+/// An edge in the visual scene graph: subject → relation → object.
+///
+/// Encoded in HDC as `relation_hv = subject_hv ⊗ relation_basis ⊗ object_hv`,
+/// giving a holographic relational triple the cognitive loop can reason over.
+#[derive(Debug, Clone)]
+pub struct SceneGraphEdge {
+    /// Track ID of the subject object.
+    pub subject_id: u64,
+    /// Track ID of the object.
+    pub object_id: u64,
+    /// Spatial relation (e.g., Above, LeftOf, Near).
+    pub relation: SpatialRelation,
+    /// HDC encoding of this relational triple.
+    pub relation_hv: symthaea_core::hdc::ContinuousHV,
+}
+
 /// Per-scale health metrics for multi-scale encoders.
 ///
 /// Reports the state of each scale in a `MultiScaleEncoder`, including
@@ -527,7 +650,8 @@ mod tests {
         assert_eq!(cfg.num_levels, 32);
         assert!(cfg.enable_motion);
         assert!(cfg.enable_color);
-        assert_eq!(cfg.total_features(), 9); // 5 base + 2 motion + 2 color
+        assert!(cfg.enable_opponent_color);
+        assert_eq!(cfg.total_features(), 11); // 5 base + 2 motion + 2 color + 2 opponent
         assert!((cfg.input_blend - 0.7).abs() < 1e-6);
         assert!(!cfg.enable_predictive_hierarchy);
     }
@@ -589,7 +713,10 @@ mod tests {
     #[test]
     fn test_total_features_combinations() {
         let mut cfg = VisionConfig::default();
-        assert_eq!(cfg.total_features(), 9);
+        assert_eq!(cfg.total_features(), 11); // 5 base + 2 motion + 2 color + 2 opponent
+
+        cfg.enable_opponent_color = false;
+        assert_eq!(cfg.total_features(), 9); // 5 + 2 motion + 2 color
 
         cfg.enable_motion = false;
         assert_eq!(cfg.total_features(), 7); // 5 + 2 color
@@ -599,6 +726,9 @@ mod tests {
 
         cfg.enable_motion = true;
         assert_eq!(cfg.total_features(), 7); // 5 + 2 motion
+
+        cfg.enable_opponent_color = true;
+        assert_eq!(cfg.total_features(), 9); // 5 + 2 motion + 2 opponent
     }
 
     #[test]

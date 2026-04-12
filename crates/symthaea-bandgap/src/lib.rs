@@ -22,10 +22,10 @@
 //! - Rajan, A.C. et al. (2018). Machine-Learning-Assisted Accurate Band Gap
 //!   Predictions of Functionalized MXene. *Chem. Mater.*, 30, 4031-4038.
 
-pub mod periodic_table;
 pub mod bandgap_baseline;
-pub mod features;
-pub mod training_data;
-pub mod ml_bandgap;
 mod benchmark;
+pub mod features;
+pub mod ml_bandgap;
+pub mod periodic_table;
+pub mod training_data;
 mod transfer;

@@ -79,7 +79,9 @@ impl CollaborativeComposer {
 
     /// Add or update a participant's contribution.
     pub fn contribute(&mut self, contribution: HarmonyContribution) {
-        if let Some(existing) = self.contributions.iter_mut()
+        if let Some(existing) = self
+            .contributions
+            .iter_mut()
             .find(|c| c.participant_id == contribution.participant_id)
         {
             *existing = contribution;
@@ -131,10 +133,14 @@ impl CollaborativeComposer {
         let mut harmonies = [0.0f32; 8];
         let mut phi = 0.0f32;
         for c in &self.contributions {
-            for i in 0..8 { harmonies[i] += c.harmonies[i]; }
+            for i in 0..8 {
+                harmonies[i] += c.harmonies[i];
+            }
             phi += c.phi;
         }
-        for h in &mut harmonies { *h /= n; }
+        for h in &mut harmonies {
+            *h /= n;
+        }
         (harmonies, phi / n)
     }
 
@@ -144,7 +150,9 @@ impl CollaborativeComposer {
         let mut phi = 0.0f32;
         for c in &self.contributions {
             let weight = c.phi.max(0.01) / total_phi;
-            for i in 0..8 { harmonies[i] += c.harmonies[i] * weight; }
+            for i in 0..8 {
+                harmonies[i] += c.harmonies[i] * weight;
+            }
             phi += c.phi * weight;
         }
         (harmonies, phi)
@@ -154,7 +162,9 @@ impl CollaborativeComposer {
         let mut harmonies = [0.0f32; 8];
         let mut phi = 0.0f32;
         for c in &self.contributions {
-            for i in 0..8 { harmonies[i] = harmonies[i].max(c.harmonies[i]); }
+            for i in 0..8 {
+                harmonies[i] = harmonies[i].max(c.harmonies[i]);
+            }
             phi = phi.max(c.phi);
         }
         (harmonies, phi)
@@ -164,7 +174,9 @@ impl CollaborativeComposer {
         let mut harmonies = [1.0f32; 8];
         let mut phi = 1.0f32;
         for c in &self.contributions {
-            for i in 0..8 { harmonies[i] = harmonies[i].min(c.harmonies[i]); }
+            for i in 0..8 {
+                harmonies[i] = harmonies[i].min(c.harmonies[i]);
+            }
             phi = phi.min(c.phi);
         }
         (harmonies, phi)
@@ -178,9 +190,12 @@ impl CollaborativeComposer {
         }
         let n = self.contributions.len() as f32;
         let mean_phi: f32 = self.contributions.iter().map(|c| c.phi).sum::<f32>() / n;
-        let variance: f32 = self.contributions.iter()
+        let variance: f32 = self
+            .contributions
+            .iter()
             .map(|c| (c.phi - mean_phi).powi(2))
-            .sum::<f32>() / n;
+            .sum::<f32>()
+            / n;
         (variance.sqrt() * 3.0).clamp(0.0, 1.0) // scale to [0, 1]
     }
 
@@ -200,7 +215,12 @@ mod tests {
     use super::*;
 
     fn make_contribution(id: u64, phi: f32, harmonies: [f32; 8]) -> HarmonyContribution {
-        HarmonyContribution { participant_id: id, harmonies, phi, cycle: 0 }
+        HarmonyContribution {
+            participant_id: id,
+            harmonies,
+            phi,
+            cycle: 0,
+        }
     }
 
     #[test]
@@ -224,14 +244,26 @@ mod tests {
 
         // Should be closer to high-phi participant
         // (EMA moves from default 0.3 toward weighted blend ~0.74)
-        assert!(state.harmony_activations[0] > 0.3, "phi-weighted should favor high-phi: {}", state.harmony_activations[0]);
+        assert!(
+            state.harmony_activations[0] > 0.3,
+            "phi-weighted should favor high-phi: {}",
+            state.harmony_activations[0]
+        );
     }
 
     #[test]
     fn maximum_takes_union() {
         let mut composer = CollaborativeComposer::new(BlendStrategy::Maximum);
-        composer.contribute(make_contribution(1, 0.5, [0.2, 0.8, 0.3, 0.1, 0.5, 0.6, 0.4, 0.7]));
-        composer.contribute(make_contribution(2, 0.5, [0.8, 0.2, 0.7, 0.9, 0.1, 0.4, 0.6, 0.3]));
+        composer.contribute(make_contribution(
+            1,
+            0.5,
+            [0.2, 0.8, 0.3, 0.1, 0.5, 0.6, 0.4, 0.7],
+        ));
+        composer.contribute(make_contribution(
+            2,
+            0.5,
+            [0.8, 0.2, 0.7, 0.9, 0.1, 0.4, 0.6, 0.3],
+        ));
         let state = composer.blend();
 
         // Each harmony should be at least the EMA-smoothed max of the two
@@ -247,7 +279,11 @@ mod tests {
         composer.contribute(make_contribution(2, 0.9, [0.5; 8]));
         let state = composer.blend();
 
-        assert!(state.arousal > 0.3, "disagreement should increase arousal: {}", state.arousal);
+        assert!(
+            state.arousal > 0.3,
+            "disagreement should increase arousal: {}",
+            state.arousal
+        );
     }
 
     #[test]

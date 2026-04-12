@@ -10,7 +10,9 @@
 mod tests {
     use crate::cognitive_loop::managers::hypervisor_manager::*;
     use crate::cognitive_loop::managers::swarm_manager::SwarmEvent;
-    use crate::cognitive_loop::subsystem_trait::{CognitiveSubsystem, CycleSnapshot, SubsystemOutput};
+    use crate::cognitive_loop::subsystem_trait::{
+        CognitiveSubsystem, CycleSnapshot, SubsystemOutput,
+    };
 
     fn make_snapshot(cycle: u64, phi: f64) -> CycleSnapshot {
         let mut snap = CycleSnapshot::default();
@@ -47,7 +49,9 @@ mod tests {
 
         // Verify A generated an election event
         let a_events = agent_a.drain_events();
-        assert!(a_events.iter().any(|e| matches!(e, SupervisoryEvent::Elected { .. })));
+        assert!(a_events
+            .iter()
+            .any(|e| matches!(e, SupervisoryEvent::Elected { .. })));
     }
 
     /// Test: Supervisor broadcasts heartbeat, subordinate receives it via SwarmEvent.
@@ -68,11 +72,22 @@ mod tests {
 
         // Drain heartbeat events
         let events = supervisor.drain_events();
-        let heartbeat = events.iter().find(|e| matches!(e, SupervisoryEvent::Heartbeat { .. }));
-        assert!(heartbeat.is_some(), "supervisor should emit heartbeat at cycle 355");
+        let heartbeat = events
+            .iter()
+            .find(|e| matches!(e, SupervisoryEvent::Heartbeat { .. }));
+        assert!(
+            heartbeat.is_some(),
+            "supervisor should emit heartbeat at cycle 355"
+        );
 
         // Convert to SwarmEvent (this is what would flow over DHT)
-        if let Some(SupervisoryEvent::Heartbeat { epoch, subordinate_count, aggregated_phi, .. }) = heartbeat {
+        if let Some(SupervisoryEvent::Heartbeat {
+            epoch,
+            subordinate_count,
+            aggregated_phi,
+            ..
+        }) = heartbeat
+        {
             let swarm_event = SwarmEvent::SupervisoryHeartbeat {
                 supervisor_id: "supervisor".into(),
                 epoch: *epoch,
@@ -110,10 +125,20 @@ mod tests {
 
         // Check for escalation event
         let events = supervisor.drain_events();
-        let escalation = events.iter().find(|e| matches!(e, SupervisoryEvent::Escalation { .. }));
-        assert!(escalation.is_some(), "supervisor should detect distressed subordinate");
+        let escalation = events
+            .iter()
+            .find(|e| matches!(e, SupervisoryEvent::Escalation { .. }));
+        assert!(
+            escalation.is_some(),
+            "supervisor should detect distressed subordinate"
+        );
 
-        if let Some(SupervisoryEvent::Escalation { affected_peers, severity, .. }) = escalation {
+        if let Some(SupervisoryEvent::Escalation {
+            affected_peers,
+            severity,
+            ..
+        }) = escalation
+        {
             assert!(affected_peers.contains(&"sub-distressed".to_string()));
             assert!(*severity > 0.0);
         }
@@ -144,8 +169,10 @@ mod tests {
         supervisor.aggregate_subordinates(2000);
         let agg_phi_stale = supervisor.aggregated_phi;
         // Both are very stale now (>1000 cycles), aggregation falls back to self_phi
-        assert!(agg_phi_stale >= supervisor.self_phi * 0.5,
-            "very stale data should decay toward self_phi");
+        assert!(
+            agg_phi_stale >= supervisor.self_phi * 0.5,
+            "very stale data should decay toward self_phi"
+        );
     }
 
     /// Test: Re-election after epoch boundary with changed Phi rankings.

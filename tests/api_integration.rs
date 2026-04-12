@@ -14,13 +14,20 @@
 
 use axum::{
     body::Body,
-    http::{Request, StatusCode},
+    http::{header, Request, StatusCode},
     Router,
 };
-use tower::ServiceExt; // for `oneshot`
+use tower::util::ServiceExt; // for `oneshot`
 
 fn create_test_app() -> Router {
     symthaea::api::create_router()
+}
+
+fn create_authed_app() -> Router {
+    symthaea::api::create_router_with_config(symthaea::api::ApiConfig {
+        bearer_token: Some("test-token".to_string()),
+        ..symthaea::api::ApiConfig::default()
+    })
 }
 
 #[tokio::test]
@@ -242,4 +249,277 @@ async fn test_submit_with_valid_payload() {
         "Expected status to be processing or completed, got: {}",
         json["status"]
     );
+}
+
+#[tokio::test]
+async fn test_private_submission_requires_auth_config() {
+    let app: Router = create_test_app();
+
+    let response = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/v1/submit")
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    r#"{"model_name":"private-model","topology_type":"ring","n_nodes":8,"public":false}"#,
+                ))
+                .expect("request builder"),
+        )
+        .await
+        .expect("response");
+
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+}
+
+#[tokio::test]
+async fn test_private_submission_hidden_without_auth() {
+    let app: Router = create_authed_app();
+
+    let submit_response = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/v1/submit")
+                .header("content-type", "application/json")
+                .header(header::AUTHORIZATION, "Bearer test-token")
+                .body(Body::from(
+                    r#"{"model_name":"private-model","topology_type":"ring","n_nodes":8,"public":false}"#,
+                ))
+                .expect("request builder"),
+        )
+        .await
+        .expect("submit response");
+
+    assert_eq!(submit_response.status(), StatusCode::ACCEPTED);
+    let body = axum::body::to_bytes(submit_response.into_body(), usize::MAX)
+        .await
+        .expect("body bytes");
+    let json: serde_json::Value = serde_json::from_slice(&body).expect("parse JSON");
+    let submission_id = json["submission_id"]
+        .as_str()
+        .expect("submission_id")
+        .to_string();
+
+    for _ in 0..20 {
+        let response = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri(format!("/v1/results/{submission_id}"))
+                    .body(Body::empty())
+                    .expect("request builder"),
+            )
+            .await
+            .expect("response");
+
+        if response.status() == StatusCode::UNAUTHORIZED {
+            break;
+        }
+
+        tokio::time::sleep(std::time::Duration::from_millis(25)).await;
+    }
+
+    let unauthorized = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri(format!("/v1/results/{submission_id}"))
+                .body(Body::empty())
+                .expect("request builder"),
+        )
+        .await
+        .expect("response");
+    assert_eq!(unauthorized.status(), StatusCode::UNAUTHORIZED);
+
+    let authorized = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri(format!("/v1/results/{submission_id}"))
+                .header(header::AUTHORIZATION, "Bearer test-token")
+                .body(Body::empty())
+                .expect("request builder"),
+        )
+        .await
+        .expect("response");
+    assert!(
+        authorized.status() == StatusCode::OK || authorized.status() == StatusCode::ACCEPTED,
+        "expected OK or ACCEPTED, got {}",
+        authorized.status()
+    );
+
+    let leaderboard = app
+        .oneshot(
+            Request::builder()
+                .uri("/v1/leaderboard")
+                .body(Body::empty())
+                .expect("request builder"),
+        )
+        .await
+        .expect("response");
+    assert_eq!(leaderboard.status(), StatusCode::OK);
+
+    let body = axum::body::to_bytes(leaderboard.into_body(), usize::MAX)
+        .await
+        .expect("body bytes");
+    let json: serde_json::Value = serde_json::from_slice(&body).expect("parse JSON");
+    let entries = json["entries"].as_array().expect("entries array");
+    assert!(
+        !entries
+            .iter()
+            .any(|entry| entry["model_name"] == "private-model"),
+        "private submission should not appear on leaderboard"
+    );
+}
+
+#[tokio::test]
+async fn test_submit_requires_auth_when_bearer_is_configured() {
+    let app: Router = create_authed_app();
+
+    let response = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/v1/submit")
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    r#"{"model_name":"unauthorized-model","topology_type":"ring","n_nodes":8}"#,
+                ))
+                .expect("request builder"),
+        )
+        .await
+        .expect("response");
+
+    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+}
+
+#[tokio::test]
+async fn test_audit_events_requires_auth_when_bearer_is_configured() {
+    let app: Router = create_authed_app();
+
+    let response = app
+        .oneshot(
+            Request::builder()
+                .uri("/v1/audit/events")
+                .body(Body::empty())
+                .expect("request builder"),
+        )
+        .await
+        .expect("response");
+
+    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+}
+
+#[tokio::test]
+async fn test_audit_events_return_recent_entries() {
+    let app: Router = create_authed_app();
+
+    let _ = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/v1/submit")
+                .header("content-type", "application/json")
+                .header(header::AUTHORIZATION, "Bearer test-token")
+                .body(Body::from(
+                    r#"{"model_name":"audit-model","topology_type":"ring","n_nodes":8}"#,
+                ))
+                .expect("request builder"),
+        )
+        .await
+        .expect("submit response");
+
+    let response = app
+        .oneshot(
+            Request::builder()
+                .uri("/v1/audit/events?limit=10")
+                .header(header::AUTHORIZATION, "Bearer test-token")
+                .body(Body::empty())
+                .expect("request builder"),
+        )
+        .await
+        .expect("response");
+
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+        .await
+        .expect("body bytes");
+    let json: serde_json::Value = serde_json::from_slice(&body).expect("parse JSON");
+    let events = json["events"].as_array().expect("events");
+    assert!(!events.is_empty(), "expected at least one audit event");
+}
+
+#[tokio::test]
+async fn test_large_submission_is_processed_not_permanently_queued() {
+    let app: Router = create_test_app();
+
+    let response = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/v1/submit")
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    r#"{"model_name":"large-model","topology_type":"ring","n_nodes":17}"#,
+                ))
+                .expect("request builder"),
+        )
+        .await
+        .expect("response");
+
+    assert_eq!(response.status(), StatusCode::ACCEPTED);
+    let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+        .await
+        .expect("body bytes");
+    let json: serde_json::Value = serde_json::from_slice(&body).expect("parse JSON");
+    let submission_id = json["submission_id"]
+        .as_str()
+        .expect("submission_id")
+        .to_string();
+
+    let mut saw_ok = false;
+    for _ in 0..40 {
+        let response = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri(format!("/v1/results/{submission_id}"))
+                    .body(Body::empty())
+                    .expect("request builder"),
+            )
+            .await
+            .expect("response");
+
+        if response.status() == StatusCode::OK {
+            saw_ok = true;
+            break;
+        }
+
+        tokio::time::sleep(std::time::Duration::from_millis(25)).await;
+    }
+
+    assert!(saw_ok, "large submission should eventually complete");
+}
+
+#[tokio::test]
+async fn test_dimensional_sweep_returns_not_implemented() {
+    let app: Router = create_test_app();
+
+    let response = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/v1/dimensional-sweep")
+                .header("content-type", "application/json")
+                .body(Body::from(r#"{"topology_type":"ring","min_dimension":128,"max_dimension":256,"samples_per_dimension":4}"#))
+                .expect("request builder"),
+        )
+        .await
+        .expect("response");
+
+    assert_eq!(response.status(), StatusCode::NOT_IMPLEMENTED);
 }

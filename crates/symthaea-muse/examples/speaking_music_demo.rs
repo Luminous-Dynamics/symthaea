@@ -5,7 +5,9 @@
 //! Run: cargo run --features "muse,humanoid,voice" --example speaking_music_demo
 
 #[cfg(not(feature = "voice"))]
-fn main() { println!("Requires --features voice"); }
+fn main() {
+    println!("Requires --features voice");
+}
 
 #[cfg(feature = "voice")]
 fn main() {
@@ -25,7 +27,11 @@ fn main() {
     let chunks_per_second = sample_rate as usize / chunk_samples;
 
     let mut synth = StreamingSynth::new(
-        MuseConfig { duration_secs: 300.0, max_notes: 32, ..Default::default() },
+        MuseConfig {
+            duration_secs: 300.0,
+            max_notes: 32,
+            ..Default::default()
+        },
         sample_rate,
     );
     synth.enable_binaural = true;
@@ -72,7 +78,12 @@ fn main() {
         state.arousal = state.arousal.clamp(0.1, 0.8);
 
         if chunk_idx % (chunks_per_second * 10) == 0 {
-            println!("  [{:.0}%] Ψ={:.2} a={:.2}", progress * 100.0, state.consciousness_level, state.arousal);
+            println!(
+                "  [{:.0}%] Ψ={:.2} a={:.2}",
+                progress * 100.0,
+                state.consciousness_level,
+                state.arousal
+            );
         }
     }
 
@@ -91,15 +102,23 @@ fn write_wav(path: &std::path::Path, stereo: &[[f32; 2]], sr: u32) {
     use std::io::Write;
     let data_len = (stereo.len() * 4) as u32;
     let mut f = std::fs::File::create(path).expect("create WAV");
-    f.write_all(b"RIFF").ok(); f.write_all(&(36 + data_len).to_le_bytes()).ok();
-    f.write_all(b"WAVE").ok(); f.write_all(b"fmt ").ok();
-    f.write_all(&16u32.to_le_bytes()).ok(); f.write_all(&1u16.to_le_bytes()).ok();
-    f.write_all(&2u16.to_le_bytes()).ok(); f.write_all(&sr.to_le_bytes()).ok();
+    f.write_all(b"RIFF").ok();
+    f.write_all(&(36 + data_len).to_le_bytes()).ok();
+    f.write_all(b"WAVE").ok();
+    f.write_all(b"fmt ").ok();
+    f.write_all(&16u32.to_le_bytes()).ok();
+    f.write_all(&1u16.to_le_bytes()).ok();
+    f.write_all(&2u16.to_le_bytes()).ok();
+    f.write_all(&sr.to_le_bytes()).ok();
     f.write_all(&(sr * 4).to_le_bytes()).ok();
-    f.write_all(&4u16.to_le_bytes()).ok(); f.write_all(&16u16.to_le_bytes()).ok();
-    f.write_all(b"data").ok(); f.write_all(&data_len.to_le_bytes()).ok();
+    f.write_all(&4u16.to_le_bytes()).ok();
+    f.write_all(&16u16.to_le_bytes()).ok();
+    f.write_all(b"data").ok();
+    f.write_all(&data_len.to_le_bytes()).ok();
     for s in stereo {
-        f.write_all(&((s[0] * 32767.0).clamp(-32768.0, 32767.0) as i16).to_le_bytes()).ok();
-        f.write_all(&((s[1] * 32767.0).clamp(-32768.0, 32767.0) as i16).to_le_bytes()).ok();
+        f.write_all(&((s[0] * 32767.0).clamp(-32768.0, 32767.0) as i16).to_le_bytes())
+            .ok();
+        f.write_all(&((s[1] * 32767.0).clamp(-32768.0, 32767.0) as i16).to_le_bytes())
+            .ok();
     }
 }
