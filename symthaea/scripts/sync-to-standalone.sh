@@ -299,8 +299,12 @@ if ! $DRY_RUN; then
     find "${STANDALONE_REPO}/crates" -name "Cargo.toml" -exec \
         sed -i '/path.*\.\.\/\.\.\/\.\./s/^/# [standalone-stripped] /' {} \;
     # Strip feature flags referencing stripped deps in sub-crates
+    # Match both prism-search and prism_search (Cargo normalizes hyphens)
     find "${STANDALONE_REPO}/crates" -name "Cargo.toml" -exec \
-        sed -i '/^prism_search\s*=/s/^/# [standalone-stripped] /' {} \;
+        sed -i '/^prism[-_]search\s*=\s*\[/s/^/# [standalone-stripped] /' {} \;
+    # Also strip positioning feature if it references the dep
+    find "${STANDALONE_REPO}/crates" -name "Cargo.toml" -exec \
+        sed -i '/^positioning\s*=\s*\[.*dep:positioning/s/^/# [standalone-stripped] /' {} \;
 
     # Verify the rewrites actually happened
     REWRITE_OK=true
