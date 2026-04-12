@@ -454,6 +454,49 @@ impl ProblemDifficulty {
     }
 }
 
+/// **Adversarial Hard corpus generator.** Constructs problems where the
+/// correct tactic is deliberately ranked badly by the strong-heuristic
+/// baseline. Selection rule: for each sampled problem, pick the correct
+/// tactic to be the one with the **lowest** heuristic score in its
+/// native domain, then assign the problem to that tactic's domain.
+///
+/// This guarantees the strong baseline needs multiple attempts to find
+/// the correct answer, populating the Hard tier that random sampling
+/// leaves empty.
+pub fn adversarial_hard_corpus(n: usize, seed: u64) -> Vec<Problem> {
+    // For each domain, find the tactic with the lowest heuristic_score in
+    // that domain. This is the "worst-ranked" correct-tactic choice.
+    let all_tactics = TacticId::all();
+    let worst_per_domain = |d: Domain| -> TacticId {
+        all_tactics
+            .iter()
+            .filter(|t| t.native_domain() == d)
+            .min_by(|a, b| {
+                let sa = heuristic_score(**a, d);
+                let sb = heuristic_score(**b, d);
+                sa.partial_cmp(&sb).unwrap_or(std::cmp::Ordering::Equal)
+            })
+            .copied()
+            .expect("at least one tactic per domain")
+    };
+    let hard_nt = worst_per_domain(Domain::NumberTheory);
+    let hard_geo = worst_per_domain(Domain::Geometry);
+    let hard_ineq = worst_per_domain(Domain::Inequality);
+    let hard_choices = [
+        (hard_nt, Domain::NumberTheory),
+        (hard_geo, Domain::Geometry),
+        (hard_ineq, Domain::Inequality),
+    ];
+    let mut state = seed;
+    let mut out = Vec::with_capacity(n);
+    for i in 0..n {
+        let r = xorshift64(&mut state);
+        let (t, d) = hard_choices[(r % 3) as usize];
+        out.push(Problem::new(&format!("hard_{}", i), d, t));
+    }
+    out
+}
+
 /// Stratified corpus generation. Generates up to `n_per_tier` problems
 /// at each difficulty tier by sampling the underlying random_corpus and
 /// filtering by baseline-attempts-needed. Returns a HashMap from
@@ -1150,6 +1193,145 @@ mod tests {
         eprintln!("════════════════════════════════════════════════════════════");
 
         assert!(!summary.is_empty());
+    }
+
+    // ── Adversarial Hard corpus ────────────────────────────────────────
+
+    #[test]
+    fn test_adversarial_hard_corpus_is_hard() {
+        // Verify the adversarial corpus actually stresses the baseline.
+        let corpus = adversarial_hard_corpus(30, 42);
+        let tactics = TacticId::all();
+        let mut sel = SrTacticSelector::new(0.0, 42);
+        let mut total_attempts = 0usize;
+        let mut max_attempts = 0usize;
+        for p in &corpus {
+            let n = sel.solve(p, &tactics);
+            total_attempts += n;
+            max_attempts = max_attempts.max(n);
+        }
+        let mean = total_attempts as f32 / corpus.len() as f32;
+        eprintln!(
+            "\nAdversarial Hard corpus: mean baseline attempts = {:.2}, max = {}",
+            mean, max_attempts
+        );
+        // Should be genuinely hard: mean at least 3, max at least 5.
+        assert!(
+            mean >= 3.0,
+            "adversarial corpus not actually hard — mean={:.2}",
+            mean
+        );
+    }
+
+    /// **Hard-tier SR sweep — distinguishing amplification from override.**
+    /// Runs an extended σ-sweep on the adversarial Hard corpus using the
+    /// WEAK heuristic. Tests whether SR on Hard problems produces:
+    ///   (a) An inverted-U peak (amplification mechanism, as on Medium)
+    ///   (b) A monotone curve approaching random-selection ceiling
+    ///       (override mechanism — noise defeats an adversarial heuristic)
+    ///
+    /// These are distinct phenomena. Both fall under the SR umbrella but
+    /// have different practical implications: amplification means SR
+    /// discovers signal that greedy misses; override means noise
+    /// nullifies a bad heuristic.
+    ///
+    /// Theoretical random-selection ceiling for Hard corpus:
+    ///   success = threshold / |tactics| = 7 / 15 ≈ 46.7%
+    #[test]
+    fn test_phase4_5_adversarial_hard_sweep() {
+        let corpus = adversarial_hard_corpus(50, 42);
+        // Extended σ range to observe plateau:
+        let sigmas = [0.00, 0.10, 0.20, 0.30, 0.40, 0.50, 0.70, 1.00, 1.50, 2.00];
+        let trials = 100;
+        let points = sigma_sweep_weak(&corpus, &sigmas, trials, 42);
+
+        eprintln!("\n════════════════════════════════════════════════════════════");
+        eprintln!("  PHASE 4.5 — ADVERSARIAL HARD-TIER SR SWEEP");
+        eprintln!("  Corpus: 50 adversarial problems (worst-bias correct tactic)");
+        eprintln!("  {} trials per σ on weak heuristic", trials);
+        eprintln!("────────────────────────────────────────────────────────────");
+        eprintln!("    σ     │ solve rate │ 95% CI              │ mean attempts");
+        eprintln!("   ───────┼────────────┼─────────────────────┼──────────────");
+        for pt in &points {
+            let successes = (pt.solve_rate * pt.trials as f32).round() as usize;
+            let (lo, hi) = wilson_ci_95(successes, pt.trials);
+            eprintln!(
+                "    {:.2}  │   {:5.2}%  │ [{:5.2}%, {:5.2}%]  │   {:5.3}",
+                pt.sigma,
+                pt.solve_rate * 100.0,
+                lo * 100.0,
+                hi * 100.0,
+                pt.mean_attempts
+            );
+        }
+
+        let baseline = &points[0];
+        let best = points
+            .iter()
+            .max_by(|a, b| a.solve_rate.partial_cmp(&b.solve_rate).unwrap())
+            .unwrap();
+        let delta_pp = (best.solve_rate - baseline.solve_rate) * 100.0;
+
+        // Two-proportion z-test best vs baseline
+        let base_succ =
+            (baseline.solve_rate * baseline.trials as f32).round() as usize;
+        let best_succ = (best.solve_rate * best.trials as f32).round() as usize;
+        let z = two_proportion_z(best_succ, best.trials, base_succ, baseline.trials);
+
+        // Theoretical random-selection ceiling: threshold / |tactics|
+        let random_ceiling = 7.0 / 15.0 * 100.0;
+
+        eprintln!("\n  BASELINE (σ=0): solve rate = {:.2}%", baseline.solve_rate * 100.0);
+        eprintln!(
+            "  BEST σ = {:.2} (solve rate {:.2}%)",
+            best.sigma,
+            best.solve_rate * 100.0
+        );
+        eprintln!("  Δ = {:+.2}pp    z = {:.2}", delta_pp, z);
+        eprintln!("  Theoretical random-selection ceiling: {:.2}%", random_ceiling);
+        if z.abs() > 2.58 {
+            eprintln!("  p < 0.01 ✓");
+        } else if z.abs() > 1.96 {
+            eprintln!("  p < 0.05 ✓");
+        } else {
+            eprintln!("  p ≥ 0.05 — SR effect not significant on this tier");
+        }
+        eprintln!("════════════════════════════════════════════════════════════");
+
+        // Classify the mechanism: amplification (inverted-U) vs override
+        // (monotone toward random ceiling). Amplification = the peak is
+        // at a σ STRICTLY INSIDE the tested range, with later σ values
+        // showing a decline. Override = peak is at the highest σ and the
+        // curve is monotone.
+        let peak_is_interior = {
+            let peak_idx = points
+                .iter()
+                .position(|p| (p.solve_rate - best.solve_rate).abs() < 1e-6)
+                .unwrap();
+            peak_idx > 0 && peak_idx < points.len() - 1
+        };
+        let saturation_gap = (random_ceiling / 100.0) - best.solve_rate;
+
+        if peak_is_interior {
+            eprintln!(
+                "\n  ◇ MECHANISM: AMPLIFICATION (inverted-U, peak at interior σ={:.2})",
+                best.sigma
+            );
+            eprintln!("     The weak signal is being amplified by noise — true SR.");
+        } else if saturation_gap.abs() < 0.08 {
+            eprintln!(
+                "\n  ◇ MECHANISM: OVERRIDE (monotone, plateau near random ceiling {:.1}%)",
+                random_ceiling
+            );
+            eprintln!("     Noise is nullifying the adversarial heuristic, not amplifying signal.");
+            eprintln!("     Both mechanisms fall under SR theory but have distinct signatures.");
+        } else {
+            eprintln!("\n  ◇ MECHANISM: CURVE STILL RISING at σ={:.2} — test higher σ", best.sigma);
+            eprintln!("     Current: {:.2}%, random ceiling: {:.2}%, gap: {:+.2}pp",
+                      best.solve_rate * 100.0, random_ceiling, saturation_gap * 100.0);
+        }
+
+        assert_eq!(points.len(), sigmas.len());
     }
 
     /// Sanity: the heuristic MUST be imperfect for SR to have room to help.
