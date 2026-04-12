@@ -30,7 +30,7 @@ impl SurgicalEmbodiment {
     pub fn reset(&mut self) { self.simulator.reset(); self.controller.reset(); self.encoder.reset(); self.last_perception = None; self.total_steps = 0; self.current_safety = MotorSafetyLevel::Green; self.safety_override = None; self.last_control_effort = 0.0; self.last_prediction_error = 0.0; self.surgical_safety = SurgicalSafetyLevel::FullControl; }
     pub fn safety_level(&self) -> MotorSafetyLevel { self.current_safety }
     pub fn total_steps(&self) -> usize { self.total_steps }
-    pub fn telemetry(&self) -> EmbodimentTelemetry { EmbodimentTelemetry { total_steps: self.total_steps as u64, control_effort: self.last_control_effort, prediction_error: self.last_prediction_error, safety_level: format!("{:?}", self.current_safety), platform: "surgical".to_string(), num_actuators: NUM_ACTUATORS, epistemic_grounding: grounding_label(GROUNDING_SENSORIMOTOR).to_string(), observation_confidence: grounding_from_prediction_error(self.last_prediction_error) } }
+    pub fn telemetry(&self) -> EmbodimentTelemetry { EmbodimentTelemetry { total_steps: self.total_steps as u64, control_effort: self.last_control_effort, prediction_error: self.last_prediction_error, safety_level: format!("{:?}", self.current_safety), platform: "surgical".to_string(), num_actuators: NUM_ACTUATORS, epistemic_grounding: grounding_label(GROUNDING_SENSORIMOTOR).to_string(), observation_confidence: grounding_from_prediction_error(self.last_prediction_error), platform_specific: Vec::new() } }
 }
 
 impl symthaea_core::embodiment::EmbodimentBridge for SurgicalEmbodiment {

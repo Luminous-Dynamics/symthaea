@@ -22,7 +22,7 @@ impl OrbitalEmbodiment {
     pub fn reset(&mut self) { self.sim.reset(); self.ctrl.reset(); self.enc.reset(); self.last_p = None; self.steps = 0; self.safety = MotorSafetyLevel::Green; self.safety_ov = None; self.effort = 0.0; self.pe = 0.0; }
     pub fn safety_level(&self) -> MotorSafetyLevel { self.safety }
     pub fn total_steps(&self) -> usize { self.steps }
-    pub fn telemetry(&self) -> EmbodimentTelemetry { EmbodimentTelemetry { total_steps: self.steps as u64, control_effort: self.effort, prediction_error: self.pe, safety_level: format!("{:?}", self.safety), platform: "orbital".to_string(), num_actuators: NUM_ACTUATORS, epistemic_grounding: grounding_label(GROUNDING_SENSORIMOTOR).to_string(), observation_confidence: grounding_from_prediction_error(self.pe) } }
+    pub fn telemetry(&self) -> EmbodimentTelemetry { EmbodimentTelemetry { total_steps: self.steps as u64, control_effort: self.effort, prediction_error: self.pe, safety_level: format!("{:?}", self.safety), platform: "orbital".to_string(), num_actuators: NUM_ACTUATORS, epistemic_grounding: grounding_label(GROUNDING_SENSORIMOTOR).to_string(), observation_confidence: grounding_from_prediction_error(self.pe), platform_specific: Vec::new() } }
 }
 impl symthaea_core::embodiment::EmbodimentBridge for OrbitalEmbodiment {
     fn step(&mut self, hv: &ContinuousHV, dt: f32, phi: f64) -> EmbodimentResult { self.step(hv, dt, phi) }
