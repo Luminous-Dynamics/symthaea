@@ -45,10 +45,13 @@ impl InstrumentKey {
         match inst {
             Instrument::Piano | Instrument::PianoPP => Self::Piano,
             Instrument::Violin | Instrument::Cello => Self::Strings,
-            Instrument::Flute => Self::Wind,
-            Instrument::AcousticGuitar | Instrument::Harp => Self::Plucked,
-            Instrument::ElectricPiano | Instrument::Bell => Self::Keys,
-            Instrument::Pad | Instrument::Organ => Self::Pad,
+            Instrument::Flute | Instrument::Ney | Instrument::Clarinet
+                | Instrument::Trumpet | Instrument::Saxophone => Self::Wind,
+            Instrument::AcousticGuitar | Instrument::Harp | Instrument::Koto
+                | Instrument::Oud | Instrument::Sitar | Instrument::UprightBass => Self::Plucked,
+            Instrument::ElectricPiano | Instrument::Bell | Instrument::Marimba
+                | Instrument::Kalimba => Self::Keys,
+            Instrument::Pad | Instrument::Organ | Instrument::SawLead => Self::Pad,
         }
     }
 }

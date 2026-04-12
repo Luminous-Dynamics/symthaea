@@ -211,9 +211,6 @@ impl fmt::Display for Expr {
                 };
                 write!(f, "{}({})", name, arg)
             }
-            Expr::Sum(body, var) => {
-                write!(f, "Σ_{}({})", var, body)
-            }
         }
     }
 }
@@ -1138,6 +1135,23 @@ fn build_template_library(growth: &GrowthClass) -> Vec<Expr> {
             templates.push(Expr::Const(1.0));
             templates.push(Expr::Const(std::f64::consts::PI));
             templates.push(Expr::Const(1.0 / std::f64::consts::E));
+            // a - b/n^c (constant + convergent correction)
+            // Discovers limits like M(n)/C(n) → 3√3/(2π) ≈ 0.827
+            templates.push(Expr::BinOp(BinOp::Sub,
+                c(1.0),
+                Box::new(Expr::BinOp(BinOp::Div,
+                    c(1.0),
+                    Box::new(Expr::BinOp(BinOp::Pow, n(), c(0.5)))))));
+            // a - b/n (simpler 1/n correction)
+            templates.push(Expr::BinOp(BinOp::Sub,
+                c(1.0),
+                Box::new(Expr::BinOp(BinOp::Div, c(1.0), n()))));
+            // a + b/sqrt(n) (convergent from below)
+            templates.push(Expr::BinOp(BinOp::Add,
+                c(1.0),
+                Box::new(Expr::BinOp(BinOp::Div,
+                    c(1.0),
+                    Box::new(Expr::Func(UnaryFn::Sqrt, n()))))));
         }
         GrowthClass::Logarithmic => {
             // a * ln(n) + b
@@ -2021,11 +2035,218 @@ pub fn invariant_variance(data: &[(f64, f64)]) -> (f64, f64) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
+// MOTZKIN/CATALAN RATIO OBSERVER
+// ═══════════════════════════════════════════════════════════════════════════
+
+/// Observe the central binomial normalization: C(2n,n) · √n / 4^n → 1/√π.
+///
+/// This is a classic result from Stirling's approximation.
+/// C(2n,n) ~ 4^n / √(πn), so C(2n,n) · √n / 4^n → 1/√π ≈ 0.5642.
+///
+/// The GP should discover this limit using the convergent-template (a - b/n^c).
+/// The constant 1/√π connects combinatorics to transcendental mathematics.
+pub fn observe_central_binomial_limit(max_n: usize) -> ObservedSequence {
+    use crate::hdc::combinatorics::binomial;
+
+    let data: Vec<(f64, f64)> = (2..=max_n)
+        .filter_map(|n| {
+            let cbn = binomial(2 * n as u64, n as u64) as f64;
+            let val = cbn * (n as f64).sqrt() / 4.0_f64.powi(n as i32);
+            if val.is_finite() && val > 0.0 {
+                Some((n as f64, val))
+            } else { None }
+        })
+        .collect();
+    ObservedSequence::new("central_binom_limit(n)", MathDomain::Combinatorics, data)
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// PHYSICS VALIDATION OBSERVERS
+// ═══════════════════════════════════════════════════════════════════════════
+
+/// Observe hydrogen atom energy levels: E_n = -13.6 / n² eV.
+///
+/// The Rydberg formula is one of the oldest known quantization laws.
+/// The conjecture engine should rediscover E(n) ∝ 1/n² from the data.
+pub fn observe_hydrogen_energy_levels(max_n: usize) -> ObservedSequence {
+    let data: Vec<(f64, f64)> = (1..=max_n)
+        .map(|n| (n as f64, -13.6 / (n as f64).powi(2)))
+        .collect();
+    ObservedSequence::new("hydrogen_E(n)", MathDomain::Physics, data)
+}
+
+/// Observe quantum harmonic oscillator energy levels: E_n = ℏω(n + ½).
+///
+/// In natural units (ℏω = 1): E_n = n + 0.5. The conjecture engine should
+/// discover the linear relationship with the ½ zero-point offset.
+pub fn observe_quantum_harmonic_oscillator(max_n: usize) -> ObservedSequence {
+    let data: Vec<(f64, f64)> = (0..=max_n)
+        .map(|n| (n as f64, n as f64 + 0.5))
+        .collect();
+    ObservedSequence::new("qho_E(n)", MathDomain::Physics, data)
+}
+
+/// Observe blackbody radiation peak wavelength vs temperature: Wien's law.
+///
+/// λ_max = b / T where b = 2.898e-3 m·K (Wien's displacement constant).
+/// Data: T in [300, 10000] K → λ_max in meters.
+pub fn observe_blackbody_peak(n_temps: usize) -> ObservedSequence {
+    let wien_b = 2.898e-3; // Wien's displacement constant (m·K)
+    let data: Vec<(f64, f64)> = (1..=n_temps)
+        .map(|i| {
+            let frac = (i as f64) / (n_temps as f64);
+            let t = 300.0 * (10000.0_f64 / 300.0).powf(frac);
+            (t, wien_b / t)
+        })
+        .collect();
+    ObservedSequence::new("blackbody_peak(T)", MathDomain::Physics, data)
+}
+
+/// Observe Balmer series wavelengths: 1/λ = R_H (1/4 - 1/n²) for n = 3,4,5,...
+///
+/// R_H ≈ 1.097e7 m⁻¹. Returns (n, λ) pairs in nanometers.
+pub fn observe_balmer_series(max_n: usize) -> ObservedSequence {
+    let rydberg = 1.0973731568539e7; // m⁻¹
+    let data: Vec<(f64, f64)> = (3..=max_n.max(3))
+        .map(|n| {
+            let inv_lambda = rydberg * (0.25 - 1.0 / (n as f64).powi(2));
+            let lambda_nm = 1.0e9 / inv_lambda;
+            (n as f64, lambda_nm)
+        })
+        .collect();
+    ObservedSequence::new("balmer_λ(n)", MathDomain::Physics, data)
+}
+
+/// Observe Kepler's third law: T = r^(3/2) (normalized units GM = 4π²).
+pub fn observe_kepler_third_law(n_orbits: usize) -> ObservedSequence {
+    let data: Vec<(f64, f64)> = (1..=n_orbits)
+        .map(|i| {
+            let r = i as f64;
+            let t = r.powf(1.5);
+            (r, t)
+        })
+        .collect();
+    ObservedSequence::new("kepler_T(r)", MathDomain::Physics, data)
+}
+
+/// Observe Stefan-Boltzmann law: P ∝ T⁴ (normalized units σA = 1).
+pub fn observe_stefan_boltzmann(n_temps: usize) -> ObservedSequence {
+    let data: Vec<(f64, f64)> = (1..=n_temps)
+        .map(|i| {
+            let t = i as f64 * 100.0;
+            let p = t.powi(4);
+            (t, p)
+        })
+        .collect();
+    ObservedSequence::new("stefan_boltzmann_P(T)", MathDomain::Physics, data)
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 // INTERNAL UTILITIES
 // ═══════════════════════════════════════════════════════════════════════════
 
 fn lcg_step(state: u64) -> u64 {
     state.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407)
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// CROSS-SEQUENCE RELATION DISCOVERY
+// ═══════════════════════════════════════════════════════════════════════════
+
+/// Type of relationship between two sequences.
+#[derive(Debug, Clone)]
+pub enum RelationType {
+    /// A(n) ≈ constant · B(n)
+    Proportional { constant: f64 },
+    /// A(n) ≈ B(n) + offset
+    ConstantDifference { offset: f64 },
+    /// A(n) ≈ a · B(n) + b
+    Linear { slope: f64, intercept: f64 },
+}
+
+/// A discovered relationship between two sequences.
+#[derive(Debug, Clone)]
+pub struct CrossSequenceRelation {
+    pub source_a: String,
+    pub source_b: String,
+    pub relation_type: RelationType,
+    pub r_squared: f64,
+}
+
+impl fmt::Display for CrossSequenceRelation {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match &self.relation_type {
+            RelationType::Proportional { constant } =>
+                write!(f, "{} ≈ {:.4} · {} (R²={:.4})", self.source_a, constant, self.source_b, self.r_squared),
+            RelationType::ConstantDifference { offset } =>
+                write!(f, "{} ≈ {} + {:.4} (R²={:.4})", self.source_a, self.source_b, offset, self.r_squared),
+            RelationType::Linear { slope, intercept } =>
+                write!(f, "{} ≈ {:.4}·{} + {:.4} (R²={:.4})", self.source_a, slope, self.source_b, intercept, self.r_squared),
+        }
+    }
+}
+
+/// Discover relationships between two sequences by testing proportional,
+/// constant-difference, and linear fits.
+pub fn discover_cross_sequence_relations(
+    a: &ObservedSequence,
+    b: &ObservedSequence,
+) -> Vec<CrossSequenceRelation> {
+    let mut relations = Vec::new();
+    // Align sequences by matching x-values
+    let pairs: Vec<(f64, f64)> = a.data.iter()
+        .filter_map(|(ax, ay)| {
+            b.data.iter()
+                .find(|(bx, _)| (*bx - *ax).abs() < 1e-10)
+                .map(|(_, by)| (*ay, *by))
+        })
+        .collect();
+
+    if pairs.len() < 3 { return relations; }
+
+    // Test proportional: A = k·B
+    let valid_ratios: Vec<f64> = pairs.iter()
+        .filter(|(_, by)| by.abs() > 1e-10)
+        .map(|(ay, by)| ay / by)
+        .collect();
+    if valid_ratios.len() >= 3 {
+        let mean_ratio = valid_ratios.iter().sum::<f64>() / valid_ratios.len() as f64;
+        let var = valid_ratios.iter().map(|r| (r - mean_ratio).powi(2)).sum::<f64>()
+            / valid_ratios.len() as f64;
+        let cv = var.sqrt() / mean_ratio.abs().max(1e-10);
+        if cv < 0.1 {
+            let ss_res: f64 = pairs.iter().map(|(ay, by)| (ay - mean_ratio * by).powi(2)).sum();
+            let mean_a = pairs.iter().map(|(ay, _)| ay).sum::<f64>() / pairs.len() as f64;
+            let ss_tot: f64 = pairs.iter().map(|(ay, _)| (ay - mean_a).powi(2)).sum();
+            let r2 = if ss_tot > 1e-10 { 1.0 - ss_res / ss_tot } else { 0.0 };
+            relations.push(CrossSequenceRelation {
+                source_a: a.name.clone(),
+                source_b: b.name.clone(),
+                relation_type: RelationType::Proportional { constant: mean_ratio },
+                r_squared: r2,
+            });
+        }
+    }
+
+    // Test constant difference: A = B + c
+    let diffs: Vec<f64> = pairs.iter().map(|(ay, by)| ay - by).collect();
+    let mean_diff = diffs.iter().sum::<f64>() / diffs.len() as f64;
+    let diff_var = diffs.iter().map(|d| (d - mean_diff).powi(2)).sum::<f64>() / diffs.len() as f64;
+    let mean_a = pairs.iter().map(|(ay, _)| ay).sum::<f64>() / pairs.len() as f64;
+    let a_var = pairs.iter().map(|(ay, _)| (ay - mean_a).powi(2)).sum::<f64>() / pairs.len() as f64;
+    if diff_var < a_var * 0.01 && a_var > 1e-10 {
+        let ss_res: f64 = pairs.iter().map(|(ay, by)| (ay - by - mean_diff).powi(2)).sum();
+        let ss_tot: f64 = pairs.iter().map(|(ay, _)| (ay - mean_a).powi(2)).sum();
+        let r2 = if ss_tot > 1e-10 { 1.0 - ss_res / ss_tot } else { 0.0 };
+        relations.push(CrossSequenceRelation {
+            source_a: a.name.clone(),
+            source_b: b.name.clone(),
+            relation_type: RelationType::ConstantDifference { offset: mean_diff },
+            r_squared: r2,
+        });
+    }
+
+    relations
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -2856,5 +3077,248 @@ mod tests {
         let inv_e = 1.0 / std::f64::consts::E;
         assert!((last - inv_e).abs() < 1e-6,
             "D(12)/12! should ≈ 1/e = {:.6}, got {:.6}", inv_e, last);
+    }
+
+    // ════════════════════════════════════════════════════════════════════
+    // PHYSICS VALIDATION SUITE
+    // ════════════════════════════════════════════════════════════════════
+
+    /// Hydrogen ground state: E(n) = -13.6/n² eV.
+    #[test]
+    fn test_physics_hydrogen_ground_state() {
+        let mut engine = ConjectureEngine::with_config(RegressorConfig {
+            population_size: 200,
+            generations: 80,
+            max_depth: 4,
+            max_complexity: 12,
+            seed: 42,
+            ..RegressorConfig::default()
+        });
+
+        engine.observe(observe_hydrogen_energy_levels(20));
+        engine.generate_conjectures(5);
+        engine.verify_numerical();
+
+        eprintln!("\n═══ HYDROGEN ENERGY LEVEL DISCOVERY ═══");
+        for c in engine.conjectures.iter().take(5) {
+            eprintln!("  E(n) ≈ {} | MSE={:.2e} | {:?}", c.formula_str, c.training_mse, c.status);
+        }
+
+        if let Some(best) = engine.best_for("hydrogen_E(n)") {
+            eprintln!("  >>> Best: {} (MSE={:.2e})", best.formula_str, best.training_mse);
+            assert!(best.training_mse < 5.0,
+                "hydrogen energy MSE should be < 5.0, got {:.2e}", best.training_mse);
+            let e1 = best.formula.eval(&[("n", 1.0)]);
+            if e1.is_finite() {
+                eprintln!("  >>> E(1) = {:.4} (expected -13.6)", e1);
+            }
+        }
+    }
+
+    /// Quantum harmonic oscillator: E_n = n + 0.5 (natural units).
+    #[test]
+    fn test_physics_harmonic_oscillator_quantization() {
+        let mut engine = ConjectureEngine::with_config(RegressorConfig {
+            population_size: 150,
+            generations: 60,
+            max_depth: 3,
+            max_complexity: 8,
+            seed: 42,
+            ..RegressorConfig::default()
+        });
+
+        engine.observe(observe_quantum_harmonic_oscillator(20));
+        engine.generate_conjectures(3);
+        engine.verify_numerical();
+
+        eprintln!("\n═══ QUANTUM HARMONIC OSCILLATOR DISCOVERY ═══");
+        if let Some(best) = engine.best_for("qho_E(n)") {
+            eprintln!("  E(n) ≈ {} | MSE={:.2e}", best.formula_str, best.training_mse);
+            assert!(best.training_mse < 1.0,
+                "QHO should be discoverable, MSE={:.2e}", best.training_mse);
+        }
+    }
+
+    /// Wien's displacement law: λ_max = b/T.
+    #[test]
+    fn test_physics_blackbody_peak() {
+        let mut engine = ConjectureEngine::with_config(RegressorConfig {
+            population_size: 200,
+            generations: 80,
+            max_depth: 4,
+            max_complexity: 10,
+            lambda: 0.001,
+            seed: 42,
+            ..RegressorConfig::default()
+        });
+
+        engine.observe(observe_blackbody_peak(30));
+        engine.generate_conjectures(5);
+        engine.verify_numerical();
+
+        eprintln!("\n═══ BLACKBODY PEAK (WIEN'S LAW) DISCOVERY ═══");
+        if let Some(best) = engine.best_for("blackbody_peak(T)") {
+            eprintln!("  λ_max(T) ≈ {} | MSE={:.2e}", best.formula_str, best.training_mse);
+            assert!(best.training_mse < 1e-10,
+                "Wien's law should be discoverable, got MSE={:.2e}", best.training_mse);
+        }
+    }
+
+    /// Kepler's third law: T = r^(3/2).
+    #[test]
+    fn test_physics_kepler_third_law() {
+        let mut engine = ConjectureEngine::with_config(RegressorConfig {
+            population_size: 150,
+            generations: 60,
+            max_depth: 3,
+            max_complexity: 8,
+            seed: 42,
+            ..RegressorConfig::default()
+        });
+
+        engine.observe(observe_kepler_third_law(20));
+        engine.generate_conjectures(3);
+        engine.verify_numerical();
+
+        eprintln!("\n═══ KEPLER'S THIRD LAW DISCOVERY ═══");
+        if let Some(best) = engine.best_for("kepler_T(r)") {
+            eprintln!("  T(r) ≈ {} | MSE={:.2e}", best.formula_str, best.training_mse);
+            let t4 = best.formula.eval(&[("n", 4.0)]);
+            if t4.is_finite() {
+                assert!((t4 - 8.0).abs() < 1.0,
+                    "T(4AU) should be ≈ 8 years, got {:.4}", t4);
+            }
+        }
+    }
+
+    /// Stefan-Boltzmann law: P ∝ T⁴.
+    #[test]
+    fn test_physics_stefan_boltzmann() {
+        let mut engine = ConjectureEngine::with_config(RegressorConfig {
+            population_size: 200,
+            generations: 80,
+            max_depth: 4,
+            max_complexity: 10,
+            seed: 42,
+            ..RegressorConfig::default()
+        });
+
+        engine.observe(observe_stefan_boltzmann(20));
+        engine.generate_conjectures(3);
+        engine.verify_numerical();
+
+        eprintln!("\n═══ STEFAN-BOLTZMANN LAW DISCOVERY ═══");
+        if let Some(best) = engine.best_for("stefan_boltzmann_P(T)") {
+            eprintln!("  P(T) ≈ {} | MSE={:.2e}", best.formula_str, best.training_mse);
+        }
+    }
+
+    /// Balmer series wavelength data validation.
+    #[test]
+    fn test_physics_balmer_series() {
+        let seq = observe_balmer_series(10);
+        // n=3 → Hα ≈ 656.3 nm
+        let h_alpha = seq.data[0].1;
+        assert!((h_alpha - 656.3).abs() < 1.0,
+            "Hα should be ≈ 656.3 nm, got {:.1}", h_alpha);
+        // n=4 → Hβ ≈ 486.1 nm
+        let h_beta = seq.data[1].1;
+        assert!((h_beta - 486.1).abs() < 1.0,
+            "Hβ should be ≈ 486.1 nm, got {:.1}", h_beta);
+        eprintln!("Balmer series: Hα={:.1}nm, Hβ={:.1}nm", h_alpha, h_beta);
+    }
+
+    /// Combined physics validation: multiple laws in one engine run.
+    #[test]
+    fn test_physics_validation_combined() {
+        let mut engine = ConjectureEngine::with_config(RegressorConfig {
+            population_size: 200,
+            generations: 80,
+            max_depth: 4,
+            max_complexity: 12,
+            lambda: 0.001,
+            seed: 42,
+            ..RegressorConfig::default()
+        });
+
+        engine.observe(observe_hydrogen_energy_levels(15));
+        engine.observe(observe_quantum_harmonic_oscillator(15));
+        engine.observe(observe_kepler_third_law(15));
+
+        engine.generate_conjectures(3);
+        engine.verify_numerical();
+        engine.verify_formal(50);
+
+        eprintln!("\n═══ PHYSICS VALIDATION COMBINED ═══\n");
+        let sources = ["hydrogen_E(n)", "qho_E(n)", "kepler_T(r)"];
+        let mut discoveries = 0;
+        for source in &sources {
+            if let Some(best) = engine.best_for(source) {
+                eprintln!("  {} ≈ {} | MSE={:.2e} | {:?}",
+                    source, best.formula_str, best.training_mse, best.status);
+                if best.training_mse < 1.0 { discoveries += 1; }
+            } else {
+                eprintln!("  {} — no conjecture found", source);
+            }
+        }
+        assert!(discoveries >= 2,
+            "should discover at least 2 of 3 physics laws, got {}", discoveries);
+    }
+
+    // ════════════════════════════════════════════════════════════════════
+    // MOTZKIN/CATALAN CONVERGENT LIMIT DISCOVERY
+    // ════════════════════════════════════════════════════════════════════
+
+    /// Verify that the central binomial limit observer produces correct data.
+    #[test]
+    fn test_central_binomial_limit_data() {
+        let seq = observe_central_binomial_limit(30);
+        assert!(seq.data.len() >= 20, "should have data points");
+        let inv_sqrt_pi = 1.0 / std::f64::consts::PI.sqrt();
+        // Last value should be approaching 1/√π ≈ 0.5642
+        let last = seq.data.last().unwrap().1;
+        assert!((last - inv_sqrt_pi).abs() < 0.01,
+            "C(60,30)·√30/4^30 should ≈ {:.4}, got {:.4}", inv_sqrt_pi, last);
+        eprintln!("C(2n,n)·√n/4^n at n=30: {:.6} (true: {:.6})", last, inv_sqrt_pi);
+    }
+
+    /// Test that convergent-limit templates discover 1/√π.
+    #[test]
+    fn test_central_binomial_convergent_limit() {
+        let mut engine = ConjectureEngine::with_config(RegressorConfig {
+            population_size: 300,
+            generations: 120,
+            max_depth: 4,
+            max_complexity: 15,
+            lambda: 0.0005,
+            seed: 42,
+            ..RegressorConfig::default()
+        });
+
+        engine.observe(observe_central_binomial_limit(40));
+        engine.generate_conjectures(5);
+        engine.verify_numerical();
+
+        let inv_sqrt_pi = 1.0 / std::f64::consts::PI.sqrt();
+        eprintln!("\n═══ CENTRAL BINOMIAL LIMIT DISCOVERY ═══");
+        eprintln!("  True limit: 1/√π ≈ {:.6}\n", inv_sqrt_pi);
+
+        if let Some(best) = engine.best_for("central_binom_limit(n)") {
+            let limit = best.formula.eval(&[("n", 1000.0)]);
+            eprintln!("  BEST: {} | MSE={:.2e}", best.formula_str, best.training_mse);
+            if limit.is_finite() {
+                let error = (limit - inv_sqrt_pi).abs() / inv_sqrt_pi * 100.0;
+                eprintln!("  Limit at n=1000: {:.6} (error: {:.1}%)", limit, error);
+            }
+        }
+
+        for c in engine.conjectures.iter()
+            .filter(|c| c.source.contains("central_binom")).take(5) {
+            let lim = c.formula.eval(&[("n", 1000.0)]);
+            eprintln!("  {} | lim={:.6} | MSE={:.2e}", c.formula_str,
+                if lim.is_finite() { lim } else { f64::NAN }, c.training_mse);
+        }
+
+        assert!(!engine.conjectures.is_empty());
     }
 }

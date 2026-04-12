@@ -197,8 +197,8 @@ impl CreativeManager {
                 ..AtelierConfig::default()
             },
             muse_config: MuseConfig {
-                duration_secs: 4.0,
-                max_notes: 16,
+                duration_secs: 6.0,
+                max_notes: 32,
                 ..MuseConfig::default()
             },
             tracker,
@@ -281,6 +281,28 @@ impl CreativeManager {
             })
             .collect();
         Some(symthaea_muse::arc::EmotionalArc::new(bars))
+    }
+
+    /// Receive human feedback on the most recent composition.
+    ///
+    /// `rating`: -1.0 (terrible) to +1.0 (beautiful). 0.0 = neutral.
+    ///
+    /// Human feedback carries 10x the weight of self-evaluation. Over time,
+    /// this reshapes which harmonies, instruments, and emotional states produce
+    /// music the human enjoys. Call this from a UI "like/dislike" button.
+    pub fn human_feedback(
+        &mut self,
+        rating: f32,
+        harmony_activations: &[f32; 8],
+    ) -> symthaea_aesthetic::AestheticFeedback {
+        let feedback = self.tracker.human_feedback(rating, harmony_activations);
+        tracing::info!(
+            rating = rating,
+            dopamine = feedback.dopamine_delta,
+            ema = self.tracker.expectation(),
+            "Human feedback received — aesthetic system recalibrated"
+        );
+        feedback
     }
 
     /// Flush aesthetic + motif memory to disk. Called on drop and can be called manually.

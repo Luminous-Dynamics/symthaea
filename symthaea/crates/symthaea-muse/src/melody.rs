@@ -31,13 +31,16 @@ pub fn generate_melody(
 
     // Contour direction: valence influences ascending/descending tendency
     let ascend_bias = 0.5 + state.valence * 0.3; // positive valence → upward motion
-    let mut pitch_selector = 0.45f32; // start slightly below center
+    let mut pitch_selector = 0.35f32; // start low — gives room for the arc to rise
 
     // Phrase contour: arc shape (rise → peak → fall) scaled by arousal.
     // Calm music gets flatter contours; intense music gets dramatic arcs.
     let phrase_len = config.max_notes.max(4);
     let peak_position = 0.35 + (1.0 - state.arousal) * 0.25; // 0.35-0.60 through phrase
-    let contour_strength = 0.3 + state.arousal * 0.5; // 0.3-0.8: calm=subtle, intense=dramatic
+    // Contour strength: base from arousal, boosted for sparse melodies
+    // (fewer notes need more pronounced pitch arc to register as a contour)
+    let sparsity_boost = if config.max_notes <= 8 { 0.15 } else { 0.0 };
+    let contour_strength = (0.35 + state.arousal * 0.45 + sparsity_boost).min(0.9);
 
     // Base velocity from consciousness + dopamine
     let base_velocity = (0.3 + state.consciousness_level * 0.3 + state.dopamine * 0.15).clamp(0.2, 0.85);

@@ -380,6 +380,88 @@ impl AestheticTracker {
         self.evaluation_count = 0;
         // harmony_bias intentionally preserved — it's long-term taste, not session state
     }
+
+    // ── Human Feedback API ───────────────────────────────────────────────────
+
+    /// Incorporate human feedback into the aesthetic system.
+    ///
+    /// `rating` is a scalar from -1.0 (terrible) through 0.0 (neutral) to +1.0 (beautiful).
+    /// `harmony_activations` is the harmony state at the time the rated piece was generated.
+    ///
+    /// Human feedback carries 10x more weight than self-evaluation because humans
+    /// are the ground truth for aesthetic quality. The system recalibrates its
+    /// EMA and harmony bias toward the human's judgement.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use symthaea_aesthetic::{AestheticTracker, AestheticConfig};
+    /// let mut tracker = AestheticTracker::new(AestheticConfig::default());
+    /// let harmonies = [0.5, 0.6, 0.4, 0.7, 0.3, 0.5, 0.8, 0.2];
+    /// tracker.human_feedback(0.8, &harmonies); // "that was beautiful"
+    /// ```
+    pub fn human_feedback(
+        &mut self,
+        rating: f32,
+        harmony_activations: &[f32; 8],
+    ) -> AestheticFeedback {
+        let rating = rating.clamp(-1.0, 1.0);
+        // Map rating [-1, 1] to score [0, 1]
+        let score = (rating + 1.0) * 0.5;
+
+        self.evaluation_count += 1;
+
+        let delta = score - self.ema;
+
+        // Human feedback EMA alpha is 10x stronger than self-evaluation.
+        // One "beautiful" from a human shifts expectations more than 10 self-scores.
+        let human_alpha = (self.config.ema_alpha * 10.0).min(0.5);
+        self.ema = self.ema * (1.0 - human_alpha) + score * human_alpha;
+
+        // Harmony bias: human-rated works get 5x stronger bias update.
+        // This is how Symthaea learns "what sounds she likes = what humans like."
+        let human_bias_alpha = 0.05_f32;
+        for i in 0..8 {
+            let target = harmony_activations[i] * score;
+            self.harmony_bias[i] =
+                self.harmony_bias[i] * (1.0 - human_bias_alpha) + target * human_bias_alpha;
+        }
+
+        // Strong dopamine signal: human approval is the ultimate reward
+        let dopamine_delta = delta * self.config.dopamine_scale * 2.0;
+        let serotonin_delta = if rating > 0.3 {
+            rating * self.config.serotonin_scale * 1.5 // warm glow from approval
+        } else if rating < -0.3 {
+            rating * self.config.serotonin_scale * 0.5 // mild serotonin dip
+        } else {
+            0.0
+        };
+
+        let mut harmony_projection = [0.0f32; 8];
+        for i in 0..8 {
+            harmony_projection[i] = harmony_activations[i] * score;
+        }
+
+        AestheticFeedback {
+            dopamine_delta: dopamine_delta.clamp(-0.2, 0.3),
+            serotonin_delta: serotonin_delta.clamp(-0.1, 0.2),
+            surprise_signal: delta.abs() * self.config.surprise_scale,
+            harmony_projection,
+        }
+    }
+
+    /// Batch human feedback: apply multiple ratings at once.
+    ///
+    /// Useful for catching up on feedback from a listening session.
+    pub fn human_feedback_batch(
+        &mut self,
+        ratings: &[(f32, [f32; 8])],
+    ) -> Vec<AestheticFeedback> {
+        ratings
+            .iter()
+            .map(|(rating, harmonies)| self.human_feedback(*rating, harmonies))
+            .collect()
+    }
 }
 
 impl Default for AestheticTracker {
