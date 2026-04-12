@@ -284,7 +284,21 @@ impl SubstrateManager {
     /// When a composition is set, weight-blends speed/scale from all components.
     pub fn recompute_substrate_dynamics(&mut self, config: &CognitiveLoopConfig) {
         if !config.enable_substrate_speed_modulation {
-            self.tau_factor = 1.0;
+            // Even without speed modulation, compute substrate-aware tau_factor
+            // so that substrate type affects dynamics proportionally.
+            // Without this, all substrates behave identically (tau=1.0).
+            let bio_speed = SubstrateType::BiologicalNeurons.operation_speed();
+            let sub_speed = if let Some(ref comp) = config.substrate_composition {
+                let mut log_speed = 0.0f64;
+                for (sub, &weight) in &comp.weights {
+                    log_speed += (weight as f64) * sub.operation_speed().ln();
+                }
+                log_speed.exp()
+            } else {
+                config.substrate_type.operation_speed()
+            };
+            let log_ratio = (bio_speed / sub_speed).log10();
+            self.tau_factor = (1.0 + 0.5 * log_ratio / 9.0).clamp(0.5, 2.0) as f32;
             self.scale_pressure = 0.0;
             return;
         }
