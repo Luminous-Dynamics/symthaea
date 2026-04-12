@@ -1424,6 +1424,189 @@ pub fn condition_number_estimate(a: &[Vec<f64>], iterations: usize) -> f64 {
     (lambda_max / lambda_min).max(1.0)
 }
 
+// ─── Sparse Matrix (CSR Format) ─────────────────────────────────────────────
+
+/// Compressed Sparse Row (CSR) matrix representation.
+///
+/// Stores only non-zero entries. For an m×n matrix with nnz non-zeros:
+/// - `values`: non-zero values (length nnz)
+/// - `col_indices`: column index for each value (length nnz)
+/// - `row_ptr`: start index in values/col_indices for each row (length m+1)
+///
+/// Memory: O(nnz + m) vs O(m·n) for dense. Critical for large sparse systems.
+#[derive(Debug, Clone)]
+pub struct SparseMatrix {
+    pub rows: usize,
+    pub cols: usize,
+    pub values: Vec<f64>,
+    pub col_indices: Vec<usize>,
+    pub row_ptr: Vec<usize>,
+}
+
+impl SparseMatrix {
+    /// Create an empty sparse matrix.
+    pub fn new(rows: usize, cols: usize) -> Self {
+        Self {
+            rows,
+            cols,
+            values: Vec::new(),
+            col_indices: Vec::new(),
+            row_ptr: vec![0; rows + 1],
+        }
+    }
+
+    /// Create from triplets (row, col, value). Duplicate entries are summed.
+    pub fn from_triplets(rows: usize, cols: usize, triplets: &[(usize, usize, f64)]) -> Self {
+        // Sort by row, then column
+        let mut sorted = triplets.to_vec();
+        sorted.sort_by(|a, b| a.0.cmp(&b.0).then(a.1.cmp(&b.1)));
+
+        let mut values = Vec::new();
+        let mut col_indices = Vec::new();
+        let mut row_ptr = vec![0usize; rows + 1];
+
+        let mut prev_row = 0;
+        let mut prev_col = usize::MAX;
+
+        for &(r, c, v) in &sorted {
+            if v.abs() < 1e-15 { continue; }
+            // Sum duplicates
+            if r == prev_row && c == prev_col && !values.is_empty() {
+                *values.last_mut().unwrap() += v;
+            } else {
+                values.push(v);
+                col_indices.push(c);
+                for row in (prev_row + 1)..=r {
+                    row_ptr[row] = values.len() - 1;
+                }
+                prev_row = r;
+                prev_col = c;
+            }
+        }
+        for row in (prev_row + 1)..=rows {
+            row_ptr[row] = values.len();
+        }
+
+        Self { rows, cols, values, col_indices, row_ptr }
+    }
+
+    /// Create identity matrix of given size.
+    pub fn identity(n: usize) -> Self {
+        let triplets: Vec<(usize, usize, f64)> = (0..n).map(|i| (i, i, 1.0)).collect();
+        Self::from_triplets(n, n, &triplets)
+    }
+
+    /// Number of non-zero entries.
+    pub fn nnz(&self) -> usize {
+        self.values.len()
+    }
+
+    /// Get element at (row, col). O(log(nnz_in_row)) via binary search.
+    pub fn get(&self, row: usize, col: usize) -> f64 {
+        let start = self.row_ptr[row];
+        let end = self.row_ptr[row + 1];
+        match self.col_indices[start..end].binary_search(&col) {
+            Ok(idx) => self.values[start + idx],
+            Err(_) => 0.0,
+        }
+    }
+
+    /// Sparse matrix-vector product: y = A·x. O(nnz).
+    pub fn mul_vec(&self, x: &[f64]) -> Vec<f64> {
+        assert_eq!(x.len(), self.cols);
+        let mut y = vec![0.0; self.rows];
+        for i in 0..self.rows {
+            let start = self.row_ptr[i];
+            let end = self.row_ptr[i + 1];
+            for j in start..end {
+                y[i] += self.values[j] * x[self.col_indices[j]];
+            }
+        }
+        y
+    }
+
+    /// Sparse matrix addition: C = A + B.
+    pub fn add(&self, other: &SparseMatrix) -> SparseMatrix {
+        assert_eq!(self.rows, other.rows);
+        assert_eq!(self.cols, other.cols);
+        let mut triplets = Vec::with_capacity(self.nnz() + other.nnz());
+        for i in 0..self.rows {
+            for j in self.row_ptr[i]..self.row_ptr[i + 1] {
+                triplets.push((i, self.col_indices[j], self.values[j]));
+            }
+            for j in other.row_ptr[i]..other.row_ptr[i + 1] {
+                triplets.push((i, other.col_indices[j], other.values[j]));
+            }
+        }
+        SparseMatrix::from_triplets(self.rows, self.cols, &triplets)
+    }
+
+    /// Transpose: A^T (swaps rows and columns).
+    pub fn transpose(&self) -> SparseMatrix {
+        let mut triplets = Vec::with_capacity(self.nnz());
+        for i in 0..self.rows {
+            for j in self.row_ptr[i]..self.row_ptr[i + 1] {
+                triplets.push((self.col_indices[j], i, self.values[j]));
+            }
+        }
+        SparseMatrix::from_triplets(self.cols, self.rows, &triplets)
+    }
+
+    /// Convert to dense HdcMatrix.
+    pub fn to_dense(&self) -> Vec<Vec<f64>> {
+        let mut dense = vec![vec![0.0; self.cols]; self.rows];
+        for i in 0..self.rows {
+            for j in self.row_ptr[i]..self.row_ptr[i + 1] {
+                dense[i][self.col_indices[j]] = self.values[j];
+            }
+        }
+        dense
+    }
+
+    /// Conjugate gradient solver for Ax = b (A must be SPD).
+    ///
+    /// Returns the solution x and the number of iterations.
+    /// Convergence: ||r||/||b|| < tol.
+    pub fn solve_cg(&self, b: &[f64], tol: f64, max_iter: usize) -> (Vec<f64>, usize) {
+        assert_eq!(self.rows, self.cols, "CG requires square matrix");
+        assert_eq!(b.len(), self.rows);
+
+        let n = self.rows;
+        let mut x = vec![0.0; n];
+        let mut r: Vec<f64> = b.to_vec();
+        let mut p = r.clone();
+        let mut rs_old: f64 = r.iter().map(|v| v * v).sum();
+        let b_norm: f64 = b.iter().map(|v| v * v).sum::<f64>().sqrt();
+
+        if b_norm < 1e-15 { return (x, 0); }
+
+        for iter in 0..max_iter {
+            let ap = self.mul_vec(&p);
+            let p_ap: f64 = p.iter().zip(&ap).map(|(pi, api)| pi * api).sum();
+            if p_ap.abs() < 1e-15 { return (x, iter + 1); }
+            let alpha = rs_old / p_ap;
+
+            for i in 0..n {
+                x[i] += alpha * p[i];
+                r[i] -= alpha * ap[i];
+            }
+
+            let rs_new: f64 = r.iter().map(|v| v * v).sum();
+            if rs_new.sqrt() / b_norm < tol {
+                return (x, iter + 1);
+            }
+
+            let beta = rs_new / rs_old;
+            for i in 0..n {
+                p[i] = r[i] + beta * p[i];
+            }
+            rs_old = rs_new;
+        }
+
+        (x, max_iter)
+    }
+}
+
 // ─── Tests ───────────────────────────────────────────────────────────────────
 
 #[cfg(test)]
@@ -2669,5 +2852,106 @@ mod tests {
         let cond = condition_number_estimate(&a, 50);
         assert!(cond >= 1.0, "Condition number must be >= 1: {}", cond);
         assert!(cond < 10.0, "Identity condition number should be near 1: {}", cond);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // Sparse Matrix Tests
+    // ═══════════════════════════════════════════════════════════════════
+
+    #[test]
+    fn test_sparse_identity() {
+        let eye = SparseMatrix::identity(4);
+        assert_eq!(eye.nnz(), 4);
+        assert_eq!(eye.get(0, 0), 1.0);
+        assert_eq!(eye.get(1, 1), 1.0);
+        assert_eq!(eye.get(0, 1), 0.0);
+    }
+
+    #[test]
+    fn test_sparse_from_triplets() {
+        let triplets = vec![
+            (0, 0, 2.0), (0, 1, -1.0),
+            (1, 0, -1.0), (1, 1, 2.0), (1, 2, -1.0),
+            (2, 1, -1.0), (2, 2, 2.0),
+        ];
+        let a = SparseMatrix::from_triplets(3, 3, &triplets);
+        assert_eq!(a.nnz(), 7);
+        assert_eq!(a.get(0, 0), 2.0);
+        assert_eq!(a.get(0, 1), -1.0);
+        assert_eq!(a.get(2, 2), 2.0);
+        assert_eq!(a.get(2, 0), 0.0); // not stored
+    }
+
+    #[test]
+    fn test_sparse_mul_vec() {
+        // [2 -1 0] [1]   [1]
+        // [-1 2 -1] [1] = [0]
+        // [0 -1 2] [1]   [1]
+        let triplets = vec![
+            (0, 0, 2.0), (0, 1, -1.0),
+            (1, 0, -1.0), (1, 1, 2.0), (1, 2, -1.0),
+            (2, 1, -1.0), (2, 2, 2.0),
+        ];
+        let a = SparseMatrix::from_triplets(3, 3, &triplets);
+        let x = vec![1.0, 1.0, 1.0];
+        let y = a.mul_vec(&x);
+        assert!((y[0] - 1.0).abs() < TOL);
+        assert!((y[1] - 0.0).abs() < TOL);
+        assert!((y[2] - 1.0).abs() < TOL);
+    }
+
+    #[test]
+    fn test_sparse_transpose() {
+        let triplets = vec![(0, 1, 3.0), (1, 0, 5.0), (1, 2, 7.0)];
+        let a = SparseMatrix::from_triplets(2, 3, &triplets);
+        let at = a.transpose();
+        assert_eq!(at.rows, 3);
+        assert_eq!(at.cols, 2);
+        assert_eq!(at.get(1, 0), 3.0);
+        assert_eq!(at.get(0, 1), 5.0);
+        assert_eq!(at.get(2, 1), 7.0);
+    }
+
+    #[test]
+    fn test_sparse_add() {
+        let a = SparseMatrix::from_triplets(2, 2, &[(0, 0, 1.0), (1, 1, 2.0)]);
+        let b = SparseMatrix::from_triplets(2, 2, &[(0, 1, 3.0), (1, 1, 4.0)]);
+        let c = a.add(&b);
+        assert_eq!(c.get(0, 0), 1.0);
+        assert_eq!(c.get(0, 1), 3.0);
+        assert_eq!(c.get(1, 1), 6.0); // 2 + 4
+    }
+
+    #[test]
+    fn test_sparse_cg_tridiagonal() {
+        // SPD tridiagonal: diag=4, off-diag=-1
+        let n = 10;
+        let mut triplets = Vec::new();
+        for i in 0..n {
+            triplets.push((i, i, 4.0));
+            if i > 0 { triplets.push((i, i - 1, -1.0)); }
+            if i < n - 1 { triplets.push((i, i + 1, -1.0)); }
+        }
+        let a = SparseMatrix::from_triplets(n, n, &triplets);
+        let b: Vec<f64> = vec![1.0; n];
+
+        let (x, iters) = a.solve_cg(&b, 1e-10, 100);
+        let ax = a.mul_vec(&x);
+        for (ai, bi) in ax.iter().zip(b.iter()) {
+            assert!((ai - bi).abs() < 1e-8,
+                "Sparse CG residual too large: {} vs {}", ai, bi);
+        }
+        eprintln!("Sparse CG: {}×{}, nnz={}, converged in {} iters", n, n, a.nnz(), iters);
+    }
+
+    #[test]
+    fn test_sparse_to_dense() {
+        let triplets = vec![(0, 0, 1.0), (0, 2, 3.0), (1, 1, 5.0)];
+        let a = SparseMatrix::from_triplets(2, 3, &triplets);
+        let dense = a.to_dense();
+        assert_eq!(dense[0][0], 1.0);
+        assert_eq!(dense[0][1], 0.0);
+        assert_eq!(dense[0][2], 3.0);
+        assert_eq!(dense[1][1], 5.0);
     }
 }

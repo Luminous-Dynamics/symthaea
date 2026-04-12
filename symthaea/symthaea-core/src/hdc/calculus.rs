@@ -1138,46 +1138,46 @@ pub fn exponential_integral(x: f64) -> f64 {
 
 /// Fresnel cosine integral: C(x) = ∫₀ˣ cos(πt²/2) dt.
 ///
-/// Used in optics (Fresnel diffraction). C(∞) = 0.5.
+/// Computed via Simpson's rule. C(∞) = 0.5.
+/// Used in optics (Fresnel diffraction).
 pub fn fresnel_c(x: f64) -> f64 {
     if x.abs() < 1e-15 { return 0.0; }
     let sign = if x < 0.0 { -1.0 } else { 1.0 };
     let x = x.abs();
-
-    // Taylor series: C(x) = Σ (-1)^n (π/2)^(2n) x^(4n+1) / ((4n+1)(2n)!)
     let pi_half = std::f64::consts::PI / 2.0;
-    let mut sum = 0.0;
-    let mut term = x; // n=0 term: x
-    let mut fact = 1.0;
-    for n in 0..30 {
-        sum += term / (4 * n + 1) as f64 / fact;
-        term *= -pi_half * pi_half * x * x * x * x;
-        fact *= (2 * n + 1) as f64 * (2 * n + 2) as f64;
-        if term.abs() / ((4 * n + 5) as f64 * fact) < 1e-15 { break; }
+    let n = (x * 50.0).ceil() as usize;
+    let n = n.max(100) | 1; // ensure odd for Simpson
+    let n = n + 1 - (n % 2); // ensure even number of intervals
+    let h = x / n as f64;
+    let f = |t: f64| (pi_half * t * t).cos();
+    let mut sum = f(0.0) + f(x);
+    for i in 1..n {
+        let t = i as f64 * h;
+        sum += if i % 2 == 0 { 2.0 * f(t) } else { 4.0 * f(t) };
     }
-    sign * sum
+    sign * sum * h / 3.0
 }
 
 /// Fresnel sine integral: S(x) = ∫₀ˣ sin(πt²/2) dt.
 ///
-/// Used in optics (Fresnel diffraction). S(∞) = 0.5.
+/// Computed via Simpson's rule. S(∞) = 0.5.
+/// Used in optics (Fresnel diffraction).
 pub fn fresnel_s(x: f64) -> f64 {
     if x.abs() < 1e-15 { return 0.0; }
     let sign = if x < 0.0 { -1.0 } else { 1.0 };
     let x = x.abs();
-
     let pi_half = std::f64::consts::PI / 2.0;
-    let mut sum = 0.0;
-    let mut term = pi_half * x * x * x / 3.0; // n=0 term
-    let mut fact = 1.0;
-    for n in 0..30 {
-        let denom = (4 * n + 3) as f64 * fact;
-        sum += term / denom;
-        term *= -pi_half * pi_half * x * x * x * x;
-        fact *= (2 * n + 2) as f64 * (2 * n + 3) as f64;
-        if (term / ((4 * n + 7) as f64 * fact)).abs() < 1e-15 { break; }
+    let n = (x * 50.0).ceil() as usize;
+    let n = n.max(100) | 1;
+    let n = n + 1 - (n % 2);
+    let h = x / n as f64;
+    let f = |t: f64| (pi_half * t * t).sin();
+    let mut sum = f(0.0) + f(x);
+    for i in 1..n {
+        let t = i as f64 * h;
+        sum += if i % 2 == 0 { 2.0 * f(t) } else { 4.0 * f(t) };
     }
-    sign * sum
+    sign * sum * h / 3.0
 }
 
 #[cfg(test)]
