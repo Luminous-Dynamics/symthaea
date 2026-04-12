@@ -128,6 +128,34 @@ impl ChemicalReadings {
             self.dissolved_oxygen_mg_l as f32,
         ]
     }
+
+    /// Pack into 8-element f64 array (for noise model processing).
+    pub fn to_array(&self) -> [f64; NUM_CHEMICAL_CHANNELS] {
+        [
+            self.ph,
+            self.turbidity_ntu,
+            self.tds_ppm,
+            self.nitrates_mg_l,
+            self.arsenic_ug_l,
+            self.lead_ug_l,
+            self.chlorine_mg_l,
+            self.dissolved_oxygen_mg_l,
+        ]
+    }
+
+    /// Construct from 8-element f64 array.
+    pub fn from_array(a: &[f64; NUM_CHEMICAL_CHANNELS]) -> Self {
+        Self {
+            ph: a[0],
+            turbidity_ntu: a[1],
+            tds_ppm: a[2],
+            nitrates_mg_l: a[3],
+            arsenic_ug_l: a[4],
+            lead_ug_l: a[5],
+            chlorine_mg_l: a[6],
+            dissolved_oxygen_mg_l: a[7],
+        }
+    }
 }
 
 impl AuvState {
