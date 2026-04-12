@@ -228,11 +228,13 @@ pub fn random_expr(rng: &mut u64, max_depth: usize) -> Expr {
             // π, e, φ enable transcendental formula discovery (Hardy-Ramanujan, etc.)
             let constants = [
                 0.0, 1.0, 2.0, 3.0, 4.0, 0.5,
+                -1.0, -2.0, -0.5,                       // negative constants
                 std::f64::consts::PI,                   // π ≈ 3.14159
                 std::f64::consts::E,                    // e ≈ 2.71828
                 (1.0 + 5.0_f64.sqrt()) / 2.0,          // φ ≈ 1.61803
                 std::f64::consts::FRAC_1_SQRT_2,        // 1/√2 ≈ 0.70711
                 2.0 / 3.0,                              // 2/3
+                1.0 / std::f64::consts::E,              // 1/e ≈ 0.36788
             ];
             *rng = lcg_step(*rng);
             Expr::Const(constants[*rng as usize % constants.len()])
@@ -1210,6 +1212,20 @@ pub fn analyze_growth(data: &[(f64, f64)]) -> GrowthClass {
     let var = values.iter().map(|v| (v - mean).powi(2)).sum::<f64>() / values.len() as f64;
     if var < mean * mean * 0.01 { return GrowthClass::Constant; }
 
+    // Check convergent: second half has much less variance than first half
+    // This catches sequences like fibonacci_ratio → φ
+    let half = values.len() / 2;
+    if half >= 3 {
+        let mean1 = values[..half].iter().sum::<f64>() / half as f64;
+        let var1 = values[..half].iter().map(|v| (v - mean1).powi(2)).sum::<f64>() / half as f64;
+        let mean2 = values[half..].iter().sum::<f64>() / (values.len() - half) as f64;
+        let var2 = values[half..].iter().map(|v| (v - mean2).powi(2)).sum::<f64>()
+            / (values.len() - half) as f64;
+        if var2 < var1 * 0.1 && var2 < mean2 * mean2 * 0.01 {
+            return GrowthClass::Constant; // converging — use constant templates
+        }
+    }
+
     // Check growth rate via log-log regression
     let positive: Vec<(f64, f64)> = data.iter()
         .filter(|(x, y)| *x > 0.0 && *y > 0.0)
@@ -1373,6 +1389,14 @@ fn build_template_library(growth: &GrowthClass) -> Vec<Expr> {
                 Box::new(Expr::BinOp(BinOp::Mul, n(),
                     Box::new(Expr::BinOp(BinOp::Add, n(), c(1.0))))),
                 c(2.0)));
+            // a / n^b (inverse power — hydrogen, Coulomb, gravity)
+            templates.push(Expr::BinOp(BinOp::Div,
+                c(-1.0),
+                Box::new(Expr::BinOp(BinOp::Pow, n(), c(2.0)))));
+            // a / n^b (general inverse power)
+            templates.push(Expr::BinOp(BinOp::Div,
+                c(1.0),
+                Box::new(Expr::BinOp(BinOp::Pow, n(), c(1.5)))));
         }
         GrowthClass::Exponential => {
             // a * exp(b * sqrt(n)) / (c * n) — Hardy-Ramanujan
@@ -1818,8 +1842,8 @@ impl ConjectureEngine {
     /// Get the best verified conjecture for a given source.
     pub fn best_for(&self, source: &str) -> Option<&Conjecture> {
         self.conjectures.iter()
-            .filter(|c| c.source == source && c.confidence > 0.3)
-            .min_by(|a, b| a.fitness.partial_cmp(&b.fitness).unwrap_or(std::cmp::Ordering::Equal))
+            .filter(|c| c.source == source)
+            .min_by(|a, b| a.training_mse.partial_cmp(&b.training_mse).unwrap_or(std::cmp::Ordering::Equal))
     }
 
     /// Generate a human-readable report of all conjectures.
