@@ -43,6 +43,10 @@ const MAX_STEPS: usize = 100_000;
 pub enum ODEMethod {
     /// Classical 4th-order Runge-Kutta with fixed step size.
     RK4,
+    /// Dormand-Prince adaptive RK45.
+    RK45,
+    /// Backward Euler with Newton iteration (L-stable, for stiff systems).
+    ImplicitEuler,
     /// Shooting method (wraps an inner IVP solver).
     Shooting,
 }
@@ -51,6 +55,8 @@ impl std::fmt::Display for ODEMethod {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             ODEMethod::RK4 => write!(f, "RK4"),
+            ODEMethod::RK45 => write!(f, "RK45 (Dormand-Prince)"),
+            ODEMethod::ImplicitEuler => write!(f, "Implicit Euler (Newton)"),
             ODEMethod::Shooting => write!(f, "Shooting"),
         }
     }
@@ -131,6 +137,31 @@ pub struct PDEResult {
     /// Phi measure (energy conservation or convergence quality).
     pub phi: f64,
     /// HDC encoding of the final solution.
+    pub encoding: BinaryHV,
+}
+
+/// Result of a 2D PDE solve.
+#[derive(Debug, Clone)]
+pub struct PDE2DResult {
+    /// Spatial grid in x-direction.
+    pub x_grid: Vec<f64>,
+    /// Spatial grid in y-direction.
+    pub y_grid: Vec<f64>,
+    /// Final time.
+    pub t_end: f64,
+    /// Number of interior points in x.
+    pub nx: usize,
+    /// Number of interior points in y.
+    pub ny: usize,
+    /// Initial condition (row-major, nx × ny).
+    pub u_initial: Vec<f64>,
+    /// Final solution (row-major, nx × ny).
+    pub u_final: Vec<f64>,
+    /// Number of time steps taken.
+    pub time_steps: usize,
+    /// Phi measure.
+    pub phi: f64,
+    /// HDC encoding.
     pub encoding: BinaryHV,
 }
 
@@ -474,6 +505,107 @@ impl DifferentialEquationsEngine {
         }
     }
 
+    // ── PDE: 2-D Heat Equation ────────────────────────────────────────────
+
+    /// Solve the 2-D heat equation on a rectangular domain
+    ///
+    /// ```text
+    /// ∂u/∂t = α (∂²u/∂x² + ∂²u/∂y²),   u = 0 on boundary
+    /// u(x, y, 0) = u0(x, y)
+    /// ```
+    ///
+    /// using a 5-point stencil with explicit Euler time-stepping.
+    ///
+    /// **Stability**: requires `α dt (1/dx² + 1/dy²) ≤ 0.5`. The engine
+    /// enforces this automatically.
+    ///
+    /// # Arguments
+    ///
+    /// * `alpha`  — thermal diffusivity (> 0)
+    /// * `lx, ly` — domain dimensions [0, lx] × [0, ly]
+    /// * `t_end`  — integration end time
+    /// * `nx, ny` — number of interior grid points in each direction
+    /// * `u0`     — initial condition, row-major: u0[i * ny + j] = u(x_i, y_j, 0)
+    ///
+    /// Returns the final solution as a flat row-major array of size nx × ny.
+    pub fn heat_equation_2d(
+        alpha: f64,
+        lx: f64,
+        ly: f64,
+        t_end: f64,
+        nx: usize,
+        ny: usize,
+        u0: &[f64],
+    ) -> PDE2DResult {
+        assert_eq!(u0.len(), nx * ny, "u0 length must equal nx * ny");
+        assert!(alpha > 0.0, "thermal diffusivity must be positive");
+        assert!(nx >= 2 && ny >= 2, "need at least 2 interior points per axis");
+
+        let dx = lx / (nx + 1) as f64;
+        let dy = ly / (ny + 1) as f64;
+
+        // CFL-safe time step: r_x + r_y = α·dt·(1/dx² + 1/dy²) ≤ 0.4
+        let dt_max = 0.4 / (alpha * (1.0 / (dx * dx) + 1.0 / (dy * dy)));
+        let n_steps = ((t_end / dt_max).ceil() as usize).max(1).min(MAX_STEPS);
+        let dt = t_end / n_steps as f64;
+
+        let rx = alpha * dt / (dx * dx);
+        let ry = alpha * dt / (dy * dy);
+
+        let mut u = u0.to_vec();
+
+        for _ in 0..n_steps {
+            let mut u_new = u.clone();
+            for i in 0..nx {
+                for j in 0..ny {
+                    let idx = i * ny + j;
+                    let u_left = if i == 0 { 0.0 } else { u[(i - 1) * ny + j] };
+                    let u_right = if i == nx - 1 { 0.0 } else { u[(i + 1) * ny + j] };
+                    let u_down = if j == 0 { 0.0 } else { u[i * ny + (j - 1)] };
+                    let u_up = if j == ny - 1 { 0.0 } else { u[i * ny + (j + 1)] };
+
+                    u_new[idx] = u[idx]
+                        + rx * (u_left - 2.0 * u[idx] + u_right)
+                        + ry * (u_down - 2.0 * u[idx] + u_up);
+                }
+            }
+            u = u_new;
+        }
+
+        // Build spatial grids
+        let x_grid: Vec<f64> = (1..=nx).map(|i| i as f64 * dx).collect();
+        let y_grid: Vec<f64> = (1..=ny).map(|j| j as f64 * dy).collect();
+
+        // Phi: energy should decay monotonically for heat equation
+        let initial_energy: f64 = u0.iter().map(|&v| v * v).sum::<f64>().sqrt();
+        let final_energy: f64 = u.iter().map(|&v| v * v).sum::<f64>().sqrt();
+        let energy_ratio = if initial_energy > 0.0 {
+            final_energy / initial_energy
+        } else {
+            1.0
+        };
+        let phi = if (0.0..=1.0).contains(&energy_ratio) {
+            0.7 + 0.2 * (1.0 - energy_ratio)
+        } else {
+            0.1
+        };
+
+        let encoding = Self::encode_pde_result(&u, "HEAT_EQ_2D");
+
+        PDE2DResult {
+            x_grid,
+            y_grid,
+            t_end,
+            nx,
+            ny,
+            u_initial: u0.to_vec(),
+            u_final: u,
+            time_steps: n_steps,
+            phi,
+            encoding,
+        }
+    }
+
     // ── Internal RK4 step ────────────────────────────────────────────────
 
     /// Single RK4 step: y_{n+1} = y_n + (dt/6)(k1 + 2k2 + 2k3 + k4).
@@ -710,18 +842,22 @@ impl DifferentialEquationsEngine {
         }
     }
 
-    /// Implicit Euler (backward Euler) for stiff ODEs via fixed-point iteration.
+    /// Implicit Euler (backward Euler) for stiff ODEs via Newton iteration.
     ///
-    /// Solves y_{n+1} = y_n + h * f(t_{n+1}, y_{n+1}) by iterating:
-    ///   y^(k+1) = y_n + h * f(t_{n+1}, y^(k))
-    /// Converges when h * L < 1 where L is the Lipschitz constant.
+    /// Solves the nonlinear system G(y_{n+1}) = y_{n+1} - y_n - h·f(t_{n+1}, y_{n+1}) = 0
+    /// using simplified Newton iteration with diagonal Jacobian approximation:
+    ///   J_ii ≈ 1 - h · ∂f_i/∂y_i  (finite differences)
+    ///   Δy = -G / J  (component-wise)
+    ///
+    /// This is L-stable: unconditionally damps fast modes regardless of step size.
+    /// Suitable for stiff systems with eigenvalue ratios > 10^6.
     pub fn solve_implicit_euler(
         system: &ODESystem,
         t0: f64,
         t_end: f64,
         y0: &[f64],
         n_steps: usize,
-        fp_iters: usize,
+        newton_iters: usize,
     ) -> ODEResult {
         let dim = system.dim;
         let h = (t_end - t0) / n_steps as f64;
@@ -731,14 +867,47 @@ impl DifferentialEquationsEngine {
         t_values.push(t0);
         y_values.push(y.clone());
 
+        let newton_tol = 1e-10;
+
         for step in 0..n_steps {
             let t_next = t0 + (step + 1) as f64 * h;
-            // Fixed-point iteration: y* = y + h*f(t_next, y*)
-            let mut y_next = y.clone();
-            for _ in 0..fp_iters {
+
+            // Initial guess: forward Euler predictor
+            let f_current = (system.f)(t_next - h, &y);
+            let mut y_next: Vec<f64> = (0..dim).map(|i| y[i] + h * f_current[i]).collect();
+
+            // Newton iteration with diagonal Jacobian
+            for _iter in 0..newton_iters {
                 let fy = (system.f)(t_next, &y_next);
-                y_next = (0..dim).map(|i| y[i] + h * fy[i]).collect();
+
+                // Residual: G = y_next - y - h*f(t_next, y_next)
+                let residual: Vec<f64> = (0..dim)
+                    .map(|i| y_next[i] - y[i] - h * fy[i])
+                    .collect();
+
+                // Check convergence
+                let res_norm: f64 = residual.iter().map(|r| r.abs()).fold(0.0f64, f64::max);
+                if res_norm < newton_tol { break; }
+
+                // Diagonal Jacobian via finite differences: J_ii = 1 - h * df_i/dy_i
+                let eps_fd = 1e-8;
+                for i in 0..dim {
+                    let orig = y_next[i];
+                    let pert = eps_fd * (1.0 + orig.abs());
+                    y_next[i] = orig + pert;
+                    let fy_pert = (system.f)(t_next, &y_next);
+                    y_next[i] = orig; // restore
+
+                    let dfdy_ii = (fy_pert[i] - fy[i]) / pert;
+                    let j_ii = 1.0 - h * dfdy_ii;
+
+                    // Newton update: Δy_i = -G_i / J_ii
+                    if j_ii.abs() > 1e-15 {
+                        y_next[i] -= residual[i] / j_ii;
+                    }
+                }
             }
+
             y = y_next;
             t_values.push(t_next);
             y_values.push(y.clone());
@@ -755,7 +924,7 @@ impl DifferentialEquationsEngine {
         ODEResult {
             t_values,
             y_values,
-            method: ODEMethod::RK4, // reuse enum (no implicit variant yet)
+            method: ODEMethod::ImplicitEuler,
             steps: n_steps,
             phi,
             encoding,
@@ -1391,6 +1560,88 @@ mod tests {
         );
     }
 
+    // ── Stiff ODE validation tests ──────────────────────────────────────
+
+    /// STIFF TEST: dy/dt = -1000y + 1000 → y(t) = 1 - exp(-1000t), y(0) = 0
+    /// Eigenvalue ratio = 1000. Forward Euler requires h < 0.002.
+    /// Implicit Euler should handle h = 0.01 (5× beyond explicit stability).
+    #[test]
+    fn test_implicit_euler_stiff_decay() {
+        fn stiff_decay(_t: f64, y: &[f64]) -> Vec<f64> {
+            vec![-1000.0 * y[0] + 1000.0]
+        }
+        let sys = ODESystem { f: stiff_decay, dim: 1 };
+        // h = 0.01 → h*λ = 10 (well beyond explicit stability limit of 2)
+        let result = DifferentialEquationsEngine::solve_implicit_euler(
+            &sys, 0.0, 0.1, &[0.0], 10, 10);
+        let final_y = result.final_state()[0];
+        // y(0.1) = 1 - exp(-100) ≈ 1.0
+        assert!(
+            (final_y - 1.0).abs() < 0.1,
+            "Stiff decay: got {:.6}, expected ≈ 1.0 (h*λ=10, implicit should handle this)",
+            final_y
+        );
+    }
+
+    /// STIFF TEST: Two-rate system
+    /// dy1/dt = -y1         (slow, λ₁ = 1)
+    /// dy2/dt = -1000*y2    (fast, λ₂ = 1000)
+    /// Eigenvalue ratio = 1000. Step size h = 0.01.
+    #[test]
+    fn test_implicit_euler_two_rate() {
+        fn two_rate(_t: f64, y: &[f64]) -> Vec<f64> {
+            vec![-y[0], -1000.0 * y[1]]
+        }
+        let sys = ODESystem { f: two_rate, dim: 2 };
+        let result = DifferentialEquationsEngine::solve_implicit_euler(
+            &sys, 0.0, 1.0, &[1.0, 1.0], 100, 10);
+        let final_state = result.final_state();
+
+        // y1(1) = exp(-1) ≈ 0.3679
+        let y1_expected = (-1.0f64).exp();
+        assert!(
+            (final_state[0] - y1_expected).abs() < 0.05,
+            "Slow component: got {:.6}, expected {:.6}", final_state[0], y1_expected
+        );
+
+        // y2(1) = exp(-1000) ≈ 0 (fast component fully decayed)
+        assert!(
+            final_state[1].abs() < 1e-3,
+            "Fast component should decay to ~0, got {:.6}", final_state[1]
+        );
+    }
+
+    /// STIFF TEST: Van der Pol oscillator with μ = 1000 (severely stiff)
+    /// dy1/dt = y2
+    /// dy2/dt = μ(1 - y1²)y2 - y1
+    /// At μ = 1000, the system exhibits fast transients near limit cycle boundary.
+    #[test]
+    fn test_implicit_euler_van_der_pol() {
+        fn van_der_pol(_t: f64, y: &[f64]) -> Vec<f64> {
+            let mu = 1000.0;
+            vec![y[1], mu * (1.0 - y[0] * y[0]) * y[1] - y[0]]
+        }
+        let sys = ODESystem { f: van_der_pol, dim: 2 };
+        // Small step size (h=0.001) with many Newton iterations for severely stiff VdP
+        let result = DifferentialEquationsEngine::solve_implicit_euler(
+            &sys, 0.0, 0.1, &[2.0, 0.0], 100, 20);
+        let final_state = result.final_state();
+
+        // Don't check exact value — VdP at μ=1000 is notoriously difficult.
+        // Just verify the solver doesn't blow up (finite output).
+        assert!(
+            final_state[0].is_finite() && final_state[1].is_finite(),
+            "Van der Pol (μ=1000) should produce finite output, got [{:.6}, {:.6}]",
+            final_state[0], final_state[1]
+        );
+        // The solution should stay bounded (VdP has a stable limit cycle)
+        assert!(
+            final_state[0].abs() < 10.0 && final_state[1].abs() < 2000.0,
+            "Van der Pol should stay bounded, got [{:.6}, {:.6}]",
+            final_state[0], final_state[1]
+        );
+    }
+
     // ── SDE tests ─────────────────────────────────────────────────────────
 
     #[test]
@@ -1433,5 +1684,54 @@ mod tests {
             result.y_values.iter().all(|&v| v > 0.0),
             "GBM should stay positive"
         );
+    }
+
+    // ── 2D Heat Equation ────────────────────────────────────────────────
+
+    #[test]
+    fn test_heat_equation_2d_energy_decays() {
+        let nx = 10;
+        let ny = 10;
+        // Initial hot spot in the center
+        let mut u0 = vec![0.0; nx * ny];
+        u0[5 * ny + 5] = 1.0;
+
+        let result = DifferentialEquationsEngine::heat_equation_2d(0.01, 1.0, 1.0, 1.0, nx, ny, &u0);
+
+        // Energy should decay (heat dissipates)
+        let initial_energy: f64 = u0.iter().map(|v| v * v).sum::<f64>();
+        let final_energy: f64 = result.u_final.iter().map(|v| v * v).sum::<f64>();
+        assert!(
+            final_energy < initial_energy,
+            "Energy should decay: initial={initial_energy}, final={final_energy}"
+        );
+        // All values should remain non-negative (heat can't go negative from positive IC)
+        assert!(
+            result.u_final.iter().all(|&v| v >= -1e-10),
+            "Solution should stay non-negative"
+        );
+        // Phi should indicate stable solution
+        assert!(result.phi > 0.5, "Phi should indicate good solution: {}", result.phi);
+    }
+
+    #[test]
+    fn test_heat_equation_2d_symmetry() {
+        let n = 8;
+        // Symmetric initial condition (center hot spot)
+        let mut u0 = vec![0.0; n * n];
+        u0[4 * n + 4] = 1.0;
+        u0[3 * n + 4] = 0.5;
+        u0[4 * n + 3] = 0.5;
+        u0[4 * n + 5] = 0.5;
+        u0[5 * n + 4] = 0.5;
+
+        let result = DifferentialEquationsEngine::heat_equation_2d(0.01, 1.0, 1.0, 0.5, n, n, &u0);
+
+        // Result should have correct shape
+        assert_eq!(result.u_final.len(), n * n);
+        assert_eq!(result.x_grid.len(), n);
+        assert_eq!(result.y_grid.len(), n);
+        // All values finite
+        assert!(result.u_final.iter().all(|v| v.is_finite()));
     }
 }

@@ -1189,6 +1189,165 @@ pub fn bic(log_likelihood: f64, n_params: usize, n: usize) -> f64 {
     -2.0 * log_likelihood + n_params as f64 * (n as f64).ln()
 }
 
+// ─── Multivariate Statistics ────────────────────────────────────────────────
+
+/// Compute the sample covariance matrix from column-oriented data.
+///
+/// `columns` is a slice of variables, each of which is a slice of observations.
+/// All columns must have the same length (panics otherwise).
+/// Returns an n×n covariance matrix (Vec<Vec<f64>>) with Bessel correction.
+pub fn covariance_matrix(columns: &[&[f64]]) -> Vec<Vec<f64>> {
+    let p = columns.len();
+    if p == 0 {
+        return vec![];
+    }
+    let n = columns[0].len();
+    assert!(n >= 2, "Need at least 2 observations for covariance");
+    for col in columns {
+        assert_eq!(col.len(), n, "All columns must have the same length");
+    }
+
+    let means: Vec<f64> = columns.iter().map(|c| mean(c)).collect();
+    let mut cov = vec![vec![0.0; p]; p];
+
+    for i in 0..p {
+        for j in i..p {
+            let mut sum = 0.0;
+            for k in 0..n {
+                sum += (columns[i][k] - means[i]) * (columns[j][k] - means[j]);
+            }
+            let c = sum / (n - 1) as f64; // Bessel correction
+            cov[i][j] = c;
+            cov[j][i] = c; // Symmetric
+        }
+    }
+    cov
+}
+
+/// Compute the Pearson correlation matrix from column-oriented data.
+///
+/// Returns an n×n matrix where entry (i,j) is the Pearson correlation
+/// between columns i and j. Diagonal entries are 1.0.
+pub fn correlation_matrix(columns: &[&[f64]]) -> Vec<Vec<f64>> {
+    let cov = covariance_matrix(columns);
+    let p = cov.len();
+    let mut corr = vec![vec![0.0; p]; p];
+
+    let stds: Vec<f64> = (0..p).map(|i| cov[i][i].sqrt()).collect();
+
+    for i in 0..p {
+        for j in 0..p {
+            if stds[i] > 1e-15 && stds[j] > 1e-15 {
+                corr[i][j] = cov[i][j] / (stds[i] * stds[j]);
+            } else if i == j {
+                corr[i][j] = 1.0;
+            }
+        }
+    }
+    corr
+}
+
+/// Result of Principal Component Analysis.
+#[derive(Debug, Clone)]
+pub struct PcaResult {
+    /// Eigenvalues (variance explained by each component), sorted descending.
+    pub eigenvalues: Vec<f64>,
+    /// Proportion of variance explained by each component.
+    pub variance_explained: Vec<f64>,
+    /// Cumulative proportion of variance explained.
+    pub cumulative_variance: Vec<f64>,
+    /// Number of components needed to explain ≥ threshold variance (default 0.95).
+    pub components_for_95pct: usize,
+    /// Principal component loadings (eigenvectors as rows), shape k × p.
+    pub loadings: Vec<Vec<f64>>,
+    /// Projected data (scores), shape n × k.
+    pub scores: Vec<Vec<f64>>,
+}
+
+/// Perform Principal Component Analysis on column-oriented data.
+///
+/// `columns`: slice of p variables, each with n observations.
+/// `k`: number of principal components to retain (clamped to min(n, p)).
+///
+/// Uses the covariance matrix + SVD approach via `HdcMatrix::svd()`.
+pub fn pca(columns: &[&[f64]], k: usize) -> PcaResult {
+    use crate::hdc::linear_algebra::HdcMatrix;
+
+    let p = columns.len();
+    assert!(p > 0, "PCA needs at least 1 variable");
+    let n = columns[0].len();
+    assert!(n >= 2, "PCA needs at least 2 observations");
+    let k = k.min(p).min(n);
+
+    // Center the data
+    let means: Vec<f64> = columns.iter().map(|c| mean(c)).collect();
+    let centered: Vec<Vec<f64>> = columns
+        .iter()
+        .zip(means.iter())
+        .map(|(col, &m)| col.iter().map(|&x| x - m).collect())
+        .collect();
+
+    // Build covariance matrix and compute its eigendecomposition via SVD
+    let cov = covariance_matrix(columns);
+    let cov_flat: Vec<f64> = cov.iter().flat_map(|row| row.iter().copied()).collect();
+    let cov_matrix = HdcMatrix::new(cov_flat, p, p);
+
+    let (singular_values, _u, v, _result) = cov_matrix.svd();
+
+    // Eigenvalues of cov = singular values (cov is symmetric PSD)
+    let total_var: f64 = singular_values.iter().sum();
+    let variance_explained: Vec<f64> = singular_values
+        .iter()
+        .map(|&s| if total_var > 1e-15 { s / total_var } else { 0.0 })
+        .collect();
+
+    let mut cumulative = Vec::with_capacity(singular_values.len());
+    let mut cum = 0.0;
+    for &ve in &variance_explained {
+        cum += ve;
+        cumulative.push(cum);
+    }
+
+    let components_for_95pct = cumulative
+        .iter()
+        .position(|&c| c >= 0.95)
+        .map(|i| i + 1)
+        .unwrap_or(p);
+
+    // Extract top-k loadings from V (eigenvectors as columns)
+    let mut loadings = Vec::with_capacity(k);
+    for j in 0..k {
+        let mut loading = Vec::with_capacity(p);
+        for i in 0..p {
+            loading.push(v.get(i, j));
+        }
+        loadings.push(loading);
+    }
+
+    // Project data onto principal components: scores = centered_data × loadings^T
+    let mut scores = Vec::with_capacity(n);
+    for obs in 0..n {
+        let mut score_row = Vec::with_capacity(k);
+        for pc in 0..k {
+            let mut s = 0.0;
+            for var in 0..p {
+                s += centered[var][obs] * loadings[pc][var];
+            }
+            score_row.push(s);
+        }
+        scores.push(score_row);
+    }
+
+    PcaResult {
+        eigenvalues: singular_values[..k].to_vec(),
+        variance_explained: variance_explained[..k].to_vec(),
+        cumulative_variance: cumulative[..k].to_vec(),
+        components_for_95pct,
+        loadings,
+        scores,
+    }
+}
+
 // ─── Tests ───────────────────────────────────────────────────────────────────
 
 #[cfg(test)]
@@ -1718,5 +1877,98 @@ mod tests {
         assert!(bic(ll_good, 2, n) < bic(ll_bad, 2, n));
         // More params → higher BIC (penalty)
         assert!(bic(ll_good, 5, n) > bic(ll_good, 2, n));
+    }
+
+    // ── Multivariate Statistics ─────────────────────────────────────────
+
+    #[test]
+    fn test_covariance_matrix_identity() {
+        // Independent variables with unit variance
+        let x = [1.0, 2.0, 3.0, 4.0, 5.0];
+        let y = [5.0, 4.0, 3.0, 2.0, 1.0];
+        let cov = covariance_matrix(&[&x, &y]);
+
+        assert_eq!(cov.len(), 2);
+        assert_eq!(cov[0].len(), 2);
+        // Diagonal = sample variance
+        assert!((cov[0][0] - sample_variance(&x)).abs() < TOL);
+        assert!((cov[1][1] - sample_variance(&y)).abs() < TOL);
+        // Symmetric
+        assert!((cov[0][1] - cov[1][0]).abs() < TOL);
+        // x and y are perfectly anti-correlated
+        assert!(cov[0][1] < 0.0);
+    }
+
+    #[test]
+    fn test_covariance_matrix_identical_columns() {
+        let x = [1.0, 3.0, 5.0, 7.0];
+        let cov = covariance_matrix(&[&x, &x]);
+        // Cov(X, X) = Var(X)
+        assert!((cov[0][0] - cov[0][1]).abs() < TOL);
+        assert!((cov[0][0] - cov[1][1]).abs() < TOL);
+    }
+
+    #[test]
+    fn test_correlation_matrix_properties() {
+        let x = [1.0, 2.0, 3.0, 4.0, 5.0];
+        let y = [2.0, 4.0, 6.0, 8.0, 10.0]; // Perfectly correlated (y = 2x)
+        let z = [5.0, 4.0, 3.0, 2.0, 1.0]; // Perfectly anti-correlated
+
+        let corr = correlation_matrix(&[&x, &y, &z]);
+        // Diagonal = 1.0
+        assert!((corr[0][0] - 1.0).abs() < TOL);
+        assert!((corr[1][1] - 1.0).abs() < TOL);
+        // x-y perfect positive correlation
+        assert!((corr[0][1] - 1.0).abs() < TOL);
+        // x-z perfect negative correlation
+        assert!((corr[0][2] - (-1.0)).abs() < TOL);
+        // Symmetric
+        assert!((corr[0][1] - corr[1][0]).abs() < TOL);
+    }
+
+    #[test]
+    fn test_pca_basic() {
+        // 2D data with most variance along x-axis
+        let x = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0];
+        let y = [1.1, 2.0, 3.1, 4.0, 4.9, 6.1, 7.0, 7.9, 9.1, 10.0];
+
+        let result = pca(&[&x, &y], 2);
+        // First PC should explain most variance
+        assert!(
+            result.variance_explained[0] > 0.95,
+            "First PC should explain >95% variance, got {:.4}",
+            result.variance_explained[0]
+        );
+        // Eigenvalues should be non-negative and sorted descending
+        assert!(result.eigenvalues[0] >= result.eigenvalues[1]);
+        assert!(result.eigenvalues[1] >= 0.0);
+        // Scores should have correct shape: 10 observations × 2 components
+        assert_eq!(result.scores.len(), 10);
+        assert_eq!(result.scores[0].len(), 2);
+        // Cumulative variance of all components should be ~1.0
+        assert!((result.cumulative_variance[1] - 1.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_pca_loadings_orthogonal() {
+        let x = [1.0, 2.0, 3.0, 4.0, 5.0];
+        let y = [5.0, 3.0, 1.0, 2.0, 4.0];
+        let z = [2.0, 4.0, 1.0, 3.0, 5.0];
+
+        let result = pca(&[&x, &y, &z], 3);
+        // Loadings should be approximately orthogonal
+        for i in 0..result.loadings.len() {
+            for j in (i + 1)..result.loadings.len() {
+                let dot: f64 = result.loadings[i]
+                    .iter()
+                    .zip(result.loadings[j].iter())
+                    .map(|(a, b)| a * b)
+                    .sum();
+                assert!(
+                    dot.abs() < 0.1,
+                    "Loadings {i} and {j} should be orthogonal, dot={dot:.4}"
+                );
+            }
+        }
     }
 }
