@@ -455,6 +455,29 @@ impl SymbolicRegressor {
             self.population = next_gen;
         }
 
+        // ── Constant Optimization ──────────────────────────────────────
+        // After GP finds good tree structures, optimize the constants in
+        // the top candidates by coordinate descent. This is the single
+        // biggest quality improvement to any GP regressor (Eureqa does this).
+        let mut scored_pre: Vec<(f64, usize)> = self.population.iter().enumerate()
+            .map(|(i, expr)| {
+                let mse = compute_mse(expr, &train);
+                let c = expr.complexity();
+                let fit = if mse.is_finite() && c <= self.config.max_complexity {
+                    mse + self.config.lambda * c as f64
+                } else { f64::MAX };
+                (fit, i)
+            })
+            .collect();
+        scored_pre.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
+
+        // Optimize constants in top 10% of population
+        let optimize_count = (self.config.population_size / 10).max(3);
+        for &(_, idx) in scored_pre.iter().take(optimize_count) {
+            let optimized = optimize_constants(&self.population[idx], &train, 20);
+            self.population[idx] = optimized;
+        }
+
         // Final scoring and return top-k
         let mut results: Vec<(f64, f64, usize)> = self.population.iter().enumerate()
             .map(|(i, expr)| {
@@ -524,6 +547,96 @@ fn crossover(a: &Expr, b: &Expr, rng: &mut u64) -> Expr {
             *rng = lcg_step(*rng);
             if *rng % 2 == 0 { a.clone() } else { b.clone() }
         }
+    }
+}
+
+/// Optimize constants in an expression tree by coordinate descent.
+///
+/// For each `Const(c)` node, try small perturbations and keep the value
+/// that minimizes MSE. This is a simple but effective post-GP refinement
+/// that turns approximate formulas into exact ones.
+fn optimize_constants(expr: &Expr, data: &[(f64, f64)], iterations: usize) -> Expr {
+    let mut best = expr.clone();
+    let mut best_mse = compute_mse(&best, data);
+
+    // Don't perturb expressions that already have near-zero MSE
+    if best_mse < 1e-10 { return best; }
+
+    for _ in 0..iterations {
+        let constants = collect_constants(&best);
+        if constants.is_empty() { break; }
+
+        let mut improved = false;
+        for (path_idx, old_val) in constants.iter().enumerate() {
+            // Try perturbations: ±1%, ±10%, ±1, round to integer
+            let candidates = [
+                old_val * 1.01, old_val * 0.99,
+                old_val * 1.1, old_val * 0.9,
+                old_val + 1.0, old_val - 1.0,
+                old_val.round(),
+                old_val * 2.0, old_val * 0.5,
+            ];
+            for &new_val in &candidates {
+                let trial = replace_nth_constant(&best, path_idx, new_val);
+                let trial_mse = compute_mse(&trial, data);
+                if trial_mse.is_finite() && trial_mse < best_mse {
+                    best_mse = trial_mse;
+                    best = trial;
+                    improved = true;
+                }
+            }
+        }
+        if !improved { break; }
+    }
+    best
+}
+
+/// Collect all constant values from an expression tree (in-order traversal).
+fn collect_constants(expr: &Expr) -> Vec<f64> {
+    match expr {
+        Expr::Const(c) => vec![*c],
+        Expr::Var(_) => vec![],
+        Expr::BinOp(_, l, r) => {
+            let mut v = collect_constants(l);
+            v.extend(collect_constants(r));
+            v
+        }
+        Expr::Func(_, arg) => collect_constants(arg),
+        Expr::Sum(body, _) => collect_constants(body),
+    }
+}
+
+/// Replace the nth constant in the expression tree with a new value.
+fn replace_nth_constant(expr: &Expr, n: usize, val: f64) -> Expr {
+    let mut counter = 0usize;
+    replace_nth_const_inner(expr, n, val, &mut counter)
+}
+
+fn replace_nth_const_inner(expr: &Expr, target: usize, val: f64, counter: &mut usize) -> Expr {
+    match expr {
+        Expr::Const(c) => {
+            if *counter == target {
+                *counter += 1;
+                Expr::Const(val)
+            } else {
+                *counter += 1;
+                Expr::Const(*c)
+            }
+        }
+        Expr::Var(v) => Expr::Var(v.clone()),
+        Expr::BinOp(op, l, r) => Expr::BinOp(
+            *op,
+            Box::new(replace_nth_const_inner(l, target, val, counter)),
+            Box::new(replace_nth_const_inner(r, target, val, counter)),
+        ),
+        Expr::Func(f, arg) => Expr::Func(
+            *f,
+            Box::new(replace_nth_const_inner(arg, target, val, counter)),
+        ),
+        Expr::Sum(body, var) => Expr::Sum(
+            Box::new(replace_nth_const_inner(body, target, val, counter)),
+            var.clone(),
+        ),
     }
 }
 
