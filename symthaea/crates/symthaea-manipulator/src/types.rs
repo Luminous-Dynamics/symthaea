@@ -109,6 +109,13 @@ pub struct ManipulatorConfig {
     pub neurons_per_layer: usize,
     pub physics_hz: f64,
     pub cognitive_interval: usize,
+    pub steps_per_episode: usize,
+}
+
+impl ManipulatorConfig {
+    pub fn physics_dt(&self) -> f64 {
+        1.0 / self.physics_hz
+    }
 }
 
 impl Default for ManipulatorConfig {
@@ -120,6 +127,7 @@ impl Default for ManipulatorConfig {
             neurons_per_layer: 8,
             physics_hz: 500.0,
             cognitive_interval: 25, // 20Hz cognitive
+            steps_per_episode: 2000,
         }
     }
 }

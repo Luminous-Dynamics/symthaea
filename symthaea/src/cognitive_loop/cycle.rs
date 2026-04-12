@@ -286,7 +286,9 @@ impl CognitiveLoopService {
             if cycle_num % interval == 0 {
                 if let Some(mut bridge) = self.sensorimotor.embodiment_bridge.take() {
                     let phi = self.carryover.history.consciousness_level;
-                    let dt = self.config.cfc_config.delta_t;
+                    // Scale motor dt by substrate speed factor (Putnam 1967: substrate independence).
+                    // Photonic substrates step physics faster; biological substrates slower.
+                    let dt = self.config.cfc_config.delta_t * self.substrate_manager.tau_factor;
                     let thought_hv = perception.encoding.encoding_result.hdv.clone();
                     let result = bridge.step(&thought_hv, dt, phi);
                     if result.success {
