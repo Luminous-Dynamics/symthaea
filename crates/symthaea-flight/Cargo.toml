@@ -12,7 +12,7 @@ keywords = ["flight-control", "active-inference", "hdc", "quadrotor", "mujoco"]
 categories = ["science", "algorithms", "simulation"]
 
 [dependencies]
-positioning = { path = "../../../mycelix-position/lib/positioning" }
+# [standalone-stripped] positioning = { path = "../../../mycelix-position/lib/positioning" }
 symthaea-core = { path = "../../symthaea-core" }
 symthaea-fep = { path = "../symthaea-fep" }
 symthaea-hal = { path = "../symthaea-hal", default-features = false }

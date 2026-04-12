@@ -23,9 +23,9 @@ blake3 = { workspace = true }
 ed25519-dalek = { version = "2", optional = true, default-features = false, features = ["rand_core"] }
 hex = { version = "0.4", optional = true }
 symthaea-broca = { path = "../symthaea-broca", optional = true }
-positioning = { path = "../../../mycelix-position/lib/positioning", optional = true }
-prism-common = { path = "../../../prism/prism-common", optional = true }
-prism-search = { path = "../../../prism/prism-search", optional = true }
+# [standalone-stripped] positioning = { path = "../../../mycelix-position/lib/positioning", optional = true }
+# [standalone-stripped] prism-common = { path = "../../../prism/prism-common", optional = true }
+# [standalone-stripped] prism-search = { path = "../../../prism/prism-search", optional = true }
 tracing = { workspace = true }
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 

@@ -2041,33 +2041,41 @@ pub fn invariant_variance(data: &[(f64, f64)]) -> (f64, f64) {
 // MOTZKIN/CATALAN RATIO OBSERVER
 // ═══════════════════════════════════════════════════════════════════════════
 
-/// Observe Motzkin(n) / Catalan(n) ratio, which converges to 3√3/(2π) ≈ 0.8270.
+/// Compute Motzkin numbers up to max_n using the recurrence:
+/// (n+3)*M(n+1) = (2n+3)*M(n) + 3n*M(n-1), with M(0)=1, M(1)=1.
+fn compute_motzkin(max_n: usize) -> Vec<f64> {
+    let len = max_n.max(2) + 1;
+    let mut m = vec![0.0f64; len];
+    m[0] = 1.0;
+    m[1] = 1.0;
+    for n in 1..max_n {
+        m[n + 1] = ((2 * n + 3) as f64 * m[n] + 3.0 * n as f64 * m[n - 1])
+            / (n + 3) as f64;
+    }
+    m
+}
+
+/// Observe the rescaled Motzkin/Catalan ratio: M(n)/C(n) · (4/3)^n.
 ///
-/// Motzkin numbers count lattice paths with steps (1,0), (1,1), (1,-1) that stay ≥ 0.
-/// The asymptotic ratio with Catalan numbers has the beautiful closed form 3√3/(2π).
+/// Raw M(n)/C(n) → 0 because M(n) ~ 3^n and C(n) ~ 4^n. But the rescaled
+/// ratio converges to a constant involving √3:
+///   M(n)/C(n) · (4/3)^n → 3√3/(4√π) · √π = 3√3/4 ≈ 1.299
+///
+/// The GP should discover this limit from the convergent-template (a - b/n^c).
 pub fn observe_motzkin_catalan_ratio(max_n: usize) -> ObservedSequence {
     use crate::hdc::combinatorics::catalan;
 
-    // Compute Motzkin numbers via recurrence: M(n) = M(n-1) + Σ_{k=0}^{n-2} M(k)·M(n-2-k)
-    // Simpler: M(n) = ((2n+3)*M(n-1) + 3*n*M(n-2)) / (n+3) — OEIS A001006 recurrence is complex
-    // Use the standard recurrence: M(0)=1, M(1)=1, (n+2)M(n) = (2n+1)M(n-1) + 3(n-1)M(n-2) — WRONG
-    // Correct: M(0)=1, M(1)=1, M(n+1) = M(n) + Σ_{i=0}^{n-1} M(i)*M(n-1-i)
-    // Or use: (n+3)*M(n+1) = (2n+3)*M(n) + 3n*M(n-1)
-    let mut motzkin = vec![1.0_f64; max_n.max(2) + 1];
-    motzkin[0] = 1.0;
-    motzkin[1] = 1.0;
-    for n in 1..max_n {
-        // (n+3)*M(n+1) = (2n+3)*M(n) + 3n*M(n-1)
-        motzkin[n + 1] = ((2 * n + 3) as f64 * motzkin[n] + 3.0 * n as f64 * motzkin[n - 1])
-            / (n + 3) as f64;
-    }
+    let motzkin = compute_motzkin(max_n);
 
     let data: Vec<(f64, f64)> = (2..=max_n)
         .filter_map(|n| {
             let c = catalan(n as u64) as f64;
             let m_val = motzkin[n];
-            if c > 0.0 {
-                Some((n as f64, m_val / c))
+            if c > 0.0 && m_val > 0.0 {
+                let rescaled = m_val / c * (4.0_f64 / 3.0).powi(n as i32);
+                if rescaled.is_finite() {
+                    Some((n as f64, rescaled))
+                } else { None }
             } else { None }
         })
         .collect();
