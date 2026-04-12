@@ -35,41 +35,46 @@
 
 % ── Abstract ────────────────────────────────────────────────────────────────
 \begin{abstract}
-We present the \emph{Ramanujan Protocol}, a closed-loop pipeline for
-automated mathematical conjecture that \textbf{observes} numerical data,
-\textbf{discovers} formulas via genetic programming,
-\textbf{verifies} them through Z3 SMT solving, and
-\textbf{self-corrects} when findings are structurally trivial or
-statistically unsupported.
+We present the \emph{Ramanujan Protocol}, a pipeline for automated
+mathematical conjecture whose principal contribution is not discovery
+but \textbf{epistemic restraint}. The system observes numerical data,
+discovers formulas via genetic programming, verifies them through Z3
+SMT solving, and---most importantly---autonomously detects and retracts
+its own false positives at four distinct levels of statistical failure.
 
-The system's principal contribution is \emph{epistemic self-correction}:
-it autonomously caught a GCT obstruction ``discovery'' that was a
-structural tautology, and a ``universal power-law exponent'' for $abc$
-triple quality that was an artifact of model choice (exponential decay
-$R^2 = 0.93$ vs.\ power law $R^2 = 0.69$, AIC difference 596). Both
-were retracted before publication.
+We document four retractions caught by the Protocol's own auditing:
+(i)~a GCT obstruction ``discovery'' that was a structural tautology
+(Littlewood--Richardson size constraint);
+(ii)~a ``universal power-law exponent'' for $abc$ triple quality that was
+a model-selection artifact (exponential $R^2{=}0.93$ vs.\ power law
+$R^2{=}0.69$, AIC difference 596);
+(iii)~a cross-domain correlation matrix in which 8 of 9 statistically
+significant pairs collapsed to $\rho \approx 0$ after detrending; and
+(iv)~the final surviving correlation, which a null-hypothesis test
+revealed to be an artifact of the detrending procedure itself (random
+monotonic sequences produced nearly identical $\rho$).
 
-As a test of cross-domain pattern matching, the system recovered all
-7~known modularity correspondences between elliptic curves and modular
-forms from raw coefficient data (95/95 prime matches, 0/3 decoy false
-positives), confirmed the Sato--Tate $\sin^2\theta$ distribution from
-302~primes, and computed BSD critical values matching LMFDB to
-4~significant figures. It formally proved $R(3,3) = 6$ and $R(3,4) = 9$
-via SAT encoding, and verified the Montgomery pair correlation against
-GUE ($\chi^2 = 9.28$, $df = 19$, cannot reject at 5\%).
+After this four-layer audit, the only cross-domain bridges that survive
+are \emph{exact algebraic identities}: the system recovered all 7~known
+modularity correspondences from raw coefficient data (95/95 prime
+matches, 0/3 decoy false positives), confirmed the Sato--Tate
+$\sin^2\theta$ distribution from 302~primes, computed BSD critical
+values matching LMFDB to 4~significant figures, and formally proved
+$R(3,3) = 6$ and $R(3,4) = 9$ via SAT encoding.
 
-A spectral analysis of the cross-domain correlation matrix reveals
-structural clustering: arithmetic sequences form one connected component
-(Fiedler value $\lambda_2 = 0.273$) with Sato--Tate equidistribution as
-a weakly connected outlier.
+\textbf{Principal finding}: For arithmetic sequences, statistical
+correlation is not reliable evidence of mathematical connection. Only
+exact identities constitute genuine cross-domain bridges. A system that
+cannot catch its own false positives cannot be trusted with its true
+positives.
 
-Implemented in Rust (5{,}400~LOC conjecture engine, 1{,}300~LOC number
-theory module, 345+~tests, Z3 4.15.8 backend). Open source.
+Implemented in Rust (5{,}400~LOC conjecture engine, 1{,}300~LOC
+number theory module, 345+~tests, Z3 4.15.8 backend). Open source.
 \end{abstract}
 
 \textbf{Keywords:} automated conjecture, symbolic regression, formal
-verification, self-correcting AI, epistemic integrity, cross-domain
-pattern matching
+verification, epistemic integrity, self-correcting AI, statistical
+artifacts, exact identities
 
 % ════════════════════════════════════════════════════════════════════════════
 \section{Introduction}
@@ -184,29 +189,31 @@ Bell--Stirling identity ($B(n) = \sum S(n,k)$, exact to $n=15$).
 
 
 % ════════════════════════════════════════════════════════════════════════════
-\section{Epistemic Self-Correction}
+\section{Epistemic Self-Correction: Four Layers of Restraint}
 \label{sec:selfcorrect}
 
-The Protocol's most distinctive capability is not discovery but
-\emph{retraction}. The system autonomously caught two false positives:
+The Protocol's distinctive contribution is not discovery but
+\emph{retraction}. We document four retractions caught automatically,
+each representing a different failure mode of statistical discovery.
 
-\subsection{Structural Tautology: GCT Obstruction}
+\subsection{Layer 1: Structural Tautology (GCT Obstruction)}
 
 The engine computed Kronecker coefficient obstruction ratios for
 same-weight partition triples and reported 99.9\% obstruction at
-$n = 6$---apparently strong computational evidence. Post-hoc auditing
-revealed this is a \textbf{mathematical tautology}: the
+$n = 6$---apparently strong computational evidence for $P \neq NP$.
+Post-hoc auditing revealed a \textbf{mathematical tautology}: the
 Littlewood--Richardson size constraint $|\mu|+|\nu|=|\lambda|$ forces
 $2w = w$ for same-weight triples, so $w = 0$ and all non-trivial
-triples vanish by construction. The finding was retracted before
-publication, preventing a false claim of evidence for $P \neq NP$.
+triples vanish by construction.
 
-\subsection{Model Artifact: $abc$ Quality Decay}
+\textbf{Failure mode}: logical constraint makes the finding vacuous.
+\textbf{Detection mechanism}: structural constraint checking.
+
+\subsection{Layer 2: Model Selection Artifact ($abc$ Quality Decay)}
 
 The engine discovered $q(\text{rank}) \approx 1 + A/\text{rank}^B$
-with exponent $B \approx 1.05$, stable across four scales ($c \leq$
-1K--50K). This appeared to be a universal power law. Competing model
-analysis revealed:
+with exponent $B \approx 1.05$, stable across four scales. Competing
+model analysis via AIC:
 
 \begin{center}
 \begin{tabular}{lccc}
@@ -222,17 +229,97 @@ analysis revealed:
 
 The AIC difference of 596 is decisive. Bootstrap 95\% CI for the
 power-law exponent: $B \in [0.92, 1.24]$---too wide to claim
-$B \approx 1.05$. The true decay is exponential, consistent with
-extreme value statistics.
+$B \approx 1.05$.
+
+\textbf{Failure mode}: wrong functional form inflates apparent fit.
+\textbf{Detection mechanism}: competing model comparison (AIC),
+bootstrap CI.
+
+\subsection{Layer 3: Growth-Rate Confound (Correlation Matrix)}
+
+We computed Spearman rank correlations between 6 arithmetic sequences
+(prime gaps, $abc$ quality, partitions, class numbers, zeta zero
+spacings, Sato--Tate angles). The raw matrix showed 9~pairs with
+$|\rho| > 0.3$, including 5 with $|\rho| > 0.5$. A Fiedler-vector
+analysis suggested a clustering structure.
+
+Detrending each sequence by its power-law fit and re-correlating the
+residuals revealed:
+
+\begin{center}
+\begin{tabular}{lcc}
+  \toprule
+  Pair & Raw $\rho$ & Detrended $\rho$ \\
+  \midrule
+  class\_nums $\leftrightarrow$ partitions & $+0.616$ & $+0.070$ \\
+  abc\_quality $\leftrightarrow$ class\_nums & $-0.617$ & $-0.051$ \\
+  partitions $\leftrightarrow$ zeta\_spaces & $-0.436$ & $+0.039$ \\
+  prime\_gaps $\leftrightarrow$ abc\_quality & $-0.507$ & $+0.036$ \\
+  partitions $\leftrightarrow$ prime\_gaps & $+0.507$ & $-0.002$ \\
+  \bottomrule
+\end{tabular}
+\end{center}
+
+\textbf{8 of 9 correlations collapsed to $\rho \approx 0$.} Only
+$abc$\_quality$\leftrightarrow$partitions survived with detrended
+$\rho = -0.630$.
+
+\textbf{Failure mode}: monotonic sequences spuriously correlate through
+shared growth rates.
+\textbf{Detection mechanism}: detrending residuals, first-difference
+analysis.
+
+\subsection{Layer 4: Detrending Artifact (Null Hypothesis Test)}
+
+The surviving $abc \leftrightarrow$ partitions correlation ($\rho =
+-0.63$) was subjected to a null hypothesis test comparing against
+random baselines:
+
+\begin{itemize}
+  \item \textbf{Shuffle baseline}: randomly permuted $abc$ qualities
+    give $\rho = -0.03 \pm 0.11$ (test works correctly).
+  \item \textbf{Random-sequence baseline}: random monotonic sequences
+    with similar growth rate give detrended $\rho = -0.50 \pm 0.10$.
+    The real $\rho = -0.63$ is only $1.26$~std devs from this baseline.
+  \item \textbf{Trend-model sensitivity}: linear detrending gives
+    $\rho = +0.34$ (opposite sign). Power-law gives $-0.63$.
+  \item \textbf{Subsample instability}: $\rho_{30} = +0.05$,
+    $\rho_{50} = -0.72$, $\rho_{100} = -0.63$.
+\end{itemize}
+
+\textbf{The detrending procedure itself induces spurious correlation
+when applied to monotonic sequences.} The result is opposite-signed
+under different trend models and unstable under subsampling.
+
+\textbf{Failure mode}: statistical procedure generates its own artifact.
+\textbf{Detection mechanism}: random-sequence null baseline,
+trend-model sensitivity analysis.
+
+\subsection{What Survives}
+
+After four layers of self-correction, \emph{no statistical correlation
+between arithmetic sequences survives}. The only cross-domain bridges
+that remain are \textbf{exact algebraic identities}:
+
+\begin{itemize}
+  \item Modularity: $a_p(E) = c_p(f)$ for 95/95 prime matches.
+  \item Sato--Tate: $\sin^2\theta$ density shape from 302~primes
+    ($|\rho| < 0.1$ with all other sequences, even raw).
+  \item Formal Z3 proofs: $T(n) = n(n+1)/2$, $R(3,3) = 6$, etc.
+\end{itemize}
 
 \subsection{Significance}
 
-These retractions are not failures---they are the system's primary
-contribution. Most automated discovery systems report findings and move
-on. The Ramanujan Protocol audits its own outputs via competing model
-analysis (AIC), bootstrap confidence intervals, and structural
-constraint checking. A system that cannot catch its own false positives
-cannot be trusted with its true positives.
+Each retraction removed something we wanted to believe. The GCT result
+looked like evidence for $P \neq NP$. The $abc$ power law looked
+universal. The correlation matrix looked like a map of mathematical
+structure. All four were illusions, caught before publication by the
+system's own auditing.
+
+\textbf{A system that cannot catch its own false positives cannot be
+trusted with its true positives.} The four layers of restraint
+demonstrated here are the necessary infrastructure for trustworthy
+automated conjecture generation.
 
 
 % ════════════════════════════════════════════════════════════════════════════
@@ -272,59 +359,42 @@ reject GUE at 5\% significance. Level repulsion confirmed.
 
 
 % ════════════════════════════════════════════════════════════════════════════
-\section{Exploratory: Correlation Structure of Arithmetic Sequences}
+\section{Retracted Claim: The Spectral Map of Mathematics}
 \label{sec:spectral}
 
-We computed Spearman rank correlations between six arithmetic sequences
-(prime gaps, $abc$ quality, partitions, class numbers, zeta zero
-spacings, Sato--Tate angles; $n = 100$ each) and analyzed the
-resulting graph via spectral methods.
+An earlier version of this paper included a spectral-geometry section
+claiming that the cross-domain correlation matrix reveals a ``map of
+mathematics''---an arithmetic continent (prime gaps, $abc$ quality,
+partitions, class numbers, zeta spacings) joined by a weak bridge
+(Fiedler value $\lambda_2 = 0.273$) to an isolated Sato--Tate island.
+The Fiedler vector appeared to cleanly partition the sequences into
+these two clusters.
 
-\subsection{Correlation Structure}
+\emph{The system caught this claim as a statistical artifact} (see
+Section~\ref{sec:selfcorrect}, Layers 3 and 4). After detrending and
+null-hypothesis testing, all apparent cross-domain correlations except
+those involving Sato--Tate collapsed to $\rho \approx 0$.
 
-Sato--Tate angles are statistically independent of all other sequences
-($|\rho| < 0.1$), confirming equidistribution and serving as a
-methodological control. The remaining five sequences form a correlated
-block with $|\rho| > 0.5$ for several pairs (e.g., class numbers $\leftrightarrow$
-partitions: $\rho = 0.62$).
+The honest interpretation of the Laplacian spectrum is:
+\begin{itemize}
+  \item Sato--Tate's isolation from the other sequences
+    ($|\rho| < 0.1$ even raw) is genuine, and reflects the
+    equidistribution theorem.
+  \item The ``arithmetic continent'' is a cluster of sequences that
+    share \emph{growth rates}, not structure. Monotonically increasing
+    sequences statistically correlate with each other even when they
+    are mathematically unrelated.
+  \item The Fiedler value $\lambda_2 = 0.273$ identifies a bottleneck
+    between \emph{deterministic growth} and \emph{probabilistic
+    equidistribution}, not between two regions of mathematics.
+\end{itemize}
 
-\subsection{Laplacian Spectrum}
-
-The 6$\times$6 correlation matrix (absolute values as edge weights)
-yields Graph Laplacian eigenvalues:
-\[
-  \lambda = \{0.000, \; 0.273, \; 1.860, \; 2.127, \; 2.716, \; 3.578\}
-\]
-
-$\lambda_1 = 0$: all mathematics is \textbf{one connected component}.
-$\lambda_2 = 0.273$ (Fiedler value): the connection is \textbf{weak}
-(spectral gap $\lambda_2/\lambda_6 = 0.076$).
-
-\subsection{The Fiedler Clustering}
-
-The Fiedler vector (eigenvector of $\lambda_2$) partitions the sequences:
-
-\begin{center}
-\begin{tabular}{lrl}
-  \toprule
-  Sequence & Fiedler component & Cluster \\
-  \midrule
-  Sato--Tate & $+0.912$ & \textbf{A (isolated)} \\
-  Prime gaps & $-0.195$ & B (arithmetic) \\
-  $abc$ quality & $-0.196$ & B \\
-  Partitions & $-0.196$ & B \\
-  Class numbers & $-0.161$ & B \\
-  Zeta spacings & $-0.166$ & B \\
-  \bottomrule
-\end{tabular}
-\end{center}
-
-\textbf{Interpretation}: Arithmetic sequences (primes, partitions, class
-numbers, $abc$ triples, zeta zeros) form one tightly coupled continent.
-Sato--Tate equidistribution is a separate island. The Langlands
-correspondence is the bridge between them---it maps the arithmetic
-structure of elliptic curves to the equidistributed angles of their
-Frobenius elements.
+We retain this retracted section in the manuscript because the
+retraction is itself a result. The correlation matrix passed several
+plausibility checks (including Sato--Tate as a built-in control
+sequence) before the detrending audit exposed it. Without that audit,
+a visually compelling ``map of mathematics'' would have been published.
+Visual compellingness is not evidence.
 
 
 % ════════════════════════════════════════════════════════════════════════════
@@ -349,22 +419,35 @@ modularity computationally and discover it autonomously.
 \section{Conclusion}
 \label{sec:conclusion}
 
-The Ramanujan Protocol demonstrates that automated conjecture generation
-becomes trustworthy when paired with formal verification and epistemic
-self-correction. The system's principal contribution is not any specific
-formula it discovered, but the demonstration that an automated pipeline
-can:
-\begin{itemize}
-  \item \textbf{Retract} its own false positives (GCT tautology, $abc$
-    model artifact) before publication.
-  \item \textbf{Recover} known cross-domain correspondences (modularity,
-    7/7 correct with 0 false positives) from raw data.
-  \item \textbf{Verify} formally (Z3 induction proofs, Ramsey SAT)
-    rather than just numerically.
-\end{itemize}
+The Ramanujan Protocol's principal contribution is a categorical
+distinction: for arithmetic sequences, \textbf{statistical correlation
+is not mathematical connection, but exact identity is}.
 
-The retractions are as important as the recoveries. A system that cannot
-catch its own false positives cannot be trusted with its true positives.
+This distinction was established empirically through four layers of
+self-correction. Every statistical claim the system generated was
+audited, and every correlation between arithmetic sequences---from
+class numbers to partition counts to $abc$ triple qualities---failed
+that audit. What survived were the exact identities: modularity
+correspondences ($a_p = c_p$ on all 95 prime matches), the Sato--Tate
+density shape, Z3-proven induction identities, and formally verified
+Ramsey numbers.
+
+The practical consequence for automated mathematics is stark.
+Correlation-based discovery between arithmetic sequences is unreliable
+even with sophisticated detrending. Trustworthy automated mathematics
+requires auditing mechanisms at every level:
+\begin{enumerate}
+  \item Structural constraint checking (catches tautologies).
+  \item Competing model analysis via AIC (catches model artifacts).
+  \item Detrending residuals (catches growth-rate confounds).
+  \item Null-hypothesis testing against random baselines (catches
+    procedural artifacts).
+\end{enumerate}
+
+A system that cannot catch its own false positives cannot be trusted
+with its true positives. We suggest that this auditing hierarchy should
+become standard practice for any automated conjecture system that
+claims to find cross-domain correspondences in arithmetic data.
 
 The pipeline is open-source (Rust, 345+ tests) and implemented as part
 of the Symthaea cognitive architecture.\footnote{%
