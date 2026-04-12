@@ -185,10 +185,13 @@ impl BasisSetProvider for Basis631G {
                         })
                         .collect();
 
-                    functions.push(ContractedGaussian {
+                    let mut cg = ContractedGaussian {
                         primitives,
                         shell_type: shell.shell_type,
-                    });
+                    };
+                    // Normalize contracted function so ⟨χ|χ⟩ = 1
+                    cg.normalize();
+                    functions.push(cg);
                 }
             }
         }

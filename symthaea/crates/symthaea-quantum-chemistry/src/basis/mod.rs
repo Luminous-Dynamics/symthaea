@@ -115,6 +115,43 @@ pub struct ContractedGaussian {
     pub shell_type: ShellType,
 }
 
+impl ContractedGaussian {
+    /// Compute the self-overlap of this contracted function: ⟨χ|χ⟩
+    pub fn self_overlap(&self) -> f64 {
+        let mut result = 0.0;
+        for pa in &self.primitives {
+            let na = pa.normalization();
+            for pb in &self.primitives {
+                let nb = pb.normalization();
+                let p = pa.alpha + pb.alpha;
+                // Overlap of two s-type primitives at the same center
+                // For general angular momentum, use the full overlap formula
+                let ex = crate::integrals::hermite::hermite_coefficient(
+                    pa.l as i32, pb.l as i32, 0, pa.alpha, pb.alpha, pa.center[0], pb.center[0]);
+                let ey = crate::integrals::hermite::hermite_coefficient(
+                    pa.m as i32, pb.m as i32, 0, pa.alpha, pb.alpha, pa.center[1], pb.center[1]);
+                let ez = crate::integrals::hermite::hermite_coefficient(
+                    pa.n as i32, pb.n as i32, 0, pa.alpha, pb.alpha, pa.center[2], pb.center[2]);
+                let s = ex * ey * ez * (PI_CONST / p).powf(1.5);
+                result += pa.coeff * pb.coeff * na * nb * s;
+            }
+        }
+        result
+    }
+
+    /// Normalize this contracted function so ⟨χ|χ⟩ = 1.
+    /// Modifies the contraction coefficients in place.
+    pub fn normalize(&mut self) {
+        let s = self.self_overlap();
+        if s > 1e-15 {
+            let factor = 1.0 / s.sqrt();
+            for p in &mut self.primitives {
+                p.coeff *= factor;
+            }
+        }
+    }
+}
+
 /// A complete basis set for a molecule.
 #[derive(Debug, Clone)]
 pub struct BasisSet {
