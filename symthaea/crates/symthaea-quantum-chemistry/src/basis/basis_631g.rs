@@ -56,7 +56,7 @@ fn shells_for_element(z: u8) -> Vec<ShellData631G> {
                     0.232_184, 0.467_941, 0.362_312,
                 ],
             },
-            // 2s inner: 3 primitives
+            // 2s inner: 3 primitives (Hehre 1972 segmented contraction)
             ShellData631G {
                 shell_type: ShellType::S,
                 exponents: vec![7.868_272_4, 1.881_288_5, 0.544_249_3],
@@ -82,10 +82,10 @@ fn shells_for_element(z: u8) -> Vec<ShellData631G> {
             },
         ],
 
-        // ── Nitrogen (Z=7) — Hehre, Ditchfield & Pople (1972) ────────────
-        // NOTE: 6-31G valence S coefficients are for SEGMENTED contractions
-        // with primitive normalization applied separately. The negative first
-        // coefficient describes the 2s nodal structure.
+        // ── Nitrogen (Z=7) — Hehre (1972) segmented contraction ──────────
+        // NOTE: BSE provides general-contraction coefficients with different
+        // normalization. These are the segmented contraction values that work
+        // with our per-primitive normalization.
         7 => vec![
             ShellData631G {
                 shell_type: ShellType::S,
@@ -133,7 +133,7 @@ fn shells_for_element(z: u8) -> Vec<ShellData631G> {
                     0.232_714, 0.470_193, 0.358_521,
                 ],
             },
-            // 2s inner: 3 primitives
+            // 2s inner: 3 primitives (Hehre 1972 segmented contraction)
             ShellData631G {
                 shell_type: ShellType::S,
                 exponents: vec![15.539_616, 3.599_934, 1.013_762],
