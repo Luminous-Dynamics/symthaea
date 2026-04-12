@@ -275,7 +275,11 @@ impl HdcLtcNeuron {
         let tau_effective = self.config.tau_base * (1.0 + self.config.backbone_tau * state_norm);
 
         // 6. Compute derivative: dx/dt = (-x + activated) / τ
-        let delta = activated.subtract(&self.state).scale(dt / tau_effective);
+        // Clamp dt/tau to prevent overflow when dt >> tau (e.g., large time steps
+        // with fast neurons). Max ratio of 50.0 means state fully converges to
+        // activated (exponential decay > 99.99% complete at exp(-50)).
+        let dt_over_tau = (dt / tau_effective).min(50.0);
+        let delta = activated.subtract(&self.state).scale(dt_over_tau);
 
         // 7. Update state: x = x + dx
         self.state = self.state.add(&delta);

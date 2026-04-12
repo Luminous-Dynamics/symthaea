@@ -55,6 +55,7 @@
 //! println!("Final Phi: {:.4}", history.last().unwrap().phi);
 //! ```
 
+use crate::hdc::statistics::Xorshift64;
 use serde::{Deserialize, Serialize};
 use std::f64::consts::PI;
 
@@ -317,6 +318,8 @@ pub struct AutodiffPhiEngine {
     tape: ComputationTape,
     /// Cached similarity gradients: d(sim[i][j])/d(node[i][k])
     sim_grad_cache: Vec<Vec<Vec<f64>>>,
+    /// PRNG for Gumbel noise sampling in soft partitions (Jang et al. 2016)
+    rng: Xorshift64,
 }
 
 impl AutodiffPhiEngine {
@@ -326,6 +329,7 @@ impl AutodiffPhiEngine {
             config,
             tape: ComputationTape::new(),
             sim_grad_cache: Vec::new(),
+            rng: Xorshift64::new(42),
         }
     }
 
@@ -624,6 +628,17 @@ impl AutodiffPhiEngine {
                 let logit = affinity / self.config.temperature;
                 logits.push(logit);
             }
+
+            // Gumbel-Softmax: add Gumbel(0,1) noise to logits for stochastic
+            // differentiable partitioning (Jang et al. 2016, Maddison et al. 2016).
+            // g = -log(-log(u)), u ~ Uniform(0,1)
+            let logits: Vec<f64> = logits
+                .iter()
+                .map(|&l| {
+                    let u = self.rng.next_f64().clamp(1e-10, 1.0 - 1e-10);
+                    l + (-(-u.ln()).ln()) // Add Gumbel noise
+                })
+                .collect();
 
             // Softmax normalization
             let max_logit = logits.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
