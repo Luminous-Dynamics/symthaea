@@ -539,6 +539,18 @@ function connect() {
             sbEl.className = 'betti-badge ' + (sf > 0.7 ? 'green' : sf > 0.3 ? 'amber' : 'rose');
         }
 
+        // Mesh network telemetry
+        const spEl = document.getElementById('swarmPeers');
+        if (spEl) spEl.textContent = data.swarm_peers || 0;
+        const mpEl = document.getElementById('networkMeanPhi');
+        if (mpEl) mpEl.textContent = (data.network_mean_phi || 0).toFixed(3);
+        const mcEl = document.getElementById('meshPeerCount');
+        if (mcEl) mcEl.textContent = data.mesh_peer_count || 0;
+        const mhEl = document.getElementById('meshHealth');
+        if (mhEl) mhEl.textContent = (data.mesh_health_score || 0).toFixed(2);
+        const mkEl = document.getElementById('meshPackets');
+        if (mkEl) mkEl.textContent = ((data.mesh_bytes_sent || 0) + (data.mesh_bytes_received || 0)).toLocaleString();
+
         // Update cycle info
         document.getElementById('cycleInfo').textContent =
             `Cycle ${data.cycle} | ${(data.cycle_time_us / 1000).toFixed(1)}ms | Input: "${data.input_text}"`;

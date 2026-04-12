@@ -2,17 +2,67 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 use serde::{Deserialize, Serialize};
 
+/// Physical transport class for radio tier routing.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum DomainTransportClass {
+    /// Local mesh (LoRa, B.A.T.M.A.N., <1km)
+    LocalMesh,
+    /// Metro relay (Yggdrasil, Iroh, <50km)
+    MetroRelay,
+    /// Regional relay (satellite uplink, <5000km)
+    RegionalRelay,
+    /// Interplanetary relay (DTN, light-minutes)
+    InterplanetaryRelay,
+}
+
+/// Transport capabilities and preferences for a domain.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DomainTransportProfile {
+    /// Whether the domain tolerates store-and-forward fragmentation.
+    pub store_and_forward_required: bool,
+    /// Ordered transport preferences (most preferred first).
+    preferred_transports: Vec<DomainTransportClass>,
+}
+
+impl Default for DomainTransportProfile {
+    fn default() -> Self {
+        Self {
+            store_and_forward_required: false,
+            preferred_transports: vec![
+                DomainTransportClass::LocalMesh,
+                DomainTransportClass::MetroRelay,
+                DomainTransportClass::RegionalRelay,
+            ],
+        }
+    }
+}
+
+impl DomainTransportProfile {
+    /// Return transport classes in priority order.
+    pub fn priority_order(&self) -> Vec<DomainTransportClass> {
+        self.preferred_transports.clone()
+    }
+}
+
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct DomainProfile {
     pub primary_domain: String,
     pub kind: String,
     pub capabilities: Vec<String>,
+    /// Transport class preferences for radio tier routing.
+    #[serde(default)]
+    pub transport: DomainTransportProfile,
 }
 
 impl DomainProfile {
-    pub fn underwater() -> Self { Self { primary_domain: "underwater".into(), kind: "underwater".into(), capabilities: vec!["sonar".into()] } }
-    pub fn subterranean() -> Self { Self { primary_domain: "subterranean".into(), kind: "subterranean".into(), capabilities: vec!["lidar".into()] } }
-    pub fn deep_space() -> Self { Self { primary_domain: "deep_space".into(), kind: "deep_space".into(), capabilities: vec!["star_tracker".into()] } }
+    pub fn underwater() -> Self { Self { primary_domain: "underwater".into(), kind: "underwater".into(), capabilities: vec!["sonar".into()], transport: DomainTransportProfile { store_and_forward_required: true, ..Default::default() } } }
+    pub fn subterranean() -> Self { Self { primary_domain: "subterranean".into(), kind: "subterranean".into(), capabilities: vec!["lidar".into()], ..Default::default() } }
+    pub fn deep_space() -> Self { Self { primary_domain: "deep_space".into(), kind: "deep_space".into(), capabilities: vec!["star_tracker".into()], transport: DomainTransportProfile { store_and_forward_required: true, preferred_transports: vec![DomainTransportClass::InterplanetaryRelay, DomainTransportClass::RegionalRelay] } } }
+
+    /// Check if this domain supports the given transport class.
+    pub fn supports_transport(&self, class: DomainTransportClass) -> bool {
+        self.transport.preferred_transports.contains(&class)
+    }
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
