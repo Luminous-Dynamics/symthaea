@@ -977,6 +977,8 @@ impl CognitiveLoopService {
 
         #[cfg(feature = "jepa")]
         let jepa_input_dim = config.cfc_config.input_dim;
+        #[cfg(feature = "mesh")]
+        let mesh_domain_profile = config.domain_profile.clone();
         let mut service = Self {
             config,
             encoder,
@@ -1475,7 +1477,30 @@ impl CognitiveLoopService {
             known_unknowns: Some(crate::consciousness::sacred_stillness::KnownUnknowns::new()),
             swarm_manager: super::managers::SwarmManager::default(),
             #[cfg(feature = "muse")]
-            muse_manager: super::managers::MuseManager::new(),
+            muse_manager: {
+                let mut mm = super::managers::MuseManager::new();
+                // Restore motif memory from previous session if available
+                let motif_path = config
+                    .aesthetic_memory_path
+                    .as_deref()
+                    .map(|p| {
+                        let mut pb = std::path::PathBuf::from(p);
+                        pb.set_extension("motifs.json");
+                        pb
+                    })
+                    .unwrap_or_else(|| std::path::PathBuf::from(".claude/motif_memory.json"));
+                let snapshot = symthaea_muse::motif_memory::MotifSnapshot::load(&motif_path);
+                if !snapshot.is_empty() {
+                    log::info!(
+                        "[muse] restored {} motif phrases from {:?}",
+                        snapshot.phrases.len(),
+                        motif_path,
+                    );
+                    mm.restore_motif(&snapshot);
+                }
+                mm.set_motif_save_path(motif_path);
+                mm
+            },
             #[cfg(feature = "muse")]
             music_publisher: super::managers::MusicPublisher::new(),
             holon_receiver: crate::consciousness::holon_receiver::HolonReceiver::new(),
@@ -1489,7 +1514,7 @@ impl CognitiveLoopService {
             network_service: None,
             #[cfg(feature = "mesh")]
             spectrum_manager: super::managers::SpectrumManager::with_domain_profile(
-                config.domain_profile.clone(),
+                mesh_domain_profile,
             ),
             #[cfg(feature = "mesh")]
             consciousness_router:

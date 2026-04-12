@@ -983,6 +983,156 @@ fn replace_nth_const_inner(expr: &Expr, target: usize, val: f64, counter: &mut u
     }
 }
 
+/// Identify a numerical constant as a known mathematical constant (#7).
+/// Returns a human-readable name if the value matches within 1e-4.
+fn identify_constant(val: f64) -> Option<String> {
+    let candidates: &[(&str, f64)] = &[
+        ("π", std::f64::consts::PI),
+        ("e", std::f64::consts::E),
+        ("φ", (1.0 + 5.0_f64.sqrt()) / 2.0),
+        ("1/e", 1.0 / std::f64::consts::E),
+        ("√2", std::f64::consts::SQRT_2),
+        ("1/√2", std::f64::consts::FRAC_1_SQRT_2),
+        ("ln(2)", std::f64::consts::LN_2),
+        ("π²/6", std::f64::consts::PI * std::f64::consts::PI / 6.0),
+        ("1/π", std::f64::consts::FRAC_1_PI),
+        ("2/π", std::f64::consts::FRAC_2_PI),
+        ("√3", 3.0_f64.sqrt()),
+        ("1/√3", 1.0 / 3.0_f64.sqrt()),
+        ("γ (Euler-Mascheroni)", 0.5772156649015329),
+    ];
+    for (name, known) in candidates {
+        if (val - known).abs() < known.abs().max(1.0) * 1e-4 {
+            return Some(name.to_string());
+        }
+    }
+    // Check simple fractions
+    for d in 1..=12 {
+        for n in 0..=d * 3 {
+            let frac = n as f64 / d as f64;
+            if (val - frac).abs() < 1e-6 && d > 1 {
+                return Some(format!("{}/{}", n, d));
+            }
+        }
+    }
+    None
+}
+
+/// Analyze growth class of a sequence (#5, #8).
+/// Returns (growth_type, estimated_rate) to guide GP grammar.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum GrowthClass {
+    Constant,       // f(n) → c
+    Logarithmic,    // f(n) ~ ln(n)
+    Polynomial(f64),// f(n) ~ n^p (returns p)
+    Exponential,    // f(n) ~ a^n
+    SuperExponential,// f(n) ~ n! or faster
+}
+
+pub fn analyze_growth(data: &[(f64, f64)]) -> GrowthClass {
+    if data.len() < 4 { return GrowthClass::Constant; }
+
+    let values: Vec<f64> = data.iter().map(|(_, y)| *y).collect();
+
+    // Check constant (variance < 1% of mean²)
+    let mean = values.iter().sum::<f64>() / values.len() as f64;
+    let var = values.iter().map(|v| (v - mean).powi(2)).sum::<f64>() / values.len() as f64;
+    if var < mean * mean * 0.01 { return GrowthClass::Constant; }
+
+    // Check growth rate via log-log regression
+    let positive: Vec<(f64, f64)> = data.iter()
+        .filter(|(x, y)| *x > 0.0 && *y > 0.0)
+        .map(|(x, y)| (x.ln(), y.ln()))
+        .collect();
+
+    if positive.len() >= 3 {
+        // Linear regression in log-log space: ln(y) = p*ln(x) + c → y ~ x^p
+        let n = positive.len() as f64;
+        let sx: f64 = positive.iter().map(|(x, _)| x).sum();
+        let sy: f64 = positive.iter().map(|(_, y)| y).sum();
+        let sxy: f64 = positive.iter().map(|(x, y)| x * y).sum();
+        let sx2: f64 = positive.iter().map(|(x, _)| x * x).sum();
+        let denom = n * sx2 - sx * sx;
+        if denom.abs() > 1e-10 {
+            let p = (n * sxy - sx * sy) / denom;
+            let r2 = {
+                let ss_res: f64 = positive.iter().map(|(x, y)| {
+                    let pred = p * x + (sy - p * sx) / n;
+                    (y - pred).powi(2)
+                }).sum();
+                let ss_tot: f64 = positive.iter().map(|(_, y)| (y - sy / n).powi(2)).sum();
+                if ss_tot > 1e-10 { 1.0 - ss_res / ss_tot } else { 0.0 }
+            };
+
+            if r2 > 0.95 && p > 0.0 && p < 10.0 {
+                return GrowthClass::Polynomial(p);
+            }
+        }
+    }
+
+    // Check exponential: log(y) linear in x
+    let log_linear: Vec<(f64, f64)> = data.iter()
+        .filter(|(_, y)| *y > 0.0)
+        .map(|(x, y)| (*x, y.ln()))
+        .collect();
+
+    if log_linear.len() >= 3 {
+        let n = log_linear.len() as f64;
+        let sx: f64 = log_linear.iter().map(|(x, _)| x).sum();
+        let sy: f64 = log_linear.iter().map(|(_, y)| y).sum();
+        let sxy: f64 = log_linear.iter().map(|(x, y)| x * y).sum();
+        let sx2: f64 = log_linear.iter().map(|(x, _)| x * x).sum();
+        let denom = n * sx2 - sx * sx;
+        if denom.abs() > 1e-10 {
+            let slope = (n * sxy - sx * sy) / denom;
+            let r2 = {
+                let ss_res: f64 = log_linear.iter().map(|(x, y)| {
+                    let pred = slope * x + (sy - slope * sx) / n;
+                    (y - pred).powi(2)
+                }).sum();
+                let ss_tot: f64 = log_linear.iter().map(|(_, y)| (y - sy / n).powi(2)).sum();
+                if ss_tot > 1e-10 { 1.0 - ss_res / ss_tot } else { 0.0 }
+            };
+            if r2 > 0.95 && slope > 0.1 {
+                return GrowthClass::Exponential;
+            }
+        }
+    }
+
+    // Check super-exponential: ratios f(n)/f(n-1) growing
+    let ratios: Vec<f64> = values.windows(2)
+        .filter_map(|w| if w[0].abs() > 1e-10 { Some(w[1] / w[0]) } else { None })
+        .collect();
+    if ratios.len() >= 3 {
+        let ratio_growing = ratios.windows(2).filter(|w| w[1] > w[0] * 1.05).count();
+        if ratio_growing > ratios.len() / 2 {
+            return GrowthClass::SuperExponential;
+        }
+    }
+
+    GrowthClass::Polynomial(1.0) // default
+}
+
+/// Compute difference sequence Δf(n) = f(n) - f(n-1) (#7).
+/// If Δf is simpler than f, discovering Δf first is more efficient.
+pub fn difference_sequence(data: &[(f64, f64)]) -> Vec<(f64, f64)> {
+    data.windows(2)
+        .map(|w| (w[1].0, w[1].1 - w[0].1))
+        .collect()
+}
+
+/// Compute ratio sequence f(n)/f(n-1) (#8).
+/// If this converges, the sequence is asymptotically geometric.
+pub fn ratio_sequence(data: &[(f64, f64)]) -> Vec<(f64, f64)> {
+    data.windows(2)
+        .filter_map(|w| {
+            if w[0].1.abs() > 1e-10 {
+                Some((w[1].0, w[1].1 / w[0].1))
+            } else { None }
+        })
+        .collect()
+}
+
 /// Fingerprint an expression by hashing its outputs on sample points.
 /// Two formulas with the same fingerprint are functionally identical.
 fn fingerprint_expr(expr: &Expr, sample_points: &[f64]) -> u64 {
@@ -1084,18 +1234,71 @@ impl ConjectureEngine {
                 });
             }
 
-            // ── Phase 1: GP symbolic regression ──────────────────────
-            let mut regressor = SymbolicRegressor::new(RegressorConfig {
-                seed: self.config.seed,
-                population_size: self.config.population_size,
-                generations: self.config.generations,
-                max_depth: self.config.max_depth,
-                max_complexity: self.config.max_complexity,
-                lambda: self.config.lambda,
-                tournament_size: self.config.tournament_size,
-                mutation_rate: self.config.mutation_rate,
-            });
-            let new_conjectures = regressor.fit(seq, top_k_per_sequence);
+            // ── Phase 0.5: Growth analysis (#5,#8) ───────────────────
+            let growth = analyze_growth(&seq.data);
+
+            // ── Phase 0.7: Difference sequence analysis (#7) ─────────
+            // If Δf is simpler, discover that first
+            let diff_seq = difference_sequence(&seq.data);
+            let diff_growth = if diff_seq.len() >= 3 { analyze_growth(&diff_seq) } else { growth };
+            let diff_is_simple = match diff_growth {
+                GrowthClass::Constant => true,
+                GrowthClass::Polynomial(p) => p < 1.5,
+                _ => false,
+            };
+            if diff_is_simple {
+                // Δf is simple — try to discover it
+                let diff_obs = ObservedSequence::new(
+                    &format!("Δ({})", seq.name), seq.domain, diff_seq);
+                let mut diff_reg = SymbolicRegressor::new(RegressorConfig {
+                    seed: self.config.seed.wrapping_add(999),
+                    population_size: self.config.population_size / 3,
+                    generations: self.config.generations / 3,
+                    max_depth: 3,
+                    max_complexity: 8,
+                    lambda: self.config.lambda,
+                    tournament_size: self.config.tournament_size,
+                    mutation_rate: self.config.mutation_rate,
+                });
+                let diff_results = diff_reg.fit(&diff_obs, 1);
+                for c in &diff_results {
+                    if c.training_mse < 1e-6 {
+                        self.conjectures.push(Conjecture {
+                            formula_str: format!("Δf(n) = {}", simplify(&c.formula)),
+                            ..c.clone()
+                        });
+                    }
+                }
+            }
+
+            // ── Phase 1: GP symbolic regression (ensemble #10) ───────
+            // Run with 3 seeds for diversity, collect best from each
+            let seeds = [self.config.seed, self.config.seed.wrapping_add(1234),
+                         self.config.seed.wrapping_add(5678)];
+            let mut all_conjectures = Vec::new();
+            for &seed in &seeds {
+                let mut regressor = SymbolicRegressor::new(RegressorConfig {
+                    seed,
+                    population_size: self.config.population_size,
+                    generations: self.config.generations,
+                    max_depth: self.config.max_depth,
+                    max_complexity: self.config.max_complexity,
+                    lambda: self.config.lambda,
+                    tournament_size: self.config.tournament_size,
+                    mutation_rate: self.config.mutation_rate,
+                });
+                all_conjectures.extend(regressor.fit(seq, top_k_per_sequence));
+            }
+            // Deduplicate across ensemble runs
+            let sample_pts: Vec<f64> = seq.data.iter().take(5).map(|(x,_)| *x).collect();
+            let mut seen = Vec::new();
+            let new_conjectures: Vec<Conjecture> = all_conjectures.into_iter()
+                .filter(|c| {
+                    let fp = fingerprint_expr(&c.formula, &sample_pts);
+                    if seen.contains(&fp) { false } else { seen.push(fp); true }
+                })
+                .take(top_k_per_sequence * 2) // keep more from ensemble
+                .collect();
 
             // ── Phase 2: Simplify all discovered formulas ────────────
             for mut c in new_conjectures {
@@ -1119,25 +1322,64 @@ impl ConjectureEngine {
             if !matches!(conjecture.status, ConjectureStatus::Proposed) {
                 continue;
             }
-            // Find the source sequence
             if let Some(seq) = observations.iter().find(|s| s.name == conjecture.source) {
-                let (_train, test) = seq.train_test_split();
-                if test.is_empty() {
-                    continue;
-                }
+                let (train, test) = seq.train_test_split();
+                if test.is_empty() { continue; }
+
                 let test_mse = compute_mse(&conjecture.formula, &test);
-                if test_mse.is_finite() && test_mse < conjecture.training_mse * 10.0 {
+                let train_mse = conjecture.training_mse;
+
+                // ── Convergent sequence detection (#2) ────────────────
+                // Check if formula evaluates to same value for different n
+                // (functionally constant even if syntactically complex)
+                let v1 = conjecture.formula.eval(&[("n", 10.0)]);
+                let v2 = conjecture.formula.eval(&[("n", 100.0)]);
+                let is_constant = v1.is_finite() && v2.is_finite() && (v1 - v2).abs() < 1e-10;
+                let test_better = test_mse.is_finite() && test_mse < train_mse;
+
+                // ── Asymptotic verification (#1) ──────────────────────
+                // For asymptotic formulas, use RELATIVE error on test data
+                let rel_errors: Vec<f64> = test.iter()
+                    .filter_map(|(x, y)| {
+                        let pred = conjecture.formula.eval(&[("n", *x)]);
+                        if pred.is_finite() && y.abs() > 1e-10 {
+                            Some(((pred - y) / y).abs())
+                        } else { None }
+                    })
+                    .collect();
+                let mean_rel_error = if rel_errors.is_empty() { f64::MAX }
+                    else { rel_errors.iter().sum::<f64>() / rel_errors.len() as f64 };
+
+                // Accept if: (a) test MSE reasonable, OR (b) constant capturing limit,
+                // OR (c) relative error < 10%
+                if test_mse.is_finite() && (
+                    test_mse < train_mse * 10.0 ||
+                    (is_constant && test_better) ||
+                    mean_rel_error < 0.10
+                ) {
                     conjecture.status = ConjectureStatus::NumericallyTested { test_mse };
-                    // Boost confidence if test MSE is close to training MSE
-                    if test_mse < conjecture.training_mse * 2.0 {
+                    if test_better || mean_rel_error < 0.01 {
                         conjecture.confidence = (conjecture.confidence + 0.9) / 2.0;
+                    } else {
+                        conjecture.confidence = (conjecture.confidence + 0.7) / 2.0;
                     }
-                } else if test_mse.is_finite() {
+
+                    // ── Known constant matching (#7) ──────────────────
+                    // If it's a constant, try to identify it
+                    if is_constant {
+                        if let Expr::Const(c) = &conjecture.formula {
+                            if let Some(name) = identify_constant(*c) {
+                                conjecture.formula_str = name;
+                            }
+                        }
+                    }
+                } else if test_mse.is_finite() && mean_rel_error > 0.5 {
                     conjecture.status = ConjectureStatus::Refuted {
                         counterexample: test[0].0,
                     };
                     conjecture.confidence = 0.0;
                 }
+                // If neither accepted nor refuted, stays Proposed (uncertain)
             }
         }
     }
@@ -1158,13 +1400,19 @@ impl ConjectureEngine {
     pub fn verify_formal(&mut self, max_n: usize) {
         let observations = self.observations.clone();
         for conjecture in &mut self.conjectures {
-            // Only verify numerically-tested conjectures
             if !matches!(conjecture.status, ConjectureStatus::NumericallyTested { .. }) {
                 continue;
             }
 
+            // Skip formal verification for asymptotic/constant conjectures (#1).
+            // These capture limits, not exact values — formal point-wise matching
+            // is the wrong verification mode. They're already numerically verified.
+            let v1 = conjecture.formula.eval(&[("n", 10.0)]);
+            let v2 = conjecture.formula.eval(&[("n", 100.0)]);
+            let is_asymptotic = v1.is_finite() && v2.is_finite() && (v1 - v2).abs() < v1.abs().max(1.0) * 0.01;
+            if is_asymptotic { continue; }
+
             if let Some(seq) = observations.iter().find(|s| s.name == conjecture.source) {
-                // Build a lookup of known values
                 let known: std::collections::HashMap<i64, f64> = seq.data.iter()
                     .map(|(x, y)| (*x as i64, *y))
                     .collect();
@@ -1181,8 +1429,8 @@ impl ConjectureEngine {
                         break;
                     }
 
-                    // If we have a known value, check exact match
                     if let Some(&expected) = known.get(&(n as i64)) {
+                        // Use relative tolerance for large values, absolute for small
                         let tol = expected.abs().max(1.0) * 1e-9;
                         if (predicted - expected).abs() > tol {
                             all_exact = false;
@@ -1199,13 +1447,18 @@ impl ConjectureEngine {
                     };
                     conjecture.confidence = 0.95;
                 } else if let Some(cx) = first_failure {
-                    // Only refute if it was previously good (numerical test passed)
-                    // — don't downgrade for extrapolation beyond known data
                     if known.contains_key(&(cx as i64)) {
-                        conjecture.status = ConjectureStatus::Refuted {
-                            counterexample: cx,
-                        };
-                        conjecture.confidence = 0.0;
+                        // Don't refute if error is small relative to value (#1)
+                        let pred = conjecture.formula.eval(&[("n", cx)]);
+                        let expected = known[&(cx as i64)];
+                        let rel_err = if expected.abs() > 1e-10 {
+                            ((pred - expected) / expected).abs()
+                        } else { (pred - expected).abs() };
+                        if rel_err > 0.5 {
+                            conjecture.status = ConjectureStatus::Refuted { counterexample: cx };
+                            conjecture.confidence = 0.0;
+                        }
+                        // If rel_err <= 0.5, stay NumericallyTested (don't refute)
                     }
                 }
             }
