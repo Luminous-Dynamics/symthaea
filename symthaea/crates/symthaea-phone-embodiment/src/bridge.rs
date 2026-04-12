@@ -466,8 +466,11 @@ impl PhoneBridge {
     }
 
     /// Encode current screen perception as a 16,384D ContinuousHV.
+    ///
+    /// Uses the last perception HV from the vision manifold observation,
+    /// or returns a zero HV if no observation has been made yet.
     pub fn encode_perception_hv(&mut self) -> symthaea_core::hdc::ContinuousHV {
-        self.vision.scene_hv().cloned().unwrap_or_else(|| {
+        self.last_perception.clone().unwrap_or_else(|| {
             symthaea_core::hdc::ContinuousHV::zero(symthaea_core::hdc::HDC_DIMENSION)
         })
     }

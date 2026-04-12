@@ -279,7 +279,7 @@ impl CognitiveLoopService {
         #[cfg(any(feature = "humanoid", feature = "helicopter", feature = "flight",
                   feature = "vehicle", feature = "auv", feature = "manipulator",
                   feature = "exoskeleton", feature = "surgical", feature = "orbital",
-                  feature = "quadruped"))]
+                  feature = "quadruped", feature = "phone"))]
         {
             let cycle_num = self.stats.total_cycles as usize;
             let interval = self.config.embodiment_step_interval.max(1);
@@ -459,7 +459,7 @@ impl CognitiveLoopService {
             #[cfg(any(feature = "humanoid", feature = "helicopter", feature = "flight",
                       feature = "vehicle", feature = "auv", feature = "manipulator",
                       feature = "exoskeleton", feature = "surgical", feature = "orbital",
-                      feature = "quadruped"))]
+                      feature = "quadruped", feature = "phone"))]
             if let Some(ref mut bridge) = self.sensorimotor.embodiment_bridge {
                 use crate::cognitive_loop::motor_bridge::MotorSafetyLevel;
                 if safety_result.motor_halt {

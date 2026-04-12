@@ -62,92 +62,8 @@ use super::{
     WorldModelBridge,
 };
 
-/// Macro: generate a thin adapter that wraps a platform's embodiment struct
-/// and delegates all EmbodimentBridge methods. Since all types now come from
-/// `symthaea_core::embodiment`, step/telemetry/safety_level pass through directly.
-macro_rules! bridge_adapter {
-    ($name:ident, $inner:ty, $platform:ident, $actuators:expr, $feature:literal) => {
-        #[cfg(feature = $feature)]
-        pub(crate) struct $name(pub(crate) $inner);
-
-        #[cfg(feature = $feature)]
-        impl super::motor_bridge::EmbodimentBridge for $name {
-            fn step(
-                &mut self,
-                thought_hv: &symthaea_core::hdc::ContinuousHV,
-                dt: f32,
-                phi: f64,
-            ) -> super::motor_bridge::EmbodimentResult {
-                self.0.step(thought_hv, dt, phi)
-            }
-
-            fn encode_perception(&mut self) -> symthaea_core::hdc::ContinuousHV {
-                self.0.encode_perception()
-            }
-
-            fn reset(&mut self) {
-                self.0.reset();
-            }
-            fn safety_level(&self) -> super::motor_bridge::MotorSafetyLevel {
-                self.0.safety_level()
-            }
-            fn set_safety_override(&mut self, level: super::motor_bridge::MotorSafetyLevel) {
-                self.0.set_safety_override(level);
-            }
-            fn clear_safety_override(&mut self) {
-                self.0.clear_safety_override();
-            }
-            fn platform(&self) -> super::motor_bridge::EmbodimentPlatform {
-                super::motor_bridge::EmbodimentPlatform::$platform
-            }
-            fn num_actuators(&self) -> usize {
-                $actuators
-            }
-            fn total_steps(&self) -> usize {
-                self.0.total_steps()
-            }
-            fn telemetry(&self) -> super::motor_bridge::EmbodimentTelemetry {
-                self.0.telemetry()
-            }
-        }
-    };
-}
-
-bridge_adapter!(
-    HelicopterBridgeAdapter,
-    crate::helicopter::embodiment::HelicopterEmbodiment,
-    Helicopter,
-    6,
-    "helicopter"
-);
-bridge_adapter!(
-    FlightBridgeAdapter,
-    crate::flight::embodiment::FlightEmbodiment,
-    Quadrotor,
-    4,
-    "flight"
-);
-bridge_adapter!(
-    VehicleBridgeAdapter,
-    crate::vehicle::embodiment::VehicleEmbodiment,
-    Vehicle,
-    3,
-    "vehicle"
-);
-bridge_adapter!(
-    ManipulatorBridgeAdapter,
-    crate::manipulator::embodiment::ManipulatorEmbodiment,
-    Manipulator,
-    8,
-    "manipulator"
-);
-bridge_adapter!(
-    AuvBridgeAdapter,
-    crate::auv::embodiment::AuvEmbodiment,
-    Auv,
-    8,
-    "auv"
-);
+// Bridge adapters removed — all platforms now implement EmbodimentBridge directly
+// in their own crate (see each platform's embodiment.rs).
 
 /// Optional consciousness monitors and ethics analyzers built from config flags.
 ///
@@ -837,7 +753,7 @@ impl CognitiveLoopService {
                 },
             };
 
-            #[cfg(any(feature = "humanoid", feature = "helicopter", feature = "flight", feature = "vehicle", feature = "auv", feature = "manipulator", feature = "exoskeleton", feature = "surgical", feature = "orbital", feature = "quadruped"))]
+            #[cfg(any(feature = "humanoid", feature = "helicopter", feature = "flight", feature = "vehicle", feature = "auv", feature = "manipulator", feature = "exoskeleton", feature = "surgical", feature = "orbital", feature = "quadruped", feature = "phone"))]
             let embodiment_bridge_init = {
                 use super::motor_bridge::EmbodimentPlatform;
                 match config.embodiment_platform {
@@ -855,71 +771,42 @@ impl CognitiveLoopService {
                     }
                     #[cfg(feature = "helicopter")]
                     EmbodimentPlatform::Helicopter => {
-                        let genesis = config
-                            .genesis_phrase
-                            .as_ref()
-                            .map(|p| symthaea_core::genesis::GenesisSeed::from_phrase(p));
-                        let inner = crate::helicopter::embodiment::HelicopterEmbodiment::new(
-                            &genesis.unwrap_or_else(|| {
-                                symthaea_core::genesis::GenesisSeed::from_phrase("default")
-                            }),
-                        );
-                        Some(Box::new(HelicopterBridgeAdapter(inner))
+                        let genesis = config.genesis_phrase.as_ref()
+                            .map(|p| symthaea_core::genesis::GenesisSeed::from_phrase(p))
+                            .unwrap_or_else(|| symthaea_core::genesis::GenesisSeed::from_phrase("default"));
+                        Some(Box::new(crate::helicopter::embodiment::HelicopterEmbodiment::new(&genesis))
                             as Box<dyn super::motor_bridge::EmbodimentBridge>)
                     }
                     #[cfg(feature = "flight")]
                     EmbodimentPlatform::Quadrotor => {
-                        let genesis = config
-                            .genesis_phrase
-                            .as_ref()
-                            .map(|p| symthaea_core::genesis::GenesisSeed::from_phrase(p));
-                        let inner = crate::flight::embodiment::FlightEmbodiment::new(
-                            &genesis.unwrap_or_else(|| {
-                                symthaea_core::genesis::GenesisSeed::from_phrase("default")
-                            }),
-                        );
-                        Some(Box::new(FlightBridgeAdapter(inner))
+                        let genesis = config.genesis_phrase.as_ref()
+                            .map(|p| symthaea_core::genesis::GenesisSeed::from_phrase(p))
+                            .unwrap_or_else(|| symthaea_core::genesis::GenesisSeed::from_phrase("default"));
+                        Some(Box::new(crate::flight::embodiment::FlightEmbodiment::new(&genesis))
                             as Box<dyn super::motor_bridge::EmbodimentBridge>)
                     }
                     #[cfg(feature = "vehicle")]
                     EmbodimentPlatform::Vehicle => {
-                        let genesis = config
-                            .genesis_phrase
-                            .as_ref()
-                            .map(|p| symthaea_core::genesis::GenesisSeed::from_phrase(p));
-                        let inner = crate::vehicle::embodiment::VehicleEmbodiment::new(
-                            &genesis.unwrap_or_else(|| {
-                                symthaea_core::genesis::GenesisSeed::from_phrase("default")
-                            }),
-                        );
-                        Some(Box::new(VehicleBridgeAdapter(inner))
+                        let genesis = config.genesis_phrase.as_ref()
+                            .map(|p| symthaea_core::genesis::GenesisSeed::from_phrase(p))
+                            .unwrap_or_else(|| symthaea_core::genesis::GenesisSeed::from_phrase("default"));
+                        Some(Box::new(crate::vehicle::embodiment::VehicleEmbodiment::new(&genesis))
                             as Box<dyn super::motor_bridge::EmbodimentBridge>)
                     }
                     #[cfg(feature = "manipulator")]
                     EmbodimentPlatform::Manipulator => {
-                        let genesis = config
-                            .genesis_phrase
-                            .as_ref()
-                            .map(|p| symthaea_core::genesis::GenesisSeed::from_phrase(p));
-                        let inner = crate::manipulator::embodiment::ManipulatorEmbodiment::new(
-                            &genesis.unwrap_or_else(|| {
-                                symthaea_core::genesis::GenesisSeed::from_phrase("default")
-                            }),
-                        );
-                        Some(Box::new(ManipulatorBridgeAdapter(inner))
+                        let genesis = config.genesis_phrase.as_ref()
+                            .map(|p| symthaea_core::genesis::GenesisSeed::from_phrase(p))
+                            .unwrap_or_else(|| symthaea_core::genesis::GenesisSeed::from_phrase("default"));
+                        Some(Box::new(crate::manipulator::embodiment::ManipulatorEmbodiment::new(&genesis))
                             as Box<dyn super::motor_bridge::EmbodimentBridge>)
                     }
                     #[cfg(feature = "auv")]
                     EmbodimentPlatform::Auv => {
-                        let genesis = config
-                            .genesis_phrase
-                            .as_ref()
-                            .map(|p| symthaea_core::genesis::GenesisSeed::from_phrase(p));
-                        let inner =
-                            crate::auv::embodiment::AuvEmbodiment::new(&genesis.unwrap_or_else(
-                                || symthaea_core::genesis::GenesisSeed::from_phrase("default"),
-                            ));
-                        Some(Box::new(AuvBridgeAdapter(inner))
+                        let genesis = config.genesis_phrase.as_ref()
+                            .map(|p| symthaea_core::genesis::GenesisSeed::from_phrase(p))
+                            .unwrap_or_else(|| symthaea_core::genesis::GenesisSeed::from_phrase("default"));
+                        Some(Box::new(crate::auv::embodiment::AuvEmbodiment::new(&genesis))
                             as Box<dyn super::motor_bridge::EmbodimentBridge>)
                     }
                     #[cfg(feature = "exoskeleton")]
@@ -954,6 +841,15 @@ impl CognitiveLoopService {
                         Some(Box::new(symthaea_quadruped::embodiment::QuadrupedEmbodiment::new(&genesis))
                             as Box<dyn super::motor_bridge::EmbodimentBridge>)
                     }
+                    #[cfg(feature = "phone")]
+                    EmbodimentPlatform::Phone => {
+                        let _genesis = config.genesis_phrase.as_ref()
+                            .map(|p| symthaea_core::genesis::GenesisSeed::from_phrase(p))
+                            .unwrap_or_else(|| symthaea_core::genesis::GenesisSeed::from_phrase("default"));
+                        Some(Box::new(symthaea_phone_embodiment::PhoneBridge::new(
+                            "41201FDJG000UM", 1008, 2244,
+                        )) as Box<dyn super::motor_bridge::EmbodimentBridge>)
+                    }
                     _ => None,
                 }
             };
@@ -967,11 +863,11 @@ impl CognitiveLoopService {
                 Some(pain_sender),
                 thermal_bridge_instance,
                 Some(thermal_sender),
-                #[cfg(any(feature = "humanoid", feature = "helicopter", feature = "flight", feature = "vehicle", feature = "auv", feature = "manipulator", feature = "exoskeleton", feature = "surgical", feature = "orbital", feature = "quadruped"))]
+                #[cfg(any(feature = "humanoid", feature = "helicopter", feature = "flight", feature = "vehicle", feature = "auv", feature = "manipulator", feature = "exoskeleton", feature = "surgical", feature = "orbital", feature = "quadruped", feature = "phone"))]
                 embodiment_bridge_init,
-                #[cfg(any(feature = "humanoid", feature = "helicopter", feature = "flight", feature = "vehicle", feature = "auv", feature = "manipulator", feature = "exoskeleton", feature = "surgical", feature = "orbital", feature = "quadruped"))]
+                #[cfg(any(feature = "humanoid", feature = "helicopter", feature = "flight", feature = "vehicle", feature = "auv", feature = "manipulator", feature = "exoskeleton", feature = "surgical", feature = "orbital", feature = "quadruped", feature = "phone"))]
                 None,
-                #[cfg(any(feature = "humanoid", feature = "helicopter", feature = "flight", feature = "vehicle", feature = "auv", feature = "manipulator", feature = "exoskeleton", feature = "surgical", feature = "orbital", feature = "quadruped"))]
+                #[cfg(any(feature = "humanoid", feature = "helicopter", feature = "flight", feature = "vehicle", feature = "auv", feature = "manipulator", feature = "exoskeleton", feature = "surgical", feature = "orbital", feature = "quadruped", feature = "phone"))]
                 super::motor_bridge::EmbodimentTelemetry::default(),
             )
         };
