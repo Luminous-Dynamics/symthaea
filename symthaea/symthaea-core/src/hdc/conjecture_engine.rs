@@ -1170,9 +1170,12 @@ fn identify_constant(val: f64) -> Option<String> {
         ("π²/6", std::f64::consts::PI * std::f64::consts::PI / 6.0),
         ("1/π", std::f64::consts::FRAC_1_PI),
         ("2/π", std::f64::consts::FRAC_2_PI),
+        ("1/√π", 1.0 / std::f64::consts::PI.sqrt()),
         ("√3", 3.0_f64.sqrt()),
         ("1/√3", 1.0 / 3.0_f64.sqrt()),
         ("γ (Euler-Mascheroni)", 0.5772156649015329),
+        ("Catalan", 0.9159655941772190),   // Catalan's constant
+        ("Apéry ζ(3)", 1.2020569031595942), // Apéry's constant
     ];
     for (name, known) in candidates {
         if (val - known).abs() < known.abs().max(1.0) * 1e-4 {
@@ -1189,6 +1192,37 @@ fn identify_constant(val: f64) -> Option<String> {
         }
     }
     None
+}
+
+/// Identify mathematical constants in a conjecture's formula and annotate the limit.
+///
+/// Evaluates the formula at large n to find the asymptotic limit, then
+/// checks all constants in the expression tree. Returns a string like
+/// "→ φ ≈ 1.618" or "constants: [π, 1/e]".
+pub fn annotate_conjecture(conjecture: &Conjecture) -> String {
+    let mut annotations = Vec::new();
+
+    // Check constants in the expression tree
+    let consts = collect_constants(&conjecture.formula);
+    for c in &consts {
+        if let Some(name) = identify_constant(*c) {
+            annotations.push(format!("{}≈{:.4}", name, c));
+        }
+    }
+
+    // Check the asymptotic limit (evaluate at large n)
+    let limit = conjecture.formula.eval(&[("n", 1000.0)]);
+    if limit.is_finite() {
+        if let Some(name) = identify_constant(limit) {
+            annotations.push(format!("limit→{}", name));
+        }
+    }
+
+    if annotations.is_empty() {
+        String::new()
+    } else {
+        format!(" [{}]", annotations.join(", "))
+    }
 }
 
 /// Analyze growth class of a sequence (#5, #8).
@@ -2188,6 +2222,44 @@ pub fn observe_prime_gaps(max_prime: u64) -> ObservedSequence {
         .map(|(i, w)| (i as f64 + 1.0, (w[1] - w[0]) as f64))
         .collect();
     ObservedSequence::new("prime_gap(k)", MathDomain::NumberTheory, data)
+}
+
+/// Observe maximal prime gap below n: G(n) = max(p_{k+1} - p_k) for p_k ≤ n.
+///
+/// Cramér's conjecture: G(n) ~ (ln n)². The GP should discover the log-squared
+/// growth. This is an open problem — any quantitative scaling law is publishable.
+pub fn observe_maximal_prime_gap(max_n: u64) -> ObservedSequence {
+    let mut is_prime = vec![true; max_n as usize + 1];
+    for i in 2..=(max_n as f64).sqrt() as usize {
+        if is_prime[i] {
+            let mut j = i * i;
+            while j <= max_n as usize {
+                is_prime[j] = false;
+                j += i;
+            }
+        }
+    }
+
+    let mut max_gap = 0u64;
+    let mut prev_prime = 2u64;
+    let mut data = Vec::new();
+    let checkpoints: Vec<u64> = (1..=20).map(|i| max_n * i / 20).collect();
+    let mut next_cp = 0;
+
+    for n in 3..=max_n {
+        if n as usize <= max_n as usize && is_prime[n as usize] {
+            let gap = n - prev_prime;
+            if gap > max_gap { max_gap = gap; }
+            prev_prime = n;
+        }
+        if next_cp < checkpoints.len() && n >= checkpoints[next_cp] {
+            if max_gap > 0 {
+                data.push((n as f64, max_gap as f64));
+            }
+            next_cp += 1;
+        }
+    }
+    ObservedSequence::new("max_prime_gap(n)", MathDomain::NumberTheory, data)
 }
 
 /// Collect permanent/determinant ratio for random n×n matrices.
@@ -4467,14 +4539,15 @@ mod tests {
         ];
 
         let mut discovered = 0;
-        for (source, expected) in &sources {
+        for (source, _expected) in &sources {
             if let Some(best) = engine.best_for(source) {
                 let status = if best.training_mse < 1e-6 { "EXACT" }
                     else if best.training_mse < 1.0 { "GOOD" }
                     else { "APPROX" };
-                eprintln!("║ {:30} │ {:.2e} │ {:.3}  │ {:>4} ║  {} → {}",
+                let annotation = annotate_conjecture(best);
+                eprintln!("║ {:30} │ {:.2e} │ {:.3}  │ {:>4} ║  {} → {}{}",
                     source, best.training_mse, best.confidence, best.complexity,
-                    status, best.formula_str);
+                    status, best.formula_str, annotation);
                 if best.training_mse < 10.0 { discovered += 1; }
             } else {
                 eprintln!("║ {:30} │ {:>8} │ {:>6} │ {:>4} ║  NONE",
@@ -4641,5 +4714,76 @@ mod tests {
         eprintln!("Derivative: f'(n) = {}, max_err={:.4}, consistent={}",
             v.derivative_str, v.max_relative_error, v.is_consistent);
         assert!(v.is_consistent, "n² derivative should match finite differences");
+    }
+
+    // ════════════════════════════════════════════════════════════════════
+    // CONSTANT IDENTIFICATION + FRONTIER SEQUENCES
+    // ════════════════════════════════════════════════════════════════════
+
+    #[test]
+    fn test_identify_known_constants() {
+        assert_eq!(identify_constant(std::f64::consts::PI), Some("π".into()));
+        assert_eq!(identify_constant((1.0 + 5.0_f64.sqrt()) / 2.0), Some("φ".into()));
+        assert_eq!(identify_constant(1.0 / std::f64::consts::PI.sqrt()), Some("1/√π".into()));
+        assert_eq!(identify_constant(1.0 / std::f64::consts::E), Some("1/e".into()));
+        // Fractions
+        assert_eq!(identify_constant(0.5), Some("1/2".into()));
+        assert_eq!(identify_constant(0.333333), Some("1/3".into()));
+    }
+
+    #[test]
+    fn test_annotate_conjecture_identifies_phi() {
+        let conjecture = Conjecture {
+            formula: Expr::Const((1.0 + 5.0_f64.sqrt()) / 2.0),
+            formula_str: "1.618034".into(),
+            source: "test".into(),
+            domain: MathDomain::Combinatorics,
+            training_mse: 0.0,
+            complexity: 1,
+            fitness: 0.0,
+            status: ConjectureStatus::Proposed,
+            confidence: 0.5,
+        };
+        let ann = annotate_conjecture(&conjecture);
+        assert!(ann.contains("φ"), "should identify φ: {}", ann);
+    }
+
+    #[test]
+    fn test_maximal_prime_gap_observer() {
+        let seq = observe_maximal_prime_gap(1000);
+        assert!(!seq.data.is_empty(), "should have data points");
+        // Max gap below 1000 is 20 (between 887 and 907)
+        let last = seq.data.last().unwrap();
+        assert!(last.1 >= 8.0, "max gap below 1000 should be ≥ 8, got {}", last.1);
+        eprintln!("Max prime gap below {}: {}", last.0, last.1);
+    }
+
+    /// Frontier experiment: can the GP discover Cramér's conjecture G(n) ~ (ln n)²?
+    #[test]
+    fn test_frontier_prime_gap_scaling() {
+        let mut engine = ConjectureEngine::with_config(RegressorConfig {
+            population_size: 200,
+            generations: 80,
+            max_depth: 4,
+            max_complexity: 12,
+            lambda: 0.001,
+            seed: 42,
+            ..RegressorConfig::default()
+        });
+
+        engine.observe(observe_maximal_prime_gap(10000));
+        engine.generate_conjectures(5);
+        engine.verify_numerical();
+
+        eprintln!("\n═══ FRONTIER: PRIME GAP SCALING (Cramér's conjecture) ═══");
+        eprintln!("  Expected: G(n) ~ (ln n)² (open problem)\n");
+        for c in engine.conjectures.iter()
+            .filter(|c| c.source.contains("max_prime_gap")).take(5) {
+            let annotation = annotate_conjecture(c);
+            eprintln!("  {} | MSE={:.2e} | conf={:.2}{}",
+                c.formula_str, c.training_mse, c.confidence, annotation);
+        }
+
+        assert!(!engine.conjectures.is_empty());
     }
 }
