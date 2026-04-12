@@ -404,6 +404,14 @@ pub mod measure_probability;     // Measure spaces, martingales, Brownian motion
 pub mod polynomial_algebra;      // Groebner bases, Buchberger, ideal membership, resultants
 pub mod tactics;                 // Proof tactics: ring, omega, induct, norm_num, cases
 
+// ── Geometric Algebra (via symtropy-math) ────────────────────────────────────
+// N-dimensional bivectors, rotors, transforms, collision shapes.
+// Re-exported under feature gate for use in robotics crates and Einstein search.
+#[cfg(feature = "geometric-algebra")]
+pub mod geometric_algebra {
+    pub use symtropy_math::*;
+}
+
 // ── Conjecture Engine — The Ramanujan Protocol ───────────────────────────────
 pub mod conjecture_engine; // Automated conjecture generation via symbolic regression + verification
 
@@ -439,6 +447,7 @@ pub mod hierarchical_bundle; // Per-region bundling with role-based binding for 
 pub mod substrate_composition; // Weighted substrate mixtures for hybrid analysis
 pub mod substrate_independence; // Substrate type definitions // Real-time consciousness monitoring
 pub mod substrate_validation; // Validation framework with evidence levels and feasibility gaps
+pub mod topology_comparison; // Cross-domain topological comparison: Betti distance, bottleneck, Wasserstein, Rips complex
 pub mod trajectory_accumulator; // Behavioral identity via temporal HDC binding
 
 // Track: Neural Validation — TRIBE v2 fMRI comparison (feature-gated)
@@ -475,6 +484,7 @@ pub mod predictive_encoder; // Attention-modulated HDC encoding with LTC predict
 
 // Novel Algorithm Modules (Dec 2025)
 pub mod autodiff_phi; // Reverse-mode autodiff for consciousness optimization (Jan 2026)
+pub mod cross_domain_discovery; // Cross-domain knowledge bridge discovery via relational vectors
 pub mod cross_modal_binding; // Cross-modal binding for multi-sensory integration
 pub mod differentiable_phi; // Soft-partitioned differentiable Φ for gradient optimization
 pub mod metacognitive_monitor; // Real-time consciousness monitoring with self-reflection
