@@ -1014,6 +1014,10 @@ pub fn try_seq(goal: &Goal, tactics: &[Box<dyn Fn(&Goal) -> TacticResult>]) -> T
 use crate::hdc::barycentric::{centroid, circumcenter, incenter, orthocenter, Barycentric};
 use crate::hdc::computational_geometry::Point2D;
 use crate::hdc::diophantine::pell_equation;
+use crate::hdc::inequalities::{
+    amgm_holds, cauchy_schwarz_holds, jensen_convex_holds, power_mean_inequality_holds,
+    schur_t1_holds, schur_t2_holds,
+};
 use crate::hdc::number_theory::NumberTheoryEngine;
 use crate::hdc::synthetic_geometry::{GeomPredicate, GeomState};
 
@@ -1285,6 +1289,105 @@ pub fn tactic_barycentric_coerce(
             "{} is not a classical center of triangle {}{}{}",
             point_name, a_name, b_name, c_name
         ))
+    }
+}
+
+// ─── Phase 3A: IMO inequality tactics ────────────────────────────────────────
+//
+// Numerical verification wrappers around `hdc::inequalities`. These close
+// goals of the form "inequality X holds for witness W" by computing the
+// inequality at concrete values. They do NOT prove the inequality for all
+// real inputs — that's Z3's job. Their value is fast numerical pre-check
+// before committing to a symbolic proof.
+
+/// Closes a goal asserting AM ≥ GM for a concrete non-negative slice.
+pub fn tactic_amgm_check(_goal: &Goal, xs: &[f64]) -> TacticResult {
+    if xs.iter().any(|&x| x < 0.0) {
+        return TacticResult::Failed("AM-GM requires non-negative inputs".into());
+    }
+    if amgm_holds(xs) {
+        TacticResult::Closed
+    } else {
+        TacticResult::Failed(format!("AM-GM violated on {:?}", xs))
+    }
+}
+
+/// Closes a goal asserting (Σaᵢbᵢ)² ≤ (Σaᵢ²)(Σbᵢ²) for concrete slices.
+pub fn tactic_cauchy_schwarz_check(_goal: &Goal, a: &[f64], b: &[f64]) -> TacticResult {
+    if a.len() != b.len() {
+        return TacticResult::Failed("Cauchy-Schwarz requires equal-length slices".into());
+    }
+    if cauchy_schwarz_holds(a, b) {
+        TacticResult::Closed
+    } else {
+        TacticResult::Failed(format!("Cauchy-Schwarz violated on {:?}, {:?}", a, b))
+    }
+}
+
+/// Closes a goal asserting the power-mean inequality M_p ≤ M_q holds on a
+/// concrete non-negative slice.
+pub fn tactic_power_mean_check(
+    _goal: &Goal,
+    xs: &[f64],
+    p: f64,
+    q: f64,
+) -> TacticResult {
+    if p > q {
+        return TacticResult::Failed(format!(
+            "power mean requires p ≤ q, got p={}, q={}",
+            p, q
+        ));
+    }
+    if power_mean_inequality_holds(xs, p, q) {
+        TacticResult::Closed
+    } else {
+        TacticResult::Failed(format!("power mean violated on {:?} at p={}, q={}", xs, p, q))
+    }
+}
+
+/// Closes a Jensen-inequality goal for a user-supplied convex function,
+/// weights (summing to 1), and sample points.
+pub fn tactic_jensen_check<F>(
+    _goal: &Goal,
+    f: F,
+    weights: &[f64],
+    points: &[f64],
+) -> TacticResult
+where
+    F: Fn(f64) -> f64,
+{
+    if weights.len() != points.len() {
+        return TacticResult::Failed("Jensen: weights and points length mismatch".into());
+    }
+    let total: f64 = weights.iter().sum();
+    if (total - 1.0).abs() > 1e-9 {
+        return TacticResult::Failed(format!("Jensen: weights sum to {}, not 1", total));
+    }
+    if weights.iter().any(|&w| w < 0.0) {
+        return TacticResult::Failed("Jensen: weights must be non-negative".into());
+    }
+    if jensen_convex_holds(f, weights, points) {
+        TacticResult::Closed
+    } else {
+        TacticResult::Failed("Jensen (convex form) violated".into())
+    }
+}
+
+/// Closes a Schur-inequality goal for concrete non-negative triples at
+/// exponent t ∈ {1, 2}.
+pub fn tactic_schur_check(_goal: &Goal, a: f64, b: f64, c: f64, t: u32) -> TacticResult {
+    if a < 0.0 || b < 0.0 || c < 0.0 {
+        return TacticResult::Failed("Schur requires non-negative inputs".into());
+    }
+    let ok = match t {
+        1 => schur_t1_holds(a, b, c),
+        2 => schur_t2_holds(a, b, c),
+        _ => return TacticResult::Failed(format!("Schur exponent t={} not supported", t)),
+    };
+    if ok {
+        TacticResult::Closed
+    } else {
+        TacticResult::Failed(format!("Schur t={} violated at ({}, {}, {})", t, a, b, c))
     }
 }
 
@@ -1929,6 +2032,136 @@ mod tests {
         assert!(o.x.abs() < 1e-9 && o.y.abs() < 1e-9);
         // Step 4: every derived fact must still verify.
         assert!(s.facts_consistent());
+    }
+
+    // ── Phase 3A inequality tactics ────────────────────────────────────
+
+    #[test]
+    fn test_tactic_amgm_check_closes() {
+        let goal = Goal::new(Expr::Const(0));
+        assert!(matches!(
+            tactic_amgm_check(&goal, &[1.0, 4.0, 9.0]),
+            TacticResult::Closed
+        ));
+    }
+
+    #[test]
+    fn test_tactic_amgm_check_rejects_negative() {
+        let goal = Goal::new(Expr::Const(0));
+        assert!(matches!(
+            tactic_amgm_check(&goal, &[1.0, -1.0, 4.0]),
+            TacticResult::Failed(_)
+        ));
+    }
+
+    #[test]
+    fn test_tactic_cauchy_schwarz_check_closes() {
+        let goal = Goal::new(Expr::Const(0));
+        assert!(matches!(
+            tactic_cauchy_schwarz_check(&goal, &[1.0, 2.0, 3.0], &[4.0, 5.0, 6.0]),
+            TacticResult::Closed
+        ));
+    }
+
+    #[test]
+    fn test_tactic_cauchy_schwarz_length_mismatch() {
+        let goal = Goal::new(Expr::Const(0));
+        assert!(matches!(
+            tactic_cauchy_schwarz_check(&goal, &[1.0, 2.0], &[1.0, 2.0, 3.0]),
+            TacticResult::Failed(_)
+        ));
+    }
+
+    #[test]
+    fn test_tactic_power_mean_check_closes() {
+        let goal = Goal::new(Expr::Const(0));
+        // HM ≤ GM ≤ AM ≤ QM — multiple valid (p, q) pairs
+        for &(p, q) in &[(-1.0, 0.0), (0.0, 1.0), (1.0, 2.0)] {
+            assert!(matches!(
+                tactic_power_mean_check(&goal, &[1.0, 2.0, 4.0], p, q),
+                TacticResult::Closed
+            ));
+        }
+    }
+
+    #[test]
+    fn test_tactic_power_mean_wrong_order() {
+        let goal = Goal::new(Expr::Const(0));
+        // p > q should fail the precondition check
+        assert!(matches!(
+            tactic_power_mean_check(&goal, &[1.0, 2.0, 4.0], 2.0, 1.0),
+            TacticResult::Failed(_)
+        ));
+    }
+
+    #[test]
+    fn test_tactic_jensen_check_x_squared() {
+        let goal = Goal::new(Expr::Const(0));
+        assert!(matches!(
+            tactic_jensen_check(&goal, |x: f64| x * x, &[0.3, 0.3, 0.4], &[1.0, 2.0, 3.0]),
+            TacticResult::Closed
+        ));
+    }
+
+    #[test]
+    fn test_tactic_jensen_check_weights_dont_sum_to_one() {
+        let goal = Goal::new(Expr::Const(0));
+        assert!(matches!(
+            tactic_jensen_check(&goal, |x: f64| x * x, &[0.5, 0.3], &[1.0, 2.0]),
+            TacticResult::Failed(_)
+        ));
+    }
+
+    #[test]
+    fn test_tactic_schur_check_t1() {
+        let goal = Goal::new(Expr::Const(0));
+        assert!(matches!(
+            tactic_schur_check(&goal, 1.0, 2.0, 3.0, 1),
+            TacticResult::Closed
+        ));
+    }
+
+    #[test]
+    fn test_tactic_schur_check_t2() {
+        let goal = Goal::new(Expr::Const(0));
+        assert!(matches!(
+            tactic_schur_check(&goal, 0.5, 1.5, 2.5, 2),
+            TacticResult::Closed
+        ));
+    }
+
+    #[test]
+    fn test_tactic_schur_unsupported_exponent() {
+        let goal = Goal::new(Expr::Const(0));
+        assert!(matches!(
+            tactic_schur_check(&goal, 1.0, 2.0, 3.0, 5),
+            TacticResult::Failed(_)
+        ));
+    }
+
+    /// Phase 3A integration: stack three inequality tactics in sequence to
+    /// verify the classical chain   HM ≤ GM ≤ AM  on a concrete triple.
+    /// Each tactic closes independently; together they demonstrate the
+    /// compositional pattern for numerical inequality reasoning.
+    #[test]
+    fn test_phase3a_integration_hm_gm_am_chain() {
+        let goal = Goal::new(Expr::Const(0));
+        let xs = &[1.0, 2.0, 4.0][..];
+        // HM ≤ GM  (power mean at p=-1 ≤ p=0)
+        assert!(matches!(
+            tactic_power_mean_check(&goal, xs, -1.0, 0.0),
+            TacticResult::Closed
+        ));
+        // GM ≤ AM  (power mean at p=0 ≤ p=1)
+        assert!(matches!(
+            tactic_power_mean_check(&goal, xs, 0.0, 1.0),
+            TacticResult::Closed
+        ));
+        // And direct AM ≥ GM via the AM-GM tactic
+        assert!(matches!(
+            tactic_amgm_check(&goal, xs),
+            TacticResult::Closed
+        ));
     }
 
     /// Integration test: IMO-style sub-problem combining CRT + Legendre.
