@@ -2489,6 +2489,14 @@ fn harmonic_rhs(s: &[f64], _t: f64) -> Vec<f64> {
     vec![s[1], -s[0]]
 }
 
+/// Lotka-Volterra predator-prey: dx/dt = αx - βxy, dy/dt = δxy - γy.
+/// With α=β=δ=γ=1: dx/dt = x(1-y), dy/dt = y(x-1).
+/// Conserved: V = x - ln(x) + y - ln(y).
+fn lotka_volterra_rhs(s: &[f64], _t: f64) -> Vec<f64> {
+    let (x, y) = (s[0], s[1]);
+    vec![x * (1.0 - y), y * (x - 1.0)]
+}
+
 /// Observe harmonic oscillator invariant candidates.
 /// Returns time series of x²+v² (true invariant) and x² (not conserved).
 pub fn observe_harmonic_invariants(n_points: usize) -> Vec<ObservedSequence> {
@@ -2698,8 +2706,10 @@ pub enum SymExpr {
     Const(f64),
     Add(Box<SymExpr>, Box<SymExpr>),
     Mul(Box<SymExpr>, Box<SymExpr>),
+    Div(Box<SymExpr>, Box<SymExpr>),
     Neg(Box<SymExpr>),
     Pow(Box<SymExpr>, f64), // base^(constant exponent)
+    Log(Box<SymExpr>),      // natural logarithm
 }
 
 impl SymExpr {
@@ -2712,8 +2722,16 @@ impl SymExpr {
             SymExpr::Const(c) => *c,
             SymExpr::Add(a, b) => a.eval(vars) + b.eval(vars),
             SymExpr::Mul(a, b) => a.eval(vars) * b.eval(vars),
+            SymExpr::Div(a, b) => {
+                let bv = b.eval(vars);
+                if bv.abs() > 1e-15 { a.eval(vars) / bv } else { f64::NAN }
+            }
             SymExpr::Neg(a) => -a.eval(vars),
             SymExpr::Pow(base, exp) => base.eval(vars).powf(*exp),
+            SymExpr::Log(a) => {
+                let v = a.eval(vars);
+                if v > 0.0 { v.ln() } else { f64::NAN }
+            }
         }
     }
 
@@ -2735,6 +2753,16 @@ impl SymExpr {
                     Box::new(SymExpr::Mul(a.clone(), Box::new(b.diff(var)))),
                 )
             }
+            SymExpr::Div(a, b) => {
+                // Quotient rule: (a/b)' = (a'·b - a·b') / b²
+                SymExpr::Div(
+                    Box::new(SymExpr::Add(
+                        Box::new(SymExpr::Mul(Box::new(a.diff(var)), b.clone())),
+                        Box::new(SymExpr::Neg(Box::new(SymExpr::Mul(
+                            a.clone(), Box::new(b.diff(var)))))))),
+                    Box::new(SymExpr::Pow(b.clone(), 2.0)),
+                )
+            }
             SymExpr::Neg(a) => SymExpr::Neg(Box::new(a.diff(var))),
             SymExpr::Pow(base, exp) => {
                 // Power rule: (base^n)' = n · base^(n-1) · base'
@@ -2744,6 +2772,13 @@ impl SymExpr {
                         Box::new(SymExpr::Pow(base.clone(), *exp - 1.0)),
                     )),
                     Box::new(base.diff(var)),
+                )
+            }
+            SymExpr::Log(a) => {
+                // Chain rule: d/dx(ln(f)) = f'(x) / f(x)
+                SymExpr::Div(
+                    Box::new(a.diff(var)),
+                    a.clone(),
                 )
             }
         }
@@ -2782,11 +2817,31 @@ impl SymExpr {
                     _ => SymExpr::Neg(Box::new(a)),
                 }
             }
+            SymExpr::Div(a, b) => {
+                let a = a.simplify();
+                let b = b.simplify();
+                match (&a, &b) {
+                    (SymExpr::Const(x), _) if x.abs() < 1e-15 => SymExpr::Const(0.0),
+                    (_, SymExpr::Const(x)) if (*x - 1.0).abs() < 1e-15 => a,
+                    (SymExpr::Const(x), SymExpr::Const(y)) if y.abs() > 1e-15 => SymExpr::Const(x / y),
+                    _ => SymExpr::Div(Box::new(a), Box::new(b)),
+                }
+            }
             SymExpr::Pow(base, exp) => {
                 let base = base.simplify();
                 if (*exp - 1.0).abs() < 1e-15 { return base; }
                 if exp.abs() < 1e-15 { return SymExpr::Const(1.0); }
-                SymExpr::Pow(Box::new(base), *exp)
+                match &base {
+                    SymExpr::Const(c) => SymExpr::Const(c.powf(*exp)),
+                    _ => SymExpr::Pow(Box::new(base), *exp),
+                }
+            }
+            SymExpr::Log(a) => {
+                let a = a.simplify();
+                match &a {
+                    SymExpr::Const(c) if *c > 0.0 => SymExpr::Const(c.ln()),
+                    _ => SymExpr::Log(Box::new(a)),
+                }
             }
             _ => self.clone(),
         }
@@ -2803,8 +2858,10 @@ impl fmt::Display for SymExpr {
             }
             SymExpr::Add(a, b) => write!(f, "({} + {})", a, b),
             SymExpr::Mul(a, b) => write!(f, "({} · {})", a, b),
+            SymExpr::Div(a, b) => write!(f, "({}/{})", a, b),
             SymExpr::Neg(a) => write!(f, "(-{})", a),
             SymExpr::Pow(base, exp) => write!(f, "{}^{}", base, exp),
+            SymExpr::Log(a) => write!(f, "ln({})", a),
         }
     }
 }
@@ -3035,6 +3092,35 @@ pub fn discover_conservation_laws(
                  Box::new(SymExpr::Const(2.0)),
                  Box::new(SymExpr::Pow(Box::new(SymExpr::Var(v0.into())), 2.0)))),
              Box::new(SymExpr::Pow(Box::new(SymExpr::Var(v1.into())), 2.0)))),
+        // ── Transcendental candidates (Lotka-Volterra, ecology, economics) ──
+        // x - ln(x) + y - ln(y) (Lotka-Volterra invariant with α=β=δ=γ=1)
+        ("x - ln(x) + y - ln(y)",
+         Box::new(|s: &[f64]| {
+             if s[0] > 0.0 && s[1] > 0.0 {
+                 s[0] - s[0].ln() + s[1] - s[1].ln()
+             } else { f64::NAN }
+         }),
+         SymExpr::Add(
+             Box::new(SymExpr::Add(
+                 Box::new(SymExpr::Var(v0.into())),
+                 Box::new(SymExpr::Neg(Box::new(SymExpr::Log(Box::new(SymExpr::Var(v0.into())))))))),
+             Box::new(SymExpr::Add(
+                 Box::new(SymExpr::Var(v1.into())),
+                 Box::new(SymExpr::Neg(Box::new(SymExpr::Log(Box::new(SymExpr::Var(v1.into())))))))))),
+        // x + y (total population — not conserved in LV)
+        ("x + y",
+         Box::new(|s: &[f64]| s[0] + s[1]),
+         SymExpr::Add(
+             Box::new(SymExpr::Var(v0.into())),
+             Box::new(SymExpr::Var(v1.into())))),
+        // ln(x) + ln(y) = ln(xy) (not conserved in general)
+        ("ln(x) + ln(y)",
+         Box::new(|s: &[f64]| {
+             if s[0] > 0.0 && s[1] > 0.0 { s[0].ln() + s[1].ln() } else { f64::NAN }
+         }),
+         SymExpr::Add(
+             Box::new(SymExpr::Log(Box::new(SymExpr::Var(v0.into())))),
+             Box::new(SymExpr::Log(Box::new(SymExpr::Var(v1.into())))))),
     ];
 
     let mut results = Vec::new();
@@ -4952,5 +5038,82 @@ mod tests {
 
         eprintln!("\n  >>> DISCOVERY: E = x² + v² is a conserved quantity");
         eprintln!("  >>> PROOF: dE/dt = 2x·v + 2v·(-x) = 0 ✓");
+    }
+
+    /// LOTKA-VOLTERRA: discover the transcendental invariant V = x - ln(x) + y - ln(y).
+    ///
+    /// This is the graduate-level test. The conserved quantity involves logarithms,
+    /// not just polynomials. The symbolic proof requires chain rule through ln:
+    ///   dV/dt = (1 - 1/x)(x - xy) + (1 - 1/y)(xy - y)
+    ///         = (x - xy - 1 + y) + (xy - y - x + 1)
+    ///         = 0
+    #[test]
+    fn test_automated_conservation_lotka_volterra() {
+        // Symbolic dynamics: dx/dt = x(1-y) = x - xy, dy/dt = y(x-1) = xy - y
+        let dynamics = vec![
+            ("x", SymExpr::Add(
+                Box::new(SymExpr::Var("x".into())),
+                Box::new(SymExpr::Neg(Box::new(SymExpr::Mul(
+                    Box::new(SymExpr::Var("x".into())),
+                    Box::new(SymExpr::Var("y".into())))))))),
+            ("y", SymExpr::Add(
+                Box::new(SymExpr::Mul(
+                    Box::new(SymExpr::Var("x".into())),
+                    Box::new(SymExpr::Var("y".into())))),
+                Box::new(SymExpr::Neg(Box::new(SymExpr::Var("y".into())))))),
+        ];
+
+        // Initial condition: x₀=2, y₀=1 (off-equilibrium, creates oscillating orbits)
+        let results = discover_conservation_laws(
+            lotka_volterra_rhs, &[2.0, 1.0], &dynamics, &["x", "y"], 30.0, 0.005);
+
+        eprintln!("\n═══ AUTOMATED PHYSICIST: LOTKA-VOLTERRA PREDATOR-PREY ═══");
+        eprintln!("  Input: dx/dt = x(1-y), dy/dt = y(x-1)\n");
+        for r in &results {
+            let status = if r.symbolically_proven { "PROVEN ✓" }
+                else if r.variance < 1e-4 { "numerically conserved" }
+                else { "NOT conserved" };
+            eprintln!("  {:25} │ var={:.2e} │ mean={:.4} │ {}",
+                r.name, r.variance, r.mean_value, status);
+        }
+
+        // The LV invariant should be discovered AND symbolically proven
+        let lv = results.iter().find(|r| r.name.contains("ln(x)") && r.name.contains("ln(y)") && r.name.contains("x -"));
+        assert!(lv.is_some(), "should find LV invariant candidate");
+        let lv = lv.unwrap();
+        assert!(lv.variance < 1e-4,
+            "V = x - ln(x) + y - ln(y) should be conserved, var={:.2e}", lv.variance);
+
+        // Polynomial candidates should NOT be conserved
+        let x2y2 = results.iter().find(|r| r.name == "x² + y²");
+        if let Some(c) = x2y2 {
+            assert!(!c.symbolically_proven, "x²+y² should NOT be conserved in LV");
+        }
+
+        eprintln!("\n  >>> DISCOVERY: V = x - ln(x) + y - ln(y) is a conserved quantity");
+        eprintln!("  >>> This is the Lotka-Volterra first integral (transcendental invariant)");
+        if lv.symbolically_proven {
+            eprintln!("  >>> PROOF: dV/dt = (1-1/x)(x-xy) + (1-1/y)(xy-y) = 0 ✓");
+        }
+    }
+
+    /// Test that SymExpr Log differentiation works correctly.
+    #[test]
+    fn test_sym_diff_log() {
+        // d/dx(ln(x)) = 1/x
+        let expr = SymExpr::Log(Box::new(SymExpr::Var("x".into())));
+        let deriv = expr.diff("x").simplify();
+        // Evaluate: at x=2, d/dx(ln(x)) = 1/2 = 0.5
+        let val = deriv.eval(&[("x", 2.0)]);
+        assert!((val - 0.5).abs() < 1e-10, "d/dx(ln(x)) at x=2 = 0.5, got {}", val);
+
+        // d/dx(x - ln(x)) = 1 - 1/x
+        let expr2 = SymExpr::Add(
+            Box::new(SymExpr::Var("x".into())),
+            Box::new(SymExpr::Neg(Box::new(SymExpr::Log(Box::new(SymExpr::Var("x".into())))))));
+        let deriv2 = expr2.diff("x").simplify();
+        // At x=2: 1 - 1/2 = 0.5
+        let val2 = deriv2.eval(&[("x", 2.0)]);
+        assert!((val2 - 0.5).abs() < 1e-10, "d/dx(x - ln(x)) at x=2 = 0.5, got {}", val2);
     }
 }
