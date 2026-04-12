@@ -175,6 +175,13 @@ fn main() {
             all_samples.extend_from_slice(&chunk);
         }
 
+        // P0.2: Auto-master before writing (LUFS normalization + limiting)
+        symthaea_muse::auto_master::auto_master(
+            &mut all_samples,
+            44100,
+            &symthaea_muse::auto_master::MasteringConfig::default(),
+        );
+
         // Write WAV
         let path = format!("{}/{}", out_dir, phase.filename);
         let spec = hound::WavSpec {

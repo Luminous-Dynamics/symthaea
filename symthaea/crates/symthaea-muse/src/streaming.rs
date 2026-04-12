@@ -110,6 +110,20 @@ fn envelope(atk: f32, dec: f32, sus: f32, rel: f32, t: f32, dur: f32) -> f32 {
     }
 }
 
+/// Gentle limiter: identity below ±0.95, smooth compression above.
+/// Unlike tanh (which compresses starting at ~0.3), this preserves full
+/// dynamics for normal audio levels and only activates on peaks.
+fn gentle_limit(x: f32) -> f32 {
+    let threshold = 0.95_f32;
+    if x > threshold {
+        threshold + (1.0 - threshold) * (1.0 - (-(x - threshold) * 4.0).exp())
+    } else if x < -threshold {
+        -threshold - (1.0 - threshold) * (1.0 - ((x + threshold) * 4.0).exp())
+    } else {
+        x
+    }
+}
+
 fn soft_clip(x: f32) -> f32 {
     if x > 1.0 {
         1.0 - (-x + 1.0).exp() * 0.5
@@ -937,10 +951,11 @@ impl StreamingSynth {
             features.modulate_state(&mut self.state, self.feedback_strength);
         }
 
-        // Final soft clip: prevent any sample from exceeding ±1.0
+        // Final limiter: gentle clip that preserves dynamics below ±0.95
+        // (tanh crushes dynamics at moderate levels — 0.8 input → 0.66 output)
         for pair in &mut buffer {
-            pair[0] = pair[0].tanh();
-            pair[1] = pair[1].tanh();
+            pair[0] = gentle_limit(pair[0]);
+            pair[1] = gentle_limit(pair[1]);
         }
 
         self.total_samples_rendered += self.chunk_samples as u64;
@@ -1321,31 +1336,44 @@ impl StreamingSynth {
             }
 
             if let Some(note) = Some(note) {
-                let idx = self.active_notes.len();
-                let voice_idx = match idx % 4 {
-                    0 => 0, // lead
-                    1 => {
-                        if psi > 0.4 {
-                            1
-                        } else {
-                            0
-                        }
-                    } // bass or lead
-                    2 => {
-                        if psi > 0.6 {
-                            2
-                        } else {
-                            0
-                        }
-                    } // harmony or lead
-                    _ => {
-                        if psi > 0.7 {
-                            3
-                        } else {
-                            0
-                        }
-                    } // ostinato or lead
-                };
+                // P0.1: Voice-aware pitch derivation.
+                // Lead uses the melody note as-is. Bass/harmony/ostinato derive
+                // musically related pitches from the lead frequency.
+                let note_counter = self.note_counter;
+                let voice_idx = 0_usize; // Lead voice always gets the melody note
+
+                // Spawn accompaniment voices alongside lead (not randomly)
+                // Bass: every 2nd note, octave below
+                let spawn_bass = psi > 0.4 && note_counter % 2 == 0;
+                // Harmony: every 3rd note, chord tone above
+                let spawn_harmony = psi > 0.6 && note_counter % 3 == 0;
+                // Ostinato: every 4th note, repeat a motif
+                let spawn_ostinato = psi > 0.7 && note_counter % 4 == 0;
+
+                // Collect voices to spawn: (voice_idx, frequency, velocity_scale)
+                let mut voices_to_spawn: Vec<(usize, f32, f32)> = vec![
+                    (0, note.frequency, 1.0), // lead always
+                ];
+                if spawn_bass {
+                    // Bass: octave below, longer duration implicit via lower voice volume
+                    let bass_freq = (note.frequency * 0.5).max(55.0);
+                    voices_to_spawn.push((1, bass_freq, 0.7));
+                }
+                if spawn_harmony {
+                    // Harmony: perfect 5th above for positive valence, minor 3rd for negative
+                    let harm_ratio = if self.state.valence > 0.0 { 1.4983 } else { 1.1892 }; // P5 or m3
+                    let harm_freq = note.frequency * harm_ratio;
+                    voices_to_spawn.push((2, harm_freq, 0.5));
+                }
+                if spawn_ostinato {
+                    // Ostinato: same pitch, delayed entry creates echo effect
+                    voices_to_spawn.push((3, note.frequency, 0.3));
+                }
+
+                for &(voice_idx, voice_freq, vel_scale) in &voices_to_spawn {
+                let mut note = note;
+                note.frequency = voice_freq;
+                note.velocity *= vel_scale;
 
                 // Clear old notes in this voice to prevent mud
                 // Allow more overlap when sustain pedal is engaged (high Phi)
@@ -1449,6 +1477,7 @@ impl StreamingSynth {
                     ks,
                     fm_buffer,
                 });
+                } // end for voice_idx in voices_to_spawn
             }
         }
     }
