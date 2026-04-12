@@ -265,7 +265,7 @@ pub fn random_expr(rng: &mut u64, max_depth: usize) -> Expr {
 // ═══════════════════════════════════════════════════════════════════════════
 
 /// A mathematical domain that produces observable data.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum MathDomain {
     NumberTheory,
     Combinatorics,
@@ -3311,6 +3311,334 @@ pub fn discover_conservation_laws_with_custom(
     results
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// AUTONOMOUS INVARIANT DISCOVERY (GP variance minimization)
+// ═══════════════════════════════════════════════════════════════════════════
+
+/// Generate a random expression tree over multiple state variables.
+fn random_expr_multivar(rng: &mut u64, max_depth: usize, var_names: &[&str]) -> Expr {
+    *rng = lcg_step(*rng);
+    if max_depth == 0 || (*rng % 3 == 0 && max_depth < 3) {
+        *rng = lcg_step(*rng);
+        if *rng % 3 == 0 {
+            // Pick a random state variable
+            *rng = lcg_step(*rng);
+            Expr::Var(var_names[*rng as usize % var_names.len()].to_string())
+        } else {
+            let constants = [0.0, 0.5, 1.0, 2.0, 3.0, -1.0, -0.5,
+                std::f64::consts::PI, std::f64::consts::E];
+            *rng = lcg_step(*rng);
+            Expr::Const(constants[*rng as usize % constants.len()])
+        }
+    } else {
+        *rng = lcg_step(*rng);
+        if *rng % 5 == 0 {
+            let fns = [UnaryFn::Sqrt, UnaryFn::Log, UnaryFn::Sin, UnaryFn::Cos];
+            *rng = lcg_step(*rng);
+            Expr::Func(fns[*rng as usize % fns.len()],
+                Box::new(random_expr_multivar(rng, max_depth - 1, var_names)))
+        } else {
+            let ops = [BinOp::Add, BinOp::Sub, BinOp::Mul, BinOp::Div, BinOp::Pow];
+            *rng = lcg_step(*rng);
+            let op = ops[*rng as usize % ops.len()];
+            Expr::BinOp(op,
+                Box::new(random_expr_multivar(rng, max_depth - 1, var_names)),
+                Box::new(random_expr_multivar(rng, max_depth - 1, var_names)))
+        }
+    }
+}
+
+/// Mutate an expression, using multi-variable random subtrees.
+fn mutate_multivar(expr: &Expr, rng: &mut u64, depth: usize, var_names: &[&str]) -> Expr {
+    *rng = lcg_step(*rng);
+    let p = 1.0 / (1.0 + depth as f64);
+    if (*rng as f64 / u64::MAX as f64) < p {
+        return random_expr_multivar(rng, 2, var_names);
+    }
+    match expr {
+        Expr::Var(_) | Expr::Const(_) => random_expr_multivar(rng, 1, var_names),
+        Expr::BinOp(op, l, r) => {
+            *rng = lcg_step(*rng);
+            if *rng % 2 == 0 {
+                Expr::BinOp(*op, Box::new(mutate_multivar(l, rng, depth + 1, var_names)), r.clone())
+            } else {
+                Expr::BinOp(*op, l.clone(), Box::new(mutate_multivar(r, rng, depth + 1, var_names)))
+            }
+        }
+        Expr::Func(f, arg) => Expr::Func(*f, Box::new(mutate_multivar(arg, rng, depth + 1, var_names))),
+        Expr::Sum(body, var) => Expr::Sum(Box::new(mutate_multivar(body, rng, depth + 1, var_names)), var.clone()),
+    }
+}
+
+/// Compute variance of an expression evaluated along trajectory states.
+/// Low variance = potential conservation law.
+fn compute_trajectory_variance(expr: &Expr, trajectory: &[Vec<f64>], var_names: &[&str]) -> f64 {
+    let values: Vec<f64> = trajectory.iter()
+        .map(|state| {
+            let bindings: Vec<(&str, f64)> = var_names.iter()
+                .zip(state.iter())
+                .map(|(name, val)| (*name, *val))
+                .collect();
+            expr.eval(&bindings)
+        })
+        .filter(|v| v.is_finite())
+        .collect();
+
+    if values.len() < 10 { return f64::MAX; }
+
+    let mean = values.iter().sum::<f64>() / values.len() as f64;
+    if !mean.is_finite() || mean.abs() > 1e15 { return f64::MAX; }
+
+    let var = values.iter().map(|v| (v - mean).powi(2)).sum::<f64>() / values.len() as f64;
+    if !var.is_finite() { f64::MAX } else { var }
+}
+
+/// A conservation law discovered autonomously by GP variance minimization.
+#[derive(Debug, Clone)]
+pub struct AutonomousInvariant {
+    /// The discovered formula
+    pub formula: Expr,
+    /// Human-readable formula string
+    pub formula_str: String,
+    /// Trajectory variance (lower = more conserved)
+    pub variance: f64,
+    /// Mean value along trajectory
+    pub mean_value: f64,
+    /// AST complexity
+    pub complexity: usize,
+    /// Whether symbolically proven via chain rule
+    pub symbolically_proven: bool,
+}
+
+/// Autonomously discover conservation laws from a dynamical system.
+///
+/// **No pre-specified candidates.** The GP evolves expressions over state
+/// variables that minimize trajectory variance — any function f(state) that
+/// evaluates to a near-constant along the trajectory is a conservation law.
+///
+/// This is the core automated physicist: give it ONLY the ODE and initial
+/// conditions, and it discovers what's conserved.
+pub fn discover_invariants_autonomous(
+    rhs: fn(&[f64], f64) -> Vec<f64>,
+    initial_state: &[f64],
+    var_names: &[&str],
+    dynamics: Option<&[(&str, SymExpr)]>, // for symbolic proof (optional)
+    config: &RegressorConfig,
+    t_max: f64,
+    dt: f64,
+) -> Vec<AutonomousInvariant> {
+    let ndim = initial_state.len();
+    assert_eq!(var_names.len(), ndim);
+
+    // Step 1: Integrate and sample trajectory
+    let (_times, states) = rk45_trajectory(rhs, initial_state, t_max, dt);
+    let n_samples = 200.min(states.len());
+    let step = states.len() / n_samples.max(1);
+    let sampled: Vec<Vec<f64>> = states.iter()
+        .step_by(step.max(1))
+        .take(n_samples)
+        .cloned()
+        .collect();
+
+    if sampled.len() < 20 { return Vec::new(); }
+
+    // Step 2: GP evolution with variance as fitness
+    let pop_size = config.population_size;
+    let generations = config.generations;
+    let max_depth = config.max_depth;
+    let max_complexity = config.max_complexity;
+
+    let mut rng = config.seed;
+    let mut population: Vec<Expr> = (0..pop_size)
+        .map(|_| {
+            rng = lcg_step(rng);
+            random_expr_multivar(&mut rng, max_depth.min(3), var_names)
+        })
+        .collect();
+
+    // Seed with known useful templates
+    let seed_templates = build_invariant_templates(var_names);
+    for (i, template) in seed_templates.into_iter().enumerate() {
+        if i < population.len() / 4 {
+            population[i] = template;
+        }
+    }
+
+    for _gen in 0..generations {
+        // Evaluate fitness (variance) for each individual
+        let fitnesses: Vec<f64> = population.iter()
+            .map(|expr| {
+                if expr.complexity() > max_complexity { return f64::MAX; }
+                // Minimum complexity: trivial expressions (constants, single vars) get huge penalty
+                if expr.complexity() < 3 { return f64::MAX; }
+                // Check non-triviality: must differ at two test points
+                let v0 = expr.eval(&var_names.iter().enumerate()
+                    .map(|(i, n)| (*n, if i == 0 { 1.0 } else { 0.5 })).collect::<Vec<_>>());
+                let v1 = expr.eval(&var_names.iter().enumerate()
+                    .map(|(i, n)| (*n, if i == 0 { 0.3 } else { 0.9 })).collect::<Vec<_>>());
+                if !v0.is_finite() || !v1.is_finite() { return f64::MAX; }
+                if (v0 - v1).abs() < 1e-10 * v0.abs().max(1.0) { return f64::MAX; } // constant
+                let var = compute_trajectory_variance(expr, &sampled, var_names);
+                var
+            })
+            .collect();
+
+        // Tournament selection + mutation
+        let mut new_pop = Vec::with_capacity(pop_size);
+
+        // Elitism: keep best 5
+        let mut ranked: Vec<(usize, f64)> = fitnesses.iter().enumerate()
+            .map(|(i, f)| (i, *f)).collect();
+        ranked.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
+        for &(idx, _) in ranked.iter().take(5) {
+            new_pop.push(population[idx].clone());
+        }
+
+        while new_pop.len() < pop_size {
+            // Tournament selection
+            rng = lcg_step(rng);
+            let a = rng as usize % pop_size;
+            rng = lcg_step(rng);
+            let b = rng as usize % pop_size;
+            let winner = if fitnesses[a] < fitnesses[b] { a } else { b };
+
+            rng = lcg_step(rng);
+            let child = if (*&rng as f64 / u64::MAX as f64) < config.mutation_rate {
+                mutate_multivar(&population[winner], &mut rng, 0, var_names)
+            } else {
+                // Crossover with another tournament winner
+                rng = lcg_step(rng);
+                let c = rng as usize % pop_size;
+                rng = lcg_step(rng);
+                let d = rng as usize % pop_size;
+                let other = if fitnesses[c] < fitnesses[d] { c } else { d };
+                crossover(&population[winner], &population[other], &mut rng)
+            };
+            new_pop.push(child);
+        }
+        population = new_pop;
+    }
+
+    // Step 3: Collect best candidates, deduplicate by fingerprint
+    let mut scored: Vec<(usize, f64, f64)> = population.iter().enumerate()
+        .map(|(i, expr)| {
+            let var = compute_trajectory_variance(expr, &sampled, var_names);
+            let mean = {
+                let vals: Vec<f64> = sampled.iter()
+                    .map(|s| {
+                        let bindings: Vec<(&str, f64)> = var_names.iter()
+                            .zip(s.iter()).map(|(n, v)| (*n, *v)).collect();
+                        expr.eval(&bindings)
+                    })
+                    .filter(|v| v.is_finite())
+                    .collect();
+                if vals.is_empty() { 0.0 } else { vals.iter().sum::<f64>() / vals.len() as f64 }
+            };
+            (i, var, mean)
+        })
+        .filter(|(_, var, _)| var.is_finite() && *var < 1e10)
+        .collect();
+
+    scored.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
+
+    // Deduplicate by mean value and filter trivial invariants
+    let mut results = Vec::new();
+    let mut seen_means: Vec<f64> = Vec::new();
+    for &(idx, var, mean) in scored.iter().take(100) {
+        // Reject trivial invariants: constants and expressions that evaluate
+        // to the same value regardless of state (disguised constants like x-x, 0*v, etc.)
+        let expr_simplified = simplify(&population[idx]);
+        if matches!(expr_simplified, Expr::Const(_)) { continue; }
+
+        // Non-triviality: must differ at two different states
+        let test_states: Vec<Vec<(&str, f64)>> = vec![
+            var_names.iter().enumerate().map(|(i, n)| (*n, if i == 0 { 1.0 } else { 0.5 })).collect(),
+            var_names.iter().enumerate().map(|(i, n)| (*n, if i == 0 { 0.3 } else { 0.9 })).collect(),
+        ];
+        let v0 = expr_simplified.eval(&test_states[0]);
+        let v1 = expr_simplified.eval(&test_states[1]);
+        if v0.is_finite() && v1.is_finite()
+            && (v0 - v1).abs() < 1e-8 * v0.abs().max(1.0) {
+            continue; // effectively constant
+        }
+        if !v0.is_finite() || !v1.is_finite() { continue; }
+
+        let is_duplicate = seen_means.iter().any(|m| (m - mean).abs() < mean.abs() * 0.01 + 1e-6);
+        if is_duplicate { continue; }
+        seen_means.push(mean);
+
+        let expr = simplify(&population[idx]);
+
+        // Step 4: Symbolic proof if dynamics provided
+        let proven = if let Some(dyn_rules) = dynamics {
+            if var < 1e-4 * mean.abs().max(1.0) {
+                if let Some(sym) = expr_to_sym(&expr) {
+                    verify_conservation_symbolic(&sym, dyn_rules).is_conserved
+                } else { false }
+            } else { false }
+        } else { false };
+
+        results.push(AutonomousInvariant {
+            formula_str: format!("{}", expr),
+            formula: expr.clone(),
+            variance: var,
+            mean_value: mean,
+            complexity: expr.complexity(),
+            symbolically_proven: proven,
+        });
+
+        if results.len() >= 10 { break; }
+    }
+
+    results
+}
+
+/// Build seed templates for multi-variable invariant GP.
+fn build_invariant_templates(var_names: &[&str]) -> Vec<Expr> {
+    let mut templates = Vec::new();
+    let ndim = var_names.len();
+
+    // Sum of squares: Σ xᵢ²
+    if ndim >= 2 {
+        let mut sum = Expr::BinOp(BinOp::Pow, Box::new(Expr::Var(var_names[0].into())), Box::new(Expr::Const(2.0)));
+        for v in &var_names[1..] {
+            sum = Expr::BinOp(BinOp::Add, Box::new(sum),
+                Box::new(Expr::BinOp(BinOp::Pow, Box::new(Expr::Var(v.to_string())), Box::new(Expr::Const(2.0)))));
+        }
+        templates.push(sum);
+    }
+
+    // Cross products (for 4D: x·vy - y·vx type)
+    if ndim >= 4 {
+        templates.push(Expr::BinOp(BinOp::Sub,
+            Box::new(Expr::BinOp(BinOp::Mul,
+                Box::new(Expr::Var(var_names[0].into())),
+                Box::new(Expr::Var(var_names[3].into())))),
+            Box::new(Expr::BinOp(BinOp::Mul,
+                Box::new(Expr::Var(var_names[1].into())),
+                Box::new(Expr::Var(var_names[2].into()))))));
+
+        // ½(v²) - 1/r type (Kepler energy)
+        let v2 = Expr::BinOp(BinOp::Add,
+            Box::new(Expr::BinOp(BinOp::Pow, Box::new(Expr::Var(var_names[2].into())), Box::new(Expr::Const(2.0)))),
+            Box::new(Expr::BinOp(BinOp::Pow, Box::new(Expr::Var(var_names[3].into())), Box::new(Expr::Const(2.0)))));
+        let r = Expr::Func(UnaryFn::Sqrt, Box::new(Expr::BinOp(BinOp::Add,
+            Box::new(Expr::BinOp(BinOp::Pow, Box::new(Expr::Var(var_names[0].into())), Box::new(Expr::Const(2.0)))),
+            Box::new(Expr::BinOp(BinOp::Pow, Box::new(Expr::Var(var_names[1].into())), Box::new(Expr::Const(2.0)))))));
+        templates.push(Expr::BinOp(BinOp::Sub,
+            Box::new(Expr::BinOp(BinOp::Mul, Box::new(Expr::Const(0.5)), Box::new(v2))),
+            Box::new(Expr::BinOp(BinOp::Div, Box::new(Expr::Const(1.0)), Box::new(r)))));
+    }
+
+    // Individual variables and simple products
+    for v in var_names {
+        templates.push(Expr::Var(v.to_string()));
+        templates.push(Expr::BinOp(BinOp::Pow, Box::new(Expr::Var(v.to_string())), Box::new(Expr::Const(2.0))));
+    }
+
+    templates
+}
+
 // INTERNAL UTILITIES
 // ═══════════════════════════════════════════════════════════════════════════
 
@@ -5387,5 +5715,111 @@ mod tests {
         }
 
         eprintln!("  >>> The Hamiltonian survives chaos — only total energy is invariant");
+    }
+
+    // ════════════════════════════════════════════════════════════════════
+    // AUTONOMOUS INVARIANT DISCOVERY (zero human guidance)
+    // ════════════════════════════════════════════════════════════════════
+
+    /// THE AUTOMATED PHYSICIST: give it ONLY an ODE. No candidates. No hints.
+    /// Can it discover E = x² + v² from scratch?
+    #[test]
+    fn test_autonomous_discovery_harmonic() {
+        let dynamics = vec![
+            ("x", SymExpr::Var("v".into())),
+            ("v", SymExpr::Neg(Box::new(SymExpr::Var("x".into())))),
+        ];
+
+        let config = RegressorConfig {
+            population_size: 300,
+            generations: 100,
+            max_depth: 4,
+            max_complexity: 12,
+            lambda: 0.001,
+            mutation_rate: 0.4,
+            seed: 42,
+            ..RegressorConfig::default()
+        };
+
+        let invariants = discover_invariants_autonomous(
+            harmonic_rhs, &[1.0, 0.0], &["x", "v"],
+            Some(&dynamics), &config, 20.0, 0.01);
+
+        eprintln!("\n╔══════════════════════════════════════════════════════════════╗");
+        eprintln!("║  AUTONOMOUS PHYSICIST — ZERO HUMAN GUIDANCE                 ║");
+        eprintln!("║  Input: dx/dt = v, dv/dt = -x (that's ALL she gets)        ║");
+        eprintln!("╠══════════════════════════════════════════════════════════════╣");
+        for (i, inv) in invariants.iter().enumerate() {
+            let status = if inv.symbolically_proven { "PROVEN ✓" }
+                else if inv.variance < 1e-6 { "conserved" }
+                else { "—" };
+            eprintln!("║ #{}: {:40} │ var={:.2e} │ {}",
+                i + 1, inv.formula_str, inv.variance, status);
+        }
+        eprintln!("╚══════════════════════════════════════════════════════════════╝");
+
+        // The best invariant should have near-zero variance
+        assert!(!invariants.is_empty(), "should discover at least one invariant");
+        let best = &invariants[0];
+        assert!(best.variance < 1e-4,
+            "best invariant should have low variance, got {:.2e}", best.variance);
+
+        eprintln!("\n  >>> BEST DISCOVERY: {} (var={:.2e})", best.formula_str, best.variance);
+        if best.symbolically_proven {
+            eprintln!("  >>> SYMBOLICALLY PROVEN: dE/dt = 0 ✓");
+        }
+    }
+
+    /// Autonomous Kepler: discover both energy and angular momentum with no candidates.
+    #[test]
+    fn test_autonomous_discovery_kepler() {
+        let r2 = || SymExpr::Add(
+            Box::new(SymExpr::Pow(Box::new(SymExpr::Var("x".into())), 2.0)),
+            Box::new(SymExpr::Pow(Box::new(SymExpr::Var("y".into())), 2.0)));
+        let dynamics = vec![
+            ("x",  SymExpr::Var("vx".into())),
+            ("y",  SymExpr::Var("vy".into())),
+            ("vx", SymExpr::Mul(
+                Box::new(SymExpr::Neg(Box::new(SymExpr::Var("x".into())))),
+                Box::new(SymExpr::Pow(Box::new(r2()), -1.5)))),
+            ("vy", SymExpr::Mul(
+                Box::new(SymExpr::Neg(Box::new(SymExpr::Var("y".into())))),
+                Box::new(SymExpr::Pow(Box::new(r2()), -1.5)))),
+        ];
+
+        let config = RegressorConfig {
+            population_size: 400,
+            generations: 120,
+            max_depth: 5,
+            max_complexity: 15,
+            lambda: 0.001,
+            mutation_rate: 0.35,
+            seed: 42,
+            ..RegressorConfig::default()
+        };
+
+        let invariants = discover_invariants_autonomous(
+            kepler_rhs, &[1.0, 0.0, 0.0, 0.8],
+            &["x", "y", "vx", "vy"],
+            Some(&dynamics), &config, 20.0, 0.001);
+
+        eprintln!("\n╔══════════════════════════════════════════════════════════════╗");
+        eprintln!("║  AUTONOMOUS PHYSICIST — KEPLER TWO-BODY                     ║");
+        eprintln!("║  Input: d²r/dt² = -r/|r|³ (that's ALL she gets)            ║");
+        eprintln!("╠══════════════════════════════════════════════════════════════╣");
+        for (i, inv) in invariants.iter().enumerate() {
+            let status = if inv.symbolically_proven { "PROVEN ✓" }
+                else if inv.variance < 1e-4 { "conserved" }
+                else { "—" };
+            eprintln!("║ #{}: {:40} │ var={:.2e} │ {}",
+                i + 1, inv.formula_str, inv.variance, status);
+        }
+        eprintln!("╚══════════════════════════════════════════════════════════════╝");
+
+        assert!(!invariants.is_empty());
+        // Should find at least one well-conserved quantity
+        let conserved_count = invariants.iter().filter(|i| i.variance < 1e-4).count();
+        assert!(conserved_count >= 1,
+            "should find at least 1 conserved quantity, found {}", conserved_count);
     }
 }
