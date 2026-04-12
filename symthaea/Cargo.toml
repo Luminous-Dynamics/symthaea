@@ -73,6 +73,7 @@ members = [
     "crates/symthaea-memory",
     "crates/symthaea-fabrication-kernel",
     "crates/symthaea-vision-manifold",
+    "crates/symthaea-phone-embodiment",
     "crates/symthaea-foveation",
     "crates/symthaea-phi-oracle",
     "crates/symthaea-pulse",

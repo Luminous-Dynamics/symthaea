@@ -227,6 +227,10 @@ pub enum EmbodimentPlatform {
     CareProvider,
     /// Browser agent — web pages as sensory environment via CDP.
     Browser,
+    /// Phone screen — ADB-controlled Android device as sensory environment.
+    Phone,
+    /// Desktop screen — mouse/keyboard control via xdotool/ydotool.
+    Desktop,
 }
 
 // ── Agent Identity ────────────────────────────────────────────────────────
