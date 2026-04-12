@@ -39,3 +39,7 @@ optional = true
 default = []
 symtropy = ["dep:symtropy-physics", "dep:symtropy-math", "dep:nalgebra"]
 hal = ["dep:symthaea-hal", "dep:symthaea-humanoid", "symtropy"]
+
+[[example]]
+name = "full_frame_demo"
+required-features = ["hal"]
