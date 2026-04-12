@@ -14,6 +14,7 @@
 //! - `contact::ContactManifold<D>` — collision contact data
 //! - `integrator` — semi-implicit Euler with bivector angular dynamics
 
+pub mod articulation;
 pub mod body;
 pub mod broadphase;
 pub mod ccd;
@@ -37,3 +38,4 @@ pub use broadphase::{Aabb, Lbvh, morton_encode, morton_prefix};
 pub use joints::{BallJoint, FixedJoint, HingeJoint, MotorDrive, PrismaticJoint};
 pub use replay::{apply_commands, ReplayTape, WorldCommand, WorldSnapshot};
 pub use world::{NoOpCallback, PhysicsCallback, PhysicsWorld};
+pub use articulation::{ArticulatedChain, ChainBuilder, LinkSpec};
