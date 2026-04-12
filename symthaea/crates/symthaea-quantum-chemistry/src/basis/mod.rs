@@ -6,6 +6,7 @@
 //! Defines primitive and contracted Gaussian-type orbitals (GTOs),
 //! basis sets, and the provider trait for building a basis from a molecule.
 
+pub mod basis_631g;
 pub mod sto3g;
 
 use crate::constants::{double_factorial, PI_CONST};

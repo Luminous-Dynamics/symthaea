@@ -36,6 +36,7 @@
 //! - Boys (1950). Proc. R. Soc. Lond. A 200, 542 (Boys function).
 
 pub mod basis;
+pub mod bridge;
 pub mod consciousness;
 pub mod constants;
 pub mod coupled_cluster;
