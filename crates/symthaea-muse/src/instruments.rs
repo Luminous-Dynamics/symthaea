@@ -74,6 +74,17 @@ pub enum Instrument {
     AcousticGuitar,
     Harp,
     Pad,
+    Clarinet,
+    Trumpet,
+    Saxophone,
+    Marimba,
+    Sitar,
+    Kalimba,
+    SawLead,
+    Koto,
+    Oud,
+    Ney,
+    UprightBass,
 }
 
 impl Instrument {
@@ -81,31 +92,38 @@ impl Instrument {
     pub fn partials(&self) -> &'static [f32; 16] {
         match self {
             Self::Piano => &PIANO_FF,
-            Self::PianoPP => &PIANO_PP,
+            Self::PianoPP | Self::Pad => &PIANO_PP,
             Self::Violin => &VIOLIN,
-            Self::Cello => &CELLO,
-            Self::Flute => &FLUTE,
+            Self::Cello | Self::UprightBass => &CELLO,
+            Self::Flute | Self::Ney => &FLUTE,
             Self::Organ => &ORGAN,
-            Self::Pad => &PIANO_PP, // soft pad uses pp piano profile
-            Self::ElectricPiano | Self::Bell | Self::AcousticGuitar | Self::Harp => &PIANO_FF,
+            Self::Clarinet => &CLARINET,
+            Self::Trumpet => &TRUMPET,
+            Self::Saxophone => &SAXOPHONE,
+            Self::Sitar => &SITAR,
+            Self::SawLead => &SAW_LEAD,
+            _ => &PIANO_FF, // ElectricPiano, Bell, Guitar, Harp, Koto, Oud, Marimba, Kalimba
         }
     }
 
     /// Whether this instrument uses Karplus-Strong synthesis.
     pub fn uses_karplus_strong(&self) -> bool {
-        matches!(self, Self::AcousticGuitar | Self::Harp)
+        matches!(self, Self::AcousticGuitar | Self::Harp | Self::Koto | Self::Oud | Self::UprightBass)
     }
 
     /// Whether this instrument uses FM synthesis.
     pub fn uses_fm(&self) -> bool {
-        matches!(self, Self::ElectricPiano | Self::Bell)
+        matches!(self, Self::ElectricPiano | Self::Bell | Self::Marimba | Self::Kalimba)
     }
 
     /// Karplus-Strong parameters: (damping, brightness, stiffness).
     pub fn ks_params(&self) -> (f32, f32, f32) {
         match self {
-            Self::AcousticGuitar => (0.996, 0.42, 0.005), // warmer: brightness 0.42
-            Self::Harp => (0.997, 0.40, 0.000),           // warmer: brightness 0.40
+            Self::AcousticGuitar => (0.996, 0.42, 0.005),
+            Self::Harp => (0.997, 0.40, 0.000),
+            Self::Koto => (0.994, 0.55, 0.008),
+            Self::Oud => (0.997, 0.35, 0.002),
+            Self::UprightBass => (0.998, 0.30, 0.001),
             _ => (0.996, 0.42, 0.000),
         }
     }
@@ -113,8 +131,10 @@ impl Instrument {
     /// FM parameters: (carrier_ratio, mod_ratio, index, index_decay_rate).
     pub fn fm_params(&self) -> (f32, f32, f32, f32) {
         match self {
-            Self::ElectricPiano => (1.0, 1.0, 1.5, 15.0), // Rhodes: gentler index
-            Self::Bell => (1.0, 3.5, 2.5, 3.0),           // Bell: reduced index for warmth
+            Self::ElectricPiano => (1.0, 1.0, 1.5, 15.0),
+            Self::Bell => (1.0, 3.5, 2.5, 3.0),
+            Self::Marimba => (1.0, 4.0, 1.0, 30.0),
+            Self::Kalimba => (1.0, 5.17, 1.2, 8.0),
             _ => (1.0, 1.0, 0.3, 10.0),
         }
     }
@@ -234,27 +254,38 @@ pub fn render_fm_instrument(
 pub fn select_instrument(state: &MusicalState) -> Instrument {
     let psi = state.consciousness_level;
     let arousal = state.arousal;
+    let valence = state.valence;
     let da = state.dopamine;
+    let ne = state.noradrenaline;
     let stillness = state.harmony_activations[7];
+    let cultural = state.harmony_activations[5];
+    let progress = state.harmony_activations[6];
+    let play = state.harmony_activations[3];
 
     if stillness > 0.6 && arousal < 0.3 {
-        Instrument::Pad
+        if cultural > 0.5 { Instrument::Kalimba } else { Instrument::Pad }
     } else if psi < 0.3 {
-        Instrument::Flute
+        if valence < -0.2 { Instrument::Ney } else { Instrument::Flute }
+    } else if ne > 0.6 && arousal > 0.5 {
+        if valence < -0.3 { Instrument::SawLead } else { Instrument::Trumpet }
     } else if da > 0.7 {
-        if arousal > 0.5 {
-            Instrument::Bell
-        } else {
-            Instrument::ElectricPiano
-        }
+        if arousal > 0.6 { Instrument::Marimba }
+        else if arousal > 0.4 { Instrument::Bell }
+        else { Instrument::ElectricPiano }
+    } else if cultural > 0.6 {
+        if valence < -0.2 { Instrument::Oud }
+        else if arousal < 0.4 { Instrument::Koto }
+        else { Instrument::Sitar }
     } else if psi > 0.7 && arousal > 0.5 {
-        if state.harmony_activations[2] > 0.5 {
-            Instrument::Violin
-        } else {
-            Instrument::Organ
-        }
-    } else if arousal > 0.4 {
+        if state.harmony_activations[2] > 0.5 { Instrument::Violin } else { Instrument::Cello }
+    } else if progress > 0.5 && arousal > 0.5 {
+        if valence > 0.2 { Instrument::Saxophone } else { Instrument::Clarinet }
+    } else if play > 0.5 && arousal > 0.3 {
         Instrument::AcousticGuitar
+    } else if valence < -0.3 && arousal < 0.4 {
+        Instrument::UprightBass
+    } else if arousal < 0.3 {
+        Instrument::PianoPP
     } else {
         Instrument::Piano
     }

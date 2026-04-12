@@ -276,6 +276,10 @@ impl CognitiveLoopService {
         // Science: Lakoff & Johnson (1999) embodied cognition, Varela (1991) enactivism
         // Platform-agnostic: works for all 10 robotics platforms via EmbodimentBridge trait.
         // ═══════════════════════════════════════════════════════════════════
+        #[cfg(any(feature = "humanoid", feature = "helicopter", feature = "flight",
+                  feature = "vehicle", feature = "auv", feature = "manipulator",
+                  feature = "exoskeleton", feature = "surgical", feature = "orbital",
+                  feature = "quadruped"))]
         {
             let cycle_num = self.stats.total_cycles as usize;
             let interval = self.config.embodiment_step_interval.max(1);

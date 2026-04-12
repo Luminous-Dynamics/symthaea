@@ -279,6 +279,26 @@ if ! $DRY_RUN; then
     sed -i 's|^\(mycelix-crypto\s*=\s*{\s*path\s*=\s*\)"[^"]*"|\1"stubs/mycelix-crypto"|' \
         "${STANDALONE_REPO}/Cargo.toml"
 
+    # Strip external deps that escape the workspace (prism, positioning)
+    # and their feature flags. These are optional and not needed for CI.
+    sed -i '/^prism-common\s*=.*path.*\.\.\//s/^/# [standalone-stripped] /' \
+        "${STANDALONE_REPO}/Cargo.toml"
+    sed -i '/^prism-search\s*=.*path.*\.\.\//s/^/# [standalone-stripped] /' \
+        "${STANDALONE_REPO}/Cargo.toml"
+    sed -i '/^plexus-common\s*=.*path.*\.\.\//s/^/# [standalone-stripped] /' \
+        "${STANDALONE_REPO}/Cargo.toml"
+    sed -i '/^plexus-search\s*=.*path.*\.\.\//s/^/# [standalone-stripped] /' \
+        "${STANDALONE_REPO}/Cargo.toml"
+    sed -i '/^positioning\s*=.*path.*\.\.\//s/^/# [standalone-stripped] /' \
+        "${STANDALONE_REPO}/Cargo.toml"
+    # Strip feature flags that reference stripped deps
+    sed -i '/^prism_search\s*=/s/^/# [standalone-stripped] /' \
+        "${STANDALONE_REPO}/Cargo.toml"
+
+    # Also strip from sub-crate Cargo.tomls
+    find "${STANDALONE_REPO}/crates" -name "Cargo.toml" -exec \
+        sed -i '/path.*\.\.\/.\.\.\/\.\./s/^/# [standalone-stripped] /' {} \;
+
     # Verify the rewrites actually happened
     REWRITE_OK=true
     if ! grep -q 'mycelix-fl-core.*stubs/mycelix-fl-core' "${STANDALONE_REPO}/Cargo.toml"; then

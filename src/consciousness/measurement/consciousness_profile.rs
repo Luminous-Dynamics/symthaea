@@ -144,11 +144,13 @@ impl ConsciousnessProfile {
 
     /// Compute complexity - structural sophistication
     ///
-    /// Measures how intricate the conscious state structure is.
-    /// Uses multiple indicators:
+    /// Measures how intricate the conscious state structure is via:
     /// - Number of components (basic complexity)
     /// - Component diversity (structural variety)
-    /// - Interaction patterns (relational complexity)
+    /// - **PCA effective dimensionality**: the number of principal components
+    ///   needed to explain 95% of variance. Higher effective dimensionality
+    ///   means the system has more independent degrees of freedom — richer
+    ///   consciousness structure (Tononi & Edelman 1998, neural complexity).
     fn compute_complexity(components: &[BinaryHV]) -> f64 {
         if components.is_empty() {
             return 0.0;
@@ -162,8 +164,39 @@ impl ConsciousnessProfile {
         // Diversity complexity - how different are components?
         let diversity = Self::compute_component_diversity(components);
 
-        // Combined complexity
-        (count_complexity + diversity) / 2.0
+        // PCA effective dimensionality — uses new PCA from statistics module.
+        // Subsample dimensions to keep tractable (max 64 dims for PCA).
+        let pca_complexity = if components.len() >= 3 {
+            let dim = 64; // subsample first 64 bit-dimensions (BinaryHV is 16384 bits)
+            let columns: Vec<Vec<f64>> = (0..dim)
+                .map(|d| {
+                    components
+                        .iter()
+                        .map(|hv| {
+                            // BinaryHV is a tuple struct: BinaryHV(pub [u8; 2048])
+                            let byte_idx = d / 8;
+                            let bit_idx = d % 8;
+                            if (hv.0[byte_idx] >> bit_idx) & 1 == 1 {
+                                1.0
+                            } else {
+                                0.0
+                            }
+                        })
+                        .collect()
+                })
+                .collect();
+
+            let col_refs: Vec<&[f64]> = columns.iter().map(|c| c.as_slice()).collect();
+            let result = symthaea_core::hdc::statistics::pca(&col_refs, dim);
+            // Effective dimensionality: components for 95% variance, normalized by total
+            let eff_dim = result.components_for_95pct as f64 / dim as f64;
+            eff_dim.clamp(0.0, 1.0)
+        } else {
+            0.5 // Default for tiny systems
+        };
+
+        // Blend: count (30%), diversity (30%), PCA dimensionality (40%)
+        0.3 * count_complexity + 0.3 * diversity + 0.4 * pca_complexity
     }
 
     /// Compute component diversity - how different components are from each other
