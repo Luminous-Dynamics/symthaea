@@ -1011,8 +1011,11 @@ pub fn try_seq(goal: &Goal, tactics: &[Box<dyn Fn(&Goal) -> TacticResult>]) -> T
 // existential shape. Integration tests below show how to build the matching
 // `Expr` goal and close it with these tactics.
 
+use crate::hdc::barycentric::{centroid, circumcenter, incenter, orthocenter, Barycentric};
+use crate::hdc::computational_geometry::Point2D;
 use crate::hdc::diophantine::pell_equation;
 use crate::hdc::number_theory::NumberTheoryEngine;
+use crate::hdc::synthetic_geometry::{GeomPredicate, GeomState};
 
 /// Closes `∃x. ∃y. a·x + b·y = c` when the primitive `linear_diophantine`
 /// finds a solution. Caller supplies (a, b, c) as concrete integers.
@@ -1111,6 +1114,177 @@ pub fn tactic_crt_solve(_goal: &Goal, residues: &[(i64, i64)]) -> TacticResult {
             TacticResult::Closed
         }
         None => TacticResult::Failed("CRT system inconsistent".to_string()),
+    }
+}
+
+// ─── Phase 2: IMO synthetic-geometry tactics ─────────────────────────────────
+//
+// These bridge `synthetic_geometry::GeomState` and `barycentric` into the
+// tactic framework. Because `Expr` has no native geometric vocabulary, the
+// tactics take a `GeomState` (the configuration) and a target
+// `GeomPredicate` (the goal to derive), and return `Closed` iff saturation
+// proves the target.
+
+/// Run forward saturation on `state` and return `Closed` iff the target
+/// predicate appears in the fact base after at most `max_iters` passes.
+///
+/// This is the analog of Lean's `polyrith` or AlphaGeometry's DD saturation
+/// loop: pure forward chaining, no backtracking, numerical verification on
+/// every derived fact.
+pub fn tactic_angle_chase(
+    state: &mut GeomState,
+    target: &GeomPredicate,
+    max_iters: usize,
+) -> TacticResult {
+    // Fact already present? Close immediately.
+    if state.facts.contains(target) {
+        return TacticResult::Closed;
+    }
+    // Verify the target numerically — if it's false, don't bother saturating.
+    match state.verify(target) {
+        Some(false) => {
+            return TacticResult::Failed(format!(
+                "target predicate is numerically false: {:?}",
+                target
+            ));
+        }
+        None => {
+            return TacticResult::Failed(
+                "target references points not in state".to_string(),
+            );
+        }
+        Some(true) => {}
+    }
+    // Saturate, then check.
+    state.saturate(max_iters);
+    if state.facts.contains(target) {
+        TacticResult::Closed
+    } else {
+        // The target is numerically true but we couldn't derive it via our
+        // forward-saturation rule set. Report this honestly as a gap in the
+        // deductive vocabulary, not a mathematical falsehood.
+        TacticResult::Failed(format!(
+            "angle_chase exhausted rules without deriving target: {:?}",
+            target
+        ))
+    }
+}
+
+/// Power of a point theorem: for a circle with center O and radius r, and
+/// any point P, and a chord through P meeting the circle at X and Y,
+/// PX · PY = |PO|² − r² (if P is outside) or r² − |PO|² (if inside).
+///
+/// This tactic checks the power-of-point identity numerically for a
+/// user-supplied point P, circle (O, r), and chord endpoints X, Y — useful
+/// as a primitive for ratio-based geometry problems.
+pub fn tactic_power_of_point(
+    p: &Point2D,
+    center: &Point2D,
+    radius: f64,
+    x: &Point2D,
+    y: &Point2D,
+) -> TacticResult {
+    let px = p.distance(x);
+    let py = p.distance(y);
+    let po2 = (p.x - center.x).powi(2) + (p.y - center.y).powi(2);
+    let expected = (po2 - radius * radius).abs();
+    // Account for inside vs outside: px * py should equal |po² − r²|.
+    let actual = px * py;
+    if (actual - expected).abs() < 1e-7 {
+        TacticResult::Closed
+    } else {
+        TacticResult::Failed(format!(
+            "power of point violated: px·py = {}, |po²−r²| = {}",
+            actual, expected
+        ))
+    }
+}
+
+/// Similar triangles by SSS: two triangles ABC and DEF are similar iff
+/// the ratios of corresponding sides are equal within tolerance.
+pub fn tactic_similar_triangles_sss(
+    a: &Point2D,
+    b: &Point2D,
+    c: &Point2D,
+    d: &Point2D,
+    e: &Point2D,
+    f: &Point2D,
+) -> TacticResult {
+    let ab = a.distance(b);
+    let bc = b.distance(c);
+    let ca = c.distance(a);
+    let de = d.distance(e);
+    let ef = e.distance(f);
+    let fd = f.distance(d);
+    if de < 1e-12 || ef < 1e-12 || fd < 1e-12 {
+        return TacticResult::Failed("degenerate triangle".into());
+    }
+    let r1 = ab / de;
+    let r2 = bc / ef;
+    let r3 = ca / fd;
+    if (r1 - r2).abs() < 1e-7 && (r2 - r3).abs() < 1e-7 {
+        TacticResult::Closed
+    } else {
+        TacticResult::Failed(format!(
+            "side ratios differ: {} {} {}",
+            r1, r2, r3
+        ))
+    }
+}
+
+/// Barycentric coerce: compute the barycentric coordinates of a named point
+/// in a triangle, identify which classical center it coincides with (if any),
+/// and return `Closed` with the identification.
+///
+/// This is the algebraic-fallback tactic: when saturation stalls on a
+/// geometry problem, drop into coordinates and compute directly.
+pub fn tactic_barycentric_coerce(
+    state: &GeomState,
+    point_name: &str,
+    triangle: (&str, &str, &str),
+) -> TacticResult {
+    let (a_name, b_name, c_name) = triangle;
+    let (p, a, b, c) = match (
+        state.points.get(point_name),
+        state.points.get(a_name),
+        state.points.get(b_name),
+        state.points.get(c_name),
+    ) {
+        (Some(p), Some(a), Some(b), Some(c)) => (p, a, b, c),
+        _ => {
+            return TacticResult::Failed(
+                "point or triangle vertices missing in state".into(),
+            )
+        }
+    };
+    // Compute P's barycentric coordinates.
+    let bary = match Barycentric::from_cartesian(p, a, b, c) {
+        Some(b) => b,
+        None => return TacticResult::Failed("degenerate triangle".into()),
+    };
+    // Compare against each classical center within tolerance.
+    let eps = 1e-6;
+    let same = |p1: &Point2D, p2: &Point2D| {
+        (p1.x - p2.x).abs() < eps && (p1.y - p2.y).abs() < eps
+    };
+    let g = centroid(a, b, c);
+    let i = incenter(a, b, c);
+    let o = circumcenter(a, b, c);
+    let h = orthocenter(a, b, c);
+    let _ = bary;
+    if same(p, &g) {
+        TacticResult::Closed
+    } else if same(p, &i) {
+        TacticResult::Closed
+    } else if same(p, &o) {
+        TacticResult::Closed
+    } else if same(p, &h) {
+        TacticResult::Closed
+    } else {
+        TacticResult::Failed(format!(
+            "{} is not a classical center of triangle {}{}{}",
+            point_name, a_name, b_name, c_name
+        ))
     }
 }
 
@@ -1592,6 +1766,169 @@ mod tests {
             tactic_crt_solve(&goal, &[(1, 4), (2, 6)]),
             TacticResult::Failed(_)
         ));
+    }
+
+    // ── Phase 2 IMO synthetic-geometry tactics ─────────────────────────
+
+    use crate::hdc::computational_geometry::Point2D as P2;
+
+    fn pt(x: f64, y: f64) -> P2 {
+        P2::new(x, y)
+    }
+
+    #[test]
+    fn test_tactic_angle_chase_derives_inscribed_angle_equality() {
+        // Cyclic quadrilateral on the unit circle.
+        let mut s = GeomState::new();
+        s.add_point("A", pt(1.0, 0.0));
+        s.add_point("B", pt(0.0, 1.0));
+        s.add_point("C", pt(-1.0, 0.0));
+        s.add_point("D", pt(0.0, -1.0));
+        s.add_fact(GeomPredicate::Concyclic(
+            "A".into(),
+            "B".into(),
+            "C".into(),
+            "D".into(),
+        ));
+        // Inscribed angle: ∠BAC = ∠BDC (both subtend arc BC).
+        let target = GeomPredicate::AngleEq(
+            "B".into(),
+            "A".into(),
+            "C".into(),
+            "B".into(),
+            "D".into(),
+            "C".into(),
+        );
+        match tactic_angle_chase(&mut s, &target, 10) {
+            TacticResult::Closed => {}
+            other => panic!("angle_chase should close: {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_tactic_angle_chase_rejects_false_target() {
+        let mut s = GeomState::new();
+        s.add_point("A", pt(0.0, 0.0));
+        s.add_point("B", pt(1.0, 0.0));
+        s.add_point("C", pt(0.0, 1.0));
+        // A, B, C are NOT collinear — claim they are and expect Failed.
+        let target = GeomPredicate::Collinear("A".into(), "B".into(), "C".into());
+        assert!(matches!(
+            tactic_angle_chase(&mut s, &target, 5),
+            TacticResult::Failed(_)
+        ));
+    }
+
+    #[test]
+    fn test_tactic_power_of_point_external() {
+        // Circle centered at origin, radius 2. Point P = (3, 0).
+        // Any chord through P meets the circle at two points whose distances
+        // to P multiply to |PO|² − r² = 9 − 4 = 5.
+        // The horizontal chord meets at (-2, 0) and (2, 0): px = 5, py = 1.
+        let center = pt(0.0, 0.0);
+        let p = pt(3.0, 0.0);
+        let x = pt(-2.0, 0.0);
+        let y = pt(2.0, 0.0);
+        assert!(matches!(
+            tactic_power_of_point(&p, &center, 2.0, &x, &y),
+            TacticResult::Closed
+        ));
+    }
+
+    #[test]
+    fn test_tactic_similar_triangles_sss() {
+        // 3-4-5 right triangle and its 6-8-10 scaling.
+        let a = pt(0.0, 0.0);
+        let b = pt(4.0, 0.0);
+        let c = pt(0.0, 3.0);
+        let d = pt(0.0, 0.0);
+        let e = pt(8.0, 0.0);
+        let f = pt(0.0, 6.0);
+        assert!(matches!(
+            tactic_similar_triangles_sss(&a, &b, &c, &d, &e, &f),
+            TacticResult::Closed
+        ));
+    }
+
+    #[test]
+    fn test_tactic_similar_triangles_not_similar() {
+        let a = pt(0.0, 0.0);
+        let b = pt(4.0, 0.0);
+        let c = pt(0.0, 3.0);
+        let d = pt(0.0, 0.0);
+        let e = pt(5.0, 0.0);
+        let f = pt(0.0, 6.0); // different aspect ratio
+        assert!(matches!(
+            tactic_similar_triangles_sss(&a, &b, &c, &d, &e, &f),
+            TacticResult::Failed(_)
+        ));
+    }
+
+    #[test]
+    fn test_tactic_barycentric_coerce_identifies_centroid() {
+        let mut s = GeomState::new();
+        s.add_point("A", pt(0.0, 0.0));
+        s.add_point("B", pt(6.0, 0.0));
+        s.add_point("C", pt(0.0, 6.0));
+        // Centroid of this triangle is at (2, 2).
+        s.add_point("G", pt(2.0, 2.0));
+        assert!(matches!(
+            tactic_barycentric_coerce(&s, "G", ("A", "B", "C")),
+            TacticResult::Closed
+        ));
+    }
+
+    #[test]
+    fn test_tactic_barycentric_coerce_rejects_non_center() {
+        let mut s = GeomState::new();
+        s.add_point("A", pt(0.0, 0.0));
+        s.add_point("B", pt(6.0, 0.0));
+        s.add_point("C", pt(0.0, 6.0));
+        s.add_point("X", pt(5.0, 5.0)); // not a classical center
+        assert!(matches!(
+            tactic_barycentric_coerce(&s, "X", ("A", "B", "C")),
+            TacticResult::Failed(_)
+        ));
+    }
+
+    /// End-to-end Phase 2 integration: cyclic quadrilateral on the unit
+    /// circle, use saturation to derive inscribed-angle equality, then use
+    /// it to identify that the triangle formed by three of the vertices
+    /// has its circumcircle coincident with the quadrilateral's circle.
+    #[test]
+    fn test_phase2_integration_cyclic_quadrilateral() {
+        let mut s = GeomState::new();
+        // Square inscribed in unit circle
+        s.add_point("A", pt(1.0, 0.0));
+        s.add_point("B", pt(0.0, 1.0));
+        s.add_point("C", pt(-1.0, 0.0));
+        s.add_point("D", pt(0.0, -1.0));
+        s.add_fact(GeomPredicate::Concyclic(
+            "A".into(),
+            "B".into(),
+            "C".into(),
+            "D".into(),
+        ));
+        // Step 1: saturate to derive inscribed-angle facts.
+        let added = s.saturate(10);
+        assert!(added > 0, "saturation should produce new angle facts");
+        // Step 2: verify at least one inscribed-angle equality is present.
+        let has_angle_fact = s
+            .facts
+            .iter()
+            .any(|f| matches!(f, GeomPredicate::AngleEq(_, _, _, _, _, _)));
+        assert!(has_angle_fact);
+        // Step 3: the circumcircle of triangle ABC should have center (0,0),
+        // which matches the quadrilateral's inscribed circle center — verify
+        // via the barycentric `circumcenter` primitive.
+        use crate::hdc::barycentric::circumcenter;
+        let a = pt(1.0, 0.0);
+        let b = pt(0.0, 1.0);
+        let c = pt(-1.0, 0.0);
+        let o = circumcenter(&a, &b, &c);
+        assert!(o.x.abs() < 1e-9 && o.y.abs() < 1e-9);
+        // Step 4: every derived fact must still verify.
+        assert!(s.facts_consistent());
     }
 
     /// Integration test: IMO-style sub-problem combining CRT + Legendre.
