@@ -295,9 +295,12 @@ if ! $DRY_RUN; then
     sed -i '/^prism_search\s*=/s/^/# [standalone-stripped] /' \
         "${STANDALONE_REPO}/Cargo.toml"
 
-    # Also strip from sub-crate Cargo.tomls
+    # Also strip from sub-crate Cargo.tomls (paths escaping workspace with ../../..)
     find "${STANDALONE_REPO}/crates" -name "Cargo.toml" -exec \
-        sed -i '/path.*\.\.\/.\.\.\/\.\./s/^/# [standalone-stripped] /' {} \;
+        sed -i '/path.*\.\.\/\.\.\/\.\./s/^/# [standalone-stripped] /' {} \;
+    # Strip feature flags referencing stripped deps in sub-crates
+    find "${STANDALONE_REPO}/crates" -name "Cargo.toml" -exec \
+        sed -i '/^prism_search\s*=/s/^/# [standalone-stripped] /' {} \;
 
     # Verify the rewrites actually happened
     REWRITE_OK=true
