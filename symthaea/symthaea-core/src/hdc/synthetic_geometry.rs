@@ -369,6 +369,384 @@ impl GeomState {
     }
 }
 
+// ─── Phase 2B: forward-saturation rules ─────────────────────────────────────
+//
+// Each rule is a function (&GeomState) -> Vec<GeomPredicate> that produces
+// *candidate* new facts from existing ones. The main `saturate` loop runs
+// all rules repeatedly, verifies each candidate against the concrete point
+// positions, and adds only those that verify true and aren't already present.
+//
+// This numerical double-check is the safety net: any bug in a rule produces
+// predicates that fail to verify and get silently dropped, instead of
+// polluting the fact base. Self-correction by construction.
+
+/// R1. Collinearity is invariant under argument permutation.
+fn rule_collinear_symm(state: &GeomState) -> Vec<GeomPredicate> {
+    let mut out = Vec::new();
+    for f in &state.facts {
+        if let GeomPredicate::Collinear(a, b, c) = f {
+            out.push(GeomPredicate::Collinear(b.clone(), a.clone(), c.clone()));
+            out.push(GeomPredicate::Collinear(a.clone(), c.clone(), b.clone()));
+            out.push(GeomPredicate::Collinear(c.clone(), b.clone(), a.clone()));
+        }
+    }
+    out
+}
+
+/// R2. Midpoint implies collinearity.
+fn rule_midpoint_collinear(state: &GeomState) -> Vec<GeomPredicate> {
+    state
+        .facts
+        .iter()
+        .filter_map(|f| {
+            if let GeomPredicate::Midpoint(m, a, b) = f {
+                Some(GeomPredicate::Collinear(a.clone(), m.clone(), b.clone()))
+            } else {
+                None
+            }
+        })
+        .collect()
+}
+
+/// R3. Midpoint implies |am| = |mb|.
+fn rule_midpoint_equal_lengths(state: &GeomState) -> Vec<GeomPredicate> {
+    state
+        .facts
+        .iter()
+        .filter_map(|f| {
+            if let GeomPredicate::Midpoint(m, a, b) = f {
+                Some(GeomPredicate::EqualLength(
+                    a.clone(),
+                    m.clone(),
+                    m.clone(),
+                    b.clone(),
+                ))
+            } else {
+                None
+            }
+        })
+        .collect()
+}
+
+/// R4. Parallel is symmetric in the point pairs and between the two lines.
+fn rule_parallel_symm(state: &GeomState) -> Vec<GeomPredicate> {
+    let mut out = Vec::new();
+    for f in &state.facts {
+        if let GeomPredicate::Parallel(a, b, c, d) = f {
+            out.push(GeomPredicate::Parallel(
+                b.clone(),
+                a.clone(),
+                c.clone(),
+                d.clone(),
+            ));
+            out.push(GeomPredicate::Parallel(
+                a.clone(),
+                b.clone(),
+                d.clone(),
+                c.clone(),
+            ));
+            out.push(GeomPredicate::Parallel(
+                c.clone(),
+                d.clone(),
+                a.clone(),
+                b.clone(),
+            ));
+        }
+    }
+    out
+}
+
+/// R5. Perpendicular is symmetric in each pair and between the two pairs.
+fn rule_perpendicular_symm(state: &GeomState) -> Vec<GeomPredicate> {
+    let mut out = Vec::new();
+    for f in &state.facts {
+        if let GeomPredicate::Perpendicular(a, b, c, d) = f {
+            out.push(GeomPredicate::Perpendicular(
+                c.clone(),
+                d.clone(),
+                a.clone(),
+                b.clone(),
+            ));
+            out.push(GeomPredicate::Perpendicular(
+                b.clone(),
+                a.clone(),
+                c.clone(),
+                d.clone(),
+            ));
+        }
+    }
+    out
+}
+
+/// R6. Parallel is transitive: (a,b)∥(c,d) ∧ (c,d)∥(e,f) ⇒ (a,b)∥(e,f).
+fn rule_parallel_transitive(state: &GeomState) -> Vec<GeomPredicate> {
+    let mut out = Vec::new();
+    for f1 in &state.facts {
+        for f2 in &state.facts {
+            if let (
+                GeomPredicate::Parallel(a1, b1, c1, d1),
+                GeomPredicate::Parallel(a2, b2, c2, d2),
+            ) = (f1, f2)
+            {
+                if c1 == a2 && d1 == b2 {
+                    out.push(GeomPredicate::Parallel(
+                        a1.clone(),
+                        b1.clone(),
+                        c2.clone(),
+                        d2.clone(),
+                    ));
+                }
+            }
+        }
+    }
+    out
+}
+
+/// R7. Perp ∘ Perp = Parallel: (a,b)⊥(c,d) ∧ (c,d)⊥(e,f) ⇒ (a,b)∥(e,f).
+fn rule_perp_perp_is_parallel(state: &GeomState) -> Vec<GeomPredicate> {
+    let mut out = Vec::new();
+    for f1 in &state.facts {
+        for f2 in &state.facts {
+            if let (
+                GeomPredicate::Perpendicular(a1, b1, c1, d1),
+                GeomPredicate::Perpendicular(a2, b2, c2, d2),
+            ) = (f1, f2)
+            {
+                if c1 == c2 && d1 == d2 && (a1, b1) != (a2, b2) {
+                    out.push(GeomPredicate::Parallel(
+                        a1.clone(),
+                        b1.clone(),
+                        a2.clone(),
+                        b2.clone(),
+                    ));
+                }
+            }
+        }
+    }
+    out
+}
+
+/// R8. Concyclic: cyclic rotation + first-two swap (covers all perms).
+fn rule_concyclic_symm(state: &GeomState) -> Vec<GeomPredicate> {
+    let mut out = Vec::new();
+    for f in &state.facts {
+        if let GeomPredicate::Concyclic(a, b, c, d) = f {
+            out.push(GeomPredicate::Concyclic(
+                b.clone(),
+                c.clone(),
+                d.clone(),
+                a.clone(),
+            ));
+            out.push(GeomPredicate::Concyclic(
+                c.clone(),
+                d.clone(),
+                a.clone(),
+                b.clone(),
+            ));
+            out.push(GeomPredicate::Concyclic(
+                d.clone(),
+                a.clone(),
+                b.clone(),
+                c.clone(),
+            ));
+            out.push(GeomPredicate::Concyclic(
+                b.clone(),
+                a.clone(),
+                c.clone(),
+                d.clone(),
+            ));
+        }
+    }
+    out
+}
+
+/// R9. Inscribed angle theorem: if ABCD is concyclic then ∠BAC = ∠BDC
+/// (both subtend the arc BC) and ∠ABD = ∠ACD (both subtend arc AD).
+fn rule_inscribed_angle(state: &GeomState) -> Vec<GeomPredicate> {
+    let mut out = Vec::new();
+    for f in &state.facts {
+        if let GeomPredicate::Concyclic(a, b, c, d) = f {
+            out.push(GeomPredicate::AngleEq(
+                b.clone(),
+                a.clone(),
+                c.clone(),
+                b.clone(),
+                d.clone(),
+                c.clone(),
+            ));
+            out.push(GeomPredicate::AngleEq(
+                a.clone(),
+                b.clone(),
+                d.clone(),
+                a.clone(),
+                c.clone(),
+                d.clone(),
+            ));
+        }
+    }
+    out
+}
+
+/// R10. Equal-length is symmetric.
+fn rule_equal_length_symm(state: &GeomState) -> Vec<GeomPredicate> {
+    let mut out = Vec::new();
+    for f in &state.facts {
+        if let GeomPredicate::EqualLength(a, b, c, d) = f {
+            out.push(GeomPredicate::EqualLength(
+                c.clone(),
+                d.clone(),
+                a.clone(),
+                b.clone(),
+            ));
+            out.push(GeomPredicate::EqualLength(
+                b.clone(),
+                a.clone(),
+                c.clone(),
+                d.clone(),
+            ));
+        }
+    }
+    out
+}
+
+/// R11. Equal-length is transitive.
+fn rule_equal_length_transitive(state: &GeomState) -> Vec<GeomPredicate> {
+    let mut out = Vec::new();
+    for f1 in &state.facts {
+        for f2 in &state.facts {
+            if let (
+                GeomPredicate::EqualLength(a1, b1, c1, d1),
+                GeomPredicate::EqualLength(a2, b2, c2, d2),
+            ) = (f1, f2)
+            {
+                if c1 == a2 && d1 == b2 {
+                    out.push(GeomPredicate::EqualLength(
+                        a1.clone(),
+                        b1.clone(),
+                        c2.clone(),
+                        d2.clone(),
+                    ));
+                }
+            }
+        }
+    }
+    out
+}
+
+/// R12. AngleEq is symmetric.
+fn rule_angle_eq_symm(state: &GeomState) -> Vec<GeomPredicate> {
+    let mut out = Vec::new();
+    for f in &state.facts {
+        if let GeomPredicate::AngleEq(a, b, c, d, e, g) = f {
+            out.push(GeomPredicate::AngleEq(
+                d.clone(),
+                e.clone(),
+                g.clone(),
+                a.clone(),
+                b.clone(),
+                c.clone(),
+            ));
+        }
+    }
+    out
+}
+
+/// R13. AngleEq is transitive.
+fn rule_angle_eq_transitive(state: &GeomState) -> Vec<GeomPredicate> {
+    let mut out = Vec::new();
+    for f1 in &state.facts {
+        for f2 in &state.facts {
+            if let (
+                GeomPredicate::AngleEq(a1, b1, c1, d1, e1, g1),
+                GeomPredicate::AngleEq(a2, b2, c2, d2, e2, g2),
+            ) = (f1, f2)
+            {
+                if d1 == a2 && e1 == b2 && g1 == c2 {
+                    out.push(GeomPredicate::AngleEq(
+                        a1.clone(),
+                        b1.clone(),
+                        c1.clone(),
+                        d2.clone(),
+                        e2.clone(),
+                        g2.clone(),
+                    ));
+                }
+            }
+        }
+    }
+    out
+}
+
+/// R14. Midpoint theorem (parallel side): M mid(AB), N mid(AC) ⇒ MN ∥ BC.
+fn rule_midpoint_theorem(state: &GeomState) -> Vec<GeomPredicate> {
+    let mut out = Vec::new();
+    for f1 in &state.facts {
+        for f2 in &state.facts {
+            if let (
+                GeomPredicate::Midpoint(m, a1, b1),
+                GeomPredicate::Midpoint(n, a2, c1),
+            ) = (f1, f2)
+            {
+                if a1 == a2 && m != n && b1 != c1 {
+                    out.push(GeomPredicate::Parallel(
+                        m.clone(),
+                        n.clone(),
+                        b1.clone(),
+                        c1.clone(),
+                    ));
+                }
+            }
+        }
+    }
+    out
+}
+
+impl GeomState {
+    /// Run forward saturation until fixpoint (or `max_iters` reached).
+    /// Every candidate fact is verified against point positions; only
+    /// numerically true candidates are added. Returns the number of new
+    /// facts added in total.
+    pub fn saturate(&mut self, max_iters: usize) -> usize {
+        let rules: &[fn(&GeomState) -> Vec<GeomPredicate>] = &[
+            rule_collinear_symm,
+            rule_midpoint_collinear,
+            rule_midpoint_equal_lengths,
+            rule_parallel_symm,
+            rule_perpendicular_symm,
+            rule_parallel_transitive,
+            rule_perp_perp_is_parallel,
+            rule_concyclic_symm,
+            rule_inscribed_angle,
+            rule_equal_length_symm,
+            rule_equal_length_transitive,
+            rule_angle_eq_symm,
+            rule_angle_eq_transitive,
+            rule_midpoint_theorem,
+        ];
+        let mut added_total = 0usize;
+        for _ in 0..max_iters {
+            let mut added_this_iter = 0usize;
+            for rule in rules {
+                let candidates = rule(self);
+                for c in candidates {
+                    if self.facts.contains(&c) {
+                        continue;
+                    }
+                    if let Some(true) = self.verify(&c) {
+                        self.facts.push(c);
+                        added_this_iter += 1;
+                    }
+                }
+            }
+            added_total += added_this_iter;
+            if added_this_iter == 0 {
+                break;
+            }
+        }
+        added_total
+    }
+}
+
 // ─── Tests ───────────────────────────────────────────────────────────────────
 
 #[cfg(test)]
@@ -543,5 +921,132 @@ mod tests {
             s.verify(&GeomPredicate::Collinear("X".into(), "Y".into(), "Z".into())),
             None
         );
+    }
+
+    // ── Phase 2B: forward-saturation tests ──────────────────────────────
+
+    #[test]
+    fn test_saturate_midpoint_implies_collinear_and_equal_length() {
+        let mut s = GeomState::new();
+        s.add_point("A", p(0.0, 0.0));
+        s.add_point("M", p(1.0, 1.0));
+        s.add_point("B", p(2.0, 2.0));
+        s.add_fact(GeomPredicate::Midpoint("M".into(), "A".into(), "B".into()));
+        let added = s.saturate(10);
+        assert!(added >= 2, "expected collinear + equal-length derivations");
+        assert!(s
+            .facts
+            .iter()
+            .any(|f| matches!(f, GeomPredicate::Collinear(_, _, _))));
+        assert!(s
+            .facts
+            .iter()
+            .any(|f| matches!(f, GeomPredicate::EqualLength(_, _, _, _))));
+        assert!(s.facts_consistent());
+    }
+
+    #[test]
+    fn test_saturate_perp_perp_yields_parallel() {
+        let mut s = GeomState::new();
+        s.add_point("A", p(0.0, 0.0));
+        s.add_point("B", p(1.0, 0.0));
+        s.add_point("C", p(0.0, 0.0));
+        s.add_point("D", p(0.0, 1.0));
+        s.add_point("E", p(0.0, 2.0));
+        s.add_point("F", p(1.0, 2.0));
+        s.add_fact(GeomPredicate::Perpendicular(
+            "A".into(), "B".into(), "C".into(), "D".into(),
+        ));
+        s.add_fact(GeomPredicate::Perpendicular(
+            "E".into(), "F".into(), "C".into(), "D".into(),
+        ));
+        s.saturate(10);
+        let found = s.facts.iter().any(|f| match f {
+            GeomPredicate::Parallel(a, b, c, d) => {
+                (a == "A" && b == "B" && c == "E" && d == "F")
+                    || (a == "E" && b == "F" && c == "A" && d == "B")
+            }
+            _ => false,
+        });
+        assert!(found, "expected Parallel(A,B,E,F) or symmetric form");
+    }
+
+    #[test]
+    fn test_saturate_inscribed_angle_theorem() {
+        let mut s = GeomState::new();
+        s.add_point("A", p(1.0, 0.0));
+        s.add_point("B", p(0.0, 1.0));
+        s.add_point("C", p(-1.0, 0.0));
+        s.add_point("D", p(0.0, -1.0));
+        s.add_fact(GeomPredicate::Concyclic(
+            "A".into(), "B".into(), "C".into(), "D".into(),
+        ));
+        let added = s.saturate(10);
+        assert!(added > 0, "inscribed-angle rule should fire");
+        assert!(s
+            .facts
+            .iter()
+            .any(|f| matches!(f, GeomPredicate::AngleEq(_, _, _, _, _, _))));
+        assert!(s.facts_consistent());
+    }
+
+    #[test]
+    fn test_saturate_midpoint_theorem_parallel() {
+        let mut s = GeomState::new();
+        s.add_point("A", p(0.0, 0.0));
+        s.add_point("B", p(6.0, 0.0));
+        s.add_point("C", p(0.0, 6.0));
+        s.add_point("M", p(3.0, 0.0));
+        s.add_point("N", p(0.0, 3.0));
+        s.add_fact(GeomPredicate::Midpoint("M".into(), "A".into(), "B".into()));
+        s.add_fact(GeomPredicate::Midpoint("N".into(), "A".into(), "C".into()));
+        s.saturate(10);
+        let mn_parallel_bc = s.facts.iter().any(|f| match f {
+            GeomPredicate::Parallel(a, b, c, d) => {
+                (a == "M" && b == "N" && c == "B" && d == "C")
+                    || (a == "B" && b == "C" && c == "M" && d == "N")
+                    || (a == "N" && b == "M" && c == "B" && d == "C")
+                    || (a == "M" && b == "N" && c == "C" && d == "B")
+            }
+            _ => false,
+        });
+        assert!(mn_parallel_bc, "midpoint theorem: MN ∥ BC not derived");
+        assert!(s.facts_consistent());
+    }
+
+    #[test]
+    fn test_saturate_transitive_parallel() {
+        let mut s = GeomState::new();
+        s.add_point("A", p(0.0, 0.0));
+        s.add_point("B", p(1.0, 0.0));
+        s.add_point("C", p(0.0, 1.0));
+        s.add_point("D", p(1.0, 1.0));
+        s.add_point("E", p(0.0, 2.0));
+        s.add_point("F", p(1.0, 2.0));
+        s.add_fact(GeomPredicate::Parallel(
+            "A".into(), "B".into(), "C".into(), "D".into(),
+        ));
+        s.add_fact(GeomPredicate::Parallel(
+            "C".into(), "D".into(), "E".into(), "F".into(),
+        ));
+        s.saturate(10);
+        assert!(s.facts.iter().any(|f| matches!(
+            f,
+            GeomPredicate::Parallel(a, b, c, d)
+                if a == "A" && b == "B" && c == "E" && d == "F"
+        )));
+        assert!(s.facts_consistent());
+    }
+
+    #[test]
+    fn test_saturate_reaches_fixpoint() {
+        let mut s = GeomState::new();
+        s.add_point("A", p(0.0, 0.0));
+        s.add_point("B", p(1.0, 0.0));
+        s.add_point("C", p(2.0, 0.0));
+        s.add_fact(GeomPredicate::Collinear("A".into(), "B".into(), "C".into()));
+        let added = s.saturate(20);
+        assert!(added < 100, "unbounded derivation: added {}", added);
+        assert!(s.facts_consistent());
     }
 }
