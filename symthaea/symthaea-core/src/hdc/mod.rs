@@ -417,6 +417,7 @@ pub mod conjecture_engine; // Automated conjecture generation via symbolic regre
 pub mod autodiff; // Reverse-mode automatic differentiation (Wengert tape) for exact gradients
 pub mod sparse_matrix; // Compressed Sparse Row (CSR) matrix for PDE solvers and graph Laplacians
 pub mod langlands; // Computational Langlands: elliptic curve L-functions, modular forms, modularity verification
+pub mod frontier_math; // Frontier mathematics: Montgomery pair correlation, Ramsey bounds, knot invariants, abc conjecture
 // pub mod topology_comparison; // TEMP: file removed by concurrent session
 // pub mod cross_domain_discovery; // TEMP: file removed by concurrent session
 
