@@ -28,6 +28,7 @@ pub mod coarse_graining;
 pub mod consciousness_scaling;
 pub mod id_tradeoff;
 pub mod nonhomogeneous_consciousness;
+pub mod neural_validation;
 pub mod open_quantum;
 pub mod predictive_consciousness;
 pub mod self_tuning_consciousness;
