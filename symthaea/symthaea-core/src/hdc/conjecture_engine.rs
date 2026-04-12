@@ -614,45 +614,283 @@ fn crossover(a: &Expr, b: &Expr, rng: &mut u64) -> Expr {
     }
 }
 
-/// Optimize constants in an expression tree by coordinate descent.
+/// Optimize constants in an expression tree via Nelder-Mead simplex.
 ///
-/// For each `Const(c)` node, try small perturbations and keep the value
-/// that minimizes MSE. This is a simple but effective post-GP refinement
-/// that turns approximate formulas into exact ones.
-fn optimize_constants(expr: &Expr, data: &[(f64, f64)], iterations: usize) -> Expr {
-    let mut best = expr.clone();
-    let mut best_mse = compute_mse(&best, data);
+/// Extracts all constants as a parameter vector, runs derivative-free
+/// optimization to minimize MSE, then writes the optimized values back.
+/// This is what PySR/Eureqa do: GP finds tree structure, optimizer fits constants.
+fn optimize_constants(expr: &Expr, data: &[(f64, f64)], max_iter: usize) -> Expr {
+    let initial = collect_constants(expr);
+    if initial.is_empty() { return expr.clone(); }
 
-    // Don't perturb expressions that already have near-zero MSE
-    if best_mse < 1e-10 { return best; }
+    let initial_mse = compute_mse(expr, data);
+    if initial_mse < 1e-10 { return expr.clone(); } // already exact
 
-    for _ in 0..iterations {
-        let constants = collect_constants(&best);
-        if constants.is_empty() { break; }
+    let n = initial.len();
 
-        let mut improved = false;
-        for (path_idx, old_val) in constants.iter().enumerate() {
-            // Try perturbations: ±1%, ±10%, ±1, round to integer
-            let candidates = [
-                old_val * 1.01, old_val * 0.99,
-                old_val * 1.1, old_val * 0.9,
-                old_val + 1.0, old_val - 1.0,
-                old_val.round(),
-                old_val * 2.0, old_val * 0.5,
-            ];
-            for &new_val in &candidates {
-                let trial = replace_nth_constant(&best, path_idx, new_val);
-                let trial_mse = compute_mse(&trial, data);
-                if trial_mse.is_finite() && trial_mse < best_mse {
-                    best_mse = trial_mse;
-                    best = trial;
-                    improved = true;
+    // Objective: MSE as a function of the constant vector
+    let objective = |params: &[f64]| -> f64 {
+        let mut trial = expr.clone();
+        for (i, &val) in params.iter().enumerate() {
+            trial = replace_nth_constant(&trial, i, val);
+        }
+        let mse = compute_mse(&trial, data);
+        if mse.is_finite() { mse } else { 1e30 }
+    };
+
+    // Nelder-Mead simplex optimization
+    // Initialize simplex: n+1 vertices around the initial point
+    let mut simplex: Vec<Vec<f64>> = Vec::with_capacity(n + 1);
+    simplex.push(initial.clone());
+    for i in 0..n {
+        let mut vertex = initial.clone();
+        let step = if vertex[i].abs() > 1e-10 { vertex[i] * 0.1 } else { 0.1 };
+        vertex[i] += step;
+        simplex.push(vertex);
+    }
+
+    let mut values: Vec<f64> = simplex.iter().map(|v| objective(v)).collect();
+
+    let (alpha, gamma, rho, sigma) = (1.0, 2.0, 0.5, 0.5); // standard NM coefficients
+
+    for _ in 0..max_iter {
+        // Sort by objective value
+        let mut order: Vec<usize> = (0..=n).collect();
+        order.sort_by(|&a, &b| values[a].partial_cmp(&values[b]).unwrap_or(std::cmp::Ordering::Equal));
+
+        let best_val = values[order[0]];
+        let worst_val = values[order[n]];
+
+        // Convergence check
+        if (worst_val - best_val).abs() < 1e-14 { break; }
+
+        // Centroid of all points except worst
+        let mut centroid = vec![0.0; n];
+        for &idx in &order[..n] {
+            for j in 0..n { centroid[j] += simplex[idx][j]; }
+        }
+        for j in 0..n { centroid[j] /= n as f64; }
+
+        // Reflection
+        let worst_idx = order[n];
+        let reflected: Vec<f64> = (0..n).map(|j|
+            centroid[j] + alpha * (centroid[j] - simplex[worst_idx][j])
+        ).collect();
+        let reflected_val = objective(&reflected);
+
+        if reflected_val < values[order[n - 1]] && reflected_val >= best_val {
+            // Accept reflection
+            simplex[worst_idx] = reflected;
+            values[worst_idx] = reflected_val;
+        } else if reflected_val < best_val {
+            // Try expansion
+            let expanded: Vec<f64> = (0..n).map(|j|
+                centroid[j] + gamma * (reflected[j] - centroid[j])
+            ).collect();
+            let expanded_val = objective(&expanded);
+            if expanded_val < reflected_val {
+                simplex[worst_idx] = expanded;
+                values[worst_idx] = expanded_val;
+            } else {
+                simplex[worst_idx] = reflected;
+                values[worst_idx] = reflected_val;
+            }
+        } else {
+            // Contraction
+            let contracted: Vec<f64> = (0..n).map(|j|
+                centroid[j] + rho * (simplex[worst_idx][j] - centroid[j])
+            ).collect();
+            let contracted_val = objective(&contracted);
+            if contracted_val < worst_val {
+                simplex[worst_idx] = contracted;
+                values[worst_idx] = contracted_val;
+            } else {
+                // Shrink toward best
+                let best_idx = order[0];
+                for &idx in &order[1..] {
+                    for j in 0..n {
+                        simplex[idx][j] = simplex[best_idx][j] +
+                            sigma * (simplex[idx][j] - simplex[best_idx][j]);
+                    }
+                    values[idx] = objective(&simplex[idx]);
                 }
             }
         }
-        if !improved { break; }
     }
-    best
+
+    // Find best vertex and reconstruct expression
+    let best_idx = values.iter().enumerate()
+        .min_by(|a, b| a.1.partial_cmp(b.1).unwrap_or(std::cmp::Ordering::Equal))
+        .map(|(i, _)| i).unwrap_or(0);
+
+    let best_params = &simplex[best_idx];
+    if values[best_idx] < initial_mse {
+        let mut result = expr.clone();
+        for (i, &val) in best_params.iter().enumerate() {
+            result = replace_nth_constant(&result, i, val);
+        }
+        result
+    } else {
+        expr.clone() // optimization didn't improve; keep original
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ALGEBRAIC SIMPLIFICATION
+// ═══════════════════════════════════════════════════════════════════════════
+
+/// Simplify an expression tree by applying algebraic rewriting rules.
+///
+/// Rules: x+0=x, x*1=x, x*0=0, x/1=x, x^1=x, x^0=1,
+/// a/(b/c)=a*c/b, constant folding, etc.
+pub fn simplify(expr: &Expr) -> Expr {
+    match expr {
+        Expr::BinOp(op, l, r) => {
+            let sl = simplify(l);
+            let sr = simplify(r);
+            match (op, &sl, &sr) {
+                // Constant folding: both operands are constants
+                (_, Expr::Const(a), Expr::Const(b)) => {
+                    let result = Expr::BinOp(*op, Box::new(sl.clone()), Box::new(sr.clone()));
+                    let val = result.eval(&[]);
+                    if val.is_finite() { Expr::Const(val) } else { result }
+                }
+                // x + 0 = x, 0 + x = x
+                (BinOp::Add, _, Expr::Const(c)) if *c == 0.0 => sl,
+                (BinOp::Add, Expr::Const(c), _) if *c == 0.0 => sr,
+                // x - 0 = x
+                (BinOp::Sub, _, Expr::Const(c)) if *c == 0.0 => sl,
+                // x * 1 = x, 1 * x = x
+                (BinOp::Mul, _, Expr::Const(c)) if *c == 1.0 => sl,
+                (BinOp::Mul, Expr::Const(c), _) if *c == 1.0 => sr,
+                // x * 0 = 0, 0 * x = 0
+                (BinOp::Mul, _, Expr::Const(c)) if *c == 0.0 => Expr::Const(0.0),
+                (BinOp::Mul, Expr::Const(c), _) if *c == 0.0 => Expr::Const(0.0),
+                // x / 1 = x
+                (BinOp::Div, _, Expr::Const(c)) if *c == 1.0 => sl,
+                // x ^ 1 = x
+                (BinOp::Pow, _, Expr::Const(c)) if *c == 1.0 => sl,
+                // x ^ 0 = 1
+                (BinOp::Pow, _, Expr::Const(c)) if *c == 0.0 => Expr::Const(1.0),
+                // a / (b / c) = a * c / b
+                (BinOp::Div, _, Expr::BinOp(BinOp::Div, b, c)) => {
+                    simplify(&Expr::BinOp(BinOp::Div,
+                        Box::new(Expr::BinOp(BinOp::Mul, Box::new(sl), c.clone())),
+                        b.clone()))
+                }
+                _ => Expr::BinOp(*op, Box::new(sl), Box::new(sr)),
+            }
+        }
+        Expr::Func(f, arg) => {
+            let sa = simplify(arg);
+            // Constant folding for functions
+            if let Expr::Const(c) = &sa {
+                let result = Expr::Func(*f, Box::new(sa.clone()));
+                let val = result.eval(&[]);
+                if val.is_finite() { return Expr::Const(val); }
+            }
+            Expr::Func(*f, Box::new(sa))
+        }
+        Expr::Sum(body, var) => Expr::Sum(Box::new(simplify(body)), var.clone()),
+        other => other.clone(),
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// RECURRENCE DETECTION
+// ═══════════════════════════════════════════════════════════════════════════
+
+/// Detect if a sequence satisfies a simple recurrence relation.
+///
+/// Tests: f(n) = a*f(n-1) + b, f(n) = a*f(n-1) + b*n, f(n) = f(n-1) + f(n-2)
+/// Returns the recurrence as a string if found, with coefficients.
+pub fn detect_recurrence(data: &[(f64, f64)]) -> Option<RecurrenceRelation> {
+    if data.len() < 4 { return None; }
+
+    let values: Vec<f64> = data.iter().map(|(_, y)| *y).collect();
+
+    // Test 1: f(n) = a*f(n-1) + b (linear recurrence with constant)
+    // Solve: y[i] = a*y[i-1] + b for a, b via least squares on pairs
+    if values.len() >= 3 && values[0].abs() > 1e-15 {
+        let n = values.len() - 1;
+        let mut sum_yy = 0.0; let mut sum_y = 0.0;
+        let mut sum_y1 = 0.0; let mut sum_yy1 = 0.0;
+        let mut sum_1 = 0.0;
+        for i in 1..=n {
+            let y = values[i];
+            let y1 = values[i - 1];
+            sum_yy1 += y * y1;
+            sum_y += y;
+            sum_y1 += y1;
+            sum_yy += y1 * y1;
+            sum_1 += 1.0;
+        }
+        // Solve 2x2 system: [sum_yy, sum_y1; sum_y1, sum_1] * [a; b] = [sum_yy1; sum_y]
+        let det = sum_yy * sum_1 - sum_y1 * sum_y1;
+        if det.abs() > 1e-15 {
+            let a = (sum_yy1 * sum_1 - sum_y * sum_y1) / det;
+            let b = (sum_yy * sum_y - sum_yy1 * sum_y1) / det;
+            // Verify: check residuals
+            let max_residual = (1..=n).map(|i| {
+                (values[i] - (a * values[i - 1] + b)).abs()
+            }).fold(0.0f64, f64::max);
+            if max_residual < values.iter().map(|v| v.abs()).sum::<f64>() * 1e-10 / n as f64 {
+                return Some(RecurrenceRelation {
+                    formula: format!("f(n) = {:.6}*f(n-1) + {:.6}", a, b),
+                    order: 1,
+                    coefficients: vec![a, b],
+                    max_residual,
+                });
+            }
+        }
+    }
+
+    // Test 2: f(n) = f(n-1) + f(n-2) (Fibonacci-type)
+    if values.len() >= 4 {
+        let max_residual = (2..values.len()).map(|i| {
+            (values[i] - values[i - 1] - values[i - 2]).abs()
+        }).fold(0.0f64, f64::max);
+        let scale = values.iter().map(|v| v.abs()).sum::<f64>() / values.len() as f64;
+        if max_residual < scale * 1e-10 {
+            return Some(RecurrenceRelation {
+                formula: "f(n) = f(n-1) + f(n-2)".to_string(),
+                order: 2,
+                coefficients: vec![1.0, 1.0],
+                max_residual,
+            });
+        }
+    }
+
+    // Test 3: f(n) = f(n-1) + n (triangular-type)
+    if values.len() >= 3 {
+        let max_residual = (1..values.len()).map(|i| {
+            let n_val = data[i].0;
+            (values[i] - values[i - 1] - n_val).abs()
+        }).fold(0.0f64, f64::max);
+        if max_residual < 1e-10 {
+            return Some(RecurrenceRelation {
+                formula: "f(n) = f(n-1) + n".to_string(),
+                order: 1,
+                coefficients: vec![1.0],
+                max_residual,
+            });
+        }
+    }
+
+    None
+}
+
+/// A detected recurrence relation.
+#[derive(Debug, Clone)]
+pub struct RecurrenceRelation {
+    /// Human-readable formula
+    pub formula: String,
+    /// Order of the recurrence (1 for f(n-1), 2 for f(n-2), etc.)
+    pub order: usize,
+    /// Coefficients
+    pub coefficients: Vec<f64>,
+    /// Maximum absolute residual across all data points
+    pub max_residual: f64,
 }
 
 /// Collect all constant values from an expression tree (in-order traversal).
@@ -1911,5 +2149,104 @@ mod tests {
             assert_ne!(m.source_domain, m.target_domain);
             assert!(m.mse_ratio < 5.0);
         }
+    }
+
+    // ── Simplification tests ────────────────────────────────────────────
+
+    #[test]
+    fn test_simplify_identity_rules() {
+        // x + 0 = x
+        let e = Expr::BinOp(BinOp::Add, Box::new(Expr::Var("n".into())), Box::new(Expr::Const(0.0)));
+        assert_eq!(format!("{}", simplify(&e)), "n");
+        // x * 1 = x
+        let e = Expr::BinOp(BinOp::Mul, Box::new(Expr::Var("n".into())), Box::new(Expr::Const(1.0)));
+        assert_eq!(format!("{}", simplify(&e)), "n");
+        // x * 0 = 0
+        let e = Expr::BinOp(BinOp::Mul, Box::new(Expr::Var("n".into())), Box::new(Expr::Const(0.0)));
+        assert_eq!(format!("{}", simplify(&e)), "0");
+        // x ^ 1 = x
+        let e = Expr::BinOp(BinOp::Pow, Box::new(Expr::Var("n".into())), Box::new(Expr::Const(1.0)));
+        assert_eq!(format!("{}", simplify(&e)), "n");
+    }
+
+    #[test]
+    fn test_simplify_div_div() {
+        // a / (b / c) = a*c / b → (n+1) / (2/n) → ((n+1)*n) / 2
+        let inner = Expr::BinOp(BinOp::Div, Box::new(Expr::Const(2.0)), Box::new(Expr::Var("n".into())));
+        let outer = Expr::BinOp(BinOp::Div,
+            Box::new(Expr::BinOp(BinOp::Add, Box::new(Expr::Var("n".into())), Box::new(Expr::Const(1.0)))),
+            Box::new(inner));
+        let simplified = simplify(&outer);
+        // Should evaluate the same at n=5: (5+1)/(2/5) = 6/0.4 = 15 = T(5)
+        let orig_val = outer.eval(&[("n", 5.0)]);
+        let simp_val = simplified.eval(&[("n", 5.0)]);
+        assert!((orig_val - simp_val).abs() < 1e-10,
+            "simplified should match original: {} vs {}", orig_val, simp_val);
+        // The simplified form should contain Mul (not nested Div)
+        let s = format!("{}", simplified);
+        assert!(!s.contains("/ ("), "should eliminate nested division: {}", s);
+    }
+
+    #[test]
+    fn test_simplify_constant_folding() {
+        // 2 + 3 = 5
+        let e = Expr::BinOp(BinOp::Add, Box::new(Expr::Const(2.0)), Box::new(Expr::Const(3.0)));
+        assert_eq!(format!("{}", simplify(&e)), "5");
+        // sin(0) = 0
+        let e = Expr::Func(UnaryFn::Sin, Box::new(Expr::Const(0.0)));
+        assert_eq!(format!("{}", simplify(&e)), "0");
+    }
+
+    // ── Recurrence detection tests ──────────────────────────────────────
+
+    #[test]
+    fn test_detect_recurrence_triangular() {
+        // T(n) = T(n-1) + n: data = [(1,1), (2,3), (3,6), (4,10), (5,15)]
+        let data: Vec<(f64, f64)> = (1..=10).map(|n| (n as f64, (n*(n+1)/2) as f64)).collect();
+        let rec = detect_recurrence(&data);
+        assert!(rec.is_some(), "should detect f(n) = f(n-1) + n");
+        let r = rec.unwrap();
+        assert!(r.formula.contains("f(n-1) + n"), "formula: {}", r.formula);
+        eprintln!("  Detected: {} (residual={:.2e})", r.formula, r.max_residual);
+    }
+
+    #[test]
+    fn test_detect_recurrence_fibonacci() {
+        use crate::hdc::combinatorics::fibonacci;
+        let data: Vec<(f64, f64)> = (1..=15).map(|n| (n as f64, fibonacci(n) as f64)).collect();
+        let rec = detect_recurrence(&data);
+        assert!(rec.is_some(), "should detect f(n) = f(n-1) + f(n-2)");
+        let r = rec.unwrap();
+        assert!(r.formula.contains("f(n-2)"), "formula: {}", r.formula);
+        eprintln!("  Detected: {} (residual={:.2e})", r.formula, r.max_residual);
+    }
+
+    #[test]
+    fn test_detect_recurrence_geometric() {
+        // f(n) = 2*f(n-1): data = [1, 2, 4, 8, 16, 32]
+        let data: Vec<(f64, f64)> = (0..=8).map(|n| (n as f64, 2.0f64.powi(n as i32))).collect();
+        let rec = detect_recurrence(&data);
+        assert!(rec.is_some(), "should detect f(n) = 2*f(n-1)");
+        let r = rec.unwrap();
+        assert!((r.coefficients[0] - 2.0).abs() < 1e-6, "coefficient should be 2, got {}", r.coefficients[0]);
+        eprintln!("  Detected: {} (residual={:.2e})", r.formula, r.max_residual);
+    }
+
+    /// Nelder-Mead constant optimization test
+    #[test]
+    fn test_nelder_mead_improves_constants() {
+        // Create a*n + b with wrong constants, fit to y = 3n + 7
+        let expr = Expr::BinOp(BinOp::Add,
+            Box::new(Expr::BinOp(BinOp::Mul, Box::new(Expr::Const(1.0)), Box::new(Expr::Var("n".into())))),
+            Box::new(Expr::Const(1.0)));
+        let data: Vec<(f64, f64)> = (1..=20).map(|n| (n as f64, 3.0 * n as f64 + 7.0)).collect();
+
+        let before_mse = compute_mse(&expr, &data);
+        let optimized = optimize_constants(&expr, &data, 100);
+        let after_mse = compute_mse(&optimized, &data);
+
+        eprintln!("  NM optimization: MSE {:.2e} → {:.2e}", before_mse, after_mse);
+        assert!(after_mse < before_mse * 0.1,
+            "NM should significantly improve: {:.2e} → {:.2e}", before_mse, after_mse);
     }
 }
