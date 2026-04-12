@@ -113,9 +113,9 @@ pub fn generate_melody(
 
         time = grid_time + grid_steps * base_note_dur;
 
-        // Pitch contour: blend random walk with arc shape
-        let random_step = (rng.gen::<f32>() - (1.0 - ascend_bias)) * 0.18;
-        let arc_pull = (contour_pitch - pitch_selector) * 0.15 * contour_strength;
+        // Pitch contour: arc pull dominates, random walk adds flavor
+        let random_step = (rng.gen::<f32>() - (1.0 - ascend_bias)) * 0.12;
+        let arc_pull = (contour_pitch - pitch_selector) * 0.30 * contour_strength;
         pitch_selector += random_step + arc_pull;
 
         // EvolutionaryProgression (harmony 6): tendency to ascend
@@ -123,8 +123,8 @@ pub fn generate_melody(
             pitch_selector += 0.02;
         }
 
-        // Gravity: return toward contour target, scaled by contour strength
-        pitch_selector += (contour_pitch - pitch_selector) * 0.05;
+        // Gravity: return toward contour target (stronger pull = clearer arc)
+        pitch_selector += (contour_pitch - pitch_selector) * 0.12;
 
         let _ = i;
     }
