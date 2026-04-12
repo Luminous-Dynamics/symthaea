@@ -2067,4 +2067,168 @@ mod tests {
             eprintln!("  Statistical correlation between different arithmetic sequences is not.");
         }
     }
+
+    /// DECISIVE TEST: Is the abc↔partition detrended correlation real?
+    ///
+    /// The detrended ρ = -0.63 between partitions and abc qualities
+    /// survived our first audit. Before claiming it as real structure,
+    /// we must rule out: (a) trend-removal artifact, (b) finite-sample
+    /// noise, (c) ordering coincidence.
+    ///
+    /// Strategy: compare against NULL baselines.
+    /// 1. Shuffle baseline: randomly permute abc qualities, retest.
+    /// 2. Random growth baseline: generate a random monotonically
+    ///    decreasing sequence with similar growth rate, retest.
+    /// 3. Different trend models: linear vs power-law vs polynomial
+    ///    detrending — does the correlation depend on model choice?
+    /// 4. Subsample stability: compute ρ at multiple sample sizes.
+    ///
+    /// If the random baselines show similar detrended correlations,
+    /// the effect is an artifact. If they don't, it's real.
+    #[test]
+    fn test_abc_partition_null_hypothesis() {
+        eprintln!("\n═══ DECISIVE TEST: abc ↔ partitions ═══\n");
+        eprintln!("Is detrended ρ = -0.63 real, or a detrending artifact?\n");
+
+        let max_n = 100;
+
+        // Real data
+        let partitions: Vec<f64> = (1..=max_n)
+            .map(|n| super::super::conjecture_engine::observe_partitions(n)
+                .data.last().map(|&(_, y)| y).unwrap_or(0.0))
+            .collect();
+        let abc = super::search_abc_triples(10000, 1.0);
+        let abc_quals: Vec<f64> = abc.iter().take(max_n).map(|t| t.quality).collect();
+        let n = partitions.len().min(abc_quals.len());
+        let partitions = &partitions[..n];
+        let abc_quals = &abc_quals[..n];
+
+        // Detrending function
+        let detrend = |seq: &[f64]| -> Vec<f64> {
+            let log_data: Vec<(f64, f64)> = seq.iter().enumerate()
+                .filter(|(_, &y)| y > 0.0)
+                .map(|(i, &y)| ((i as f64 + 1.0).ln(), y.ln()))
+                .collect();
+            if log_data.len() < 3 { return seq.to_vec(); }
+            let (slope, intercept, _) = super::linear_regression(&log_data);
+            seq.iter().enumerate().map(|(i, &y)| {
+                if y > 0.0 {
+                    y - (intercept + slope * (i as f64 + 1.0).ln()).exp()
+                } else { 0.0 }
+            }).collect()
+        };
+
+        // Real correlation (baseline to beat)
+        let real_dt_p = detrend(partitions);
+        let real_dt_a = detrend(abc_quals);
+        let real_rho = spearman_correlation(&real_dt_p, &real_dt_a);
+        eprintln!("  REAL: detrended(partitions) vs detrended(abc_quality):");
+        eprintln!("    ρ = {:.4}", real_rho);
+
+        // ── Test 1: Shuffle abc qualities ──────────────────────────────
+        // If ordering doesn't matter, the correlation should survive.
+        // If ordering does matter (i.e., it's real), shuffling kills it.
+        eprintln!("\n  TEST 1: Shuffle abc quality values");
+        let mut rng = 12345u64;
+        let mut shuffled_rhos = Vec::new();
+        for _ in 0..20 {
+            let mut shuffled: Vec<f64> = abc_quals.to_vec();
+            // Fisher-Yates shuffle
+            for i in (1..n).rev() {
+                rng = rng.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+                let j = (rng >> 33) as usize % (i + 1);
+                shuffled.swap(i, j);
+            }
+            let dt_shuffled = detrend(&shuffled);
+            shuffled_rhos.push(spearman_correlation(&real_dt_p, &dt_shuffled));
+        }
+        let shuffle_mean: f64 = shuffled_rhos.iter().sum::<f64>() / shuffled_rhos.len() as f64;
+        let shuffle_std: f64 = (shuffled_rhos.iter().map(|r| (r - shuffle_mean).powi(2)).sum::<f64>()
+            / shuffled_rhos.len() as f64).sqrt();
+        eprintln!("    Shuffled ρ mean = {:.4} ± {:.4} (should be ≈ 0)", shuffle_mean, shuffle_std);
+        let z_shuffle = (real_rho - shuffle_mean).abs() / shuffle_std.max(1e-6);
+        eprintln!("    Real ρ is {:.2} std devs from shuffle mean", z_shuffle);
+
+        // ── Test 2: Random growth baseline ─────────────────────────────
+        // Generate a RANDOM sequence with similar growth to abc quality
+        // (monotonically decreasing from ~1.5 to ~1.0 with noise).
+        eprintln!("\n  TEST 2: Random monotonic sequence with similar growth");
+        let mut random_rhos = Vec::new();
+        for _ in 0..20 {
+            let mut random_seq: Vec<f64> = (0..n).map(|i| {
+                rng = rng.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+                let noise = ((rng >> 33) as f64 / u32::MAX as f64 - 0.5) * 0.1;
+                // Mimic abc quality decay: 1 + 0.5 * exp(-0.03 * i) + noise
+                1.0 + 0.5 * (-0.03 * i as f64).exp() + noise
+            }).collect();
+            // Sort descending to mimic ranked quality
+            random_seq.sort_by(|a, b| b.partial_cmp(a).unwrap_or(std::cmp::Ordering::Equal));
+            let dt_rand = detrend(&random_seq);
+            random_rhos.push(spearman_correlation(&real_dt_p, &dt_rand));
+        }
+        let random_mean: f64 = random_rhos.iter().sum::<f64>() / random_rhos.len() as f64;
+        let random_std: f64 = (random_rhos.iter().map(|r| (r - random_mean).powi(2)).sum::<f64>()
+            / random_rhos.len() as f64).sqrt();
+        eprintln!("    Random-seq ρ mean = {:.4} ± {:.4}", random_mean, random_std);
+        let z_random = (real_rho - random_mean).abs() / random_std.max(1e-6);
+        eprintln!("    Real ρ is {:.2} std devs from random-seq mean", z_random);
+
+        // ── Test 3: Alternative trend models ───────────────────────────
+        eprintln!("\n  TEST 3: Alternative trend models");
+
+        // 3a: Linear trend removal (not power law)
+        let linear_detrend = |seq: &[f64]| -> Vec<f64> {
+            let data: Vec<(f64, f64)> = seq.iter().enumerate()
+                .map(|(i, &y)| (i as f64 + 1.0, y))
+                .collect();
+            let (slope, intercept, _) = super::linear_regression(&data);
+            seq.iter().enumerate().map(|(i, &y)| {
+                y - (intercept + slope * (i as f64 + 1.0))
+            }).collect()
+        };
+        let lin_p = linear_detrend(partitions);
+        let lin_a = linear_detrend(abc_quals);
+        let lin_rho = spearman_correlation(&lin_p, &lin_a);
+        eprintln!("    Linear detrending:     ρ = {:.4}", lin_rho);
+
+        // 3b: Simple ratio — y_i / y_{i-1} (local growth rate)
+        let ratio_seq = |seq: &[f64]| -> Vec<f64> {
+            seq.windows(2).map(|w| if w[0].abs() > 1e-10 { w[1] / w[0] } else { 0.0 }).collect()
+        };
+        let rat_p = ratio_seq(partitions);
+        let rat_a = ratio_seq(abc_quals);
+        let ratio_rho = spearman_correlation(&rat_p, &rat_a);
+        eprintln!("    Ratio sequences:       ρ = {:.4}", ratio_rho);
+
+        // ── Test 4: Subsample stability ────────────────────────────────
+        eprintln!("\n  TEST 4: Subsample stability");
+        for &k in &[30usize, 50, 75, 100] {
+            let k = k.min(n);
+            let dt_p_k = detrend(&partitions[..k]);
+            let dt_a_k = detrend(&abc_quals[..k]);
+            let rho_k = spearman_correlation(&dt_p_k, &dt_a_k);
+            eprintln!("    n = {:3}: ρ = {:+.4}", k, rho_k);
+        }
+
+        // ── VERDICT ────────────────────────────────────────────────────
+        eprintln!("\n  ═══ VERDICT ═══");
+        let random_ok = random_mean.abs() < 0.3;
+        let shuffle_ok = shuffle_mean.abs() < 0.3;
+        let real_survives = real_rho.abs() > 0.4;
+        let far_from_random = z_random > 2.0;
+
+        if real_survives && shuffle_ok && random_ok && far_from_random {
+            eprintln!("  >>> REAL: abc↔partitions detrended correlation is GENUINE.");
+            eprintln!("      The local fluctuations are truly linked.");
+        } else if !random_ok && random_mean.abs() > 0.4 {
+            eprintln!("  >>> ARTIFACT: random sequences also show ρ ≈ {:.2}", random_mean);
+            eprintln!("      The detrending procedure INDUCES the correlation.");
+            eprintln!("      The abc↔partitions ρ = {:.2} is not mathematically real.", real_rho);
+        } else {
+            eprintln!("  >>> INCONCLUSIVE: signals mixed.");
+            eprintln!("      real ρ = {:.4}", real_rho);
+            eprintln!("      shuffle baseline = {:.4} ± {:.4}", shuffle_mean, shuffle_std);
+            eprintln!("      random baseline  = {:.4} ± {:.4}", random_mean, random_std);
+        }
+    }
 }
